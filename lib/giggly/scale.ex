@@ -16,6 +16,14 @@ defmodule Giggly.Scale do
     * `:string`, `:boolean` and `:atom` get a discrete scale (`Giggly.Scale.Discrete`);
     * dates, times and `:term` get none yet.
 
+  ## Transformation
+
+  A continuous scale records, by name, the transformation its values are put through before it
+  trains on them (`Giggly.Scale.Transform`), so it trains, and maps, in transformed space. Every
+  continuous scale records the identity until a plot can choose another, as ggplot2's continuous
+  scales default to `transform = "identity"`: an untransformed axis says so rather than leaving it
+  out. A discrete scale has no transformation, as in ggplot2.
+
   ## Training and mapping
 
   Training follows R's `scales` package. A continuous scale's range spans the finite numbers it
@@ -52,18 +60,26 @@ defmodule Giggly.Scale do
   def kind(dtype) when is_atom(dtype), do: :none
 
   @doc """
-  An untrained scale of the given kind.
+  An untrained scale of the given kind; a continuous one records the identity transformation.
   """
   @spec new(:continuous | :discrete) :: t()
-  def new(:continuous), do: %Continuous{range: :none}
+  def new(:continuous), do: %Continuous{range: :none, transform: :identity}
   def new(:discrete), do: %Discrete{levels: []}
+
+  @doc """
+  The values in the space the scale trains and maps in: put through a continuous scale's
+  transformation, and as given to a discrete scale, which has none.
+  """
+  @spec transform(t(), list()) :: list()
+  def transform(%Continuous{} = scale, values), do: Continuous.transform(scale, values)
+  def transform(%Discrete{}, values), do: values
 
   @doc """
   The scale widened to cover `values`.
 
       iex> scale = Giggly.Scale.new(:continuous)
       iex> scale |> Giggly.Scale.train([nil, 3, :infinity, 1.5]) |> Giggly.Scale.train([2])
-      %Giggly.Scale.Continuous{range: {1.5, 3}}
+      %Giggly.Scale.Continuous{range: {1.5, 3}, transform: :identity}
 
       iex> scale = Giggly.Scale.new(:discrete)
       iex> scale |> Giggly.Scale.train(["b", nil, "a"]) |> Giggly.Scale.train(["c", "a"])

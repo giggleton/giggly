@@ -38,7 +38,8 @@ defmodule Giggly.Plot do
   """
 
   # A plot is a description: it may use the aesthetic vocabulary and the data frame, and nothing
-  # that runs it. A layer is read only through `computed_mapping/2`, so `Layer` stays private.
+  # that runs it. A layer is read only through `computed_mapping/2`, `layer_stat/1` and
+  # `layer_position/1`, so `Layer` stays private.
   use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: []
 
   alias Giggly.{Aesthetics, DataFrame}
@@ -96,7 +97,8 @@ defmodule Giggly.Plot do
   Adds a layer of points, one per row, at `x` and `y`.
 
   `mapping` is laid over the plot's. Points use `:x`, `:y` and `:group`, and need `:x` and `:y`
-  from one mapping or the other.
+  from one mapping or the other. Each row is one point, where the data puts it: the layer's stat
+  and position are the identity, as `geom_point()`'s are in ggplot2.
 
   A plot with no mapping of its own, every aesthetic mapped by its layer, is ggplot2's
   `ggplot(df) + geom_point(aes(...))`:
@@ -106,11 +108,24 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.new()
       ...>   |> Giggly.Plot.geom_point(%{x: :wt, y: :mpg, group: :cyl})
       iex> plot.reversed_layers
-      [%Giggly.Plot.Layer{geom: :point, mapping: %{x: "wt", y: "mpg", group: "cyl"}}]
+      [
+        %Giggly.Plot.Layer{
+          geom: :point,
+          stat: :identity,
+          position: :identity,
+          mapping: %{x: "wt", y: "mpg", group: "cyl"}
+        }
+      ]
   """
   @spec geom_point(t(), mapping_argument()) :: t()
   def geom_point(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
-    layer = %Layer{geom: :point, mapping: resolve(mapping, plot.data, "Plot.geom_point/2")}
+    layer = %Layer{
+      geom: :point,
+      stat: :identity,
+      position: :identity,
+      mapping: resolve(mapping, plot.data, "Plot.geom_point/2")
+    }
+
     combined_mapping = computed_mapping(plot, layer)
     check_accepted(combined_mapping)
     check_required(combined_mapping)
@@ -126,6 +141,18 @@ defmodule Giggly.Plot do
   @spec computed_mapping(t(), Layer.t()) :: mapping()
   def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
     do: Map.merge(plot_mapping, layer_mapping)
+
+  @doc """
+  The name of the stat `layer` computes its table with (`Giggly.Stat`).
+  """
+  @spec layer_stat(Layer.t()) :: Layer.stat()
+  def layer_stat(%Layer{stat: stat}), do: stat
+
+  @doc """
+  The name of the position `layer` moves its marks with (`Giggly.Position`).
+  """
+  @spec layer_position(Layer.t()) :: Layer.position()
+  def layer_position(%Layer{position: position}), do: position
 
   defp resolve(mapping, frame, function_name) do
     names = DataFrame.names(frame)

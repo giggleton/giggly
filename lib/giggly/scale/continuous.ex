@@ -1,13 +1,20 @@
 defmodule Giggly.Scale.Continuous do
   @moduledoc """
   A trained continuous position scale: the range of the finite numbers it has seen, or `:none`
-  before it has seen any. Use it through `Giggly.Scale`.
+  before it has seen any, and the name of the transformation its values are put through before it
+  sees them (`Giggly.Scale.Transform`). Use it through `Giggly.Scale`.
   """
 
-  @enforce_keys [:range]
+  alias Giggly.Scale.Transform
+
+  @enforce_keys [:range, :transform]
   defstruct @enforce_keys
 
-  @type t :: %__MODULE__{range: :none | {number(), number()}}
+  @type t :: %__MODULE__{range: :none | {number(), number()}, transform: Transform.name()}
+
+  @doc "The values put through the scale's transformation, as `Giggly.Scale.transform/2` describes."
+  @spec transform(t(), list()) :: list()
+  def transform(%__MODULE__{transform: name}, values), do: Transform.transform(name, values)
 
   @doc "The scale widened to cover the finite numbers in `values`, as `Giggly.Scale.train/2` describes."
   @spec train(t(), list()) :: t()

@@ -53,7 +53,10 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
   `Giggly`) — `.claude/rules/assembly.md`.
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.
-- **Position scales** (`Giggly.Scale`, kinds, training, mapping) — `.claude/rules/scale.md`.
+- **Position scales** (`Giggly.Scale`, kinds, transformations, training, mapping) —
+  `.claude/rules/scale.md`.
+- **Stats** (`Giggly.Stat`, the layer's stat by name) — `.claude/rules/stat.md`.
+- **Positions** (`Giggly.Position`, the layer's position by name) — `.claude/rules/position.md`.
 
 ## Approach & architecture
 
@@ -117,9 +120,11 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `pos`, `points` not `pts`, `value` not `v`. Never single-letter variables (no `p`, `s`, `n`,
   `r`). Spell out domain terms in code too; acronyms are fine only in prose where defined.
 - **One name per module kind; no two in a family share a last segment** — a shared tail collides
-  silently at `alias` (open for ggplot2's `Stat.Identity`/`Position.Identity`, design-log §7). A
-  process module ends in `Server`, `Worker`, `Watcher` or `Poller`; a singular name is a pure type
-  or fold, its plural the context owning the table.
+  silently at `alias`. Where ggplot2's names repeat a tail across families (`Stat.Identity`,
+  `Position.Identity`, `Transform.Identity`), alias the family and write `Stat.Identity`; never
+  alias such a module down to its last segment. A process module ends in `Server`, `Worker`,
+  `Watcher` or `Poller`; a singular name is a pure type or fold, its plural the context owning the
+  table.
 
 ## Publishing
 

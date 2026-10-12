@@ -33,9 +33,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills
   it:** the layer frames, the layout table, and the trained x and y scales keyed by scale id.
-- **Scales are trained after grouping, on every layer's columns in an axis's family, and those
-  columns are then mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s
-  answer, never a name compared with `:x`.
+- **Each axis's scale is added after grouping, of the kind its columns need; every layer's
+  columns in the axis's family are then put through the scale's transformation, trained on, and
+  mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
+  a name compared with `:x`.
+- **A layer's stat and position run by the names the plot records**, read with
+  `Plot.layer_stat/1` and `Plot.layer_position/1` and resolved by `Stat.compute/2` and
+  `Position.compute/2`; the assembly names no stat or position module.
 - **One scale per axis until free scales.** Each axis's scale id is read from the layout, and the
   assembly matches exactly one; routing rows to several arrives with `facet_wrap`'s free scales,
   where that match fails loudly until it does.
@@ -63,17 +67,19 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 
 `Giggly` lists `Giggly.DataFrame` so its sub-boundaries may — a sub-boundary may list a
 top-level boundary only when its parent does — and because `panel_scales/2` reads the layout
-table. It exports `Plot`; `Assembly`, `Facet`, `Group`
-and `Scale` are internal.
+table. It exports `Plot`; `Assembly`, `Facet`, `Group`,
+`Position`, `Scale` and `Stat` are internal.
 
 `Assembly.run/1` first has `Facet.assign_panels/1` put the `:panel` column on the plot's data,
 once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
 each layer, lays its mapping over the plot's (the layer's column wins), sorts the pairs by
 aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `DataFrame.put/3`,
-and calls `Group.add/2` with `Scale.level_key/1`. It then trains each axis's scale: it reads each
-layer's computed mapping for the axis's family, refuses an unplaceable or disagreeing column, takes
-the kind from the first column (an axis no layer maps is continuous), and `Scale.train/2` folds in every such column of every layer. Last, each frame's
-x-family and y-family columns are replaced by `Scale.map/2`'s positions. `layer_data/2` checks the
+and calls `Group.add/2` with `Scale.level_key/1`. It then adds each axis's scale: it reads each
+layer's computed mapping for the axis's family, refuses an unplaceable or disagreeing column, and
+takes the kind from the first column (an axis no layer maps is continuous). Each frame's x-family
+and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/2` folds in every
+such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Last,
+each frame goes through its layer's stat and then its position. `layer_data/2` checks the
 index against the plot's layer count before assembling, so a missing layer raises an
 `ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises
 the same way for a panel the plot does not have.

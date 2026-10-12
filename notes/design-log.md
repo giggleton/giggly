@@ -65,6 +65,53 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **A layer names its stat and position, and a continuous scale its transformation, the identity
+  included; each is a name its own namespace resolves (2026-10-12, Steve).** `geom_point/2`
+  records `stat: :identity` and `position: :identity` on its layer and `Scale.new(:continuous)`
+  records `transform: :identity`, as ggplot2's `geom_point()` defaults `stat = "identity"` and
+  `position = "identity"` and its continuous scales `transform = "identity"`. A discrete scale
+  records none: ggplot2's has none. The assembly runs the stages where the fixed order puts them:
+  each axis's scale is added after grouping, its columns are put through `Scale.transform/2`,
+  trained on and mapped, and then each layer's stat (`Giggly.Stat`) and position
+  (`Giggly.Position`) run. Each is a module implementing its namespace's behaviour
+  (`Stat.Identity`, `Position.Identity`, `Scale.Transform.Identity`), resolved from the recorded
+  name by the namespace's root; `Stat` and `Position` are boundaries listing nothing, the assembly
+  lists both, and `Plot` reads a layer's names out through `layer_stat/1` and `layer_position/1`
+  without listing either. Modules whose last segment repeats across namespaces are written through
+  their namespace (`alias Giggly.Stat`, then `Stat.Identity`), never aliased to the tail: a second
+  `alias` with the same tail replaces the first without a warning (tried). That settles §7's
+  module-name question. *Rejected: the identity as the absence of a stat, a position or a
+  transformation* (proposed for this increment, and how increment 5 left transforms out, in an
+  aside never discussed) — an absent stat cannot be told from a forgotten one, while a recorded
+  `:identity` says the choice was made and a test can assert it; the cost is stage calls that the
+  mutation step reports as equivalent survivors, since removing an identity changes no output.
+  *Rejected: the layer holding the modules* (ggplot2's shape: `layer()` resolves `"identity"` to
+  `StatIdentity` as the layer is built) — `Plot` would name `Stat.Identity` as a value, which
+  boundary does not count unless `check: [aliases: true]` is on, and listing `Stat` would let a
+  plot run stats, the reason `Plot` does not list `Scale`; the question returns when a caller can
+  pass `stat:`, whose misspelling must raise at the call. *Rejected: `as:` aliases* — credo's
+  `AliasAs` check is enabled; *and renamed modules (`StatIdentity`)* — ggplot2 prefixes because an
+  R package has one flat namespace, and module nesting does that job here. *Rejected:
+  `position_jitter` as the stages' first non-identity member now* — it would bring keyword options,
+  NimbleOptions' placement, the "absent" sentinel, `resolution()` and a default seed (ggplot2's
+  `seed = NA` draws a fresh one per build, which a pure pipeline cannot) into a Phase 1 scatter
+  plot; it belongs with stack and dodge. *Deferred to first reader:* `after_stat` (no mapping can
+  be one, and no stat has defaults); the geom's setup step (the layer already records its geom,
+  ggplot2's points have none, and geom modules arrive with drawing); a stat's or position's
+  further arguments and its split by panel and group; a transformation's inverse, breaks, labels
+  and domain (ggplot2 takes an axis's default breaks and labels from its transformation, and a
+  date axis is a continuous scale with a date transformation, which is how the date columns
+  refused today will be placed); and the reset and retrain of the position scales with the second
+  mapping. When the retrain arrives, a discrete scale must take mapped positions into a
+  continuous range of its own, never its levels — `Scale.Discrete.train/2` would turn
+  `["4", "6"]` into `[1, 2, "4", "6"]` today — and ggplot2 clears only that range on reset,
+  keeping the levels (`ScaleDiscretePosition$reset`). Increment 5 deferred that range to "the first
+  continuous value on" a discrete axis; the reason was incomplete, since the second training puts
+  mapped positions there on every discrete axis. For points it spans 1 to n, inside the expanded
+  level range, so it changes nothing the coordinate system builds until a mark lands off the
+  integer positions. And when a stat first supplies an aesthetic, a geom's required aesthetics
+  must be checked after the stat, as ggplot2's `compute_geom_1` does, not only at the geom call.
+
 - **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
   Steve).** The review runs `mix muex` with `--coverage-guided --format json --output` added: each
   test file runs once under `:cover`, each mutant then runs exactly the test files that execute its
@@ -106,10 +153,12 @@ stops the question being reopened from scratch.
   to several scales now* — with one panel nothing could exercise it; the assembly matches exactly
   one scale id per axis and fails loudly when free scales bring more. *Deferred to first reader or
   need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel),
-  transforms (identity is their absence), expansion and the view scale with the empty-axis default
-  (the coordinate system), breaks, labels and extended Wilkinson (the axes), a discrete axis's
-  continuous range (the first continuous value on one), the second training (stat and position),
-  and the layout's `row` and `col` (the scene).
+  transforms (identity is their absence; since amended — a continuous scale records the identity,
+  see the entry beginning "A layer names its stat and position"), expansion and the view scale
+  with the empty-axis default (the coordinate system), breaks, labels and extended Wilkinson (the
+  axes), a discrete axis's continuous range (the first continuous value on one; that reason since
+  corrected in the same entry), the second training (stat and position), and the layout's `row`
+  and `col` (the scene).
 
 - **The facet assigns panels now; the layout table arrives with scale training; one plain
   function until a second facet (2026-10-12, Steve).** `Giggly.Facet.assign_panels/1`
@@ -426,6 +475,30 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-12 — The stat, position and transform stages (Phase 1, sixth increment).** Each
+  layer now records `stat: :identity` and `position: :identity`, and each continuous scale
+  `transform: :identity`; the assembly adds each axis's scale before putting its columns through
+  the scale's transformation, then trains, maps, and runs each layer's stat (`Giggly.Stat`) and
+  position (`Giggly.Position`). The §4 entry beginning "A layer names its stat and position" gives
+  the shape, what was rejected and what was deferred. The scope changed in discussion before any
+  code. The proposal was to build nothing, treating the identity stat and position as absences;
+  Steve kept them as recorded values, since an absent stat cannot be told from a forgotten one,
+  and extended the rule to transforms, where "identity is their absence" had been an aside in
+  increment 5's deferral list, never discussed. The reset and retrain that the plan put in this
+  increment was deferred with `after_stat` and the geom's setup step: it is not something a plot
+  records, and it gives the same scales for every plot until a stat computes. Checking ggplot2's
+  source for it showed that retraining a discrete scale today would put mapped positions among
+  its levels, and corrected increment 5's reason for deferring a discrete axis's continuous range;
+  both are in §4. §7's module-name question was settled (alias the family, write
+  `Stat.Identity`), and CLAUDE.md's naming rule now says so. `Stat` and `Position` are new
+  boundaries listing nothing, and `Assembly` lists both; the change was shown to Steve in plain
+  language and his approval recorded with `waiver-gate.sh approve-widening`. The areas got
+  `.claude/rules/stat.md` and `position.md`, with status-map lines. Review's mutation step
+  (coverage-guided, over the twelve changed files) found no line unexecuted, and its only
+  survivors in the new code were the expected ones: dropping the stat or the position stage, which
+  an identity makes equivalent by design; reordered struct keys; and `Enum.uniq()` on a layout of
+  one row. Its other survivors are in code from earlier increments.
+
 - **2026-10-12 — Code review's mutation step picks tests by coverage.** `--coverage-guided` and a
   JSON report were added to the procedure in `elixir-code-review`'s `mutation-testing.md`, which
   now also treats a line no test executes as a finding (§4, the entry beginning "Mutation testing
@@ -667,13 +740,6 @@ _(none yet)_
   default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's
   options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
   internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
-- **Module names whose last segments collide.** CLAUDE.md forbids two modules in a family sharing a
-  last segment, since a second `alias` with the same tail shadows the first. ggplot2's naming gives
-  `Stat.Identity`, `Position.Identity` and `Scale.Identity`, and the build stage will use several at
-  once. Options: keep ggplot2's names and call them through their namespace (`alias Giggly.Stat`,
-  then `Stat.Identity`); keep them and alias with `as:`, which credo's `AliasAs` check (enabled)
-  flags; or rename (`StatIdentity`). Settled when the first stat and position land.
-
 - **What a second geom makes legal in an inherited mapping.** Each geom call checks the plot's
   mapping with its own, so today an inherited aesthetic the geom cannot use raises. ggplot2
   evaluates every inherited aesthetic and carries the ones a layer ignores: a plot-level `label`

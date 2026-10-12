@@ -10,7 +10,8 @@ paths:
 `Giggly.Plot` is the public pipe API and the plot value it builds; `Giggly.Plot.Layer` is one
 layer of that value. Why the API is shaped this way, and what was rejected: design-log §4, the
 entries beginning "The public pipe API lives in", "A plot is a value built by", "The table is
-read when the plot is created" and "Points accept only what Phase 1 can draw".
+read when the plot is created", "Points accept only what Phase 1 can draw" and "A layer names its
+stat and position".
 
 ## Rules
 
@@ -20,6 +21,10 @@ read when the plot is created" and "Points accept only what Phase 1 can draw".
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence (the layer's column wins) exists once.
+- **A layer records its stat and position by name, the identity included**, and the assembly
+  reads them with `layer_stat/1` and `layer_position/1`, so `Layer` stays private and `Plot` names
+  no module of `Giggly.Stat` or `Giggly.Position`. What a misspelt name does arrives with the first
+  option that lets a caller choose one: it must raise at the call, which will need the valid names.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an
   unusable aesthetic is reported by the line that has it, never later when the plot is run. A
@@ -50,6 +55,6 @@ read when the plot is created" and "Points accept only what Phase 1 can draw".
 `new/2` reads the data with `DataFrame.from_table/1` and resolves the plot's mapping;
 `geom_point/2` resolves the layer's, checks the aesthetics it adds and those it inherits against
 what points accept, checks that `:x` and `:y` are mapped by one mapping or the other, and puts a
-`%Layer{}` at the front of `reversed_layers`, so adding a layer never walks the list and the
+`%Layer{}` with the identity stat and position at the front of `reversed_layers`, so adding a layer never walks the list and the
 assembly reverses them into drawing order. Resolving a mapping canonicalizes its keys and
 looks each value up, as a string, in `DataFrame.names/1`; no atom is ever made from a column name.

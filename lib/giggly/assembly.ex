@@ -12,10 +12,14 @@ defmodule Giggly.Assembly do
     2. evaluates each layer's mapping against that data;
     3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
        discrete scale gives its levels, so group ids follow axis and legend order;
-    4. trains one x scale and one y scale per scale id in the layout, over every layer's x-family
-       and y-family columns (`Giggly.Scale`), first refusing an axis column no scale can place
-       yet, or one whose kind disagrees with the axis's first column: an axis has one scale;
-    5. maps those columns to their positions on the scales.
+    4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
+       the axis's columns need, first refusing an axis column no scale can place yet, or one whose
+       kind disagrees with the axis's first column: an axis has one scale;
+    5. puts every layer's x-family and y-family columns through their scale's transformation;
+    6. trains each scale over those columns;
+    7. maps them to their positions on the scales;
+    8. computes each layer's stat (`Giggly.Stat`) on its table;
+    9. moves each layer's marks by its position (`Giggly.Position`).
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   columns are named by aesthetic plus `:panel` and `:group`; the layout table; and the trained
@@ -34,11 +38,13 @@ defmodule Giggly.Assembly do
       Giggly.Facet,
       Giggly.Group,
       Giggly.Plot,
-      Giggly.Scale
+      Giggly.Position,
+      Giggly.Scale,
+      Giggly.Stat
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, DataFrame, Facet, Group, Plot, Scale}
+  alias Giggly.{Aesthetics, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
 
   @enforce_keys [:layer_data, :layout, :x_scales, :y_scales]
   defstruct @enforce_keys
@@ -61,8 +67,10 @@ defmodule Giggly.Assembly do
   over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
   column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
   out in name order, since a mapping is a map and has no written order to keep, followed by
-  `:panel` and `:group`, as ggplot2 orders them. Last, each axis's scale is trained on every
-  layer's columns in that axis's family, and those columns are mapped to their positions.
+  `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
+  columns in that axis's family are put through the scale's transformation, trained on, and mapped
+  to their positions. Last, each layer's stat computes on its table, and its position moves the
+  marks.
 
   Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -73,21 +81,38 @@ defmodule Giggly.Assembly do
   def run(%Plot{data: data, reversed_layers: reversed_layers} = plot) do
     layout = Facet.layout()
     paneled_data = Facet.assign_panels(data)
+    layers = Enum.reverse(reversed_layers)
 
-    layer_data =
-      reversed_layers
-      |> Enum.reverse()
-      |> Enum.map(fn layer ->
+    grouped_data =
+      Enum.map(layers, fn layer ->
         paneled_data
         |> evaluate(plot, layer)
         |> Group.add(&Scale.level_key/1)
       end)
 
-    x_scales = train(:x, plot, layer_data, layout)
-    y_scales = train(:y, plot, layer_data, layout)
+    untrained_x_scales = add_scales(:x, plot, layout)
+    untrained_y_scales = add_scales(:y, plot, layout)
+
+    transformed_data =
+      Enum.map(grouped_data, fn frame ->
+        through_scales(frame, untrained_x_scales, untrained_y_scales, &Scale.transform/2)
+      end)
+
+    x_scales = train(untrained_x_scales, :x, transformed_data)
+    y_scales = train(untrained_y_scales, :y, transformed_data)
+
+    layer_data =
+      layers
+      |> Enum.zip(transformed_data)
+      |> Enum.map(fn {layer, frame} ->
+        frame
+        |> through_scales(x_scales, y_scales, &Scale.map/2)
+        |> Stat.compute(Plot.layer_stat(layer))
+        |> Position.compute(Plot.layer_position(layer))
+      end)
 
     %__MODULE__{
-      layer_data: Enum.map(layer_data, fn frame -> map_positions(frame, x_scales, y_scales) end),
+      layer_data: layer_data,
       layout: layout,
       x_scales: x_scales,
       y_scales: y_scales
@@ -109,10 +134,11 @@ defmodule Giggly.Assembly do
     |> DataFrame.put(:panel, panels)
   end
 
-  # One scale per scale id the layout gives this axis. Every panel shares one scale while there is
-  # one panel, so the match below holds; routing rows to several scales arrives with free scales,
-  # where the match fails loudly until it does.
-  defp train(family, plot, layer_data, layout) do
+  # One untrained scale per scale id the layout gives this axis, of the kind its columns need, as
+  # ggplot2 adds its default scales before transforming anything. Every panel shares one scale
+  # while there is one panel, so the match below holds; routing rows to several scales arrives
+  # with free scales, where the match fails loudly until it does.
+  defp add_scales(family, plot, layout) do
     [scale_id] =
       layout
       |> DataFrame.pull(scale_column(family))
@@ -123,14 +149,21 @@ defmodule Giggly.Assembly do
       |> scale_kind(family)
       |> Scale.new()
 
-    scale =
-      layer_data
-      |> family_columns(family)
-      |> Enum.reduce(untrained, fn {frame, name}, scale ->
-        Scale.train(scale, DataFrame.pull(frame, name))
-      end)
+    %{scale_id => untrained}
+  end
 
-    %{scale_id => scale}
+  # Each scale folds in every layer's columns on its axis; `add_scales/3` gives an axis one scale.
+  defp train(scales, family, layer_data) do
+    Map.new(scales, fn {scale_id, untrained} ->
+      trained =
+        layer_data
+        |> family_columns(family)
+        |> Enum.reduce(untrained, fn {frame, name}, scale ->
+          Scale.train(scale, DataFrame.pull(frame, name))
+        end)
+
+      {scale_id, trained}
+    end)
   end
 
   defp scale_column(:x), do: :scale_x
@@ -195,21 +228,22 @@ defmodule Giggly.Assembly do
       "#{inspect(first_column)}, a #{first_kind} one; an axis has one scale"
   end
 
-  defp map_positions(frame, x_scales, y_scales) do
+  # Replaces each x-family and y-family column with what `scale_function` (a transformation or a
+  # mapping) makes of its values on the axis's scale.
+  defp through_scales(frame, x_scales, y_scales, scale_function) do
     frame
     |> DataFrame.names()
-    |> Enum.reduce(frame, fn name, mapped ->
+    |> Enum.reduce(frame, fn name, scaled ->
       case Aesthetics.family(name) do
-        :x -> map_column(mapped, name, x_scales)
-        :y -> map_column(mapped, name, y_scales)
-        :none -> mapped
+        :x -> through_scale(scaled, name, x_scales, scale_function)
+        :y -> through_scale(scaled, name, y_scales, scale_function)
+        :none -> scaled
       end
     end)
   end
 
-  defp map_column(frame, name, scales) do
+  defp through_scale(frame, name, scales, scale_function) do
     [scale] = Map.values(scales)
-    positions = Scale.map(scale, DataFrame.pull(frame, name))
-    DataFrame.put(frame, name, positions)
+    DataFrame.put(frame, name, scale_function.(scale, DataFrame.pull(frame, name)))
   end
 end

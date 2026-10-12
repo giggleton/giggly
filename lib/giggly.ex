@@ -68,7 +68,7 @@ defmodule Giggly do
       iex> Giggly.panel_scales(plot)
       %{
         x: %Giggly.Scale.Discrete{levels: ["4", "6"]},
-        y: %Giggly.Scale.Continuous{range: {21.0, 22.8}}
+        y: %Giggly.Scale.Continuous{range: {21.0, 22.8}, transform: :identity}
       }
   """
   @spec panel_scales(Plot.t(), integer()) :: %{x: Giggly.Scale.t(), y: Giggly.Scale.t()}
