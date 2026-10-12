@@ -47,7 +47,7 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `dependency-updates` skill.
 - **The documentation system** (what goes where, the ratchet) — `.claude/rules/docs.md`; the
   `docs-sync` skill.
-- **Open items** — design-log.md §7.
+- **The aesthetic vocabulary** (spelling, the x/y position families) — `.claude/rules/aesthetics.md`.
 
 ## Approach & architecture
 

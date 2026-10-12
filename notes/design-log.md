@@ -23,20 +23,145 @@ been ratified yet; decisions and their rejected alternatives move into §4 as th
 
 ## 2. Architecture & principles
 
-_The shape of the system in prose: the boundaries (`mix boundary.spec` prints the graph), the
-pure core and what sits around it, where external services are kept, how time and randomness are
-handled. Principles that span areas go here; an area's own rules go in its `.claude/rules` file._
+Giggly is a pipeline over immutable values. `%Giggly.Plot{}` is the spec the public pipe builds:
+data, a mapping from aesthetics to columns, layers (each a geom, a stat and a position), scale
+specs, a facet, a coord, labels and a theme. `Giggly.build/1` turns it into `%Giggly.Built{}`: one
+data frame per layer in the aesthetic vocabulary with `panel` and `group` columns, the layout table,
+the trained scales and the per-panel view scales (panel params). `Giggly.render/1` turns that into
+`%Giggly.Scene{}`, a tree of drawing primitives sized in units inside a table layout; a backend
+(`Giggly.SVG` first) serializes the scene. Each value is inspectable on its own, which is how the
+facet and coord seams are tested without rendering anything.
+
+The whole pipeline is pure. Its only inputs are the plot spec and a `Table.Reader`; it reads no
+config, no clock and no randomness (jitter will take a seed). The impure edges are adapters at the
+rim: reading the input table, and whatever a host does with the emitted iodata. `boundary` holds
+the shape (`mix boundary.spec` prints the graph); the sub-boundaries get carved as the first
+modules of each area land, starting from the umbrella `Giggly` with `exports: :all`.
+
+Two cross-cutting rules come straight from the ggplot2 study and ggity post-mortem (§1 points at
+the research): **a geom never sees a panel, a pixel or a facet variable** — facets are a column
+and a lookup table, the coord is the only route from data space to the unit panel, and layout is
+resolved by the scene's table of tracks, not by arithmetic in geoms; and **cross-cutting concerns
+get a seam before the second user of them exists** — grouping, panels, coordinate transforms and
+per-mark attributes are each applied in one place the pipeline threads through, never
+re-implemented per geom.
 
 ## 3. Module map
 
-_A short orientation to the tree, by namespace. Point at directories and moduledocs rather than
-listing modules — a hand-maintained list goes stale._
+`lib/giggly.ex` is the umbrella root, and will hold the top-level entry points (`build/1`,
+`render/1`, `to_svg/1`). Each area of the pipeline is a module or namespace directly under
+`lib/giggly/`, with its invariants in a `.claude/rules/<area>.md` that CLAUDE.md's status map
+names — the status map is the index, and the moduledocs are the contracts.
 
 ## 4. Key design decisions (the "why", so we don't relitigate)
 
 Each entry: **the decision (date, whose call)**, then *Rejected: the alternative* — and why. Newest
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
+
+- **Options are validated with NimbleOptions at every public function (2026-10-11, Steve).** A
+  schema per function, typed errors on an unknown or ill-typed option, option docs generated into
+  ExDoc. Validation lives at the API boundary; the pure functions beneath are assertive and take
+  validated data. *Rejected: `struct/2` with the options keyword* — ggity's approach; it silently
+  drops unknown keys, so `colour:`, a typo, or `scale_x_continuous(limits: …)` did nothing and
+  said nothing. *Rejected: hand-rolled guards only* — no new dependency, but option documentation
+  and "unknown option" errors then have to be written by hand per function, and the allowlist
+  check is the part that gets skipped.
+
+- **The public pipe API lives in `Giggly.Plot`, ggity-style (2026-10-11, Steve).**
+  `Plot.new(data, %{x: :wt, y: :mpg}) |> Plot.geom_point(%{color: :cyl}, alpha: 0.4) |>
+  Plot.labs(…)`; a map argument is a mapping, a keyword list is fixed options, both may be given.
+  The `Giggly` root holds `build/1`, `render/1`, `to_svg/1` and the boundary declaration.
+  *Rejected: every function on the `Giggly` root* — reads closest to `ggplot() + geom_point()`,
+  but one module then carries every geom, scale and theme function. *Rejected: an importable
+  bare-function DSL* — closest to R visually, unusual in Elixir, collides with user names.
+
+- **Three top-level values with one function between each (2026-10-11, Steve):** `%Giggly.Plot{}`
+  → `build/1` → `%Giggly.Built{}` → `render/1` → `%Giggly.Scene{}` → a backend → iodata. The
+  build product carries per-layer frames with resolved params, the layout table, trained scales
+  and panel params; nothing in it knows about SVG. *Rejected: a single pass from spec to markup* —
+  ggity's `Plot.plot/1`, where aesthetic mapping, pixel arithmetic and SVG emission happened in
+  one loop per row inside each geom, so there was no point at which a layout could be measured or
+  a panel inserted.
+
+- **Scales are three values, never one mutated object (2026-10-11, Steve).** The *spec*
+  (`scale_x_log10(…)`), the *trained scale* (spec plus the range folded over the layer frames — a
+  provisional one feeds stats and positions, a final one is retrained after positions), and the
+  per-panel *view scale* (expanded range, breaks, labels) that the coord freezes. A position scale
+  stops at "trained limits in transformed space"; the coord is the only route to the unit panel,
+  and nothing under `Giggly.Scale` knows a pixel exists. Expansion happens in transformed space.
+  *Rejected: scales that map to pixels* — ggity baked `width: 200` into every scale struct, which
+  is the single decision that made facets (panels of different sizes) and coords (swapping which
+  scale drives which screen axis) unreachable. *Rejected: one mutable scale with `clone/0` and
+  `reset/0`* — ggplot2's shape, which works only because every `+` and every build clones, and
+  whose getters with side effects make call order matter.
+
+- **The build order is fixed up front, and each adjacent pair is a semantic we chose
+  (2026-10-11, Steve).** Transform scales → train position scales → map positions to numeric (not
+  to the unit panel) → stat → `after_stat` → geom reparameterize (bar to `xmin/xmax/ymin/ymax`) →
+  position → reset and retrain position scales → freeze view scales → map positions again → train
+  non-position scales → build guides → map non-position scales → `after_scale` → fixed values
+  last. Transform-before-stat means a smoother on a log axis fits in log space; train-before-stat
+  means bin edges come from the panel range and agree across groups; position-before-retrain means
+  stacked totals reach the axis; fixed values last means they bypass scales. This list moves into
+  `.claude/rules/build.md` when the build area has code. *Rejected: ggity's order* — positions ran
+  in pixel space after scaling, so the scale could not see stacked totals and the stat had to run a
+  second time at `geom_bar` call time to stash a maximum in a side channel.
+
+- **The layer-data currency is `Giggly.DataFrame`, a behaviour with a relational, engine-neutral
+  operation set, and `Giggly.DataFrame.Lists` is the only implementation in core (2026-10-11,
+  Steve).** Columns keyed by aesthetic atom; the operations are select, mutate from a closed
+  expression catalog, filter, group-by-aggregate, sort, distinct and a lookup join — the set that
+  Polars, DuckDB and SQL all implement. Transforms and built-in stats are named operations so a
+  backend could run them in its engine; anything user-defined (a custom transform or stat)
+  materializes to lists. Engine backends are deferred (§7). Measured 2026-10-11, pure Elixir on
+  one core: the pipeline's dozen column passes run in ~50 ms at 10⁵ rows and ~0.5 s at 10⁶, with
+  per-group splitting (0.5 s) and sorting for quantiles (0.7 s) the costly steps at 10⁶ — and SVG
+  cannot carry more than ~10⁵ marks anyway, so "large data" means large input into a summarizing
+  stat, which is where an engine backend would pay. *Rejected: Explorer as the currency* — ggity's
+  choice; a ~42 MB precompiled NIF per target for every user, a Rust toolchain for source builds,
+  no list columns (ggity serialized boxplot outliers with `term_to_binary` into a binary column),
+  and a single-maintainer upstream. *Rejected: lists with no behaviour behind them* — cheapest
+  today, but gives up stats on large inputs permanently. *Rejected: Nx* — vectorized math without
+  a group-by shape, and its fast backend is a larger NIF than Explorer's.
+
+- **Input is anything implementing `Table.Reader`, read once at build start (2026-10-11, Steve).**
+  The `table` package is tiny, stable, and implemented by Explorer, Dux, the database drivers and
+  plain lists of maps, because Livebook requires it — so it survives whichever dataframe library
+  is maintained in three years. Mapping values may be atoms or strings and are resolved against the
+  table's column names at evaluation; after that point user column names do not exist in the
+  pipeline. *Rejected: Explorer only* — ggity; couples the library's life to one dependency's.
+  *Rejected: per-format adapters* — each one is code the `Table.Reader` implementers already wrote.
+
+- **Two reserved frame columns, `panel` and `group`, integer ids, present from aesthetic
+  evaluation onward (2026-10-11, Steve).** `panel` is assigned by the facet against the raw data,
+  before aesthetics are evaluated, because facet variables name raw columns that evaluation
+  discards. `group` is inferred once, from the discrete-typed aesthetic columns, before any scale
+  touches the data — position mapping turns a discrete x into integers, after which it no longer
+  looks discrete — and is global across panels so stack and dodge order agree between facets.
+  *Rejected: per-geom grouping* — ggity had at least six definitions of "a series" (line by every
+  non-positional aesthetic, ribbon by `{alpha, fill}`, bar by x, text alone reading `:group`, and
+  the stats a seventh); none could feed a stat or a position. *Rejected: inferring after position
+  mapping* — collapses every per-category bar and boxplot into one group.
+
+- **Aesthetics are atoms with ggplot2's names, American spelling canonical, aliases rewritten once
+  at the API (2026-10-11, Steve).** `color` is canonical and `colour` is accepted and normalized at
+  the boundary so nothing downstream sees both; `linewidth` is line thickness and `size` is point
+  size (ggplot2 ≥ 3.4). The x and y position families are ggplot2's lists verbatim (`x xmin xmax
+  xend xintercept xmin_final xmax_final xlower xmiddle xupper x0`, and the y mirror with `lower
+  middle upper`), kept as data in one module that scales, coords, flip and positions all key off.
+  Two keys naming one aesthetic after renaming (`color` and `colour` together) raise.
+  *Rejected: British canonical* — ggplot2's internal choice, but ggity's users wrote `color` and the
+  Elixir ecosystem does too. *Rejected: `size` for line thickness* — pre-3.4 ggplot2 and ggity;
+  conflates point area with stroke width in one scale. *Rejected: no family list* — ggity trained x
+  only on `x`, so `xmin`/`xend` annotations never widened the axis. *Rejected: ggplot2's duplicate
+  handling* — it warns and keeps one value (`rename_aes`, `R/aes.R`), the silent behavior the
+  validation decision exists to prevent. *Rejected: ggplot2's substring rule* (`sub("color",
+  "colour", …)` on every name) — in Elixir it means minting atoms from caller input; an explicit
+  alias table does the same job for the names that exist. *Rejected: the base-graphics aliases*
+  (`col`, `pch`, `cex`, `lty`, `lwd`, `srt`, `adj`, `bg`, `fg`, `min`, `max`) — ggplot2's
+  concession to base R, not names ggplot2 users write in `aes()`, and contrary to the
+  descriptive-names convention.
 
 ## 5. Testing approach
 
@@ -58,6 +183,29 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-11 — The aesthetic vocabulary (Phase 1, first increment).** `Giggly.Aesthetics`:
+  canonical spelling with `colour` as the one alias, `canonicalize/1` for mappings and fixed
+  options (raising on a collision), and ggplot2's x/y position families with `family/1` and
+  `counterpart/1`. The families were taken from `ggplot_global$x_aes`/`y_aes` in the ggplot2
+  source, whose own comment says the lists "must match in length and position of symmetrical
+  aesthetics"; here they are held as one list of x/y pairs, so they cannot drift apart. The reserved `panel`/`group` columns are
+  left for the data frame increment, where they are first used. The area got
+  `.claude/rules/aesthetics.md`; its status-map line replaced CLAUDE.md's "Open items" line, which
+  named no rules file and repeated the documentation section's pointer to §7, so the CLAUDE.md
+  budget did not move.
+
+- **2026-10-11 — Phase 0 ratified: the vocabulary and the value types.** The decisions in §4
+  dated today were proposed from the pre-design research (§1) and ratified in conversation, with
+  one amendment (the currency is named `Giggly.DataFrame`, not `Frame`) and one deferral (engine
+  backends, §7). The phases that follow, from the research synthesis: **1** — a scatter plot that
+  is architecturally complete: the null facet, the cartesian coord, `add_group`, identity stat and
+  position, one point geom, one continuous and one discrete position scale with no pixel knowledge,
+  the scene graph with its table layout, an SVG backend, and a text-metrics service behind an
+  interface; **2** — prove the seams before widening: `facet_wrap` with free scales, `coord_flip`,
+  polar; **3** — breadth: stats, stack/dodge, bar/line/boxplot, non-position scales and guides,
+  the theme tree; **4** — the LiveView layer: HEEx output, per-mark attributes applied once at the
+  scene, stable ids, optional PNG.
+
 - **2026-10-11 — The coding harness installed.** `mix tack.install --profile library` wrote
   CLAUDE.md, the `.claude/` rules, skills and hooks, `.credo.exs` and the `boundary`
   declarations, the `mix quality` gate and CI. It ran directly rather than through
@@ -70,6 +218,13 @@ _(none yet)_
 
 ## 7. Deferred / open questions
 
+- **Engine backends for `Giggly.DataFrame` (Explorer, Dux, SQL) are deferred.** The behaviour's
+  operation set is kept relational so one can be added as a separate optional package without
+  touching stats or scales. One gets built only against a measured case the list implementation
+  cannot serve (the §4 numbers: ~0.5 s per 10⁶-row pass for splitting or sorting) **and** an
+  upstream healthy enough at that moment to carry it — checked then, not assumed now. As of
+  2026-10-11 Explorer has a new de facto maintainer and a release cadence again after an
+  eleven-month gap; Dux has been quiet since May and calls itself not production ready.
 - **`tack` is a git dependency with no `ref`/`tag`.** `mix.lock` pins the commit, so builds are
   reproducible, but `mix deps.update tack` floats to the branch head. Settled by pinning a `tag:`
   once Tack publishes releases.
