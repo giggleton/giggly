@@ -159,9 +159,9 @@ semver or the changelog).
     in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed.
 - **Architecture as a compile-time check** (`boundary`): `compilers: [:boundary]` in `mix.exs`
   checks the `use Boundary` declarations, so a forbidden cross-namespace call is a compiler
-  warning and therefore a gate failure. The installed shape is the umbrella `Giggly`
-  (`exports: :all`), with every `Mix.Tasks.*` classified by hand via `classify_to:`. `mix boundary.spec`
-  prints the graph. Four constraints govern any change to it, each found by compiling rather than
+  warning and therefore a gate failure. The installed shape was the umbrella `Giggly`
+  (`exports: :all`), with every `Mix.Tasks.*` classified by hand via `classify_to:`; areas carve
+  their own sub-boundaries beneath it as they land. `mix boundary.spec` prints the current graph. Four constraints govern any change to it, each found by compiling rather than
   by reading the docs: **(1)** `check: [in: false]` / `[out: false]` is legal **only on a top-level
   boundary**, and such a boundary may not contain sub-boundaries; **(2)** a boundary with
   `check.in` false may not be exported from, nor listed as anyone's dep; **(3)** a top-level

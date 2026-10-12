@@ -59,6 +59,36 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Callers reach a frame only through `Giggly.DataFrame`, which dispatches on the frame's
+  struct (2026-10-11, Steve).** Each operation is a `@callback` plus a function in
+  `Giggly.DataFrame` that calls the frame's own module, the backend pattern Explorer and Nx use.
+  The frame is the implementation's struct with no wrapper, and `Giggly.DataFrame` is its own
+  boundary exporting only its root, so a caller naming `Lists` fails the build. Operations arrive
+  with their first caller, so the first set is only what aesthetic evaluation needs; reading one
+  column is `pull/2`, after dplyr and Explorer. *Rejected: a protocol* — it cannot construct a
+  frame, and building one is half the job. *Rejected: a wrapper struct around the
+  implementation's* (Explorer's shape) — nothing outside matches on the frame, so one can come with
+  a second backend that needs it. *Rejected: the facade rule as a rules-file sentence only* — the
+  boundary makes breaking it a build failure. *Rejected: `fetch!/2`* — vague about one column or
+  several; *`column/2`* — returns a column object, not values, in pyarrow and Arquero.
+  *Rejected: designing split/recombine and the `panel`/`group` columns with the frame* (the Phase 1
+  plan's draft) — nothing splits until scales train by scale id, and that caller decides the
+  contract (piece order, whether row order is restored, pieces whose columns differ); the reserved
+  columns belong to the facet and `add_group`, and a frame that knew about panels would be the
+  facet leaking into the currency.
+
+- **User column names become strings when a table is read; every column the pipeline writes is an
+  atom (2026-10-11, Steve).** `from_table/1` converts names with `to_string/1` and refuses two that
+  collide (`:wt` and `"wt"`). So a user column called `"panel"`, `"group"` or `"x"` cannot collide
+  with the pipeline's `:panel`, `:group` or `:x`; a mapping reference resolves with `to_string/1`
+  and never mints an atom; and "after evaluation, user column names do not exist" holds by type
+  rather than by a test. Reading is a thin adapter over the pure `new/1` and the only caller of
+  `table`, so it can sit outside a strict core. *Rejected: names as the source gives them* — a list
+  of maps with a `:panel` key collides with the reserved column, and every reference has to be
+  looked up as both an atom and a string. *Rejected: ggplot2's upper-case `PANEL`* — it still
+  collides with a user column of that name. *Rejected: converting user names to atoms* — that
+  creates atoms from caller input.
+
 - **Options are validated with NimbleOptions at every public function (2026-10-11, Steve).** A
   schema per function, typed errors on an unknown or ill-typed option, option docs generated into
   ExDoc. Validation lives at the API boundary; the pure functions beneath are assertive and take
@@ -182,6 +212,24 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-11 — The data frame (Phase 1, second increment).** `Giggly.DataFrame`, the behaviour
+  and the module callers use, with `Giggly.DataFrame.Lists` its one implementation: reading any
+  `Table.Reader` into a frame, building one from columns, column names and row count, choosing and
+  renaming columns, pulling one column and putting one back. The §4 entries beginning "Callers
+  reach a frame" and "User column names become strings" give the shape. `table` 0.1.2 was added after reading its whole source rather than its docs, which
+  turned up what the adapter has to do itself: `Table.to_columns/1` returns a map, so the column
+  order comes from `Table.Reader.init/1`'s metadata; nothing in the package checks that columns
+  have equal lengths, and its row reader zips columns to the shortest, so a short column would
+  silently misalign the rows; and a list of maps yields its columns sorted by key. It has no
+  runtime dependencies, and the lock gained only its own line. The boundary was proved with a
+  throwaway module outside it: a call to `Lists` and a `%Lists{}` each failed the build, and a
+  call through `Giggly.DataFrame` did not. `nil` in a column is a missing value, as every
+  `Table.Reader` source returns a null; the `:none` sentinel is for options, not data. Moved out of
+  this increment to their first callers: split and recombine (scale training by scale id), column
+  types and dense group ids (`add_group`), the `panel` and `group` columns (the facet and
+  `add_group`), and the remaining relational operations (the first stat, `facet_wrap`). The area
+  got `.claude/rules/data_frame.md` and a status-map line.
 
 - **2026-10-11 — CLAUDE.md trimmed to what applies to a library.** Tack's library profile installed
   a CLAUDE.md written with an application in mind. Dropped: the external-services rule, the

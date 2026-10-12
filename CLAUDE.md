@@ -46,6 +46,7 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **The documentation system** (what goes where, the ratchet) — `.claude/rules/docs.md`; the
   `docs-sync` skill.
 - **The aesthetic vocabulary** (spelling, the x/y position families) — `.claude/rules/aesthetics.md`.
+- **The data frame** (the layer-data currency, reading input tables) — `.claude/rules/data_frame.md`.
 
 ## Approach & architecture
 
