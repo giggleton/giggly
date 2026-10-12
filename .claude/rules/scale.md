@@ -40,8 +40,13 @@ identity transformation: the entry beginning "A layer names its stat and positio
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
   there. What R's transformation object carries beside the transform itself (the inverse, the
   axis's default breaks and labels, the domain) joins the behaviour with its first reader.
-- **An untrained continuous scale's range is `:none`.** Defaults for an empty axis (ggplot2's 0
-  to 1) belong to the view of the scale the coordinate system builds, when it arrives.
+- **An untrained continuous scale's range is `:none`.** The empty axis's 0 to 1 is
+  `dimension/1`'s, as it is ggplot2's `get_limits()`'s.
+- **`dimension/1` is an axis's extent widened by ggplot2's default expansion**, in transformed
+  positions: a continuous range by 5% of its width at each end, discrete levels (1 to n) by 0.6,
+  a range of zero width (R's `zero_range()`, rounding error included) as if its width were 1.
+  The coordinate system maps it onto the panel and adds nothing; a scale's own `expand`, and the
+  coordinate system's switch to turn expansion off, arrive with options.
 
 ## How it works
 

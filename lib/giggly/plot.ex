@@ -38,14 +38,14 @@ defmodule Giggly.Plot do
   """
 
   # A plot is a description: it may use the aesthetic vocabulary and the data frame, and nothing
-  # that runs it. A layer is read only through `computed_mapping/2`, `layer_stat/1` and
-  # `layer_position/1`, so `Layer` stays private.
+  # that runs it. A layer is read only through `computed_mapping/2`, `layer_geom/1`,
+  # `layer_stat/1` and `layer_position/1`, so `Layer` stays private.
   use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: []
 
   alias Giggly.{Aesthetics, DataFrame}
   alias Giggly.Plot.Layer
 
-  @enforce_keys [:data, :mapping, :reversed_layers]
+  @enforce_keys [:data, :mapping, :facet, :coord, :reversed_layers]
   defstruct @enforce_keys
 
   @typedoc """
@@ -53,13 +53,21 @@ defmodule Giggly.Plot do
   """
   @type mapping :: %{optional(Aesthetics.name()) => String.t()}
 
+  @typedoc "How the plot's rows are split into panels (`Giggly.Facet`)."
+  @type facet :: :null
+
+  @typedoc "How positions are placed in each panel (`Giggly.Coord`)."
+  @type coord :: :cartesian
+
   @typedoc """
-  A plot: its data, its mapping, and its layers newest first (each function adds one at the
-  front; they are assembled in the order they were added).
+  A plot: its data, its mapping, its facet and coordinate system, and its layers newest first (each
+  function adds one at the front; they are assembled in the order they were added).
   """
   @type t :: %__MODULE__{
           data: DataFrame.t(),
           mapping: mapping(),
+          facet: facet(),
+          coord: coord(),
           reversed_layers: [Layer.t()]
         }
 
@@ -74,6 +82,9 @@ defmodule Giggly.Plot do
   @doc """
   A plot of `data` with the aesthetics in `mapping` applying to every layer.
 
+  The plot is drawn in one panel on cartesian coordinates, which it records rather than leaves
+  out: ggplot2's `ggplot()` defaults to the null facet and `coord_cartesian()`.
+
       iex> plot =
       ...>   Giggly.Plot.new(
       ...>     %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]},
@@ -81,6 +92,8 @@ defmodule Giggly.Plot do
       ...>   )
       iex> plot.mapping
       %{x: "wt", y: "mpg", color: "cyl"}
+      iex> {plot.facet, plot.coord}
+      {:null, :cartesian}
   """
   @spec new(Table.Reader.t(), mapping_argument()) :: t()
   def new(data, mapping \\ %{}) when is_map(mapping) do
@@ -89,6 +102,8 @@ defmodule Giggly.Plot do
     %__MODULE__{
       data: frame,
       mapping: resolve(mapping, frame, "Plot.new/2"),
+      facet: :null,
+      coord: :cartesian,
       reversed_layers: []
     }
   end
@@ -141,6 +156,12 @@ defmodule Giggly.Plot do
   @spec computed_mapping(t(), Layer.t()) :: mapping()
   def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
     do: Map.merge(plot_mapping, layer_mapping)
+
+  @doc """
+  The name of the geom `layer` draws with (`Giggly.Geom`).
+  """
+  @spec layer_geom(Layer.t()) :: Layer.geom()
+  def layer_geom(%Layer{geom: geom}), do: geom
 
   @doc """
   The name of the stat `layer` computes its table with (`Giggly.Stat`).

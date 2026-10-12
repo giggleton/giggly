@@ -65,6 +65,55 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene, and
+  records its facet and coordinate system by name (2026-10-12, Steve).** `Giggly.to_svg/1`
+  assembles a plot, renders it into a scene (`Giggly.Render`, ggplot2's rendering stage) and has
+  `Giggly.SVG` draw the scene at 720 by 576 points; today a plot is drawn as its panel alone, each
+  row a point placed by the coordinate system in a panel that fills the drawing. The plot records
+  `facet: :null` and `coord: :cartesian`, which ggplot2's `ggplot()` defaults to; each is a name
+  its namespace resolves to a module implementing a behaviour (`Facet.Null`, `Coord.Cartesian`),
+  and a layer's `geom: :point` resolves to `Geom.Point` the same way. The assembly builds each
+  panel's params last, from `Scale.dimension/1`: the axis's extent widened by ggplot2's default
+  expansion (5% of a continuous range at each end, 0.6 around discrete positions 1 to n, a range
+  of zero width by R's `zero_range()` widened as if its width were 1, an empty axis 0 to 1 first).
+  `Coord.transform/2` rescales every x-family and y-family column into the panel by those extents
+  and puts an infinite position at the edge (`squish_infinite()`). `Geom.Point` calls it, as
+  ggplot2's `draw_panel()` calls `coord$transform()`, drops a row missing its x or y, and draws
+  ggplot2's default point (black, size 1.5 mm, border 0.5 mm) as a circle of radius 1.95 points
+  with a 0.71-point outline: the figures in ggplot2's own visual-test snapshots, reproduced from
+  `.pt`, `.stroke` and R's 0.375 radius for shape 19. The scene is a table of weighted tracks
+  holding one cell, the panel, placed at the layout's new `row` and `column` (ggplot2's `ROW` and
+  `COL`); its primitives sit in cell units and are sized in points. SVG follows svglite (the point
+  as its unit, two decimals, its circle markup) at vdiffr's 720 by 576 points, so its output can
+  be set beside ggplot2's snapshots; the first golden test compares a whole document. New
+  boundaries: `Coord` lists `Aesthetics` and `DataFrame`; `Geom` lists `Coord`, `DataFrame` and
+  `Scene`; `Scene` lists nothing and exports `Cell` and `Points`; `SVG` lists `Scene`; `Render`
+  lists `Assembly`, `DataFrame`, `Geom` and `Scene`; `Assembly` gained `Coord`. This amends the
+  entry beginning "The facet assigns panels now", which kept the facet plain functions until a
+  second kind. *Rejected: the coordinate system alone, its params stored for drawing to read
+  later* (the plan's increment 7) — the params would be read by nothing and `transform/2` called
+  only by tests. *Rejected: a public panel-params inspector as its reader* — ggplot2 has none (its
+  params are opaque by contract, reachable only through `ggplot_build()`'s object), and §4 keeps
+  the assembled value internal. *Rejected: `Coord` handed the family rule, or each geom naming
+  its x and y columns, rather than listing `Aesthetics`* — handing the rule in moves the listing to
+  `Geom`, a peer domain, and naming columns makes every geom repeat the family lists, while
+  `coord_flip` needs each column's counterpart from the vocabulary anyway. *Rejected: the
+  expansion in the coordinate system* — ggplot2 lets a scale's own `expand` override the default,
+  and `expand_range()` is R's `scales`; the coordinate system holds the widened extents.
+  *Rejected: the assembly writing unit-panel positions into the tables* — whether to munch before
+  transforming is the geom's call, and a path in polar coordinates could not curve. *Rejected:
+  point defaults in a theme now* — ggplot2 4 takes them from the theme's `element_geom`, but the
+  theme's next reader is the panel background; they sit in `Geom.Point`, where ggplot2 kept them
+  before 4.0. *Rejected names:* `Display` for the stage (proposed, after Wilkinson's third stage;
+  Steve preferred ggplot2's "render"), and `SVG.render/3` for the backend's function (the verb
+  would name two steps; `draw/3`, after grid's `grid.draw()`). *Deferred to first reader:* axes,
+  breaks, labels and extended Wilkinson; text measurement and absolute or measured tracks; the
+  panel background, grid lines and the theme; `munch` (the first path geom); every coordinate
+  option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`; a size for
+  `to_svg` (the first keyword options); splitting a layer's rows by panel (the second panel,
+  where rendering's one-panel match fails loudly); clipping, cell names and spans; and how a
+  dropped row is reported, since ggplot2 warns and a pure pipeline cannot.
+
 - **A layer names its stat and position, and a continuous scale its transformation, the identity
   included; each is a name its own namespace resolves (2026-10-12, Steve).** `geom_point/2`
   records `stat: :identity` and `position: :identity` on its layer and `Scale.new(:continuous)`
@@ -155,13 +204,17 @@ stops the question being reopened from scratch.
   need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel),
   transforms (identity is their absence; since amended — a continuous scale records the identity,
   see the entry beginning "A layer names its stat and position"), expansion and the view scale
-  with the empty-axis default (the coordinate system), breaks, labels and extended Wilkinson (the
+  with the empty-axis default (the coordinate system; expansion and the empty axis since built,
+  in `Scale.dimension/1`, see the entry beginning "The coordinate system arrives with drawing"),
+  breaks, labels and extended Wilkinson (the
   axes), a discrete axis's continuous range (the first continuous value on one; that reason since
   corrected in the same entry), the second training (stat and position), and the layout's `row`
-  and `col` (the scene).
+  and `col` (the scene; since built as `row` and `column`, read by rendering).
 
 - **The facet assigns panels now; the layout table arrives with scale training; one plain
-  function until a second facet (2026-10-12, Steve).** `Giggly.Facet.assign_panels/1`
+  function until a second facet (2026-10-12, Steve; since amended — the plot records its facet by
+  name and `Facet.Null` implements a behaviour, see the entry beginning "The coordinate system
+  arrives with drawing").** `Giggly.Facet.assign_panels/1`
   (ggplot2's `FacetNull$map_data()`) runs first in the assembly and puts `panel = 1` on every row
   of the plot's data, which evaluation carries into every layer frame, ordered as ggplot2 orders
   them: aesthetics, `panel`, `group`. Checked against `R/facet-null.R`, `R/facet-.R`
@@ -474,6 +527,35 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-12 — The coordinate system, drawn: `Giggly.to_svg/1` (Phase 1, seventh increment).**
+  A plot is now drawn to SVG: the assembly builds each panel's params from `Scale.dimension/1`,
+  `Giggly.Render` has each layer's geom draw its rows through `Coord.transform/2` into a
+  one-cell scene, and `Giggly.SVG` draws the scene at 720 by 576 points. The plot records
+  `facet: :null` and `coord: :cartesian`, and the layout gained `row` and `column`. The §4 entry
+  beginning "The coordinate system arrives with drawing" gives the shape, what was rejected and
+  what waits. The scope changed in discussion before any code. The plan had the coordinate system
+  alone, with drawing in increments 8 and 9; since nothing but drawing reads it, Steve chose the
+  thinnest slice that draws, folding the scene and SVG in for points only, and recording the
+  facet beside the coordinate system by the rule increment 6 set. Steve asked what the
+  coordinate system needs that the assembly does not already hold (nothing: the trained scales,
+  the layout and the tables carry it all, and what it adds is the expansion and the rescale),
+  and why it should list `Aesthetics` (for `transform/2`'s family lookup alone); it lists it.
+  He preferred ggplot2's "render" to `Display` for the stage, and the SVG function became
+  `draw/3` so one verb does not name two steps. The proposal said a single-valued axis widens by
+  ±0.5; R's `expand_range()` treats it as width 1, so 5% gives ±0.05, which is what was built.
+  ggplot2's own visual-test snapshots settled the point's look (radius 1.95, outline 0.71, both
+  reproduced from its constants) and the canvas (vdiffr's 720 by 576 points). Review's mutation
+  step (coverage-guided, over the fifteen changed files) found no line unexecuted and three
+  holes, each fixed: a single value of 0 (the `zero_range()` clause for equal ends survived
+  deletion, since the example's 2.5 was answered the same by the tolerance clause, and an
+  all-zero axis would have had no width); the tolerance's being relative (the example sat where
+  relative and absolute agree); and `SVG`'s sharing of the drawing among weighted tracks and its
+  cell lookup, which no scene of one cell could exercise and which now accepts the one-cell scene
+  alone, failing loudly otherwise, as rendering does with a second panel. A geom test pins a
+  point dropped for a missing x, the doctest of `Coord.transform/2` gained `:nan`, and the golden
+  carries its label. The areas got `.claude/rules/coord.md`, `geom.md`, `render.md`, `scene.md`
+  and `svg.md`, with status-map lines.
 
 - **2026-10-12 — The stat, position and transform stages (Phase 1, sixth increment).** Each
   layer now records `stat: :identity` and `position: :identity`, and each continuous scale

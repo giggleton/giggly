@@ -132,4 +132,26 @@ defmodule GigglyTest do
       assert %{x: %Giggly.Scale.Continuous{range: :none}} = Giggly.panel_scales(plot)
     end
   end
+
+  describe "to_svg/1" do
+    # Golden: test/golden/point.svg. Its positions were checked against an independent
+    # calculation (each axis's range widened by 5% at each end, rescaled onto 720 by 576 points with
+    # y running down), and its radius and outline are ggplot2's default point in its own SVG test
+    # snapshots. The row missing its mpg is not drawn but still widens the x axis, as in ggplot2.
+    # It moves only with a change to what a plot draws: the drawing's size, the point's look, the
+    # expansion, axes or a background arriving, or the document's markup.
+    test "each row with an x and a y is drawn as a point where the coordinate system puts it" do
+      plot =
+        %{"wt" => [2.62, 2.875, 2.32, 3.215], "mpg" => [21.0, 22.8, 22.8, nil]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+
+      svg =
+        plot
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point.svg")
+    end
+  end
 end

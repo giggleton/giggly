@@ -18,10 +18,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 
 ## Rules
 
-- **A plot is run only from `Giggly`.** The root module holds the run functions (`layer_data/2`
-  now; `to_svg` and the rest as they arrive), each taking a finished plot; `Plot` describes and
-  never runs, and nothing outside Giggly calls `Assembly`. Arrows run root → `Assembly` → `Plot`,
-  and nothing calls back up.
+- **A plot is run only from `Giggly`.** The root module holds the run functions (`layer_data/2`,
+  `panel_scales/2`, `to_svg/1`), each taking a finished plot; `Plot` describes and never runs, and
+  nothing outside Giggly calls `Assembly`. Arrows run root → `Render` → `Assembly` → `Plot` and
+  root → `SVG` → `Scene`, and nothing calls back up.
 - **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet assigns
   `panel` to the raw data → each layer's mapping is evaluated → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
@@ -32,7 +32,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills
-  it:** the layer frames, the layout table, and the trained x and y scales keyed by scale id.
+  it:** the layer frames with each layer's geom, the layout table, the trained x and y scales keyed
+  by scale id, and each panel's params keyed by panel id.
+- **The facet and the coordinate system run by the names the plot records**, `:null` and
+  `:cartesian` included, resolved by `Giggly.Facet` and `Giggly.Coord`.
+- **Each panel's params are built once, after the positions, from the extents of the scales its
+  layout row names** (`Scale.dimension/1`), ggplot2's `setup_panel_params()`; until the reset and
+  retrain arrives, those are the scales trained before the stat.
 - **Each axis's scale is added after grouping, of the kind its columns need; every layer's
   columns in the axis's family are then put through the scale's transformation, trained on, and
   mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
@@ -67,10 +73,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 
 `Giggly` lists `Giggly.DataFrame` so its sub-boundaries may — a sub-boundary may list a
 top-level boundary only when its parent does — and because `panel_scales/2` reads the layout
-table. It exports `Plot`; `Assembly`, `Facet`, `Group`,
-`Position`, `Scale` and `Stat` are internal.
+table. It exports `Plot`; every other domain is internal.
 
-`Assembly.run/1` first has `Facet.assign_panels/1` put the `:panel` column on the plot's data,
+`Assembly.run/1` first has `Facet.assign_panels/2` put the `:panel` column on the plot's data,
 once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
 each layer, lays its mapping over the plot's (the layer's column wins), sorts the pairs by
 aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `DataFrame.put/3`,
@@ -78,8 +83,11 @@ and calls `Group.add/2` with `Scale.level_key/1`. It then adds each axis's scale
 layer's computed mapping for the axis's family, refuses an unplaceable or disagreeing column, and
 takes the kind from the first column (an axis no layer maps is continuous). Each frame's x-family
 and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/2` folds in every
-such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Last,
-each frame goes through its layer's stat and then its position. `layer_data/2` checks the
+such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Each
+frame then goes through its layer's stat and its position. Last, each layout row's scale ids
+pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from their
+`Scale.dimension/1`. `to_svg/1` hands the result to `Render.scene/1` and the scene to
+`SVG.draw/3`. `layer_data/2` checks the
 index against the plot's layer count before assembling, so a missing layer raises an
 `ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises
 the same way for a panel the plot does not have.

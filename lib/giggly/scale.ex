@@ -47,6 +47,14 @@ defmodule Giggly.Scale do
   @continuous_dtypes [:integer, :float, :null]
   @discrete_dtypes [:string, :boolean, :atom]
 
+  # ggplot2's default expansion, as {multiple of the width, constant}: `expansion(mult = 0.05)`
+  # for a continuous scale and `expansion(add = 0.6)` for a discrete one.
+  @continuous_expansion {0.05, 0}
+  @discrete_expansion {0, 0.6}
+
+  # R's `zero_range()` tolerance: 1000 times the double-precision machine epsilon.
+  @zero_range_tolerance 1000 * 2.220446049250313e-16
+
   @doc """
   The kind of scale a column of type `dtype` (a `Giggly.DataFrame` type) needs.
 
@@ -104,6 +112,56 @@ defmodule Giggly.Scale do
   @spec map(t(), list()) :: list()
   def map(%Continuous{} = scale, values), do: Continuous.map(scale, values)
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
+
+  @doc """
+  The extent of the axis in positions, widened as ggplot2 widens it by default before drawing: a
+  continuous range by 5% of its width at each end, and discrete levels, at positions 1 to n, by
+  0.6. A range of zero width is widened as though its width were 1, as R's `expand_range()` does,
+  so one value, zero included, spans 0.05 either side of it; an untrained continuous scale spans 0 to 1 before it
+  is widened, ggplot2's default for an empty axis. It is ggplot2's `dimension()` with the default
+  expansion, and the coordinate system maps it onto the panel.
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1, 3])
+      iex> Giggly.Scale.dimension(scale)
+      {0.9, 3.1}
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [0])
+      iex> Giggly.Scale.dimension(scale)
+      {-0.05, 0.05}
+
+  Ends that differ only by rounding error, relative to their size, count as one value:
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1000.0, 1000.0000000000001])
+      iex> Giggly.Scale.dimension(scale)
+      {999.95, 1000.0500000000001}
+
+      iex> Giggly.Scale.dimension(Giggly.Scale.new(:continuous))
+      {-0.05, 1.05}
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:discrete), ["6", "4", "8"])
+      iex> Giggly.Scale.dimension(scale)
+      {0.4, 3.6}
+  """
+  @spec dimension(t()) :: {number(), number()}
+  def dimension(%Continuous{range: :none}), do: expand({0, 1}, @continuous_expansion)
+  def dimension(%Continuous{range: range}), do: expand(range, @continuous_expansion)
+  def dimension(%Discrete{levels: levels}), do: expand({1, length(levels)}, @discrete_expansion)
+
+  # Widens each end by a multiple of the range's width plus a constant: R's `expand_range()`.
+  defp expand({low, high}, {multiple, constant}) do
+    width = if zero_range?(low, high), do: 1, else: high - low
+    padding = width * multiple + constant
+    {low - padding, high + padding}
+  end
+
+  # R's `zero_range()`: equal ends, or ends so close, relative to the smaller, that their
+  # difference is rounding error.
+  defp zero_range?(low, high) when low == high, do: true
+
+  defp zero_range?(low, high) do
+    smaller = min(abs(low), abs(high))
+    smaller != 0 and abs((low - high) / smaller) < @zero_range_tolerance
+  end
 
   @doc """
   The key that orders discrete values: `nil` after every present value, which compare in Erlang

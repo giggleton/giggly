@@ -21,9 +21,11 @@ stat and position".
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence (the layer's column wins) exists once.
-- **A layer records its stat and position by name, the identity included**, and the assembly
-  reads them with `layer_stat/1` and `layer_position/1`, so `Layer` stays private and `Plot` names
-  no module of `Giggly.Stat` or `Giggly.Position`. What a misspelt name does arrives with the first
+- **A layer records its geom, stat and position by name, the identity included**, and the
+  assembly reads them with `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
+  private and `Plot` names no module of `Giggly.Geom`, `Giggly.Stat` or `Giggly.Position`. The
+  plot records its facet and coordinate system the same way, `facet: :null` and
+  `coord: :cartesian` when nothing chooses others. What a misspelt name does arrives with the first
   option that lets a caller choose one: it must raise at the call, which will need the valid names.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an

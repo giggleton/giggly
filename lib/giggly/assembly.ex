@@ -3,7 +3,7 @@ defmodule Giggly.Assembly do
   The assembly of a plot: the fixed sequence of stages that turns a `Giggly.Plot`, a description,
   into what is drawn, and the value those stages produce. The name is the middle of Wilkinson's
   three stages of making a graphic (specification, assembly, display); a plot is the
-  specification, and drawing is the display.
+  specification, and rendering and drawing it are the display.
 
   The stages run in one fixed order, each adjacent pair a semantic chosen on purpose, and they
   arrive one at a time. Today the assembly:
@@ -19,11 +19,14 @@ defmodule Giggly.Assembly do
     6. trains each scale over those columns;
     7. maps them to their positions on the scales;
     8. computes each layer's stat (`Giggly.Stat`) on its table;
-    9. moves each layer's marks by its position (`Giggly.Position`).
+    9. moves each layer's marks by its position (`Giggly.Position`);
+   10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+       extents of the panel's scales.
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
-  columns are named by aesthetic plus `:panel` and `:group`; the layout table; and the trained
-  scales, by scale id. The data's own column names do not appear.
+  columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
+  table; the trained scales, by scale id; and each panel's params, by panel id. The data's own
+  column names do not appear.
 
   Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
   """
@@ -34,6 +37,7 @@ defmodule Giggly.Assembly do
   use Boundary,
     deps: [
       Giggly.Aesthetics,
+      Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Facet,
       Giggly.Group,
@@ -44,20 +48,23 @@ defmodule Giggly.Assembly do
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
+  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
 
-  @enforce_keys [:layer_data, :layout, :x_scales, :y_scales]
+  @enforce_keys [:layer_data, :layer_geoms, :layout, :x_scales, :y_scales, :panel_params]
   defstruct @enforce_keys
 
   @typedoc """
-  An assembled plot: each layer's table in the order the layers were added, the layout table, and
-  the trained x and y scales keyed by the scale ids the layout gives each panel.
+  An assembled plot: each layer's table and the name of the geom that draws it, in the order the
+  layers were added; the layout table; the trained x and y scales keyed by the scale ids the layout
+  gives each panel; and each panel's params, keyed by panel id.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
+          layer_geoms: [atom()],
           layout: DataFrame.t(),
           x_scales: %{optional(pos_integer()) => Scale.t()},
-          y_scales: %{optional(pos_integer()) => Scale.t()}
+          y_scales: %{optional(pos_integer()) => Scale.t()},
+          panel_params: %{optional(pos_integer()) => Coord.panel_params()}
         }
 
   @doc """
@@ -69,8 +76,9 @@ defmodule Giggly.Assembly do
   out in name order, since a mapping is a map and has no written order to keep, followed by
   `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
   columns in that axis's family are put through the scale's transformation, trained on, and mapped
-  to their positions. Last, each layer's stat computes on its table, and its position moves the
-  marks.
+  to their positions. Each layer's stat then computes on its table, and its position moves the
+  marks. Last, the plot's coordinate system builds each panel's params from the extents of the
+  scales the layout gives that panel.
 
   Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -78,9 +86,9 @@ defmodule Giggly.Assembly do
   as the data names it, and its type.
   """
   @spec run(Plot.t()) :: t()
-  def run(%Plot{data: data, reversed_layers: reversed_layers} = plot) do
-    layout = Facet.layout()
-    paneled_data = Facet.assign_panels(data)
+  def run(%Plot{data: data, facet: facet, coord: coord, reversed_layers: reversed_layers} = plot) do
+    layout = Facet.layout(facet)
+    paneled_data = Facet.assign_panels(data, facet)
     layers = Enum.reverse(reversed_layers)
 
     grouped_data =
@@ -113,10 +121,33 @@ defmodule Giggly.Assembly do
 
     %__MODULE__{
       layer_data: layer_data,
+      layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
       x_scales: x_scales,
-      y_scales: y_scales
+      y_scales: y_scales,
+      panel_params: panel_params(coord, layout, x_scales, y_scales)
     }
+  end
+
+  # Each panel's params, from the extents of the scales its layout row names: ggplot2's
+  # `setup_panel_params()`, after the positions have run.
+  defp panel_params(coord, layout, x_scales, y_scales) do
+    [:panel, :scale_x, :scale_y]
+    |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
+    |> Enum.zip()
+    |> Map.new(fn {panel, scale_x_id, scale_y_id} ->
+      x_dimension =
+        x_scales
+        |> Map.fetch!(scale_x_id)
+        |> Scale.dimension()
+
+      y_dimension =
+        y_scales
+        |> Map.fetch!(scale_y_id)
+        |> Scale.dimension()
+
+      {panel, Coord.panel_params(coord, x_dimension, y_dimension)}
+    end)
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across

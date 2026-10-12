@@ -4,8 +4,8 @@ defmodule Giggly do
 
   A plot is described with `Giggly.Plot`, which builds a value and runs nothing, and the functions
   here take a finished plot and run it, as ggplot2's `ggsave()` and `get_layer_data()` take a
-  finished ggplot. `layer_data/2` shows the table a layer computes and `panel_scales/2` the scales
-  a panel is drawn on; drawing to SVG will be one of these functions too.
+  finished ggplot. `layer_data/2` shows the table a layer computes, `panel_scales/2` the scales
+  a panel is drawn on, and `to_svg/1` draws the plot.
   """
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
@@ -15,7 +15,12 @@ defmodule Giggly do
   # `Plot`, which with this module is what a user of Giggly calls.
   use Boundary, deps: [Giggly.DataFrame], exports: [Plot]
 
-  alias Giggly.{Assembly, DataFrame, Plot}
+  alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
+
+  # The size every plot is drawn at until a size can be given: 10 by 8 inches, in points, the size
+  # of the SVG ggplot2's own visual tests snapshot (vdiffr's default).
+  @width 720
+  @height 576
 
   @doc """
   The table the layer at `index` computes, counting from 0 in the order the layers were added; the
@@ -88,5 +93,21 @@ defmodule Giggly do
         raise ArgumentError,
               "the plot has panel(s) #{Enum.join(panels, ", ")}, so it has no panel #{panel}"
     end
+  end
+
+  @doc """
+  The plot drawn as an SVG document, 720 by 576 points (10 by 8 inches), the size of the SVG
+  ggplot2's own visual tests snapshot. It is ggplot2's `ggsave()` to an SVG file, returned as
+  iodata rather than written.
+
+  Today a plot is drawn as its panel alone: each layer's marks, placed by the coordinate system in
+  a panel that fills the drawing. Axes, the panel's background and titles arrive in turn.
+  """
+  @spec to_svg(Plot.t()) :: iodata()
+  def to_svg(%Plot{} = plot) do
+    plot
+    |> Assembly.run()
+    |> Render.scene()
+    |> SVG.draw(@width, @height)
   end
 end

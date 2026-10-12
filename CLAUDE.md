@@ -57,6 +57,12 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `.claude/rules/scale.md`.
 - **Stats** (`Giggly.Stat`, the layer's stat by name) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the layer's position by name) — `.claude/rules/position.md`.
+- **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
+  `.claude/rules/coord.md`.
+- **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.
+- **Rendering** (`Giggly.Render`, an assembled plot into a scene) — `.claude/rules/render.md`.
+- **The scene** (`Giggly.Scene`, the table of tracks and its primitives) — `.claude/rules/scene.md`.
+- **The SVG backend** (`Giggly.SVG`, `Giggly.to_svg/1`, the goldens) — `.claude/rules/svg.md`.
 
 ## Approach & architecture
 
