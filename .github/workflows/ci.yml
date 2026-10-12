@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # One version, read from .tool-versions so CI and a dev machine cannot drift apart: the
+      # exact toolchain is pinned in one place. `strict` takes the pinned patch, not the newest
+      # matching build.
+      - name: Set up Elixir / OTP
+        uses: erlef/setup-beam@v1
+        with:
+          version-file: .tool-versions
+          version-type: strict
+
+      - name: Cache deps and build
+        uses: actions/cache@v5
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashFiles('.tool-versions') }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ hashFiles('.tool-versions') }}-
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      # The whole gate, from the one list in mix.exs (`quality_steps`) — so a step added there is
+      # picked up here with no second list to keep in sync. `--check` drops only the formatting
+      # *write*: running it would make the trailing `--check-formatted` step check work it had
+      # just done itself.
+      - name: Quality gate
+        run: mix quality --check
