@@ -21,8 +21,8 @@ defmodule Giggly do
   The table the layer at `index` computes, counting from 0 in the order the layers were added; the
   first layer when no index is given. It is ggplot2's `get_layer_data()`.
 
-  Its columns are named by aesthetic, plus a `:group` column (`Giggly.Group`); the data's own
-  column names do not appear. Raises `ArgumentError` when the plot has no layer at `index`; a
+  Its columns are named by aesthetic, plus the `:panel` each row is drawn in (`Giggly.Facet`) and
+  its `:group` (`Giggly.Group`); the data's own column names do not appear. Raises `ArgumentError` when the plot has no layer at `index`; a
   negative index is refused too, not counted from the end.
 
       iex> plot =
@@ -31,7 +31,9 @@ defmodule Giggly do
       ...>   |> Giggly.Plot.geom_point()
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.names(frame)
-      [:x, :y, :group]
+      [:x, :y, :panel, :group]
+      iex> Giggly.DataFrame.pull(frame, :panel)
+      [1, 1, 1]
       iex> Giggly.DataFrame.pull(frame, :group)
       [2, 1, 2]
   """

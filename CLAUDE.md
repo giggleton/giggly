@@ -52,6 +52,7 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `.claude/rules/plot.md`.
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
   `Giggly`) — `.claude/rules/assembly.md`.
+- **The facet** (`Giggly.Facet`, the `panel` column) — `.claude/rules/facet.md`.
 
 ## Approach & architecture
 

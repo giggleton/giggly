@@ -65,6 +65,22 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The facet assigns panels now; the layout table arrives with scale training; one plain
+  function until a second facet (2026-10-12, Steve).** `Giggly.Facet.assign_panels/1`
+  (ggplot2's `FacetNull$map_data()`) runs first in the assembly and puts `panel = 1` on every row
+  of the plot's data, which evaluation carries into every layer frame, ordered as ggplot2 orders
+  them: aesthetics, `panel`, `group`. Checked against `R/facet-null.R`, `R/facet-.R`
+  (`layout_null()`) and `R/layout.R`. *Rejected: the layout table now* (the Phase 1 plan's draft)
+  — its `scale_x`/`scale_y` columns are first read by scale training (increment 5), which routes
+  each panel's rows to a scale through them, and its `row`/`col` by the scene (increment 8);
+  built now, nothing would read it. *Rejected: a facet behaviour, a `facet` field on the plot and
+  dispatch now* — with one kind of facet there is nothing to dispatch on; `facet_wrap` brings
+  them, touching only `Plot`, `Facet` and the assembly, never a geom. *Rejected: a mutable
+  go-between like ggplot2's `Layout` object* — it holds the facet, the coord, the panel scales and
+  the panel params and is trained by side effect; here the assembly passes values between stages.
+  *Rejected: folding this into increment 5* — small verifiable increments, and this one proves
+  the stage order's first slot on its own.
+
 - **A plot is a value built by `Giggly.Plot` and run by the functions in `Giggly`; the stages run
   in `Giggly.Assembly` (2026-10-12, Steve).** `Plot` holds the value and the vocabulary that
   builds it, and runs nothing. The root module holds the run functions, each taking a finished
@@ -361,6 +377,25 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-12 — Staging no longer invalidates a recorded boundary approval.** The waiver gate
+  hashed the changed files' declarations in `git status` order, which lists an untracked file
+  after every tracked one and a staged new file in path order; so staging alone reordered the
+  list, and the commit of the restructure above was refused under an approval recorded minutes
+  before, with no declaration changed. `widening_state` now sorts the paths first, as
+  `commit-gate.sh` already sorts its marks'. Proved in a throwaway clone with a new declaring
+  file sorting ahead of an edited one: before the fix, approving and then staging failed the
+  commit check; after it, approving before or after staging passed, and widening a list after
+  approving still failed. Changing the hash meant re-recording the standing approval for this
+  increment, whose declarations had not changed. This copy of the hook now differs from Tack's.
+
+- **2026-10-12 — Panels (Phase 1, fourth increment).** `Giggly.Facet.assign_panels/1` puts a
+  `:panel` column of 1s on the plot's data, first in the assembly, and every layer frame now
+  reads `aesthetics…, :panel, :group`; `layer_data/2`'s doctest shows it. The §4 entry beginning
+  "The facet assigns panels now" gives the scope: the layout table was moved to increment 5,
+  where scale training is its first reader, and there is no facet behaviour until `facet_wrap`.
+  `Facet` lists `DataFrame` and `Assembly` gained `Facet`; both widenings were in the agreed
+  proposal. The area got `.claude/rules/facet.md` and a status-map line.
 
 - **2026-10-12 — A plot is run from `Giggly`; the stages run in `Giggly.Assembly`; every boundary
   is strict.** Settling where the strict boundary went turned into a walk through the whole

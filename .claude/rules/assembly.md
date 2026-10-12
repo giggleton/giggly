@@ -43,19 +43,21 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
-- **Evaluated columns are in aesthetic-name order, and the group key follows column order.**
-  Reordering the columns renumbers groups.
+- **Evaluated columns are the aesthetics in name order, then `panel`, then `group`** (ggplot2's
+  order), and the group key follows column order: reordering the aesthetics renumbers groups.
 
 ## How it works
 
 `Giggly` lists `Giggly.DataFrame` only so its sub-boundaries may: a sub-boundary may list a
-top-level boundary only when its parent does. It exports `Plot`; `Assembly` and `Group` are
-internal.
+top-level boundary only when its parent does. It exports `Plot`; `Assembly`, `Facet` and `Group`
+are internal.
 
-`Assembly.run/1` reverses the plot's `reversed_layers` into drawing order and, for each layer,
-lays its mapping over the plot's (the layer's column wins), sorts the pairs by aesthetic and
-passes them to `DataFrame.select/2`, then `Group.add/1`. `layer_data/2` checks the index against
-the plot's layer count before assembling, so a missing layer raises an `ArgumentError` naming it.
+`Assembly.run/1` first has `Facet.assign_panels/1` put the `:panel` column on the plot's data,
+once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
+each layer, lays its mapping over the plot's (the layer's column wins), sorts the pairs by
+aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `DataFrame.put/3`,
+and calls `Group.add/1`. `layer_data/2` checks the index against the plot's layer count before
+assembling, so a missing layer raises an `ArgumentError` naming it.
 
 `Group.add/1` takes its key from the frame's types: a mapped `group` alone, or else every discrete
 column. It zips the key columns into one tuple per row, sorts the distinct tuples with each

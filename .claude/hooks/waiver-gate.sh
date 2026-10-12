@@ -431,7 +431,10 @@ changed_files() {
 # which is not a corner case: batch rewrites are how most renames are made, and the
 # Edit hook never sees them. Compares the committed declaration against the working tree one.
 # The declarations of every changed compiled source, hashed. An approval is granted against this
-# exact state, so a further widening after one invalidates it rather than riding along.
+# exact state, so a further widening after one invalidates it rather than riding along. The paths
+# are sorted first, as commit-gate.sh sorts its marks': `git status` lists an untracked file after
+# every tracked one and a staged new file in path order, so staging alone reordered the list and
+# refused the commit an approval had been recorded for, with no declaration changed.
 widening_state() {
   local path
   {
@@ -443,7 +446,7 @@ widening_state() {
       else
         printf '%s deleted\n' "$path"
       fi
-    done < <(changed_files | cut -f1)
+    done < <(changed_files | cut -f1 | sort -u)
   } | sha256sum | cut -d' ' -f1
 }
 
