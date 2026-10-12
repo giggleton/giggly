@@ -23,6 +23,9 @@ defmodule Giggly.Aesthetics do
   `:lower`, `:middle` and `:upper`.
   """
 
+  # The vocabulary depends on nothing, so nothing it calls can change what a name means.
+  use Boundary, deps: [], exports: []
+
   # Each name is written beside its partner, so neither family can gain a name without the other.
   @position_pairs [
     {:x, :y},

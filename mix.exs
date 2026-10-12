@@ -9,6 +9,9 @@ defmodule Giggly.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       compilers: [:boundary] ++ Mix.compilers(),
+      # Every boundary is strict: a boundary's `deps:` list is the whole of what it may call,
+      # outside libraries included, and a boundary inherits nothing from its parent.
+      boundary: [default: [type: :strict]],
       quality_steps: [
         {"format (write)", "mix format", skip_on_check: true},
         {"hex.audit", "mix hex.audit"},

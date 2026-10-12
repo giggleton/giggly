@@ -19,6 +19,8 @@ atoms with ggplot2's names".
   not write.
 - **Spelling only, not membership.** An unknown name passes through `canonical/1` unchanged; which
   aesthetics a layer accepts is declared by its geom, stat and position, and checked there.
+- **The vocabulary depends on nothing.** Its boundary lists no `deps:`, so nothing it could call
+  can change what a name means; every domain that needs a name's family lists it instead.
 - **`panel` is not an aesthetic and must not become one** — the pipeline reserves it for the panel
   id column.
 - **Anything that treats x and y differently asks `family/1`**, never `name == :x`. That is the

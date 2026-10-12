@@ -12,7 +12,12 @@ defmodule Giggly.BoundaryDeclarationsTest do
 
   # The accepted exceptions, each with the reason it was accepted. A new entry is the decision;
   # this test failing is the prompt to make it deliberately.
-  @sanctioned %{}
+  @sanctioned %{
+    {"lib/giggly/data_frame.ex", "top_level?:"} =>
+      "Giggly.DataFrame owns the `table` library. Nested under Giggly it could list `Table` only " <>
+        "if Giggly did too, which would let every module directly in Giggly call it; at the top " <>
+        "level only from_table/1 may."
+  }
 
   @umbrella "lib/giggly.ex"
 
@@ -59,6 +64,30 @@ defmodule Giggly.BoundaryDeclarationsTest do
              "export list is an approval gate: an explicit list fails safe (a new module is " <>
              "private until a person admits it) while :all makes it public the moment it " <>
              "compiles. List the exported modules instead (.claude/rules/dependencies.md)."
+  end
+
+  test "every boundary stays strict by default" do
+    # The loaded config, which is what boundary reads: a pattern over mix.exs's text would still
+    # match the line commented out.
+    assert get_in(Mix.Project.config(), [:boundary, :default, :type]) == :strict,
+           "mix.exs no longer makes every boundary strict. Without that default a boundary's " <>
+             "`deps:` stops being the whole of what it may call: it inherits its parent's " <>
+             "list and may call any outside library it does not name, and nothing reports it."
+  end
+
+  test "no declaration relaxes the strict default" do
+    relaxed =
+      for path <-
+            BoundaryDeclarations.source_files("lib") ++
+              BoundaryDeclarations.source_files("test/support"),
+          declaration <- BoundaryDeclarations.declarations_in(path),
+          declaration =~ ~r/type:\s*:relaxed/,
+          do: path
+
+    assert relaxed == [],
+           "A boundary declaration sets `type: :relaxed`, opting out of the strict default: " <>
+             "#{inspect(relaxed)}. Its `deps:` no longer bounds what it may call. If that is " <>
+             "the intent, it is a decision for the user, made in this file."
   end
 
   test "the boundary compiler is wired into the project" do

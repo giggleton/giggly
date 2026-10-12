@@ -215,11 +215,10 @@
             # and the tests conventionally go undocumented.
             {Tack.Credo.Check.PublicFunctionDoc,
              [files: %{excluded: [~r"/test/", ~r"/lib/mix/"]}]},
-            # Scoped to the pure core, which does not exist yet: the moment `lib/giggly/core.ex`
-            # or `lib/giggly/core/` appears, this check reads it. All four categories it flags
-            # are ordinary everywhere else.
-            {Tack.Credo.Check.CorePurity,
-             [files: %{included: ["lib/giggly/core.ex", "lib/giggly/core/"]}]},
+            # The whole library is the pure core: it is a pipeline of values with no process, no
+            # config and no clock, so every file under `lib/` is read. A module that must be
+            # impure (a host integration doing IO) is excluded here by name, with its reason.
+            {Tack.Credo.Check.CorePurity, [files: %{included: ["lib/"]}]},
 
             #
             ## Formerly-disabled "controversial and experimental" checks, each enabled deliberately.

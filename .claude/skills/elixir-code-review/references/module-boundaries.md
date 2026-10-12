@@ -70,9 +70,10 @@ correct here and not findings. The line is IO and calls out.
 
 ### 5. A core module that is no longer pure — High
 
-In a namespace declared `type: :strict` (the pure core), Boundary forbids every library and every
-other namespace, and the `CorePurity` credo check fails the gate on the standard-library escapes
-it cannot see: a clock read, a config read, unseeded randomness, a process or IO call. What is
+In Giggly the whole library is the pure core. Every boundary is strict (the `mix.exs` default), so
+Boundary forbids any library or domain a boundary's `deps:` does not name, and the `CorePurity`
+credo check, run over all of `lib/`, fails the gate on the standard-library escapes Boundary
+cannot see: a clock read, a config read, unseeded randomness, a process or IO call. What is
 left to the review is the borderline — a value computed from "now" or from config two calls
 upstream, a function that would be pure if its one impure input were an argument. The fix is the
 same every time: take the value as an argument, and let the shell above the core read it.

@@ -1,0 +1,50 @@
+---
+paths:
+  - "lib/giggly/plot.ex"
+  - "lib/giggly/plot/**"
+  - "test/giggly/plot_test.exs"
+---
+
+# The plot and its API
+
+`Giggly.Plot` is the public pipe API and the plot value it builds; `Giggly.Plot.Layer` is one
+layer of that value. Why the API is shaped this way, and what was rejected: design-log §4, the
+entries beginning "The public pipe API lives in", "A plot is a value built by", "The table is
+read when the plot is created" and "Points accept only what Phase 1 can draw".
+
+## Rules
+
+- **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
+  inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics` and
+  `Giggly.DataFrame`, and it exports `Layer` because the assembly reads a plot's layers.
+- **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
+  given against the data and checks what the geom can use there, so a misspelt column or an
+  unusable aesthetic is reported by the line that has it, never later when the plot is run. A
+  missing column's message names the aesthetic, the reference as the caller wrote it, and the
+  data's columns.
+- **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
+  this API sees a `Table.Reader`.
+- **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
+  runs on every mapping as it enters), and mapping values are the data's string column names,
+  never the atoms the caller wrote.
+- **A column reference is an atom or a string,** compared with the data's names as a string.
+  Nothing else is read as a name: `2.5` is not the column `"2.5"`.
+- **The plot's mapping is checked against each layer as the layer is added,** together with the
+  layer's own: an aesthetic either gives that the geom cannot use raises, and so does a required
+  one neither gives. With one geom this is exact; what a second geom makes legal is open
+  (design-log §7).
+- **A geom accepts only what the pipeline can draw.** An aesthetic joins a geom's accepted list
+  with the scale that maps it, so a mapping never silently does nothing.
+- **When keyword options arrive, `Aesthetics.canonicalize/1` runs before NimbleOptions validates
+  them.** NimbleOptions keeps only the first of a repeated key and checks only that one, so
+  validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
+  repeat.
+
+## How it works
+
+`new/2` reads the data with `DataFrame.from_table/1` and resolves the plot's mapping;
+`geom_point/2` resolves the layer's, checks the aesthetics it adds and those it inherits against
+what points accept, checks that `:x` and `:y` are mapped by one mapping or the other, and puts a
+`%Layer{}` at the front of `reversed_layers`, so adding a layer never walks the list and the
+assembly reverses them into drawing order. Resolving a mapping canonicalizes its keys and
+looks each value up, as a string, in `DataFrame.names/1`; no atom is ever made from a column name.

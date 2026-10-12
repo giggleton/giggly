@@ -46,22 +46,30 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **The documentation system** (what goes where, the ratchet) — `.claude/rules/docs.md`; the
   `docs-sync` skill.
 - **The aesthetic vocabulary** (spelling, the x/y position families) — `.claude/rules/aesthetics.md`.
-- **The data frame** (the layer-data currency, reading input tables) — `.claude/rules/data_frame.md`.
+- **The data frame** (the layer-data currency, reading input tables, column types) —
+  `.claude/rules/data_frame.md`.
+- **The plot spec and its public API** (`Giggly.Plot`, layers, checking mappings at the call) —
+  `.claude/rules/plot.md`.
+- **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
+  `Giggly`) — `.claude/rules/assembly.md`.
 
 ## Approach & architecture
 
-- **Functional-core-first, and the compiler holds it.** The architecture is declared with
-  `boundary` (`use Boundary` in the namespace root modules; `compilers: [:boundary]` in `mix.exs`),
-  so a forbidden cross-namespace call is a compiler warning and therefore a gate failure under
-  `--warnings-as-errors`. The shape to grow into: the pure domain rules are their own boundary
-  (`Giggly.Core`, `type: :strict`, so a core module reaching a context, config or any
-  external library fails the build); each namespace's root module is its public API and the
-  modules beneath it are implementation; callers reach the library through its root modules, and
-  nothing inside reaches back out.
-  **`mix boundary.spec` prints the graph**, and no list here restates it — a hand-maintained list
-  of what is pure goes wrong in every copy of it. Widening a boundary's `deps:` or `exports:` is a
-  decision for the user, and `.claude/hooks/waiver-gate.sh` stops the edit until it has been
-  explained in conversation (`.claude/rules/dependencies.md`).
+- **The whole library is the pure core, and the compiler holds its shape.** The architecture is
+  declared with `boundary` (`use Boundary` in each domain's root module; `compilers: [:boundary]`
+  in `mix.exs`), so a forbidden reference is a compiler warning and therefore a gate failure under
+  `--warnings-as-errors`. Every boundary is strict (the `mix.exs` default, pinned by
+  `boundary_declarations_test.exs`), so a boundary's `deps:` is the whole of what it may call,
+  outside libraries included. A plot is a value built by `Giggly.Plot` and run by the functions
+  in `Giggly`; every other domain is its own boundary, carved when its first module lands, and
+  its `deps:` is its contract. A domain that owns an outside library is a top-level boundary, so
+  the library is listed only where it is used. Arrows run one way, from what runs a plot toward
+  the data; nothing calls back up. What boundary cannot see — the standard library — the
+  `CorePurity` credo check covers over all of `lib/`: no clock, config, unseeded randomness,
+  process or IO, an impure module excluded by name.
+  **`mix boundary.spec` prints the graph**, and no list here restates it. Widening a boundary's
+  `deps:` or `exports:` is a decision for the user, and `.claude/hooks/waiver-gate.sh` stops the
+  edit until it has been explained in conversation (`.claude/rules/dependencies.md`).
 - **The pipeline is pure: no application config, no clock, no unseeded randomness.** Every option
   is an argument, and the one random step (jitter) takes an injected integer seed, so a render is
   reproducible and the suite runs offline.

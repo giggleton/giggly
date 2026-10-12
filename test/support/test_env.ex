@@ -1,4 +1,4 @@
-defmodule Giggly.TestEnv do
+defmodule GigglyTest.TestEnv do
   @moduledoc """
   Overriding `:giggly` application config for the rest of one test, and putting it back.
 
@@ -19,7 +19,7 @@ defmodule Giggly.TestEnv do
   Plain functions over `ExUnit.Callbacks.on_exit/1`, so they work from any case template, in a `test`
   body or a `setup` block:
 
-      alias Giggly.TestEnv
+      alias GigglyTest.TestEnv
 
       setup do
         TestEnv.put_app_env(:feature_enabled, true)
@@ -30,6 +30,10 @@ defmodule Giggly.TestEnv do
   Several overrides of one key in one test unwind correctly: `on_exit/1` callbacks run last-first,
   so each restores the value the one before it recorded, and the last to run puts back the original.
   """
+
+  # Test support, compiled only in the test environment: its own top-level boundary, named outside
+  # `Giggly` so that nothing in the library gains ExUnit.
+  use Boundary, deps: [ExUnit]
 
   import ExUnit.Callbacks, only: [on_exit: 1]
 

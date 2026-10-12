@@ -1,4 +1,4 @@
-defmodule Giggly.Eventually do
+defmodule GigglyTest.Eventually do
   @moduledoc """
   Waiting in a test for something asynchronous to become true — the one polling loop the suite uses.
 
@@ -6,7 +6,7 @@ defmodule Giggly.Eventually do
   until the condition holds and **fails the test when it never does**: there is no return value to
   forget to `assert` on, and no budget that runs out quietly into a pass.
 
-      import Giggly.Eventually
+      import GigglyTest.Eventually
 
       eventually(fn -> Registry.lookup(Giggly.Registry, key) == [] end)
 
@@ -26,6 +26,10 @@ defmodule Giggly.Eventually do
   process that must stay dead, a message that must never arrive — there is nothing to poll for;
   use `refute_receive` with a timeout, or a sleep carrying an inline waiver that says why.
   """
+
+  # Test support, compiled only in the test environment: its own top-level boundary, named outside
+  # `Giggly` so that nothing in the library gains ExUnit.
+  use Boundary, deps: [ExUnit]
 
   import ExUnit.Assertions, only: [flunk: 1]
 
