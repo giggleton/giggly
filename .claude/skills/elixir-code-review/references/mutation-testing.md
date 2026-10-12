@@ -15,7 +15,9 @@ The files are the `lib/` ones in scope: the command under the skill's Scope, pip
 `--files` takes. When only a test file changed, the file to mutate is its module under test.
 
 ```bash
-mix muex --no-optimize --no-filter --verbose --files lib/giggly/one.ex,lib/giggly/two.ex
+mix muex --no-optimize --no-filter --verbose --coverage-guided \
+  --format json --output <scratchpad>/muex.json \
+  --files lib/giggly/one.ex,lib/giggly/two.ex
 ```
 
 Every flag there carries weight:
@@ -30,14 +32,28 @@ Every flag there carries weight:
   diffs `<ref>...HEAD`, so it sees committed work only.
 - **`--verbose`** — prints `Found <n> file(s)` before any mutant runs. Check that it counts every
   file you named: a file that never loads is never mutated, and the summary line does not say so.
+- **`--coverage-guided`** — runs each test file once under `:cover` first, then runs against each
+  mutant exactly the test files that execute its line. Without it, muex picks a mutant's tests by
+  scanning test sources for module names, and the scan is blind to a grouped alias
+  (`alias Giggly.{DataFrame, Plot}`, after which `Plot.new` reads as a module named `Plot`) and to
+  `doctest Mod`. A module linked to some test files then runs only those, so a test file that
+  exercises it under a grouped alias never runs against its mutants and they "survive" it; that
+  happened to `Plot.computed_mapping/2`. Coverage also reports the lines no test executes at all.
+  The run leaves `cover/muex_cov_*.coverdata`, which git ignores.
+- **`--format json --output`** — the terminal report gives only a count of the uncovered
+  mutants. The JSON report gives every mutant its `status`, `location`, the `test_files` that ran,
+  and a `patch` of the mutated node `before` and `after`. A statement deletion's node is the whole
+  enclosing block, so diff the two to see the line that went.
+  Write it outside the repository (the session's scratchpad); the terminal then prints one summary
+  line.
 
 It takes minutes, not seconds — one sandboxed `mix test` per mutant — which is why it runs on the
 changed files and is not a `mix quality` step.
 
 ## Findings
 
-The output to act on is the **survivors**, not the score. Each one is one of three things, and the
-report says which.
+The output to act on is the **survivors** and the **uncovered mutants**, not the score. Each
+survivor is one of three things, and the report says which; each uncovered mutant is a fourth.
 
 ### 1. A behavior no test pins — report under test quality
 
@@ -53,9 +69,16 @@ Such as a guard its only caller already enforces — a finding on the code, not 
 The mutant cannot change behavior: map keys reordered, `Map.put` → `Map.put_new` where a guard
 already excludes the key, a type guard whose removal only changes which exception a programmer
 error raises. Named with the reason, so the call can be checked; a survivor is never dismissed
-silently. (muex never mutates documentation; the report shows the module from its first line, so
-a deletion further down can read as if the moduledoc went — find the deleted line before naming
-it.)
+silently. Diff the `patch`'s `before` and `after` to see what a mutant changed, never a glance at
+the code around it.
+
+### 4. A line no test executes — report under test quality
+
+An uncovered mutant (`status: "no_coverage"`) was skipped because no test runs its line at all,
+which is a stronger finding than a survivor: nothing exercises that code. Find what the line is
+before judging it. It may be a clause or default argument no caller uses yet (`Plot.new/1`, the
+clause a default argument generates, was one), which wants an example or a test; or code nothing
+can reach, which is a finding on the code (Low).
 
 ## Not a finding
 
@@ -73,7 +96,8 @@ it.)
   `mix quality` would fail. Deleting a `use Boundary` declaration survives too; the waiver gate
   denies that edit (design-log §4).
 - **The score.** Equivalent mutants count against it, so it measures noise as well as holes; the
-  survivor list is the signal.
+  survivor list is the signal. muex also exits non-zero when the score falls below its default
+  `--fail-at` of 80; that exit status is not a failure of the review.
 
 ## What it cannot tell you
 
@@ -87,11 +111,13 @@ applies; this file contributes only its line in the survivors section.
 
 ## Report
 
-The report ends with the survivors, each with what it is (a finding above, or equivalent and why);
-when none survived, one line says so. Message-wording survivors are grouped, one line per message.
+The report ends with the survivors and the uncovered mutants, each with what it is (a finding
+above, or equivalent and why); when there are none, one line says so. Message-wording survivors
+are grouped, one line per message.
 
 ```markdown
 ### Mutation survivors (<n> of <total> mutants)
 - `lib/my_lib/parser.ex:31` guard → `true` — finding above (High: no test pins the refusal)
 - `lib/my_lib/parser.ex:48` map keys reordered — equivalent: key order means nothing
+- `lib/my_lib/parser.ex:60` no coverage — finding above (no test runs the `parse/1` clause)
 ```

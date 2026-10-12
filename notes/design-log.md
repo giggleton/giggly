@@ -65,6 +65,52 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
+  Steve).** The review runs `mix muex` with `--coverage-guided --format json --output` added: each
+  test file runs once under `:cover`, each mutant then runs exactly the test files that execute its
+  line, and a line no test executes is reported as an uncovered mutant, a fourth kind of finding.
+  The JSON report gives each mutant its status, location, test files, and the mutated node before
+  and after. *Rejected: muex's default selection* — it scans test sources for module names,
+  misses a grouped alias and a `doctest` line, and runs only the linked files when there are any,
+  so `Plot`'s mutants never ran against `giggly_test.exs` and a mutant of `computed_mapping/2`
+  "survived" a test that catches it; trialled on `plot.ex`, coverage selection removed that
+  survivor and one other, took about as long (412 s), and found `Plot.new/1` unexecuted.
+  *Rejected: writing tests so the scan sees them* (single-module aliases, a call per module) — the
+  suite's style would bend to a tool's parser and still miss `doctest`. *Rejected: the terminal
+  report* — it gives only a count of uncovered mutants.
+
+- **Position scales are chosen by column type, trained after grouping and mapped to data-space
+  positions; what has no reader yet waits (2026-10-12, Steve).** `Giggly.Scale` (boundary lists
+  nothing) takes plain values: `kind/1` gives `:continuous` for `:integer`, `:float` and `:null`,
+  `:discrete` for `:string`, `:boolean` and `:atom`, and `:none` for dates, times and `:term`;
+  training follows R's `scales` (`train_continuous`: the finite numbers' range; `discrete_range`:
+  sorted distinct values, missing last — read in its source); mapping leaves a continuous value as
+  it is and puts a discrete one at its level's position from 1. The assembly trains one scale per
+  axis over every layer's x-family or y-family columns, reading the scale id from the layout table
+  (`Facet.layout/0`: `panel`, `scale_x`, `scale_y`), and maps those columns; its output became
+  `%Giggly.Assembly{}`. `Giggly.panel_scales(plot, panel)` is ggplot2's `get_panel_scales()`,
+  indexed by panel id. The assembly refuses, when the plot is run, an axis column no scale can
+  place and one whose kind disagrees with the axis's first column, naming the layer by index, the
+  aesthetic, the column and its type — where ggplot2 refuses too. `Group.add/2` numbers values by
+  an order key the assembly hands it, `Scale.level_key/1`, so group ids and axis positions come
+  from one rule while grouping names nothing about scales. *Rejected: refusing at the geom call,
+  with `Plot` asking `Scale.kind/1`* (first built, then reversed by Steve) — the description would
+  list `Scale`, and a list grants a whole boundary, so the plot could start running scales; what
+  the plot checks is what it knows, names and which aesthetics a geom takes. *Rejected: `Group`
+  listing `Scale`* — grouping would depend on scales to borrow one comparison. *Rejected: a shared
+  `Ordering` module that both list* — extracting `Scale` would carry a module that non-extracted
+  domains depend on. *Rejected: a copy of the level order in `Group`* — two copies of one rule, to
+  be kept in step by a test. Handing the order in costs one argument with one value today, and is
+  the shape configurable level order needs: ggplot2's stacks follow factor levels, not scale
+  limits, and here the assembly can hand grouping the configured order. *Rejected: routing rows
+  to several scales now* — with one panel nothing could exercise it; the assembly matches exactly
+  one scale id per axis and fails loudly when free scales bring more. *Deferred to first reader or
+  need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel),
+  transforms (identity is their absence), expansion and the view scale with the empty-axis default
+  (the coordinate system), breaks, labels and extended Wilkinson (the axes), a discrete axis's
+  continuous range (the first continuous value on one), the second training (stat and position),
+  and the layout's `row` and `col` (the scene).
+
 - **The facet assigns panels now; the layout table arrives with scale training; one plain
   function until a second facet (2026-10-12, Steve).** `Giggly.Facet.assign_panels/1`
   (ggplot2's `FacetNull$map_data()`) runs first in the assembly and puts `panel = 1` on every row
@@ -110,7 +156,8 @@ stops the question being reopened from scratch.
   with a second test refusing any `type: :relaxed`. Each domain is a sub-boundary carved when its
   first module lands: `Aesthetics` lists nothing, `Group` lists `DataFrame`, `Plot` lists
   `Aesthetics` and `DataFrame` and exports `Layer`, `Assembly` lists `Plot`, `DataFrame` and
-  `Group`; to come, `Scale` lists nothing (so it stays extractable) and the SVG backend lists only
+  `Group` (each list has grown since, with its domains' needs, and `Plot` now exports nothing —
+  `mix boundary.spec` prints the current graph); to come, `Scale` lists nothing (so it stays extractable) and the SVG backend lists only
   the scene. A domain that owns an outside library is a top-level boundary, so the library is
   listed only where it is used: `DataFrame` with `Table`, a sanctioned `top_level?:` exemption;
   `Giggly` lists `DataFrame` only so its sub-boundaries may, and exports `Plot`. The test helpers
@@ -202,7 +249,8 @@ stops the question being reopened from scratch.
   approval for a change that opens nothing.
 
 - **Mutation testing runs in code review, with muex, over the changed files; survivors are
-  triaged, not scored (2026-10-11, Steve).** `elixir-code-review` runs `mix muex --no-optimize
+  triaged, not scored (2026-10-11, Steve; since amended — tests are picked by coverage, see the
+  entry above).** `elixir-code-review` runs `mix muex --no-optimize
   --no-filter --verbose` with the changed `lib/` files as one comma-separated `--files`, and its
   report says of each survivor whether it is a missing test, unreachable or redundant code, an
   equivalent mutant, or the wording of a message whose datum the tests assert — and why.
@@ -377,6 +425,45 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-12 — Code review's mutation step picks tests by coverage.** `--coverage-guided` and a
+  JSON report were added to the procedure in `elixir-code-review`'s `mutation-testing.md`, which
+  now also treats a line no test executes as a finding (§4, the entry beginning "Mutation testing
+  picks each mutant's tests by coverage"). Found while triaging increment 5: a survivor
+  contradicted a test that existed, and the report's per-survivor "Test files" showed muex had not
+  run it. This copy of the skill now differs further from Tack's.
+
+- **2026-10-12 — Position scales (Phase 1, fifth increment).** `Giggly.Scale` with
+  `Scale.Continuous` and `Scale.Discrete`; `Facet.layout/0`; two new assembly stages, training and
+  mapping; `%Giggly.Assembly{}`; and `Giggly.panel_scales/2`. `layer_data/2` now shows a discrete
+  x at its level positions, as ggplot2's `get_layer_data()` does. The §4 entry beginning "Position
+  scales are chosen by column type" gives the shape and what was deferred. The proposal named
+  `Plot` and `Group` gaining `Scale`; writing it showed the assembly needs `Scale` and
+  `Aesthetics` too (which columns are an axis's is `Aesthetics.family/1`'s answer). Reviewing the
+  four, Steve took `Scale` out of `Plot` and `Group`: the axis checks moved into the assembly, and
+  grouping is handed its order; only the assembly's two widenings remained. The area got `.claude/rules/scale.md` and a
+  status-map line. Increment 6 (the coordinate system) would have no reader until drawing, and
+  Steve moved the stat and position stages ahead of it, so the stages are built in the order the
+  pipeline runs them. (The reason first offered — that they show in `layer_data` — was wrong: the
+  identity stat and position leave the layer tables unchanged, so they have no reader before
+  drawing either.) Review's mutation step found the type-to-kind
+  table pinned only for floats and strings (a mutant dropping `:integer` from it survived), a
+  continuous range whose first value had never been `nil` (dropping `widen`'s number guard would
+  have made the range `{nil, nil}`), the scale check unexercised for a layer remapping an axis and
+  for `group` on a date column, and the fallback for an axis no layer maps unpinned; each got an
+  example or a test. It also showed "a layer's mapping laid over the plot's" written in three
+  places, a mutant surviving in an untested copy; the rule became `Plot.computed_mapping/2`
+  (ggplot2's name), and `Plot` stopped exporting `Layer`, which nothing outside it reads any more.
+  ggplot2 gives a plot with no layers a blank layer that inherits the plot's mapping, so its axes
+  span the mapped columns; here they are untrained until a geom that draws nothing arrives. A
+  later run showed muex choosing each mutant's tests by scanning test files for module names: it
+  misses a grouped `alias Giggly.{DataFrame, Plot}` and a `doctest` line, and a module linked to
+  some test files runs only those, so `Plot`'s mutants never ran against `giggly_test.exs` and a
+  mutant of `computed_mapping/2` "survived" a test that catches it. Run with `--coverage-guided`,
+  which picks each mutant's tests by the lines they execute, that survivor and one other went,
+  and the run reported the one line no test executes: `Plot.new/1`, the plot with no mapping of
+  its own, whose doctest now shows it. Whether the review procedure switches to coverage-guided
+  selection is Steve's call.
 
 - **2026-10-12 — Staging no longer invalidates a recorded boundary approval.** The waiver gate
   hashed the changed files' declarations in `git status` order, which lists an untracked file

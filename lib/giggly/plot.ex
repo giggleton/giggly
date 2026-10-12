@@ -29,7 +29,8 @@ defmodule Giggly.Plot do
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
   both map takes the layer's column. Which aesthetics a layer can use is checked, on the two
-  mappings together, when the layer is added.
+  mappings together, when the layer is added. Whether a column's type suits an axis is a question
+  for the scales, answered when the plot is run.
 
   ## Errors
 
@@ -37,8 +38,8 @@ defmodule Giggly.Plot do
   """
 
   # A plot is a description: it may use the aesthetic vocabulary and the data frame, and nothing
-  # that runs it. `Layer` is exported because the assembly reads a plot's layers.
-  use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: [Layer]
+  # that runs it. A layer is read only through `computed_mapping/2`, so `Layer` stays private.
+  use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: []
 
   alias Giggly.{Aesthetics, DataFrame}
   alias Giggly.Plot.Layer
@@ -97,23 +98,34 @@ defmodule Giggly.Plot do
   `mapping` is laid over the plot's. Points use `:x`, `:y` and `:group`, and need `:x` and `:y`
   from one mapping or the other.
 
+  A plot with no mapping of its own, every aesthetic mapped by its layer, is ggplot2's
+  `ggplot(df) + geom_point(aes(...))`:
+
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
-      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
-      ...>   |> Giggly.Plot.geom_point(%{group: :cyl})
+      ...>   |> Giggly.Plot.new()
+      ...>   |> Giggly.Plot.geom_point(%{x: :wt, y: :mpg, group: :cyl})
       iex> plot.reversed_layers
-      [%Giggly.Plot.Layer{geom: :point, mapping: %{group: "cyl"}}]
+      [%Giggly.Plot.Layer{geom: :point, mapping: %{x: "wt", y: "mpg", group: "cyl"}}]
   """
   @spec geom_point(t(), mapping_argument()) :: t()
   def geom_point(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
-    layer_mapping = resolve(mapping, plot.data, "Plot.geom_point/2")
-    combined_mapping = Map.merge(plot.mapping, layer_mapping)
+    layer = %Layer{geom: :point, mapping: resolve(mapping, plot.data, "Plot.geom_point/2")}
+    combined_mapping = computed_mapping(plot, layer)
     check_accepted(combined_mapping)
     check_required(combined_mapping)
 
-    layer = %Layer{geom: :point, mapping: layer_mapping}
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
+
+  @doc """
+  The mapping `layer` draws with: its own mapping laid over the plot's, so an aesthetic both map
+  takes the layer's column. ggplot2 calls it the layer's computed mapping; every reader of a
+  layer's aesthetics asks for it here.
+  """
+  @spec computed_mapping(t(), Layer.t()) :: mapping()
+  def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
+    do: Map.merge(plot_mapping, layer_mapping)
 
   defp resolve(mapping, frame, function_name) do
     names = DataFrame.names(frame)

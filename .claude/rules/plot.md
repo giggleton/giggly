@@ -16,12 +16,17 @@ read when the plot is created" and "Points accept only what Phase 1 can draw".
 
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics` and
-  `Giggly.DataFrame`, and it exports `Layer` because the assembly reads a plot's layers.
+  `Giggly.DataFrame`, and exports nothing beyond `Plot`. It knows nothing about scales.
+- **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
+  reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
+  the precedence (the layer's column wins) exists once.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an
   unusable aesthetic is reported by the line that has it, never later when the plot is run. A
   missing column's message names the aesthetic, the reference as the caller wrote it, and the
-  data's columns.
+  data's columns. This covers what the plot itself knows — names, and which aesthetics a geom
+  takes and needs; whether a column's type suits an axis is the scales' question, answered when
+  the plot is run.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
