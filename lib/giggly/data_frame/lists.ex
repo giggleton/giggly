@@ -37,7 +37,7 @@ defmodule Giggly.DataFrame.Lists do
   def row_count(%__MODULE__{row_count: row_count}), do: row_count
 
   @impl DataFrame
-  def select(%__MODULE__{row_count: row_count} = frame, renames) when is_list(renames) do
+  def select(%__MODULE__{row_count: row_count} = frame, renames) do
     Enum.reduce(renames, empty(row_count), fn {new_name, existing_name}, selected ->
       add_column({new_name, pull(frame, existing_name)}, selected)
     end)

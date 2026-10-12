@@ -59,10 +59,21 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Removing a boundary declaration is a widening, and the waiver gate denies it (2026-10-11,
+  Steve).** The hook counts `use Boundary` declarations outside docstrings and denies an edit that
+  lowers the count; the commit check does the same, and flags a declaring file deleted while
+  `.ex` files remain under its namespace directory. *Rejected: a test listing the modules that
+  must declare a boundary* — it would protect Giggly only, and keep a second list in step with the
+  declarations themselves. *Rejected: relying on the permission score* — `exports: []` scores 0,
+  the same as no declaration, so deleting `Giggly.DataFrame`'s declaration scored 0 → 0 and passed.
+  *Rejected: flagging every deleted declaring file* — deleting an area outright would need an
+  approval for a change that opens nothing.
+
 - **Mutation testing runs in code review, with muex, over the changed files; survivors are
   triaged, not scored (2026-10-11, Steve).** `elixir-code-review` runs `mix muex --no-optimize
-  --no-filter` with one `--files` per changed `lib/` file, and its report says of each survivor
-  whether it is a missing test, unreachable or redundant code, or an equivalent mutant and why.
+  --no-filter --verbose` with the changed `lib/` files as one comma-separated `--files`, and its
+  report says of each survivor whether it is a missing test, unreachable or redundant code, an
+  equivalent mutant, or the wording of a message whose datum the tests assert — and why.
   An experiment; how it goes decides whether it stays. *Rejected: hand-picked mutants* — chosen by
   looking at the tests already written, they never mutated `DataFrame.pull/2`'s guard, the one
   behaviour with no test; and a scripted loop reused a previous mutant's build. *Rejected: a `mix
@@ -71,7 +82,12 @@ stops the question being reopened from scratch.
   *Rejected: muex's defaults* — its optimizer reported 100% over five mutants where the full run
   had a real survivor, and its filter skips any module declaring several callbacks. *Rejected:
   `--since <ref>`* — it diffs committed history, and review here runs before commit.
-  *Rejected: muzak and exavier* — no release since 2022 and 2020.
+  *Rejected: muzak and exavier* — no release since 2022 and 2020. *Rejected: dropping the
+  `literal` and `function_call` mutators* (2026-10-12, Steve) — replacing a value and removing or
+  rearranging a call are basic mutation operators, and their survivors are judged one by one like
+  any other. On the data frame most of theirs were error-message wording, set aside only where the
+  tests assert the message's datum; a call renamed to one that does not exist is killed whenever a
+  test runs its line, so one that survives marks a line no test runs.
 
 - **Callers reach a frame only through `Giggly.DataFrame`, which dispatches on the frame's
   struct (2026-10-11, Steve).** Each operation is a `@callback` plus a function in
@@ -227,6 +243,39 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-11 — The waiver gate treats a removed boundary declaration as a widening.** The
+  corrected mutation run left a survivor deleting `use Boundary, exports: []` from
+  `Giggly.DataFrame`: no test failed, the build stayed clean, and `.claude/hooks/waiver-gate.sh`
+  allowed the edit, since its permission score reads that declaration and no declaration alike as
+  0. Simulated edits confirmed it: exporting `Lists` was denied, deleting the declaration was not.
+  The hook now counts declarations (`boundary_count`, docstrings excluded) at edit time and at
+  commit time, flags a declaring file deleted while modules remain under its namespace, and hashes
+  the count into a recorded approval so an earlier approval cannot cover a later removal. Proved
+  against the real tree for edits (removal and widening denied; a doc edit, an identical rewrite
+  and a docstring example's removal allowed) and in a throwaway clone for the commit check
+  (removal flagged, then passed once approved and flagged again after a further change; a lone
+  deleted root flagged; a whole deleted namespace and a `git mv` passed; a plain `mv` flagged). The
+  hook came from the Tack harness, so this copy now differs from Tack's.
+
+- **2026-10-11 — The mutation step mutated only the last file named.** The procedure said to pass
+  each changed file in a `--files` of its own; muex declares `--files` as a single string, so a
+  repeated flag keeps only the last value, and it splits that value on commas. Every run before
+  this one mutated `Lists` alone — the trial's finding stands, since `pull/2`'s guard is in
+  `Lists` — and `Giggly.DataFrame` had never been mutated; the summary line gives no per-file
+  count, so nothing showed it. Found during the first review to use the step, by looking for a
+  mutant of `DataFrame.select/2`'s guard and finding none. The procedure now passes one
+  comma-separated `--files` and `--verbose`, whose `Found <n> file(s)` line counts what loaded; a
+  capped run showed the comma form loading both files and the repeated form loading one.
+  The corrected run's survivors were mostly the wording of error messages, whose datum the tests
+  assert and whose sentence they deliberately do not — a kind the reference had no name for, and
+  now names as not a finding — plus equivalent mutants and two deletions muex's sandbox lets
+  compile: an `alias`, whose warnings the gate's `--warnings-as-errors` fails, and
+  `Giggly.DataFrame`'s `use Boundary` declaration, which nothing caught (the entry above). The
+  entry below reported the `alias` deletion as a deleted `@moduledoc`; muex never mutates docs,
+  and the report's module listing had been misread. The review's own change removed `Lists.select/2`'s
+  `is_list(renames)` guard, which repeated `DataFrame.select/2`'s, its only caller, so the facade's
+  guard is the one check.
+
 - **2026-10-11 — The review's scope command works without a remote.** `elixir-code-review` found
   its files with `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`. With no `origin`
   the merge base failed inside `$(…)`, the pipeline still exited 0, and the review was scoped to
@@ -248,7 +297,8 @@ _(none yet)_
   read for what it writes: each mutant is built from source in a sandbox under the temp directory
   that symlinks the project, and runs `mix test` in a fresh VM after the mutated module's `.beam` is
   deleted, so it cannot reuse a stale build; the in-place mutate-and-restore code still in the
-  package has no callers. On the committed data frame it leaves survivors that are equivalent
+  package has no callers. (These runs mutated `lists.ex` only, and the "deleted `@moduledoc`" below
+  was a misread `alias` deletion — see "The mutation step mutated only the last file named" above.) On the committed data frame it leaves survivors that are equivalent
   (a deleted `@moduledoc`, reordered map keys, `Map.put_new` under a guard that excludes the key, a
   type guard that only changes the exception) and one that is not: `Lists.select/2`'s
   `is_list(renames)` guard repeats `DataFrame.select/2`'s, its only caller. The skill came from the

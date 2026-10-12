@@ -83,8 +83,13 @@ semver or the changelog).
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored
   against the **whole file** it would leave, not its fragments, since a formatted declaration keeps
   its `exports:` list on the lines below `use Boundary,` and a fragment holding only list entries
-  would otherwise score nothing. No comment satisfies the deny, and the commit gate re-scans the
-  working tree so a Bash edit cannot slip past. Narrowing is always free. Two gentler designs fail
+  would otherwise score nothing. **Removing a declaration is a widening too**, though the score reads
+  it as 0 → 0 (a boundary exporting only its root scores 0, and so does no declaration): it folds
+  the boundary's modules into the parent, where anything may call them. So the hook also counts
+  declarations and denies a drop, and the commit gate flags a declaring file deleted while modules
+  remain under its namespace — deleting the whole namespace widens nothing. No comment satisfies
+  the deny, and the commit gate re-scans the working tree so a Bash edit cannot slip past.
+  Narrowing is always free. Two gentler designs fail
   the same way: `ask` is auto-approved by the session's permission mode, so the widening reaches
   nobody; and a required `# why:` comment is the agent writing a justification, meeting its own
   rule with it, and approving it — a control with no second party. So the explanation belongs

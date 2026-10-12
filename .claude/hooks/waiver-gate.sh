@@ -111,6 +111,9 @@ decide() {
 # widening when it is a narrowing. Telling the two apart needs the boundary's place in the graph,
 # which this script does not parse — so boundary_caveats says so in the deny message rather than
 # pretending the number ranks the change.
+#
+# It is blind in a second direction: deleting a whole declaration. A boundary exporting only its
+# root scores 0, and so does a file with no declaration at all — see boundary_count.
 boundary_grants() {
   boundary_declaration "$1" | awk '
     {
@@ -227,6 +230,18 @@ boundary_classifications() {
     }'
 }
 
+# How many `use Boundary` declarations a text holds, docstrings excluded (strip_doc_lines), so a
+# moduledoc showing one is not counted. Removing a declaration is a widening the permission score
+# cannot see: `use Boundary, exports: []` scores 0, and so does no declaration at all, yet deleting
+# it folds the boundary's modules into its parent, where every module may call what the declaration
+# kept private. Found by mutation testing: a mutant deleting `Giggly.DataFrame`'s declaration failed
+# no test, compiled clean, and passed this hook, which read it as 0 → 0.
+boundary_count() {
+  printf '%s\n' "$1" | strip_doc_lines | awk '
+    { line = $0; sub(/^[[:space:]]+/, "", line); if (line ~ /^use Boundary([,[:space:]]|$)/) count++ }
+    END { print count + 0 }'
+}
+
 # Only files the boundary compiler actually reads — `elixirc_paths`, i.e. `.ex` under lib/ and
 # test/support. A `use Boundary` in a `.exs` file is inert by construction: ExUnit loads those at
 # runtime and the compiler never sees them. This is not a convenience carve-out; scanning them is
@@ -247,6 +262,14 @@ boundary_check() {
     decide deny "BOUNDARY GATE: this edit changes a \`classify_to:\` target in $path, moving a module from one boundary into another. That changes what it is allowed to call, so it is a grant like any other — and one the permission score cannot rank, since neither direction is obviously 'more'.
 
 Stop and tell the user in plain language: which module moves, out of which boundary and into which, and what it can call there that it could not before. Then let them decide."
+  fi
+
+  if [ "$(boundary_count "$new")" -lt "$(boundary_count "$old")" ]; then
+    decide deny "BOUNDARY GATE: this edit removes a \`use Boundary\` declaration from $path. That folds the boundary's modules into its parent, where every module may call what the declaration kept private — a widening the permission score cannot see, since a boundary exporting only its root scores 0 and so does no declaration at all.
+
+This is a hard stop, as for any widening. Do NOT edit this hook to get past it.
+
+Stop and tell the user in plain language: which boundary goes, which modules lose its protection, and what can now call them. If those modules are being deleted along with it, say so — that widens nothing. Then let them decide."
   fi
 
   before="$(boundary_grants "$old")"
@@ -415,8 +438,11 @@ widening_state() {
     while IFS= read -r path; do
       [ -z "$path" ] && continue
       compiled_source "$path" || continue
-      [ -f "$path" ] || continue
-      printf '%s %s\n' "$path" "$(boundary_grants "$(cat "$path")")"
+      if [ -f "$path" ]; then
+        printf '%s %s %s\n' "$path" "$(boundary_grants "$(cat "$path")")" "$(boundary_count "$(cat "$path")")"
+      else
+        printf '%s deleted\n' "$path"
+      fi
     done < <(changed_files | cut -f1)
   } | sha256sum | cut -d' ' -f1
 }
@@ -453,6 +479,11 @@ scan_boundary() {
     return 1
   fi
 
+  if [ "$(boundary_count "$new")" -lt "$(boundary_count "$old")" ] && ! widening_approved; then
+    printf '%s: a use Boundary declaration was removed, folding its modules into the parent boundary, where every module may call them — raise it with the user in plain language (which boundary goes, which modules lose it, what can now call them), then record their answer with: bash .claude/hooks/waiver-gate.sh approve-widening\n' "$path"
+    return 1
+  fi
+
   before="$(boundary_grants "$old")"
   after="$(boundary_grants "$new")"
   [ "$after" -le "$before" ] && return 0
@@ -466,12 +497,34 @@ scan_boundary() {
   return 1
 }
 
+# A declaring file deleted outright — through Bash, `git rm`, or a plain `mv` that git has not
+# paired as a rename. When nothing remains under its namespace the boundary went with its code,
+# which widens nothing; when modules remain, they fold into the parent exactly as if the
+# declaration had been deleted from the file. The namespace is read from the path, the convention
+# every boundary here follows.
+scan_deleted_boundary() {
+  local head_path="$1" namespace
+  compiled_source "$head_path" || return 0
+  git cat-file -e "HEAD:$head_path" 2>/dev/null || return 0
+  [ "$(boundary_count "$(git show "HEAD:$head_path")")" -gt 0 ] || return 0
+  namespace="${head_path%.ex}"
+  [ -n "$(find "$namespace" -name '*.ex' 2>/dev/null | head -1)" ] || return 0
+  widening_approved && return 0
+
+  printf '%s: deleted, but its use Boundary declaration covered modules that remain under %s/, which fold into the parent boundary, where every module may call them — raise it with the user in plain language (which boundary goes, which modules lose it, what can now call them; if the file moved, `git mv` it so the move is paired), then record their answer with: bash .claude/hooks/waiver-gate.sh approve-widening\n' \
+    "$head_path" "$namespace"
+  return 1
+}
+
 diff_check() {
   local path head_path moved_from status=0 output
   while IFS=$'\t' read -r path head_path; do
     [ -z "$path" ] && continue
     code_file "$path" || continue
-    [ -f "$path" ] || continue
+    if [ ! -f "$path" ]; then
+      scan_deleted_boundary "$head_path" || status=1
+      continue
+    fi
     if [ "$head_path" != "$path" ] && git cat-file -e "HEAD:$head_path" 2>/dev/null; then
       # A moved file is diffed against the file it was at HEAD, so it shows only what changed in
       # the move; against itself every line is added, and any waiver written before the fields
