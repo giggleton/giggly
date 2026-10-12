@@ -16,9 +16,7 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
 - **[notes/design-log.md](notes/design-log.md)** — the design overview, decision log, and milestone
   log. **Read it first to get oriented.** New work gets its full write-up there (§6), decisions with
   their rejected alternatives go in §4, and open questions in §7, with at most a one-line update
-  here. §6 keeps only recent entries (~two weeks) in full; older ones compact to a one-line index
-  after their durable content is confirmed housed in §4 and the evergreen surfaces, with the full
-  write-ups remaining in git history.
+  here.
 - **Plans do not live in this repo.** A working plan file goes in **`~/.claude/plans/`**, never
   under `notes/` and never inside a worktree — it is scaffolding for one piece of work, not a
   documentation surface. Anything durable a plan contains (a ratified decision, a rejected
@@ -43,8 +41,8 @@ Everything below is **built and merged to `main`** unless marked otherwise. Full
 design-log.md §6. Each line names the area's rules file, which carries its invariants and how it
 works. Add a line here when an area gets its rules file; nothing else about the area belongs here.
 
-- **Dependencies, toolchain, lint and security waivers** — `.claude/rules/dependencies.md`; the
-  `dependency-updates` skill.
+- **Dependencies, toolchain, the quality gate's steps, lint and security waivers** —
+  `.claude/rules/dependencies.md`; the `dependency-updates` skill.
 - **The documentation system** (what goes where, the ratchet) — `.claude/rules/docs.md`; the
   `docs-sync` skill.
 - **The aesthetic vocabulary** (spelling, the x/y position families) — `.claude/rules/aesthetics.md`.
@@ -57,61 +55,30 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `--warnings-as-errors`. The shape to grow into: the pure domain rules are their own boundary
   (`Giggly.Core`, `type: :strict`, so a core module reaching a context, config or any
   external library fails the build); each namespace's root module is its public API and the
-  modules beneath it are implementation; one `Settings` module is the only place application
-  config is read; callers reach the library through its root modules, and nothing inside reaches
-  back out.
+  modules beneath it are implementation; callers reach the library through its root modules, and
+  nothing inside reaches back out.
   **`mix boundary.spec` prints the graph**, and no list here restates it — a hand-maintained list
   of what is pure goes wrong in every copy of it. Widening a boundary's `deps:` or `exports:` is a
   decision for the user, and `.claude/hooks/waiver-gate.sh` stops the edit until it has been
   explained in conversation (`.claude/rules/dependencies.md`).
-- **Determinism via injected seeds.** All randomness derives from injected integer seeds (the
-  state-passing `:rand` API, `:erlang.phash2`), so every run is reproducible and fully
-  unit-testable with no network. No clock read in the core either: a `Clock` module at the boundary
-  reads "now" and hands the instant to a pure function.
-- **External services are flavor, behind a behaviour boundary.** Anything that talks to the
-  network — an HTTP client, an LLM, a mail adapter — sits behind a behaviour with a stub for tests,
-  and never decides domain logic. The suite runs offline, always.
-- **Pipes in the core, `with`s at the boundary.** Pure-core builders are **assertive**: they take
-  already-validated data, return **plain structs**, and raise (`FunctionClauseError`, via guards)
-  on programmer error — so they chain cleanly with `|>`. Untrusted input is validated at the
-  **boundary** shells (contexts, controllers), where errors become data: those return
-  `{:ok, t} | {:error, reason}` and thread the happy path with `with`. Validation uses guards
-  (incl. custom `defguard`s) rather than `cond`. `:none` is the "absent" sentinel (not `nil`).
+- **The pipeline is pure: no application config, no clock, no unseeded randomness.** Every option
+  is an argument, and the one random step (jitter) takes an injected integer seed, so a render is
+  reproducible and the suite runs offline.
+- **The public API raises; everything beneath it is assertive and pipes.** The `Giggly.Plot`
+  functions validate their options with NimbleOptions and raise on anything invalid, since a pipe
+  cannot carry `{:error, reason}`. The functions beneath take already-validated data, return
+  **plain structs**, and raise (`FunctionClauseError`, via guards) on programmer error. Validation
+  uses guards (incl. custom `defguard`s) rather than `cond`. `:none` is the "absent" sentinel
+  (not `nil`) — open for public options, design-log §7.
 
 ## Conventions
 
-- **Quality gate — run `mix quality` before every commit and keep it green.** The alias runs
-  `mix tack.quality`, which executes every step in the `quality_steps` list in `mix.exs`,
-  in order, each in its own `mix` subprocess, and **stops at the first failing step** with a
-  `❌ mix quality FAILED at step: <name>` banner as its final lines. That list is the single source
-  of truth: CI runs `mix quality --check` (the same list minus the formatting write), so a step
-  added there is picked up by CI with no second list to keep in sync. What the steps are for:
-  - `mix format` runs **first**, so an unformatted file is fixed up front instead of surfacing only
-    at the trailing `--check-formatted` step after the whole suite has already run.
-  - **`mix hex.audit` runs every time**, not just when `mix.exs`/`mix.lock` change: a new advisory
-    can be published against a dependency you already have, so an unchanged tree can go from
-    clean to vulnerable with no code change. It fails on retired packages as well as advisories.
-    Triage a false positive via the `:hex` project key's `ignore_advisories` list in `mix.exs`,
-    never by skipping the step. **Requires Hex ≥ 2.5** — older Hex checks retirements only and
-    exits 0, so the gate refuses to run under it (`mix local.hex --force` to update).
-  - `mix deps.unlock --check-unused` fails when `mix.lock` carries an entry for a package `mix.exs`
-    no longer declares. This is the one failure that **cannot** surface locally otherwise: the
-    stale `deps/` directory stays on disk, so every other step is happy, while CI fetches only the
-    declared tree and finds it missing. Offline and instant; fix with `mix deps.unlock --unused`.
-  - Both `mix compile --warnings-as-errors` (in `:dev` and in `:test`) warm the two build dirs; a
-    compile warning is a hard failure, matching CI. `mix test --warnings-as-errors` makes a warning
-    in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed. A
-    guard test that deliberately calls a function with the wrong type to assert it raises routes
-    the bad argument through a small `@spec`'d type-erasing identity helper, so the set-theoretic
-    type checker doesn't flag the deliberate misuse.
-  - `mix credo --strict` **must report no issues.** The checks are an explicit allowlist in
-    `.credo.exs`; new ones are adopted deliberately, never by plugin default.
-  - `mix tack.rules_check` keeps the agent-facing docs from regrowing into the shape that
-    rots: CLAUDE.md may not exceed the line budget in `.claude/rules/BUDGET`; every `paths:` glob
-    in `.claude/rules/*.md` must match an existing file (an orphan glob is a rule that silently
-    never loads); and the count of `lib/**/*.ex` files no glob covers may not rise. The budgets
-    are ratchets — `--tighten` only lowers them, and an edit that raises one stops and asks the
-    user (`.claude/hooks/waiver-gate.sh`).
+- **Quality gate — run `mix quality` before every commit and keep it green.** It runs the
+  `quality_steps` list in `mix.exs` in order and **stops at the first failing step**, ending with a
+  `❌ mix quality FAILED at step: <name>` banner; CI runs the same list with `mix quality --check`.
+  Why each step is there is in `.claude/rules/dependencies.md`. The two failures ordinary work
+  hits: `deps (unused)`, fixed with `mix deps.unlock --unused`; and a `hex.audit` advisory against
+  an unchanged tree, which goes to the user — never a skipped step.
 
   **Run `mix quality` bare — never pipe it (or any single step) through `tail`, `head`, or
   `grep`.** A pipe hides the failing step's output and makes the shell report the *pipe's* exit
@@ -119,7 +86,7 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   final `❌ … FAILED` banner. To iterate on one check in isolation, run that single `mix` task
   directly — still bare.
 - Do not commit or ask the user to commit changes. The user will prompt you to commit and does not
-  want to be reminded/encouraged to do so. Similarly do not merge or deploy without a prompt from
+  want to be reminded/encouraged to do so. Similarly do not merge or publish without a prompt from
   the user.
 - **Merging a feature branch:** if the branch has just one commit, merge it fast-forward (no merge
   commit). Use a `--no-ff` merge commit only when the branch carries two or more commits.
@@ -129,14 +96,9 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   (and a `@spec`); these are the pure core's contract and feed `ex_doc`. Use `@moduledoc false`
   only for modules with no public surface. Private functions (`defp`) don't need `@doc`; clarify
   them with a brief comment when non-obvious.
-- **Configuration is read in one place** — a `Settings` module with one documented accessor per
-  switch, carrying its default and where it is set. Nothing else under `lib/` calls
-  `Application.get_env`; the core reads no config at all and takes the value as an argument.
 - **Follow credo conventions.** If credo flags a style requirement, remember that and don't make
   the same mistake again. **A new lint or security waiver stops and asks the user** —
   `.claude/rules/dependencies.md`.
-- **Follow mix format conventions.** Don't write code that isn't consistent with the mix format
-  rules.
 - **No capture-operator anonymous functions.** Always write anonymous functions as
   `fn descriptive_name -> body end` — never the `&`/`&1` shorthand (e.g. `& &1.id`, `&(&1 + 1)`).
   `&Mod.fun/arity` references are ok. Prefer descriptive argument names over positional `&1`.
@@ -144,12 +106,11 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `pos`, `points` not `pts`, `value` not `v`. Never single-letter variables (no `p`, `s`, `n`,
   `r`). Spell out domain terms in code too; acronyms are fine only in prose where defined.
 - **One name per module kind; no two in a family share a last segment** — a shared tail collides
-  silently at `alias`. A process module ends in `Server`, `Worker`, `Watcher` or `Poller`; a
-  singular name is a pure type or fold, its plural the context owning the table.
+  silently at `alias` (open for ggplot2's `Stat.Identity`/`Position.Identity`, design-log §7). A
+  process module ends in `Server`, `Worker`, `Watcher` or `Poller`; a singular name is a pure type
+  or fold, its plural the context owning the table.
 
-## Deployment
+## Publishing
 
-- **Claude never has access to the keys** — if a task needs a secret (an API key, a signing key,
-  a deploy token), prompt the user to run that step.
-- Everything else about deployment belongs in `.claude/rules/deploy.md` once there is a deployment
-  to describe. Never state a deployed value from this repo; say where to look.
+- **Claude never has access to the keys** — publishing to Hex (`mix hex.publish`), and anything
+  else that needs a secret, is a step the user runs.

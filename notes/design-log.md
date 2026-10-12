@@ -183,6 +183,26 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-11 — CLAUDE.md trimmed to what applies to a library.** Tack's library profile installed
+  a CLAUDE.md written with an application in mind. Dropped: the external-services rule, the
+  `Settings` configuration module, the `Clock` half of the determinism rule (now one line: the
+  pipeline reads no config, clock or unseeded randomness), the deployment section (now one line
+  about publishing keys), and the "follow mix format" bullet the gate already enforces. Moved
+  without rewording: the per-step reasoning of the quality gate, into
+  `.claude/rules/dependencies.md`, which loads with `mix.exs`. Dropped as already housed
+  elsewhere: the credo-allowlist and rules-check paragraphs (`dependencies.md`, `docs.md`), the §6
+  compaction policy (§6's own header, the docs-sync skill) and the type-erasing helper note (the
+  review skill's `test-quality.md`). Rewritten: "pipes in the core, `with`s at the boundary" said
+  the boundary returns `{:ok, t} | {:error, reason}`, which a pipe API cannot do; it now says the
+  public API raises, per §4. Two harness rules that may not fit Giggly are flagged in §7 rather
+  than changed. This was prompted by the line budget: each area's rules file earns a status-map
+  line, and CLAUDE.md was at its budget after the first. The trim leaves room for Phase 1's lines,
+  so the budget is not tightened until they are in. *Rejected: raising the budget a line per area*
+  — the cap exists to keep CLAUDE.md small, and much of what filled it did not apply.
+  *Rejected: fewer, larger rules files* — each would load whenever any of its areas is read.
+  *Rejected: one status-map line per pipeline tier listing several rules files* — workable, but
+  unnecessary once the inapplicable text was gone.
+
 - **2026-10-11 — The aesthetic vocabulary (Phase 1, first increment).** `Giggly.Aesthetics`:
   canonical spelling with `colour` as the one alias, `canonicalize/1` for mappings and fixed
   options (raising on a collision), and ggplot2's x/y position families with `family/1` and
@@ -217,6 +237,18 @@ _(none yet)_
   research is in `~/.claude/plans/giggly-research/` (§1).
 
 ## 7. Deferred / open questions
+
+- **How a public option says "absent".** CLAUDE.md's sentinel rule (`:none`, never `nil`) came with
+  the harness. ggplot2 separates "remove this" (`breaks = NULL`, `guide = "none"`) from "use the
+  default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's
+  options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
+  internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
+- **Module names whose last segments collide.** CLAUDE.md forbids two modules in a family sharing a
+  last segment, since a second `alias` with the same tail shadows the first. ggplot2's naming gives
+  `Stat.Identity`, `Position.Identity` and `Scale.Identity`, and the build stage will use several at
+  once. Options: keep ggplot2's names and call them through their namespace (`alias Giggly.Stat`,
+  then `Stat.Identity`); keep them and alias with `as:`, which credo's `AliasAs` check (enabled)
+  flags; or rename (`StatIdentity`). Settled when the first stat and position land.
 
 - **Engine backends for `Giggly.DataFrame` (Explorer, Dux, SQL) are deferred.** The behaviour's
   operation set is kept relational so one can be added as a separate optional package without

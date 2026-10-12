@@ -139,6 +139,24 @@ semver or the changelog).
 - The gate's tools: `ex_doc`, `credo` (with the `jump_credo_checks` and `ex_slop` plugins and
   the `tack` checks), and `boundary`. Dependency-advisory scanning is Hex's own
   `mix hex.audit` — no scanner dependency.
+- **The quality gate's steps** are the `quality_steps` list in `mix.exs`, run in order by
+  `mix quality` and, minus the formatting write, by CI's `mix quality --check` — so a step added
+  there reaches CI with no second list to keep in sync. Why the less obvious ones are there:
+  - `mix format` runs **first**, so an unformatted file is fixed up front instead of surfacing only
+    at the trailing `--check-formatted` step after the whole suite has already run.
+  - **`mix hex.audit` runs every time**, not just when `mix.exs`/`mix.lock` change: a new advisory
+    can be published against a dependency you already have, so an unchanged tree can go from
+    clean to vulnerable with no code change. It fails on retired packages as well as advisories.
+    Triage a false positive via the `:hex` project key's `ignore_advisories` list in `mix.exs`,
+    never by skipping the step. **Requires Hex ≥ 2.5** — older Hex checks retirements only and
+    exits 0, so the gate refuses to run under it (`mix local.hex --force` to update).
+  - `mix deps.unlock --check-unused` fails when `mix.lock` carries an entry for a package `mix.exs`
+    no longer declares. This is the one failure that **cannot** surface locally otherwise: the
+    stale `deps/` directory stays on disk, so every other step is happy, while CI fetches only the
+    declared tree and finds it missing. Offline and instant; fix with `mix deps.unlock --unused`.
+  - Both `mix compile --warnings-as-errors` (in `:dev` and in `:test`) warm the two build dirs; a
+    compile warning is a hard failure, matching CI. `mix test --warnings-as-errors` makes a warning
+    in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed.
 - **Architecture as a compile-time check** (`boundary`): `compilers: [:boundary]` in `mix.exs`
   checks the `use Boundary` declarations, so a forbidden cross-namespace call is a compiler
   warning and therefore a gate failure. The installed shape is the umbrella `Giggly`
