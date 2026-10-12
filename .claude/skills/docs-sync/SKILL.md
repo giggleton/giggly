@@ -18,8 +18,8 @@ the code, and docs written before that describe a draft; and this skill fires re
 "before reporting done" while a review is easy to skip at exactly the moment you want to wrap
 up. If it's already been run for this change, carry on.
 
-**Not a loop.** `elixir-code-review`'s own last step says to run docs-sync when its findings
-led to code changes — that step is *this* run, continuing at Step 1. Don't re-invoke either
+**Not a loop.** `elixir-code-review`'s "If findings led to code changes" step says to run
+docs-sync — that step is *this* run, continuing at Step 1. Don't re-invoke either
 skill from the other a second time.
 
 ## Step 1 — grep for dead names (the highest-value check)

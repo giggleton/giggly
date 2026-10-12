@@ -59,6 +59,20 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Mutation testing runs in code review, with muex, over the changed files; survivors are
+  triaged, not scored (2026-10-11, Steve).** `elixir-code-review` runs `mix muex --no-optimize
+  --no-filter` with one `--files` per changed `lib/` file, and its report says of each survivor
+  whether it is a missing test, unreachable or redundant code, or an equivalent mutant and why.
+  An experiment; how it goes decides whether it stays. *Rejected: hand-picked mutants* — chosen by
+  looking at the tests already written, they never mutated `DataFrame.pull/2`'s guard, the one
+  behaviour with no test; and a scripted loop reused a previous mutant's build. *Rejected: a `mix
+  quality` step or a `--fail-at` score threshold* — two small files take minutes, and equivalent
+  mutants count as survivors, so the score is noise while the survivor list is the signal.
+  *Rejected: muex's defaults* — its optimizer reported 100% over five mutants where the full run
+  had a real survivor, and its filter skips any module declaring several callbacks. *Rejected:
+  `--since <ref>`* — it diffs committed history, and review here runs before commit.
+  *Rejected: muzak and exavier* — no release since 2022 and 2020.
+
 - **Callers reach a frame only through `Giggly.DataFrame`, which dispatches on the frame's
   struct (2026-10-11, Steve).** Each operation is a `@callback` plus a function in
   `Giggly.DataFrame` that calls the frame's own module, the backend pattern Explorer and Nx use.
@@ -212,6 +226,33 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-11 — The review's scope command works without a remote.** `elixir-code-review` found
+  its files with `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`. With no `origin`
+  the merge base failed inside `$(…)`, the pipeline still exited 0, and the review was scoped to
+  nothing and reported clean; and even with a remote, `...HEAD` sees committed work only, while
+  review here runs before the commit. The command now takes the merge base with the local `main`
+  and lists `git diff --name-only <base>` (the branch's commits and the uncommitted changes)
+  together with the untracked files. It was proved in a throwaway repo: on `main` it lists the
+  working tree, on a branch it adds the branch's commits, and with no `main` it prints git's error
+  and exits non-zero. The mutation step takes its files from the same list instead of keeping a
+  command of its own. Like the mutation step, this makes Giggly's copy of the skill differ from
+  Tack's.
+
+- **2026-10-11 — Mutation testing added to code review.** `muex` 0.11.3 (dev/test only, pinned
+  exactly; its one runtime dependency, `jason`, was already locked through credo) and a new step in
+  `elixir-code-review` that runs it over the changed `lib/` files and triages every survivor (§4),
+  its procedure in the skill's `references/mutation-testing.md` like the other checks' rules.
+  It was tried first on a copy of the tree with `DataFrame.pull/2`'s test removed: the full run
+  found that guard among its survivors, the gap the hand-picked mutants had missed. Its source was
+  read for what it writes: each mutant is built from source in a sandbox under the temp directory
+  that symlinks the project, and runs `mix test` in a fresh VM after the mutated module's `.beam` is
+  deleted, so it cannot reuse a stale build; the in-place mutate-and-restore code still in the
+  package has no callers. On the committed data frame it leaves survivors that are equivalent
+  (a deleted `@moduledoc`, reordered map keys, `Map.put_new` under a guard that excludes the key, a
+  type guard that only changes the exception) and one that is not: `Lists.select/2`'s
+  `is_list(renames)` guard repeats `DataFrame.select/2`'s, its only caller. The skill came from the
+  Tack harness, so this copy of it now differs from Tack's.
 
 - **2026-10-11 — The data frame (Phase 1, second increment).** `Giggly.DataFrame`, the behaviour
   and the module callers use, with `Giggly.DataFrame.Lists` its one implementation: reading any

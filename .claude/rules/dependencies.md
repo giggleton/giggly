@@ -73,6 +73,11 @@ semver or the changelog).
 - **`boundary` is the one dev tool that is not `only: [:dev, :test]`**, and must stay that way: it
   is a compiler, so it has to exist wherever `mix compile` runs, including a `:prod` release
   build. Scoping it away from prod makes the release build fail on an unknown compiler.
+- **`muex` is pinned exactly (`==`), not with `~>`.** It is young and releases fast, and the
+  flags in `elixir-code-review`'s `references/mutation-testing.md` exist because its defaults give
+  a confident false pass. So a bump goes through `dependency-updates` like any other, and before
+  the step is trusted again it re-checks what the new version does by default: which mutants the
+  optimizer drops, which modules the filter skips, how `--files` is read.
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored
@@ -138,7 +143,8 @@ semver or the changelog).
   `.tool-versions`, which CI reads.
 - The gate's tools: `ex_doc`, `credo` (with the `jump_credo_checks` and `ex_slop` plugins and
   the `tack` checks), and `boundary`. Dependency-advisory scanning is Hex's own
-  `mix hex.audit` — no scanner dependency.
+  `mix hex.audit` — no scanner dependency. `muex` is a review tool, not a gate step:
+  `elixir-code-review` runs it over the changed files.
 - **The quality gate's steps** are the `quality_steps` list in `mix.exs`, run in order by
   `mix quality` and, minus the formatting write, by CI's `mix quality --check` — so a step added
   there reaches CI with no second list to keep in sync. Why the less obvious ones are there:
