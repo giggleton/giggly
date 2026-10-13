@@ -63,7 +63,9 @@ defmodule GigglyTest do
         |> Plot.geom_point(%{x: :cyl})
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
-      assert error.message =~ ~s("cyl")
+      # The later layer is blamed, first and with its own column; the earlier one is named after
+      # it as what it disagrees with.
+      assert String.starts_with?(error.message, ~s(the layer at index 1 maps :x to "cyl"))
       assert error.message =~ ~s("wt")
     end
 

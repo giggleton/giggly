@@ -794,6 +794,32 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-13 — Phase 1 audited: the scatter plot is architecturally complete.** Phase 0 asked
+  for a scatter plot with every seam in its null form, so that Phase 2 (`facet_wrap` with free
+  scales, `coord_flip`, polar coordinates) lands without touching a geom. Built: the null facet
+  assigning `panel` to the raw data and laying out panels with scale ids; grouping; the identity
+  stat and position; one continuous and one discrete position scale that know no pixel; the
+  cartesian coordinate system as the only route to the unit panel (`transform/2`, `axes/1`,
+  `grid/1`, `clip/1`); points; the scene's table and SVG; text measurement; and, beyond the
+  list, axes, titles, a resolved theme, the panel's background and grid, and clipping. The geom
+  test holds: `Geom.Point` reads only `Coord.transform/2` and the placed `:x` and `:y`, so
+  `coord_flip` (ggplot2 relabels x and y before its transform, and `Coord.axes/1` already names
+  the aesthetic each side shows) and polar coordinates (another transform) change no geom. What
+  Phase 2 changes instead, each already marked where it fails loudly or recorded as deferred: the
+  facet's callbacks take no parameters and the plot records a bare name, while `facet_wrap` needs
+  its variables, free scales and layout; the assembly matches exactly one scale per axis, where
+  free scales route each panel's rows to its scale id; rendering matches exactly one panel and
+  hands each layer's whole frame to its geom, and `Giggly.DataFrame` has no operation yet to split
+  rows by panel; the scene and SVG allow exactly one `:rest` column and row, where panels share
+  the rest, and polar's fixed aspect ratio needs the scene to keep a cell's proportions; the
+  guide draws straight axes only; and the theme grows strip and spacing elements. The first
+  increment of Phase 2 also brings the first public options (`facet_wrap()`'s, `coord_polar()`'s),
+  and with them NimbleOptions' placement, §7's "absent" question and a misspelt name raising at
+  the call. Two items of the synthesis's Phase 1 remain deferred to Phase 3 readers, as recorded
+  in §4: `munch`, which the first path geom calls, and a discrete scale's continuous range, which
+  jitter and bars need; and a stat or position is handed no scales or panel until the first one
+  that computes.
+
 - **2026-10-13 — The panel is clipped to its edges.** What is drawn in the panel is now cut off
   at its edges, as ggplot2 cuts it, so a point at an infinite position shows only its inner half.
   The §4 entry beginning "The panel is clipped to its edges" gives the shape and how the decision
