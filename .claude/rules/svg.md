@@ -29,6 +29,12 @@ drawing"; why labels are drawn at their measured widths, and in which fonts: the
   as svglite leaves it out) and `font-family`, and `textLength` with
   `lengthAdjust='spacingAndGlyphs'`. Output can then be set beside the SVG
   in ggplot2's own visual-test snapshots.
+- **A clipped cell is written as svglite writes a clipping viewport**: a `<defs>` holding a
+  `<clipPath>` of the cell's box, then its primitives in a `<g clip-path='url(#…)'>`. The id is
+  svglite's, `cp` and the base64 of the box's `left|right|top|bottom` to two decimals, so two
+  drawings inlined on one page share an id only when they share the box and cannot clip each
+  other wrongly. svglite's group clipped to the whole drawing, around everything else, does
+  nothing visible and is left out.
 - **A label is drawn at the width `Giggly.Font` measured** (`textLength`), so the drawing agrees
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,

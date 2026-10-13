@@ -6,7 +6,8 @@ defmodule Giggly.SVG do
   size in points takes it, and the one column and the one row that are `:rest` take what is left.
   A scene with more than one of either is refused (`MatchError`) until panels can share the rest.
   Each cell's box runs from the start of its first column and row to the end of its last, and its
-  primitives are placed in that box, cells in the order the scene lists them. The
+  primitives are placed in that box, cells in the order the scene lists them; a clipped cell's
+  are drawn in a group cut off at the box, as svglite writes one. The
   document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
   `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
   shown. Numbers are written with two decimals, and each primitive as svglite writes it, so
@@ -68,9 +69,40 @@ defmodule Giggly.SVG do
   defp span_length({:points, length}, _rest), do: length
   defp span_length(:rest, rest), do: rest
 
-  defp cell(%Cell{rows: rows, columns: columns, primitives: primitives}, column_spans, row_spans) do
+  defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
     box = {span(column_spans, columns), span(row_spans, rows)}
-    Enum.map(primitives, fn primitive -> primitive(primitive, box) end)
+    drawn = Enum.map(cell.primitives, fn primitive -> primitive(primitive, box) end)
+    clip(drawn, cell.clip, box)
+  end
+
+  # A clipped cell's primitives are drawn in a group cut off at the cell's box, as svglite writes a
+  # clipping viewport: the box's clip path, named by its edges so that two drawings on one page
+  # share a name only when they share the box, then the group.
+  defp clip(drawn, :off, _box), do: drawn
+
+  defp clip(drawn, :on, {{left, width}, {top, height}}) do
+    edges =
+      Enum.join([number(left), number(left + width), number(top), number(top + height)], "|")
+
+    id = ["cp", Base.encode64(edges)]
+
+    [
+      "<defs>\n  <clipPath id='",
+      id,
+      "'>\n    <rect x='",
+      number(left),
+      "' y='",
+      number(top),
+      "' width='",
+      number(width),
+      "' height='",
+      number(height),
+      "' />\n  </clipPath>\n</defs>\n<g clip-path='url(#",
+      id,
+      ")'>\n",
+      drawn,
+      "</g>\n"
+    ]
   end
 
   # A cell's start and length in one direction: from its first column's or row's start to its

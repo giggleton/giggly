@@ -17,7 +17,8 @@ why rendering resolves the theme: the entry beginning "The theme is a resolved v
   layer's geom draws in each panel, and the guide draws the panel's background, grid lines and
   axes (`Giggly.Guide`), with that panel's params, which rendering passes on unread; rendering
   arranges what they draw into cells, the panel's background and grid under its layers, as
-  ggplot2's coordinate system draws them (`render_bg`).
+  ggplot2's coordinate system draws them (`render_bg`). The panel's cell is clipped when the
+  assembly says the coordinate system clips that panel; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
   carries the theme's name; `Theme.complete/1` turns it into the elements, which the guide and
   rendering itself read. A geom is handed no theme: the point keeps its own look until default

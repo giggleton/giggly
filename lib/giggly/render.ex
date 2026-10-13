@@ -8,7 +8,8 @@ defmodule Giggly.Render do
   (`Giggly.Theme`), which everything drawn here other than the marks takes its look from. Each
   layer is drawn by its geom (`Giggly.Geom`) in each panel, with that panel's params, in the order
   the layers were added, over the panel's background and grid lines (`Giggly.Guide`), and each
-  panel becomes a cell of the scene's table. Its axes and their
+  panel becomes a cell of the scene's table, cut off at its edges when the coordinate system
+  clips it, as every ggplot2 coordinate system does by default. Its axes and their
   titles (`Giggly.Guide`) become cells beside it, the y axis's column as wide as the axis and the
   x axis's row as tall, and the panel takes the rest of the drawing. Around the whole table is the
   theme's plot margin, and the plot's background is drawn first, under everything, over the whole
@@ -44,6 +45,7 @@ defmodule Giggly.Render do
         layer_geoms: layer_geoms,
         layout: layout,
         panel_params: panel_params,
+        panel_clips: panel_clips,
         titles: titles,
         theme: theme_name
       }) do
@@ -92,12 +94,17 @@ defmodule Giggly.Render do
         {:points, margin}
       ],
       cells: [
-        %Cell{rows: 1..5, columns: 1..5, primitives: [background_rect(background)]},
-        %Cell{rows: 2..2, columns: 4..4, primitives: panel_primitives},
-        %Cell{rows: 2..2, columns: 3..3, primitives: left_axis},
-        %Cell{rows: 3..3, columns: 4..4, primitives: bottom_axis},
-        %Cell{rows: 4..4, columns: 4..4, primitives: bottom_title},
-        %Cell{rows: 2..2, columns: 2..2, primitives: left_title}
+        %Cell{rows: 1..5, columns: 1..5, clip: :off, primitives: [background_rect(background)]},
+        %Cell{
+          rows: 2..2,
+          columns: 4..4,
+          clip: Map.fetch!(panel_clips, panel),
+          primitives: panel_primitives
+        },
+        %Cell{rows: 2..2, columns: 3..3, clip: :off, primitives: left_axis},
+        %Cell{rows: 3..3, columns: 4..4, clip: :off, primitives: bottom_axis},
+        %Cell{rows: 4..4, columns: 4..4, clip: :off, primitives: bottom_title},
+        %Cell{rows: 2..2, columns: 2..2, clip: :off, primitives: left_title}
       ]
     }
   end

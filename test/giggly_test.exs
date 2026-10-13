@@ -138,7 +138,8 @@ defmodule GigglyTest do
     # as ggplot2's own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg` does, and
     # the drawing is checked against ggplot2's drawing of the same plot, made by
     # test/golden/point.R, element by element: the plot's and the panel's backgrounds, every grid
-    # line, point, tick, label and title match it in position, size, colour and textLength. The
+    # line, point, tick, label and title match it in position, size, colour and textLength, and
+    # the panel's clip path and its group are svglite's for the same panel, id included. The
     # row missing its mpg is not drawn but still widens the x axis, as in ggplot2. It moves only
     # with a change to what a plot draws: the drawing's size, the theme, the look of the points,
     # the expansion, the breaks, a plot title arriving, or the markup.
@@ -191,8 +192,12 @@ defmodule GigglyTest do
                  "viewBox='0 0 720.00 576.00'>\n" <>
                  "<rect x='0.00' y='0.00' width='720.00' height='576.00' " <>
                  "style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />\n" <>
+                 "<defs>\n  <clipPath id='cpNS40OHw3MTQuNTJ8NS40OHw1NzAuNTI='>\n" <>
+                 "    <rect x='5.48' y='5.48' width='709.04' height='565.04' />\n" <>
+                 "  </clipPath>\n</defs>\n" <>
+                 "<g clip-path='url(#cpNS40OHw3MTQuNTJ8NS40OHw1NzAuNTI=)'>\n" <>
                  "<rect x='5.48' y='5.48' width='709.04' height='565.04' " <>
-                 "style='stroke-width: 1.07; stroke: none; fill: #EBEBEB;' />\n</svg>\n"
+                 "style='stroke-width: 1.07; stroke: none; fill: #EBEBEB;' />\n</g>\n</svg>\n"
     end
   end
 end

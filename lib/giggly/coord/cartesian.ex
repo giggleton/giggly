@@ -2,7 +2,8 @@ defmodule Giggly.Coord.Cartesian do
   @moduledoc """
   Cartesian coordinates, ggplot2's `coord_cartesian()`: x across the panel and y up it, each
   rescaled from its axis's extent to 0 to 1. Its struct is a panel's params: the x and y extents,
-  already widened by the scales, and each axis's breaks and minor breaks. Use it through
+  already widened by the scales, each axis's breaks and minor breaks, and whether the panel is
+  clipped to its edges, which it records as `:on`, ggplot2's default. Use it through
   `Giggly.Coord`.
 
   An infinite position is put at the panel's edge, as ggplot2's `squish_infinite()` puts it, so a
@@ -21,7 +22,15 @@ defmodule Giggly.Coord.Cartesian do
 
   alias Giggly.{Aesthetics, DataFrame}
 
-  @enforce_keys [:x_range, :y_range, :x_breaks, :y_breaks, :x_minor_breaks, :y_minor_breaks]
+  @enforce_keys [
+    :x_range,
+    :y_range,
+    :x_breaks,
+    :y_breaks,
+    :x_minor_breaks,
+    :y_minor_breaks,
+    :clip
+  ]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
@@ -30,7 +39,8 @@ defmodule Giggly.Coord.Cartesian do
           x_breaks: [Giggly.Coord.break()],
           y_breaks: [Giggly.Coord.break()],
           x_minor_breaks: [number()],
-          y_minor_breaks: [number()]
+          y_minor_breaks: [number()],
+          clip: Giggly.Coord.clip()
         }
 
   @impl Giggly.Coord
@@ -41,7 +51,8 @@ defmodule Giggly.Coord.Cartesian do
       x_breaks: x_breaks,
       y_breaks: y_breaks,
       x_minor_breaks: x_minor_breaks,
-      y_minor_breaks: y_minor_breaks
+      y_minor_breaks: y_minor_breaks,
+      clip: :on
     }
   end
 
@@ -67,6 +78,9 @@ defmodule Giggly.Coord.Cartesian do
       }) do
     %{bottom: {:x, place_breaks(x_breaks, x_range)}, left: {:y, place_breaks(y_breaks, y_range)}}
   end
+
+  @impl Giggly.Coord
+  def clip(%__MODULE__{clip: clip}), do: clip
 
   @impl Giggly.Coord
   def grid(%__MODULE__{x_range: x_range, y_range: y_range} = params) do

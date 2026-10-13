@@ -8,8 +8,9 @@ defmodule Giggly.Coord do
   `Giggly.Scale.minor_breaks/3`). When the plot is rendered, each geom hands its panel's rows and
   those params to `transform/2`, which places every x-family and y-family column in the panel, 0
   to 1 across its width and height; each axis is drawn from `axes/1`, which places the breaks the
-  same way and says which side of the panel each axis is drawn on; and the panel's grid is drawn
-  from `grid/1`, which runs a line across the panel at each break and minor break. A geom never
+  same way and says which side of the panel each axis is drawn on; the panel's grid is drawn
+  from `grid/1`, which runs a line across the panel at each break and minor break; and `clip/1`
+  says whether what is drawn in the panel is cut off at its edges. A geom never
   sees a scale's range, and the params are opaque to everything but this namespace, so a
   coordinate system that places positions differently (flipped, polar) changes no geom, no axis
   and no grid.
@@ -55,6 +56,12 @@ defmodule Giggly.Coord do
   """
   @type grid :: %{major: %{x: [line()], y: [line()]}, minor: %{x: [line()], y: [line()]}}
 
+  @typedoc """
+  Whether what is drawn in a panel is cut off at its edges: `:on`, ggplot2's default for every
+  coordinate system; `:off` arrives with the option to turn it off.
+  """
+  @type clip :: :on
+
   @typedoc "What a coordinate system needs to place one panel's positions."
   @type panel_params :: Coord.Cartesian.t()
 
@@ -69,6 +76,9 @@ defmodule Giggly.Coord do
 
   @doc "The panel's grid lines, placed in the panel."
   @callback grid(panel_params()) :: grid()
+
+  @doc "Whether what is drawn in the panel is cut off at its edges."
+  @callback clip(panel_params()) :: clip()
 
   @doc """
   The params of a panel whose x and y axes are `x_axis` and `y_axis`, each its extent, its breaks
@@ -172,4 +182,17 @@ defmodule Giggly.Coord do
   """
   @spec grid(panel_params()) :: grid()
   def grid(%Coord.Cartesian{} = panel_params), do: Coord.Cartesian.grid(panel_params)
+
+  @doc """
+  Whether what is drawn in the panel `panel_params` describes is cut off at its edges, ggplot2's
+  `clip`: a point at an infinite position, placed on the panel's edge, shows only its inner half.
+  Cartesian coordinates record ggplot2's default, `coord_cartesian(clip = "on")`, until the option
+  to turn it off arrives.
+
+      iex> params = Giggly.Coord.panel_params(:cartesian, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
+      iex> Giggly.Coord.clip(params)
+      :on
+  """
+  @spec clip(panel_params()) :: clip()
+  def clip(%Coord.Cartesian{} = panel_params), do: Coord.Cartesian.clip(panel_params)
 end

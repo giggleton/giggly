@@ -33,7 +33,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills
   it:** the layer frames with each layer's geom, the layout table, the trained x and y scales keyed
-  by scale id, each panel's params keyed by panel id, the x and y titles, and the name of the
+  by scale id, each panel's params and whether it is clipped (`Coord.clip/1`, asked here so
+  rendering never lists `Coord`) keyed by panel id, the x and y titles, and the name of the
   plot's theme, which the assembly passes on unread for rendering to resolve, the only stage that
   reads a theme so far; the first build stage to read one (default aesthetics, palettes) brings
   the resolution here, where ggplot2's build completes the theme.

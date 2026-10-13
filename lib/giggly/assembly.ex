@@ -21,11 +21,13 @@ defmodule Giggly.Assembly do
     8. computes each layer's stat (`Giggly.Stat`) on its table;
     9. moves each layer's marks by its position (`Giggly.Position`);
    10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
-       extents of the panel's scales and each axis's breaks and minor breaks on its extent.
+       extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
+       say whether each panel is clipped to its edges.
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  table; the trained scales, by scale id; each panel's params, by panel id; each axis's title,
+  table; the trained scales, by scale id; each panel's params and whether it is clipped, by panel
+  id; each axis's title,
   the name of the column the first layer to map the axis's aesthetic maps it to (ggplot2's
   `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering, the only
   stage that reads a theme so far. The data's own column names appear only as titles.
@@ -59,6 +61,7 @@ defmodule Giggly.Assembly do
     :x_scales,
     :y_scales,
     :panel_params,
+    :panel_clips,
     :titles,
     :theme
   ]
@@ -67,8 +70,9 @@ defmodule Giggly.Assembly do
   @typedoc """
   An assembled plot: each layer's table and the name of the geom that draws it, in the order the
   layers were added; the layout table; the trained x and y scales keyed by the scale ids the layout
-  gives each panel; each panel's params, keyed by panel id; the x and y axes' titles, `:none`
-  for an axis no layer maps; and the name of the plot's theme, which rendering resolves.
+  gives each panel; each panel's params, and whether it is clipped to its edges, keyed by panel
+  id; the x and y axes' titles, `:none` for an axis no layer maps; and the name of the plot's
+  theme, which rendering resolves.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -77,6 +81,7 @@ defmodule Giggly.Assembly do
           x_scales: %{optional(pos_integer()) => Scale.t()},
           y_scales: %{optional(pos_integer()) => Scale.t()},
           panel_params: %{optional(pos_integer()) => Coord.panel_params()},
+          panel_clips: %{optional(pos_integer()) => Coord.clip()},
           titles: %{x: String.t() | :none, y: String.t() | :none},
           theme: Plot.theme()
         }
@@ -144,13 +149,16 @@ defmodule Giggly.Assembly do
         |> Position.compute(Plot.layer_position(layer))
       end)
 
+    panel_params = panel_params(coord, layout, x_scales, y_scales)
+
     %__MODULE__{
       layer_data: layer_data,
       layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
       x_scales: x_scales,
       y_scales: y_scales,
-      panel_params: panel_params(coord, layout, x_scales, y_scales),
+      panel_params: panel_params,
+      panel_clips: Map.new(panel_params, fn {panel, params} -> {panel, Coord.clip(params)} end),
       titles: Map.new([:x, :y], fn aesthetic -> {aesthetic, title(plot, layers, aesthetic)} end),
       theme: theme
     }

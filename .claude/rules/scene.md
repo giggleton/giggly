@@ -29,8 +29,11 @@ entry beginning "Three top-level values".
 - **A text carries each label's measured width**, which the backend draws it at.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
-  `t`, `l`, `b` and `r`). Names, clipping, z-order beyond list order and aspect ratio arrive with
-  their first reader.
+  `t`, `l`, `b` and `r`). Names, z-order beyond list order and aspect ratio arrive with their first
+  reader.
+- **Every cell says whether it is clipped, `:on` or `:off`**, as gtable's `clip` does: what is
+  drawn in a clipped cell is cut off at its box. Only the panel's is `:on`, when its coordinate
+  system clips it.
 - **A rectangle fills its cell**, as grid's `rectGrob()` does at its default place and size, which
   is how ggplot2 draws a background; a rectangle placed and sized within its cell arrives with the
   first geom that draws one (bars).
@@ -39,7 +42,7 @@ entry beginning "Three top-level values".
 
 `%Giggly.Scene{}` holds the column widths (left to right), the row heights (top to bottom), each
 `{:points, size}` or `:rest`, and the cells. `Scene.Cell` holds the ranges of rows and columns it
-spans and its primitives in drawing order. The primitives are named after grid's: `Scene.Points`
+spans, whether it is clipped, and its primitives in drawing order. The primitives are named after grid's: `Scene.Points`
 (`pointsGrob()` for shape 19: positions, one radius, one outline width, one colour),
 `Scene.Polylines` (`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour,
 square-cut ends), `Scene.Rect` (`rectGrob()` filling its cell: a fill, a border colour or

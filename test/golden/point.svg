@@ -1,5 +1,11 @@
 <svg xmlns='http://www.w3.org/2000/svg' width='720.00pt' height='576.00pt' viewBox='0 0 720.00 576.00'>
 <rect x='0.00' y='0.00' width='720.00' height='576.00' style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />
+<defs>
+  <clipPath id='cpMzIuNzl8NzE0LjUyfDUuNDh8NTQ1LjEx'>
+    <rect x='32.79' y='5.48' width='681.73' height='539.63' />
+  </clipPath>
+</defs>
+<g clip-path='url(#cpMzIuNzl8NzE0LjUyfDUuNDh8NTQ1LjEx)'>
 <rect x='32.79' y='5.48' width='681.73' height='539.63' style='stroke-width: 1.07; stroke: none; fill: #EBEBEB;' />
 <polyline points='32.79,471.53 714.52,471.53 ' style='stroke-width: 0.53; stroke: #FFFFFF; stroke-linecap: butt;' />
 <polyline points='32.79,373.41 714.52,373.41 ' style='stroke-width: 0.53; stroke: #FFFFFF; stroke-linecap: butt;' />
@@ -24,6 +30,7 @@
 <circle cx='63.78' cy='520.58' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
 <circle cx='311.68' cy='30.01' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
 <circle cx='497.61' cy='324.35' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
+</g>
 <text x='27.86' y='523.61' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>0</text>
 <text x='27.86' y='425.50' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>10</text>
 <text x='27.86' y='327.38' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>20</text>

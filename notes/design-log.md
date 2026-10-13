@@ -65,6 +65,31 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The panel is clipped to its edges; the coordinate system records it and the assembly carries
+  it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
+  every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
+  `Coord$draw_panel` with the background and the border): a point at an infinite position, on
+  the panel's edge, shows only its inner half. Cartesian panel params record `clip: :on`, read
+  by a new `Coord.clip/1`; the assembly asks for each panel's and keeps it in `%Assembly{}` as
+  `panel_clips`; rendering marks the panel's cell, every `Scene.Cell` now saying `:on` or `:off`
+  as gtable's `clip` does; and SVG writes a clipped cell as svglite writes a clipping viewport,
+  a `<clipPath>` of the cell's box in `<defs>` and the cell's primitives in a `<g>` that uses
+  it, with svglite's id, `cp` and the base64 of the box's `left|right|top|bottom`. The golden's
+  clip markup is svglite's for ggplot2's drawing of the same plot, byte for byte. That id is kept
+  because it is named by the box: two drawings inlined on one page share an id only when they
+  share the box, while a counter would let one drawing's clip path cut off another's. svglite's
+  group clipped to the whole drawing around everything else does nothing visible and is left out.
+  Steve first chose the coordinate system's saying so over rendering clipping every panel itself,
+  since a deliberate default is recorded as a value a test can assert; asked how I felt about the
+  `Render` + `Coord` dependency that shape needed, I said it granted rendering the whole
+  coordinate system, `transform/2` included, against its rule of computing no positions, to read
+  one value with one answer, and proposed the assembly carry it, as it carries the axes' titles;
+  Steve agreed. *Rejected: rendering clipping every panel as a rule of its own* (proposed first)
+  — the coordinate system's default would be nowhere a test can see it, and `clip = "off"` would
+  move it later. *Rejected: `Render` listing `Coord` to ask* (Steve's first choice) — the reasons
+  above. No boundary changed. *Deferred to first reader:* `clip = "off"`, with the coordinate
+  options.
+
 - **An axis whose extent is zero wide once widened is drawn at the panel's middle, and the scale
   says so by giving the extent equal ends (2026-10-13, Steve).** A single value is widened by
   0.05 either side; from about 4.5e11 up that is rounding error beside the value, R's
@@ -122,7 +147,7 @@ stops the question being reopened from scratch.
   at an infinite position is drawn today half over the axis, where ggplot2 shows half a circle; but
   clipping is the coordinate system's `clip` option, touches the scene and svglite's clip-path
   markup, and nothing here needs it. *Rejected: a third step of this increment.* It was flagged as
-  a separate task. *Deferred to first reader:* a grid that is not rectangular, munched with its
+  a separate task (since built, see the entry beginning "The panel is clipped to its edges"). *Deferred to first reader:* a grid that is not rectangular, munched with its
   background (polar coordinates); grid lines styled apart for x and y, or drawn over the layers
   (`panel.ontop`); minor ticks on an axis; the panel's border (`render_fg`, blank in
   `theme_gray()`).
@@ -296,7 +321,8 @@ stops the question being reopened from scratch.
   secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
   `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells
   (the theme and spanning cells since built, see the entry beginning "The theme is a resolved
-  value"), names, clipping, z-order beyond list order and aspect ratio; a size for `to_svg`; placing
+  value"), names, clipping (since built, see the entry beginning "The panel is clipped"), z-order
+  beyond list order and aspect ratio; a size for `to_svg`; placing
   panels among their axes in the facet, as ggplot2's `draw_panels()` does (the second panel); a
   polyline's fill (the first with area); and the plot's title.
 
@@ -348,7 +374,9 @@ stops the question being reopened from scratch.
   theme is a resolved value"); `munch` (the first path geom); every coordinate
   option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`; a size for
   `to_svg` (the first keyword options); splitting a layer's rows by panel (the second panel,
-  where rendering's one-panel match fails loudly); clipping, cell names and spans; and how a
+  where rendering's one-panel match fails loudly); clipping, cell names and spans (clipping and
+  spans since built, see the entries beginning "The panel is clipped" and "The theme is a resolved
+  value"); and how a
   dropped row is reported, since ggplot2 warns and a pure pipeline cannot.
 
 - **A layer names its stat and position, and a continuous scale its transformation, the identity
@@ -765,6 +793,18 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-13 — The panel is clipped to its edges.** What is drawn in the panel is now cut off
+  at its edges, as ggplot2 cuts it, so a point at an infinite position shows only its inner half.
+  The §4 entry beginning "The panel is clipped to its edges" gives the shape and how the decision
+  moved: Steve chose the coordinate system's recording it, then, asked how I felt about rendering
+  listing `Coord` to read it, agreed to the assembly carrying it instead. Flagged as a separate
+  task during increment 9 and done here, after the zero-width fix. The golden gained svglite's
+  clip markup around the panel, byte for byte what svglite writes for ggplot2's drawing of the
+  same plot, and a point at infinity gets ggplot2's clip id with the edge circle inside it.
+  Review's mutation step (1,442 mutants over the six changed files) left no line unexecuted and,
+  on the changed lines, only reordered keys, one-row ranges' ends swapped and the left title's
+  cell widened rightward, which draws the same. No boundary changed.
 
 - **2026-10-13 — An axis of one huge value is drawn at the panel's middle.** A single value from
   about 1e15 up crashed `to_svg/1`, a division by zero in the coordinate system, and one from about
