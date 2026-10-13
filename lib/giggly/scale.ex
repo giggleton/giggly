@@ -210,6 +210,54 @@ defmodule Giggly.Scale do
     |> Enum.map(fn {label, position} -> {position, label} end)
   end
 
+  @doc """
+  The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
+  `breaks/2` gives on that extent, in ascending order: ggplot2's `get_breaks_minor()` as its view
+  scale calls it, less the breaks themselves, which ggplot2's grid leaves out of its minor lines.
+
+  A continuous scale takes its transformation's minor breaks (`Giggly.Scale.Transform`) and keeps
+  those inside `extent`, its ends included. Midway between breaks, and between the outermost
+  breaks and the extent's ends:
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [0, 10])
+      iex> extent = Giggly.Scale.dimension(scale)
+      iex> Giggly.Scale.minor_breaks(scale, Giggly.Scale.breaks(scale, extent), extent)
+      [1.25, 3.75, 6.25, 8.75]
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1.513, 5.424])
+      iex> extent = Giggly.Scale.dimension(scale)
+      iex> Giggly.Scale.minor_breaks(scale, Giggly.Scale.breaks(scale, extent), extent)
+      [1.5, 2.5, 3.5, 4.5, 5.5]
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [0, 10])
+      iex> breaks = [{2.5, "2.5"}, {5.0, "5.0"}, {7.5, "7.5"}]
+      iex> Giggly.Scale.minor_breaks(scale, breaks, {1.25, 8.75})
+      [1.25, 3.75, 6.25, 8.75]
+
+  An axis with fewer than two breaks has none, and so does a discrete scale, as in ggplot2:
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1.0e16])
+      iex> extent = Giggly.Scale.dimension(scale)
+      iex> Giggly.Scale.minor_breaks(scale, Giggly.Scale.breaks(scale, extent), extent)
+      []
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:discrete), ["a", "b", "c"])
+      iex> extent = Giggly.Scale.dimension(scale)
+      iex> Giggly.Scale.minor_breaks(scale, Giggly.Scale.breaks(scale, extent), extent)
+      []
+  """
+  @spec minor_breaks(t(), [break()], {float(), float()}) :: [float()]
+  def minor_breaks(%Continuous{transform: transform}, breaks, {low, high} = extent) do
+    positions = Enum.map(breaks, fn {position, _label} -> position end)
+
+    transform
+    |> Transform.minor_breaks(positions, extent)
+    |> Enum.filter(fn position -> position >= low and position <= high end)
+    |> Enum.reject(fn position -> position in positions end)
+  end
+
+  def minor_breaks(%Discrete{}, _breaks, _extent), do: []
+
   # Widens each end by a multiple of the range's width plus a constant: R's `expand_range()`.
   defp expand({low, high}, {multiple, constant}) do
     width = if zero_range?(low, high), do: 1, else: high - low

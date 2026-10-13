@@ -4,145 +4,132 @@ defmodule Giggly.Guide.Axis do
   and the break's label beyond it; and the axis's title, beyond the axis in a cell of its own, as
   ggplot2 lays its axis titles out. Use it through `Giggly.Guide`.
 
-  It looks as ggplot2's default theme draws an axis (`theme_grey()`), until a theme can be set:
-  ticks 2.75 points long in dark grey (#333333), 0.5 mm thick; labels in 8.8-point text in grey
-  (#4D4D4D), 2.2 points beyond the ticks. ggplot2 gives those lengths in TeX points, 1/72.27 inch,
-  so each is converted here to the scene's points, 1/72 inch. The labels below the panel are
-  centred on their ticks and hang from their tops; those to its left end at the gap and are
-  centred on their ticks. The axis reaches as far from the panel as its tick, its gap and its
+  It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
+  the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
+  are centred on their ticks and hang from their tops; those to its left end at the margin and are
+  centred on their ticks. The axis reaches as far from the panel as its tick, its margin and its
   labels need; one with no breaks draws nothing and takes no room, as ggplot2's does.
 
   The order things are drawn in follows ggplot2's: below the panel the ticks and then the labels,
   to its left the labels and then the ticks.
 
-  A title is 11-point black text, 2.75 points beyond its axis, centred on the panel's side: below
-  the panel hanging from the top of its cell, to its left turned 90 degrees with its top to the
-  left. Its cell is as deep as the gap and a line of text; an axis with no title takes no room.
+  A title sits the title's margin beyond its axis, centred on the panel's side: below the panel
+  hanging from the top of its cell, to its left turned 90 degrees with its top to the left, as
+  `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and a line of text;
+  an axis with no title takes no room.
   """
 
-  alias Giggly.Font
+  alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Polylines, Text}
-
-  # Scene points per TeX point (grid's "pt"), the unit ggplot2's theme gives lengths in.
-  @points_per_theme_point 72 / 72.27
-
-  # ggplot2's line widths are millimetres, which grid draws as `.pt` line-width units each, and a
-  # line-width unit is 1/96 inch.
-  @line_width_units_per_millimetre 72.27 / 25.4
-  @points_per_line_width_unit 72 / 96
-
-  # `theme_grey()`: `axis.ticks.length` (half of `half_line`, 5.5), `axis.ticks` (ink mixed 20%
-  # toward paper, `base_line_size` 11 / 22 mm), `axis.text` (0.8 of `base_size` 11, ink mixed
-  # 30.2% toward paper) and its margin (0.8 of half of `half_line`).
-  @tick_length 2.75 * @points_per_theme_point
-  @tick_color "#333333"
-  @tick_width 11 / 22 * @line_width_units_per_millimetre * @points_per_line_width_unit
-  @label_size 0.8 * 11
-  @label_color "#4D4D4D"
-  @label_gap 2.2 * @points_per_theme_point
-
-  # `axis.title.x` and `axis.title.y`: `base_size` 11 in ink, with a margin of half of `half_line`
-  # toward the axis.
-  @title_size 11.0
-  @title_color "#000000"
-  @title_gap 2.75 * @points_per_theme_point
 
   @doc """
   The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
-  and its label: how far it reaches from the panel, in points, and its primitives, placed in a
-  cell that deep.
+  and its label, in `theme`'s look: how far it reaches from the panel, in points, and its
+  primitives, placed in a cell that deep.
   """
-  @spec draw([{float(), String.t()}], :bottom | :left) :: Giggly.Guide.drawn_axis()
-  def draw([], _side), do: {0.0, []}
+  @spec draw([{float(), String.t()}], :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
+  def draw([], _side, _theme), do: {0.0, []}
 
-  def draw(breaks, :bottom) do
+  def draw(breaks, :bottom, %Theme{
+        axis_ticks: ticks_look,
+        axis_ticks_length: tick_length,
+        axis_text: text_look
+      }) do
     {places, labels} = Enum.unzip(breaks)
-    height = @tick_length + @label_gap + Font.ascent(@label_size) + Font.descent(@label_size)
+    height = tick_length + text_look.margin + line_height(text_look.size)
 
     # A cell's y runs up from its bottom; the panel's edge is the cell's top.
-    tick_end = 1 - @tick_length / height
-    label_top = 1 - (@tick_length + @label_gap) / height
+    tick_end = 1 - tick_length / height
+    label_top = 1 - (tick_length + text_look.margin) / height
 
     ticks = %Polylines{
       lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
-      stroke_width: @tick_width,
-      color: @tick_color
+      stroke_width: ticks_look.line_width,
+      color: ticks_look.color
     }
 
     text = %Text{
       x: places,
       y: List.duplicate(label_top, length(places)),
       labels: labels,
-      widths: Enum.map(labels, fn label -> Font.width(label, @label_size) end),
-      size: @label_size,
-      color: @label_color,
+      widths: Enum.map(labels, fn label -> Font.width(label, text_look.size) end),
+      size: text_look.size,
+      color: text_look.color,
       angle: 0,
       anchor: :middle,
-      baseline_offset: -Font.ascent(@label_size)
+      baseline_offset: -Font.ascent(text_look.size)
     }
 
     {height, [ticks, text]}
   end
 
-  def draw(breaks, :left) do
+  def draw(breaks, :left, %Theme{
+        axis_ticks: ticks_look,
+        axis_ticks_length: tick_length,
+        axis_text: text_look
+      }) do
     {places, labels} = Enum.unzip(breaks)
-    label_widths = Enum.map(labels, fn label -> Font.width(label, @label_size) end)
-    width = Enum.max(label_widths) + @label_gap + @tick_length
+    label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
+    width = Enum.max(label_widths) + text_look.margin + tick_length
 
     # The panel's edge is the cell's right.
-    tick_end = 1 - @tick_length / width
-    label_end = 1 - (@tick_length + @label_gap) / width
+    tick_end = 1 - tick_length / width
+    label_end = 1 - (tick_length + text_look.margin) / width
 
     text = %Text{
       x: List.duplicate(label_end, length(places)),
       y: places,
       labels: labels,
       widths: label_widths,
-      size: @label_size,
-      color: @label_color,
+      size: text_look.size,
+      color: text_look.color,
       angle: 0,
       anchor: :end,
-      baseline_offset: -Font.ascent(@label_size) / 2
+      baseline_offset: -Font.ascent(text_look.size) / 2
     }
 
     ticks = %Polylines{
       lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
-      stroke_width: @tick_width,
-      color: @tick_color
+      stroke_width: ticks_look.line_width,
+      color: ticks_look.color
     }
 
     {width, [text, ticks]}
   end
 
   @doc """
-  The title of the axis on `side` of the panel: how far its cell reaches from the axis, in points,
-  and its primitives, placed in a cell that deep and as long as the panel's side.
+  The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
+  the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
+  side.
   """
-  @spec title(String.t() | :none, :bottom | :left) :: Giggly.Guide.drawn_axis()
-  def title(:none, _side), do: {0.0, []}
+  @spec title(String.t() | :none, :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
+  def title(:none, _side, _theme), do: {0.0, []}
 
-  def title(text, :bottom) do
-    height = @title_gap + Font.ascent(@title_size) + Font.descent(@title_size)
-    {height, [title_text(text, {0.5, 1 - @title_gap / height}, 0)]}
+  def title(text, :bottom, %Theme{axis_title: title_look}) do
+    height = title_look.margin + line_height(title_look.size)
+    {height, [title_text(text, {0.5, 1 - title_look.margin / height}, 0, title_look)]}
   end
 
-  def title(text, :left) do
-    width = @title_gap + Font.ascent(@title_size) + Font.descent(@title_size)
-    {width, [title_text(text, {0.0, 0.5}, 90)]}
+  def title(text, :left, %Theme{axis_title: title_look}) do
+    width = title_look.margin + line_height(title_look.size)
+    {width, [title_text(text, {0.0, 0.5}, 90, title_look)]}
   end
 
   # A title hangs from its point, the top of the text's box, toward the axis.
-  defp title_text(text, {x_place, y_place}, angle) do
+  defp title_text(text, {x_place, y_place}, angle, title_look) do
     %Text{
       x: [x_place],
       y: [y_place],
       labels: [text],
-      widths: [Font.width(text, @title_size)],
-      size: @title_size,
-      color: @title_color,
+      widths: [Font.width(text, title_look.size)],
+      size: title_look.size,
+      color: title_look.color,
       angle: angle,
       anchor: :middle,
-      baseline_offset: -Font.ascent(@title_size)
+      baseline_offset: -Font.ascent(title_look.size)
     }
   end
+
+  # How deep a line of text is, ggplot2's `titleGrob` measure: its ascent and its deepest descent.
+  defp line_height(size), do: Font.ascent(size) + Font.descent(size)
 end

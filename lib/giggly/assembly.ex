@@ -21,13 +21,14 @@ defmodule Giggly.Assembly do
     8. computes each layer's stat (`Giggly.Stat`) on its table;
     9. moves each layer's marks by its position (`Giggly.Position`);
    10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
-       extents of the panel's scales and each axis's breaks on its extent.
+       extents of the panel's scales and each axis's breaks and minor breaks on its extent.
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  table; the trained scales, by scale id; each panel's params, by panel id; and each axis's title,
+  table; the trained scales, by scale id; each panel's params, by panel id; each axis's title,
   the name of the column the first layer to map the axis's aesthetic maps it to (ggplot2's
-  `setup_plot_labels()`). The data's own column names appear only as titles.
+  `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering, the only
+  stage that reads a theme so far. The data's own column names appear only as titles.
 
   Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
   """
@@ -51,14 +52,23 @@ defmodule Giggly.Assembly do
 
   alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
 
-  @enforce_keys [:layer_data, :layer_geoms, :layout, :x_scales, :y_scales, :panel_params, :titles]
+  @enforce_keys [
+    :layer_data,
+    :layer_geoms,
+    :layout,
+    :x_scales,
+    :y_scales,
+    :panel_params,
+    :titles,
+    :theme
+  ]
   defstruct @enforce_keys
 
   @typedoc """
   An assembled plot: each layer's table and the name of the geom that draws it, in the order the
   layers were added; the layout table; the trained x and y scales keyed by the scale ids the layout
-  gives each panel; each panel's params, keyed by panel id; and the x and y axes' titles, `:none`
-  for an axis no layer maps.
+  gives each panel; each panel's params, keyed by panel id; the x and y axes' titles, `:none`
+  for an axis no layer maps; and the name of the plot's theme, which rendering resolves.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -67,7 +77,8 @@ defmodule Giggly.Assembly do
           x_scales: %{optional(pos_integer()) => Scale.t()},
           y_scales: %{optional(pos_integer()) => Scale.t()},
           panel_params: %{optional(pos_integer()) => Coord.panel_params()},
-          titles: %{x: String.t() | :none, y: String.t() | :none}
+          titles: %{x: String.t() | :none, y: String.t() | :none},
+          theme: Plot.theme()
         }
 
   @doc """
@@ -81,7 +92,8 @@ defmodule Giggly.Assembly do
   columns in that axis's family are put through the scale's transformation, trained on, and mapped
   to their positions. Each layer's stat then computes on its table, and its position moves the
   marks. Last, the plot's coordinate system builds each panel's params from the extents of the
-  scales the layout gives that panel and the breaks each axis draws on its extent. Each axis is
+  scales the layout gives that panel and the breaks and minor breaks each axis draws on its
+  extent. Each axis is
   titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x` (or
   `:y`); a later layer never retitles it, and an axis no layer maps has no title.
 
@@ -91,7 +103,15 @@ defmodule Giggly.Assembly do
   as the data names it, and its type.
   """
   @spec run(Plot.t()) :: t()
-  def run(%Plot{data: data, facet: facet, coord: coord, reversed_layers: reversed_layers} = plot) do
+  def run(
+        %Plot{
+          data: data,
+          facet: facet,
+          coord: coord,
+          theme: theme,
+          reversed_layers: reversed_layers
+        } = plot
+      ) do
     layout = Facet.layout(facet)
     paneled_data = Facet.assign_panels(data, facet)
     layers = Enum.reverse(reversed_layers)
@@ -131,7 +151,8 @@ defmodule Giggly.Assembly do
       x_scales: x_scales,
       y_scales: y_scales,
       panel_params: panel_params(coord, layout, x_scales, y_scales),
-      titles: Map.new([:x, :y], fn aesthetic -> {aesthetic, title(plot, layers, aesthetic)} end)
+      titles: Map.new([:x, :y], fn aesthetic -> {aesthetic, title(plot, layers, aesthetic)} end),
+      theme: theme
     }
   end
 
@@ -164,11 +185,13 @@ defmodule Giggly.Assembly do
     end)
   end
 
-  # An axis as the coordinate system takes it: the scale's extent, widened, and the breaks an axis
-  # showing that extent draws, which ggplot2's view scale computes on the same extent.
+  # An axis as the coordinate system takes it: the scale's extent, widened, and the breaks and
+  # minor breaks an axis showing that extent draws, which ggplot2's view scale computes on the
+  # same extent.
   defp axis(scale) do
     extent = Scale.dimension(scale)
-    {extent, Scale.breaks(scale, extent)}
+    breaks = Scale.breaks(scale, extent)
+    {extent, breaks, Scale.minor_breaks(scale, breaks, extent)}
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across

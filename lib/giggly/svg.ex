@@ -5,8 +5,8 @@ defmodule Giggly.SVG do
   The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
   size in points takes it, and the one column and the one row that are `:rest` take what is left.
   A scene with more than one of either is refused (`MatchError`) until panels can share the rest.
-  Each cell's
-  primitives are then placed in the cell's box, cells in the order the scene lists them. The
+  Each cell's box runs from the start of its first column and row to the end of its last, and its
+  primitives are placed in that box, cells in the order the scene lists them. The
   document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
   `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
   shown. Numbers are written with two decimals, and each primitive as svglite writes it, so
@@ -22,7 +22,7 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Points, Polylines, Text}
+  alias Giggly.Scene.{Cell, Points, Polylines, Rect, Text}
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -32,8 +32,8 @@ defmodule Giggly.SVG do
   """
   @spec draw(Scene.t(), number(), number()) :: iodata()
   def draw(%Scene{widths: widths, heights: heights, cells: cells}, width, height) do
-    columns = lay_out(widths, width)
-    rows = lay_out(heights, height)
+    column_spans = lay_out(widths, width)
+    row_spans = lay_out(heights, height)
 
     [
       "<svg xmlns='http://www.w3.org/2000/svg' width='",
@@ -45,7 +45,7 @@ defmodule Giggly.SVG do
       " ",
       number(height),
       "'>\n",
-      Enum.map(cells, fn cell -> cell(cell, columns, rows) end),
+      Enum.map(cells, fn cell -> cell(cell, column_spans, row_spans) end),
       "</svg>\n"
     ]
   end
@@ -68,9 +68,17 @@ defmodule Giggly.SVG do
   defp span_length({:points, length}, _rest), do: length
   defp span_length(:rest, rest), do: rest
 
-  defp cell(%Cell{row: row, column: column, primitives: primitives}, columns, rows) do
-    box = {Enum.at(columns, column - 1), Enum.at(rows, row - 1)}
+  defp cell(%Cell{rows: rows, columns: columns, primitives: primitives}, column_spans, row_spans) do
+    box = {span(column_spans, columns), span(row_spans, rows)}
     Enum.map(primitives, fn primitive -> primitive(primitive, box) end)
+  end
+
+  # A cell's start and length in one direction: from its first column's or row's start to its
+  # last one's end.
+  defp span(spans, first..last//1) do
+    {start, _first_length} = Enum.at(spans, first - 1)
+    {last_start, last_length} = Enum.at(spans, last - 1)
+    {start, last_start + last_length - start}
   end
 
   # A cell's y runs up from its bottom edge; SVG's runs down from the top.
@@ -105,6 +113,27 @@ defmodule Giggly.SVG do
         " />\n"
       ]
     end)
+  end
+
+  # A rectangle fills its cell.
+  defp primitive(%Rect{} = rect, {{left, width}, {top, height}}) do
+    [
+      "<rect x='",
+      number(left),
+      "' y='",
+      number(top),
+      "' width='",
+      number(width),
+      "' height='",
+      number(height),
+      "' style='stroke-width: ",
+      number(rect.stroke_width),
+      "; stroke: ",
+      stroke(rect.color),
+      "; fill: ",
+      rect.fill,
+      ";' />\n"
+    ]
   end
 
   defp primitive(%Polylines{} = polylines, box) do
@@ -178,6 +207,10 @@ defmodule Giggly.SVG do
 
   defp text_anchor(:middle), do: " text-anchor='middle'"
   defp text_anchor(:end), do: " text-anchor='end'"
+
+  # A border of `:none` is SVG's `none`, as svglite writes a border whose colour is R's `NA`.
+  defp stroke(:none), do: "none"
+  defp stroke(color), do: color
 
   # svglite writes a text's fill only when it is not black, SVG's default.
   defp fill("#000000"), do: ""

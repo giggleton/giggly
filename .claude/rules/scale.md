@@ -15,7 +15,8 @@ are three values"; what increment 5 built and what waits for its first reader: t
 beginning "Position scales are chosen by column type"; why a continuous scale records the
 identity transformation: the entry beginning "A layer names its stat and position"; why breaks
 come from extended Wilkinson and labels are written the Elixir way: the entry beginning "Axes are
-drawn".
+drawn"; why minor breaks are R's regular ones, less the breaks: the entry beginning "The panel's
+grid lines are placed by the coordinate system".
 
 ## Rules
 
@@ -41,8 +42,8 @@ drawn".
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
-  there, and carries its axis's default breaks and labels, as R's object carries `breaks` and
-  `format`. What else R's object carries (the inverse, the domain) joins the behaviour with its
+  there, and carries its axis's default breaks, minor breaks and labels, as R's object carries
+  `breaks`, `minor_breaks` and `format`. What else R's object carries (the inverse, the domain) joins the behaviour with its
   first reader: the first transformation that is not the identity, whose breaks must be found in
   data space and mapped back.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
@@ -50,6 +51,15 @@ drawn".
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and
   the extent's low end alone when it has zero width; a discrete scale's are its levels at 1..n.
   Positions and labels travel as pairs so they cannot drift apart.
+- **`minor_breaks/3` gives an axis's minor breaks between the breaks `breaks/2` gave on the same
+  extent**, as ggplot2's view scale hands `get_breaks_minor()` its breaks: the transformation's
+  minor breaks kept inside the extent, ends included (R's `discard()`), less the breaks
+  themselves, which ggplot2's grid takes out of its minor lines and nothing here reads. A discrete
+  scale has none, as in ggplot2.
+- **The identity's minor breaks are R's `scales::regular_minor_breaks()`** (`Scale.MinorBreaks`)
+  with two intervals per gap: one more step past an outermost break the extent reaches beyond,
+  then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
+  from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
 - **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
   degenerate cases included (`Scale.Breaks`). Its test pins R's own output for a range of every
   winning nice number, skip, count and zero bonus, since a slip in one score shows only where that
@@ -79,4 +89,6 @@ value through a level-to-position map built once per call.
 `breaks/2` lives in the root, beside `dimension/1`, whose zero-width test it shares. A
 continuous scale's breaks come from `Transform.breaks/2` and its labels from `Transform.format/2`;
 `Transform.Identity` hands these to `Scale.Breaks.extended/1` and `Scale.Labels.numbers/1`.
+`minor_breaks/3` takes the breaks' positions to `Transform.minor_breaks/3`, which the identity
+hands to `Scale.MinorBreaks.regular/2`, then filters to the extent and drops the breaks.
 `Scale.Labels.levels/1` writes a discrete scale's levels.

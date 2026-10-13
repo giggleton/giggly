@@ -65,6 +65,101 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The panel's grid lines are placed by the coordinate system and drawn by the guide, at R's
+  regular minor breaks; clipping waits for a step of its own (2026-10-12, Steve).** The panel
+  is drawn as ggplot2's `theme_gray()` draws it: a light grey background (ink mixed 92% toward
+  paper, no border) and white grid lines, major ones at each axis's breaks as wide as a line and
+  minor ones between them half as wide, under the layers. **`Coord.grid/1` places the lines**: it
+  returns, for the major and the minor breaks of each aesthetic, lines of points in the unit panel,
+  which for cartesian coordinates cross the panel from edge to edge, as ggplot2's `guide_grid()`
+  runs each line from minus to plus infinity through the coordinate system. A new
+  `Giggly.Guide.Grid` gives them the theme's look and ggplot2's order (the background, the minor
+  lines of y and then of x, the major lines of y and then of x) and draws the panel's background
+  with them, as `guide_grid()` does; rendering puts them first in the panel's cell. A group with no
+  lines is drawn as an empty primitive, which draws nothing, rather than left out by a filter
+  whose effect nothing could see. *Rejected: the axes carrying minor breaks, and the guide
+  drawing a straight line across the panel at each* — the guide would decide that a grid line is
+  straight and crosses the panel, which is the coordinate system's call (ggplot2's polar
+  `render_bg` draws circles and spokes), the grid would be keyed by an axis's side where ggplot2
+  keys it by aesthetic, and the axis would carry minor breaks it never draws. The minor breaks
+  come from the scale: `Scale.Transform` gained `minor_breaks`, as R's transformation object
+  carries it, and the identity's is a port of `scales::regular_minor_breaks()` asking for two
+  intervals per gap (`Scale.MinorBreaks`): one more step past an outermost break the extent
+  reaches beyond, then each gap's middle, found as R's `seq()` finds it, the gap's start plus half
+  its width, which differs from the two ends' mean in the last bit. `Scale.minor_breaks/3` takes
+  the breaks `breaks/2` gave on the same extent, as ggplot2's view scale hands its breaks to
+  `get_breaks_minor()`, keeps the minor breaks inside the extent, its ends included, as R's
+  `discard()` does, and leaves out the breaks themselves; a discrete scale has none. The
+  assembly hands each axis's minor breaks to the coordinate system with its extent and breaks.
+  *Rejected: the breaks left among the minor breaks, for the guide to take out* (ggplot2's
+  `guide_grid()` does so with `setdiff()`) — nothing here reads them together. Every example of
+  the minor breaks was checked against R (ggplot2 4.0.3, scales 1.4.0): ggplot2's own minor grid
+  breaks for the golden's axes, mtcars's `wt`, a single value of 1e16 and a discrete axis, and
+  `regular_minor_breaks()` on inputs chosen so each clause decides one. With them the golden matches ggplot2's drawing of the same
+  plot in every element. No boundary changed. **Clipping is a step of its own, after this
+  increment** (Steve, as proposed): ggplot2 clips a panel's contents to it in the same function
+  that draws its background (`Coord$draw_panel`, from `coord_cartesian(clip = "on")`), and a point
+  at an infinite position is drawn today half over the axis, where ggplot2 shows half a circle; but
+  clipping is the coordinate system's `clip` option, touches the scene and svglite's clip-path
+  markup, and nothing here needs it. *Rejected: a third step of this increment.* It was flagged as
+  a separate task. *Deferred to first reader:* a grid that is not rectangular, munched with its
+  background (polar coordinates); grid lines styled apart for x and y, or drawn over the layers
+  (`panel.ontop`); minor ticks on an axis; the panel's border (`render_fg`, blank in
+  `theme_gray()`).
+
+- **The theme is a resolved value that every drawing function takes, recorded by name and set
+  by nobody yet; the plot's background is the first element added to it (2026-10-12, Steve).** A
+  plot records `theme: :gray`, as it records its facet and coordinate system, and `Giggly.Theme`
+  resolves the name into the complete theme (ggplot2's `complete_theme()`): every element it
+  draws, worked out from `theme_gray()`'s arguments (base size 11, black ink on white paper,
+  lines and borders 11/22 mm) as ggplot2's `theme-defaults.R` works them out, each length and
+  line width in points and each colour a hex string, so the TeX-point and millimetre conversions
+  happen once, where the theme declares them. The assembly carries the name unread; rendering
+  resolves it and hands the complete theme to the guide. The axis look moved out of the guide's
+  module attributes into it, and the plot margin out of rendering's. The plot's background, a
+  white fill with a white 0.5 mm border, is drawn first, in a cell spanning the whole table,
+  margin included, as ggplot2's `table_add_background()` adds it: without it the drawing is
+  transparent outside the panel, and on a dark page its grey labels vanish. The scene gained
+  `Rect` (grid's `rectGrob()` at its default place and size, filling its cell) and cells that span
+  ranges of rows and columns, and SVG writes svglite's rectangle markup. svglite's own page
+  rectangle is left out with the rest of its preamble, since the plot's background covers it.
+  *Rejected: a theme users can set, now* (`theme/2`, complete themes and their arguments, element
+  constructors, ggplot2's inheritance with `rel()` and `element_blank()`) — it brings
+  NimbleOptions and §7's "absent" question, which ggplot2's `NULL` (inherit) and `element_blank()`
+  (remove) are exactly, and Phase 0 put the theme tree in Phase 3. *Rejected: module attributes
+  until a theme can be set* (what the guide's rules said) — the look would sit in three drawing
+  modules sharing derived values (paper white is the grid lines' colour and the background's, 0.5
+  mm the tick's width and the major grid line's, the margin half a line), each copying the
+  derivations and conversions, and every drawing function's signature would change when a theme
+  arrived. **The point keeps its own look** (Steve, over the plan's note that the theme's
+  `element_geom` would take it now): ggplot2 4 reads `element_geom` when its build fills each
+  layer's default aesthetics in as columns (`compute_geom_2`, which is why its `layer_data()`
+  shows colour, size, shape and stroke), and that stage, points drawn with a look per row, and the
+  theme resolved in the assembly, as ggplot2's `ggplot_build()` completes it, arrive with the
+  first mapped or set colour or size. *Rejected: the geom reading the theme as it draws* —
+  ggplot2 has no such shape, `Geom` would list `Theme`, and the defaults would move again; *and
+  the default-aesthetics stage now* — every row would hold the same values, which nothing can
+  vary. **The name is `:gray`** (Steve): the American spelling the aesthetics' `color` set,
+  plotnine's `theme_gray`, and the spelling ggplot2's own documentation lists and its examples
+  use, though ggplot2 defines the function as `theme_grey` and makes `theme_gray` the alias.
+  *Rejected: `:grey`.* Accepting the other spelling waits for the public function. **A golden is
+  checked against ggplot2's drawing of the same plot** (Steve): `test/golden/point.R` draws the
+  golden's plot with ggplot2 (4.0.3) and vdiffr (1.0.9), which Docker's `r-base` image installs,
+  as ggplot2's snapshots are drawn but with no title row, since vdiffr adds `theme_test()` only to
+  a plot that sets no theme; its header gives the command and the element-by-element comparison,
+  and the suite never runs it. Before this step the golden already matched ggplot2's
+  `theme_test()` drawing of its data in every point, tick and label. *Rejected: committing
+  ggplot2's drawing with a test that compares the two* — the comparison needs a normaliser that
+  grows with each deliberate difference, such as Elixir-style labels, and two stored files that
+  must agree; *and the scratchpad alone*, where increment 8's R checks were lost with the session.
+  New boundary: `Theme` lists nothing; `Render` and `Guide` gained `Theme`; `Scene` exports
+  `Rect`. *Deferred to first reader:* a theme a user can set, and accepting `:grey`; default
+  aesthetics from `element_geom`; the panel's border (blank in `theme_gray()`); x and y styled
+  apart; text alignment and angle in the theme; theme values as CSS classes, ggity's way (the
+  LiveView layer; only colours could move, since the layout is measured from the sizes); the
+  theme's fonts. The panel's background and grid lines are this increment's second step (since
+  built, see the entry beginning "The panel's grid lines are placed").
+
 - **An axis is titled by the first layer to map its aesthetic, and the title is drawn by the
   axis's guide (2026-10-12, Steve).** The assembly titles each axis with the name of the column
   the first layer, in the order added, maps the axis's own aesthetic to through its computed
@@ -77,7 +172,7 @@ stops the question being reopened from scratch.
   fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
   here means a break's text. `Coord.axes/1` now says which aesthetic each side's axis shows, so
   which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
-  with axes. `Guide.Axis.title/2` draws each title in a cell of its own beyond its axis, as
+  with axes. `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as
   ggplot2's layout adds its `xlab-b` row and `ylab-l` column: 11-point black text, a 2.75-TeX-point
   gap toward the axis, centred on the panel's side, hanging from the cell's far edge, the y title
   turned 90 degrees. `Scene.Text` gained an angle, and SVG writes turned text and leaves out a
@@ -110,7 +205,8 @@ stops the question being reopened from scratch.
   coordinate system, whose new `axes/1` places them by the rescale the data goes through, keyed
   by the side of the panel each axis is drawn on (cartesian: x at the bottom, y on the left). A new
   `Giggly.Guide`, ggplot2's `guide_axis()`, draws each side's ticks and labels in `theme_grey()`'s
-  look, held as module attributes until a theme can be set, and measures how far the axis reaches;
+  look, held as module attributes until a theme can be set (since moved into the theme, see the
+  entry beginning "The theme is a resolved value"), and measures how far the axis reaches;
   a new `Giggly.Font` measures text. The scene gained sizes in points, its weighted size became
   `:rest`, what the fixed sizes leave, and it gained `Text` and `Polylines` primitives; SVG lays the table out and writes svglite's markup; rendering puts
   the axes and ggplot2's plot margin around the panel. Two findings made the layout exact: vdiffr,
@@ -178,8 +274,9 @@ stops the question being reopened from scratch.
   transformation's inverse and domain (the first transformation that is not the identity); minor
   breaks (grid lines); the axis line (blank in `theme_grey()`); axes above or to the right, and
   secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
-  `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells,
-  names, clipping, z-order beyond list order and aspect ratio; a size for `to_svg`; placing
+  `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells
+  (the theme and spanning cells since built, see the entry beginning "The theme is a resolved
+  value"), names, clipping, z-order beyond list order and aspect ratio; a size for `to_svg`; placing
   panels among their axes in the facet, as ggplot2's `draw_panels()` does (the second panel); a
   polyline's fill (the first with area); and the plot's title.
 
@@ -227,7 +324,8 @@ stops the question being reopened from scratch.
   would name two steps; `draw/3`, after grid's `grid.draw()`). *Deferred to first reader:* axes,
   breaks, labels and extended Wilkinson; text measurement and absolute or measured tracks (each
   since built, see the entry beginning "Axes are drawn"); the
-  panel background, grid lines and the theme; `munch` (the first path geom); every coordinate
+  panel background, grid lines and the theme (the theme since built, see the entry beginning "The
+  theme is a resolved value"); `munch` (the first path geom); every coordinate
   option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`; a size for
   `to_svg` (the first keyword options); splitting a layer's rows by panel (the second panel,
   where rendering's one-panel match fails loudly); clipping, cell names and spans; and how a
@@ -648,6 +746,50 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-13 — The panel's background and grid lines (Phase 1, ninth increment, second of two
+  steps).** The panel is drawn grey with white grid lines, major ones at each axis's breaks and
+  minor ones between them, under the points. The §4 entry beginning "The panel's grid lines are
+  placed" gives the shape, what was rejected and what waits. A continuous scale now gives minor
+  breaks (`Scale.minor_breaks/3`, the transformation's new `minor_breaks`, and
+  `Scale.MinorBreaks`, a port of R's `regular_minor_breaks()`), the assembly hands them to the
+  coordinate system, `Coord.grid/1` places the lines, and the new `Guide.Grid` draws them with the
+  panel's background, which the theme gained with the grid's two looks; a rectangle's border can
+  now be `:none`. Every expected value in the new examples came from R, run in Docker; one
+  example, breaks 0.1, 0.7 and 1.3, was chosen because only R's way of finding a gap's middle
+  gives 0.4 there, and swapping in the plain mean failed it. The golden now matches ggplot2's own
+  drawing of the same plot in all 49 elements the comparison in `test/golden/point.R` reads. A
+  plot with no layers now draws the panel's background inside the margin, and still no axes.
+  Review's mutation step (2,112 mutants over the fourteen files this step changed) left no line
+  unexecuted, and on this step's lines only equivalent survivors: reordered keys, a one-row
+  range's ends swapped, and arguments swapped in clauses that ignore all of them. Credo asked for
+  two changes on the way, an alias order and a single-item append rewritten as a final chunk. No
+  boundary changed.
+
+- **2026-10-12 — The theme and the plot's background (Phase 1, ninth increment, first of two
+  steps).** A plot records `theme: :gray`, `Giggly.Theme` resolves it into the complete theme,
+  and everything drawn other than the marks takes its look from it: the axes' ticks, labels and
+  titles, the plot margin, and the plot's new white background, drawn first over the whole
+  drawing. The §4 entry beginning "The theme is a resolved value" gives the shape, what was
+  rejected and what waits. The scope was settled one decision at a time before any code: the
+  theme a resolved value nobody can set yet, the point keeping its own look (Steve agreed, over
+  the plan's note that it would move now), `Coord.grid/1` for the second step's grid lines,
+  `:gray`, clipping as a step of its own after this increment (flagged as a separate task: a point
+  at an infinite position is drawn half over the axis today, where ggplot2 clips it), and the R
+  script kept beside the golden. Preparing the proposal found that Docker's `r-base` installs
+  ggplot2 and vdiffr, so ggplot2 can draw the golden's own plot with no title row, and that
+  today's golden already matched ggplot2's `theme_test()` drawing of it in every point, tick and
+  label; increment 8's check had used the nearest snapshot, drawn in another theme with a title,
+  and carried a caveat for it. The panel's background moved from this step into the second, so
+  the grid's drawing module arrives whole. After this step the golden gained one line, the
+  plot's background, identical to ggplot2's; what ggplot2 draws and the golden does not is the
+  panel's background and its twenty grid lines. Review's mutation step (1,897 mutants over the
+  eleven changed files) left no line unexecuted; on this step's lines its survivors were the two
+  new `use Boundary` lines, which the waiver gate stops being deleted, reordered keys, a
+  one-row range's ends swapped, and the left title's cell widened rightward, which draws the same
+  since the turned title hangs from its cell's left edge. The area got `.claude/rules/theme.md`
+  and a status-map line; the boundary changes were shown to Steve and approved before they were
+  written.
+
 - **2026-10-12 — Axis titles (Phase 1, eighth increment, second of two steps).** Each axis is
   titled by the first layer to map it, and the title is drawn beside its axis: "wt" below the x
   axis, "mpg" turned beside the y axis. The §4 entry beginning "An axis is titled" gives the rule,
@@ -1011,6 +1153,14 @@ _(none yet)_
   default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's
   options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
   internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
+- **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
+  Livebooks reproducing the examples in ggplot2's documentation, for checking drawings by eye;
+  each example can be drawn in R as `test/golden/point.R` draws the golden and compared, element
+  by element rather than byte for byte once a CSS theme moves colours out of the elements. The
+  goldens may become those examples. ExDoc does not build graphics, as ggity's docs did; it points
+  at the Livebooks. A side quest: a Kino library so a plot value draws itself in a cell (Livebook
+  shows the SVG with `Kino.Image` before then), as an optional dependency or a package of its own
+  like `kino_vega_lite`, settled when it is built.
 - **What a second geom makes legal in an inherited mapping.** Each geom call checks the plot's
   mapping with its own, so today an inherited aesthetic the geom cannot use raises. ggplot2
   evaluates every inherited aesthetic and carries the ones a layer ignores: a plot-level `label`

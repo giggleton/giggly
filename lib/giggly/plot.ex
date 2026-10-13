@@ -45,7 +45,7 @@ defmodule Giggly.Plot do
   alias Giggly.{Aesthetics, DataFrame}
   alias Giggly.Plot.Layer
 
-  @enforce_keys [:data, :mapping, :facet, :coord, :reversed_layers]
+  @enforce_keys [:data, :mapping, :facet, :coord, :theme, :reversed_layers]
   defstruct @enforce_keys
 
   @typedoc """
@@ -59,15 +59,19 @@ defmodule Giggly.Plot do
   @typedoc "How positions are placed in each panel (`Giggly.Coord`)."
   @type coord :: :cartesian
 
+  @typedoc "The look everything but the marks is drawn in (`Giggly.Theme`)."
+  @type theme :: :gray
+
   @typedoc """
-  A plot: its data, its mapping, its facet and coordinate system, and its layers newest first (each
-  function adds one at the front; they are assembled in the order they were added).
+  A plot: its data, its mapping, its facet, coordinate system and theme, and its layers newest
+  first (each function adds one at the front; they are assembled in the order they were added).
   """
   @type t :: %__MODULE__{
           data: DataFrame.t(),
           mapping: mapping(),
           facet: facet(),
           coord: coord(),
+          theme: theme(),
           reversed_layers: [Layer.t()]
         }
 
@@ -82,8 +86,9 @@ defmodule Giggly.Plot do
   @doc """
   A plot of `data` with the aesthetics in `mapping` applying to every layer.
 
-  The plot is drawn in one panel on cartesian coordinates, which it records rather than leaves
-  out: ggplot2's `ggplot()` defaults to the null facet and `coord_cartesian()`.
+  The plot is drawn in one panel on cartesian coordinates in ggplot2's default theme, which it
+  records rather than leaves out: ggplot2's `ggplot()` defaults to the null facet and
+  `coord_cartesian()`, and draws in `theme_gray()`.
 
       iex> plot =
       ...>   Giggly.Plot.new(
@@ -92,8 +97,8 @@ defmodule Giggly.Plot do
       ...>   )
       iex> plot.mapping
       %{x: "wt", y: "mpg", color: "cyl"}
-      iex> {plot.facet, plot.coord}
-      {:null, :cartesian}
+      iex> {plot.facet, plot.coord, plot.theme}
+      {:null, :cartesian, :gray}
   """
   @spec new(Table.Reader.t(), mapping_argument()) :: t()
   def new(data, mapping \\ %{}) when is_map(mapping) do
@@ -104,6 +109,7 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, frame, "Plot.new/2"),
       facet: :null,
       coord: :cartesian,
+      theme: :gray,
       reversed_layers: []
     }
   end

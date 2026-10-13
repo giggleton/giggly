@@ -33,7 +33,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills
   it:** the layer frames with each layer's geom, the layout table, the trained x and y scales keyed
-  by scale id, each panel's params keyed by panel id, and the x and y titles.
+  by scale id, each panel's params keyed by panel id, the x and y titles, and the name of the
+  plot's theme, which the assembly passes on unread for rendering to resolve, the only stage that
+  reads a theme so far; the first build stage to read one (default aesthetics, palettes) brings
+  the resolution here, where ggplot2's build completes the theme.
 - **The facet and the coordinate system run by the names the plot records**, `:null` and
   `:cartesian` included, resolved by `Giggly.Facet` and `Giggly.Coord`.
 - **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,

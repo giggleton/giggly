@@ -4,8 +4,9 @@ defmodule Giggly.Scale.Transform do
   `scales` transformation objects (`new_transform()`), which ggplot2's continuous scales hold as
   their `transform`. A scale records its transformation by name, and the name is resolved here.
 
-  A transformation also carries its axis's default breaks and labels, as R's object carries
-  `breaks` and `format`: a log axis wants powers of ten, a date axis calendar dates.
+  A transformation also carries its axis's default breaks, minor breaks and labels, as R's object
+  carries `breaks`, `minor_breaks` and `format`: a log axis wants powers of ten, a date axis
+  calendar dates.
 
   There is one transformation so far, the identity (`Giggly.Scale.Transform.Identity`), which
   every continuous scale records until a plot can choose another, as ggplot2's continuous scales
@@ -25,6 +26,12 @@ defmodule Giggly.Scale.Transform do
   @doc "The breaks of an axis showing `extent`, ascending; some may fall outside it."
   @callback breaks(extent :: {float(), float()}) :: [float()]
 
+  @doc """
+  The minor breaks between `breaks` on an axis showing `extent`, ascending; the breaks themselves
+  may be among them, and some may fall outside the extent.
+  """
+  @callback minor_breaks(breaks :: [float()], extent :: {float(), float()}) :: [float()]
+
   @doc "Each break's label, in the order given."
   @callback format(breaks :: [float()]) :: [String.t()]
 
@@ -39,6 +46,13 @@ defmodule Giggly.Scale.Transform do
   """
   @spec breaks(name(), {float(), float()}) :: [float()]
   def breaks(:identity, extent), do: Transform.Identity.breaks(extent)
+
+  @doc """
+  The default minor breaks between `breaks` on an axis showing `extent` under the transformation
+  named `name`.
+  """
+  @spec minor_breaks(name(), [float()], {float(), float()}) :: [float()]
+  def minor_breaks(:identity, breaks, extent), do: Transform.Identity.minor_breaks(breaks, extent)
 
   @doc """
   The default labels of `breaks` under the transformation named `name`.

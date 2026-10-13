@@ -5,18 +5,22 @@ defmodule Giggly.Scale.Transform.Identity do
   `Giggly.Scale.Transform`.
 
   Its axis takes R's default breaks for a transformation, extended Wilkinson
-  (`Giggly.Scale.Breaks`), and writes them as plain decimals (`Giggly.Scale.Labels`).
+  (`Giggly.Scale.Breaks`), and its default minor breaks, midway between them
+  (`Giggly.Scale.MinorBreaks`), and writes the breaks as plain decimals (`Giggly.Scale.Labels`).
   """
 
   @behaviour Giggly.Scale.Transform
 
-  alias Giggly.Scale.{Breaks, Labels}
+  alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
 
   @impl Giggly.Scale.Transform
   def transform(values), do: values
 
   @impl Giggly.Scale.Transform
   def breaks(extent), do: Breaks.extended(extent)
+
+  @impl Giggly.Scale.Transform
+  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Giggly.Scale.Transform
   def format(breaks), do: Labels.numbers(breaks)

@@ -136,15 +136,12 @@ defmodule GigglyTest do
   describe "to_svg/1" do
     # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50 in columns wt and mpg,
     # as ggplot2's own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg` does, and
-    # the drawing was checked against that snapshot element by element: every tick, label and
-    # title has the same x, the same text-anchor and the same textLength, and everything below the
-    # panel (ticks, labels and the wt title) the same y. The rest differs only by the plot title
-    # row ggplot2's test tooling adds above the panel, which moves the panel's top: the y axis's
-    # labels sit 3.03 points below their ticks as there, and the mpg title at the middle of the
-    # panel's height. The points' radius and outline are ggplot2's default point. The row missing
-    # its mpg is not drawn but still widens the x axis, as in ggplot2. It moves only with a change
-    # to what a plot draws: the drawing's size, the look of the points, axes or titles, the
-    # expansion, a background or a plot title arriving, or the markup.
+    # the drawing is checked against ggplot2's drawing of the same plot, made by
+    # test/golden/point.R, element by element: the plot's and the panel's backgrounds, every grid
+    # line, point, tick, label and title match it in position, size, colour and textLength. The
+    # row missing its mpg is not drawn but still widens the x axis, as in ggplot2. It moves only
+    # with a change to what a plot draws: the drawing's size, the theme, the look of the points,
+    # the expansion, the breaks, a plot title arriving, or the markup.
     test "each row with an x and a y is drawn as a point, with titled axes below and to the left" do
       plot =
         %{"wt" => [0.0, 4.0, 7.0, 10.0], "mpg" => [0.0, 50.0, 20.0, nil]}
@@ -182,7 +179,7 @@ defmodule GigglyTest do
       assert svg =~ ">hp</text>"
     end
 
-    test "a plot with no layers maps no axis, so it draws no axes and no titles" do
+    test "a plot with no layers maps no axis, so it draws its backgrounds but no axes or titles" do
       svg =
         %{"wt" => [2.62], "mpg" => [21.0]}
         |> Plot.new(%{x: :wt, y: :mpg})
@@ -191,7 +188,11 @@ defmodule GigglyTest do
 
       assert svg ==
                "<svg xmlns='http://www.w3.org/2000/svg' width='720.00pt' height='576.00pt' " <>
-                 "viewBox='0 0 720.00 576.00'>\n</svg>\n"
+                 "viewBox='0 0 720.00 576.00'>\n" <>
+                 "<rect x='0.00' y='0.00' width='720.00' height='576.00' " <>
+                 "style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />\n" <>
+                 "<rect x='5.48' y='5.48' width='709.04' height='565.04' " <>
+                 "style='stroke-width: 1.07; stroke: none; fill: #EBEBEB;' />\n</svg>\n"
     end
   end
 end

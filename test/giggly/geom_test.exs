@@ -6,7 +6,7 @@ defmodule Giggly.GeomTest do
 
   describe "draw_panel/3 for points" do
     test "a row missing its x or its y is not drawn" do
-      panel_params = Coord.panel_params(:cartesian, {{0.0, 4.0}, []}, {{0.0, 4.0}, []})
+      panel_params = Coord.panel_params(:cartesian, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
       frame = DataFrame.new(x: [1.0, nil, 2.0, 3.0], y: [1.0, 3.0, :nan, 2.0])
 
       assert [%Points{x: [0.25, 0.75], y: [0.25, 0.5]}] =

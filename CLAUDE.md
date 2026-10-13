@@ -61,6 +61,8 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   `.claude/rules/coord.md`.
 - **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.
 - **Guides** (`Giggly.Guide`, a panel's axes and their titles) — `.claude/rules/guide.md`.
+- **The theme** (`Giggly.Theme`, the complete theme everything but the marks is drawn in) —
+  `.claude/rules/theme.md`.
 - **Text measurement** (`Giggly.Font`, the glyph table ggplot2's snapshots measure with) —
   `.claude/rules/font.md`.
 - **Rendering** (`Giggly.Render`, an assembled plot into a scene) — `.claude/rules/render.md`.
