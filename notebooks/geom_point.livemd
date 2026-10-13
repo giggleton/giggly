@@ -1,0 +1,150 @@
+# Points: geom_point
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_point()`](https://ggplot2.tidyverse.org/reference/geom_point.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/1`, which returns an SVG document that
+`Kino.Image` shows below the cell. The data in these examples is `Giggly.Datasets.mtcars/0`, R's
+`mtcars`: 32 cars from the 1974 *Motor Trend* US magazine.
+
+## A scatter plot
+
+```r
+p <- ggplot(mtcars, aes(wt, mpg))
+p + geom_point()
+```
+
+```elixir
+plot =
+  Giggly.Datasets.mtcars()
+  |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+  |> Giggly.Plot.geom_point()
+
+plot
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Mapping colour, shape and size
+
+```r
+p + geom_point(aes(colour = factor(cyl)))
+p + geom_point(aes(shape = factor(cyl)))
+# A "bubblechart":
+p + geom_point(aes(size = qsec))
+```
+
+Not in Giggly yet: mapping `colour`, `shape` or `size` to a column, the scales that map them,
+and the legends that read them back.
+
+## Setting an aesthetic to a fixed value
+
+```r
+ggplot(mtcars, aes(wt, mpg)) + geom_point(colour = "red", size = 3)
+```
+
+Not in Giggly yet: fixed aesthetics, such as every point's colour or size.
+
+## Transparency for large datasets
+
+```r
+d <- ggplot(diamonds, aes(carat, price))
+d + geom_point(alpha = 1/10)
+d + geom_point(alpha = 1/20)
+d + geom_point(alpha = 1/100)
+```
+
+Not in Giggly yet: a fixed `alpha`, and the `diamonds` dataset, which arrives with the first
+example that can draw it.
+
+## A point's fill and border
+
+```r
+ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
+```
+
+Not in Giggly yet: shapes other than the solid circle, and a point's `fill` and `stroke`.
+
+## A legend that shows the fill
+
+```r
+ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
+  geom_point(size = 5, stroke = 1) +
+  scale_shape_manual(values = 21:25) +
+  scale_fill_ordinal(guide = guide_legend(override.aes = list(shape = 21)))
+```
+
+Not in Giggly yet: mapping `fill` and `shape`, setting a scale by hand, and legends.
+
+## Layering points of different sizes
+
+```r
+p <- ggplot(mtcars, aes(mpg, wt, shape = factor(cyl)))
+p +
+  geom_point(aes(colour = factor(cyl)), size = 4) +
+  geom_point(colour = "grey90", size = 1.5)
+p +
+  geom_point(colour = "black", size = 4.5) +
+  geom_point(colour = "pink", size = 4) +
+  geom_point(aes(shape = factor(cyl)))
+```
+
+Not in Giggly yet: mapping `shape` and `colour`, and fixed colours and sizes. Several layers of
+points already work.
+
+## Missing values
+
+ggplot2's example blanks the `mpg` of about a fifth of the cars at random, with R's
+`set.seed(1)`, and draws the rest: a row without a `y` has no point.
+
+```r
+set.seed(1)
+mtcars2 <- transform(mtcars, mpg = ifelse(runif(32) < 0.2, NA, mpg))
+ggplot(mtcars2, aes(wt, mpg)) +
+  geom_point()
+```
+
+R blanks four cars there; Giggly's version blanks the same four by name. ggplot2 also warns that
+it removed them. Giggly drops them without a warning, since drawing a plot has no side effects.
+
+```elixir
+blanked = ["Merc 280", "Merc 450SE", "Camaro Z28", "Porsche 914-2"]
+mtcars = Giggly.Datasets.mtcars()
+
+mpg =
+  Enum.zip_with(Keyword.fetch!(mtcars, :model), Keyword.fetch!(mtcars, :mpg), fn model, value ->
+    if model in blanked, do: nil, else: value
+  end)
+
+mtcars2 = List.keyreplace(mtcars, :mpg, 0, {:mpg, mpg})
+
+mtcars2
+|> Giggly.Plot.new(%{x: :wt, y: :mpg})
+|> Giggly.Plot.geom_point()
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+```r
+ggplot(mtcars2, aes(wt, mpg)) +
+  geom_point(na.rm = TRUE)
+```
+
+Not in Giggly yet: the `na.rm` option. Giggly never warns about a dropped row, so the drawing
+above is already what it would draw.

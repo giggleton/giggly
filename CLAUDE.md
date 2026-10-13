@@ -68,6 +68,9 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **Rendering** (`Giggly.Render`, an assembled plot into a scene) — `.claude/rules/render.md`.
 - **The scene** (`Giggly.Scene`, the table of cells and its primitives) — `.claude/rules/scene.md`.
 - **The SVG backend** (`Giggly.SVG`, `Giggly.to_svg/1`, the goldens) — `.claude/rules/svg.md`.
+- **Datasets** (`Giggly.Datasets`, R's tables for examples and users) — `.claude/rules/datasets.md`.
+- **Notebooks** (`notebooks/`, Livebooks following ggplot2's reference pages) —
+  `.claude/rules/notebooks.md`.
 
 ## Approach & architecture
 

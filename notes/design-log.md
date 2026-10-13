@@ -65,6 +65,29 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The notebooks follow ggplot2's reference pages, every example, as documentation; their data
+  is a public datasets module read from R's own files (2026-10-13, Steve).** Steve's aim is a set
+  of Livebook notebooks matching ggplot2's online reference, which ExDoc points at rather than
+  drawing graphics itself, as ggity's docs did. The first, `notebooks/geom_point.livemd`, follows
+  the `geom_point()` page: **every example, in the page's order** (Steve), each with ggplot2's
+  code first; the two Giggly can draw are drawn, and the rest keep their code and name what they
+  wait for, so the notebook is also the page's list of what remains. *Rejected: only the
+  examples Giggly can draw.* **No ggplot2 drawings beside Giggly's** (Steve: "this is a
+  documentation tool first"); checking a drawing against ggplot2 stays review's job. *Rejected:
+  each example drawn by ggplot2 in Docker and shown beside Giggly's* (proposed). **The data is a
+  module, `Giggly.Datasets`, so users have it for their own plots** (Steve); *rejected: JSON files
+  beside the notebooks* (proposed) *and the data inline in each notebook*. `mtcars/0` is the
+  first, a keyword list of columns in R's order with the row names as a first `model` column,
+  whole numbers as integers as plotnine's copy has them. **Its values are R's file, read at
+  compile time** (as recommended): `priv/datasets/mtcars.csv` is R 4.6.1's `write.csv(mtcars)`
+  with a provenance header, read behind a second `CorePurity` waiver worded as `Giggly.Font`'s,
+  and the file's header gives the column order. *Rejected: the values as literals in the module*
+  — R's data could not be regenerated and diffed apart from the code, and its hundreds of literal
+  mutants would survive every review, the reason the glyph table is a file. A notebook installs
+  Giggly by path and Kino, and shows a plot with `Kino.Image` until the Kino side quest lets a
+  plot show itself. Both drawn examples were checked against ggplot2's drawings of the same code
+  and match in every element. The missing-values example draws R's `set.seed(1)` rows, named.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -793,6 +816,18 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-13 — The first notebook: `geom_point`.** `notebooks/geom_point.livemd` follows
+  ggplot2's `geom_point()` reference page example by example, and `Giggly.Datasets.mtcars/0`
+  gives its data. The §4 entry beginning "The notebooks follow ggplot2's reference pages" gives
+  the decisions, each Steve's: every example, no ggplot2 drawings, a datasets module, and R's file
+  read at compile time. Two of the page's examples draw today: the scatter plot of `wt` against
+  `mpg`, and the same with four cars' `mpg` blanked, the rows R's `set.seed(1)` blanks, found by
+  running R; both match ggplot2's drawings of the same code in every element (76 and 72). The
+  others wait for mapped and fixed aesthetics, other shapes, legends, scales set by hand, the
+  `diamonds` dataset and `na.rm`. The notebook's cells were run in order, as Livebook runs them.
+  The local `livebook` escript was built with Elixir 1.14 and needs reinstalling to run Giggly,
+  which requires 1.20.
 
 - **2026-10-13 — Phase 1 audited: the scatter plot is architecturally complete.** Phase 0 asked
   for a scatter plot with every seam in its null form, so that Phase 2 (`facet_wrap` with free
