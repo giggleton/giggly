@@ -135,13 +135,15 @@ defmodule GigglyTest do
     end
   end
 
-  describe "to_svg/1" do
+  describe "to_svg/2" do
     # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50 in columns wt and mpg,
     # as ggplot2's own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg` does, and
     # the drawing is checked against ggplot2's drawing of the same plot, made by
     # test/golden/point.R, element by element: the plot's and the panel's backgrounds, every grid
     # line, point, tick, label and title match it in position, size, colour and textLength, and
-    # the panel's clip path and its group are svglite's for the same panel, id included. The
+    # the panel's clip path and its group are svglite's for the same panel, id included. It is
+    # drawn at vdiffr's size, 960 by 768 pixels (10 by 8 inches), so it can be set beside ggplot2's
+    # own snapshots. The
     # row missing its mpg is not drawn but still widens the x axis, as in ggplot2. It moves only
     # with a change to what a plot draws: the drawing's size, the theme, the look of the points,
     # the expansion, the breaks, a plot title arriving, or the markup.
@@ -153,7 +155,7 @@ defmodule GigglyTest do
 
       svg =
         plot
-        |> Giggly.to_svg()
+        |> Giggly.to_svg(width: 960, height: 768)
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/point.svg")
@@ -182,6 +184,7 @@ defmodule GigglyTest do
       assert svg =~ ">hp</text>"
     end
 
+    # Drawn at the default size, 700 by 433 pixels, which the document gives in points.
     test "a plot with no layers maps no axis, so it draws its backgrounds but no axes or titles" do
       svg =
         %{"wt" => [2.62], "mpg" => [21.0]}
@@ -190,16 +193,28 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg ==
-               "<svg xmlns='http://www.w3.org/2000/svg' width='720.00pt' height='576.00pt' " <>
-                 "viewBox='0 0 720.00 576.00'>\n" <>
-                 "<rect x='0.00' y='0.00' width='720.00' height='576.00' " <>
+               "<svg xmlns='http://www.w3.org/2000/svg' width='525.00pt' height='324.75pt' " <>
+                 "viewBox='0 0 525.00 324.75'>\n" <>
+                 "<rect x='0.00' y='0.00' width='525.00' height='324.75' " <>
                  "style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />\n" <>
-                 "<defs>\n  <clipPath id='cpNS40OHw3MTQuNTJ8NS40OHw1NzAuNTI='>\n" <>
-                 "    <rect x='5.48' y='5.48' width='709.04' height='565.04' />\n" <>
+                 "<defs>\n  <clipPath id='cpNS40OHw1MTkuNTJ8NS40OHwzMTkuMjc='>\n" <>
+                 "    <rect x='5.48' y='5.48' width='514.04' height='313.79' />\n" <>
                  "  </clipPath>\n</defs>\n" <>
-                 "<g clip-path='url(#cpNS40OHw3MTQuNTJ8NS40OHw1NzAuNTI=)'>\n" <>
-                 "<rect x='5.48' y='5.48' width='709.04' height='565.04' " <>
+                 "<g clip-path='url(#cpNS40OHw1MTkuNTJ8NS40OHwzMTkuMjc=)'>\n" <>
+                 "<rect x='5.48' y='5.48' width='514.04' height='313.79' " <>
                  "style='stroke-width: 1.07; stroke: none; fill: #EBEBEB;' />\n</g>\n</svg>\n"
+    end
+
+    test "an option it does not take is refused at the call, naming the option" do
+      plot =
+        %{"wt" => [2.62], "mpg" => [21.0]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Giggly.to_svg(plot, widht: 700) end
+
+      assert error.key == [:widht]
     end
   end
 end

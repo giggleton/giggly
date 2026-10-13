@@ -4,7 +4,7 @@
 Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
-])
+  ])
 ```
 
 ## About this notebook
@@ -16,7 +16,7 @@ draw yet keeps its ggplot2 code and names what it is waiting for, so the page is
 what remains.
 
 Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is
-described with `Giggly.Plot` and drawn with `Giggly.to_svg/1`, which returns an SVG document that
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document that
 `Kino.Image` shows below the cell. The data in these examples is `Giggly.Datasets.mtcars/0`, R's
 `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine.
 

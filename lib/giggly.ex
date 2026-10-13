@@ -5,22 +5,36 @@ defmodule Giggly do
   A plot is described with `Giggly.Plot`, which builds a value and runs nothing, and the functions
   here take a finished plot and run it, as ggplot2's `ggsave()` and `get_layer_data()` take a
   finished ggplot. `layer_data/2` shows the table a layer computes, `panel_scales/2` the scales
-  a panel is drawn on, and `to_svg/1` draws the plot.
+  a panel is drawn on, and `to_svg/2` draws the plot.
   """
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
   # a sub-boundary beneath it. Like every boundary it is strict (`mix.exs`). It lists
   # `Giggly.DataFrame`, which owns an outside library and so sits at the top level: a sub-boundary
-  # may only list what its parent does, and `panel_scales/2` reads the layout table. It exports
-  # `Plot`, which with this module is what a user of Giggly calls.
-  use Boundary, deps: [Giggly.DataFrame], exports: [Plot]
+  # may only list what its parent does, and `panel_scales/2` reads the layout table. It lists
+  # `NimbleOptions`, which validates `to_svg/2`'s options and which a sub-boundary may list in turn
+  # when its own options arrive. It exports `Plot`, which with this module is what a user of Giggly
+  # calls.
+  use Boundary, deps: [Giggly.DataFrame, NimbleOptions], exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
 
-  # The size every plot is drawn at until a size can be given: 10 by 8 inches, in points, the size
-  # of the SVG ggplot2's own visual tests snapshot (vdiffr's default).
-  @width 720
-  @height 576
+  # `to_svg/2`'s options, validated at the call as every public function's are.
+  @to_svg_options NimbleOptions.new!(
+                    width: [
+                      type: :pos_integer,
+                      default: 700,
+                      doc: "The drawing's width, in pixels."
+                    ],
+                    height: [
+                      type: :pos_integer,
+                      default: 433,
+                      doc: "The drawing's height, in pixels."
+                    ]
+                  )
+
+  # Points (1/72 inch), the unit the drawing is written in, per CSS pixel (1/96 inch).
+  @points_per_pixel 72 / 96
 
   @doc """
   The table the layer at `index` computes, counting from 0 in the order the layers were added; the
@@ -96,9 +110,23 @@ defmodule Giggly do
   end
 
   @doc """
-  The plot drawn as an SVG document, 720 by 576 points (10 by 8 inches), the size of the SVG
-  ggplot2's own visual tests snapshot. It is ggplot2's `ggsave()` to an SVG file, returned as
-  iodata rather than written.
+  The plot drawn as an SVG document. It is ggplot2's `ggsave()` to an SVG file, returned as iodata
+  rather than written.
+
+  The drawing's size is given in pixels, the unit Livebook, VegaLite and the web size things in,
+  and written in the document in points, svglite's unit, at 96 pixels to the inch. The default,
+  700 by 433 pixels, is the size ggplot2's online reference draws its examples at (pkgdown's
+  default: 700 pixels wide at 96 dots per inch, the golden ratio's height), so the notebooks look
+  as those pages do. ggplot2's own visual tests snapshot at 960 by 768 pixels (vdiffr's 10 by 8
+  inches). Text, points and lines keep their sizes in points whatever the size, so a smaller
+  drawing gives them more of it, as ggplot2's does.
+
+  ## Options
+
+  #{NimbleOptions.docs(@to_svg_options)}
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a size that is not a
+  positive whole number of pixels.
 
   Today a plot is drawn as its panel and its axes in its theme's look: each layer's marks, placed
   by the coordinate system in the panel over its background and grid lines, with the x axis below
@@ -106,11 +134,15 @@ defmodule Giggly do
   it shows, inside the theme's plot margin, on the theme's plot background. The plot's title
   arrives in turn.
   """
-  @spec to_svg(Plot.t()) :: iodata()
-  def to_svg(%Plot{} = plot) do
+  @spec to_svg(Plot.t(), keyword()) :: iodata()
+  def to_svg(%Plot{} = plot, options \\ []) when is_list(options) do
+    options = NimbleOptions.validate!(options, @to_svg_options)
+    width = Keyword.fetch!(options, :width) * @points_per_pixel
+    height = Keyword.fetch!(options, :height) * @points_per_pixel
+
     plot
     |> Assembly.run()
     |> Render.scene()
-    |> SVG.draw(@width, @height)
+    |> SVG.draw(width, height)
   end
 end

@@ -46,4 +46,4 @@ and returns a scene whose columns are margin, y title, y axis, panel and margin 
 margin, panel, x axis, x title and margin, the panel's column and row `:rest` and the others in
 points. Its first cell spans every row and column and holds a `Scene.Rect` in the theme's
 `plot_background`.
-`Giggly.to_svg/1` runs the assembly, renders, and has `Giggly.SVG` draw the scene.
+`Giggly.to_svg/2` runs the assembly, renders, and has `Giggly.SVG` draw the scene.

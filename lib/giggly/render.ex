@@ -16,7 +16,7 @@ defmodule Giggly.Render do
   table, margin included, as ggplot2 adds it (`table_add_background()`). Today a plot has one
   panel, at the layout's first row and column; legends become cells around it as they arrive.
 
-  Nothing outside Giggly calls this module: `Giggly.to_svg/1` assembles a plot and renders it
+  Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
   here.
   """
 

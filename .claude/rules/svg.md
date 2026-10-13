@@ -6,9 +6,10 @@ paths:
 
 # The SVG backend
 
-`Giggly.SVG` draws a `Giggly.Scene` as an SVG document. Why it follows svglite and draws at
-720 by 576 points: design-log §4, the entry beginning "The coordinate system arrives with
-drawing"; why labels are drawn at their measured widths, and in which fonts: the entry beginning
+`Giggly.SVG` draws a `Giggly.Scene` as an SVG document at the size it is handed. Why it follows
+svglite: design-log §4, the entry beginning "The coordinate system arrives with drawing"; why
+`to_svg/2` sizes a drawing in pixels: the entry beginning "A plot is drawn at the size it is
+given"; why labels are drawn at their measured widths, and in which fonts: the entry beginning
 "Axes are drawn".
 
 ## Rules
@@ -42,6 +43,8 @@ drawing"; why labels are drawn at their measured widths, and in which fonts: the
 - **The backend measures nothing.** Every size reaches it as points or as `:rest`.
 - **A polyline's fill is left unset**, which SVG fills black: ticks have no area, so it shows
   nothing; the first polyline with area (a path geom) sets `fill: none`.
+- **A golden is drawn at vdiffr's size, 960 by 768 pixels (720 by 576 points)**, passed to
+  `to_svg/2` explicitly, so it can be set beside ggplot2's own snapshots whatever the default.
 - **A golden changes only on purpose, checked against ggplot2's drawing of the same plot.**
   `test/golden/` holds whole documents compared byte for byte; a change to one is reviewed as a
   change to the product. Beside each golden is the R script that draws its plot with ggplot2 and
@@ -59,5 +62,6 @@ and row's start to its last one's end, a rectangle fills it, and each other prim
 at `(left + x * box_width, top + (1 - y) * box_height)`, since a cell's y runs up and SVG's runs
 down; a label's baseline is a further `baseline_offset` points toward its top, which is up for
 level text and left for text turned 90 degrees. It returns iodata.
-`Giggly.to_svg/1` draws at 720 by 576 points, the size of ggplot2's snapshots (vdiffr's default),
-until a size can be given.
+`Giggly.to_svg/2` draws at the size it is given in pixels, 700 by 433 by default, ggplot2's online
+reference size, and hands `draw/3` the size in points, at 96 pixels to the inch. Why pixels, and
+why that default: design-log §4, the entry beginning "A plot is drawn at the size it is given".

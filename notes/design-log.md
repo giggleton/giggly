@@ -65,6 +65,28 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **A plot is drawn at the size it is given, in pixels, 700 by 433 by default, ggplot2's online
+  reference size; `to_svg/2`'s options are the first NimbleOptions validates, from the root
+  boundary (2026-10-13, Steve).** In Livebook the notebook's drawings looked tiny: `to_svg/1`
+  drew every plot at vdiffr's 10 by 8 inches (960 by 768 pixels), chosen in increment 7 to match
+  ggplot2's snapshots, while ggplot2's reference pages draw at pkgdown's default, 700 pixels wide
+  at 96 dots per inch with the golden ratio's height (`pkgdown/R/figure.R`); text, points and
+  lines keep their sizes in points, so on the larger canvas they take less of it, and Livebook
+  then scales the image down to its column. Scaling the image could not help, since it keeps the
+  proportions. `Giggly.to_svg/2` now takes `width:` and `height:`, **in pixels**, the unit
+  Livebook, VegaLite and the web size things in, written in the document in points at 96 pixels to
+  the inch; *rejected: inches*, ggsave's unit, which ggplot2's users know. **The default is 700 by
+  433 pixels**, what the notebooks mirror; the golden passes vdiffr's 960 by 768 explicitly, so it
+  still sits beside ggplot2's snapshots; *rejected: keeping vdiffr's size as the default*, which
+  every notebook would override, *and R's 7 by 7 inch device*. **Options are validated with
+  NimbleOptions at the call**, as ratified on 2026-10-11, and this is its first use: `nimble_options`
+  1.1.1 (Apache 2.0, no runtime dependencies, its source read in increment 3) is a new dependency,
+  and **the root boundary lists `NimbleOptions`**, since `to_svg/2` lives there, so a sub-boundary
+  may list it in turn when its options arrive (`Plot`'s, by the same ownership rule); that settles
+  where NimbleOptions sits, which the Phase 1 audit left for Phase 2. A misspelt option
+  raises `NimbleOptions.ValidationError` naming it. The widening was agreed with the three
+  choices and recorded with `waiver-gate.sh approve-widening`.
+
 - **The notebooks follow ggplot2's reference pages, every example, as documentation; their data
   is a public datasets module read from R's own files (2026-10-13, Steve).** Steve's aim is a set
   of Livebook notebooks matching ggplot2's online reference, which ExDoc points at rather than
@@ -345,14 +367,16 @@ stops the question being reopened from scratch.
   `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells
   (the theme and spanning cells since built, see the entry beginning "The theme is a resolved
   value"), names, clipping (since built, see the entry beginning "The panel is clipped"), z-order
-  beyond list order and aspect ratio; a size for `to_svg`; placing
+  beyond list order and aspect ratio; a size for `to_svg` (since built, see the entry beginning
+  "A plot is drawn at the size it is given"); placing
   panels among their axes in the facet, as ggplot2's `draw_panels()` does (the second panel); a
   polyline's fill (the first with area); and the plot's title.
 
 - **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene, and
-  records its facet and coordinate system by name (2026-10-12, Steve).** `Giggly.to_svg/1`
+  records its facet and coordinate system by name (2026-10-12, Steve).** `Giggly.to_svg/2`
   assembles a plot, renders it into a scene (`Giggly.Render`, ggplot2's rendering stage) and has
-  `Giggly.SVG` draw the scene at 720 by 576 points; today a plot is drawn as its panel alone, each
+  `Giggly.SVG` draw the scene at 720 by 576 points (since given a size, see the entry beginning
+  "A plot is drawn at the size it is given"); today a plot is drawn as its panel alone, each
   row a point placed by the coordinate system in a panel that fills the drawing. The plot records
   `facet: :null` and `coord: :cartesian`, which ggplot2's `ggplot()` defaults to; each is a name
   its namespace resolves to a module implementing a behaviour (`Facet.Null`, `Coord.Cartesian`),
@@ -816,6 +840,16 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-13 — `to_svg/2` draws at a size in pixels, 700 by 433 by default.** In Livebook the
+  first notebook's labels, titles and points looked tiny: every plot was drawn at vdiffr's 10 by 8
+  inches, larger than ggplot2's reference pages draw at, and Livebook shrank it to fit. The §4
+  entry beginning "A plot is drawn at the size it is given" gives the three choices, each Steve's
+  as recommended: pixels, ggplot2's reference size as the default, and NimbleOptions from the root
+  boundary, its first use and a new dependency (`nimble_options` 1.1.1; the lock gained only its
+  line). The golden passes vdiffr's size and is unchanged; the empty-plot test draws at the
+  default and pins it; a new test pins a misspelt option's refusal, which, with the validation
+  replaced by merging defaults in a scratch run, failed.
 
 - **2026-10-13 — The first notebook: `geom_point`.** `notebooks/geom_point.livemd` follows
   ggplot2's `geom_point()` reference page example by example, and `Giggly.Datasets.mtcars/0`
@@ -1287,13 +1321,12 @@ _(none yet)_
   options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
   internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
-  Livebooks reproducing the examples in ggplot2's documentation, for checking drawings by eye;
-  each example can be drawn in R as `test/golden/point.R` draws the golden and compared, element
-  by element rather than byte for byte once a CSS theme moves colours out of the elements. The
-  goldens may become those examples. ExDoc does not build graphics, as ggity's docs did; it points
-  at the Livebooks. A side quest: a Kino library so a plot value draws itself in a cell (Livebook
-  shows the SVG with `Kino.Image` before then), as an optional dependency or a package of its own
-  like `kino_vega_lite`, settled when it is built.
+  Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
+  building graphics, as ggity's docs did. The first, `geom_point`, is built, and how notebooks are
+  made is settled (the §4 entry beginning "The notebooks follow ggplot2's reference pages"). Still
+  open: which pages follow, and a side quest, a Kino library so a plot value draws itself in a
+  cell (Livebook shows the SVG with `Kino.Image` until then), as an optional dependency or a
+  package of its own like `kino_vega_lite`, settled when it is built.
 - **What a second geom makes legal in an inherited mapping.** Each geom call checks the plot's
   mapping with its own, so today an inherited aesthetic the geom cannot use raises. ggplot2
   evaluates every inherited aesthetic and carries the ones a layer ignores: a plot-level `label`

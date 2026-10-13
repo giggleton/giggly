@@ -19,7 +19,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 ## Rules
 
 - **A plot is run only from `Giggly`.** The root module holds the run functions (`layer_data/2`,
-  `panel_scales/2`, `to_svg/1`), each taking a finished plot; `Plot` describes and never runs, and
+  `panel_scales/2`, `to_svg/2`), each taking a finished plot; `Plot` describes and never runs, and
   nothing outside Giggly calls `Assembly`. Arrows run root → `Render` → `Assembly` → `Plot` and
   root → `SVG` → `Scene`, and nothing calls back up.
 - **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet assigns
@@ -100,7 +100,7 @@ and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/
 such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Each
 frame then goes through its layer's stat and its position. Last, each layout row's scale ids
 pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from each
-one's `Scale.dimension/1` and the `Scale.breaks/2` on it. `to_svg/1` hands the result to `Render.scene/1` and the scene to
+one's `Scale.dimension/1` and the `Scale.breaks/2` on it. `to_svg/2` validates its options, hands the result to `Render.scene/1` and the scene to
 `SVG.draw/3`. `layer_data/2` checks the
 index against the plot's layer count before assembling, so a missing layer raises an
 `ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises
