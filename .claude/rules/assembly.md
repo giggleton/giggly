@@ -33,9 +33,17 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills
   it:** the layer frames with each layer's geom, the layout table, the trained x and y scales keyed
-  by scale id, and each panel's params keyed by panel id.
+  by scale id, each panel's params keyed by panel id, and the x and y titles.
 - **The facet and the coordinate system run by the names the plot records**, `:null` and
   `:cartesian` included, resolved by `Giggly.Facet` and `Giggly.Coord`.
+- **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,
+  read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
+  `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
+  which reads the scale's first aesthetic, so `:xmin` alone titles nothing. An axis no layer maps
+  has the title `:none`. Every point layer maps x and y, so today the first layer is the one; the
+  search past a layer that does not map the aesthetic arrives with the first geom that can leave
+  an axis unmapped, where `Map.fetch!/2` fails loudly until it does. The titles are the only place the data's own column names survive the
+  assembly.
 - **Each panel's params are built once, after the positions, from the scales its layout row
   names:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing that extent
   draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`; until the reset and retrain
@@ -51,7 +59,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   assembly matches exactly one; routing rows to several arrives with `facet_wrap`'s free scales,
   where that match fails loudly until it does.
 - **After evaluation a layer's frame speaks only the aesthetic vocabulary:** one column per
-  mapped aesthetic, plus the columns the pipeline writes. The data's own names never appear.
+  mapped aesthetic, plus the columns the pipeline writes. The data's own names never appear in a
+  frame; only the axes' titles carry them.
 - **`group` is written once, by `Group.add/2`, straight after evaluation** — before any scale maps
   a discrete position to numbers, after which it no longer looks discrete.
 - **The assembly gives grouping its order.** `Group.add/2` numbers values by the key it is handed;

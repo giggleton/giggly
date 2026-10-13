@@ -134,17 +134,18 @@ defmodule GigglyTest do
   end
 
   describe "to_svg/1" do
-    # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50, the axes of ggplot2's
-    # own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg`, and every tick and
-    # label was checked against that snapshot measured from the panel's edges: y ticks from 2.74
-    # points left of the panel to its edge, y labels ending 4.93 points left of it with baselines
-    # 3.03 points below their ticks, x ticks 2.74 points below it and x baselines 10.99, the same
-    # break labels and the same `textLength`s. The panel is the drawing less ggplot2's 5.48-point
-    # plot margin and the two axes (14.72 points wide, 12.81 tall); the points' radius and outline
-    # are ggplot2's default point. The row missing its mpg is not drawn but still widens the x axis,
-    # as in ggplot2. It moves only with a change to what a plot draws: the drawing's size, the
-    # point's or the axes' look, the expansion, a background or titles arriving, or the markup.
-    test "each row with an x and a y is drawn as a point, with an axis below and to the left" do
+    # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50 in columns wt and mpg,
+    # as ggplot2's own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg` does, and
+    # the drawing was checked against that snapshot element by element: every tick, label and
+    # title has the same x, the same text-anchor and the same textLength, and everything below the
+    # panel (ticks, labels and the wt title) the same y. The rest differs only by the plot title
+    # row ggplot2's test tooling adds above the panel, which moves the panel's top: the y axis's
+    # labels sit 3.03 points below their ticks as there, and the mpg title at the middle of the
+    # panel's height. The points' radius and outline are ggplot2's default point. The row missing
+    # its mpg is not drawn but still widens the x axis, as in ggplot2. It moves only with a change
+    # to what a plot draws: the drawing's size, the look of the points, axes or titles, the
+    # expansion, a background or a plot title arriving, or the markup.
+    test "each row with an x and a y is drawn as a point, with titled axes below and to the left" do
       plot =
         %{"wt" => [0.0, 4.0, 7.0, 10.0], "mpg" => [0.0, 50.0, 20.0, nil]}
         |> Plot.new(%{x: :wt, y: :mpg})
@@ -167,6 +168,30 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg =~ ">&lt;a &amp; b&gt;</text>"
+    end
+
+    test "an axis is titled by the first layer to map it, through that layer's own mapping" do
+      svg =
+        %{"wt" => [2.62], "hp" => [110], "mpg" => [21.0]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(%{x: :hp})
+        |> Plot.geom_point()
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      assert svg =~ ">hp</text>"
+    end
+
+    test "a plot with no layers maps no axis, so it draws no axes and no titles" do
+      svg =
+        %{"wt" => [2.62], "mpg" => [21.0]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      assert svg ==
+               "<svg xmlns='http://www.w3.org/2000/svg' width='720.00pt' height='576.00pt' " <>
+                 "viewBox='0 0 720.00 576.00'>\n</svg>\n"
     end
   end
 end

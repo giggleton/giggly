@@ -28,8 +28,9 @@ beginning "Scales are three values".
   system adds no expansion of its own and never lists `Scale` until a coordinate option
   (`expand = FALSE`, `xlim`) arrives; then the extent is the coordinate system's to decide.
 - **`axes/1` places each axis's breaks by the same rescale as the data, keyed by the side the
-  axis is drawn on** (cartesian: x at the bottom, y on the left), so a guide never reads the
-  params and a flipped or polar system moves axes without touching a guide.
+  axis is drawn on, with the aesthetic the axis shows** (cartesian: x at the bottom, y on the
+  left), so a guide never reads the params, takes the title of that aesthetic, and a flipped or
+  polar system moves axes and their titles without touching a guide.
 - **`transform/2` places every x-family and y-family column**, by `Aesthetics.family/1`, never by
   comparing a name with `:x`; other columns pass through.
 - **An infinite position goes to the panel's edge and a missing one stays missing**, as ggplot2's
@@ -45,6 +46,6 @@ struct, each axis given as `{extent, breaks}`; `transform(frame, params)` and `a
 dispatch on that struct. `Coord.Cartesian` holds the x and y extents and breaks and rescales each
 value by its axis's extent, `(value - low) / (high - low)`, putting `:infinity` at 1 and
 `:neg_infinity` at 0 and returning `nil` and `:nan` as they are; `axes/1` rescales each break's
-position the same way and keeps its label.
+position the same way, keeps its label, and returns `%{bottom: {:x, breaks}, left: {:y, breaks}}`.
 The boundary lists `Giggly.Aesthetics`, for which columns are x and which y, and
 `Giggly.DataFrame`.

@@ -49,7 +49,7 @@ defmodule Giggly.Coord.Cartesian do
         x_breaks: x_breaks,
         y_breaks: y_breaks
       }) do
-    %{bottom: place_breaks(x_breaks, x_range), left: place_breaks(y_breaks, y_range)}
+    %{bottom: {:x, place_breaks(x_breaks, x_range)}, left: {:y, place_breaks(y_breaks, y_range)}}
   end
 
   defp place_breaks(breaks, range) do

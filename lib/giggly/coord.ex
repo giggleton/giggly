@@ -38,6 +38,9 @@ defmodule Giggly.Coord do
   @typedoc "A side of the panel an axis is drawn on."
   @type side :: :bottom | :left
 
+  @typedoc "The axis drawn on a side: the aesthetic it shows and its breaks, placed along the side."
+  @type placed_axis :: {:x | :y, [break()]}
+
   @typedoc "What a coordinate system needs to place one panel's positions."
   @type panel_params :: Coord.Cartesian.t()
 
@@ -47,8 +50,8 @@ defmodule Giggly.Coord do
   @doc "The frame with its x-family and y-family columns placed in the panel."
   @callback transform(DataFrame.t(), panel_params()) :: DataFrame.t()
 
-  @doc "Each axis's breaks placed along the side of the panel it is drawn on, by side."
-  @callback axes(panel_params()) :: %{side() => [break()]}
+  @doc "Each axis placed along the side of the panel it is drawn on, by side."
+  @callback axes(panel_params()) :: %{side() => placed_axis()}
 
   @doc """
   The params of a panel whose x and y axes are `x_axis` and `y_axis`, each its extent and its
@@ -84,10 +87,11 @@ defmodule Giggly.Coord do
     do: Coord.Cartesian.transform(frame, panel_params)
 
   @doc """
-  Each axis's breaks placed along the side of the panel it is drawn on, 0 to 1 as `transform/2`
-  places positions, keyed by that side: ggplot2's axis guides take their breaks through the same
-  transformation as the data, so ticks and marks cannot disagree. A cartesian panel draws its x
-  axis at the bottom and its y axis on the left.
+  Each axis on the side of the panel it is drawn on, keyed by that side: the aesthetic it shows,
+  whose title goes with it, and its breaks placed along the side, 0 to 1 as `transform/2` places
+  positions. ggplot2's axis guides take their breaks through the same transformation as the data,
+  so ticks and marks cannot disagree, and which axis goes on which side is the coordinate
+  system's: a cartesian panel draws its x axis at the bottom and its y axis on the left.
 
       iex> params =
       ...>   Giggly.Coord.panel_params(
@@ -96,8 +100,8 @@ defmodule Giggly.Coord do
       ...>     {{10.0, 20.0}, [{15.0, "15"}]}
       ...>   )
       iex> Giggly.Coord.axes(params)
-      %{bottom: [{0.25, "1"}, {0.75, "3"}], left: [{0.5, "15"}]}
+      %{bottom: {:x, [{0.25, "1"}, {0.75, "3"}]}, left: {:y, [{0.5, "15"}]}}
   """
-  @spec axes(panel_params()) :: %{side() => [break()]}
+  @spec axes(panel_params()) :: %{side() => placed_axis()}
   def axes(%Coord.Cartesian{} = panel_params), do: Coord.Cartesian.axes(panel_params)
 end

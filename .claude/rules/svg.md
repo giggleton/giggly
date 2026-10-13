@@ -21,9 +21,11 @@ drawing"; why labels are drawn at their measured widths, and in which fonts: the
 - **The document's unit is the point, written as svglite writes it:** `width` and `height` in
   `pt`, a `viewBox` of the size in points, numbers with two decimals, circles with
   `cx`/`cy`/`r` and a `style` of `stroke-width`, `stroke` and `fill`, polylines with `points`
-  and a `style` of `stroke-width`, `stroke` and `stroke-linecap: butt`, and text with `x`, `y`,
-  `text-anchor`, a `style` of `font-size` (in `px`, the user unit), `fill` and `font-family`,
-  and `textLength` with `lengthAdjust='spacingAndGlyphs'`. Output can then be set beside the SVG
+  and a `style` of `stroke-width`, `stroke` and `stroke-linecap: butt`, and text with `x` and
+  `y` (or, turned 90 degrees, `transform='translate(x,y) rotate(-90)'`), `text-anchor`, a
+  `style` of `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default,
+  as svglite leaves it out) and `font-family`, and `textLength` with
+  `lengthAdjust='spacingAndGlyphs'`. Output can then be set beside the SVG
   in ggplot2's own visual-test snapshots.
 - **A label is drawn at the width `Giggly.Font` measured** (`textLength`), so the drawing agrees
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
@@ -42,6 +44,7 @@ drawing"; why labels are drawn at their measured widths, and in which fonts: the
 each size in points takes its length, and the one `:rest` takes what they leave; a scene with
 none or several in a direction raises `MatchError`. Each cell's box is its column's and row's span, and each primitive is written in it
 at `(left + x * box_width, top + (1 - y) * box_height)`, since a cell's y runs up and SVG's runs
-down; a label's baseline is a further `baseline_offset` points up. It returns iodata.
+down; a label's baseline is a further `baseline_offset` points toward its top, which is up for
+level text and left for text turned 90 degrees. It returns iodata.
 `Giggly.to_svg/1` draws at 720 by 576 points, the size of ggplot2's snapshots (vdiffr's default),
 until a size can be given.

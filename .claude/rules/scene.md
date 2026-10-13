@@ -39,4 +39,5 @@ primitives in drawing order. The primitives are named after grid's: `Scene.Point
 (`pointsGrob()` for shape 19: positions, one radius, one outline width, one colour),
 `Scene.Polylines` (`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour,
 square-cut ends) and `Scene.Text` (`textGrob()`: positions, labels and their measured widths, one
-size and colour, an anchor of `:middle` or `:end`, and the baseline offset).
+size and colour, an angle of 0 or 90 degrees, an anchor of `:middle` or `:end`, and the baseline
+offset, measured toward the text's top, which is to the left for text turned 90 degrees).

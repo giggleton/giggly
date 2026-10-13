@@ -36,7 +36,8 @@ defmodule Giggly.Render do
         layer_data: layer_data,
         layer_geoms: layer_geoms,
         layout: layout,
-        panel_params: panel_params
+        panel_params: panel_params,
+        titles: titles
       }) do
     # One panel, at the layout's first row and column, until `facet_wrap`, where this match fails
     # loudly until each layer's rows are split by panel and panels are placed among their axes.
@@ -52,13 +53,18 @@ defmodule Giggly.Render do
       |> Enum.zip(layer_data)
       |> Enum.flat_map(fn {geom, frame} -> Geom.draw_panel(frame, geom, params) end)
 
-    %{left: {left_width, left_axis}, bottom: {bottom_height, bottom_axis}} = Guide.axes(params)
+    %{
+      left: %{axis: {left_width, left_axis}, title: {left_title_width, left_title}},
+      bottom: %{axis: {bottom_height, bottom_axis}, title: {bottom_title_height, bottom_title}}
+    } = Guide.axes(params, titles)
 
-    # Columns: margin, y axis, panel, margin. Rows: margin, panel, x axis, margin. The axes are
-    # drawn after the panel, the y axis first, in ggplot2's order.
+    # Columns: margin, y title, y axis, panel, margin. Rows: margin, panel, x axis, x title,
+    # margin. The axes are drawn after the panel, the y axis first, and then the titles, the x
+    # title first, in ggplot2's order.
     %Scene{
       widths: [
         {:points, @plot_margin},
+        {:points, left_title_width},
         {:points, left_width},
         :rest,
         {:points, @plot_margin}
@@ -67,12 +73,15 @@ defmodule Giggly.Render do
         {:points, @plot_margin},
         :rest,
         {:points, bottom_height},
+        {:points, bottom_title_height},
         {:points, @plot_margin}
       ],
       cells: [
-        %Cell{row: 2, column: 3, primitives: primitives},
-        %Cell{row: 2, column: 2, primitives: left_axis},
-        %Cell{row: 3, column: 3, primitives: bottom_axis}
+        %Cell{row: 2, column: 4, primitives: primitives},
+        %Cell{row: 2, column: 3, primitives: left_axis},
+        %Cell{row: 3, column: 4, primitives: bottom_axis},
+        %Cell{row: 4, column: 4, primitives: bottom_title},
+        %Cell{row: 2, column: 2, primitives: left_title}
       ]
     }
   end

@@ -25,8 +25,9 @@ defmodule Giggly.Assembly do
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  table; the trained scales, by scale id; and each panel's params, by panel id. The data's own
-  column names do not appear.
+  table; the trained scales, by scale id; each panel's params, by panel id; and each axis's title,
+  the name of the column the first layer to map the axis's aesthetic maps it to (ggplot2's
+  `setup_plot_labels()`). The data's own column names appear only as titles.
 
   Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
   """
@@ -50,13 +51,14 @@ defmodule Giggly.Assembly do
 
   alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
 
-  @enforce_keys [:layer_data, :layer_geoms, :layout, :x_scales, :y_scales, :panel_params]
+  @enforce_keys [:layer_data, :layer_geoms, :layout, :x_scales, :y_scales, :panel_params, :titles]
   defstruct @enforce_keys
 
   @typedoc """
   An assembled plot: each layer's table and the name of the geom that draws it, in the order the
   layers were added; the layout table; the trained x and y scales keyed by the scale ids the layout
-  gives each panel; and each panel's params, keyed by panel id.
+  gives each panel; each panel's params, keyed by panel id; and the x and y axes' titles, `:none`
+  for an axis no layer maps.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -64,7 +66,8 @@ defmodule Giggly.Assembly do
           layout: DataFrame.t(),
           x_scales: %{optional(pos_integer()) => Scale.t()},
           y_scales: %{optional(pos_integer()) => Scale.t()},
-          panel_params: %{optional(pos_integer()) => Coord.panel_params()}
+          panel_params: %{optional(pos_integer()) => Coord.panel_params()},
+          titles: %{x: String.t() | :none, y: String.t() | :none}
         }
 
   @doc """
@@ -78,7 +81,9 @@ defmodule Giggly.Assembly do
   columns in that axis's family are put through the scale's transformation, trained on, and mapped
   to their positions. Each layer's stat then computes on its table, and its position moves the
   marks. Last, the plot's coordinate system builds each panel's params from the extents of the
-  scales the layout gives that panel and the breaks each axis draws on its extent.
+  scales the layout gives that panel and the breaks each axis draws on its extent. Each axis is
+  titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x` (or
+  `:y`); a later layer never retitles it, and an axis no layer maps has no title.
 
   Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -125,8 +130,25 @@ defmodule Giggly.Assembly do
       layout: layout,
       x_scales: x_scales,
       y_scales: y_scales,
-      panel_params: panel_params(coord, layout, x_scales, y_scales)
+      panel_params: panel_params(coord, layout, x_scales, y_scales),
+      titles: Map.new([:x, :y], fn aesthetic -> {aesthetic, title(plot, layers, aesthetic)} end)
     }
+  end
+
+  # An axis's title: the column the first layer to map the axis's own aesthetic maps it to, through
+  # the layer's computed mapping, or `:none` when no layer maps it. It is ggplot2's
+  # `setup_plot_labels()`, where a later layer never replaces an earlier one's label, read as
+  # `resolve_label()` reads it, by the scale's first aesthetic. Every point layer maps x and y, so
+  # today the first layer maps it whenever there is one; the search past a layer that does not
+  # arrives with the first geom that can leave an axis unmapped, and `Map.fetch!/2` fails loudly
+  # until it does.
+  defp title(_plot, [], _aesthetic), do: :none
+
+  # The plot holds each mapping's column by the name the data gives it, which is the title.
+  defp title(plot, [first_layer | _later_layers], aesthetic) do
+    plot
+    |> Plot.computed_mapping(first_layer)
+    |> Map.fetch!(aesthetic)
   end
 
   # Each panel's params, from the scales its layout row names: ggplot2's `setup_panel_params()`,

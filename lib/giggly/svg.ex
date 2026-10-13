@@ -127,16 +127,15 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # The baseline sits `baseline_offset` points above the label's point, and SVG's y runs down.
   defp primitive(%Text{} = text, box) do
     anchor = text_anchor(text.anchor)
 
     style = [
       "style='font-size: ",
       number(text.size),
-      "px; fill: ",
-      text.color,
-      "; font-family: ",
+      "px;",
+      fill(text.color),
+      " font-family: ",
       @font_family,
       ";'"
     ]
@@ -144,14 +143,14 @@ defmodule Giggly.SVG do
     [text.x, text.y, text.labels, text.widths]
     |> Enum.zip()
     |> Enum.map(fn {x_place, y_place, label, label_width} ->
-      {x_position, y_position} = place({x_place, y_place}, box)
+      baseline =
+        {x_place, y_place}
+        |> place(box)
+        |> baseline(text.baseline_offset, text.angle)
 
       [
-        "<text x='",
-        number(x_position),
-        "' y='",
-        number(y_position - text.baseline_offset),
-        "'",
+        "<text",
+        text_position(baseline, text.angle),
         anchor,
         " ",
         style,
@@ -164,8 +163,25 @@ defmodule Giggly.SVG do
     end)
   end
 
+  # The baseline sits `baseline_offset` points toward the text's top: up, which is SVG's lower y,
+  # for level text, and left for text turned 90 degrees.
+  defp baseline({x_position, y_position}, offset, 0), do: {x_position, y_position - offset}
+  defp baseline({x_position, y_position}, offset, 90), do: {x_position - offset, y_position}
+
+  # svglite places level text by its `x` and `y`, and turned text by a transform, its angle negated
+  # since SVG turns clockwise.
+  defp text_position({x_position, y_position}, 0),
+    do: [" x='", number(x_position), "' y='", number(y_position), "'"]
+
+  defp text_position({x_position, y_position}, 90),
+    do: [" transform='translate(", number(x_position), ",", number(y_position), ") rotate(-90)'"]
+
   defp text_anchor(:middle), do: " text-anchor='middle'"
   defp text_anchor(:end), do: " text-anchor='end'"
+
+  # svglite writes a text's fill only when it is not black, SVG's default.
+  defp fill("#000000"), do: ""
+  defp fill(color), do: [" fill: ", color, ";"]
 
   # The characters svglite escapes in text.
   defp escape(label) do

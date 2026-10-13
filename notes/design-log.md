@@ -65,6 +65,34 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **An axis is titled by the first layer to map its aesthetic, and the title is drawn by the
+  axis's guide (2026-10-12, Steve).** The assembly titles each axis with the name of the column
+  the first layer, in the order added, maps the axis's own aesthetic to through its computed
+  mapping (`Plot.computed_mapping/2`): ggplot2's `setup_plot_labels()`, where a later layer
+  never replaces an earlier one's label, read as `resolve_label()` reads it, by the scale's first
+  aesthetic, so `xmin` alone titles nothing. An axis no layer maps has the title `:none` and
+  draws none. Every point layer maps x and y, so today the first layer is always the one; review's
+  mutation step showed the search past a layer that does not map the aesthetic could not be
+  reached, so it waits for the first geom that can leave an axis unmapped, and `Map.fetch!/2`
+  fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
+  here means a break's text. `Coord.axes/1` now says which aesthetic each side's axis shows, so
+  which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
+  with axes. `Guide.Axis.title/2` draws each title in a cell of its own beyond its axis, as
+  ggplot2's layout adds its `xlab-b` row and `ylab-l` column: 11-point black text, a 2.75-TeX-point
+  gap toward the axis, centred on the panel's side, hanging from the cell's far edge, the y title
+  turned 90 degrees. `Scene.Text` gained an angle, and SVG writes turned text and leaves out a
+  black fill as svglite does. With the titles, the golden matches ggplot2's `expand-range`
+  snapshot element for element in every x position and in everything below the panel; the rest
+  differs only by the plot title row vdiffr adds above the panel. *Rejected: deferring titles
+  past the background, with `labs/2`* (proposed) — Steve chose them now and `labs/2` later.
+  *Rejected: the plot's mapping alone* — a layer that remaps x would be titled by the plot's
+  column; *and the last layer winning* — ggplot2 has no basis for it, and adding a layer would
+  retitle the plot. *Rejected: titles drawn by rendering* — it computes no positions; *or by a
+  domain of their own* — ggplot2's `guide_axis(title = …)` sets an axis's title, and legends draw
+  their own. *Deferred to first reader:* the search past a layer that leaves the axis unmapped (a
+  geom such as `geom_hline()`); `labs/2` and a title set by hand (NimbleOptions and §7's "absent"
+  question come with it); the plot's title; and titles of other aesthetics (legends).
+
 - **Axes are drawn from breaks the scale computes and the coordinate system places, by a guide
   that measures its labels with the glyph table ggplot2's own snapshots were measured with
   (2026-10-12, Steve).** `Scale.breaks(scale, extent)` returns an axis's breaks as `{position,
@@ -619,6 +647,26 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-12 — Axis titles (Phase 1, eighth increment, second of two steps).** Each axis is
+  titled by the first layer to map it, and the title is drawn beside its axis: "wt" below the x
+  axis, "mpg" turned beside the y axis. The §4 entry beginning "An axis is titled" gives the rule,
+  what was rejected and what waits. It was built to the design agreed in the first step's
+  discussion, with two choices of mine reported rather than asked: the assembly's field is
+  `titles`, since "labels" now means a break's text, and `Coord.axes/1` says which aesthetic each
+  side shows. The golden gained the titles and now matches ggplot2's snapshot element for
+  element wherever the snapshot's plot title does not move the panel's top. Review's mutation step
+  (1,552 mutants over the eight changed files) left no line unexecuted; on this step's lines its
+  survivors were reordered struct and map keys, and two real ones. The rule's branch for a layer
+  that does not map the aesthetic could not be reached, since every point layer maps both, so the
+  rule now takes the first layer and fails loudly otherwise. And the size of an axis with no
+  breaks and of a title of `:none` were unpinned: `Guide.axes/1`'s doctest had pinned the first,
+  and I deleted it when the function gained the titles, judging a test of a plot with no layers to
+  cover it, but such a plot draws nothing, so no size shows. The doctest came back for
+  `Guide.axes/2` and pins both. A confirming run over `Assembly` and `Guide` (894 mutants)
+  killed both size mutants and left on this step's lines only reordered keys and a `to_string/1`
+  that changed nothing, since the plot already holds each mapping's column by its name; it was
+  removed.
 
 - **2026-10-12 — Axes (Phase 1, eighth increment, first of two steps).** A plot is drawn with
   its axes: a tick and a label at each break, the x axis below the panel and the y axis to its
