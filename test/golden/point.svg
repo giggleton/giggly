@@ -1,5 +1,27 @@
 <svg xmlns='http://www.w3.org/2000/svg' width='720.00pt' height='576.00pt' viewBox='0 0 720.00 576.00'>
-<circle cx='252.13' cy='549.82' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
-<circle cx='438.62' cy='26.18' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
-<circle cx='32.73' cy='26.18' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
+<circle cx='51.76' cy='532.60' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
+<circle cx='304.24' cy='30.58' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
+<circle cx='493.60' cy='331.80' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
+<text x='15.27' y='535.63' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>0</text>
+<text x='15.27' y='435.23' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>10</text>
+<text x='15.27' y='334.82' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>20</text>
+<text x='15.27' y='234.42' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>30</text>
+<text x='15.27' y='134.01' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>40</text>
+<text x='15.27' y='33.61' text-anchor='end' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>50</text>
+<polyline points='17.46,532.60 20.20,532.60 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='17.46,432.20 20.20,432.20 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='17.46,331.80 20.20,331.80 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='17.46,231.39 20.20,231.39 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='17.46,130.99 20.20,130.99 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='17.46,30.58 20.20,30.58 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='51.76,560.45 51.76,557.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='209.56,560.45 209.56,557.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='367.36,560.45 367.36,557.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='525.16,560.45 525.16,557.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<polyline points='682.96,560.45 682.96,557.71 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt;' />
+<text x='51.76' y='568.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='12.23px' lengthAdjust='spacingAndGlyphs'>0.0</text>
+<text x='209.56' y='568.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='12.23px' lengthAdjust='spacingAndGlyphs'>2.5</text>
+<text x='367.36' y='568.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='12.23px' lengthAdjust='spacingAndGlyphs'>5.0</text>
+<text x='525.16' y='568.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='12.23px' lengthAdjust='spacingAndGlyphs'>7.5</text>
+<text x='682.96' y='568.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='17.13px' lengthAdjust='spacingAndGlyphs'>10.0</text>
 </svg>

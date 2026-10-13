@@ -100,8 +100,10 @@ defmodule Giggly do
   ggplot2's own visual tests snapshot. It is ggplot2's `ggsave()` to an SVG file, returned as
   iodata rather than written.
 
-  Today a plot is drawn as its panel alone: each layer's marks, placed by the coordinate system in
-  a panel that fills the drawing. Axes, the panel's background and titles arrive in turn.
+  Today a plot is drawn as its panel and its axes: each layer's marks, placed by the coordinate
+  system in the panel, with the x axis below it and the y axis to its left, each a tick and a
+  label at every break, inside ggplot2's default plot margin. The panel's background, axis titles
+  and the plot's title arrive in turn.
   """
   @spec to_svg(Plot.t()) :: iodata()
   def to_svg(%Plot{} = plot) do

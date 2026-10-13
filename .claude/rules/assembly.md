@@ -36,9 +36,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   by scale id, and each panel's params keyed by panel id.
 - **The facet and the coordinate system run by the names the plot records**, `:null` and
   `:cartesian` included, resolved by `Giggly.Facet` and `Giggly.Coord`.
-- **Each panel's params are built once, after the positions, from the extents of the scales its
-  layout row names** (`Scale.dimension/1`), ggplot2's `setup_panel_params()`; until the reset and
-  retrain arrives, those are the scales trained before the stat.
+- **Each panel's params are built once, after the positions, from the scales its layout row
+  names:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing that extent
+  draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`; until the reset and retrain
+  arrives, those are the scales trained before the stat.
 - **Each axis's scale is added after grouping, of the kind its columns need; every layer's
   columns in the axis's family are then put through the scale's transformation, trained on, and
   mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
@@ -85,8 +86,8 @@ takes the kind from the first column (an axis no layer maps is continuous). Each
 and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/2` folds in every
 such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Each
 frame then goes through its layer's stat and its position. Last, each layout row's scale ids
-pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from their
-`Scale.dimension/1`. `to_svg/1` hands the result to `Render.scene/1` and the scene to
+pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from each
+one's `Scale.dimension/1` and the `Scale.breaks/2` on it. `to_svg/1` hands the result to `Render.scene/1` and the scene to
 `SVG.draw/3`. `layer_data/2` checks the
 index against the plot's layer count before assembling, so a missing layer raises an
 `ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises

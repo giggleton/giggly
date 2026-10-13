@@ -3,6 +3,7 @@ paths:
   - "lib/giggly/scale.ex"
   - "lib/giggly/scale/**"
   - "test/giggly/scale_test.exs"
+  - "test/giggly/scale/**"
 ---
 
 # Position scales
@@ -12,7 +13,9 @@ transformation, trains a scale over the values it is given, and maps values to t
 Why scales are values rather than one mutated object: design-log §4, the entry beginning "Scales
 are three values"; what increment 5 built and what waits for its first reader: the entry
 beginning "Position scales are chosen by column type"; why a continuous scale records the
-identity transformation: the entry beginning "A layer names its stat and position".
+identity transformation: the entry beginning "A layer names its stat and position"; why breaks
+come from extended Wilkinson and labels are written the Elixir way: the entry beginning "Axes are
+drawn".
 
 ## Rules
 
@@ -38,8 +41,24 @@ identity transformation: the entry beginning "A layer names its stat and positio
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
-  there. What R's transformation object carries beside the transform itself (the inverse, the
-  axis's default breaks and labels, the domain) joins the behaviour with its first reader.
+  there, and carries its axis's default breaks and labels, as R's object carries `breaks` and
+  `format`. What else R's object carries (the inverse, the domain) joins the behaviour with its
+  first reader: the first transformation that is not the identity, whose breaks must be found in
+  data space and mapped back.
+- **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
+  never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
+  transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and
+  the extent's low end alone when it has zero width; a discrete scale's are its levels at 1..n.
+  Positions and labels travel as pairs so they cannot drift apart.
+- **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
+  degenerate cases included (`Scale.Breaks`). Its test pins R's own output for a range of every
+  winning nice number, skip, count and zero bonus, since a slip in one score shows only where that
+  score decides the winner; a row that stops matching is a bug in the port, and the table is
+  regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
+- **Labels are written the Elixir way, not R's** (`Scale.Labels`): `inspect`'s plain decimals,
+  rounded to 15 significant digits, as many decimals on every label as the most precise needs,
+  none when all are whole, negative zero as `0`, never scientific, no thousands separators. A
+  discrete level is `to_string/1` of its value, and a missing level is `NA`.
 - **An untrained continuous scale's range is `:none`.** The empty axis's 0 to 1 is
   `dimension/1`'s, as it is ggplot2's `get_limits()`'s.
 - **`dimension/1` is an axis's extent widened by ggplot2's default expansion**, in transformed
@@ -57,3 +76,7 @@ trained struct. `Scale.Continuous` puts values through its transformation by han
 unchanged until limits can censor them.
 `Scale.Discrete` merges values into its levels as a sorted, de-duplicated list, and maps each
 value through a level-to-position map built once per call.
+`breaks/2` lives in the root, beside `dimension/1`, whose zero-width test it shares. A
+continuous scale's breaks come from `Transform.breaks/2` and its labels from `Transform.format/2`;
+`Transform.Identity` hands these to `Scale.Breaks.extended/1` and `Scale.Labels.numbers/1`.
+`Scale.Labels.levels/1` writes a discrete scale's levels.

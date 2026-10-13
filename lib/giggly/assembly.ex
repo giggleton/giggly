@@ -21,7 +21,7 @@ defmodule Giggly.Assembly do
     8. computes each layer's stat (`Giggly.Stat`) on its table;
     9. moves each layer's marks by its position (`Giggly.Position`);
    10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
-       extents of the panel's scales.
+       extents of the panel's scales and each axis's breaks on its extent.
 
   The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
@@ -78,7 +78,7 @@ defmodule Giggly.Assembly do
   columns in that axis's family are put through the scale's transformation, trained on, and mapped
   to their positions. Each layer's stat then computes on its table, and its position moves the
   marks. Last, the plot's coordinate system builds each panel's params from the extents of the
-  scales the layout gives that panel.
+  scales the layout gives that panel and the breaks each axis draws on its extent.
 
   Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -129,25 +129,24 @@ defmodule Giggly.Assembly do
     }
   end
 
-  # Each panel's params, from the extents of the scales its layout row names: ggplot2's
-  # `setup_panel_params()`, after the positions have run.
+  # Each panel's params, from the scales its layout row names: ggplot2's `setup_panel_params()`,
+  # after the positions have run.
   defp panel_params(coord, layout, x_scales, y_scales) do
     [:panel, :scale_x, :scale_y]
     |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
     |> Enum.zip()
     |> Map.new(fn {panel, scale_x_id, scale_y_id} ->
-      x_dimension =
-        x_scales
-        |> Map.fetch!(scale_x_id)
-        |> Scale.dimension()
-
-      y_dimension =
-        y_scales
-        |> Map.fetch!(scale_y_id)
-        |> Scale.dimension()
-
-      {panel, Coord.panel_params(coord, x_dimension, y_dimension)}
+      x_axis = axis(Map.fetch!(x_scales, scale_x_id))
+      y_axis = axis(Map.fetch!(y_scales, scale_y_id))
+      {panel, Coord.panel_params(coord, x_axis, y_axis)}
     end)
+  end
+
+  # An axis as the coordinate system takes it: the scale's extent, widened, and the breaks an axis
+  # showing that extent draws, which ggplot2's view scale computes on the same extent.
+  defp axis(scale) do
+    extent = Scale.dimension(scale)
+    {extent, Scale.breaks(scale, extent)}
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across

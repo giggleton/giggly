@@ -65,6 +65,96 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Axes are drawn from breaks the scale computes and the coordinate system places, by a guide
+  that measures its labels with the glyph table ggplot2's own snapshots were measured with
+  (2026-10-12, Steve).** `Scale.breaks(scale, extent)` returns an axis's breaks as `{position,
+  label}` pairs on the extent it is handed. A continuous scale's are its transformation's (the
+  `Scale.Transform` behaviour gained `breaks` and `format`, as R's transformation object carries
+  them), kept inside the extent as ggplot2's view scale censors them; an untrained scale has none,
+  and an extent of zero width has its low end alone, as `ScaleContinuous$get_breaks` returns. A
+  discrete scale's are its levels at 1..n. The identity's breaks are extended Wilkinson, ported
+  from `labeling::extended()` 0.4.3 with five breaks wanted (`scales::breaks_extended()`), its
+  degenerate cases included: a range under 100 epsilons wide, or wider than the square root of the
+  largest float, spaced evenly from end to end, and a best sequence whose span is rounding error
+  beside its size reduced to its first break, as R's `seq()` reduces it. The port reproduces the
+  break sets in ggplot2's snapshots (0–10, 0–50, and mtcars's wt and mpg) and agreed with a second,
+  independent port on 409 random ranges. The assembly hands each axis's extent and breaks to the
+  coordinate system, whose new `axes/1` places them by the rescale the data goes through, keyed
+  by the side of the panel each axis is drawn on (cartesian: x at the bottom, y on the left). A new
+  `Giggly.Guide`, ggplot2's `guide_axis()`, draws each side's ticks and labels in `theme_grey()`'s
+  look, held as module attributes until a theme can be set, and measures how far the axis reaches;
+  a new `Giggly.Font` measures text. The scene gained sizes in points, its weighted size became
+  `:rest`, what the fixed sizes leave, and it gained `Text` and `Polylines` primitives; SVG lays the table out and writes svglite's markup; rendering puts
+  the axes and ggplot2's plot margin around the panel. Two findings made the layout exact: vdiffr,
+  which writes ggplot2's SVG snapshots, measures text from Liberation Sans's glyph table (its
+  `glyph_dims.h`: advances summed with no kerning, a line's height the ascent of "M", to which
+  ggplot2's `titleGrob` adds the deepest descent of "gjpqyQ"); and ggplot2's theme lengths are TeX
+  points (grid's `"pt"`, 1/72.27 inch) while font sizes and svglite's unit are 1/72 inch. With both,
+  the axes of `coord-cartesian/expand-range.svg` are reproduced to the hundredth of a point
+  measured from the panel's edges. New boundaries: `Font` lists nothing; `Guide` lists `Coord`,
+  `Font` and `Scene`; `Render` gained `Guide`; `Scene` exports `Polylines` and `Text`.
+  *Rejected: the coordinate system listing `Scale` and building view scales itself* (ggplot2's
+  shape, `view_scales_from_scale()` in `coord-cartesian-.R`) — it widens `Coord` to save the
+  assembly one call per axis, and the assembly already hands it what it needs; revisit when `xlim`
+  makes the extent the coordinate system's to decide. *Rejected: positions and labels as two
+  lists* (ggplot2's `get_breaks()` and `get_labels()`) — they must agree element by element, so
+  they travel as one; *and a `%Scale.View{}` struct* — matching another domain's struct is a
+  dependency, so `Coord` would list `Scale` after all. **Number labels are written the Elixir way:**
+  `inspect`'s plain decimals, each break rounded to 15 significant digits first, as many decimals on
+  every label of an axis as the most precise needs (`0.0 2.5 5.0`), none when every break is whole
+  (`2 3 4`), negative zero as `0`, never scientific, no thousands separators. *Rejected: R's
+  `format()`* (proposed: `formatReal()` and `scientific()` in R's `format.c`, seven significant
+  digits, scientific when narrower, so `1e+05` and `0e+00`, which is ggplot2's default and what
+  its snapshots show) — Steve: people expect numbers written as Elixir writes them. *Rejected:
+  Elixir's output as it stands* — `Float.to_string/1` writes 25000.0 as `2.5e4`, both it and
+  `inspect` show float noise (`0.30000000000000004`) and `2.0`, and `inspect` switches to
+  scientific below 0.0001, which would mix forms on one axis. *Rejected: the scales package's
+  `label_number()`* — not ggplot2's default either. **A discrete level is labelled with
+  `to_string/1`, and a missing one `NA`** (Steve, over my proposal of `nil`, Elixir's spelling
+  and consistent with `true` and `false`, which keep Elixir's spelling); *rejected: an empty
+  label*, which reads as a missing label rather than a missing value. **`Giggly.Font` is a plain
+  module with no behaviour**, which amends Phase 0's "a text-metrics service behind an interface":
+  its functions are the only route to a text's size, and nothing chooses a font yet; a behaviour
+  arrives with a second font (the theme's family, or a backend that can measure). It holds the
+  whole of vdiffr's Liberation Sans table, 2,242 glyphs, so Greek and Cyrillic are measured right,
+  and a character the font lacks takes vdiffr's own fallback width. The table is
+  `priv/fonts/liberation_sans.txt`, copied from vdiffr with its provenance in a header and read at
+  compile time behind the tree's one `CorePurity` waiver. *Rejected: a flat estimate (0.6 em per
+  character)* — it reproduces nothing; *ASCII and Latin-1 only* — with `textLength` a label
+  measured at the fallback is drawn visibly stretched; *a map literal in the module* — about
+  9,000 literal mutants surviving every mutation run; *a heredoc in the module* (proposed, needing
+  no waiver) — Steve chose a file: the table is generated data, regenerated and diffed apart from
+  the code; *reading a font file when a plot is drawn* — IO. **Axes are drawn by a domain of their
+  own**, which places breaks through the coordinate system as a geom places rows. *Rejected: the
+  coordinate system drawing them* (where ggplot2's `render_axis_h/v` sit, though they only
+  delegate to the guide) — `Coord` would list `Scene` and `Font` and become a drawing domain;
+  *rendering drawing them* — rendering computes no positions; *the name `Axis`* — it would be
+  renamed when legends join, and ggplot2, Wilkinson and plotnine call both guides. **Sizes are
+  measured when the scene is built** (ggplot2 measures an axis's grobs while building its table;
+  only `"null"` sizes wait for the drawing), and text carries one offset in points to its
+  baseline; *rejected: lazy measured sizes resolved by the backend* (grid's `"grobwidth"`), which
+  would put a font in every backend, *and grid's mixed units for every position*, more general
+  than anything that uses them. The scene's docs say column widths and row heights, not "tracks"
+  (Steve did not know the term). The panel's column and row are `:rest`, taking what the fixed
+  sizes leave, and exactly one of each is allowed; *rejected: increment 7's `{:null, weight}`
+  shared by weight* — every scene has one of each, of weight 1, so review's mutation step found
+  the sharing arithmetic unpinnable (`left * weight / total_weight` and its mutants agree), and
+  weights return with `facet_wrap`'s panels. **A label is drawn at its measured width** (svglite's
+  `textLength`), so the layout and the drawing agree whatever font the browser picks, at the cost
+  of squeezed letters in a font of other widths; *rejected: natural letters*, which can overrun
+  their space. Its `font-family` is `"Liberation Sans", Arial, Helvetica, sans-serif`; *rejected:
+  vdiffr's `sans`*, which is not a CSS generic family. **Axis titles come in this increment, as
+  its second step** (Steve, over my proposal to defer them past the background), with `labs/2`
+  later; the two steps are reviewed and committed apart. The plot margin arrived with the axes,
+  since without it the leftmost label touches the drawing's edge. *Deferred to first reader:* the
+  transformation's inverse and domain (the first transformation that is not the identity); minor
+  breaks (grid lines); the axis line (blank in `theme_grey()`); axes above or to the right, and
+  secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
+  `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells,
+  names, clipping, z-order beyond list order and aspect ratio; a size for `to_svg`; placing
+  panels among their axes in the facet, as ggplot2's `draw_panels()` does (the second panel); a
+  polyline's fill (the first with area); and the plot's title.
+
 - **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene, and
   records its facet and coordinate system by name (2026-10-12, Steve).** `Giggly.to_svg/1`
   assembles a plot, renders it into a scene (`Giggly.Render`, ggplot2's rendering stage) and has
@@ -107,7 +197,8 @@ stops the question being reopened from scratch.
   before 4.0. *Rejected names:* `Display` for the stage (proposed, after Wilkinson's third stage;
   Steve preferred ggplot2's "render"), and `SVG.render/3` for the backend's function (the verb
   would name two steps; `draw/3`, after grid's `grid.draw()`). *Deferred to first reader:* axes,
-  breaks, labels and extended Wilkinson; text measurement and absolute or measured tracks; the
+  breaks, labels and extended Wilkinson; text measurement and absolute or measured tracks (each
+  since built, see the entry beginning "Axes are drawn"); the
   panel background, grid lines and the theme; `munch` (the first path geom); every coordinate
   option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`; a size for
   `to_svg` (the first keyword options); splitting a layer's rows by panel (the second panel,
@@ -150,7 +241,8 @@ stops the question being reopened from scratch.
   further arguments and its split by panel and group; a transformation's inverse, breaks, labels
   and domain (ggplot2 takes an axis's default breaks and labels from its transformation, and a
   date axis is a continuous scale with a date transformation, which is how the date columns
-  refused today will be placed); and the reset and retrain of the position scales with the second
+  refused today will be placed; the breaks and labels since built, see the entry beginning "Axes
+  are drawn"); and the reset and retrain of the position scales with the second
   mapping. When the retrain arrives, a discrete scale must take mapped positions into a
   continuous range of its own, never its levels — `Scale.Discrete.train/2` would turn
   `["4", "6"]` into `[1, 2, "4", "6"]` today — and ggplot2 clears only that range on reset,
@@ -527,6 +619,55 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-12 — Axes (Phase 1, eighth increment, first of two steps).** A plot is drawn with
+  its axes: a tick and a label at each break, the x axis below the panel and the y axis to its
+  left, inside ggplot2's plot margin. `Scale.breaks/2` gives each axis's breaks (extended
+  Wilkinson and Elixir-style labels for a continuous axis, levels for a discrete one), the
+  coordinate system places them (`Coord.axes/1`), the new `Giggly.Guide` draws them and the new
+  `Giggly.Font` measures their labels; the scene gained sizes in points, `:rest`, `Text` and
+  `Polylines`, and SVG lays the table out. The §4 entry beginning "Axes are drawn" gives the
+  shape, what was rejected and what waits. The scope was settled one decision at a time, before
+  any code. Steve chose labels written as Elixir writes numbers over R's `format()`, `NA` over
+  `nil` for a missing level, the glyph table as a file over a heredoc, axis titles in this
+  increment rather than after the background, and two steps, axes then titles; he called one
+  proposed decision (how the scene holds measured sizes) no decision at all, since its
+  alternatives were strawmen. Before proposing, ggplot2's, scales', labeling's and vdiffr's
+  sources were read and the snapshot's geometry worked through: the two findings in §4 (vdiffr's
+  glyph table, TeX points) account for every number in `coord-cartesian/expand-range.svg`'s axes
+  to the hundredth. The golden now draws that snapshot's axes, x 0 to 10 and y 0 to 50, and its
+  ticks, labels and label widths match the snapshot measured from the panel's edges. Review's
+  mutation step ran three times. The first (3,102 mutants over the seventeen changed files) left
+  308 alive and 25 on lines no test ran. 168 of the survivors were in `Scale.Breaks`, 37 of them
+  on the one line giving the bonus for a sequence through zero: its examples, the break sets
+  ggplot2's snapshots show, were all correct, but no scoring term decided their winners. R was
+  run in Docker (`r-base`, R 4.6.1, labeling 0.4.3) and matched the port exactly on 813 ranges,
+  random and degenerate, and the port's test became a table of R's output for the shortest range
+  found for each of the 46 winning combinations of nice number, skip, count and zero bonus. The
+  same run found the censoring's inclusive ends and SVG's escaping of `&`, `<` and `>` unpinned
+  (examples and a test added), the reversed-range clause copied from R unreachable (removed),
+  `Labels.numbers/1` with no breaks and `Guide.axes/1` with an axis of none unexecuted (examples
+  added), conversions and an `abs/1` that changed nothing (removed), and SVG sharing the leftover
+  space by weight when every scene has one weighted column and row of weight 1 (the scene's
+  `{:null, weight}` became `:rest`, one of each, and any other shape is refused). The second run
+  (2,087 mutants over the seven files the fixes touched) left nothing unexecuted and 75
+  survivors in `Breaks`; applied one at a time to a scratch copy, 66 matched R on all 813 ranges
+  (pruning that only shortens the search, constants shifting every score alike, swapped
+  arguments to symmetric functions) and 9 did not, so the seven ranges where those first depart
+  joined the table with R's breaks. It also showed that 16 significant digits, not 15, would
+  print rounding noise in 131 of R's 813 break sets (an example now pins it), and that the `nil`
+  level I had taken out of `Scale.breaks/2`'s example as a duplicate of `Labels.levels/1`'s was
+  the only pin on its call to that rule (restored). A third run (1,344 mutants over `Breaks`,
+  `Labels` and `Scale`) showed two of the departing variants still alive, since one line held
+  three candidate literals each departing on a range of its own (both ranges added), and that
+  nothing pinned how many digits a genuine break keeps: Erlang's `float_to_binary/2` reads a
+  negative precision as its default, so `1 - 15` survived as seven digits, and 14 survived for 15
+  (an example with a break needing all fifteen added). After that, every remaining `Breaks`
+  survivor either matches R on all 813 ranges or fails the table, and a last run over `Labels`
+  (126 mutants) left only a fallback's unused value and `max/2`'s arguments swapped. The areas got
+  `.claude/rules/font.md` and `guide.md` with status-map lines, and CLAUDE.md's scene line no
+  longer says "tracks". The boundary changes were shown to Steve and approved before they were
+  written; the `CorePurity` waiver carries the reason Steve agreed in conversation.
 
 - **2026-10-12 — The coordinate system, drawn: `Giggly.to_svg/1` (Phase 1, seventh increment).**
   A plot is now drawn to SVG: the assembly builds each panel's params from `Scale.dimension/1`,

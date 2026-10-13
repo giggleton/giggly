@@ -36,10 +36,13 @@ defmodule Giggly.Scale do
   # Values in, values out: a scale depends on nothing, so it stays extractable.
   use Boundary, deps: [], exports: []
 
-  alias Giggly.Scale.{Continuous, Discrete}
+  alias Giggly.Scale.{Continuous, Discrete, Labels, Transform}
 
   @typedoc "A trained position scale."
   @type t :: Continuous.t() | Discrete.t()
+
+  @typedoc "A break on an axis: its position and its label."
+  @type break :: {number(), String.t()}
 
   @typedoc "Which kind of scale a column needs, or `:none` when no scale can place it yet."
   @type kind :: :continuous | :discrete | :none
@@ -146,6 +149,66 @@ defmodule Giggly.Scale do
   def dimension(%Continuous{range: :none}), do: expand({0, 1}, @continuous_expansion)
   def dimension(%Continuous{range: range}), do: expand(range, @continuous_expansion)
   def dimension(%Discrete{levels: levels}), do: expand({1, length(levels)}, @discrete_expansion)
+
+  @doc """
+  The breaks an axis showing `extent` of the scale draws, each its position and its label, in
+  ascending order: ggplot2's `get_breaks()` and `get_labels()` as its view scale calls them.
+
+  A continuous scale takes its transformation's breaks (`Giggly.Scale.Transform`), keeps those
+  inside `extent` (ggplot2 computes breaks on the widened extent and drops the rest), and writes
+  them as its transformation writes them. An untrained one has none, and an extent of zero width
+  has one break, at its end, as in ggplot2.
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [0, 10])
+      iex> Giggly.Scale.breaks(scale, Giggly.Scale.dimension(scale))
+      [{0.0, "0.0"}, {2.5, "2.5"}, {5.0, "5.0"}, {7.5, "7.5"}, {10.0, "10.0"}]
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1.513, 5.424])
+      iex> Giggly.Scale.breaks(scale, Giggly.Scale.dimension(scale))
+      [{2.0, "2"}, {3.0, "3"}, {4.0, "4"}, {5.0, "5"}]
+
+  A break exactly at an end of the extent is kept:
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [3, 17])
+      iex> Giggly.Scale.breaks(scale, {0.0, 20.0})
+      [{0.0, "0"}, {5.0, "5"}, {10.0, "10"}, {15.0, "15"}, {20.0, "20"}]
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1.0e16])
+      iex> Giggly.Scale.breaks(scale, Giggly.Scale.dimension(scale))
+      [{1.0e16, "10000000000000000"}]
+
+      iex> Giggly.Scale.breaks(Giggly.Scale.new(:continuous), {-0.05, 1.05})
+      []
+
+  A discrete scale has a break at each level, whatever the extent, labelled as
+  `Giggly.Scale.Labels` writes a level:
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:discrete), ["6", nil, "4"])
+      iex> Giggly.Scale.breaks(scale, Giggly.Scale.dimension(scale))
+      [{1, "4"}, {2, "6"}, {3, "NA"}]
+  """
+  @spec breaks(t(), {float(), float()}) :: [break()]
+  def breaks(%Continuous{range: :none}, _extent), do: []
+
+  def breaks(%Continuous{transform: transform}, {low, high} = extent) do
+    positions =
+      if zero_range?(low, high) do
+        [low]
+      else
+        transform
+        |> Transform.breaks(extent)
+        |> Enum.filter(fn position -> position >= low and position <= high end)
+      end
+
+    Enum.zip(positions, Transform.format(transform, positions))
+  end
+
+  def breaks(%Discrete{levels: levels}, _extent) do
+    levels
+    |> Labels.levels()
+    |> Enum.with_index(1)
+    |> Enum.map(fn {label, position} -> {position, label} end)
+  end
 
   # Widens each end by a multiple of the range's width plus a constant: R's `expand_range()`.
   defp expand({low, high}, {multiple, constant}) do

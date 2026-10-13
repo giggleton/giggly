@@ -134,15 +134,19 @@ defmodule GigglyTest do
   end
 
   describe "to_svg/1" do
-    # Golden: test/golden/point.svg. Its positions were checked against an independent
-    # calculation (each axis's range widened by 5% at each end, rescaled onto 720 by 576 points with
-    # y running down), and its radius and outline are ggplot2's default point in its own SVG test
-    # snapshots. The row missing its mpg is not drawn but still widens the x axis, as in ggplot2.
-    # It moves only with a change to what a plot draws: the drawing's size, the point's look, the
-    # expansion, axes or a background arriving, or the document's markup.
-    test "each row with an x and a y is drawn as a point where the coordinate system puts it" do
+    # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50, the axes of ggplot2's
+    # own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg`, and every tick and
+    # label was checked against that snapshot measured from the panel's edges: y ticks from 2.74
+    # points left of the panel to its edge, y labels ending 4.93 points left of it with baselines
+    # 3.03 points below their ticks, x ticks 2.74 points below it and x baselines 10.99, the same
+    # break labels and the same `textLength`s. The panel is the drawing less ggplot2's 5.48-point
+    # plot margin and the two axes (14.72 points wide, 12.81 tall); the points' radius and outline
+    # are ggplot2's default point. The row missing its mpg is not drawn but still widens the x axis,
+    # as in ggplot2. It moves only with a change to what a plot draws: the drawing's size, the
+    # point's or the axes' look, the expansion, a background or titles arriving, or the markup.
+    test "each row with an x and a y is drawn as a point, with an axis below and to the left" do
       plot =
-        %{"wt" => [2.62, 2.875, 2.32, 3.215], "mpg" => [21.0, 22.8, 22.8, nil]}
+        %{"wt" => [0.0, 4.0, 7.0, 10.0], "mpg" => [0.0, 50.0, 20.0, nil]}
         |> Plot.new(%{x: :wt, y: :mpg})
         |> Plot.geom_point()
 
@@ -152,6 +156,17 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/point.svg")
+    end
+
+    test "a label's &, < and > are escaped, so a level cannot break the document" do
+      svg =
+        %{"make" => ["<a & b>"], "mpg" => [21.0]}
+        |> Plot.new(%{x: :make, y: :mpg})
+        |> Plot.geom_point()
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      assert svg =~ ">&lt;a &amp; b&gt;</text>"
     end
   end
 end
