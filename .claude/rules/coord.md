@@ -37,12 +37,17 @@ grid lines are placed by the coordinate system".
   system's call**, as ggplot2's `render_bg` differs by coordinate system (straight lines here,
   circles and spokes in polar). It returns lines of points in the unit panel, major and minor, by
   the aesthetic whose breaks they mark; the guide gives them the theme's look and the drawing
-  order. A cartesian line crosses the panel from edge to edge, from minus to plus infinity as
-  ggplot2 runs it, squished to 0 and 1.
+  order. A cartesian line runs from minus to plus infinity along the other axis, as ggplot2 runs
+  it, through the same rescale as the data: from edge to edge, or shrunk to a point at the middle
+  across an axis whose extent has equal ends, as ggplot2's does.
 - **`transform/2` places every x-family and y-family column**, by `Aesthetics.family/1`, never by
   comparing a name with `:x`; other columns pass through.
 - **An infinite position goes to the panel's edge and a missing one stays missing**, as ggplot2's
   `squish_infinite()` and `rescale()` leave them; dropping a missing row is the geom's.
+- **On an axis whose extent has equal ends, every position goes to the panel's middle, infinite
+  ones too**, as `scales::rescale()` puts every value on a zero-wide range before ggplot2 squishes
+  anything. The scale gives equal ends exactly when R's `zero_range()` calls the widened extent
+  zero wide; this namespace tests only that the ends are equal and never copies the rule.
 - **What waits for its first reader:** `munch` (the first path geom; a grid that is not
   rectangular munches its lines and background, as ggplot2's does), axes above or to the right, and every coordinate option (`xlim`, `expand`, `reverse`, `ratio`,
   `clip`).
@@ -56,6 +61,7 @@ value by its axis's extent, `(value - low) / (high - low)`, putting `:infinity` 
 `:neg_infinity` at 0 and returning `nil` and `:nan` as they are; `axes/1` rescales each break's
 position the same way, keeps its label, and returns `%{bottom: {:x, breaks}, left: {:y, breaks}}`;
 `grid/1` rescales each break's and minor break's position the same way and runs an x line from
-`{place, 0.0}` to `{place, 1.0}` and a y line from `{0.0, place}` to `{1.0, place}`.
+`{place, bottom}` to `{place, top}`, the y extent's rescaled minus and plus infinity, and a y line
+from `{left, place}` to `{right, place}` on the x extent.
 The boundary lists `Giggly.Aesthetics`, for which columns are x and which y, and
 `Giggly.DataFrame`.

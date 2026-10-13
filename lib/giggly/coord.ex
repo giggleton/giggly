@@ -99,6 +99,16 @@ defmodule Giggly.Coord do
       [0.5, 0.0, 1.0, 0.0]
       iex> Giggly.DataFrame.pull(placed, :group)
       [1, 1, 2, 2]
+
+  On an axis whose extent has equal ends, which `Giggly.Scale.dimension/1` gives an extent R's
+  `zero_range()` calls zero wide, every position is placed at the middle, infinite ones too, as
+  `scales::rescale()` places them:
+
+      iex> params = Giggly.Coord.panel_params(:cartesian, {{1.0e16, 1.0e16}, [], []}, {{0.0, 1.0}, [], []})
+      iex> frame = Giggly.DataFrame.new(x: [1.0e16, :infinity, :neg_infinity, nil], y: [0.0, 0.0, 0.0, 0.0])
+      iex> placed = Giggly.Coord.transform(frame, params)
+      iex> Giggly.DataFrame.pull(placed, :x)
+      [0.5, 0.5, 0.5, nil]
   """
   @spec transform(DataFrame.t(), panel_params()) :: DataFrame.t()
   def transform(frame, %Coord.Cartesian{} = panel_params),
@@ -147,6 +157,18 @@ defmodule Giggly.Coord do
           y: [[{0.0, 0.25}, {1.0, 0.25}], [{0.0, 0.75}, {1.0, 0.75}]]
         }
       }
+
+  Across an axis whose extent has equal ends, where every position is placed at the middle, a
+  line shrinks to a point there, as ggplot2's does:
+
+      iex> params =
+      ...>   Giggly.Coord.panel_params(
+      ...>     :cartesian,
+      ...>     {{1.0e16, 1.0e16}, [{1.0e16, "10000000000000000"}], []},
+      ...>     {{0.0, 1.0}, [{0.5, "0.5"}], []}
+      ...>   )
+      iex> Giggly.Coord.grid(params).major
+      %{x: [[{0.5, 0.0}, {0.5, 1.0}]], y: [[{0.5, 0.5}, {0.5, 0.5}]]}
   """
   @spec grid(panel_params()) :: grid()
   def grid(%Coord.Cartesian{} = panel_params), do: Coord.Cartesian.grid(panel_params)

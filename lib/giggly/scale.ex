@@ -120,9 +120,9 @@ defmodule Giggly.Scale do
   The extent of the axis in positions, widened as ggplot2 widens it by default before drawing: a
   continuous range by 5% of its width at each end, and discrete levels, at positions 1 to n, by
   0.6. A range of zero width is widened as though its width were 1, as R's `expand_range()` does,
-  so one value, zero included, spans 0.05 either side of it; an untrained continuous scale spans 0 to 1 before it
-  is widened, ggplot2's default for an empty axis. It is ggplot2's `dimension()` with the default
-  expansion, and the coordinate system maps it onto the panel.
+  so one value, zero included, spans 0.05 either side of it; an untrained continuous scale spans 0
+  to 1 before it is widened, ggplot2's default for an empty axis. It is ggplot2's `dimension()`
+  with the default expansion, and the coordinate system maps it onto the panel.
 
       iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1, 3])
       iex> Giggly.Scale.dimension(scale)
@@ -138,6 +138,15 @@ defmodule Giggly.Scale do
       iex> Giggly.Scale.dimension(scale)
       {999.95, 1000.0500000000001}
 
+  An extent still zero wide once widened, by R's `zero_range()`, is its middle, both ends equal:
+  a single value from about 4.5e11 up, where 0.05 either side is rounding error beside its size.
+  ggplot2 keeps such an extent's ends and `scales::rescale()` draws every value on it at the
+  middle of the panel; ends that are equal are how the coordinate system is told to.
+
+      iex> scale = Giggly.Scale.train(Giggly.Scale.new(:continuous), [1.0e12])
+      iex> Giggly.Scale.dimension(scale)
+      {1.0e12, 1.0e12}
+
       iex> Giggly.Scale.dimension(Giggly.Scale.new(:continuous))
       {-0.05, 1.05}
 
@@ -147,7 +156,13 @@ defmodule Giggly.Scale do
   """
   @spec dimension(t()) :: {number(), number()}
   def dimension(%Continuous{range: :none}), do: expand({0, 1}, @continuous_expansion)
-  def dimension(%Continuous{range: range}), do: expand(range, @continuous_expansion)
+
+  def dimension(%Continuous{range: range}) do
+    range
+    |> expand(@continuous_expansion)
+    |> collapse_zero_width()
+  end
+
   def dimension(%Discrete{levels: levels}), do: expand({1, length(levels)}, @discrete_expansion)
 
   @doc """
@@ -263,6 +278,16 @@ defmodule Giggly.Scale do
     width = if zero_range?(low, high), do: 1, else: high - low
     padding = width * multiple + constant
     {low - padding, high + padding}
+  end
+
+  # An extent R's `zero_range()` still calls zero wide, as its middle with both ends equal.
+  defp collapse_zero_width({low, high} = extent) do
+    if zero_range?(low, high) do
+      middle = (low + high) / 2
+      {middle, middle}
+    else
+      extent
+    end
   end
 
   # R's `zero_range()`: equal ends, or ends so close, relative to the smaller, that their

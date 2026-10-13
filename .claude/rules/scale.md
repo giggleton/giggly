@@ -74,7 +74,11 @@ grid lines are placed by the coordinate system".
 - **`dimension/1` is an axis's extent widened by ggplot2's default expansion**, in transformed
   positions: a continuous range by 5% of its width at each end, discrete levels (1 to n) by 0.6,
   a range of zero width (R's `zero_range()`, rounding error included) as if its width were 1.
-  The coordinate system maps it onto the panel and adds nothing; a scale's own `expand`, and the
+  **An extent still zero wide once widened is returned as its middle, both ends equal** (a single
+  value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every
+  value on it at the panel's middle, and equal ends are how the coordinate system is told, so
+  `zero_range()` stays in this namespace alone. The coordinate system maps the extent onto the
+  panel and adds nothing; a scale's own `expand`, and the
   coordinate system's switch to turn expansion off, arrive with options.
 
 ## How it works

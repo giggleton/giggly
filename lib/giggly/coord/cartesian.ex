@@ -7,10 +7,14 @@ defmodule Giggly.Coord.Cartesian do
 
   An infinite position is put at the panel's edge, as ggplot2's `squish_infinite()` puts it, so a
   mark can reach the edge whatever the range; a missing one (`nil`, or the float `:nan`) stays
-  missing for the geom to drop. The x axis is drawn below the panel and the y axis to its left,
-  ggplot2's default places, each break placed by the same rescale as the data. Its grid lines are
-  straight, each crossing the panel from edge to edge at a break or a minor break, placed the same
-  way.
+  missing for the geom to drop. On an axis whose extent has equal ends, which the scale gives one
+  R's `zero_range()` calls zero wide, every position is put at the panel's middle, infinite ones
+  too, as `scales::rescale()` puts them before ggplot2 squishes anything.
+
+  The x axis is drawn below the panel and the y axis to its left, ggplot2's default places, each
+  break placed by the same rescale as the data. Its grid lines are straight, each crossing the
+  panel from edge to edge at a break or a minor break, placed the same way; the lines crossing an
+  axis of equal ends shrink to a point at its middle, as ggplot2's do.
   """
 
   @behaviour Giggly.Coord
@@ -65,32 +69,40 @@ defmodule Giggly.Coord.Cartesian do
   end
 
   @impl Giggly.Coord
-  def grid(%__MODULE__{} = params) do
+  def grid(%__MODULE__{x_range: x_range, y_range: y_range} = params) do
     major_x = Enum.map(params.x_breaks, fn {position, _label} -> position end)
     major_y = Enum.map(params.y_breaks, fn {position, _label} -> position end)
 
     %{
-      major: %{x: x_lines(major_x, params.x_range), y: y_lines(major_y, params.y_range)},
+      major: %{x: x_lines(major_x, x_range, y_range), y: y_lines(major_y, x_range, y_range)},
       minor: %{
-        x: x_lines(params.x_minor_breaks, params.x_range),
-        y: y_lines(params.y_minor_breaks, params.y_range)
+        x: x_lines(params.x_minor_breaks, x_range, y_range),
+        y: y_lines(params.y_minor_breaks, x_range, y_range)
       }
     }
   end
 
-  # ggplot2 runs each grid line from minus to plus infinity, which the panel's edges squish to 0
-  # and 1: an x line up the panel from its bottom, a y line across it from its left.
-  defp x_lines(positions, range) do
+  # ggplot2 runs each grid line from minus to plus infinity along the other axis, through the same
+  # rescale as the data, which puts its ends at that axis's edges, 0 and 1, or both at its middle
+  # when its extent has equal ends: an x line up the panel from its bottom, a y line across it
+  # from its left.
+  defp x_lines(positions, x_range, y_range) do
+    bottom = rescale(:neg_infinity, y_range)
+    top = rescale(:infinity, y_range)
+
     Enum.map(positions, fn position ->
-      place = rescale(position, range)
-      [{place, rescale(:neg_infinity, range)}, {place, rescale(:infinity, range)}]
+      place = rescale(position, x_range)
+      [{place, bottom}, {place, top}]
     end)
   end
 
-  defp y_lines(positions, range) do
+  defp y_lines(positions, x_range, y_range) do
+    left = rescale(:neg_infinity, x_range)
+    right = rescale(:infinity, x_range)
+
     Enum.map(positions, fn position ->
-      place = rescale(position, range)
-      [{rescale(:neg_infinity, range), place}, {rescale(:infinity, range), place}]
+      place = rescale(position, y_range)
+      [{left, place}, {right, place}]
     end)
   end
 
@@ -106,6 +118,11 @@ defmodule Giggly.Coord.Cartesian do
 
     DataFrame.put(frame, name, rescaled)
   end
+
+  # An extent of equal ends is one R's `zero_range()` calls zero wide, and `scales::rescale()` puts
+  # every value on it at the middle, infinities included, since ggplot2 squishes them only after.
+  defp rescale(value, {low, low}) when is_number(value) or value in [:infinity, :neg_infinity],
+    do: 0.5
 
   defp rescale(:infinity, _range), do: 1.0
   defp rescale(:neg_infinity, _range), do: 0.0

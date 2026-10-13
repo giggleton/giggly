@@ -65,6 +65,26 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **An axis whose extent is zero wide once widened is drawn at the panel's middle, and the scale
+  says so by giving the extent equal ends (2026-10-13, Steve).** A single value is widened by
+  0.05 either side; from about 4.5e11 up that is rounding error beside the value, R's
+  `zero_range()` calls the extent zero wide, and `scales::rescale()` puts every value on it,
+  infinities included, at the middle of the panel; from about 1e15 up the widening is lost
+  altogether and the extent's ends are equal. Giggly divided by zero there, and between the two
+  put the point at the middle by arithmetic but the axis's one tick, at the extent's low end, at
+  the panel's left edge. `Scale.dimension/1` now returns such an extent as its middle, both ends
+  equal, and `Coord.Cartesian` puts every value on an axis of equal ends at the middle, before it
+  squishes infinities, as ggplot2 rescales before it squishes; the single break, at that middle,
+  is labelled with the value itself. Drawn with ggplot2 in Docker, single values of 1e12 and 1e16
+  now match in every element but the label, which ggplot2 writes in scientific form (`1e+12`) and
+  Giggly as plain digits, as decided for labels. *Rejected: mapping to the middle only when the
+  ends are exactly equal* — it ends the crash but leaves the tick at the left edge for single
+  values from about 4.5e11 to 1e15; *and a copy of `zero_range()` in the coordinate system* — one
+  rule stored twice, while equal ends carry the scale's verdict to it. The check against ggplot2
+  also found that `Coord.Cartesian.grid/1` rescaled each line's ends on its own axis's extent
+  rather than the other axis's, which agree whenever an extent's ends differ; across an axis of
+  equal ends ggplot2's lines shrink to a point at the middle, and now so do Giggly's.
+
 - **The panel's grid lines are placed by the coordinate system and drawn by the guide, at R's
   regular minor breaks; clipping waits for a step of its own (2026-10-12, Steve).** The panel
   is drawn as ggplot2's `theme_gray()` draws it: a light grey background (ink mixed 92% toward
@@ -745,6 +765,18 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-13 — An axis of one huge value is drawn at the panel's middle.** A single value from
+  about 1e15 up crashed `to_svg/1`, a division by zero in the coordinate system, and one from about
+  4.5e11 up drew its tick at the panel's left edge, where ggplot2 draws it in the middle. The §4
+  entry beginning "An axis whose extent is zero wide" gives the fix and what was rejected; Steve
+  chose it over ending the crash alone. Flagged as a separate task during increment 8 and done
+  here. Checking the fix against ggplot2's drawings of single values of 1e12 and 1e16 found a bug
+  in the previous commit's grid: each line's ends were rescaled on its own axis's extent, which
+  gives the same 0 and 1 for every extent but one of equal ends. Both drawings now match ggplot2's
+  in every element but the tick's label. Review's mutation step (610 mutants over `Scale`,
+  `Coord` and `Coord.Cartesian`) left no line unexecuted and only equivalent survivors on the
+  changed lines.
 
 - **2026-10-13 — The panel's background and grid lines (Phase 1, ninth increment, second of two
   steps).** The panel is drawn grey with white grid lines, major ones at each axis's breaks and
