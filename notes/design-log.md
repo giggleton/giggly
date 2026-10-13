@@ -65,6 +65,28 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Giggly follows ggplot2's current coordinate functions: no `coord_flip()` and no
+  `coord_polar()`; Phase 2 proves the coordinate seam with `coord_radial()` (2026-10-13,
+  Steve).** ggplot2 marked `coord_flip()` superseded in 3.5.0: a horizontal plot is made by
+  swapping the x and y aesthetics, and since 3.3.0 geoms and stats detect their orientation from
+  the mapping or take `orientation = "y"`; `coord_flip()` remains only for a geom or stat without
+  that support. Giggly gives the feature without the function. For points it already works, since
+  a point has no direction; for bars, boxplots and histograms it is orientation in the geom and the
+  stat (ggplot2's `flipped_aes` and `flip_data()`), which arrives in Phase 3 with the first geom
+  that has a direction, and `Aesthetics.counterpart/1` already gives its renaming. ggplot2 4.0.3
+  signals that `coord_polar()` is superseded in favour of `coord_radial()` (checked by running it),
+  which 3.5.0 added as its successor: partial circles by start and end angles, an inner radius, the
+  radius axis inside the panel, an axis around the circle (`guide_axis_theta()`), `reverse`, and
+  scales expanded by default as cartesian ones are, where `coord_polar()` expands none. Giggly
+  follows `coord_radial()`, its arguments and its defaults, and offers no `coord_polar()`. Phase 2
+  is now `facet_wrap` with free scales, then `coord_radial()` in its simplest form, a full circle
+  with no inner radius, as the test that a coordinate system which places positions differently
+  changes no geom; its other features follow it. This amends Phase 0's list of phases (§6, the
+  entry beginning "Phase 0 ratified"). *Rejected: `coord_flip` as Phase 2's coordinate test*
+  (Phase 0's plan) — superseded, and the cheaper test it offered (axes and titles keyed by the
+  aesthetic each side shows) is exercised by `coord_radial()`'s axes as well; *and
+  `coord_polar()`* — superseded, with defaults that differ from its successor's.
+
 - **A plot is drawn at the size it is given, in pixels, 700 by 433 by default, ggplot2's online
   reference size; `to_svg/2`'s options are the first NimbleOptions validates, from the root
   boundary (2026-10-13, Steve).** In Livebook the notebook's drawings looked tiny: `to_svg/1`
@@ -262,7 +284,8 @@ stops the question being reopened from scratch.
   fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
   here means a break's text. `Coord.axes/1` now says which aesthetic each side's axis shows, so
   which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
-  with axes. `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as
+  with axes (Giggly since chose not to build `coord_flip`; see the entry beginning "Giggly follows
+  ggplot2's current coordinate functions"). `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as
   ggplot2's layout adds its `xlab-b` row and `ylab-l` column: 11-point black text, a 2.75-TeX-point
   gap toward the axis, centred on the panel's side, hanging from the cell's far edge, the y title
   turned 90 degrees. `Scene.Text` gained an angle, and SVG writes turned text and leaves out a
@@ -405,7 +428,9 @@ stops the question being reopened from scratch.
   the assembled value internal. *Rejected: `Coord` handed the family rule, or each geom naming
   its x and y columns, rather than listing `Aesthetics`* — handing the rule in moves the listing to
   `Geom`, a peer domain, and naming columns makes every geom repeat the family lists, while
-  `coord_flip` needs each column's counterpart from the vocabulary anyway. *Rejected: the
+  `coord_flip` needs each column's counterpart from the vocabulary anyway (that reason since gone:
+  Giggly builds no `coord_flip`, see the entry beginning "Giggly follows ggplot2's current
+  coordinate functions"). *Rejected: the
   expansion in the coordinate system* — ggplot2 lets a scale's own `expand` override the default,
   and `expand_range()` is R's `scales`; the coordinate system holds the widened extents.
   *Rejected: the assembly writing unit-panel positions into the tables* — whether to munch before

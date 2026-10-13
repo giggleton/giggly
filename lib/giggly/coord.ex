@@ -12,8 +12,8 @@ defmodule Giggly.Coord do
   from `grid/1`, which runs a line across the panel at each break and minor break; and `clip/1`
   says whether what is drawn in the panel is cut off at its edges. A geom never
   sees a scale's range, and the params are opaque to everything but this namespace, so a
-  coordinate system that places positions differently (flipped, polar) changes no geom, no axis
-  and no grid.
+  coordinate system that places positions differently (radial, ggplot2's `coord_radial()`) changes
+  no geom, no axis and no grid.
 
   A plot records its coordinate system by name, and the name is resolved here; each coordinate
   system is a module implementing this behaviour, whose struct is its panel params. There is one

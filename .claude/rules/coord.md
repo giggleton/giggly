@@ -31,8 +31,8 @@ grid lines are placed by the coordinate system".
   (`expand = FALSE`, `xlim`) arrives; then the extent is the coordinate system's to decide.
 - **`axes/1` places each axis's breaks by the same rescale as the data, keyed by the side the
   axis is drawn on, with the aesthetic the axis shows** (cartesian: x at the bottom, y on the
-  left), so a guide never reads the params, takes the title of that aesthetic, and a flipped or
-  polar system moves axes and their titles without touching a guide.
+  left), so a guide never reads the params, takes the title of that aesthetic, and a radial
+  system moves axes and their titles without touching a guide.
 - **`grid/1` places the panel's grid lines, so where a grid line runs is the coordinate
   system's call**, as ggplot2's `render_bg` differs by coordinate system (straight lines here,
   circles and spokes in polar). It returns lines of points in the unit panel, major and minor, by
