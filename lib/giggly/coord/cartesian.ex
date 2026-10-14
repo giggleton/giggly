@@ -1,22 +1,22 @@
 defmodule Giggly.Coord.Cartesian do
-  @moduledoc """
-  Cartesian coordinates, ggplot2's `coord_cartesian()`: x across the panel and y up it, each
-  rescaled from its axis's extent to 0 to 1. Its struct is a panel's params: the x and y extents,
-  already widened by the scales, each axis's breaks and minor breaks, and whether the panel is
-  clipped to its edges, which it records as `:on`, ggplot2's default. Use it through
-  `Giggly.Coord`.
+  @moduledoc false
 
-  An infinite position is put at the panel's edge, as ggplot2's `squish_infinite()` puts it, so a
-  mark can reach the edge whatever the range; a missing one (`nil`, or the float `:nan`) stays
-  missing for the geom to drop. On an axis whose extent has equal ends, which the scale gives one
-  R's `zero_range()` calls zero wide, every position is put at the panel's middle, infinite ones
-  too, as `scales::rescale()` puts them before ggplot2 squishes anything.
-
-  The x axis is drawn below the panel and the y axis to its left, ggplot2's default places, each
-  break placed by the same rescale as the data. Its grid lines are straight, each crossing the
-  panel from edge to edge at a break or a minor break, placed the same way; the lines crossing an
-  axis of equal ends shrink to a point at its middle, as ggplot2's do.
-  """
+  # Cartesian coordinates, ggplot2's `coord_cartesian()`: x across the panel and y up it, each
+  # rescaled from its axis's extent to 0 to 1. Its struct is a panel's params: the x and y extents,
+  # already widened by the scales, each axis's breaks and minor breaks, and whether the panel is
+  # clipped to its edges, which it records as `:on`, ggplot2's default. Use it through
+  # `Giggly.Coord`.
+  #
+  # An infinite position is put at the panel's edge, as ggplot2's `squish_infinite()` puts it, so a
+  # mark can reach the edge whatever the range; a missing one (`nil`, or the float `:nan`) stays
+  # missing for the geom to drop. On an axis whose extent has equal ends, which the scale gives one
+  # R's `zero_range()` calls zero wide, every position is put at the panel's middle, infinite ones
+  # too, as `scales::rescale()` puts them before ggplot2 squishes anything.
+  #
+  # The x axis is drawn below the panel and the y axis to its left, ggplot2's default places, each
+  # break placed by the same rescale as the data. Its grid lines are straight, each crossing the
+  # panel from edge to edge at a break or a minor break, placed the same way; the lines crossing an
+  # axis of equal ends shrink to a point at its middle, as ggplot2's do.
 
   @behaviour Giggly.Coord
 

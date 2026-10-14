@@ -16,7 +16,7 @@ check is the judgment calls a linter can't make.
 The suite is deliberately tiered: **exhaustive at the pure core, thin smoke above it.**
 
 - A pure-core rule gets its matrix of cases in the core test file (`test/giggly/`),
-  driven through the public API.
+  driven through the public functions of the module that owns it, API or not.
 - A process layer tests only what the *process* adds: seed threading, broadcasts,
   clock/timeout behavior, crash recovery. One integration case per wiring concern, each with
   a comment naming the specific mutant it exists to kill; that comment style is the standard.
@@ -129,6 +129,12 @@ When reviewing a diff that changes behavior, ask what the change *orphaned*:
   check, a task) is handed a fabricated source or a temporary directory, never pointed at the
   repository itself — the repository changes, and the test then pins whatever it happened to
   contain. Build inputs with the fixture builders; inline hand-rolled structs drift.
+- **Doctests are for the API.** A `@doc` example runs as a doctest only on an API function,
+  where it is also the documentation users read (CLAUDE.md, Conventions). A function that is not
+  API — `@doc false`, or any function of a `@moduledoc false` module — is tested by ordinary tests
+  in its module's test file, with `===` where a doctest's pinned match would have told `2` from
+  `2.0`; a `doctest` line for an internal module is a finding. An API example shows what a user
+  sees, never an internal struct.
 - Test names are behavioral sentences ("a missing budget key is a finding rather than a silent
   pass"), and deliberate wrong-type guard tests route through a `@spec`'d type-erasing helper
   so `--warnings-as-errors` holds.

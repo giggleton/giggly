@@ -13,8 +13,9 @@ defmodule Giggly do
   # `Giggly.DataFrame`, which owns an outside library and so sits at the top level: a sub-boundary
   # may only list what its parent does, and `panel_scales/2` reads the layout table. It lists
   # `NimbleOptions`, which validates `to_svg/2`'s options and which a sub-boundary may list in turn
-  # when its own options arrive. It exports `Plot`, which with this module is what a user of Giggly
-  # calls.
+  # when its own options arrive. It exports `Plot`, the description the run functions take; what a
+  # user of Giggly calls is the documented API (CLAUDE.md, Conventions), which reaches past
+  # boundary exports to `Datasets`, `DataFrame`'s readers and the scales `panel_scales/2` returns.
   use Boundary, deps: [Giggly.DataFrame, NimbleOptions], exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
@@ -36,12 +37,15 @@ defmodule Giggly do
   # Points (1/72 inch), the unit the drawing is written in, per CSS pixel (1/96 inch).
   @points_per_pixel 72 / 96
 
+  @typedoc "A panel's trained position scale, continuous or discrete."
+  @type panel_scale :: Giggly.Scale.Continuous.t() | Giggly.Scale.Discrete.t()
+
   @doc """
   The table the layer at `index` computes, counting from 0 in the order the layers were added; the
   first layer when no index is given. It is ggplot2's `get_layer_data()`.
 
-  Its columns are named by aesthetic, plus the `:panel` each row is drawn in (`Giggly.Facet`) and
-  its `:group` (`Giggly.Group`); the data's own column names do not appear. Its x and y columns
+  Its columns are named by aesthetic, plus the `:panel` each row is drawn in and its `:group`, the
+  series it belongs to; the data's own column names do not appear. Its x and y columns
   hold positions on the panel's scales: a discrete value is its level's position, counting from
   1, as in ggplot2. Raises `ArgumentError` when the plot has no layer at `index`; a
   negative index is refused too, not counted from the end.
@@ -90,7 +94,7 @@ defmodule Giggly do
         y: %Giggly.Scale.Continuous{range: {21.0, 22.8}, transform: :identity}
       }
   """
-  @spec panel_scales(Plot.t(), integer()) :: %{x: Giggly.Scale.t(), y: Giggly.Scale.t()}
+  @spec panel_scales(Plot.t(), integer()) :: %{x: panel_scale(), y: panel_scale()}
   def panel_scales(%Plot{} = plot, panel \\ 1) when is_integer(panel) do
     %Assembly{layout: layout, x_scales: x_scales, y_scales: y_scales} = Assembly.run(plot)
     panels = DataFrame.pull(layout, :panel)

@@ -27,6 +27,22 @@ defmodule Giggly.PlotTest do
   end
 
   describe "geom_point/2" do
+    test "a point layer records its geom, the identity stat and position, and its resolved mapping" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :wt, y: :mpg, group: :cyl})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: :point,
+                 stat: :identity,
+                 position: :identity,
+                 mapping: %{x: "wt", y: "mpg", group: "cyl"}
+               }
+             ]
+    end
+
     test "a column the data does not have is refused by the layer that maps it" do
       plot = Plot.new(@rows, %{x: :wt})
 

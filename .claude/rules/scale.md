@@ -20,6 +20,10 @@ grid lines are placed by the coordinate system".
 
 ## Rules
 
+- **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
+  `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
+  the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
+  `@moduledoc false` like `Breaks`, `Labels`, `MinorBreaks` and `Transform`.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists nothing; the
   assembly pulls a column and hands its values here, so the namespace stays extractable, as R's
   `scales` stands beside ggplot2. Anything that needs a frame belongs to the caller.

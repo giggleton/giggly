@@ -1,9 +1,9 @@
 defmodule Giggly.Scene.Points do
-  @moduledoc """
-  Filled circles, one at each `x` and `y` in the cell's units, all of one `radius`, outline
-  `stroke_width` (both in points) and `color`: grid's `pointsGrob()` for shape 19, the solid
-  circle that is ggplot2's default point.
-  """
+  @moduledoc false
+
+  # Filled circles, one at each `x` and `y` in the cell's units, all of one `radius`, outline
+  # `stroke_width` (both in points) and `color`: grid's `pointsGrob()` for shape 19, the solid
+  # circle that is ggplot2's default point.
 
   @enforce_keys [:x, :y, :radius, :stroke_width, :color]
   defstruct @enforce_keys

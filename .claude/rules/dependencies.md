@@ -29,8 +29,10 @@ semver or the changelog).
   approve with the diff in view; the commit gate re-checks the diff. **A marker quoted inside a
   `"""` heredoc is prose, not a waiver**, and both scanners skip it — documenting the invariant
   that keeps a waiver safe in a moduledoc is the pattern here, so a moduledoc explaining one must
-  not read as one. A waiver whose rejected alternative was cheaper than the waiver is a finding on
-  the construct, not the comment (`elixir-code-review`, `references/suppressions.md`). Scope a
+  not read as one. An internal module's documentation is a comment, where a quoted marker would
+  read as a waiver, so it explains its waiver without quoting one. A waiver whose rejected
+  alternative was cheaper than the waiver is a finding on the construct, not the comment
+  (`elixir-code-review`, `references/suppressions.md`). Scope a
   waiver as narrowly as the tool allows; a `.credo.exs` check moved to `disabled:` silences code
   not yet written.
 - **The exact Elixir/Erlang toolchain is pinned in `.tool-versions`**, and CI reads it from there

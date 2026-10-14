@@ -19,7 +19,8 @@ sentence restated across surfaces, and the file that rots fastest is the one loa
 - **One home per kind of fact.** Cross-cutting rules and the status map live in CLAUDE.md. An
   area's invariants and how it works live in its `.claude/rules/<area>.md`, `## Rules` first,
   `## How it works` second. Decisions with rejected alternatives live in design-log §4; the
-  narrative of a change in §6; mechanism in a guide or a moduledoc; procedure in a skill.
+  narrative of a change in §6; mechanism in a guide or the module's documentation (an API
+  module's moduledoc, an internal module's opening comment); procedure in a skill.
 - **No count, ordinal, size or code-mirrored list in prose.** Point at the thing (`quality_steps`
   in `mix.exs`, a directory) or refer by label; every such number drifts.
 - **No sentence about deployment state.** The repo cannot show which keys are set or which flags
@@ -37,7 +38,7 @@ sentence restated across surfaces, and the file that rots fastest is the one loa
 - **Size a rename before making it: `mix xref callers Mod` for the code, grep for the prose.** The
   compiler's cross-reference data answers the one question grep cannot — which references the build
   will catch on its own — and it is exact where a text search guesses (it sees through aliases,
-  `defdelegate` and macro expansion). It is also blind to most of a repo's surface: moduledoc
+  `defdelegate` and macro expansion). It is also blind to most of a repo's surface: doc and comment
   prose, rules files, skills, config comments, and **`test/`**, whose files are not in the app's
   compile artifacts. So it sizes the job rather than doing it. Run `mix compile` first, since xref
   reads build artifacts. `mix xref callers` takes a module, never a function, so for a partial

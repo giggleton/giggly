@@ -18,6 +18,10 @@ stat and position".
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics` and
   `Giggly.DataFrame`, and exports nothing beyond `Plot`. It knows nothing about scales.
+- **The API is `new/2` and the geom functions.** `computed_mapping/2` and the `layer_*`
+  accessors exist for the assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an
+  API type names no hidden one (`aesthetic`, not `Aesthetics.name/0`). An example in the docs
+  shows what a user sees, through `Giggly.layer_data/2`, never a layer struct.
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence (the layer's column wins) exists once.

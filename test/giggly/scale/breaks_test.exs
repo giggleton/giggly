@@ -3,8 +3,6 @@ defmodule Giggly.Scale.BreaksTest do
 
   alias Giggly.Scale.Breaks
 
-  doctest Giggly.Scale.Breaks
-
   # Golden: R's own `labeling::extended(low, high, 5)` (labeling 0.4.3, R 4.6.1, run in Docker's
   # `r-base` image), each break printed to 17 significant digits. extended Wilkinson is a search
   # scored on simplicity, coverage and density, so a slip in one score changes the winner only for
@@ -106,5 +104,25 @@ defmodule Giggly.Scale.BreaksTest do
     for {extent, r_breaks} <- @r_breaks do
       assert {extent, Breaks.extended(extent)} == {extent, r_breaks}
     end
+  end
+
+  test "a range narrower than 100 machine epsilons gets five breaks spaced evenly end to end" do
+    assert Breaks.extended({0.001, 0.00100000000001}) ===
+             [0.001, 0.0010000000000025, 0.001000000000005, 0.0010000000000075, 0.00100000000001]
+  end
+
+  test "a range wider than the square root of the largest float gets five breaks spaced evenly" do
+    assert Breaks.extended({-1.0e154, 1.3e154}) ===
+             [
+               -1.0e154,
+               -4.250_000_000_000_000_4e153,
+               1.499_999_999_999_999_5e153,
+               7.25e153,
+               1.3e154
+             ]
+  end
+
+  test "a best sequence whose span is rounding error beside its size is its first break alone" do
+    assert Breaks.extended({1.0e15, 1.0e15 + 0.25}) === [1.0e15]
   end
 end

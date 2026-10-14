@@ -1,13 +1,13 @@
 defmodule Giggly.Scale.Transform.Identity do
-  @moduledoc """
-  The identity transformation, R's `transform_identity()`: every value as it is. It is what a
-  continuous scale records when nothing transforms its axis. Use it through
-  `Giggly.Scale.Transform`.
+  @moduledoc false
 
-  Its axis takes R's default breaks for a transformation, extended Wilkinson
-  (`Giggly.Scale.Breaks`), and its default minor breaks, midway between them
-  (`Giggly.Scale.MinorBreaks`), and writes the breaks as plain decimals (`Giggly.Scale.Labels`).
-  """
+  # The identity transformation, R's `transform_identity()`: every value as it is. It is what a
+  # continuous scale records when nothing transforms its axis. Use it through
+  # `Giggly.Scale.Transform`.
+  #
+  # Its axis takes R's default breaks for a transformation, extended Wilkinson
+  # (`Giggly.Scale.Breaks`), and its default minor breaks, midway between them
+  # (`Giggly.Scale.MinorBreaks`), and writes the breaks as plain decimals (`Giggly.Scale.Labels`).
 
   @behaviour Giggly.Scale.Transform
 

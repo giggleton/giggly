@@ -14,27 +14,18 @@ defmodule Giggly.Plot do
 
   The data is anything implementing `Table.Reader`: a list of maps, a map of columns, an Explorer
   data frame, a database result. `new/2` reads it once, into a `Giggly.DataFrame` whose column
-  names are strings, so a source that cannot be read, or a column holding two types, is refused by
-  the call that gave it.
+  names are strings.
 
   ## Mappings
 
   A mapping is a map from aesthetic to column, `%{x: :wt, y: :mpg}`. A column is named by an atom
   or a string and compared with the data's column names as a string, so `:wt` and `"wt"` name the
-  same column. `:colour` is accepted for `:color`.
-
-  Each function checks the mapping it is given against the data when it is called, and raises
-  `ArgumentError` naming the aesthetic, the column as written and the data's columns, so a
-  misspelt column is reported by the call that has it.
+  same column.
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
-  both map takes the layer's column. Which aesthetics a layer can use is checked, on the two
-  mappings together, when the layer is added. Whether a column's type suits an axis is a question
-  for the scales, answered when the plot is run.
-
-  ## Errors
-
-  Every function raises on an argument it cannot use, since a pipe cannot carry an error tuple.
+  both the plot and layer map takes the layer's column. Which aesthetics a layer can use is checked,
+  on the two mappings together, when the layer is added. Whether a column's type suits an axis is
+  checked when the plot is run.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary and the data frame, and nothing
@@ -48,18 +39,21 @@ defmodule Giggly.Plot do
   @enforce_keys [:data, :mapping, :facet, :coord, :theme, :reversed_layers]
   defstruct @enforce_keys
 
+  @typedoc "An aesthetic's name, such as `:x`, `:y` or `:color`."
+  @type aesthetic :: atom()
+
   @typedoc """
   A mapping as stored: aesthetic to the name of a column in the plot's data.
   """
-  @type mapping :: %{optional(Aesthetics.name()) => String.t()}
+  @type mapping :: %{optional(aesthetic()) => String.t()}
 
-  @typedoc "How the plot's rows are split into panels (`Giggly.Facet`)."
+  @typedoc "How the plot's rows are split into panels."
   @type facet :: :null
 
-  @typedoc "How positions are placed in each panel (`Giggly.Coord`)."
+  @typedoc "How positions are placed in each panel."
   @type coord :: :cartesian
 
-  @typedoc "The look everything but the marks is drawn in (`Giggly.Theme`)."
+  @typedoc "The look everything but the marks is drawn in."
   @type theme :: :gray
 
   @typedoc """
@@ -72,11 +66,11 @@ defmodule Giggly.Plot do
           facet: facet(),
           coord: coord(),
           theme: theme(),
-          reversed_layers: [Layer.t()]
+          reversed_layers: [struct()]
         }
 
   @typedoc "A mapping as written: aesthetic to column, the column named by an atom or a string."
-  @type mapping_argument :: %{optional(Aesthetics.name()) => atom() | String.t()}
+  @type mapping_argument :: %{optional(aesthetic()) => atom() | String.t()}
 
   @point_aesthetics [:group, :x, :y]
   @point_required [:x, :y]
@@ -85,10 +79,6 @@ defmodule Giggly.Plot do
 
   @doc """
   A plot of `data` with the aesthetics in `mapping` applying to every layer.
-
-  The plot is drawn in one panel on cartesian coordinates in ggplot2's default theme, which it
-  records rather than leaves out: ggplot2's `ggplot()` defaults to the null facet and
-  `coord_cartesian()`, and draws in `theme_gray()`.
 
       iex> plot =
       ...>   Giggly.Plot.new(
@@ -117,26 +107,17 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  `mapping` is laid over the plot's. Points use `:x`, `:y` and `:group`, and need `:x` and `:y`
-  from one mapping or the other. Each row is one point, where the data puts it: the layer's stat
-  and position are the identity, as `geom_point()`'s are in ggplot2.
-
-  A plot with no mapping of its own, every aesthetic mapped by its layer, is ggplot2's
-  `ggplot(df) + geom_point(aes(...))`:
+  Points use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other.
 
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
       ...>   |> Giggly.Plot.new()
       ...>   |> Giggly.Plot.geom_point(%{x: :wt, y: :mpg, group: :cyl})
-      iex> plot.reversed_layers
-      [
-        %Giggly.Plot.Layer{
-          geom: :point,
-          stat: :identity,
-          position: :identity,
-          mapping: %{x: "wt", y: "mpg", group: "cyl"}
-        }
-      ]
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [2.62, 2.875]
+      iex> Giggly.DataFrame.pull(frame, :group)
+      [2, 1]
   """
   @spec geom_point(t(), mapping_argument()) :: t()
   def geom_point(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
@@ -154,30 +135,25 @@ defmodule Giggly.Plot do
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
 
-  @doc """
-  The mapping `layer` draws with: its own mapping laid over the plot's, so an aesthetic both map
-  takes the layer's column. ggplot2 calls it the layer's computed mapping; every reader of a
-  layer's aesthetics asks for it here.
-  """
+  # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
+  # the layer's column is used.
+  @doc false
   @spec computed_mapping(t(), Layer.t()) :: mapping()
   def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
     do: Map.merge(plot_mapping, layer_mapping)
 
-  @doc """
-  The name of the geom `layer` draws with (`Giggly.Geom`).
-  """
+  # The name of the geom `layer` draws with (`Giggly.Geom`).
+  @doc false
   @spec layer_geom(Layer.t()) :: Layer.geom()
   def layer_geom(%Layer{geom: geom}), do: geom
 
-  @doc """
-  The name of the stat `layer` computes its table with (`Giggly.Stat`).
-  """
+  # The name of the stat `layer` computes its table with (`Giggly.Stat`).
+  @doc false
   @spec layer_stat(Layer.t()) :: Layer.stat()
   def layer_stat(%Layer{stat: stat}), do: stat
 
-  @doc """
-  The name of the position `layer` moves its marks with (`Giggly.Position`).
-  """
+  # The name of the position `layer` moves its marks with (`Giggly.Position`).
+  @doc false
   @spec layer_position(Layer.t()) :: Layer.position()
   def layer_position(%Layer{position: position}), do: position
 

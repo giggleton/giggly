@@ -1,8 +1,8 @@
 defmodule Giggly.Stat.Identity do
-  @moduledoc """
-  The identity stat, ggplot2's `StatIdentity`: the layer's table as it is, one mark per row. Use
-  it through `Giggly.Stat`.
-  """
+  @moduledoc false
+
+  # The identity stat, ggplot2's `StatIdentity`: the layer's table as it is, one mark per row. Use
+  # it through `Giggly.Stat`.
 
   @behaviour Giggly.Stat
 

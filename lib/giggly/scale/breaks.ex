@@ -1,27 +1,27 @@
 defmodule Giggly.Scale.Breaks do
-  @moduledoc """
-  Where a continuous axis's breaks go: the extended Wilkinson algorithm of Talbot, Lin and
-  Hanrahan (2010), as R's `labeling::extended()` implements it and `scales::breaks_extended()`
-  calls it, with five breaks wanted, which is ggplot2's default for a continuous axis. Use it
-  through `Giggly.Scale`.
+  @moduledoc false
 
-  It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
-  0.2, 0.5 and 0.05: simplicity (a step from the nice numbers 1, 5, 2, 2.5, 4 and 3 times a power
-  of ten, early in that list, and zero among the breaks), coverage (the sequence spans the range
-  without overshooting it far), density (close to the number of breaks wanted) and legibility
-  (which `labeling` scores as 1 for every sequence). The breaks may fall outside the range; the
-  caller decides what to keep.
-
-  Three ranges are handled as R handles them. One narrower than 100 times the machine epsilon,
-  or wider than the square root of the largest float (where Elixir's arithmetic would overflow
-  rather than reach infinity), gets the number of breaks wanted spaced evenly from end to end. And
-  a best sequence whose span is within that tolerance of its ends' size, as on a narrow range of
-  large numbers, is its first break alone, as R's `seq()` returns it.
-
-  R computes some intermediate steps in extended precision; here every step is a double, which
-  can differ only where a sum lands within rounding error of a whole multiple of the step. Over
-  813 ranges, random and degenerate, it gives exactly R's breaks.
-  """
+  # Where a continuous axis's breaks go: the extended Wilkinson algorithm of Talbot, Lin and
+  # Hanrahan (2010), as R's `labeling::extended()` implements it and `scales::breaks_extended()`
+  # calls it, with five breaks wanted, which is ggplot2's default for a continuous axis. Use it
+  # through `Giggly.Scale`.
+  #
+  # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
+  # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers 1, 5, 2, 2.5, 4 and 3 times a power
+  # of ten, early in that list, and zero among the breaks), coverage (the sequence spans the range
+  # without overshooting it far), density (close to the number of breaks wanted) and legibility
+  # (which `labeling` scores as 1 for every sequence). The breaks may fall outside the range; the
+  # caller decides what to keep.
+  #
+  # Three ranges are handled as R handles them. One narrower than 100 times the machine epsilon,
+  # or wider than the square root of the largest float (where Elixir's arithmetic would overflow
+  # rather than reach infinity), gets the number of breaks wanted spaced evenly from end to end. And
+  # a best sequence whose span is within that tolerance of its ends' size, as on a narrow range of
+  # large numbers, is its first break alone, as R's `seq()` returns it.
+  #
+  # R computes some intermediate steps in extended precision; here every step is a double, which
+  # can differ only where a sum lands within rounding error of a whole multiple of the step. Over
+  # 813 ranges, random and degenerate, it gives exactly R's breaks.
 
   # The number of breaks wanted: `scales::breaks_extended()`'s `n`.
   @wanted 5
@@ -43,20 +43,10 @@ defmodule Giggly.Scale.Breaks do
   # R's `sqrt(.Machine$double.xmax)`, beyond which `labeling` stops searching.
   @widest_searched 1.340_780_792_994_259_6e154
 
-  @doc """
-  The breaks of the extended Wilkinson sequence that scores best over `{low, high}`, `low` below
-  `high`, in ascending order: on an ordinary range a nice number of nice steps (`{9.225, 35.075}`
-  gives 10 to 35 by 5). The degenerate ranges:
-
-      iex> Giggly.Scale.Breaks.extended({0.001, 0.00100000000001})
-      [0.001, 0.0010000000000025, 0.001000000000005, 0.0010000000000075, 0.00100000000001]
-
-      iex> Giggly.Scale.Breaks.extended({-1.0e154, 1.3e154})
-      [-1.0e154, -4.2500000000000004e153, 1.4999999999999995e153, 7.25e153, 1.3e154]
-
-      iex> Giggly.Scale.Breaks.extended({1.0e15, 1.0e15 + 0.25})
-      [1.0e15]
-  """
+  # The breaks of the extended Wilkinson sequence that scores best over `{low, high}`, `low` below
+  # `high`, in ascending order: on an ordinary range a nice number of nice steps (`{9.225, 35.075}`
+  # gives 10 to 35 by 5), and on the degenerate ranges what the comment above describes.
+  @doc false
   @spec extended({float(), float()}) :: [float()]
   def extended({low, high}) when high - low < @epsilon or high - low > @widest_searched,
     do: spaced_evenly(low, high)

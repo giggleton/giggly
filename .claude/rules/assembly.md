@@ -87,7 +87,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 
 `Giggly` lists `Giggly.DataFrame` so its sub-boundaries may — a sub-boundary may list a
 top-level boundary only when its parent does — and because `panel_scales/2` reads the layout
-table. It exports `Plot`; every other domain is internal.
+table. It exports `Plot`. A user calls only the API (CLAUDE.md, Conventions); the domains
+beneath are `@moduledoc false`, apart from the parts of `DataFrame` and `Scale` the run functions
+hand back.
 
 `Assembly.run/1` first has `Facet.assign_panels/2` put the `:panel` column on the plot's data,
 once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for

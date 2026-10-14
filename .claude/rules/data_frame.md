@@ -17,6 +17,11 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Callers use `Giggly.DataFrame`, never an implementation.** It is its own boundary exporting
   only its root, so a call to `Giggly.DataFrame.Lists` or a `%Lists{}` outside it fails the build.
   A new operation is a `@callback` plus a function here that dispatches on the frame's struct.
+- **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
+  `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
+  `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3` and
+  the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
+  user another operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library, and is a top-level boundary because of it.** Its `deps:`
   is `Table` alone, and nothing else in Giggly may call `table`. Nested under `Giggly`, it could
   list `Table` only if `Giggly` did too, which would open the library to every module directly in

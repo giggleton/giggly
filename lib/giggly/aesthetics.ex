@@ -1,27 +1,27 @@
 defmodule Giggly.Aesthetics do
-  @moduledoc """
-  The aesthetic vocabulary: how aesthetic names are spelled, and which of them are x or y
-  positions.
+  @moduledoc false
 
-  ## Spelling
-
-  Aesthetics are atoms named as in ggplot2, with American spelling canonical. `:color` is the name
-  every stage after the public API sees; `:colour` is accepted there and rewritten by
-  `canonicalize/1`. The vocabulary is open: a name with no alias is returned as given, and which
-  aesthetics a layer accepts is declared by its geom, stat and position. So this module decides
-  spelling, not membership.
-
-  ## Position families
-
-  The x scale trains on, and the coordinate system transforms, more than `:x`: `:xmin`, `:xend`,
-  `:xintercept` and the rest of the x family are all x positions, and likewise for y. `family/1`
-  classifies a name, and `counterpart/1` maps it to its partner in the other family, so a flipped
-  orientation is a renaming of columns rather than a second implementation.
-
-  The families are ggplot2's `x_aes` and `y_aes`, and every x name has a partner in the y family.
-  The one irregular set is the boxplot hinges, where `:xlower`, `:xmiddle` and `:xupper` partner
-  `:lower`, `:middle` and `:upper`.
-  """
+  # The aesthetic vocabulary: how aesthetic names are spelled, and which of them are x or y
+  # positions.
+  #
+  # ## Spelling
+  #
+  # Aesthetics are atoms named as in ggplot2, with American spelling canonical. `:color` is the name
+  # every stage after the public API sees; `:colour` is accepted there and rewritten by
+  # `canonicalize/1`. The vocabulary is open: a name with no alias is returned as given, and which
+  # aesthetics a layer accepts is declared by its geom, stat and position. So this module decides
+  # spelling, not membership.
+  #
+  # ## Position families
+  #
+  # The x scale trains on, and the coordinate system transforms, more than `:x`: `:xmin`, `:xend`,
+  # `:xintercept` and the rest of the x family are all x positions, and likewise for y. `family/1`
+  # classifies a name, and `counterpart/1` maps it to its partner in the other family, so a flipped
+  # orientation is a renaming of columns rather than a second implementation.
+  #
+  # The families are ggplot2's `x_aes` and `y_aes`, and every x name has a partner in the y family.
+  # The one irregular set is the boxplot hinges, where `:xlower`, `:xmiddle` and `:xupper` partner
+  # `:lower`, `:middle` and `:upper`.
 
   # The vocabulary depends on nothing, so nothing it calls can change what a name means.
   use Boundary, deps: [], exports: []
@@ -56,29 +56,18 @@ defmodule Giggly.Aesthetics do
   @typedoc "The position family a name belongs to, or `:none` for every non-position aesthetic."
   @type family :: :x | :y | :none
 
-  @doc """
-  The canonical spelling of an aesthetic name.
-
-      iex> Giggly.Aesthetics.canonical(:colour)
-      :color
-
-      iex> Giggly.Aesthetics.canonical(:fill)
-      :fill
-  """
+  # The canonical spelling of an aesthetic name.
+  @doc false
   @spec canonical(name()) :: name()
   def canonical(name) when is_atom(name), do: Map.get(@aliases, name, name)
 
-  @doc """
-  Rewrites the keys of a mapping, or of a keyword list of fixed aesthetics, to their canonical
-  spelling. Values are untouched, and a keyword list keeps its order.
-
-  Raises `ArgumentError` when two keys name the same aesthetic — `:color` and `:colour` together,
-  or one name twice in a keyword list — since letting either value win would draw a plot the
-  caller did not write.
-
-      iex> Giggly.Aesthetics.canonicalize(%{x: :wt, colour: :cyl})
-      %{x: :wt, color: :cyl}
-  """
+  # Rewrites the keys of a mapping, or of a keyword list of fixed aesthetics, to their canonical
+  # spelling. Values are untouched, and a keyword list keeps its order.
+  #
+  # Raises `ArgumentError` when two keys name the same aesthetic — `:color` and `:colour` together,
+  # or one name twice in a keyword list — since letting either value win would draw a plot the
+  # caller did not write.
+  @doc false
   @spec canonicalize(%{optional(name()) => term()}) :: %{optional(name()) => term()}
   @spec canonicalize(keyword()) :: keyword()
   def canonicalize(aesthetics) when is_map(aesthetics) do
@@ -114,35 +103,15 @@ defmodule Giggly.Aesthetics do
       "(as #{inspect(earlier_name)} and #{inspect(name)}); give it once"
   end
 
-  @doc """
-  The position family `name` belongs to.
-
-      iex> Giggly.Aesthetics.family(:xend)
-      :x
-
-      iex> Giggly.Aesthetics.family(:lower)
-      :y
-
-      iex> Giggly.Aesthetics.family(:color)
-      :none
-  """
+  # The position family `name` belongs to.
+  @doc false
   @spec family(name()) :: family()
   def family(name) when name in @x_family, do: :x
   def family(name) when name in @y_family, do: :y
   def family(name) when is_atom(name), do: :none
 
-  @doc """
-  The partner of a position name in the other family; any other name is returned as given.
-
-      iex> Giggly.Aesthetics.counterpart(:xmin)
-      :ymin
-
-      iex> Giggly.Aesthetics.counterpart(:upper)
-      :xupper
-
-      iex> Giggly.Aesthetics.counterpart(:fill)
-      :fill
-  """
+  # The partner of a position name in the other family; any other name is returned as given.
+  @doc false
   @spec counterpart(name()) :: name()
   def counterpart(name) when is_atom(name), do: Map.get(@counterparts, name, name)
 end

@@ -33,7 +33,8 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
   `.claude/hooks/commit-gate.sh` (a PreToolUse hook) denies `git commit` on any diff touching
   those gated paths until both skills' final steps have recorded a pass for the exact working-tree
   state — a mark that goes stale if any file changes after it.
-- Moduledocs are the per-module contract and are kept accurate; trust them.
+- Module documentation is the per-module contract and is kept accurate; trust it: an API
+  module's `@moduledoc`, or the comment block at the top of an internal module.
 
 ## Status map
 
@@ -120,10 +121,13 @@ works. Add a line here when an area gets its rules file; nothing else about the 
   commit). Use a `--no-ff` merge commit only when the branch carries two or more commits.
 - Work in **small, verifiable increments** and keep the suite green. Prefer async tests wherever
   possible; a file that is `async: false` says in its header what stops it.
-- **Document public API.** Every module gets a `@moduledoc` and every public function a `@doc`
-  (and a `@spec`); these are the pure core's contract and feed `ex_doc`. Use `@moduledoc false`
-  only for modules with no public surface. Private functions (`defp`) don't need `@doc`; clarify
-  them with a brief comment when non-obvious.
+- **Document the public API, and mark everything else as not API.** The API is what a user
+  calls. An API module has a `@moduledoc`; an internal module has `@moduledoc false` and keeps its
+  documentation as a comment block at its top. Every public function has a `@spec` and says
+  whether it is API, wherever it is: a `@doc` string, whose examples run as doctests, or
+  `@doc false`, its explanation a comment. A function that is not API is tested by ordinary
+  tests, never doctests. Private functions (`defp`) don't need `@doc`; clarify them with a brief
+  comment when non-obvious.
 - **Follow credo conventions.** If credo flags a style requirement, remember that and don't make
   the same mistake again. **A new lint or security waiver stops and asks the user** —
   `.claude/rules/dependencies.md`.

@@ -1,18 +1,18 @@
 defmodule Giggly.DataFrame.Lists do
-  @moduledoc """
-  The pure-Elixir data frame: each column is a list. Callers use `Giggly.DataFrame`, which
-  dispatches here.
+  @moduledoc false
 
-  A frame keeps a map from column name to the column's type and values, the names newest first
-  (reversed when `names/1` asks, so gaining a column never walks the list), and its row count, so
-  a `select/2` that keeps no column keeps the rows. Every column has exactly `row_count` values
-  and no name appears twice: every column a frame gains passes one guarded clause that checks
-  both, so a frame that exists is well formed.
-
-  A column's type is worked out once, when its values enter through `new/1` or `put/3`, by one
-  pass that widens the type as each value arrives; `select/2` carries a column's type with it. The
-  type and the values are stored together, so a column cannot exist without its type.
-  """
+  # The pure-Elixir data frame: each column is a list. Callers use `Giggly.DataFrame`, which
+  # dispatches here.
+  #
+  # A frame keeps a map from column name to the column's type and values, the names newest first
+  # (reversed when `names/1` asks, so gaining a column never walks the list), and its row count, so
+  # a `select/2` that keeps no column keeps the rows. Every column has exactly `row_count` values
+  # and no name appears twice: every column a frame gains passes one guarded clause that checks
+  # both, so a frame that exists is well formed.
+  #
+  # A column's type is worked out once, when its values enter through `new/1` or `put/3`, by one
+  # pass that widens the type as each value arrives; `select/2` carries a column's type with it. The
+  # type and the values are stored together, so a column cannot exist without its type.
 
   @behaviour Giggly.DataFrame
 

@@ -58,7 +58,8 @@ survivor is one of three things, and the report says which; each uncovered mutan
 ### 1. A behavior no test pins — report under test quality
 
 A test-quality finding, and the High "coverage hole on a documented contract" when a `@doc`
-promises the behavior. The fix is a test or doctest naming the bug the mutant introduced.
+promises the behavior. The fix is a test naming the bug the mutant introduced — a doctest only
+on an API function.
 
 ### 2. Code the mutant shows is unreachable or redundant — Low
 

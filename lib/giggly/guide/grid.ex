@@ -1,22 +1,21 @@
 defmodule Giggly.Guide.Grid do
-  @moduledoc """
-  A panel's background and grid, ggplot2's `guide_grid()`: the background filling the panel, and
-  a line across it at each break and minor break, which the coordinate system has already placed
-  (`Giggly.Coord.grid/1`). Use it through `Giggly.Guide`.
+  @moduledoc false
 
-  It looks as the theme says (`Giggly.Theme`): the panel's background, then its minor grid lines
-  and its major ones over them. They are drawn in ggplot2's order: the background, the minor lines
-  at the y axis's minor breaks, then at the x axis's, then the major lines at the y axis's breaks
-  and then at the x axis's, so a major line is drawn over a minor one and an x line over a y.
-  """
+  # A panel's background and grid, ggplot2's `guide_grid()`: the background filling the panel, and
+  # a line across it at each break and minor break, which the coordinate system has already placed
+  # (`Giggly.Coord.grid/1`). Use it through `Giggly.Guide`.
+  #
+  # It looks as the theme says (`Giggly.Theme`): the panel's background, then its minor grid lines
+  # and its major ones over them. They are drawn in ggplot2's order: the background, the minor lines
+  # at the y axis's minor breaks, then at the x axis's, then the major lines at the y axis's breaks
+  # and then at the x axis's, so a major line is drawn over a minor one and an x line over a y.
 
   alias Giggly.Scene.{Polylines, Rect}
   alias Giggly.Theme
 
-  @doc """
-  The panel's background and the lines of `grid`, in `theme`'s look and ggplot2's order, placed in
-  the panel's cell.
-  """
+  # The panel's background and the lines of `grid`, in `theme`'s look and ggplot2's order, placed in
+  # the panel's cell.
+  @doc false
   @spec draw(Giggly.Coord.grid(), Theme.t()) :: [Giggly.Scene.primitive()]
   def draw(%{major: major, minor: minor}, %Theme{
         panel_background: background,

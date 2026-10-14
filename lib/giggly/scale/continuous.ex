@@ -1,28 +1,33 @@
 defmodule Giggly.Scale.Continuous do
   @moduledoc """
-  A trained continuous position scale: the range of the finite numbers it has seen, or `:none`
-  before it has seen any, and the name of the transformation its values are put through before it
-  sees them (`Giggly.Scale.Transform`). Use it through `Giggly.Scale`.
+  A trained continuous position scale, as `Giggly.panel_scales/2` returns it: the range of the
+  finite numbers it has seen, or `:none` before it has seen any, and the name of the
+  transformation its values are put through before it sees them.
   """
+
+  # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.
 
   alias Giggly.Scale.Transform
 
   @enforce_keys [:range, :transform]
   defstruct @enforce_keys
 
-  @type t :: %__MODULE__{range: :none | {number(), number()}, transform: Transform.name()}
+  @type t :: %__MODULE__{range: :none | {number(), number()}, transform: atom()}
 
-  @doc "The values put through the scale's transformation, as `Giggly.Scale.transform/2` describes."
+  # The values put through the scale's transformation, as `Giggly.Scale.transform/2` describes.
+  @doc false
   @spec transform(t(), list()) :: list()
   def transform(%__MODULE__{transform: name}, values), do: Transform.transform(name, values)
 
-  @doc "The scale widened to cover the finite numbers in `values`, as `Giggly.Scale.train/2` describes."
+  # The scale widened to cover the finite numbers in `values`, as `Giggly.Scale.train/2` describes.
+  @doc false
   @spec train(t(), list()) :: t()
   def train(%__MODULE__{range: range} = scale, values) do
     %{scale | range: Enum.reduce(values, range, &widen/2)}
   end
 
-  @doc "The values unchanged, as `Giggly.Scale.map/2` describes."
+  # The values unchanged, as `Giggly.Scale.map/2` describes.
+  @doc false
   @spec map(t(), list()) :: list()
   def map(%__MODULE__{}, values), do: values
 

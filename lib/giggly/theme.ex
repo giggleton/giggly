@@ -1,20 +1,20 @@
 defmodule Giggly.Theme do
-  @moduledoc """
-  Themes: the look a plot is drawn in, apart from its data. In ggplot2 a theme gives every part of
-  a plot that is not a mark its colours, sizes, line widths and spacing: the background, the axes
-  and their titles.
+  @moduledoc false
 
-  A plot records its theme by name, and the name is resolved here into the complete theme, every
-  element it draws already worked out (ggplot2's `complete_theme()`): each length in points (1/72
-  inch), each colour as a hex string. Each theme is a module implementing this behaviour. There is
-  one so far, ggplot2's default, `theme_gray()` (`Giggly.Theme.Gray`), and nothing can change it
-  yet; the elements a user sets, and how an element inherits what it leaves unset from its parent,
-  arrive with the first theme setting a user can make.
-
-  When a plot is rendered, every function that draws something other than a mark takes the
-  complete theme and reads the elements it draws. A theme holds sizes, colours, line widths and
-  spacing; how text is aligned and turned is the drawing's until a theme can set it.
-  """
+  # Themes: the look a plot is drawn in, apart from its data. In ggplot2 a theme gives every part of
+  # a plot that is not a mark its colours, sizes, line widths and spacing: the background, the axes
+  # and their titles.
+  #
+  # A plot records its theme by name, and the name is resolved here into the complete theme, every
+  # element it draws already worked out (ggplot2's `complete_theme()`): each length in points (1/72
+  # inch), each colour as a hex string. Each theme is a module implementing this behaviour. There is
+  # one so far, ggplot2's default, `theme_gray()` (`Giggly.Theme.Gray`), and nothing can change it
+  # yet; the elements a user sets, and how an element inherits what it leaves unset from its parent,
+  # arrive with the first theme setting a user can make.
+  #
+  # When a plot is rendered, every function that draws something other than a mark takes the
+  # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths and
+  # spacing; how text is aligned and turned is the drawing's until a theme can set it.
 
   # A theme is values: it calls nothing, and the complete theme is this module's struct, which a
   # boundary listing this one reads.
@@ -69,12 +69,12 @@ defmodule Giggly.Theme do
           axis_title: text()
         }
 
-  @doc "The complete theme."
+  # The complete theme.
+  @doc false
   @callback complete() :: t()
 
-  @doc """
-  The complete theme named `name`: every element it draws, worked out.
-  """
+  # The complete theme named `name`: every element it draws, worked out.
+  @doc false
   @spec complete(name()) :: t()
   def complete(:gray), do: Theme.Gray.complete()
 end

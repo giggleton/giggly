@@ -57,13 +57,59 @@ re-implemented per geom.
 today, and `to_svg` when it is written. `Giggly.Plot` builds the plot value, `Giggly.Assembly`
 runs the stages, and each other area of the pipeline is a module or namespace directly under
 `lib/giggly/`, with its invariants in a `.claude/rules/<area>.md` that CLAUDE.md's status map
-names — the status map is the index, and the moduledocs are the contracts.
+names — the status map is the index, and each module's documentation is its contract: an API
+module's moduledoc, an internal module's opening comment.
 
 ## 4. Key design decisions (the "why", so we don't relitigate)
 
 Each entry: **the decision (date, whose call)**, then *Rejected: the alternative* — and why. Newest
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
+
+- **The API is what a user calls, and everything else says it is not API: an internal module is
+  `@moduledoc false` with its documentation as an opening comment, every public function says
+  whether it is API, and only API functions have doctests (2026-10-13, Steve).** Every module had
+  a `@moduledoc` and every public function a `@doc`, so ExDoc published the whole pipeline, the
+  assembly, rendering, the scene's primitives and `Plot.computed_mapping/2` among it, as if users
+  called it; Elixir has only `def` and `defp`, and a function another module calls must be `def`.
+  CLAUDE.md's rule meant that the API is documented, not that every `def` is API. The API is now
+  `Giggly`'s run functions, `Plot`, `Datasets`, `DataFrame`'s readers (`names/1`, `row_count/1`,
+  `dtypes/1`, `pull/2`, since `layer_data/2` returns a frame) and the two scale structs
+  `panel_scales/2` returns. Every other module is `@moduledoc false`, its documentation kept word
+  for word as a comment block at its top (Steve: nothing stops the documentation being kept
+  without being a moduledoc). Every public function says whether it is API, wherever it is: a
+  `@doc` string, or `@doc false` with its explanation as a comment, in an internal module too
+  (Steve: explicit, not inferred from the module), so Tack's `PublicFunctionDoc` check still holds
+  every public function to an answer. A function that is not API is tested by ordinary tests
+  (Steve: doctests make no sense for documentation users will not read); its examples moved one
+  for one into its module's test file, compared with `===` as a doctest's pinned match compares,
+  and an API example shows what a user sees, never an internal struct. API types name no hidden
+  type, which ExDoc warns about: `DataFrame.t` is `@opaque`, and `Plot` and `Giggly` gained
+  `aesthetic` and `panel_scale`. *Rejected: hiding internal modules with ExDoc's
+  `filter_modules` option* (recommended: no source change, every doctest kept) — Steve chose
+  `@moduledoc false`, which the module itself says. *Rejected: internal modules left in the docs*
+  — users would read the pipeline's joints as API. *Rejected: an internal module's functions
+  keeping their `@doc` and doctests under `@moduledoc false`* (this decision's first wording) —
+  examples no user reads are tests written in doc syntax. *Rejected: narrowing
+  `PublicFunctionDoc` to the API modules' files* (recommended) — a second record of what is API,
+  and an API module left off it goes unchecked; *and a Giggly copy of the check skipping
+  `@moduledoc false` modules* — a second check to maintain and test. *Rejected: the frame
+  implementing `Table.Reader` so that `DataFrame` stays internal* (recommended: a user would read
+  `layer_data/2` with Explorer, Kino's data table or `Table`, the protocol data comes in by) —
+  Steve chose `DataFrame`'s readers as API.
+
+- **Data a plot cannot read is refused by raising, at the call; what to do about bad data is
+  decided upstream (2026-10-13, Steve).** Reviewing `DataFrame.from_table/1`, Steve asked whether
+  loading data is a process boundary that should return `{:ok, frame}` or `{:error, reason}`
+  through `with`. It is not: `from_table/1` is handed a value already in memory, any IO happened
+  where the caller read the data, with that tool's tuples, a pipe cannot carry a tuple, and
+  Explorer draws the same line (`from_csv/2` returns a tuple, `DataFrame.new/2` raises). Giggly's
+  part is to detect bad data and refuse it loudly, since a plausible wrong plot is worse than a
+  crash; the caller decides what to do about it. A precondition checked as a statement, by a
+  helper that returns `:ok` or raises (`Plot`'s `check_accepted/1`), is idiomatic: Elixir's
+  standard library writes its checks the same way, with and without a bang (`Module`'s
+  `validate_doc_meta/2`, `Supervisor.Spec.supervise/2`'s `assert_unique_ids/1`). *Rejected:
+  tuples or `with` at data loading.* What the review found and left unscheduled is in §7.
 
 - **Giggly follows ggplot2's current coordinate functions: no `coord_flip()` and no
   `coord_polar()`; Phase 2 proves the coordinate seam with `coord_radial()` (2026-10-13,
@@ -866,6 +912,25 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-13 — Only the API is documented; everything else says it is not API.** Steve's review
+  of Phase 1's code began with why `Plot.computed_mapping/2` was public. The §4 entry beginning
+  "The API is what a user calls" gives the decisions, each Steve's, and what was rejected; the one
+  beginning "Data a plot cannot read is refused by raising" records the review's other question.
+  Every module outside the API became `@moduledoc false` with its moduledoc kept as a comment block
+  (a script did it; the sentences that had introduced a removed example were reworded and lines
+  pushed past the width rewrapped), every public function outside the API gained `@doc false`
+  with its doc as a comment, and ExDoc now publishes six modules with no warnings. Every doctest
+  of a function that is not API became an ordinary test, one for one; `geom_point/2`'s example,
+  which showed the now internal `%Plot.Layer{}`, moved to `plot_test.exs`, where it pins the
+  recorded identity stat and position, and `geom_point/2` and `DataFrame.dtypes/1` gained
+  examples through `layer_data/2`. Two examples that matched a refusal's whole message became
+  assertions on its data, as review's test rules ask. Review's mutation step ran over the
+  nineteen files the moved tests exercise, once on the tree before the change and once after,
+  3,476 mutants each, paired by what each changed: no mutant the doctests caught went uncaught but
+  rewordings of those two messages, and two that swap which value the mixed-type message names as
+  the column, now caught by an assertion on the column's place. Credo asked for pipes in the new
+  tests and underscores in two exponent floats.
+
 - **2026-10-13 — `to_svg/2` draws at a size in pixels, 700 by 433 by default.** In Livebook the
   first notebook's labels, titles and points looked tiny: every plot was drawn at vdiffr's 10 by 8
   inches, larger than ggplot2's reference pages draw at, and Livebook shrank it to fit. The §4
@@ -1369,6 +1434,13 @@ _(none yet)_
   upstream healthy enough at that moment to carry it — checked then, not assumed now. As of
   2026-10-11 Explorer has a new de facto maintainer and a release cadence again after an
   eleven-month gap; Dux has been quiet since May and calls itself not production ready.
+- **Rows that `table` reads loosely (found 2026-10-13, unscheduled).** Reviewing
+  `DataFrame.from_table/1`: rows whose keys disagree (a later map row missing a key, keyword rows
+  in another order, a row that is not a record) raise `table`'s own `RuntimeError`, not an
+  `ArgumentError` in Giggly's words, and `from_table/1`'s explanation does not list them; a later
+  map row's **extra key is dropped without a word**, since `table` takes the columns from the first
+  row, which is the silent loss `from_table/1`'s length check exists to prevent; and `[]` is a
+  table of no rows while `%{}` is refused as not a table.
 - **`tack` is a git dependency with no `ref`/`tag`.** `mix.lock` pins the commit, so builds are
   reproducible, but `mix deps.update tack` floats to the branch head. Settled by pinning a `tag:`
   once Tack publishes releases.

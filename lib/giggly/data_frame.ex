@@ -1,12 +1,14 @@
 defmodule Giggly.DataFrame do
   @moduledoc """
-  The table every stage of the pipeline reads and writes: named columns of equal length.
+  A table of named columns of equal length, as Giggly holds one: the data a plot was given, and
+  each table `Giggly.layer_data/2` returns. `names/1`, `row_count/1`, `dtypes/1` and `pull/2` read
+  it.
 
   ## Column names
 
-  The data a plot is given is read once, by `from_table/1`, and its column names become strings
-  whatever the source used. Every column the pipeline writes is named by an atom, such as the
-  aesthetic `:x`, so a user column called `"x"` can never be mistaken for one.
+  The data a plot is given is read once, when the plot is created (`Giggly.Plot.new/2`), and its
+  column names become strings whatever the source used. Every column Giggly computes is named by
+  an atom, such as the aesthetic `:x`, so a user column called `"x"` can never be mistaken for one.
 
   ## Values
 
@@ -32,15 +34,15 @@ defmodule Giggly.DataFrame do
   other structs). A `:term` column's values are not checked against each other; it is the frame's
   equivalent of pandas' and Polars' `object` type, so a column the plot never uses cannot refuse the
   table.
-
-  ## Implementations
-
-  This module is both the behaviour an implementation follows and the only module callers use:
-  each operation dispatches on the frame's struct. `Giggly.DataFrame.Lists` is the one
-  implementation. The operations are relational (choosing, renaming and adding columns), so an
-  engine such as a database could run them, and none takes an Elixir function, since an engine
-  cannot run one. Code that needs one pulls a column into a list and puts the result back.
   """
+
+  # ## Implementations
+  #
+  # This module is both the behaviour an implementation follows and the only module callers use:
+  # each operation dispatches on the frame's struct. `Giggly.DataFrame.Lists` is the one
+  # implementation. The operations are relational (choosing, renaming and adding columns), so an
+  # engine such as a database could run them, and none takes an Elixir function, since an engine
+  # cannot run one. Code that needs one pulls a column into a list and puts the result back.
 
   # Its own boundary, exporting only this module: callers reach a frame through the functions
   # below, so an implementation's struct and functions are private to it and a second
@@ -51,8 +53,8 @@ defmodule Giggly.DataFrame do
 
   alias Giggly.DataFrame.Lists
 
-  @typedoc "A frame: the struct of the implementation holding it."
-  @type t :: Lists.t()
+  @typedoc "A frame, read through the functions here."
+  @opaque t :: Lists.t()
 
   @typedoc "A column name: a string for a column read from the input, an atom for every other."
   @type name :: atom() | String.t()
@@ -71,46 +73,43 @@ defmodule Giggly.DataFrame do
           | :null
           | :term
 
-  @doc "Builds a frame from `{name, values}` pairs, as `new/1` describes."
+  # Builds a frame from `{name, values}` pairs, as `new/1` describes.
+  @doc false
   @callback new([{name(), list()}]) :: t()
 
-  @doc "The column names, as `names/1` describes."
+  # The column names, as `names/1` describes.
+  @doc false
   @callback names(t()) :: [name()]
 
-  @doc "The number of rows, as `row_count/1` describes."
+  # The number of rows, as `row_count/1` describes.
+  @doc false
   @callback row_count(t()) :: non_neg_integer()
 
-  @doc "Each column's type, as `dtypes/1` describes."
+  # Each column's type, as `dtypes/1` describes.
+  @doc false
   @callback dtypes(t()) :: %{optional(name()) => dtype()}
 
-  @doc "Chooses and renames columns, as `select/2` describes."
+  # Chooses and renames columns, as `select/2` describes.
+  @doc false
   @callback select(t(), [{name(), name()}]) :: t()
 
-  @doc "One column's values, as `pull/2` describes."
+  # One column's values, as `pull/2` describes.
+  @doc false
   @callback pull(t(), name()) :: list()
 
-  @doc "Adds or replaces a column, as `put/3` describes."
+  # Adds or replaces a column, as `put/3` describes.
+  @doc false
   @callback put(t(), name(), list()) :: t()
 
-  @doc """
-  Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
-  result) into a frame.
-
-  Every column is read into a list, so a lazy source is read here and nowhere else, and column
-  names become strings. Raises `ArgumentError` when the input is a list or map that is not a
-  table, when two of its names become the same string (`:wt` and `"wt"`), when its columns
-  differ in length, or when a column mixes two types; a value with no `Table.Reader`
-  implementation raises `Protocol.UndefinedError`.
-
-      iex> frame = Giggly.DataFrame.from_table(%{wt: [2.62, 2.875, 2.32], id: 1..3})
-      iex> Giggly.DataFrame.names(frame)
-      ["id", "wt"]
-      iex> Giggly.DataFrame.pull(frame, "id")
-      [1, 2, 3]
-
-      iex> Giggly.DataFrame.from_table([1, 2, 3])
-      ** (ArgumentError) expected a table (any Table.Reader), got: [1, 2, 3]
-  """
+  # Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
+  # result) into a frame.
+  #
+  # Every column is read into a list, so a lazy source is read here and nowhere else, and column
+  # names become strings. Raises `ArgumentError` when the input is a list or map that is not a
+  # table, when two of its names become the same string (`:wt` and `"wt"`), when its columns
+  # differ in length, or when a column mixes two types; a value with no `Table.Reader`
+  # implementation raises `Protocol.UndefinedError`.
+  @doc false
   @spec from_table(Table.Reader.t()) :: t()
   def from_table(table) do
     table
@@ -175,23 +174,12 @@ defmodule Giggly.DataFrame do
     end
   end
 
-  @doc """
-  Builds a frame from `{name, values}` pairs, keeping their order.
-
-  This is how the pipeline builds a frame; data from outside it enters through `from_table/1`.
-  Every `values` is a list of the same length and no name appears twice; a call that breaks either
-  raises `FunctionClauseError`. A column mixing two types raises `ArgumentError`.
-
-      iex> frame = Giggly.DataFrame.new(x: [1.5, 2.0], color: ["a", "b"])
-      iex> Giggly.DataFrame.names(frame)
-      [:x, :color]
-
-      iex> Giggly.DataFrame.new([]) |> Giggly.DataFrame.row_count()
-      0
-
-      iex> Giggly.DataFrame.new(mpg: [21.0, nil, "n/a"])
-      ** (ArgumentError) the column :mpg holds values of more than one type (21.0 and "n/a"); give each column one type
-  """
+  # Builds a frame from `{name, values}` pairs, keeping their order.
+  #
+  # This is how the pipeline builds a frame; data from outside it enters through `from_table/1`.
+  # Every `values` is a list of the same length and no name appears twice; a call that breaks either
+  # raises `FunctionClauseError`. A column mixing two types raises `ArgumentError`.
+  @doc false
   @spec new([{name(), list()}]) :: t()
   def new(columns) when is_list(columns), do: Lists.new(columns)
 
@@ -207,58 +195,21 @@ defmodule Giggly.DataFrame do
   Each column's type, by column name, as the moduledoc's Types section describes.
 
       iex> frame =
-      ...>   Giggly.DataFrame.new(
-      ...>     count: [1, nil],
-      ...>     mpg: [21, 22.8],
-      ...>     ratio: [:nan, 2],
-      ...>     limit: [:infinity, :neg_infinity],
-      ...>     model: ["Mazda RX4", "Datsun 710"],
-      ...>     manual: [true, false],
-      ...>     species: [:setosa, :virginica],
-      ...>     day: [~D[2026-10-12], nil],
-      ...>     clock: [~T[09:30:00], ~T[17:00:00]],
-      ...>     logged: [~N[2026-10-12 09:30:00], ~N[2026-10-12 17:00:00]],
-      ...>     stamped: [~U[2026-10-12 09:30:00Z], ~U[2026-10-12 17:00:00Z]],
-      ...>     missing: [nil, nil],
-      ...>     payload: [%{id: 1}, [2]]
-      ...>   )
+      ...>   %{"cyl" => ["6", "4"], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :cyl, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.layer_data()
       iex> Giggly.DataFrame.dtypes(frame)
-      %{
-        count: :integer,
-        mpg: :float,
-        ratio: :float,
-        limit: :float,
-        model: :string,
-        manual: :boolean,
-        species: :atom,
-        day: :date,
-        clock: :time,
-        logged: :naive_datetime,
-        stamped: :datetime,
-        missing: :null,
-        payload: :term
-      }
+      %{x: :integer, y: :float, panel: :integer, group: :integer}
   """
   @spec dtypes(t()) :: %{optional(name()) => dtype()}
   def dtypes(%implementation{} = frame), do: implementation.dtypes(frame)
 
-  @doc """
-  A frame of the columns named in `renames`, each `{new_name, existing_name}`, in that order.
-
-  It is dplyr's `select(x = wt)`: an existing column may be chosen under several new names, and
-  any column not named is dropped. The rows are kept even when no column is.
-
-      iex> frame = Giggly.DataFrame.from_table(%{"wt" => [2.62, 2.875], "cyl" => ["6", "4"]})
-      iex> selected = Giggly.DataFrame.select(frame, x: "wt", color: "cyl", label: "wt")
-      iex> Giggly.DataFrame.names(selected)
-      [:x, :color, :label]
-      iex> Giggly.DataFrame.dtypes(selected)
-      %{x: :float, color: :string, label: :float}
-      iex> Giggly.DataFrame.pull(selected, :label)
-      [2.62, 2.875]
-      iex> frame |> Giggly.DataFrame.select([]) |> Giggly.DataFrame.row_count()
-      2
-  """
+  # A frame of the columns named in `renames`, each `{new_name, existing_name}`, in that order.
+  #
+  # It is dplyr's `select(x = wt)`: an existing column may be chosen under several new names, and
+  # any column not named is dropped. The rows are kept even when no column is.
+  @doc false
   @spec select(t(), [{name(), name()}]) :: t()
   def select(%implementation{} = frame, renames) when is_list(renames),
     do: implementation.select(frame, renames)
@@ -270,23 +221,11 @@ defmodule Giggly.DataFrame do
   @spec pull(t(), name()) :: list()
   def pull(%implementation{} = frame, name), do: implementation.pull(frame, name)
 
-  @doc """
-  The frame with the column `name` holding `values`: replaced where it is, or added after the
-  last column. The column's type is worked out from `values`, so a replacement may change it.
-  Raises `FunctionClauseError` unless `values` has one value per row, and `ArgumentError` when
-  they mix two types.
-
-      iex> frame =
-      ...>   Giggly.DataFrame.new(x: ["a", "b"])
-      ...>   |> Giggly.DataFrame.put(:group, [1, 1])
-      ...>   |> Giggly.DataFrame.put(:x, [1.0, 2.0])
-      iex> Giggly.DataFrame.names(frame)
-      [:x, :group]
-      iex> Giggly.DataFrame.dtypes(frame)
-      %{x: :float, group: :integer}
-      iex> Giggly.DataFrame.pull(frame, :x)
-      [1.0, 2.0]
-  """
+  # The frame with the column `name` holding `values`: replaced where it is, or added after the
+  # last column. The column's type is worked out from `values`, so a replacement may change it.
+  # Raises `FunctionClauseError` unless `values` has one value per row, and `ArgumentError` when
+  # they mix two types.
+  @doc false
   @spec put(t(), name(), list()) :: t()
   def put(%implementation{} = frame, name, values), do: implementation.put(frame, name, values)
 end

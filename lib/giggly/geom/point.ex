@@ -1,16 +1,16 @@
 defmodule Giggly.Geom.Point do
-  @moduledoc """
-  Points, ggplot2's `geom_point()`: one solid circle per row, at its `x` and `y`. Use it through
-  `Giggly.Geom`.
+  @moduledoc false
 
-  A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
-  it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
-  panel's edge, where the coordinate system puts it.
-
-  Every point looks as ggplot2's default point does, until aesthetics such as colour and size can
-  be mapped or set: black, size 1.5 mm with a 0.5 mm border, which grid draws as a circle of radius
-  1.95 points with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots.
-  """
+  # Points, ggplot2's `geom_point()`: one solid circle per row, at its `x` and `y`. Use it through
+  # `Giggly.Geom`.
+  #
+  # A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
+  # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
+  # panel's edge, where the coordinate system puts it.
+  #
+  # Every point looks as ggplot2's default point does, until aesthetics such as colour and size can
+  # be mapped or set: black, size 1.5 mm with a 0.5 mm border, which grid draws as a circle of
+  # radius 1.95 points with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots.
 
   @behaviour Giggly.Geom
 

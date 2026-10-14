@@ -1,23 +1,23 @@
 defmodule Giggly.SVG do
-  @moduledoc """
-  Writes a `Giggly.Scene` as SVG.
+  @moduledoc false
 
-  The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
-  size in points takes it, and the one column and the one row that are `:rest` take what is left.
-  A scene with more than one of either is refused (`MatchError`) until panels can share the rest.
-  Each cell's box runs from the start of its first column and row to the end of its last, and its
-  primitives are placed in that box, cells in the order the scene lists them; a clipped cell's
-  are drawn in a group cut off at the box, as svglite writes one. The
-  document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
-  `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
-  shown. Numbers are written with two decimals, and each primitive as svglite writes it, so
-  output can be set beside the SVG ggplot2's own tests snapshot.
-
-  Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
-  Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
-  measured width (svglite's `textLength`), so it fills the space measured for it whatever font
-  draws it.
-  """
+  # Writes a `Giggly.Scene` as SVG.
+  #
+  # The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
+  # size in points takes it, and the one column and the one row that are `:rest` take what is left.
+  # A scene with more than one of either is refused (`MatchError`) until panels can share the rest.
+  # Each cell's box runs from the start of its first column and row to the end of its last, and its
+  # primitives are placed in that box, cells in the order the scene lists them; a clipped cell's
+  # are drawn in a group cut off at the box, as svglite writes one. The
+  # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
+  # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
+  # shown. Numbers are written with two decimals, and each primitive as svglite writes it, so
+  # output can be set beside the SVG ggplot2's own tests snapshot.
+  #
+  # Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
+  # Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
+  # measured width (svglite's `textLength`), so it fills the space measured for it whatever font
+  # draws it.
 
   # The SVG backend reads the scene and nothing else.
   use Boundary, deps: [Giggly.Scene], exports: []
@@ -27,10 +27,9 @@ defmodule Giggly.SVG do
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
-  @doc """
-  The SVG document that draws `scene` at `width` by `height` points, as grid's `grid.draw()` puts a
-  finished table on a device.
-  """
+  # The SVG document that draws `scene` at `width` by `height` points, as grid's `grid.draw()` puts
+  # a finished table on a device.
+  @doc false
   @spec draw(Scene.t(), number(), number()) :: iodata()
   def draw(%Scene{widths: widths, heights: heights, cells: cells}, width, height) do
     column_spans = lay_out(widths, width)

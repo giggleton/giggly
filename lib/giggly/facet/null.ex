@@ -1,8 +1,8 @@
 defmodule Giggly.Facet.Null do
-  @moduledoc """
-  The null facet, ggplot2's `facet_null()`: one panel, which every row is drawn in. Use it
-  through `Giggly.Facet`.
-  """
+  @moduledoc false
+
+  # The null facet, ggplot2's `facet_null()`: one panel, which every row is drawn in. Use it
+  # through `Giggly.Facet`.
 
   @behaviour Giggly.Facet
 

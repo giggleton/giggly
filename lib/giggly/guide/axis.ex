@@ -1,32 +1,31 @@
 defmodule Giggly.Guide.Axis do
-  @moduledoc """
-  An axis, ggplot2's `guide_axis()`: a tick at each break, reaching out from the panel's edge,
-  and the break's label beyond it; and the axis's title, beyond the axis in a cell of its own, as
-  ggplot2 lays its axis titles out. Use it through `Giggly.Guide`.
+  @moduledoc false
 
-  It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
-  the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
-  are centred on their ticks and hang from their tops; those to its left end at the margin and are
-  centred on their ticks. The axis reaches as far from the panel as its tick, its margin and its
-  labels need; one with no breaks draws nothing and takes no room, as ggplot2's does.
-
-  The order things are drawn in follows ggplot2's: below the panel the ticks and then the labels,
-  to its left the labels and then the ticks.
-
-  A title sits the title's margin beyond its axis, centred on the panel's side: below the panel
-  hanging from the top of its cell, to its left turned 90 degrees with its top to the left, as
-  `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and a line of text;
-  an axis with no title takes no room.
-  """
+  # An axis, ggplot2's `guide_axis()`: a tick at each break, reaching out from the panel's edge,
+  # and the break's label beyond it; and the axis's title, beyond the axis in a cell of its own, as
+  # ggplot2 lays its axis titles out. Use it through `Giggly.Guide`.
+  #
+  # It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
+  # the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
+  # are centred on their ticks and hang from their tops; those to its left end at the margin and are
+  # centred on their ticks. The axis reaches as far from the panel as its tick, its margin and its
+  # labels need; one with no breaks draws nothing and takes no room, as ggplot2's does.
+  #
+  # The order things are drawn in follows ggplot2's: below the panel the ticks and then the labels,
+  # to its left the labels and then the ticks.
+  #
+  # A title sits the title's margin beyond its axis, centred on the panel's side: below the panel
+  # hanging from the top of its cell, to its left turned 90 degrees with its top to the left, as
+  # `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and a line of text;
+  # an axis with no title takes no room.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Polylines, Text}
 
-  @doc """
-  The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
-  and its label, in `theme`'s look: how far it reaches from the panel, in points, and its
-  primitives, placed in a cell that deep.
-  """
+  # The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
+  # and its label, in `theme`'s look: how far it reaches from the panel, in points, and its
+  # primitives, placed in a cell that deep.
+  @doc false
   @spec draw([{float(), String.t()}], :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
   def draw([], _side, _theme), do: {0.0, []}
 
@@ -97,11 +96,10 @@ defmodule Giggly.Guide.Axis do
     {width, [text, ticks]}
   end
 
-  @doc """
-  The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
-  the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
-  side.
-  """
+  # The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
+  # the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
+  # side.
+  @doc false
   @spec title(String.t() | :none, :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
   def title(:none, _side, _theme), do: {0.0, []}
 

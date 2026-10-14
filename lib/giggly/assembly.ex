@@ -1,39 +1,39 @@
 defmodule Giggly.Assembly do
-  @moduledoc """
-  The assembly of a plot: the fixed sequence of stages that turns a `Giggly.Plot`, a description,
-  into what is drawn, and the value those stages produce. The name is the middle of Wilkinson's
-  three stages of making a graphic (specification, assembly, display); a plot is the
-  specification, and rendering and drawing it are the display.
+  @moduledoc false
 
-  The stages run in one fixed order, each adjacent pair a semantic chosen on purpose, and they
-  arrive one at a time. Today the assembly:
-
-    1. lays the panels out and assigns each row of the plot's data its panel (`Giggly.Facet`);
-    2. evaluates each layer's mapping against that data;
-    3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
-       discrete scale gives its levels, so group ids follow axis and legend order;
-    4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
-       the axis's columns need, first refusing an axis column no scale can place yet, or one whose
-       kind disagrees with the axis's first column: an axis has one scale;
-    5. puts every layer's x-family and y-family columns through their scale's transformation;
-    6. trains each scale over those columns;
-    7. maps them to their positions on the scales;
-    8. computes each layer's stat (`Giggly.Stat`) on its table;
-    9. moves each layer's marks by its position (`Giggly.Position`);
-   10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
-       extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
-       say whether each panel is clipped to its edges.
-
-  The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
-  columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  table; the trained scales, by scale id; each panel's params and whether it is clipped, by panel
-  id; each axis's title,
-  the name of the column the first layer to map the axis's aesthetic maps it to (ggplot2's
-  `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering, the only
-  stage that reads a theme so far. The data's own column names appear only as titles.
-
-  Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
-  """
+  # The assembly of a plot: the fixed sequence of stages that turns a `Giggly.Plot`, a description,
+  # into what is drawn, and the value those stages produce. The name is the middle of Wilkinson's
+  # three stages of making a graphic (specification, assembly, display); a plot is the
+  # specification, and rendering and drawing it are the display.
+  #
+  # The stages run in one fixed order, each adjacent pair a semantic chosen on purpose, and they
+  # arrive one at a time. Today the assembly:
+  #
+  #   1. lays the panels out and assigns each row of the plot's data its panel (`Giggly.Facet`);
+  #   2. evaluates each layer's mapping against that data;
+  #   3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
+  #      discrete scale gives its levels, so group ids follow axis and legend order;
+  #   4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
+  #      the axis's columns need, first refusing an axis column no scale can place yet, or one whose
+  #      kind disagrees with the axis's first column: an axis has one scale;
+  #   5. puts every layer's x-family and y-family columns through their scale's transformation;
+  #   6. trains each scale over those columns;
+  #   7. maps them to their positions on the scales;
+  #   8. computes each layer's stat (`Giggly.Stat`) on its table;
+  #   9. moves each layer's marks by its position (`Giggly.Position`);
+  #  10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
+  #      say whether each panel is clipped to its edges.
+  #
+  # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
+  # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
+  # table; the trained scales, by scale id; each panel's params and whether it is clipped, by panel
+  # id; each axis's title,
+  # the name of the column the first layer to map the axis's aesthetic maps it to (ggplot2's
+  # `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering, the only
+  # stage that reads a theme so far. The data's own column names appear only as titles.
+  #
+  # Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
 
   # The assembly reads a plot and hands each stage its input; what it may call is the plot, the
   # data frame, the aesthetic vocabulary (which columns are x and which y) and the stages, each
@@ -86,27 +86,26 @@ defmodule Giggly.Assembly do
           theme: Plot.theme()
         }
 
-  @doc """
-  Assembles `plot`, running the stages in order.
-
-  The facet first gives each row of the plot's data its panel. Then each layer's mapping is laid
-  over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
-  column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
-  out in name order, since a mapping is a map and has no written order to keep, followed by
-  `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
-  columns in that axis's family are put through the scale's transformation, trained on, and mapped
-  to their positions. Each layer's stat then computes on its table, and its position moves the
-  marks. Last, the plot's coordinate system builds each panel's params from the extents of the
-  scales the layout gives that panel and the breaks and minor breaks each axis draws on its
-  extent. Each axis is
-  titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x` (or
-  `:y`); a later layer never retitles it, and an axis no layer maps has no title.
-
-  Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
-  date, or to a column whose kind (continuous or discrete) disagrees with the first column on
-  that axis. The message names the layer by its index, counting from 0, the aesthetic, the column
-  as the data names it, and its type.
-  """
+  # Assembles `plot`, running the stages in order.
+  #
+  # The facet first gives each row of the plot's data its panel. Then each layer's mapping is laid
+  # over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
+  # column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
+  # out in name order, since a mapping is a map and has no written order to keep, followed by
+  # `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
+  # columns in that axis's family are put through the scale's transformation, trained on, and mapped
+  # to their positions. Each layer's stat then computes on its table, and its position moves the
+  # marks. Last, the plot's coordinate system builds each panel's params from the extents of the
+  # scales the layout gives that panel and the breaks and minor breaks each axis draws on its
+  # extent. Each axis is
+  # titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x` (or
+  # `:y`); a later layer never retitles it, and an axis no layer maps has no title.
+  #
+  # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
+  # date, or to a column whose kind (continuous or discrete) disagrees with the first column on
+  # that axis. The message names the layer by its index, counting from 0, the aesthetic, the column
+  # as the data names it, and its type.
+  @doc false
   @spec run(Plot.t()) :: t()
   def run(
         %Plot{

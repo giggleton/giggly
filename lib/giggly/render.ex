@@ -1,24 +1,24 @@
 defmodule Giggly.Render do
-  @moduledoc """
-  The rendering of an assembled plot: turning a `Giggly.Assembly` into a `Giggly.Scene`, as
-  ggplot2's rendering stage (`ggplot_gtable()`, in its `plot-render.R`) turns a built plot into a
-  table of grobs. A backend such as `Giggly.SVG` then draws the scene.
+  @moduledoc false
 
-  The plot's theme, recorded by name, is resolved first into its complete form
-  (`Giggly.Theme`), which everything drawn here other than the marks takes its look from. Each
-  layer is drawn by its geom (`Giggly.Geom`) in each panel, with that panel's params, in the order
-  the layers were added, over the panel's background and grid lines (`Giggly.Guide`), and each
-  panel becomes a cell of the scene's table, cut off at its edges when the coordinate system
-  clips it, as every ggplot2 coordinate system does by default. Its axes and their
-  titles (`Giggly.Guide`) become cells beside it, the y axis's column as wide as the axis and the
-  x axis's row as tall, and the panel takes the rest of the drawing. Around the whole table is the
-  theme's plot margin, and the plot's background is drawn first, under everything, over the whole
-  table, margin included, as ggplot2 adds it (`table_add_background()`). Today a plot has one
-  panel, at the layout's first row and column; legends become cells around it as they arrive.
-
-  Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
-  here.
-  """
+  # The rendering of an assembled plot: turning a `Giggly.Assembly` into a `Giggly.Scene`, as
+  # ggplot2's rendering stage (`ggplot_gtable()`, in its `plot-render.R`) turns a built plot into a
+  # table of grobs. A backend such as `Giggly.SVG` then draws the scene.
+  #
+  # The plot's theme, recorded by name, is resolved first into its complete form
+  # (`Giggly.Theme`), which everything drawn here other than the marks takes its look from. Each
+  # layer is drawn by its geom (`Giggly.Geom`) in each panel, with that panel's params, in the order
+  # the layers were added, over the panel's background and grid lines (`Giggly.Guide`), and each
+  # panel becomes a cell of the scene's table, cut off at its edges when the coordinate system
+  # clips it, as every ggplot2 coordinate system does by default. Its axes and their
+  # titles (`Giggly.Guide`) become cells beside it, the y axis's column as wide as the axis and the
+  # x axis's row as tall, and the panel takes the rest of the drawing. Around the whole table is the
+  # theme's plot margin, and the plot's background is drawn first, under everything, over the whole
+  # table, margin included, as ggplot2 adds it (`table_add_background()`). Today a plot has one
+  # panel, at the layout's first row and column; legends become cells around it as they arrive.
+  #
+  # Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
+  # here.
 
   # Rendering reads the assembled plot and its layout, resolves its theme, has each layer's geom
   # draw and each axis's guide, and builds the scene from what they draw.
@@ -36,9 +36,8 @@ defmodule Giggly.Render do
   alias Giggly.{Assembly, DataFrame, Geom, Guide, Scene, Theme}
   alias Giggly.Scene.{Cell, Rect}
 
-  @doc """
-  The scene that draws `assembly`.
-  """
+  # The scene that draws `assembly`.
+  @doc false
   @spec scene(Assembly.t()) :: Scene.t()
   def scene(%Assembly{
         layer_data: layer_data,

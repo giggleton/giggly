@@ -63,7 +63,7 @@ wearing a pass.
 | An area's invariant or mechanism (a rule the code must keep, or how a feature works) | The area's **`.claude/rules/<area>.md`** — `## Rules` for must/never sentences, `## How it works` for the narrative. It is path-scoped, so it loads only when that area's code is read; that is where the write-up belongs, never CLAUDE.md. An area without a rules file yet gets one, plus a status-map line in CLAUDE.md. |
 | Milestone-worthy feature or refactor | Full entry in **notes/design-log.md §6** (what + why + decisions). The area's rules file gets the invariant. CLAUDE.md changes **only** for a cross-cutting rule or a status-map line — the one-home rule; never write the full story twice. |
 | A decision with a rejected alternative | **design-log.md §4** (the "why, so we don't relitigate" log). |
-| New/changed public module or function | `@moduledoc`/`@doc`/`@spec` accurate to the *final* behavior (not the first draft's). |
+| New/changed module or public function | Whether it is API (CLAUDE.md, Conventions), then its documentation accurate to the *final* behavior (not the first draft's): an API module's `@moduledoc` and an API function's `@doc` and doctests; an internal module's opening comment under `@moduledoc false` and a non-API function's comment under `@doc false`; a `@spec` on every public function. |
 | Schema, migration, lifecycle/status change | The persistence guide under `guides/`, if the project has one; otherwise the area's rules file. |
 | Supervision tree / process shape | The processes guide under `guides/`, if the project has one; otherwise the area's rules file. |
 | A new mix task, cron schedule, or ops workflow | The ops skill or rules file that lists them — those tables are live doc surfaces. |
