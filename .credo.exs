@@ -221,6 +221,13 @@
             {Tack.Credo.Check.CorePurity, [files: %{included: ["lib/"]}]},
 
             #
+            ## The repo-local checks (`.credo/checks/`), each a rule CLAUDE.md states in prose
+            #
+            # Zip and map in one pass (`Enum.zip_with/2,3`), everywhere credo reads, as credo's own
+            # `MapJoin` is scoped.
+            {GigglyCredo.Check.ZipMap, []},
+
+            #
             ## Formerly-disabled "controversial and experimental" checks, each enabled deliberately.
             ## The ones that stay off (a deliberate design/style choice) live in `disabled:` below,
             ## each with a documented rationale.

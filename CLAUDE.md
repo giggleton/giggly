@@ -134,6 +134,8 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **No capture-operator anonymous functions.** Always write anonymous functions as
   `fn descriptive_name -> body end` — never the `&`/`&1` shorthand (e.g. `& &1.id`, `&(&1 + 1)`).
   `&Mod.fun/arity` references are ok. Prefer descriptive argument names over positional `&1`.
+- **Zip and map in one pass:** `Enum.zip_with/2,3`, never `Enum.zip` piped or passed into
+  `Enum.map`. `GigglyCredo.Check.ZipMap` (`.credo/checks/`) fails the gate on it.
 - **Descriptive names; no abbreviations or single letters.** Spell names out: `position` not
   `pos`, `points` not `pts`, `value` not `v`. Never single-letter variables (no `p`, `s`, `n`,
   `r`). Spell out domain terms in code too; acronyms are fine only in prose where defined.

@@ -47,6 +47,12 @@ Every flag there carries weight:
   Write it outside the repository (the session's scratchpad); the terminal then prints one summary
   line.
 
+**A repo-local credo check** (`.credo/checks/`) is run with `--mirror .credo` and **without**
+`--coverage-guided`: muex writes a mutant only into a directory the sandbox mirrors, and refuses
+to write through the symlink otherwise; and `:cover` cannot see a module the test loads with
+`Code.require_file`, so every mutant would be reported uncovered. muex then picks the test file by
+the module's name, which `test/credo_checks_test.exs` gives through a single `alias`.
+
 It takes minutes, not seconds — one sandboxed `mix test` per mutant — which is why it runs on the
 changed files and is not a `mix quality` step.
 

@@ -66,6 +66,20 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Zip and map in one pass, `Enum.zip_with/2,3`, and a repo-local credo check holds the rule
+  (2026-10-13, Steve).** Three places piped `Enum.zip` into `Enum.map`, building a list of tuples
+  only to walk it again; `Enum.zip_with` calls the function as it zips. CLAUDE.md's Conventions now
+  say so, and `GigglyCredo.Check.ZipMap`, the repo's first check in `.credo/checks/`, fails the gate
+  on a zip piped or passed straight into a map, as credo's own `MapJoin` does for `map` then
+  `join`. The case for a check over fixing the three by hand is the code still to be written: an
+  agent writes `zip |> map` by habit, and a credo finding is the feedback that sticks. The module
+  is named outside `Giggly`, as the test helpers are (`GigglyTest`), since it is the repo's, not the
+  library's (my choice). *Rejected: fixing the three by hand with no check* — the habit returns
+  with the next agent. *Rejected for now: `Stream.zip` into `Stream.map`, and zip then reduce
+  (`Enum.zip_reduce/4`)* — nothing here writes either; the check grows when something does. What
+  it cannot see, by design: a zip bound to a variable and mapped later, and `Enum` reached through
+  an alias; it reads the code as written, as `MapJoin` does.
+
 - **The API is what a user calls, and everything else says it is not API: an internal module is
   `@moduledoc false` with its documentation as an opening comment, every public function says
   whether it is API, and only API functions have doctests (2026-10-13, Steve).** Every module had
@@ -911,6 +925,21 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-13 — Zip and map in one pass, held by the first repo-local credo check.** The §4 entry
+  beginning "Zip and map in one pass" gives the decision. `GigglyCredo.Check.ZipMap` matches a
+  zip piped or passed straight into a map; run alone over the tree before the fix, it found the
+  three places and nothing else, two in `Giggly.SVG` and one in `Giggly.Assembly`, now
+  `Enum.zip_with` as plain calls (credo refuses a one-stage pipe). Its tests, in
+  `test/credo_checks_test.exs`, the one file that loads the local checks, cover six shapes it
+  reports and four near misses it leaves alone. Review's mutation step on the check, run with
+  `--mirror .credo` and without coverage selection (`references/mutation-testing.md` says why),
+  found the issue reported with no column: it named `Enum.zip` as its trigger, which in a pipe
+  sits on another line than the map the issue is reported at, and credo finds the column by
+  searching the reported line. The trigger is `Enum.map` now, and a test pins the issue's line,
+  column and message; one survivor is left, a character appended to the message. On the two
+  `lib/` files nothing new survived on the changed lines: the one survivor there drops the
+  identity position stage, the known equivalent.
 
 - **2026-10-13 — Only the API is documented; everything else says it is not API.** Steve's review
   of Phase 1's code began with why `Plot.computed_mapping/2` was public. The §4 entry beginning

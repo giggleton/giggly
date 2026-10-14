@@ -139,9 +139,7 @@ defmodule Giggly.Assembly do
     y_scales = train(untrained_y_scales, :y, transformed_data)
 
     layer_data =
-      layers
-      |> Enum.zip(transformed_data)
-      |> Enum.map(fn {layer, frame} ->
+      Enum.zip_with(layers, transformed_data, fn layer, frame ->
         frame
         |> through_scales(x_scales, y_scales, &Scale.map/2)
         |> Stat.compute(Plot.layer_stat(layer))

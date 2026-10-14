@@ -66,9 +66,13 @@ semver or the changelog).
   why it is sanctioned and the hook makes the next one a decision.
   **(3) Each check is tested in both directions**: a check that fires on everything and a check
   that fires on nothing both pass a one-sided test, and the second failure is the silent one — a
-  rule that quietly stopped being enforced. One test file `Code.require_file`s the local checks,
-  and only one may, since requiring the same source twice in one VM redefines the module and the
-  warning fails the gate.
+  rule that quietly stopped being enforced. One test file, `test/credo_checks_test.exs`,
+  `Code.require_file`s the local checks, and only one may, since requiring the same source twice in
+  one VM redefines the module and the warning fails the gate; it starts the `credo` application
+  itself, since credo is a `runtime: false` dependency whose parsing services nothing else starts.
+  An issue's place is asserted too, its line, column and trigger: credo finds the column by
+  searching the reported line for the trigger, so a trigger that is not on that line leaves the
+  issue pointing at no column, and nothing else would notice.
   **(4) Size a candidate check by running it, scoped as its nearest sibling is, never by grep.** A
   grep over-reports twice over: it ignores the scoping the check will take, and it matches prose,
   including the header comments that document the very rule being counted.

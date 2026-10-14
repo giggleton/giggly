@@ -127,10 +127,8 @@ defmodule Giggly.SVG do
       ";'"
     ]
 
-    points.x
-    |> Enum.zip(points.y)
-    |> Enum.map(fn position ->
-      {x_position, y_position} = place(position, box)
+    Enum.zip_with(points.x, points.y, fn x_place, y_place ->
+      {x_position, y_position} = place({x_place, y_place}, box)
 
       [
         "<circle cx='",
@@ -200,9 +198,9 @@ defmodule Giggly.SVG do
       ";'"
     ]
 
-    [text.x, text.y, text.labels, text.widths]
-    |> Enum.zip()
-    |> Enum.map(fn {x_place, y_place, label, label_width} ->
+    columns = [text.x, text.y, text.labels, text.widths]
+
+    Enum.zip_with(columns, fn [x_place, y_place, label, label_width] ->
       baseline =
         {x_place, y_place}
         |> place(box)

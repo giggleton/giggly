@@ -20,10 +20,12 @@ Four things hold a new check together (`.claude/rules/dependencies.md` has the f
 2. **Scoping lives in `.credo.exs`**, in the check's `files:` filter with its reason beside it. A
    per-check `excluded:` string is resolved as a file or directory, not a prefix — use a regex.
 3. **Test it in both directions.** A check that fires on everything and one that fires on nothing
-   both pass a one-sided test. One test file `Code.require_file`s the checks in this directory
-   (`use Credo.Test.Case`, `to_source_file/1`, `run_check/2`, `assert_issue/1`, `refute_issues/1`),
-   and only one may: requiring the same source twice in one VM redefines the module, and the warning
-   fails the gate.
+   both pass a one-sided test. The tests go in `test/credo_checks_test.exs` (`use Credo.Test.Case`,
+   `to_source_file/1`, `run_check/2`, `assert_issue/1`, `refute_issues/1`), the one file that
+   `Code.require_file`s the checks in this directory, and only one may: requiring the same source
+   twice in one VM redefines the module, and the warning fails the gate. It starts the `credo`
+   application the helpers need, and asserts an issue's line, column and trigger as well as that
+   it is raised.
 4. **Size a candidate by running it, scoped as its sibling is, never by grep.** A grep ignores the
    scoping and matches prose, including the comment documenting the rule being counted.
 
