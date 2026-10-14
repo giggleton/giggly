@@ -66,6 +66,26 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **A theme is a function that builds the complete theme, not a module implementing a behaviour;
+  a behaviour is for kinds that differ in what they do (2026-10-14, Steve).** `Giggly.Theme` had a
+  behaviour of one callback, `complete/0`, and one module implementing it, `Theme.Gray`, because
+  every name a plot records resolves through its namespace, and facets, coordinate systems, geoms,
+  stats, positions and transformations are each a module implementing their namespace's
+  behaviour. Those kinds differ in what they do: a coordinate system has five operations that all
+  change when it is radial rather than cartesian, and a behaviour groups operations that vary
+  together. Themes differ only in their values, every theme one `%Giggly.Theme{}`, so a callback
+  returning the struct was a function in disguise. ggplot2's complete themes are functions with
+  arguments (`theme_grey(base_size = 11, …)`), and the others are built from one by replacing
+  elements (`theme_bw()` is `theme_grey()` `%+replace%` a few), neither of which a callback with
+  no arguments can express. The behaviour bought nothing besides: names were resolved by a closed
+  match in `complete/1`, so no one could add a theme by implementing it. `theme_gray()`'s
+  derivation is now the private `gray/0` in `Giggly.Theme`, called by `complete(:gray)`; it
+  becomes public with the first theme a user can choose. *Rejected: keeping the behaviour for
+  uniformity* — the rule is that a behaviour serves kinds that differ in behaviour, and plain
+  functions serve kinds that differ in data. *Deferred to the first theme setting a user can
+  make:* the plot holding the theme's value, or the call that builds it, rather than its name,
+  once a theme takes arguments.
+
 - **The scene's circle primitive is `Circles`, not `Points` (2026-10-14, Steve).** The scene names
   its primitives after grid's, and this one holds positions and one radius, grid's
   `circleGrob(x, y, r)`; grid's `pointsGrob()` takes a shape and a size, which it never held. A
