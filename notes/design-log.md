@@ -66,6 +66,20 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The scene's circle primitive is `Circles`, not `Points` (2026-10-14, Steve).** The scene names
+  its primitives after grid's, and this one holds positions and one radius, grid's
+  `circleGrob(x, y, r)`; grid's `pointsGrob()` takes a shape and a size, which it never held. A
+  primitive is named for what it draws, a shape, while a geom is named for the grammar's mark:
+  `geom_point` and `Geom.Point` keep their names, and which primitives a point is drawn with is the
+  geom's business. When shapes become an aesthetic, the likely design follows R's split, where
+  `pointsGrob()` meets a graphics engine (`GESymbol` in `engine.c`) that turns each shape into
+  circles, rectangles, polygons or line segments and the device draws only those, so shape 19
+  stays `Circles` and no scene primitive called `Points` returns. *Rejected: keeping `Points` until
+  the shape stage* (proposed) — the name broke the scene's own rule, and the churn feared was
+  real only if the scene held shapes itself, which the likely design does not; *and renaming
+  everything point-related to circle* — the geom draws the grammar's point, whatever it draws it
+  with.
+
 - **Zip and map in one pass, `Enum.zip_with/2,3`, and a repo-local credo check holds the rule
   (2026-10-13, Steve).** Three places piped `Enum.zip` into `Enum.map`, building a list of tuples
   only to walk it again; `Enum.zip_with` calls the function as it zips. CLAUDE.md's Conventions now
@@ -478,7 +492,8 @@ stops the question being reopened from scratch.
   as its unit, two decimals, its circle markup) at vdiffr's 720 by 576 points, so its output can
   be set beside ggplot2's snapshots; the first golden test compares a whole document. New
   boundaries: `Coord` lists `Aesthetics` and `DataFrame`; `Geom` lists `Coord`, `DataFrame` and
-  `Scene`; `Scene` lists nothing and exports `Cell` and `Points`; `SVG` lists `Scene`; `Render`
+  `Scene`; `Scene` lists nothing and exports `Cell` and `Points` (since renamed `Circles`, see the
+  entry beginning "The scene's circle primitive is `Circles`"); `SVG` lists `Scene`; `Render`
   lists `Assembly`, `DataFrame`, `Geom` and `Scene`; `Assembly` gained `Coord`. This amends the
   entry beginning "The facet assigns panels now", which kept the facet plain functions until a
   second kind. *Rejected: the coordinate system alone, its params stored for drawing to read

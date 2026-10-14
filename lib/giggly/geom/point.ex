@@ -15,7 +15,7 @@ defmodule Giggly.Geom.Point do
   @behaviour Giggly.Geom
 
   alias Giggly.{Coord, DataFrame}
-  alias Giggly.Scene.Points
+  alias Giggly.Scene.Circles
 
   # ggplot2's default point: size and border width in millimetres, and its ink.
   @size 1.5
@@ -49,7 +49,7 @@ defmodule Giggly.Geom.Point do
       |> Enum.unzip()
 
     [
-      %Points{
+      %Circles{
         x: x_positions,
         y: y_positions,
         radius: @radius,

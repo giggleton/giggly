@@ -16,7 +16,7 @@ defmodule Giggly.Scene do
 
   # A scene is values: it calls nothing, and exports the structs that rendering builds and a
   # backend reads.
-  use Boundary, deps: [], exports: [Cell, Points, Polylines, Rect, Text]
+  use Boundary, deps: [], exports: [Cell, Circles, Polylines, Rect, Text]
 
   alias Giggly.Scene.Cell
 
@@ -30,7 +30,7 @@ defmodule Giggly.Scene do
 
   @typedoc "Something drawn in a cell."
   @type primitive ::
-          Giggly.Scene.Points.t()
+          Giggly.Scene.Circles.t()
           | Giggly.Scene.Polylines.t()
           | Giggly.Scene.Rect.t()
           | Giggly.Scene.Text.t()

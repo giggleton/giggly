@@ -31,7 +31,7 @@ coordinate system arrives with drawing".
 
 `draw_panel(frame, name, panel_params)` resolves the name and calls the module's
 `draw_panel/2`. `Geom.Point` transforms the frame, keeps the rows whose `x` and `y` are both
-numbers after placing, and returns one `Scene.Points` holding them. Its radius and outline are
+numbers after placing, and returns one `Scene.Circles` holding them. Its radius and outline are
 computed at compile time from ggplot2's constants: a font size of `size * .pt + stroke * .stroke /
 2` (`.pt` = 72.27/25.4 font points per millimetre, `.stroke` = 96/25.4 line-width units per
 millimetre), a radius of 0.375 times that font size (R's graphics engine for shape 19), and an

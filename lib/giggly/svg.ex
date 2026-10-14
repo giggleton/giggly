@@ -23,7 +23,7 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Points, Polylines, Rect, Text}
+  alias Giggly.Scene.{Cell, Circles, Polylines, Rect, Text}
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -116,18 +116,18 @@ defmodule Giggly.SVG do
   defp place({x, y}, {{left, width}, {top, height}}),
     do: {left + x * width, top + (1 - y) * height}
 
-  defp primitive(%Points{} = points, box) do
+  defp primitive(%Circles{} = circles, box) do
     style = [
       "style='stroke-width: ",
-      number(points.stroke_width),
+      number(circles.stroke_width),
       "; stroke: ",
-      points.color,
+      circles.color,
       "; fill: ",
-      points.color,
+      circles.color,
       ";'"
     ]
 
-    Enum.zip_with(points.x, points.y, fn x_place, y_place ->
+    Enum.zip_with(circles.x, circles.y, fn x_place, y_place ->
       {x_position, y_position} = place({x_place, y_place}, box)
 
       [
@@ -136,7 +136,7 @@ defmodule Giggly.SVG do
         "' cy='",
         number(y_position),
         "' r='",
-        number(points.radius),
+        number(circles.radius),
         "' ",
         style,
         " />\n"

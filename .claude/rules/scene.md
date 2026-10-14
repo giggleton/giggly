@@ -15,7 +15,7 @@ entry beginning "Three top-level values".
 ## Rules
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
-  rendering builds and a backend reads (`Cell`, `Points`, `Polylines`, `Rect`, `Text`); nothing in
+  rendering builds and a backend reads (`Cell`, `Circles`, `Polylines`, `Rect`, `Text`); nothing in
   it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or `:rest`.** A size in points is
   measured when the scene is built (an axis, a margin); `:rest` is what the fixed sizes leave of
@@ -42,10 +42,11 @@ entry beginning "Three top-level values".
 
 `%Giggly.Scene{}` holds the column widths (left to right), the row heights (top to bottom), each
 `{:points, size}` or `:rest`, and the cells. `Scene.Cell` holds the ranges of rows and columns it
-spans, whether it is clipped, and its primitives in drawing order. The primitives are named after grid's: `Scene.Points`
-(`pointsGrob()` for shape 19: positions, one radius, one outline width, one colour),
-`Scene.Polylines` (`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour,
-square-cut ends), `Scene.Rect` (`rectGrob()` filling its cell: a fill, a border colour or
-`:none`, and the border's width) and `Scene.Text` (`textGrob()`: positions, labels and their measured widths, one
-size and colour, an angle of 0 or 90 degrees, an anchor of `:middle` or `:end`, and the baseline
-offset, measured toward the text's top, which is to the left for text turned 90 degrees).
+spans, whether it is clipped, and its primitives in drawing order. The primitives are named after
+grid's: `Scene.Circles` (`circleGrob()`: positions, one radius, one outline width, one colour; what
+R's graphics engine draws for shape 19, ggplot2's default point), `Scene.Polylines`
+(`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour, square-cut ends),
+`Scene.Rect` (`rectGrob()` filling its cell: a fill, a border colour or `:none`, and the border's
+width) and `Scene.Text` (`textGrob()`: positions, labels and their measured widths, one size and
+colour, an angle of 0 or 90 degrees, an anchor of `:middle` or `:end`, and the baseline offset,
+measured toward the text's top, which is to the left for text turned 90 degrees).
