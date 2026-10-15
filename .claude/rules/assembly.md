@@ -36,6 +36,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   each geom's `setup_data`; `draw_panel`, `transform`, `axes` and `grid` are rendering's. It lists
   `Coord` and `Geom` for their build functions, so this holds by review: design-log §4, the entry
   beginning "A geom says where its marks sit".
+- **Each geom is told each axis's scale kind, discrete or continuous**, which the assembly decides
+  once per axis, so a bar's orientation is decided as ggplot2's `has_flipped_aes()` decides it from
+  `mapped_discrete` positions; a geom never sees a scale itself.
 - **After the stat, each aesthetic the layer leaves unmapped takes the computed column its stat
   names for it** (`Stat.default_mapping/1`), as ggplot2's `map_statistic()` evaluates a stat's
   `after_stat()` defaults: counting's count goes into y.

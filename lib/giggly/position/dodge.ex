@@ -12,7 +12,8 @@ defmodule Giggly.Position.Dodge do
   # first bar's width, and is the widest bar's width over n wide, as ggplot2's `pos_dodge()` places
   # it. An x with one group keeps its bar as it is, so a group missing at an x leaves no gap
   # (`preserve = "total"`). Every x comes out a double, as R's are. Heights are left alone, and a
-  # row missing its x stays missing.
+  # row missing its x stays missing. Horizontal bars, those whose `flipped_aes` column says so, are
+  # dodged along y, x and y swapped and swapped back, as ggplot2's `flip_data()` does.
 
   defstruct []
 
@@ -21,12 +22,43 @@ defmodule Giggly.Position.Dodge do
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
 
-    alias Giggly.DataFrame
+    alias Giggly.{Aesthetics, DataFrame}
 
     @columns [:panel, :group, :x, :xmin, :xmax]
 
     @impl Giggly.Position
     def compute_layer(_position, frame) do
+      flipped = flipped?(frame)
+
+      frame
+      |> flip(flipped)
+      |> moved()
+      |> flip(flipped)
+    end
+
+    # Horizontal where the stat or geom wrote so in `flipped_aes`, as ggplot2's positions read it.
+    defp flipped?(frame) do
+      if :flipped_aes in DataFrame.names(frame) do
+        frame
+        |> DataFrame.pull(:flipped_aes)
+        |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
+      else
+        false
+      end
+    end
+
+    defp flip(frame, false), do: frame
+
+    defp flip(frame, true) do
+      renames =
+        frame
+        |> DataFrame.names()
+        |> Aesthetics.flipped()
+
+      DataFrame.select(frame, renames)
+    end
+
+    defp moved(frame) do
       dodged =
         @columns
         |> Enum.map(fn name -> DataFrame.pull(frame, name) end)

@@ -23,6 +23,10 @@ atoms with ggplot2's names".
   can change what a name means; every domain that needs a name's family lists it instead.
 - **`panel` is not an aesthetic and must not become one** — the pipeline reserves it for the panel
   id column.
+- **A horizontal mark is computed as a vertical one by renaming, `flipped/1`**: each position name
+  becomes its counterpart (`counterpart/1`), as ggplot2's `flip_data()` renames, in the
+  `{new_name, name}` pairs `Giggly.DataFrame.select/2` takes. Counting, the bar geom, stacking and
+  dodging flip, compute and flip back, so the swap's rule has one home.
 - **Anything that treats x and y differently asks `family/1`**, never `name == :x`. That is the
   difference between `:xmin` and `:xend` training the x scale and silently not, which is how ggity
   annotations failed to widen the axis.

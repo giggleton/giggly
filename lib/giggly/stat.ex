@@ -27,7 +27,9 @@ defprotocol Giggly.Stat do
   # frame, and sizes what it counts at by the spacing of its positions (`Giggly.Resolution`).
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.DataFrame, Giggly.Resolution], exports: [Count, Identity]
+  use Boundary,
+    deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
+    exports: [Count, Identity]
 
   alias Giggly.DataFrame
 

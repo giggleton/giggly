@@ -104,6 +104,14 @@ written, and git history keeps every version.
   second protocol name per family, rejected before; *the extent in the stat, the position or
   rendering* — counting tied to bars, each position knowing each geom, or axes that miss the mark.
 
+- **A geom is told whether each axis is discrete, so a bar finds its orientation as ggplot2's does
+  (2026-10-15, Steve).** ggplot2's `GeomBar` draws horizontally when y alone is `mapped_discrete`;
+  Giggly's discrete positions are plain integers, so the assembly hands `Geom.setup_data/3` each
+  axis's scale kind, a kind and never a range. Counting decides from which of x and y is mapped,
+  and positions read the `flipped_aes` column. *Rejected: an `orientation:` option instead* — a
+  departure for every horizontal `geom_col()`; *`geom_bar` alone this step* — `geom_col` with a
+  discrete y drawn wrongly meanwhile.
+
 - **A layer chooses its position by an atom now, a constructor later (2026-10-15, Steve).**
   `geom_bar` and `geom_col` take `position: :stack | :dodge`, ggplot2's string shorthand,
   validated by NimbleOptions, `:stack` by default. When a position's parameters arrive,
@@ -1231,8 +1239,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Dodge bars side by side (bars, step 3); §4: "A layer chooses its position by an
-  atom"
+- 2026-10-15 — Draw horizontal bars (bars, step 4); §4: "A geom says where its marks sit", "Bars
+  are Phase 3's first increment"
+- 2026-10-15 — Dodge bars side by side (bars, step 3) (`5d24693`); §4: "A layer chooses its
+  position by an atom"
 - 2026-10-15 — Count bars with geom_bar (bars, step 2) (`fe658e8`); §4: "Bars are Phase 3's first
   increment"
 - 2026-10-15 — Draw columns with geom_col (bars, step 1) (`eb2c178`); §4: "Bars are Phase 3's first

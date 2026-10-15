@@ -23,7 +23,7 @@ defmodule Giggly.Assembly do
   #   9. puts into each aesthetic the layer leaves unmapped the computed column its stat names for
   #      it, as a count into y;
   #  10. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
-  #      bar's edges;
+  #      bar's edges, told whether each axis is discrete, which decides a bar's orientation;
   #  11. moves each layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
@@ -147,8 +147,9 @@ defmodule Giggly.Assembly do
 
     x_routes = routes(layout, :x)
     y_routes = routes(layout, :y)
-    untrained_x_scales = add_scales(:x, plot, x_routes)
-    untrained_y_scales = add_scales(:y, plot, y_routes)
+    axis_kinds = %{x: scale_kind(plot, :x), y: scale_kind(plot, :y)}
+    untrained_x_scales = add_scales(axis_kinds.x, x_routes)
+    untrained_y_scales = add_scales(axis_kinds.y, y_routes)
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
@@ -168,7 +169,7 @@ defmodule Giggly.Assembly do
         mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
         statistic = map_statistic(computed, plot, layer)
-        set_up = Geom.setup_data(Plot.layer_geom(layer), statistic)
+        set_up = Geom.setup_data(Plot.layer_geom(layer), statistic, axis_kinds)
         Position.compute_layer(Plot.layer_position(layer), set_up)
       end)
 
@@ -301,11 +302,8 @@ defmodule Giggly.Assembly do
   # One untrained scale per scale id the layout gives this axis, every one of the kind the axis's
   # columns need, as ggplot2 adds its default scales before transforming anything and clones the
   # axis's scale for each scale id.
-  defp add_scales(family, plot, routes) do
-    untrained =
-      plot
-      |> scale_kind(family)
-      |> Scale.new()
+  defp add_scales(kind, routes) do
+    untrained = Scale.new(kind)
 
     routes
     |> Map.values()

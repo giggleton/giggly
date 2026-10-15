@@ -189,9 +189,11 @@ defmodule Giggly.Plot do
   positions, counting from zero, and stacked where groups share an `x`, the highest group at the
   bottom, or set side by side with `position: :dodge`.
 
-  Counting uses `:x`, `:weight` and `:group`, and needs `:x`; a `:weight` column must hold numbers.
-  The count is the bar's height, so a mapping that gives `:y` is refused. A mapping, a map, and
-  options, a keyword list, may each be given alone or both together.
+  Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
+  counts along the one mapped, and the count is the other, so mapping `:y` alone draws horizontal
+  bars, as ggplot2's `geom_bar(aes(y = class))` does, the x axis titled `count`. A `:weight` column
+  must hold numbers. A mapping, a map, and options, a keyword list, may each be given alone or
+  both together.
 
   ## Options
 
@@ -223,7 +225,8 @@ defmodule Giggly.Plot do
     plot
     |> add_layer(layer, "Plot.geom_bar/3",
       accepted: Stat.Count.accepted_aesthetics(),
-      required: Stat.Count.required_aesthetics()
+      required: Stat.Count.required_aesthetics(),
+      exclusive: Stat.Count.exclusive_aesthetics()
     )
     |> check_weight(layer)
   end
@@ -241,8 +244,10 @@ defmodule Giggly.Plot do
   as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
   reaches to 0, since every bar starts there.
 
-  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. A
-  mapping, a map, and options, a keyword list, may each be given alone or both together.
+  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. When `y`
+  is the discrete axis and `x` the continuous one, the bars are horizontal, each from 0 to its `x`,
+  as ggplot2 decides. A mapping, a map, and options, a keyword list, may each be given alone or both
+  together.
 
   ## Options
 
@@ -422,10 +427,11 @@ defmodule Giggly.Plot do
   # The plot with `layer` added, once the mapping it draws with is checked against what the function
   # that adds it, `function`, accepts and requires. At the front, so adding a layer never walks the
   # list.
-  defp add_layer(plot, layer, function, accepted: accepted, required: required) do
+  defp add_layer(plot, layer, function, facts) do
     combined_mapping = computed_mapping(plot, layer)
-    check_accepted(combined_mapping, accepted, function)
-    check_required(combined_mapping, required, function)
+    check_accepted(combined_mapping, Keyword.fetch!(facts, :accepted), function)
+    check_required(combined_mapping, Keyword.fetch!(facts, :required), function)
+    check_exclusive(combined_mapping, Keyword.get(facts, :exclusive, []), function)
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
@@ -478,15 +484,44 @@ defmodule Giggly.Plot do
     end
   end
 
+  # A required aesthetic is a name, or a list of names of which one is enough, as ggplot2 writes
+  # `"x|y"`.
   defp check_required(mapping, required, function) do
-    case Enum.reject(required, fn aesthetic -> Map.has_key?(mapping, aesthetic) end) do
+    case Enum.reject(required, fn needed -> mapped?(mapping, needed) end) do
       [] ->
         :ok
 
       missing ->
         raise ArgumentError,
-              "#{function} needs #{inspect_all(missing)}, " <>
+              "#{function} needs #{Enum.map_join(missing, ", ", &needed_message/1)}, " <>
                 "but neither its mapping nor the plot's maps it"
+    end
+  end
+
+  defp mapped?(mapping, alternatives) when is_list(alternatives),
+    do: Enum.any?(alternatives, fn aesthetic -> Map.has_key?(mapping, aesthetic) end)
+
+  defp mapped?(mapping, aesthetic), do: Map.has_key?(mapping, aesthetic)
+
+  defp needed_message(alternatives) when is_list(alternatives),
+    do: "one of #{inspect_all(alternatives)}"
+
+  defp needed_message(aesthetic), do: inspect(aesthetic)
+
+  # Aesthetics of which a layer maps at most one, as counting maps x or y but not both.
+  defp check_exclusive(mapping, exclusive, function) do
+    Enum.each(exclusive, fn alternatives -> check_one_of(mapping, alternatives, function) end)
+  end
+
+  defp check_one_of(mapping, alternatives, function) do
+    case Enum.filter(alternatives, fn aesthetic -> Map.has_key?(mapping, aesthetic) end) do
+      [_first, _second | _rest] = both ->
+        raise ArgumentError,
+              "#{function} maps #{inspect_all(both)}, but takes only one of them, " <>
+                "since it counts along one and the count is the other"
+
+      _one_or_none ->
+        :ok
     end
   end
 

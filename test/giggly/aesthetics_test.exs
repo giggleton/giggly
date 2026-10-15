@@ -53,6 +53,16 @@ defmodule Giggly.AestheticsTest do
     end
   end
 
+  describe "flipped/1" do
+    test "each name becomes its counterpart, paired new name first as select/2 takes them" do
+      assert Aesthetics.flipped([:y, :xmin, :group]) === [
+               {:x, :y},
+               {:ymin, :xmin},
+               {:group, :group}
+             ]
+    end
+  end
+
   describe "counterpart/1" do
     test "an x name's partner is its y name" do
       assert Aesthetics.counterpart(:xmin) == :ymin

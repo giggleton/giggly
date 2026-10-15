@@ -20,7 +20,7 @@ defprotocol Giggly.Position do
   # the data frame.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.DataFrame], exports: [Dodge, Identity, Stack]
+  use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: [Dodge, Identity, Stack]
 
   alias Giggly.DataFrame
 

@@ -180,19 +180,28 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":position"
     end
 
-    test "y, which the count gives, is refused, naming the call" do
+    test "x and y together are refused, since it counts along one and the count is the other" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
       assert error.message =~ "Plot.geom_bar/3"
-      assert error.message =~ ":y"
+      assert error.message =~ ":x, :y"
     end
 
-    test "x mapped by neither the layer nor the plot is refused" do
+    test "y alone is counted along, for horizontal bars" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_bar(%{y: :cyl})
+
+      assert [%Plot.Layer{mapping: %{y: "cyl"}}] = plot.reversed_layers
+    end
+
+    test "neither x nor y mapped is refused, naming both" do
       plot = Plot.new(@rows)
 
       error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
-      assert error.message =~ ":x"
+      assert error.message =~ "one of :x, :y"
     end
 
     test "a weight from a column that is not a number is refused, naming the column and its type" do

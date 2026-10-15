@@ -19,11 +19,16 @@ where its marks sit".
 - **A geom never sees a panel's size, a pixel, a scale's range or a facet.** It is handed one
   panel's rows, the plot's coordinate system and that panel's params, as ggplot2's `draw_panel()`
   is, places the rows with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
-- **A geom has a say during the build: `setup_data/2`** gives each row the extent it is drawn
+- **A geom has a say during the build: `setup_data/3`** gives each row the extent it is drawn
   over in data space, after the stat and before the position, as ggplot2's `setup_data()` does, so
   a position stacks or dodges that extent and the scales, trained again after the position, cover
   it. A geom drawn at its x and y alone returns the frame as it is. It is a build function: the
-  assembly calls it, and rendering calls `draw_panel/4`.
+  assembly calls it, and rendering calls `draw_panel/4`. **It is told whether each axis is
+  discrete** (`axis_kinds`), which ggplot2's geoms read from a position's `mapped_discrete` class;
+  a geom sees an axis's kind, never its range.
+- **A bar is horizontal when its stat says so in `flipped_aes`, or else when y alone is
+  discrete**, as ggplot2's `GeomBar` decides; it writes `flipped_aes` for the position and makes a
+  horizontal bar as a vertical one, flipped and flipped back (`Aesthetics.flipped/1`).
 - **A mark with a width and none given takes it from the spacing of its positions**
   (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar takes the `width` its stat
   gave it, as counting does, or else 0.9 of the closest spacing of its x positions, not counting

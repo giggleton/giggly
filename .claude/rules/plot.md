@@ -55,9 +55,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   since counting the panels is its computation, answered when the plot is run.
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
   column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
-  (`Stat.Count`: `:x` needed, `:weight` taken, `:y` refused, since the count gives it). A weight's
-  column must hold numbers, refused at the call, where R would fail inside the stat and draw
-  nothing.
+  (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken). A
+  required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
+  allows at most one. A weight's column must hold numbers, refused at the call, where R would fail
+  inside the stat and draw nothing.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by

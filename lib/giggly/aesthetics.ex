@@ -114,4 +114,13 @@ defmodule Giggly.Aesthetics do
   @doc false
   @spec counterpart(name()) :: name()
   def counterpart(name) when is_atom(name), do: Map.get(@counterparts, name, name)
+
+  # The renames that swap x and y in a table whose columns are `names`, each `{new_name, name}` as
+  # `Giggly.DataFrame.select/2` takes them, as ggplot2's `flip_data()` renames a layer's columns so
+  # a horizontal mark is computed as a vertical one: a position name becomes its counterpart, any
+  # other keeps its own.
+  @doc false
+  @spec flipped([name()]) :: [{name(), name()}]
+  def flipped(names) when is_list(names),
+    do: Enum.map(names, fn name -> {counterpart(name), name} end)
 end

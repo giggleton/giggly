@@ -56,7 +56,7 @@ defmodule Giggly.Geom.Point do
 
     # A point is drawn at its x and y alone.
     @impl Giggly.Geom
-    def setup_data(_geom, frame), do: frame
+    def setup_data(_geom, frame, _axis_kinds), do: frame
 
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do

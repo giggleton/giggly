@@ -25,17 +25,22 @@ defprotocol Giggly.Geom do
   # and nothing they draw with: that is in their protocol implementations, which no boundary
   # exports.
   use Boundary,
-    deps: [Giggly.Coord, Giggly.DataFrame, Giggly.Resolution, Giggly.Scene],
+    deps: [Giggly.Aesthetics, Giggly.Coord, Giggly.DataFrame, Giggly.Resolution, Giggly.Scene],
     exports: [Bar, Point]
 
   alias Giggly.{Coord, DataFrame, Scene}
 
+  @typedoc "Whether each axis's scale is discrete or continuous."
+  @type axis_kinds :: %{x: :continuous | :discrete, y: :continuous | :discrete}
+
   # `frame` with each row given the extent `geom` draws it over, in data space, after the layer's
-  # stat and before its position: ggplot2's `setup_data()`. A geom that draws a row at its x and y
-  # alone returns the frame as it is.
+  # stat and before its position: ggplot2's `setup_data()`. `axis_kinds` says whether each axis is
+  # discrete or continuous, which ggplot2's geoms read from a position's `mapped_discrete` class to
+  # decide their orientation; a geom sees whether an axis is discrete, never its range. A geom that
+  # draws a row at its x and y alone returns the frame as it is.
   @doc false
-  @spec setup_data(t(), DataFrame.t()) :: DataFrame.t()
-  def setup_data(geom, frame)
+  @spec setup_data(t(), DataFrame.t(), axis_kinds()) :: DataFrame.t()
+  def setup_data(geom, frame, axis_kinds)
 
   # The primitives `geom` draws `frame`'s rows with, in the panel that `panel_params` describes
   # under `coord`: ggplot2's `draw_panel()`.

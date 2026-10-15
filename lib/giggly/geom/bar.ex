@@ -7,6 +7,11 @@ defmodule Giggly.Geom.Bar do
   # Bars use `:x`, `:y` and `:group`, and need `:x` and `:y`; an aesthetic joins the accepted list
   # with the scale that maps it, so a mapping never silently does nothing.
   #
+  # A bar is horizontal when its stat says so in a `flipped_aes` column, as counting along y does,
+  # or else when y is the one discrete axis, as ggplot2's `GeomBar` decides (`has_flipped_aes()`);
+  # it writes the orientation in `flipped_aes` for the position to read, and makes a horizontal bar
+  # as a vertical one, x and y swapped and swapped back, as ggplot2's `flip_data()` does.
+  #
   # While the plot is assembled, each row becomes a rectangle in data space (`setup_data/2`), as
   # ggplot2's `GeomBar$setup_data()` makes one: from the lower of its y and 0 to the higher, and as
   # wide as the `width` its stat gave it, as counting does, or else 0.9 of the closest spacing of
@@ -36,7 +41,7 @@ defmodule Giggly.Geom.Bar do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Coord, DataFrame, Resolution}
+    alias Giggly.{Aesthetics, Coord, DataFrame, Resolution}
     alias Giggly.Scene.Rectangles
 
     # ggplot2's default bar: its share of the spacing of the x positions, centred on its x
@@ -47,7 +52,40 @@ defmodule Giggly.Geom.Bar do
     @stroke_width 0.5 * 72.27 / 25.4 * 72 / 96
 
     @impl Giggly.Geom
-    def setup_data(_geom, frame) do
+    def setup_data(_geom, frame, axis_kinds) do
+      flipped = flipped?(frame, axis_kinds)
+      orientation = List.duplicate(flipped, DataFrame.row_count(frame))
+
+      frame
+      |> DataFrame.put(:flipped_aes, orientation)
+      |> flip(flipped)
+      |> edges()
+      |> flip(flipped)
+    end
+
+    # The stat's orientation where it gave one, else horizontal when y alone is discrete.
+    defp flipped?(frame, axis_kinds) do
+      if :flipped_aes in DataFrame.names(frame) do
+        frame
+        |> DataFrame.pull(:flipped_aes)
+        |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
+      else
+        axis_kinds == %{x: :continuous, y: :discrete}
+      end
+    end
+
+    defp flip(frame, false), do: frame
+
+    defp flip(frame, true) do
+      renames =
+        frame
+        |> DataFrame.names()
+        |> Aesthetics.flipped()
+
+      DataFrame.select(frame, renames)
+    end
+
+    defp edges(frame) do
       widths = widths(frame)
       x_positions = DataFrame.pull(frame, :x)
       y_positions = DataFrame.pull(frame, :y)

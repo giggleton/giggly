@@ -35,3 +35,6 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
   bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged
   positions come out doubles, as R's are, so a discrete axis's column stays one type.
+- **A position reads a layer's orientation from its `flipped_aes` column**, written by the stat or
+  the geom, and moves horizontal bars along y, flipped and flipped back, as ggplot2's positions
+  read `flipped_aes`; without the column, bars are vertical.

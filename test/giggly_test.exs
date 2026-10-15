@@ -428,6 +428,90 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same `mpg` where it
+  # is used, printed to 17 significant digits. It moves with ggplot2's bar orientation.
+  describe "layer_data/2, horizontal bars" do
+    test "counting along y draws each bar from 0 rightward to its count" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new()
+        |> Plot.geom_bar(%{y: :class})
+        |> Giggly.layer_data()
+
+      counts = [5.0, 47.0, 41.0, 11.0, 33.0, 35.0, 62.0]
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :xmin),
+              DataFrame.pull(frame, :xmax)} === {counts, List.duplicate(0.0, 7), counts}
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :flipped_aes)} ===
+               {[
+                  0.55000000000000004,
+                  1.55000000000000004,
+                  2.54999999999999982,
+                  3.54999999999999982,
+                  4.54999999999999982,
+                  5.54999999999999982,
+                  6.54999999999999982
+                ], List.duplicate(true, 7)}
+    end
+
+    test "columns are horizontal when y alone is discrete, vertical when both are" do
+      horizontal =
+        %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+        |> Plot.new(%{x: :outcome, y: :trt})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      both_discrete =
+        %{"x" => ["a", "b"], "y" => ["p", "q"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(horizontal, :xmax), DataFrame.pull(horizontal, :ymax)} ===
+               {[2.3, 1.9, 3.2], [1.45, 2.4500000000000002, 3.4500000000000002]}
+
+      assert {DataFrame.pull(both_discrete, :ymin), DataFrame.pull(both_discrete, :ymax),
+              DataFrame.pull(both_discrete, :flipped_aes)} ===
+               {[0.0, 0.0], [1.0, 2.0], [false, false]}
+    end
+
+    test "horizontal bars stack rightward, below zero leftward, apart" do
+      counted =
+        %{"y" => ["a", "a", "a", "b"], "g" => ["p", "q", "q", "p"]}
+        |> Plot.new(%{y: :y, group: :g})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      negative =
+        %{"v" => [1.0, 2.0, -1.0], "k" => ["a", "a", "b"], "g" => ["p", "q", "p"]}
+        |> Plot.new(%{x: :v, y: :k, group: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(counted, :xmin), DataFrame.pull(counted, :xmax)} ===
+               {[2.0, 0.0, 0.0], [3.0, 1.0, 2.0]}
+
+      assert {DataFrame.pull(negative, :xmin), DataFrame.pull(negative, :xmax),
+              DataFrame.pull(negative, :x)} ===
+               {[2.0, 0.0, -1.0], [3.0, 2.0, 0.0], [3.0, 2.0, 0.0]}
+    end
+
+    test "horizontal bars dodge along y" do
+      frame =
+        %{"y" => ["a", "a", "a", "b"], "g" => ["p", "q", "q", "p"]}
+        |> Plot.new(%{y: :y, group: :g})
+        |> Plot.geom_bar(position: :dodge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :y), DataFrame.pull(frame, :ymin),
+              DataFrame.pull(frame, :ymax)} ===
+               {[0.77500000000000002, 2.0, 1.22500000000000009],
+                [0.55000000000000004, 1.55000000000000004, 1.0],
+                [1.0, 2.4500000000000002, 1.4500000000000002]}
+    end
+  end
+
   describe "the guides' titles" do
     test "an axis no layer maps is titled by the column a stat puts into it" do
       assembly =
@@ -437,6 +521,16 @@ defmodule GigglyTest do
         |> Giggly.Assembly.run()
 
       assert assembly.guide_titles === %{x: "class", y: "count"}
+    end
+
+    test "counting along y titles x by the count" do
+      assembly =
+        %{"class" => ["suv", "compact"]}
+        |> Plot.new()
+        |> Plot.geom_bar(%{y: :class})
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles === %{x: "count", y: "class"}
     end
 
     test "a later layer's own mapping titles the axis over an earlier stat's column" do
@@ -634,6 +728,25 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/dodge.svg")
+    end
+
+    # Golden: test/golden/horizontal_bar.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/horizontal_bar.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. geom_bar()'s third example from ggplot2's
+    # reference page: mpg's classes counted along y, the bars running rightward from 0 and the x
+    # axis titled count. It moves with what moves test/golden/bar.svg, and with bar orientation.
+    test "bars counted along y run rightward, the x axis titled count" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new()
+        |> Plot.geom_bar(%{y: :class})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/horizontal_bar.svg")
     end
 
     # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by
