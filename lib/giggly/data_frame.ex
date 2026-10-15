@@ -109,10 +109,11 @@ defmodule Giggly.DataFrame do
   # result) into a frame.
   #
   # Every column is read into a list, so a lazy source is read here and nowhere else, and column
-  # names become strings. Raises `ArgumentError` when the input is a list or map that is not a
-  # table, when two of its names become the same string (`:wt` and `"wt"`), when its columns
-  # differ in length, or when a column mixes two types; a value with no `Table.Reader`
-  # implementation raises `Protocol.UndefinedError`.
+  # names become strings. A list of maps gives its columns in sorted key order, since `table` sorts
+  # the first row's keys; a list of keyword lists keeps its written order. Raises `ArgumentError`
+  # when the input is a list or map that is not a table, when two of its names become the same
+  # string (`:wt` and `"wt"`), when its columns differ in length, or when a column mixes two types;
+  # a value with no `Table.Reader` implementation raises `Protocol.UndefinedError`.
   @doc false
   @spec from_table(Table.Reader.t()) :: t()
   def from_table(table) do

@@ -51,19 +51,3 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   boundary. The boundary exports the kinds, whose structs a plot records; what they compute with
   stays in their implementations. `facet_wrap` arrives as `%Facet.Wrap{}`, touching only `Plot`,
   `Facet`, the assembly and rendering, never a geom.
-
-## How it works
-
-`layout(facet, frame, order_key)` and `assign_panels(facet, frame, layout)` dispatch on the
-facet's struct. `Facet.Null` is ggplot2's null facet, with no parameters: its `assign_panels/3`
-(`FacetNull$map_data()`) puts a `:panel` column of 1s on the frame, and its `layout/3`
-(`layout_null()`) is a one-row frame of `:panel`, `:row`, `:column`, `:scale_x` and `:scale_y`,
-all 1. `Facet.Wrap` is `facet_wrap()`, its struct the columns it splits on (by their names in the
-data), `nrow` and `ncol`, each `:none` when not given, and `scales`: its `layout/3` takes the combinations of
-those columns' values that occur, sorts them by the order key applied to each value, places panel
-`i` at row `div(i - 1, ncol) + 1` and column `rem(i - 1, ncol) + 1`, and puts each facet column
-beside them; its `assign_panels/3` looks each row's values up in those columns. The assembly calls
-`layout/3` and then `assign_panels/3` once, on the plot's data, and each layer's evaluation carries
-the column across with `DataFrame.put/3` after choosing the layer's aesthetics, so every layer
-frame ends `…, :panel, :group`. The boundary lists `Giggly.DataFrame` and nothing else, and
-exports `Null` and `Wrap`.

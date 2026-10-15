@@ -83,7 +83,9 @@ semver or the changelog).
   flags in `elixir-code-review`'s `references/mutation-testing.md` exist because its defaults give
   a confident false pass. So a bump goes through `dependency-updates` like any other, and before
   the step is trusted again it re-checks what the new version does by default: which mutants the
-  optimizer drops, which modules the filter skips, how `--files` is read.
+  optimizer drops, which modules the filter skips, how `--files` is read, and that each mutant is
+  still built from source in a sandbox of its own and run in a fresh VM, so none reuses another's
+  build.
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored
@@ -109,6 +111,11 @@ semver or the changelog).
   explanation to the user must cover the whole change, not the number. **Move a declared file with
   `git mv`**: the commit check pairs a staged rename and scores it against its old declaration,
   while a plain `mv` reads as a new file whose every grant is new.
+- **A change to a hook is written as a patch, tested on a copy, and applied by the user.** Claude
+  Code's auto mode may refuse the agent's edit to `.claude/hooks/waiver-gate.sh`; revert any
+  half-made edit, never leave the hook between states. Prove the patch on a copy (or a throwaway
+  clone, where staging, approving and committing touch no real marks) with a case that must pass
+  and one that must still be stopped.
 - **`exports: :all` is for the umbrella root only.** On a sub-boundary the list is written out one
   module at a time, because the list is an approval gate, not bookkeeping: an explicit list fails
   **safe** — a new module is private until a person admits it — while `:all` makes it public the
@@ -157,6 +164,14 @@ semver or the changelog).
 
 ## How it works
 
+- Tack's harness is installed with `mix tack.install --profile library`, with `igniter` added to
+  `mix.exs` for the run and removed after: `mix igniter.install tack@git:…` cannot take the SSH
+  URL, since igniter's `git:` form splits on `@` to read a ref.
+- Giggly's copies of Tack-installed files have changed since the install, and a re-install must
+  keep the changes: `waiver-gate.sh` counts declarations, so a removed one is a widening, sorts
+  paths before hashing an approval, and passes a `defimpl`'s own `classify_to:`;
+  `elixir-code-review` scopes its review against the local `main` and adds the mutation step;
+  `docs-sync` routes a milestone to one §6 line and mechanism to module documentation.
 - The `elixir:` requirement in `mix.exs` is the floor; the **exact** toolchain is pinned in
   `.tool-versions`, which CI reads.
 - The gate's tools: `ex_doc`, `credo` (with the `jump_credo_checks` and `ex_slop` plugins and

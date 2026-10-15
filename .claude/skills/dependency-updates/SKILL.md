@@ -155,8 +155,9 @@ unreachable from our code, and here is why for each" is the finding.
 
 ## Documenting
 
-A design-log §6 entry when the update changed behavior we depend on, broke something, or taught
-something worth not rediscovering. Not for a routine bump that touched nothing — but say in your
+A design-log §6 line (the story in the commit message) when the update changed behavior we
+depend on, broke something, or taught something worth not rediscovering, and the lesson itself in
+the rules file or skill where the next update will meet it. Not for a routine bump that touched nothing — but say in your
 report that you decided that, rather than leaving it silent. Then `docs-sync` as usual; the bump
 also owes `elixir-code-review` if fixing it touched a gated path.
 

@@ -49,8 +49,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   which reads the scale's first aesthetic, so `:xmin` alone titles nothing. An axis no layer maps
   has the title `:none`. Every point layer maps x and y, so today the first layer is the one; the
   search past a layer that does not map the aesthetic arrives with the first geom that can leave
-  an axis unmapped, where `Map.fetch!/2` fails loudly until it does. The titles are the only place the data's own column names survive the
-  assembly.
+  an axis unmapped, where `Map.fetch!/2` fails loudly until it does. The titles are the only
+  place the data's own column names survive the assembly.
+- **A plot with no layers trains no scale, so its axes have no breaks and no titles.** ggplot2
+  builds such a plot with a `geom_blank()` layer that inherits the plot's mapping, so its axes
+  span the mapped columns and are titled; Giggly follows when a geom that draws nothing arrives.
 - **Each panel's params are built once, after the positions, from the scales its layout row
   names:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing that extent
   draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`; until the reset and retrain
@@ -89,40 +92,3 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   no exclusion from the key.
 - **Evaluated columns are the aesthetics in name order, then `panel`, then `group`** (ggplot2's
   order), and the group key follows column order: reordering the aesthetics renumbers groups.
-
-## How it works
-
-`Giggly` lists `Giggly.DataFrame` so its sub-boundaries may — a sub-boundary may list a
-top-level boundary only when its parent does — and because `panel_scales/2` reads the layout
-table. It exports `Plot`. A user calls only the API (CLAUDE.md, Conventions); the domains
-beneath are `@moduledoc false`, apart from the parts of `DataFrame` and `Scale` the run functions
-hand back.
-
-`Assembly.run/1` first has `Facet.layout/3` build the layout table from the plot's data, handed
-`Scale.level_key/1`, and `Facet.assign_panels/3` put the `:panel` column on that data from the
-layout, once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
-each layer, lays its mapping over the plot's (the layer's column wins), sorts the pairs by
-aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `DataFrame.put/3`,
-and calls `Group.add/2` with `Scale.level_key/1`. It then adds each axis's scale: it reads each
-layer's computed mapping for the axis's family, refuses an unplaceable or disagreeing column, and
-takes the kind from the first column (an axis no layer maps is continuous). Each frame's x-family
-and y-family columns are replaced by `Scale.transform/2`'s values, each scale folds in with
-`Scale.train/2` every such column's values in the rows of the panels that use it, and the columns
-are replaced again by `Scale.map/2`'s positions; each transformation and mapping groups a column's
-values by their panel's scale, hands each group to its scale, and puts the results back in row
-order. Each
-frame then goes through its layer's stat and its position. Last, each layout row's scale ids
-pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from each
-one's `Scale.dimension/1` and the `Scale.breaks/2` on it; `Coord.clip/1` says whether panels are
-clipped. `to_svg/2` validates its options, hands the result to `Render.scene/1` and the scene to
-`SVG.draw/3`. `layer_data/2` checks the
-index against the plot's layer count before assembling, so a missing layer raises an
-`ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises
-the same way for a panel the plot does not have.
-
-`Group.add/2` takes its key columns from the frame's types: a mapped `group` alone, or else every
-discrete column. It zips the key columns into one tuple per row, sorts the distinct tuples by the
-order key applied to each value, numbers them from 1, and looks each row up. An empty key gives
-every row `-1`. With `Scale.level_key/1` as the key, `nil` sorts last and values otherwise compare
-in Erlang term order, so strings sort by bytes and structs such as dates by their fields rather than
-chronologically.

@@ -52,18 +52,3 @@ ggplot2's facets' order".
   one.
 - **A layer's rows are split by panel, and each panel's are drawn by the layer's geom alone**, as
   ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows.
-
-## How it works
-
-`scene(assembly)` resolves the assembly's theme name with `Theme.complete/1` and splits each
-layer's frame by panel (`DataFrame.split/2`). For each layout row it takes the panel's params, has
-`Guide.grid/3` draw the panel's background and grid lines and `Geom.draw_panel/4` each layer's rows
-in that panel over them, `Guide.axes/3` its axes (kept where the layout says the panel draws them)
-and `Guide.strips/2` its strips. `Guide.titles/4` draws the titles from the first panel's params.
-The scene's columns are named as they are built — the margin, the y title, then for each column of
-panels its left axes and its panels with the panel spacing between, then the margin — and so are
-its rows — the margin, then for each row of panels its strip layers, its panels and its bottom
-axes with the spacing between, then the x title and the margin — and each cell is placed by those
-names. The panels' columns and rows are `:rest` and every other size is in points. The first cell
-spans every row and column and holds a `Scene.Rect` in the theme's `plot_background`.
-`Giggly.to_svg/2` runs the assembly, renders, and has `Giggly.SVG` draw the scene.

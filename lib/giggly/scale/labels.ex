@@ -41,6 +41,9 @@ defmodule Giggly.Scale.Labels do
   defp level(value), do: to_string(value)
 
   # Rounds through the 15-significant-digit scientific form; a zero of either sign becomes 0.0.
+  # `:erlang.float_to_binary/2` takes a negative `scientific:` precision without complaint and uses
+  # its default of six decimals, where a negative `decimals:` raises, so the example with a break
+  # needing all fifteen digits is what pins the precision.
   defp round_significant(value) when value == 0, do: 0.0
 
   defp round_significant(value) do

@@ -16,7 +16,8 @@ defprotocol Giggly.Position do
   # leaving the position out, so a layer whose marks stay where they are says so.
 
   # A position is handed a layer's table and returns one. It names the data frame's type in its
-  # specs, and lists nothing because nothing here calls the data frame yet.
+  # specs, which boundary does not check, and lists nothing because nothing here calls the data
+  # frame yet.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
   use Boundary, deps: [], exports: [Identity]

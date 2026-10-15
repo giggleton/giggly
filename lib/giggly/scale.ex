@@ -191,7 +191,8 @@ defmodule Giggly.Scale do
   end
 
   # R's `zero_range()`: equal ends, or ends so close, relative to the smaller, that their
-  # difference is rounding error.
+  # difference is rounding error. `dimension/1` and `breaks/2` both ask it, which is why
+  # `breaks/2` lives here in the root.
   defp zero_range?(low, high) when low == high, do: true
 
   defp zero_range?(low, high) do
@@ -200,8 +201,9 @@ defmodule Giggly.Scale do
   end
 
   # The key that orders discrete values: `nil` after every present value, which compare in Erlang
-  # term order. Grouping orders its combinations by the same key, so group ids and axis positions
-  # agree.
+  # term order, so strings sort by their bytes and structs such as dates by their fields, not
+  # chronologically. Grouping orders its combinations by the same key, so group ids and axis
+  # positions agree.
   @doc false
   @spec level_key(term()) :: {0, term()} | {1, nil}
   def level_key(nil), do: {1, nil}

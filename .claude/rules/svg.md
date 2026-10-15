@@ -48,24 +48,9 @@ given"; why labels are drawn at their measured widths, and in which fonts: the e
 - **A golden changes only on purpose, checked against ggplot2's drawing of the same plot.**
   `test/golden/` holds whole documents compared byte for byte; a change to one is reviewed as a
   change to the product. Beside each golden is the R script that draws its plot with ggplot2 and
-  vdiffr (`point.R`, `facet_wrap.R`), never run by the suite; its header gives the Docker command
+  vdiffr (`test/golden/*.R`), never run by the suite; its header gives the Docker command
   and the element-by-element comparison, which leaves out only what svglite writes and Giggly does
   not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, and a
   circle's black stroke. Any other difference is a finding or a stated departure, named in the
   script's header: the plain plot's axes drawn in the other order, a background edge written as
   R's rounding error.
-
-## How it works
-
-`draw(scene, width, height)` lays the columns out across `width` and the rows down `height`:
-each size in points takes its length, and each `:rest` an equal share of what they leave. Each
-cell's box runs from its first column's and row's start to its last one's end, or, for a hanging
-cell, its own height down from its first row's top or its own width back from its last column's
-end; a rectangle fills it, and each other
-primitive is written in it
-at `(left + x * box_width, top + (1 - y) * box_height)`, since a cell's y runs up and SVG's runs
-down; a label's baseline is a further `baseline_offset` points toward its top, which is up for
-level text and left for text turned 90 degrees. It returns iodata.
-`Giggly.to_svg/2` draws at the size it is given in pixels, 700 by 433 by default, ggplot2's online
-reference size, and hands `draw/3` the size in points, at 96 pixels to the inch. Why pixels, and
-why that default: design-log §4, the entry beginning "A plot is drawn at the size it is given".

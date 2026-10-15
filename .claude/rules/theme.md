@@ -38,14 +38,3 @@ a behaviour: the entry beginning "A theme is a function".
 - **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
   fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
   assembly, arrive with the first mapped or set colour or size.
-
-## How it works
-
-The elements so far: the plot's background and margin, the panel's background and grid lines,
-the axes' ticks, labels and titles, the panel spacing, and the strips' background and text.
-`Theme.complete(:gray)` calls the private `gray/0`, which works each element out from
-`theme_gray()`'s arguments (base size 11, black ink on white paper, lines and borders 11/22 mm) as
-ggplot2's `theme-defaults.R` does: `half_line` is half the base size, and colours are ink mixed
-toward paper by `col_mix()`, written as the hex values it rounds to. The plot records the name,
-the assembly passes it on in `%Assembly{theme: …}`, and `Giggly.Render` resolves it once and hands
-the complete theme to `Giggly.Guide`.

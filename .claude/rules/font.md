@@ -29,10 +29,3 @@ Sans table, why a plain module rather than a behaviour, and why the table is a f
 - **Sizes are points (1/72 inch), as font sizes are.** ggplot2's theme lengths are TeX points
   (1/72.27 inch) and are converted where they are declared, not here.
 - **No behaviour until a second font**: the theme's text family, or a backend that can measure.
-
-## How it works
-
-At compile time the table's lines become a map of codepoint to `{width, ascent, descent}` at 12
-points, and the widths, the ascent of "M" and the deepest descent of "gjpqyQ" are taken from it.
-`width(text, size)` sums the widths of the text's codepoints and scales the sum by `size / 12`;
-`ascent(size)` and `descent(size)` scale their constants the same way.

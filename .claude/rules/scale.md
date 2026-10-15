@@ -54,7 +54,10 @@ grid lines are placed by the coordinate system".
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and
   the extent's low end alone when it has zero width; a discrete scale's are its levels at 1..n.
-  Positions and labels travel as pairs so they cannot drift apart.
+  Positions and labels travel as pairs so they cannot drift apart. A surviving mutant there is
+  judged against R: applied to a scratch copy and compared with `labeling::extended()` on many
+  random and degenerate ranges, it is equivalent only if it matches R on all of them; otherwise
+  the first range where it departs joins the tests, with R's breaks.
 - **`minor_breaks/3` gives an axis's minor breaks between the breaks `breaks/2` gave on the same
   extent**, as ggplot2's view scale hands `get_breaks_minor()` its breaks: the transformation's
   minor breaks kept inside the extent, ends included (R's `discard()`), less the breaks
@@ -84,19 +87,3 @@ grid lines are placed by the coordinate system".
   `zero_range()` stays in this namespace alone. The coordinate system maps the extent onto the
   panel and adds nothing; a scale's own `expand`, and the
   coordinate system's switch to turn expansion off, arrive with options.
-
-## How it works
-
-`Giggly.Scale` is the namespace root and the only module callers use; it dispatches on the
-trained struct. `Scale.Continuous` puts values through its transformation by handing its name to
-`Scale.Transform`, whose `Transform.Identity` returns them as given; it folds values into a
-`{low, high}` range, skipping anything that is not a number; its `map` returns the values
-unchanged until limits can censor them.
-`Scale.Discrete` merges values into its levels as a sorted, de-duplicated list, and maps each
-value through a level-to-position map built once per call.
-`breaks/2` lives in the root, beside `dimension/1`, whose zero-width test it shares. A
-continuous scale's breaks come from `Transform.breaks/2` and its labels from `Transform.format/2`;
-`Transform.Identity` hands these to `Scale.Breaks.extended/1` and `Scale.Labels.numbers/1`.
-`minor_breaks/3` takes the breaks' positions to `Transform.minor_breaks/3`, which the identity
-hands to `Scale.MinorBreaks.regular/2`, then filters to the extent and drops the breaks.
-`Scale.Labels.levels/1` writes a discrete scale's levels.

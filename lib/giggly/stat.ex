@@ -17,8 +17,9 @@ defprotocol Giggly.Stat do
   # is, as ggplot2's `geom_point()` defaults `stat = "identity"`. A layer records it rather than
   # leaving the stat out, so a layer that computes nothing says so.
 
-  # A stat is handed a layer's table and returns one. It names the data frame's type in its specs,
-  # and lists nothing because nothing here calls the data frame yet.
+  # A stat is handed a layer's table and returns one. It names the data frame's type in its
+  # specs, which boundary does not check, and lists nothing because nothing here calls the data
+  # frame yet.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
   use Boundary, deps: [], exports: [Identity]

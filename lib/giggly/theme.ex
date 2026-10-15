@@ -110,11 +110,12 @@ defmodule Giggly.Theme do
   # arguments: an 11-point base size, black ink on white paper, and lines and borders half a
   # millimetre wide.
   #
-  # Every element is worked out from those arguments as `theme_gray()` works it out: `half_line`,
-  # half the base size, spaces most things, and each colour is ink mixed toward paper by ggplot2's
-  # `col_mix()`. ggplot2 gives lengths in TeX points (1/72.27 inch) and line widths in millimetres,
-  # which grid draws as `.pt` line-width units of 1/96 inch each; each is converted here into the
-  # scene's points (1/72 inch), so nothing that reads the theme converts anything.
+  # Every element is worked out from those arguments as `theme_gray()` works it out, in ggplot2's
+  # `theme-defaults.R`: `half_line`, half the base size, spaces most things, and each colour is
+  # ink mixed toward paper by ggplot2's `col_mix()`. ggplot2 gives lengths in TeX points (1/72.27
+  # inch) and line widths in millimetres, which grid draws as `.pt` line-width units of 1/96 inch
+  # each; each is converted here into the scene's points (1/72 inch), so nothing that reads the
+  # theme converts anything.
   #
   # The plot's background is white with a white border, and the plot margin is `half_line` on every
   # side. The panel's background is light grey (ink mixed 92% toward paper) with no border, and its

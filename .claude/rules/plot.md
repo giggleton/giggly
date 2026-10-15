@@ -68,16 +68,5 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **When keyword options arrive, `Aesthetics.canonicalize/1` runs before NimbleOptions validates
   them.** NimbleOptions keeps only the first of a repeated key and checks only that one, so
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
-  repeat.
-
-## How it works
-
-`new/2` reads the data with `DataFrame.from_table/1` and resolves the plot's mapping;
-`geom_point/2` resolves the layer's, checks the aesthetics it adds and those it inherits against
-`Geom.Point.accepted_aesthetics/0`, checks that each of `Geom.Point.required_aesthetics/0` is
-mapped by one mapping or the other, and puts a `%Layer{}` of `%Geom.Point{}` with the identity stat
-and position at the front of `reversed_layers`, so adding a layer never walks the list and the
-assembly reverses them into drawing order. Resolving a mapping canonicalizes its keys and
-looks each value up, as a string, in `DataFrame.names/1`; no atom is ever made from a column name.
-`facet_wrap/3` validates its options, resolves its columns the same way (one column needs no
-list), and replaces the plot's facet with a `%Facet.Wrap{}` of the columns' names in the data.
+  repeat. NimbleOptions has no number type either: an option taking any number, such as `alpha:`,
+  is `{:or, [:integer, :float]}`, or an integer is refused.

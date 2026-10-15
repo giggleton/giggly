@@ -9,20 +9,20 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
 ## Where the documentation lives
 
 - **Area rules** (`.claude/rules/*.md`) — one file per area of the code, each with a `paths:`
-  frontmatter so it loads only when a file matching its globs is read: the area's rules first,
-  then how it works. **A feature's invariants and mechanism live there, not here.** This file
-  holds only what applies to every session, plus the status map below. A change to an area
-  updates its rules file; this file changes only for a cross-cutting rule or a status-map line.
-- **[notes/design-log.md](notes/design-log.md)** — the design overview, decision log, and milestone
-  log. **Read it first to get oriented.** New work gets its full write-up there (§6), decisions with
-  their rejected alternatives go in §4, and open questions in §7, with at most a one-line update
-  here.
+  frontmatter so it loads only when a file matching its globs is read. **A feature's invariants
+  live there, not here; its mechanism lives in the module's documentation.** This file holds
+  only what applies to every session, plus the status map below. A change to an area updates its
+  rules file; this file changes only for a cross-cutting rule or a status-map line.
+- **[notes/design-log.md](notes/design-log.md)** — the design overview and decision log. **It is
+  reference, not reading:** orient from the plan's "Where we are", and read a §4 entry when a rules
+  file or the plan names it. A decision with its rejected alternatives goes in §4 (about 150
+  words); a milestone is one §6 line naming its commit, whose message tells the story; open
+  questions go in §7.
 - **Plans do not live in this repo.** A working plan file goes in **`~/.claude/plans/`**, never
-  under `notes/` and never inside a worktree — it is scaffolding for one piece of work, not a
-  documentation surface. Anything durable a plan contains (a ratified decision, a rejected
-  alternative and its reason) must be copied into design-log.md §4/§6 **before** the work is
-  reported done, because that is the only copy that survives: a plan in a worktree dies with
-  `git worktree remove`.
+  under `notes/` and never inside a worktree — it is scaffolding for the current work, its "Where
+  we are" a few hundred words, not a documentation surface. Anything durable a plan contains (a
+  ratified decision, a rejected alternative and its reason) must be copied into design-log.md §4
+  **before** the work is reported done, because that is the only copy that survives.
 - **Skills** (`.claude/skills/`) — task-triggered instructions: `dependency-updates` (taking
   anything `mix hex.outdated` offers — read the package diffs, never trust semver or the
   changelog), `docs-sync` (run after any substantive change, before reporting done — routes the
@@ -38,9 +38,10 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
 
 ## Status map
 
-Everything below is **built and merged to `main`** unless marked otherwise. Full histories:
-design-log.md §6. Each line names the area's rules file, which carries its invariants and how it
-works. Add a line here when an area gets its rules file; nothing else about the area belongs here.
+Everything below is **built and merged to `main`** unless marked otherwise. Histories: the commit
+messages, indexed in design-log.md §6. Each line names the area's rules file, which carries its
+invariants. Add a line here when an area gets its rules file; nothing else about the area belongs
+here.
 
 - **Dependencies, toolchain, the quality gate's steps, lint and security waivers** —
   `.claude/rules/dependencies.md`; the `dependency-updates` skill.

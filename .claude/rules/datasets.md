@@ -28,10 +28,3 @@ pages".
   shared.
 - **A dataset is public API with no caller in Giggly**, and its boundary lists nothing. Each
   arrives with the first notebook example that draws it.
-
-## How it works
-
-`mtcars/0` and `mpg/0` each return a dataset from a module attribute built when Giggly
-compiles: for each file read, its lines, less its `#` comments, split on commas and turned into
-columns, each named by its header (an existing atom, from the dataset's table of column types)
-and read as a string, an integer or a float.

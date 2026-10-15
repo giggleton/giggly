@@ -30,13 +30,3 @@ holds the facts a plot checks: the entry beginning "Each facet, coordinate syste
 - **A point looks like ggplot2's default point until aesthetics can change it:** black, size 1.5
   mm, border 0.5 mm, which grid draws as a circle of radius 1.95 points with a 0.71-point outline.
   The defaults move to the theme with its second reader.
-
-## How it works
-
-`draw_panel(geom, frame, coord, panel_params)` dispatches on the geom's struct. `Geom.Point`
-accepts `:group`, `:x` and `:y` and requires `:x` and `:y`; its drawing transforms the frame, keeps the rows whose `x` and `y` are both
-numbers after placing, and returns one `Scene.Circles` holding them. Its radius and outline are
-computed at compile time from ggplot2's constants: a font size of `size * .pt + stroke * .stroke /
-2` (`.pt` = 72.27/25.4 font points per millimetre, `.stroke` = 96/25.4 line-width units per
-millimetre), a radius of 0.375 times that font size (R's graphics engine for shape 19), and an
-outline of `stroke * .stroke / 2` line-width units of 1/96 inch, written in points.

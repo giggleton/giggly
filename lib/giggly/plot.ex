@@ -166,6 +166,7 @@ defmodule Giggly.Plot do
     check_accepted(combined_mapping, Geom.Point.accepted_aesthetics())
     check_required(combined_mapping, Geom.Point.required_aesthetics())
 
+    # At the front, so adding a layer never walks the list.
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
 

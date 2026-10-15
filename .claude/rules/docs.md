@@ -17,10 +17,17 @@ sentence restated across surfaces, and the file that rots fastest is the one loa
 ## Rules
 
 - **One home per kind of fact.** Cross-cutting rules and the status map live in CLAUDE.md. An
-  area's invariants and how it works live in its `.claude/rules/<area>.md`, `## Rules` first,
-  `## How it works` second. Decisions with rejected alternatives live in design-log §4; the
-  narrative of a change in §6; mechanism in a guide or the module's documentation (an API
-  module's moduledoc, an internal module's opening comment); procedure in a skill.
+  area's invariants live in its `.claude/rules/<area>.md`, under `## Rules`; its mechanism in the
+  module's documentation (an API module's moduledoc, an internal module's opening comment), never
+  restated in the rules file. Decisions with rejected alternatives live in design-log §4; a
+  change's story in its commit message, indexed by one §6 line; procedure in a skill. Only the
+  rules files with no module behind them (this one, `dependencies.md`) keep a `## How it works`.
+- **Short entries, read by name.** A §4 entry is about 150 words: the decision, a sentence or two
+  of why, one line per rejected alternative. A §6 entry is one line: the date, a title, the
+  commit, and the §4 entries it settled. Nobody reads the design log whole: a session orients from
+  its plan's "Where we are", a few hundred words, and reads the §4 entries a rules file or the plan
+  names, by their opening words. Context is the cost: every surface a fact is written to is also
+  read back.
 - **No count, ordinal, size or code-mirrored list in prose.** Point at the thing (`quality_steps`
   in `mix.exs`, a directory) or refer by label; every such number drifts.
 - **No sentence about deployment state.** The repo cannot show which keys are set or which flags
@@ -77,8 +84,8 @@ sentence restated across surfaces, and the file that rots fastest is the one loa
 ## How it works
 
 CLAUDE.md is the always-loaded file, so it holds only what every session needs: the cross-cutting
-rules and a status map naming each area's rules file. Each area's narrative lives in
-`.claude/rules/<area>.md` behind a `paths:` frontmatter, so it loads only when a matching file is
+rules and a status map naming each area's rules file. Each area's invariants live in
+`.claude/rules/<area>.md` behind a `paths:` frontmatter, so they load only when a matching file is
 read (Claude Code's path-scoped rules). `mix tack.rules_check` runs as a `mix quality`
-step so the root file cannot regrow and the globs cannot rot silently. When an area's write-up
-grows past a few paragraphs, that is the signal to give it a rules file and a status-map line.
+step so the root file cannot regrow and the globs cannot rot silently. When an area's invariants
+grow past a few sentences, that is the signal to give it a rules file and a status-map line.

@@ -61,18 +61,3 @@ the root, and why a geom is handed it: the entry beginning "Each facet, coordina
 - **What waits for its first reader:** `munch` (the first path geom; a grid that is not
   rectangular munches its lines and background, as ggplot2's does), axes above or to the right,
   and every coordinate option (`xlim`, `expand`, `reverse`, `ratio`, and `clip = "off"`).
-
-## How it works
-
-Every function dispatches on the coordinate system's struct: `panel_params(coord, x_axis,
-y_axis)`, each axis given as `{extent, breaks, minor_breaks}`, returns the panel's params, and
-`transform(coord, frame, params)`, `axes(coord, params)`, `grid(coord, params)` and `clip(coord)`
-read them or the struct. `%Coord.Cartesian{clip: :on}`'s params are a map of the x and y extents,
-breaks and minor breaks; it rescales each value by its axis's extent, `(value - low) / (high -
-low)`, putting `:infinity` at 1 and `:neg_infinity` at 0 and returning `nil` and `:nan` as they
-are; `axes/2` rescales each break's position the same way, keeps its label, and returns
-`%{bottom: {:x, breaks}, left: {:y, breaks}}`; `grid/2` rescales each break's and minor break's
-position the same way and runs an x line from `{place, bottom}` to `{place, top}`, the y extent's
-rescaled minus and plus infinity, and a y line from `{left, place}` to `{right, place}` on the x
-extent. The boundary lists `Giggly.Aesthetics`, for which columns are x and which y, and
-`Giggly.DataFrame`, and exports `Cartesian`.

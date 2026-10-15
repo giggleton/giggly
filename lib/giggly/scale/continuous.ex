@@ -26,7 +26,7 @@ defmodule Giggly.Scale.Continuous do
     %{scale | range: Enum.reduce(values, range, &widen/2)}
   end
 
-  # The values unchanged, as `Giggly.Scale.map/2` describes.
+  # The values unchanged, as `Giggly.Scale.map/2` describes, until limits can censor them.
   @doc false
   @spec map(t(), list()) :: list()
   def map(%__MODULE__{}, values), do: values

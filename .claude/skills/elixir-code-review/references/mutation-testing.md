@@ -65,7 +65,9 @@ survivor is one of three things, and the report says which; each uncovered mutan
 
 A test-quality finding, and the High "coverage hole on a documented contract" when a `@doc`
 promises the behavior. The fix is a test naming the bug the mutant introduced — a doctest only
-on an API function.
+on an API function. Prove the new test by applying the survivor's `patch` by hand to a copy and
+watching the test fail, then restore it; a test that passes with the mutant applied has not
+closed the hole.
 
 ### 2. Code the mutant shows is unreachable or redundant — Low
 
@@ -75,7 +77,9 @@ Such as a guard its only caller already enforces — a finding on the code, not 
 
 The mutant cannot change behavior: map keys reordered, `Map.put` → `Map.put_new` where a guard
 already excludes the key, a type guard whose removal only changes which exception a programmer
-error raises. Named with the reason, so the call can be checked; a survivor is never dismissed
+error raises, a range of one row or column with its ends swapped (`3..3`), dropping a stage that
+runs an identity (the identity stat or position). muex never mutates documentation or typespec
+attributes, so a survivor that seems to delete a `@moduledoc` is a neighbouring statement. Named with the reason, so the call can be checked; a survivor is never dismissed
 silently. Diff the `patch`'s `before` and `after` to see what a mutant changed, never a glance at
 the code around it.
 

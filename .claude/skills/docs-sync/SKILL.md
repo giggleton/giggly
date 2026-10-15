@@ -60,9 +60,9 @@ wearing a pass.
 
 | The change | Update |
 |---|---|
-| An area's invariant or mechanism (a rule the code must keep, or how a feature works) | The area's **`.claude/rules/<area>.md`** — `## Rules` for must/never sentences, `## How it works` for the narrative. It is path-scoped, so it loads only when that area's code is read; that is where the write-up belongs, never CLAUDE.md. An area without a rules file yet gets one, plus a status-map line in CLAUDE.md. |
-| Milestone-worthy feature or refactor | Full entry in **notes/design-log.md §6** (what + why + decisions). The area's rules file gets the invariant. CLAUDE.md changes **only** for a cross-cutting rule or a status-map line — the one-home rule; never write the full story twice. |
-| A decision with a rejected alternative | **design-log.md §4** (the "why, so we don't relitigate" log). |
+| An area's invariant (a rule the code must keep) | The area's **`.claude/rules/<area>.md`**, under `## Rules`, one or two sentences each. It is path-scoped, so it loads only when that area's code is read; that is where the invariant belongs, never CLAUDE.md. An area without a rules file yet gets one, plus a status-map line in CLAUDE.md. How the area works is not restated there: it is the module's documentation (the row below). |
+| Milestone-worthy feature or refactor | **One line** in **notes/design-log.md §6**: the date, the commit's subject as its title (so `git log --grep` finds it), and the §4 entries it settled. The story goes in the commit message, the decisions in §4, the invariants in the rules files. CLAUDE.md changes **only** for a cross-cutting rule or a status-map line. |
+| A decision with a rejected alternative | **design-log.md §4** (the "why, so we don't relitigate" log), about 150 words: the decision, a sentence or two of why, one line per rejected alternative. |
 | New/changed module or public function | Whether it is API (CLAUDE.md, Conventions), then its documentation accurate to the *final* behavior (not the first draft's): an API module's `@moduledoc` and an API function's `@doc` and doctests; an internal module's opening comment under `@moduledoc false` and a non-API function's comment under `@doc false`; a `@spec` on every public function. |
 | Schema, migration, lifecycle/status change | The persistence guide under `guides/`, if the project has one; otherwise the area's rules file. |
 | Supervision tree / process shape | The processes guide under `guides/`, if the project has one; otherwise the area's rules file. |
@@ -70,12 +70,8 @@ wearing a pass.
 | A new `mix quality` step | `quality_steps` in `mix.exs` **is** the list; CLAUDE.md gets a sentence only if the step needs explaining. |
 | A new guide or doc file | README's Documentation section + `mix.exs` `extras:`. |
 
-**§6 retention (rolling):** while updating design-log.md, check its Full-entries region for
-entries dated more than ~2 weeks back. Compact each into the §6 Compacted index: first
-verify its decisions/rejected alternatives live in §4 and its behavior claims in the
-evergreen surfaces (harvest anything missing), then replace it with a one-line index
-entry. Git history keeps the full text. Never compact an entry whose durable content has
-no evergreen home yet.
+**§6 is an index, not a record:** one line per milestone, never a paragraph. A session
+orients from its plan's "Where we are" and reads §4 entries by name, never the whole log.
 
 ## Step 3 — skills are docs too
 

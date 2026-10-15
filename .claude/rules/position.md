@@ -26,11 +26,3 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A position's arguments arrive with their first reader.** The identity is handed the table
   alone; its own parameters (a dodge's width, a jitter's seed), the panel's scales and the split by
   panel arrive with the first position that moves a mark.
-
-## How it works
-
-`Giggly.Position` is a protocol: `compute_layer(position, frame)` dispatches on the position's
-struct. `Position.Identity`, which has no parameters, returns the table as given, as ggplot2's
-`PositionIdentity` overrides `compute_layer` to return its data. The boundary lists nothing, since
-nothing here calls the data frame yet, and exports `Identity`; the specs name the frame's type,
-which boundary does not check.

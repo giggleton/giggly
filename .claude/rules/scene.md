@@ -44,17 +44,3 @@ entry beginning "Three top-level values".
 - **A rectangle fills its cell**, as grid's `rectGrob()` does at its default place and size, which
   is how ggplot2 draws a background; a rectangle placed and sized within its cell arrives with the
   first geom that draws one (bars).
-
-## How it works
-
-`%Giggly.Scene{}` holds the column widths (left to right), the row heights (top to bottom), each
-`{:points, size}` or `:rest`, and the cells. `Scene.Cell` holds the ranges of rows and columns it
-spans, whether it is clipped, whether it hangs (`:none`, `{:top, height}` or `{:right, width}`),
-and its primitives in drawing order. The primitives are named after
-grid's: `Scene.Circles` (`circleGrob()`: positions, one radius, one outline width, one colour; what
-R's graphics engine draws for shape 19, ggplot2's default point), `Scene.Polylines`
-(`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour, square-cut ends),
-`Scene.Rect` (`rectGrob()` filling its cell: a fill, a border colour or `:none`, and the border's
-width) and `Scene.Text` (`textGrob()`: positions, labels and their measured widths, one size and
-colour, an angle of 0 or 90 degrees, an anchor of `:middle` or `:end`, and the baseline offset,
-measured toward the text's top, which is to the left for text turned 90 degrees).

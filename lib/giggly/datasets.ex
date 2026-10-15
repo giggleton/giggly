@@ -62,8 +62,8 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @mpg_text File.read!(@mpg_path)
 
-  # Each dataset's columns, its file's comment lines skipped: each named by its header and read by
-  # its type.
+  # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
+  # its table of types already holds, and read by its type.
   @datasets Map.new(
               [mtcars: {@mtcars_text, @mtcars_types}, mpg: {@mpg_text, @mpg_types}],
               fn {dataset, {text, types}} ->

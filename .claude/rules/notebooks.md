@@ -20,7 +20,8 @@ design-log §4, the entry beginning "The notebooks follow ggplot2's reference pa
 - **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses. Where an example
   draws random numbers in R, the notebook takes the rows R actually produced and says so.
 - **A notebook installs Giggly by path** (`Path.join(__DIR__, "..")`) and Kino, and shows a plot
-  with `Kino.Image.new(svg, :svg)` until a plot can show itself.
+  with `Kino.Image.new(svg, :svg)` until a plot can show itself. A `livebook` escript built with an
+  older Elixir than `mix.exs` requires cannot run them; reinstall it under `.tool-versions`.
 - **The setup cell aliases `Giggly.Datasets` and `Giggly.Plot`**, so the cells read
   `Plot.facet_wrap(plot, :class)`, as a user's code would; the prose keeps full module names.
 - **Reviewing a notebook is the user's job, not a gate.** Nothing runs the notebooks: not the

@@ -40,7 +40,10 @@ The question for every assertion: *would this still pass after a harmless refact
 - **Goldens are allowed, with a license plate.** A hardcoded value (`result.total == 6152.0`)
   must be labeled `Golden:` and carry a comment naming what legitimately moves it (a ruleset
   change, a fixture refresh) and, ideally, the mutant it kills. An unlabeled magic number in an
-  assertion is a finding.
+  assertion is a finding. A value ggplot2 or R computes (a layout, a break set, a size in a
+  drawing) is R's own output, never worked out by hand from R's source: run R in Docker (the
+  `docker run` line in `test/golden/point.R`'s header), choose inputs so each clause under test
+  decides one example, and name R's and the package's versions in the label.
 - **Match on text only where the text is the contract.** An error a caller pattern-matches on is
   contract: assert the error struct or the reason atom, not the sentence. A log line, a `Mix.shell`
   message or a help text is prose: assert that the datum appears (`=~ "261"`), not the wording

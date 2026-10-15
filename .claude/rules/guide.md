@@ -51,22 +51,3 @@ placed by the coordinate system".
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
   labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, and a
   guide behaviour (the first legend).
-
-## How it works
-
-`axes(coord, panel_params, theme)` asks `Coord.axes/2` for each side's placed breaks and returns
-for each side the axis `Guide.Axis.draw/3` draws, `{size, primitives}`; `titles(coord,
-panel_params, guide_titles, theme)` asks it for each side's aesthetic and returns that
-aesthetic's title from `Guide.Axis.title/3`; `strips(labels, theme)` returns a `{height,
-primitives}` per label from `Guide.Strip.draw/2`, a `Scene.Rect` in the theme's
-`strip_background` under a `Scene.Text` in its `strip_text`. Below the
-panel: a `Scene.Polylines` of one two-point line per tick, from the tick's end up to the panel's
-edge, then a `Scene.Text` of the labels centred on their ticks with their tops at the gap and
-their baselines an ascent below. To its left: the labels ending at the gap, centred on their ticks
-with baselines half an ascent below them, then the ticks. Below the panel the axis is as tall as
-tick, gap, ascent and descent; to its left as wide as tick, gap and the widest label. A title's
-cell is as deep as its margin and a line of its text; its text is anchored at its middle, at the
-cell's far edge, with its baseline an ascent toward the axis. `grid(coord, panel_params, theme)`
-asks `Coord.grid/2` for the placed lines and returns, for the panel's cell, a `Scene.Rect` in the
-theme's `panel_background` and four `Scene.Polylines` in `panel_grid_minor` and `panel_grid_major`
-(`Guide.Grid.draw/2`).

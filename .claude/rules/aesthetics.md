@@ -26,10 +26,3 @@ atoms with ggplot2's names".
 - **Anything that treats x and y differently asks `family/1`**, never `name == :x`. That is the
   difference between `:xmin` and `:xend` training the x scale and silently not, which is how ggity
   annotations failed to widen the axis.
-
-## How it works
-
-The families are derived at compile time from one list of x/y pairs; `family/1` matches them in
-guards, and `counterpart/1` reads a map built from the pairs in both directions. `canonicalize/1` folds over
-the pairs once, recording which name first claimed each canonical aesthetic so a collision can name
-both spellings.

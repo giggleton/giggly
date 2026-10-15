@@ -1,9 +1,11 @@
 # giggly — Design Notes
 
-The canonical design overview, decision log and milestone log. CLAUDE.md says what applies to
-every session; the area files under `.claude/rules/` say how each area works; this file says
-**why** — what was decided, what was rejected, and what shipped when. The `docs-sync` skill routes
-changes here; `.claude/rules/docs.md` is the shape.
+The design overview, the decision log and an index of milestones. CLAUDE.md says what applies to
+every session; the area files under `.claude/rules/` give each area's invariants and the modules'
+documentation how it works; this file says **why** — what was decided and what was rejected — and
+indexes what shipped when, each commit's message telling its story. It is reference: read an
+entry by name, never the whole file. The `docs-sync` skill routes changes here;
+`.claude/rules/docs.md` is the shape.
 
 ## 1. What we're building
 
@@ -20,6 +22,14 @@ together; why ggity could not grow facets or coordinate systems; and what the El
 offers — is working material outside the repo, in `~/.claude/plans/giggly-research/` (its
 `00-synthesis.md` is the proposed build order), as CLAUDE.md asks of plans. What is drawn from it
 moves into §4, with its rejected alternatives, as each decision is ratified.
+
+**Roadmap** (Phase 0's, as amended in §4): **1** — a scatter plot that is architecturally
+complete, every seam in its null form (done); **2** — prove the seams before widening: `facet_wrap`
+with free scales (done), then `coord_radial()` as a full circle with no inner radius (the §4 entry
+beginning "Giggly follows ggplot2's current coordinate functions"); **3** — breadth: stats, stack
+and dodge, bar, line and boxplot geoms, non-position scales and guides, the theme tree; **4** — the
+LiveView layer: HEEx output, per-mark attributes applied once at the scene, stable ids, optional
+PNG.
 
 ## 2. Architecture & principles
 
@@ -64,7 +74,20 @@ module's moduledoc, an internal module's opening comment.
 
 Each entry: **the decision (date, whose call)**, then *Rejected: the alternative* — and why. Newest
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
-stops the question being reopened from scratch.
+stops the question being reopened from scratch. A new entry is about 150 words: the decision, a
+sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
+written, and git history keeps every version.
+
+- **The design log is reference, not reading, and each fact has one home (2026-10-15, Steve).**
+  Sessions filled their context before touching code: orientation read a 24,000-word design log
+  and a 5,900-word plan, and one change was written into four or five surfaces. Now a session
+  orients from its plan's "Where we are", a few hundred words; a §4 entry is about 150 words, read
+  by name; §6 is one line per milestone, the commit message carrying the story; a rules file holds
+  invariants, and the mechanism lives in the module's documentation. *Rejected: an in-repo status
+  file* — a commit every session. *Rejected: dropping §6 for `git log`* — the index ties each
+  milestone to its §4 entries. *Rejected: compressing the existing §4 entries* — nuance lost from
+  entries now read only by lookup. *Rejected: keeping a trimmed "How it works" in each rules
+  file* — a second home for the mechanism.
 
 - **Each dataset's file is read behind a waiver of its own, so every new dataset asks (2026-10-15,
   Steve).** `Giggly.Datasets` reads each dataset's file at compile time with `File.read!/1`, which
@@ -319,8 +342,7 @@ stops the question being reopened from scratch.
   follows `coord_radial()`, its arguments and its defaults, and offers no `coord_polar()`. Phase 2
   is now `facet_wrap` with free scales, then `coord_radial()` in its simplest form, a full circle
   with no inner radius, as the test that a coordinate system which places positions differently
-  changes no geom; its other features follow it. This amends Phase 0's list of phases (§6, the
-  entry beginning "Phase 0 ratified"). *Rejected: `coord_flip` as Phase 2's coordinate test*
+  changes no geom; its other features follow it. This amends Phase 0's list of phases (§1, the roadmap). *Rejected: `coord_flip` as Phase 2's coordinate test*
   (Phase 0's plan) — superseded, and the cheaper test it offered (axes and titles keyed by the
   aesthetic each side shows) is exercised by `coord_radial()`'s axes as well; *and
   `coord_polar()`* — superseded, with defaults that differ from its successor's.
@@ -926,6 +948,15 @@ stops the question being reopened from scratch.
   NimbleOptions waits for the first keyword option; what its source showed about duplicates is in
   `.claude/rules/plot.md`.
 
+- **CLAUDE.md holds only what applies to a library, and each area's rules file earns one
+  status-map line (2026-10-11).** Tack's library profile wrote a CLAUDE.md for an application, and
+  its line budget was spent after the first area's line. The rules that did not apply were dropped
+  and the gate's per-step reasoning moved to `dependencies.md`, under the same budget. *Rejected:
+  raising the budget a line per area* — the cap exists to keep CLAUDE.md small. *Rejected: fewer,
+  larger rules files* — each would load whenever any of its areas is read. *Rejected: one
+  status-map line per pipeline tier naming several rules files* — workable, but unnecessary once
+  the inapplicable text was gone.
+
 - **Removing a boundary declaration is a widening, and the waiver gate denies it (2026-10-11,
   Steve).** The hook counts `use Boundary` declarations outside docstrings and denies an edit that
   lowers the count; the commit check does the same, and flags a declaring file deleted while
@@ -1052,7 +1083,8 @@ stops the question being reopened from scratch.
   no list columns (ggity serialized boxplot outliers with `term_to_binary` into a binary column),
   and a single-maintainer upstream. *Rejected: lists with no behaviour behind them* — cheapest
   today, but gives up stats on large inputs permanently. *Rejected: Nx* — vectorized math without
-  a group-by shape, and its fast backend is a larger NIF than Explorer's.
+  a group-by shape, and its fast backend is a larger NIF than Explorer's. *Rejected name:
+  `Giggly.Frame`* (Phase 0's proposal, amended at ratification).
 
 - **Input is anything implementing `Table.Reader`, read once at build start (2026-10-11, Steve;
   since amended — it is read in `Plot.new/2`, see the entry beginning "The table is read when the
@@ -1100,633 +1132,83 @@ _The tiers (exhaustive at the pure core, thin smoke above it), what runs offline
 fixture builders, and the suite's conventions that `elixir-code-review`'s `test-quality.md`
 enforces._
 
-## 6. Milestone log & roadmap
+## 6. Milestone log
 
-Entries older than about two weeks are compacted into the one-line index below; newer ones are kept
-in full and compact on the same schedule as they age. Before an entry is compacted its durable
-content is verified to live in the evergreen surfaces — decisions and rejected alternatives in §4,
-current behaviour in CLAUDE.md / the rules files / the skills / moduledocs — so the index is a
-finding aid, not the record. The full text is one `git log -S "<its title>"` away.
+One line per milestone, newest first: the date, a title (since 2026-10-15, the commit's subject,
+so `git log --grep` finds it), the commit, and the §4 entries it settled. The commit message
+tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a full entry here;
+`git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
+§1's roadmap.
 
-**Compacted index:**
-
-_(none yet)_
-
-**Full entries (newest first):**
-
-- **2026-10-15 — The `facet_wrap` notebook and `Datasets.mpg/0` (Phase 2, `facet_wrap`'s step 4,
-  closing the increment).** `notebooks/facet_wrap.livemd` follows ggplot2's `facet_wrap()`
-  reference page, every example in order: four drawn (by `class`, with `nrow = 4`, by `cyl` and
-  `drv`, and with free scales), six waiting, each named (`labeller`, ordering a column's values,
-  `axes`, a layer's own data with a fixed colour, `strip.position` with lines, dates and themes,
-  `dir`). The data is `Giggly.Datasets.mpg/0`, ggplot2 4.0.3's `mpg` written by R 4.6.1 into
-  `priv/datasets/mpg.csv`, unquoted, with a provenance header, read behind a waiver of its own
-  (§4, the entry beginning "Each dataset's file is read behind a waiver of its own"). Each drawn
-  example was drawn by ggplot2 too (vdiffr in Docker) and matches in every element and clip path,
-  but for R's rounding error on one background edge. With it, Phase 2's first increment,
-  `facet_wrap` with free scales, is complete.
-
-- **2026-10-15 — `facet_wrap`'s free scales (Phase 2, its step 3).** `facet_wrap/3` takes
-  `scales: :fixed | :free_x | :free_y | :free`, `:fixed` recorded by default. On a free axis the
-  layout gives each panel a scale id of its own, the panel's, as ggplot2's `SCALE_X` and `SCALE_Y`
-  are, and every panel draws that axis. The assembly now routes rows: it adds an untrained scale
-  per id, all of the axis's one kind, trains each on the rows of the panels that use it, and
-  transforms and maps each row on its panel's scale, grouping a column's values by scale and
-  putting the results back in row order (ggplot2's `scale_apply()`), so a free discrete axis
-  places each panel's levels from 1. Rendering got back what step 2's review had cut to fixed
-  scales: a bottom axis is measured unless an empty cell is under it, and a left axis hangs from
-  its panel's edge at its own width (`hang: {:right, width}`), so one narrower than its column sits
-  against its panel. The new golden, `test/golden/facet_wrap_free.svg`, five panels on free x and
-  y scales, matches ggplot2's drawing in all 230 elements, in order, and every clip path, but for
-  the background's rounding error; it was right on the first drawing. Review's mutation run
-  (2,657 mutants) found one hole: no test had a discrete y axis, which a crash had pinned until
-  the routes were taken out of `add_scales/3`; a test now does.
-
-- **2026-10-15 — `facet_wrap`'s panels drawn (Phase 2, its step 2).** A faceted plot draws: each
-  layer's rows are split by panel (`DataFrame.split/2`, R's `split()`), each panel is drawn alone
-  with its background, grid and layers, and rendering arranges the panels as the layout table
-  says, which now carries each panel's `axis_bottom`, `axis_left` and `strip` labels, the facet's
-  say: axes at the margins (below the last row and above an empty cell, left of the first
-  column), and a strip per facet column, `to_string/1`, `nil` as `NA`. The theme gained the panel
-  spacing and the strips' background and text, `Giggly.Guide.Strip` draws a strip, and the guide's
-  `axes/3` and `titles/4` split, since a plot draws an axis per panel but its titles once. The
-  scene's `:rest` columns and rows now share equally, and a cell can hang a height of its own from
-  the top of its rows, which is how ggplot2's unmeasured axis over an empty cell hangs into it.
-  Before writing it, ggplot2's own drawings were read element by element (vdiffr in Docker) and
-  every size reproduced from Giggly's font table to the hundredth: a strip 16.65 points tall, its
-  baseline 3.03 below its middle, panels 5.48 apart, titles centred on the panels and not the top
-  strips. That reading found that ggplot2 draws a faceted plot's x axes before its y axes and a
-  plain plot's the other way round; Steve chose facets' order for every plot (§4, the entry
-  beginning "Every plot's cells are drawn in ggplot2's facets' order"), so `test/golden/point.svg`
-  changed only by its x axis's elements moving ahead of its y axis's, every line otherwise the
-  same. The new golden, `test/golden/facet_wrap.svg` (two facet columns, five panels, the last row
-  one short), matches ggplot2's drawing in all 191 elements in order and all 15 clip paths, but
-  for a background edge svglite writes as R's rounding error. Review's mutation run (2,878
-  mutants) found rules in rendering that only free scales could tell apart — measuring an axis
-  over an empty cell, an empty cell to a panel's left, a strip height per row and layer — so they
-  were cut to the shape fixed scales give (bottom axes measured in the last row, left axes always,
-  one strip height, ggplot2's `assemble_strips()`), and step 3 brings back what free scales need.
-
-- **2026-10-14 — `facet_wrap`'s panels, as data (Phase 2, its step 1).** `Plot.facet_wrap/3`
-  takes a column or a list of them, resolved at the call as a mapping's are (none, one named twice
-  or one the data lacks is refused there), and `nrow:` and `ncol:`, validated by NimbleOptions,
-  which `Plot` now lists; it records `%Facet.Wrap{}`, which `Facet` now exports (both widenings
-  raised one at a time and approved). The facet protocol's functions now take the plot's data and
-  the order key the assembly hands over (`Scale.level_key/1`, as grouping gets it), and
-  `assign_panels/3` the layout. `Facet.Wrap` makes a panel for each combination of values that
-  occurs, ordered column by column as a discrete scale orders levels, a missing value last, lays
-  them out row by row by ggplot2's rule, and carries each facet column in the layout, as ggplot2's
-  does, to find each row's panel; too few cells for the panels, or data with no rows, raise when
-  the plot is run. Every expected value was R's: `n2mfrow()` for 1 to 30 panels and ggplot2
-  4.0.3's layouts on mpg (`class`, `nrow = 4` and `5`, `ncol = 2`, `cyl` with `drv`, a missing
-  value, and the too-few error), run in Docker; the one difference, mixed-case strings, is
-  §4's bytes-not-locale decision. A faceted plot is seen through `layer_data/2`'s `:panel` and
-  `panel_scales/2`; drawing it still fails at rendering's one-panel match until step 2. Which
-  axes and strip labels each panel has moved to step 2, where rendering first reads them, rather
-  than arriving here with no reader. Review's mutation run (1,400 mutants) left nothing in
-  `Facet.Wrap`; outside messages, the survivors were type guards, reordered map keys and the
-  assembly's known equivalents, and the repeated-column refusal's call name and columns gained
-  assertions, checked by applying both mutants by hand.
-
-- **2026-10-14 — Facets, coordinate systems, geoms, stats and positions are structs of their kinds
-  (Phase 2, `facet_wrap`'s step 0).** The §4 entry beginning "Each facet, coordinate system, geom,
-  stat and position is a struct" gives the decision and what building it settled; the one beginning
-  "`facet_wrap` is built in steps" gives the steps that follow. The five roots are protocols, each
-  keeping its boundary declaration and comment block; each kind's code moved into a
-  `defimpl … for: __MODULE__` beside its struct, `Geom.Point` gained its two fact functions, and
-  `Plot` records `%Facet.Null{}`, `%Coord.Cartesian{}`, and on each point layer `%Geom.Point{}`,
-  `%Stat.Identity{}` and `%Position.Identity{}`, checking a layer against `Geom.Point`'s facts.
-  The assembly carries the coordinate system and one `clip`; rendering and the guide hand the
-  coordinate system on with each panel's params. Nothing drawn changed: the golden is byte for
-  byte the same. **Found while building:** boundary checks nothing an unclassified `defimpl` calls,
-  shown by compiling a probe in a throwaway worktree before anything was written, so each `defimpl`
-  opens with `use Boundary, classify_to:` its protocol and a new test in
-  `boundary_declarations_test.exs` fails on one that does not (it also fails if it finds no
-  implementations, so it cannot pass by finding nothing). My edit to `waiver-gate.sh` letting
-  such a line through was refused by Claude Code's auto mode, so I reverted my half-made edit and
-  wrote the change as a patch, tested on a copy (its own protocol straight after `defimpl` passes;
-  another target, or a blank line between, is still stopped), which Steve applied; Giggly's hook
-  now differs from Tack's there. The six boundary widenings were raised one at a time and each
-  approved and recorded. **The check:** `GigglyCredo.Check.PlotRunsNothing`, scoped to `Plot`'s
-  files, roots derived in `.credo.exs` from the build (exactly the five protocols). The first gate
-  run caught it reporting `Plot`'s own `use Boundary` declaration, whose `deps:` must name the
-  roots; the declaration is now passed over like an `alias`. **Review:** the mutation run over the
-  changed `lib/` files (1,484 mutants) left no finding: every mutant in the five kinds' modules
-  and implementations died, and the 95 that survived are message wording, map keys reordered,
-  type guards on the public functions, or a layout row's fields read in another order, which
-  changes nothing while there is one panel (rendering's `{panel, row, column}`, the assembly's
-  `{panel, scale_x, scale_y}`) and which steps 2 and 3 must pin. On the check (211 mutants), the
-  survivors showed its handling of names it cannot resolve (`alias __MODULE__.X`, an Erlang
-  module, a `__MODULE__.X` reference), a grouped alias rebinding a name, and an alias of the
-  namespace above a root were unpinned; one test was added and two tightened, and the guards and
-  branches no valid source reaches were removed. A re-run left ten survivors, each message wording
-  or a change nothing can observe (the placeholder an `alias` node is swapped for).
-
-- **2026-10-13 — Zip and map in one pass, held by the first repo-local credo check.** The §4 entry
-  beginning "Zip and map in one pass" gives the decision. `GigglyCredo.Check.ZipMap` matches a
-  zip piped or passed straight into a map; run alone over the tree before the fix, it found the
-  three places and nothing else, two in `Giggly.SVG` and one in `Giggly.Assembly`, now
-  `Enum.zip_with` as plain calls (credo refuses a one-stage pipe). Its tests, in
-  `test/credo_checks_test.exs`, the one file that loads the local checks, cover six shapes it
-  reports and four near misses it leaves alone. Review's mutation step on the check, run with
-  `--mirror .credo` and without coverage selection (`references/mutation-testing.md` says why),
-  found the issue reported with no column: it named `Enum.zip` as its trigger, which in a pipe
-  sits on another line than the map the issue is reported at, and credo finds the column by
-  searching the reported line. The trigger is `Enum.map` now, and a test pins the issue's line,
-  column and message; one survivor is left, a character appended to the message. On the two
-  `lib/` files nothing new survived on the changed lines: the one survivor there drops the
-  identity position stage, the known equivalent.
-
-- **2026-10-13 — Only the API is documented; everything else says it is not API.** Steve's review
-  of Phase 1's code began with why `Plot.computed_mapping/2` was public. The §4 entry beginning
-  "The API is what a user calls" gives the decisions, each Steve's, and what was rejected; the one
-  beginning "Data a plot cannot read is refused by raising" records the review's other question.
-  Every module outside the API became `@moduledoc false` with its moduledoc kept as a comment block
-  (a script did it; the sentences that had introduced a removed example were reworded and lines
-  pushed past the width rewrapped), every public function outside the API gained `@doc false`
-  with its doc as a comment, and ExDoc now publishes six modules with no warnings. Every doctest
-  of a function that is not API became an ordinary test, one for one; `geom_point/2`'s example,
-  which showed the now internal `%Plot.Layer{}`, moved to `plot_test.exs`, where it pins the
-  recorded identity stat and position, and `geom_point/2` and `DataFrame.dtypes/1` gained
-  examples through `layer_data/2`. Two examples that matched a refusal's whole message became
-  assertions on its data, as review's test rules ask. Review's mutation step ran over the
-  nineteen files the moved tests exercise, once on the tree before the change and once after,
-  3,476 mutants each, paired by what each changed: no mutant the doctests caught went uncaught but
-  rewordings of those two messages, and two that swap which value the mixed-type message names as
-  the column, now caught by an assertion on the column's place. Credo asked for pipes in the new
-  tests and underscores in two exponent floats.
-
-- **2026-10-13 — `to_svg/2` draws at a size in pixels, 700 by 433 by default.** In Livebook the
-  first notebook's labels, titles and points looked tiny: every plot was drawn at vdiffr's 10 by 8
-  inches, larger than ggplot2's reference pages draw at, and Livebook shrank it to fit. The §4
-  entry beginning "A plot is drawn at the size it is given" gives the three choices, each Steve's
-  as recommended: pixels, ggplot2's reference size as the default, and NimbleOptions from the root
-  boundary, its first use and a new dependency (`nimble_options` 1.1.1; the lock gained only its
-  line). The golden passes vdiffr's size and is unchanged; the empty-plot test draws at the
-  default and pins it; a new test pins a misspelt option's refusal, which, with the validation
-  replaced by merging defaults in a scratch run, failed.
-
-- **2026-10-13 — The first notebook: `geom_point`.** `notebooks/geom_point.livemd` follows
-  ggplot2's `geom_point()` reference page example by example, and `Giggly.Datasets.mtcars/0`
-  gives its data. The §4 entry beginning "The notebooks follow ggplot2's reference pages" gives
-  the decisions, each Steve's: every example, no ggplot2 drawings, a datasets module, and R's file
-  read at compile time. Two of the page's examples draw today: the scatter plot of `wt` against
-  `mpg`, and the same with four cars' `mpg` blanked, the rows R's `set.seed(1)` blanks, found by
-  running R; both match ggplot2's drawings of the same code in every element (76 and 72). The
-  others wait for mapped and fixed aesthetics, other shapes, legends, scales set by hand, the
-  `diamonds` dataset and `na.rm`. The notebook's cells were run in order, as Livebook runs them.
-  The local `livebook` escript was built with Elixir 1.14 and needs reinstalling to run Giggly,
-  which requires 1.20.
-
-- **2026-10-13 — Phase 1 audited: the scatter plot is architecturally complete.** Phase 0 asked
-  for a scatter plot with every seam in its null form, so that Phase 2 (`facet_wrap` with free
-  scales, `coord_flip`, polar coordinates) lands without touching a geom. Built: the null facet
-  assigning `panel` to the raw data and laying out panels with scale ids; grouping; the identity
-  stat and position; one continuous and one discrete position scale that know no pixel; the
-  cartesian coordinate system as the only route to the unit panel (`transform/2`, `axes/1`,
-  `grid/1`, `clip/1`); points; the scene's table and SVG; text measurement; and, beyond the
-  list, axes, titles, a resolved theme, the panel's background and grid, and clipping. The geom
-  test holds: `Geom.Point` reads only `Coord.transform/2` and the placed `:x` and `:y`, so
-  `coord_flip` (ggplot2 relabels x and y before its transform, and `Coord.axes/1` already names
-  the aesthetic each side shows) and polar coordinates (another transform) change no geom. What
-  Phase 2 changes instead, each already marked where it fails loudly or recorded as deferred: the
-  facet's callbacks take no parameters and the plot records a bare name, while `facet_wrap` needs
-  its variables, free scales and layout; the assembly matches exactly one scale per axis, where
-  free scales route each panel's rows to its scale id; rendering matches exactly one panel and
-  hands each layer's whole frame to its geom, and `Giggly.DataFrame` has no operation yet to split
-  rows by panel; the scene and SVG allow exactly one `:rest` column and row, where panels share
-  the rest, and polar's fixed aspect ratio needs the scene to keep a cell's proportions; the
-  guide draws straight axes only; and the theme grows strip and spacing elements. The first
-  increment of Phase 2 also brings the first public options (`facet_wrap()`'s, `coord_polar()`'s),
-  and with them NimbleOptions' placement, §7's "absent" question and a misspelt name raising at
-  the call. Two items of the synthesis's Phase 1 remain deferred to Phase 3 readers, as recorded
-  in §4: `munch`, which the first path geom calls, and a discrete scale's continuous range, which
-  jitter and bars need; and a stat or position is handed no scales or panel until the first one
-  that computes.
-
-- **2026-10-13 — The panel is clipped to its edges.** What is drawn in the panel is now cut off
-  at its edges, as ggplot2 cuts it, so a point at an infinite position shows only its inner half.
-  The §4 entry beginning "The panel is clipped to its edges" gives the shape and how the decision
-  moved: Steve chose the coordinate system's recording it, then, asked how I felt about rendering
-  listing `Coord` to read it, agreed to the assembly carrying it instead. Flagged as a separate
-  task during increment 9 and done here, after the zero-width fix. The golden gained svglite's
-  clip markup around the panel, byte for byte what svglite writes for ggplot2's drawing of the
-  same plot, and a point at infinity gets ggplot2's clip id with the edge circle inside it.
-  Review's mutation step (1,442 mutants over the six changed files) left no line unexecuted and,
-  on the changed lines, only reordered keys, one-row ranges' ends swapped and the left title's
-  cell widened rightward, which draws the same. No boundary changed.
-
-- **2026-10-13 — An axis of one huge value is drawn at the panel's middle.** A single value from
-  about 1e15 up crashed `to_svg/1`, a division by zero in the coordinate system, and one from about
-  4.5e11 up drew its tick at the panel's left edge, where ggplot2 draws it in the middle. The §4
-  entry beginning "An axis whose extent is zero wide" gives the fix and what was rejected; Steve
-  chose it over ending the crash alone. Flagged as a separate task during increment 8 and done
-  here. Checking the fix against ggplot2's drawings of single values of 1e12 and 1e16 found a bug
-  in the previous commit's grid: each line's ends were rescaled on its own axis's extent, which
-  gives the same 0 and 1 for every extent but one of equal ends. Both drawings now match ggplot2's
-  in every element but the tick's label. Review's mutation step (610 mutants over `Scale`,
-  `Coord` and `Coord.Cartesian`) left no line unexecuted and only equivalent survivors on the
-  changed lines.
-
-- **2026-10-13 — The panel's background and grid lines (Phase 1, ninth increment, second of two
-  steps).** The panel is drawn grey with white grid lines, major ones at each axis's breaks and
-  minor ones between them, under the points. The §4 entry beginning "The panel's grid lines are
-  placed" gives the shape, what was rejected and what waits. A continuous scale now gives minor
-  breaks (`Scale.minor_breaks/3`, the transformation's new `minor_breaks`, and
-  `Scale.MinorBreaks`, a port of R's `regular_minor_breaks()`), the assembly hands them to the
-  coordinate system, `Coord.grid/1` places the lines, and the new `Guide.Grid` draws them with the
-  panel's background, which the theme gained with the grid's two looks; a rectangle's border can
-  now be `:none`. Every expected value in the new examples came from R, run in Docker; one
-  example, breaks 0.1, 0.7 and 1.3, was chosen because only R's way of finding a gap's middle
-  gives 0.4 there, and swapping in the plain mean failed it. The golden now matches ggplot2's own
-  drawing of the same plot in all 49 elements the comparison in `test/golden/point.R` reads. A
-  plot with no layers now draws the panel's background inside the margin, and still no axes.
-  Review's mutation step (2,112 mutants over the fourteen files this step changed) left no line
-  unexecuted, and on this step's lines only equivalent survivors: reordered keys, a one-row
-  range's ends swapped, and arguments swapped in clauses that ignore all of them. Credo asked for
-  two changes on the way, an alias order and a single-item append rewritten as a final chunk. No
-  boundary changed.
-
-- **2026-10-12 — The theme and the plot's background (Phase 1, ninth increment, first of two
-  steps).** A plot records `theme: :gray`, `Giggly.Theme` resolves it into the complete theme,
-  and everything drawn other than the marks takes its look from it: the axes' ticks, labels and
-  titles, the plot margin, and the plot's new white background, drawn first over the whole
-  drawing. The §4 entry beginning "The theme is a resolved value" gives the shape, what was
-  rejected and what waits. The scope was settled one decision at a time before any code: the
-  theme a resolved value nobody can set yet, the point keeping its own look (Steve agreed, over
-  the plan's note that it would move now), `Coord.grid/1` for the second step's grid lines,
-  `:gray`, clipping as a step of its own after this increment (flagged as a separate task: a point
-  at an infinite position is drawn half over the axis today, where ggplot2 clips it), and the R
-  script kept beside the golden. Preparing the proposal found that Docker's `r-base` installs
-  ggplot2 and vdiffr, so ggplot2 can draw the golden's own plot with no title row, and that
-  today's golden already matched ggplot2's `theme_test()` drawing of it in every point, tick and
-  label; increment 8's check had used the nearest snapshot, drawn in another theme with a title,
-  and carried a caveat for it. The panel's background moved from this step into the second, so
-  the grid's drawing module arrives whole. After this step the golden gained one line, the
-  plot's background, identical to ggplot2's; what ggplot2 draws and the golden does not is the
-  panel's background and its twenty grid lines. Review's mutation step (1,897 mutants over the
-  eleven changed files) left no line unexecuted; on this step's lines its survivors were the two
-  new `use Boundary` lines, which the waiver gate stops being deleted, reordered keys, a
-  one-row range's ends swapped, and the left title's cell widened rightward, which draws the same
-  since the turned title hangs from its cell's left edge. The area got `.claude/rules/theme.md`
-  and a status-map line; the boundary changes were shown to Steve and approved before they were
-  written.
-
-- **2026-10-12 — Axis titles (Phase 1, eighth increment, second of two steps).** Each axis is
-  titled by the first layer to map it, and the title is drawn beside its axis: "wt" below the x
-  axis, "mpg" turned beside the y axis. The §4 entry beginning "An axis is titled" gives the rule,
-  what was rejected and what waits. It was built to the design agreed in the first step's
-  discussion, with two choices of mine reported rather than asked: the assembly's field is
-  `titles`, since "labels" now means a break's text, and `Coord.axes/1` says which aesthetic each
-  side shows. The golden gained the titles and now matches ggplot2's snapshot element for
-  element wherever the snapshot's plot title does not move the panel's top. Review's mutation step
-  (1,552 mutants over the eight changed files) left no line unexecuted; on this step's lines its
-  survivors were reordered struct and map keys, and two real ones. The rule's branch for a layer
-  that does not map the aesthetic could not be reached, since every point layer maps both, so the
-  rule now takes the first layer and fails loudly otherwise. And the size of an axis with no
-  breaks and of a title of `:none` were unpinned: `Guide.axes/1`'s doctest had pinned the first,
-  and I deleted it when the function gained the titles, judging a test of a plot with no layers to
-  cover it, but such a plot draws nothing, so no size shows. The doctest came back for
-  `Guide.axes/2` and pins both. A confirming run over `Assembly` and `Guide` (894 mutants)
-  killed both size mutants and left on this step's lines only reordered keys and a `to_string/1`
-  that changed nothing, since the plot already holds each mapping's column by its name; it was
-  removed.
-
-- **2026-10-12 — Axes (Phase 1, eighth increment, first of two steps).** A plot is drawn with
-  its axes: a tick and a label at each break, the x axis below the panel and the y axis to its
-  left, inside ggplot2's plot margin. `Scale.breaks/2` gives each axis's breaks (extended
-  Wilkinson and Elixir-style labels for a continuous axis, levels for a discrete one), the
-  coordinate system places them (`Coord.axes/1`), the new `Giggly.Guide` draws them and the new
-  `Giggly.Font` measures their labels; the scene gained sizes in points, `:rest`, `Text` and
-  `Polylines`, and SVG lays the table out. The §4 entry beginning "Axes are drawn" gives the
-  shape, what was rejected and what waits. The scope was settled one decision at a time, before
-  any code. Steve chose labels written as Elixir writes numbers over R's `format()`, `NA` over
-  `nil` for a missing level, the glyph table as a file over a heredoc, axis titles in this
-  increment rather than after the background, and two steps, axes then titles; he called one
-  proposed decision (how the scene holds measured sizes) no decision at all, since its
-  alternatives were strawmen. Before proposing, ggplot2's, scales', labeling's and vdiffr's
-  sources were read and the snapshot's geometry worked through: the two findings in §4 (vdiffr's
-  glyph table, TeX points) account for every number in `coord-cartesian/expand-range.svg`'s axes
-  to the hundredth. The golden now draws that snapshot's axes, x 0 to 10 and y 0 to 50, and its
-  ticks, labels and label widths match the snapshot measured from the panel's edges. Review's
-  mutation step ran three times. The first (3,102 mutants over the seventeen changed files) left
-  308 alive and 25 on lines no test ran. 168 of the survivors were in `Scale.Breaks`, 37 of them
-  on the one line giving the bonus for a sequence through zero: its examples, the break sets
-  ggplot2's snapshots show, were all correct, but no scoring term decided their winners. R was
-  run in Docker (`r-base`, R 4.6.1, labeling 0.4.3) and matched the port exactly on 813 ranges,
-  random and degenerate, and the port's test became a table of R's output for the shortest range
-  found for each of the 46 winning combinations of nice number, skip, count and zero bonus. The
-  same run found the censoring's inclusive ends and SVG's escaping of `&`, `<` and `>` unpinned
-  (examples and a test added), the reversed-range clause copied from R unreachable (removed),
-  `Labels.numbers/1` with no breaks and `Guide.axes/1` with an axis of none unexecuted (examples
-  added), conversions and an `abs/1` that changed nothing (removed), and SVG sharing the leftover
-  space by weight when every scene has one weighted column and row of weight 1 (the scene's
-  `{:null, weight}` became `:rest`, one of each, and any other shape is refused). The second run
-  (2,087 mutants over the seven files the fixes touched) left nothing unexecuted and 75
-  survivors in `Breaks`; applied one at a time to a scratch copy, 66 matched R on all 813 ranges
-  (pruning that only shortens the search, constants shifting every score alike, swapped
-  arguments to symmetric functions) and 9 did not, so the seven ranges where those first depart
-  joined the table with R's breaks. It also showed that 16 significant digits, not 15, would
-  print rounding noise in 131 of R's 813 break sets (an example now pins it), and that the `nil`
-  level I had taken out of `Scale.breaks/2`'s example as a duplicate of `Labels.levels/1`'s was
-  the only pin on its call to that rule (restored). A third run (1,344 mutants over `Breaks`,
-  `Labels` and `Scale`) showed two of the departing variants still alive, since one line held
-  three candidate literals each departing on a range of its own (both ranges added), and that
-  nothing pinned how many digits a genuine break keeps: Erlang's `float_to_binary/2` reads a
-  negative precision as its default, so `1 - 15` survived as seven digits, and 14 survived for 15
-  (an example with a break needing all fifteen added). After that, every remaining `Breaks`
-  survivor either matches R on all 813 ranges or fails the table, and a last run over `Labels`
-  (126 mutants) left only a fallback's unused value and `max/2`'s arguments swapped. The areas got
-  `.claude/rules/font.md` and `guide.md` with status-map lines, and CLAUDE.md's scene line no
-  longer says "tracks". The boundary changes were shown to Steve and approved before they were
-  written; the `CorePurity` waiver carries the reason Steve agreed in conversation.
-
-- **2026-10-12 — The coordinate system, drawn: `Giggly.to_svg/1` (Phase 1, seventh increment).**
-  A plot is now drawn to SVG: the assembly builds each panel's params from `Scale.dimension/1`,
-  `Giggly.Render` has each layer's geom draw its rows through `Coord.transform/2` into a
-  one-cell scene, and `Giggly.SVG` draws the scene at 720 by 576 points. The plot records
-  `facet: :null` and `coord: :cartesian`, and the layout gained `row` and `column`. The §4 entry
-  beginning "The coordinate system arrives with drawing" gives the shape, what was rejected and
-  what waits. The scope changed in discussion before any code. The plan had the coordinate system
-  alone, with drawing in increments 8 and 9; since nothing but drawing reads it, Steve chose the
-  thinnest slice that draws, folding the scene and SVG in for points only, and recording the
-  facet beside the coordinate system by the rule increment 6 set. Steve asked what the
-  coordinate system needs that the assembly does not already hold (nothing: the trained scales,
-  the layout and the tables carry it all, and what it adds is the expansion and the rescale),
-  and why it should list `Aesthetics` (for `transform/2`'s family lookup alone); it lists it.
-  He preferred ggplot2's "render" to `Display` for the stage, and the SVG function became
-  `draw/3` so one verb does not name two steps. The proposal said a single-valued axis widens by
-  ±0.5; R's `expand_range()` treats it as width 1, so 5% gives ±0.05, which is what was built.
-  ggplot2's own visual-test snapshots settled the point's look (radius 1.95, outline 0.71, both
-  reproduced from its constants) and the canvas (vdiffr's 720 by 576 points). Review's mutation
-  step (coverage-guided, over the fifteen changed files) found no line unexecuted and three
-  holes, each fixed: a single value of 0 (the `zero_range()` clause for equal ends survived
-  deletion, since the example's 2.5 was answered the same by the tolerance clause, and an
-  all-zero axis would have had no width); the tolerance's being relative (the example sat where
-  relative and absolute agree); and `SVG`'s sharing of the drawing among weighted tracks and its
-  cell lookup, which no scene of one cell could exercise and which now accepts the one-cell scene
-  alone, failing loudly otherwise, as rendering does with a second panel. A geom test pins a
-  point dropped for a missing x, the doctest of `Coord.transform/2` gained `:nan`, and the golden
-  carries its label. The areas got `.claude/rules/coord.md`, `geom.md`, `render.md`, `scene.md`
-  and `svg.md`, with status-map lines.
-
-- **2026-10-12 — The stat, position and transform stages (Phase 1, sixth increment).** Each
-  layer now records `stat: :identity` and `position: :identity`, and each continuous scale
-  `transform: :identity`; the assembly adds each axis's scale before putting its columns through
-  the scale's transformation, then trains, maps, and runs each layer's stat (`Giggly.Stat`) and
-  position (`Giggly.Position`). The §4 entry beginning "A layer names its stat and position" gives
-  the shape, what was rejected and what was deferred. The scope changed in discussion before any
-  code. The proposal was to build nothing, treating the identity stat and position as absences;
-  Steve kept them as recorded values, since an absent stat cannot be told from a forgotten one,
-  and extended the rule to transforms, where "identity is their absence" had been an aside in
-  increment 5's deferral list, never discussed. The reset and retrain that the plan put in this
-  increment was deferred with `after_stat` and the geom's setup step: it is not something a plot
-  records, and it gives the same scales for every plot until a stat computes. Checking ggplot2's
-  source for it showed that retraining a discrete scale today would put mapped positions among
-  its levels, and corrected increment 5's reason for deferring a discrete axis's continuous range;
-  both are in §4. §7's module-name question was settled (alias the family, write
-  `Stat.Identity`), and CLAUDE.md's naming rule now says so. `Stat` and `Position` are new
-  boundaries listing nothing, and `Assembly` lists both; the change was shown to Steve in plain
-  language and his approval recorded with `waiver-gate.sh approve-widening`. The areas got
-  `.claude/rules/stat.md` and `position.md`, with status-map lines. Review's mutation step
-  (coverage-guided, over the twelve changed files) found no line unexecuted, and its only
-  survivors in the new code were the expected ones: dropping the stat or the position stage, which
-  an identity makes equivalent by design; reordered struct keys; and `Enum.uniq()` on a layout of
-  one row. Its other survivors are in code from earlier increments.
-
-- **2026-10-12 — Code review's mutation step picks tests by coverage.** `--coverage-guided` and a
-  JSON report were added to the procedure in `elixir-code-review`'s `mutation-testing.md`, which
-  now also treats a line no test executes as a finding (§4, the entry beginning "Mutation testing
-  picks each mutant's tests by coverage"). Found while triaging increment 5: a survivor
-  contradicted a test that existed, and the report's per-survivor "Test files" showed muex had not
-  run it. This copy of the skill now differs further from Tack's.
-
-- **2026-10-12 — Position scales (Phase 1, fifth increment).** `Giggly.Scale` with
-  `Scale.Continuous` and `Scale.Discrete`; `Facet.layout/0`; two new assembly stages, training and
-  mapping; `%Giggly.Assembly{}`; and `Giggly.panel_scales/2`. `layer_data/2` now shows a discrete
-  x at its level positions, as ggplot2's `get_layer_data()` does. The §4 entry beginning "Position
-  scales are chosen by column type" gives the shape and what was deferred. The proposal named
-  `Plot` and `Group` gaining `Scale`; writing it showed the assembly needs `Scale` and
-  `Aesthetics` too (which columns are an axis's is `Aesthetics.family/1`'s answer). Reviewing the
-  four, Steve took `Scale` out of `Plot` and `Group`: the axis checks moved into the assembly, and
-  grouping is handed its order; only the assembly's two widenings remained. The area got `.claude/rules/scale.md` and a
-  status-map line. Increment 6 (the coordinate system) would have no reader until drawing, and
-  Steve moved the stat and position stages ahead of it, so the stages are built in the order the
-  pipeline runs them. (The reason first offered — that they show in `layer_data` — was wrong: the
-  identity stat and position leave the layer tables unchanged, so they have no reader before
-  drawing either.) Review's mutation step found the type-to-kind
-  table pinned only for floats and strings (a mutant dropping `:integer` from it survived), a
-  continuous range whose first value had never been `nil` (dropping `widen`'s number guard would
-  have made the range `{nil, nil}`), the scale check unexercised for a layer remapping an axis and
-  for `group` on a date column, and the fallback for an axis no layer maps unpinned; each got an
-  example or a test. It also showed "a layer's mapping laid over the plot's" written in three
-  places, a mutant surviving in an untested copy; the rule became `Plot.computed_mapping/2`
-  (ggplot2's name), and `Plot` stopped exporting `Layer`, which nothing outside it reads any more.
-  ggplot2 gives a plot with no layers a blank layer that inherits the plot's mapping, so its axes
-  span the mapped columns; here they are untrained until a geom that draws nothing arrives. A
-  later run showed muex choosing each mutant's tests by scanning test files for module names: it
-  misses a grouped `alias Giggly.{DataFrame, Plot}` and a `doctest` line, and a module linked to
-  some test files runs only those, so `Plot`'s mutants never ran against `giggly_test.exs` and a
-  mutant of `computed_mapping/2` "survived" a test that catches it. Run with `--coverage-guided`,
-  which picks each mutant's tests by the lines they execute, that survivor and one other went,
-  and the run reported the one line no test executes: `Plot.new/1`, the plot with no mapping of
-  its own, whose doctest now shows it. Whether the review procedure switches to coverage-guided
-  selection is Steve's call.
-
-- **2026-10-12 — Staging no longer invalidates a recorded boundary approval.** The waiver gate
-  hashed the changed files' declarations in `git status` order, which lists an untracked file
-  after every tracked one and a staged new file in path order; so staging alone reordered the
-  list, and the commit of the restructure above was refused under an approval recorded minutes
-  before, with no declaration changed. `widening_state` now sorts the paths first, as
-  `commit-gate.sh` already sorts its marks'. Proved in a throwaway clone with a new declaring
-  file sorting ahead of an edited one: before the fix, approving and then staging failed the
-  commit check; after it, approving before or after staging passed, and widening a list after
-  approving still failed. Changing the hash meant re-recording the standing approval for this
-  increment, whose declarations had not changed. This copy of the hook now differs from Tack's.
-
-- **2026-10-12 — Panels (Phase 1, fourth increment).** `Giggly.Facet.assign_panels/1` puts a
-  `:panel` column of 1s on the plot's data, first in the assembly, and every layer frame now
-  reads `aesthetics…, :panel, :group`; `layer_data/2`'s doctest shows it. The §4 entry beginning
-  "The facet assigns panels now" gives the scope: the layout table was moved to increment 5,
-  where scale training is its first reader, and there is no facet behaviour until `facet_wrap`.
-  `Facet` lists `DataFrame` and `Assembly` gained `Facet`; both widenings were in the agreed
-  proposal. The area got `.claude/rules/facet.md` and a status-map line.
-
-- **2026-10-12 — A plot is run from `Giggly`; the stages run in `Giggly.Assembly`; every boundary
-  is strict.** Settling where the strict boundary went turned into a walk through the whole
-  architecture, prompted by Steve asking why the top-level `Giggly` should list `Table` when
-  nothing in it calls `table`. The two §4 entries dated today beginning "A plot is a value built
-  by" and "Every boundary is strict" give the result. In code: `Giggly.build/1` and
-  `Giggly.Built` gave way to `Giggly.Assembly.run/1` (returning the list of layer frames) and
-  `Giggly.layer_data/2`, whose tests replaced the build's; `Giggly.Layer` became
-  `Giggly.Plot.Layer`; every domain got its declaration; the test helpers moved out of the
-  `Giggly` name. Experiments in a throwaway copy decided the shape: the purity check, pointed at
-  all of `lib/`, passed and flagged a planted clock read; a strict top-level boundary refused
-  `Table` from `Plot` but not from `DataFrame`, which was not strict itself; `Table` listed on
-  `DataFrame` alone was rejected until its parent listed it; and a `Plot.t()` named in a `@spec`
-  crossed a boundary unseen while a `%Plot{}` match did not. In the real tree a planted module
-  inside `Plot` calling `Table` and `Group` was refused on both counts, and each strictness test
-  failed when its default was removed or a declaration relaxed. Each widened declaration was
-  shown to Steve in plain language before it was written, and his approval recorded with
-  `waiver-gate.sh approve-widening`. The build area's rules file became `assembly.md`. Review's
-  mutation step found `layer_data/2`'s `index >= 0` guard unpinned: without it a negative index
-  reached `Enum.at/2`, which counts from the end, so `layer_data(plot, -1)` returned the last
-  layer; a negative index now raises the documented `ArgumentError`, and a test pins it. It also
-  ran over `Giggly.Aesthetics` for the first time, since the declaration brought the file into
-  scope; its survivors are in increment 1's code and are reported, not acted on.
-
-- **2026-10-12 — The plot spec, the first build stages and column types (Phase 1, third
-  increment).** `Giggly.Plot` (`new/2`, `geom_point/2`) builds a `%Plot{}` of a data frame, a
-  mapping and layers (`Giggly.Layer`); `Giggly.build/1` evaluates each layer's mapping and adds the
-  `group` column (`Giggly.Group.add/1`), returning `%Giggly.Built{data: [frame per layer]}`; and
-  `Giggly.DataFrame.dtypes/1` reports each column's type. The §4 entries dated today give the
-  shape. The scope changed in discussion before any code: the plan's draft wired the build at
-  increment 7 and added fixed aesthetics and NimbleOptions now; the build instead starts here, and
-  the other two wait for drawing. Discreteness was first proposed as a rule over values in the
-  grouping code; Steve moved column types into the frame, since what a column holds is the frame's
-  to report. NimbleOptions 1.1.1's source was read ahead of the increment that will add it: it
-  keeps the first of a repeated key and type-checks only that one, and it has no number type —
-  recorded in `.claude/rules/plot.md`. ggplot2's grouping was checked against `R/grouping.R` and
-  `R/compat-plyr.R`, and Explorer's inference against its 0.13.0 `Series.from_list/2`. Review's
-  mutation step (all seven changed files) found two doc promises no example kept — the two
-  infinities, and a float before an integer — and `:group` unpinned among the aesthetics points
-  accept; refusal tests that asserted no datum of their message; and two branches that only
-  chose between wordings (a separate message for an inherited aesthetic, and refusing `nil`,
-  `true` and `false` as column references), which were removed rather than tested. The areas got
-  `.claude/rules/plot.md` and `build.md`, and `data_frame.md` gained the type rules; covering the
-  root module left no `lib/` file outside a rules glob.
-
-- **2026-10-11 — The waiver gate treats a removed boundary declaration as a widening.** The
-  corrected mutation run left a survivor deleting `use Boundary, exports: []` from
-  `Giggly.DataFrame`: no test failed, the build stayed clean, and `.claude/hooks/waiver-gate.sh`
-  allowed the edit, since its permission score reads that declaration and no declaration alike as
-  0. Simulated edits confirmed it: exporting `Lists` was denied, deleting the declaration was not.
-  The hook now counts declarations (`boundary_count`, docstrings excluded) at edit time and at
-  commit time, flags a declaring file deleted while modules remain under its namespace, and hashes
-  the count into a recorded approval so an earlier approval cannot cover a later removal. Proved
-  against the real tree for edits (removal and widening denied; a doc edit, an identical rewrite
-  and a docstring example's removal allowed) and in a throwaway clone for the commit check
-  (removal flagged, then passed once approved and flagged again after a further change; a lone
-  deleted root flagged; a whole deleted namespace and a `git mv` passed; a plain `mv` flagged). The
-  hook came from the Tack harness, so this copy now differs from Tack's.
-
-- **2026-10-11 — The mutation step mutated only the last file named.** The procedure said to pass
-  each changed file in a `--files` of its own; muex declares `--files` as a single string, so a
-  repeated flag keeps only the last value, and it splits that value on commas. Every run before
-  this one mutated `Lists` alone — the trial's finding stands, since `pull/2`'s guard is in
-  `Lists` — and `Giggly.DataFrame` had never been mutated; the summary line gives no per-file
-  count, so nothing showed it. Found during the first review to use the step, by looking for a
-  mutant of `DataFrame.select/2`'s guard and finding none. The procedure now passes one
-  comma-separated `--files` and `--verbose`, whose `Found <n> file(s)` line counts what loaded; a
-  capped run showed the comma form loading both files and the repeated form loading one.
-  The corrected run's survivors were mostly the wording of error messages, whose datum the tests
-  assert and whose sentence they deliberately do not — a kind the reference had no name for, and
-  now names as not a finding — plus equivalent mutants and two deletions muex's sandbox lets
-  compile: an `alias`, whose warnings the gate's `--warnings-as-errors` fails, and
-  `Giggly.DataFrame`'s `use Boundary` declaration, which nothing caught (the entry above). The
-  entry below reported the `alias` deletion as a deleted `@moduledoc`; muex never mutates docs,
-  and the report's module listing had been misread. The review's own change removed `Lists.select/2`'s
-  `is_list(renames)` guard, which repeated `DataFrame.select/2`'s, its only caller, so the facade's
-  guard is the one check.
-
-- **2026-10-11 — The review's scope command works without a remote.** `elixir-code-review` found
-  its files with `git diff --name-only $(git merge-base HEAD origin/main)...HEAD`. With no `origin`
-  the merge base failed inside `$(…)`, the pipeline still exited 0, and the review was scoped to
-  nothing and reported clean; and even with a remote, `...HEAD` sees committed work only, while
-  review here runs before the commit. The command now takes the merge base with the local `main`
-  and lists `git diff --name-only <base>` (the branch's commits and the uncommitted changes)
-  together with the untracked files. It was proved in a throwaway repo: on `main` it lists the
-  working tree, on a branch it adds the branch's commits, and with no `main` it prints git's error
-  and exits non-zero. The mutation step takes its files from the same list instead of keeping a
-  command of its own. Like the mutation step, this makes Giggly's copy of the skill differ from
-  Tack's.
-
-- **2026-10-11 — Mutation testing added to code review.** `muex` 0.11.3 (dev/test only, pinned
-  exactly; its one runtime dependency, `jason`, was already locked through credo) and a new step in
-  `elixir-code-review` that runs it over the changed `lib/` files and triages every survivor (§4),
-  its procedure in the skill's `references/mutation-testing.md` like the other checks' rules.
-  It was tried first on a copy of the tree with `DataFrame.pull/2`'s test removed: the full run
-  found that guard among its survivors, the gap the hand-picked mutants had missed. Its source was
-  read for what it writes: each mutant is built from source in a sandbox under the temp directory
-  that symlinks the project, and runs `mix test` in a fresh VM after the mutated module's `.beam` is
-  deleted, so it cannot reuse a stale build; the in-place mutate-and-restore code still in the
-  package has no callers. (These runs mutated `lists.ex` only, and the "deleted `@moduledoc`" below
-  was a misread `alias` deletion — see "The mutation step mutated only the last file named" above.) On the committed data frame it leaves survivors that are equivalent
-  (a deleted `@moduledoc`, reordered map keys, `Map.put_new` under a guard that excludes the key, a
-  type guard that only changes the exception) and one that is not: `Lists.select/2`'s
-  `is_list(renames)` guard repeats `DataFrame.select/2`'s, its only caller. The skill came from the
-  Tack harness, so this copy of it now differs from Tack's.
-
-- **2026-10-11 — The data frame (Phase 1, second increment).** `Giggly.DataFrame`, the behaviour
-  and the module callers use, with `Giggly.DataFrame.Lists` its one implementation: reading any
-  `Table.Reader` into a frame, building one from columns, column names and row count, choosing and
-  renaming columns, pulling one column and putting one back. The §4 entries beginning "Callers
-  reach a frame" and "User column names become strings" give the shape. `table` 0.1.2 was added after reading its whole source rather than its docs, which
-  turned up what the adapter has to do itself: `Table.to_columns/1` returns a map, so the column
-  order comes from `Table.Reader.init/1`'s metadata; nothing in the package checks that columns
-  have equal lengths, and its row reader zips columns to the shortest, so a short column would
-  silently misalign the rows; and a list of maps yields its columns sorted by key. It has no
-  runtime dependencies, and the lock gained only its own line. The boundary was proved with a
-  throwaway module outside it: a call to `Lists` and a `%Lists{}` each failed the build, and a
-  call through `Giggly.DataFrame` did not. `nil` in a column is a missing value, as every
-  `Table.Reader` source returns a null; the `:none` sentinel is for options, not data. Moved out of
-  this increment to their first callers: split and recombine (scale training by scale id), column
-  types and dense group ids (`add_group`), the `panel` and `group` columns (the facet and
-  `add_group`), and the remaining relational operations (the first stat, `facet_wrap`). The area
-  got `.claude/rules/data_frame.md` and a status-map line.
-
-- **2026-10-11 — CLAUDE.md trimmed to what applies to a library.** Tack's library profile installed
-  a CLAUDE.md written with an application in mind. Dropped: the external-services rule, the
-  `Settings` configuration module, the `Clock` half of the determinism rule (now one line: the
-  pipeline reads no config, clock or unseeded randomness), the deployment section (now one line
-  about publishing keys), and the "follow mix format" bullet the gate already enforces. Moved
-  without rewording: the per-step reasoning of the quality gate, into
-  `.claude/rules/dependencies.md`, which loads with `mix.exs`. Dropped as already housed
-  elsewhere: the credo-allowlist and rules-check paragraphs (`dependencies.md`, `docs.md`), the §6
-  compaction policy (§6's own header, the docs-sync skill) and the type-erasing helper note (the
-  review skill's `test-quality.md`). Rewritten: "pipes in the core, `with`s at the boundary" said
-  the boundary returns `{:ok, t} | {:error, reason}`, which a pipe API cannot do; it now says the
-  public API raises, per §4. Two harness rules that may not fit Giggly are flagged in §7 rather
-  than changed. This was prompted by the line budget: each area's rules file earns a status-map
-  line, and CLAUDE.md was at its budget after the first. The trim leaves room for Phase 1's lines,
-  so the budget is not tightened until they are in. *Rejected: raising the budget a line per area*
-  — the cap exists to keep CLAUDE.md small, and much of what filled it did not apply.
-  *Rejected: fewer, larger rules files* — each would load whenever any of its areas is read.
-  *Rejected: one status-map line per pipeline tier listing several rules files* — workable, but
-  unnecessary once the inapplicable text was gone.
-
-- **2026-10-11 — The aesthetic vocabulary (Phase 1, first increment).** `Giggly.Aesthetics`:
-  canonical spelling with `colour` as the one alias, `canonicalize/1` for mappings and fixed
-  options (raising on a collision), and ggplot2's x/y position families with `family/1` and
-  `counterpart/1`. The families were taken from `ggplot_global$x_aes`/`y_aes` in the ggplot2
-  source, whose own comment says the lists "must match in length and position of symmetrical
-  aesthetics"; here they are held as one list of x/y pairs, so they cannot drift apart. The reserved `panel`/`group` columns are
-  left for the data frame increment, where they are first used. The area got
-  `.claude/rules/aesthetics.md`; its status-map line replaced CLAUDE.md's "Open items" line, which
-  named no rules file and repeated the documentation section's pointer to §7, so the CLAUDE.md
-  budget did not move.
-
-- **2026-10-11 — Phase 0 ratified: the vocabulary and the value types.** The decisions in §4
-  dated today were proposed from the pre-design research (§1) and ratified in conversation, with
-  one amendment (the currency is named `Giggly.DataFrame`, not `Frame`) and one deferral (engine
-  backends, §7). The phases that follow, from the research synthesis: **1** — a scatter plot that
-  is architecturally complete: the null facet, the cartesian coord, `add_group`, identity stat and
-  position, one point geom, one continuous and one discrete position scale with no pixel knowledge,
-  the scene graph with its table layout, an SVG backend, and a text-metrics service behind an
-  interface; **2** — prove the seams before widening: `facet_wrap` with free scales, `coord_flip`,
-  polar; **3** — breadth: stats, stack/dodge, bar/line/boxplot, non-position scales and guides,
-  the theme tree; **4** — the LiveView layer: HEEx output, per-mark attributes applied once at the
-  scene, stable ids, optional PNG.
-
-- **2026-10-11 — The coding harness installed.** `mix tack.install --profile library` wrote
-  CLAUDE.md, the `.claude/` rules, skills and hooks, `.credo.exs` and the `boundary`
-  declarations, the `mix quality` gate and CI. It ran directly rather than through
-  `mix igniter.install tack@git:…` because igniter's `git:` form splits on `@` to read a ref, so
-  an SSH URL (`git@github.com:…`) is unusable there and the HTTPS form has no credentials on this
-  machine; igniter was added to `mix.exs` for the run and removed after. The `mix new` placeholder
-  (`Giggly.hello/0` and its test) was deleted rather than given a `@spec`, which is what brought the
-  first `mix quality` run to green. Nothing about the product has been decided yet; the pre-design
-  research is in `~/.claude/plans/giggly-research/` (§1).
+- 2026-10-15 — Cut the internal documents to one home per fact; §4: "The design log is reference,
+  not reading"
+- 2026-10-15 — The `facet_wrap` notebook and `Datasets.mpg/0` (`09421b0`); §4: "Each dataset's
+  file is read behind a waiver of its own"
+- 2026-10-15 — `facet_wrap`'s free scales (`3276a48`)
+- 2026-10-15 — `facet_wrap`'s panels drawn (`129c30f`); §4: "Every plot's cells are drawn in
+  ggplot2's facets' order"
+- 2026-10-14 — `facet_wrap`'s panels, as data (`21a9507`)
+- 2026-10-14 — Facets, coordinate systems, geoms, stats and positions are structs of their kinds
+  (`64e899b`, `74ce98b`); §4: "Each facet, coordinate system, geom, stat and position is a
+  struct", "`facet_wrap` is built in steps"
+- 2026-10-14 — The assembly's axis titles are `guide_titles` (`b29f225`); §4: "The assembly's
+  titles are"
+- 2026-10-14 — A theme is a function, not a module implementing a behaviour (`6ca507e`); §4: "A
+  theme is a function"
+- 2026-10-14 — The scene's circle primitive is `Circles`, not `Points` (`2cdfefa`); §4: "The
+  scene's circle primitive is"
+- 2026-10-13 — Zip and map in one pass, held by the first repo-local credo check (`ba323d6`); §4:
+  "Zip and map in one pass"
+- 2026-10-13 — Phase 2 planned around `coord_radial()`; no `coord_flip()` or `coord_polar()`
+  (`7703f52`); §4: "Giggly follows ggplot2's current coordinate functions"
+- 2026-10-13 — Only the API is documented; everything else says it is not API (`308ae52`); §4:
+  "The API is what a user calls", "Data a plot cannot read is refused by raising"
+- 2026-10-13 — `to_svg/2` draws at a size in pixels, 700 by 433 by default (`a8b02ce`); §4: "A
+  plot is drawn at the size it is given"
+- 2026-10-13 — The first notebook: `geom_point` (`e05d891`); §4: "The notebooks follow ggplot2's
+  reference pages"
+- 2026-10-13 — Phase 1 audited: the scatter plot is architecturally complete (`22de0a3`)
+- 2026-10-13 — The panel is clipped to its edges (`c32529b`); §4: "The panel is clipped to its
+  edges"
+- 2026-10-13 — An axis of one huge value is drawn at the panel's middle (`b38cf68`); §4: "An axis
+  whose extent is zero wide"
+- 2026-10-13 — The panel's background and grid lines (Phase 1, increment 9, step 2) (`596f08b`);
+  §4: "The panel's grid lines are placed"
+- 2026-10-12 — The theme and the plot's background (Phase 1, increment 9, step 1) (`596f08b`); §4:
+  "The theme is a resolved value"
+- 2026-10-12 — Axis titles (Phase 1, increment 8, step 2) (`721bfc1`); §4: "An axis is titled"
+- 2026-10-12 — Axes (Phase 1, increment 8, step 1) (`714436c`); §4: "Axes are drawn"
+- 2026-10-12 — The coordinate system, drawn: `Giggly.to_svg/1` (`e049a0e`); §4: "The coordinate
+  system arrives with drawing"
+- 2026-10-12 — The stat, position and transform stages (`1d9c2f4`); §4: "A layer names its stat
+  and position"
+- 2026-10-12 — Code review's mutation step picks tests by coverage (`72890c5`); §4: "Mutation
+  testing picks each mutant's tests by coverage"
+- 2026-10-12 — Position scales (Phase 1, increment 5) (`72890c5`); §4: "Position scales are chosen
+  by column type"
+- 2026-10-12 — Staging no longer invalidates a recorded boundary approval (`a2624ca`)
+- 2026-10-12 — Panels (Phase 1, increment 4) (`a2624ca`); §4: "The facet assigns panels now"
+- 2026-10-12 — A plot is run from `Giggly`; the stages run in `Giggly.Assembly`; every boundary is
+  strict (`e01519e`); §4: "A plot is a value built by", "Every boundary is strict"
+- 2026-10-12 — The plot spec, the first build stages and column types (`e01519e`); §4: "Column
+  types belong to the frame", "Group ids follow ggplot2's", "The table is read when the plot is
+  created", "`Giggly.build/1` exists from its first stage", "Points accept only what Phase 1 can
+  draw"
+- 2026-10-11 — The waiver gate treats a removed boundary declaration as a widening (`e4aaade`);
+  §4: "Removing a boundary declaration is a widening"
+- 2026-10-11 — The mutation step mutated only the last file named (`e4aaade`)
+- 2026-10-11 — The review's scope command works without a remote (`8850615`)
+- 2026-10-11 — Mutation testing added to code review (`8850615`); §4: "Mutation testing runs in
+  code review"
+- 2026-10-11 — The data frame (Phase 1, increment 2) (`cdb9ee0`); §4: "Callers reach a frame",
+  "User column names become strings"
+- 2026-10-11 — CLAUDE.md trimmed to what applies to a library (`ca7d7e7`); §4: "CLAUDE.md holds
+  only what applies to a library"
+- 2026-10-11 — The aesthetic vocabulary (Phase 1, increment 1) (`de4e8ec`); §4: "Aesthetics are
+  atoms with ggplot2's names"
+- 2026-10-11 — Phase 0 ratified: the vocabulary and the value types (`de4e8ec`); §4: the entries
+  dated 2026-10-11
+- 2026-10-11 — The coding harness installed (`85b24cd`)
 
 ## 7. Deferred / open questions
 
