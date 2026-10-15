@@ -3,17 +3,25 @@ defmodule Giggly.SVG do
 
   # Writes a `Giggly.Scene` as SVG.
   #
-  # The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
-  # size in points takes it, and the columns that are `:rest` share what is left equally, as do the
-  # rows. Each cell's box runs from the start of its first column and row to the end of its last,
-  # or hangs a height of its own from its rows' top or a width of its own from its columns' right,
-  # and its primitives are placed in that box, cells in the order the scene lists them; a clipped
-  # cell's
-  # are drawn in a group cut off at the box, as svglite writes one. The
-  # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
-  # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
-  # shown. Numbers are written with two decimals, and each primitive as svglite writes it, so
-  # output can be set beside the SVG ggplot2's own tests snapshot.
+  # The table is laid out at the size it is given, in points (1/72 inch), as grid lays out a
+  # layout: each column or row with a size in points takes it, and the columns that are shares
+  # split what is left by their weights, as do the rows. A scene that keeps its proportions gives
+  # every share one scale, the one that fits whichever way runs out first, as grid does a layout
+  # with `respect`, and the table, which then fills the drawing only one way, is centred in it.
+  # Each cell's box runs from the start of its first column and row to the end of its last, or
+  # hangs a height of its own from its rows' top or a width of its own from its columns' right,
+  # and its primitives are placed in that box, and moved by any offset they carry in points,
+  # cells in the order the scene lists them; a clipped cell's are drawn in a group cut off at the
+  # box, as svglite writes one. The document's user unit is the point, as svglite writes it: the
+  # `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
+  # 1.95 points at the size the plot is shown. Numbers are written with two decimals, and each
+  # primitive as svglite writes it, so output can be set beside the SVG ggplot2's own tests
+  # snapshot; a polyline also says it is not filled, which svglite leaves to its stylesheet and
+  # SVG would otherwise fill black.
+  #
+  # svglite anchors text only at its start, middle or end, so R's graphics engine hands it the
+  # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
+  # its width; so does this backend.
   #
   # Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
   # Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
@@ -24,7 +32,7 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Circles, Polylines, Rect, Text}
+  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Text}
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -32,9 +40,9 @@ defmodule Giggly.SVG do
   # a finished table on a device.
   @doc false
   @spec draw(Scene.t(), number(), number()) :: iodata()
-  def draw(%Scene{widths: widths, heights: heights, cells: cells}, width, height) do
-    column_spans = lay_out(widths, width)
-    row_spans = lay_out(heights, height)
+  def draw(%Scene{widths: widths, heights: heights, cells: cells} = scene, width, height) do
+    {column_spans, row_spans} =
+      lay_out({widths, width}, {heights, height}, scene.keep_proportions)
 
     [
       "<svg xmlns='http://www.w3.org/2000/svg' width='",
@@ -51,23 +59,60 @@ defmodule Giggly.SVG do
     ]
   end
 
-  # Each column's or row's start and length along the drawing: sizes in points take their length,
-  # and each `:rest` an equal share of what they leave.
-  defp lay_out(sizes, total) do
-    {fixed_sizes, rests} = Enum.split_with(sizes, fn size -> size != :rest end)
-    rest = (total - Enum.sum(for {:points, length} <- fixed_sizes, do: length)) / length(rests)
+  # Each column's and each row's start and length along the drawing, as grid lays out a layout:
+  # sizes in points take their length, and the shares split what they leave by weight, its weight
+  # times what is left over all the weights. A table keeping its proportions gives each share its
+  # weight over the weights of the way that runs out first, times what that way leaves, as grid
+  # allocates a respected layout's null units, and is centred both ways.
+  defp lay_out({widths, width}, {heights, height}, false) do
+    {spans(widths, split(widths, width), 0), spans(heights, split(heights, height), 0)}
+  end
 
+  defp lay_out({widths, width}, {heights, height}, true) do
+    {width_left, height_left} = {left(widths, width), left(heights, height)}
+    {width_weight, height_weight} = {weight(widths), weight(heights)}
+
+    share =
+      if height_left / width_left > height_weight / width_weight,
+        do: fn weight -> weight / width_weight * width_left end,
+        else: fn weight -> weight / height_weight * height_left end
+
+    {centred(widths, share, width), centred(heights, share, height)}
+  end
+
+  # The shares' split of what the sizes in points leave of `total`.
+  defp split(sizes, total) do
+    left = left(sizes, total)
+    total_weight = weight(sizes)
+    fn weight -> left * weight / total_weight end
+  end
+
+  defp left(sizes, total), do: total - Enum.sum(for {:points, length} <- sizes, do: length)
+  defp weight(sizes), do: Enum.sum(for {:rest, weight} <- sizes, do: weight)
+
+  # The sizes laid end to end, centred in `total`.
+  defp centred(sizes, share, total) do
+    length =
+      sizes
+      |> Enum.map(fn size -> length(size, share) end)
+      |> Enum.sum()
+
+    spans(sizes, share, (total - length) / 2)
+  end
+
+  # Each size's start and length, the first starting at `start`.
+  defp spans(sizes, share, start) do
     {spans, _end} =
-      Enum.map_reduce(sizes, 0, fn size, start ->
-        length = span_length(size, rest)
-        {{start, length}, start + length}
+      Enum.map_reduce(sizes, start, fn size, from ->
+        length = length(size, share)
+        {{from, length}, from + length}
       end)
 
     spans
   end
 
-  defp span_length({:points, length}, _rest), do: length
-  defp span_length(:rest, rest), do: rest
+  defp length({:points, length}, _share), do: length
+  defp length({:rest, weight}, share), do: share.(weight)
 
   defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
     box = hang({span(column_spans, columns), span(row_spans, rows)}, cell.hang)
@@ -125,6 +170,9 @@ defmodule Giggly.SVG do
   defp place({x, y}, {{left, width}, {top, height}}),
     do: {left + x * width, top + (1 - y) * height}
 
+  # A position moved `across` and `up` in points.
+  defp moved({x_position, y_position}, {across, up}), do: {x_position + across, y_position - up}
+
   defp primitive(%Circles{} = circles, box) do
     style = [
       "style='stroke-width: ",
@@ -180,22 +228,33 @@ defmodule Giggly.SVG do
       number(polylines.stroke_width),
       "; stroke: ",
       polylines.color,
-      "; stroke-linecap: butt;'"
+      "; stroke-linecap: butt; fill: none;'"
     ]
 
-    Enum.map(polylines.lines, fn line ->
-      points =
-        Enum.map(line, fn position ->
-          {x_position, y_position} = place(position, box)
-          [number(x_position), ",", number(y_position), " "]
-        end)
+    polylines
+    |> placed_lines(box)
+    |> Enum.map(fn line -> ["<polyline points='", points(line), "' ", style, " />\n"] end)
+  end
 
-      ["<polyline points='", points, "' ", style, " />\n"]
+  defp primitive(%Polygons{} = polygons, box) do
+    style = [
+      "style='stroke-width: ",
+      number(polygons.stroke_width),
+      "; stroke: ",
+      stroke(polygons.color),
+      "; fill: ",
+      polygons.fill,
+      ";'"
+    ]
+
+    Enum.map(polygons.outlines, fn outline ->
+      placed = Enum.map(outline, fn position -> place(position, box) end)
+      ["<polygon points='", points(placed), "' ", style, " />\n"]
     end)
   end
 
   defp primitive(%Text{} = text, box) do
-    anchor = text_anchor(text.anchor)
+    anchor = 0.5 * Float.floor(2 * text.hjust + 0.5)
 
     style = [
       "style='font-size: ",
@@ -208,17 +267,20 @@ defmodule Giggly.SVG do
     ]
 
     columns = [text.x, text.y, text.labels, text.widths]
+    {along, up} = text.offset
 
     Enum.zip_with(columns, fn [x_place, y_place, label, label_width] ->
+      # The anchor, moved back along the baseline by the part of the label's width between where
+      # svglite anchors it and its `hjust`.
       baseline =
         {x_place, y_place}
         |> place(box)
-        |> baseline(text.baseline_offset, text.angle)
+        |> along_text({along - (text.hjust - anchor) * label_width, up}, text.angle)
 
       [
         "<text",
         text_position(baseline, text.angle),
-        anchor,
+        text_anchor(anchor),
         " ",
         style,
         " textLength='",
@@ -230,10 +292,10 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # The baseline sits `baseline_offset` points toward the text's top: up, which is SVG's lower y,
-  # for level text, and left for text turned 90 degrees.
-  defp baseline({x_position, y_position}, offset, 0), do: {x_position, y_position - offset}
-  defp baseline({x_position, y_position}, offset, 90), do: {x_position - offset, y_position}
+  # A position moved `along` a text's baseline and `up` toward its top, in points: rightward and
+  # up the page for level text, up and leftward for text turned 90 degrees.
+  defp along_text(position, {along, up}, 0), do: moved(position, {along, up})
+  defp along_text(position, {along, up}, 90), do: moved(position, {-up, along})
 
   # svglite places level text by its `x` and `y`, and turned text by a transform, its angle negated
   # since SVG turns clockwise.
@@ -243,8 +305,30 @@ defmodule Giggly.SVG do
   defp text_position({x_position, y_position}, 90),
     do: [" transform='translate(", number(x_position), ",", number(y_position), ") rotate(-90)'"]
 
-  defp text_anchor(:middle), do: " text-anchor='middle'"
-  defp text_anchor(:end), do: " text-anchor='end'"
+  # svglite writes no anchor for text anchored at its start, SVG's default.
+  defp text_anchor(anchor) when anchor == 0.0, do: ""
+  defp text_anchor(anchor) when anchor == 0.5, do: " text-anchor='middle'"
+  defp text_anchor(anchor) when anchor == 1.0, do: " text-anchor='end'"
+
+  # Placed lines, each point moved by its offset, if the lines carry any.
+  defp placed_lines(%Polylines{lines: lines, offsets: :none}, box),
+    do: Enum.map(lines, fn line -> Enum.map(line, fn position -> place(position, box) end) end)
+
+  defp placed_lines(%Polylines{lines: lines, offsets: offsets}, box) do
+    Enum.zip_with(lines, offsets, fn line, line_offsets ->
+      Enum.zip_with(line, line_offsets, fn position, offset ->
+        position
+        |> place(box)
+        |> moved(offset)
+      end)
+    end)
+  end
+
+  defp points(positions) do
+    Enum.map(positions, fn {x_position, y_position} ->
+      [number(x_position), ",", number(y_position), " "]
+    end)
+  end
 
   # A border of `:none` is SVG's `none`, as svglite writes a border whose colour is R's `NA`.
   defp stroke(:none), do: "none"

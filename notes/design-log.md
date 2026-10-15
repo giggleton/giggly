@@ -94,10 +94,13 @@ written, and git history keeps every version.
 - **A primitive's position is a place in its cell plus an offset in points (2026-10-15, Steve).**
   The theta axis's ticks and labels sit 2.75 and 4.95 points out from points on the circle, while
   the panel's size is known only when the backend lays the scene out, so a position is grid's
-  `unit(x, "npc") + unit(d, "pt")`: polylines' points and text labels carry offsets in points, and
-  a text's `baseline_offset` is no longer the one position in points. Text takes any `hjust`,
-  which the SVG backend writes as R's graphics engine writes it for svglite, the nearest of start,
-  middle and end shifted by the rest of the label's width, a device's limit being the backend's.
+  `unit(x, "npc") + unit(d, "pt")`: a polyline's points carry offsets, `{across, up}`, and a
+  text's anchor one, `{along, up}` in its own frame, which replaced its `baseline_offset`. Text
+  takes any `hjust`, which the SVG backend writes as R's graphics engine writes it for svglite,
+  the nearest of start, middle and end shifted by the rest of the label's width, a device's limit
+  being the backend's. A polyline says `fill: none`, as grid's never fills, so a radial grid's
+  circle is not filled black; *rejected: svglite's stylesheet*, which in an inlined SVG styles
+  the whole page.
   *Rejected: rendering laying the scene out at the drawing's size*, everything then in points —
   the scene tied to one size, closing off a backend that lays it out again (a resizing LiveView or
   Kino plot).
@@ -1176,7 +1179,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Place positions in radial coordinates (`coord_radial()`, step 1); §4:
+- 2026-10-15 — Give the scene offsets, polygons and kept proportions (`coord_radial()`, step 2);
+  §4: "A primitive's position is a place in its cell plus an offset in points", "A `:rest` size
+  has a weight"
+- 2026-10-15 — Place positions in radial coordinates (`coord_radial()`, step 1) (`f4440ce`); §4:
   "`coord_radial()` is built in four steps"
 - 2026-10-15 — Cut the internal documents to one home per fact; §4: "The design log is reference,
   not reading"

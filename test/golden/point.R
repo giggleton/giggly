@@ -9,10 +9,11 @@
 #
 # and compare the two drawings element by element, leaving out what svglite writes and Giggly does
 # not (its XML declaration, its stylesheet, its page rectangle and its clip groups), each label's
-# font-family, and a circle's black stroke, which svglite leaves to its stylesheet:
+# font-family, and a circle's black stroke and a polyline's `fill: none`, which svglite leaves to
+# its stylesheet:
 #
-#   elements() { grep -E "^<(rect x|circle|polyline|text)" "$1" |
-#     sed -e 's/font-family: [^;]*;//' -e 's/ stroke: #000000;//'; }
+#   elements() { grep -E "^<(rect x|circle|polygon|polyline|text)" "$1" |
+#     sed -e 's/font-family: [^;]*;//' -e 's/ stroke: #000000;//' -e 's/ fill: none;//'; }
 #   diff <(elements point.ggplot2.svg) <(elements test/golden/point.svg)
 #
 # vdiffr's `write_svg()` draws with its own copy of svglite and the Liberation fonts, at 720 by 576

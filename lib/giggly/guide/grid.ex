@@ -32,5 +32,5 @@ defmodule Giggly.Guide.Grid do
   end
 
   defp lines(lines, look),
-    do: %Polylines{lines: lines, stroke_width: look.line_width, color: look.color}
+    do: %Polylines{lines: lines, offsets: :none, stroke_width: look.line_width, color: look.color}
 end

@@ -30,8 +30,8 @@ defmodule Giggly.Guide.Strip do
       size: size,
       color: text_look.color,
       angle: 0,
-      anchor: :middle,
-      baseline_offset: -Font.ascent(size) / 2
+      hjust: 0.5,
+      offset: {0.0, -Font.ascent(size) / 2}
     }
 
     {height,

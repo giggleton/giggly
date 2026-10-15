@@ -84,6 +84,7 @@ defmodule Giggly.Render do
     %Scene{
       widths: Enum.map(widths, fn {_name, size} -> size end),
       heights: Enum.map(heights, fn {_name, size} -> size end),
+      keep_proportions: false,
       cells:
         cells(panels, grid, indexes(widths), indexes(heights), {bottom_title, left_title}, theme,
           clip: assembly.clip,
@@ -139,7 +140,7 @@ defmodule Giggly.Render do
       Enum.map(1..grid.columns//1, fn column ->
         [
           {{:axis_left, column}, {:points, left_axis_width(panels, column)}},
-          {{:panel_column, column}, :rest}
+          {{:panel_column, column}, {:rest, 1}}
         ]
       end)
 
@@ -175,7 +176,7 @@ defmodule Giggly.Render do
 
         strips ++
           [
-            {{:panel_row, row}, :rest},
+            {{:panel_row, row}, {:rest, 1}},
             {{:axis_bottom, row}, {:points, bottom_axis_height(panels, grid, row)}}
           ]
       end)

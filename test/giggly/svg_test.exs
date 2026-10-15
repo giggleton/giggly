@@ -1,0 +1,195 @@
+defmodule Giggly.SVGTest do
+  use ExUnit.Case, async: true
+
+  alias Giggly.{Scene, SVG}
+  alias Giggly.Scene.{Cell, Polygons, Polylines, Rect, Text}
+
+  # Golden throughout: grid's own drawing of the same layout or marks, written by vdiffr 1.0.9's
+  # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
+  # out a table, anchors text or writes these elements.
+
+  describe "draw/3, laying out the table" do
+    test "shares split what the sizes in points leave by their weights" do
+      drawn = draw(gray_cells([10, {:rest, 1}, {:rest, 3}, 20], [30, {:rest, 2}], false))
+
+      # R writes the top edge as its rounding error, -0.0000000000000071.
+      assert rects(drawn) === [
+               {"0.00", "0.00", "10.00", "30.00"},
+               {"10.00", "0.00", "172.50", "30.00"},
+               {"182.50", "0.00", "517.50", "30.00"},
+               {"700.00", "0.00", "20.00", "30.00"},
+               {"0.00", "30.00", "10.00", "546.00"},
+               {"10.00", "30.00", "172.50", "546.00"},
+               {"182.50", "30.00", "517.50", "546.00"},
+               {"700.00", "30.00", "20.00", "546.00"}
+             ]
+    end
+
+    test "kept proportions give every share the scale of the way that runs out first, centred" do
+      wide = draw(gray_cells([10, {:rest, 1}, {:rest, 3}, 20], [30, {:rest, 2}], true))
+
+      assert rects(wide) === [
+               {"0.00", "100.50", "10.00", "30.00"},
+               {"10.00", "100.50", "172.50", "30.00"},
+               {"182.50", "100.50", "517.50", "30.00"},
+               {"700.00", "100.50", "20.00", "30.00"},
+               {"0.00", "130.50", "10.00", "345.00"},
+               {"10.00", "130.50", "172.50", "345.00"},
+               {"182.50", "130.50", "517.50", "345.00"},
+               {"700.00", "130.50", "20.00", "345.00"}
+             ]
+
+      # R writes the top edge as its rounding error, -0.0000000000000071.
+      tall = draw(gray_cells([10, {:rest, 1}, 20], [30, {:rest, 2}], true))
+
+      assert rects(tall) === [
+               {"208.50", "0.00", "10.00", "30.00"},
+               {"218.50", "0.00", "273.00", "30.00"},
+               {"491.50", "0.00", "20.00", "30.00"},
+               {"208.50", "30.00", "10.00", "546.00"},
+               {"218.50", "30.00", "273.00", "546.00"},
+               {"491.50", "30.00", "20.00", "546.00"}
+             ]
+    end
+  end
+
+  describe "draw/3, writing primitives" do
+    test "text is anchored at the start, middle or end nearest its hjust, and moved the rest of its width" do
+      text = fn x_place, hjust, angle ->
+        %Text{
+          x: [x_place],
+          y: [100 / 576],
+          labels: ["Hello"],
+          widths: [20.05],
+          size: 8.8,
+          color: "#000000",
+          angle: angle,
+          hjust: hjust,
+          offset: {0.0, 0.0}
+        }
+      end
+
+      drawn =
+        draw(
+          whole([
+            text.(100 / 720, 0.3, 0),
+            text.(200 / 720, 0.8, 0),
+            text.(100 / 720, 0.2, 0),
+            text.(300 / 720, 0.3, 90)
+          ])
+        )
+
+      assert texts(drawn) === [
+               "<text x='104.01' y='476.00' text-anchor='middle'",
+               "<text x='204.01' y='476.00' text-anchor='end'",
+               "<text x='95.99' y='476.00'",
+               "<text transform='translate(300.00,471.99) rotate(-90)' text-anchor='middle'"
+             ]
+    end
+
+    # Not R's: the offset is the scene's own, along the text's baseline and toward its top.
+    test "a text's anchor is moved along its baseline and toward its top by its offset" do
+      text = fn angle ->
+        %Text{
+          x: [100 / 720],
+          y: [100 / 576],
+          labels: ["Hello"],
+          widths: [20.05],
+          size: 8.8,
+          color: "#000000",
+          angle: angle,
+          hjust: 0.5,
+          offset: {3.0, -4.0}
+        }
+      end
+
+      assert texts(draw(whole([text.(0), text.(90)]))) === [
+               "<text x='103.00' y='480.00' text-anchor='middle'",
+               "<text transform='translate(104.00,473.00) rotate(-90)' text-anchor='middle'"
+             ]
+    end
+
+    test "a polyline's points are moved by their offsets in points" do
+      line = %Polylines{
+        lines: [[{0.5, 0.25}, {0.5, 0.25}]],
+        offsets: [[{0.0, 0.0}, {3.0, -4.0}]],
+        stroke_width: 0.75,
+        color: "#000000"
+      }
+
+      assert draw(whole([line])) =~ "<polyline points='360.00,432.00 363.00,436.00 '"
+    end
+
+    test "a polygon is filled round its outline, its border as svglite writes it" do
+      polygon = %Polygons{
+        outlines: [[{0.1, 0.1}, {0.2, 0.1}, {0.2, 0.3}]],
+        fill: "#EBEBEB",
+        color: :none,
+        stroke_width: 0.75
+      }
+
+      drawn = draw(whole([polygon]))
+
+      assert String.ends_with?(
+               drawn,
+               "<polygon points='72.00,518.40 144.00,518.40 144.00,403.20 ' " <>
+                 "style='stroke-width: 0.75; stroke: none; fill: #EBEBEB;' />\n</svg>\n"
+             )
+    end
+  end
+
+  # A grey rectangle in every cell of a table with these widths and heights, a bare number a size
+  # in points.
+  defp gray_cells(widths, heights, keep_proportions) do
+    cells =
+      for row <- 1..length(heights), column <- 1..length(widths) do
+        %Cell{
+          rows: row..row,
+          columns: column..column,
+          clip: :off,
+          hang: :none,
+          primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75}]
+        }
+      end
+
+    %Scene{
+      widths: Enum.map(widths, &size/1),
+      heights: Enum.map(heights, &size/1),
+      keep_proportions: keep_proportions,
+      cells: cells
+    }
+  end
+
+  # One cell filling the drawing, holding `primitives`.
+  defp whole(primitives) do
+    %Scene{
+      widths: [{:rest, 1}],
+      heights: [{:rest, 1}],
+      keep_proportions: false,
+      cells: [%Cell{rows: 1..1, columns: 1..1, clip: :off, hang: :none, primitives: primitives}]
+    }
+  end
+
+  defp size({:rest, weight}), do: {:rest, weight}
+  defp size(points), do: {:points, points}
+
+  # Drawn at vdiffr's size, 720 by 576 points.
+  defp draw(scene) do
+    scene
+    |> SVG.draw(720, 576)
+    |> IO.iodata_to_binary()
+  end
+
+  defp rects(svg) do
+    ~r/<rect x='([^']*)' y='([^']*)' width='([^']*)' height='([^']*)'/
+    |> Regex.scan(svg, capture: :all_but_first)
+    |> Enum.map(fn [x, y, width, height] -> {x, y, width, height} end)
+  end
+
+  # Each text element up to its style, which says where it is and how it is anchored.
+  defp texts(svg) do
+    ~r/<text[^>]*?(?= style=)/
+    |> Regex.scan(svg)
+    |> Enum.map(fn [element] -> element end)
+  end
+end

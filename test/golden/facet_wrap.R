@@ -9,8 +9,8 @@
 #
 # and compare the two drawings element by element, as test/golden/point.R describes:
 #
-#   elements() { grep -E "^<(rect x|circle|polyline|text)" "$1" |
-#     sed -e 's/font-family: [^;]*;//' -e 's/ stroke: #000000;//'; }
+#   elements() { grep -E "^<(rect x|circle|polygon|polyline|text)" "$1" |
+#     sed -e 's/font-family: [^;]*;//' -e 's/ stroke: #000000;//' -e 's/ fill: none;//'; }
 #   diff <(elements facet_wrap.ggplot2.svg) <(elements test/golden/facet_wrap.svg)
 #
 # Five combinations of two columns make five panels in two rows of three, the last row one short,

@@ -43,6 +43,7 @@ defmodule Giggly.Guide.Axis do
 
     ticks = %Polylines{
       lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
+      offsets: :none,
       stroke_width: ticks_look.line_width,
       color: ticks_look.color
     }
@@ -55,8 +56,8 @@ defmodule Giggly.Guide.Axis do
       size: text_look.size,
       color: text_look.color,
       angle: 0,
-      anchor: :middle,
-      baseline_offset: -Font.ascent(text_look.size)
+      hjust: 0.5,
+      offset: {0.0, -Font.ascent(text_look.size)}
     }
 
     {height, [ticks, text]}
@@ -83,12 +84,13 @@ defmodule Giggly.Guide.Axis do
       size: text_look.size,
       color: text_look.color,
       angle: 0,
-      anchor: :end,
-      baseline_offset: -Font.ascent(text_look.size) / 2
+      hjust: 1.0,
+      offset: {0.0, -Font.ascent(text_look.size) / 2}
     }
 
     ticks = %Polylines{
       lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
+      offsets: :none,
       stroke_width: ticks_look.line_width,
       color: ticks_look.color
     }
@@ -123,8 +125,8 @@ defmodule Giggly.Guide.Axis do
       size: title_look.size,
       color: title_look.color,
       angle: angle,
-      anchor: :middle,
-      baseline_offset: -Font.ascent(title_look.size)
+      hjust: 0.5,
+      offset: {0.0, -Font.ascent(title_look.size)}
     }
   end
 
