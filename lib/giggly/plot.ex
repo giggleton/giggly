@@ -169,6 +169,43 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of bars counting the rows at each `x`: ggplot2's `geom_bar()`. Each bar runs from 0
+  to the number of rows at its `x`, or, where `:weight` is mapped, to the sum of their weights, and
+  the y axis is titled `count`. A row missing its `x` is not counted.
+
+  Bars are drawn as `geom_col/2` draws them: 0.9 as wide as the closest spacing of the `x`
+  positions, counting from zero, and stacked where groups share an `x`, the highest group at the
+  bottom.
+
+  Counting uses `:x`, `:weight` and `:group`, and needs `:x`; a `:weight` column must hold numbers.
+  The count is the bar's height, so a mapping that gives `:y` is refused.
+
+      iex> plot =
+      ...>   %{"class" => ["suv", "compact", "suv"]}
+      ...>   |> Giggly.Plot.new(%{x: :class})
+      ...>   |> Giggly.Plot.geom_bar()
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :count)
+      [1.0, 2.0]
+  """
+  @spec geom_bar(t(), mapping_argument()) :: t()
+  def geom_bar(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
+    layer = %Layer{
+      geom: %Geom.Bar{},
+      stat: %Stat.Count{},
+      position: %Position.Stack{},
+      mapping: resolve(mapping, plot.data, "Plot.geom_bar/2")
+    }
+
+    plot
+    |> add_layer(layer, "geom_bar",
+      accepted: Stat.Count.accepted_aesthetics(),
+      required: Stat.Count.required_aesthetics()
+    )
+    |> check_weight(layer)
+  end
+
+  @doc """
   Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`: ggplot2's
   `geom_col()`, for bars whose heights are in the data. Bars at the same `x` are stacked, those
   above zero upward and those below it downward, ordered by group so the highest group is at the
@@ -344,6 +381,22 @@ defmodule Giggly.Plot do
     check_required(combined_mapping, required, function)
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
+  end
+
+  # A weight is summed, so the column a layer's weight comes from must hold numbers, missing ones
+  # included.
+  defp check_weight(plot, layer) do
+    mapping = computed_mapping(plot, layer)
+    dtypes = DataFrame.dtypes(plot.data)
+
+    with {:ok, column} <- Map.fetch(mapping, :weight),
+         dtype when dtype not in [:integer, :float, :null] <- Map.fetch!(dtypes, column) do
+      raise ArgumentError,
+            "Plot.geom_bar/2 maps :weight to #{inspect(column)}, a #{inspect(dtype)} column, " <>
+              "but a weight is summed, so it must be a number"
+    end
+
+    plot
   end
 
   # The plot's mapping reaches every layer, so an aesthetic it maps that the geom cannot use is as

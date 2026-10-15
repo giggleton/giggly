@@ -13,16 +13,21 @@ defprotocol Giggly.Stat do
   # this namespace (`Stat.Identity`), never aliased to its last segment, which other namespaces
   # share.
   #
-  # There is one stat so far, the identity (`Giggly.Stat.Identity`), which leaves the table as it
-  # is, as ggplot2's `geom_point()` defaults `stat = "identity"`. A layer records it rather than
-  # leaving the stat out, so a layer that computes nothing says so.
+  # The identity (`Giggly.Stat.Identity`) leaves the table as it is, as ggplot2's `geom_point()`
+  # defaults `stat = "identity"`; a layer records it rather than leaving the stat out, so a layer
+  # that computes nothing says so. Counting (`Giggly.Stat.Count`) counts the rows at each x, as
+  # `geom_bar()` defaults `stat = "count"`.
+  #
+  # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
+  # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
+  # aesthetic the layer maps to nothing, and the aesthetic's guide is titled by it when no layer
+  # maps the aesthetic itself.
 
-  # A stat is handed a layer's table and returns one. It names the data frame's type in its
-  # specs, which boundary does not check, and lists nothing because nothing here calls the data
-  # frame yet.
+  # A stat is handed a layer's table and returns one, reading and building tables through the data
+  # frame, and sizes what it counts at by the spacing of its positions (`Giggly.Resolution`).
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [], exports: [Identity]
+  use Boundary, deps: [Giggly.DataFrame, Giggly.Resolution], exports: [Count, Identity]
 
   alias Giggly.DataFrame
 
@@ -30,4 +35,11 @@ defprotocol Giggly.Stat do
   @doc false
   @spec compute_layer(t(), DataFrame.t()) :: DataFrame.t()
   def compute_layer(stat, frame)
+
+  # The computed column each aesthetic takes by default once `stat` has run, ggplot2's
+  # `after_stat()` defaults: `%{y: :count}` puts the count in y. Empty for a stat that computes
+  # nothing.
+  @doc false
+  @spec default_mapping(t()) :: %{optional(atom()) => atom()}
+  def default_mapping(stat)
 end

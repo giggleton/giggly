@@ -122,6 +122,48 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_bar/2" do
+    test "a bar layer records the bar geom, counting and stacking" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_bar(%{x: :cyl, weight: :wt})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Bar{},
+                 stat: %Stat.Count{},
+                 position: %Position.Stack{},
+                 mapping: %{x: "cyl", weight: "wt"}
+               }
+             ]
+    end
+
+    test "y, which the count gives, is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
+      assert error.message =~ "Plot.geom_bar/2"
+      assert error.message =~ ":y"
+    end
+
+    test "x mapped by neither the layer nor the plot is refused" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
+      assert error.message =~ ":x"
+    end
+
+    test "a weight from a column that is not a number is refused, naming the column and its type" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{weight: :cyl}) end
+      assert error.message =~ "Plot.geom_bar/2"
+      assert error.message =~ ~s("cyl")
+      assert error.message =~ ":string"
+    end
+  end
+
   describe "facet_wrap/3" do
     test "a plot records the wrapped facet with its columns by their names in the data" do
       plot =

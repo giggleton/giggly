@@ -203,6 +203,197 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
+  # `mpg` where it is used, printed to 17 significant digits. It moves with `stat_count()` or the
+  # bar geometry.
+  describe "layer_data/2, for geom_bar" do
+    test "each bar counts its level's rows, its height the count" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      counts = [5.0, 47.0, 41.0, 11.0, 33.0, 35.0, 62.0]
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :y),
+              DataFrame.pull(frame, :prop)} === {counts, counts, List.duplicate(1.0, 7)}
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[
+                  0.55000000000000004,
+                  1.55000000000000004,
+                  2.54999999999999982,
+                  3.54999999999999982,
+                  4.54999999999999982,
+                  5.54999999999999982,
+                  6.54999999999999982
+                ],
+                [
+                  1.45,
+                  2.4500000000000002,
+                  3.4500000000000002,
+                  4.4500000000000002,
+                  5.4500000000000002,
+                  6.4500000000000002,
+                  7.4500000000000002
+                ]}
+    end
+
+    test "groups are counted apart, in group order, each proportion its group's, and stacked" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, group: :drv})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) === [2, 3, 5, 6, 7, 2, 3, 4, 6, 1, 6, 7]
+
+      assert DataFrame.pull(frame, :count) ===
+               [12.0, 3.0, 33.0, 4.0, 51.0, 35.0, 38.0, 11.0, 22.0, 5.0, 9.0, 11.0]
+
+      assert DataFrame.pull(frame, :prop) === [
+               0.116504854368932043,
+               0.029126213592233011,
+               0.320388349514563131,
+               0.038834951456310676,
+               0.495145631067961167,
+               0.330188679245283001,
+               0.358490566037735825,
+               0.103773584905660382,
+               0.207547169811320764,
+               0.200000000000000011,
+               0.359999999999999987,
+               0.440000000000000002
+             ]
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[35.0, 38.0, 0.0, 31.0, 11.0, 0.0, 0.0, 0.0, 9.0, 0.0, 0.0, 0.0],
+                [47.0, 41.0, 33.0, 35.0, 62.0, 35.0, 38.0, 11.0, 31.0, 5.0, 9.0, 11.0]}
+    end
+
+    test "a weight sums its rows' weights instead of counting them" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(%{weight: :displ})
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :y) === [
+               30.800000000000001,
+               109.299999999999983,
+               119.799999999999983,
+               37.300000000000004,
+               145.800000000000040,
+               93.100000000000023,
+               276.299999999999898
+             ]
+    end
+
+    test "on a continuous axis a bar is 0.9 of the closest gap, counting from zero" do
+      x = List.duplicate(2.9, 5) ++ List.duplicate(3.1, 10) ++ List.duplicate(4.5, 4)
+
+      frame =
+        %{"x" => x}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :xmin),
+              DataFrame.pull(frame, :xmax)} ===
+               {[5.0, 10.0, 4.0], [2.8099999999999996, 3.0099999999999998, 4.4100000000000001],
+                [2.9900000000000002, 3.1900000000000004, 4.5899999999999999]}
+    end
+
+    test "an integer column's bars are 0.9 wide, a float column's its closest gap's 0.9" do
+      integers =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cyl})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      floats =
+        %{"x" => [4.0, 6.0, 8.0, 8.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(integers, :xmin), DataFrame.pull(floats, :xmin)} ===
+               {[3.5499999999999998, 4.5499999999999998, 5.5499999999999998, 7.5499999999999998],
+                [3.1000000000000001, 5.0999999999999996, 7.0999999999999996]}
+    end
+
+    test "a row missing its x is not counted, and a missing weight adds nothing" do
+      missing_x =
+        %{"x" => [1.0, nil, 1.0, 2.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      missing_weight =
+        %{"x" => [1.0, 1.0, 2.0], "w" => [1.0, nil, 2.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(missing_x, :count), DataFrame.pull(missing_x, :prop)} ===
+               {[2.0, 1.0], [0.66666666666666663, 0.33333333333333331]}
+
+      assert DataFrame.pull(missing_weight, :count) === [1.0, 2.0]
+    end
+
+    test "a column constant within every group is carried, one that varies is dropped" do
+      constant =
+        %{"x" => ["a", "a", "b"], "w" => [2.0, 2.0, 2.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      varying =
+        %{"x" => [1.0, 1.0, 2.0], "w" => [1.0, 3.0, 2.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(constant, :weight) === [2.0, 2.0]
+      assert :weight not in DataFrame.names(varying)
+    end
+
+    test "a group whose counts are all zero has no proportions" do
+      frame =
+        %{"x" => [1.0, 1.0, 2.0], "w" => [0.0, 0.0, 0.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :prop)} ===
+               {[0.0, 0.0], [:nan, :nan]}
+    end
+  end
+
+  describe "the guides' titles" do
+    test "an axis no layer maps is titled by the column a stat puts into it" do
+      assembly =
+        %{"class" => ["suv", "compact"]}
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles === %{x: "class", y: "count"}
+    end
+
+    test "a later layer's own mapping titles the axis over an earlier stat's column" do
+      assembly =
+        %{"x" => ["a", "b"], "y" => [5.0, 7.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Plot.geom_col(%{y: :y})
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles === %{x: "x", y: "y"}
+    end
+  end
+
   describe "panel_scales/2" do
     test "the scales are trained again on the marks, so a discrete axis holds its bars' edges" do
       scales =
@@ -348,6 +539,25 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/col.svg")
+    end
+
+    # Golden: test/golden/bar.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/bar.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_bar()'s first example from ggplot2's
+    # reference page: the number of cars in each of mpg's classes, the y axis titled by the count
+    # counting puts into it. It moves with what moves test/golden/col.svg, and with counting.
+    test "counted bars rise to the number of rows at each level, the y axis titled count" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/bar.svg")
     end
 
     # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by

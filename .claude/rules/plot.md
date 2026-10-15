@@ -53,6 +53,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the plot is run. A facet's columns are resolved the same way, at the call, and none, or one named
   twice, is refused there; whether `nrow:` and `ncol:` hold the panels is the facet's question,
   since counting the panels is its computation, answered when the plot is run.
+- **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
+  column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
+  (`Stat.Count`: `:x` needed, `:weight` taken, `:y` refused, since the count gives it). A weight's
+  column must hold numbers, refused at the call, where R would fail inside the stat and draw
+  nothing.
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`), so a misspelt option raises naming it. A deliberate default is
   recorded as a value (`scales: :fixed`). An option not given is recorded as

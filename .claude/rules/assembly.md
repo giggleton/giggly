@@ -36,6 +36,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   each geom's `setup_data`; `draw_panel`, `transform`, `axes` and `grid` are rendering's. It lists
   `Coord` and `Geom` for their build functions, so this holds by review: design-log §4, the entry
   beginning "A geom says where its marks sit".
+- **After the stat, each aesthetic the layer leaves unmapped takes the computed column its stat
+  names for it** (`Stat.default_mapping/1`), as ggplot2's `map_statistic()` evaluates a stat's
+  `after_stat()` defaults: counting's count goes into y.
 - **The position scales are reset and trained again after the position**, on every layer's
   x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
   `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels
@@ -57,11 +60,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,
   read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
   `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
-  which reads the scale's first aesthetic, so `:xmin` alone titles nothing. An axis no layer maps
-  has the title `:none`. Every point layer maps x and y, so today the first layer is the one; the
-  search past a layer that does not map the aesthetic arrives with the first geom that can leave
-  an axis unmapped, where `Map.fetch!/2` fails loudly until it does. The titles are the only
-  place the data's own column names survive the assembly.
+  which reads the scale's first aesthetic, so `:xmin` alone titles nothing. **Failing that, it is
+  the computed column a stat puts into the aesthetic, the last layer's to do so** (`count`), which
+  ggplot2 keeps as a fallback any layer's own mapping replaces; else `:none`. The titles are the
+  only place the data's own column names survive the assembly.
 - **A plot with no layers trains no scale, so its axes have no breaks and no titles.** ggplot2
   builds such a plot with a `geom_blank()` layer that inherits the plot's mapping, so its axes
   span the mapped columns and are titled; Giggly follows when a geom that draws nothing arrives.

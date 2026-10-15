@@ -20,12 +20,14 @@ defmodule Giggly.Assembly do
   #   6. trains each scale over those columns, in the rows of the panels that use it;
   #   7. maps them to their positions, each row on its panel's scale;
   #   8. computes each layer's stat (`Giggly.Stat`) on its table;
-  #   9. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
+  #   9. puts into each aesthetic the layer leaves unmapped the computed column its stat names for
+  #      it, as a count into y;
+  #  10. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
   #      bar's edges;
-  #  10. moves each layer's marks by its position (`Giggly.Position`);
-  #  11. resets each scale and trains it again on every layer's columns on its axis, where the
+  #  11. moves each layer's marks by its position (`Giggly.Position`);
+  #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
-  #  12. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #  13. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
   #      panel's params, as ggplot2 asks it.
@@ -165,7 +167,8 @@ defmodule Giggly.Assembly do
       Enum.zip_with(layers, transformed_data, fn layer, frame ->
         mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
-        set_up = Geom.setup_data(Plot.layer_geom(layer), computed)
+        statistic = map_statistic(computed, plot, layer)
+        set_up = Geom.setup_data(Plot.layer_geom(layer), statistic)
         Position.compute_layer(Plot.layer_position(layer), set_up)
       end)
 
@@ -195,19 +198,55 @@ defmodule Giggly.Assembly do
   end
 
   # The title of an aesthetic's guide, an axis's so far: the column the first layer to map the
-  # aesthetic maps it to, through the layer's computed mapping, or `:none` when no layer maps it. It
-  # is ggplot2's `setup_plot_labels()`, where a later layer never replaces an earlier one's label,
-  # read as `resolve_label()` reads it, by the scale's first aesthetic. Every point layer maps x and
-  # y, so today the first layer maps it whenever there is one; the search past a layer that does not
-  # arrives with the first geom that can leave an axis unmapped, and `Map.fetch!/2` fails loudly
-  # until it does.
-  defp guide_title(_plot, [], _aesthetic), do: :none
+  # aesthetic maps it to, through the layer's computed mapping; failing that, the computed column a
+  # stat puts into it by default, the last layer's to do so, as `count`; or `:none`. It is ggplot2's
+  # `setup_plot_labels()`, where a layer's own label is never replaced by a later layer's and
+  # replaces a stat's default, which ggplot2 marks as a fallback, read as `resolve_label()` reads it,
+  # by the scale's first aesthetic. The plot holds each mapping's column by the name the data gives
+  # it, which is the title.
+  defp guide_title(plot, layers, aesthetic) do
+    mapped =
+      Enum.find_value(layers, fn layer ->
+        plot
+        |> Plot.computed_mapping(layer)
+        |> Map.get(aesthetic)
+      end)
 
-  # The plot holds each mapping's column by the name the data gives it, which is the title.
-  defp guide_title(plot, [first_layer | _later_layers], aesthetic) do
-    plot
-    |> Plot.computed_mapping(first_layer)
-    |> Map.fetch!(aesthetic)
+    computed =
+      layers
+      |> Enum.reverse()
+      |> Enum.find_value(fn layer ->
+        layer
+        |> default_mapping()
+        |> Map.get(aesthetic)
+      end)
+
+    title(mapped, computed)
+  end
+
+  defp title(nil, nil), do: :none
+  defp title(nil, computed), do: Atom.to_string(computed)
+  defp title(mapped, _computed), do: mapped
+
+  defp default_mapping(layer) do
+    layer
+    |> Plot.layer_stat()
+    |> Stat.default_mapping()
+  end
+
+  # The layer's table with each aesthetic its own and the plot's mappings leave unmapped given the
+  # computed column its stat puts into it by default, as ggplot2's `map_statistic()` evaluates a
+  # stat's `after_stat()` defaults: counting puts its count into y when no mapping gives y.
+  defp map_statistic(frame, plot, layer) do
+    mapped = Plot.computed_mapping(plot, layer)
+
+    layer
+    |> default_mapping()
+    |> Enum.reject(fn {aesthetic, _column} -> Map.has_key?(mapped, aesthetic) end)
+    |> Enum.sort()
+    |> Enum.reduce(frame, fn {aesthetic, column}, statistic ->
+      DataFrame.put(statistic, aesthetic, DataFrame.pull(statistic, column))
+    end)
   end
 
   # Each panel's params, from the scales its layout row names: ggplot2's `setup_panel_params()`,

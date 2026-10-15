@@ -25,8 +25,9 @@ where its marks sit".
   it. A geom drawn at its x and y alone returns the frame as it is. It is a build function: the
   assembly calls it, and rendering calls `draw_panel/4`.
 - **A mark with a width and none given takes it from the spacing of its positions**
-  (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar is 0.9 of the closest
-  spacing of its x positions, not counting from zero, the smallest found in any panel.
+  (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar takes the `width` its stat
+  gave it, as counting does, or else 0.9 of the closest spacing of its x positions, not counting
+  from zero, the smallest found in any panel; the `width` column is then dropped.
 - **A geom calls the coordinate system itself**, as ggplot2's `draw_panel()` calls
   `coord$transform()`: a path will choose `munch` over `transform`, which only the geom knows to
   do. The params stay opaque to it.

@@ -9,8 +9,9 @@ defmodule Giggly.Geom.Bar do
   #
   # While the plot is assembled, each row becomes a rectangle in data space (`setup_data/2`), as
   # ggplot2's `GeomBar$setup_data()` makes one: from the lower of its y and 0 to the higher, and as
-  # wide as 0.9 of the closest spacing of the x positions (`Giggly.Resolution`, not counting from
-  # zero), the smallest found in any panel, centred on its x. A row missing its x has no width, and
+  # wide as the `width` its stat gave it, as counting does, or else 0.9 of the closest spacing of
+  # the x positions (`Giggly.Resolution`, not counting from zero), the smallest found in any panel,
+  # centred on its x; the `width` column is then dropped. A row missing its x has no width, and
   # one missing its y no height, so neither is drawn; an infinite y is not taken yet. The position
   # then stacks or moves those rectangles, and the scales are trained again to cover them.
   #
@@ -47,14 +48,23 @@ defmodule Giggly.Geom.Bar do
 
     @impl Giggly.Geom
     def setup_data(_geom, frame) do
-      width = width(frame)
-
+      widths = widths(frame)
       x_positions = DataFrame.pull(frame, :x)
       y_positions = DataFrame.pull(frame, :y)
 
+      kept =
+        frame
+        |> DataFrame.names()
+        |> Enum.reject(fn name -> name == :width end)
+        |> Enum.map(fn name -> {name, name} end)
+
+      xmins = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, -width * @just) end)
+      xmaxes = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width * (1 - @just)) end)
+
       frame
-      |> DataFrame.put(:xmin, Enum.map(x_positions, fn x -> edge(x, -width * @just) end))
-      |> DataFrame.put(:xmax, Enum.map(x_positions, fn x -> edge(x, width * (1 - @just)) end))
+      |> DataFrame.select(kept)
+      |> DataFrame.put(:xmin, xmins)
+      |> DataFrame.put(:xmax, xmaxes)
       |> DataFrame.put(:ymin, Enum.map(y_positions, fn y -> toward_zero(y, :lower) end))
       |> DataFrame.put(:ymax, Enum.map(y_positions, fn y -> toward_zero(y, :higher) end))
     end
@@ -82,9 +92,19 @@ defmodule Giggly.Geom.Bar do
       ]
     end
 
-    # ggplot2's `compute_data_size()` across panels: the closest spacing of the x positions in each
-    # panel, the smallest of them, times the bar's share.
-    defp width(frame) do
+    # Each row's width, ggplot2's `compute_data_size()`: the `width` its stat gave it, as counting
+    # does, or else the closest spacing of the x positions in each panel, the smallest of them,
+    # times the bar's share.
+    defp widths(frame) do
+      if :width in DataFrame.names(frame) do
+        DataFrame.pull(frame, :width)
+      else
+        width = own_width(frame)
+        List.duplicate(width, DataFrame.row_count(frame))
+      end
+    end
+
+    defp own_width(frame) do
       panels = DataFrame.pull(frame, :panel)
       x_positions = DataFrame.pull(frame, :x)
 

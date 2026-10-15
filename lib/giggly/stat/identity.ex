@@ -13,5 +13,8 @@ defmodule Giggly.Stat.Identity do
 
     @impl Giggly.Stat
     def compute_layer(_stat, frame), do: frame
+
+    @impl Giggly.Stat
+    def default_mapping(_stat), do: %{}
   end
 end
