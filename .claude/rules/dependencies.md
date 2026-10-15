@@ -118,7 +118,14 @@ semver or the changelog).
   tier, so `classify_to:` assigns it to one by hand — and changing that target changes what the
   module may call. `waiver-gate.sh` denies any change to a `classify_to:` target and the commit
   gate re-checks it, on the same footing as widening `deps:`/`exports:`, because neither direction
-  of a move is obviously "more" and a permission score cannot rank it.
+  of a move is obviously "more" and a permission score cannot rank it. **One `classify_to:` is not
+  a move: a `defimpl` classifying itself into the boundary of the protocol it implements**, on the
+  line straight after the `defimpl` line, naming the protocol as that line writes it. Boundary
+  checks nothing an unclassified protocol implementation calls, so that line only narrows, and the
+  hook passes it (Giggly's copy of the hook; Tack's stops it). Every `defimpl` here opens with it,
+  since each kind of facet, coordinate system, geom, stat and position computes in one. Leaving it
+  out compiles in silence, so `test/giggly/boundary_declarations_test.exs` fails on any protocol
+  implementation in the app not classified into its protocol's boundary.
 - **Disabling a check is pinned by a test, not scored by the hook** (the hook only *lists* one in a
   widening's deny message). `check: [in/out/apps/aliases]`, `dirty_xrefs:` and `top_level?:` are
   the options that make the compiler enforce *less*, and `test/giggly/boundary_declarations_test.exs`
@@ -195,4 +202,7 @@ semver or the changelog).
   listed for one nested domain is open to every module directly in the parent, which is why its
   owner is lifted to the top level instead. The checker ignores plain **alias references** by
   default (`check: [aliases: true]` is off), so passing a module as a value crosses a boundary
-  silently; only calls and struct use are caught.
+  silently; only calls and struct use are caught. And it checks nothing a **protocol
+  implementation** calls until the implementation is classified with `classify_to:`
+  (`unclassified_protocol_impl?` in its checker; found by compiling a `defimpl` that called a
+  module its family does not list), nor any call *to* one.

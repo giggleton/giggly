@@ -3,7 +3,7 @@ defmodule Giggly.Guide.Grid do
 
   # A panel's background and grid, ggplot2's `guide_grid()`: the background filling the panel, and
   # a line across it at each break and minor break, which the coordinate system has already placed
-  # (`Giggly.Coord.grid/1`). Use it through `Giggly.Guide`.
+  # (`Giggly.Coord.grid/2`). Use it through `Giggly.Guide`.
   #
   # It looks as the theme says (`Giggly.Theme`): the panel's background, then its minor grid lines
   # and its major ones over them. They are drawn in ggplot2's order: the background, the minor lines

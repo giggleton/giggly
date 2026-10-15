@@ -6,6 +6,26 @@
 # be *derived* from the code the same way; guard any such call with `Code.ensure_loaded?/1` and
 # raise, because `mix credo` requires only `loadpaths` and a cold `_build` has nothing to call.
 # Inside `mix quality` the question never arises: compile runs before credo.
+
+# The roots `GigglyCredo.Check.PlotRunsNothing` keeps out of `Giggly.Plot`: every protocol Giggly
+# defines, each the root of a family of kinds (facets, coordinate systems, geoms, stats,
+# positions) that computes or draws. Derived rather than listed, so a family added later is covered
+# without a second list to keep in step; it raises on a build with nothing to read, or with no
+# protocol in it, rather than check against nothing.
+giggly_protocols =
+  with load when load in [:ok, {:error, {:already_loaded, :giggly}}] <- Application.load(:giggly),
+       {:ok, modules} <- :application.get_key(:giggly, :modules),
+       [_ | _] = protocols <-
+         Enum.filter(modules, fn module ->
+           Code.ensure_loaded?(module) and function_exported?(module, :__protocol__, 1)
+         end) do
+    protocols
+  else
+    _not_compiled ->
+      raise "the PlotRunsNothing check reads Giggly's protocols from the build, and found none: " <>
+              "run `mix compile` first"
+  end
+
 %{
   #
   # You can have as many configs as you like in the `configs:` field.
@@ -226,6 +246,15 @@
             # Zip and map in one pass (`Enum.zip_with/2,3`), everywhere credo reads, as credo's own
             # `MapJoin` is scoped.
             {GigglyCredo.Check.ZipMap, []},
+            # A plot describes and runs nothing (`.claude/rules/plot.md`): `Giggly.Plot` builds the
+            # kinds' structs and reads their facts, and calls no family's root, which `boundary`
+            # cannot forbid while it lets `Plot` use the kinds. Scoped to `Plot`'s files, the only
+            # ones the rule is about.
+            {GigglyCredo.Check.PlotRunsNothing,
+             [
+               files: %{included: ["lib/giggly/plot.ex", "lib/giggly/plot/"]},
+               roots: giggly_protocols
+             ]},
 
             #
             ## Formerly-disabled "controversial and experimental" checks, each enabled deliberately.

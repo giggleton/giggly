@@ -33,14 +33,16 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   needs; it never reaches back into the assembly or the plot.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
-  scale id, each panel's params and whether it is clipped (`Coord.clip/1`, asked here so rendering
-  never lists `Coord`) keyed by panel id, the title of each aesthetic's guide (`guide_titles`, the x
+  scale id, the plot's coordinate system (carried for rendering to hand each geom and guide), each
+  panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`, asked once here so
+  rendering never lists `Coord`), the title of each aesthetic's guide (`guide_titles`, the x
   and y axes' so far), and the name of the plot's theme, which the assembly passes on unread for
   rendering to resolve, the only stage that reads a theme so far; the first build stage to read one
   (default aesthetics, palettes) brings the resolution here, where ggplot2's build completes the
   theme.
-- **The facet and the coordinate system run by the names the plot records**, `:null` and
-  `:cartesian` included, resolved by `Giggly.Facet` and `Giggly.Coord`.
+- **The facet and the coordinate system run by the structs the plot records**, the null facet and
+  cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
+  assembly names no kind.
 - **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,
   read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
   `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
@@ -57,9 +59,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   columns in the axis's family are then put through the scale's transformation, trained on, and
   mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
   a name compared with `:x`.
-- **A layer's stat and position run by the names the plot records**, read with
-  `Plot.layer_stat/1` and `Plot.layer_position/1` and resolved by `Stat.compute/2` and
-  `Position.compute/2`; the assembly names no stat or position module.
+- **A layer's stat and position run by the structs the layer records**, read with
+  `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/2` and
+  `Position.compute_layer/2`; the assembly names no stat or position kind.
 - **One scale per axis until free scales.** Each axis's scale id is read from the layout, and the
   assembly matches exactly one; routing rows to several arrives with `facet_wrap`'s free scales,
   where that match fails loudly until it does.
@@ -103,7 +105,8 @@ and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/
 such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Each
 frame then goes through its layer's stat and its position. Last, each layout row's scale ids
 pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from each
-one's `Scale.dimension/1` and the `Scale.breaks/2` on it. `to_svg/2` validates its options, hands the result to `Render.scene/1` and the scene to
+one's `Scale.dimension/1` and the `Scale.breaks/2` on it; `Coord.clip/1` says whether panels are
+clipped. `to_svg/2` validates its options, hands the result to `Render.scene/1` and the scene to
 `SVG.draw/3`. `layer_data/2` checks the
 index against the plot's layer count before assembling, so a missing layer raises an
 `ArgumentError` naming it; `panel_scales/2` finds the panel's scale ids in the layout and raises

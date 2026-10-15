@@ -1,4 +1,4 @@
-defmodule Giggly.Facet do
+defprotocol Giggly.Facet do
   @moduledoc false
 
   # Which panel each row of a plot's data is drawn in, and where each panel sits.
@@ -13,37 +13,31 @@ defmodule Giggly.Facet do
   # and `:scale_y` say which x and y scale it uses, so that panels sharing an axis share a scale and
   # free scales are only more of them. The stages read nothing else about panels.
   #
-  # A plot records its facet by name, and the facet is resolved here; each facet is a module
-  # implementing this behaviour. There is one so far, ggplot2's null facet (`Giggly.Facet.Null`):
-  # a single panel, so every row is in panel 1, at row 1 and column 1, on scale 1 of each axis.
-  # Faceting by a variable (`facet_wrap`) arrives as a second.
+  # A plot records its facet as a struct of its kind, and the assembly runs it here. Each facet is
+  # one module holding everything about it: its struct, whose fields are the facet's parameters,
+  # and its computing, in a `defimpl Giggly.Facet` whose first line classifies it into this
+  # boundary, since boundary checks nothing a protocol implementation calls until it is classified.
+  # There is one so far, ggplot2's null facet (`Giggly.Facet.Null`): a single panel, so every row is
+  # in panel 1, at row 1 and column 1, on scale 1 of each axis. Faceting by a variable
+  # (`facet_wrap`) arrives as a second.
 
   # The facet reads and writes the plot's data frame and nothing else.
-  use Boundary, deps: [Giggly.DataFrame], exports: []
+  # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
+  # their protocol implementations, which no boundary exports.
+  use Boundary, deps: [Giggly.DataFrame], exports: [Null]
 
-  alias Giggly.{DataFrame, Facet}
+  alias Giggly.DataFrame
 
-  @typedoc "A facet's name, as a plot records it."
-  @type name :: :null
-
-  # The layout table: one row per panel, as `layout/1` describes.
+  # The layout table of `facet`: one row per panel, with its `:panel` id, the `:row` and `:column`
+  # it is rendered at, and the `:scale_x` and `:scale_y` ids of the scales it uses, as ggplot2's
+  # layout has `PANEL`, `ROW`, `COL`, `SCALE_X` and `SCALE_Y`.
   @doc false
-  @callback layout() :: DataFrame.t()
+  @spec layout(t()) :: DataFrame.t()
+  def layout(facet)
 
-  # The frame with each row's `:panel`, as `assign_panels/2` describes.
+  # The frame with a `:panel` column giving each row's panel under `facet`: ggplot2's
+  # `map_data()`.
   @doc false
-  @callback assign_panels(DataFrame.t()) :: DataFrame.t()
-
-  # The layout table of the facet named `name`: one row per panel, with its `:panel` id, the `:row`
-  # and `:column` it is rendered at, and the `:scale_x` and `:scale_y` ids of the scales it uses,
-  # as ggplot2's layout has `PANEL`, `ROW`, `COL`, `SCALE_X` and `SCALE_Y`.
-  @doc false
-  @spec layout(name()) :: DataFrame.t()
-  def layout(:null), do: Facet.Null.layout()
-
-  # The frame with a `:panel` column giving each row's panel under the facet named `name`:
-  # ggplot2's `map_data()`.
-  @doc false
-  @spec assign_panels(DataFrame.t(), name()) :: DataFrame.t()
-  def assign_panels(frame, :null), do: Facet.Null.assign_panels(frame)
+  @spec assign_panels(t(), DataFrame.t()) :: DataFrame.t()
+  def assign_panels(facet, frame)
 end

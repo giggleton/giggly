@@ -1,13 +1,20 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Plot
+  alias Giggly.{Coord, Facet, Geom, Plot, Position, Stat}
 
   doctest Giggly.Plot
 
   @rows %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
 
   describe "new/2" do
+    test "a plot records the null facet, cartesian coordinates and the gray theme by default" do
+      plot = Plot.new(@rows)
+
+      assert {plot.facet, plot.coord, plot.theme} ==
+               {%Facet.Null{}, %Coord.Cartesian{clip: :on}, :gray}
+    end
+
     test "a missing column's refusal names the call, the aesthetic, the column as written and the columns" do
       error = assert_raise ArgumentError, fn -> Plot.new(@rows, %{x: :wt, y: :mgp}) end
 
@@ -35,9 +42,9 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: :point,
-                 stat: :identity,
-                 position: :identity,
+                 geom: %Geom.Point{},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
                  mapping: %{x: "wt", y: "mpg", group: "cyl"}
                }
              ]

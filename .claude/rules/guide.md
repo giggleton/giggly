@@ -15,14 +15,14 @@ placed by the coordinate system".
 
 ## Rules
 
-- **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/1`), so
+- **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
   ticks and marks are placed by one rule. Which side of the panel an axis is drawn on, and so
   which aesthetic's title goes there, is the coordinate system's call; a guide draws the sides it
   is given, with the titles it is handed by aesthetic.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
   out its axis titles: centred on the panel's side, hanging from the cell's edge away from the
   axis, turned 90 degrees on the left. A title of `:none` draws nothing and takes no room.
-- **The grid's lines come placed from the coordinate system** (`Coord.grid/1`); the guide gives
+- **The grid's lines come placed from the coordinate system** (`Coord.grid/2`); the guide gives
   them the theme's look and ggplot2's order: the panel's background, the minor lines at the y
   axis's minor breaks, then the x axis's, then the major lines at the y axis's breaks, then the
   x axis's. A group with no lines is drawn as an empty primitive, which draws nothing.
@@ -45,15 +45,16 @@ placed by the coordinate system".
 
 ## How it works
 
-`axes(panel_params, guide_titles, theme)` asks `Coord.axes/1` for each side's aesthetic and placed
-breaks, and returns for each side `%{axis: …, title: …}`, each `{size, primitives}`, from
+`axes(coord, panel_params, guide_titles, theme)` asks `Coord.axes/2` for each side's aesthetic and
+placed breaks, and returns for each side `%{axis: …, title: …}`, each `{size, primitives}`, from
 `Guide.Axis.draw/3` and `Guide.Axis.title/3` (the title of that side's aesthetic). Below the
-panel: a `Scene.Polylines` of one two-point line per tick, from the tick's end up to the panel's edge, then a `Scene.Text` of
-the labels centred on their ticks with their tops at the gap and their baselines an ascent below.
-To its left: the labels ending at the gap, centred on their ticks with baselines half an ascent
-below them, then the ticks. Below the panel the axis is as tall as tick, gap, ascent and descent;
-to its left as wide as tick, gap and the widest label. A title's cell is as deep as its margin
-and a line of its text; its text is anchored at its middle, at the cell's far edge, with its
-baseline an ascent toward the axis. `grid(panel_params, theme)` asks `Coord.grid/1` for the
-placed lines and returns, for the panel's cell, a `Scene.Rect` in the theme's `panel_background`
-and four `Scene.Polylines` in `panel_grid_minor` and `panel_grid_major` (`Guide.Grid.draw/2`).
+panel: a `Scene.Polylines` of one two-point line per tick, from the tick's end up to the panel's
+edge, then a `Scene.Text` of the labels centred on their ticks with their tops at the gap and
+their baselines an ascent below. To its left: the labels ending at the gap, centred on their ticks
+with baselines half an ascent below them, then the ticks. Below the panel the axis is as tall as
+tick, gap, ascent and descent; to its left as wide as tick, gap and the widest label. A title's
+cell is as deep as its margin and a line of its text; its text is anchored at its middle, at the
+cell's far edge, with its baseline an ascent toward the axis. `grid(coord, panel_params, theme)`
+asks `Coord.grid/2` for the placed lines and returns, for the panel's cell, a `Scene.Rect` in the
+theme's `panel_background` and four `Scene.Polylines` in `panel_grid_minor` and `panel_grid_major`
+(`Guide.Grid.draw/2`).

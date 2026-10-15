@@ -90,11 +90,55 @@ defmodule Giggly.BoundaryDeclarationsTest do
              "the intent, it is a decision for the user, made in this file."
   end
 
+  test "every protocol implementation is classified into its protocol's boundary" do
+    # Boundary checks nothing a protocol implementation calls until the implementation is
+    # classified, so an unclassified `defimpl`, where each kind of facet, coordinate system, geom,
+    # stat and position does its computing, compiles clean with every call it makes unchecked.
+    {:ok, modules} = :application.get_key(:giggly, :modules)
+
+    implementations =
+      Enum.filter(modules, fn module ->
+        Code.ensure_loaded?(module) and function_exported?(module, :__impl__, 1)
+      end)
+
+    # Every kind is a protocol implementation, so finding none means the search broke, not that
+    # every implementation is classified.
+    assert implementations != []
+
+    unclassified =
+      for module <- implementations,
+          protocol = module.__impl__(:protocol),
+          classified_to(module) != protocol,
+          do:
+            "  #{inspect(module)}: classify it with `use Boundary, classify_to: #{inspect(protocol)}`"
+
+    assert unclassified == [],
+           """
+           A protocol implementation is not classified into its protocol's boundary, so boundary
+           checks none of the calls it makes.
+
+           #{Enum.join(unclassified, "\n")}
+
+           Make that declaration the first line of the `defimpl`.
+           """
+  end
+
   test "the boundary compiler is wired into the project" do
     assert BoundaryDeclarations.compiler_configured_in?("mix.exs"),
            "mix.exs no longer runs the boundary compiler, so every declaration in lib/ is " <>
              "inert and the architecture is unenforced. This is the single largest bypass " <>
              "and the cheapest to make by accident."
+  end
+
+  # The boundary a module's `use Boundary, classify_to: …` puts it in, which boundary keeps in the
+  # module's attributes; `nil` for a module with no such declaration.
+  defp classified_to(module) do
+    attributes = module.__info__(:attributes)
+
+    case Keyword.get(attributes, Boundary) do
+      [%{opts: options}] -> Keyword.get(options, :classify_to)
+      nil -> nil
+    end
   end
 
   defp sanctioned_exemption_present?(path, token) do

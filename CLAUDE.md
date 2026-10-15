@@ -56,8 +56,9 @@ works. Add a line here when an area gets its rules file; nothing else about the 
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.
 - **Position scales** (`Giggly.Scale`, kinds, transformations, training, mapping) —
   `.claude/rules/scale.md`.
-- **Stats** (`Giggly.Stat`, the layer's stat by name) — `.claude/rules/stat.md`.
-- **Positions** (`Giggly.Position`, the layer's position by name) — `.claude/rules/position.md`.
+- **Stats** (`Giggly.Stat`, the protocol a layer's stat runs through) — `.claude/rules/stat.md`.
+- **Positions** (`Giggly.Position`, the protocol a layer's position runs through) —
+  `.claude/rules/position.md`.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
   `.claude/rules/coord.md`.
 - **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.

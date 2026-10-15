@@ -8,9 +8,9 @@ paths:
 
 `Giggly.Facet` decides which panel each row of a plot's data is drawn in, and where each panel
 sits. Why it runs where it does and why `panel` is an integer: design-log §4, the entry beginning
-"Two reserved frame columns"; why the plot records its facet, `:null` included: the entry
+"Two reserved frame columns"; why the plot records its facet, the null facet included: the entry
 beginning "The coordinate system arrives with drawing", which amends the entry beginning "The
-facet assigns panels".
+facet assigns panels"; why a facet is a struct of its kind with a protocol at the root: the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".
 
 ## Rules
 
@@ -25,18 +25,19 @@ facet assigns panels".
   columns join it, as in ggplot2's.
 - **A panel id is an integer.** It is never discrete, so it never enters the group key, and a
   layer with no rows in a panel still lines up with the others through the layout table.
-- **A plot always names its facet, `:null` included**, and this namespace resolves the name; each
-  facet is a module implementing the behaviour. `facet_wrap` arrives as a struct of its kind with
-  the facet protocol (design-log §4, the entry beginning "Each facet, coordinate system, geom, stat
-  and position will be a struct"), touching only `Plot`, `Facet`, the assembly and rendering, never
-  a geom.
+- **A plot always records its facet as a struct of its kind, `%Facet.Null{}` included.**
+  `Giggly.Facet` is a protocol; each facet is one module holding its struct, whose fields are its
+  parameters, and its computing, in a `defimpl` that opens by classifying itself into this
+  boundary. The boundary exports the kinds, whose structs a plot records; what they compute with
+  stays in their implementations. `facet_wrap` arrives as `%Facet.Wrap{}`, touching only `Plot`,
+  `Facet`, the assembly and rendering, never a geom.
 
 ## How it works
 
-`assign_panels(frame, name)` and `layout(name)` resolve the facet's name and call its module.
-`Facet.Null` is ggplot2's null facet: its `assign_panels/1` (`FacetNull$map_data()`) puts a
-`:panel` column of 1s on the frame, and its `layout/0` (`layout_null()`) is a one-row frame of
+`layout(facet)` and `assign_panels(facet, frame)` dispatch on the facet's struct. `Facet.Null` is
+ggplot2's null facet, with no parameters: its `assign_panels/2` (`FacetNull$map_data()`) puts a
+`:panel` column of 1s on the frame, and its `layout/1` (`layout_null()`) is a one-row frame of
 `:panel`, `:row`, `:column`, `:scale_x` and `:scale_y`, all 1. The assembly calls
 `assign_panels/2` once, on the plot's data, and each layer's evaluation carries the column across
 with `DataFrame.put/3` after choosing the layer's aesthetics, so every layer frame ends
-`…, :panel, :group`. The boundary lists `Giggly.DataFrame` and nothing else.
+`…, :panel, :group`. The boundary lists `Giggly.DataFrame` and nothing else, and exports `Null`.

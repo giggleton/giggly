@@ -66,34 +66,97 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
-- **Each facet, coordinate system, geom, stat and position will be a struct of its kind, drawn or
-  computed through a protocol at its family's root, and a repo-local check keeps `Plot` from
-  calling those roots (2026-10-14, Steve; to be built with `facet_wrap`).** A plot records each
-  of these choices by name today (`facet: :null`, `geom: :point`), resolved to a module
-  implementing its family's behaviour. Names have no room for parameters, and `facet_wrap`, Phase
-  2's first increment, brings the first (its variables, `ncol`, free scales), with
+- **`facet_wrap` is built in steps after the conversion to structs, and the facet says where each
+  panel's axes and strips go as data, which rendering arranges and the guide draws (2026-10-14,
+  Steve, agreeing the proposal's recommendations).** Step 1 is panels as data:
+  `Plot.facet_wrap(plot, facets, options)` with `facets` a column or a list of them, resolved at
+  the call as a mapping is, and `nrow:` and `ncol:` validated by NimbleOptions, which `Plot` will
+  list; panels are the combinations of values present, ordered as a discrete scale orders its
+  levels by the key the assembly hands in (`Scale.level_key/1`, as for `Group.add/2`), `nil` its
+  own panel labelled `NA`, laid out by ggplot2's `wrap_dims()`. Too few cells for the panels
+  raises when the plot is run, since counting the combinations is the facet's computation and the
+  plot checks only what it knows. §7's question of how an option says "absent" does not arrive: a
+  caller leaves `nrow:` out and never writes "absent". Step 2 draws several panels: strips, one per
+  facet variable, stacked, the value as ggplot2's `label_value` gives it; the theme's panel
+  spacing; axes at the margins, a panel above an empty cell included; panels sharing what the
+  fixed sizes leave equally. Step 3 is free scales. Step 4 is a notebook following ggplot2's
+  `facet_wrap` reference page, with `Giggly.Datasets.mpg/0`, in this increment (Steve).
+  **The arrangement:** the facet's layout table says, for each panel, which axes it draws and its
+  strip labels; rendering arranges the scene's table from those columns, knowing no facet; and
+  `Giggly.Guide` draws the strips, text in the theme's look in a cell beside the panel, measured
+  as an axis title is, and by the guide's own definition something that helps a reader turn marks
+  back into data. No boundary changes, and the facet stays a data domain. *Rejected: ggplot2's
+  shape, the facet protocol drawing its panels and strips* (`draw_panels`, `render_strips`) —
+  `Facet` would list `Font`, `Scene` and `Theme`, a data domain becoming a drawing one. The cost
+  of the choice made: an arrangement the layout's columns cannot express, such as a third party's
+  facet, grows a case in rendering. *Deferred:* `labeller`, `strip.position`, `dir`, `as.table`,
+  `axes` and `axis.labels`, `space`, `shrink`, `drop` (moot without factors), a layer's own data,
+  `facet_grid`, and theme settings for strips.
+
+- **Each facet, coordinate system, geom, stat and position is a struct of its kind, computed or
+  drawn through a protocol at its family's root, and a repo-local check keeps `Plot` from
+  referencing those roots (decided 2026-10-14, Steve; built the same day as Phase 2's step 0).** A
+  plot recorded each of these choices by name (`facet: :null`, `geom: :point`), resolved to a
+  module implementing its family's behaviour. Names have no room for parameters, and `facet_wrap`,
+  Phase 2's first increment, brings the first (its variables, `ncol`, free scales), with
   `coord_radial()`'s, geoms', stats' and positions' after it. Names also spread each kind's facts
-  across the pipeline: `Plot` holds `geom_point`'s accepted and required aesthetics while
-  `Geom.Point` draws, and default aesthetics (the assembly) and legend keys (the guides) would
+  across the pipeline: `Plot` held `geom_point`'s accepted and required aesthetics while
+  `Geom.Point` drew, and default aesthetics (the assembly) and legend keys (the guides) would
   each add another place, the scattering the ggity research found. **The shape:** a family's root
-  is a protocol (`Giggly.Geom` with `draw_panel/3`; `Giggly.Stat`, `Giggly.Position`,
-  `Giggly.Facet`, `Giggly.Coord` with theirs), and each kind is one module holding everything
-  about it, as ggplot2's `GeomPoint` does: `Giggly.Geom.Point` has `defstruct` with the kind's
-  parameters, functions giving its facts (`accepted_aesthetics/0`, `required_aesthetics/0`), and
-  `defimpl Giggly.Geom, for: __MODULE__` with its drawing. The identities become
-  `%Stat.Identity{}` and `%Position.Identity{}`, still values a test can assert. `Plot` lists the
-  five family boundaries, builds the kinds' structs, and reads their facts to check a mapping at
-  the call, so `plot.md`'s "a mistake raises from the call that wrote it" holds. A third party
-  adds a kind with a module of its own and a `defimpl`. **The check:** `boundary` cannot let
+  is a protocol (`Giggly.Geom` with `draw_panel/4`; `Giggly.Stat` and `Giggly.Position` with
+  `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
+  `panel_params/3`, `transform/3`, `axes/2`, `grid/2` and `clip/1`), each function taking the
+  kind first, and each kind is one module holding everything about it, as ggplot2's `GeomPoint`
+  does: `Giggly.Geom.Point` has `defstruct` with the kind's parameters, functions giving its facts
+  (`accepted_aesthetics/0`, `required_aesthetics/0`), and `defimpl Giggly.Geom, for: __MODULE__`
+  with its drawing. The identities are `%Stat.Identity{}` and `%Position.Identity{}`, still values
+  a test can assert. `Plot` lists the five family boundaries, builds the kinds' structs, and reads
+  their facts to check a mapping at the call, so `plot.md`'s "a mistake raises from the call that
+  wrote it" holds. A third party adds a kind with a module of its own and a `defimpl`. **What
+  building it settled**, each a consequence of a protocol dispatching on its first argument rather
+  than a fresh choice: **the geom is handed the coordinate system** as well as the panel's params
+  (`draw_panel(geom, frame, coord, params)`, ggplot2's own signature, where the decision had said
+  `draw_panel/3`), since every coordinate function needs the coordinate system's struct to
+  dispatch on, so the assembly carries the plot's coordinate system and rendering hands it on
+  unread; *rejected: params carrying the coordinate system inside them* — the geom would read a
+  field of params meant to be opaque. **Panel params are a plain map** the coordinate system's
+  implementation builds and alone reads, as ggplot2's are a list, since `%Coord.Cartesian{}` now
+  names the coordinate system. **`clip` moved from the params to the coordinate system's struct**
+  (`%Coord.Cartesian{clip: :on}` by default), where ggplot2's `coord$clip` keeps it and where
+  `clip = "off"` will be set, so the assembly carries one `clip` rather than one per panel.
+  **Boundary checks nothing a protocol implementation calls until the implementation is
+  classified** (found by compiling a `defimpl` that called a module its family does not list: it
+  compiled clean; boundary's checker skips references from an unclassified implementation), so
+  every `defimpl` opens with `use Boundary, classify_to:` its protocol, and the boundary
+  declarations test fails on any implementation in the app not classified into its protocol's
+  boundary. Such a line only narrows and has one right answer, so Giggly's `waiver-gate.sh` passes
+  a `classify_to:` naming the protocol of the `defimpl` it opens, on the line straight after it,
+  and still stops any other (Steve: my edit to the hook was refused by Claude Code's auto mode, and
+  he applied the tested patch himself). *Rejected: the hook as it was* — a stop for every kind,
+  each with one answer; *thin implementations calling functions on the kind's module* — the
+  drawing would sit on an exported module `Plot` could call. **The check:** `boundary` cannot let
   `Plot` use `Geom.Point` while forbidding `Giggly.Geom`, since a boundary always exports its root
   module and a boundary may depend only on its siblings, its parent and its ancestors' deps (read
-  in its source), so a repo-local credo check holds the rule: in `Plot`'s files, no call to a
-  family root's own functions and no bare reference to a root (which closes a call through a
-  variable), while a kind's struct and fact functions stay allowed. It runs in `mix credo
-  --strict`, and the waiver gate stops any disabling of it, as `CorePurity` holds what boundary
-  cannot see. Themes stay functions returning a value (the entry beginning "A theme is a
-  function"): a protocol on a struct is for kinds that differ in what they do. *Rejected: names
-  with a behaviour, as now* — no room for parameters, and facts spread. *Rejected: names with
+  in its source), so `GigglyCredo.Check.PlotRunsNothing` holds the rule: in `Plot`'s files, no
+  module reference resolves to a root — a call, a module passed as a value (which closes a call
+  through a variable), an `import` or `require`, a typespec (a protocol's `t()` is any term, so a
+  field holding a kind is typed `struct()`) — following aliases, grouped or renamed with `as:`,
+  while an `alias` of a root, the `use Boundary` declaration, and a kind's struct and fact
+  functions stay allowed. **Its roots are every protocol Giggly defines, derived in `.credo.exs`**
+  (Steve), which raises on a build with none; *rejected: the five named in `.credo.exs`* — a
+  second list to keep in step, and a later protocol (scale kinds) would go unchecked. It runs in
+  `mix credo --strict`, and the waiver gate stops any disabling of it, as `CorePurity` holds what
+  boundary cannot see. **The boundary changes were approved one at a time** (Steve): `Plot` lists
+  `Coord`, `Facet`, `Geom`, `Position` and `Stat`, and each family exports its kinds
+  (`Facet.Null`, `Coord.Cartesian`, `Geom.Point`, `Stat.Identity`, `Position.Identity`), whose
+  computing stays in implementations nothing exports. An export applies to every boundary listing
+  the family, so a geom or guide could match `%Coord.Cartesian{}`, which the coordinate seam's
+  rule forbids and review watches for. **Transformations stay a name and a behaviour**
+  (`transform: :identity`) until the first one a user chooses (`scale_x_log10()`), when a struct
+  has something to hold (Steve); *rejected: converting them now, for one shape everywhere.*
+  Themes stay functions returning a value (the entry beginning "A theme is a function"): a
+  protocol on a struct is for kinds that differ in what they do. *Rejected: names with a
+  behaviour, as before* — no room for parameters, and facts spread. *Rejected: names with
   parameters and a table of facts in `Plot`* — closed to extension, facts apart from the drawing.
   *Rejected: descriptions taking the family name with a separately named drawing protocol*
   (`Geom.Point` with `Giggly.Draw`) — a second protocol name per family. *Rejected: descriptions
@@ -105,9 +168,8 @@ stops the question being reopened from scratch.
   boundaries by Phase 3's end. *Rejected: a check against anything under a family's namespace* —
   it would forbid the facts; the rule is about the roots. *Deferred:* a public function adding a
   layer of any kind (ggplot2's `layer()`), which third-party kinds need, until the first one;
-  required aesthetics checked after the stat, which §4 already records for Phase 3. The decision
-  replaces the names of the entry beginning "A layer names its stat and position" when it is
-  built, and `Plot` listing the family boundaries is approved then, through the waiver gate.
+  required aesthetics checked after the stat, which §4 already records for Phase 3. It replaces
+  the names of the entry beginning "A layer names its stat and position".
 
 - **The assembly's titles are `guide_titles`, the title each aesthetic's guide draws (2026-10-14,
   Steve).** `%Assembly{}` held the axes' titles as `titles`, keyed by aesthetic, a name chosen
@@ -282,7 +344,9 @@ stops the question being reopened from scratch.
   and match in every element. The missing-values example draws R's `set.seed(1)` rows, named.
 
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
-  it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
+  it to rendering (2026-10-13, Steve).** *(Since amended: `clip` is a parameter of the coordinate
+  system's struct, and the assembly carries one value rather than `panel_clips`; see the entry
+  beginning "Each facet, coordinate system, geom, stat and position is a struct".)* What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
   `Coord$draw_panel` with the background and the border): a point at an infinite position, on
   the panel's edge, shows only its inner half. Cartesian panel params record `clip: :on`, read
@@ -298,7 +362,7 @@ stops the question being reopened from scratch.
   Steve first chose the coordinate system's saying so over rendering clipping every panel itself,
   since a deliberate default is recorded as a value a test can assert; asked how I felt about the
   `Render` + `Coord` dependency that shape needed, I said it granted rendering the whole
-  coordinate system, `transform/2` included, against its rule of computing no positions, to read
+  coordinate system, `transform/3` included, against its rule of computing no positions, to read
   one value with one answer, and proposed the assembly carry it, as it carries the axes' titles;
   Steve agreed. *Rejected: rendering clipping every panel as a rule of its own* (proposed first)
   — the coordinate system's default would be nowhere a test can see it, and `clip = "off"` would
@@ -322,7 +386,7 @@ stops the question being reopened from scratch.
   ends are exactly equal* — it ends the crash but leaves the tick at the left edge for single
   values from about 4.5e11 to 1e15; *and a copy of `zero_range()` in the coordinate system* — one
   rule stored twice, while equal ends carry the scale's verdict to it. The check against ggplot2
-  also found that `Coord.Cartesian.grid/1` rescaled each line's ends on its own axis's extent
+  also found that cartesian coordinates' `grid/2` rescaled each line's ends on its own axis's extent
   rather than the other axis's, which agree whenever an extent's ends differ; across an axis of
   equal ends ggplot2's lines shrink to a point at the middle, and now so do Giggly's.
 
@@ -330,7 +394,7 @@ stops the question being reopened from scratch.
   regular minor breaks; clipping waits for a step of its own (2026-10-12, Steve).** The panel
   is drawn as ggplot2's `theme_gray()` draws it: a light grey background (ink mixed 92% toward
   paper, no border) and white grid lines, major ones at each axis's breaks as wide as a line and
-  minor ones between them half as wide, under the layers. **`Coord.grid/1` places the lines**: it
+  minor ones between them half as wide, under the layers. **`Coord.grid/2` places the lines**: it
   returns, for the major and the minor breaks of each aesthetic, lines of points in the unit panel,
   which for cartesian coordinates cross the panel from edge to edge, as ggplot2's `guide_grid()`
   runs each line from minus to plus infinity through the coordinate system. A new
@@ -432,7 +496,7 @@ stops the question being reopened from scratch.
   reached, so it waits for the first geom that can leave an axis unmapped, and `Map.fetch!/2`
   fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
   here means a break's text (since renamed `guide_titles`, see the entry beginning "The assembly's
-  titles are `guide_titles`"). `Coord.axes/1` now says which aesthetic each side's axis shows, so
+  titles are `guide_titles`"). `Coord.axes/2` now says which aesthetic each side's axis shows, so
   which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
   with axes (Giggly since chose not to build `coord_flip`; see the entry beginning "Giggly follows
   ggplot2's current coordinate functions"). `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as
@@ -465,7 +529,7 @@ stops the question being reopened from scratch.
   beside its size reduced to its first break, as R's `seq()` reduces it. The port reproduces the
   break sets in ggplot2's snapshots (0–10, 0–50, and mtcars's wt and mpg) and agreed with a second,
   independent port on 409 random ranges. The assembly hands each axis's extent and breaks to the
-  coordinate system, whose new `axes/1` places them by the rescale the data goes through, keyed
+  coordinate system, whose new `axes/2` places them by the rescale the data goes through, keyed
   by the side of the panel each axis is drawn on (cartesian: x at the bottom, y on the left). A new
   `Giggly.Guide`, ggplot2's `guide_axis()`, draws each side's ticks and labels in `theme_grey()`'s
   look, held as module attributes until a theme can be set (since moved into the theme, see the
@@ -546,7 +610,9 @@ stops the question being reopened from scratch.
   polyline's fill (the first with area); and the plot's title.
 
 - **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene, and
-  records its facet and coordinate system by name (2026-10-12, Steve).** `Giggly.to_svg/2`
+  records its facet and coordinate system by name (2026-10-12, Steve).** *(The names since
+  superseded by structs of their kinds; see the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".)*
+  `Giggly.to_svg/2`
   assembles a plot, renders it into a scene (`Giggly.Render`, ggplot2's rendering stage) and has
   `Giggly.SVG` draw the scene at 720 by 576 points (since given a size, see the entry beginning
   "A plot is drawn at the size it is given"); today a plot is drawn as its panel alone, each
@@ -557,7 +623,7 @@ stops the question being reopened from scratch.
   panel's params last, from `Scale.dimension/1`: the axis's extent widened by ggplot2's default
   expansion (5% of a continuous range at each end, 0.6 around discrete positions 1 to n, a range
   of zero width by R's `zero_range()` widened as if its width were 1, an empty axis 0 to 1 first).
-  `Coord.transform/2` rescales every x-family and y-family column into the panel by those extents
+  `Coord.transform/3` rescales every x-family and y-family column into the panel by those extents
   and puts an infinite position at the edge (`squish_infinite()`). `Geom.Point` calls it, as
   ggplot2's `draw_panel()` calls `coord$transform()`, drops a row missing its x or y, and draws
   ggplot2's default point (black, size 1.5 mm, border 0.5 mm) as a circle of radius 1.95 points
@@ -573,7 +639,7 @@ stops the question being reopened from scratch.
   lists `Assembly`, `DataFrame`, `Geom` and `Scene`; `Assembly` gained `Coord`. This amends the
   entry beginning "The facet assigns panels now", which kept the facet plain functions until a
   second kind. *Rejected: the coordinate system alone, its params stored for drawing to read
-  later* (the plan's increment 7) — the params would be read by nothing and `transform/2` called
+  later* (the plan's increment 7) — the params would be read by nothing and `transform/3` called
   only by tests. *Rejected: a public panel-params inspector as its reader* — ggplot2 has none (its
   params are opaque by contract, reachable only through `ggplot_build()`'s object), and §4 keeps
   the assembled value internal. *Rejected: `Coord` handed the family rule, or each geom naming
@@ -603,7 +669,9 @@ stops the question being reopened from scratch.
   dropped row is reported, since ggplot2 warns and a pure pipeline cannot.
 
 - **A layer names its stat and position, and a continuous scale its transformation, the identity
-  included; each is a name its own namespace resolves (2026-10-12, Steve).** `geom_point/2`
+  included; each is a name its own namespace resolves (2026-10-12, Steve).** *(For the stat and
+  position, the names since superseded by structs of their kinds, the identity still recorded; see
+  the entry beginning "Each facet, coordinate system, geom, stat and position is a struct". The transformation is still a name.)* `geom_point/2`
   records `stat: :identity` and `position: :identity` on its layer and `Scale.new(:continuous)`
   records `transform: :identity`, as ggplot2's `geom_point()` defaults `stat = "identity"` and
   `position = "identity"` and its continuous scales `transform = "identity"`. A discrete scale
@@ -1018,6 +1086,40 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-14 — Facets, coordinate systems, geoms, stats and positions are structs of their kinds
+  (Phase 2, `facet_wrap`'s step 0).** The §4 entry beginning "Each facet, coordinate system, geom,
+  stat and position is a struct" gives the decision and what building it settled; the one beginning
+  "`facet_wrap` is built in steps" gives the steps that follow. The five roots are protocols, each
+  keeping its boundary declaration and comment block; each kind's code moved into a
+  `defimpl … for: __MODULE__` beside its struct, `Geom.Point` gained its two fact functions, and
+  `Plot` records `%Facet.Null{}`, `%Coord.Cartesian{}`, and on each point layer `%Geom.Point{}`,
+  `%Stat.Identity{}` and `%Position.Identity{}`, checking a layer against `Geom.Point`'s facts.
+  The assembly carries the coordinate system and one `clip`; rendering and the guide hand the
+  coordinate system on with each panel's params. Nothing drawn changed: the golden is byte for
+  byte the same. **Found while building:** boundary checks nothing an unclassified `defimpl` calls,
+  shown by compiling a probe in a throwaway worktree before anything was written, so each `defimpl`
+  opens with `use Boundary, classify_to:` its protocol and a new test in
+  `boundary_declarations_test.exs` fails on one that does not (it also fails if it finds no
+  implementations, so it cannot pass by finding nothing). My edit to `waiver-gate.sh` letting
+  such a line through was refused by Claude Code's auto mode, so I reverted my half-made edit and
+  wrote the change as a patch, tested on a copy (its own protocol straight after `defimpl` passes;
+  another target, or a blank line between, is still stopped), which Steve applied; Giggly's hook
+  now differs from Tack's there. The six boundary widenings were raised one at a time and each
+  approved and recorded. **The check:** `GigglyCredo.Check.PlotRunsNothing`, scoped to `Plot`'s
+  files, roots derived in `.credo.exs` from the build (exactly the five protocols). The first gate
+  run caught it reporting `Plot`'s own `use Boundary` declaration, whose `deps:` must name the
+  roots; the declaration is now passed over like an `alias`. **Review:** the mutation run over the
+  changed `lib/` files (1,484 mutants) left no finding: every mutant in the five kinds' modules
+  and implementations died, and the 95 that survived are message wording, map keys reordered,
+  type guards on the public functions, or a layout row's fields read in another order, which
+  changes nothing while there is one panel (rendering's `{panel, row, column}`, the assembly's
+  `{panel, scale_x, scale_y}`) and which steps 2 and 3 must pin. On the check (211 mutants), the
+  survivors showed its handling of names it cannot resolve (`alias __MODULE__.X`, an Erlang
+  module, a `__MODULE__.X` reference), a grouped alias rebinding a name, and an alias of the
+  namespace above a root were unpinned; one test was added and two tightened, and the guards and
+  branches no valid source reaches were removed. A re-run left ten survivors, each message wording
+  or a change nothing can observe (the placeholder an `alias` node is swapped for).
 
 - **2026-10-13 — Zip and map in one pass, held by the first repo-local credo check.** The §4 entry
   beginning "Zip and map in one pass" gives the decision. `GigglyCredo.Check.ZipMap` matches a

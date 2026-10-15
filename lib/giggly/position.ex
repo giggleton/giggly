@@ -1,32 +1,30 @@
-defmodule Giggly.Position do
+defprotocol Giggly.Position do
   @moduledoc false
 
   # Position adjustments: where a layer's marks move to once its stat has run, as ggplot2's
   # positions stack bars, dodge them side by side or jitter points apart.
   #
-  # A layer records its position by name, and the assembly runs it here after the stat. Each
-  # position is a module implementing this behaviour, named only through this namespace
+  # A layer records its position as a struct of its kind, and the assembly runs it here after the
+  # stat. Each position is one module holding everything about it: its struct, whose fields are the
+  # position's parameters, and its computing, in a `defimpl Giggly.Position` whose first line
+  # classifies it into this boundary, since boundary checks nothing a protocol implementation calls
+  # until it is classified. A position is named only through this namespace
   # (`Position.Identity`), never aliased to its last segment, which other namespaces share.
   #
   # There is one position so far, the identity (`Giggly.Position.Identity`), which moves nothing, as
-  # ggplot2's `geom_point()` defaults `position = "identity"`. A layer names it rather than leaving
-  # the position out, so a layer whose marks stay where they are says so.
+  # ggplot2's `geom_point()` defaults `position = "identity"`. A layer records it rather than
+  # leaving the position out, so a layer whose marks stay where they are says so.
 
   # A position is handed a layer's table and returns one. It names the data frame's type in its
   # specs, and lists nothing because nothing here calls the data frame yet.
-  use Boundary, deps: [], exports: []
+  # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
+  # their protocol implementations, which no boundary exports.
+  use Boundary, deps: [], exports: [Identity]
 
-  alias Giggly.{DataFrame, Position}
+  alias Giggly.DataFrame
 
-  @typedoc "A position's name, as a layer records it."
-  @type name :: :identity
-
-  # The layer's table with its marks moved: ggplot2's `compute_layer()`.
+  # The layer's table `frame` after `position` has moved its marks: ggplot2's `compute_layer()`.
   @doc false
-  @callback compute_layer(DataFrame.t()) :: DataFrame.t()
-
-  # The layer's table `frame` after the position named `name` has moved its marks.
-  @doc false
-  @spec compute(DataFrame.t(), name()) :: DataFrame.t()
-  def compute(frame, :identity), do: Position.Identity.compute_layer(frame)
+  @spec compute_layer(t(), DataFrame.t()) :: DataFrame.t()
+  def compute_layer(position, frame)
 end

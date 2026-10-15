@@ -215,9 +215,10 @@ boundary_caveats() {
 # could rank. A score that reads only `deps:` and `exports:` is blind to it: a task moved from the
 # umbrella into a read-model boundary gains the right to call that whole namespace, and
 # nothing stops it. Any *change* to a target is treated as needing the user, since "more" and
-# "less" are not comparable here.
+# "less" are not comparable here — with the one exception without_own_protocol_classifications
+# describes.
 boundary_classifications() {
-  boundary_declaration "$1" | awk '
+  boundary_declaration "$(without_own_protocol_classifications "$1")" | awk '
     {
       decl = $0
       while (match(decl, /classify_to:[[:space:]]*[A-Za-z0-9_.]+/)) {
@@ -227,6 +228,33 @@ boundary_classifications() {
         out = out " " s
       }
       print out
+    }'
+}
+
+# The text with each `classify_to:` that names the protocol of the `defimpl` it opens blanked out,
+# so boundary_classifications does not read it as a move. Boundary does not check what a protocol
+# implementation calls until the implementation is classified (`unclassified_protocol_impl?` in
+# its checker), so classifying a `defimpl` into the boundary of the protocol it implements only
+# ever narrows: the impl's calls go from unchecked to held to that boundary's `deps:`. It has one
+# right answer, and Giggly writes one for every kind of facet, coordinate system, geom, stat and
+# position, so it would otherwise stop every new kind. Leaving one out, or removing it, compiles
+# in silence and is not seen here either: the boundary declarations test fails on any protocol
+# implementation not classified into its protocol's boundary. Recognised in one shape only — the
+# declaration is the line straight after the `defimpl` line and names the protocol exactly as that
+# line writes it — so anything else still reads as a move and stops.
+without_own_protocol_classifications() {
+  printf '%s\n' "$1" | awk '
+    {
+      line = $0; sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+      if (protocol != "" && line ~ /^use Boundary,[[:space:]]*classify_to:[[:space:]]*[A-Za-z0-9_.]+$/) {
+        target = line; sub(/^use Boundary,[[:space:]]*classify_to:[[:space:]]*/, "", target)
+        if (target == protocol) { protocol = ""; print ""; next }
+      }
+      protocol = ""
+      if (line ~ /^defimpl[[:space:]]+[A-Za-z0-9_.]+[[:space:]]*,/) {
+        protocol = line; sub(/^defimpl[[:space:]]+/, "", protocol); sub(/[[:space:]]*,.*$/, "", protocol)
+      }
+      print
     }'
 }
 

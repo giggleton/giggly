@@ -7,15 +7,20 @@ paths:
 # Stats
 
 `Giggly.Stat` runs a layer's statistical transformation on its table. Why the identity is a stat a
-layer names rather than an absence, and why the layer records a name rather than a module:
-design-log §4, the entry beginning "A layer names its stat and position".
+layer names rather than an absence: design-log §4, the entry beginning "A layer names its stat and
+position"; why the layer records a struct of its kind, run through a protocol at the root:
+the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".
 
 ## Rules
 
-- **A layer always names its stat, the identity included.** An absent stat cannot be told from a
-  forgotten one; `:identity` says the layer computes nothing on purpose, and a test can say so.
-- **A layer records the stat's name, and this namespace resolves it.** `Plot` names no module
-  here, so a plot describes a stat and never runs one, and `Plot`'s boundary does not list `Stat`.
+- **A layer always records its stat, the identity included.** An absent stat cannot be told from
+  a forgotten one; `%Stat.Identity{}` says the layer computes nothing on purpose, and a test can
+  say so.
+- **A layer records its stat as a struct of its kind, which `Plot` builds and never runs.** `Plot`
+  lists this boundary to build the struct; `GigglyCredo.Check.PlotRunsNothing` keeps the protocol
+  out of its files. Each stat is one module holding its struct, whose fields are its parameters,
+  and its computing, in a `defimpl` that opens by classifying itself into this boundary; the
+  boundary exports the kinds.
 - **A stat runs after the position scales have mapped the layer's x and y columns**, so it
   computes on positions: a discrete value is its level's position.
 - **A stat's arguments arrive with their first reader.** The identity is handed the table alone.
@@ -25,8 +30,8 @@ design-log §4, the entry beginning "A layer names its stat and position".
 
 ## How it works
 
-`Giggly.Stat` is the behaviour (`compute_layer/1`) and the root its callers use:
-`compute(frame, name)` resolves the name to its module and calls it. `Stat.Identity` returns the
-table as given, as ggplot2's `StatIdentity` overrides `compute_layer` to return its data. The
-boundary lists nothing, since nothing here calls the data frame yet; the specs name the frame's
-type, which boundary does not check.
+`Giggly.Stat` is a protocol: `compute_layer(stat, frame)` dispatches on the stat's struct.
+`Stat.Identity`, which has no parameters, returns the table as given, as ggplot2's `StatIdentity`
+overrides `compute_layer` to return its data. The boundary lists nothing, since nothing here calls
+the data frame yet, and exports `Identity`; the specs name the frame's type, which boundary does
+not check.

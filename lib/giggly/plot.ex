@@ -28,12 +28,26 @@ defmodule Giggly.Plot do
   checked when the plot is run.
   """
 
-  # A plot is a description: it may use the aesthetic vocabulary and the data frame, and nothing
-  # that runs it. A layer is read only through `computed_mapping/2`, `layer_geom/1`,
-  # `layer_stat/1` and `layer_position/1`, so `Layer` stays private.
-  use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: []
+  # A plot is a description: it may use the aesthetic vocabulary, the data frame, and the kinds of
+  # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
+  # checks a layer against, and nothing that runs it. The five families' roots are protocols that
+  # compute and draw, and `GigglyCredo.Check.PlotRunsNothing` keeps them out of these files, which
+  # boundary cannot, since a boundary always exports its root. A layer is read only through
+  # `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
+  # private.
+  use Boundary,
+    deps: [
+      Giggly.Aesthetics,
+      Giggly.Coord,
+      Giggly.DataFrame,
+      Giggly.Facet,
+      Giggly.Geom,
+      Giggly.Position,
+      Giggly.Stat
+    ],
+    exports: []
 
-  alias Giggly.{Aesthetics, DataFrame}
+  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Geom, Position, Stat}
   alias Giggly.Plot.Layer
 
   @enforce_keys [:data, :mapping, :facet, :coord, :theme, :reversed_layers]
@@ -47,11 +61,11 @@ defmodule Giggly.Plot do
   """
   @type mapping :: %{optional(aesthetic()) => String.t()}
 
-  @typedoc "How the plot's rows are split into panels."
-  @type facet :: :null
+  @typedoc "How the plot's rows are split into panels: a facet's struct."
+  @type facet :: struct()
 
-  @typedoc "How positions are placed in each panel."
-  @type coord :: :cartesian
+  @typedoc "How positions are placed in each panel: a coordinate system's struct."
+  @type coord :: struct()
 
   @typedoc "The look everything but the marks is drawn in."
   @type theme :: :gray
@@ -72,9 +86,6 @@ defmodule Giggly.Plot do
   @typedoc "A mapping as written: aesthetic to column, the column named by an atom or a string."
   @type mapping_argument :: %{optional(aesthetic()) => atom() | String.t()}
 
-  @point_aesthetics [:group, :x, :y]
-  @point_required [:x, :y]
-
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   @doc """
@@ -87,8 +98,6 @@ defmodule Giggly.Plot do
       ...>   )
       iex> plot.mapping
       %{x: "wt", y: "mpg", color: "cyl"}
-      iex> {plot.facet, plot.coord, plot.theme}
-      {:null, :cartesian, :gray}
   """
   @spec new(Table.Reader.t(), mapping_argument()) :: t()
   def new(data, mapping \\ %{}) when is_map(mapping) do
@@ -97,8 +106,8 @@ defmodule Giggly.Plot do
     %__MODULE__{
       data: frame,
       mapping: resolve(mapping, frame, "Plot.new/2"),
-      facet: :null,
-      coord: :cartesian,
+      facet: %Facet.Null{},
+      coord: %Coord.Cartesian{},
       theme: :gray,
       reversed_layers: []
     }
@@ -122,15 +131,15 @@ defmodule Giggly.Plot do
   @spec geom_point(t(), mapping_argument()) :: t()
   def geom_point(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
     layer = %Layer{
-      geom: :point,
-      stat: :identity,
-      position: :identity,
+      geom: %Geom.Point{},
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
       mapping: resolve(mapping, plot.data, "Plot.geom_point/2")
     }
 
     combined_mapping = computed_mapping(plot, layer)
-    check_accepted(combined_mapping)
-    check_required(combined_mapping)
+    check_accepted(combined_mapping, Geom.Point.accepted_aesthetics())
+    check_required(combined_mapping, Geom.Point.required_aesthetics())
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
@@ -142,17 +151,17 @@ defmodule Giggly.Plot do
   def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
     do: Map.merge(plot_mapping, layer_mapping)
 
-  # The name of the geom `layer` draws with (`Giggly.Geom`).
+  # The geom `layer` draws with, a struct of its kind (`Giggly.Geom`).
   @doc false
   @spec layer_geom(Layer.t()) :: Layer.geom()
   def layer_geom(%Layer{geom: geom}), do: geom
 
-  # The name of the stat `layer` computes its table with (`Giggly.Stat`).
+  # The stat `layer` computes its table with, a struct of its kind (`Giggly.Stat`).
   @doc false
   @spec layer_stat(Layer.t()) :: Layer.stat()
   def layer_stat(%Layer{stat: stat}), do: stat
 
-  # The name of the position `layer` moves its marks with (`Giggly.Position`).
+  # The position `layer` moves its marks with, a struct of its kind (`Giggly.Position`).
   @doc false
   @spec layer_position(Layer.t()) :: Layer.position()
   def layer_position(%Layer{position: position}), do: position
@@ -191,11 +200,11 @@ defmodule Giggly.Plot do
 
   # The plot's mapping reaches every layer, so an aesthetic it maps that the geom cannot use is as
   # wrong as one the layer maps itself.
-  defp check_accepted(mapping) do
+  defp check_accepted(mapping, accepted) do
     unaccepted =
       mapping
       |> Map.keys()
-      |> Enum.reject(fn aesthetic -> aesthetic in @point_aesthetics end)
+      |> Enum.reject(fn aesthetic -> aesthetic in accepted end)
 
     case unaccepted do
       [] ->
@@ -204,12 +213,12 @@ defmodule Giggly.Plot do
       unaccepted ->
         raise ArgumentError,
               "Plot.geom_point/2 cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
-                "or by the plot; geom_point accepts #{inspect_all(@point_aesthetics)}"
+                "or by the plot; geom_point accepts #{inspect_all(accepted)}"
     end
   end
 
-  defp check_required(mapping) do
-    case Enum.reject(@point_required, fn aesthetic -> Map.has_key?(mapping, aesthetic) end) do
+  defp check_required(mapping, required) do
+    case Enum.reject(required, fn aesthetic -> Map.has_key?(mapping, aesthetic) end) do
       [] ->
         :ok
 

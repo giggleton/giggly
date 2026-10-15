@@ -15,10 +15,11 @@ why rendering resolves the theme: the entry beginning "The theme is a resolved v
 
 - **Rendering reads the assembled plot and builds the scene; it computes no positions.** Each
   layer's geom draws in each panel, and the guide draws the panel's background, grid lines and
-  axes (`Giggly.Guide`), with that panel's params, which rendering passes on unread; rendering
-  arranges what they draw into cells, the panel's background and grid under its layers, as
-  ggplot2's coordinate system draws them (`render_bg`). The panel's cell is clipped when the
-  assembly says the coordinate system clips that panel; every other cell is not.
+  axes (`Giggly.Guide`), handed the plot's coordinate system and that panel's params, which
+  rendering passes on unread; rendering arranges what they draw into cells, the panel's background
+  and grid under its layers, as ggplot2's coordinate system draws them (`render_bg`). The panel's
+  cell is clipped when the assembly says the coordinate system clips panels; every other cell is
+  not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
   carries the theme's name; `Theme.complete/1` turns it into the elements, which the guide and
   rendering itself read. A geom is handed no theme: the point keeps its own look until default
@@ -40,10 +41,11 @@ why rendering resolves the theme: the entry beginning "The theme is a resolved v
 ## How it works
 
 `scene(assembly)` resolves the assembly's theme name with `Theme.complete/1`, reads the layout's
-one row, takes that panel's params, has `Guide.grid/2` draw the panel's background and grid lines
-and `Geom.draw_panel/3` each layer's frame over them, and `Guide.axes/3` draw its axes and their titles from the assembly's titles in the theme's look,
-and returns a scene whose columns are margin, y title, y axis, panel and margin and whose rows are
-margin, panel, x axis, x title and margin, the panel's column and row `:rest` and the others in
-points. Its first cell spans every row and column and holds a `Scene.Rect` in the theme's
-`plot_background`.
+one row, takes that panel's params, has `Guide.grid/3` draw the panel's background and grid lines
+and `Geom.draw_panel/4` each layer's frame over them, and `Guide.axes/4` draw its axes and their
+titles from the assembly's titles in the theme's look, each handed the coordinate system and the
+params, and returns a scene whose columns are margin, y title, y axis, panel and margin and whose
+rows are margin, panel, x axis, x title and margin, the panel's column and row `:rest` and the
+others in points. Its first cell spans every row and column and holds a `Scene.Rect` in the
+theme's `plot_background`.
 `Giggly.to_svg/2` runs the assembly, renders, and has `Giggly.SVG` draw the scene.

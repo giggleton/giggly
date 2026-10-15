@@ -7,8 +7,9 @@ defmodule Giggly.Render do
   #
   # The plot's theme, recorded by name, is resolved first into its complete form
   # (`Giggly.Theme`), which everything drawn here other than the marks takes its look from. Each
-  # layer is drawn by its geom (`Giggly.Geom`) in each panel, with that panel's params, in the order
-  # the layers were added, over the panel's background and grid lines (`Giggly.Guide`), and each
+  # layer is drawn by its geom (`Giggly.Geom`) in each panel, handed the plot's coordinate system
+  # and that panel's params, in the order the layers were added, over the panel's background and
+  # grid lines (`Giggly.Guide`), and each
   # panel becomes a cell of the scene's table, cut off at its edges when the coordinate system
   # clips it, as every ggplot2 coordinate system does by default. Its axes and their
   # titles (`Giggly.Guide`) become cells beside it, the y axis's column as wide as the axis and the
@@ -43,8 +44,9 @@ defmodule Giggly.Render do
         layer_data: layer_data,
         layer_geoms: layer_geoms,
         layout: layout,
+        coord: coord,
         panel_params: panel_params,
-        panel_clips: panel_clips,
+        clip: clip,
         guide_titles: guide_titles,
         theme: theme_name
       }) do
@@ -62,15 +64,15 @@ defmodule Giggly.Render do
     layer_primitives =
       layer_geoms
       |> Enum.zip(layer_data)
-      |> Enum.flat_map(fn {geom, frame} -> Geom.draw_panel(frame, geom, params) end)
+      |> Enum.flat_map(fn {geom, frame} -> Geom.draw_panel(geom, frame, coord, params) end)
 
     # The panel's background and grid under its layers, as ggplot2's coordinate system draws them.
-    panel_primitives = Guide.grid(params, theme) ++ layer_primitives
+    panel_primitives = Guide.grid(coord, params, theme) ++ layer_primitives
 
     %{
       left: %{axis: {left_width, left_axis}, title: {left_title_width, left_title}},
       bottom: %{axis: {bottom_height, bottom_axis}, title: {bottom_title_height, bottom_title}}
-    } = Guide.axes(params, guide_titles, theme)
+    } = Guide.axes(coord, params, guide_titles, theme)
 
     %Theme{plot_margin: margin, plot_background: background} = theme
 
@@ -97,7 +99,7 @@ defmodule Giggly.Render do
         %Cell{
           rows: 2..2,
           columns: 4..4,
-          clip: Map.fetch!(panel_clips, panel),
+          clip: clip,
           primitives: panel_primitives
         },
         %Cell{rows: 2..2, columns: 3..3, clip: :off, primitives: left_axis},
