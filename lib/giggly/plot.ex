@@ -111,6 +111,18 @@ defmodule Giggly.Plot do
                         ]
                       )
 
+  # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
+  @bar_options NimbleOptions.new!(
+                 position: [
+                   type: {:in, [:stack, :dodge]},
+                   default: :stack,
+                   doc:
+                     "How bars that share an `x` are placed: piled on one another (`:stack`), " <>
+                       "or set side by side within the width one bar takes (`:dodge`), " <>
+                       "ggplot2's `position = \"dodge\"`."
+                 ]
+               )
+
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   @doc """
@@ -162,7 +174,7 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot.data, "Plot.geom_point/2")
     }
 
-    add_layer(plot, layer, "geom_point",
+    add_layer(plot, layer, "Plot.geom_point/2",
       accepted: Geom.Point.accepted_aesthetics(),
       required: Geom.Point.required_aesthetics()
     )
@@ -173,12 +185,17 @@ defmodule Giggly.Plot do
   to the number of rows at its `x`, or, where `:weight` is mapped, to the sum of their weights, and
   the y axis is titled `count`. A row missing its `x` is not counted.
 
-  Bars are drawn as `geom_col/2` draws them: 0.9 as wide as the closest spacing of the `x`
+  Bars are drawn as `geom_col/3` draws them: 0.9 as wide as the closest spacing of the `x`
   positions, counting from zero, and stacked where groups share an `x`, the highest group at the
-  bottom.
+  bottom, or set side by side with `position: :dodge`.
 
   Counting uses `:x`, `:weight` and `:group`, and needs `:x`; a `:weight` column must hold numbers.
-  The count is the bar's height, so a mapping that gives `:y` is refused.
+  The count is the bar's height, so a mapping that gives `:y` is refused. A mapping, a map, and
+  options, a keyword list, may each be given alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@bar_options)}
 
       iex> plot =
       ...>   %{"class" => ["suv", "compact", "suv"]}
@@ -188,17 +205,23 @@ defmodule Giggly.Plot do
       iex> Giggly.DataFrame.pull(frame, :count)
       [1.0, 2.0]
   """
-  @spec geom_bar(t(), mapping_argument()) :: t()
-  def geom_bar(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
+  @spec geom_bar(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_bar(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_bar(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_bar(plot, %{}, options)
+
+  def geom_bar(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Count{},
-      position: %Position.Stack{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_bar/2")
+      position: bar_position(options),
+      mapping: resolve(mapping, plot.data, "Plot.geom_bar/3")
     }
 
     plot
-    |> add_layer(layer, "geom_bar",
+    |> add_layer(layer, "Plot.geom_bar/3",
       accepted: Stat.Count.accepted_aesthetics(),
       required: Stat.Count.required_aesthetics()
     )
@@ -209,14 +232,21 @@ defmodule Giggly.Plot do
   Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`: ggplot2's
   `geom_col()`, for bars whose heights are in the data. Bars at the same `x` are stacked, those
   above zero upward and those below it downward, ordered by group so the highest group is at the
-  bottom of each stack, as ggplot2 orders them to match the legend.
+  bottom of each stack, as ggplot2 orders them to match the legend; with `position: :dodge` they
+  are set side by side within the width one bar takes, ordered by group from the left, an `x` with
+  one group keeping its whole width.
 
   Each bar is 0.9 as wide as the closest spacing of the `x` positions: 0.9 on a discrete axis,
   whose values sit 1 apart, and on a continuous one the closest pair's gap times 0.9 for every bar,
   as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
   reaches to 0, since every bar starts there.
 
-  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other.
+  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. A
+  mapping, a map, and options, a keyword list, may each be given alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@bar_options)}
 
       iex> plot =
       ...>   %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
@@ -227,17 +257,33 @@ defmodule Giggly.Plot do
       [0.0, 0.0, 0.0]
       iex> Giggly.DataFrame.pull(frame, :ymax)
       [2.3, 1.9, 3.2]
+
+  Dodged, the two groups at `a` share its width, and `b`'s one group keeps all of it:
+
+      iex> plot =
+      ...>   %{"x" => ["a", "a", "b"], "y" => [1.0, 2.0, 3.0], "g" => ["p", "q", "p"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, group: :g})
+      ...>   |> Giggly.Plot.geom_col(position: :dodge)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :xmin)
+      [0.55, 1.0, 1.55]
   """
-  @spec geom_col(t(), mapping_argument()) :: t()
-  def geom_col(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
+  @spec geom_col(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_col(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_col(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_col(plot, %{}, options)
+
+  def geom_col(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Identity{},
-      position: %Position.Stack{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_col/2")
+      position: bar_position(options),
+      mapping: resolve(mapping, plot.data, "Plot.geom_col/3")
     }
 
-    add_layer(plot, layer, "geom_col",
+    add_layer(plot, layer, "Plot.geom_col/3",
       accepted: Geom.Bar.accepted_aesthetics(),
       required: Geom.Bar.required_aesthetics()
     )
@@ -373,8 +419,9 @@ defmodule Giggly.Plot do
       "its columns are #{inspect_all(names)}"
   end
 
-  # The plot with `layer` added, once the mapping it draws with is checked against what its function,
-  # `function`, accepts and requires. At the front, so adding a layer never walks the list.
+  # The plot with `layer` added, once the mapping it draws with is checked against what the function
+  # that adds it, `function`, accepts and requires. At the front, so adding a layer never walks the
+  # list.
   defp add_layer(plot, layer, function, accepted: accepted, required: required) do
     combined_mapping = computed_mapping(plot, layer)
     check_accepted(combined_mapping, accepted, function)
@@ -382,6 +429,19 @@ defmodule Giggly.Plot do
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
+
+  # The position a bar layer's options choose, its option names put in their canonical spelling
+  # first, so a repeated option is refused rather than one silently winning.
+  defp bar_position(options) do
+    options
+    |> Aesthetics.canonicalize()
+    |> NimbleOptions.validate!(@bar_options)
+    |> Keyword.fetch!(:position)
+    |> position()
+  end
+
+  defp position(:stack), do: %Position.Stack{}
+  defp position(:dodge), do: %Position.Dodge{}
 
   # A weight is summed, so the column a layer's weight comes from must hold numbers, missing ones
   # included.
@@ -392,7 +452,7 @@ defmodule Giggly.Plot do
     with {:ok, column} <- Map.fetch(mapping, :weight),
          dtype when dtype not in [:integer, :float, :null] <- Map.fetch!(dtypes, column) do
       raise ArgumentError,
-            "Plot.geom_bar/2 maps :weight to #{inspect(column)}, a #{inspect(dtype)} column, " <>
+            "Plot.geom_bar/3 maps :weight to #{inspect(column)}, a #{inspect(dtype)} column, " <>
               "but a weight is summed, so it must be a number"
     end
 
@@ -413,8 +473,8 @@ defmodule Giggly.Plot do
 
       unaccepted ->
         raise ArgumentError,
-              "Plot.#{function}/2 cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
-                "or by the plot; #{function} accepts #{inspect_all(accepted)}"
+              "#{function} cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
+                "or by the plot; it accepts #{inspect_all(accepted)}"
     end
   end
 
@@ -425,7 +485,7 @@ defmodule Giggly.Plot do
 
       missing ->
         raise ArgumentError,
-              "Plot.#{function}/2 needs #{inspect_all(missing)}, " <>
+              "#{function} needs #{inspect_all(missing)}, " <>
                 "but neither its mapping nor the plot's maps it"
     end
   end

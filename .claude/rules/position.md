@@ -31,3 +31,7 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   the layer share an x, in any panel; then each panel's bars pile by their `xmin`, those below
   zero downward and apart from the rest, ordered by group, highest first, each bar's y moving to
   the top of its stretch. A row missing its x, edges or y loses them all and stacks as nothing.
+- **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: each panel's bars at one
+  `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
+  bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged
+  positions come out doubles, as R's are, so a discrete axis's column stays one type.

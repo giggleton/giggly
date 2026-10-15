@@ -371,6 +371,63 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, `geom_bar(position = "dodge")` on the same
+  # `mpg`, printed to 17 significant digits. It moves with `position_dodge()`.
+  describe "layer_data/2, dodged" do
+    test "the groups at one x share a bar's width, lowest group leftmost; a lone group keeps it" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, group: :drv})
+        |> Plot.geom_bar(position: :dodge)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) === [
+               1.7749999999999999,
+               2.7749999999999999,
+               5.0,
+               5.7000000000000002,
+               6.7750000000000004,
+               2.2250000000000001,
+               3.2250000000000001,
+               4.0,
+               6.0,
+               1.0,
+               6.2999999999999998,
+               7.2249999999999996
+             ]
+
+      assert DataFrame.pull(frame, :xmin) === [
+               1.54999999999999982,
+               2.54999999999999982,
+               4.54999999999999982,
+               5.54999999999999982,
+               6.55000000000000071,
+               2.0,
+               3.0,
+               3.54999999999999982,
+               5.84999999999999964,
+               0.55000000000000004,
+               6.14999999999999947,
+               7.0
+             ]
+
+      assert DataFrame.pull(frame, :xmax) === [
+               2.0,
+               3.0,
+               5.4500000000000002,
+               5.8500000000000005,
+               7.0,
+               2.4500000000000002,
+               3.4500000000000002,
+               4.4500000000000002,
+               6.1500000000000004,
+               1.45,
+               6.4500000000000002,
+               7.4499999999999993
+             ]
+    end
+  end
+
   describe "the guides' titles" do
     test "an axis no layer maps is titled by the column a stat puts into it" do
       assembly =
@@ -558,6 +615,25 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/bar.svg")
+    end
+
+    # Golden: test/golden/dodge.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/dodge.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's classes counted by drive train and dodged:
+    # the groups at each class share one bar's width side by side, a class with one group keeping
+    # all of it. It moves with what moves test/golden/bar.svg, and with dodging.
+    test "dodged bars stand side by side within the width one bar takes" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, group: :drv})
+        |> Plot.geom_bar(position: :dodge)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/dodge.svg")
     end
 
     # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by

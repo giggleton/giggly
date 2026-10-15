@@ -28,7 +28,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user sees, through
   `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
 - **A kind is named after ggplot2's ggproto class without its family prefix, and a class ggplot2
-  keeps only as an alias is not a kind:** `geom_col/2` records `%Geom.Bar{}` with
+  keeps only as an alias is not a kind:** `geom_col/3` records `%Geom.Bar{}` with
   `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`. A
   function takes ggplot2's function name, several may share a kind, and a refusal names the
   function that wrote the mapping (design-log §4, the entry beginning "A kind is named after").
@@ -58,8 +58,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`Stat.Count`: `:x` needed, `:weight` taken, `:y` refused, since the count gives it). A weight's
   column must hold numbers, refused at the call, where R would fail inside the stat and draw
   nothing.
+- **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
+  (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
+  position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
+  an atom (`position: :stack | :dodge`) and recorded as its kind's struct; its parameters never
+  become the geom's options (the entry beginning "A layer chooses its position by an atom").
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`), so a misspelt option raises naming it. A deliberate default is
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`), so a misspelt option raises
+  naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
   recorded as a value (`scales: :fixed`). An option not given is recorded as
   `:none` in the kind's struct; a caller never writes "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past

@@ -81,7 +81,7 @@ defmodule Giggly.PlotTest do
     end
   end
 
-  describe "geom_col/2" do
+  describe "geom_col/3" do
     test "a column layer records the bar geom, the identity stat and stacking" do
       plot =
         @rows
@@ -102,14 +102,24 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :cyl})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{y: :mgp}) end
-      assert error.message =~ "Plot.geom_col/2"
+      assert error.message =~ "Plot.geom_col/3"
+    end
+
+    test "a mapping and options together record both" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_col(%{x: :cyl, y: :mpg}, position: :dodge)
+
+      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{x: "cyl", y: "mpg"}}] =
+               plot.reversed_layers
     end
 
     test "an aesthetic bars cannot use is refused, naming the call" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{color: :wt}) end
-      assert error.message =~ "Plot.geom_col/2"
+      assert error.message =~ "Plot.geom_col/3"
       assert error.message =~ ":color"
     end
 
@@ -117,12 +127,12 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :cyl})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_col(plot) end
-      assert error.message =~ "Plot.geom_col/2"
+      assert error.message =~ "Plot.geom_col/3"
       assert error.message =~ ":y"
     end
   end
 
-  describe "geom_bar/2" do
+  describe "geom_bar/3" do
     test "a bar layer records the bar geom, counting and stacking" do
       plot =
         @rows
@@ -139,11 +149,42 @@ defmodule Giggly.PlotTest do
              ]
     end
 
+    test "options alone choose the position, and dodging records the dodge" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl})
+        |> Plot.geom_bar(position: :dodge)
+
+      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{}}] = plot.reversed_layers
+    end
+
+    test "a position bars do not take is refused by the option's validation" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_bar(plot, position: :jitter)
+        end
+
+      assert error.key == :position
+    end
+
+    test "an option given twice is refused rather than one silently winning" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_bar(plot, %{}, position: :dodge, position: :stack)
+        end
+
+      assert error.message =~ ":position"
+    end
+
     test "y, which the count gives, is refused, naming the call" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
-      assert error.message =~ "Plot.geom_bar/2"
+      assert error.message =~ "Plot.geom_bar/3"
       assert error.message =~ ":y"
     end
 
@@ -158,7 +199,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{weight: :cyl}) end
-      assert error.message =~ "Plot.geom_bar/2"
+      assert error.message =~ "Plot.geom_bar/3"
       assert error.message =~ ~s("cyl")
       assert error.message =~ ":string"
     end

@@ -123,7 +123,7 @@ written, and git history keeps every version.
 - **A kind is named after ggplot2's ggproto class without its family prefix; a class ggplot2
   keeps only as an alias is not a kind (2026-10-15, Steve).** `GeomPoint` is `Geom.Point`,
   `CoordRadial` `Coord.Radial`. ggplot2's `GeomCol` is an empty subclass of `GeomBar` marked to
-  be deprecated, so `geom_col/2` records `%Geom.Bar{}` with `%Stat.Identity{}`: functions take
+  be deprecated, so `geom_col/3` records `%Geom.Bar{}` with `%Stat.Identity{}`: functions take
   ggplot2's function names and may share a kind, as ggplot2's `geom_histogram()` is `GeomBar` and
   `geom_jitter()` `GeomPoint`. *Rejected: `Geom.Col`* — a second kind drawing exactly as the first.
 
@@ -1231,7 +1231,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Count bars with geom_bar (bars, step 2); §4: "Bars are Phase 3's first increment"
+- 2026-10-15 — Dodge bars side by side (bars, step 3); §4: "A layer chooses its position by an
+  atom"
+- 2026-10-15 — Count bars with geom_bar (bars, step 2) (`fe658e8`); §4: "Bars are Phase 3's first
+  increment"
 - 2026-10-15 — Draw columns with geom_col (bars, step 1) (`eb2c178`); §4: "Bars are Phase 3's first
   increment", "A geom says where its marks sit", "A kind is named after ggplot2's ggproto class",
   "ggplot2's `resolution()` is a boundary of its own"
