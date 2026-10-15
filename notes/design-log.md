@@ -26,7 +26,8 @@ moves into §4, with its rejected alternatives, as each decision is ratified.
 **Roadmap** (Phase 0's, as amended in §4): **1** — a scatter plot that is architecturally
 complete, every seam in its null form (done); **2** — prove the seams before widening: `facet_wrap`
 with free scales (done), then `coord_radial()` as a full circle with no inner radius (the §4 entry
-beginning "Giggly follows ggplot2's current coordinate functions"); **3** — breadth: stats, stack
+beginning "Giggly follows ggplot2's current coordinate functions"; done); **3** — breadth, bars
+first (in progress): stats, stack
 and dodge, bar, line and boxplot geoms, non-position scales and guides, the theme tree; **4** — the
 LiveView layer: HEEx output, per-mark attributes applied once at the scene, stable ids, optional
 PNG.
@@ -77,6 +78,54 @@ first. A decision belongs here when someone could plausibly propose undoing it; 
 stops the question being reopened from scratch. A new entry is about 150 words: the decision, a
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
+
+- **Bars are Phase 3's first increment, in five steps: columns, counts, dodge, horizontal bars,
+  a notebook (2026-10-15, Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).**
+  Steve chose bars before other aesthetics to exercise stats, positions and discrete axes.
+  `geom_col` and `geom_bar` with `stat_count` (its group split and constant-column carry,
+  `weight`, `y` from `count` titled "count"), `position_stack` and `position_dodge`
+  (`preserve = "total"`), and orientation, which the entry beginning "Giggly follows ggplot2's
+  current coordinate functions" said arrives with the first geom that has a direction (Steve:
+  now). Position scales reset and retrain after the position, a discrete scale keeping its levels
+  and retraining the continuous range bars give it. A bar's width follows R's `resolution()`,
+  integer columns included (Steve): an integer column's bars are 0.9 wide. *Rejected: width from
+  the values alone*, which departs from ggplot2 for R's integer columns. *Deferred:* bars under
+  `coord_radial()` (Steve), with `Coord.munch/3` and the radial options every radial bar example
+  needs; `position_fill`; user-written `after_stat()`; `geom_bar`'s options; histograms.
+
+- **A geom says where its marks sit in data space during the build (`Geom.setup_data/2`), and
+  the assembly calls only the families' build functions (2026-10-15, Steve).** ggplot2 calls a
+  geom's `setup_data` after the stat and before the position, since positions stack and dodge a
+  mark's extent and the retrained scales must cover it (a bar's `ymin` of 0). So the assembly lists
+  `Giggly.Geom`, as it lists `Giggly.Coord`, and could call `draw_panel/4`; `assembly.md` says it
+  calls build functions only, which review holds. *Rejected: a credo allow-list* (proposed) — the
+  assembly calls family roots by design, so the list would change with every build stage, against
+  a mistake no one has made; *a protocol per family for drawing* — the compiler would hold it, at a
+  second protocol name per family, rejected before; *the extent in the stat, the position or
+  rendering* — counting tied to bars, each position knowing each geom, or axes that miss the mark.
+
+- **A layer chooses its position by an atom now, a constructor later (2026-10-15, Steve).**
+  `geom_bar` and `geom_col` take `position: :stack | :dodge`, ggplot2's string shorthand,
+  validated by NimbleOptions, `:stack` by default. When a position's parameters arrive,
+  `Plot.position_dodge/1` returns its struct and the same option takes it, as ggplot2's
+  `position = position_dodge()` does; a position's parameters never become the geom's options,
+  ggity's mistake (`position_vjust:`). *Rejected: constructors from the start* — two public
+  functions taking nothing yet, more to write for the common case.
+
+- **ggplot2's `resolution()` is a boundary of its own, `Giggly.Resolution` (2026-10-15,
+  Steve).** A mark with a width in data units takes it from the closest spacing of its positions:
+  a bar is 0.9 of it. The bar geom needs it (step 1), the count stat with different options (step
+  2), positions later (jitter), each in its own boundary, so one pure function sits where each may
+  list it. It asks `Giggly.Scale` whether a range is zero wide, the one home of R's
+  `zero_range()`. *Rejected: in `Giggly.Scale`* — a geom would list the scales, against the
+  coordinate seam; *a copy where used* — one utility in two places, then three.
+
+- **A kind is named after ggplot2's ggproto class without its family prefix; a class ggplot2
+  keeps only as an alias is not a kind (2026-10-15, Steve).** `GeomPoint` is `Geom.Point`,
+  `CoordRadial` `Coord.Radial`. ggplot2's `GeomCol` is an empty subclass of `GeomBar` marked to
+  be deprecated, so `geom_col/2` records `%Geom.Bar{}` with `%Stat.Identity{}`: functions take
+  ggplot2's function names and may share a kind, as ggplot2's `geom_histogram()` is `GeomBar` and
+  `geom_jitter()` `GeomPoint`. *Rejected: `Geom.Col`* — a second kind drawing exactly as the first.
 
 - **`coord_radial()` is built in four steps, in its simplest form, with ggplot2's defaults
   (2026-10-15, Steve, agreeing the proposal).** Checked against ggplot2 4.0.3 in R: a full circle
@@ -1182,8 +1231,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-15 — Draw columns with geom_col (bars, step 1); §4: "Bars are Phase 3's first
+  increment", "A geom says where its marks sit", "A kind is named after ggplot2's ggproto class",
+  "ggplot2's `resolution()` is a boundary of its own"
 - 2026-10-15 — Draw faceted radial panels, and clip the plot's background (`coord_radial()`,
-  step 4); §4: "A `:rest` size has a weight"
+  step 4) (`cbd42bb`), which completes Phase 2; §4: "A `:rest` size has a weight"
 - 2026-10-15 — Draw a plot in radial coordinates (`coord_radial()`, step 3) (`8989249`); §4:
   "`coord_radial()` is built in four steps"
 - 2026-10-15 — Give the scene offsets, polygons and kept proportions (`coord_radial()`, step 2)
@@ -1263,6 +1315,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 
 ## 7. Deferred / open questions
 
+- **The datasets should carry R's column types (found 2026-10-15).** Bars follow R's
+  `resolution()`, which gives an integer column bars 0.9 wide; Giggly's `mtcars` reads `cyl` and
+  `gear` as integers where R stores doubles, so its bars are 0.9 wide where ggplot2's are 1.8.
+  Reading them as floats would label them `4.0` where R writes `4`, so it waits for labels that
+  print whole floats as R does.
 - **How a public option says "absent".** CLAUDE.md's sentinel rule (`:none`, never `nil`) came with
   the harness. ggplot2 separates "remove this" (`breaks = NULL`, `guide = "none"`) from "use the
   default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's

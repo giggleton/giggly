@@ -106,7 +106,131 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
+  # significant digits. It moves with ggplot2's bar geometry or stacking.
+  describe "layer_data/2, for geom_col" do
+    test "each bar runs from 0 to its y, 0.9 wide and centred on its level" do
+      frame =
+        %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+        |> Plot.new(%{x: :trt, y: :outcome})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert edges(frame) === %{
+               xmin: [0.55000000000000004, 1.55000000000000004, 2.54999999999999982],
+               xmax: [1.45, 2.4500000000000002, 3.4500000000000002],
+               ymin: [0.0, 0.0, 0.0],
+               ymax: [2.3, 1.9, 3.2],
+               y: [2.3, 1.9, 3.2]
+             }
+    end
+
+    test "on a continuous axis a bar is 0.9 of the closest pair's gap, not counting from zero" do
+      frame =
+        %{"x" => [0.5, 10.0], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[-3.7750000000000004, 5.7249999999999996],
+                [4.7750000000000004, 14.2750000000000004]}
+    end
+
+    test "bars at one x stack upward in group order, the highest group at the bottom" do
+      frame =
+        %{"x" => ["a", "a", "a", "b"], "y" => [1.0, 2.0, 4.0, 3.0], "g" => ["p", "q", "r", "p"]}
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax),
+              DataFrame.pull(frame, :y)} ===
+               {[6.0, 4.0, 0.0, 0.0], [7.0, 6.0, 4.0, 3.0], [7.0, 6.0, 4.0, 3.0]}
+    end
+
+    test "a bar below zero stacks downward from zero, apart from those above it" do
+      frame =
+        %{"x" => ["a", "a", "b", "b"], "y" => [1.0, 2.0, 3.0, -1.0], "g" => ["p", "q", "p", "q"]}
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax),
+              DataFrame.pull(frame, :y)} ===
+               {[2.0, 0.0, 0.0, -1.0], [3.0, 2.0, 3.0, 0.0], [3.0, 2.0, 3.0, 0.0]}
+    end
+
+    test "with every x different nothing stacks, so a bar below zero keeps its y" do
+      frame =
+        %{"x" => ["a", "b"], "y" => [2.0, -1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax),
+              DataFrame.pull(frame, :y)} === {[0.0, -1.0], [2.0, 0.0], [2.0, -1.0]}
+    end
+
+    test "an x shared only across panels still turns stacking on, each panel stacked alone" do
+      frame =
+        %{"x" => ["a", "a", "b"], "y" => [2.0, -1.0, 3.0], "f" => ["u", "v", "v"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Plot.facet_wrap(:f)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax),
+              DataFrame.pull(frame, :y)} === {[0.0, -1.0, 0.0], [2.0, 0.0, 3.0], [2.0, 0.0, 3.0]}
+    end
+
+    test "a stacked row missing its y loses its x and edges and stacks as nothing" do
+      frame =
+        %{"x" => ["a", "a", "b"], "y" => [2.0, nil, 3.0], "g" => ["p", "q", "p"]}
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert edges(frame) === %{
+               xmin: [0.55000000000000004, nil, 1.55000000000000004],
+               xmax: [1.45, nil, 2.4500000000000002],
+               ymin: [0.0, nil, 0.0],
+               ymax: [2.0, nil, 3.0],
+               y: [2.0, 0.0, 3.0]
+             }
+
+      assert DataFrame.pull(frame, :x) === [1, nil, 2]
+    end
+  end
+
   describe "panel_scales/2" do
+    test "the scales are trained again on the marks, so a discrete axis holds its bars' edges" do
+      scales =
+        %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+        |> Plot.new(%{x: :trt, y: :outcome})
+        |> Plot.geom_col()
+        |> Giggly.panel_scales()
+
+      assert scales === %{
+               x: %Giggly.Scale.Discrete{
+                 levels: ["a", "b", "c"],
+                 continuous_range: {0.55000000000000004, 3.4500000000000002}
+               },
+               y: %Giggly.Scale.Continuous{range: {0.0, 3.2}, transform: :identity}
+             }
+    end
+
+    # Golden: ggplot2 4.0.3's x scale range in R 4.6.1 for the same plot.
+    test "a scale is reset before it is trained again, so a mark that lost its x is not covered" do
+      scales =
+        %{"x" => [1.0, 1.0, 5.0], "y" => [1.0, 2.0, nil]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.panel_scales()
+
+      assert scales.x.range === {-0.80000000000000004, 2.7999999999999998}
+    end
+
     test "an axis's scale is trained on every layer's column on that axis" do
       plot =
         @rows
@@ -136,8 +260,8 @@ defmodule GigglyTest do
         |> Plot.facet_wrap(:am, scales: :free_x)
 
       assert {Giggly.panel_scales(plot, 1).x, Giggly.panel_scales(plot, 2).x} ==
-               {%Giggly.Scale.Discrete{levels: ["6", "8"]},
-                %Giggly.Scale.Discrete{levels: ["4", "6"]}}
+               {%Giggly.Scale.Discrete{levels: ["6", "8"], continuous_range: {1, 2}},
+                %Giggly.Scale.Discrete{levels: ["4", "6"], continuous_range: {1, 2}}}
 
       # Each row on its own panel's scale, in row order: "8" is the second level of panel 1's.
       frame = Giggly.layer_data(plot)
@@ -203,6 +327,27 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/point.svg")
+    end
+
+    # Golden: test/golden/col.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/col.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_col()'s example from ggplot2's reference page:
+    # three bars 0.9 wide on a discrete axis, from 0, which the y axis reaches once its scale is
+    # trained again on the bars' edges; the discrete axis has major grid lines at its levels and no
+    # minor ones. It moves with what moves test/golden/point.svg, and with the bars' geometry or
+    # look.
+    test "columns draw a bar from 0 to each y, 0.9 wide on a discrete axis" do
+      plot =
+        %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+        |> Plot.new(%{x: :trt, y: :outcome})
+        |> Plot.geom_col()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/col.svg")
     end
 
     # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by
@@ -367,5 +512,9 @@ defmodule GigglyTest do
 
       assert error.key == [:widht]
     end
+  end
+
+  defp edges(frame) do
+    Map.new([:xmin, :xmax, :ymin, :ymax, :y], fn name -> {name, DataFrame.pull(frame, name)} end)
   end
 end

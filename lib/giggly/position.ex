@@ -11,16 +11,16 @@ defprotocol Giggly.Position do
   # until it is classified. A position is named only through this namespace
   # (`Position.Identity`), never aliased to its last segment, which other namespaces share.
   #
-  # There is one position so far, the identity (`Giggly.Position.Identity`), which moves nothing, as
-  # ggplot2's `geom_point()` defaults `position = "identity"`. A layer records it rather than
-  # leaving the position out, so a layer whose marks stay where they are says so.
+  # The identity (`Giggly.Position.Identity`) moves nothing, as ggplot2's `geom_point()` defaults
+  # `position = "identity"`; a layer records it rather than leaving the position out, so a layer
+  # whose marks stay where they are says so. Stacking (`Giggly.Position.Stack`) piles bars that
+  # share an x, as `geom_col()` defaults `position = "stack"`.
 
-  # A position is handed a layer's table and returns one. It names the data frame's type in its
-  # specs, which boundary does not check, and lists nothing because nothing here calls the data
-  # frame yet.
+  # A position is handed a layer's table and returns one, reading and writing its columns through
+  # the data frame.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [], exports: [Identity]
+  use Boundary, deps: [Giggly.DataFrame], exports: [Identity, Stack]
 
   alias Giggly.DataFrame
 

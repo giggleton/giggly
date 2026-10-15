@@ -61,6 +61,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{color: :cyl}) end
+      assert error.message =~ "Plot.geom_point/2"
       assert error.message =~ ":color"
       assert error.message =~ ":group"
     end
@@ -76,6 +77,47 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot) end
+      assert error.message =~ ":y"
+    end
+  end
+
+  describe "geom_col/2" do
+    test "a column layer records the bar geom, the identity stat and stacking" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_col(%{x: :cyl, y: :mpg})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Bar{},
+                 stat: %Stat.Identity{},
+                 position: %Position.Stack{},
+                 mapping: %{x: "cyl", y: "mpg"}
+               }
+             ]
+    end
+
+    test "a column the data does not have is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{y: :mgp}) end
+      assert error.message =~ "Plot.geom_col/2"
+    end
+
+    test "an aesthetic bars cannot use is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{color: :wt}) end
+      assert error.message =~ "Plot.geom_col/2"
+      assert error.message =~ ":color"
+    end
+
+    test "y mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot) end
+      assert error.message =~ "Plot.geom_col/2"
       assert error.message =~ ":y"
     end
   end

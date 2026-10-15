@@ -23,8 +23,14 @@ defmodule Giggly.Scale.Continuous do
   @doc false
   @spec train(t(), list()) :: t()
   def train(%__MODULE__{range: range} = scale, values) do
-    %{scale | range: Enum.reduce(values, range, &widen/2)}
+    %{scale | range: train_range(range, values)}
   end
+
+  # A range, `:none` for none, widened to cover the finite numbers among `values`: R's
+  # `scales::train_continuous()`, which a discrete scale's continuous range trains by too.
+  @doc false
+  @spec train_range(:none | {number(), number()}, list()) :: :none | {number(), number()}
+  def train_range(range, values), do: Enum.reduce(values, range, &widen/2)
 
   # The values unchanged, as `Giggly.Scale.map/2` describes, until limits can censor them.
   @doc false

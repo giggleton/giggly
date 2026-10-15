@@ -1,21 +1,32 @@
 defmodule Giggly.Scale.Discrete do
   @moduledoc """
   A trained discrete position scale, as `Giggly.panel_scales/2` returns it: the distinct values it
-  has seen, in level order.
+  has seen, in level order, and the continuous range of the positions it has been handed since its
+  levels were placed, such as a bar's edges, `:none` before any: ggplot2's `range_c`, which can
+  widen the axis past its levels.
   """
 
   # Use it through `Giggly.Scale`.
 
-  @enforce_keys [:levels]
+  alias Giggly.Scale.Continuous
+
+  @enforce_keys [:levels, :continuous_range]
   defstruct @enforce_keys
 
-  @type t :: %__MODULE__{levels: list()}
+  @type t :: %__MODULE__{levels: list(), continuous_range: :none | {number(), number()}}
 
   # The scale with the distinct `values` merged into its levels, as `Giggly.Scale.train/2`
-  # describes.
+  # describes; or, handed positions, its continuous range widened to cover them, as ggplot2's
+  # discrete position scale trains a numeric column on `range_c` rather than its levels.
   @doc false
   @spec train(t(), list()) :: t()
-  def train(%__MODULE__{levels: levels} = scale, values) do
+  def train(%__MODULE__{continuous_range: range} = scale, values) do
+    if Enum.any?(values, fn value -> is_number(value) end),
+      do: %{scale | continuous_range: Continuous.train_range(range, values)},
+      else: train_levels(scale, values)
+  end
+
+  defp train_levels(%__MODULE__{levels: levels} = scale, values) do
     merged =
       levels
       |> Enum.concat(values)

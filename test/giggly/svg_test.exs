@@ -2,7 +2,7 @@ defmodule Giggly.SVGTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Scene, SVG}
-  alias Giggly.Scene.{Cell, Polygons, Polylines, Rect, Text}
+  alias Giggly.Scene.{Cell, Polygons, Polylines, Rect, Rectangles, Text}
 
   # Golden throughout: grid's own drawing of the same layout or marks, written by vdiffr 1.0.9's
   # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
@@ -118,6 +118,28 @@ defmodule Giggly.SVGTest do
       }
 
       assert draw(whole([line])) =~ "<polyline points='360.00,432.00 363.00,436.00 '"
+    end
+
+    test "a rectangle is hung from its top left corner, its look as ggplot2's GeomRect draws it" do
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: "#595959",
+        color: :none,
+        # A 0.5 mm line, as grid draws it in points.
+        stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
+      }
+
+      drawn = draw(whole([rectangles]))
+
+      assert String.ends_with?(
+               drawn,
+               "<rect x='72.00' y='115.20' width='144.00' height='172.80' " <>
+                 "style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; fill: #595959;' />\n</svg>\n"
+             )
     end
 
     test "a polygon is filled round its outline, its border as svglite writes it" do

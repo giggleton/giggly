@@ -20,14 +20,19 @@ defmodule Giggly.Assembly do
   #   6. trains each scale over those columns, in the rows of the panels that use it;
   #   7. maps them to their positions, each row on its panel's scale;
   #   8. computes each layer's stat (`Giggly.Stat`) on its table;
-  #   9. moves each layer's marks by its position (`Giggly.Position`);
-  #  10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #   9. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
+  #      bar's edges;
+  #  10. moves each layer's marks by its position (`Giggly.Position`);
+  #  11. resets each scale and trains it again on every layer's columns on its axis, where the
+  #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
+  #  12. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
   #      panel's params, as ggplot2 asks it.
   #
   # Each stage is run by the struct the plot records for it, its facet, its coordinate system and
-  # each layer's stat and position, through the protocol at its family's root.
+  # each layer's geom, stat and position, through the protocol at its family's root; the assembly
+  # calls only the families' build functions, never their drawing ones, which are rendering's.
   #
   # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
@@ -49,6 +54,7 @@ defmodule Giggly.Assembly do
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Facet,
+      Giggly.Geom,
       Giggly.Group,
       Giggly.Plot,
       Giggly.Position,
@@ -57,7 +63,7 @@ defmodule Giggly.Assembly do
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Group, Plot, Position, Scale, Stat}
+  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Geom, Group, Plot, Position, Scale, Stat}
 
   @enforce_keys [
     :layer_data,
@@ -159,17 +165,24 @@ defmodule Giggly.Assembly do
       Enum.zip_with(layers, transformed_data, fn layer, frame ->
         mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
-        Position.compute_layer(Plot.layer_position(layer), computed)
+        set_up = Geom.setup_data(Plot.layer_geom(layer), computed)
+        Position.compute_layer(Plot.layer_position(layer), set_up)
       end)
 
-    panel_params = panel_params(coord, layout, x_scales, y_scales)
+    # ggplot2 resets the position scales and trains them again on the marks where they now stand,
+    # so an axis covers every bar's edges; it maps the positions again after, which changes nothing
+    # here, since a scale maps a position to itself.
+    final_x_scales = retrain(x_scales, x_routes, :x, layer_data)
+    final_y_scales = retrain(y_scales, y_routes, :y, layer_data)
+
+    panel_params = panel_params(coord, layout, final_x_scales, final_y_scales)
 
     %__MODULE__{
       layer_data: layer_data,
       layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
-      x_scales: x_scales,
-      y_scales: y_scales,
+      x_scales: final_x_scales,
+      y_scales: final_y_scales,
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -273,6 +286,14 @@ defmodule Giggly.Assembly do
 
       {scale_id, trained}
     end)
+  end
+
+  # Each scale reset and trained again on every layer's columns on its axis: ggplot2's
+  # `reset_scales()` and second `train_position()`.
+  defp retrain(scales, routes, family, layer_data) do
+    scales
+    |> Map.new(fn {scale_id, scale} -> {scale_id, Scale.reset(scale)} end)
+    |> train(routes, family, layer_data)
   end
 
   # The column's values in the rows whose panel uses the scale `scale_id`.

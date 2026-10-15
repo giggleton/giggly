@@ -63,6 +63,7 @@ here.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
   `.claude/rules/coord.md`.
 - **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.
+- **Resolution** (`Giggly.Resolution`, ggplot2's `resolution()`) — `.claude/rules/resolution.md`.
 - **Guides** (`Giggly.Guide`, a panel's axes and their titles) — `.claude/rules/guide.md`.
 - **The theme** (`Giggly.Theme`, the complete theme everything but the marks is drawn in) —
   `.claude/rules/theme.md`.

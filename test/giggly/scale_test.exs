@@ -46,7 +46,32 @@ defmodule Giggly.ScaleTest do
         |> Scale.train(["b", nil, "a"])
         |> Scale.train(["c", "a"])
 
-      assert scale === %Scale.Discrete{levels: ["a", "b", "c", nil]}
+      assert scale === %Scale.Discrete{levels: ["a", "b", "c", nil], continuous_range: :none}
+    end
+
+    test "a discrete scale handed positions widens its continuous range, not its levels" do
+      scale =
+        :discrete
+        |> trained(["b", "a"])
+        |> Scale.train([1, 2])
+        |> Scale.train([0.55, nil, 2.45])
+
+      assert scale === %Scale.Discrete{levels: ["a", "b"], continuous_range: {0.55, 2.45}}
+    end
+  end
+
+  describe "reset/1" do
+    test "a continuous scale forgets its range, a discrete one its continuous range alone" do
+      continuous = trained(:continuous, [1.0, 3.0])
+
+      discrete =
+        :discrete
+        |> trained(["b", "a"])
+        |> Scale.train([0.55, 2.45])
+
+      assert {Scale.reset(continuous), Scale.reset(discrete)} ===
+               {%Scale.Continuous{range: :none, transform: :identity},
+                %Scale.Discrete{levels: ["a", "b"], continuous_range: :none}}
     end
   end
 
@@ -99,6 +124,24 @@ defmodule Giggly.ScaleTest do
       scale = trained(:discrete, ["6", "4", "8"])
 
       assert Scale.dimension(scale) === {0.4, 3.6}
+    end
+
+    # Golden: ggplot2 4.0.3's x extents in R 4.6.1, for bars 0.9 wide on seven levels (`mpg`'s
+    # classes) and 1.5 wide on three (`geom_col(width = 1.5)`).
+    test "a continuous range widens the levels' extent where it reaches further, unwidened" do
+      levels = Enum.map(1..7, fn level -> "level #{level}" end)
+
+      narrow =
+        :discrete
+        |> trained(levels)
+        |> Scale.train([0.55, 7.45])
+
+      wide =
+        :discrete
+        |> trained(["a", "b", "c"])
+        |> Scale.train([0.25, 3.75])
+
+      assert {Scale.dimension(narrow), Scale.dimension(wide)} === {{0.4, 7.6}, {0.25, 3.75}}
     end
   end
 

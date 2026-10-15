@@ -76,11 +76,19 @@ grid lines are placed by the coordinate system".
   rounded to 15 significant digits, as many decimals on every label as the most precise needs,
   none when all are whole, negative zero as `0`, never scientific, no thousands separators. A
   discrete level is `to_string/1` of its value, and a missing level is `NA`.
+- **A discrete scale keeps a continuous range beside its levels**, ggplot2's `range_c`: handed
+  positions, such as a bar's edges once its levels are mapped, it widens that range and leaves
+  its levels alone. `reset/1` empties a continuous scale's range and a discrete one's continuous
+  range, keeping its levels, as ggplot2 resets its scales before training them again on the
+  positioned marks.
 - **An untrained continuous scale's range is `:none`.** The empty axis's 0 to 1 is
   `dimension/1`'s, as it is ggplot2's `get_limits()`'s.
 - **`dimension/1` is an axis's extent widened by ggplot2's default expansion**, in transformed
   positions: a continuous range by 5% of its width at each end, discrete levels (1 to n) by 0.6,
-  a range of zero width (R's `zero_range()`, rounding error included) as if its width were 1.
+  a range of zero width (R's `zero_range()`, rounding error included) as if its width were 1;
+  a discrete scale's extent then reaches as far as its continuous range does, unwidened, as
+  ggplot2's `expand_limits_discrete()` takes the range of both. `zero_range?/2` is the one home of
+  R's `zero_range()`; `Giggly.Resolution` asks it.
   **An extent still zero wide once widened is returned as its middle, both ends equal** (a single
   value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every
   value on it at the panel's middle, and equal ends are how the coordinate system is told, so

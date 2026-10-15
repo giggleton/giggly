@@ -19,7 +19,7 @@ weight".
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
   rendering builds and a backend reads (`Cell`, `Circles`, `Polygons`, `Polylines`, `Rect`,
-  `Text`); nothing in it knows SVG, a font or a theme.
+  `Rectangles`, `Text`); nothing in it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
   what the fixed sizes leave of the drawing, which a panel takes (grid's `"null"` unit): the
@@ -48,7 +48,8 @@ weight".
 - **Every cell says whether it is clipped, `:on` or `:off`**, as gtable's `clip` does: what is
   drawn in a clipped cell is cut off at its box. Rendering sets which are
   (`.claude/rules/render.md`).
-- **A rectangle fills its cell**, as grid's `rectGrob()` does at its default place and size, which
-  is how ggplot2 draws a background; a rectangle placed and sized within its cell arrives with the
-  first geom that draws one (bars). A background that is not rectangular is a polygon
-  (`Polygons`), closed round its outline.
+- **A rectangle (`Rect`) fills its cell**, as grid's `rectGrob()` does at its default place and
+  size, which is how ggplot2 draws a background; **rectangles placed and sized within their cell
+  (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, as ggplot2's
+  `GeomRect` draws a bar. A background that is not rectangular is a polygon (`Polygons`), closed
+  round its outline.

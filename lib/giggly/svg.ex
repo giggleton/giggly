@@ -32,7 +32,7 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Text}
+  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Text}
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -220,6 +220,40 @@ defmodule Giggly.SVG do
       rect.fill,
       ";' />\n"
     ]
+  end
+
+  # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
+  # it, its width and height the cell's share of its extent.
+  defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
+    style = [
+      "style='stroke-width: ",
+      number(rectangles.stroke_width),
+      "; stroke: ",
+      stroke(rectangles.color),
+      "; stroke-linecap: butt; stroke-linejoin: miter; fill: ",
+      rectangles.fill,
+      ";'"
+    ]
+
+    columns = [rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax]
+
+    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax] ->
+      {x_position, y_position} = place({xmin, ymax}, box)
+
+      [
+        "<rect x='",
+        number(x_position),
+        "' y='",
+        number(y_position),
+        "' width='",
+        number((xmax - xmin) * width),
+        "' height='",
+        number((ymax - ymin) * height),
+        "' ",
+        style,
+        " />\n"
+      ]
+    end)
   end
 
   defp primitive(%Polylines{} = polylines, box) do

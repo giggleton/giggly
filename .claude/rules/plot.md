@@ -27,6 +27,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one
   (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user sees, through
   `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
+- **A kind is named after ggplot2's ggproto class without its family prefix, and a class ggplot2
+  keeps only as an alias is not a kind:** `geom_col/2` records `%Geom.Bar{}` with
+  `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`. A
+  function takes ggplot2's function name, several may share a kind, and a refusal names the
+  function that wrote the mapping (design-log §4, the entry beginning "A kind is named after").
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence (the layer's column wins) exists once.

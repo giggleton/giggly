@@ -24,7 +24,9 @@ size has a weight".
   `pt`, a `viewBox` of the size in points, numbers with two decimals, circles with
   `cx`/`cy`/`r` and a `style` of `stroke-width`, `stroke` and `fill`, rectangles with `x`, `y`,
   `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border) and
-  `fill`, polygons with `points` and the same `style` as rectangles, polylines with `points` and
+  `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
+  bars, with `stroke-linecap: butt; stroke-linejoin: miter` before the `fill`, as `GeomRect` sets
+  them, polygons with `points` and the same `style` as rectangles, polylines with `points` and
   a `style` of `stroke-width`, `stroke`, `stroke-linecap: butt` and `fill: none`, and text with
   `x` and `y` (or, turned 90 degrees, `transform='translate(x,y) rotate(-90)'`), `text-anchor`
   (left out for text anchored at its start, as svglite leaves it out), a `style` of `font-size`

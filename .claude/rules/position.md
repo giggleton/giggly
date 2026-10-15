@@ -23,6 +23,11 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary; the boundary exports the kinds.
 - **A position runs after the stat**, on positions: a discrete value is its level's position, so
   a width is a fraction of the spacing between levels.
-- **A position's arguments arrive with their first reader.** The identity is handed the table
-  alone; its own parameters (a dodge's width, a jitter's seed), the panel's scales and the split by
-  panel arrive with the first position that moves a mark.
+- **A position's arguments arrive with their first reader.** Every position is handed the table
+  alone: stacking splits it by the `panel` column itself and reads no scale. A position's own
+  parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
+  them, and the panel's scales with the first position that reads one.
+- **Stacking is ggplot2's `position_stack()`, `vjust = 1`**: nothing moves unless two rows of
+  the layer share an x, in any panel; then each panel's bars pile by their `xmin`, those below
+  zero downward and apart from the rest, ordered by group, highest first, each bar's y moving to
+  the top of its stretch. A row missing its x, edges or y loses them all and stacks as nothing.

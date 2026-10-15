@@ -70,7 +70,7 @@ defmodule Giggly.Scale do
   @doc false
   @spec new(:continuous | :discrete) :: t()
   def new(:continuous), do: %Continuous{range: :none, transform: :identity}
-  def new(:discrete), do: %Discrete{levels: []}
+  def new(:discrete), do: %Discrete{levels: [], continuous_range: :none}
 
   # The values in the space the scale trains and maps in: put through a continuous scale's
   # transformation, and as given to a discrete scale, which has none.
@@ -79,11 +79,21 @@ defmodule Giggly.Scale do
   def transform(%Continuous{} = scale, values), do: Continuous.transform(scale, values)
   def transform(%Discrete{}, values), do: values
 
-  # The scale widened to cover `values`.
+  # The scale widened to cover `values`. A discrete scale handed positions, such as a bar's edges
+  # once its levels are mapped, widens its continuous range instead of its levels, as ggplot2's
+  # discrete position scale trains `range_c`.
   @doc false
   @spec train(t(), list()) :: t()
   def train(%Continuous{} = scale, values), do: Continuous.train(scale, values)
   def train(%Discrete{} = scale, values), do: Discrete.train(scale, values)
+
+  # The scale as ggplot2 resets it before training it again on the positioned marks: a continuous
+  # scale forgets its range, and a discrete one its continuous range, keeping its levels, since
+  # their values can no longer be recovered from positions.
+  @doc false
+  @spec reset(t()) :: t()
+  def reset(%Continuous{} = scale), do: %{scale | range: :none}
+  def reset(%Discrete{} = scale), do: %{scale | continuous_range: :none}
 
   # Each value's position on the scale's axis: a continuous value unchanged, a discrete one at its
   # level's position counting from 1.
@@ -94,7 +104,9 @@ defmodule Giggly.Scale do
 
   # The extent of the axis in positions, widened as ggplot2 widens it by default before drawing: a
   # continuous range by 5% of its width at each end, and discrete levels, at positions 1 to n, by
-  # 0.6. A range of zero width is widened as though its width were 1, as R's `expand_range()` does,
+  # 0.6, then reaching further where its continuous range does, which is not widened: a bar wider
+  # than its level's slot widens the axis, as ggplot2's `expand_limits_discrete()` takes the range
+  # of both. A range of zero width is widened as though its width were 1, as R's `expand_range()` does,
   # so one value, zero included, spans 0.05 either side of it; an untrained continuous scale spans 0
   # to 1 before it is widened, ggplot2's default for an empty axis. It is ggplot2's `dimension()`
   # with the default expansion, and the coordinate system maps it onto the panel.
@@ -115,7 +127,13 @@ defmodule Giggly.Scale do
     |> collapse_zero_width()
   end
 
-  def dimension(%Discrete{levels: levels}), do: expand({1, length(levels)}, @discrete_expansion)
+  def dimension(%Discrete{levels: levels, continuous_range: :none}),
+    do: expand({1, length(levels)}, @discrete_expansion)
+
+  def dimension(%Discrete{levels: levels, continuous_range: {range_low, range_high}}) do
+    {low, high} = expand({1, length(levels)}, @discrete_expansion)
+    {min(low, range_low), max(high, range_high)}
+  end
 
   # The breaks an axis showing `extent` of the scale draws, each its position and its label, in
   # ascending order: ggplot2's `get_breaks()` and `get_labels()` as its view scale calls them.
@@ -192,10 +210,12 @@ defmodule Giggly.Scale do
 
   # R's `zero_range()`: equal ends, or ends so close, relative to the smaller, that their
   # difference is rounding error. `dimension/1` and `breaks/2` both ask it, which is why
-  # `breaks/2` lives here in the root.
-  defp zero_range?(low, high) when low == high, do: true
+  # `breaks/2` lives here in the root, and so does `Giggly.Resolution`, so the rule has one home.
+  @doc false
+  @spec zero_range?(number(), number()) :: boolean()
+  def zero_range?(low, high) when low == high, do: true
 
-  defp zero_range?(low, high) do
+  def zero_range?(low, high) do
     smaller = min(abs(low), abs(high))
     smaller != 0 and abs((low - high) / smaller) < @zero_range_tolerance
   end

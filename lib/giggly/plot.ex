@@ -162,12 +162,48 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot.data, "Plot.geom_point/2")
     }
 
-    combined_mapping = computed_mapping(plot, layer)
-    check_accepted(combined_mapping, Geom.Point.accepted_aesthetics())
-    check_required(combined_mapping, Geom.Point.required_aesthetics())
+    add_layer(plot, layer, "geom_point",
+      accepted: Geom.Point.accepted_aesthetics(),
+      required: Geom.Point.required_aesthetics()
+    )
+  end
 
-    # At the front, so adding a layer never walks the list.
-    %{plot | reversed_layers: [layer | plot.reversed_layers]}
+  @doc """
+  Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`: ggplot2's
+  `geom_col()`, for bars whose heights are in the data. Bars at the same `x` are stacked, those
+  above zero upward and those below it downward, ordered by group so the highest group is at the
+  bottom of each stack, as ggplot2 orders them to match the legend.
+
+  Each bar is 0.9 as wide as the closest spacing of the `x` positions: 0.9 on a discrete axis,
+  whose values sit 1 apart, and on a continuous one the closest pair's gap times 0.9 for every bar,
+  as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
+  reaches to 0, since every bar starts there.
+
+  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other.
+
+      iex> plot =
+      ...>   %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+      ...>   |> Giggly.Plot.new(%{x: :trt, y: :outcome})
+      ...>   |> Giggly.Plot.geom_col()
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :ymin)
+      [0.0, 0.0, 0.0]
+      iex> Giggly.DataFrame.pull(frame, :ymax)
+      [2.3, 1.9, 3.2]
+  """
+  @spec geom_col(t(), mapping_argument()) :: t()
+  def geom_col(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
+    layer = %Layer{
+      geom: %Geom.Bar{},
+      stat: %Stat.Identity{},
+      position: %Position.Stack{},
+      mapping: resolve(mapping, plot.data, "Plot.geom_col/2")
+    }
+
+    add_layer(plot, layer, "geom_col",
+      accepted: Geom.Bar.accepted_aesthetics(),
+      required: Geom.Bar.required_aesthetics()
+    )
   end
 
   @doc """
@@ -300,9 +336,19 @@ defmodule Giggly.Plot do
       "its columns are #{inspect_all(names)}"
   end
 
+  # The plot with `layer` added, once the mapping it draws with is checked against what its function,
+  # `function`, accepts and requires. At the front, so adding a layer never walks the list.
+  defp add_layer(plot, layer, function, accepted: accepted, required: required) do
+    combined_mapping = computed_mapping(plot, layer)
+    check_accepted(combined_mapping, accepted, function)
+    check_required(combined_mapping, required, function)
+
+    %{plot | reversed_layers: [layer | plot.reversed_layers]}
+  end
+
   # The plot's mapping reaches every layer, so an aesthetic it maps that the geom cannot use is as
   # wrong as one the layer maps itself.
-  defp check_accepted(mapping, accepted) do
+  defp check_accepted(mapping, accepted, function) do
     unaccepted =
       mapping
       |> Map.keys()
@@ -314,19 +360,19 @@ defmodule Giggly.Plot do
 
       unaccepted ->
         raise ArgumentError,
-              "Plot.geom_point/2 cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
-                "or by the plot; geom_point accepts #{inspect_all(accepted)}"
+              "Plot.#{function}/2 cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
+                "or by the plot; #{function} accepts #{inspect_all(accepted)}"
     end
   end
 
-  defp check_required(mapping, required) do
+  defp check_required(mapping, required, function) do
     case Enum.reject(required, fn aesthetic -> Map.has_key?(mapping, aesthetic) end) do
       [] ->
         :ok
 
       missing ->
         raise ArgumentError,
-              "Plot.geom_point/2 needs #{inspect_all(missing)}, " <>
+              "Plot.#{function}/2 needs #{inspect_all(missing)}, " <>
                 "but neither its mapping nor the plot's maps it"
     end
   end

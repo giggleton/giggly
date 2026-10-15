@@ -54,6 +54,10 @@ defmodule Giggly.Geom.Point do
     @radius @radius_per_font_size * (@size * @font_points_per_millimetre + @outline)
     @stroke_width @outline * @points_per_line_width_unit
 
+    # A point is drawn at its x and y alone.
+    @impl Giggly.Geom
+    def setup_data(_geom, frame), do: frame
+
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)

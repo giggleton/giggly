@@ -31,6 +31,16 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   last. A stage arrives with its increment and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
+- **The assembly calls the families' build functions, never their drawing ones**: the facet's,
+  the coordinate system's `panel_params`, `clip` and `aspect`, each layer's stat and position, and
+  each geom's `setup_data`; `draw_panel`, `transform`, `axes` and `grid` are rendering's. It lists
+  `Coord` and `Geom` for their build functions, so this holds by review: design-log §4, the entry
+  beginning "A geom says where its marks sit".
+- **The position scales are reset and trained again after the position**, on every layer's
+  x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
+  `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels
+  and widens its continuous range. ggplot2 maps the positions again after; a scale maps a position
+  to itself, so nothing here does.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
   scale id, the plot's coordinate system (carried for rendering to hand each geom and guide), each
@@ -56,9 +66,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   builds such a plot with a `geom_blank()` layer that inherits the plot's mapping, so its axes
   span the mapped columns and are titled; Giggly follows when a geom that draws nothing arrives.
 - **Each panel's params are built once, after the positions, from the scales its layout row
-  names:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing that extent
-  draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`; until the reset and retrain
-  arrives, those are the scales trained before the stat.
+  names, trained again:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing
+  that extent draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`.
 - **Each axis's scale is added after grouping, of the kind its columns need; every layer's
   columns in the axis's family are then put through the scale's transformation, trained on, and
   mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
