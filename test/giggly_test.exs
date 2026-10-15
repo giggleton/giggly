@@ -206,12 +206,13 @@ defmodule GigglyTest do
     end
 
     # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by
-    # test/golden/radial.R: every element matches it, in order. The point golden's data in radial
-    # coordinates: the panel is square and the table centred across the drawing, the background a
-    # disc and the grid circles and spokes, munched as ggplot2 munches them; the angle axis is drawn
-    # round the circle over the points, each label justified by its angle, and the radius axis to
-    # the panel's left, its labels centred, up the panel's upper half. It moves with what moves
-    # test/golden/point.svg, and with radial placing, munching, or either radial axis's look.
+    # test/golden/radial.R: every element matches it, in order, and every clip path. The point
+    # golden's data in radial coordinates: the panel is square and the table centred across the
+    # drawing, the background a disc and the grid circles and spokes, munched as ggplot2 munches
+    # them; the angle axis is drawn round the circle over the points, each label justified by its
+    # angle, and the radius axis to the panel's left, its labels centred, up the panel's upper
+    # half. It moves with what moves test/golden/point.svg, and with radial placing, munching, or
+    # either radial axis's look.
     test "radial coordinates draw a square panel, its grid on a disc and its axes round and up it" do
       plot =
         %{"wt" => [0.0, 4.0, 7.0, 10.0], "mpg" => [0.0, 50.0, 20.0, nil]}
@@ -253,6 +254,33 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/facet_wrap.svg")
+    end
+
+    # Golden: test/golden/facet_wrap_radial.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/facet_wrap_radial.R: every element matches it, in order, and every strip's
+    # clip path. test/golden/facet_wrap.svg's plot in radial coordinates: the five panels stay
+    # square, the width running out first, so the table is centred down the drawing; each panel
+    # draws its angle axis, the left column its radius axes, and no panel draws a bottom axis. It
+    # moves with what moves test/golden/facet_wrap.svg and test/golden/radial.svg.
+    test "faceted radial panels keep their shape together, the table centred in the drawing" do
+      plot =
+        %{
+          "wt" => [0.0, 4.0, 7.0, 10.0, 2.0, 5.0, 8.0, 3.0, 6.0],
+          "mpg" => [0.0, 50.0, 20.0, 35.0, 10.0, 40.0, 25.0, 15.0, 30.0],
+          "cyl" => [4, 4, 4, 6, 6, 6, 8, 8, 8],
+          "drv" => ["f", "r", "r", "4", "4", "f", "f", "f", "f"]
+        }
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap([:cyl, :drv])
+        |> Plot.coord_radial()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/facet_wrap_radial.svg")
     end
 
     # Golden: test/golden/facet_wrap_free.svg, checked against ggplot2's drawing of the same plot,
@@ -314,8 +342,12 @@ defmodule GigglyTest do
       assert svg ==
                "<svg xmlns='http://www.w3.org/2000/svg' width='525.00pt' height='324.75pt' " <>
                  "viewBox='0 0 525.00 324.75'>\n" <>
+                 "<defs>\n  <clipPath id='cpMC4wMHw1MjUuMDB8MC4wMHwzMjQuNzU='>\n" <>
+                 "    <rect x='0.00' y='0.00' width='525.00' height='324.75' />\n" <>
+                 "  </clipPath>\n</defs>\n" <>
+                 "<g clip-path='url(#cpMC4wMHw1MjUuMDB8MC4wMHwzMjQuNzU=)'>\n" <>
                  "<rect x='0.00' y='0.00' width='525.00' height='324.75' " <>
-                 "style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />\n" <>
+                 "style='stroke-width: 1.07; stroke: #FFFFFF; fill: #FFFFFF;' />\n</g>\n" <>
                  "<defs>\n  <clipPath id='cpNS40OHw1MTkuNTJ8NS40OHwzMTkuMjc='>\n" <>
                  "    <rect x='5.48' y='5.48' width='514.04' height='313.79' />\n" <>
                  "  </clipPath>\n</defs>\n" <>

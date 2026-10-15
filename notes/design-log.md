@@ -114,8 +114,11 @@ written, and git history keeps every version.
   the assembly carries as their weight and keeps proportions; without one, weights are 1 and the
   layout is as before. *Rejected: an `aspect_ratio` on the scene* (proposed) — one case of the
   weights, replaced again when `space = "free"` arrives; the general form costs a few lines, its
-  unequal weights pinned by the backend's tests until a pipeline gives one. *Deferred:* the
-  drawing beside a kept-proportion table stays empty (svglite paints its page white).
+  unequal weights pinned by the backend's tests until a pipeline gives one. **The plot's
+  background is clipped to the table** (Steve, found building the faceted golden), as gtable adds
+  it, cutting its border's outer half at the table's edge; *rejected: a stated departure*, a
+  hairline on a dark page. *Deferred:* the drawing beside a kept-proportion table stays empty
+  (svglite paints its page white).
 
 - **The design log is reference, not reading, and each fact has one home (2026-10-15, Steve).**
   Sessions filled their context before touching code: orientation read a 24,000-word design log
@@ -1179,7 +1182,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Draw a plot in radial coordinates (`coord_radial()`, step 3); §4:
+- 2026-10-15 — Draw faceted radial panels, and clip the plot's background (`coord_radial()`,
+  step 4); §4: "A `:rest` size has a weight"
+- 2026-10-15 — Draw a plot in radial coordinates (`coord_radial()`, step 3) (`8989249`); §4:
   "`coord_radial()` is built in four steps"
 - 2026-10-15 — Give the scene offsets, polygons and kept proportions (`coord_radial()`, step 2)
   (`93fb858`); §4: "A primitive's position is a place in its cell plus an offset in points", "A

@@ -14,8 +14,10 @@
 #   diff <(elements radial.ggplot2.svg) <(elements test/golden/radial.svg)
 #
 # The point golden's data in coord_radial()'s simplest form, its defaults. First checked with
-# ggplot2 4.0.3 and vdiffr 1.0.9: every element matches, in order, with no departure; neither
-# drawing clips the panel, coord_radial()'s default.
+# ggplot2 4.0.3 and vdiffr 1.0.9: every element matches, in order, with no departure, and every
+# clip path but svglite's around the whole drawing: neither drawing clips the panel,
+# coord_radial()'s default, and both clip the plot's background to the table, centred across the
+# drawing.
 
 library(ggplot2)
 

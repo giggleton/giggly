@@ -22,8 +22,9 @@ defmodule Giggly.Render do
   # drawn once, centred on the span of panels, the x title below them and the y title to their
   # left; around the whole table is the theme's plot margin, and the plot's background is drawn
   # first, under everything, over the whole table, margin included, as ggplot2 adds it
-  # (`table_add_background()`). Each panel's cell is cut off at its edges when the coordinate
-  # system clips panels, and each strip's always, as `theme_gray()`'s `strip.clip` says.
+  # (`table_add_background()`), cut off at the table's edges as it is. Each panel's cell is cut off
+  # at its edges when the coordinate system clips panels, and each strip's always, as
+  # `theme_gray()`'s `strip.clip` says.
   #
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
@@ -245,10 +246,13 @@ defmodule Giggly.Render do
     {_title_height, bottom_title_primitives} = bottom_title
     {_title_width, left_title_primitives} = left_title
 
+    # Clipped to its cell, as `table_add_background()` adds it: when the table keeps its
+    # proportions and fills the drawing only one way, the border's outer half is cut off at the
+    # table's edge.
     background = %Cell{
       rows: 1..row_count,
       columns: 1..column_count,
-      clip: :off,
+      clip: :on,
       hang: :none,
       primitives: [background_rect(theme.plot_background)]
     }

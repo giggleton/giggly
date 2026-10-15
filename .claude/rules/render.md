@@ -23,7 +23,9 @@ ggplot2's facets' order".
   and grid under its layers and any axis inside the panel over them, as ggplot2's coordinate
   system draws its background and foreground (`render_bg`, `render_fg`). The panel's
   cell is clipped when the assembly says the coordinate system clips panels; each strip's cell is
-  clipped, as `theme_gray()`'s `strip.clip = "on"` says; every other cell is not.
+  clipped, as `theme_gray()`'s `strip.clip = "on"` says; the plot's background is clipped to the
+  table, as `table_add_background()` adds it, which shows only when the table keeps its
+  proportions and fills the drawing one way alone; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
   carries the theme's name; `Theme.complete/1` turns it into the elements, which the guide and
   rendering itself read. A geom is handed no theme: the point keeps its own look until default

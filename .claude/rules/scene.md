@@ -46,8 +46,8 @@ weight".
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.
 - **Every cell says whether it is clipped, `:on` or `:off`**, as gtable's `clip` does: what is
-  drawn in a clipped cell is cut off at its box. Only the panel's is `:on`, when its coordinate
-  system clips it.
+  drawn in a clipped cell is cut off at its box. Rendering sets which are
+  (`.claude/rules/render.md`).
 - **A rectangle fills its cell**, as grid's `rectGrob()` does at its default place and size, which
   is how ggplot2 draws a background; a rectangle placed and sized within its cell arrives with the
   first geom that draws one (bars). A background that is not rectangular is a polygon
