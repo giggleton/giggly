@@ -66,6 +66,17 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Each dataset's file is read behind a waiver of its own, so every new dataset asks (2026-10-15,
+  Steve).** `Giggly.Datasets` reads each dataset's file at compile time with `File.read!/1`, which
+  the `CorePurity` check refuses without a waiver. Adding `mpg/0`, the facet_wrap notebook's data,
+  I proposed one read for every dataset, the waiver moved onto a comprehension over the files and
+  reworded for datasets in general, since every dataset's answer would be the same. Steve chose a
+  waiver per file: "I'd rather you have to ask each time as opposed to adding whatever you want to
+  the list". A list behind one waiver would let a dataset in without anyone deciding it, while a
+  waiver per file makes each one a stop. The parsing is shared; only the reads are separate.
+  *Rejected: one read covering every dataset's file* (proposed) — a list that grows with no
+  decision.
+
 - **Every plot's cells are drawn in ggplot2's facets' order, a plot without a facet included
   (2026-10-15, Steve).** ggplot2 is not consistent: a plot without a facet draws its y axis before
   its x axis (`FacetNull$draw_panels()` gives the left axis a lower z than the bottom one), while
@@ -1103,6 +1114,18 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-15 — The `facet_wrap` notebook and `Datasets.mpg/0` (Phase 2, `facet_wrap`'s step 4,
+  closing the increment).** `notebooks/facet_wrap.livemd` follows ggplot2's `facet_wrap()`
+  reference page, every example in order: four drawn (by `class`, with `nrow = 4`, by `cyl` and
+  `drv`, and with free scales), six waiting, each named (`labeller`, ordering a column's values,
+  `axes`, a layer's own data with a fixed colour, `strip.position` with lines, dates and themes,
+  `dir`). The data is `Giggly.Datasets.mpg/0`, ggplot2 4.0.3's `mpg` written by R 4.6.1 into
+  `priv/datasets/mpg.csv`, unquoted, with a provenance header, read behind a waiver of its own
+  (§4, the entry beginning "Each dataset's file is read behind a waiver of its own"). Each drawn
+  example was drawn by ggplot2 too (vdiffr in Docker) and matches in every element and clip path,
+  but for R's rounding error on one background edge. With it, Phase 2's first increment,
+  `facet_wrap` with free scales, is complete.
+
 - **2026-10-15 — `facet_wrap`'s free scales (Phase 2, its step 3).** `facet_wrap/3` takes
   `scales: :fixed | :free_x | :free_y | :free`, `:fixed` recorded by default. On a free axis the
   layout gives each panel a scale id of its own, the panel's, as ggplot2's `SCALE_X` and `SCALE_Y`
@@ -1714,7 +1737,7 @@ _(none yet)_
   internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
-  building graphics, as ggity's docs did. The first, `geom_point`, is built, and how notebooks are
+  building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are
   made is settled (the §4 entry beginning "The notebooks follow ggplot2's reference pages"). Still
   open: which pages follow, and a side quest, a Kino library so a plot value draws itself in a
   cell (Livebook shows the SVG with `Kino.Image` until then), as an optional dependency or a

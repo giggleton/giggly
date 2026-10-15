@@ -1,0 +1,187 @@
+# Facets: facet_wrap
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.{Datasets, Plot}
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`facet_wrap()`](https://ggplot2.tidyverse.org/reference/facet_wrap.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`Giggly.Plot.facet_wrap/3` splits a plot into panels, one for each value of a column, or each
+combination of values of several, that occurs in the data, and wraps them into rows: a
+one-dimensional sequence of panels laid out in two dimensions. Each panel draws the rows with its
+values, and a strip above it says which those are. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
+cell; the setup cell aliases `Giggly.Datasets` and `Giggly.Plot`, so the cells write `Plot.new/2`.
+The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for
+234 cars of 38 popular models from 1999 to 2008.
+
+## Facets by one column
+
+ggplot2 names the columns to facet by with `vars()`; Giggly names a column as a mapping does, by
+an atom or a string.
+
+```r
+p <- ggplot(mpg, aes(displ, hwy)) + geom_point()
+# Use vars() to supply faceting variables:
+p + facet_wrap(vars(class))
+```
+
+```elixir
+plot =
+  Datasets.mpg()
+  |> Plot.new(%{x: :displ, y: :hwy})
+  |> Plot.geom_point()
+
+plot
+|> Plot.facet_wrap(:class)
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## The number of rows and columns
+
+```r
+# Control the number of rows and columns with nrow and ncol
+p + facet_wrap(vars(class), nrow = 4)
+```
+
+```elixir
+plot
+|> Plot.facet_wrap(:class, nrow: 4)
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Facets by several columns
+
+A panel for each combination of the columns' values that occurs, with a strip for each column.
+
+```r
+# You can facet by multiple variables
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(cyl, drv))
+```
+
+```elixir
+plot
+|> Plot.facet_wrap([:cyl, :drv])
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## How strips are labelled
+
+```r
+# Use the `labeller` option to control how labels are printed:
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(cyl, drv), labeller = "label_both")
+```
+
+Not in Giggly yet: `labeller`, which here writes each strip as `cyl: 4` rather than `4`.
+
+## The order of the panels
+
+```r
+# To change the order in which the panels appear, change the levels
+# of the underlying factor.
+mpg$class2 <- reorder(mpg$class, mpg$displ)
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(class2))
+```
+
+Not in Giggly yet: choosing the order of a column's values. Giggly orders panels as it orders an
+axis's levels, alphabetically, with a missing value last.
+
+## Free scales
+
+```r
+# By default, the same scales are used for all panels. You can allow
+# scales to vary across the panels with the `scales` argument.
+# Free scales make it easier to see patterns within each panel, but
+# harder to compare across panels.
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(class), scales = "free")
+```
+
+```elixir
+plot
+|> Plot.facet_wrap(:class, scales: :free)
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Axes on every panel
+
+```r
+# When scales are constant, duplicated axes can be shown with
+# or without labels
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(class), axes = "all", axis.labels = "all_y")
+```
+
+Not in Giggly yet: `axes` and `axis.labels`, which draw an axis on every panel when the scales
+are fixed.
+
+## The same data in every panel
+
+```r
+# To repeat the same data in every panel, simply construct a data frame
+# that does not contain the faceting variable.
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point(data = transform(mpg, class = NULL), colour = "grey85") +
+  geom_point() +
+  facet_wrap(vars(class))
+```
+
+Not in Giggly yet: a layer with data of its own, and a fixed colour.
+
+## Where the strips go
+
+```r
+# Use `strip.position` to display the facet labels at the side of your
+# choice. Setting it to `bottom` makes it act as a subtitle for the axis.
+# This is typically used with free scales and a theme without boxes around
+# strip labels.
+ggplot(economics_long, aes(date, value)) +
+  geom_line() +
+  facet_wrap(vars(variable), scales = "free_y", nrow = 2, strip.position = "top") +
+  theme(strip.background = element_blank(), strip.placement = "outside")
+```
+
+Not in Giggly yet: `strip.position`, lines (`geom_line()`), dates, the `economics_long` dataset,
+and changing the theme.
+
+## The direction the panels fill
+
+```r
+# The two letters determine the starting position, so 'tr' starts
+# in the top-right.
+# The first letter determines direction, so 'tr' fills top-to-bottom.
+# `dir = "tr"` is equivalent to `dir = "v", as.table = FALSE`
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  facet_wrap(vars(class), dir = "tr")
+```
+
+Not in Giggly yet: `dir` and `as.table`. Giggly's panels fill each row left to right, from the
+top.

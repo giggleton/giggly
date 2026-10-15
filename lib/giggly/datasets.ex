@@ -16,6 +16,9 @@ defmodule Giggly.Datasets do
   @mtcars_path Application.app_dir(:giggly, "priv/datasets/mtcars.csv")
   @external_resource @mtcars_path
 
+  @mpg_path Application.app_dir(:giggly, "priv/datasets/mpg.csv")
+  @external_resource @mpg_path
+
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
     model: :string,
@@ -32,37 +35,67 @@ defmodule Giggly.Datasets do
     carb: :integer
   ]
 
+  # How each of mpg's columns is read; the file's header gives their order.
+  @mpg_types [
+    manufacturer: :string,
+    model: :string,
+    displ: :float,
+    year: :integer,
+    cyl: :integer,
+    trans: :string,
+    drv: :string,
+    cty: :integer,
+    hwy: :integer,
+    fl: :string,
+    class: :string
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @mtcars_text File.read!(@mtcars_path)
 
-  # The file's columns, its comment lines skipped: each named by its header and read by its type.
-  @mtcars @mtcars_text
-          |> String.split("\n", trim: true)
-          |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
-          |> Enum.map(fn line -> String.split(line, ",") end)
-          |> Enum.zip_with(fn [header | values] ->
-            name = String.to_existing_atom(header)
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @mpg_text File.read!(@mpg_path)
 
-            read =
-              case Keyword.fetch!(@mtcars_types, name) do
-                :string ->
-                  fn value -> value end
+  # Each dataset's columns, its file's comment lines skipped: each named by its header and read by
+  # its type.
+  @datasets Map.new(
+              [mtcars: {@mtcars_text, @mtcars_types}, mpg: {@mpg_text, @mpg_types}],
+              fn {dataset, {text, types}} ->
+                columns =
+                  text
+                  |> String.split("\n", trim: true)
+                  |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
+                  |> Enum.map(fn line -> String.split(line, ",") end)
+                  |> Enum.zip_with(fn [header | values] ->
+                    name = String.to_existing_atom(header)
 
-                :integer ->
-                  &String.to_integer/1
+                    read =
+                      case Keyword.fetch!(types, name) do
+                        :string ->
+                          fn value -> value end
 
-                :float ->
-                  fn value ->
-                    {number, ""} = Float.parse(value)
-                    number
-                  end
+                        :integer ->
+                          &String.to_integer/1
+
+                        :float ->
+                          fn value ->
+                            {number, ""} = Float.parse(value)
+                            number
+                          end
+                      end
+
+                    {name, Enum.map(values, read)}
+                  end)
+
+                {dataset, columns}
               end
-
-            {name, Enum.map(values, read)}
-          end)
+            )
 
   @doc """
   R's `mtcars`: fuel consumption and ten aspects of design and performance for 32 cars (1973-74
@@ -96,5 +129,39 @@ defmodule Giggly.Datasets do
       ]
   """
   @spec mtcars() :: [{atom(), [String.t() | number()]}]
-  def mtcars, do: @mtcars
+  def mtcars, do: Map.fetch!(@datasets, :mtcars)
+
+  @doc """
+  ggplot2's `mpg`: fuel economy from 1999 to 2008 for 38 popular models of car, 234 cars in all, a
+  subset of the data the US Environmental Protection Agency publishes at
+  [fueleconomy.gov](https://fueleconomy.gov/), keeping only models with a new release every year
+  from 1999 to 2008.
+
+  The columns: `manufacturer`; `model`; `displ`, engine displacement in litres; `year`, of
+  manufacture; `cyl`, cylinders; `trans`, the transmission; `drv`, the drive, `"f"` front-wheel,
+  `"r"` rear-wheel and `"4"` four-wheel; `cty`, city miles per gallon; `hwy`, highway miles per
+  gallon; `fl`, the fuel type; `class`, the type of car.
+
+      iex> mpg = Giggly.Datasets.mpg()
+      iex> Keyword.keys(mpg)
+      [:manufacturer, :model, :displ, :year, :cyl, :trans, :drv, :cty, :hwy, :fl, :class]
+      iex> mpg |> Keyword.fetch!(:model) |> length()
+      234
+      iex> Enum.map(mpg, fn {name, values} -> {name, Enum.at(values, 2)} end)
+      [
+        manufacturer: "audi",
+        model: "a4",
+        displ: 2.0,
+        year: 2008,
+        cyl: 4,
+        trans: "manual(m6)",
+        drv: "f",
+        cty: 20,
+        hwy: 31,
+        fl: "p",
+        class: "compact"
+      ]
+  """
+  @spec mpg() :: [{atom(), [String.t() | number()]}]
+  def mpg, do: Map.fetch!(@datasets, :mpg)
 end
