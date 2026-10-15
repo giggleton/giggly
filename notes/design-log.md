@@ -78,6 +78,42 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **`coord_radial()` is built in four steps, in its simplest form, with ggplot2's defaults
+  (2026-10-15, Steve, agreeing the proposal).** Checked against ggplot2 4.0.3 in R: a full circle
+  clockwise from 12 o'clock, scales expanded exactly as cartesian ones, and `clip = "off"`, its
+  own default. The panel is square (`coord$aspect()` is 1) and its background a munched disc; the
+  r axis is a left axis up the panel's upper half, its labels centred between two margins
+  (`axis.text.r`); the theta axis is drawn inside the panel over the layers, unmeasured. The
+  radial transform places `x` and `y` only, as ggplot2's does, and fails loudly on any other x-
+  or y-family column, since a range cannot be placed without its pair; munching is private to
+  `Coord.Radial` until a path geom brings `Coord.munch/3`, which is where geoms first bend (Phase
+  3: ggplot2's rect and segment geoms ask `is_linear()`).
+  *Deferred:* every option, `guide_axis_theta()`'s options, label merging (needs
+  `expand = FALSE`), a notebook (its examples need bars, arcs, an inner radius).
+
+- **A primitive's position is a place in its cell plus an offset in points (2026-10-15, Steve).**
+  The theta axis's ticks and labels sit 2.75 and 4.95 points out from points on the circle, while
+  the panel's size is known only when the backend lays the scene out, so a position is grid's
+  `unit(x, "npc") + unit(d, "pt")`: polylines' points and text labels carry offsets in points, and
+  a text's `baseline_offset` is no longer the one position in points. Text takes any `hjust`,
+  which the SVG backend writes as R's graphics engine writes it for svglite, the nearest of start,
+  middle and end shifted by the rest of the label's width, a device's limit being the backend's.
+  *Rejected: rendering laying the scene out at the drawing's size*, everything then in points —
+  the scene tied to one size, closing off a backend that lays it out again (a resizing LiveView or
+  Kino plot).
+
+- **A `:rest` size has a weight, and a scene can keep its proportions, gtable's null units and
+  `respect` (2026-10-15, Steve).** Radial panels are square: ggplot2 sets panel heights to the
+  aspect ratio in null units, widths to 1, and has the table respected, so both directions take
+  one scale, the largest that fits, and the table is centred, the plot's background covering the
+  table only. A size is `{:rest, weight}`; the scene's `keep_proportions` is gtable's `respect`,
+  named for what it does, as `:rest` is for "null". Rendering gives panel rows the aspect ratio
+  the assembly carries as their weight and keeps proportions; without one, weights are 1 and the
+  layout is as before. *Rejected: an `aspect_ratio` on the scene* (proposed) — one case of the
+  weights, replaced again when `space = "free"` arrives; the general form costs a few lines, its
+  unequal weights pinned by the backend's tests until a pipeline gives one. *Deferred:* the
+  drawing beside a kept-proportion table stays empty (svglite paints its page white).
+
 - **The design log is reference, not reading, and each fact has one home (2026-10-15, Steve).**
   Sessions filled their context before touching code: orientation read a 24,000-word design log
   and a 5,900-word plan, and one change was written into four or five surfaces. Now a session
@@ -1140,6 +1176,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-15 — Place positions in radial coordinates (`coord_radial()`, step 1); §4:
+  "`coord_radial()` is built in four steps"
 - 2026-10-15 — Cut the internal documents to one home per fact; §4: "The design log is reference,
   not reading"
 - 2026-10-15 — The `facet_wrap` notebook and `Datasets.mpg/0` (`09421b0`); §4: "Each dataset's

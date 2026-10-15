@@ -12,7 +12,9 @@ with drawing, and why it lists the aesthetic vocabulary: design-log §4, the ent
 coordinate system arrives with drawing"; why it is the only route to the panel: the entry
 beginning "Scales are three values"; why it places the grid lines: the entry beginning "The panel's
 grid lines are placed by the coordinate system"; why it is a struct of its kind with a protocol at
-the root, and why a geom is handed it: the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".
+the root, and why a geom is handed it: the entry beginning "Each facet, coordinate system, geom,
+stat and position is a struct"; what radial coordinates are and why: the entry beginning
+"`coord_radial()` is built in four steps".
 
 ## Rules
 
@@ -22,7 +24,8 @@ the root, and why a geom is handed it: the entry beginning "Each facet, coordina
 - **Panel params are opaque outside the coordinate system that built them.** The assembly has them
   built, rendering passes them on with the plot's coordinate system, and a geom or a guide hands
   both back; only that coordinate system's implementation reads them, a map it builds in its own
-  shape, so a coordinate system that places positions differently changes no geom and no guide.
+  shape, so a coordinate system that places positions differently changes no geom, and a guide
+  draws only what `axes/2` and `grid/2` hand it.
 - **A plot always records its coordinate system as a struct of its kind, `%Coord.Cartesian{}`
   included**, whose fields are its parameters. `Giggly.Coord` is a protocol, every function taking
   the coordinate system first; each coordinate system is one module holding its struct and its
@@ -34,30 +37,46 @@ the root, and why a geom is handed it: the entry beginning "Each facet, coordina
   `Scale.minor_breaks/3`). The coordinate
   system adds no expansion of its own and never lists `Scale` until a coordinate option
   (`expand = FALSE`, `xlim`) arrives; then the extent is the coordinate system's to decide.
-- **`axes/2` places each axis's breaks by the same rescale as the data, keyed by the side the
-  axis is drawn on, with the aesthetic the axis shows** (cartesian: x at the bottom, y on the
-  left), so a guide never reads the params, takes the title of that aesthetic, and a radial
-  system moves axes and their titles without touching a guide.
+- **`axes/2` places each axis's breaks by the same rescale as the data, keyed by where the axis
+  is drawn, with the aesthetic it shows and the look it is drawn in** (ggplot2's theme suffix),
+  so a guide never reads the params and takes the title of that aesthetic. Cartesian: x at the
+  bottom and y on the left, each in its own look. Radial: the radius axis on the left in the
+  `:r` look, the angle axis `:theta`, around the circle inside the panel, and a bottom axis with
+  no breaks, which keeps the x title where ggplot2 draws it.
 - **`grid/2` places the panel's grid lines, so where a grid line runs is the coordinate
   system's call**, as ggplot2's `render_bg` differs by coordinate system (straight lines here,
   circles and spokes in polar). It returns lines of points in the unit panel, major and minor, by
   the aesthetic whose breaks they mark; the guide gives them the theme's look and the drawing
-  order. A cartesian line runs from minus to plus infinity along the other axis, as ggplot2 runs
-  it, through the same rescale as the data: from edge to edge, or shrunk to a point at the middle
-  across an axis whose extent has equal ends, as ggplot2's does.
-- **`transform/3` places every x-family and y-family column**, by `Aesthetics.family/1`, never by
-  comparing a name with `:x`; other columns pass through.
-- **An infinite position goes to the panel's edge and a missing one stays missing**, as ggplot2's
-  `squish_infinite()` and `rescale()` leave them; dropping a missing row is the geom's.
-- **On an axis whose extent has equal ends, every position goes to the panel's middle, infinite
-  ones too**, as `scales::rescale()` puts every value on a zero-wide range before ggplot2 squishes
-  anything. The scale gives equal ends exactly when R's `zero_range()` calls the widened extent
-  zero wide; this namespace tests only that the ends are equal and never copies the rule.
+  order. A line runs from minus to plus infinity along the other aesthetic, as ggplot2 runs it,
+  through the same placing as the data: a cartesian one from edge to edge, or shrunk to a point
+  at the middle across an axis whose extent has equal ends; a radial one a spoke or a whole
+  circle. `grid/2` also gives the background's shape: `:panel`, filling it, or the outline of the
+  shape it fills, radially a disc. A grid that is not rectangular is munched as ggplot2's
+  `coord_munch()` munches it, inside the coordinate system that draws it.
+- **Cartesian `transform/3` places every x-family and y-family column**, by
+  `Aesthetics.family/1`, never by comparing a name with `:x`; other columns pass through.
+  **Radial `transform/3` places `x` and `y` only**, as ggplot2's does, **and fails on any other
+  x-family or y-family column**: a range cannot be placed without its pair, so a geom drawing
+  one turns it into a path first, as ggplot2's geoms do under coordinates that are not linear.
+- **An infinite position goes to its extent's end and a missing one stays missing**, as ggplot2's
+  `squish_infinite()` and `rescale()` leave them: the panel's edge, or radially the angle's start
+  or the circle's centre or edge, a row missing either radial position missing both; dropping a
+  missing row is the geom's.
+- **On an axis whose extent has equal ends, every position goes to the middle, infinite ones
+  too**: the panel's middle, or radially half a turn round or halfway out, as `scales::rescale()`
+  puts every value on a zero-wide range before ggplot2 squishes anything. The scale gives equal
+  ends exactly when R's `zero_range()` calls the widened extent zero wide; this namespace tests
+  only that the ends are equal and never copies the rule.
 - **A coordinate system records whether its panels are clipped as one of its parameters, and
   `clip/1` reads it**, as ggplot2's `coord$clip` holds it. Cartesian coordinates default to `:on`,
-  `coord_cartesian(clip = "on")`'s default, a value a test can assert on the plot. The assembly
-  asks once and carries the answer to rendering, which marks each panel's cell, so rendering never
-  lists this namespace.
-- **What waits for its first reader:** `munch` (the first path geom; a grid that is not
-  rectangular munches its lines and background, as ggplot2's does), axes above or to the right,
-  and every coordinate option (`xlim`, `expand`, `reverse`, `ratio`, and `clip = "off"`).
+  `coord_cartesian(clip = "on")`'s default, and radial ones to `:off`, `coord_radial()`'s, values
+  a test can assert on the plot. The assembly asks once and carries the answer to rendering,
+  which marks each panel's cell, so rendering never lists this namespace.
+- **`aspect/2` gives the shape a panel keeps, its height over its width**, from the first
+  panel's params, as ggplot2 asks `coord$aspect()`: `:none` for cartesian coordinates, 1 for a
+  full circle.
+- **What waits for its first reader:** `Coord.munch/3` for geoms (the first path geom), and with
+  it munching a spiral, which radial munching refuses until then; axes above or to the right; and
+  every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`; radial `theta`,
+  `start` and `end`, `inner.radius`, `thetalim` and `rlim`, `expand`, `clip = "on"`,
+  `r.axis.inside`, `rotate.angle`, `reverse`).

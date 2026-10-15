@@ -38,7 +38,7 @@ defmodule Giggly.Guide do
   def axes(coord, panel_params, theme) do
     coord
     |> Coord.axes(panel_params)
-    |> Map.new(fn {side, {_aesthetic, breaks}} ->
+    |> Map.new(fn {side, {_aesthetic, _look, breaks}} ->
       {side, Guide.Axis.draw(breaks, side, theme)}
     end)
   end
@@ -56,7 +56,7 @@ defmodule Giggly.Guide do
   def titles(coord, panel_params, guide_titles, theme) do
     coord
     |> Coord.axes(panel_params)
-    |> Map.new(fn {side, {aesthetic, _breaks}} ->
+    |> Map.new(fn {side, {aesthetic, _look, _breaks}} ->
       title =
         guide_titles
         |> Map.fetch!(aesthetic)

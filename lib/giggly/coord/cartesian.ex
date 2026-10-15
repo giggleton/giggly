@@ -14,13 +14,15 @@ defmodule Giggly.Coord.Cartesian do
   # too, as `scales::rescale()` puts them before ggplot2 squishes anything.
   #
   # The x axis is drawn below the panel and the y axis to its left, ggplot2's default places, each
-  # break placed by the same rescale as the data. Its grid lines are straight, each crossing the
-  # panel from edge to edge at a break or a minor break, placed the same way; the lines crossing an
-  # axis of equal ends shrink to a point at its middle, as ggplot2's do.
+  # in its own aesthetic's look and each break placed by the same rescale as the data. Its grid
+  # lines are straight, each crossing the panel from edge to edge at a break or a minor break,
+  # placed the same way; the lines crossing an axis of equal ends shrink to a point at its middle,
+  # as ggplot2's do. Its background fills the panel, and a panel takes whatever shape the drawing
+  # leaves it, as ggplot2's `coord_cartesian()` has no aspect ratio.
 
   defstruct clip: :on
 
-  @type t :: %__MODULE__{clip: Giggly.Coord.clip()}
+  @type t :: %__MODULE__{clip: :on}
 
   @typedoc "A panel's params under cartesian coordinates."
   @type panel_params :: %{
@@ -74,13 +76,16 @@ defmodule Giggly.Coord.Cartesian do
           y_breaks: y_breaks
         }) do
       %{
-        bottom: {:x, place_breaks(x_breaks, x_range)},
-        left: {:y, place_breaks(y_breaks, y_range)}
+        bottom: {:x, :x, place_breaks(x_breaks, x_range)},
+        left: {:y, :y, place_breaks(y_breaks, y_range)}
       }
     end
 
     @impl Giggly.Coord
     def clip(%{clip: clip}), do: clip
+
+    @impl Giggly.Coord
+    def aspect(_coord, _panel_params), do: :none
 
     @impl Giggly.Coord
     def grid(_coord, %{x_range: x_range, y_range: y_range} = params) do
@@ -92,7 +97,8 @@ defmodule Giggly.Coord.Cartesian do
         minor: %{
           x: x_lines(params.x_minor_breaks, x_range, y_range),
           y: y_lines(params.y_minor_breaks, x_range, y_range)
-        }
+        },
+        background: :panel
       }
     end
 

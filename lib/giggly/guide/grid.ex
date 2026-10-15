@@ -17,7 +17,7 @@ defmodule Giggly.Guide.Grid do
   # the panel's cell.
   @doc false
   @spec draw(Giggly.Coord.grid(), Theme.t()) :: [Giggly.Scene.primitive()]
-  def draw(%{major: major, minor: minor}, %Theme{
+  def draw(%{major: major, minor: minor, background: :panel}, %Theme{
         panel_background: background,
         panel_grid_major: major_look,
         panel_grid_minor: minor_look
