@@ -35,12 +35,13 @@ ggplot2's facets' order".
   The margin is the theme's, on every side, and so is the spacing between panels. Above each row
   of panels are its strips, a row per strip layer as tall as its tallest strip; below it a row as
   tall as its tallest measured bottom axis, and left of each column a column as wide as its widest
-  measured left axis. **An axis over an empty cell is not measured**, as ggplot2's
-  `measure_axes()` sets it to nothing, so it hangs into the empty space (`Scene.Cell`'s `hang`):
-  while scales are fixed, that is every bottom axis outside the last row, and no left axis, since
-  panels fill the layout a row at a time. Free scales draw axes over other panels, which are
-  measured, and bring the rule that tells the two apart. The titles are drawn once each, centred on the span of panels, not the strips above
-  them, as ggplot2 spans its title cells over the panel rows and columns.
+  measured left axis. **A bottom axis with an empty cell under it is not measured**, as ggplot2's
+  `measure_axes()` sets it to nothing, so it hangs into the empty space (`Scene.Cell`'s `hang`);
+  one over another panel, which free x scales draw, is measured. No left axis has an empty cell to
+  its left, since panels fill the layout a row at a time. Each axis hangs from its panel's edge at
+  its own size, so a left axis narrower than its column sits against its panel. The titles are
+  drawn once each, centred on the span of panels, not the strips above them, as ggplot2 spans its
+  title cells over the panel rows and columns.
 - **Every plot's cells are drawn in ggplot2's facets' order**: the background first, over the
   whole table, margin included, as ggplot2's `table_add_background()` adds it; then the panels
   column by column; the strips from the last row of panels to the first, left to right; the bottom

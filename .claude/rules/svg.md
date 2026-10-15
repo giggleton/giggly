@@ -60,7 +60,8 @@ given"; why labels are drawn at their measured widths, and in which fonts: the e
 `draw(scene, width, height)` lays the columns out across `width` and the rows down `height`:
 each size in points takes its length, and each `:rest` an equal share of what they leave. Each
 cell's box runs from its first column's and row's start to its last one's end, or, for a hanging
-cell, its own height down from its first row's top; a rectangle fills it, and each other
+cell, its own height down from its first row's top or its own width back from its last column's
+end; a rectangle fills it, and each other
 primitive is written in it
 at `(left + x * box_width, top + (1 - y) * box_height)`, since a cell's y runs up and SVG's runs
 down; a label's baseline is a further `baseline_offset` points toward its top, which is up for

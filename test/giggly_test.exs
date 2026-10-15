@@ -128,6 +128,50 @@ defmodule GigglyTest do
       assert error.message =~ "panel(s) 1"
     end
 
+    test "a free discrete axis gives each panel the levels of its own rows, placed from 1" do
+      plot =
+        %{"cyl" => ["6", "4", "8", "6"], "mpg" => [21.0, 22.8, 18.7, 19.2], "am" => [1, 1, 0, 0]}
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:am, scales: :free_x)
+
+      assert {Giggly.panel_scales(plot, 1).x, Giggly.panel_scales(plot, 2).x} ==
+               {%Giggly.Scale.Discrete{levels: ["6", "8"]},
+                %Giggly.Scale.Discrete{levels: ["4", "6"]}}
+
+      # Each row on its own panel's scale, in row order: "8" is the second level of panel 1's.
+      frame = Giggly.layer_data(plot)
+      assert DataFrame.pull(frame, :x) == [2, 1, 2, 1]
+    end
+
+    test "a fixed axis shares one scale across the panels, a free one beside it does not" do
+      plot =
+        %{"wt" => [1.0, 2.0, 3.0, 9.0], "mpg" => [10.0, 20.0, 30.0, 40.0], "am" => [0, 0, 1, 1]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:am, scales: :free_y)
+
+      assert {Giggly.panel_scales(plot, 1), Giggly.panel_scales(plot, 2)} ==
+               {%{
+                  x: %Giggly.Scale.Continuous{range: {1.0, 9.0}, transform: :identity},
+                  y: %Giggly.Scale.Continuous{range: {10.0, 20.0}, transform: :identity}
+                },
+                %{
+                  x: %Giggly.Scale.Continuous{range: {1.0, 9.0}, transform: :identity},
+                  y: %Giggly.Scale.Continuous{range: {30.0, 40.0}, transform: :identity}
+                }}
+    end
+
+    test "an axis's scale is of the kind its columns need, on the y axis as on the x" do
+      plot =
+        @mixed_rows
+        |> Plot.new(%{x: :wt, y: :cyl})
+        |> Plot.geom_point()
+
+      assert %{x: %Giggly.Scale.Continuous{}, y: %Giggly.Scale.Discrete{levels: ["4", "6"]}} =
+               Giggly.panel_scales(plot)
+    end
+
     test "an axis no layer maps gets an untrained continuous scale" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
@@ -187,6 +231,31 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/facet_wrap.svg")
+    end
+
+    # Golden: test/golden/facet_wrap_free.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/facet_wrap_free.R: every element, in order, and every clip path match it.
+    # Each of five panels is on its own x and y scale, so each draws both axes; the first row's x
+    # axes take room but for the one over the empty cell, and the left axes of panels b and e share
+    # a column as wide as e's, b's sitting against its panel. It moves with what moves
+    # test/golden/facet_wrap.svg, and with how free scales are trained or their axes placed.
+    test "free scales give each panel its own scales, and each panel its own axes" do
+      plot =
+        %{
+          "x" => [0.0, 10.0, 0.0, 1.0, 100.0, 200.0, 0.0, 4.0, 2.0, 3.0],
+          "y" => [0.0, 50.0, 0.0, 5.0, 0.0, 500.0, 10.0, 20.0, 0.0, 1000.0],
+          "g" => ["a", "a", "b", "b", "c", "c", "d", "d", "e", "e"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:g, scales: :free)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/facet_wrap_free.svg")
     end
 
     test "a label's &, < and > are escaped, so a level cannot break the document" do

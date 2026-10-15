@@ -30,7 +30,9 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   in the data, as in ggplot2's, and each row's panel is found from its values there.
 - **A wrapped panel draws an axis on each side with no panel beside it**, ggplot2's axes at the
   margins: below the last row and below a panel with an empty cell under it, left of the first
-  column. Its strips are one per facet column, the value written as ggplot2's `label_value()`
+  column. **On a free axis (`scales: :free_x`, `:free_y` or `:free`) each panel has a scale of its
+  own, its id the panel's, and draws its own axis**, as ggplot2's layout numbers `SCALE_X` and
+  `SCALE_Y` by panel and its `facet_wrap` draws every axis of a free scale. Its strips are one per facet column, the value written as ggplot2's `label_value()`
   writes it, here `to_string/1`, a missing value `NA`. The null facet's one panel draws both axes
   and has no strip.
 - **Panels made from values are ordered as a discrete scale orders its levels**, by the key the
@@ -57,7 +59,7 @@ facet's struct. `Facet.Null` is ggplot2's null facet, with no parameters: its `a
 (`FacetNull$map_data()`) puts a `:panel` column of 1s on the frame, and its `layout/3`
 (`layout_null()`) is a one-row frame of `:panel`, `:row`, `:column`, `:scale_x` and `:scale_y`,
 all 1. `Facet.Wrap` is `facet_wrap()`, its struct the columns it splits on (by their names in the
-data), `nrow` and `ncol`, each `:none` when not given: its `layout/3` takes the combinations of
+data), `nrow` and `ncol`, each `:none` when not given, and `scales`: its `layout/3` takes the combinations of
 those columns' values that occur, sorts them by the order key applied to each value, places panel
 `i` at row `div(i - 1, ncol) + 1` and column `rem(i - 1, ncol) + 1`, and puts each facet column
 beside them; its `assign_panels/3` looks each row's values up in those columns. The assembly calls

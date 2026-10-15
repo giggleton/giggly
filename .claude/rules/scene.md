@@ -24,11 +24,12 @@ entry beginning "Three top-level values".
   with the first panels of different sizes (`space = "free"`, an aspect ratio). Nothing is
   measured later, so a backend needs no font. The docs say widths and heights, not "tracks".
 - **A cell's box is its rows and columns, unless it hangs.** `hang: {:top, height}` makes the box
-  `height` points tall from the top of its rows, whatever they measure: ggplot2 measures an axis
-  below a panel with an empty cell under it as taking no room, and the axis hangs into the empty
-  space. Every bottom axis hangs from its panel's edge at its own height, which is the row's height
-  when it is measured. Hanging to the left arrives with the first left axis narrower than its
-  column (free y scales).
+  `height` points tall from the top of its rows, and `hang: {:right, width}` `width` points wide
+  ending at the right of its columns, whatever they measure: ggplot2 measures an axis below a
+  panel with an empty cell under it as taking no room, and the axis hangs into the empty space;
+  and a left axis narrower than its column (free y scales) sits against its panel. Every bottom
+  axis hangs from its panel's edge at its own height, and every left axis at its own width, which
+  are the row's and the column's when it is the one that measures them.
 - **Primitives are placed in their cell's units, 0 to 1 across and up, and sized in points.** A
   primitive never knows the cell's size; the backend places it in the cell's box. The one position
   in points is a text's `baseline_offset`, from its anchor to its baseline.
@@ -48,8 +49,8 @@ entry beginning "Three top-level values".
 
 `%Giggly.Scene{}` holds the column widths (left to right), the row heights (top to bottom), each
 `{:points, size}` or `:rest`, and the cells. `Scene.Cell` holds the ranges of rows and columns it
-spans, whether it is clipped, whether it hangs (`:none`, or `{:top, height}`), and its primitives
-in drawing order. The primitives are named after
+spans, whether it is clipped, whether it hangs (`:none`, `{:top, height}` or `{:right, width}`),
+and its primitives in drawing order. The primitives are named after
 grid's: `Scene.Circles` (`circleGrob()`: positions, one radius, one outline width, one colour; what
 R's graphics engine draws for shape 19, ggplot2's default point), `Scene.Polylines`
 (`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour, square-cut ends),

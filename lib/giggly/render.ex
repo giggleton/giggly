@@ -72,7 +72,11 @@ defmodule Giggly.Render do
     panel_rows = DataFrame.pull(layout, :row)
     panel_columns = DataFrame.pull(layout, :column)
 
-    grid = %{rows: Enum.max(panel_rows), columns: Enum.max(panel_columns)}
+    grid = %{
+      rows: Enum.max(panel_rows),
+      columns: Enum.max(panel_columns),
+      occupied: MapSet.new(panels, fn panel -> {panel.row, panel.column} end)
+    }
 
     widths = widths(panels, grid, left_title, theme)
     heights = heights(panels, grid, bottom_title, theme)
@@ -196,19 +200,21 @@ defmodule Giggly.Render do
     |> Map.new(fn {{name, _size}, index} -> {name, index} end)
   end
 
-  # A row's bottom axes take the room of the tallest one measured. ggplot2's `measure_axes()` does
-  # not measure an axis with an empty cell under it, and while scales are fixed every bottom axis
-  # outside the last row has one; free scales, which draw an axis over another panel, measure it
-  # and bring the rule that tells the two apart. Every panel in the last row draws its axis.
+  # A row's bottom axes take the room of the tallest one measured: one with an empty cell under it
+  # is not, as ggplot2's `measure_axes()` sets it to nothing, so it hangs into the empty space.
   defp bottom_axis_height(panels, grid, row) do
     panels
-    |> Enum.filter(fn panel -> panel.row == row and panel.row == grid.rows end)
+    |> Enum.filter(fn panel -> panel.row == row and panel.bottom != :none end)
+    |> Enum.reject(fn panel ->
+      panel.row < grid.rows and {panel.row + 1, panel.column} not in grid.occupied
+    end)
     |> Enum.map(fn %{bottom: {height, _primitives}} -> height end)
     |> Enum.max(fn -> 0.0 end)
   end
 
-  # A column's left axes take the room of the widest one; panels fill the layout a row at a time,
-  # so none has an empty cell to its left, which ggplot2 would not measure.
+  # A column's left axes take the room of the widest one, and a narrower one hangs from its panel's
+  # edge. Panels fill the layout a row at a time, so none has an empty cell to its left, which
+  # ggplot2 would not measure.
   defp left_axis_width(panels, column) do
     panels
     |> Enum.filter(fn panel -> panel.column == column and panel.left != :none end)
@@ -270,8 +276,9 @@ defmodule Giggly.Render do
       panels
       |> Enum.reject(fn panel -> panel.left == :none end)
       |> Enum.sort_by(fn panel -> {-panel.column, panel.row} end)
-      |> Enum.map(fn %{left: {_width, primitives}} = panel ->
+      |> Enum.map(fn %{left: {width, primitives}} = panel ->
         cell(rows, {:panel_row, panel.row}, columns, {:axis_left, panel.column},
+          hang: {:right, width},
           primitives: primitives
         )
       end)

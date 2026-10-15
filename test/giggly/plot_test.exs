@@ -87,16 +87,21 @@ defmodule Giggly.PlotTest do
         |> Plot.new()
         |> Plot.facet_wrap([:cyl, "wt"], ncol: 2)
 
-      assert plot.facet == %Facet.Wrap{facets: ["cyl", "wt"], nrow: :none, ncol: 2}
+      assert plot.facet == %Facet.Wrap{
+               facets: ["cyl", "wt"],
+               nrow: :none,
+               ncol: 2,
+               scales: :fixed
+             }
     end
 
-    test "one column needs no list, and an option not given is recorded as :none" do
+    test "one column needs no list, an option not given is recorded as :none, and scales as given" do
       plot =
         @rows
         |> Plot.new()
-        |> Plot.facet_wrap(:cyl, nrow: 3)
+        |> Plot.facet_wrap(:cyl, nrow: 3, scales: :free_y)
 
-      assert plot.facet == %Facet.Wrap{facets: ["cyl"], nrow: 3, ncol: :none}
+      assert plot.facet == %Facet.Wrap{facets: ["cyl"], nrow: 3, ncol: :none, scales: :free_y}
     end
 
     test "a column the data does not have is refused, naming it and the data's columns" do

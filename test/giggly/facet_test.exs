@@ -10,7 +10,8 @@ defmodule Giggly.FacetTest do
     %Facet.Wrap{
       facets: facets,
       nrow: Keyword.get(options, :nrow, :none),
-      ncol: Keyword.get(options, :ncol, :none)
+      ncol: Keyword.get(options, :ncol, :none),
+      scales: Keyword.get(options, :scales, :fixed)
     }
   end
 
@@ -129,6 +130,25 @@ defmodule Giggly.FacetTest do
 
       facet_layout = layout(wrap(["cyl", "drv"]), frame)
       assert DataFrame.pull(facet_layout, :strip) == [["4", "awd"], ["4", "f"], ["NA", "r"]]
+    end
+  end
+
+  describe "the wrapped layout's free scales" do
+    test "a free axis gives each panel its own scale and draws every panel's axis" do
+      free_x = layout(wrap(["g"], scales: :free_x), distinct_values(5))
+      free_y = layout(wrap(["g"], scales: :free_y), distinct_values(5))
+
+      assert {DataFrame.pull(free_x, :scale_x), DataFrame.pull(free_x, :scale_y)} ==
+               {[1, 2, 3, 4, 5], [1, 1, 1, 1, 1]}
+
+      assert {DataFrame.pull(free_x, :axis_bottom), DataFrame.pull(free_x, :axis_left)} ==
+               {[true, true, true, true, true], [true, false, false, true, false]}
+
+      assert {DataFrame.pull(free_y, :scale_x), DataFrame.pull(free_y, :scale_y)} ==
+               {[1, 1, 1, 1, 1], [1, 2, 3, 4, 5]}
+
+      assert {DataFrame.pull(free_y, :axis_bottom), DataFrame.pull(free_y, :axis_left)} ==
+               {[false, false, true, true, true], [true, true, true, true, true]}
     end
   end
 end

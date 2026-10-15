@@ -17,8 +17,8 @@ defmodule Giggly.Assembly do
   #      the axis's columns need, first refusing an axis column no scale can place yet, or one whose
   #      kind disagrees with the axis's first column: an axis has one scale;
   #   5. puts every layer's x-family and y-family columns through their scale's transformation;
-  #   6. trains each scale over those columns;
-  #   7. maps them to their positions on the scales;
+  #   6. trains each scale over those columns, in the rows of the panels that use it;
+  #   7. maps them to their positions, each row on its panel's scale;
   #   8. computes each layer's stat (`Giggly.Stat`) on its table;
   #   9. moves each layer's marks by its position (`Giggly.Position`);
   #  10. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
@@ -132,20 +132,27 @@ defmodule Giggly.Assembly do
         |> Group.add(&Scale.level_key/1)
       end)
 
-    untrained_x_scales = add_scales(:x, plot, layout)
-    untrained_y_scales = add_scales(:y, plot, layout)
+    x_routes = routes(layout, :x)
+    y_routes = routes(layout, :y)
+    untrained_x_scales = add_scales(:x, plot, x_routes)
+    untrained_y_scales = add_scales(:y, plot, y_routes)
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
-        through_scales(frame, untrained_x_scales, untrained_y_scales, &Scale.transform/2)
+        through_scales(
+          frame,
+          {untrained_x_scales, x_routes},
+          {untrained_y_scales, y_routes},
+          &Scale.transform/2
+        )
       end)
 
-    x_scales = train(untrained_x_scales, :x, transformed_data)
-    y_scales = train(untrained_y_scales, :y, transformed_data)
+    x_scales = train(untrained_x_scales, x_routes, :x, transformed_data)
+    y_scales = train(untrained_y_scales, y_routes, :y, transformed_data)
 
     layer_data =
       Enum.zip_with(layers, transformed_data, fn layer, frame ->
-        mapped = through_scales(frame, x_scales, y_scales, &Scale.map/2)
+        mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
         Position.compute_layer(Plot.layer_position(layer), computed)
       end)
@@ -220,36 +227,55 @@ defmodule Giggly.Assembly do
     |> DataFrame.put(:panel, panels)
   end
 
-  # One untrained scale per scale id the layout gives this axis, of the kind its columns need, as
-  # ggplot2 adds its default scales before transforming anything. Every panel shares one scale
-  # while there is one panel, so the match below holds; routing rows to several scales arrives
-  # with free scales, where the match fails loudly until it does.
-  defp add_scales(family, plot, layout) do
-    [scale_id] =
-      layout
-      |> DataFrame.pull(scale_column(family))
-      |> Enum.uniq()
+  # Which of the axis's scales each panel uses, by panel: the layout's `:scale_x` or `:scale_y`,
+  # ggplot2's `SCALE_X` and `SCALE_Y`. A fixed axis routes every panel to one scale, a free one each
+  # panel to its own.
+  defp routes(layout, family) do
+    panels = DataFrame.pull(layout, :panel)
+    scale_ids = DataFrame.pull(layout, scale_column(family))
 
+    panels
+    |> Enum.zip(scale_ids)
+    |> Map.new()
+  end
+
+  # One untrained scale per scale id the layout gives this axis, every one of the kind the axis's
+  # columns need, as ggplot2 adds its default scales before transforming anything and clones the
+  # axis's scale for each scale id.
+  defp add_scales(family, plot, routes) do
     untrained =
       plot
       |> scale_kind(family)
       |> Scale.new()
 
-    %{scale_id => untrained}
+    routes
+    |> Map.values()
+    |> Map.new(fn scale_id -> {scale_id, untrained} end)
   end
 
-  # Each scale folds in every layer's columns on its axis; `add_scales/3` gives an axis one scale.
-  defp train(scales, family, layer_data) do
+  # Each scale folds in, from every layer's columns on its axis, the values in the rows of the
+  # panels that use it, as ggplot2's `train_position()` trains each panel scale on its panels.
+  defp train(scales, routes, family, layer_data) do
     Map.new(scales, fn {scale_id, untrained} ->
       trained =
         layer_data
         |> family_columns(family)
         |> Enum.reduce(untrained, fn {frame, name}, scale ->
-          Scale.train(scale, DataFrame.pull(frame, name))
+          Scale.train(scale, values_on(frame, name, routes, scale_id))
         end)
 
       {scale_id, trained}
     end)
+  end
+
+  # The column's values in the rows whose panel uses the scale `scale_id`.
+  defp values_on(frame, name, routes, scale_id) do
+    panels = DataFrame.pull(frame, :panel)
+    values = DataFrame.pull(frame, name)
+
+    for {panel, value} <- Enum.zip(panels, values),
+        Map.fetch!(routes, panel) == scale_id,
+        do: value
   end
 
   defp scale_column(:x), do: :scale_x
@@ -315,21 +341,44 @@ defmodule Giggly.Assembly do
   end
 
   # Replaces each x-family and y-family column with what `scale_function` (a transformation or a
-  # mapping) makes of its values on the axis's scale.
-  defp through_scales(frame, x_scales, y_scales, scale_function) do
+  # mapping) makes of its values, each row's on the scale its panel uses: ggplot2's `scale_apply()`.
+  defp through_scales(frame, x_axis, y_axis, scale_function) do
     frame
     |> DataFrame.names()
     |> Enum.reduce(frame, fn name, scaled ->
       case Aesthetics.family(name) do
-        :x -> through_scale(scaled, name, x_scales, scale_function)
-        :y -> through_scale(scaled, name, y_scales, scale_function)
+        :x -> through_scale(scaled, name, x_axis, scale_function)
+        :y -> through_scale(scaled, name, y_axis, scale_function)
         :none -> scaled
       end
     end)
   end
 
-  defp through_scale(frame, name, scales, scale_function) do
-    [scale] = Map.values(scales)
-    DataFrame.put(frame, name, scale_function.(scale, DataFrame.pull(frame, name)))
+  # Each scale takes its own rows' values, in their order, and what it makes of them goes back in
+  # row order.
+  defp through_scale(frame, name, {scales, routes}, scale_function) do
+    scale_ids =
+      frame
+      |> DataFrame.pull(:panel)
+      |> Enum.map(fn panel -> Map.fetch!(routes, panel) end)
+
+    values = DataFrame.pull(frame, name)
+
+    results =
+      scale_ids
+      |> Enum.zip(values)
+      |> Enum.group_by(fn {scale_id, _value} -> scale_id end, fn {_scale_id, value} -> value end)
+      |> Map.new(fn {scale_id, scale_values} ->
+        scale = Map.fetch!(scales, scale_id)
+        {scale_id, scale_function.(scale, scale_values)}
+      end)
+
+    {placed, _none_left} =
+      Enum.map_reduce(scale_ids, results, fn scale_id, remaining ->
+        [result | rest] = Map.fetch!(remaining, scale_id)
+        {result, Map.put(remaining, scale_id, rest)}
+      end)
+
+    DataFrame.put(frame, name, placed)
   end
 end

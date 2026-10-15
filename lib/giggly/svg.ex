@@ -6,8 +6,9 @@ defmodule Giggly.SVG do
   # The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
   # size in points takes it, and the columns that are `:rest` share what is left equally, as do the
   # rows. Each cell's box runs from the start of its first column and row to the end of its last,
-  # or hangs a height of its own from the top of its first row, and its primitives are placed in
-  # that box, cells in the order the scene lists them; a clipped cell's
+  # or hangs a height of its own from its rows' top or a width of its own from its columns' right,
+  # and its primitives are placed in that box, cells in the order the scene lists them; a clipped
+  # cell's
   # are drawn in a group cut off at the box, as svglite writes one. The
   # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
   # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
@@ -69,7 +70,7 @@ defmodule Giggly.SVG do
   defp span_length(:rest, rest), do: rest
 
   defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
-    box = {span(column_spans, columns), hang(span(row_spans, rows), cell.hang)}
+    box = hang({span(column_spans, columns), span(row_spans, rows)}, cell.hang)
     drawn = Enum.map(cell.primitives, fn primitive -> primitive(primitive, box) end)
     clip(drawn, cell.clip, box)
   end
@@ -104,9 +105,13 @@ defmodule Giggly.SVG do
     ]
   end
 
-  # A hanging cell's rows: from their top, as tall as it says.
-  defp hang(rows, :none), do: rows
-  defp hang({top, _height}, {:top, height}), do: {top, height}
+  # A hanging cell's box: from its rows' top as tall as it says, or as wide as it says ending at its
+  # columns' right.
+  defp hang(box, :none), do: box
+  defp hang({columns, {top, _height}}, {:top, height}), do: {columns, {top, height}}
+
+  defp hang({{left, width}, rows}, {:right, own_width}),
+    do: {{left + width - own_width, own_width}, rows}
 
   # A cell's start and length in one direction: from its first column's or row's start to its
   # last one's end.

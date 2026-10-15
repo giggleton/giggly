@@ -49,7 +49,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   twice, is refused there; whether `nrow:` and `ncol:` hold the panels is the facet's question,
   since counting the panels is its computation, answered when the plot is run.
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:` and `ncol:`), so a misspelt option raises naming it. An option not given is recorded as
+  `nrow:`, `ncol:` and `scales:`), so a misspelt option raises naming it. A deliberate default is
+  recorded as a value (`scales: :fixed`). An option not given is recorded as
   `:none` in the kind's struct; a caller never writes "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.

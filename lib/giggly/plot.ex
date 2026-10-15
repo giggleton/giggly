@@ -100,6 +100,14 @@ defmodule Giggly.Plot do
                         ncol: [
                           type: :pos_integer,
                           doc: "How many columns to lay the panels out in."
+                        ],
+                        scales: [
+                          type: {:in, [:fixed, :free_x, :free_y, :free]},
+                          default: :fixed,
+                          doc:
+                            "Whether the panels share each axis's scale (`:fixed`), or each " <>
+                              "panel has its own x scale (`:free_x`), y scale (`:free_y`) or both " <>
+                              "(`:free`), and draws its own axis for each."
                         ]
                       )
 
@@ -175,6 +183,11 @@ defmodule Giggly.Plot do
   rows up to six, three up to twelve, and beyond that in a square or nearly one. Given one of the
   two, the other is as many as the panels need.
 
+  The panels share each axis's scale, so the same position means the same value in every panel,
+  and an axis is drawn only at the edges of the panels. Free scales give each panel a scale of its
+  own, trained on its rows alone, which makes patterns within a panel easier to see and comparisons
+  between panels harder; each panel then draws its own axis.
+
   ## Options
 
   #{NimbleOptions.docs(@facet_wrap_options)}
@@ -199,7 +212,8 @@ defmodule Giggly.Plot do
     facet = %Facet.Wrap{
       facets: facet_columns(facets, data),
       nrow: Keyword.get(options, :nrow, :none),
-      ncol: Keyword.get(options, :ncol, :none)
+      ncol: Keyword.get(options, :ncol, :none),
+      scales: Keyword.fetch!(options, :scales)
     }
 
     %{plot | facet: facet}

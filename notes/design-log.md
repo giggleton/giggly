@@ -1103,6 +1103,22 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-15 — `facet_wrap`'s free scales (Phase 2, its step 3).** `facet_wrap/3` takes
+  `scales: :fixed | :free_x | :free_y | :free`, `:fixed` recorded by default. On a free axis the
+  layout gives each panel a scale id of its own, the panel's, as ggplot2's `SCALE_X` and `SCALE_Y`
+  are, and every panel draws that axis. The assembly now routes rows: it adds an untrained scale
+  per id, all of the axis's one kind, trains each on the rows of the panels that use it, and
+  transforms and maps each row on its panel's scale, grouping a column's values by scale and
+  putting the results back in row order (ggplot2's `scale_apply()`), so a free discrete axis
+  places each panel's levels from 1. Rendering got back what step 2's review had cut to fixed
+  scales: a bottom axis is measured unless an empty cell is under it, and a left axis hangs from
+  its panel's edge at its own width (`hang: {:right, width}`), so one narrower than its column sits
+  against its panel. The new golden, `test/golden/facet_wrap_free.svg`, five panels on free x and
+  y scales, matches ggplot2's drawing in all 230 elements, in order, and every clip path, but for
+  the background's rounding error; it was right on the first drawing. Review's mutation run
+  (2,657 mutants) found one hole: no test had a discrete y axis, which a crash had pinned until
+  the routes were taken out of `add_scales/3`; a test now does.
+
 - **2026-10-15 — `facet_wrap`'s panels drawn (Phase 2, its step 2).** A faceted plot draws: each
   layer's rows are split by panel (`DataFrame.split/2`, R's `split()`), each panel is drawn alone
   with its background, grid and layers, and rendering arranges the panels as the layout table

@@ -62,9 +62,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A layer's stat and position run by the structs the layer records**, read with
   `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/2` and
   `Position.compute_layer/2`; the assembly names no stat or position kind.
-- **One scale per axis until free scales.** Each axis's scale id is read from the layout, and the
-  assembly matches exactly one; routing rows to several arrives with `facet_wrap`'s free scales,
-  where that match fails loudly until it does.
+- **Each row is routed to the scale its panel uses.** The layout's `scale_x` and `scale_y` say
+  which scale each panel uses, one for a fixed axis and one per panel for a free one; the assembly
+  adds an untrained scale per id, all of the axis's one kind, trains each on the rows of the
+  panels that use it, and transforms and maps each row on its panel's scale, putting the values
+  back in row order, as ggplot2's `scale_apply()` does. One kind per axis holds across every
+  panel: free scales are clones of one scale.
 - **After evaluation a layer's frame speaks only the aesthetic vocabulary:** one column per
   mapped aesthetic, plus the columns the pipeline writes. The data's own names never appear in a
   frame; only the axes' titles carry them.
@@ -103,8 +106,11 @@ aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `Da
 and calls `Group.add/2` with `Scale.level_key/1`. It then adds each axis's scale: it reads each
 layer's computed mapping for the axis's family, refuses an unplaceable or disagreeing column, and
 takes the kind from the first column (an axis no layer maps is continuous). Each frame's x-family
-and y-family columns are replaced by `Scale.transform/2`'s values, `Scale.train/2` folds in every
-such column of every layer, and the columns are replaced again by `Scale.map/2`'s positions. Each
+and y-family columns are replaced by `Scale.transform/2`'s values, each scale folds in with
+`Scale.train/2` every such column's values in the rows of the panels that use it, and the columns
+are replaced again by `Scale.map/2`'s positions; each transformation and mapping groups a column's
+values by their panel's scale, hands each group to its scale, and puts the results back in row
+order. Each
 frame then goes through its layer's stat and its position. Last, each layout row's scale ids
 pick the panel's x and y scales, and `Coord.panel_params/3` builds the panel's params from each
 one's `Scale.dimension/1` and the `Scale.breaks/2` on it; `Coord.clip/1` says whether panels are

@@ -3,8 +3,9 @@ defmodule Giggly.Facet.Wrap do
 
   # Wrapped panels, ggplot2's `facet_wrap()`: a panel for each combination of the values of the
   # facet's columns that occurs in the data, laid out in rows. Its struct holds its parameters: the
-  # columns it splits on, by the names the data gives them, and the number of rows and of columns
-  # to lay the panels out in, each `:none` when not given. Run it through `Giggly.Facet`.
+  # columns it splits on, by the names the data gives them; the number of rows and of columns to lay
+  # the panels out in, each `:none` when not given; and which axes' scales are free, ggplot2's
+  # `scales`: `:fixed`, `:free_x`, `:free_y` or `:free`. Run it through `Giggly.Facet`.
   #
   # The panels are ordered by the first column's values, then the next's, each as a discrete scale
   # orders its levels, by the key the assembly hands over, so a missing value (`nil`) gets a panel
@@ -13,23 +14,26 @@ defmodule Giggly.Facet.Wrap do
   # one row for up to three panels, two for up to six, three for up to twelve, and beyond that as
   # many columns as the square root of the count, rounded up, and as many rows as those columns
   # need. Given one, the other is as many as the panels need; given both, they must hold every
-  # panel. Every panel uses scale 1 of each axis: its scales are fixed.
+  # panel. On a fixed axis every panel uses that axis's scale 1; on a free one each panel has a
+  # scale of its own, numbered as the panel is, as ggplot2's layout numbers them.
   #
   # The layout carries each facet column, by its name in the data, as ggplot2's does, and each
   # row's panel is found from its values there. It also says where each panel's axes and strip go.
   # A panel draws an axis on each side that has no panel beside it, ggplot2's axes at the margins:
   # below the last row, and below a panel with an empty cell under it, at the end of an unfilled
-  # last row; and left of the first column. Each panel has a strip above it for each facet column,
+  # last row; and left of the first column. On a free axis every panel draws its own, since no two
+  # share a scale. Each panel has a strip above it for each facet column,
   # in the columns' order, labelled with its value as ggplot2's `label_value()` writes it, here
   # `to_string/1`, with a missing value written `NA`.
 
-  @enforce_keys [:facets, :nrow, :ncol]
+  @enforce_keys [:facets, :nrow, :ncol, :scales]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           facets: [String.t()],
           nrow: pos_integer() | :none,
-          ncol: pos_integer() | :none
+          ncol: pos_integer() | :none,
+          scales: :fixed | :free_x | :free_y | :free
         }
 
   defimpl Giggly.Facet, for: __MODULE__ do
@@ -37,31 +41,36 @@ defmodule Giggly.Facet.Wrap do
 
     alias Giggly.DataFrame
 
-    # Fixed scales: every panel uses scale 1 of each axis.
+    # A fixed axis's one scale.
     @only_scale 1
 
     @impl Giggly.Facet
-    def layout(%{facets: facets} = wrap, frame, order_key) do
+    def layout(%{facets: facets, scales: scales} = wrap, frame, order_key) do
       combinations = combinations(frame, facets, order_key)
       count = length(combinations)
       {_rows, columns} = dimensions(wrap, count)
-      places = Enum.map(1..count//1, fn panel -> place(panel, columns) end)
+      panels = Enum.to_list(1..count//1)
+      places = Enum.map(panels, fn panel -> place(panel, columns) end)
       occupied = MapSet.new(places)
+      free_x = scales in [:free_x, :free]
+      free_y = scales in [:free_y, :free]
 
       DataFrame.new(
         [
-          panel: Enum.to_list(1..count//1),
+          panel: panels,
           row: Enum.map(places, fn {row, _column} -> row end),
           column: Enum.map(places, fn {_row, column} -> column end)
         ] ++
           facet_columns(facets, combinations) ++
           [
-            scale_x: List.duplicate(@only_scale, count),
-            scale_y: List.duplicate(@only_scale, count),
+            scale_x: scale_ids(panels, free_x),
+            scale_y: scale_ids(panels, free_y),
             axis_bottom:
-              Enum.map(places, fn {row, column} -> {row + 1, column} not in occupied end),
+              Enum.map(places, fn {row, column} ->
+                free_x or {row + 1, column} not in occupied
+              end),
             axis_left:
-              Enum.map(places, fn {row, column} -> {row, column - 1} not in occupied end),
+              Enum.map(places, fn {row, column} -> free_y or {row, column - 1} not in occupied end),
             strip: Enum.map(combinations, fn values -> Enum.map(values, &label/1) end)
           ]
       )
@@ -98,6 +107,10 @@ defmodule Giggly.Facet.Wrap do
         combinations -> combinations
       end
     end
+
+    # Each panel's scale on an axis: its own, numbered as the panel is, on a free axis.
+    defp scale_ids(panels, true), do: panels
+    defp scale_ids(panels, false), do: Enum.map(panels, fn _panel -> @only_scale end)
 
     defp facet_columns(facets, combinations) do
       Enum.with_index(facets, fn name, index ->

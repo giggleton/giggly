@@ -9,9 +9,11 @@ defmodule Giggly.Scene.Cell do
   # part inside it.
   #
   # A cell's box is its rows and columns, unless it hangs: `{:top, height}` makes the box `height`
-  # points tall from the top of its rows, whatever they measure. An axis is drawn so below a panel
-  # with an empty cell under it, which ggplot2 measures as taking no room, so the axis hangs into
-  # the empty space below; every bottom axis hangs from its panel's edge, at its own height.
+  # points tall from the top of its rows, and `{:right, width}` `width` points wide ending at the
+  # right of its columns, whatever they measure. An axis is drawn so below a panel with an empty
+  # cell under it, which ggplot2 measures as taking no room, so the axis hangs into the empty space
+  # below; every bottom axis hangs from its panel's edge, at its own height, and every left axis at
+  # its own width, so one narrower than its column sits against its panel, as ggplot2's does.
 
   @enforce_keys [:rows, :columns, :clip, :hang, :primitives]
   defstruct @enforce_keys
@@ -20,7 +22,7 @@ defmodule Giggly.Scene.Cell do
           rows: Range.t(pos_integer(), pos_integer()),
           columns: Range.t(pos_integer(), pos_integer()),
           clip: :on | :off,
-          hang: :none | {:top, number()},
+          hang: :none | {:top, number()} | {:right, number()},
           primitives: [Giggly.Scene.primitive()]
         }
 end
