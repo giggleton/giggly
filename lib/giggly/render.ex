@@ -45,7 +45,7 @@ defmodule Giggly.Render do
         layout: layout,
         panel_params: panel_params,
         panel_clips: panel_clips,
-        titles: titles,
+        guide_titles: guide_titles,
         theme: theme_name
       }) do
     theme = Theme.complete(theme_name)
@@ -70,7 +70,7 @@ defmodule Giggly.Render do
     %{
       left: %{axis: {left_width, left_axis}, title: {left_title_width, left_title}},
       bottom: %{axis: {bottom_height, bottom_axis}, title: {bottom_title_height, bottom_title}}
-    } = Guide.axes(params, titles, theme)
+    } = Guide.axes(params, guide_titles, theme)
 
     %Theme{plot_margin: margin, plot_background: background} = theme
 

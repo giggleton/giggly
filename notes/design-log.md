@@ -66,6 +66,18 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **The assembly's titles are `guide_titles`, the title each aesthetic's guide draws (2026-10-14,
+  Steve).** `%Assembly{}` held the axes' titles as `titles`, keyed by aesthetic, a name chosen
+  because "labels" here means a break's text. But ggplot2 titles a legend by the same rule as an
+  axis (`setup_plot_labels()` over every aesthetic), so the map will grow by `color:` and the
+  rest, while a plot's own title, subtitle and caption belong to no aesthetic; `titles` would have
+  read as every title in the plot once a plot title existed. They are the titles guides draw:
+  ggplot2's axes and legends are both guides, each titled from the mapping and set with
+  `guide_axis(title = …)` or `guide_legend(title = …)`, and `Giggly.Guide` draws them. The field,
+  the private `guide_title/3` that finds one, and `Guide.axes/3`'s argument took the name.
+  *Rejected: `aesthetic_titles`* — it says how the map is keyed, not what the titles are for;
+  *and waiting for `labs/2`* — the rename was cheapest while nothing depended on the name.
+
 - **A theme is a function that builds the complete theme, not a module implementing a behaviour;
   a behaviour is for kinds that differ in what they do (2026-10-14, Steve).** `Giggly.Theme` had a
   behaviour of one callback, `complete/0`, and one module implementing it, `Theme.Gray`, because
@@ -376,7 +388,8 @@ stops the question being reopened from scratch.
   mutation step showed the search past a layer that does not map the aesthetic could not be
   reached, so it waits for the first geom that can leave an axis unmapped, and `Map.fetch!/2`
   fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
-  here means a break's text. `Coord.axes/1` now says which aesthetic each side's axis shows, so
+  here means a break's text (since renamed `guide_titles`, see the entry beginning "The assembly's
+  titles are `guide_titles`"). `Coord.axes/1` now says which aesthetic each side's axis shows, so
   which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
   with axes (Giggly since chose not to build `coord_flip`; see the entry beginning "Giggly follows
   ggplot2's current coordinate functions"). `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as

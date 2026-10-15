@@ -45,7 +45,7 @@ placed by the coordinate system".
 
 ## How it works
 
-`axes(panel_params, titles, theme)` asks `Coord.axes/1` for each side's aesthetic and placed
+`axes(panel_params, guide_titles, theme)` asks `Coord.axes/1` for each side's aesthetic and placed
 breaks, and returns for each side `%{axis: …, title: …}`, each `{size, primitives}`, from
 `Guide.Axis.draw/3` and `Guide.Axis.title/3` (the title of that side's aesthetic). Below the
 panel: a `Scene.Polylines` of one two-point line per tick, from the tick's end up to the panel's edge, then a `Scene.Text` of

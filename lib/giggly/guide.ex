@@ -34,12 +34,12 @@ defmodule Giggly.Guide do
   @doc false
   @spec axes(Coord.panel_params(), %{(:x | :y) => String.t() | :none}, Theme.t()) ::
           %{Coord.side() => %{axis: drawn_axis(), title: drawn_axis()}}
-  def axes(panel_params, titles, theme) do
+  def axes(panel_params, guide_titles, theme) do
     panel_params
     |> Coord.axes()
     |> Map.new(fn {side, {aesthetic, breaks}} ->
       title =
-        titles
+        guide_titles
         |> Map.fetch!(aesthetic)
         |> Guide.Axis.title(side, theme)
 

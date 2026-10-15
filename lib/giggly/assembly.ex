@@ -62,7 +62,7 @@ defmodule Giggly.Assembly do
     :y_scales,
     :panel_params,
     :panel_clips,
-    :titles,
+    :guide_titles,
     :theme
   ]
   defstruct @enforce_keys
@@ -71,8 +71,8 @@ defmodule Giggly.Assembly do
   An assembled plot: each layer's table and the name of the geom that draws it, in the order the
   layers were added; the layout table; the trained x and y scales keyed by the scale ids the layout
   gives each panel; each panel's params, and whether it is clipped to its edges, keyed by panel
-  id; the x and y axes' titles, `:none` for an axis no layer maps; and the name of the plot's
-  theme, which rendering resolves.
+  id; the title of each aesthetic's guide, the x and y axes' so far, `:none` for an axis no layer
+  maps; and the name of the plot's theme, which rendering resolves.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -82,7 +82,7 @@ defmodule Giggly.Assembly do
           y_scales: %{optional(pos_integer()) => Scale.t()},
           panel_params: %{optional(pos_integer()) => Coord.panel_params()},
           panel_clips: %{optional(pos_integer()) => Coord.clip()},
-          titles: %{x: String.t() | :none, y: String.t() | :none},
+          guide_titles: %{x: String.t() | :none, y: String.t() | :none},
           theme: Plot.theme()
         }
 
@@ -156,22 +156,23 @@ defmodule Giggly.Assembly do
       y_scales: y_scales,
       panel_params: panel_params,
       panel_clips: Map.new(panel_params, fn {panel, params} -> {panel, Coord.clip(params)} end),
-      titles: Map.new([:x, :y], fn aesthetic -> {aesthetic, title(plot, layers, aesthetic)} end),
+      guide_titles:
+        Map.new([:x, :y], fn aesthetic -> {aesthetic, guide_title(plot, layers, aesthetic)} end),
       theme: theme
     }
   end
 
-  # An axis's title: the column the first layer to map the axis's own aesthetic maps it to, through
-  # the layer's computed mapping, or `:none` when no layer maps it. It is ggplot2's
-  # `setup_plot_labels()`, where a later layer never replaces an earlier one's label, read as
-  # `resolve_label()` reads it, by the scale's first aesthetic. Every point layer maps x and y, so
-  # today the first layer maps it whenever there is one; the search past a layer that does not
+  # The title of an aesthetic's guide, an axis's so far: the column the first layer to map the
+  # aesthetic maps it to, through the layer's computed mapping, or `:none` when no layer maps it. It
+  # is ggplot2's `setup_plot_labels()`, where a later layer never replaces an earlier one's label,
+  # read as `resolve_label()` reads it, by the scale's first aesthetic. Every point layer maps x and
+  # y, so today the first layer maps it whenever there is one; the search past a layer that does not
   # arrives with the first geom that can leave an axis unmapped, and `Map.fetch!/2` fails loudly
   # until it does.
-  defp title(_plot, [], _aesthetic), do: :none
+  defp guide_title(_plot, [], _aesthetic), do: :none
 
   # The plot holds each mapping's column by the name the data gives it, which is the title.
-  defp title(plot, [first_layer | _later_layers], aesthetic) do
+  defp guide_title(plot, [first_layer | _later_layers], aesthetic) do
     plot
     |> Plot.computed_mapping(first_layer)
     |> Map.fetch!(aesthetic)
