@@ -66,6 +66,49 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Each facet, coordinate system, geom, stat and position will be a struct of its kind, drawn or
+  computed through a protocol at its family's root, and a repo-local check keeps `Plot` from
+  calling those roots (2026-10-14, Steve; to be built with `facet_wrap`).** A plot records each
+  of these choices by name today (`facet: :null`, `geom: :point`), resolved to a module
+  implementing its family's behaviour. Names have no room for parameters, and `facet_wrap`, Phase
+  2's first increment, brings the first (its variables, `ncol`, free scales), with
+  `coord_radial()`'s, geoms', stats' and positions' after it. Names also spread each kind's facts
+  across the pipeline: `Plot` holds `geom_point`'s accepted and required aesthetics while
+  `Geom.Point` draws, and default aesthetics (the assembly) and legend keys (the guides) would
+  each add another place, the scattering the ggity research found. **The shape:** a family's root
+  is a protocol (`Giggly.Geom` with `draw_panel/3`; `Giggly.Stat`, `Giggly.Position`,
+  `Giggly.Facet`, `Giggly.Coord` with theirs), and each kind is one module holding everything
+  about it, as ggplot2's `GeomPoint` does: `Giggly.Geom.Point` has `defstruct` with the kind's
+  parameters, functions giving its facts (`accepted_aesthetics/0`, `required_aesthetics/0`), and
+  `defimpl Giggly.Geom, for: __MODULE__` with its drawing. The identities become
+  `%Stat.Identity{}` and `%Position.Identity{}`, still values a test can assert. `Plot` lists the
+  five family boundaries, builds the kinds' structs, and reads their facts to check a mapping at
+  the call, so `plot.md`'s "a mistake raises from the call that wrote it" holds. A third party
+  adds a kind with a module of its own and a `defimpl`. **The check:** `boundary` cannot let
+  `Plot` use `Geom.Point` while forbidding `Giggly.Geom`, since a boundary always exports its root
+  module and a boundary may depend only on its siblings, its parent and its ancestors' deps (read
+  in its source), so a repo-local credo check holds the rule: in `Plot`'s files, no call to a
+  family root's own functions and no bare reference to a root (which closes a call through a
+  variable), while a kind's struct and fact functions stay allowed. It runs in `mix credo
+  --strict`, and the waiver gate stops any disabling of it, as `CorePurity` holds what boundary
+  cannot see. Themes stay functions returning a value (the entry beginning "A theme is a
+  function"): a protocol on a struct is for kinds that differ in what they do. *Rejected: names
+  with a behaviour, as now* — no room for parameters, and facts spread. *Rejected: names with
+  parameters and a table of facts in `Plot`* — closed to extension, facts apart from the drawing.
+  *Rejected: descriptions taking the family name with a separately named drawing protocol*
+  (`Geom.Point` with `Giggly.Draw`) — a second protocol name per family. *Rejected: descriptions
+  under `Plot` (`Plot.Geom.Point`)* — `Plot`'s exports grow, and the computing domains would
+  depend on `Plot`. *Rejected: a boundary of descriptions (`Spec.Geom.Point`)* (Steve) —
+  three-level names, and `Spec` abbreviates. *Rejected: no `Giggly.Geom` module, each kind its own
+  boundary beside a `Geom.Draw` protocol* (Steve's, and the one the compiler would hold) — a
+  boundary per kind, and two dependency entries per new kind, each a widening; about seventy
+  boundaries by Phase 3's end. *Rejected: a check against anything under a family's namespace* —
+  it would forbid the facts; the rule is about the roots. *Deferred:* a public function adding a
+  layer of any kind (ggplot2's `layer()`), which third-party kinds need, until the first one;
+  required aesthetics checked after the stat, which §4 already records for Phase 3. The decision
+  replaces the names of the entry beginning "A layer names its stat and position" when it is
+  built, and `Plot` listing the family boundaries is approved then, through the waiver gate.
+
 - **The assembly's titles are `guide_titles`, the title each aesthetic's guide draws (2026-10-14,
   Steve).** `%Assembly{}` held the axes' titles as `titles`, keyed by aesthetic, a name chosen
   because "labels" here means a break's text. But ggplot2 titles a legend by the same rule as an
@@ -583,7 +626,9 @@ stops the question being reopened from scratch.
   `StatIdentity` as the layer is built) — `Plot` would name `Stat.Identity` as a value, which
   boundary does not count unless `check: [aliases: true]` is on, and listing `Stat` would let a
   plot run stats, the reason `Plot` does not list `Scale`; the question returns when a caller can
-  pass `stat:`, whose misspelling must raise at the call. *Rejected: `as:` aliases* — credo's
+  pass `stat:`, whose misspelling must raise at the call (since decided, to be built with
+  `facet_wrap`: see the entry beginning "Each facet, coordinate system, geom, stat and position
+  will be a struct"). *Rejected: `as:` aliases* — credo's
   `AliasAs` check is enabled; *and renamed modules (`StatIdentity`)* — ggplot2 prefixes because an
   R package has one flat namespace, and module nesting does that job here. *Rejected:
   `position_jitter` as the stages' first non-identity member now* — it would bring keyword options,

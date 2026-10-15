@@ -31,6 +31,10 @@ stat and position".
   plot records its facet, coordinate system and theme the same way, `facet: :null`,
   `coord: :cartesian` and `theme: :gray` when nothing chooses others. What a misspelt name does arrives with the first
   option that lets a caller choose one: it must raise at the call, which will need the valid names.
+  **This changes with `facet_wrap`:** the facet, coordinate system, geom, stat and position become
+  structs of their kinds, which `Plot` builds and reads the facts of but never computes or draws
+  with (design-log §4, the entry beginning "Each facet, coordinate system, geom, stat and position
+  will be a struct"); the theme stays a name until a user can set one.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an
   unusable aesthetic is reported by the line that has it, never later when the plot is run. A

@@ -26,8 +26,10 @@ facet assigns panels".
 - **A panel id is an integer.** It is never discrete, so it never enters the group key, and a
   layer with no rows in a panel still lines up with the others through the layout table.
 - **A plot always names its facet, `:null` included**, and this namespace resolves the name; each
-  facet is a module implementing the behaviour. `facet_wrap` is a second module and a second
-  name, touching only `Plot`, `Facet`, the assembly and rendering, never a geom.
+  facet is a module implementing the behaviour. `facet_wrap` arrives as a struct of its kind with
+  the facet protocol (design-log §4, the entry beginning "Each facet, coordinate system, geom, stat
+  and position will be a struct"), touching only `Plot`, `Facet`, the assembly and rendering, never
+  a geom.
 
 ## How it works
 
