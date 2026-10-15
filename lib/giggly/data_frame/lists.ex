@@ -71,7 +71,37 @@ defmodule Giggly.DataFrame.Lists do
 
   def put(%__MODULE__{} = frame, name, values), do: add_column(frame, name, typed(name, values))
 
+  @impl DataFrame
+  def split(%__MODULE__{columns: columns} = frame, name) do
+    keys = pull(frame, name)
+
+    # Each column's values grouped by the row's key, in row order, keeping the column's type.
+    grouped =
+      Map.new(columns, fn {column_name, {dtype, values}} ->
+        by_key =
+          keys
+          |> Enum.zip(values)
+          |> Enum.group_by(fn {key, _value} -> key end, fn {_key, value} -> value end)
+
+        {column_name, {dtype, by_key}}
+      end)
+
+    keys
+    |> Enum.frequencies()
+    |> Map.new(fn {key, row_count} -> {key, part(frame, grouped, key, row_count)} end)
+  end
+
   defp empty(row_count), do: %__MODULE__{reversed_names: [], columns: %{}, row_count: row_count}
+
+  # The frame of the `row_count` rows whose key is `key`, from the columns grouped by key.
+  defp part(%__MODULE__{reversed_names: reversed_names}, grouped, key, row_count) do
+    columns =
+      Map.new(grouped, fn {column_name, {dtype, by_key}} ->
+        {column_name, {dtype, Map.fetch!(by_key, key)}}
+      end)
+
+    %__MODULE__{reversed_names: reversed_names, columns: columns, row_count: row_count}
+  end
 
   defp column(%__MODULE__{columns: columns}, name) when is_map_key(columns, name),
     do: Map.fetch!(columns, name)

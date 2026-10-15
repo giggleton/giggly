@@ -26,7 +26,7 @@ defmodule Giggly.Guide.Axis do
   # and its label, in `theme`'s look: how far it reaches from the panel, in points, and its
   # primitives, placed in a cell that deep.
   @doc false
-  @spec draw([{float(), String.t()}], :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
+  @spec draw([{float(), String.t()}], :bottom | :left, Theme.t()) :: Giggly.Guide.drawn()
   def draw([], _side, _theme), do: {0.0, []}
 
   def draw(breaks, :bottom, %Theme{
@@ -100,7 +100,7 @@ defmodule Giggly.Guide.Axis do
   # the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
   # side.
   @doc false
-  @spec title(String.t() | :none, :bottom | :left, Theme.t()) :: Giggly.Guide.drawn_axis()
+  @spec title(String.t() | :none, :bottom | :left, Theme.t()) :: Giggly.Guide.drawn()
   def title(:none, _side, _theme), do: {0.0, []}
 
   def title(text, :bottom, %Theme{axis_title: title_look}) do

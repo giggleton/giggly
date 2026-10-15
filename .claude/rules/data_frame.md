@@ -19,8 +19,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   A new operation is a `@callback` plus a function here that dispatches on the frame's struct.
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
-  `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3` and
-  the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
+  `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
+  `split/2` and the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
   user another operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library, and is a top-level boundary because of it.** Its `deps:`
   is `Table` alone, and nothing else in Giggly may call `table`. Nested under `Giggly`, it could
@@ -67,3 +67,6 @@ the row count; `put/3` replacing a column has its own length guard. A column's t
 over its values that starts at `:null`, skips `nil`, takes the first value's kind, and widens
 `:integer` to `:float`; any other disagreement raises, naming the first value of the column's type
 and the value that broke it. The type is stored with the values, so the two cannot drift apart.
+`split/2` groups every column's values by a key column's value in one pass each, rows kept in
+order, and gives each key a frame of the same names and types, as R's `split()` divides
+ggplot2's layer data by panel; rendering splits each layer by `:panel`.

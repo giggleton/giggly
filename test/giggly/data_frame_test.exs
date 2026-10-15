@@ -158,4 +158,24 @@ defmodule Giggly.DataFrameTest do
       end
     end
   end
+
+  describe "split/2" do
+    test "each value's rows keep their order, every column and each column's type" do
+      frame = DataFrame.new(x: [1.0, 2.0, 3.0, 4.0], panel: [2, 1, 2, 1])
+
+      parts = DataFrame.split(frame, :panel)
+
+      assert Map.keys(parts) == [1, 2]
+      assert DataFrame.pull(parts[1], :x) === [2.0, 4.0]
+      assert DataFrame.pull(parts[2], :x) === [1.0, 3.0]
+      assert DataFrame.names(parts[2]) == [:x, :panel]
+      assert DataFrame.row_count(parts[2]) == 2
+    end
+
+    test "a part keeps its column's type even when its own values would read as another" do
+      frame = DataFrame.new(x: [1, 2.5], panel: [1, 2])
+
+      assert DataFrame.dtypes(DataFrame.split(frame, :panel)[1]) == %{x: :float, panel: :integer}
+    end
+  end
 end

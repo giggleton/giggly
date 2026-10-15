@@ -101,6 +101,10 @@ defmodule Giggly.DataFrame do
   @doc false
   @callback put(t(), name(), list()) :: t()
 
+  # The rows split by the values of one column, as `split/2` describes.
+  @doc false
+  @callback split(t(), name()) :: %{optional(term()) => t()}
+
   # Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
   # result) into a frame.
   #
@@ -228,4 +232,11 @@ defmodule Giggly.DataFrame do
   @doc false
   @spec put(t(), name(), list()) :: t()
   def put(%implementation{} = frame, name, values), do: implementation.put(frame, name, values)
+
+  # The frame's rows split by the values of the column `name`, as R's `split()` splits ggplot2's
+  # layer data by panel: for each value the column holds, a frame of the rows holding it, in their
+  # order, with every column and each column's type. A value the column does not hold has no frame.
+  @doc false
+  @spec split(t(), name()) :: %{optional(term()) => t()}
+  def split(%implementation{} = frame, name), do: implementation.split(frame, name)
 end

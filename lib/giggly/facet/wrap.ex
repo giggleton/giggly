@@ -16,7 +16,12 @@ defmodule Giggly.Facet.Wrap do
   # panel. Every panel uses scale 1 of each axis: its scales are fixed.
   #
   # The layout carries each facet column, by its name in the data, as ggplot2's does, and each
-  # row's panel is found from its values there.
+  # row's panel is found from its values there. It also says where each panel's axes and strip go.
+  # A panel draws an axis on each side that has no panel beside it, ggplot2's axes at the margins:
+  # below the last row, and below a panel with an empty cell under it, at the end of an unfilled
+  # last row; and left of the first column. Each panel has a strip above it for each facet column,
+  # in the columns' order, labelled with its value as ggplot2's `label_value()` writes it, here
+  # `to_string/1`, with a missing value written `NA`.
 
   @enforce_keys [:facets, :nrow, :ncol]
   defstruct @enforce_keys
@@ -41,6 +46,7 @@ defmodule Giggly.Facet.Wrap do
       count = length(combinations)
       {_rows, columns} = dimensions(wrap, count)
       places = Enum.map(1..count//1, fn panel -> place(panel, columns) end)
+      occupied = MapSet.new(places)
 
       DataFrame.new(
         [
@@ -51,7 +57,12 @@ defmodule Giggly.Facet.Wrap do
           facet_columns(facets, combinations) ++
           [
             scale_x: List.duplicate(@only_scale, count),
-            scale_y: List.duplicate(@only_scale, count)
+            scale_y: List.duplicate(@only_scale, count),
+            axis_bottom:
+              Enum.map(places, fn {row, column} -> {row + 1, column} not in occupied end),
+            axis_left:
+              Enum.map(places, fn {row, column} -> {row, column - 1} not in occupied end),
+            strip: Enum.map(combinations, fn values -> Enum.map(values, &label/1) end)
           ]
       )
     end
@@ -126,6 +137,10 @@ defmodule Giggly.Facet.Wrap do
     defp place(panel, columns), do: {div(panel - 1, columns) + 1, rem(panel - 1, columns) + 1}
 
     defp ceiling_divide(numerator, denominator), do: div(numerator + denominator - 1, denominator)
+
+    # A value as its strip writes it, ggplot2's `label_value()`.
+    defp label(nil), do: "NA"
+    defp label(value), do: to_string(value)
 
     defp no_panels_message(facets) do
       "facet_wrap by #{inspect_all(facets)} has no panels to make: the data has no rows"

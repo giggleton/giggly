@@ -66,6 +66,22 @@ Each entry: **the decision (date, whose call)**, then *Rejected: the alternative
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch.
 
+- **Every plot's cells are drawn in ggplot2's facets' order, a plot without a facet included
+  (2026-10-15, Steve).** ggplot2 is not consistent: a plot without a facet draws its y axis before
+  its x axis (`FacetNull$draw_panels()` gives the left axis a lower z than the bottom one), while
+  `facet_wrap` and `facet_grid` add every bottom axis before every left one at one z, so draw them
+  in that order. Axes never overlap, so the order changes nothing visible, only the order of the
+  SVG's elements, which the goldens' comparison with ggplot2 diffs. Rendering arranges every
+  plot's panels the same way (the entry beginning "`facet_wrap` is built in steps"), so it can
+  follow one order: ggplot2's facets', in which the panels go column by column, the strips and
+  bottom axes from the last row of panels to the first, and the left axes from the last column to
+  the first, as ggplot2's `weave_tables_row()` and `weave_tables_col()` add them. The plain plot's
+  golden draws its x axis before its y axis, which `test/golden/point.R` names; the faceted golden
+  matches ggplot2's drawing in every element, in order. *Rejected: the facet carrying a drawing
+  order as data (ggplot2's z levels)*, which matches every kind of plot exactly but adds a concept
+  to the layout only to reproduce a difference no one can see; *and the plain plot's order for
+  every plot*, which puts every faceted golden out of ggplot2's order instead.
+
 - **`facet_wrap` is built in steps after the conversion to structs, and the facet says where each
   panel's axes and strips go as data, which rendering arranges and the guide draws (2026-10-14,
   Steve, agreeing the proposal's recommendations).** Step 1 is panels as data:
@@ -1086,6 +1102,31 @@ finding aid, not the record. The full text is one `git log -S "<its title>"` awa
 _(none yet)_
 
 **Full entries (newest first):**
+
+- **2026-10-15 — `facet_wrap`'s panels drawn (Phase 2, its step 2).** A faceted plot draws: each
+  layer's rows are split by panel (`DataFrame.split/2`, R's `split()`), each panel is drawn alone
+  with its background, grid and layers, and rendering arranges the panels as the layout table
+  says, which now carries each panel's `axis_bottom`, `axis_left` and `strip` labels, the facet's
+  say: axes at the margins (below the last row and above an empty cell, left of the first
+  column), and a strip per facet column, `to_string/1`, `nil` as `NA`. The theme gained the panel
+  spacing and the strips' background and text, `Giggly.Guide.Strip` draws a strip, and the guide's
+  `axes/3` and `titles/4` split, since a plot draws an axis per panel but its titles once. The
+  scene's `:rest` columns and rows now share equally, and a cell can hang a height of its own from
+  the top of its rows, which is how ggplot2's unmeasured axis over an empty cell hangs into it.
+  Before writing it, ggplot2's own drawings were read element by element (vdiffr in Docker) and
+  every size reproduced from Giggly's font table to the hundredth: a strip 16.65 points tall, its
+  baseline 3.03 below its middle, panels 5.48 apart, titles centred on the panels and not the top
+  strips. That reading found that ggplot2 draws a faceted plot's x axes before its y axes and a
+  plain plot's the other way round; Steve chose facets' order for every plot (§4, the entry
+  beginning "Every plot's cells are drawn in ggplot2's facets' order"), so `test/golden/point.svg`
+  changed only by its x axis's elements moving ahead of its y axis's, every line otherwise the
+  same. The new golden, `test/golden/facet_wrap.svg` (two facet columns, five panels, the last row
+  one short), matches ggplot2's drawing in all 191 elements in order and all 15 clip paths, but
+  for a background edge svglite writes as R's rounding error. Review's mutation run (2,878
+  mutants) found rules in rendering that only free scales could tell apart — measuring an axis
+  over an empty cell, an empty cell to a panel's left, a strip height per row and layer — so they
+  were cut to the shape fixed scales give (bottom axes measured in the last row, left axes always,
+  one strip height, ggplot2's `assemble_strips()`), and step 3 brings back what free scales need.
 
 - **2026-10-14 — `facet_wrap`'s panels, as data (Phase 2, its step 1).** `Plot.facet_wrap/3`
   takes a column or a list of them, resolved at the call as a mapping's are (none, one named twice

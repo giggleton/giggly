@@ -18,11 +18,17 @@ entry beginning "Three top-level values".
   rendering builds and a backend reads (`Cell`, `Circles`, `Polylines`, `Rect`, `Text`); nothing in
   it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or `:rest`.** A size in points is
-  measured when the scene is built (an axis, a margin); `:rest` is what the fixed sizes leave of
-  the drawing, which the panel takes (grid's `"null"` unit). Exactly one column and one row are
-  `:rest` until `facet_wrap` brings panels to share it, by weight; `SVG.draw/3` refuses any other
-  shape. Nothing is measured later, so a backend needs no font. The docs say widths and heights,
-  not "tracks".
+  measured when the scene is built (an axis, a margin); `:rest` is a share of what the fixed sizes
+  leave of the drawing, which a panel takes (grid's `"null"` unit): the columns that are `:rest`
+  share the width equally, and the rows the height, so every panel is one size. Weights arrive
+  with the first panels of different sizes (`space = "free"`, an aspect ratio). Nothing is
+  measured later, so a backend needs no font. The docs say widths and heights, not "tracks".
+- **A cell's box is its rows and columns, unless it hangs.** `hang: {:top, height}` makes the box
+  `height` points tall from the top of its rows, whatever they measure: ggplot2 measures an axis
+  below a panel with an empty cell under it as taking no room, and the axis hangs into the empty
+  space. Every bottom axis hangs from its panel's edge at its own height, which is the row's height
+  when it is measured. Hanging to the left arrives with the first left axis narrower than its
+  column (free y scales).
 - **Primitives are placed in their cell's units, 0 to 1 across and up, and sized in points.** A
   primitive never knows the cell's size; the backend places it in the cell's box. The one position
   in points is a text's `baseline_offset`, from its anchor to its baseline.
@@ -42,7 +48,8 @@ entry beginning "Three top-level values".
 
 `%Giggly.Scene{}` holds the column widths (left to right), the row heights (top to bottom), each
 `{:points, size}` or `:rest`, and the cells. `Scene.Cell` holds the ranges of rows and columns it
-spans, whether it is clipped, and its primitives in drawing order. The primitives are named after
+spans, whether it is clipped, whether it hangs (`:none`, or `{:top, height}`), and its primitives
+in drawing order. The primitives are named after
 grid's: `Scene.Circles` (`circleGrob()`: positions, one radius, one outline width, one colour; what
 R's graphics engine draws for shape 19, ggplot2's default point), `Scene.Polylines`
 (`polylineGrob()`: lines of `{x, y}` points, one stroke width and colour, square-cut ends),

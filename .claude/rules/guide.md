@@ -6,8 +6,9 @@ paths:
 
 # Guides
 
-`Giggly.Guide` draws the axes beside a panel and their titles, ggplot2's `guide_axis()`, and the
-panel's background and grid lines, ggplot2's `guide_grid()`. Why a
+`Giggly.Guide` draws the axes beside a panel and their titles, ggplot2's `guide_axis()`; the
+panel's background and grid lines, ggplot2's `guide_grid()`; and the strips that label a facet's
+panels, which ggplot2's facets draw with `render_strips()`. Why a
 domain of its own, and why it is called a guide: design-log §4, the entry beginning "Axes are
 drawn"; which name titles an axis: the entry beginning "An axis is titled"; why the grid is
 drawn here but placed by the coordinate system: the entry beginning "The panel's grid lines are
@@ -39,15 +40,26 @@ placed by the coordinate system".
 - **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early.
 - **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
   the labels and then the ticks.
+- **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
+  centred, its baseline half an ascent below the middle, the strip text's margin above and below a
+  line of text, so it is as tall as the margin twice, an ascent and the deepest descent. A panel
+  has one strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
+  stacks them.
+- **An axis is drawn per panel, its title once per plot.** `axes/3` draws one panel's axes;
+  `titles/4` the plot's titles, from any panel's params, since every panel puts the same aesthetic
+  on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
   labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, and a
   guide behaviour (the first legend).
 
 ## How it works
 
-`axes(coord, panel_params, guide_titles, theme)` asks `Coord.axes/2` for each side's aesthetic and
-placed breaks, and returns for each side `%{axis: …, title: …}`, each `{size, primitives}`, from
-`Guide.Axis.draw/3` and `Guide.Axis.title/3` (the title of that side's aesthetic). Below the
+`axes(coord, panel_params, theme)` asks `Coord.axes/2` for each side's placed breaks and returns
+for each side the axis `Guide.Axis.draw/3` draws, `{size, primitives}`; `titles(coord,
+panel_params, guide_titles, theme)` asks it for each side's aesthetic and returns that
+aesthetic's title from `Guide.Axis.title/3`; `strips(labels, theme)` returns a `{height,
+primitives}` per label from `Guide.Strip.draw/2`, a `Scene.Rect` in the theme's
+`strip_background` under a `Scene.Text` in its `strip_text`. Below the
 panel: a `Scene.Polylines` of one two-point line per tick, from the tick's end up to the panel's
 edge, then a `Scene.Text` of the labels centred on their ticks with their tops at the gap and
 their baselines an ascent below. To its left: the labels ending at the gap, centred on their ticks

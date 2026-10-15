@@ -4,10 +4,10 @@ defmodule Giggly.SVG do
   # Writes a `Giggly.Scene` as SVG.
   #
   # The table is laid out at the size it is given, in points (1/72 inch): each column or row with a
-  # size in points takes it, and the one column and the one row that are `:rest` take what is left.
-  # A scene with more than one of either is refused (`MatchError`) until panels can share the rest.
-  # Each cell's box runs from the start of its first column and row to the end of its last, and its
-  # primitives are placed in that box, cells in the order the scene lists them; a clipped cell's
+  # size in points takes it, and the columns that are `:rest` share what is left equally, as do the
+  # rows. Each cell's box runs from the start of its first column and row to the end of its last,
+  # or hangs a height of its own from the top of its first row, and its primitives are placed in
+  # that box, cells in the order the scene lists them; a clipped cell's
   # are drawn in a group cut off at the box, as svglite writes one. The
   # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
   # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
@@ -51,10 +51,10 @@ defmodule Giggly.SVG do
   end
 
   # Each column's or row's start and length along the drawing: sizes in points take their length,
-  # and the one `:rest` takes what they leave.
+  # and each `:rest` an equal share of what they leave.
   defp lay_out(sizes, total) do
-    {fixed_sizes, [:rest]} = Enum.split_with(sizes, fn size -> size != :rest end)
-    rest = total - Enum.sum(for {:points, length} <- fixed_sizes, do: length)
+    {fixed_sizes, rests} = Enum.split_with(sizes, fn size -> size != :rest end)
+    rest = (total - Enum.sum(for {:points, length} <- fixed_sizes, do: length)) / length(rests)
 
     {spans, _end} =
       Enum.map_reduce(sizes, 0, fn size, start ->
@@ -69,7 +69,7 @@ defmodule Giggly.SVG do
   defp span_length(:rest, rest), do: rest
 
   defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
-    box = {span(column_spans, columns), span(row_spans, rows)}
+    box = {span(column_spans, columns), hang(span(row_spans, rows), cell.hang)}
     drawn = Enum.map(cell.primitives, fn primitive -> primitive(primitive, box) end)
     clip(drawn, cell.clip, box)
   end
@@ -103,6 +103,10 @@ defmodule Giggly.SVG do
       "</g>\n"
     ]
   end
+
+  # A hanging cell's rows: from their top, as tall as it says.
+  defp hang(rows, :none), do: rows
+  defp hang({top, _height}, {:top, height}), do: {top, height}
 
   # A cell's start and length in one direction: from its first column's or row's start to its
   # last one's end.

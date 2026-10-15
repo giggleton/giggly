@@ -1,8 +1,8 @@
 defmodule Giggly.Facet.Null do
   @moduledoc false
 
-  # The null facet, ggplot2's `facet_null()`: one panel, which every row is drawn in. It takes no
-  # parameters. Run it through `Giggly.Facet`.
+  # The null facet, ggplot2's `facet_null()`: one panel, which every row is drawn in, with an axis
+  # below it and to its left and no strip. It takes no parameters. Run it through `Giggly.Facet`.
 
   defstruct []
 
@@ -26,7 +26,10 @@ defmodule Giggly.Facet.Null do
         row: [@only_row],
         column: [@only_column],
         scale_x: [@only_scale],
-        scale_y: [@only_scale]
+        scale_y: [@only_scale],
+        axis_bottom: [true],
+        axis_left: [true],
+        strip: [[]]
       )
     end
 

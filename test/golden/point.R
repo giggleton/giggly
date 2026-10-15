@@ -18,6 +18,10 @@
 # vdiffr's `write_svg()` draws with its own copy of svglite and the Liberation fonts, at 720 by 576
 # points, with no title; `theme_gray()` is added because vdiffr gives a plot that sets no theme
 # `theme_test()` instead. First checked with ggplot2 4.0.3 and vdiffr 1.0.9.
+#
+# The diff shows one difference, by design: Giggly draws the x axis before the y axis, the order
+# ggplot2's facets draw axes in, where ggplot2's plot without a facet draws the y axis first; the
+# two never overlap, so the drawings look the same, and every element matches.
 
 library(ggplot2)
 

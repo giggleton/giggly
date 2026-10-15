@@ -24,9 +24,15 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   layout table; never the facet's settings or the variables it splits on.
 - **The layout table holds only what a stage reads.** One row per panel: `panel`; the `row` and
   `column` rendering puts the panel's cell at (ggplot2's `ROW` and `COL`, spelled out); and the
-  `scale_x`/`scale_y` ids scale training routes by. Under `facet_wrap` each column it splits on
-  joins it, by its name in the data, as in ggplot2's, and each row's panel is found from its
-  values there.
+  `scale_x`/`scale_y` ids scale training routes by; and what rendering arranges, which is the
+  facet's say: `axis_bottom` and `axis_left`, whether the panel draws each axis, and `strip`, its
+  strip labels top to bottom. Under `facet_wrap` each column it splits on joins it, by its name
+  in the data, as in ggplot2's, and each row's panel is found from its values there.
+- **A wrapped panel draws an axis on each side with no panel beside it**, ggplot2's axes at the
+  margins: below the last row and below a panel with an empty cell under it, left of the first
+  column. Its strips are one per facet column, the value written as ggplot2's `label_value()`
+  writes it, here `to_string/1`, a missing value `NA`. The null facet's one panel draws both axes
+  and has no strip.
 - **Panels made from values are ordered as a discrete scale orders its levels**, by the key the
   assembly hands the facet (`Scale.level_key/1`): column by column, a missing value last, strings
   by bytes rather than R's locale. Only the combinations that occur get a panel.

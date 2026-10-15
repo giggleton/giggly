@@ -32,7 +32,10 @@ defmodule Giggly.Theme do
     :axis_ticks,
     :axis_ticks_length,
     :axis_text,
-    :axis_title
+    :axis_title,
+    :panel_spacing,
+    :strip_background,
+    :strip_text
   ]
   defstruct @enforce_keys
 
@@ -56,7 +59,9 @@ defmodule Giggly.Theme do
   @typedoc """
   A complete theme: the plot's background, drawn over the whole drawing, and the margin around
   what is drawn on it, in points; the panel's background and its major and minor grid lines; each
-  axis's ticks, their length in points, its labels and its title.
+  axis's ticks, their length in points, its labels and its title; the space between panels, in
+  points; and the background and text of the strips that label each panel, the text's margin on
+  every side of it.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -67,7 +72,10 @@ defmodule Giggly.Theme do
           axis_ticks: line(),
           axis_ticks_length: float(),
           axis_text: text(),
-          axis_title: text()
+          axis_title: text(),
+          panel_spacing: float(),
+          strip_background: rect(),
+          strip_text: text()
         }
 
   # Scene points per TeX point (grid's "pt"), the unit ggplot2's theme gives lengths in.
@@ -87,8 +95,10 @@ defmodule Giggly.Theme do
   @half_line @base_size / 2
 
   # `col_mix(ink, paper, amount)` for black ink on white paper, as ggplot2 rounds it.
+  @ink_toward_paper_10 "#1A1A1A"
   @ink_toward_paper_20 "#333333"
   @ink_toward_paper_30_2 "#4D4D4D"
+  @ink_toward_paper_85 "#D9D9D9"
   @ink_toward_paper_92 "#EBEBEB"
 
   # The complete theme named `name`: every element it draws, worked out.
@@ -111,7 +121,10 @@ defmodule Giggly.Theme do
   # grid lines are paper white, the major ones as wide as a line and the minor ones half that. An
   # axis's ticks are dark grey (ink mixed 20% toward paper), `half_line / 2` long and as wide
   # as a line; its labels are grey (30.2% toward paper), 0.8 of the base size, `0.8 * half_line / 2`
-  # from the ticks; its title is black at the base size, `half_line / 2` from the labels.
+  # from the ticks; its title is black at the base size, `half_line / 2` from the labels. Panels are
+  # `half_line` apart (ggplot2's `spacing`, which `panel.spacing` takes). A strip is light grey (85%
+  # toward paper) with no border, and its text near black (10% toward paper), 0.8 of the base size,
+  # with `0.8 * half_line` around it on every side.
   defp gray do
     %__MODULE__{
       plot_background: %{
@@ -147,6 +160,17 @@ defmodule Giggly.Theme do
         size: @base_size,
         color: @ink,
         margin: @half_line / 2 * @points_per_theme_point
+      },
+      panel_spacing: @half_line * @points_per_theme_point,
+      strip_background: %{
+        fill: @ink_toward_paper_85,
+        color: :none,
+        line_width: @base_rect_size * @points_per_millimetre_of_line
+      },
+      strip_text: %{
+        size: 0.8 * @base_size,
+        color: @ink_toward_paper_10,
+        margin: 0.8 * @half_line * @points_per_theme_point
       }
     }
   end

@@ -41,6 +41,8 @@ a behaviour: the entry beginning "A theme is a function".
 
 ## How it works
 
+The elements so far: the plot's background and margin, the panel's background and grid lines,
+the axes' ticks, labels and titles, the panel spacing, and the strips' background and text.
 `Theme.complete(:gray)` calls the private `gray/0`, which works each element out from
 `theme_gray()`'s arguments (base size 11, black ink on white paper, lines and borders 11/22 mm) as
 ggplot2's `theme-defaults.R` does: `half_line` is half the base size, and colours are ink mixed

@@ -161,6 +161,34 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/point.svg")
     end
 
+    # Golden: test/golden/facet_wrap.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/facet_wrap.R: every element, in order, and every clip path match it. Five
+    # combinations of cyl and drv make five panels in two rows of three, the last row one short, so
+    # the panel above the empty cell draws an x axis that hangs into it while its row takes no room
+    # for it, and each panel has a strip for each column; the panels share the drawing equally,
+    # the theme's spacing between them, and the titles are centred on them. It moves with what
+    # moves test/golden/point.svg, and with the strips' look, the panel spacing, the layout of the
+    # panels, or the order cells are drawn in.
+    test "a wrapped facet draws a panel for each combination, with strips and axes at the margins" do
+      plot =
+        %{
+          "wt" => [0.0, 4.0, 7.0, 10.0, 2.0, 5.0, 8.0, 3.0, 6.0],
+          "mpg" => [0.0, 50.0, 20.0, 35.0, 10.0, 40.0, 25.0, 15.0, 30.0],
+          "cyl" => [4, 4, 4, 6, 6, 6, 8, 8, 8],
+          "drv" => ["f", "r", "r", "4", "4", "f", "f", "f", "f"]
+        }
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap([:cyl, :drv])
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/facet_wrap.svg")
+    end
+
     test "a label's &, < and > are escaped, so a level cannot break the document" do
       svg =
         %{"make" => ["<a & b>"], "mpg" => [21.0]}

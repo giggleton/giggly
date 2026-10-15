@@ -113,4 +113,22 @@ defmodule Giggly.FacetTest do
       assert DataFrame.pull(paneled, :panel) == [5, 1, 3, 2, 4]
     end
   end
+
+  describe "the wrapped layout's axes and strips" do
+    test "a panel draws an axis on each side with no panel beside it" do
+      facet_layout = layout(wrap(["g"]), distinct_values(5))
+
+      # Two rows of three, the last one short: the third panel has an empty cell below it.
+      assert {DataFrame.pull(facet_layout, :axis_bottom),
+              DataFrame.pull(facet_layout, :axis_left)} ==
+               {[false, false, true, true, true], [true, false, false, true, false]}
+    end
+
+    test "each panel's strips label its values, one per column, a missing value as NA" do
+      frame = DataFrame.new([{"cyl", [4, nil, 4]}, {"drv", [:f, :r, :awd]}])
+
+      facet_layout = layout(wrap(["cyl", "drv"]), frame)
+      assert DataFrame.pull(facet_layout, :strip) == [["4", "awd"], ["4", "f"], ["NA", "r"]]
+    end
+  end
 end
