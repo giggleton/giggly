@@ -22,7 +22,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
-- **The API is `new/2` and the geom functions.** `computed_mapping/2` and the `layer_*`
+- **The API is `new/2`, the geom functions and the facet functions (`facet_wrap/3`).**
+  `computed_mapping/2` and the `layer_*`
   accessors exist for the assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an
   API type names no hidden one (`aesthetic`, not `Aesthetics.name/0`). An example in the docs
   shows what a user sees, through `Giggly.layer_data/2`, never a layer struct.
@@ -44,7 +45,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   missing column's message names the aesthetic, the reference as the caller wrote it, and the
   data's columns. This covers what the plot itself knows — names, and which aesthetics a geom
   takes and needs; whether a column's type suits an axis is the scales' question, answered when
-  the plot is run.
+  the plot is run. A facet's columns are resolved the same way, at the call, and none, or one named
+  twice, is refused there; whether `nrow:` and `ncol:` hold the panels is the facet's question,
+  since counting the panels is its computation, answered when the plot is run.
+- **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
+  `nrow:` and `ncol:`), so a misspelt option raises naming it. An option not given is recorded as
+  `:none` in the kind's struct; a caller never writes "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
@@ -72,3 +78,5 @@ mapped by one mapping or the other, and puts a `%Layer{}` of `%Geom.Point{}` wit
 and position at the front of `reversed_layers`, so adding a layer never walks the list and the
 assembly reverses them into drawing order. Resolving a mapping canonicalizes its keys and
 looks each value up, as a string, in `DataFrame.names/1`; no atom is ever made from a column name.
+`facet_wrap/3` validates its options, resolves its columns the same way (one column needs no
+list), and replaces the plot's facet with a `%Facet.Wrap{}` of the columns' names in the data.

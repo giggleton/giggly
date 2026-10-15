@@ -1087,6 +1087,27 @@ _(none yet)_
 
 **Full entries (newest first):**
 
+- **2026-10-14 — `facet_wrap`'s panels, as data (Phase 2, its step 1).** `Plot.facet_wrap/3`
+  takes a column or a list of them, resolved at the call as a mapping's are (none, one named twice
+  or one the data lacks is refused there), and `nrow:` and `ncol:`, validated by NimbleOptions,
+  which `Plot` now lists; it records `%Facet.Wrap{}`, which `Facet` now exports (both widenings
+  raised one at a time and approved). The facet protocol's functions now take the plot's data and
+  the order key the assembly hands over (`Scale.level_key/1`, as grouping gets it), and
+  `assign_panels/3` the layout. `Facet.Wrap` makes a panel for each combination of values that
+  occurs, ordered column by column as a discrete scale orders levels, a missing value last, lays
+  them out row by row by ggplot2's rule, and carries each facet column in the layout, as ggplot2's
+  does, to find each row's panel; too few cells for the panels, or data with no rows, raise when
+  the plot is run. Every expected value was R's: `n2mfrow()` for 1 to 30 panels and ggplot2
+  4.0.3's layouts on mpg (`class`, `nrow = 4` and `5`, `ncol = 2`, `cyl` with `drv`, a missing
+  value, and the too-few error), run in Docker; the one difference, mixed-case strings, is
+  §4's bytes-not-locale decision. A faceted plot is seen through `layer_data/2`'s `:panel` and
+  `panel_scales/2`; drawing it still fails at rendering's one-panel match until step 2. Which
+  axes and strip labels each panel has moved to step 2, where rendering first reads them, rather
+  than arriving here with no reader. Review's mutation run (1,400 mutants) left nothing in
+  `Facet.Wrap`; outside messages, the survivors were type guards, reordered map keys and the
+  assembly's known equivalents, and the repeated-column refusal's call name and columns gained
+  assertions, checked by applying both mutants by hand.
+
 - **2026-10-14 — Facets, coordinate systems, geoms, stats and positions are structs of their kinds
   (Phase 2, `facet_wrap`'s step 0).** The §4 entry beginning "Each facet, coordinate system, geom,
   stat and position is a struct" gives the decision and what building it settled; the one beginning

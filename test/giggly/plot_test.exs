@@ -79,4 +79,61 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":y"
     end
   end
+
+  describe "facet_wrap/3" do
+    test "a plot records the wrapped facet with its columns by their names in the data" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.facet_wrap([:cyl, "wt"], ncol: 2)
+
+      assert plot.facet == %Facet.Wrap{facets: ["cyl", "wt"], nrow: :none, ncol: 2}
+    end
+
+    test "one column needs no list, and an option not given is recorded as :none" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.facet_wrap(:cyl, nrow: 3)
+
+      assert plot.facet == %Facet.Wrap{facets: ["cyl"], nrow: 3, ncol: :none}
+    end
+
+    test "a column the data does not have is refused, naming it and the data's columns" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.facet_wrap(plot, :cly) end
+      assert error.message =~ "Plot.facet_wrap/3"
+      assert error.message =~ ":cly"
+      assert error.message =~ ~s("cyl")
+    end
+
+    test "a value that is not a column reference is refused" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.facet_wrap(plot, ncol: 2) end
+      assert error.message =~ "{:ncol, 2}"
+    end
+
+    test "no column at all is refused" do
+      plot = Plot.new(@rows)
+
+      assert_raise ArgumentError, ~r/none/, fn -> Plot.facet_wrap(plot, []) end
+    end
+
+    test "a column named twice is refused" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.facet_wrap(plot, [:cyl, "cyl"]) end
+      assert error.message =~ "Plot.facet_wrap/3"
+      assert error.message =~ ~s(:cyl, "cyl")
+      assert error.message =~ ~s(column "cyl" more than once)
+    end
+
+    test "a count that is not a positive whole number is refused by the option's validation" do
+      plot = Plot.new(@rows)
+
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
+    end
+  end
 end

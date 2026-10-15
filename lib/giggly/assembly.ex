@@ -121,8 +121,8 @@ defmodule Giggly.Assembly do
           reversed_layers: reversed_layers
         } = plot
       ) do
-    layout = Facet.layout(facet)
-    paneled_data = Facet.assign_panels(facet, data)
+    layout = Facet.layout(facet, data, &Scale.level_key/1)
+    paneled_data = Facet.assign_panels(facet, data, layout)
     layers = Enum.reverse(reversed_layers)
 
     grouped_data =

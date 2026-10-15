@@ -72,8 +72,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   a discrete position to numbers, after which it no longer looks discrete.
 - **The assembly gives grouping its order.** `Group.add/2` numbers values by the key it is handed;
   the assembly hands it `Scale.level_key/1`, the order a discrete scale gives its levels, so group
-  ids follow axis and legend order while grouping names nothing about scales. When level order
-  can be configured, the assembly hands over the configured order.
+  ids follow axis and legend order while grouping names nothing about scales. It hands the facet
+  the same key, so panels made from a column's values follow the same order. When level order can
+  be configured, the assembly hands over the configured order.
 - **Whether a column suits an axis is checked here, when the plot is run.** Before training, every
   column on an axis must be a type `Scale.kind/1` can place and all of one kind; a refusal names
   the layer by index, the aesthetic, the column as the data names it, and its type. The plot
@@ -94,8 +95,9 @@ table. It exports `Plot`. A user calls only the API (CLAUDE.md, Conventions); th
 beneath are `@moduledoc false`, apart from the parts of `DataFrame` and `Scale` the run functions
 hand back.
 
-`Assembly.run/1` first has `Facet.assign_panels/2` put the `:panel` column on the plot's data,
-once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
+`Assembly.run/1` first has `Facet.layout/3` build the layout table from the plot's data, handed
+`Scale.level_key/1`, and `Facet.assign_panels/3` put the `:panel` column on that data from the
+layout, once for every layer. It then reverses the plot's `reversed_layers` into drawing order and, for
 each layer, lays its mapping over the plot's (the layer's column wins), sorts the pairs by
 aesthetic, passes them to `DataFrame.select/2`, carries `:panel` across with `DataFrame.put/3`,
 and calls `Group.add/2` with `Scale.level_key/1`. It then adds each axis's scale: it reads each

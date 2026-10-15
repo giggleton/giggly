@@ -20,7 +20,7 @@ defmodule Giggly.Facet.Null do
     @only_scale 1
 
     @impl Giggly.Facet
-    def layout(_facet) do
+    def layout(_facet, _frame, _order_key) do
       DataFrame.new(
         panel: [@only_panel],
         row: [@only_row],
@@ -31,7 +31,7 @@ defmodule Giggly.Facet.Null do
     end
 
     @impl Giggly.Facet
-    def assign_panels(_facet, frame) do
+    def assign_panels(_facet, frame, _layout) do
       panels = List.duplicate(@only_panel, DataFrame.row_count(frame))
       DataFrame.put(frame, :panel, panels)
     end

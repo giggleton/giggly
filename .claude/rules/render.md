@@ -33,10 +33,12 @@ why rendering resolves the theme: the entry beginning "The theme is a resolved v
   x title before the y, as ggplot2 orders them.
 - **Layers are drawn in the order they were added**, so a later layer is drawn over an earlier
   one.
-- **One panel until `facet_wrap`.** Rendering matches exactly one layout row, at row 1 and column
-  1, and hands each layer's whole frame to its geom; splitting a layer's rows by panel, placing
-  several panels among their axes (perhaps in the facet, as ggplot2's `draw_panels()`), arrives
-  with the second panel, where that match fails loudly until it does.
+- **One panel until `facet_wrap`'s drawing step.** Rendering matches exactly one layout row, at
+  row 1 and column 1, and hands each layer's whole frame to its geom, so a plot `facet_wrap`
+  splits into several panels fails that match loudly. Splitting a layer's rows by panel and
+  arranging several panels among their axes and strips arrives in the next step, from columns of
+  the layout table that say where each panel's axes and strips go (design-log §4, the entry
+  beginning "`facet_wrap` is built in steps").
 
 ## How it works
 

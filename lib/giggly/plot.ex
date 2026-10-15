@@ -28,9 +28,10 @@ defmodule Giggly.Plot do
   checked when the plot is run.
   """
 
-  # A plot is a description: it may use the aesthetic vocabulary, the data frame, and the kinds of
+  # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, and nothing that runs it. The five families' roots are protocols that
+  # checks a layer against, and NimbleOptions, which validates its functions' options at the call,
+  # and nothing that runs it. The five families' roots are protocols that
   # compute and draw, and `GigglyCredo.Check.PlotRunsNothing` keeps them out of these files, which
   # boundary cannot, since a boundary always exports its root. A layer is read only through
   # `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
@@ -43,7 +44,8 @@ defmodule Giggly.Plot do
       Giggly.Facet,
       Giggly.Geom,
       Giggly.Position,
-      Giggly.Stat
+      Giggly.Stat,
+      NimbleOptions
     ],
     exports: []
 
@@ -83,8 +85,23 @@ defmodule Giggly.Plot do
           reversed_layers: [struct()]
         }
 
-  @typedoc "A mapping as written: aesthetic to column, the column named by an atom or a string."
-  @type mapping_argument :: %{optional(aesthetic()) => atom() | String.t()}
+  @typedoc "A column of the plot's data as written: its name as an atom or a string."
+  @type column_reference :: atom() | String.t()
+
+  @typedoc "A mapping as written: aesthetic to column."
+  @type mapping_argument :: %{optional(aesthetic()) => column_reference()}
+
+  # `facet_wrap/3`'s options, validated at the call as every public function's are.
+  @facet_wrap_options NimbleOptions.new!(
+                        nrow: [
+                          type: :pos_integer,
+                          doc: "How many rows to lay the panels out in."
+                        ],
+                        ncol: [
+                          type: :pos_integer,
+                          doc: "How many columns to lay the panels out in."
+                        ]
+                      )
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
@@ -142,6 +159,50 @@ defmodule Giggly.Plot do
     check_required(combined_mapping, Geom.Point.required_aesthetics())
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
+  end
+
+  @doc """
+  Splits the plot into panels, one for each combination of values of the `facets` columns that
+  occurs in the data, laid out in rows: ggplot2's `facet_wrap()`. `facets` is a column, or a list
+  of columns, each named as a mapping names one, so `facet_wrap(plot, :class)` is ggplot2's
+  `facet_wrap(vars(class))` and `facet_wrap(plot, [:cyl, :drv])` its `facet_wrap(vars(cyl, drv))`.
+  It replaces the plot's facet, which is one panel until a plot is faceted.
+
+  Each layer's rows are drawn in the panel of their values. The panels are ordered by the first
+  column's values, then the next's, as an axis orders its levels, with a missing value (`nil`)
+  given a panel of its own, last. They fill the rows left to right. With neither `nrow:` nor
+  `ncol:`, the panels are laid out as ggplot2 lays them out: in one row up to three panels, two
+  rows up to six, three up to twelve, and beyond that in a square or nearly one. Given one of the
+  two, the other is as many as the panels need.
+
+  ## Options
+
+  #{NimbleOptions.docs(@facet_wrap_options)}
+
+  Raises `ArgumentError` for a column the data does not have, a column named twice or none at all,
+  and `NimbleOptions.ValidationError` for an option it does not take or a count that is not a
+  positive whole number. When the plot is run, `nrow:` and `ncol:` that together hold fewer
+  panels than there are raise `ArgumentError`, as does data with no rows to make a panel from.
+
+      iex> plot =
+      ...>   %{"wt" => [2.32, 2.62, 3.44, 2.2], "mpg" => [22.8, 21.0, 18.7, 32.4], "cyl" => [4, 6, 8, 4]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.facet_wrap(:cyl)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:panel)
+      [1, 2, 3, 1]
+  """
+  @spec facet_wrap(t(), column_reference() | [column_reference()], keyword()) :: t()
+  def facet_wrap(%__MODULE__{data: data} = plot, facets, options \\ []) when is_list(options) do
+    options = NimbleOptions.validate!(options, @facet_wrap_options)
+
+    facet = %Facet.Wrap{
+      facets: facet_columns(facets, data),
+      nrow: Keyword.get(options, :nrow, :none),
+      ncol: Keyword.get(options, :ncol, :none)
+    }
+
+    %{plot | facet: facet}
   end
 
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
@@ -226,6 +287,52 @@ defmodule Giggly.Plot do
         raise ArgumentError,
               "Plot.geom_point/2 needs #{inspect_all(missing)}, " <>
                 "but neither its mapping nor the plot's maps it"
+    end
+  end
+
+  # The columns a facet splits on, by the names the data gives them, in the order written.
+  defp facet_columns(facets, frame) do
+    names = DataFrame.names(frame)
+    references = List.wrap(facets)
+
+    columns =
+      Enum.map(references, fn reference -> facet_column(reference, names) end)
+
+    check_facet_columns(columns, references)
+    columns
+  end
+
+  defp facet_column(reference, names) when is_column_reference(reference) do
+    name = to_string(reference)
+
+    if name in names do
+      name
+    else
+      raise ArgumentError,
+            "Plot.facet_wrap/3 facets by #{inspect(reference)}, but the data has no column " <>
+              "#{inspect(name)}; its columns are #{inspect_all(names)}"
+    end
+  end
+
+  defp facet_column(reference, _names) do
+    raise ArgumentError,
+          "Plot.facet_wrap/3 facets by #{inspect(reference)}, " <>
+            "but a facet names a column, as an atom or a string"
+  end
+
+  defp check_facet_columns([], _references) do
+    raise ArgumentError, "Plot.facet_wrap/3 needs a column to facet by, and was given none"
+  end
+
+  defp check_facet_columns(columns, references) do
+    case columns -- Enum.uniq(columns) do
+      [] ->
+        :ok
+
+      [repeated | _others] ->
+        raise ArgumentError,
+              "Plot.facet_wrap/3 facets by #{inspect_all(references)}, which names the column " <>
+                "#{inspect(repeated)} more than once"
     end
   end
 
