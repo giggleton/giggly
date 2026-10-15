@@ -8,8 +8,10 @@ defmodule Giggly.Guide.Axis do
   # It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
   # the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
   # are centred on their ticks and hang from their tops; those to its left end at the margin and are
-  # centred on their ticks. The axis reaches as far from the panel as its tick, its margin and its
-  # labels need; one with no breaks draws nothing and takes no room, as ggplot2's does.
+  # centred on their ticks. A radial panel's radius axis, to its left, is drawn in the radius
+  # axis's look, ggplot2's `axis.text.r`: its labels are centred between the margin and a margin
+  # as wide on their far side. The axis reaches as far from the panel as its tick, its margins and
+  # its labels need; one with no breaks draws nothing and takes no room, as ggplot2's does.
   #
   # The order things are drawn in follows ggplot2's: below the panel the ticks and then the labels,
   # to its left the labels and then the ticks.
@@ -23,13 +25,15 @@ defmodule Giggly.Guide.Axis do
   alias Giggly.Scene.{Polylines, Text}
 
   # The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
-  # and its label, in `theme`'s look: how far it reaches from the panel, in points, and its
-  # primitives, placed in a cell that deep.
+  # and its label, in `look` (an x axis's below the panel, a y axis's or a radius axis's to its
+  # left) and `theme`'s: how far it reaches from the panel, in points, and its primitives, placed
+  # in a cell that deep.
   @doc false
-  @spec draw([{float(), String.t()}], :bottom | :left, Theme.t()) :: Giggly.Guide.drawn()
-  def draw([], _side, _theme), do: {0.0, []}
+  @spec draw([{float(), String.t()}], :bottom | :left, :x | :y | :r, Theme.t()) ::
+          Giggly.Guide.drawn()
+  def draw([], _side, _look, _theme), do: {0.0, []}
 
-  def draw(breaks, :bottom, %Theme{
+  def draw(breaks, :bottom, :x, %Theme{
         axis_ticks: ticks_look,
         axis_ticks_length: tick_length,
         axis_text: text_look
@@ -63,39 +67,68 @@ defmodule Giggly.Guide.Axis do
     {height, [ticks, text]}
   end
 
-  def draw(breaks, :left, %Theme{
-        axis_ticks: ticks_look,
-        axis_ticks_length: tick_length,
-        axis_text: text_look
-      }) do
+  def draw(
+        breaks,
+        :left,
+        :y,
+        %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
+      ) do
     {places, labels} = Enum.unzip(breaks)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     width = Enum.max(label_widths) + text_look.margin + tick_length
 
-    # The panel's edge is the cell's right.
-    tick_end = 1 - tick_length / width
+    # The panel's edge is the cell's right; the labels end at the margin.
     label_end = 1 - (tick_length + text_look.margin) / width
+    text = left_labels({places, labels, label_widths}, label_end, 1.0, theme)
 
-    text = %Text{
-      x: List.duplicate(label_end, length(places)),
+    {width, [text, left_ticks(places, width, theme)]}
+  end
+
+  def draw(
+        breaks,
+        :left,
+        :r,
+        %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
+      ) do
+    {places, labels} = Enum.unzip(breaks)
+    label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
+    label_width = Enum.max(label_widths)
+    width = text_look.margin + label_width + text_look.margin + tick_length
+
+    # The labels are centred on the middle of the widest, between the two margins.
+    label_middle = 1 - (tick_length + text_look.margin + label_width / 2) / width
+    text = left_labels({places, labels, label_widths}, label_middle, 0.5, theme)
+
+    {width, [text, left_ticks(places, width, theme)]}
+  end
+
+  # The labels of an axis to the panel's left, anchored at `x_place` across the axis's cell by
+  # `hjust` of their widths, each centred on its break.
+  defp left_labels({places, labels, label_widths}, x_place, hjust, %Theme{axis_text: text_look}) do
+    %Text{
+      x: List.duplicate(x_place, length(places)),
       y: places,
       labels: labels,
       widths: label_widths,
       size: text_look.size,
       color: text_look.color,
       angle: 0,
-      hjust: 1.0,
+      hjust: hjust,
       offset: {0.0, -Font.ascent(text_look.size) / 2}
     }
+  end
 
-    ticks = %Polylines{
+  # The ticks of an axis `width` points wide to the panel's left, reaching in to the panel's edge,
+  # the cell's right.
+  defp left_ticks(places, width, %Theme{axis_ticks: ticks_look, axis_ticks_length: tick_length}) do
+    tick_end = 1 - tick_length / width
+
+    %Polylines{
       lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
       offsets: :none,
       stroke_width: ticks_look.line_width,
       color: ticks_look.color
     }
-
-    {width, [text, ticks]}
   end
 
   # The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from

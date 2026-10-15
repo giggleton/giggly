@@ -22,22 +22,22 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
-- **The API is `new/2`, the geom functions and the facet functions (`facet_wrap/3`).**
-  `computed_mapping/2` and the `layer_*`
-  accessors exist for the assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an
-  API type names no hidden one (`aesthetic`, not `Aesthetics.name/0`). An example in the docs
-  shows what a user sees, through `Giggly.layer_data/2`, never a layer struct.
+- **The API is `new/2`, the geom functions, the facet functions (`facet_wrap/3`) and the coordinate
+  functions (`coord_radial/1`).** `computed_mapping/2` and the `layer_*` accessors exist for the
+  assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one
+  (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user sees, through
+  `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence (the layer's column wins) exists once.
-- **A plot and its layers record their kinds as structs, the null and identity ones included**:
-  each layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`,
-  `%Position.Identity{}`), and the plot's facet and coordinate system (`%Facet.Null{}` and
-  `%Coord.Cartesian{}` when nothing chooses others). `Plot` builds them and reads a geom's facts to
-  check a layer, but never computes or draws with one; the assembly reads a layer's with
-  `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays private. A field holding
-  a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses it. The theme
-  is still a name, `theme: :gray`, until a user can set one; what a misspelt name does arrives with
+- **A plot and its layers record their kinds as structs, the null and identity ones included**: each
+  layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
+  the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
+  chooses others; `coord_radial/1` records `%Coord.Radial{}`). `Plot` builds them and reads a geom's
+  facts to check a layer, but never computes or draws with one; the assembly reads a layer's with
+  `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays private. A field holding a
+  kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses it. The theme is
+  still a name, `theme: :gray`, until a user can set one; what a misspelt name does arrives with
   that option, and it must raise at the call.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an

@@ -220,6 +220,32 @@ defmodule Giggly.Plot do
     %{plot | facet: facet}
   end
 
+  @doc """
+  Draws the plot in radial coordinates, ggplot2's `coord_radial()`: x is the angle, running
+  clockwise round a full circle from 12 o'clock, and y the radius, out from the centre. It
+  replaces the plot's coordinate system, which is cartesian until a plot says otherwise.
+
+  The scales are expanded as cartesian ones are, so the marks keep clear of the circle's edge and
+  centre, and the first and last positions on x are a gap apart at 12 o'clock rather than meeting.
+  Each panel is square. Its grid is a circle at each of y's breaks and a spoke at each of x's, on
+  a disc; x's axis is drawn round the circle inside the panel, and y's to the panel's left, up the
+  radius at 12 o'clock. Nothing is clipped at the panel's edges, ggplot2's default for radial
+  coordinates. `coord_radial()`'s options (its start and end angles, an inner radius, which of x
+  and y is the angle) are not taken yet.
+
+      iex> svg =
+      ...>   %{"wt" => [2.32, 2.62, 3.44], "mpg" => [22.8, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.coord_radial()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> svg =~ "<polygon"
+      true
+  """
+  @spec coord_radial(t()) :: t()
+  def coord_radial(%__MODULE__{} = plot), do: %{plot | coord: %Coord.Radial{}}
+
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
   # the layer's column is used.
   @doc false

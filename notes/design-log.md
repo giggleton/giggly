@@ -1179,9 +1179,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Give the scene offsets, polygons and kept proportions (`coord_radial()`, step 2);
-  §4: "A primitive's position is a place in its cell plus an offset in points", "A `:rest` size
-  has a weight"
+- 2026-10-15 — Draw a plot in radial coordinates (`coord_radial()`, step 3); §4:
+  "`coord_radial()` is built in four steps"
+- 2026-10-15 — Give the scene offsets, polygons and kept proportions (`coord_radial()`, step 2)
+  (`93fb858`); §4: "A primitive's position is a place in its cell plus an offset in points", "A
+  `:rest` size has a weight"
 - 2026-10-15 — Place positions in radial coordinates (`coord_radial()`, step 1) (`f4440ce`); §4:
   "`coord_radial()` is built in four steps"
 - 2026-10-15 — Cut the internal documents to one home per fact; §4: "The design log is reference,

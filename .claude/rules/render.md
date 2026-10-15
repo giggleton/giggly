@@ -20,7 +20,8 @@ ggplot2's facets' order".
   layer's geom draws in each panel, and the guide draws the panel's background, grid lines and
   axes (`Giggly.Guide`), handed the plot's coordinate system and that panel's params, which
   rendering passes on unread; rendering arranges what they draw into cells, the panel's background
-  and grid under its layers, as ggplot2's coordinate system draws them (`render_bg`). The panel's
+  and grid under its layers and any axis inside the panel over them, as ggplot2's coordinate
+  system draws its background and foreground (`render_bg`, `render_fg`). The panel's
   cell is clipped when the assembly says the coordinate system clips panels; each strip's cell is
   clipped, as `theme_gray()`'s `strip.clip = "on"` says; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
@@ -31,7 +32,11 @@ ggplot2's facets' order".
   gives a panel's row and column, whether it draws its bottom and left axes, and its strip labels;
   a facet says where things go, and rendering lays them out as ggplot2's facets lay them out. An
   arrangement those columns cannot express grows a case here.
-- **The panels share what the margin, axes, strips, titles and panel spacing leave, equally.**
+- **The panels share what the margin, axes, strips, titles and panel spacing leave, equally**,
+  each one share wide; a plot whose coordinate system keeps an aspect ratio (the assembly's
+  `aspect_ratio`, radially 1) gives each panel row that ratio as its weight and keeps the scene's
+  proportions, as ggplot2's facets give the panel rows the ratio in null units and respect the
+  table, so the panels keep their shape and the table is centred in the drawing.
   The margin is the theme's, on every side, and so is the spacing between panels. Above each row
   of panels are its strips, a row per strip layer as tall as its tallest strip; below it a row as
   tall as its tallest measured bottom axis, and left of each column a column as wide as its widest

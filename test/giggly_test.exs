@@ -205,6 +205,28 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/point.svg")
     end
 
+    # Golden: test/golden/radial.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/radial.R: every element matches it, in order. The point golden's data in radial
+    # coordinates: the panel is square and the table centred across the drawing, the background a
+    # disc and the grid circles and spokes, munched as ggplot2 munches them; the angle axis is drawn
+    # round the circle over the points, each label justified by its angle, and the radius axis to
+    # the panel's left, its labels centred, up the panel's upper half. It moves with what moves
+    # test/golden/point.svg, and with radial placing, munching, or either radial axis's look.
+    test "radial coordinates draw a square panel, its grid on a disc and its axes round and up it" do
+      plot =
+        %{"wt" => [0.0, 4.0, 7.0, 10.0], "mpg" => [0.0, 50.0, 20.0, nil]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.coord_radial()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/radial.svg")
+    end
+
     # Golden: test/golden/facet_wrap.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/facet_wrap.R: every element, in order, and every clip path match it. Five
     # combinations of cyl and drv make five panels in two rows of three, the last row one short, so

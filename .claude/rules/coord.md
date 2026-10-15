@@ -74,7 +74,7 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   which marks each panel's cell, so rendering never lists this namespace.
 - **`aspect/2` gives the shape a panel keeps, its height over its width**, from the first
   panel's params, as ggplot2 asks `coord$aspect()`: `:none` for cartesian coordinates, 1 for a
-  full circle.
+  full circle. The assembly asks once and carries it to rendering, as it carries `clip`.
 - **What waits for its first reader:** `Coord.munch/3` for geoms (the first path geom), and with
   it munching a spiral, which radial munching refuses until then; axes above or to the right; and
   every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`; radial `theta`,

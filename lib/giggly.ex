@@ -132,11 +132,13 @@ defmodule Giggly do
   Raises `NimbleOptions.ValidationError` for an option it does not take or a size that is not a
   positive whole number of pixels.
 
-  Today a plot is drawn as its panel and its axes in its theme's look: each layer's marks, placed
-  by the coordinate system in the panel over its background and grid lines, with the x axis below
+  Today a plot is drawn as its panels and their axes in its theme's look: each layer's marks, placed
+  by the coordinate system in each panel over its background and grid lines, with the x axis below
   it and the y axis to its left, each a tick and a label at every break and titled by the column
-  it shows, inside the theme's plot margin, on the theme's plot background. The plot's title
-  arrives in turn.
+  it shows, inside the theme's plot margin, on the theme's plot background. In radial coordinates
+  (`Giggly.Plot.coord_radial/1`) each panel is square, its background a disc, and its x axis is
+  drawn round the circle inside it; the plot is centred in the drawing, which it fills only one
+  way. The plot's title arrives in turn.
   """
   @spec to_svg(Plot.t(), keyword()) :: iodata()
   def to_svg(%Plot{} = plot, options \\ []) when is_list(options) do

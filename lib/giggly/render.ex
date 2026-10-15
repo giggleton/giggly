@@ -72,10 +72,20 @@ defmodule Giggly.Render do
     panel_rows = DataFrame.pull(layout, :row)
     panel_columns = DataFrame.pull(layout, :column)
 
+    # A panel that keeps an aspect ratio is that many times as tall as it is wide, and the table
+    # keeps its proportions, as ggplot2's facets give the panels' rows the ratio in null units and
+    # have the table respected.
+    {panel_height, keep_proportions} =
+      case assembly.aspect_ratio do
+        :none -> {1, false}
+        ratio -> {ratio, true}
+      end
+
     grid = %{
       rows: Enum.max(panel_rows),
       columns: Enum.max(panel_columns),
-      occupied: MapSet.new(panels, fn panel -> {panel.row, panel.column} end)
+      occupied: MapSet.new(panels, fn panel -> {panel.row, panel.column} end),
+      panel_height: panel_height
     }
 
     widths = widths(panels, grid, left_title, theme)
@@ -84,7 +94,7 @@ defmodule Giggly.Render do
     %Scene{
       widths: Enum.map(widths, fn {_name, size} -> size end),
       heights: Enum.map(heights, fn {_name, size} -> size end),
-      keep_proportions: false,
+      keep_proportions: keep_proportions,
       cells:
         cells(panels, grid, indexes(widths), indexes(heights), {bottom_title, left_title}, theme,
           clip: assembly.clip,
@@ -123,9 +133,14 @@ defmodule Giggly.Render do
         panel: panel,
         row: row,
         column: column,
-        # The panel's background and grid under its layers, as ggplot2's coordinate system draws
-        # them.
-        primitives: Guide.grid(coord, params, theme) ++ layer_primitives,
+        # The panel's background and grid under its layers, and any axis inside it over them, as
+        # ggplot2's coordinate system draws its background and foreground.
+        primitives:
+          Enum.concat([
+            Guide.grid(coord, params, theme),
+            layer_primitives,
+            Guide.axes_inside(coord, params, theme)
+          ]),
         bottom: if(axis_bottom, do: bottom_axis, else: :none),
         left: if(axis_left, do: left_axis, else: :none),
         strips: Guide.strips(strip, theme)
@@ -176,7 +191,7 @@ defmodule Giggly.Render do
 
         strips ++
           [
-            {{:panel_row, row}, {:rest, 1}},
+            {{:panel_row, row}, {:rest, grid.panel_height}},
             {{:axis_bottom, row}, {:points, bottom_axis_height(panels, grid, row)}}
           ]
       end)

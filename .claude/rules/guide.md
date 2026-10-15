@@ -6,40 +6,48 @@ paths:
 
 # Guides
 
-`Giggly.Guide` draws the axes beside a panel and their titles, ggplot2's `guide_axis()`; the
-panel's background and grid lines, ggplot2's `guide_grid()`; and the strips that label a facet's
-panels, which ggplot2's facets draw with `render_strips()`. Why a
-domain of its own, and why it is called a guide: design-log §4, the entry beginning "Axes are
-drawn"; which name titles an axis: the entry beginning "An axis is titled"; why the grid is
-drawn here but placed by the coordinate system: the entry beginning "The panel's grid lines are
-placed by the coordinate system".
+`Giggly.Guide` draws the axes beside a panel and their titles, ggplot2's `guide_axis()`; the axis
+around a radial panel's circle, ggplot2's `guide_axis_theta()`; the panel's background and grid
+lines, ggplot2's `guide_grid()`; and the strips that label a facet's panels, which ggplot2's facets
+draw with `render_strips()`. Why a domain of its own, and why it is called a guide: design-log §4,
+the entry beginning "Axes are drawn"; which name titles an axis: the entry beginning "An axis is
+titled"; why the grid is drawn here but placed by the coordinate system: the entry beginning "The
+panel's grid lines are placed by the coordinate system".
 
 ## Rules
 
 - **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
-  ticks and marks are placed by one rule. Which side of the panel an axis is drawn on, and so
-  which aesthetic's title goes there, is the coordinate system's call; a guide draws the sides it
-  is given, with the titles it is handed by aesthetic.
+  ticks and marks are placed by one rule. Where an axis is drawn, which aesthetic's title goes
+  there, and the look it is drawn in are the coordinate system's call; a guide draws the sides it
+  is given, in the looks it is given, with the titles it is handed by aesthetic. An axis the
+  coordinate system puts inside the panel (`:theta`) is drawn by `axes_inside/3` over the
+  panel's layers, takes no title of its own, and is neither measured nor given room, as ggplot2's
+  `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
   out its axis titles: centred on the panel's side, hanging from the cell's edge away from the
   axis, turned 90 degrees on the left. A title of `:none` draws nothing and takes no room.
-- **The grid's lines come placed from the coordinate system** (`Coord.grid/2`); the guide gives
-  them the theme's look and ggplot2's order: the panel's background, the minor lines at the y
-  axis's minor breaks, then the x axis's, then the major lines at the y axis's breaks, then the
-  x axis's. A group with no lines is drawn as an empty primitive, which draws nothing.
+- **The grid's lines and the background's shape come from the coordinate system** (`Coord.grid/2`):
+  a background filling the panel is a rectangle, any other the polygon round its outline. The guide
+  gives them the theme's look and ggplot2's order: the panel's background, the minor lines at the y
+  axis's minor breaks, then the x axis's, then the major lines at the y axis's breaks, then the x
+  axis's. A group with no lines is drawn as an empty primitive, which draws nothing.
 - **A guide measures what it draws and reports how far it reaches from the panel, in points.**
   That is the fixed width or height of the axis's column or row in the scene, measured when the
   scene is built, as ggplot2's `measure_grobs` measures an axis while building its table.
 - **Primitives are placed in the axis's cell.** Along the panel's side, at the break's place (the
-  cell spans the side); across it, at fractions of the axis's own depth. A label's baseline is the
-  one position in points, offset from its anchor, since a label centred on a break sits half a
-  line below it whatever height the panel turns out to be.
+  cell spans the side); across it, at fractions of the axis's own depth. A label's baseline is
+  offset from its anchor in points, since a label centred on a break sits half a line below it
+  whatever height the panel turns out to be. The angle axis is placed in the panel's cell: each
+  tick and label at its break on the circle's edge, offset outward along the break's angle in
+  points, each label justified by that angle, as ggplot2 justifies it.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
   ticks' colour, width and length, the labels' and titles' size, colour and margin. How a label is
-  hung from its tick and the y title's 90-degree turn are the guide's until a theme can set them.
+  hung from its tick, the radius axis's labels centred between two margins (`axis.text.r`), the
+  angle axis's labels justified by their angles, and the y title's 90-degree turn are the guide's
+  until a theme can set them.
 - **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early.
 - **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
-  the labels and then the ticks.
+  and round a radial panel's circle the labels and then the ticks.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
   centred, its baseline half an ascent below the middle, the strip text's margin above and below a
   line of text, so it is as tall as the margin twice, an ascent and the deepest descent. A panel
@@ -49,5 +57,6 @@ placed by the coordinate system".
   `titles/4` the plot's titles, from any panel's params, since every panel puts the same aesthetic
   on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
-  labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, and a
-  guide behaviour (the first legend).
+  labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, a guide
+  behaviour (the first legend), and `guide_axis_theta()`'s options and merging its first and last
+  labels when they meet (`expand = FALSE`).

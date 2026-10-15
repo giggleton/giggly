@@ -34,12 +34,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
   scale id, the plot's coordinate system (carried for rendering to hand each geom and guide), each
-  panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`, asked once here so
-  rendering never lists `Coord`), the title of each aesthetic's guide (`guide_titles`, the x
-  and y axes' so far), and the name of the plot's theme, which the assembly passes on unread for
-  rendering to resolve, the only stage that reads a theme so far; the first build stage to read one
-  (default aesthetics, palettes) brings the resolution here, where ggplot2's build completes the
-  theme.
+  panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
+  every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
+  asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
+  (`guide_titles`, the x and y axes' so far), and the name of the plot's theme, which the assembly
+  passes on unread for rendering to resolve, the only stage that reads a theme so far; the first
+  build stage to read one (default aesthetics, palettes) brings the resolution here, where ggplot2's
+  build completes the theme.
 - **The facet and the coordinate system run by the structs the plot records**, the null facet and
   cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
   assembly names no kind.
