@@ -964,6 +964,26 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/line_alpha.svg")
     end
 
+    # Golden: test/golden/line_radial.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/line_radial.R: every element matches it, in order, and every clip path but
+    # svglite's around the whole drawing, as test/golden/radial.svg's. Each piece of the line
+    # changes both its angle and its radius, so it is munched as a spiral's arc and curves round
+    # the circle. It moves with what moves test/golden/radial.svg, and with munching.
+    test "in radial coordinates a line curves round the circle, each piece a spiral's arc" do
+      plot =
+        %{"x" => [1, 2, 3, 4, 5], "y" => [1.0, 3.0, 2.0, 5.0, 4.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_line()
+        |> Plot.coord_radial()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/line_radial.svg")
+    end
+
     # Golden: each key is the one ggplot2 4.0.3 draws for the same plot through vdiffr 1.0.9's
     # svglite (R 4.6.1), with the black stroke svglite leaves to its stylesheet written out. The
     # keys are 2 mm wide only because rendering hands each key what its layer sets; it moves with
@@ -986,22 +1006,6 @@ defmodule GigglyTest do
                "<line x1='683.12' y1='308.88' x2='696.94' y2='308.88' style='stroke-width: 4.27; " <>
                  "stroke: #000000; stroke-linecap: butt;' />"
              ]
-    end
-
-    # Golden: ggplot2 4.0.3's drawing of the same plot through vdiffr 1.0.9 (R 4.6.1), which cuts
-    # the arc into a hundred steps, each a hundredth of the longest line a panel holds or less, and
-    # keeps the last point. It moves with munching, and fails if a path is placed without it.
-    test "in radial coordinates a line round a circle is cut into steps that follow it" do
-      [line] =
-        %{"x" => [1.0, 2.0], "y" => [1.0, 1.0]}
-        |> Plot.new(%{x: :x, y: :y})
-        |> Plot.geom_line()
-        |> Plot.coord_radial()
-        |> data_lines()
-
-      points = Regex.scan(~r/[0-9.]+,[0-9.]+/, line)
-
-      assert {length(points), hd(points)} === {101, ["412.00,175.69"]}
     end
 
     # Golden: test/golden/bar.svg, checked against ggplot2's drawing of the same plot, made by

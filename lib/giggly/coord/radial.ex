@@ -30,10 +30,10 @@ defmodule Giggly.Coord.Radial do
   # along the other aesthetic as ggplot2 runs it; the panel's background is the disc they lie on,
   # run round its corners at infinity. Each is munched as ggplot2's `coord_munch()` munches it:
   # every straight piece is cut into equal steps, as many as its placed length holds a hundredth
-  # of the longest line a panel holds, then each step is placed. A layer's lines are munched the
-  # same way (`munch/3`), each step copying the row it starts from. Only pieces along a spoke or
-  # round a circle are cut so far; a piece changing both its angle and its radius, a spiral,
-  # fails. The panel is square, its aspect ratio 1, since the circle's bounding box is the panel.
+  # of the longest line a panel holds, then each step is placed, a piece measured as the arc of
+  # Archimedes' spiral through its ends, a circle's arc or a ray. A layer's lines are munched the
+  # same way (`munch/3`), each step copying the row it starts from. The panel is square, its aspect
+  # ratio 1, since the circle's bounding box is the panel.
 
   defstruct clip: :off
 
@@ -285,25 +285,48 @@ defmodule Giggly.Coord.Radial do
       end
     end
 
-    # A piece's placed length as a share of the longest line, ggplot2's `dist_polar()` on boosted
-    # radii: a piece of a spoke its change of radius, a piece of a circle its radius times its
-    # change of angle.
+    # A piece's placed length as a share of the longest line, ggplot2's `dist_polar()` on radii
+    # boosted and angles rescaled to a full turn: each piece measured as the arc of Archimedes'
+    # spiral through its ends, `r = a * angle` counted from where it would meet the centre, by
+    # ggplot2's `spiral_arc_length()`; a piece whose radius stays the same is a circle's arc, one
+    # whose angle stays the same a ray, and one that goes nowhere, or from a missing position, is
+    # not measured, as R's `NA` slope is not.
     defp distance({x_from, y_from}, {x_to, y_to}, _params)
          when not (is_number(x_from) and is_number(y_from) and is_number(x_to) and is_number(y_to)),
          do: :none
 
-    defp distance(position, position, _params), do: :none
+    defp distance({x_from, y_from}, {x_to, y_to}, params) do
+      from = {boosted(y_from, params), rescale(x_from, params.theta_range, @full_turn)}
+      to = {boosted(y_to, params), rescale(x_to, params.theta_range, @full_turn)}
 
-    defp distance({x_position, y_from}, {x_position, y_to}, params),
-      do: abs((boosted(y_from, params) - boosted(y_to, params)) / @longest_line)
-
-    defp distance({x_from, y_position}, {x_to, y_position}, params) do
-      turned =
-        rescale(x_to, params.theta_range, @full_turn) -
-          rescale(x_from, params.theta_range, @full_turn)
-
-      abs(boosted(y_position, params) * turned / @longest_line)
+      case piece_length(from, to) do
+        :none -> :none
+        length -> abs(length / @longest_line)
+      end
     end
+
+    defp piece_length({radius_from, angle_from}, {radius_to, angle_to})
+         when radius_from == radius_to and angle_from == angle_to,
+         do: :none
+
+    defp piece_length({radius, angle_from}, {radius_to, angle_to}) when radius == radius_to,
+      do: radius * (angle_to - angle_from)
+
+    defp piece_length({radius_from, angle}, {radius_to, angle_to}) when angle == angle_to,
+      do: radius_from - radius_to
+
+    defp piece_length({radius_from, angle_from}, {radius_to, angle_to}) do
+      slope = (radius_to - radius_from) / (angle_to - angle_from)
+      meets_centre = angle_to - radius_to / slope
+      spiral_arc_length(slope, angle_from - meets_centre, angle_to - meets_centre)
+    end
+
+    # The length of Archimedes' spiral `r = slope * angle` from one angle to another, negative
+    # when the second is the larger, as ggplot2's `spiral_arc_length()` writes it.
+    defp spiral_arc_length(slope, angle_from, angle_to),
+      do: 0.5 * slope * (spiral_term(angle_from) - spiral_term(angle_to))
+
+    defp spiral_term(angle), do: angle * :math.sqrt(1 + angle * angle) + :math.asinh(angle)
 
     defp boosted(y_position, params) do
       y_position

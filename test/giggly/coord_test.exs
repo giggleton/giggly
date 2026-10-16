@@ -147,6 +147,52 @@ defmodule Giggly.CoordTest do
       assert DataFrame.pull(munched, :alpha) ===
                [0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.4, 0.5, 0.6]
     end
+
+    # Golden: ggplot2 4.0.3's `coord_munch()` under `coord_radial(expand = FALSE)` on the same
+    # rows and ranges (R 4.6.1), printed with `sprintf("%.17g")`. A piece changing both its angle
+    # and its radius is measured as the arc of Archimedes' spiral through its ends: in to radius
+    # 10 in four steps, then out to 30 in nine, turning back. It moves with the spiral's length,
+    # the boost or the segment length.
+    test "radially, a piece changing its angle and its radius is cut as a spiral's arc" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{0.0, 100.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 1.25, 0.75], y: [20.0, 10.0, 30.0], group: [1, 1, 1])
+
+      munched = Coord.munch(@radial, frame, params)
+
+      x_places = DataFrame.pull(munched, :x)
+      y_places = DataFrame.pull(munched, :y)
+
+      assert Enum.zip(x_places, y_places) === [
+               {0.58000000000000007, 0.5},
+               {0.56966293086705377, 0.49313880017693074},
+               {0.55884711682419386, 0.48829458067903231},
+               {0.54784701678661041, 0.4854857661372769},
+               {0.5369551813004515, 0.4846926627053964},
+               {0.54662616203657999, 0.48529882757979109},
+               {0.55640821374470728, 0.48749460008357626},
+               {0.56609632409158739, 0.4912982538519966},
+               {0.57548364340840708, 0.49670431295461909},
+               {0.58436407204469021, 0.50368341493307278},
+               {0.59253485372822223, 0.51218244460720486},
+               {0.59979914739448204, 0.52212493831367279},
+               {0.60596855008313633, 0.53341175550047482},
+               {0.61086554390135439, 0.54592201188381073}
+             ]
+    end
+
+    # Golden: as above. A radius changing by a ten-thousandth over a quarter turn is a spiral so
+    # flat it meets the centre far round, and its arc is a circle's to the step: eighteen steps.
+    test "radially, a spiral barely leaving its radius is cut as its circle would be" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{0.0, 100.0}, [], []})
+      frame = DataFrame.new(x: [2.0, 3.0], y: [30.0, 30.0001], group: [1, 1])
+
+      munched = Coord.munch(@radial, frame, params)
+
+      x_places = DataFrame.pull(munched, :x)
+
+      assert DataFrame.row_count(munched) === 19
+      assert Enum.at(x_places, 6) === 0.43999993333333332
+    end
   end
 
   describe "axes/2" do
