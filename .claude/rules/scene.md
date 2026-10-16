@@ -42,6 +42,10 @@ weight".
   text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor is at its
   `hjust` of the label's width, any fraction from its start (0) to its end (1).
 - **A text carries each label's measured width**, which the backend draws it at.
+- **Circles and placed rectangles carry an opacity for each mark**, from 0 to 1: a circle's
+  `opacity` its outline and fill alike, a rectangle's `fill_opacity` its fill alone, as grid's
+  colours carry the alpha ggplot2 gives them. One per mark, as grid's graphical parameters are,
+  so a mapped aesthetic needs no primitive per value; colour and size will take the same route.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.

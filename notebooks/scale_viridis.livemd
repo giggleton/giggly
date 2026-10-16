@@ -36,8 +36,7 @@ ggplot(dsamp, aes(carat, price)) +
   geom_point(aes(colour = clarity))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
-legend that reads it back.
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
 
 ## Discrete values
 

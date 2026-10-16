@@ -27,7 +27,9 @@ defmodule Giggly.Assembly do
   #  11. moves each layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
-  #  13. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #  13. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
+  #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
+  #  14. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
   #      panel's params, as ggplot2 asks it.
@@ -113,11 +115,11 @@ defmodule Giggly.Assembly do
   # `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
-  # marks. Last, the plot's coordinate system builds each panel's params from the extents of the
-  # scales the layout gives that panel and the breaks and minor breaks each axis draws on its
-  # extent. Each axis is
-  # titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x` (or
-  # `:y`); a later layer never retitles it, and an axis no layer maps has no title.
+  # marks, and each aesthetic a layer sets to one value is put into every row of its table. Last,
+  # the plot's coordinate system builds each panel's params from the extents of the scales the
+  # layout gives that panel and the breaks and minor breaks each axis draws on its extent. Each axis
+  # is titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x`
+  # (or `:y`); a later layer never retitles it, and an axis no layer maps has no title.
   #
   # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   # date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -179,10 +181,15 @@ defmodule Giggly.Assembly do
     final_x_scales = retrain(x_scales, x_routes, :x, layer_data)
     final_y_scales = retrain(y_scales, y_routes, :y, layer_data)
 
+    fixed_data =
+      Enum.zip_with(layers, layer_data, fn layer, frame ->
+        set_fixed(frame, Plot.layer_fixed(layer))
+      end)
+
     panel_params = panel_params(coord, layout, final_x_scales, final_y_scales)
 
     %__MODULE__{
-      layer_data: layer_data,
+      layer_data: fixed_data,
       layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
       x_scales: final_x_scales,
@@ -233,6 +240,19 @@ defmodule Giggly.Assembly do
     layer
     |> Plot.layer_stat()
     |> Stat.default_mapping()
+  end
+
+  # The layer's table with each aesthetic the layer sets to one value given that value in every
+  # row, in name order, as ggplot2's `use_defaults()` applies a layer's `aes_params` after every
+  # scale has mapped its aesthetics.
+  defp set_fixed(frame, fixed) do
+    rows = DataFrame.row_count(frame)
+
+    fixed
+    |> Enum.sort()
+    |> Enum.reduce(frame, fn {aesthetic, value}, set ->
+      DataFrame.put(set, aesthetic, List.duplicate(value, rows))
+    end)
   end
 
   # The layer's table with each aesthetic its own and the plot's mappings leave unmapped given the

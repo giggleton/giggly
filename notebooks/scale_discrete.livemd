@@ -44,8 +44,8 @@ fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setu
 ggplot(diamonds, aes(cut)) + geom_bar()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, and choosing the order of a column's values: `cut` is
-an ordered factor, which ggplot2 shows from Fair to Ideal.
+Not in Giggly yet: choosing the order of a column's values: `cut` is an ordered factor, which
+ggplot2 shows from Fair to Ideal.
 
 ## Jittered points on two discrete axes
 
@@ -59,8 +59,8 @@ Parentheses around an assignment print its value, so this draws `d` as well as n
       geom_jitter())
 ```
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values (`cut` and
-`clarity` are ordered factors), and `geom_jitter()`.
+Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered factors)
+and `geom_jitter()`.
 
 ## The axis title and labels
 
@@ -81,9 +81,8 @@ d +
 
 The labels are given by value, so the order they are written in does not matter.
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values,
-`geom_jitter()`, and `scale_x_discrete()`, whose first argument titles the axis, and its `labels`
-option.
+Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and
+`scale_x_discrete()`, whose first argument titles the axis, and its `labels` option.
 
 ## Which values are shown
 
@@ -93,8 +92,8 @@ option.
 d + scale_x_discrete(limits = c("Fair","Ideal"))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values,
-`geom_jitter()`, and `scale_x_discrete()` and its `limits` option.
+Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and
+`scale_x_discrete()` and its `limits` option.
 
 ## The xlim() and ylim() shortcuts
 
@@ -106,8 +105,8 @@ d + xlim("Fair","Ideal", "Good")
 d + ylim("I1", "IF")
 ```
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values,
-`geom_jitter()`, and `xlim()` and `ylim()`.
+Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and `xlim()` and
+`ylim()`.
 
 ## Ordering by another column
 

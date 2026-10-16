@@ -89,7 +89,7 @@ d + stat_summary(aes(y = price), fun = "mean", geom = "bar")
 The first plot counts the diamonds of each cut; the second draws the mean price of each cut as a
 bar.
 
-Not in Giggly yet: the `diamonds` dataset, and `stat_summary()` drawn as bars.
+Not in Giggly yet: `stat_summary()` drawn as bars.
 
 ## Summaries in bins
 
@@ -99,8 +99,7 @@ ggplot(diamonds, aes(carat, price)) +
   stat_summary_bin(fun = "mean", geom = "bar", orientation = 'y')
 ```
 
-Not in Giggly yet: the `diamonds` dataset, and `stat_summary_bin()` and its `orientation`
-option.
+Not in Giggly yet: `stat_summary_bin()` and its `orientation` option.
 
 ## Zooming in without losing data
 
@@ -139,8 +138,8 @@ d + stat_sum_df("median_hilow", mapping = aes(group = cyl))
 ```
 
 `stat_sum_df()` is a helper the example writes: a `stat_summary()` drawn as red crossbars.
-`mean_sdl()` is the mean give or take twice the standard deviation, or once with `mult = 1`, and
-`median_hilow()` the median with the range holding the middle 95% of the data.
+`mean_sdl()` is the mean give or take a multiple of the standard deviation, which `mult = 1`
+sets to one, and `median_hilow()` the median with a range holding the middle of the data.
 
 Not in Giggly yet: `stat_summary()` and its `fun.args` option, crossbars, `geom_crossbar()` and
 its `width` option, a fixed `colour`, and the `Hmisc` package's summaries: `mean_cl_boot()`,

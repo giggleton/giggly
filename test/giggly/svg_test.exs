@@ -2,7 +2,7 @@ defmodule Giggly.SVGTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Scene, SVG}
-  alias Giggly.Scene.{Cell, Polygons, Polylines, Rect, Rectangles, Text}
+  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Text}
 
   # Golden throughout: grid's own drawing of the same layout or marks, written by vdiffr 1.0.9's
   # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
@@ -127,6 +127,7 @@ defmodule Giggly.SVGTest do
         ymin: [0.5],
         ymax: [0.8],
         fill: "#595959",
+        fill_opacity: [1.0],
         color: :none,
         # A 0.5 mm line, as grid draws it in points.
         stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
@@ -140,6 +141,100 @@ defmodule Giggly.SVGTest do
                  "style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; " <>
                  "stroke-linejoin: miter; fill: #595959;' />\n</svg>\n"
              )
+    end
+
+    test "a circle's outline and fill carry its opacity, as svglite writes a colour's alpha" do
+      circles = %Circles{
+        x: [0.25, 0.75],
+        y: [0.5, 0.5],
+        radius: 1.95,
+        stroke_width: 0.71,
+        color: "#000000",
+        opacity: [1 / 3, 1.0]
+      }
+
+      assert circles(draw(whole([circles]))) === [
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 0.33; " <>
+                 "fill: #000000; fill-opacity: 0.33;'",
+               "style='stroke-width: 0.71; stroke: #000000; fill: #000000;'"
+             ]
+    end
+
+    test "a placed rectangle's fill carries its opacity, and its border none" do
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: "#595959",
+        fill_opacity: [0.5],
+        color: :none,
+        stroke_width: 1.07
+      }
+
+      assert draw(whole([rectangles])) =~
+               "stroke-linejoin: miter; fill: #595959; fill-opacity: 0.50;' />"
+    end
+
+    # R keeps a colour's alpha as a byte, the opacity times 255 rounded half to even, and svglite
+    # writes the byte over 255 with as many decimals as reach its first significant digit and one
+    # more. 6.5 rounds to 6, 0.024, where 7 would be 0.027; 1.5 to 2, 0.0078, where 1 would be
+    # 0.0039; 3.5 to 4, 0.016; 0.998 is byte 254, written 1.00; 0.999 is byte 255, opaque, and
+    # written not at all; byte 243 is 0.95, where dividing by 254 would give 0.96. Golden: svglite's
+    # styles for these alphas, from R 4.6.1, ggplot2 4.0.3 and vdiffr 1.0.9.
+    test "an opacity is written as the byte R rounds it to, over 255, as svglite writes a number" do
+      opacities = [6.5 / 255, 1.5 / 255, 3.5 / 255, 0.998, 0.999, 243 / 255]
+
+      circles = %Circles{
+        x: Enum.map(1..6, fn index -> index / 7 end),
+        y: List.duplicate(0.5, 6),
+        radius: 1.95,
+        stroke_width: 0.71,
+        color: "#000000",
+        opacity: opacities
+      }
+
+      assert circles(draw(whole([circles]))) === [
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 0.024; " <>
+                 "fill: #000000; fill-opacity: 0.024;'",
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 0.0078; " <>
+                 "fill: #000000; fill-opacity: 0.0078;'",
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 0.016; " <>
+                 "fill: #000000; fill-opacity: 0.016;'",
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 1.00; " <>
+                 "fill: #000000; fill-opacity: 1.00;'",
+               "style='stroke-width: 0.71; stroke: #000000; fill: #000000;'",
+               "style='stroke-width: 0.71; stroke: #000000; stroke-opacity: 0.95; " <>
+                 "fill: #000000; fill-opacity: 0.95;'"
+             ]
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's points and columns at `alpha = 0`, in vdiffr 1.0.9.
+    test "a wholly transparent colour is a stroke of none and no fill, as svglite writes it" do
+      circles = %Circles{
+        x: [0.5],
+        y: [0.5],
+        radius: 1.95,
+        stroke_width: 0.71,
+        color: "#000000",
+        opacity: [0.0]
+      }
+
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: "#595959",
+        fill_opacity: [0.0],
+        color: :none,
+        stroke_width: 1.07
+      }
+
+      drawn = draw(whole([circles, rectangles]))
+
+      assert circles(drawn) === ["style='stroke-width: 0.71; stroke: none;'"]
+      assert drawn =~ "stroke-linecap: butt; stroke-linejoin: miter;' />"
     end
 
     test "a polygon is filled round its outline, its border as svglite writes it" do
@@ -206,6 +301,13 @@ defmodule Giggly.SVGTest do
     ~r/<rect x='([^']*)' y='([^']*)' width='([^']*)' height='([^']*)'/
     |> Regex.scan(svg, capture: :all_but_first)
     |> Enum.map(fn [x, y, width, height] -> {x, y, width, height} end)
+  end
+
+  # Each circle's style, which says how it is drawn.
+  defp circles(svg) do
+    ~r/<circle [^>]*?(style='[^']*')/
+    |> Regex.scan(svg, capture: :all_but_first)
+    |> Enum.map(fn [style] -> style end)
   end
 
   # Each text element up to its style, which says where it is and how it is anchored.

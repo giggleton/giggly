@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -17,7 +28,12 @@ list of what remains.
 
 `stat_unique()` removes duplicate rows before they are drawn, so marks that would fall exactly on
 one another are drawn once. It is usually given to a geom as `stat = "unique"`. Giggly has none
-of it yet.
+of it yet, but draws the overlapping points it is compared with. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot
+and shows it below the cell with `Kino.Image`. The data in these examples is
+`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which
+the setup cell binds to `mtcars`, R's name for it.
 
 ## Overlapping points
 
@@ -29,7 +45,12 @@ ggplot(mtcars, aes(vs, am)) +
 `vs` and `am` are each 0 or 1, so the cars pile up at the corners, and each nearly
 transparent point darkens the ones beneath it.
 
-Not in Giggly yet: a fixed `alpha`.
+```elixir
+mtcars
+|> Plot.new(%{x: :vs, y: :am})
+|> Plot.geom_point(alpha: 0.1)
+|> render.()
+```
 
 ## One point for each distinct row
 
@@ -40,4 +61,4 @@ ggplot(mtcars, aes(vs, am)) +
 
 With the duplicates removed, each corner has a single faint point.
 
-Not in Giggly yet: a fixed `alpha`, and `stat_unique()` given to a geom as `stat = "unique"`.
+Not in Giggly yet: `stat_unique()` given to a geom as `stat = "unique"`.

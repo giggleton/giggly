@@ -34,9 +34,8 @@ dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
 d + scale_colour_brewer()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
-choosing the order of a column's values (`clarity` is an ordered factor), and
-`scale_colour_brewer()`.
+Not in Giggly yet: mapping `colour` and the legend that reads it back, choosing the order of a
+column's values (`clarity` is an ordered factor), and `scale_colour_brewer()`.
 
 ## Titling the legend
 
@@ -45,9 +44,9 @@ choosing the order of a column's values (`clarity` is an ordered factor), and
 d + scale_colour_brewer("Diamond\nclarity")
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
-choosing the order of a column's values, and `scale_colour_brewer()`, whose first argument titles
-the legend, here over two lines.
+Not in Giggly yet: mapping `colour` and the legend that reads it back, choosing the order of a
+column's values, and `scale_colour_brewer()`, whose first argument titles the legend, here over two
+lines.
 
 ## Choosing a palette
 
@@ -57,8 +56,8 @@ d + scale_colour_brewer(palette = "Greens")
 d + scale_colour_brewer(palette = "Set1")
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
-choosing the order of a column's values, and `scale_colour_brewer()` and its `palette` option.
+Not in Giggly yet: mapping `colour` and the legend that reads it back, choosing the order of a
+column's values, and `scale_colour_brewer()` and its `palette` option.
 
 ## Fill colours
 
@@ -70,9 +69,8 @@ p <- ggplot(diamonds, aes(x = price, fill = cut)) +
 p + scale_fill_brewer()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
-reads it back, choosing the order of a column's values (`cut` is an ordered factor), and
-`scale_fill_brewer()`.
+Not in Giggly yet: `geom_histogram()`, mapping `fill` and the legend that reads it back, choosing
+the order of a column's values (`cut` is an ordered factor), and `scale_fill_brewer()`.
 
 ## Reversing the palette
 
@@ -81,9 +79,8 @@ reads it back, choosing the order of a column's values (`cut` is an ordered fact
 p + scale_fill_brewer(direction = -1)
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
-reads it back, choosing the order of a column's values, and `scale_fill_brewer()` and its
-`direction` option.
+Not in Giggly yet: `geom_histogram()`, mapping `fill` and the legend that reads it back, choosing
+the order of a column's values, and `scale_fill_brewer()` and its `direction` option.
 
 ## A dark background
 
@@ -94,9 +91,9 @@ p +
   theme_dark()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
-reads it back, choosing the order of a column's values, `scale_fill_brewer()` and its `direction`
-option, and `theme_dark()`. Giggly draws every plot in ggplot2's default theme, `theme_gray()`.
+Not in Giggly yet: `geom_histogram()`, mapping `fill` and the legend that reads it back, choosing
+the order of a column's values, `scale_fill_brewer()` and its `direction` option, and
+`theme_dark()`. Giggly draws every plot in ggplot2's default theme, `theme_gray()`.
 
 ## Continuous colours
 

@@ -32,7 +32,7 @@ ggplot(diamonds, aes(carat)) +
 
 With neither `bins` nor `binwidth`, ggplot2 makes 30 bins and suggests choosing a better value.
 
-Not in Giggly yet: `geom_histogram()`, `stat_bin()`, and the `diamonds` dataset.
+Not in Giggly yet: `geom_histogram()` and `stat_bin()`.
 
 ## The width and number of bins
 
@@ -43,8 +43,7 @@ ggplot(diamonds, aes(carat)) +
   geom_histogram(bins = 200)
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` and `bins` options, and the `diamonds`
-dataset.
+Not in Giggly yet: `geom_histogram()` and its `binwidth` and `bins` options.
 
 ## A horizontal histogram
 
@@ -54,7 +53,7 @@ ggplot(diamonds, aes(y = carat)) +
   geom_histogram()
 ```
 
-Not in Giggly yet: `geom_histogram()` and the `diamonds` dataset.
+Not in Giggly yet: `geom_histogram()`.
 
 ## Binning the axis instead
 
@@ -69,8 +68,8 @@ ggplot(diamonds, aes(carat)) +
 `scale_x_binned()` bins the x axis itself, so `geom_bar()` counts the rows in each bin and the
 ticks fall between the bars.
 
-Not in Giggly yet: `scale_x_binned()` and the `diamonds` dataset. Giggly has `geom_bar()`, which
-without a binned scale counts the rows at each distinct `x`.
+Not in Giggly yet: `scale_x_binned()`. Giggly has `geom_bar()`, which without a binned scale counts
+the rows at each distinct `x`.
 
 ## Stacked histograms and frequency polygons
 
@@ -83,8 +82,8 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_histogram()`, `geom_freqpoly()`, mapping `fill` and `colour`, the scales
-that map them and the legends that read them back, and the `diamonds` dataset.
+Not in Giggly yet: `geom_histogram()`, `geom_freqpoly()`, and mapping `fill` and `colour`, the
+scales that map them and the legends that read them back.
 
 ## Density instead of count
 
@@ -95,9 +94,8 @@ ggplot(diamonds, aes(price, after_stat(density), colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_freqpoly()`, an expression in a mapping, here `after_stat(density)`,
-mapping `colour`, the scale that maps it and the legend that reads it back, and the `diamonds`
-dataset.
+Not in Giggly yet: `geom_freqpoly()`, an expression in a mapping, here `after_stat(density)`, and
+mapping `colour`, the scale that maps it and the legend that reads it back.
 
 ## Bins of unequal width
 
@@ -118,8 +116,8 @@ ggplot(diamonds, aes(price, after_stat(count / width))) +
 With the count as its height, every bar is about as tall as the next and the widest look the
 biggest; dividing each count by its bin's width makes each bar's area its count instead.
 
-Not in Giggly yet: `geom_histogram()` and its `breaks` option, a fixed `colour`, an expression in
-a mapping, here `after_stat(count / width)`, and the `diamonds` dataset.
+Not in Giggly yet: `geom_histogram()` and its `breaks` option, a fixed `colour`, and an expression
+in a mapping, here `after_stat(count / width)`.
 
 ## Movies by rating
 

@@ -41,7 +41,7 @@ p + annotate("rect", xmin = 3, xmax = 4.2, ymin = 12, ymax = 21,
   alpha = .2)
 ```
 
-Not in Giggly yet: `annotate()`, `geom_rect()`, and a fixed `alpha`.
+Not in Giggly yet: `annotate()` and `geom_rect()`.
 
 ## A segment
 

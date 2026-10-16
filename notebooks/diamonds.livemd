@@ -15,5 +15,7 @@ has no examples, so this notebook says only what the page describes and where Gi
 `diamonds` holds the prices and other attributes of almost 54,000 round cut diamonds: price in US
 dollars, weight in carats, the quality of the cut, colour from D (best) to J (worst), clarity,
 length, width and depth in millimetres, the total depth as a percentage of the mean of length and
-width, and the width of the top relative to the widest point. Not in Giggly yet: the `diamonds`
-dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.
+width, and the width of the top relative to the widest point. Giggly has it as
+`Giggly.Datasets.diamonds/0`, a keyword list of columns `Giggly.Plot.new/2` takes as it is. R keeps
+the cut, colour and clarity as ordered factors; Giggly keeps their labels, which sort
+alphabetically until a column's values can be put in order.

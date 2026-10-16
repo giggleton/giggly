@@ -19,7 +19,7 @@ In ggplot2, `+` adds a component to a plot: a layer, a scale, a theme, a coordin
 facet, or a mapping that replaces the plot's own. Adding a list adds each of its elements in turn,
 and replacing the plot's data takes `%+%`. A Giggly plot is built with a pipe instead: each
 function in `Giggly.Plot` takes a plot and returns it with a layer added, as
-`Giggly.Plot.geom_point/2` does, or with its facet or coordinate system replaced, as
+`Giggly.Plot.geom_point/3` does, or with its facet or coordinate system replaced, as
 `Giggly.Plot.facet_wrap/3` and `Giggly.Plot.coord_radial/1` do. The data is given once, to
 `Giggly.Plot.new/2`.
 

@@ -117,7 +117,8 @@ p + geom_point(alpha = 1/10)
 R's `rnorm()` draws the points at random from a normal distribution, the same ones every time
 after `set.seed(1)`.
 
-Not in Giggly yet: a fixed `alpha`.
+Giggly draws all three now, but this notebook leaves them undrawn: it would have to write out the
+10,000 numbers `rnorm()` draws here.
 
 ## Shading with alpha
 

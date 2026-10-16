@@ -19,8 +19,9 @@ is waiting for, so the page is also a list of what remains.
 An alpha scale maps a column to transparency, a way to fade the less important observations.
 `scale_alpha()` is short for `scale_alpha_continuous()`, for a column of numbers;
 `scale_alpha_binned()` cuts the numbers into bins first, and `scale_alpha_discrete()` and
-`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of them yet, nor the
-`alpha` aesthetic they map.
+`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of them yet, nor
+mapping `alpha` to a column; a layer can set it for every mark, as
+`Giggly.Plot.geom_point(alpha: 0.4)` does.
 
 ## Mapping transparency
 

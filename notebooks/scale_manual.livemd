@@ -66,9 +66,9 @@ ggplot(
   )
 ```
 
-Not in Giggly yet: mapping `colour` and `fill`, an expression in a mapping, such as
-`factor(cyl)`, a fixed `shape`, `alpha` and `size`, `scale_colour_manual()` and its `aesthetics`
-option, and the legend that reads them back.
+Not in Giggly yet: mapping `colour` and `fill`, an expression in a mapping, such as `factor(cyl)`, a
+fixed `shape` and `size`, `scale_colour_manual()` and its `aesthetics` option, and the legend that
+reads them back.
 
 ## Breaks and labels
 

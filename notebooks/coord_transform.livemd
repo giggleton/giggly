@@ -32,8 +32,7 @@ ggplot(diamonds, aes(log10(carat), log10(price))) +
   geom_point()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, and an expression in a mapping, such as
-`log10(carat)`.
+Not in Giggly yet: an expression in a mapping, such as `log10(carat)`.
 
 ## Transforming the scales
 
@@ -45,7 +44,7 @@ ggplot(diamonds, aes(carat, price)) +
   scale_y_log10()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, and `scale_x_log10()` and `scale_y_log10()`.
+Not in Giggly yet: `scale_x_log10()` and `scale_y_log10()`.
 
 ## Transforming the coordinate system
 
@@ -56,7 +55,7 @@ ggplot(diamonds, aes(carat, price)) +
   coord_transform(x = "log10", y = "log10")
 ```
 
-Not in Giggly yet: the `diamonds` dataset and `coord_transform()`.
+Not in Giggly yet: `coord_transform()`.
 
 ## A fitted line on transformed scales
 
@@ -78,8 +77,8 @@ ggplot(d, aes(carat, price)) +
   scale_y_log10()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`, and
-`scale_x_log10()` and `scale_y_log10()`.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()` and `scale_x_log10()` and
+`scale_y_log10()`.
 
 ## A fitted line in transformed coordinates
 
@@ -94,8 +93,7 @@ ggplot(d, aes(carat, price)) +
 # scale
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`, and
-`coord_transform()`.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()` and `coord_transform()`.
 
 ## Transforming back
 
@@ -110,9 +108,8 @@ ggplot(diamonds, aes(carat, price)) +
   coord_transform(x = scales::transform_exp(10), y = scales::transform_exp(10))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`,
-`scale_x_log10()` and `scale_y_log10()`, and `coord_transform()` with transformations from the
-`scales` package.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, `scale_x_log10()` and
+`scale_y_log10()`, and `coord_transform()` with transformations from the `scales` package.
 
 ## No transformation
 
@@ -123,7 +120,7 @@ ggplot(diamonds, aes(carat, price)) +
   geom_smooth(method = "lm")
 ```
 
-Not in Giggly yet: the `diamonds` dataset, and `geom_smooth()` with a line fitted by `lm()`.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`.
 
 ## A discrete axis
 

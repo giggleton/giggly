@@ -31,7 +31,7 @@ ggplot(diamonds, aes(price, cut)) +
   geom_boxplot()
 ```
 
-Not in Giggly yet: the `diamonds` dataset and `geom_boxplot()`.
+Not in Giggly yet: `geom_boxplot()`.
 
 ## Flipping boxplots
 
@@ -42,7 +42,7 @@ ggplot(diamonds, aes(cut, price)) +
   coord_flip()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_boxplot()`, and `coord_flip()`.
+Not in Giggly yet: `geom_boxplot()` and `coord_flip()`.
 
 ## Reversing a horizontal histogram
 
@@ -53,7 +53,7 @@ ggplot(diamonds, aes(y = carat)) +
   scale_y_reverse()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, and `scale_y_reverse()`.
+Not in Giggly yet: `geom_histogram()` and `scale_y_reverse()`.
 
 ## Reversing a flipped histogram
 
@@ -65,8 +65,7 @@ ggplot(diamonds, aes(carat)) +
   scale_x_reverse()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, `coord_flip()`, and
-`scale_x_reverse()`.
+Not in Giggly yet: `geom_histogram()`, `coord_flip()`, and `scale_x_reverse()`.
 
 ## A horizontal area
 

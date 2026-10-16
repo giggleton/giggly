@@ -40,8 +40,8 @@ d + scale_shape(name = "Cut of diamond")
 
 `name` titles the legend.
 
-Not in Giggly yet: the `diamonds` dataset, mapping `shape`, `scale_shape()` and its `solid`
-option, the legend that reads it back, and titles and labels.
+Not in Giggly yet: mapping `shape`, `scale_shape()` and its `solid` option, the legend that reads it
+back, and titles and labels.
 
 ## The order of the shapes
 
@@ -56,8 +56,8 @@ ggplot(dsmall, aes(price, carat)) + geom_point(aes(shape = cut))
 
 Shapes go to a column's values in the order of its levels.
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values, mapping
-`shape`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: choosing the order of a column's values, mapping `shape`, the scale that maps it
+and the legend that reads it back.
 
 ## The available shapes
 

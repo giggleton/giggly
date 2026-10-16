@@ -53,8 +53,8 @@ ggplot(diamonds, aes(price, fill = cut)) +
 # see ?geom_bar for more examples
 ```
 
-Not in Giggly yet: the `diamonds` dataset, histograms, `geom_histogram()`, mapping `fill` and the
-legend that reads it back, and `position_dodge2()`.
+Not in Giggly yet: histograms, `geom_histogram()`, mapping `fill` and the legend that reads it back,
+and `position_dodge2()`.
 
 ## Frequency polygons instead
 
@@ -64,8 +64,8 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, frequency polygons, `geom_freqpoly()`, and mapping
-`colour` and the legend that reads it back.
+Not in Giggly yet: frequency polygons, `geom_freqpoly()`, and mapping `colour` and the legend that
+reads it back.
 
 ## Columns dodged by group
 

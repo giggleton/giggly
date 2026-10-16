@@ -33,7 +33,7 @@ defmodule Giggly.PlotTest do
     end
   end
 
-  describe "geom_point/2" do
+  describe "geom_point/3" do
     test "a point layer records its geom, the identity stat and position, and its resolved mapping" do
       plot =
         @rows
@@ -45,7 +45,8 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Point{},
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
-                 mapping: %{x: "wt", y: "mpg", group: "cyl"}
+                 mapping: %{x: "wt", y: "mpg", group: "cyl"},
+                 fixed: %{}
                }
              ]
     end
@@ -54,14 +55,14 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{y: :mgp}) end
-      assert error.message =~ "Plot.geom_point/2"
+      assert error.message =~ "Plot.geom_point/3"
     end
 
     test "an aesthetic points cannot use is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{color: :cyl}) end
-      assert error.message =~ "Plot.geom_point/2"
+      assert error.message =~ "Plot.geom_point/3"
       assert error.message =~ ":color"
       assert error.message =~ ":group"
     end
@@ -79,6 +80,57 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot) end
       assert error.message =~ ":y"
     end
+
+    test "an alpha set alone is recorded for every mark, a whole number as a float" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(alpha: 1)
+
+      assert [%Plot.Layer{fixed: fixed, mapping: %{}}] = plot.reversed_layers
+      assert fixed === %{alpha: 1.0}
+    end
+
+    test "a mapping and an alpha together record both" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :wt, y: :mpg}, alpha: 0.4)
+
+      assert [%Plot.Layer{fixed: %{alpha: 0.4}, mapping: %{x: "wt", y: "mpg"}}] =
+               plot.reversed_layers
+    end
+
+    test "an alpha of 0, invisible, is a value like any other from 0 to 1" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(alpha: 0)
+
+      assert [%Plot.Layer{fixed: %{alpha: +0.0}}] = plot.reversed_layers
+    end
+
+    test "an alpha outside 0 to 1, or not a number, is refused by the option's validation" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for alpha <- [1.5, -0.1, "0.4"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_point(plot, alpha: alpha)
+          end
+
+        assert error.key == :alpha
+      end
+    end
+
+    test "an alpha given twice is refused rather than one silently winning" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_point(plot, alpha: 0.4, alpha: "x") end
+
+      assert error.message =~ ":alpha"
+    end
   end
 
   describe "geom_col/3" do
@@ -93,7 +145,8 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Bar{},
                  stat: %Stat.Identity{},
                  position: %Position.Stack{},
-                 mapping: %{x: "cyl", y: "mpg"}
+                 mapping: %{x: "cyl", y: "mpg"},
+                 fixed: %{}
                }
              ]
     end
@@ -109,10 +162,15 @@ defmodule Giggly.PlotTest do
       plot =
         @rows
         |> Plot.new()
-        |> Plot.geom_col(%{x: :cyl, y: :mpg}, position: :dodge)
+        |> Plot.geom_col(%{x: :cyl, y: :mpg}, position: :dodge, alpha: 0.5)
 
-      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{x: "cyl", y: "mpg"}}] =
-               plot.reversed_layers
+      assert [
+               %Plot.Layer{
+                 position: %Position.Dodge{},
+                 mapping: %{x: "cyl", y: "mpg"},
+                 fixed: %{alpha: 0.5}
+               }
+             ] = plot.reversed_layers
     end
 
     test "an aesthetic bars cannot use is refused, naming the call" do
@@ -144,7 +202,8 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Bar{},
                  stat: %Stat.Count{},
                  position: %Position.Stack{},
-                 mapping: %{x: "cyl", weight: "wt"}
+                 mapping: %{x: "cyl", weight: "wt"},
+                 fixed: %{}
                }
              ]
     end
@@ -155,7 +214,18 @@ defmodule Giggly.PlotTest do
         |> Plot.new(%{x: :cyl})
         |> Plot.geom_bar(position: :dodge)
 
-      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{}}] = plot.reversed_layers
+      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{}, fixed: %{}}] =
+               plot.reversed_layers
+    end
+
+    test "an alpha is recorded for every bar, the position left stacking" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl})
+        |> Plot.geom_bar(alpha: 0.5)
+
+      assert [%Plot.Layer{position: %Position.Stack{}, fixed: %{alpha: 0.5}}] =
+               plot.reversed_layers
     end
 
     test "a position bars do not take is refused by the option's validation" do
@@ -178,6 +248,13 @@ defmodule Giggly.PlotTest do
         end
 
       assert error.message =~ ":position"
+    end
+
+    test "a column the data does not have is refused, naming the call" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{x: :cly}) end
+      assert error.message =~ "Plot.geom_bar/3"
     end
 
     test "x and y together are refused, since it counts along one and the count is the other" do

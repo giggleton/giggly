@@ -26,6 +26,12 @@ defmodule Giggly.Plot do
   both the plot and layer map takes the layer's column. Which aesthetics a layer can use is checked,
   on the two mappings together, when the layer is added. Whether a column's type suits an axis is
   checked when the plot is run.
+
+  ## Setting aesthetics
+
+  A layer function's options can set an aesthetic to one value for every mark the layer draws, as
+  ggplot2's `geom_point(alpha = 0.4)` does: `Giggly.Plot.geom_point(plot, alpha: 0.4)`. A map
+  maps and a keyword list sets.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -111,6 +117,22 @@ defmodule Giggly.Plot do
                         ]
                       )
 
+  # An aesthetic set to one value for every mark of a layer, an option of the function that adds
+  # the layer, as ggplot2's `geom_point(alpha = 0.4)` sets it. A number from 0 to 1 is kept as a
+  # float, as R keeps it.
+  @alpha_option [
+    type: {:custom, __MODULE__, :validate_alpha, []},
+    doc:
+      "How opaque every mark is, from 0, invisible, to 1, opaque, as ggplot2's " <>
+        "`alpha = 0.4` sets it."
+  ]
+
+  # The options that set an aesthetic rather than choose how a layer is drawn.
+  @fixed_aesthetics [:alpha]
+
+  # `geom_point/3`'s options, validated at the call.
+  @point_options NimbleOptions.new!(alpha: @alpha_option)
+
   # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
                  position: [
@@ -120,7 +142,8 @@ defmodule Giggly.Plot do
                      "How bars that share an `x` are placed: piled on one another (`:stack`), " <>
                        "or set side by side within the width one bar takes (`:dodge`), " <>
                        "ggplot2's `position = \"dodge\"`."
-                 ]
+                 ],
+                 alpha: @alpha_option
                )
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
@@ -153,7 +176,13 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other.
+  Points use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. A point
+  set to be transparent is so in its outline and its fill alike, as ggplot2 draws one. A mapping,
+  a map, and options, a keyword list, may each be given alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@point_options)}
 
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
@@ -164,17 +193,35 @@ defmodule Giggly.Plot do
       [2.62, 2.875]
       iex> Giggly.DataFrame.pull(frame, :group)
       [2, 1]
+
+  A value set for every point is in every row of the layer's table:
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point(alpha: 0.4)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:alpha)
+      [0.4, 0.4]
   """
-  @spec geom_point(t(), mapping_argument()) :: t()
-  def geom_point(%__MODULE__{} = plot, mapping \\ %{}) when is_map(mapping) do
+  @spec geom_point(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_point(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_point(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_point(plot, %{}, options)
+
+  def geom_point(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @point_options)
+
     layer = %Layer{
       geom: %Geom.Point{},
       stat: %Stat.Identity{},
       position: %Position.Identity{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_point/2")
+      mapping: resolve(mapping, plot.data, "Plot.geom_point/3"),
+      fixed: fixed(validated)
     }
 
-    add_layer(plot, layer, "Plot.geom_point/2",
+    add_layer(plot, layer, "Plot.geom_point/3",
       accepted: Geom.Point.accepted_aesthetics(),
       required: Geom.Point.required_aesthetics()
     )
@@ -215,11 +262,14 @@ defmodule Giggly.Plot do
 
   def geom_bar(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @bar_options)
+
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Count{},
-      position: bar_position(options),
-      mapping: resolve(mapping, plot.data, "Plot.geom_bar/3")
+      position: position(Keyword.fetch!(validated, :position)),
+      mapping: resolve(mapping, plot.data, "Plot.geom_bar/3"),
+      fixed: fixed(validated)
     }
 
     plot
@@ -281,11 +331,14 @@ defmodule Giggly.Plot do
 
   def geom_col(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @bar_options)
+
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Identity{},
-      position: bar_position(options),
-      mapping: resolve(mapping, plot.data, "Plot.geom_col/3")
+      position: position(Keyword.fetch!(validated, :position)),
+      mapping: resolve(mapping, plot.data, "Plot.geom_col/3"),
+      fixed: fixed(validated)
     }
 
     add_layer(plot, layer, "Plot.geom_col/3",
@@ -392,6 +445,21 @@ defmodule Giggly.Plot do
   @spec layer_position(Layer.t()) :: Layer.position()
   def layer_position(%Layer{position: position}), do: position
 
+  # The aesthetics `layer` sets to one value for every mark, as ggplot2's `aes_params`.
+  @doc false
+  @spec layer_fixed(Layer.t()) :: Layer.fixed()
+  def layer_fixed(%Layer{fixed: fixed}), do: fixed
+
+  # NimbleOptions' check of an `alpha:` option: a number from 0, invisible, to 1, opaque, kept as a
+  # float.
+  @doc false
+  @spec validate_alpha(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_alpha(alpha) when is_number(alpha) and alpha >= 0 and alpha <= 1,
+    do: {:ok, alpha / 1}
+
+  def validate_alpha(alpha),
+    do: {:error, "expected a number from 0 to 1, got: #{inspect(alpha)}"}
+
   defp resolve(mapping, frame, function_name) do
     names = DataFrame.names(frame)
 
@@ -436,14 +504,19 @@ defmodule Giggly.Plot do
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
 
-  # The position a bar layer's options choose, its option names put in their canonical spelling
-  # first, so a repeated option is refused rather than one silently winning.
-  defp bar_position(options) do
+  # A layer function's options, validated against `schema`, their names put in their canonical
+  # spelling first, so a repeated option is refused rather than one silently winning.
+  defp layer_options(options, schema) do
     options
     |> Aesthetics.canonicalize()
-    |> NimbleOptions.validate!(@bar_options)
-    |> Keyword.fetch!(:position)
-    |> position()
+    |> NimbleOptions.validate!(schema)
+  end
+
+  # The aesthetics a layer's validated options set for every mark.
+  defp fixed(validated) do
+    validated
+    |> Keyword.take(@fixed_aesthetics)
+    |> Map.new()
   end
 
   defp position(:stack), do: %Position.Stack{}

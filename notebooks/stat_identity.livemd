@@ -18,7 +18,7 @@ list of what remains.
 The identity stat leaves the data unchanged, so each row is drawn where its mapping puts it. It is
 the stat of most geoms, `geom_point()` and `geom_col()` among them; as a layer of its own,
 `stat_identity()` draws points unless another geom is given. Giggly has no `stat_identity()`, but
-its `Giggly.Plot.geom_point/2` and `Giggly.Plot.geom_col/3` are ggplot2's `geom_point()` and
+its `Giggly.Plot.geom_point/3` and `Giggly.Plot.geom_col/3` are ggplot2's `geom_point()` and
 `geom_col()`, which use it.
 
 ## Points, unchanged
@@ -29,4 +29,4 @@ p + stat_identity()
 ```
 
 Not in Giggly yet: `stat_identity()`. With its default geom, this is the scatter plot that
-`geom_point()` draws from the same mapping, which `Giggly.Plot.geom_point/2` draws too.
+`geom_point()` draws from the same mapping, which `Giggly.Plot.geom_point/3` draws too.

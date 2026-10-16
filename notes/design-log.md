@@ -79,6 +79,29 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **ggplot2's `diamonds` is shipped whole, kept compressed, and drawn whole (2026-10-16, Steve).**
+  `geom_point`'s transparency example draws all 53,940 diamonds, which no sample shows, and the
+  pages that sample draw from the whole table. Kept as its columns, as `mpg` is, it would be some
+  18 MB held wherever `Giggly.Datasets` is loaded, which a release does at boot; compiled into a
+  compressed binary it is 0.49 MB, decoded in about 23 ms per call, with no IO. Its read has a
+  waiver of its own, as every dataset's does. *Rejected: reading the file when called*, as ggity
+  did, since the core does no IO. *Rejected: drawing a sample* (Steve did not mind the departure)
+  — the example is about overplotting at scale, and 53,940 points draw in about half a second as
+  an 8 MB SVG. *Open:* whether `mpg` and `mtcars` move to the same compressed storage.
+
+- **Alpha is Phase 3's second increment, in four steps: setting it, mapping it through a scale,
+  its legend, the notebooks (2026-10-15, Steve, agreeing the proposal; checked against ggplot2
+  4.0.3 in R).** Steve chose `alpha` to build a non-position aesthetic, its scale and its legend
+  without colour spaces and palettes. A set value is a keyword option of the layer function
+  (`Plot.geom_point(alpha: 0.4)`), ggity's idiom of a map mapping and a keyword list setting, and
+  is applied last, as ggplot2 applies `aes_params`. A mapped numeric column is rescaled onto 0.1 to
+  1; a point is transparent outline and fill, a bar its fill only, as ggplot2's geoms draw them,
+  and the scene carries an opacity per mark. **A text column mapped to alpha is drawn as ggplot2
+  draws it, its values spread evenly over 0.1 to 1, without ggplot2's warning (Steve).**
+  *Rejected: refusing a text column* (recommended, as ggplot2 advises against it) *and leaving it
+  out.* *Deferred:* `scale_alpha()`'s options, binned and date alpha, legend positions but the
+  right, and combining legends.
+
 - **Bars are Phase 3's first increment, in five steps: columns, counts, dodge, horizontal bars,
   a notebook (2026-10-15, Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).**
   Steve chose bars before other aesthetics to exercise stats, positions and discrete axes.
@@ -1051,13 +1074,14 @@ written, and git history keeps every version.
   every stage function would have had only test callers until then.
 
 - **Points accept only what Phase 1 can draw, and fixed aesthetics wait for drawing (2026-10-12,
-  Steve).** `geom_point/2` accepts `:x`, `:y` and `:group`; an aesthetic joins a geom with the
+  Steve).** `geom_point/3` accepts `:x`, `:y` and `:group`; an aesthetic joins a geom with the
   scale that maps it. *Rejected: ggplot2's full list for points now* — a mapped colour would be
   evaluated and grouped and never drawn. *Rejected: fixed aesthetics (`alpha: 0.4`) now* — nothing
   reads one before the scene, what counts as a valid value is a rendering decision, and "a fixed
   value overrides an inherited mapping" cannot be exercised until something can be both. So
   NimbleOptions waits for the first keyword option; what its source showed about duplicates is in
-  `.claude/rules/plot.md`.
+  `.claude/rules/plot.md`. *(Fixed aesthetics arrived with alpha, 2026-10-15: the entry beginning
+  "Alpha is Phase 3's second increment".)*
 
 - **CLAUDE.md holds only what applies to a library, and each area's rules file earns one
   status-map line (2026-10-11).** Tack's library profile wrote a CLAUDE.md for an application, and
@@ -1251,8 +1275,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Add a notebook for every page of ggplot2's reference; §4: "Every page of
-  ggplot2's function reference has a notebook"
+- 2026-10-16 — Set alpha on a layer, and add the diamonds dataset (alpha, step 1); §4: "Alpha is
+  Phase 3's second increment", "ggplot2's `diamonds` is shipped whole"
+- 2026-10-15 — Add a notebook for every page of ggplot2's reference (`adf9236`); §4: "Every page
+  of ggplot2's function reference has a notebook"
 - 2026-10-15 — Add the geom_bar notebook (bars, step 5) (`6f6b680`); §4: "Bars are Phase 3's
   first increment", "The notebooks follow ggplot2's reference pages"
 - 2026-10-15 — Draw horizontal bars (bars, step 4) (`b5c2d10`); §4: "A geom says where its marks

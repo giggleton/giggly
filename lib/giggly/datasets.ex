@@ -19,6 +19,9 @@ defmodule Giggly.Datasets do
   @mpg_path Application.app_dir(:giggly, "priv/datasets/mpg.csv")
   @external_resource @mpg_path
 
+  @diamonds_path Application.app_dir(:giggly, "priv/datasets/diamonds.csv")
+  @external_resource @diamonds_path
+
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
     model: :string,
@@ -50,6 +53,21 @@ defmodule Giggly.Datasets do
     class: :string
   ]
 
+  # How each of diamonds's columns is read; the file's header gives their order. R stores `table`
+  # as a double, whole as its values are, and its factors are read as their labels.
+  @diamonds_types [
+    carat: :float,
+    cut: :string,
+    color: :string,
+    clarity: :string,
+    depth: :float,
+    table: :float,
+    price: :integer,
+    x: :float,
+    y: :float,
+    z: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -62,40 +80,59 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @mpg_text File.read!(@mpg_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @diamonds_text File.read!(@diamonds_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
   # its table of types already holds, and read by its type.
-  @datasets Map.new(
-              [mtcars: {@mtcars_text, @mtcars_types}, mpg: {@mpg_text, @mpg_types}],
-              fn {dataset, {text, types}} ->
-                columns =
-                  text
-                  |> String.split("\n", trim: true)
-                  |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
-                  |> Enum.map(fn line -> String.split(line, ",") end)
-                  |> Enum.zip_with(fn [header | values] ->
-                    name = String.to_existing_atom(header)
+  @parsed Map.new(
+            [
+              mtcars: {@mtcars_text, @mtcars_types},
+              mpg: {@mpg_text, @mpg_types},
+              diamonds: {@diamonds_text, @diamonds_types}
+            ],
+            fn {dataset, {text, types}} ->
+              columns =
+                text
+                |> String.split("\n", trim: true)
+                |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
+                |> Enum.map(fn line -> String.split(line, ",") end)
+                |> Enum.zip_with(fn [header | values] ->
+                  name = String.to_existing_atom(header)
 
-                    read =
-                      case Keyword.fetch!(types, name) do
-                        :string ->
-                          fn value -> value end
+                  read =
+                    case Keyword.fetch!(types, name) do
+                      :string ->
+                        fn value -> value end
 
-                        :integer ->
-                          &String.to_integer/1
+                      :integer ->
+                        &String.to_integer/1
 
-                        :float ->
-                          fn value ->
-                            {number, ""} = Float.parse(value)
-                            number
-                          end
-                      end
+                      :float ->
+                        fn value ->
+                          {number, ""} = Float.parse(value)
+                          number
+                        end
+                    end
 
-                    {name, Enum.map(values, read)}
-                  end)
+                  {name, Enum.map(values, read)}
+                end)
 
-                {dataset, columns}
-              end
-            )
+              {dataset, columns}
+            end
+          )
+
+  # The small datasets are kept as their columns. diamonds is kept compressed, its columns in
+  # Erlang's external term format, and decoded each time it is asked for: as columns it would be
+  # some 18 MB held wherever this module is loaded, a release loading every module at boot, where
+  # compressed it is half a megabyte, decoded in a few tens of milliseconds, with no IO either way.
+  @datasets Map.take(@parsed, [:mtcars, :mpg])
+  @diamonds @parsed
+            |> Map.fetch!(:diamonds)
+            |> :erlang.term_to_binary(compressed: 9)
 
   @doc """
   R's `mtcars`: fuel consumption and ten aspects of design and performance for 32 cars (1973-74
@@ -164,4 +201,40 @@ defmodule Giggly.Datasets do
   """
   @spec mpg() :: [{atom(), [String.t() | number()]}]
   def mpg, do: Map.fetch!(@datasets, :mpg)
+
+  @doc """
+  ggplot2's `diamonds`: the prices and other attributes of 53,940 round cut diamonds, the dataset
+  ggplot2's examples reach for when a plot has too many points to see each one.
+
+  The columns: `carat`, the weight; `cut`, the quality of the cut, from `"Fair"`, `"Good"`,
+  `"Very Good"` and `"Premium"` to `"Ideal"`; `color`, from `"D"`, the best, to `"J"`, the worst;
+  `clarity`, how clear, from `"I1"`, the worst, through `"SI2"`, `"SI1"`, `"VS2"`, `"VS1"`,
+  `"VVS2"` and `"VVS1"` to `"IF"`, the best; `depth`, the total depth as a percentage of the
+  mean width, `2 * z / (x + y)`; `table`, the width of the top relative to the widest point;
+  `price`, in US dollars; and `x`, `y` and `z`, the length, width and depth in millimetres. R
+  keeps `cut`, `color` and `clarity` as ordered factors; here they are their labels, which sort
+  alphabetically. It is kept compressed and decoded each time it is asked for, in a few tens of
+  milliseconds, so bind it once.
+
+      iex> diamonds = Giggly.Datasets.diamonds()
+      iex> Keyword.keys(diamonds)
+      [:carat, :cut, :color, :clarity, :depth, :table, :price, :x, :y, :z]
+      iex> diamonds |> Keyword.fetch!(:price) |> length()
+      53940
+      iex> Enum.map(diamonds, fn {name, values} -> {name, Enum.at(values, 2)} end)
+      [
+        carat: 0.23,
+        cut: "Good",
+        color: "E",
+        clarity: "VS1",
+        depth: 56.9,
+        table: 65.0,
+        price: 327,
+        x: 4.05,
+        y: 4.07,
+        z: 2.31
+      ]
+  """
+  @spec diamonds() :: [{atom(), [String.t() | number()]}]
+  def diamonds, do: :erlang.binary_to_term(@diamonds)
 end

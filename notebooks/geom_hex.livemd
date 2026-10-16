@@ -30,8 +30,8 @@ d + geom_hex()
 
 Each hexagon's count is mapped to its `fill`, so the plot has a legend for the counts.
 
-Not in Giggly yet: `geom_hex()`, mapping `fill`, the scale that maps it and the legend that reads
-it back, and the `diamonds` dataset.
+Not in Giggly yet: `geom_hex()` and mapping `fill`, the scale that maps it and the legend that reads
+it back.
 
 ## The number of bins
 
@@ -42,8 +42,8 @@ d + geom_hex(bins = 10)
 d + geom_hex(bins = 30)
 ```
 
-Not in Giggly yet: `geom_hex()` and its `bins` option, mapping `fill`, the scale that maps it and
-the legend that reads it back, and the `diamonds` dataset.
+Not in Giggly yet: `geom_hex()` and its `bins` option and mapping `fill`, the scale that maps it and
+the legend that reads it back.
 
 ## The width of the bins
 
@@ -55,5 +55,5 @@ d + geom_hex(binwidth = c(.1, 500))
 
 A pair of widths gives the width along `x` first, then along `y`.
 
-Not in Giggly yet: `geom_hex()` and its `binwidth` option, mapping `fill`, the scale that maps it
-and the legend that reads it back, and the `diamonds` dataset.
+Not in Giggly yet: `geom_hex()` and its `binwidth` option and mapping `fill`, the scale that maps it
+and the legend that reads it back.

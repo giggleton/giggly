@@ -29,7 +29,7 @@ what remains.
 `geom_jitter()` is a shortcut for `geom_point(position = "jitter")`: it moves each point by a small
 random amount, so that points which would sit on one another, as discrete values make them do, can
 be told apart. Giggly has no jitter yet, neither `geom_jitter()` nor `position_jitter()`; it draws
-the same points unmoved, with `Giggly.Plot.geom_point/2`. A plot is described with `Giggly.Plot` and
+the same points unmoved, with `Giggly.Plot.geom_point/3`. A plot is described with `Giggly.Plot` and
 drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
 so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
 cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel

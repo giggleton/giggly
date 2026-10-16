@@ -14,6 +14,9 @@ defmodule Giggly.Geom.Point do
   # Every point looks as ggplot2's default point does, until aesthetics such as colour and size can
   # be mapped or set: black, size 1.5 mm with a 0.5 mm border, which grid draws as a circle of
   # radius 1.95 points with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots.
+  # A row's `alpha`, where its table has one, makes the point's outline and fill alike that opaque,
+  # as ggplot2's `alpha()` colours both; a row without one is opaque, as ggplot2's default alpha,
+  # `NA`, leaves a colour.
 
   defstruct []
 
@@ -62,23 +65,37 @@ defmodule Giggly.Geom.Point do
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
 
-      {x_positions, y_positions} =
-        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y)]
+      drawn =
+        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y), opacities(placed)]
         |> Enum.zip()
-        |> Enum.filter(fn {x_position, y_position} ->
+        |> Enum.filter(fn {x_position, y_position, _opacity} ->
           is_number(x_position) and is_number(y_position)
         end)
-        |> Enum.unzip()
 
       [
         %Circles{
-          x: x_positions,
-          y: y_positions,
+          x: Enum.map(drawn, fn {x_position, _y_position, _opacity} -> x_position end),
+          y: Enum.map(drawn, fn {_x_position, y_position, _opacity} -> y_position end),
           radius: @radius,
           stroke_width: @stroke_width,
-          color: @color
+          color: @color,
+          opacity: Enum.map(drawn, fn {_x_position, _y_position, opacity} -> opacity end)
         }
       ]
     end
+
+    # Each row's opacity: its alpha, or opaque where its table has none.
+    defp opacities(frame) do
+      if :alpha in DataFrame.names(frame) do
+        frame
+        |> DataFrame.pull(:alpha)
+        |> Enum.map(&opacity/1)
+      else
+        List.duplicate(1.0, DataFrame.row_count(frame))
+      end
+    end
+
+    defp opacity(alpha) when is_number(alpha), do: alpha / 1
+    defp opacity(missing) when missing in [nil, :nan], do: 1.0
   end
 end

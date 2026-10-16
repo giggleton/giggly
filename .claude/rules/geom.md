@@ -48,3 +48,7 @@ where its marks sit".
   **A bar looks like ggplot2's default bar:** filled `#595959`, ink mixed 35% toward paper, with no
   border, its border's width 0.5 mm all the same. The defaults move to the theme with the
   default-aesthetics stage.
+- **A row's `alpha` makes a point's outline and fill alike that opaque, and a bar's fill alone,
+  its border opaque**, as ggplot2's `GeomPoint` applies `alpha()` to both colours and `GeomRect`
+  `fill_alpha()` to the fill; a row without one, or a table without the column, is opaque, as
+  ggplot2's default alpha, `NA`, leaves a colour.

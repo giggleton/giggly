@@ -28,7 +28,7 @@ waiting for, so the page is also a list of what remains.
 
 `geom_count()` is a variant of `geom_point()` for discrete data whose points overlap: `stat_sum()`
 counts the rows at each position, and the count is mapped to the point's area. Giggly has
-`Giggly.Plot.geom_point/2`, one point per row, but not the counting. A plot is described with
+`Giggly.Plot.geom_point/3`, one point per row, but not the counting. A plot is described with
 `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. The first examples use `Giggly.Datasets.mpg/0`, ggplot2's
@@ -94,8 +94,8 @@ d + geom_count(aes(size = after_stat(prop), group = 1)) +
 With each combination of `cut` and `clarity` a group of its own, every proportion is 1, so every
 point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet:
 `geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it back, an expression in
-a mapping, such as `after_stat(prop)` or the constant `1`, `scale_size_area()` and its `max_size`
-option, and the `diamonds` dataset.
+a mapping, such as `after_stat(prop)` or the constant `1`, and `scale_size_area()` and its
+`max_size` option.
 
 ## Proportions of each row or column
 
@@ -109,4 +109,4 @@ d + geom_count(aes(size = after_stat(prop), group = clarity)) +
 
 Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: `geom_count()` and
 `stat_sum()`, mapping `size` and the legend that reads it back, an expression in a mapping, such as
-`after_stat(prop)`, `scale_size_area()` and its `max_size` option, and the `diamonds` dataset.
+`after_stat(prop)`, and `scale_size_area()` and its `max_size` option.

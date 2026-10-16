@@ -34,8 +34,7 @@ dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
 (d <- ggplot(dsamp, aes(carat, price)) + geom_point(aes(colour = clarity)))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
-legend that reads it back.
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
 
 ## The legend's title
 
@@ -49,8 +48,8 @@ d + scale_colour_hue(expression(clarity[beta]))
 A scale's first argument titles its legend; `expression()` writes the title as R's plotmath,
 here with a subscript β.
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()`, the legend
-that reads it back, and titles and labels, including R's `expression()` titles.
+Not in Giggly yet: mapping `colour`, `scale_colour_hue()`, the legend that reads it back, and titles
+and labels, including R's `expression()` titles.
 
 ## Luminance and chroma
 
@@ -62,8 +61,8 @@ d + scale_colour_hue(l = 70, c = 150)
 d + scale_colour_hue(l = 80, c = 150)
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()` and its `l` and
-`c` options, and the legend that reads it back.
+Not in Giggly yet: mapping `colour`, `scale_colour_hue()` and its `l` and `c` options, and the
+legend that reads it back.
 
 ## A range of hues
 
@@ -75,8 +74,8 @@ d + scale_colour_hue(h = c(180, 270))
 d + scale_colour_hue(h = c(270, 360))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()` and its `h`
-option, and the legend that reads it back.
+Not in Giggly yet: mapping `colour`, `scale_colour_hue()` and its `h` option, and the legend that
+reads it back.
 
 ## Transparency
 
@@ -89,8 +88,7 @@ d + geom_point(alpha = 0.5)
 d + geom_point(alpha = 0.2)
 ```
 
-Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
-legend that reads it back, and a fixed `alpha`.
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
 
 ## Missing values
 

@@ -41,8 +41,8 @@ ggplot(subset(diamonds, carat > 2), aes(cut, clarity)) +
   scale_x_discrete(expand = expansion(add = 2))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values (`cut` and
-`clarity` are ordered factors), `geom_jitter()`, and `scale_x_discrete()` and its `expand` option.
+Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered
+factors), `geom_jitter()`, and `scale_x_discrete()` and its `expand` option.
 
 ## The default expansion
 
@@ -58,6 +58,5 @@ ggplot(subset(diamonds, carat > 2), aes(cut, price)) +
   scale_y_continuous(expand = expansion(mult = .05))
 ```
 
-Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values (`cut` is an
-ordered factor), `geom_jitter()`, and `scale_x_discrete()` and `scale_y_continuous()` and their
-`expand` option.
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor),
+`geom_jitter()`, and `scale_x_discrete()` and `scale_y_continuous()` and their `expand` option.

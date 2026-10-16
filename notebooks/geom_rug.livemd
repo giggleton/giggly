@@ -28,7 +28,7 @@ what remains.
 
 A rug plot adds the two one-dimensional distributions to a two-dimensional display, such as a
 scatter plot: a short line at the edge of the panel for each row's `x`, and another for its `y`. It
-draws every row, so it suits small tables. Giggly has no rugs yet, but `Giggly.Plot.geom_point/2`
+draws every row, so it suits small tables. Giggly has no rugs yet, but `Giggly.Plot.geom_point/3`
 draws the scatter plot they are added to. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
 write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
@@ -78,7 +78,7 @@ ggplot(mpg, aes(displ, cty)) +
 `displ` and `cty` take few distinct values, so many cars share a point and a rug line. Jittering
 moves each by a small random amount, so they can be told apart.
 
-Not in Giggly yet: `geom_rug()`, `geom_jitter()`, a fixed `alpha`, and `position_jitter()`.
+Not in Giggly yet: `geom_rug()`, `geom_jitter()` and `position_jitter()`.
 
 ## Rugs outside the panel
 

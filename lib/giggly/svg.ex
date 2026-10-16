@@ -3,21 +3,21 @@ defmodule Giggly.SVG do
 
   # Writes a `Giggly.Scene` as SVG.
   #
-  # The table is laid out at the size it is given, in points (1/72 inch), as grid lays out a
-  # layout: each column or row with a size in points takes it, and the columns that are shares
-  # split what is left by their weights, as do the rows. A scene that keeps its proportions gives
-  # every share one scale, the one that fits whichever way runs out first, as grid does a layout
-  # with `respect`, and the table, which then fills the drawing only one way, is centred in it.
-  # Each cell's box runs from the start of its first column and row to the end of its last, or
-  # hangs a height of its own from its rows' top or a width of its own from its columns' right,
-  # and its primitives are placed in that box, and moved by any offset they carry in points,
-  # cells in the order the scene lists them; a clipped cell's are drawn in a group cut off at the
-  # box, as svglite writes one. The document's user unit is the point, as svglite writes it: the
-  # `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
-  # 1.95 points at the size the plot is shown. Numbers are written with two decimals, and each
-  # primitive as svglite writes it, so output can be set beside the SVG ggplot2's own tests
-  # snapshot; a polyline also says it is not filled, which svglite leaves to its stylesheet and
-  # SVG would otherwise fill black.
+  # The table is laid out at the size it is given, in points (1/72 inch), as grid lays out a layout:
+  # each column or row with a size in points takes it, and the columns that are shares split what is
+  # left by their weights, as do the rows. A scene that keeps its proportions gives every share one
+  # scale, the one that fits whichever way runs out first, as grid does a layout with `respect`, and
+  # the table, which then fills the drawing only one way, is centred in it. Each cell's box runs
+  # from the start of its first column and row to the end of its last, or hangs a height of its own
+  # from its rows' top or a width of its own from its columns' right, and its primitives are placed
+  # in that box, and moved by any offset they carry in points, cells in the order the scene lists
+  # them; a clipped cell's are drawn in a group cut off at the box, as svglite writes one. The
+  # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
+  # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
+  # shown. Numbers are written with two decimals, an opacity as svglite writes a number below 1, and
+  # each primitive as svglite writes it, so output can be set beside the SVG ggplot2's own tests
+  # snapshot; a polyline also says it is not filled, which svglite leaves to its stylesheet and SVG
+  # would otherwise fill black.
   #
   # svglite anchors text only at its start, middle or end, so R's graphics engine hands it the
   # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
@@ -173,18 +173,9 @@ defmodule Giggly.SVG do
   # A position moved `across` and `up` in points.
   defp moved({x_position, y_position}, {across, up}), do: {x_position + across, y_position - up}
 
+  # Each circle's outline and fill carry its opacity, as svglite writes a colour's alpha.
   defp primitive(%Circles{} = circles, box) do
-    style = [
-      "style='stroke-width: ",
-      number(circles.stroke_width),
-      "; stroke: ",
-      circles.color,
-      "; fill: ",
-      circles.color,
-      ";'"
-    ]
-
-    Enum.zip_with(circles.x, circles.y, fn x_place, y_place ->
+    Enum.zip_with([circles.x, circles.y, circles.opacity], fn [x_place, y_place, opacity] ->
       {x_position, y_position} = place({x_place, y_place}, box)
 
       [
@@ -194,9 +185,12 @@ defmodule Giggly.SVG do
         number(y_position),
         "' r='",
         number(circles.radius),
-        "' ",
-        style,
-        " />\n"
+        "' style='stroke-width: ",
+        number(circles.stroke_width),
+        ";",
+        stroke_style(circles.color, opacity),
+        fill_style(circles.color, opacity),
+        "' />\n"
       ]
     end)
   end
@@ -223,21 +217,17 @@ defmodule Giggly.SVG do
   end
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
-  # it, its width and height the cell's share of its extent.
+  # it, its width and height the cell's share of its extent, and its fill carrying its opacity.
   defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
-    style = [
-      "style='stroke-width: ",
-      number(rectangles.stroke_width),
-      "; stroke: ",
-      stroke(rectangles.color),
-      "; stroke-linecap: butt; stroke-linejoin: miter; fill: ",
-      rectangles.fill,
-      ";'"
+    columns = [
+      rectangles.xmin,
+      rectangles.xmax,
+      rectangles.ymin,
+      rectangles.ymax,
+      rectangles.fill_opacity
     ]
 
-    columns = [rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax]
-
-    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax] ->
+    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, fill_opacity] ->
       {x_position, y_position} = place({xmin, ymax}, box)
 
       [
@@ -249,9 +239,13 @@ defmodule Giggly.SVG do
         number((xmax - xmin) * width),
         "' height='",
         number((ymax - ymin) * height),
-        "' ",
-        style,
-        " />\n"
+        "' style='stroke-width: ",
+        number(rectangles.stroke_width),
+        "; stroke: ",
+        stroke(rectangles.color),
+        "; stroke-linecap: butt; stroke-linejoin: miter;",
+        fill_style(rectangles.fill, fill_opacity),
+        "' />\n"
       ]
     end)
   end
@@ -380,5 +374,48 @@ defmodule Giggly.SVG do
     |> String.replace(">", "&gt;")
   end
 
+  # A stroke or a fill in a colour at an opacity, as svglite writes an R colour, which holds its
+  # alpha as a byte, the opacity times 255 rounded half to even: the colour, then the byte over 255
+  # as its opacity, left out for an opaque colour, 255. A stroke wholly transparent, 0, is written
+  # `none`, and such a fill not at all, as svglite skips a fill that is not filled.
+  defp stroke_style(color, opacity) do
+    case alpha_byte(opacity) do
+      0 -> " stroke: none;"
+      byte -> [" stroke: ", color, ";", opacity_style("stroke", byte)]
+    end
+  end
+
+  defp fill_style(fill, opacity) do
+    case alpha_byte(opacity) do
+      0 -> ""
+      byte -> [" fill: ", fill, ";", opacity_style("fill", byte)]
+    end
+  end
+
+  defp opacity_style(_property, 255), do: ""
+
+  defp opacity_style(property, byte),
+    do: [" ", property, "-opacity: ", significant(byte / 255), ";"]
+
+  defp alpha_byte(opacity) do
+    scaled = opacity * 255
+    whole = trunc(scaled)
+    half_to_even(whole, scaled - whole)
+  end
+
+  defp half_to_even(whole, fraction) when fraction < 0.5, do: whole
+  defp half_to_even(whole, fraction) when fraction > 0.5, do: whole + 1
+  defp half_to_even(whole, _half) when rem(whole, 2) == 0, do: whole
+  defp half_to_even(whole, _half), do: whole + 1
+
   defp number(value), do: :erlang.float_to_binary(value / 1, decimals: 2)
+
+  # A number between 0 and 1 as svglite's `write_double()` writes one: with as many decimals as
+  # reach its first significant digit and one more, so 0.0235 is 0.024 and 0.0078 keeps its 78; from
+  # 0.1 up, two. Only an opacity is written so, and an opacity written is always between 0 and 1;
+  # every other number keeps two decimals (`number/1`).
+  defp significant(value) when value > 0 and value < 1 do
+    decimals = ceil(-:math.log10(value)) + 1
+    :erlang.float_to_binary(value, decimals: decimals)
+  end
 end

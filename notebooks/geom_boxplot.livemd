@@ -106,8 +106,7 @@ ggplot(diamonds, aes(carat, price)) +
 ```
 
 Without a group, the whole of `carat` makes one box. Not in Giggly yet: `geom_boxplot()`,
-`cut_width()`, an expression in a mapping, such as `cut_width(carat, 0.25)`, and the `diamonds`
-dataset.
+`cut_width()`, and an expression in a mapping, such as `cut_width(carat, 0.25)`.
 
 ## Transparent outliers
 
@@ -117,8 +116,8 @@ ggplot(diamonds, aes(carat, price)) +
   geom_boxplot(aes(group = cut_width(carat, 0.25)), outlier.alpha = 0.1)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.alpha` option, `cut_width()`, an expression
-in a mapping, such as `cut_width(carat, 0.25)`, and the `diamonds` dataset.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.alpha` option, `cut_width()`, and an expression
+in a mapping, such as `cut_width(carat, 0.25)`.
 
 ## Numbers computed beforehand
 

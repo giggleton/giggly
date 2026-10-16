@@ -80,8 +80,8 @@ Not in Giggly yet: `stat_function()` and its `geom` and `n` options, and `xlim()
 base + stat_function(fun = dnorm, geom = "polygon", color = "blue", fill = "blue", alpha = 0.5)
 ```
 
-Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, a fixed `colour`,
-`fill` and `alpha`, and `xlim()`.
+Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, a fixed `colour` and
+`fill`, and `xlim()`.
 
 ## Fewer points on the line
 

@@ -40,10 +40,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
   chooses others; `coord_radial/1` records `%Coord.Radial{}`). `Plot` builds them and reads a geom's
   facts to check a layer, but never computes or draws with one; the assembly reads a layer's with
-  `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays private. A field holding a
-  kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses it. The theme is
-  still a name, `theme: :gray`, until a user can set one; what a misspelt name does arrives with
-  that option, and it must raise at the call.
+  `layer_geom/1`, `layer_stat/1`, `layer_position/1` and `layer_fixed/1`, so `Layer` stays private.
+  A field holding a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses
+  it. The theme is still a name, `theme: :gray`, until a user can set one; what a misspelt name does
+  arrives with that option, and it must raise at the call.
 - **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
   given against the data and checks what the geom can use there, so a misspelt column or an
   unusable aesthetic is reported by the line that has it, never later when the plot is run. A
@@ -64,11 +64,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
   an atom (`position: :stack | :dodge`) and recorded as its kind's struct; its parameters never
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
+- **An option that sets an aesthetic for every mark (`alpha:`) is recorded in the layer's `fixed`,
+  by canonical name**, as ggplot2's `aes_params`, and every geom function takes it; the assembly
+  puts it into every row last. A map maps and a keyword list sets: the two never trade places.
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`), so a misspelt option raises
-  naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
-  recorded as a value (`scales: :fixed`). An option not given is recorded as
-  `:none` in the kind's struct; a caller never writes "absent", so §7's question waits.
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`; every geom function's `alpha:`),
+  so a misspelt option raises naming it, and a repeated one is refused by
+  `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
+  :fixed`). An option not given is recorded as `:none` in the kind's struct; a caller never writes
+  "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
@@ -85,5 +89,6 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **When keyword options arrive, `Aesthetics.canonicalize/1` runs before NimbleOptions validates
   them.** NimbleOptions keeps only the first of a repeated key and checks only that one, so
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
-  repeat. NimbleOptions has no number type either: an option taking any number, such as `alpha:`,
-  is `{:or, [:integer, :float]}`, or an integer is refused.
+  repeat. NimbleOptions has no number type either: an option taking any number is
+  `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1 through a custom
+  check (`validate_alpha/1`), which takes an integer too and keeps a float, as R keeps a number.

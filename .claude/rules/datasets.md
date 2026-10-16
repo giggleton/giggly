@@ -17,11 +17,20 @@ pages".
   writes (`write.csv()`), with a header saying where it came from, which R wrote it and how to
   regenerate it; a value that differs from R's is a bug in the copy.
 - **A dataset is a keyword list of columns, in the dataset's order**, which `Plot.new/2`, Explorer
-  and Kino all read as a table. Whole numbers are integers, measurements floats, names strings;
-  R's row names become a first column.
+  and Kino all read as a table. A column takes R's type: integers where R stores integers, floats
+  where it stores doubles, names strings, as `mpg` and `diamonds` do (`diamonds`' `table` is
+  whole but a double); `mtcars` still reads R's whole doubles as integers (design-log §7, "The
+  datasets should carry R's column types"). R's row names become a first column, and a factor
+  its labels, in no order until level order exists.
 - **The file is read once, at compile time** (`@external_resource` and `File.read!/1`), so asking
   for a dataset does no IO. The file's header gives the column order; the module holds only how
   each column is read.
+- **A dataset too big to hold as columns is kept compressed** (`:erlang.term_to_binary/2` at level
+  9) and decoded each time it is asked for, still with no IO: `diamonds` as columns would be some
+  18 MB held wherever the module is loaded, and a release loads every module at boot, where
+  compressed it is half a megabyte decoded in a few tens of milliseconds. The small ones stay
+  columns; whether they join it is open (design-log §4, the entry beginning "ggplot2's
+  `diamonds` is shipped whole").
 - **Each dataset's file has a read and a `CorePurity` waiver of its own**, worded as
   `Giggly.Font`'s, so adding a dataset adds a waiver, which stops and asks (design-log §4, the
   entry beginning "Each dataset's file is read behind a waiver of its own"). Only the parsing is

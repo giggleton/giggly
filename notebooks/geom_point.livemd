@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
+diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
   plot
@@ -29,9 +30,10 @@ what remains.
 Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is described
 with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
+shows it below the cell with `Kino.Image`. The data in most examples is `Giggly.Datasets.mtcars/0`,
 R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to
-`mtcars`, R's name for it.
+`mtcars`, R's name for it; the large dataset is `Giggly.Datasets.diamonds/0`, ggplot2's `diamonds`:
+53,940 diamonds, bound to `diamonds`.
 
 ## A scatter plot
 
@@ -69,7 +71,7 @@ and the legends that read them back.
 ggplot(mtcars, aes(wt, mpg)) + geom_point(colour = "red", size = 3)
 ```
 
-Not in Giggly yet: fixed aesthetics, such as every point's colour or size.
+Not in Giggly yet: a fixed `colour` and `size`.
 
 ## Transparency for large datasets
 
@@ -81,8 +83,28 @@ d + geom_point(alpha = 1/20)
 d + geom_point(alpha = 1/100)
 ```
 
-Not in Giggly yet: a fixed `alpha`, and the `diamonds` dataset, which arrives with the first
-example that can draw it.
+Each plot draws all 53,940 diamonds, so the fainter the points, the more only the dense regions
+show.
+
+```elixir
+plot = Plot.new(diamonds, %{x: :carat, y: :price})
+
+plot
+|> Plot.geom_point(alpha: 1 / 10)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.geom_point(alpha: 1 / 20)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.geom_point(alpha: 1 / 100)
+|> render.()
+```
 
 ## A point's fill and border
 
@@ -124,7 +146,7 @@ p +
   geom_point(aes(shape = factor(cyl)))
 ```
 
-Not in Giggly yet: mapping `shape` and `colour`, and fixed colours and sizes. Several layers of
+Not in Giggly yet: mapping `shape` and `colour`, and a fixed `colour` and `size`. Several layers of
 points already work.
 
 ## Missing values

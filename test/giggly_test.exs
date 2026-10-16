@@ -240,6 +240,16 @@ defmodule GigglyTest do
                 ]}
     end
 
+    test "an alpha set on the layer is in each counted bar's row, set after counting" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(alpha: 0.5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :alpha) === List.duplicate(0.5, 7)
+    end
+
     test "groups are counted apart, in group order, each proportion its group's, and stacked" do
       frame =
         Giggly.Datasets.mpg()
@@ -690,6 +700,27 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/col.svg")
+    end
+
+    # Golden: test/golden/alpha.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/alpha.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_col()'s example with alpha set on two layers:
+    # the columns' fill half opaque and their border, which they do not draw, untouched; the points
+    # a third opaque, outline and fill, written as R holds a colour's alpha, 85 of 255. It moves
+    # with what moves test/golden/col.svg, and with how an opacity is drawn or written.
+    test "an alpha set on a layer makes a column's fill and a point's outline and fill transparent" do
+      plot =
+        %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
+        |> Plot.new(%{x: :trt, y: :outcome})
+        |> Plot.geom_col(alpha: 0.5)
+        |> Plot.geom_point(alpha: 1 / 3)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/alpha.svg")
     end
 
     # Golden: test/golden/bar.svg, checked against ggplot2's drawing of the same plot, made by

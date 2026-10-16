@@ -61,10 +61,9 @@ ggplot(cuts_df) +
   geom_pointrange()
 ```
 
-Not in Giggly yet: the `diamonds` dataset, models fitted by `lm()`, `geom_pointrange()`, mapping
-`ymin` and `ymax`, an expression in a mapping, such as `fit - se.fit`, mapping `colour` and the
-legend that reads it back, and choosing the order of a column's values (`cut` is an ordered
-factor).
+Not in Giggly yet: models fitted by `lm()`, `geom_pointrange()`, mapping `ymin` and `ymax`, an
+expression in a mapping, such as `fit - se.fit`, mapping `colour` and the legend that reads it back,
+and choosing the order of a column's values (`cut` is an ordered factor).
 
 ## Annotating a rectangle
 
@@ -88,8 +87,8 @@ p + annotate(
 )
 ```
 
-Not in Giggly yet: `annotate()`, here a rectangle placed by `xmin`, `xmax`, `ymin` and `ymax`,
-with a fixed `fill` and a fixed `alpha`.
+Not in Giggly yet: `annotate()`, here a rectangle placed by `xmin`, `xmax`, `ymin` and `ymax`, with
+a fixed `fill`.
 
 ## Segments with arrows
 
