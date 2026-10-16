@@ -193,5 +193,5 @@ ggplot(df, aes(x, y)) + geom_col(just = 0.5)
 ggplot(df, aes(x, y)) + geom_col(just = 1)
 ```
 
-Not in Giggly yet: dates on an axis, and `geom_col()`'s `just` option. Giggly centres every bar
+Not in Giggly yet: `geom_col()`'s `just` option. Giggly centres every bar
 on its `x`, as `just = 0.5` does.

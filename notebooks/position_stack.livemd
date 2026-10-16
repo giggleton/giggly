@@ -127,7 +127,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_point(aes(colour = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_line()`, mapping `colour` and the legend that reads it back, and
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and `geom_line()`'s and
 `geom_point()`'s `position` option, here `position = "stack"`.
 
 ## A line on each area
@@ -139,7 +139,7 @@ ggplot(series, aes(time, value, group = type)) +
 ```
 
 Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, and
-`geom_line()`, stacked with `position = "stack"`.
+`geom_line()`'s `position` option, here `position = "stack"`.
 
 ## Stacking labels
 

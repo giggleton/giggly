@@ -40,6 +40,6 @@ p + geom_line(key_glyph = "timeseries")
 p + geom_line(key_glyph = draw_key_rect)
 ```
 
-Not in Giggly yet: the `economics` dataset, dates on an axis, mapping `colour`, an expression in
-a mapping, here the constant `"savings rate"`, lines (`geom_line()`), a layer's `key_glyph`
-argument, `draw_key_timeseries()` and `draw_key_rect()`, and the legend that reads it back.
+Not in Giggly yet: mapping `colour`, an expression in a mapping, here the constant `"savings rate"`,
+a layer's `key_glyph` argument, `draw_key_timeseries()` and `draw_key_rect()`, and the legend that
+reads it back.

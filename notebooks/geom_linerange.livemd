@@ -67,7 +67,7 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
 ```
 
-Not in Giggly yet: `geom_line()`, `geom_errorbar()` and its `width` option, and mapping
+Not in Giggly yet: `geom_errorbar()` and its `width` option, and mapping
 `colour`, the scale that maps it and the legend that reads it back.
 
 ## Dodging bars and error bars

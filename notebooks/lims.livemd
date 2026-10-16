@@ -103,7 +103,7 @@ p <- ggplot(df, aes(date, price)) +
 p
 ```
 
-Not in Giggly yet: dates on an axis, `geom_line()` and `stat_smooth()`.
+Not in Giggly yet: `stat_smooth()`.
 
 ## Limits that drop data
 
@@ -114,7 +114,7 @@ p + lims(x= c(Sys.Date() - 30, NA), y = c(10, 20))
 
 The smooth is fitted only to the rows left inside the limits.
 
-Not in Giggly yet: `lims()`, dates on an axis, `geom_line()` and `stat_smooth()`.
+Not in Giggly yet: `lims()` and `stat_smooth()`.
 
 ## Limits that zoom
 
@@ -125,6 +125,6 @@ Not in Giggly yet: `lims()`, dates on an axis, `geom_line()` and `stat_smooth()`
 p + coord_cartesian(xlim =c(Sys.Date() - 30, NA), ylim = c(10, 20))
 ```
 
-Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options, dates on an axis,
-`geom_line()` and `stat_smooth()`. Giggly's plots are in Cartesian coordinates, as ggplot2's are
-by default, but nothing sets their options.
+Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options, and `stat_smooth()`.
+Giggly's plots are in Cartesian coordinates, as ggplot2's are by default, but nothing sets their
+options.

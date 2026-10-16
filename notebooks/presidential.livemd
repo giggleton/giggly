@@ -14,6 +14,5 @@ ggplot2's reference page for
 this notebook says only what the page describes and where Giggly stands.
 
 `presidential` gives the terms of 12 US presidents from Eisenhower to Trump: each president's last
-name, the dates the term started and ended, and the president's party. Not in Giggly yet: the
-`presidential` dataset, and dates on an axis, which its start and end dates need;
-`Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.
+name, the dates the term started and ended, and the president's party. Giggly puts dates on an axis,
+as its start and end dates need. Not in Giggly yet: the `presidential` dataset.

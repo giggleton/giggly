@@ -19,7 +19,8 @@ waiting for, so the page is also a list of what remains.
 These are the position scales for dates, date-times and times of day, which ggplot2 adds by itself
 for a column of one of them. Setting one by hand chooses its limits, where its breaks fall and how
 its labels are written, in units of time such as `"1 week"` and formats such as `"%b %d"`. Giggly
-has none of them yet, nor dates and times on an axis.
+has none of these functions yet, but puts a column of dates on an axis with the scale ggplot2 adds
+by itself; date-times and times of day have no scale yet.
 
 ## Breaks and labels
 
@@ -43,8 +44,8 @@ base + scale_x_date(date_breaks = "1 week", date_labels = "%W")
 base + scale_x_date(date_minor_breaks = "1 day")
 ```
 
-Not in Giggly yet: dates on an axis, `geom_line()`, and `scale_x_date()` and its `date_labels`,
-`date_breaks` and `date_minor_breaks` options.
+Not in Giggly yet: `scale_x_date()` and its `date_labels`, `date_breaks` and `date_minor_breaks`
+options.
 
 ## Limits
 
@@ -53,4 +54,4 @@ Not in Giggly yet: dates on an axis, `geom_line()`, and `scale_x_date()` and its
 base + scale_x_date(limits = c(Sys.Date() - 7, NA))
 ```
 
-Not in Giggly yet: dates on an axis, `geom_line()`, and `scale_x_date()` and its `limits` option.
+Not in Giggly yet: `scale_x_date()` and its `limits` option.

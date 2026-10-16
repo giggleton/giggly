@@ -20,9 +20,9 @@ page is also a list of what remains.
 from a default set supplied by Richard Pearson of the University of Manchester. A continuous
 column can be mapped to line types only through `scale_linetype_binned()`, which cuts it into
 bins first, and since patterns have no order even that is not advised. A line type can be named
-by number, by name or by a string of hex digits, and a missing one is drawn blank. Giggly has
-none of this yet: of ggplot2's geoms it has only points and bars, and it has no aesthetic but `x`,
-`y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
+by number, by name or by a string of hex digits, and a missing one is drawn blank. Giggly has none
+of this yet: it draws paths and lines solid, and it has no aesthetic but `x`, `y`, `group`, `weight`
+and `alpha`, no legend but alpha's and no scale functions.
 
 ## A line type for each series
 
@@ -32,8 +32,8 @@ base + geom_line(aes(group = variable))
 base + geom_line(aes(linetype = variable))
 ```
 
-Not in Giggly yet: the `economics_long` dataset, dates on an axis, lines (`geom_line()`), mapping
-`linetype`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: the `economics_long` dataset, mapping `linetype`, the scale that maps it and the
+legend that reads it back.
 
 ## Line types by hand
 

@@ -21,5 +21,6 @@ primitives, such as points, lines, rectangles and polygons, styled by aesthetics
 fill and linewidth. Many geoms abstract over others, as a ribbon is a special polygon and an area a
 special ribbon, and some compose several, as a boxplot is lines, rectangles and points. Giggly adds
 a layer with a function for each geom: `Giggly.Plot.geom_point/3`, `Giggly.Plot.geom_bar/3`, which
-counts with ggplot2's `stat_count()`, and `Giggly.Plot.geom_col/3`. Every other geom, giving a stat
-a geom by name, `layer()` and `ggproto()` are not in Giggly yet.
+counts with ggplot2's `stat_count()`, `Giggly.Plot.geom_col/3`, `Giggly.Plot.geom_path/3` and
+`Giggly.Plot.geom_line/3`. Every other geom, giving a stat a geom by name, `layer()` and `ggproto()`
+are not in Giggly yet.

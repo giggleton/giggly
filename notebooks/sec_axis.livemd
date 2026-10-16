@@ -94,7 +94,7 @@ ggplot(df, aes(x = dx, y = price)) +
   )
 ```
 
-Not in Giggly yet: dates on an axis, `geom_line()`, `scale_x_datetime()`, `dup_axis()` and
+Not in Giggly yet: `scale_x_datetime()`, `dup_axis()` and
 `scales::label_time()`, here to label the date on the bottom axis and the time of day on the top.
 
 ## Another time zone
@@ -116,5 +116,5 @@ ggplot(df, aes(x = dx, y = price)) +
   )
 ```
 
-Not in Giggly yet: dates on an axis, `geom_line()`, `scale_x_datetime()`, `sec_axis()` and
+Not in Giggly yet: `scale_x_datetime()`, `sec_axis()` and
 `scales::label_time()`.

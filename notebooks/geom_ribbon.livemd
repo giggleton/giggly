@@ -56,7 +56,7 @@ h +
 ```
 
 Not in Giggly yet: `geom_ribbon()`, mapping `ymin` and `ymax`, an expression in a mapping, such as
-`level - 1`, a fixed `fill`, `geom_line()`, and the `LakeHuron` dataset.
+`level - 1`, a fixed `fill`, and the `LakeHuron` dataset.
 
 ## Groups at different x values
 

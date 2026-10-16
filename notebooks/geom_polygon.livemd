@@ -74,7 +74,7 @@ p + geom_line(data = stream, colour = "grey30", linewidth = 5)
 The stream is a random walk: R draws its steps with `runif()`, and `set.seed(1)` makes them the
 same on every run.
 
-Not in Giggly yet: `geom_polygon()`, `geom_line()`, a layer with data of its own, a fixed `colour`
+Not in Giggly yet: `geom_polygon()`, a layer with data of its own, a fixed `colour`
 and `linewidth`, and mapping `fill`, the scale that maps it and the legend that reads it back.
 
 ## Map projections

@@ -70,8 +70,8 @@ ggplot(economics_long, aes(date, value01)) +
   geom_line(aes(linetype = variable))
 ```
 
-Not in Giggly yet: the `economics_long` dataset, dates on an axis, `geom_line()`, and mapping
-`linetype` and the legend that reads it back.
+Not in Giggly yet: the `economics_long` dataset, and mapping `linetype` and the legend that reads it
+back.
 
 ## One line for each boy
 
@@ -86,7 +86,7 @@ p + geom_line()
 p + geom_line(aes(group = Subject))
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, from the `nlme` package, and `geom_line()`.
+Not in Giggly yet: the `Oxboys` dataset, from the `nlme` package.
 
 ## Different groups on different layers
 
@@ -101,7 +101,7 @@ p + geom_smooth(aes(group = Subject), method = "lm", se = FALSE)
 p + geom_smooth(aes(group = 1), size = 2, method = "lm", se = FALSE)
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, `geom_line()`, `geom_smooth()` and the straight lines it
+Not in Giggly yet: the `Oxboys` dataset, `geom_smooth()` and the straight lines it
 fits with `lm()`, an expression in a mapping, such as the constant `1`, and a fixed `size`.
 
 ## Lines across a discrete axis
@@ -121,4 +121,4 @@ p
 p + geom_line(aes(group = Subject), colour = "blue")
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, `geom_boxplot()`, `geom_line()`, and a fixed `colour`.
+Not in Giggly yet: the `Oxboys` dataset, `geom_boxplot()`, and a fixed `colour`.

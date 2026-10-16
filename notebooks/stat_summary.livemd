@@ -63,8 +63,8 @@ The last plot adds a mapping to `d` with `+ aes()`, and joins the means of each 
 line.
 
 Not in Giggly yet: `stat_summary()` and its `fun` option, a fixed `colour` and `size`, adding a
-mapping with `+ aes()`, an expression in a mapping, such as `factor(vs)`, mapping `colour` and
-the legend that reads it back, and lines, `geom_line()`.
+mapping with `+ aes()`, an expression in a mapping, such as `factor(vs)`, and mapping `colour` and
+the legend that reads it back.
 
 ## A range from three functions
 

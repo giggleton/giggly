@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+economics = Giggly.Datasets.economics()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,7 +29,14 @@ and names what it is waiting for, so the page is also a list of what remains.
 These geoms join observations with lines. `geom_path()` joins them in the order they appear in the
 data, `geom_line()` in order of `x`, and `geom_step()` with stairs that show exactly where the
 value changes. The `group` aesthetic decides which observations make one line, and a missing value
-in the middle of a line breaks it. Giggly has none of them yet.
+in the middle of a line breaks it. Giggly has `Giggly.Plot.geom_path/3` and
+`Giggly.Plot.geom_line/3`, but no `geom_step()` yet. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases
+`Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows
+it below the cell with `Kino.Image`. Most examples use `Giggly.Datasets.economics/0`, ggplot2's
+`economics`: US economic time series, one row a month from 1967 to 2015, its `date` column dates,
+which the setup cell binds to `economics`, ggplot2's name for it. The rest make small tables of
+their own, as ggplot2's do.
 
 ## A time series
 
@@ -27,7 +45,15 @@ in the middle of a line breaks it. Giggly has none of them yet.
 ggplot(economics, aes(date, unemploy)) + geom_line()
 ```
 
-Not in Giggly yet: `geom_line()`, dates on an axis, and the `economics` dataset.
+The x axis is a date scale: its breaks fall on the decades, labelled by year, as R's `pretty()`
+puts them for dates.
+
+```elixir
+economics
+|> Plot.new(%{x: :date, y: :unemploy})
+|> Plot.geom_line()
+|> render.()
+```
 
 ## A line for each series
 
@@ -37,8 +63,8 @@ ggplot(economics_long, aes(date, value01, colour = variable)) +
   geom_line(key_glyph = "timeseries")
 ```
 
-Not in Giggly yet: `geom_line()` and its `key_glyph` option, mapping `colour`, the scale that maps
-it and the legend that reads it back, dates on an axis, and the `economics_long` dataset.
+Not in Giggly yet: `geom_line()`'s `key_glyph` option, mapping `colour`, the scale that maps it and
+the legend that reads it back, and the `economics_long` dataset.
 
 ## A vertical time series
 
@@ -47,8 +73,15 @@ it and the legend that reads it back, dates on an axis, and the `economics_long`
 ggplot(economics, aes(unemploy, date)) + geom_line(orientation = "y")
 ```
 
-Not in Giggly yet: `geom_line()` and its `orientation` option, dates on an axis, and the
-`economics` dataset.
+With `orientation: :y` the rows are put in order of `y`, the dates, so the line runs up the
+panel, the y axis now the date scale.
+
+```elixir
+economics
+|> Plot.new(%{x: :unemploy, y: :date})
+|> Plot.geom_line(orientation: :y)
+|> render.()
+```
 
 ## Steps
 
@@ -60,9 +93,32 @@ ggplot(recent, aes(date, unemploy)) + geom_line()
 ggplot(recent, aes(date, unemploy)) + geom_step()
 ```
 
-`recent` keeps the months after the start of 2013.
+`recent` keeps the months after the start of 2013. Giggly draws the first plot; the cell keeps
+those rows as R's subset does, each column's values where the date is later than 1 January 2013.
+Over a little more than two years the date scale's breaks fall every six months, labelled by year
+and month.
 
-Not in Giggly yet: `geom_line()`, `geom_step()`, dates on an axis, and the `economics` dataset.
+```elixir
+later = Enum.map(Keyword.fetch!(economics, :date), fn date -> Date.after?(date, ~D[2013-01-01]) end)
+
+recent =
+  Enum.map(economics, fn {name, values} ->
+    kept =
+      values
+      |> Enum.zip(later)
+      |> Enum.filter(fn {_value, keep} -> keep end)
+      |> Enum.map(fn {value, _keep} -> value end)
+
+    {name, kept}
+  end)
+
+recent
+|> Plot.new(%{x: :date, y: :unemploy})
+|> Plot.geom_line()
+|> render.()
+```
+
+Not in Giggly yet: `geom_step()`.
 
 ## A path through two variables
 
@@ -77,9 +133,8 @@ m + geom_path(aes(colour = as.numeric(date)))
 `geom_path()` joins the months in the order of the rows, which is the order of their dates, rather
 than in order of `x`.
 
-Not in Giggly yet: `geom_path()`, an expression in a mapping, such as `unemploy/pop` or
-`as.numeric(date)`, mapping `colour`, the scale that maps it and the legend that reads it back,
-and the `economics` dataset.
+Not in Giggly yet: an expression in a mapping, such as `unemploy/pop` or `as.numeric(date)`, and
+mapping `colour`, the scale that maps it and the legend that reads it back.
 
 ## A fixed colour
 
@@ -89,8 +144,7 @@ ggplot(economics, aes(date, unemploy)) +
   geom_line(colour = "red")
 ```
 
-Not in Giggly yet: `geom_line()`, a fixed `colour`, dates on an axis, and the `economics`
-dataset.
+Not in Giggly yet: a fixed `colour`.
 
 ## Arrows
 
@@ -107,8 +161,7 @@ c + geom_line(
 `arrow()` comes from R's `grid` package and describes the arrowhead: its angle, which ends get one
 and whether it is open or closed.
 
-Not in Giggly yet: `geom_line()` and its `arrow` option, dates on an axis, and the `economics`
-dataset.
+Not in Giggly yet: `geom_line()`'s `arrow` option.
 
 ## Line ends and joins
 
@@ -121,10 +174,29 @@ base + geom_path(linewidth = 10, lineend = "round")
 base + geom_path(linewidth = 10, linejoin = "mitre", lineend = "butt")
 ```
 
-A wide line shows how its ends and its corner are drawn.
+A wide line shows how its ends and its corner are drawn: cut square at the ends and rounded at the
+corner by default, then rounded at the ends too, then pointed at the corner. Giggly names a line's
+ends and corners by atoms, `lineend: :round` and `linejoin: :mitre`.
 
-Not in Giggly yet: `geom_path()` and its `lineend` and `linejoin` options, and a fixed
-`linewidth`.
+```elixir
+base = Plot.new(%{"x" => [1, 2, 3], "y" => [4.0, 1.0, 9.0]}, %{x: :x, y: :y})
+
+base
+|> Plot.geom_path(linewidth: 10)
+|> render.()
+```
+
+```elixir
+base
+|> Plot.geom_path(linewidth: 10, lineend: :round)
+|> render.()
+```
+
+```elixir
+base
+|> Plot.geom_path(linewidth: 10, linejoin: :mitre, lineend: :butt)
+|> render.()
+```
 
 ## Missing values break a line
 
@@ -135,9 +207,16 @@ ggplot(df, aes(x, y)) + geom_point() + geom_line()
 ```
 
 ggplot2 draws the line in two pieces, either side of the row without a `y`, and warns that it
-removed that row's point.
+removed that row's point. Giggly draws the same, without the warning, which a plot built without
+side effects cannot give.
 
-Not in Giggly yet: `geom_line()`.
+```elixir
+%{"x" => [1, 2, 3, 4, 5], "y" => [1.0, 2.0, nil, 4.0, 5.0]}
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point()
+|> Plot.geom_line()
+|> render.()
+```
 
 ## Line type and colour
 
@@ -162,8 +241,8 @@ p + geom_line(aes(colour = x))
 The table holds two curves, `a` and `b`, told apart by `group`; `qlogis()` is the logistic
 distribution's quantile function.
 
-Not in Giggly yet: `geom_line()`, a fixed `linetype`, and mapping `colour`, the scale that maps it
-and the legend that reads it back.
+Not in Giggly yet: a fixed `linetype`, and mapping `colour`, the scale that maps it and the legend
+that reads it back.
 
 ## A line type that cannot vary
 
@@ -175,4 +254,4 @@ should_stop(p + geom_line(aes(colour = x), linetype=2))
 `should_stop()` checks that the code inside it fails, as it does here: a dashed line cannot change
 colour along its length, so ggplot2 stops with an error.
 
-Not in Giggly yet: `geom_line()`, a fixed `linetype`, and mapping `colour`.
+Not in Giggly yet: a fixed `linetype`, and mapping `colour`.

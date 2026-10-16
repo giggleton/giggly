@@ -149,7 +149,7 @@ worldmap + coord_map("ortho")
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_path()`, `scale_y_continuous()` and
+Not in Giggly yet: map data from the `maps` package, `scale_y_continuous()` and
 `scale_x_continuous()`, here setting the scales' breaks, and `coord_map()` with its projections.
 
 ## Other orientations
@@ -166,6 +166,6 @@ worldmap + coord_map("ortho", orientation = c(41, -74, 0))
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_path()`, `scale_y_continuous()` and
+Not in Giggly yet: map data from the `maps` package, `scale_y_continuous()` and
 `scale_x_continuous()`, here setting the scales' breaks, and `coord_map()` with its projections
 and its `orientation` option.

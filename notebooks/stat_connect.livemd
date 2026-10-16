@@ -31,7 +31,7 @@ ggplot(head(economics, 20), aes(date, unemploy)) +
 `head()` keeps the first 20 months of ggplot2's `economics` dataset, whose `unemploy` is the
 number of unemployed in the US, in thousands.
 
-Not in Giggly yet: the `economics` dataset, dates on an axis, and `stat_connect()`.
+Not in Giggly yet: `stat_connect()`.
 
 ## Connections of one's own
 
@@ -50,6 +50,5 @@ ggplot(head(economics, 10), aes(date, unemploy)) +
 `smooth` is an S-shaped curve and `zigzag` goes up, down and up again. Mapping `colour` to a
 constant names each layer in the legend.
 
-Not in Giggly yet: the `economics` dataset, dates on an axis, `stat_connect()` and its
-`connection` option given as a matrix, an expression in a mapping, such as the constant
-`"zigzag"`, and mapping `colour` and the legend that reads it back.
+Not in Giggly yet: `stat_connect()` and its `connection` option given as a matrix, an expression in
+a mapping, such as the constant `"zigzag"`, and mapping `colour` and the legend that reads it back.

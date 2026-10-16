@@ -98,8 +98,7 @@ p + geom_point()
 p + geom_point(colour = "red")
 ```
 
-Not in Giggly yet: the `economics` dataset, dates on an axis, `geom_line()`, and a fixed
-`colour`.
+Not in Giggly yet: a fixed `colour`.
 
 ## Transparency for overplotting
 
@@ -139,6 +138,6 @@ p + scale_fill_manual(values = alpha(c("blue", "red"), .3))
 The rectangles span each president's term, from the `presidential` table, coloured by party and
 as tall as the range of unemployment.
 
-Not in Giggly yet: the `economics` and `presidential` datasets, dates on an axis, `geom_line()`,
-`geom_rect()` as a layer with data of its own, mapping `fill` and the legend that reads it back,
-a fixed `ymin` and `ymax`, and `scale_fill_manual()` with colours made transparent by `alpha()`.
+Not in Giggly yet: the `presidential` dataset, `geom_rect()` as a layer with data of its own,
+mapping `fill` and the legend that reads it back, a fixed `ymin` and `ymax`, and
+`scale_fill_manual()` with colours made transparent by `alpha()`.
