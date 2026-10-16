@@ -19,8 +19,9 @@ list of what remains.
 draws it, beside a label. It is chosen in a scale's `guide` argument or in `guides()`, and the
 legends of several scales are merged into one where they can be. Its options set the title, the
 number of rows or columns, the order of the keys and the aesthetics they are drawn with, and,
-through a theme of its own, where the title and labels go and how they look. Giggly has none of
-this yet: it has no legends, and no aesthetic but `x`, `y`, `group` and `weight`.
+through a theme of its own, where the title and labels go and how they look. Giggly has none of this
+yet, but reads `alpha`, its only aesthetic but `x`, `y`, `group` and `weight`, back with a legend
+drawn as `guide_legend()` draws one at its defaults.
 
 ## The basic form
 

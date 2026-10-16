@@ -19,7 +19,7 @@ waiting for, so the page is also a list of what remains.
 counterpart of `scale_colour_gradient()`. Its `start` and `end` give the first shade and the
 last, from black at 0 to white at 1, and a missing value is drawn red unless `na.value` says
 otherwise. `scale_fill_grey()` does the same for fill. Giggly has none of this yet: it has no
-aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
 
 ## Shades of grey
 

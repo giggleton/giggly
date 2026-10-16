@@ -19,8 +19,8 @@ Every scale is read back through a guide: an axis for a position scale, a legend
 for the others. Each scale's `guide` argument sets its guide; `guides()` sets them all at once, by
 aesthetic, each as a guide's name, such as `"legend"`, or a call to a guide function. A guide set
 to `"none"` is left out, and legends that show the same values under the same title merge into
-one. Giggly has none of it yet: it has no guides, no legends, and no aesthetics but `x`, `y`,
-`group` and `weight`.
+one. Giggly has none of it yet, but reads each scale back as ggplot2 does by default: `x` and `y`
+with axes, and `alpha`, its only other scaled aesthetic, with a legend.
 
 ## The guides ggplot2 chooses
 
@@ -69,8 +69,8 @@ Not in Giggly yet: mapping `colour`, `size` and `shape`, `guides()`, `guide_colo
  p + guides(colour = "colorbar",size = "none")
 ```
 
-Not in Giggly yet: mapping `colour`, `size` and `shape`, legends, and `guides()`, here to leave
-out the colour bar, or the size legend.
+Not in Giggly yet: mapping `colour`, `size` and `shape` and the colour bar and legends that read
+them back, and `guides()`, here to leave out the colour bar, or the size legend.
 
 ## Merged legends
 
@@ -99,8 +99,8 @@ Not in Giggly yet: mapping `colour`, `size` and `shape`, `guides()` and `guide_l
 p + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: mapping `colour`, `size` and `shape`, legends, and changing the theme, here to
-put the legends below the plot.
+Not in Giggly yet: mapping `colour`, `size` and `shape` and the colour bar and legends that read
+them back, and changing the theme, here to put the legends below the plot.
 
 ## The order of the legends
 

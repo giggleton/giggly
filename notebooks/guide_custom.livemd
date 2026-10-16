@@ -16,8 +16,8 @@ cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the 
 of what remains.
 
 `guide_custom()` draws any graphical object, a `grid` grob, alongside a plot's legends, with a
-title if given one. It belongs to no scale. Giggly has none of it yet: it has no guides, no
-legends and no `grid` grobs.
+title if given one. It belongs to no scale. Giggly has none of it yet: it has no guide functions, no
+legend but alpha's and no `grid` grobs.
 
 ## A grob as a guide
 

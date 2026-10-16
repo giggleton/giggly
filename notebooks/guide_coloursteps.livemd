@@ -18,7 +18,7 @@ what it is waiting for, so the page is also a list of what remains.
 `guide_coloursteps()`, or `guide_colorsteps()` spelled the American way, is the legend of a binned
 colour or fill scale: a colour bar, as `guide_colourbar()` draws, but with each bin in one
 constant colour rather than a gradient. It is the default guide for binned colour scales. Giggly
-has none of it yet: it has no legends, no scale functions, and neither colour nor fill.
+has none of it yet: it has no legend but alpha's, no scale functions, and neither colour nor fill.
 
 ## The default for binned colours
 

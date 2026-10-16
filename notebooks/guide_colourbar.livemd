@@ -20,8 +20,8 @@ colours, with ticks and labels at its breaks. It is chosen in the scale's `guide
 `guides()`, by name or by calling `guide_colourbar()`, whose options set the number of bins the
 bar is shaded in, whether the ticks at its ends are drawn, and, through a theme of its own, the
 bar's size and the look and place of its ticks and labels. `guide_colorbar()` is the same
-function. Giggly has none of this yet: it has no `colour` or `fill` aesthetic and no legends, and
-draws every plot in ggplot2's default theme, `theme_gray()`, with no way to change it.
+function. Giggly has none of this yet: it has no `colour` or `fill` aesthetic and no legend but
+alpha's, and draws every plot in ggplot2's default theme, `theme_gray()`, with no way to change it.
 
 ## The basic form
 

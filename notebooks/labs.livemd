@@ -19,7 +19,7 @@ what it is waiting for, so the page is also a list of what remains.
 aesthetic, and the plot's title, subtitle, caption and tag. `xlab()`, `ylab()` and `ggtitle()` are
 older shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly
 has none of these yet: an axis is titled by the column mapped to it, or `count` for counted bars,
-and a plot has no legends and no title, subtitle, caption or tag.
+alpha's legend by its column, and a plot has no title, subtitle, caption or tag.
 
 ## Renaming a legend or an axis
 

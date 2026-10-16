@@ -21,7 +21,8 @@ eye in colour and in black and white, and are designed to be read by people with
 colour blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
 continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
 palette, viridis by default, and the `fill` versions do the same for fill. Giggly has none of this
-yet: it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+yet: it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no
+scale functions.
 
 ## The default for ordered values
 

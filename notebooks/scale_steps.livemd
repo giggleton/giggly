@@ -21,7 +21,7 @@ into bins and give each bin one colour from a gradient. `scale_colour_steps()` r
 colour to a high one, `scale_colour_steps2()` diverges from a low colour through a middle one to a
 high one, around a midpoint, and `scale_colour_stepsn()` takes its colours from as many as it is
 given; the `fill` versions do the same for fill. Giggly has none of this yet: it has no aesthetic
-but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
 
 ## A binned gradient
 

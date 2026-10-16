@@ -24,8 +24,8 @@ draws no legend unless it is also given breaks, labels and a guide. Each functio
 aesthetic in its name, though `scale_colour_identity()` and `scale_fill_identity()` can serve
 colour and fill at once through their `aesthetics` argument; `scale_discrete_identity()` and
 `scale_continuous_identity()` work on whatever aesthetics that argument names. Giggly has none of
-this yet: it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale
-functions.
+this yet: it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and
+no scale functions.
 
 ## Colours named in the data
 

@@ -58,8 +58,9 @@ panel's grid lines are placed by the coordinate system".
   on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
   labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, a guide
-  behaviour (the first legend), and `guide_axis_theta()`'s options and merging its first and last
-  labels when they meet (`expand = FALSE`).
+  protocol (the second kind of guide; design-log §4, the entry beginning "Guides become structs of
+  their kind"), and `guide_axis_theta()`'s options and merging its first and last labels when they
+  meet (`expand = FALSE`).
 - **A legend is a table of its own (`Guide.Legend`, a nested `Giggly.Scene`), laid out as
   ggplot2's `GuideLegend` lays out a vertical legend at its defaults**: the legend margin inside
   the edge; the title above, as tall as a line of its text, left-aligned and centred down its row

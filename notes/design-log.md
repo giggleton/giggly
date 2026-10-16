@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **Guides become structs of their kind behind a protocol in the increment that brings a second
+  kind, expected to be colour (2026-10-16, Steve, agreeing the proposal).** ggplot2 makes each
+  guide an object of its kind (`GuideLegend`, `GuideColourbar`, `GuideNone`, the axes), chosen per
+  aesthetic, and runs every guide through one lifecycle: extract the key, merge, take the layers'
+  keys, draw, pack the guide box. Giggly already runs a legend through those stages as plain
+  functions, its kind fixed (`legends/3` in the assembly, `draw_legend/2` in rendering). Then each
+  kind becomes one module holding its struct (its options), key and drawing, behind a protocol at
+  `Giggly.Guide`: a build function the assembly calls, a drawing one rendering calls; glyphs stay
+  on `Geom.draw_key/3`. Merging groups guides by order, kind, title and labels, each kind merging
+  its own way. Axes join when a user can choose one. `Plot` building guide structs widens its
+  boundary, raised then. *Rejected: ggity's legend protocol on the scale*, every scale redoing the
+  layout and its own glyphs. *Rejected: building it now*, a protocol with one implementation.
+
 - **A legend is a table nested in the plot's, as gtable nests one (2026-10-16, Steve, agreeing
   the proposal).** A legend has rows and columns of its own (margin, title, a row per key, key and
   label columns) and sits centred on the panels' rows, which a facet interleaves with strips and
@@ -1301,8 +1314,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Draw alpha's legend (alpha, step 3); §4: "A legend is a table nested in the
-  plot's", "Alpha is Phase 3's second increment"
+- 2026-10-16 — Draw mapped alpha in the notebooks (alpha, step 4); §4: "Alpha is Phase 3's second
+  increment"
+- 2026-10-16 — Draw alpha's legend (alpha, step 3) (`c64b1e5`); §4: "A legend is a table nested in
+  the plot's", "Alpha is Phase 3's second increment"
 - 2026-10-16 — Map alpha through a scale (alpha, step 2) (`c8140fd`); §4: "A scale's palette is a
   field", "Alpha is Phase 3's second increment", "Group ids follow ggplot2's `add_group()`"
 - 2026-10-16 — Set alpha on a layer, and add the diamonds dataset (alpha, step 1) (`4f34ce2`); §4:

@@ -21,8 +21,8 @@ default or hollow; a seventh value and any after it are not drawn, with a warnin
 through `scale_shape_binned()`, which cuts it into bins first, and since shapes have no order even
 that is not advised. A shape can be named by number or by name, and only shapes 21 to 25 take a
 fill. Giggly has none of this yet: every point it draws looks as ggplot2's default point does, a
-solid circle, and it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale
-functions.
+solid circle, and it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but
+alpha's and no scale functions.
 
 ## A shape for each cut
 

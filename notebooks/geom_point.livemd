@@ -129,7 +129,8 @@ ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
   scale_fill_ordinal(guide = guide_legend(override.aes = list(shape = 21)))
 ```
 
-Not in Giggly yet: mapping `fill` and `shape`, setting a scale by hand, and legends.
+Not in Giggly yet: mapping `fill` and `shape` and the legends that read them back, and setting a
+scale by hand.
 
 ## Layering points of different sizes
 

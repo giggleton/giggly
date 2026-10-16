@@ -23,8 +23,8 @@ Each geom has a function that draws its key, the small glyph that stands for the
 legend: `draw_key_point()` for points, `draw_key_path()` for lines, and so on. A layer can draw
 its keys with another glyph, named or given as its function, through the layer's `key_glyph`
 argument. A `draw_key_*()` function takes a row of the key's aesthetics, the geom's parameters
-and the key's size, and returns a `grid` grob. Giggly has none of this yet: it has no legends, so
-no keys to draw.
+and the key's size, and returns a `grid` grob. Giggly has none of this yet: its only legend,
+alpha's, draws each key as the layer's geom draws its own, a point or a bar.
 
 ## Choosing a layer's key glyph
 

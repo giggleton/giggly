@@ -18,8 +18,8 @@ what remains.
 `guide_bins()` is the legend of a binned scale: a version of `guide_legend()` that puts its ticks
 between the keys, at the bins' edges, and draws a small axis to show the binning. It serves any
 aesthetic but position, though colour and fill default to `guide_coloursteps()`, and it merges
-aesthetics mapped the same way into one legend. Giggly has none of it yet: it has no legends, no
-scale functions, and no aesthetics but `x`, `y`, `group` and `weight`.
+aesthetics mapped the same way into one legend. Giggly has none of it yet: it has no legend but
+alpha's, no scale functions, and no aesthetics but `x`, `y`, `group`, `weight` and `alpha`.
 
 ## The standard look
 

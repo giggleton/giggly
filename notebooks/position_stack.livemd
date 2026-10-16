@@ -96,8 +96,8 @@ ggplot(series, aes(time, value)) +
   scale_fill_discrete(breaks = c('a', 'b', 'c', 'd'))
 ```
 
-Not in Giggly yet: `geom_area()`, mapping `fill`, legends, and `scale_fill_discrete()`, here to
-set the order of the legend's keys.
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, and
+`scale_fill_discrete()`, here to set the order of the legend's keys.
 
 ## Reversing the stack
 

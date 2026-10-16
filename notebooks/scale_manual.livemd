@@ -21,8 +21,8 @@ A manual scale maps each value of a discrete column to an aesthetic value given 
 colour, a fill, a size, a shape, a line type, a line width or a transparency. Each function works
 on the aesthetic in its name, though `scale_colour_manual()` and `scale_fill_manual()` can serve
 colour and fill at once through their `aesthetics` argument; `scale_discrete_manual()` works on
-whatever aesthetics that argument names. Giggly has none of this yet: it has no aesthetic but
-`x`, `y`, `group` and `weight`, no legends and no scale functions.
+whatever aesthetics that argument names. Giggly has none of this yet: it has no aesthetic but `x`,
+`y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
 
 ## Colours by hand
 

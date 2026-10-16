@@ -19,8 +19,8 @@ waiting for, so the page is also a list of what remains.
 colour wheel, all at one chroma and luminance. Its options choose the range of hues, the chroma
 and the luminance, where on the wheel to start and which way round to go, and the colour of
 missing values; the palettes it makes are not safe for readers with colour blindness.
-`scale_fill_hue()` does the same for fill. Giggly has none of this yet: it has no aesthetic but
-`x`, `y`, `group` and `weight`, no legends and no scale functions.
+`scale_fill_hue()` does the same for fill. Giggly has none of this yet: it has no aesthetic but `x`,
+`y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
 
 ## A sample of diamonds
 
