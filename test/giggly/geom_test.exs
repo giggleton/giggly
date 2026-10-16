@@ -81,4 +81,27 @@ defmodule Giggly.GeomTest do
                Geom.draw_panel(%Geom.Bar{}, without_alpha, coord, panel_params)
     end
   end
+
+  # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
+  # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
+  describe "draw_key/3" do
+    test "a point's key is the point at the middle of the key, at the key's alpha" do
+      assert [%Circles{x: [0.5], y: [0.5], opacity: [0.2]}] =
+               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2}, {17.28, 17.28})
+
+      assert [%Circles{opacity: [1.0]}] =
+               Geom.draw_key(%Geom.Point{}, %{alpha: nil}, {17.28, 17.28})
+    end
+
+    test "a bar's key is its fill short of the key's edges by its border's width" do
+      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{}, %{alpha: 0.55}, {17.28, 17.28})
+
+      [xmin] = key.xmin
+      [xmax] = key.xmax
+      [ymin] = key.ymin
+
+      assert {Float.round((xmax - xmin) * 17.28, 2), Float.round(ymin * 17.28, 2),
+              key.fill_opacity, key.color} === {15.86, 0.71, [0.55], :none}
+    end
+  end
 end

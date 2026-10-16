@@ -346,4 +346,38 @@ defmodule Giggly.ScaleTest do
                 }}
     end
   end
+
+  describe "legend_breaks/1" do
+    test "a continuous scale's are its breaks inside the trained range, labelled as an axis's" do
+      scale =
+        :continuous
+        |> Scale.new(:alpha)
+        |> Scale.train([1999, 2008])
+
+      assert Scale.legend_breaks(scale) === [
+               {2000.0, "2000"},
+               {2002.0, "2002"},
+               {2004.0, "2004"},
+               {2006.0, "2006"},
+               {2008.0, "2008"}
+             ]
+    end
+
+    test "a range of zero width has one break, its value, and an untrained scale none" do
+      one =
+        :continuous
+        |> Scale.new(:alpha)
+        |> Scale.train([7, 7])
+
+      untrained = Scale.new(:continuous, :alpha)
+
+      assert {Scale.legend_breaks(one), Scale.legend_breaks(untrained)} === {[{7.0, "7"}], []}
+    end
+
+    test "a discrete scale's are its levels, a missing one last and labelled NA" do
+      scale = discrete_alpha(["b", nil, "a"])
+
+      assert Scale.legend_breaks(scale) === [{"a", "a"}, {"b", "b"}, {nil, "NA"}]
+    end
+  end
 end

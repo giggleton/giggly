@@ -202,6 +202,22 @@ defmodule Giggly.Scale do
     |> Enum.map(fn {label, position} -> {position, label} end)
   end
 
+  # The breaks a legend of the scale shows, in ascending order, each the value in the data and its
+  # label: ggplot2's `get_breaks()` and `get_labels()` on the scale's limits, its trained range or
+  # levels, not an axis's widened extent. A continuous scale's are its transformation's breaks
+  # inside the range, taken as floats as R's limits are doubles, one at its low end when it has
+  # zero width, and none when untrained; a
+  # discrete scale's are its levels, `nil` last and labelled `NA`, as ggplot2's legend keeps `NA`.
+  @doc false
+  @spec legend_breaks(t()) :: [{term(), String.t()}]
+  def legend_breaks(%Continuous{range: :none}), do: []
+
+  def legend_breaks(%Continuous{range: {low, high}} = scale),
+    do: breaks(scale, {low / 1, high / 1})
+
+  def legend_breaks(%Discrete{levels: levels}),
+    do: Enum.zip(levels, Labels.levels(levels))
+
   # The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
   # `breaks/2` gives on that extent, in ascending order: ggplot2's `get_breaks_minor()` as its view
   # scale calls it, less the breaks themselves, which ggplot2's grid leaves out of its minor lines.

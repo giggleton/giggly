@@ -50,7 +50,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
   scale id, the trained scale of each aesthetic other than position that a layer maps, by
-  aesthetic (`non_position_scales`), the plot's coordinate system (carried for rendering to hand each geom and guide), each
+  aesthetic (`non_position_scales`), the legend each such scale gives (`legends`), the plot's
+  coordinate system (carried for rendering to hand each geom and guide), each
   panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
@@ -112,6 +113,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   stat dropped trains nothing), and each column mapped through it, then the set values on top: a
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
+- **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
+  the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
+  for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
+  range, a discrete one's levels, `NA` last), labelled, at the value it maps to, and drawn by every
+  layer that maps the aesthetic, a layer that sets it drawing none. One aesthetic gives one legend;
+  merging legends arrives with a second aesthetic.
 - **Evaluated columns are `x` and `y` first, then the other aesthetics in name order, then
   `panel`, then `group`**, and the group key follows column order: reordering the aesthetics
   renumbers groups. ggplot2's `aes()` takes `x` and `y` as its first arguments, so its groups are

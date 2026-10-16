@@ -26,6 +26,18 @@ defmodule Giggly.Render do
   # at its edges when the coordinate system clips panels, and each strip's always, as
   # `theme_gray()`'s `strip.clip` says.
   #
+  # A plot with a legend, one for an aesthetic other than position that a layer maps, gives it a
+  # column right of the panels, the theme's legend spacing from them: the legend is a table of its
+  # own (`Giggly.Guide`), its keys' glyphs drawn by each layer's geom that maps the aesthetic
+  # (`Giggly.Geom`), nested in a cell spanning the panels' rows and centred down them, as ggplot2
+  # places its guide box to the right, and drawn last.
+  #
+  # A plot with a legend, one for an aesthetic other than position that a layer maps, gives it a
+  # column right of the panels, the theme's legend spacing from them: the legend is a table of its
+  # own (`Giggly.Guide`), its keys' glyphs drawn by each layer's geom that maps the aesthetic
+  # (`Giggly.Geom`), nested in a cell spanning the panels' rows and centred down them, as ggplot2
+  # places its guide box to the right, and drawn last.
+  #
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
   # bottom axes in the same order; the left axes, from the last column to the first, top to
@@ -89,7 +101,8 @@ defmodule Giggly.Render do
       panel_height: panel_height
     }
 
-    widths = widths(panels, grid, left_title, theme)
+    legend = draw_legend(assembly.legends, theme)
+    widths = widths(panels, grid, left_title, legend, theme)
     heights = heights(panels, grid, bottom_title, theme)
 
     %Scene{
@@ -99,7 +112,8 @@ defmodule Giggly.Render do
       cells:
         cells(panels, grid, indexes(widths), indexes(heights), {bottom_title, left_title}, theme,
           clip: assembly.clip,
-          extent: {length(widths), length(heights)}
+          extent: {length(widths), length(heights)},
+          legend: legend
         )
     }
   end
@@ -149,9 +163,29 @@ defmodule Giggly.Render do
     end)
   end
 
+  # The plot's legend, `:none` for none, or its width and table: each key's glyphs drawn by the
+  # geom of every layer that maps the legend's aesthetic, in the order the layers were added, at
+  # the key's value, as ggplot2 draws each such layer's `draw_key` in every key.
+  defp draw_legend([], _theme), do: :none
+
+  defp draw_legend([%{aesthetic: aesthetic, title: title, keys: keys, geoms: geoms}], theme) do
+    size = {theme.legend_key_size, theme.legend_key_size}
+
+    drawn_keys =
+      Enum.map(keys, fn %{label: label, value: value} ->
+        glyphs =
+          Enum.flat_map(geoms, fn geom -> Geom.draw_key(geom, %{aesthetic => value}, size) end)
+
+        {label, glyphs}
+      end)
+
+    Guide.legend(title, drawn_keys, theme)
+  end
+
   # The columns, left to right, each named and sized: the margin, the y title, then for each
-  # column of panels its left axes and its panels, the panel spacing between, then the margin.
-  defp widths(panels, grid, {title_width, _title}, theme) do
+  # column of panels its left axes and its panels, the panel spacing between, then any legend
+  # beyond the theme's spacing from the panels, then the margin.
+  defp widths(panels, grid, {title_width, _title}, legend, theme) do
     panel_columns =
       Enum.map(1..grid.columns//1, fn column ->
         [
@@ -160,9 +194,22 @@ defmodule Giggly.Render do
         ]
       end)
 
+    legend_columns =
+      case legend do
+        :none ->
+          []
+
+        {legend_width, _scene} ->
+          [
+            {:legend_spacing, {:points, theme.legend_box_spacing}},
+            {:legend, {:points, legend_width}}
+          ]
+      end
+
     Enum.concat([
       [{:margin, {:points, theme.plot_margin}}, {:title_left, {:points, title_width}}],
       spaced(panel_columns, theme),
+      legend_columns,
       [{:margin, {:points, theme.plot_margin}}]
     ])
   end
@@ -324,7 +371,31 @@ defmodule Giggly.Render do
       }
     ]
 
-    [background] ++ panel_cells ++ strip_cells ++ bottom_axis_cells ++ left_axis_cells ++ titles
+    Enum.concat([
+      [background],
+      panel_cells,
+      strip_cells,
+      bottom_axis_cells,
+      left_axis_cells,
+      titles,
+      legend_cells(Keyword.fetch!(options, :legend), grid, columns, rows)
+    ])
+  end
+
+  # The legend's cell, last, as ggplot2 adds its guide box: right of the panels, spanning their
+  # rows, from the first's top to the last's bottom, its table centred down them.
+  defp legend_cells(:none, _grid, _columns, _rows), do: []
+
+  defp legend_cells({_width, scene}, grid, columns, rows) do
+    [
+      %Cell{
+        rows: Map.fetch!(rows, {:panel_row, 1})..Map.fetch!(rows, {:panel_row, grid.rows}),
+        columns: Map.fetch!(columns, :legend)..Map.fetch!(columns, :legend),
+        clip: :off,
+        hang: :none,
+        primitives: [scene]
+      }
+    ]
   end
 
   # A cell in one named row and one named column.

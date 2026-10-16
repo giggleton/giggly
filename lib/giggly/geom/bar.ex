@@ -53,6 +53,10 @@ defmodule Giggly.Geom.Bar do
     @fill "#595959"
     @stroke_width 0.5 * 72.27 / 25.4 * 72 / 96
 
+    # A key's fill is its border's width, 0.5 mm, short of the key each way, as ggplot2's
+    # `draw_key_polygon()` takes `linewidth` millimetres off it: half each side, in points.
+    @key_inset 0.5 * 72 / 25.4 / 2
+
     @impl Giggly.Geom
     def setup_data(_geom, frame, axis_kinds) do
       flipped = flipped?(frame, axis_kinds)
@@ -130,6 +134,24 @@ defmodule Giggly.Geom.Bar do
           ymax: Enum.map(drawn, fn [_xmin, _xmax, _ymin, ymax, _opacity] -> ymax end),
           fill: @fill,
           fill_opacity: Enum.map(drawn, fn [_xmin, _xmax, _ymin, _ymax, opacity] -> opacity end),
+          color: :none,
+          stroke_width: @stroke_width
+        }
+      ]
+    end
+
+    # A legend's key: the bar's fill short of the key's edges by its border's width, as ggplot2's
+    # `draw_key_polygon()` draws it, at the key's alpha.
+    @impl Giggly.Geom
+    def draw_key(_geom, key, {width, height}) do
+      [
+        %Rectangles{
+          xmin: [@key_inset / width],
+          xmax: [1 - @key_inset / width],
+          ymin: [@key_inset / height],
+          ymax: [1 - @key_inset / height],
+          fill: @fill,
+          fill_opacity: [opacity(Map.get(key, :alpha))],
           color: :none,
           stroke_width: @stroke_width
         }

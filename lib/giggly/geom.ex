@@ -47,4 +47,11 @@ defprotocol Giggly.Geom do
   @doc false
   @spec draw_panel(t(), DataFrame.t(), Coord.t(), Coord.panel_params()) :: [Scene.primitive()]
   def draw_panel(geom, frame, coord, panel_params)
+
+  # The primitives `geom` draws a legend's key with, in the key's cell, `size` points wide and
+  # tall, its aesthetics' values in `key`, such as `%{alpha: 0.2}`, `nil` for none: ggplot2's
+  # `draw_key`, each geom's glyph for what it draws.
+  @doc false
+  @spec draw_key(t(), %{optional(atom()) => term()}, {number(), number()}) :: [Scene.primitive()]
+  def draw_key(geom, key, size)
 end

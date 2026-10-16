@@ -316,4 +316,65 @@ defmodule Giggly.SVGTest do
     |> Regex.scan(svg)
     |> Enum.map(fn [element] -> element end)
   end
+
+  # Golden: grid's drawing, through vdiffr 1.0.9's svglite (R 4.6.1), of a gtable 10 and 20 points
+  # wide and 30 tall nested in the second column of one 100 points and a null wide, filling the
+  # page: grid centres a table of fixed sizes in its cell both ways. It moves with how a nested
+  # table is laid out.
+  describe "draw/3, a scene nested in a cell" do
+    test "a table of sizes in points is laid out in its cell and centred both ways" do
+      nested = %Scene{
+        widths: [{:points, 10}, {:points, 20}],
+        heights: [{:points, 30}],
+        keep_proportions: false,
+        cells: [
+          %Cell{
+            rows: 1..1,
+            columns: 1..2,
+            clip: :off,
+            hang: :none,
+            primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75}]
+          },
+          %Cell{
+            rows: 1..1,
+            columns: 2..2,
+            clip: :off,
+            hang: :none,
+            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75}]
+          }
+        ]
+      }
+
+      scene = %Scene{
+        widths: [{:points, 100}, {:rest, 1}],
+        heights: [{:rest, 1}],
+        keep_proportions: false,
+        cells: [%Cell{rows: 1..1, columns: 2..2, clip: :off, hang: :none, primitives: [nested]}]
+      }
+
+      assert rects(draw(scene)) === [
+               {"395.00", "273.00", "30.00", "30.00"},
+               {"405.00", "273.00", "20.00", "30.00"}
+             ]
+    end
+
+    test "a nested table's shares split what its sizes in points leave of the cell" do
+      nested = %Scene{
+        widths: [{:points, 10}, {:rest, 1}],
+        heights: [{:rest, 1}],
+        keep_proportions: false,
+        cells: [
+          %Cell{
+            rows: 1..1,
+            columns: 2..2,
+            clip: :off,
+            hang: :none,
+            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75}]
+          }
+        ]
+      }
+
+      assert rects(draw(whole([nested]))) === [{"10.00", "0.00", "710.00", "576.00"}]
+    end
+  end
 end

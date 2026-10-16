@@ -59,3 +59,9 @@ ggplot2's facets' order".
   one.
 - **A layer's rows are split by panel, and each panel's are drawn by the layer's geom alone**, as
   ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows.
+- **A plot with a legend gives it a column right of the panels**, the theme's legend spacing from
+  them, as wide as the legend, before the margin, as ggplot2 places its guide box `"right"`. The
+  legend's cell spans the panels' rows, from the first's top to the last's bottom, the strips above
+  the first row left out, and its table is centred down it; the cell is drawn last, after the
+  titles. Each key's glyphs are drawn by the geom of every layer that maps the legend's aesthetic
+  (`Geom.draw_key/3`), in layer order, at the key's value, and handed to the guide.

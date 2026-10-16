@@ -84,6 +84,22 @@ defmodule Giggly.Geom.Point do
       ]
     end
 
+    # A legend's key: the point at the middle of the key, as ggplot2's `draw_key_point()` draws
+    # it, at the key's alpha.
+    @impl Giggly.Geom
+    def draw_key(_geom, key, _size) do
+      [
+        %Circles{
+          x: [0.5],
+          y: [0.5],
+          radius: @radius,
+          stroke_width: @stroke_width,
+          color: @color,
+          opacity: [opacity(Map.get(key, :alpha))]
+        }
+      ]
+    end
+
     # Each row's opacity: its alpha, or opaque where its table has none.
     defp opacities(frame) do
       if :alpha in DataFrame.names(frame) do

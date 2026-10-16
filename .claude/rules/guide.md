@@ -60,3 +60,12 @@ panel's grid lines are placed by the coordinate system".
   labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, a guide
   behaviour (the first legend), and `guide_axis_theta()`'s options and merging its first and last
   labels when they meet (`expand = FALSE`).
+- **A legend is a table of its own (`Guide.Legend`, a nested `Giggly.Scene`), laid out as
+  ggplot2's `GuideLegend` lays out a vertical legend at its defaults**: the legend margin inside
+  the edge; the title above, as tall as a line of its text, left-aligned and centred down its row
+  by half its ascent, as grid centres text, the title's margin below; a row per key, the key
+  square on the key background with each layer's glyph over it, its label the text margin to its
+  right, centred as the title is; the label column as wide as the widest label, or wider when the
+  title is, leaving the room at the labels' right. Drawn in ggplot2's order: background, title,
+  each key's background and glyphs, then the labels. A guide never calls a geom: rendering hands
+  it each key's glyphs. `legend/3` returns its width and its table; every size is in points.

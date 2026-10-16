@@ -11,13 +11,14 @@ defmodule Giggly.SVG do
   # from the start of its first column and row to the end of its last, or hangs a height of its own
   # from its rows' top or a width of its own from its columns' right, and its primitives are placed
   # in that box, and moved by any offset they carry in points, cells in the order the scene lists
-  # them; a clipped cell's are drawn in a group cut off at the box, as svglite writes one. The
-  # document's user unit is the point, as svglite writes it: the `viewBox` is the size in points and
-  # `width` and `height` carry `pt`, so a radius of 1.95 is 1.95 points at the size the plot is
-  # shown. Numbers are written with two decimals, an opacity as svglite writes a number below 1, and
-  # each primitive as svglite writes it, so output can be set beside the SVG ggplot2's own tests
-  # snapshot; a polyline also says it is not filled, which svglite leaves to its stylesheet and SVG
-  # would otherwise fill black.
+  # them; a clipped cell's are drawn in a group cut off at the box, as svglite writes one. A scene
+  # nested in a cell, such as a legend, is laid out in the cell's box the same way, centred in it
+  # when all its sizes are in points. The document's user unit is the point, as svglite writes it:
+  # the `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
+  # 1.95 points at the size the plot is shown. Numbers are written with two decimals, an opacity as
+  # svglite writes a number below 1, and each primitive as svglite writes it, so output can be set
+  # beside the SVG ggplot2's own tests snapshot; a polyline also says it is not filled, which
+  # svglite leaves to its stylesheet and SVG would otherwise fill black.
   #
   # svglite anchors text only at its start, middle or end, so R's graphics engine hands it the
   # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
@@ -100,6 +101,19 @@ defmodule Giggly.SVG do
     spans(sizes, share, (total - length) / 2)
   end
 
+  # The sizes laid out in `total` from `start`, the shares splitting what the sizes in points leave,
+  # and centred in `total` when they take less of it, as they do when none is a share.
+  defp centred_spans(sizes, total, start) do
+    share = split(sizes, total)
+
+    length =
+      sizes
+      |> Enum.map(fn size -> length(size, share) end)
+      |> Enum.sum()
+
+    spans(sizes, share, start + (total - length) / 2)
+  end
+
   # Each size's start and length, the first starting at `start`.
   defp spans(sizes, share, start) do
     {spans, _end} =
@@ -172,6 +186,16 @@ defmodule Giggly.SVG do
 
   # A position moved `across` and `up` in points.
   defp moved({x_position, y_position}, {across, up}), do: {x_position + across, y_position - up}
+
+  # A scene nested in a cell, laid out in the cell's box as grid lays out a layout in a viewport:
+  # its sizes in points take their length and its shares split what is left, and a table of points
+  # alone, smaller than the box, is centred in it both ways, as gtable centres a legend in the plot.
+  # Its cells are drawn as the whole scene's are.
+  defp primitive(%Scene{keep_proportions: false} = scene, {{left, width}, {top, height}}) do
+    column_spans = centred_spans(scene.widths, width, left)
+    row_spans = centred_spans(scene.heights, height, top)
+    Enum.map(scene.cells, fn cell -> cell(cell, column_spans, row_spans) end)
+  end
 
   # Each circle's outline and fill carry its opacity, as svglite writes a colour's alpha.
   defp primitive(%Circles{} = circles, box) do

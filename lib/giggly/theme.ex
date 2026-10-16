@@ -35,7 +35,14 @@ defmodule Giggly.Theme do
     :axis_title,
     :panel_spacing,
     :strip_background,
-    :strip_text
+    :strip_text,
+    :legend_background,
+    :legend_margin,
+    :legend_key,
+    :legend_key_size,
+    :legend_title,
+    :legend_text,
+    :legend_box_spacing
   ]
   defstruct @enforce_keys
 
@@ -60,8 +67,10 @@ defmodule Giggly.Theme do
   A complete theme: the plot's background, drawn over the whole drawing, and the margin around
   what is drawn on it, in points; the panel's background and its major and minor grid lines; each
   axis's ticks, their length in points, its labels and its title; the space between panels, in
-  points; and the background and text of the strips that label each panel, the text's margin on
-  every side of it.
+  points; the background and text of the strips that label each panel, the text's margin on
+  every side of it; and a legend's background, the margin inside it, each key's background and
+  size, the title and its margin below, the labels and their margin from the keys, all in points,
+  and the space between the panels and the legend.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -75,7 +84,14 @@ defmodule Giggly.Theme do
           axis_title: text(),
           panel_spacing: float(),
           strip_background: rect(),
-          strip_text: text()
+          strip_text: text(),
+          legend_background: rect(),
+          legend_margin: float(),
+          legend_key: rect(),
+          legend_key_size: float(),
+          legend_title: text(),
+          legend_text: text(),
+          legend_box_spacing: float()
         }
 
   # Scene points per TeX point (grid's "pt"), the unit ggplot2's theme gives lengths in.
@@ -93,6 +109,10 @@ defmodule Giggly.Theme do
   @paper "#FFFFFF"
 
   @half_line @base_size / 2
+
+  # grid's `unit(1.2, "lines")`, ggplot2's `legend.key.size`, which grid works out at its own
+  # defaults, a 12-point font at a line height of 1.2, not at the theme's base size: 17.28 points.
+  @legend_key_size 1.2 * 12 * 1.2
 
   # `col_mix(ink, paper, amount)` for black ink on white paper, as ggplot2 rounds it.
   @ink_toward_paper_10 "#1A1A1A"
@@ -126,6 +146,13 @@ defmodule Giggly.Theme do
   # `half_line` apart (ggplot2's `spacing`, which `panel.spacing` takes). A strip is light grey (85%
   # toward paper) with no border, and its text near black (10% toward paper), 0.8 of the base size,
   # with `0.8 * half_line` around it on every side.
+  #
+  # A legend is paper white with no border, `half_line` inside its edge on every side (ggplot2's
+  # `legend.margin`, from the theme's `margins`), and `2 * half_line` right of the panels
+  # (`legend.box.spacing`). Each key is 1.2 lines square, as grid works lines out at its own
+  # defaults, on the panel's background (`legend.key`, which inherits it). The title is black at
+  # the base size with `half_line` below it, and the labels black at 0.8 of it, `half_line` right
+  # of the keys, both ggplot2's `legend.key.spacing`, from the theme's `spacing`.
   defp gray do
     %__MODULE__{
       plot_background: %{
@@ -172,7 +199,30 @@ defmodule Giggly.Theme do
         size: 0.8 * @base_size,
         color: @ink_toward_paper_10,
         margin: 0.8 * @half_line * @points_per_theme_point
-      }
+      },
+      legend_background: %{
+        fill: @paper,
+        color: :none,
+        line_width: @base_rect_size * @points_per_millimetre_of_line
+      },
+      legend_margin: @half_line * @points_per_theme_point,
+      legend_key: %{
+        fill: @ink_toward_paper_92,
+        color: :none,
+        line_width: @base_rect_size * @points_per_millimetre_of_line
+      },
+      legend_key_size: @legend_key_size,
+      legend_title: %{
+        size: @base_size,
+        color: @ink,
+        margin: @half_line * @points_per_theme_point
+      },
+      legend_text: %{
+        size: 0.8 * @base_size,
+        color: @ink,
+        margin: @half_line * @points_per_theme_point
+      },
+      legend_box_spacing: 2 * @half_line * @points_per_theme_point
     }
   end
 end

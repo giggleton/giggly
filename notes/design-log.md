@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **A legend is a table nested in the plot's, as gtable nests one (2026-10-16, Steve, agreeing
+  the proposal).** A legend has rows and columns of its own (margin, title, a row per key, key and
+  label columns) and sits centred on the panels' rows, which a facet interleaves with strips and
+  axes. So a cell's primitives may include a `%Giggly.Scene{}`, laid out in the cell's box and
+  centred when its sizes are all points, as grid centres a fixed gtable in its viewport; the
+  legend's cell spans the panel rows right of the panels. Its geometry is read from ggplot2's
+  `GuideLegend` (`setup_elements()`'s margins and justifications) and checked against R, not
+  fitted. Each geom draws its own key (`Geom.draw_key/3`), as ggplot2's `draw_key` does.
+  *Rejected: the legend's rows and columns in the plot's table*, which centring on faceted panels
+  breaks. *Rejected: one cell placed by point offsets*, which rectangles and circles lack and which
+  would write the key backgrounds unlike svglite.
+
 - **A scale's palette is a field of the two scale kinds, a value naming its function (2026-10-16,
   Steve, agreeing the proposal).** ggplot2 makes every scale a continuous or a discrete scale and
   makes it an aesthetic's by its palette, a function from R's `scales`: `pal_rescale(c(0.1, 1))`
@@ -1289,8 +1301,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Map alpha through a scale (alpha, step 2); §4: "A scale's palette is a field",
-  "Alpha is Phase 3's second increment", "Group ids follow ggplot2's `add_group()`"
+- 2026-10-16 — Draw alpha's legend (alpha, step 3); §4: "A legend is a table nested in the
+  plot's", "Alpha is Phase 3's second increment"
+- 2026-10-16 — Map alpha through a scale (alpha, step 2) (`c8140fd`); §4: "A scale's palette is a
+  field", "Alpha is Phase 3's second increment", "Group ids follow ggplot2's `add_group()`"
 - 2026-10-16 — Set alpha on a layer, and add the diamonds dataset (alpha, step 1) (`4f34ce2`); §4:
   "Alpha is Phase 3's second increment", "ggplot2's `diamonds` is shipped whole"
 - 2026-10-15 — Add a notebook for every page of ggplot2's reference (`adf9236`); §4: "Every page

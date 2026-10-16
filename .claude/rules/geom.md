@@ -52,3 +52,7 @@ where its marks sit".
   its border opaque**, as ggplot2's `GeomPoint` applies `alpha()` to both colours and `GeomRect`
   `fill_alpha()` to the fill; a row without one, or a table without the column, is opaque, as
   ggplot2's default alpha, `NA`, leaves a colour.
+- **A geom draws its own legend key (`draw_key/3`)**, as ggplot2's `draw_key` belongs to the geom:
+  handed the key's aesthetic values and its size in points, it draws in the key's cell. A point's
+  key is the point at the middle; a bar's is its fill short of the key by its border's width, 0.5
+  mm, as `draw_key_polygon()` takes `linewidth` millimetres off the key, at the key's alpha.

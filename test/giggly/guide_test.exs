@@ -14,4 +14,28 @@ defmodule Giggly.GuideTest do
                {%{bottom: {0.0, []}, left: {0.0, []}}, %{bottom: {0.0, []}, left: {0.0, []}}}
     end
   end
+
+  # Golden: the legend boxes ggplot2 4.0.3 draws through vdiffr 1.0.9 (R 4.6.1) for `alpha = year`
+  # on mpg, keys 2000 to 2008 by 2, and for a column named `a_long_column_name`, keys 2.5, 5.0 and
+  # 7.5: 53.30 by 112.69 points, and 119.22 by 78.13. They move with the theme's legend values or
+  # how a legend is laid out.
+  describe "legend/3" do
+    test "a legend is its margin around a title above a key for each label" do
+      keys = Enum.map(~w(2000 2002 2004 2006 2008), fn label -> {label, []} end)
+      {width, scene} = Guide.legend("year", keys, Theme.complete(:gray))
+      height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(height, 2)} === {53.3, 112.69}
+    end
+
+    test "a title wider than its keys and labels widens the legend to it" do
+      keys = Enum.map(~w(2.5 5.0 7.5), fn label -> {label, []} end)
+      {width, scene} = Guide.legend("a_long_column_name", keys, Theme.complete(:gray))
+      height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(height, 2)} === {119.22, 78.13}
+    end
+  end
+
+  defp height(scene), do: Enum.sum(for {:points, height} <- scene.heights, do: height)
 end

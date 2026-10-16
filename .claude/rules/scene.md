@@ -57,3 +57,8 @@ weight".
   (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, as ggplot2's
   `GeomRect` draws a bar. A background that is not rectangular is a polygon (`Polygons`), closed
   round its outline.
+- **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
+  as gtable nests one table in another: its sizes in points take their length and its shares split
+  what is left of the box, and a table of sizes in points alone is centred in the box both ways,
+  as grid centres a fixed table in its viewport. A nested scene never keeps its proportions. A
+  legend is one.

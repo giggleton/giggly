@@ -866,6 +866,63 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/alpha.svg")
     end
 
+    # Golden: test/golden/alpha_legend.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/alpha_legend.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The first example on ggplot2's scale_alpha page:
+    # each point as opaque as its year on 0.1 to 1, and the legend, titled year, a key for each of
+    # 2000 to 2008 by 2, drawn as its own table right of the panel, centred down it, the panel
+    # narrowed to make room. It moves with what moves test/golden/point.svg, with alpha's scale,
+    # and with the legend's look or layout.
+    test "a mapped alpha has a legend right of the panel, a key for each of its scale's breaks" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point(%{alpha: :year})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/alpha_legend.svg")
+    end
+
+    # Golden: the legend's box in ggplot2 4.0.3's drawing of the same plot through vdiffr 1.0.9 (R
+    # 4.6.1), whose every element this drawing matches: the legend spans the panels' rows, from the
+    # first's top to the last's bottom, the strip above the first left out, and is centred down
+    # them. It moves with the legend's size or its place.
+    test "beside several rows of panels the legend is centred on their whole span" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, alpha: :year})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:drv, ncol: 1)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg =~ "<rect x='661.22' y='227.27' width='53.30' height='112.69'"
+    end
+
+    # Golden: test/golden/alpha_bars.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/alpha_bars.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's classes counted and shaded by drive train,
+    # a text alpha that also groups the bars, the legend's keys drawn as bars, their fill short of
+    # the key by their border's width. It moves with what moves test/golden/bar.svg and
+    # test/golden/alpha_legend.svg.
+    test "a discrete alpha shades counted bars by group, its legend's keys drawn as bars" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, alpha: :drv})
+        |> Plot.geom_bar()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/alpha_bars.svg")
+    end
+
     # Golden: test/golden/bar.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/bar.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_bar()'s first example from ggplot2's

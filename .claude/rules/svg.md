@@ -74,3 +74,6 @@ size has a weight".
   circle's black stroke and a polyline's `fill: none`, which svglite leaves to its stylesheet.
   Any other difference is a finding or a stated departure, named in the script's header: the
   plain plot's axes drawn in the other order, a background edge written as R's rounding error.
+- **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, its
+  sizes in points taking their length, its shares what is left, and a table of points alone centred
+  in the box both ways; its cells are then written as any other.

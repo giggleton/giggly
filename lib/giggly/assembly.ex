@@ -31,6 +31,8 @@ defmodule Giggly.Assembly do
   #      kind its columns need, trains it on every layer's column of that aesthetic, and maps each
   #      column through it, as ggplot2 trains and maps its non-position scales once the positions
   #      are final;
+  #      it then builds each such scale's legend: a key for each break, labelled, with the value
+  #      it maps to, drawn by the geom of each layer that maps the aesthetic;
   #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
   #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
@@ -45,7 +47,7 @@ defmodule Giggly.Assembly do
   # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
   # table; the trained scales, by scale id; the trained scale of each aesthetic other than position
-  # that a layer maps, by aesthetic; the plot's coordinate system, which rendering hands each
+  # that a layer maps, by aesthetic, and the legend each gives; the plot's coordinate system, which rendering hands each
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
   # axis's title, the name of the column the first layer to map the axis's aesthetic maps it to
@@ -81,6 +83,7 @@ defmodule Giggly.Assembly do
     :x_scales,
     :y_scales,
     :non_position_scales,
+    :legends,
     :coord,
     :panel_params,
     :clip,
@@ -94,7 +97,8 @@ defmodule Giggly.Assembly do
   An assembled plot: each layer's table and the geom that draws it, in the order the layers were
   added; the layout table; the trained x and y scales keyed by the scale ids the layout gives each
   panel; the trained scale of each aesthetic other than position that a layer maps, by aesthetic;
-  the plot's coordinate system, each panel's params keyed by panel id, whether panels
+  each legend those scales give, its title, its keys and the geoms that draw them; the plot's
+  coordinate system, each panel's params keyed by panel id, whether panels
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
   for none; the title of each aesthetic's guide, the x and y axes' so far,
   `:none` for an axis no layer maps; and the name of the plot's theme, which rendering resolves.
@@ -106,12 +110,26 @@ defmodule Giggly.Assembly do
           x_scales: %{optional(pos_integer()) => Scale.t()},
           y_scales: %{optional(pos_integer()) => Scale.t()},
           non_position_scales: %{optional(Plot.aesthetic()) => Scale.t()},
+          legends: [legend()],
           coord: struct(),
           panel_params: %{optional(pos_integer()) => Coord.panel_params()},
           clip: Coord.clip(),
           aspect_ratio: Coord.aspect(),
           guide_titles: %{x: String.t() | :none, y: String.t() | :none},
           theme: Plot.theme()
+        }
+
+  @typedoc """
+  A legend for one aesthetic other than position: its title, the column the first layer to map the
+  aesthetic maps it to; a key for each of its scale's breaks, the break's label and the value it
+  maps to; and the geom of each layer that maps the aesthetic, in the order the layers were added,
+  each drawing its glyph in every key, as ggplot2's legend draws a key for each such layer.
+  """
+  @type legend :: %{
+          aesthetic: Plot.aesthetic(),
+          title: String.t(),
+          keys: [%{label: String.t(), value: term()}],
+          geoms: [struct()]
         }
 
   # Assembles `plot`, running the stages in order.
@@ -212,6 +230,7 @@ defmodule Giggly.Assembly do
       x_scales: final_x_scales,
       y_scales: final_y_scales,
       non_position_scales: non_position_scales,
+      legends: legends(non_position_scales, plot, layers),
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -258,6 +277,36 @@ defmodule Giggly.Assembly do
     layer
     |> Plot.layer_stat()
     |> Stat.default_mapping()
+  end
+
+  # The legend each scale of an aesthetic other than position gives, in name order, as ggplot2's
+  # guides build them from the trained scales: a key for each break the scale shows, labelled, with
+  # the value it maps to, drawn by the geom of every layer that maps the aesthetic, as a layer
+  # shows in a legend whose aesthetic it maps. A scale with no breaks, one trained on nothing,
+  # gives none.
+  defp legends(non_position_scales, plot, layers) do
+    for {aesthetic, scale} <- Enum.sort(non_position_scales),
+        breaks = Scale.legend_breaks(scale),
+        breaks != [] do
+      {values, labels} = Enum.unzip(breaks)
+      mapped = Scale.map(scale, values)
+
+      geoms =
+        for layer <- layers,
+            mapping = Plot.computed_mapping(plot, layer),
+            Map.has_key?(mapping, aesthetic),
+            do: Plot.layer_geom(layer)
+
+      %{
+        aesthetic: aesthetic,
+        title: guide_title(plot, layers, aesthetic),
+        keys:
+          Enum.zip_with(labels, mapped, fn label, value ->
+            %{label: label, value: value}
+          end),
+        geoms: geoms
+      }
+    end
   end
 
   # A scale for an aesthetic other than position trained on every layer's column of it, in all its

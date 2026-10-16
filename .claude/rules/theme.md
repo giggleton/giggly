@@ -38,3 +38,9 @@ a behaviour: the entry beginning "A theme is a function".
 - **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
   fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
   assembly, arrive with the first mapped or set colour or size.
+- **A legend's look is `theme_gray()`'s at its defaults**: paper white with no border, `half_line`
+  inside its edge (`legend.margin`, from the theme's `margins`) and `2 * half_line` from the panels
+  (`legend.box.spacing`); keys 1.2 lines square as grid works lines out at its own defaults, a
+  12-point font at line height 1.2, 17.28 points, not at the base size, on the panel's background
+  (`legend.key` inherits it); the title black at the base size with `half_line` below it, the
+  labels black at 0.8 of it and `half_line` from the keys (`legend.key.spacing`, from `spacing`).

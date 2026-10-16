@@ -34,6 +34,10 @@ grid lines are placed by the coordinate system".
   of operations**, and a range of zero width puts every value at the middle, so one value maps to
   the middle of its palette (0.55 for alpha); the rescale palette calls the same function. A
   missing value, or one that is not a finite number, maps to `nil`, ggplot2's `na.value`.
+- **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`): a
+  continuous scale's are its transformation's breaks inside its trained range, taken as floats as
+  R's limits are doubles, one at the low end of a range of zero width, none untrained; a discrete
+  scale's are its levels, `nil` last and labelled `NA`, as ggplot2's legend keeps `NA`.
 - **A discrete palette spreads the present levels; `nil` takes no share and maps to `nil`**, as
   ggplot2's mapping leaves `NA` out of the levels it counts. The spread is R's `seq()`: its ends
   exact, each value between found by steps from the first (the fourth of seven is

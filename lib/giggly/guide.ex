@@ -5,9 +5,11 @@ defmodule Giggly.Guide do
   # guides (`guide_axis()`, `guide_legend()`), each drawing what it is given of a scale's breaks;
   # so far Giggly draws axes (`Giggly.Guide.Axis`), the axis around a radial panel's circle
   # (`Giggly.Guide.AxisTheta`), ggplot2's `guide_axis_theta()`, the panel's background and grid lines
-  # (`Giggly.Guide.Grid`), which ggplot2 draws with `guide_grid()`, and the strips that label a
+  # (`Giggly.Guide.Grid`), which ggplot2 draws with `guide_grid()`, the strips that label a
   # facet's panels with their values (`Giggly.Guide.Strip`), which ggplot2's facets draw with
-  # `render_strips()`: a strip, like an axis, tells a reader what data the marks beside it show.
+  # `render_strips()`: a strip, like an axis, tells a reader what data the marks beside it show;
+  # and a legend for an aesthetic other than position (`Giggly.Guide.Legend`), `guide_legend()`,
+  # its keys drawn with glyphs rendering has each layer's geom draw, laid out as a table of its own.
   #
   # When a plot is rendered, `axes/3` takes the plot's coordinate system, a panel's params and the
   # plot's complete theme (`Giggly.Theme`), and draws an axis on each side of the panel that the
@@ -89,6 +91,13 @@ defmodule Giggly.Guide do
     |> Coord.axes(panel_params)
     |> Map.take([:bottom, :left])
   end
+
+  # A legend titled `title`, a key for each of `keys`, its label and the glyphs each layer draws in
+  # it, in `theme`'s look: its width in points and its table, for rendering to place right of the
+  # panels, ggplot2's `guide_legend()`.
+  @doc false
+  @spec legend(String.t(), [{String.t(), [Scene.primitive()]}], Theme.t()) :: {float(), Scene.t()}
+  def legend(title, keys, theme), do: Guide.Legend.draw(title, keys, theme)
 
   # A panel's strips, one for each of `labels`, top to bottom, in `theme`'s look: ggplot2's
   # `render_strips()` for strips above a panel. A panel with no labels has no strips.

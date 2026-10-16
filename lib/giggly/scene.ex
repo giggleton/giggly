@@ -16,6 +16,12 @@ defmodule Giggly.Scene do
   # units, 0 to 1 across its width and up its height, and offset from there in points where a
   # primitive says so; a primitive's sizes, such as a point's radius or a text's size, are in
   # points, whatever size the cell turns out to be. Cells are drawn in the order listed.
+  #
+  # A cell may hold a scene of its own among its primitives, a table laid out in the cell's box as
+  # gtable nests one table in another, as ggplot2 nests a legend in the plot: its sizes in points
+  # take their length, its shares split what they leave of the box, and a table that takes less
+  # than the box, all its sizes in points, is centred in it both ways. It never keeps its
+  # proportions.
 
   # A scene is values: it calls nothing, and exports the structs that rendering builds and a
   # backend reads.
@@ -40,6 +46,7 @@ defmodule Giggly.Scene do
           | Giggly.Scene.Rect.t()
           | Giggly.Scene.Rectangles.t()
           | Giggly.Scene.Text.t()
+          | t()
 
   @typedoc """
   The column widths left to right, the row heights top to bottom, whether the shares keep their

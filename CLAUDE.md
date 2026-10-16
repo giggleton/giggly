@@ -64,7 +64,7 @@ here.
   `.claude/rules/coord.md`.
 - **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.
 - **Resolution** (`Giggly.Resolution`, ggplot2's `resolution()`) — `.claude/rules/resolution.md`.
-- **Guides** (`Giggly.Guide`, a panel's axes and their titles) — `.claude/rules/guide.md`.
+- **Guides** (`Giggly.Guide`, a panel's axes and their titles, legends) — `.claude/rules/guide.md`.
 - **The theme** (`Giggly.Theme`, the complete theme everything but the marks is drawn in) —
   `.claude/rules/theme.md`.
 - **Text measurement** (`Giggly.Font`, the glyph table ggplot2's snapshots measure with) —
