@@ -17,8 +17,9 @@ design-log §4, the entry beginning "The notebooks follow ggplot2's reference pa
   remains. When a feature lands, the examples waiting for it are drawn.
 - **Documentation first: no ggplot2 drawings beside Giggly's.** Checking a drawing against
   ggplot2 is review's job (`test/golden/point.R`), not the notebook's.
-- **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses. Where an example
-  draws random numbers in R, the notebook takes the rows R actually produced and says so.
+- **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses; a small table
+  the example writes out in R, the cell writes out too. Where an example draws random numbers in
+  R, the notebook takes the rows R actually produced and says so.
 - **A notebook installs Giggly by path** (`Path.join(__DIR__, "..")`) and Kino, and shows a plot
   with `Kino.Image.new(svg, :svg)` until a plot can show itself. A `livebook` escript built with an
   older Elixir than `mix.exs` requires cannot run them; reinstall it under `.tool-versions`.

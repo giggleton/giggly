@@ -1,0 +1,199 @@
+# Bars: geom_bar
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.{Datasets, Plot}
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_bar()`](https://ggplot2.tidyverse.org/reference/geom_bar.html), which covers `geom_col()`
+and `stat_count()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+There are two kinds of bar chart. `Giggly.Plot.geom_bar/3` counts: each bar's height is the number
+of rows at its `x`, or the sum of their weights. `Giggly.Plot.geom_col/3` draws heights that are
+already in the data: one bar per row, from 0 to its `y`. A plot is described with `Giggly.Plot`
+and drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
+cell; the setup cell aliases `Giggly.Datasets` and `Giggly.Plot`, so the cells write `Plot.new/2`.
+Most examples use `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38
+popular models from 1999 to 2008. The rest make small tables of their own, as ggplot2's do.
+
+## Counting the cars in each class
+
+```r
+# geom_bar is designed to make it easy to create bar charts that show
+# counts (or sums of weights)
+g <- ggplot(mpg, aes(class))
+# Number of cars in each class:
+g + geom_bar()
+```
+
+The counting goes into `y`, and the y axis is titled `count`.
+
+```elixir
+plot = Plot.new(Datasets.mpg(), %{x: :class})
+
+plot
+|> Plot.geom_bar()
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Summing a weight
+
+```r
+# Total engine displacement of each class
+g + geom_bar(aes(weight = displ))
+```
+
+Mapping `weight` makes each bar the sum of its rows' weights rather than their number. The y axis
+is still titled `count`, as ggplot2's is.
+
+```elixir
+plot
+|> Plot.geom_bar(%{weight: :displ})
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Horizontal bars
+
+```r
+# Map class to y instead to flip the orientation
+ggplot(mpg) + geom_bar(aes(y = class))
+```
+
+Counting goes along whichever of `x` and `y` is mapped, so mapping `y` draws the bars rightward
+and titles the x axis `count`.
+
+```elixir
+Datasets.mpg()
+|> Plot.new()
+|> Plot.geom_bar(%{y: :class})
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Stacked bars
+
+```r
+# Bar charts are automatically stacked when multiple bars are placed
+# at the same location. The order of the fill is designed to match
+# the legend
+g + geom_bar(aes(fill = drv))
+```
+
+Not in Giggly yet: mapping `fill`, the scale that maps it and the legend that reads it back.
+Bars at the same `x` already stack, one for each `group`, but drawn in one grey without borders,
+a stack looks like a single bar.
+
+## Reversing the stack
+
+```r
+# If you need to flip the order (because you've flipped the orientation)
+# call position_stack() explicitly:
+ggplot(mpg, aes(y = class)) +
+ geom_bar(aes(fill = drv), position = position_stack(reverse = TRUE)) +
+ theme(legend.position = "top")
+```
+
+Not in Giggly yet: mapping `fill`, `position_stack()` and its `reverse` option, and changing the
+theme, here to put the legend above the plot. Giggly names a position by an atom, `position:
+:stack`, which takes no options yet.
+
+## Columns
+
+```r
+# To show (e.g.) means, you need geom_col()
+df <- data.frame(trt = c("a", "b", "c"), outcome = c(2.3, 1.9, 3.2))
+ggplot(df, aes(trt, outcome)) +
+  geom_col()
+```
+
+A table can be a keyword list of columns, as R's `data.frame()` is written.
+
+```elixir
+outcomes = [trt: ["a", "b", "c"], outcome: [2.3, 1.9, 3.2]]
+
+outcomes
+|> Plot.new(%{x: :trt, y: :outcome})
+|> Plot.geom_col()
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## The same data as points
+
+```r
+# But geom_point() displays exactly the same information and doesn't
+# require the y-axis to touch zero.
+ggplot(df, aes(trt, outcome)) +
+  geom_point()
+```
+
+```elixir
+outcomes
+|> Plot.new(%{x: :trt, y: :outcome})
+|> Plot.geom_point()
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## Counting continuous values
+
+```r
+# You can also use geom_bar() with continuous data, in which case
+# it will show counts at unique locations
+df <- data.frame(x = rep(c(2.9, 3.1, 4.5), c(5, 10, 4)))
+ggplot(df, aes(x)) + geom_bar()
+```
+
+R's `rep()` repeats each value as many times as its count says. Each bar is 0.9 as wide as the
+closest two values are apart, here 2.9 and 3.1, so the bars are narrow.
+
+```elixir
+values = List.duplicate(2.9, 5) ++ List.duplicate(3.1, 10) ++ List.duplicate(4.5, 4)
+
+[x: values]
+|> Plot.new(%{x: :x})
+|> Plot.geom_bar()
+|> Giggly.to_svg()
+|> IO.iodata_to_binary()
+|> Kino.Image.new(:svg)
+```
+
+## A histogram of the same data
+
+```r
+# cf. a histogram of the same data
+ggplot(df, aes(x)) + geom_histogram(binwidth = 0.5)
+```
+
+Not in Giggly yet: histograms, `geom_histogram()`, and the binning they count with,
+`stat_bin()`.
+
+## Aligning columns with dates
+
+```r
+# Use `just` to control how columns are aligned with axis breaks:
+df <- data.frame(x = as.Date(c("2020-01-01", "2020-02-01")), y = 1:2)
+# Columns centered on the first day of the month
+ggplot(df, aes(x, y)) + geom_col(just = 0.5)
+# Columns begin on the first day of the month
+ggplot(df, aes(x, y)) + geom_col(just = 1)
+```
+
+Not in Giggly yet: dates on an axis, and `geom_col()`'s `just` option. Giggly centres every bar
+on its `x`, as `just = 0.5` does.

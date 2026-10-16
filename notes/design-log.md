@@ -1239,8 +1239,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-15 — Draw horizontal bars (bars, step 4); §4: "A geom says where its marks sit", "Bars
-  are Phase 3's first increment"
+- 2026-10-15 — Add the geom_bar notebook (bars, step 5); §4: "Bars are Phase 3's first
+  increment", "The notebooks follow ggplot2's reference pages"
+- 2026-10-15 — Draw horizontal bars (bars, step 4) (`b5c2d10`); §4: "A geom says where its marks
+  sit", "Bars are Phase 3's first increment"
 - 2026-10-15 — Dodge bars side by side (bars, step 3) (`5d24693`); §4: "A layer chooses its
   position by an atom"
 - 2026-10-15 — Count bars with geom_bar (bars, step 2) (`fe658e8`); §4: "Bars are Phase 3's first
