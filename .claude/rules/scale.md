@@ -16,7 +16,7 @@ palette is a field".
 Why scales are values rather than one mutated object: design-log §4, the entry beginning "Scales
 are three values"; what increment 5 built and what waits for its first reader: the entry
 beginning "Position scales are chosen by column type"; why a continuous scale records the
-identity transformation: the entry beginning "A layer names its stat and position"; why breaks
+identity transformation: the entry beginning "A layer records its stat and position"; why breaks
 come from extended Wilkinson and labels are written the Elixir way: the entry beginning "Axes are
 drawn"; why minor breaks are R's regular ones, less the breaks: the entry beginning "The panel's
 grid lines are placed by the coordinate system".

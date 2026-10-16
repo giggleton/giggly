@@ -10,7 +10,7 @@ paths:
 primitives. Why it is a table from the first drawing: design-log §4, the entry beginning "The
 coordinate system arrives with drawing"; why sizes are measured when it is built and what waits:
 the entry beginning "Axes are drawn"; why there is a scene between rendering and SVG at all: the
-entry beginning "Three top-level values"; why a position can be offset in points: the entry
+entry beginning "Three values with one function"; why a position can be offset in points: the entry
 beginning "A primitive's position is a place in its cell plus an offset in points"; why a share
 has a weight and a scene can keep its proportions: the entry beginning "A `:rest` size has a
 weight".

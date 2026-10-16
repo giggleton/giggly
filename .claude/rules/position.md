@@ -7,8 +7,8 @@ paths:
 # Positions
 
 `Giggly.Position` moves a layer's marks once its stat has run. Why the identity is a position a
-layer names rather than an absence: design-log §4, the entry beginning "A layer names its stat and
-position"; why the layer records a struct of its kind, run through a protocol at the root:
+layer records rather than an absence: design-log §4, the entry beginning "A layer records its stat
+and position"; why the layer records a struct of its kind, run through a protocol at the root:
 the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".
 
 ## Rules

@@ -76,8 +76,8 @@ module's moduledoc, an internal module's opening comment.
 Each entry: **the decision (date, whose call)**, then *Rejected: the alternative* — and why. Newest
 first. A decision belongs here when someone could plausibly propose undoing it; the entry is what
 stops the question being reopened from scratch. A new entry is about 150 words: the decision, a
-sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
-written, and git history keeps every version.
+sentence or two of why, and one line per rejected alternative. What a later decision replaces is
+deleted from the entry it was in, never marked superseded; git history keeps every version.
 
 - **A library's owner nests under the umbrella, and the root lists the library (2026-10-16,
   Steve).** boundary lets a sub-boundary list an outside library only when its parent does, so
@@ -472,8 +472,7 @@ written, and git history keeps every version.
   boundaries by Phase 3's end. *Rejected: a check against anything under a family's namespace* —
   it would forbid the facts; the rule is about the roots. *Deferred:* a public function adding a
   layer of any kind (ggplot2's `layer()`), which third-party kinds need, until the first one;
-  required aesthetics checked after the stat, which §4 already records for Phase 3. It replaces
-  the names of the entry beginning "A layer names its stat and position".
+  required aesthetics checked after the stat, as ggplot2's `compute_geom_1()` checks them.
 
 - **The assembly's titles are `guide_titles`, the title each aesthetic's guide draws (2026-10-14,
   Steve).** `%Assembly{}` held the axes' titles as `titles`, keyed by aesthetic, a name chosen
@@ -596,7 +595,8 @@ written, and git history keeps every version.
   follows `coord_radial()`, its arguments and its defaults, and offers no `coord_polar()`. Phase 2
   is now `facet_wrap` with free scales, then `coord_radial()` in its simplest form, a full circle
   with no inner radius, as the test that a coordinate system which places positions differently
-  changes no geom; its other features follow it. This amends Phase 0's list of phases (§1, the roadmap). *Rejected: `coord_flip` as Phase 2's coordinate test*
+  changes no geom; its other features follow it. *Rejected: `coord_flip` as Phase 2's coordinate
+  test*
   (Phase 0's plan) — superseded, and the cheaper test it offered (axes and titles keyed by the
   aesthetic each side shows) is exercised by `coord_radial()`'s axes as well; *and
   `coord_polar()`* — superseded, with defaults that differ from its successor's.
@@ -659,14 +659,12 @@ written, and git history keeps every version.
   Livebook" cannot install a path dependency until Giggly is published.
 
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
-  it to rendering (2026-10-13, Steve).** *(Since amended: `clip` is a parameter of the coordinate
-  system's struct, and the assembly carries one value rather than `panel_clips`; see the entry
-  beginning "Each facet, coordinate system, geom, stat and position is a struct".)* What is drawn in the panel is cut off at its edges, as
+  it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
   `Coord$draw_panel` with the background and the border): a point at an infinite position, on
-  the panel's edge, shows only its inner half. Cartesian panel params record `clip: :on`, read
-  by a new `Coord.clip/1`; the assembly asks for each panel's and keeps it in `%Assembly{}` as
-  `panel_clips`; rendering marks the panel's cell, every `Scene.Cell` now saying `:on` or `:off`
+  the panel's edge, shows only its inner half. `clip` is a parameter of the coordinate system's
+  struct, read by `Coord.clip/1`; the assembly asks once and keeps it in `%Assembly{}` as `clip`;
+  rendering marks the panel's cell, every `Scene.Cell` now saying `:on` or `:off`
   as gtable's `clip` does; and SVG writes a clipped cell as svglite writes a clipping viewport,
   a `<clipPath>` of the cell's box in `<defs>` and the cell's primitives in a `<g>` that uses
   it, with svglite's id, `cp` and the base64 of the box's `left|right|top|bottom`. The golden's
@@ -742,7 +740,7 @@ written, and git history keeps every version.
   at an infinite position is drawn today half over the axis, where ggplot2 shows half a circle; but
   clipping is the coordinate system's `clip` option, touches the scene and svglite's clip-path
   markup, and nothing here needs it. *Rejected: a third step of this increment.* It was flagged as
-  a separate task (since built, see the entry beginning "The panel is clipped to its edges"). *Deferred to first reader:* a grid that is not rectangular, munched with its
+  a separate task. *Deferred to first reader:* a grid that is not rectangular, munched with its
   background (polar coordinates); grid lines styled apart for x and y, or drawn over the layers
   (`panel.ontop`); minor ticks on an axis; the panel's border (`render_fg`, blank in
   `theme_gray()`).
@@ -806,17 +804,12 @@ written, and git history keeps every version.
   mapping (`Plot.computed_mapping/2`): ggplot2's `setup_plot_labels()`, where a later layer
   never replaces an earlier one's label, read as `resolve_label()` reads it, by the scale's first
   aesthetic, so `xmin` alone titles nothing. An axis no layer maps has the title `:none` and
-  draws none. Every point layer maps x and y, so today the first layer is always the one; review's
-  mutation step showed the search past a layer that does not map the aesthetic could not be
-  reached, so it waits for the first geom that can leave an axis unmapped, and `Map.fetch!/2`
-  fails loudly until it arrives. The titles are `%Assembly{}`'s `titles`, not `labels`, which
-  here means a break's text (since renamed `guide_titles`, see the entry beginning "The assembly's
-  titles are `guide_titles`"). `Coord.axes/2` now says which aesthetic each side's axis shows, so
-  which title goes on which side is the coordinate system's call, as `coord_flip` will swap titles
-  with axes (Giggly since chose not to build `coord_flip`; see the entry beginning "Giggly follows
-  ggplot2's current coordinate functions"). `Guide.Axis.title/3` draws each title in a cell of its own beyond its axis, as
-  ggplot2's layout adds its `xlab-b` row and `ylab-l` column: 11-point black text, a 2.75-TeX-point
-  gap toward the axis, centred on the panel's side, hanging from the cell's far edge, the y title
+  draws none. The titles are `%Assembly{}`'s `guide_titles`, not `labels`,
+  which here means a break's text. `Coord.axes/2` now says which aesthetic each side's axis shows,
+  so which title goes on which side is the coordinate system's call. `Guide.Axis.title/3` draws
+  each title in a cell of its own beyond its axis, as ggplot2's layout adds its `xlab-b` row and
+  `ylab-l` column: 11-point black text, a 2.75-TeX-point gap toward the axis, centred on the
+  panel's side, hanging from the cell's far edge, the y title
   turned 90 degrees. `Scene.Text` gained an angle, and SVG writes turned text and leaves out a
   black fill as svglite does. With the titles, the golden matches ggplot2's `expand-range`
   snapshot element for element in every x position and in everything below the panel; the rest
@@ -847,8 +840,7 @@ written, and git history keeps every version.
   coordinate system, whose new `axes/2` places them by the rescale the data goes through, keyed
   by the side of the panel each axis is drawn on (cartesian: x at the bottom, y on the left). A new
   `Giggly.Guide`, ggplot2's `guide_axis()`, draws each side's ticks and labels in `theme_grey()`'s
-  look, held as module attributes until a theme can be set (since moved into the theme, see the
-  entry beginning "The theme is a resolved value"), and measures how far the axis reaches;
+  look, and measures how far the axis reaches;
   a new `Giggly.Font` measures text. The scene gained sizes in points, its weighted size became
   `:rest`, what the fixed sizes leave, and it gained `Text` and `Polylines` primitives; SVG lays the table out and writes svglite's markup; rendering puts
   the axes and ggplot2's plot margin around the panel. Two findings made the layout exact: vdiffr,
@@ -913,28 +905,17 @@ written, and git history keeps every version.
   its second step** (Steve, over my proposal to defer them past the background), with `labs/2`
   later; the two steps are reviewed and committed apart. The plot margin arrived with the axes,
   since without it the leftmost label touches the drawing's edge. *Deferred to first reader:* the
-  transformation's inverse and domain (the first transformation that is not the identity); minor
-  breaks (grid lines); the axis line (blank in `theme_grey()`); axes above or to the right, and
+  transformation's inverse and domain (the first transformation that is not the identity); the
+  axis line (blank in `theme_grey()`); axes above or to the right, and
   secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
-  `n.breaks:` (§7's "absent" question); the theme; more fonts, bold and italic; spanning cells
-  (the theme and spanning cells since built, see the entry beginning "The theme is a resolved
-  value"), names, clipping (since built, see the entry beginning "The panel is clipped"), z-order
-  beyond list order and aspect ratio; a size for `to_svg` (since built, see the entry beginning
-  "A plot is drawn at the size it is given"); placing
-  panels among their axes in the facet, as ggplot2's `draw_panels()` does (the second panel); a
-  polyline's fill (the first with area); and the plot's title.
+  `n.breaks:` (§7's "absent" question); more fonts, bold and italic; cell names and z-order beyond
+  list order; a polyline's fill (the first with area); and the plot's title.
 
-- **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene, and
-  records its facet and coordinate system by name (2026-10-12, Steve).** *(The names since
-  superseded by structs of their kinds; see the entry beginning "Each facet, coordinate system, geom, stat and position is a struct".)*
-  `Giggly.to_svg/2`
-  assembles a plot, renders it into a scene (`Giggly.Render`, ggplot2's rendering stage) and has
-  `Giggly.SVG` draw the scene at 720 by 576 points (since given a size, see the entry beginning
-  "A plot is drawn at the size it is given"); today a plot is drawn as its panel alone, each
-  row a point placed by the coordinate system in a panel that fills the drawing. The plot records
-  `facet: :null` and `coord: :cartesian`, which ggplot2's `ggplot()` defaults to; each is a name
-  its namespace resolves to a module implementing a behaviour (`Facet.Null`, `Coord.Cartesian`),
-  and a layer's `geom: :point` resolves to `Geom.Point` the same way. The assembly builds each
+- **The coordinate system arrives with drawing: a plot is drawn to SVG through a scene
+  (2026-10-12, Steve).** `Giggly.to_svg/2` assembles a plot, renders it into a scene
+  (`Giggly.Render`, ggplot2's rendering stage) and has `Giggly.SVG` draw the scene. The plot's
+  coordinate system is cartesian unless it says otherwise, as ggplot2's `ggplot()` defaults to.
+  The assembly builds each
   panel's params last, from `Scale.dimension/1`: the axis's extent widened by ggplot2's default
   expansion (5% of a continuous range at each end, 0.6 around discrete positions 1 to n, a range
   of zero width by R's `zero_range()` widened as if its width were 1, an empty axis 0 to 1 first).
@@ -948,21 +929,16 @@ written, and git history keeps every version.
   `COL`); its primitives sit in cell units and are sized in points. SVG follows svglite (the point
   as its unit, two decimals, its circle markup) at vdiffr's 720 by 576 points, so its output can
   be set beside ggplot2's snapshots; the first golden test compares a whole document. New
-  boundaries: `Coord` lists `Aesthetics` and `DataFrame`; `Geom` lists `Coord`, `DataFrame` and
-  `Scene`; `Scene` lists nothing and exports `Cell` and `Points` (since renamed `Circles`, see the
-  entry beginning "The scene's circle primitive is `Circles`"); `SVG` lists `Scene`; `Render`
-  lists `Assembly`, `DataFrame`, `Geom` and `Scene`; `Assembly` gained `Coord`. This amends the
-  entry beginning "The facet assigns panels now", which kept the facet plain functions until a
-  second kind. *Rejected: the coordinate system alone, its params stored for drawing to read
-  later* (the plan's increment 7) — the params would be read by nothing and `transform/3` called
+  boundaries: `Coord`, `Geom`, `Scene`, `SVG` and `Render`, and `Assembly` gained `Coord`
+  (`mix boundary.spec` prints the graph). *Rejected: the coordinate system alone, its params
+  stored for drawing to read later* (the plan's increment 7) — the params would be read by nothing
+  and `transform/3` called
   only by tests. *Rejected: a public panel-params inspector as its reader* — ggplot2 has none (its
   params are opaque by contract, reachable only through `ggplot_build()`'s object), and §4 keeps
   the assembled value internal. *Rejected: `Coord` handed the family rule, or each geom naming
   its x and y columns, rather than listing `Aesthetics`* — handing the rule in moves the listing to
-  `Geom`, a peer domain, and naming columns makes every geom repeat the family lists, while
-  `coord_flip` needs each column's counterpart from the vocabulary anyway (that reason since gone:
-  Giggly builds no `coord_flip`, see the entry beginning "Giggly follows ggplot2's current
-  coordinate functions"). *Rejected: the
+  `Geom`, a peer domain, and naming columns makes every geom repeat the family lists. *Rejected:
+  the
   expansion in the coordinate system* — ggplot2 lets a scale's own `expand` override the default,
   and `expand_range()` is R's `scales`; the coordinate system holds the widened extents.
   *Rejected: the assembly writing unit-panel positions into the tables* — whether to munch before
@@ -971,69 +947,35 @@ written, and git history keeps every version.
   theme's next reader is the panel background; they sit in `Geom.Point`, where ggplot2 kept them
   before 4.0. *Rejected names:* `Display` for the stage (proposed, after Wilkinson's third stage;
   Steve preferred ggplot2's "render"), and `SVG.render/3` for the backend's function (the verb
-  would name two steps; `draw/3`, after grid's `grid.draw()`). *Deferred to first reader:* axes,
-  breaks, labels and extended Wilkinson; text measurement and absolute or measured tracks (each
-  since built, see the entry beginning "Axes are drawn"); the
-  panel background, grid lines and the theme (the theme since built, see the entry beginning "The
-  theme is a resolved value"); `munch` (the first path geom); every coordinate
-  option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`; a size for
-  `to_svg` (the first keyword options); splitting a layer's rows by panel (the second panel,
-  where rendering's one-panel match fails loudly); clipping, cell names and spans (clipping and
-  spans since built, see the entries beginning "The panel is clipped" and "The theme is a resolved
-  value"); and how a
-  dropped row is reported, since ggplot2 warns and a pure pipeline cannot.
+  would name two steps; `draw/3`, after grid's `grid.draw()`). *Deferred to first reader:* every
+  coordinate option (`xlim`, `expand`, `reverse`, `ratio`, `clip`) and a scale's own `expand`;
+  cell names; and how a dropped row is reported, since ggplot2 warns and a pure pipeline cannot.
 
-- **A layer names its stat and position, and a continuous scale its transformation, the identity
-  included; each is a name its own namespace resolves (2026-10-12, Steve).** *(For the stat and
-  position, the names since superseded by structs of their kinds, the identity still recorded; see
-  the entry beginning "Each facet, coordinate system, geom, stat and position is a struct". The transformation is still a name.)* `geom_point/2`
-  records `stat: :identity` and `position: :identity` on its layer and `Scale.new(:continuous)`
-  records `transform: :identity`, as ggplot2's `geom_point()` defaults `stat = "identity"` and
-  `position = "identity"` and its continuous scales `transform = "identity"`. A discrete scale
-  records none: ggplot2's has none. The assembly runs the stages where the fixed order puts them:
-  each axis's scale is added after grouping, its columns are put through `Scale.transform/2`,
-  trained on and mapped, and then each layer's stat (`Giggly.Stat`) and position
-  (`Giggly.Position`) run. Each is a module implementing its namespace's behaviour
-  (`Stat.Identity`, `Position.Identity`, `Scale.Transform.Identity`), resolved from the recorded
-  name by the namespace's root; `Stat` and `Position` are boundaries listing nothing, the assembly
-  lists both, and `Plot` reads a layer's names out through `layer_stat/1` and `layer_position/1`
-  without listing either. Modules whose last segment repeats across namespaces are written through
-  their namespace (`alias Giggly.Stat`, then `Stat.Identity`), never aliased to the tail: a second
+- **A layer records its stat and position, and a continuous scale its transformation, the
+  identity included (2026-10-12, Steve).** `geom_point/3` records `%Stat.Identity{}` and
+  `%Position.Identity{}` on its layer and `Scale.new(:continuous)` records `transform: :identity`,
+  as ggplot2's `geom_point()` defaults `stat = "identity"` and `position = "identity"` and its
+  continuous scales `transform = "identity"`. A discrete scale records none: ggplot2's has none.
+  The assembly runs the stages where the fixed order puts them: each axis's scale is added after
+  grouping, its columns are put through `Scale.transform/2`, trained on and mapped, and then each
+  layer's stat (`Giggly.Stat`) and position (`Giggly.Position`) run. A transformation is a module
+  implementing `Giggly.Scale.Transform`, resolved from its name; a stat and a position are structs
+  of their kinds (the entry beginning "Each facet, coordinate system, geom, stat and position is a
+  struct"). Modules whose last segment repeats across namespaces are written through their
+  namespace (`alias Giggly.Stat`, then `Stat.Identity`), never aliased to the tail: a second
   `alias` with the same tail replaces the first without a warning (tried). That settles §7's
   module-name question. *Rejected: the identity as the absence of a stat, a position or a
-  transformation* (proposed for this increment, and how increment 5 left transforms out, in an
-  aside never discussed) — an absent stat cannot be told from a forgotten one, while a recorded
-  `:identity` says the choice was made and a test can assert it; the cost is stage calls that the
-  mutation step reports as equivalent survivors, since removing an identity changes no output.
-  *Rejected: the layer holding the modules* (ggplot2's shape: `layer()` resolves `"identity"` to
-  `StatIdentity` as the layer is built) — `Plot` would name `Stat.Identity` as a value, which
-  boundary does not count unless `check: [aliases: true]` is on, and listing `Stat` would let a
-  plot run stats, the reason `Plot` does not list `Scale`; the question returns when a caller can
-  pass `stat:`, whose misspelling must raise at the call (since decided, to be built with
-  `facet_wrap`: see the entry beginning "Each facet, coordinate system, geom, stat and position
-  will be a struct"). *Rejected: `as:` aliases* — credo's
-  `AliasAs` check is enabled; *and renamed modules (`StatIdentity`)* — ggplot2 prefixes because an
-  R package has one flat namespace, and module nesting does that job here. *Rejected:
-  `position_jitter` as the stages' first non-identity member now* — it would bring keyword options,
-  NimbleOptions' placement, the "absent" sentinel, `resolution()` and a default seed (ggplot2's
-  `seed = NA` draws a fresh one per build, which a pure pipeline cannot) into a Phase 1 scatter
-  plot; it belongs with stack and dodge. *Deferred to first reader:* `after_stat` (no mapping can
-  be one, and no stat has defaults); the geom's setup step (the layer already records its geom,
-  ggplot2's points have none, and geom modules arrive with drawing); a stat's or position's
-  further arguments and its split by panel and group; a transformation's inverse, breaks, labels
-  and domain (ggplot2 takes an axis's default breaks and labels from its transformation, and a
-  date axis is a continuous scale with a date transformation, which is how the date columns
-  refused today will be placed; the breaks and labels since built, see the entry beginning "Axes
-  are drawn"); and the reset and retrain of the position scales with the second
-  mapping. When the retrain arrives, a discrete scale must take mapped positions into a
-  continuous range of its own, never its levels — `Scale.Discrete.train/2` would turn
-  `["4", "6"]` into `[1, 2, "4", "6"]` today — and ggplot2 clears only that range on reset,
-  keeping the levels (`ScaleDiscretePosition$reset`). Increment 5 deferred that range to "the first
-  continuous value on" a discrete axis; the reason was incomplete, since the second training puts
-  mapped positions there on every discrete axis. For points it spans 1 to n, inside the expanded
-  level range, so it changes nothing the coordinate system builds until a mark lands off the
-  integer positions. And when a stat first supplies an aesthetic, a geom's required aesthetics
-  must be checked after the stat, as ggplot2's `compute_geom_1` does, not only at the geom call.
+  transformation* (proposed for this increment) — an absent stat cannot be told from a forgotten
+  one, while a recorded identity says the choice was made and a test can assert it; the cost is
+  stage calls that the mutation step reports as equivalent survivors, since removing an identity
+  changes no output. *Rejected: `as:` aliases* — credo's `AliasAs` check is enabled; *and renamed
+  modules (`StatIdentity`)* — ggplot2 prefixes because an R package has one flat namespace, and
+  module nesting does that job here. *Rejected: `position_jitter` as the stages' first non-identity
+  member now* — it would bring keyword options, NimbleOptions' placement, the "absent" sentinel,
+  `resolution()` and a default seed (ggplot2's `seed = NA` draws a fresh one per build, which a
+  pure pipeline cannot) into a Phase 1 scatter plot; it belongs with stack and dodge. *Deferred to
+  first reader:* `after_stat`; a stat's or position's further arguments; and a transformation's
+  inverse and domain.
 
 - **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
   Steve).** The review runs `mix muex` with `--coverage-guided --format json --output` added: each
@@ -1075,29 +1017,17 @@ written, and git history keeps every version.
   limits, and here the assembly can hand grouping the configured order. *Rejected: routing rows
   to several scales now* — with one panel nothing could exercise it; the assembly matches exactly
   one scale id per axis and fails loudly when free scales bring more. *Deferred to first reader or
-  need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel),
-  transforms (identity is their absence; since amended — a continuous scale records the identity,
-  see the entry beginning "A layer names its stat and position"), expansion and the view scale
-  with the empty-axis default (the coordinate system; expansion and the empty axis since built,
-  in `Scale.dimension/1`, see the entry beginning "The coordinate system arrives with drawing"),
-  breaks, labels and extended Wilkinson (the
-  axes), a discrete axis's continuous range (the first continuous value on one; that reason since
-  corrected in the same entry), the second training (stat and position), and the layout's `row`
-  and `col` (the scene; since built as `row` and `column`, read by rendering).
+  need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel).
 
-- **The facet assigns panels now; the layout table arrives with scale training; one plain
-  function until a second facet (2026-10-12, Steve; since amended — the plot records its facet by
-  name and `Facet.Null` implements a behaviour, see the entry beginning "The coordinate system
-  arrives with drawing").** `Giggly.Facet.assign_panels/1`
-  (ggplot2's `FacetNull$map_data()`) runs first in the assembly and puts `panel = 1` on every row
-  of the plot's data, which evaluation carries into every layer frame, ordered as ggplot2 orders
-  them: aesthetics, `panel`, `group`. Checked against `R/facet-null.R`, `R/facet-.R`
-  (`layout_null()`) and `R/layout.R`. *Rejected: the layout table now* (the Phase 1 plan's draft)
+- **The facet assigns panels first; the layout table arrives with scale training (2026-10-12,
+  Steve).** The facet runs first in the assembly and gives every row of the plot's data its panel,
+  as ggplot2's `map_data()` does (`panel = 1` without a facet), which evaluation carries into every
+  layer frame, ordered as ggplot2 orders them: aesthetics, `panel`, `group`. Checked against
+  `R/facet-null.R`, `R/facet-.R` (`layout_null()`) and `R/layout.R`. *Rejected: the layout table
+  now* (the Phase 1 plan's draft)
   — its `scale_x`/`scale_y` columns are first read by scale training (increment 5), which routes
   each panel's rows to a scale through them, and its `row`/`col` by the scene (increment 8);
-  built now, nothing would read it. *Rejected: a facet behaviour, a `facet` field on the plot and
-  dispatch now* — with one kind of facet there is nothing to dispatch on; `facet_wrap` brings
-  them, touching only `Plot`, `Facet` and the assembly, never a geom. *Rejected: a mutable
+  built now, nothing would read it. *Rejected: a mutable
   go-between like ggplot2's `Layout` object* — it holds the facet, the coord, the panel scales and
   the panel params and is trained by side effect; here the assembly passes values between stages.
   *Rejected: folding this into increment 5* — small verifiable increments, and this one proves
@@ -1130,11 +1060,8 @@ written, and git history keeps every version.
 - **Every boundary is strict, and each domain's `deps:` is its contract (2026-10-12, Steve).**
   `boundary: [default: [type: :strict]]` in `mix.exs`, pinned by `boundary_declarations_test.exs`
   with a second test refusing any `type: :relaxed`. Each domain is a sub-boundary carved when its
-  first module lands: `Aesthetics` lists nothing, `Group` lists `DataFrame`, `Plot` lists
-  `Aesthetics` and `DataFrame` and exports `Layer`, `Assembly` lists `Plot`, `DataFrame` and
-  `Group` (each list has grown since, with its domains' needs, and `Plot` now exports nothing —
-  `mix boundary.spec` prints the current graph); to come, `Scale` lists nothing (so it stays extractable) and the SVG backend lists only
-  the scene. `Giggly` exports `Plot`. The test helpers
+  first module lands, its `deps:` growing with its needs (`mix boundary.spec` prints the graph).
+  `Giggly` exports `Plot`. The test helpers
   became `GigglyTest.TestEnv` and `GigglyTest.Eventually`, top-level by name, each listing
   `ExUnit`. The `CorePurity` check now reads all of `lib/`; scoped to a `core/` that did not
   exist, it had checked nothing. Found by compiling a throwaway copy, and recorded in
@@ -1171,10 +1098,9 @@ written, and git history keeps every version.
   over its sorted values and nothing else counts; otherwise the combinations of the discrete
   columns that occur are numbered 1..k, sorted column by column; with no discrete column every row
   is `-1`. Values sort with `nil` last (R's `na.last`) and otherwise in Erlang term order. Evaluated
-  columns are in aesthetic-name order, and the key follows them. *(Since 2026-10-16, `x` and `y`
-  come first, as ggplot2's `aes()` takes them, then the rest by name, so a discrete alpha groups
-  within each `x`, as in ggplot2: the alpha entry beginning "Alpha is Phase 3's second
-  increment".)* The integer `panel` column needs
+  columns are `x` and `y` first, as ggplot2's `aes()` takes them, then the rest in aesthetic-name
+  order, and the key follows them, so a discrete alpha groups within each `x`, as in ggplot2. The
+  integer `panel` column needs
   no exclusion; ggplot2 excludes `PANEL` only because it is a factor. *Rejected: `:none` for "no
   grouping"* — it is a value in the data, not an absent option, and the column must stay integers:
   ggplot2 stacks in `-group` order. *Rejected: `1` for "no grouping"* — `-1` keeps it
@@ -1192,28 +1118,22 @@ written, and git history keeps every version.
   aesthetic, the reference as written and the data's columns; a layer's mapping is checked with
   the plot's as the layer is added. ggplot2 converts its data at construction too (`fortify(data)`
   in `ggplot.default`, `R/plot.R`, and again in `layer()`); only expression evaluation waits for
-  the build. This amends the entry beginning "Input is anything implementing `Table.Reader`".
-  *Rejected: reading at build start* (that entry's first wording) — a misspelt column surfaced at
+  the build.
+  *Rejected: reading at build start* — a misspelt column surfaced at
   render, its stack trace pointing at the wrong line, and the build held a `Table.Reader` rather
   than a checked frame. *Rejected: "did you mean"* — the list of columns already puts the right
   spelling beside the wrong one, and a similarity threshold is one more thing to tune and test.
 
-- **`Giggly.build/1` exists from its first stage and gains one stage per increment (2026-10-12,
-  Steve; since amended — the stages run in `Giggly.Assembly` and a plot is inspected with
-  `Giggly.layer_data/2`, see the entry beginning "A plot is a value built by").** It began with aesthetic evaluation and `Group.add/1`; each later increment inserts its
-  stage where the order puts it, and `%Giggly.Built{}` gains a field with the stage that fills it.
+- **The assembly exists from its first stage and gains one stage per increment (2026-10-12,
+  Steve).** It began with aesthetic evaluation and `Group.add/1`; each later increment inserts its
+  stage where the order puts it, and `%Giggly.Assembly{}` gains a field with the stage that fills
+  it.
   *Rejected: wiring the whole build at once, at the end of Phase 1* (the Phase 1 plan's draft) —
   every stage function would have had only test callers until then.
 
-- **Points accept only what Phase 1 can draw, and fixed aesthetics wait for drawing (2026-10-12,
-  Steve).** `geom_point/3` accepts `:x`, `:y` and `:group`; an aesthetic joins a geom with the
-  scale that maps it. *Rejected: ggplot2's full list for points now* — a mapped colour would be
-  evaluated and grouped and never drawn. *Rejected: fixed aesthetics (`alpha: 0.4`) now* — nothing
-  reads one before the scene, what counts as a valid value is a rendering decision, and "a fixed
-  value overrides an inherited mapping" cannot be exercised until something can be both. So
-  NimbleOptions waits for the first keyword option; what its source showed about duplicates is in
-  `.claude/rules/plot.md`. *(Fixed aesthetics arrived with alpha, 2026-10-15: the entry beginning
-  "Alpha is Phase 3's second increment".)*
+- **Points accept only what Phase 1 can draw (2026-10-12, Steve).** An aesthetic joins a geom
+  with the scale that maps it. *Rejected: ggplot2's full list for points now* — a mapped colour
+  would be evaluated and grouped and never drawn.
 
 - **CLAUDE.md holds only what applies to a library, and each area's rules file earns one
   status-map line (2026-10-11).** Tack's library profile wrote a CLAUDE.md for an application, and
@@ -1235,12 +1155,11 @@ written, and git history keeps every version.
   approval for a change that opens nothing.
 
 - **Mutation testing runs in code review, with muex, over the changed files; survivors are
-  triaged, not scored (2026-10-11, Steve; since amended — tests are picked by coverage, see the
-  entry above).** `elixir-code-review` runs `mix muex --no-optimize
-  --no-filter --verbose` with the changed `lib/` files as one comma-separated `--files`, and its
-  report says of each survivor whether it is a missing test, unreachable or redundant code, an
-  equivalent mutant, or the wording of a message whose datum the tests assert — and why.
-  An experiment; how it goes decides whether it stays. *Rejected: hand-picked mutants* — chosen by
+  triaged, not scored (2026-10-11, Steve).** `elixir-code-review` runs `mix muex` with the flags
+  its mutation-testing reference gives over the changed `lib/` files, as one comma-separated
+  `--files`, and its report says of each survivor whether it is a missing test, unreachable or
+  redundant code, an equivalent mutant, or the wording of a message whose datum the tests assert —
+  and why. *Rejected: hand-picked mutants* — chosen by
   looking at the tests already written, they never mutated `DataFrame.pull/2`'s guard, the one
   behaviour with no test; and a scripted loop reused a previous mutant's build. *Rejected: a `mix
   quality` step or a `--fail-at` score threshold* — two small files take minutes, and equivalent
@@ -1304,13 +1223,12 @@ written, and git history keeps every version.
   but one module then carries every geom, scale and theme function. *Rejected: an importable
   bare-function DSL* — closest to R visually, unusual in Elixir, collides with user names.
 
-- **Three top-level values with one function between each (2026-10-11, Steve; since amended —
-  the assembled value and the scene are internal, see the entry beginning "A plot is a value
-  built by"):** `%Giggly.Plot{}`
-  → `build/1` → `%Giggly.Built{}` → `render/1` → `%Giggly.Scene{}` → a backend → iodata. The
-  build product carries per-layer frames with resolved params, the layout table, trained scales
-  and panel params; nothing in it knows about SVG. *Rejected: a single pass from spec to markup* —
-  ggity's `Plot.plot/1`, where aesthetic mapping, pixel arithmetic and SVG emission happened in
+- **Three values with one function between each (2026-10-11, Steve):** `%Giggly.Plot{}` → the
+  assembly → `%Giggly.Assembly{}` → rendering → `%Giggly.Scene{}` → a backend → iodata; only the
+  plot is public. The assembled value carries per-layer frames with resolved params, the layout
+  table, trained scales and panel params; nothing in it knows about SVG. *Rejected: a single pass
+  from spec to markup* — ggity's `Plot.plot/1`, where aesthetic mapping, pixel arithmetic and SVG
+  emission happened in
   one loop per row inside each geom, so there was no point at which a layout could be measured or
   a panel inserted.
 
@@ -1353,13 +1271,12 @@ written, and git history keeps every version.
   a group-by shape, and its fast backend is a larger NIF than Explorer's. *Rejected name:
   `Giggly.Frame`* (Phase 0's proposal, amended at ratification).
 
-- **Input is anything implementing `Table.Reader`, read once at build start (2026-10-11, Steve;
-  since amended — it is read in `Plot.new/2`, see the entry beginning "The table is read when the
-  plot is created").**
+- **Input is anything implementing `Table.Reader`, read once, by `Plot.new/2` (2026-10-11,
+  Steve).**
   The `table` package is tiny, stable, and implemented by Explorer, Dux, the database drivers and
   plain lists of maps, because Livebook requires it — so it survives whichever dataframe library
   is maintained in three years. Mapping values may be atoms or strings and are resolved against the
-  table's column names at evaluation; after that point user column names do not exist in the
+  table's column names at the call; after that point user column names do not exist in the
   pipeline. *Rejected: Explorer only* — ggity; couples the library's life to one dependency's.
   *Rejected: per-format adapters* — each one is code the `Table.Reader` implementers already wrote.
 
@@ -1407,8 +1324,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Set colours and fills on a layer (colour, step 1); §4: "Colour and fill is Phase
-  3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come from the
+- 2026-10-16 — Set colours and fills on a layer (colour, step 1) (`2841c12`); §4: "Colour and fill
+  is Phase 3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come
+  from the
   `color` package's conversions"
 - 2026-10-16 — Draw lines and dates in the notebooks (lines, step 4) (`04e9957`); §4: "Lines and
   date axes are Phase 3's third increment"
@@ -1488,19 +1406,19 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-12 — Axes (Phase 1, increment 8, step 1) (`714436c`); §4: "Axes are drawn"
 - 2026-10-12 — The coordinate system, drawn: `Giggly.to_svg/1` (`e049a0e`); §4: "The coordinate
   system arrives with drawing"
-- 2026-10-12 — The stat, position and transform stages (`1d9c2f4`); §4: "A layer names its stat
-  and position"
+- 2026-10-12 — The stat, position and transform stages (`1d9c2f4`); §4: "A layer records its
+  stat and position"
 - 2026-10-12 — Code review's mutation step picks tests by coverage (`72890c5`); §4: "Mutation
   testing picks each mutant's tests by coverage"
 - 2026-10-12 — Position scales (Phase 1, increment 5) (`72890c5`); §4: "Position scales are chosen
   by column type"
 - 2026-10-12 — Staging no longer invalidates a recorded boundary approval (`a2624ca`)
-- 2026-10-12 — Panels (Phase 1, increment 4) (`a2624ca`); §4: "The facet assigns panels now"
+- 2026-10-12 — Panels (Phase 1, increment 4) (`a2624ca`); §4: "The facet assigns panels first"
 - 2026-10-12 — A plot is run from `Giggly`; the stages run in `Giggly.Assembly`; every boundary is
   strict (`e01519e`); §4: "A plot is a value built by", "Every boundary is strict"
 - 2026-10-12 — The plot spec, the first build stages and column types (`e01519e`); §4: "Column
   types belong to the frame", "Group ids follow ggplot2's", "The table is read when the plot is
-  created", "`Giggly.build/1` exists from its first stage", "Points accept only what Phase 1 can
+  created", "The assembly exists from its first stage", "Points accept only what Phase 1 can
   draw"
 - 2026-10-11 — The waiver gate treats a removed boundary declaration as a widening (`e4aaade`);
   §4: "Removing a boundary declaration is a widening"
