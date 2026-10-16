@@ -6,10 +6,13 @@ paths:
   - "test/giggly/scale/**"
 ---
 
-# Position scales
+# Scales
 
-`Giggly.Scale` decides what kind of axis a column needs, puts values through a scale's
-transformation, trains a scale over the values it is given, and maps values to their positions.
+`Giggly.Scale` decides what kind of scale a column needs, puts values through a scale's
+transformation, trains a scale over the values it is given, and maps values to their positions,
+or, for an aesthetic other than position, through the scale's palette to the aesthetic's values.
+Why a palette is a field of the two scale kinds: design-log §4, the entry beginning "A scale's
+palette is a field".
 Why scales are values rather than one mutated object: design-log §4, the entry beginning "Scales
 are three values"; what increment 5 built and what waits for its first reader: the entry
 beginning "Position scales are chosen by column type"; why a continuous scale records the
@@ -20,10 +23,25 @@ grid lines are placed by the coordinate system".
 
 ## Rules
 
+- **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
+  it one aesthetic's.** A palette is a value naming its function (`Scale.Palette`), never a
+  closure: `:identity` for a position, `{:rescale, {low, high}}` for a continuous aesthetic, R's
+  `pal_rescale()`, and `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high,
+  length.out = n)` as ggplot2's ordinal alpha takes it. `new/1` makes a position scale; `new/2`
+  makes an aesthetic's with ggplot2's default palette for it (`alpha`: 0.1 to 1), one of
+  `non_position_aesthetics/0`.
+- **A continuous value's place in the range is R's `rescale()` (`Scale.rescale/3`), in R's order
+  of operations**, and a range of zero width puts every value at the middle, so one value maps to
+  the middle of its palette (0.55 for alpha); the rescale palette calls the same function. A
+  missing value, or one that is not a finite number, maps to `nil`, ggplot2's `na.value`.
+- **A discrete palette spreads the present levels; `nil` takes no share and maps to `nil`**, as
+  ggplot2's mapping leaves `NA` out of the levels it counts. The spread is R's `seq()`: its ends
+  exact, each value between found by steps from the first (the fourth of seven is
+  0.54999999999999993).
 - **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
   `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
   the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
-  `@moduledoc false` like `Breaks`, `Labels`, `MinorBreaks` and `Transform`.
+  `@moduledoc false` like `Breaks`, `Labels`, `MinorBreaks`, `Palette` and `Transform`.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists nothing; the
   assembly pulls a column and hands its values here, so the namespace stays extractable, as R's
   `scales` stands beside ggplot2. Anything that needs a frame belongs to the caller.

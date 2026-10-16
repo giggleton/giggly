@@ -90,8 +90,8 @@ defmodule Giggly do
       ...>   |> Giggly.Plot.geom_point()
       iex> Giggly.panel_scales(plot)
       %{
-        x: %Giggly.Scale.Discrete{levels: ["4", "6"], continuous_range: {1, 2}},
-        y: %Giggly.Scale.Continuous{range: {21.0, 22.8}, transform: :identity}
+        x: %Giggly.Scale.Discrete{levels: ["4", "6"], continuous_range: {1, 2}, palette: :identity},
+        y: %Giggly.Scale.Continuous{range: {21.0, 22.8}, transform: :identity, palette: :identity}
       }
   """
   @spec panel_scales(Plot.t(), integer()) :: %{x: panel_scale(), y: panel_scale()}

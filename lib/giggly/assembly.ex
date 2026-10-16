@@ -27,9 +27,13 @@ defmodule Giggly.Assembly do
   #  11. moves each layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
-  #  13. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
+  #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`), of the
+  #      kind its columns need, trains it on every layer's column of that aesthetic, and maps each
+  #      column through it, as ggplot2 trains and maps its non-position scales once the positions
+  #      are final;
+  #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
-  #  14. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
   #      panel's params, as ggplot2 asks it.
@@ -40,7 +44,8 @@ defmodule Giggly.Assembly do
   #
   # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  # table; the trained scales, by scale id; the plot's coordinate system, which rendering hands each
+  # table; the trained scales, by scale id; the trained scale of each aesthetic other than position
+  # that a layer maps, by aesthetic; the plot's coordinate system, which rendering hands each
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
   # axis's title, the name of the column the first layer to map the axis's aesthetic maps it to
@@ -75,6 +80,7 @@ defmodule Giggly.Assembly do
     :layout,
     :x_scales,
     :y_scales,
+    :non_position_scales,
     :coord,
     :panel_params,
     :clip,
@@ -87,7 +93,8 @@ defmodule Giggly.Assembly do
   @typedoc """
   An assembled plot: each layer's table and the geom that draws it, in the order the layers were
   added; the layout table; the trained x and y scales keyed by the scale ids the layout gives each
-  panel; the plot's coordinate system, each panel's params keyed by panel id, whether panels
+  panel; the trained scale of each aesthetic other than position that a layer maps, by aesthetic;
+  the plot's coordinate system, each panel's params keyed by panel id, whether panels
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
   for none; the title of each aesthetic's guide, the x and y axes' so far,
   `:none` for an axis no layer maps; and the name of the plot's theme, which rendering resolves.
@@ -98,6 +105,7 @@ defmodule Giggly.Assembly do
           layout: DataFrame.t(),
           x_scales: %{optional(pos_integer()) => Scale.t()},
           y_scales: %{optional(pos_integer()) => Scale.t()},
+          non_position_scales: %{optional(Plot.aesthetic()) => Scale.t()},
           coord: struct(),
           panel_params: %{optional(pos_integer()) => Coord.panel_params()},
           clip: Coord.clip(),
@@ -111,8 +119,9 @@ defmodule Giggly.Assembly do
   # The facet first gives each row of the plot's data its panel. Then each layer's mapping is laid
   # over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
   # column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
-  # out in name order, since a mapping is a map and has no written order to keep, followed by
-  # `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
+  # out `:x` and `:y` first, as ggplot2's `aes()` takes them, then the rest in name order, since a
+  # mapping is a map and has no written order to keep, followed by `:panel` and `:group`, as
+  # ggplot2 orders them. Each axis then gets its scale, and every layer's
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
   # marks, and each aesthetic a layer sets to one value is put into every row of its table. Last,
@@ -149,7 +158,8 @@ defmodule Giggly.Assembly do
 
     x_routes = routes(layout, :x)
     y_routes = routes(layout, :y)
-    axis_kinds = %{x: scale_kind(plot, :x), y: scale_kind(plot, :y)}
+    axis_kinds = %{x: axis_kind(plot, :x), y: axis_kind(plot, :y)}
+    non_position_kinds = non_position_kinds(plot)
     untrained_x_scales = add_scales(axis_kinds.x, x_routes)
     untrained_y_scales = add_scales(axis_kinds.y, y_routes)
 
@@ -181,9 +191,16 @@ defmodule Giggly.Assembly do
     final_x_scales = retrain(x_scales, x_routes, :x, layer_data)
     final_y_scales = retrain(y_scales, y_routes, :y, layer_data)
 
+    non_position_scales =
+      Map.new(non_position_kinds, fn {aesthetic, kind} ->
+        {aesthetic, train_non_position(Scale.new(kind, aesthetic), aesthetic, layer_data)}
+      end)
+
     fixed_data =
       Enum.zip_with(layers, layer_data, fn layer, frame ->
-        set_fixed(frame, Plot.layer_fixed(layer))
+        frame
+        |> map_non_position(non_position_scales)
+        |> set_fixed(Plot.layer_fixed(layer))
       end)
 
     panel_params = panel_params(coord, layout, final_x_scales, final_y_scales)
@@ -194,6 +211,7 @@ defmodule Giggly.Assembly do
       layout: layout,
       x_scales: final_x_scales,
       y_scales: final_y_scales,
+      non_position_scales: non_position_scales,
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -240,6 +258,31 @@ defmodule Giggly.Assembly do
     layer
     |> Plot.layer_stat()
     |> Stat.default_mapping()
+  end
+
+  # A scale for an aesthetic other than position trained on every layer's column of it, in all its
+  # rows, where the positions are final, as ggplot2's `train_df()` trains its non-position scales:
+  # one scale for the whole plot, whatever the facet. A layer whose stat dropped the column, as
+  # counting drops one that varies within a bar, trains nothing. The scale's transformation is the
+  # identity, so its values are trained as they are.
+  defp train_non_position(untrained, aesthetic, layer_data) do
+    Enum.reduce(layer_data, untrained, fn frame, scale ->
+      if aesthetic in DataFrame.names(frame),
+        do: Scale.train(scale, DataFrame.pull(frame, aesthetic)),
+        else: scale
+    end)
+  end
+
+  # The layer's table with each column of an aesthetic other than position mapped through its
+  # scale, as ggplot2's `map_df()` maps them, in name order.
+  defp map_non_position(frame, scales) do
+    scales
+    |> Enum.sort()
+    |> Enum.reduce(frame, fn {aesthetic, scale}, mapped ->
+      if aesthetic in DataFrame.names(mapped),
+        do: DataFrame.put(mapped, aesthetic, Scale.map(scale, DataFrame.pull(mapped, aesthetic))),
+        else: mapped
+    end)
   end
 
   # The layer's table with each aesthetic the layer sets to one value given that value in every
@@ -293,12 +336,15 @@ defmodule Giggly.Assembly do
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across
-  # by name: it is the one raw column every layer keeps.
+  # by name: it is the one raw column every layer keeps. The columns come out `x` and `y` first,
+  # as ggplot2's `aes()` takes them as its first two arguments, then the rest in name order, since
+  # a mapping is a map with no written order to keep; grouping keys on the discrete ones in that
+  # order, so a discrete alpha groups within each `x`, as ggplot2 numbers its groups.
   defp evaluate(paneled_data, plot, layer) do
     renames =
       plot
       |> Plot.computed_mapping(layer)
-      |> Enum.sort()
+      |> Enum.sort_by(fn {aesthetic, _column} -> {aesthetic not in [:x, :y], aesthetic} end)
 
     panels = DataFrame.pull(paneled_data, :panel)
 
@@ -376,53 +422,72 @@ defmodule Giggly.Assembly do
 
   # An axis has one scale, so every column on it must be a type some scale can place, and all of
   # one kind; the first column decides, and an axis no layer maps is continuous, as ggplot2's is.
-  # The plot's mappings are read rather than the evaluated frames, so a refusal can name each
-  # column as the data names it.
-  defp scale_kind(plot, family) do
-    dtypes = DataFrame.dtypes(plot.data)
-    layers = Enum.reverse(plot.reversed_layers)
-
-    positions =
-      for {layer, index} <- Enum.with_index(layers),
-          mapping = Plot.computed_mapping(plot, layer),
-          {aesthetic, column} <- Enum.sort(mapping),
-          Aesthetics.family(aesthetic) == family,
-          dtype = Map.fetch!(dtypes, column),
-          do: {index, aesthetic, column, dtype, Scale.kind(dtype)}
-
-    case positions do
-      [] ->
-        :continuous
-
-      [{_index, _aesthetic, _column, _dtype, first_kind} = first | _rest] ->
-        Enum.each(positions, fn position -> check_position(position, first) end)
-        first_kind
+  defp axis_kind(plot, family) do
+    case mapped_columns(plot, fn aesthetic -> Aesthetics.family(aesthetic) == family end) do
+      [] -> :continuous
+      columns -> checked_kind(columns, "an axis has one scale")
     end
   end
 
-  defp check_position({_index, _aesthetic, _column, _dtype, :none} = position, _first),
-    do: raise(ArgumentError, unplaceable_message(position))
+  # The kind of scale each aesthetic other than position needs, for those a layer maps: as an
+  # axis's, every column of it must be a type some scale can map, and all of one kind, the first
+  # deciding, as ggplot2 adds a scale for the first layer's and refuses a column it cannot map.
+  defp non_position_kinds(plot) do
+    for aesthetic <- Scale.non_position_aesthetics(),
+        columns = mapped_columns(plot, fn mapped -> mapped == aesthetic end),
+        columns != [],
+        into: %{},
+        do: {aesthetic, checked_kind(columns, "an aesthetic has one scale")}
+  end
 
-  defp check_position(
+  # Each column a layer maps to one of the aesthetics `selected?` chooses, in layer order, with what
+  # a refusal names: the layer's index, the aesthetic, the column as the data names it, its type and
+  # the kind of scale that type needs. The plot's mappings are read rather than the evaluated
+  # frames, so a refusal can name each column as the data names it.
+  defp mapped_columns(plot, selected?) do
+    dtypes = DataFrame.dtypes(plot.data)
+    layers = Enum.reverse(plot.reversed_layers)
+
+    for {layer, index} <- Enum.with_index(layers),
+        mapping = Plot.computed_mapping(plot, layer),
+        {aesthetic, column} <- Enum.sort(mapping),
+        selected?.(aesthetic),
+        dtype = Map.fetch!(dtypes, column),
+        do: {index, aesthetic, column, dtype, Scale.kind(dtype)}
+  end
+
+  defp checked_kind(
+         [{_index, _aesthetic, _column, _dtype, first_kind} = first | _rest] = columns,
+         one_scale
+       ) do
+    Enum.each(columns, fn column -> check_column(column, first, one_scale) end)
+    first_kind
+  end
+
+  defp check_column({_index, _aesthetic, _column, _dtype, :none} = column, _first, _one_scale),
+    do: raise(ArgumentError, unplaceable_message(column))
+
+  defp check_column(
          {_index, _aesthetic, _column, _dtype, kind},
-         {_first_index, _first_aesthetic, _first_column, _first_dtype, kind}
+         {_first_index, _first_aesthetic, _first_column, _first_dtype, kind},
+         _one_scale
        ),
        do: :ok
 
-  defp check_position(position, first),
-    do: raise(ArgumentError, kind_conflict_message(position, first))
+  defp check_column(column, first, one_scale),
+    do: raise(ArgumentError, kind_conflict_message(column, first, one_scale))
 
   defp unplaceable_message({index, aesthetic, column, dtype, _kind}) do
     "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a " <>
       "#{inspect(dtype)} column, which no scale can place yet"
   end
 
-  defp kind_conflict_message({index, aesthetic, column, _dtype, kind}, first) do
+  defp kind_conflict_message({index, aesthetic, column, _dtype, kind}, first, one_scale) do
     {first_index, first_aesthetic, first_column, _first_dtype, first_kind} = first
 
     "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{kind} " <>
       "column, but the layer at index #{first_index} maps #{inspect(first_aesthetic)} to " <>
-      "#{inspect(first_column)}, a #{first_kind} one; an axis has one scale"
+      "#{inspect(first_column)}, a #{first_kind} one; #{one_scale}"
   end
 
   # Replaces each x-family and y-family column with what `scale_function` (a transformation or a

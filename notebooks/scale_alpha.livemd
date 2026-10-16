@@ -19,9 +19,10 @@ is waiting for, so the page is also a list of what remains.
 An alpha scale maps a column to transparency, a way to fade the less important observations.
 `scale_alpha()` is short for `scale_alpha_continuous()`, for a column of numbers;
 `scale_alpha_binned()` cuts the numbers into bins first, and `scale_alpha_discrete()` and
-`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of them yet, nor
-mapping `alpha` to a column; a layer can set it for every mark, as
-`Giggly.Plot.geom_point(alpha: 0.4)` does.
+`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of these functions yet,
+but maps `alpha` to a column as ggplot2's default scale does, a column of numbers onto 0.1 to 1 and
+one of text spread from 0.1 to 1, and a layer can set it for every mark, as
+`Giggly.Plot.geom_point(alpha: 0.4)` does; it draws no legend for a mapped `alpha` yet.
 
 ## Mapping transparency
 
@@ -33,7 +34,7 @@ p <- ggplot(mpg, aes(displ, hwy)) +
 p
 ```
 
-Not in Giggly yet: mapping `alpha` and the legend that reads it back.
+Not in Giggly yet: the legend that reads the mapped `alpha` back.
 
 ## Invisible points
 
@@ -42,7 +43,7 @@ Not in Giggly yet: mapping `alpha` and the legend that reads it back.
 p + scale_alpha(range = c(0, 1))
 ```
 
-Not in Giggly yet: mapping `alpha` and the legend that reads it back, and `scale_alpha()` and its
+Not in Giggly yet: the legend that reads the mapped `alpha` back, and `scale_alpha()` and its
 `range` option.
 
 ## Titling the legend
@@ -52,5 +53,5 @@ Not in Giggly yet: mapping `alpha` and the legend that reads it back, and `scale
 p + scale_alpha("cylinders")
 ```
 
-Not in Giggly yet: mapping `alpha` and the legend that reads it back, and `scale_alpha()`, whose
-first argument titles the legend.
+Not in Giggly yet: the legend that reads the mapped `alpha` back, and `scale_alpha()`, whose first
+argument titles the legend.

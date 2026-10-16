@@ -49,7 +49,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   to itself, so nothing here does.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
-  scale id, the plot's coordinate system (carried for rendering to hand each geom and guide), each
+  scale id, the trained scale of each aesthetic other than position that a layer maps, by
+  aesthetic (`non_position_scales`), the plot's coordinate system (carried for rendering to hand each geom and guide), each
   panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
@@ -105,5 +106,15 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
-- **Evaluated columns are the aesthetics in name order, then `panel`, then `group`** (ggplot2's
-  order), and the group key follows column order: reordering the aesthetics renumbers groups.
+- **Each aesthetic other than position that a layer maps gets one scale for the whole plot**,
+  added when a layer maps it, of the kind its first column needs, every column of it checked as
+  an axis's are, trained once the positions are final on every layer's column of it (a column a
+  stat dropped trains nothing), and each column mapped through it, then the set values on top: a
+  value a layer sets wins, its mapping of the aesthetic dropped before evaluation
+  (`Plot.computed_mapping/2`).
+- **Evaluated columns are `x` and `y` first, then the other aesthetics in name order, then
+  `panel`, then `group`**, and the group key follows column order: reordering the aesthetics
+  renumbers groups. ggplot2's `aes()` takes `x` and `y` as its first arguments, so its groups are
+  numbered `x` first whatever order a mapping is written in; a mapping here is a map with no
+  written order, so the rest go by name, where ggplot2's follow the writing. A discrete alpha
+  therefore groups within each `x`, as ggplot2's does.

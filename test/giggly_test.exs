@@ -204,6 +204,120 @@ defmodule GigglyTest do
   end
 
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
+  # `mpg` where it is used, printed to 17 significant digits. It moves with ggplot2's default alpha
+  # scales: a continuous column onto 0.1 to 1, a discrete one spread from 0.1 to 1.
+  describe "layer_data/2, mapping alpha" do
+    @alpha_rows %{
+      "x" => [1, 2, 3, 4, 5],
+      "y" => [1, 2, 3, 4, 5],
+      "a" => [2.0, 4.0, nil, 10.0, 6.0],
+      "s" => ["b", "a", nil, "c", "a"]
+    }
+
+    test "a continuous alpha is each value's place in the range on 0.1 to 1, a missing one nil" do
+      frame =
+        @alpha_rows
+        |> Plot.new(%{x: :x, y: :y, alpha: :a})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :alpha) === [0.1, 0.325, nil, 1.0, 0.55]
+    end
+
+    test "a discrete alpha spreads its levels from 0.1 to 1 and groups by them" do
+      frame =
+        @alpha_rows
+        |> Plot.new(%{x: :x, y: :y, alpha: :s})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :alpha), DataFrame.pull(frame, :group)} ===
+               {[0.55, 0.1, nil, 1.0, 0.1], [2, 1, 4, 3, 1]}
+    end
+
+    test "groups are numbered y before alpha, as ggplot2's aes() takes y first" do
+      frame =
+        %{"x" => [1, 2, 3, 4], "y" => ["q", "p", "q", "p"], "s" => ["b", "a", "a", "b"]}
+        |> Plot.new(%{x: :x, y: :y, alpha: :s})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :group) === [4, 1, 3, 2]
+    end
+
+    test "every layer's alpha trains one scale, so each layer's values sit in the whole range" do
+      frame =
+        @alpha_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{alpha: :a})
+        |> Plot.geom_point(%{alpha: :x})
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.pull(frame, :alpha) === [0.1, 0.2, 0.3, 0.4, 0.5]
+    end
+
+    test "an alpha the layer sets wins over the plot's mapping of it" do
+      frame =
+        @alpha_rows
+        |> Plot.new(%{x: :x, y: :y, alpha: :a})
+        |> Plot.geom_point(alpha: 0.3)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :alpha) === List.duplicate(0.3, 5)
+    end
+
+    test "counted bars keep a discrete alpha, each bar shaded by its group's level" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, alpha: :drv})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :alpha)} ===
+               {[5.0, 12.0, 35.0, 3.0, 38.0, 11.0, 33.0, 4.0, 22.0, 9.0, 51.0, 11.0],
+                [1.0, 0.1, 0.55, 0.1, 0.55, 0.55, 0.1, 0.1, 0.55, 1.0, 0.1, 1.0]}
+    end
+
+    test "counting drops an alpha that varies within a bar, so its bars have none" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, alpha: :year})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      refute :alpha in DataFrame.names(frame)
+    end
+
+    test "an alpha column no scale can map is refused, naming the layer, the column and its type" do
+      rows = %{"x" => [1, 2], "y" => [1, 2], "day" => [~D[2026-10-12], ~D[2026-10-13]]}
+
+      plot =
+        rows
+        |> Plot.new(%{x: :x, y: :y, alpha: :day})
+        |> Plot.geom_point()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "index 0"
+      assert error.message =~ ":alpha"
+      assert error.message =~ ~s("day")
+      assert error.message =~ ":date"
+    end
+
+    test "layers whose alpha columns disagree in kind are refused, since alpha has one scale" do
+      plot =
+        @alpha_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{alpha: :a})
+        |> Plot.geom_point(%{alpha: :s})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "index 1"
+      assert error.message =~ "index 0"
+      assert error.message =~ "an aesthetic has one scale"
+    end
+  end
+
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
   # `mpg` where it is used, printed to 17 significant digits. It moves with `stat_count()` or the
   # bar geometry.
   describe "layer_data/2, for geom_bar" do
@@ -566,9 +680,14 @@ defmodule GigglyTest do
       assert scales === %{
                x: %Giggly.Scale.Discrete{
                  levels: ["a", "b", "c"],
-                 continuous_range: {0.55000000000000004, 3.4500000000000002}
+                 continuous_range: {0.55000000000000004, 3.4500000000000002},
+                 palette: :identity
                },
-               y: %Giggly.Scale.Continuous{range: {0.0, 3.2}, transform: :identity}
+               y: %Giggly.Scale.Continuous{
+                 range: {0.0, 3.2},
+                 transform: :identity,
+                 palette: :identity
+               }
              }
     end
 
@@ -612,8 +731,16 @@ defmodule GigglyTest do
         |> Plot.facet_wrap(:am, scales: :free_x)
 
       assert {Giggly.panel_scales(plot, 1).x, Giggly.panel_scales(plot, 2).x} ==
-               {%Giggly.Scale.Discrete{levels: ["6", "8"], continuous_range: {1, 2}},
-                %Giggly.Scale.Discrete{levels: ["4", "6"], continuous_range: {1, 2}}}
+               {%Giggly.Scale.Discrete{
+                  levels: ["6", "8"],
+                  continuous_range: {1, 2},
+                  palette: :identity
+                },
+                %Giggly.Scale.Discrete{
+                  levels: ["4", "6"],
+                  continuous_range: {1, 2},
+                  palette: :identity
+                }}
 
       # Each row on its own panel's scale, in row order: "8" is the second level of panel 1's.
       frame = Giggly.layer_data(plot)
@@ -629,12 +756,28 @@ defmodule GigglyTest do
 
       assert {Giggly.panel_scales(plot, 1), Giggly.panel_scales(plot, 2)} ==
                {%{
-                  x: %Giggly.Scale.Continuous{range: {1.0, 9.0}, transform: :identity},
-                  y: %Giggly.Scale.Continuous{range: {10.0, 20.0}, transform: :identity}
+                  x: %Giggly.Scale.Continuous{
+                    range: {1.0, 9.0},
+                    transform: :identity,
+                    palette: :identity
+                  },
+                  y: %Giggly.Scale.Continuous{
+                    range: {10.0, 20.0},
+                    transform: :identity,
+                    palette: :identity
+                  }
                 },
                 %{
-                  x: %Giggly.Scale.Continuous{range: {1.0, 9.0}, transform: :identity},
-                  y: %Giggly.Scale.Continuous{range: {30.0, 40.0}, transform: :identity}
+                  x: %Giggly.Scale.Continuous{
+                    range: {1.0, 9.0},
+                    transform: :identity,
+                    palette: :identity
+                  },
+                  y: %Giggly.Scale.Continuous{
+                    range: {30.0, 40.0},
+                    transform: :identity,
+                    palette: :identity
+                  }
                 }}
     end
 

@@ -176,8 +176,9 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. A point
-  set to be transparent is so in its outline and its fill alike, as ggplot2 draws one. A mapping,
+  Points use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
+  other. A point set or mapped to be transparent is so in its outline and its fill alike, as
+  ggplot2 draws one. A mapping,
   a map, and options, a keyword list, may each be given alone or both together.
 
   ## Options
@@ -239,7 +240,9 @@ defmodule Giggly.Plot do
   Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   counts along the one mapped, and the count is the other, so mapping `:y` alone draws horizontal
   bars, as ggplot2's `geom_bar(aes(y = class))` does, the x axis titled `count`. A `:weight` column
-  must hold numbers. A mapping, a map, and options, a keyword list, may each be given alone or
+  must hold numbers. The bars also take `:alpha`, which reaches a bar where it is the same in every
+  row the bar counts, as ggplot2 keeps it, and so a discrete alpha both groups the rows and shades
+  each group's bar. A mapping, a map, and options, a keyword list, may each be given alone or
   both together.
 
   ## Options
@@ -274,7 +277,7 @@ defmodule Giggly.Plot do
 
     plot
     |> add_layer(layer, "Plot.geom_bar/3",
-      accepted: Stat.Count.accepted_aesthetics(),
+      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
       required: Stat.Count.required_aesthetics(),
       exclusive: Stat.Count.exclusive_aesthetics()
     )
@@ -294,7 +297,8 @@ defmodule Giggly.Plot do
   as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
   reaches to 0, since every bar starts there.
 
-  Bars use `:x`, `:y` and `:group`, and need `:x` and `:y` from one mapping or the other. When `y`
+  Bars use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
+  other; a bar's fill takes its alpha, its border not. When `y`
   is the discrete axis and `x` the continuous one, the bars are horizontal, each from 0 to its `x`,
   as ggplot2 decides. A mapping, a map, and options, a keyword list, may each be given alone or both
   together.
@@ -424,11 +428,15 @@ defmodule Giggly.Plot do
   def coord_radial(%__MODULE__{} = plot), do: %{plot | coord: %Coord.Radial{}}
 
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
-  # the layer's column is used.
+  # the layer's column is used, and less any aesthetic the layer sets to one value, which wins over
+  # a mapping, as ggplot2's `compute_aesthetics()` drops the aesthetics a layer's `aes_params` set.
   @doc false
   @spec computed_mapping(t(), Layer.t()) :: mapping()
-  def computed_mapping(%__MODULE__{mapping: plot_mapping}, %Layer{mapping: layer_mapping}),
-    do: Map.merge(plot_mapping, layer_mapping)
+  def computed_mapping(%__MODULE__{} = plot, %Layer{} = layer) do
+    plot.mapping
+    |> Map.merge(layer.mapping)
+    |> Map.drop(Map.keys(layer.fixed))
+  end
 
   # The geom `layer` draws with, a struct of its kind (`Giggly.Geom`).
   @doc false

@@ -55,7 +55,7 @@ here.
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
   `Giggly`) — `.claude/rules/assembly.md`.
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.
-- **Position scales** (`Giggly.Scale`, kinds, transformations, training, mapping) —
+- **Scales** (`Giggly.Scale`, kinds, transformations, training, mapping, palettes) —
   `.claude/rules/scale.md`.
 - **Stats** (`Giggly.Stat`, the protocol a layer's stat runs through) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the protocol a layer's position runs through) —

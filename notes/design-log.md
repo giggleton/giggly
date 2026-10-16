@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **A scale's palette is a field of the two scale kinds, a value naming its function (2026-10-16,
+  Steve, agreeing the proposal).** ggplot2 makes every scale a continuous or a discrete scale and
+  makes it an aesthetic's by its palette, a function from R's `scales`: `pal_rescale(c(0.1, 1))`
+  for continuous alpha, `seq(0.1, 1, length.out = n)` for discrete, the identity for a position.
+  So `Scale.Continuous` and `Scale.Discrete`, public through `Giggly.panel_scales/2`, gain
+  `palette`, `:identity` for the axes, and colour, size and shape will add palettes, not kinds. A
+  palette is a value (`{:rescale, {0.1, 1.0}}`), resolved by `Scale.Palette` as a transformation's
+  name is, so a scale stays a value. *Rejected: separate structs for non-position scales*, a second
+  pair training the same way. *Rejected: a module per aesthetic and kind*, ggity's
+  `Scale.Alpha.Continuous`, whose closures and legends multiplied with each aesthetic.
+
 - **ggplot2's `diamonds` is shipped whole, kept compressed, and drawn whole (2026-10-16, Steve).**
   `geom_point`'s transparency example draws all 53,940 diamonds, which no sample shows, and the
   pages that sample draw from the whole table. Kept as its columns, as `mpg` is, it would be some
@@ -1042,7 +1053,10 @@ written, and git history keeps every version.
   over its sorted values and nothing else counts; otherwise the combinations of the discrete
   columns that occur are numbered 1..k, sorted column by column; with no discrete column every row
   is `-1`. Values sort with `nil` last (R's `na.last`) and otherwise in Erlang term order. Evaluated
-  columns are in aesthetic-name order, and the key follows them. The integer `panel` column needs
+  columns are in aesthetic-name order, and the key follows them. *(Since 2026-10-16, `x` and `y`
+  come first, as ggplot2's `aes()` takes them, then the rest by name, so a discrete alpha groups
+  within each `x`, as in ggplot2: the alpha entry beginning "Alpha is Phase 3's second
+  increment".)* The integer `panel` column needs
   no exclusion; ggplot2 excludes `PANEL` only because it is a factor. *Rejected: `:none` for "no
   grouping"* — it is a value in the data, not an absent option, and the column must stay integers:
   ggplot2 stacks in `-group` order. *Rejected: `1` for "no grouping"* — `-1` keeps it
@@ -1275,8 +1289,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Set alpha on a layer, and add the diamonds dataset (alpha, step 1); §4: "Alpha is
-  Phase 3's second increment", "ggplot2's `diamonds` is shipped whole"
+- 2026-10-16 — Map alpha through a scale (alpha, step 2); §4: "A scale's palette is a field",
+  "Alpha is Phase 3's second increment", "Group ids follow ggplot2's `add_group()`"
+- 2026-10-16 — Set alpha on a layer, and add the diamonds dataset (alpha, step 1) (`4f34ce2`); §4:
+  "Alpha is Phase 3's second increment", "ggplot2's `diamonds` is shipped whole"
 - 2026-10-15 — Add a notebook for every page of ggplot2's reference (`adf9236`); §4: "Every page
   of ggplot2's function reference has a notebook"
 - 2026-10-15 — Add the geom_bar notebook (bars, step 5) (`6f6b680`); §4: "Bars are Phase 3's

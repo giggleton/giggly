@@ -81,6 +81,23 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":y"
     end
 
+    test "a mapped alpha is accepted, since a scale now maps it" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(%{alpha: :mpg})
+
+      assert [%Plot.Layer{mapping: %{alpha: "mpg"}}] = plot.reversed_layers
+    end
+
+    test "an alpha the layer sets leaves the plot's mapping of it out of what the layer draws" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, alpha: :cyl})
+      plot = Plot.geom_point(plot, alpha: 0.3)
+      [layer] = plot.reversed_layers
+
+      assert Plot.computed_mapping(plot, layer) === %{x: "wt", y: "mpg"}
+    end
+
     test "an alpha set alone is recorded for every mark, a whole number as a float" do
       plot =
         @rows
@@ -216,6 +233,15 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{}, fixed: %{}}] =
                plot.reversed_layers
+    end
+
+    test "counted bars accept a mapped alpha, which the bar geom draws though counting ignores it" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl})
+        |> Plot.geom_bar(%{alpha: :cyl})
+
+      assert [%Plot.Layer{mapping: %{alpha: "cyl"}}] = plot.reversed_layers
     end
 
     test "an alpha is recorded for every bar, the position left stacking" do

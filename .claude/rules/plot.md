@@ -34,7 +34,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   function that wrote the mapping (design-log §4, the entry beginning "A kind is named after").
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
-  the precedence (the layer's column wins) exists once.
+  the precedence exists once: the layer's column wins over the plot's, and an aesthetic the layer
+  sets wins over both, dropped from the mapping as ggplot2's `compute_aesthetics()` drops what
+  `aes_params` set.
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
@@ -55,7 +57,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   since counting the panels is its computation, answered when the plot is run.
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
   column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
-  (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken). A
+  (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken),
+  accepting too what its geom draws (`:alpha`), which counting carries. A
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
   allows at most one. A weight's column must hold numbers, refused at the call, where R would fail
   inside the stat and draw nothing.

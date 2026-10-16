@@ -1,8 +1,9 @@
 defmodule Giggly.Scale do
   @moduledoc false
 
-  # Position scales: what kind of axis a column's values need, the range or levels those values span
-  # once trained, and where each value sits on the axis.
+  # Scales: what kind of scale a column's values need, the range or levels those values span once
+  # trained, and where each value sits on an axis, or what it becomes as another aesthetic, such
+  # as alpha, through the scale's palette (`Giggly.Scale.Palette`).
   #
   # A scale works on plain values, never on frames or plots: the assembly pulls a column and hands
   # its values here, so this namespace depends on nothing else in Giggly and could stand alone, as
@@ -30,9 +31,18 @@ defmodule Giggly.Scale do
   # Training follows R's `scales` package. A continuous scale's range spans the finite numbers it
   # sees; `nil` and the non-finite floats are skipped. A discrete scale's levels are the distinct
   # values it sees, sorted with `nil` last and otherwise in Erlang term order, so strings sort by
-  # their bytes. Mapping leaves a continuous value as it is, and puts a discrete value at its
-  # level's position, counting from 1, as ggplot2 does before the coordinate system rescales
-  # anything.
+  # their bytes. A position scale's palette is the identity: mapping leaves a continuous value as
+  # it is, and puts a discrete value at its level's position, counting from 1, as ggplot2 does
+  # before the coordinate system rescales anything. Any other aesthetic's scale maps through its
+  # palette: a continuous value's place in the range, from 0 to 1 (R's `rescale()`), onto the
+  # palette's range, and a discrete value to its level's share of the palette's spread.
+  #
+  # ## Aesthetics other than position
+  #
+  # `alpha` is the one so far (`non_position_aesthetics/0`). Its scale is ggplot2's default for
+  # it: a continuous column onto 0.1 to 1, `scale_alpha_continuous()`, and a discrete one spread
+  # from 0.1 to 1, `scale_alpha_ordinal()`, which ggplot2's `scale_alpha_discrete()` uses with a
+  # warning that Giggly, building a plot without side effects, does not give.
 
   # Values in, values out: a scale depends on nothing, so it stays extractable.
   use Boundary, deps: [], exports: []
@@ -66,11 +76,34 @@ defmodule Giggly.Scale do
   def kind(dtype) when dtype in @discrete_dtypes, do: :discrete
   def kind(dtype) when is_atom(dtype), do: :none
 
-  # An untrained scale of the given kind; a continuous one records the identity transformation.
+  # The aesthetics other than position that a scale maps.
+  @non_position_aesthetics [:alpha]
+
+  # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
+  @alpha_range {0.1, 1.0}
+
+  # An untrained position scale of the given kind, its palette the identity; a continuous one
+  # records the identity transformation.
   @doc false
   @spec new(:continuous | :discrete) :: t()
-  def new(:continuous), do: %Continuous{range: :none, transform: :identity}
-  def new(:discrete), do: %Discrete{levels: [], continuous_range: :none}
+  def new(:continuous), do: %Continuous{range: :none, transform: :identity, palette: :identity}
+  def new(:discrete), do: %Discrete{levels: [], continuous_range: :none, palette: :identity}
+
+  # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
+  # ggplot2's default palette for it.
+  @doc false
+  @spec new(:continuous | :discrete, atom()) :: t()
+  def new(:continuous, :alpha),
+    do: %Continuous{range: :none, transform: :identity, palette: {:rescale, @alpha_range}}
+
+  def new(:discrete, :alpha),
+    do: %Discrete{levels: [], continuous_range: :none, palette: {:sequence, @alpha_range}}
+
+  # The aesthetics other than position that a scale maps, as ggplot2 adds a default scale for each
+  # one a layer maps.
+  @doc false
+  @spec non_position_aesthetics() :: [atom()]
+  def non_position_aesthetics, do: @non_position_aesthetics
 
   # The values in the space the scale trains and maps in: put through a continuous scale's
   # transformation, and as given to a discrete scale, which has none.
@@ -205,6 +238,20 @@ defmodule Giggly.Scale do
       {middle, middle}
     else
       extent
+    end
+  end
+
+  # `value` moved from the range `from` to the range `to`, linearly: R's `scales::rescale()`,
+  # `(value - from_low) / (from_high - from_low) * (to_high - to_low) + to_low`, in that order of
+  # operations. A `from` of zero width, by R's `zero_range()`, puts every value at the middle of
+  # `to`, as R does, so a column of one value maps to the middle of its palette.
+  @doc false
+  @spec rescale(number(), {number(), number()}, {number(), number()}) :: float()
+  def rescale(value, {from_low, from_high}, {to_low, to_high}) do
+    if zero_range?(from_low, from_high) do
+      (to_low + to_high) / 2
+    else
+      (value - from_low) / (from_high - from_low) * (to_high - to_low) + to_low
     end
   end
 

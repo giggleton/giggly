@@ -3,6 +3,13 @@ defmodule Giggly.ScaleTest do
 
   alias Giggly.Scale
 
+  # A new discrete alpha scale trained once on `values`.
+  defp discrete_alpha(values) do
+    :discrete
+    |> Scale.new(:alpha)
+    |> Scale.train(values)
+  end
+
   # A new scale of `kind` trained once on `values`.
   defp trained(kind, values) do
     kind
@@ -36,7 +43,11 @@ defmodule Giggly.ScaleTest do
         |> Scale.train([nil, 3, :infinity, 1.5])
         |> Scale.train([2])
 
-      assert scale === %Scale.Continuous{range: {1.5, 3}, transform: :identity}
+      assert scale === %Scale.Continuous{
+               range: {1.5, 3},
+               transform: :identity,
+               palette: :identity
+             }
     end
 
     test "discrete levels are the distinct values sorted, nil last, across trainings" do
@@ -46,7 +57,11 @@ defmodule Giggly.ScaleTest do
         |> Scale.train(["b", nil, "a"])
         |> Scale.train(["c", "a"])
 
-      assert scale === %Scale.Discrete{levels: ["a", "b", "c", nil], continuous_range: :none}
+      assert scale === %Scale.Discrete{
+               levels: ["a", "b", "c", nil],
+               continuous_range: :none,
+               palette: :identity
+             }
     end
 
     test "a discrete scale handed positions widens its continuous range, not its levels" do
@@ -56,7 +71,11 @@ defmodule Giggly.ScaleTest do
         |> Scale.train([1, 2])
         |> Scale.train([0.55, nil, 2.45])
 
-      assert scale === %Scale.Discrete{levels: ["a", "b"], continuous_range: {0.55, 2.45}}
+      assert scale === %Scale.Discrete{
+               levels: ["a", "b"],
+               continuous_range: {0.55, 2.45},
+               palette: :identity
+             }
     end
   end
 
@@ -70,8 +89,8 @@ defmodule Giggly.ScaleTest do
         |> Scale.train([0.55, 2.45])
 
       assert {Scale.reset(continuous), Scale.reset(discrete)} ===
-               {%Scale.Continuous{range: :none, transform: :identity},
-                %Scale.Discrete{levels: ["a", "b"], continuous_range: :none}}
+               {%Scale.Continuous{range: :none, transform: :identity, palette: :identity},
+                %Scale.Discrete{levels: ["a", "b"], continuous_range: :none, palette: :identity}}
     end
   end
 
@@ -230,6 +249,101 @@ defmodule Giggly.ScaleTest do
       breaks = Scale.breaks(scale, extent)
 
       assert Scale.minor_breaks(scale, breaks, extent) === []
+    end
+  end
+
+  # Golden throughout: R 4.6.1's `scales` 1.4.0 and ggplot2 4.0.3, printed to 17 significant
+  # digits: `scales::rescale()`, `seq(0.1, 1, length.out = n)` and the alpha `layer_data()` of the
+  # same values. They move only with R's arithmetic, or with ggplot2's default alpha range.
+  describe "rescale/3" do
+    test "a value moves linearly from one range to another, in R's order of operations" do
+      rescaled =
+        Enum.map([2, 4, 10, 6, 3.3], fn value -> Scale.rescale(value, {2, 10}, {0, 1}) end)
+
+      assert rescaled === [0.0, 0.25, 1.0, 0.5, 0.16249999999999998]
+    end
+
+    test "a range of zero width puts every value at the middle of the other" do
+      assert Scale.rescale(5, {5, 5}, {0, 1}) === 0.5
+      assert Scale.rescale(5, {5, 5}, {0.1, 1.0}) === 0.55
+    end
+  end
+
+  describe "map/2 through a palette" do
+    test "a continuous alpha is its place in the range rescaled onto 0.1 to 1, a missing one nil" do
+      scale =
+        :continuous
+        |> Scale.new(:alpha)
+        |> Scale.train([2, 4, nil, 10, 6])
+
+      assert Scale.map(scale, [2, 4, nil, 10, 6, 3.3, :nan]) ===
+               [0.1, 0.325, nil, 1.0, 0.55, 0.24625, nil]
+    end
+
+    test "a continuous alpha of one value is the middle of the palette" do
+      scale =
+        :continuous
+        |> Scale.new(:alpha)
+        |> Scale.train([7, 7])
+
+      assert Scale.map(scale, [7, 7]) === [0.55, 0.55]
+    end
+
+    test "a discrete alpha spreads its present levels evenly from 0.1 to 1, a missing one nil" do
+      scale =
+        :discrete
+        |> Scale.new(:alpha)
+        |> Scale.train(["b", "a", nil, "c", "a"])
+
+      assert Scale.map(scale, ["b", "a", nil, "c", "a"]) === [0.55, 0.1, nil, 1.0, 0.1]
+    end
+
+    test "the spread is R's seq(), its middle values found by steps from the first" do
+      levels = ~w(a b c d e f g)
+
+      scale =
+        :discrete
+        |> Scale.new(:alpha)
+        |> Scale.train(levels)
+
+      assert Scale.map(scale, levels) ===
+               [
+                 0.1,
+                 0.25,
+                 0.4,
+                 0.54999999999999993,
+                 0.69999999999999996,
+                 0.84999999999999998,
+                 1.0
+               ]
+    end
+
+    test "one level is the palette's start, two its ends, none at all leave only nil" do
+      one = discrete_alpha(["a", "a"])
+      two = discrete_alpha(["a", "b"])
+      none = discrete_alpha([nil])
+
+      assert {Scale.map(one, ["a"]), Scale.map(two, ["a", "b"]), Scale.map(none, [nil])} ===
+               {[0.1], [0.1, 1.0], [nil]}
+    end
+
+    test "a position scale's palette is the identity" do
+      assert {Scale.new(:continuous).palette, Scale.new(:discrete).palette} ===
+               {:identity, :identity}
+    end
+
+    test "an alpha scale records ggplot2's default range, untrained, the identity transformation" do
+      assert {Scale.new(:continuous, :alpha), Scale.new(:discrete, :alpha)} ===
+               {%Scale.Continuous{
+                  range: :none,
+                  transform: :identity,
+                  palette: {:rescale, {0.1, 1.0}}
+                },
+                %Scale.Discrete{
+                  levels: [],
+                  continuous_range: :none,
+                  palette: {:sequence, {0.1, 1.0}}
+                }}
     end
   end
 end

@@ -4,8 +4,8 @@ defmodule Giggly.Geom.Point do
   # Points, ggplot2's `geom_point()`: one solid circle per row, at its `x` and `y`. It takes no
   # parameters yet. Draw it through `Giggly.Geom`.
   #
-  # Points use `:x`, `:y` and `:group`, and need `:x` and `:y`; an aesthetic joins the accepted list
-  # with the scale that maps it, so a mapping never silently does nothing.
+  # Points use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y`; an aesthetic joins the
+  # accepted list with the scale that maps it, so a mapping never silently does nothing.
   #
   # A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
   # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
@@ -25,7 +25,7 @@ defmodule Giggly.Geom.Point do
   # The aesthetics a layer of points can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :group, :x, :y]
 
   # The aesthetics a layer of points cannot be drawn without.
   @doc false
