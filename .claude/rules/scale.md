@@ -45,16 +45,20 @@ grid lines are placed by the coordinate system".
 - **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
   `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
   the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
-  `@moduledoc false` like `Breaks`, `Labels`, `MinorBreaks`, `Palette` and `Transform`.
+  `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`, `MinorBreaks`, `Palette` and
+  `Transform`.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists nothing; the
   assembly pulls a column and hands its values here, so the namespace stays extractable, as R's
   `scales` stands beside ggplot2. Anything that needs a frame belongs to the caller.
 - **A scale knows no pixel.** It stops at positions in data space: a continuous value as its
   transformation leaves it, a discrete value at its level's position counting from 1. The unit panel is the coordinate
   system's.
-- **`kind/1` is the one rule for which column types an axis can place**, read by the assembly to
-  refuse a column when the plot is run and to choose the scale. A type with no scale yet returns
-  `:none`.
+- **`kind/1` is the one rule for which column types an axis can place, and `kind/2` for an
+  aesthetic**, read by the assembly to refuse a column when the plot is run and to choose the
+  scale. A type with no scale yet returns `:none`. A `Date` column is `:date`, as ggplot2's
+  `scale_type()` gives a `Date` `"date"`: a continuous scale through the date transformation, so
+  dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
+  date has no scale yet (`kind/2` gives `:none`).
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped); discrete levels are the distinct values, `nil` last.
 - **Discrete values are ordered by `level_key/1` alone**, and the assembly hands the same key to
@@ -62,16 +66,31 @@ grid lines are placed by the coordinate system".
   exists once, and grouping does not depend on scales to use it.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
-  `transform = "identity"`, so an untransformed axis says so. A discrete scale has none, as in
-  ggplot2, and `transform/2` returns its values as given.
+  `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`. A
+  discrete scale has none, as in ggplot2, and `transform/2` returns its values as given.
 - **A scale trains and maps in transformed space.** The assembly puts an axis's columns through
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
   there, and carries its axis's default breaks, minor breaks and labels, as R's object carries
-  `breaks`, `minor_breaks` and `format`. What else R's object carries (the inverse, the domain) joins the behaviour with its
-  first reader: the first transformation that is not the identity, whose breaks must be found in
-  data space and mapped back.
+  `breaks`, `minor_breaks` and `format`. **A label is made from the break and the extent**
+  (`format/2`), since a date's format is the step chosen for the whole axis; a number's ignores
+  the extent and is written once the breaks outside it are dropped. What else R's object carries
+  (the inverse, the domain) joins the behaviour with its first reader outside a transformation:
+  the date transformation finds its breaks in days and turns them back into dates itself.
+- **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
+  `transform_date()`): a date is a float of its days, a missing one `nil`; it trains, expands and
+  is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly
+  R's `pretty()` for dates** (`Scale.DateBreaks`, grDevices' `prettyDate()`): five days or less is
+  every day, widened by five less its length, rounded half to even; longer takes the calendar step,
+  a day to a thousand years, that cuts the extent closest to five times, from its start truncated
+  to the step's unit (a Monday for weeks), or its neighbour where that comes closer, as R does.
+  Each is labelled in its step's format, written as R's `format()` writes it, a year unpadded.
+  **What R does only for times is left out**, and reaching it fails: steps under a day, and the
+  widening, finer step and trimming no date extent needs. Its minor breaks are the identity's
+  (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
+  extended-breaks one is (below): its test pins R's own breaks for each case and for each random
+  extent where a mutant departed.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and

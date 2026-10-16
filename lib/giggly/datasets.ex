@@ -5,7 +5,7 @@ defmodule Giggly.Datasets do
 
   Each dataset is a keyword list of columns, in the dataset's own order, which `Giggly.Plot.new/2`
   reads as a table, as do Explorer's `DataFrame.new/1` and Kino's data table. Whole numbers are
-  integers and measurements floats; a name is a string. A dataset is a copy of R's, kept in
+  integers and measurements floats; a name is a string, and a date a `Date`. A dataset is a copy of R's, kept in
   Giggly's `priv/datasets` with a header saying where it came from, and read when Giggly compiles,
   so asking for one reads nothing. Each arrives with the first notebook example that draws it.
   """
@@ -21,6 +21,9 @@ defmodule Giggly.Datasets do
 
   @diamonds_path Application.app_dir(:giggly, "priv/datasets/diamonds.csv")
   @external_resource @diamonds_path
+
+  @economics_path Application.app_dir(:giggly, "priv/datasets/economics.csv")
+  @external_resource @economics_path
 
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
@@ -68,6 +71,17 @@ defmodule Giggly.Datasets do
     z: :float
   ]
 
+  # How each of economics's columns is read; the file's header gives their order. R stores every
+  # number as a double, whole ones included.
+  @economics_types [
+    date: :date,
+    pce: :float,
+    pop: :float,
+    psavert: :float,
+    uempmed: :float,
+    unemploy: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -86,13 +100,20 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @diamonds_text File.read!(@diamonds_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @economics_text File.read!(@economics_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
   # its table of types already holds, and read by its type.
   @parsed Map.new(
             [
               mtcars: {@mtcars_text, @mtcars_types},
               mpg: {@mpg_text, @mpg_types},
-              diamonds: {@diamonds_text, @diamonds_types}
+              diamonds: {@diamonds_text, @diamonds_types},
+              economics: {@economics_text, @economics_types}
             ],
             fn {dataset, {text, types}} ->
               columns =
@@ -116,6 +137,9 @@ defmodule Giggly.Datasets do
                           {number, ""} = Float.parse(value)
                           number
                         end
+
+                      :date ->
+                        &Date.from_iso8601!/1
                     end
 
                   {name, Enum.map(values, read)}
@@ -129,7 +153,7 @@ defmodule Giggly.Datasets do
   # Erlang's external term format, and decoded each time it is asked for: as columns it would be
   # some 18 MB held wherever this module is loaded, a release loading every module at boot, where
   # compressed it is half a megabyte, decoded in a few tens of milliseconds, with no IO either way.
-  @datasets Map.take(@parsed, [:mtcars, :mpg])
+  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics])
   @diamonds @parsed
             |> Map.fetch!(:diamonds)
             |> :erlang.term_to_binary(compressed: 9)
@@ -237,4 +261,33 @@ defmodule Giggly.Datasets do
   """
   @spec diamonds() :: [{atom(), [String.t() | number()]}]
   def diamonds, do: :erlang.binary_to_term(@diamonds)
+
+  @doc """
+  ggplot2's `economics`: US economic time series, one row a month from July 1967 to April 2015,
+  574 in all, from the Federal Reserve Bank of St. Louis's
+  [FRED](https://fred.stlouisfed.org/) database.
+
+  The columns: `date`, the month, as a `Date` on its first day; `pce`, personal consumption
+  expenditures, in billions of dollars; `pop`, the total population, in thousands; `psavert`, the
+  personal savings rate; `uempmed`, the median duration of unemployment, in weeks; and `unemploy`,
+  the number unemployed, in thousands. R stores every number as a double, `pop` and `unemploy`
+  whole as most of their values are, so each is a float.
+
+      iex> economics = Giggly.Datasets.economics()
+      iex> Keyword.keys(economics)
+      [:date, :pce, :pop, :psavert, :uempmed, :unemploy]
+      iex> economics |> Keyword.fetch!(:date) |> length()
+      574
+      iex> Enum.map(economics, fn {name, values} -> {name, Enum.at(values, 0)} end)
+      [
+        date: ~D[1967-07-01],
+        pce: 506.7,
+        pop: 198712.0,
+        psavert: 12.6,
+        uempmed: 4.5,
+        unemploy: 2944.0
+      ]
+  """
+  @spec economics() :: [{atom(), [Date.t() | number()]}]
+  def economics, do: Map.fetch!(@datasets, :economics)
 end

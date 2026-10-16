@@ -2,7 +2,9 @@ defmodule Giggly.Scale.Continuous do
   @moduledoc """
   A trained continuous scale, as `Giggly.panel_scales/2` returns an axis's: the range of the
   finite numbers it has seen, or `:none` before it has seen any; the name of the transformation
-  its values are put through before it sees them; and its palette, which turns a value's place in
+  its values are put through before it sees them, `:identity` for numbers and `:date` for dates,
+  which it sees as their days since 1970-01-01, as R stores a date, so a date axis's range is in
+  days; and its palette, which turns a value's place in
   that range into the value of its aesthetic: `:identity` for a position, left where it is for
   the coordinate system to place, and `{:rescale, {low, high}}` for an aesthetic such as alpha,
   each value's place, from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does.

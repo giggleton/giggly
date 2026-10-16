@@ -22,6 +22,7 @@ defmodule Giggly.Scale.Transform.Identity do
   @impl Giggly.Scale.Transform
   def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
+  # A number's label is its own, whatever the extent.
   @impl Giggly.Scale.Transform
-  def format(breaks), do: Labels.numbers(breaks)
+  def format(breaks, _extent), do: Labels.numbers(breaks)
 end

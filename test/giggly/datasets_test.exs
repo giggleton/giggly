@@ -21,4 +21,19 @@ defmodule Giggly.DatasetsTest do
              "Very Good" => 12_082
            }
   end
+
+  # Golden: R 4.6.1 with ggplot2 4.0.3, `sum(economics$unemploy)` and
+  # `sum(as.numeric(economics$date))`, whole numbers so no summation order can move them, and the
+  # first and last dates. They move only if ggplot2's economics does.
+  test "economics reads R's every row: its unemployment's and its dates' totals are R's" do
+    economics = Giggly.Datasets.economics()
+    dates = Keyword.fetch!(economics, :date)
+
+    unemployed = Keyword.fetch!(economics, :unemploy)
+
+    assert Enum.sum(unemployed) === 4_460_732.0
+
+    assert {Enum.sum_by(dates, fn date -> Date.diff(date, ~D[1970-01-01]) end), hd(dates),
+            List.last(dates)} === {4_480_873, ~D[1967-07-01], ~D[2015-04-01]}
+  end
 end

@@ -17,7 +17,7 @@ defmodule Giggly.ScaleTest do
     |> Scale.train(values)
   end
 
-  describe "kind/1" do
+  describe "kind/1 and kind/2" do
     test "a column's type decides its scale's kind, and a type with no scale yet gets none" do
       dtypes = [:integer, :float, :null, :string, :boolean, :atom, :date, :time, :term]
 
@@ -28,10 +28,18 @@ defmodule Giggly.ScaleTest do
                :discrete,
                :discrete,
                :discrete,
-               :none,
+               :date,
                :none,
                :none
              ]
+    end
+
+    test "a date has a scale on a position aesthetic and none yet on alpha" do
+      assert {Scale.kind(:date, :x), Scale.kind(:date, :ymax), Scale.kind(:date, :alpha)} ===
+               {:date, :date, :none}
+
+      assert {Scale.kind(:float, :alpha), Scale.kind(:string, :alpha)} ===
+               {:continuous, :discrete}
     end
   end
 

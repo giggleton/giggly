@@ -41,18 +41,56 @@ defmodule GigglyTest do
     end
 
     test "a column no scale can place yet is refused, naming the layer, the column and its type" do
-      rows = %{"day" => [~D[2026-10-12], ~D[2026-10-13]], "mpg" => [21.0, 22.8]}
+      rows = %{"time" => [~T[09:00:00], ~T[17:30:00]], "mpg" => [21.0, 22.8]}
 
       plot =
         rows
-        |> Plot.new(%{x: :day, y: :mpg})
+        |> Plot.new(%{x: :time, y: :mpg})
         |> Plot.geom_point()
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
       assert error.message =~ "index 0"
       assert error.message =~ ":x"
-      assert error.message =~ ~s("day")
+      assert error.message =~ ~s("time")
+      assert error.message =~ ":time"
+    end
+
+    test "a date mapped to alpha is refused, its scale not having arrived" do
+      plot =
+        %{"day" => [~D[2026-10-12], ~D[2026-10-13]], "mpg" => [21.0, 22.8]}
+        |> Plot.new(%{x: :mpg, y: :mpg, alpha: :day})
+        |> Plot.geom_point()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ ":alpha"
       assert error.message =~ ":date"
+    end
+
+    test "a date column beside a column of numbers on one axis is refused, an axis having one scale" do
+      plot =
+        %{"day" => [~D[2026-10-12], ~D[2026-10-13]], "mpg" => [21.0, 22.8]}
+        |> Plot.new(%{y: :mpg})
+        |> Plot.geom_point(%{x: :day})
+        |> Plot.geom_point(%{x: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot, 1) end
+      assert error.message =~ "date"
+      assert error.message =~ "continuous"
+    end
+
+    # R stores a date as a double, its days since 1970-01-01, and ggplot2's layer data holds them.
+    test "a date on an axis is placed at its days since 1970-01-01, a missing one missing" do
+      plot =
+        %{
+          "day" => [~D[1969-12-31], ~D[1970-01-01], nil, ~D[2015-04-01]],
+          "y" => [1.0, 2.0, 3.0, 4.0]
+        }
+        |> Plot.new(%{x: :day, y: :y})
+        |> Plot.geom_point()
+
+      frame = Giggly.layer_data(plot)
+
+      assert DataFrame.pull(frame, :x) === [-1.0, 0.0, nil, 16_526.0]
     end
 
     test "a layer whose axis column disagrees in kind with an earlier layer's is refused" do
@@ -962,6 +1000,26 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/line_alpha.svg")
+    end
+
+    # Golden: test/golden/date_line.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/date_line.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_path's first example: economics's
+    # unemployment from 1967 to 2015, the x axis a date scale with breaks every ten years, labelled
+    # by year, and minor grid lines midway. It moves with what moves test/golden/line_missing.svg,
+    # and with a date scale's breaks, labels or minor breaks.
+    test "a line over dates has an axis of R's pretty dates, labelled by the step they take" do
+      plot =
+        Giggly.Datasets.economics()
+        |> Plot.new(%{x: :date, y: :unemploy})
+        |> Plot.geom_line()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/date_line.svg")
     end
 
     # Golden: test/golden/line_radial.svg, checked against ggplot2's drawing of the same plot, made

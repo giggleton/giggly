@@ -1341,8 +1341,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Curve lines in radial coordinates (lines, step 2); §4: "Lines and date axes are
-  Phase 3's third increment"
+- 2026-10-16 — Put dates on an axis (lines, step 3); §4: "Lines and date axes are Phase 3's third
+  increment"
+- 2026-10-16 — Curve lines in radial coordinates (lines, step 2) (`10dce7f`); §4: "Lines and date
+  axes are Phase 3's third increment"
 - 2026-10-16 — Draw paths and lines (lines, step 1) (`6db4135`); §4: "Lines and date axes are Phase
   3's third increment", "The document's root declares svglite's stylesheet for lines"
 - 2026-10-16 — Draw mapped alpha in the notebooks (alpha, step 4) (`af5d981`); §4: "Alpha is Phase

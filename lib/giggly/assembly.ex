@@ -178,10 +178,11 @@ defmodule Giggly.Assembly do
 
     x_routes = routes(layout, :x)
     y_routes = routes(layout, :y)
-    axis_kinds = %{x: axis_kind(plot, :x), y: axis_kind(plot, :y)}
+    scale_kinds = %{x: axis_kind(plot, :x), y: axis_kind(plot, :y)}
+    axis_kinds = Map.new(scale_kinds, fn {axis, kind} -> {axis, discreteness(kind)} end)
     non_position_kinds = non_position_kinds(plot)
-    untrained_x_scales = add_scales(axis_kinds.x, x_routes)
-    untrained_y_scales = add_scales(axis_kinds.y, y_routes)
+    untrained_x_scales = add_scales(scale_kinds.x, x_routes)
+    untrained_y_scales = add_scales(scale_kinds.y, y_routes)
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
@@ -473,6 +474,11 @@ defmodule Giggly.Assembly do
 
   # An axis has one scale, so every column on it must be a type some scale can place, and all of
   # one kind; the first column decides, and an axis no layer maps is continuous, as ggplot2's is.
+  # Whether an axis of a scale of `kind` is discrete or continuous, all a geom is told: a date
+  # scale is continuous, as ggplot2's geoms see a date axis as not discrete.
+  defp discreteness(:discrete), do: :discrete
+  defp discreteness(_continuous), do: :continuous
+
   defp axis_kind(plot, family) do
     case mapped_columns(plot, fn aesthetic -> Aesthetics.family(aesthetic) == family end) do
       [] -> :continuous
@@ -504,7 +510,7 @@ defmodule Giggly.Assembly do
         {aesthetic, column} <- Enum.sort(mapping),
         selected?.(aesthetic),
         dtype = Map.fetch!(dtypes, column),
-        do: {index, aesthetic, column, dtype, Scale.kind(dtype)}
+        do: {index, aesthetic, column, dtype, Scale.kind(dtype, aesthetic)}
   end
 
   defp checked_kind(

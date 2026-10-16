@@ -18,10 +18,11 @@ pages".
   regenerate it; a value that differs from R's is a bug in the copy.
 - **A dataset is a keyword list of columns, in the dataset's order**, which `Plot.new/2`, Explorer
   and Kino all read as a table. A column takes R's type: integers where R stores integers, floats
-  where it stores doubles, names strings, as `mpg` and `diamonds` do (`diamonds`' `table` is
-  whole but a double); `mtcars` still reads R's whole doubles as integers (design-log §7, "The
-  datasets should carry R's column types"). R's row names become a first column, and a factor
-  its labels, in no order until level order exists.
+  where it stores doubles, names strings and dates `Date`s, as `mpg`, `diamonds` and `economics`
+  do (`diamonds`' `table` and `economics`' `unemploy` are whole but doubles); `mtcars` still reads
+  R's whole doubles as integers (design-log §7, "The datasets should carry R's column types").
+  R's row names become a first column, and a factor its labels, in no order until level order
+  exists.
 - **The file is read once, at compile time** (`@external_resource` and `File.read!/1`), so asking
   for a dataset does no IO. The file's header gives the column order; the module holds only how
   each column is read.

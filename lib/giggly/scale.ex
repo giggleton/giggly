@@ -16,15 +16,19 @@ defmodule Giggly.Scale do
   #   * `:integer` and `:float` get a continuous scale (`Giggly.Scale.Continuous`), and so does an
   #     all-`nil` (`:null`) column, matching ggplot2's continuous fallback;
   #   * `:string`, `:boolean` and `:atom` get a discrete scale (`Giggly.Scale.Discrete`);
-  #   * dates, times and `:term` get none yet.
+  #   * `:date` gets a date scale, a continuous scale of the days since 1970-01-01 through the
+  #     date transformation, as ggplot2's `scale_type()` gives a `Date` `"date"`; on an aesthetic
+  #     other than position it gets none yet;
+  #   * times, datetimes and `:term` get none yet.
   #
   # ## Transformation
   #
   # A continuous scale records, by name, the transformation its values are put through before it
-  # trains on them (`Giggly.Scale.Transform`), so it trains, and maps, in transformed space. Every
-  # continuous scale records the identity until a plot can choose another, as ggplot2's continuous
-  # scales default to `transform = "identity"`: an untransformed axis says so rather than leaving it
-  # out. A discrete scale has no transformation, as in ggplot2.
+  # trains on them (`Giggly.Scale.Transform`), so it trains, and maps, in transformed space. A
+  # continuous scale of numbers records the identity until a plot can choose another, as ggplot2's
+  # continuous scales default to `transform = "identity"`: an untransformed axis says so rather
+  # than leaving it out. A date scale records the date transformation. A discrete scale has no
+  # transformation, as in ggplot2.
   #
   # ## Training and mapping
   #
@@ -56,7 +60,10 @@ defmodule Giggly.Scale do
   @type break :: {number(), String.t()}
 
   @typedoc "Which kind of scale a column needs, or `:none` when no scale can place it yet."
-  @type kind :: :continuous | :discrete | :none
+  @type kind :: :continuous | :discrete | :date | :none
+
+  # The aesthetics other than position that a scale maps.
+  @non_position_aesthetics [:alpha]
 
   @continuous_dtypes [:integer, :float, :null]
   @discrete_dtypes [:string, :boolean, :atom]
@@ -74,19 +81,27 @@ defmodule Giggly.Scale do
   @spec kind(atom()) :: kind()
   def kind(dtype) when dtype in @continuous_dtypes, do: :continuous
   def kind(dtype) when dtype in @discrete_dtypes, do: :discrete
+  def kind(:date), do: :date
   def kind(dtype) when is_atom(dtype), do: :none
 
-  # The aesthetics other than position that a scale maps.
-  @non_position_aesthetics [:alpha]
+  # The kind of scale a column of type `dtype` needs on `aesthetic`: on a position aesthetic, its
+  # `kind/1`; on another, the same but for a date, whose scale on any aesthetic but position
+  # (ggplot2's `scale_alpha_date()`) has not arrived.
+  @doc false
+  @spec kind(atom(), atom()) :: kind()
+  def kind(:date, aesthetic) when aesthetic in @non_position_aesthetics, do: :none
+  def kind(dtype, _aesthetic), do: kind(dtype)
 
   # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
   @alpha_range {0.1, 1.0}
 
   # An untrained position scale of the given kind, its palette the identity; a continuous one
-  # records the identity transformation.
+  # records the identity transformation, and a date scale, a continuous one, the date
+  # transformation.
   @doc false
-  @spec new(:continuous | :discrete) :: t()
+  @spec new(:continuous | :discrete | :date) :: t()
   def new(:continuous), do: %Continuous{range: :none, transform: :identity, palette: :identity}
+  def new(:date), do: %Continuous{range: :none, transform: :date, palette: :identity}
   def new(:discrete), do: %Discrete{levels: [], continuous_range: :none, palette: :identity}
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
@@ -192,7 +207,7 @@ defmodule Giggly.Scale do
         |> Enum.filter(fn position -> position >= low and position <= high end)
       end
 
-    Enum.zip(positions, Transform.format(transform, positions))
+    Enum.zip(positions, Transform.format(transform, positions, extent))
   end
 
   def breaks(%Discrete{levels: levels}, _extent) do
