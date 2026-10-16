@@ -6,7 +6,9 @@ Mix.install([
   {:kino, "~> 0.19"}
   ])
 
-alias Giggly.{Datasets, Plot}
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
 ```
 
 ## About this notebook
@@ -22,9 +24,9 @@ combination of values of several, that occurs in the data, and wraps them into r
 one-dimensional sequence of panels laid out in two dimensions. Each panel draws the rows with its
 values, and a strip above it says which those are. A plot is described with `Giggly.Plot` and
 drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
-cell; the setup cell aliases `Giggly.Datasets` and `Giggly.Plot`, so the cells write `Plot.new/2`.
-The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for
-234 cars of 38 popular models from 1999 to 2008.
+cell; the setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`. The data in these
+examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular
+models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## Facets by one column
 
@@ -39,7 +41,7 @@ p + facet_wrap(vars(class))
 
 ```elixir
 plot =
-  Datasets.mpg()
+  mpg
   |> Plot.new(%{x: :displ, y: :hwy})
   |> Plot.geom_point()
 

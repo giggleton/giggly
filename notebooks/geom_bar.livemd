@@ -6,7 +6,9 @@ Mix.install([
   {:kino, "~> 0.19"}
   ])
 
-alias Giggly.{Datasets, Plot}
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
 ```
 
 ## About this notebook
@@ -21,9 +23,10 @@ There are two kinds of bar chart. `Giggly.Plot.geom_bar/3` counts: each bar's he
 of rows at its `x`, or the sum of their weights. `Giggly.Plot.geom_col/3` draws heights that are
 already in the data: one bar per row, from 0 to its `y`. A plot is described with `Giggly.Plot`
 and drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
-cell; the setup cell aliases `Giggly.Datasets` and `Giggly.Plot`, so the cells write `Plot.new/2`.
-Most examples use `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38
-popular models from 1999 to 2008. The rest make small tables of their own, as ggplot2's do.
+cell; the setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`. Most examples use
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from
+1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it. The rest make small
+tables of their own, as ggplot2's do.
 
 ## Counting the cars in each class
 
@@ -38,7 +41,7 @@ g + geom_bar()
 The counting goes into `y`, and the y axis is titled `count`.
 
 ```elixir
-plot = Plot.new(Datasets.mpg(), %{x: :class})
+plot = Plot.new(mpg, %{x: :class})
 
 plot
 |> Plot.geom_bar()
@@ -76,7 +79,7 @@ Counting goes along whichever of `x` and `y` is mapped, so mapping `y` draws the
 and titles the x axis `count`.
 
 ```elixir
-Datasets.mpg()
+mpg
 |> Plot.new()
 |> Plot.geom_bar(%{y: :class})
 |> Giggly.to_svg()

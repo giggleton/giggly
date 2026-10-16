@@ -6,7 +6,9 @@ Mix.install([
   {:kino, "~> 0.19"}
   ])
 
-alias Giggly.{Datasets, Plot}
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
 ```
 
 ## About this notebook
@@ -19,9 +21,9 @@ what remains.
 
 Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is
 described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document that
-`Kino.Image` shows below the cell; the setup cell aliases `Giggly.Datasets` and `Giggly.Plot`, so
-the cells write `Plot.new/2`. The data in these examples is `Giggly.Datasets.mtcars/0`, R's
-`mtcars`: 32 cars from the 1974 *Motor Trend* US magazine.
+`Kino.Image` shows below the cell; the setup cell aliases `Giggly.Plot`, so the cells write
+`Plot.new/2`. The data in these examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars
+from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## A scatter plot
 
@@ -32,7 +34,7 @@ p + geom_point()
 
 ```elixir
 plot =
-  Datasets.mtcars()
+  mtcars
   |> Plot.new(%{x: :wt, y: :mpg})
   |> Plot.geom_point()
 
@@ -127,7 +129,6 @@ it removed them. Giggly drops them without a warning, since drawing a plot has n
 
 ```elixir
 blanked = ["Merc 280", "Merc 450SE", "Camaro Z28", "Porsche 914-2"]
-mtcars = Datasets.mtcars()
 
 mpg =
   Enum.zip_with(Keyword.fetch!(mtcars, :model), Keyword.fetch!(mtcars, :mpg), fn model, value ->
