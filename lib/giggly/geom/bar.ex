@@ -20,11 +20,13 @@ defmodule Giggly.Geom.Bar do
   # one missing its y no height, so neither is drawn; an infinite y is not taken yet. The position
   # then stacks or moves those rectangles, and the scales are trained again to cover them.
   #
-  # Every bar looks as ggplot2's default bar does, until aesthetics such as fill can be mapped or
-  # set: filled with ink mixed 35% toward paper, `#595959`, with no border, its border's width the
-  # theme's 0.5 mm all the same, as ggplot2's snapshots write it. A row's `alpha`, where its table
-  # has one, makes the bar's fill that opaque and leaves its border opaque, as ggplot2's
-  # `GeomRect` applies `fill_alpha()` to the fill alone; a row without one is opaque.
+  # Every bar looks as ggplot2's default bar does, until its aesthetics can be mapped: filled with
+  # ink mixed 35% toward paper, `#595959`, with no border, its border's width the theme's 0.5 mm all
+  # the same, as ggplot2's snapshots write it, or filled and bordered in the colours the layer sets,
+  # `:none`, R's `NA`, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
+  # makes the bar's fill that opaque, replacing the fill's own alpha, and leaves its border in its
+  # colour's own, as ggplot2's `GeomRect` applies `fill_alpha()` to the fill alone; a row without one
+  # keeps its fill's (`Giggly.Geom.Mark`).
 
   defstruct []
 
@@ -44,6 +46,7 @@ defmodule Giggly.Geom.Bar do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Aesthetics, Coord, DataFrame, Resolution}
+    alias Giggly.Geom.Mark
     alias Giggly.Scene.Rectangles
 
     # ggplot2's default bar: its share of the spacing of the x positions, centred on its x
@@ -116,11 +119,13 @@ defmodule Giggly.Geom.Bar do
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
+      fill = Mark.set(placed, :fill, @fill)
+      border = Mark.set(placed, :color, :none)
 
       drawn =
         [:xmin, :xmax, :ymin, :ymax]
         |> Enum.map(fn name -> DataFrame.pull(placed, name) end)
-        |> Enum.concat([opacities(placed)])
+        |> Enum.concat([Mark.opacities(placed, fill)])
         |> Enum.zip_with(fn row -> row end)
         |> Enum.filter(fn [xmin, xmax, ymin, ymax, _opacity] ->
           Enum.all?([xmin, xmax, ymin, ymax], &is_number/1)
@@ -132,45 +137,36 @@ defmodule Giggly.Geom.Bar do
           xmax: Enum.map(drawn, fn [_xmin, xmax, _ymin, _ymax, _opacity] -> xmax end),
           ymin: Enum.map(drawn, fn [_xmin, _xmax, ymin, _ymax, _opacity] -> ymin end),
           ymax: Enum.map(drawn, fn [_xmin, _xmax, _ymin, ymax, _opacity] -> ymax end),
-          fill: @fill,
+          fill: Mark.hex(fill),
           fill_opacity: Enum.map(drawn, fn [_xmin, _xmax, _ymin, _ymax, opacity] -> opacity end),
-          color: :none,
+          color: Mark.hex(border),
+          color_opacity: Mark.own_opacity(border),
           stroke_width: @stroke_width
         }
       ]
     end
 
     # A legend's key: the bar's fill short of the key's edges by its border's width, as ggplot2's
-    # `draw_key_polygon()` draws it, at the key's alpha.
+    # `draw_key_polygon()` draws it, in the key's fill at its alpha and its border's colour.
     @impl Giggly.Geom
     def draw_key(_geom, key, {width, height}) do
+      fill = Map.get(key, :fill, @fill)
+      border = Map.get(key, :color, :none)
+
       [
         %Rectangles{
           xmin: [@key_inset / width],
           xmax: [1 - @key_inset / width],
           ymin: [@key_inset / height],
           ymax: [1 - @key_inset / height],
-          fill: @fill,
-          fill_opacity: [opacity(Map.get(key, :alpha))],
-          color: :none,
+          fill: Mark.hex(fill),
+          fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
+          color: Mark.hex(border),
+          color_opacity: Mark.own_opacity(border),
           stroke_width: @stroke_width
         }
       ]
     end
-
-    # Each row's fill opacity: its alpha, or opaque where its table has none.
-    defp opacities(frame) do
-      if :alpha in DataFrame.names(frame) do
-        frame
-        |> DataFrame.pull(:alpha)
-        |> Enum.map(&opacity/1)
-      else
-        List.duplicate(1.0, DataFrame.row_count(frame))
-      end
-    end
-
-    defp opacity(alpha) when is_number(alpha), do: alpha / 1
-    defp opacity(missing) when missing in [nil, :nan], do: 1.0
 
     # Each row's width, ggplot2's `compute_data_size()`: the `width` its stat gave it, as counting
     # does, or else the closest spacing of the x positions in each panel, the smallest of them,

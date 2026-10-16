@@ -148,6 +148,56 @@ defmodule Giggly.PlotTest do
 
       assert error.message =~ ":alpha"
     end
+
+    test "a colour is recorded for every mark in its one spelling, written colour: or color:" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {options, color} <- [
+            {[colour: "SteelBlue"], "#4682B4"},
+            {[color: "#4682b480"], "#4682B480"}
+          ] do
+        assert [%Plot.Layer{fixed: %{color: ^color}}] =
+                 Plot.geom_point(plot, options).reversed_layers
+      end
+    end
+
+    test "a colour the layer sets leaves the plot's mapping of colour out of what the layer draws" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: :cyl})
+      plot = Plot.geom_point(plot, colour: "red")
+      [layer] = plot.reversed_layers
+
+      assert Plot.computed_mapping(plot, layer) === %{x: "wt", y: "mpg"}
+    end
+
+    test "a colour CSS does not define is refused by the option's validation, naming the value" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_point(plot, colour: "grey50")
+        end
+
+      assert error.key == :color
+      assert error.message =~ ~s("grey50")
+    end
+
+    test "a colour given as both colour: and color: is refused rather than one silently winning" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_point(plot, colour: "red", color: "blue") end
+
+      assert error.message =~ ":color"
+    end
+
+    test "points take no fill, which only the filled shapes not yet drawn use" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_point(plot, fill: "red") end
+
+      assert error.message =~ "fill"
+    end
   end
 
   describe "geom_col/3" do
@@ -252,6 +302,28 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{position: %Position.Stack{}, fixed: %{alpha: 0.5}}] =
                plot.reversed_layers
+    end
+
+    test "a fill and a border colour are recorded for every bar, counted or not" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      for {add, options, fixed} <- [
+            {&Plot.geom_bar/2, [fill: "white", colour: "red"],
+             %{fill: "#FFFFFF", color: "#FF0000"}},
+            {fn plot, options -> Plot.geom_col(plot, %{y: :mpg}, options) end, [fill: "#7f7f7f"],
+             %{fill: "#7F7F7F"}}
+          ] do
+        assert [%Plot.Layer{fixed: ^fixed}] = add.(plot, options).reversed_layers
+      end
+    end
+
+    test "a fill CSS does not define is refused by the option's validation" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_bar(plot, fill: "grey50") end
+
+      assert error.key == :fill
     end
 
     test "a position bars do not take is refused by the option's validation" do
@@ -380,6 +452,17 @@ defmodule Giggly.PlotTest do
         |> Plot.geom_path(linewidth: 2, alpha: 1)
 
       assert [%Plot.Layer{fixed: %{linewidth: 2.0, alpha: 1.0}}] = plot.reversed_layers
+    end
+
+    test "a colour is set for every line of a path or a line, and they take no fill" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for add <- [&Plot.geom_path/2, &Plot.geom_line/2] do
+        assert [%Plot.Layer{fixed: %{color: "#FF0000"}}] =
+                 add.(plot, colour: "red").reversed_layers
+
+        assert_raise NimbleOptions.ValidationError, fn -> add.(plot, fill: "red") end
+      end
     end
 
     test "a line width below 0, a mitre limit below 1 or an end or corner not taken is refused" do

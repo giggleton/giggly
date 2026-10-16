@@ -20,27 +20,29 @@ size has a weight".
 - **The output is the product, so its strings are behaviour.** An attribute, an element or a
   number's format that changes changes the golden; a surviving mutant in a literal here is a
   finding, never message wording.
-- **The document's unit is the point, written as svglite writes it:** `width` and `height` in `pt`,
-  a `viewBox` of the size in points, numbers with two decimals, circles with `cx`/`cy`/`r` and a
-  `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`, rectangles with
-  `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border)
-  and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
-  bars, with `stroke-linecap: butt; stroke-linejoin: miter` before the `fill`, as `GeomRect` sets
-  them, and a `fill-opacity` after it, polygons with `points` and the same `style` as rectangles,
-  polylines with `points` and a `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line
-  style below, and `fill: none`, segments as `<line>` with `x1`, `y1`, `x2` and `y2` and the same
-  `style` but `fill`, and text with `x` and `y` (or, turned 90 degrees, `transform='translate(x,y)
-  rotate(-90)'`), `text-anchor` (left out for text anchored at its start, as svglite leaves it out),
-  a `style` of `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as
-  svglite leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
+- **The document's unit is the point, written as svglite writes it:** `width` and `height` in
+  `pt`, a `viewBox` of the size in points, numbers with two decimals, circles with `cx`/`cy`/`r`
+  and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`,
+  rectangles with `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none`
+  for no border) and `fill`, placed rectangles likewise, hung from their top left corner as grid
+  hangs ggplot2's bars, a `stroke-opacity` after the `stroke` and `stroke-linecap: butt;
+  stroke-linejoin: miter` before the `fill`, as `GeomRect` sets them, and a `fill-opacity` after
+  it, polygons with `points` and the same `style` as rectangles, polylines with `points` and a
+  `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line style below, and `fill:
+  none`, segments as `<line>` with `x1`, `y1`, `x2` and `y2` and the same `style` but `fill`, and
+  text with `x` and `y` (or, turned 90 degrees, `transform='translate(x,y) rotate(-90)'`),
+  `text-anchor` (left out for text anchored at its start, as svglite leaves it out), a `style` of
+  `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as svglite
+  leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
   Output can then be set beside the SVG in ggplot2's own visual-test snapshots.
 - **An opacity is written as svglite writes the alpha of an R colour**: R holds it as a byte, the
   opacity times 255 rounded half to even, and svglite writes the byte over 255 as it writes any
   number below 1 (`write_double()`), with as many decimals as reach its first significant digit
   and one more (`0.024`, `0.0078`, from 0.1 up two), or nothing for 255, opaque. So 0.998 is
-  written `1.00`, and 0.999 not at all. Every other number keeps two decimals. **A wholly
-  transparent colour, byte 0, is a stroke of `none` and no fill at all**, as svglite skips a fill
-  that is not filled; the element is still written.
+  written `1.00`, and 0.999 not at all. Every other number keeps two decimals. **No colour,
+  `:none`, or a wholly transparent one, byte 0, is a stroke of `none` and a fill of `none`**; the
+  element is still written. svglite skips such a fill and its stylesheet makes it `none`; without
+  that stylesheet SVG fills a shape black, so Giggly writes `fill: none`.
 - **The table is laid out as grid lays out a layout.** Shares split what the sizes in points
   leave by weight; a scene keeping its proportions gives each share its weight over the weights
   of the way that runs out first, times what that way leaves, as grid allocates a respected
@@ -78,8 +80,8 @@ size has a weight".
   vdiffr (`test/golden/*.R`), never run by the suite; its header gives the Docker command
   and the element-by-element comparison, which leaves out only what svglite writes and Giggly does
   not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, and a
-  black stroke and a polyline's `fill: none`, which svglite leaves to its stylesheet; a golden with
-  lines compares `<line>` elements too.
+  black stroke and a `fill: none`, which svglite leaves to its stylesheet; a golden with lines
+  compares `<line>` elements too.
   Any other difference is a finding or a stated departure, named in the script's header: the
   plain plot's axes drawn in the other order, a background edge written as R's rounding error.
 - **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, its

@@ -17,8 +17,9 @@ defmodule Giggly.SVG do
   # the `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
   # 1.95 points at the size the plot is shown. Numbers are written with two decimals, an opacity as
   # svglite writes a number below 1, and each primitive as svglite writes it, so output can be set
-  # beside the SVG ggplot2's own tests snapshot; a polyline also says it is not filled, which
-  # svglite leaves to its stylesheet and SVG would otherwise fill black. svglite's stylesheet also
+  # beside the SVG ggplot2's own tests snapshot; a polyline also says it is not filled, and so does a
+  # shape of no fill or a wholly transparent one, which svglite leaves to its stylesheet and SVG
+  # would otherwise fill black. svglite's stylesheet also
   # gives every line round ends, round corners and a mitre limit of 10, and writes a line's own
   # only where it differs; a stylesheet inlined in a page styles the whole page, so the root
   # declares those three as attributes, which every element inherits and any CSS outranks, and a
@@ -245,7 +246,8 @@ defmodule Giggly.SVG do
   end
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
-  # it, its width and height the cell's share of its extent, and its fill carrying its opacity.
+  # it, its width and height the cell's share of its extent, its border carrying the border's
+  # opacity and its fill its own.
   defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
     columns = [
       rectangles.xmin,
@@ -269,9 +271,9 @@ defmodule Giggly.SVG do
         number((ymax - ymin) * height),
         "' style='stroke-width: ",
         number(rectangles.stroke_width),
-        "; stroke: ",
-        stroke(rectangles.color),
-        "; stroke-linecap: butt; stroke-linejoin: miter;",
+        ";",
+        stroke_style(rectangles.color, rectangles.color_opacity),
+        " stroke-linecap: butt; stroke-linejoin: miter;",
         fill_style(rectangles.fill, fill_opacity),
         "' />\n"
       ]
@@ -455,8 +457,11 @@ defmodule Giggly.SVG do
 
   # A stroke or a fill in a colour at an opacity, as svglite writes an R colour, which holds its
   # alpha as a byte, the opacity times 255 rounded half to even: the colour, then the byte over 255
-  # as its opacity, left out for an opaque colour, 255. A stroke wholly transparent, 0, is written
-  # `none`, and such a fill not at all, as svglite skips a fill that is not filled.
+  # as its opacity, left out for an opaque colour, 255. A stroke or fill of no colour, `:none`, or
+  # wholly transparent, 0, is written `none`: svglite writes such a stroke `none` and skips such a
+  # fill, which its stylesheet then makes `none`, and SVG without that stylesheet would fill black.
+  defp stroke_style(:none, _opacity), do: " stroke: none;"
+
   defp stroke_style(color, opacity) do
     case alpha_byte(opacity) do
       0 -> " stroke: none;"
@@ -464,9 +469,11 @@ defmodule Giggly.SVG do
     end
   end
 
+  defp fill_style(:none, _opacity), do: " fill: none;"
+
   defp fill_style(fill, opacity) do
     case alpha_byte(opacity) do
-      0 -> ""
+      0 -> " fill: none;"
       byte -> [" fill: ", fill, ";", opacity_style("fill", byte)]
     end
   end

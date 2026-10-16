@@ -47,8 +47,7 @@ grep -rn 'OldName' lib --include='*.ex'
 leaves no dead identifier behind. The moved functions are easy to find, but a sentence saying the
 old module owns the moved responsibility still names a live module, and the sweep above passes
 over it. Grep the source module's name and read each hit for a claim of ownership it no longer
-holds. Fix every hit or justify it (historical sections explicitly marked superseded may keep
-old names — with the marker present).
+holds. Fix every hit or justify it.
 
 **Two commands, and it must stay two — do not "tidy" them back into one.** `--include`
 filters *every* path given to that `grep`, not just the one it trails. Folded together, the
@@ -120,7 +119,7 @@ having done the routing above is falsifying the record, not passing the gate.
   a test-only change, or a refactor invisible outside its module needs nothing.
 - Don't pad design-log.md with entries for trivia; do log anything you'd want the next agent
   to know *why* about.
-- Historical text stays historical: prefer a "(since superseded — see …)" marker over
-  rewriting an old entry to pretend the past was different.
+- A decision a later one replaces is deleted from the record, never marked superseded (Steve):
+  two opposite claims in the log mislead the next reader, and git history keeps the old text.
 - When reporting the work done, name the doc updates made (or explicitly deferred) — the
   user should never discover doc drift later.

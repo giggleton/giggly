@@ -26,8 +26,11 @@ defmodule Giggly.Plot.Layer do
   @typedoc "How the layer's marks are moved once its stat has run: a position's struct (`Giggly.Position`)."
   @type position :: struct()
 
-  @typedoc "The aesthetics a layer sets to one value for every mark, by canonical name."
-  @type fixed :: %{optional(Plot.aesthetic()) => float()}
+  @typedoc """
+  The aesthetics a layer sets to one value for every mark, by canonical name: a number, such as an
+  alpha or a line's width, or a colour, uppercase hex or `:none`.
+  """
+  @type fixed :: %{optional(Plot.aesthetic()) => float() | String.t() | :none}
 
   @type t :: %__MODULE__{
           geom: geom(),

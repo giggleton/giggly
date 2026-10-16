@@ -12,12 +12,7 @@ defmodule Giggly.BoundaryDeclarationsTest do
 
   # The accepted exceptions, each with the reason it was accepted. A new entry is the decision;
   # this test failing is the prompt to make it deliberately.
-  @sanctioned %{
-    {"lib/giggly/data_frame.ex", "top_level?:"} =>
-      "Giggly.DataFrame owns the `table` library. Nested under Giggly it could list `Table` only " <>
-        "if Giggly did too, which would let every module directly in Giggly call it; at the top " <>
-        "level only from_table/1 may."
-  }
+  @sanctioned %{}
 
   @umbrella "lib/giggly.ex"
 

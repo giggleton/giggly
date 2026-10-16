@@ -961,6 +961,46 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/alpha_bars.svg")
     end
 
+    # Golden: test/golden/col_fill_colour.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/col_fill_colour.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. position_dodge's columns dodged by group,
+    # filled in R's grey50, written as its hex since CSS has no name for it, and bordered in black.
+    # It moves with what moves test/golden/dodge.svg, and with how a bar's fill and border are
+    # written.
+    test "columns are filled and bordered in the colours the layer sets" do
+      plot =
+        %{"x" => ["a", "a", "b", "b"], "y" => [2, 3, 4, 5], "g" => [1, 2, 1, 2]}
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col(position: :dodge, fill: "#7F7F7F", colour: "black")
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/col_fill_colour.svg")
+    end
+
+    # Golden: test/golden/point_colour_legend.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/point_colour_legend.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. mpg's points, every one
+    # steelblue and as opaque as its cylinders, the alpha replacing the colour's own, and the
+    # legend's keys in the layer's colour at each break's alpha. It moves with what moves
+    # test/golden/alpha_legend.svg, and with how a point's colour is written.
+    test "points are drawn in the colour the layer sets, and so are their legend's keys" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, alpha: :cyl})
+        |> Plot.geom_point(colour: "steelblue")
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_colour_legend.svg")
+    end
+
     # Golden: test/golden/line_missing.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/line_missing.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. The "Missing values break a line" example on

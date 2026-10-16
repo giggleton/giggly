@@ -17,8 +17,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics`,
-  `Giggly.DataFrame` and the five families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`,
-  `Giggly.Geom`, `Giggly.Position`, `Giggly.Stat`), and exports nothing beyond `Plot`.
+  `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets, and the five
+  families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
+  `Giggly.Position`, `Giggly.Stat`), and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
@@ -67,20 +68,23 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
   an atom (`position: :stack | :dodge`) and recorded as its kind's struct; its parameters never
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
-- **An option that sets an aesthetic for every mark (`alpha:`, `linewidth:`) is recorded in the
-  layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom function takes
-  `alpha:`, and the line functions `linewidth:`, in millimetres. The assembly puts it into every row
-  last. A map maps and a keyword list sets: the two never trade places. **An option that chooses
-  how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`) **is a
-  field of the geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`,
-  `:x`).
+- **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
+  is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
+  function takes `alpha:` and `colour:`, the bar functions `fill:`, and the line functions
+  `linewidth:`, in millimetres. The assembly puts it into every row last. **A colour is resolved
+  at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its uppercase hex or `:none`,
+  never the name written, and a colour CSS does not define raises naming the value. A point takes
+  no `fill:`, which only the filled shapes not yet drawn use. A map maps and a keyword list sets:
+  the two never trade places. **An option that chooses how a geom draws** (`lineend:`,
+  `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`) **is a field of the geom's struct**,
+  its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`; every geom function's `alpha:`;
-  the line functions' `lineend:`, `linejoin:`, `linemitre:` and `linewidth:`; `geom_line/3`'s
-  `orientation:`), so a misspelt option raises naming it, and a repeated one is refused by
-  `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
-  :fixed`). An option not given is recorded as `:none` in the kind's struct; a caller never writes
-  "absent", so §7's question waits.
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
+  function's `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
+  `linewidth:`; `geom_line/3`'s `orientation:`), so a misspelt option raises naming it, and a
+  repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
+  recorded as a value (`scales: :fixed`). An option not given is recorded as `:none` in the kind's
+  struct; a caller never writes "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
@@ -101,4 +105,5 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
   more and `linemitre:` 1 or more, as grid refuses less, through custom checks
   (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`), which take an integer too
-  and keep a float, as R keeps a number.
+  and keep a float, as R keeps a number; `validate_color/1` hands a colour to
+  `Giggly.ColorOperations`.

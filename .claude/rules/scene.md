@@ -46,7 +46,10 @@ weight".
   1: a circle's `opacity` its outline and fill alike, a rectangle's `fill_opacity` its fill alone,
   a polyline's or segment's `opacity` its stroke, as grid's colours carry the alpha ggplot2 gives
   them. One per mark, as grid's graphical parameters are, so a mapped aesthetic needs no primitive
-  per value; colour and size will take the same route.
+  per value; colour and size will take the same route. **A colour is `#RRGGBB` beside its
+  opacity**, never with an alpha of its own: a placed rectangle's border carries one
+  `color_opacity`, its colour's own alpha, since ggplot2 never gives a border the row's; its `fill`
+  and `color` may be `:none`, R's `NA`, which draws none.
 - **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
   `polylineGrob()`, a line through points, one per tick, grid line or group) and `Segments`
   (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it and a

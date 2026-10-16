@@ -51,8 +51,8 @@ already read from a `Table.Reader` into a frame; it reads no config, no clock an
 (jitter will take a seed). The impure edges are adapters at the rim: reading the input table, and
 whatever a host does with the emitted iodata. `boundary` holds the shape (`mix boundary.spec`
 prints the graph): every boundary is strict, each domain is a sub-boundary carved when its first
-module lands with its `deps:` as its contract, a domain that owns an outside library is a
-top-level boundary, and the `CorePurity` check reads all of `lib/`.
+module lands with its `deps:` as its contract, a domain that owns an outside library lists it as
+the root does, and the `CorePurity` check reads all of `lib/`.
 
 Two cross-cutting rules come straight from the ggplot2 study and ggity post-mortem (§1 points at
 the research): **a geom never sees a panel, a pixel or a facet variable** — facets are a column
@@ -78,6 +78,75 @@ first. A decision belongs here when someone could plausibly propose undoing it; 
 stops the question being reopened from scratch. A new entry is about 150 words: the decision, a
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
+
+- **A library's owner nests under the umbrella, and the root lists the library (2026-10-16,
+  Steve).** boundary lets a sub-boundary list an outside library only when its parent does, so
+  `Giggly.DataFrame` lists `Table` and `Giggly.ColorOperations` lists `Color`, and the root lists
+  both libraries in place of their owners. The only module the root's list opens a library to is
+  `Giggly`, the run functions; every domain is strict and calls only what it lists, so a domain
+  reaching a library needs a widening the waiver gate brings to the user. Nesting drops two
+  `top_level?:` exemptions and keeps the namespace and the boundary tree one shape, as boundary's
+  docs prefer. *Rejected: top-level owners*, which close one silent path, `Giggly` calling a
+  library, at the cost of an exemption per library.
+
+- **Colour and fill is Phase 3's fourth increment, in four steps: fixed colours, mapped discrete
+  colour and fill, mapped continuous colour and fill with the colour bar, the notebooks
+  (2026-10-16, Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Colour is the
+  most-waited-for aesthetic: 283 of the 619 waiting notebook examples need colour or fill, though
+  only six need nothing else, most also waiting on jitter, smoothing, `labs()` or a scale
+  function. A discrete colour takes the hue palette and a legend; a continuous one the default
+  gradient and a colour bar, the second guide kind. *Rejected: folding in `factor()`* (Steve), which
+  colour does not need, since discrete scales already have levels; an expression in a mapping is
+  an increment and an API decision of its own. *Deferred:* scale functions and their options,
+  `guides()` and legend positions, ordered factors and viridis, binned and date colour scales,
+  point shapes with a fill, base R's `col` and `fg`, numeric colours, `geom_raster()` and
+  `faithfuld`.
+
+- **Colours are CSS's names and hex forms, carried as uppercase hex strings (2026-10-16, Steve).**
+  A colour is `#RRGGBB`, or `#RRGGBBAA` when it carries its own alpha, and `:none` is R's `NA`:
+  the form R, CSS and the scene already use, so it sits in a frame column, a scale's `na_value`
+  and a legend key as any string does. A name CSS lacks (`grey50`) raises at the call. A notebook
+  keeps ggplot2's name with CSS's meaning and notes where the drawing differs (CSS's `green` is
+  `#008000`, R's `#00FF00`), and writes a name CSS lacks as its hex, naming the R colour. A row's
+  `alpha` replaces a colour's own alpha, as `scales::alpha()` does, and a missing one keeps it; a
+  bar's border is never given the row's, as `GeomRect` draws it. *Rejected: R's 657 names*
+  (recommended), whose `gray`, `green`, `maroon` and `purple` are not CSS's; *CSS's plus R's
+  extras*, a vocabulary of neither; *a struct*, a public type in every column and scale for what a
+  string carries. R's `transparent` is white and CSS's black, which shows under a set alpha.
+
+- **R's exact colours come from the `color` package's conversions, handed farver's constants
+  (2026-10-16, Steve: no hand-rolled colour maths).** Both of ggplot2's default palettes go
+  through farver (`pal_hue()` too, not `hcl()`). `Color.Conversion.Lindbloom` takes the matrix and
+  the white point as arguments: given farver's sRGB matrices, the white point farver's R code
+  makes from D65's chromaticity (0.31271, 0.32902) rather than the textbook 95.047 and 108.883, and
+  each channel rounded half to even, it matches R on 50,400 HCL values, `pal_hue()` for 1 to 40
+  levels, and all but one of 35,007 gradient samples, a colour below L* 8 where farver keeps
+  0.008856 and 7.787. `Giggly.ColorOperations` is its only caller; a gradient's interpolation in
+  Lab is the scale's, as in R's scales. *Rejected: `color`'s own conversions*, 12 of 820 hue
+  colours a byte out; *porting farver*; *`Giggly.Color`* (Steve: `Color.` could not be grepped
+  apart from the library's) and *`Giggly.Colors`* (Steve).
+
+- **The colour bar is drawn as ggplot2's gradient form (2026-10-16, Steve).** ggplot2's default
+  (`display = "raster"`) is a 1×300 PNG, which svglite writes as a base64 `<image>`; its
+  `display = "gradient"` is a `<linearGradient>` of 15 stops filling a `<rect>`, which svglite 2.2
+  writes and SVG draws natively, within 0.99/255 of the raster's colours on the default gradient.
+  Its ticks take the gradient form's places, and its id comes from its content, not svglite's
+  `pat-0`, so two plots on one page cannot share it. The bar's elements are checked against
+  svglite's drawing (vdiffr cannot draw a gradient), the rest of the plot against vdiffr's.
+  *Rejected: the raster*, checkable only by decoding pixels, and needing a PNG writer and
+  `xmlns:xlink` on every root; *rectangles*, 300 of them, with seams.
+
+- **The guide protocol sits at `Giggly.Guide`, a scale names its guide, and legends stack in
+  aesthetic order (2026-10-16, Steve, agreeing the proposal).** A protocol module holds nothing but
+  its protocol (checked), so `axes/3`, `axes_inside/3` and `titles/4` move to `Guide.Axis`,
+  `strips/2` to `Guide.Strip` and `grid/3` to `Guide.Grid`, exported for rendering. A scale
+  records its guide by name, as ggplot2's scale carries `guide`; the assembly turns the name into
+  the kind's struct, as `Plot` turns `position: :dodge` into one. Legends stack as
+  `package_box()` stacks them on the right, a column, each left-aligned, `legend.spacing.y` apart,
+  centred on the panels; same kind, title and labels merge (a colour bar's colours too). ggplot2
+  orders them by a hash of title, labels and kind (9 of 20 random title pairs came out
+  alphabetical), so Giggly orders by aesthetic name and a golden's R script sets `guides(order =)`.
+  *Rejected: the protocol in a submodule*, leaving the exports alone; *title order*.
 
 - **The document's root declares svglite's stylesheet for lines as attributes (2026-10-16,
   Steve).** svglite gives every line round ends, round corners and a mitre limit of 10 through an
@@ -1065,9 +1134,7 @@ written, and git history keeps every version.
   `Aesthetics` and `DataFrame` and exports `Layer`, `Assembly` lists `Plot`, `DataFrame` and
   `Group` (each list has grown since, with its domains' needs, and `Plot` now exports nothing —
   `mix boundary.spec` prints the current graph); to come, `Scale` lists nothing (so it stays extractable) and the SVG backend lists only
-  the scene. A domain that owns an outside library is a top-level boundary, so the library is
-  listed only where it is used: `DataFrame` with `Table`, a sanctioned `top_level?:` exemption;
-  `Giggly` lists `DataFrame` only so its sub-boundaries may, and exports `Plot`. The test helpers
+  the scene. `Giggly` exports `Plot`. The test helpers
   became `GigglyTest.TestEnv` and `GigglyTest.Eventually`, top-level by name, each listing
   `ExUnit`. The `CorePurity` check now reads all of `lib/`; scoped to a `core/` that did not
   exist, it had checked nothing. Found by compiling a throwaway copy, and recorded in
@@ -1078,8 +1145,7 @@ written, and git history keeps every version.
   pure, so `Core` would hold the whole library and renaming everything would separate nothing.
   *Rejected: `type: :strict` on each declaration* — a new domain that forgot it would be relaxed
   in silence; the default fails safe. *Rejected: strict on the top-level boundary only* — it does
-  not reach a sub-boundary's calls. *Rejected: `DataFrame` nested, with `Table` listed on `Giggly`*
-  — every module directly in `Giggly` could then call `table`. *Rejected: `ExUnit` listed on
+  not reach a sub-boundary's calls. *Rejected: `ExUnit` listed on
   `Giggly` for the test helpers* — the library could then call it; *or the helpers lifted with
   `top_level?:`* — two exemptions where naming them outside `Giggly` needs none.
 
@@ -1341,8 +1407,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Draw lines and dates in the notebooks (lines, step 4); §4: "Lines and date axes are
-  Phase 3's third increment"
+- 2026-10-16 — Set colours and fills on a layer (colour, step 1); §4: "Colour and fill is Phase
+  3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come from the
+  `color` package's conversions"
+- 2026-10-16 — Draw lines and dates in the notebooks (lines, step 4) (`04e9957`); §4: "Lines and
+  date axes are Phase 3's third increment"
 - 2026-10-16 — Put dates on an axis (lines, step 3) (`223c9f1`); §4: "Lines and date axes are Phase
   3's third increment"
 - 2026-10-16 — Curve lines in radial coordinates (lines, step 2) (`10dce7f`); §4: "Lines and date
@@ -1460,7 +1529,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   the harness. ggplot2 separates "remove this" (`breaks = NULL`, `guide = "none"`) from "use the
   default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's
   options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
-  internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`).
+  internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`). The
+  first public "remove this" is `colour: :none` and `fill: :none`, ggplot2's `NA` (2026-10-16,
+  Steve, with the colour increment).
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

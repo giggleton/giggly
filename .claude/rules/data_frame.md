@@ -22,11 +22,10 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
   `split/2`, `slice/2` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
   `@moduledoc false`; offering a user another operation is a decision (CLAUDE.md, Conventions).
-- **The frame owns the `table` library, and is a top-level boundary because of it.** Its `deps:`
-  is `Table` alone, and nothing else in Giggly may call `table`. Nested under `Giggly`, it could
-  list `Table` only if `Giggly` did too, which would open the library to every module directly in
-  `Giggly`; the exemption is sanctioned in `boundary_declarations_test.exs`. A domain that uses
-  the frame lists `Giggly.DataFrame`, which `Giggly` lists so that its sub-boundaries may.
+- **The frame owns the `table` library.** Its `deps:` is `Table` alone, which the root lists too,
+  as boundary lets a sub-boundary list only what its parent does, and no other domain lists it
+  (`.claude/rules/dependencies.md`). A domain that uses the frame lists `Giggly.DataFrame`, its
+  sibling under the umbrella.
 - **User column names are strings; every column the pipeline writes is an atom.** `from_table/1`
   converts them and refuses two that become the same string. Never turn a string name into an
   atom: that creates atoms from caller input, and it would let a user column pass for an aesthetic.

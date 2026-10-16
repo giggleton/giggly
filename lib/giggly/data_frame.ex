@@ -47,10 +47,10 @@ defmodule Giggly.DataFrame do
 
   # Its own boundary, exporting only this module: callers reach a frame through the functions
   # below, so an implementation's struct and functions are private to it and a second
-  # implementation changes no caller. It is a top-level boundary because it owns the `table`
-  # library: nested under `Giggly`, it could list `Table` only if `Giggly` did too, and then every
-  # module directly in `Giggly` could call it. Here `from_table/1` is the one caller.
-  use Boundary, top_level?: true, deps: [Table], exports: []
+  # implementation changes no caller. It owns the `table` library, which `Giggly` lists too, as
+  # boundary lets a sub-boundary list only what its parent does; no other domain lists it, and
+  # here `from_table/1` is the one caller.
+  use Boundary, deps: [Table], exports: []
 
   alias Giggly.DataFrame.Lists
 

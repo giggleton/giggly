@@ -48,28 +48,39 @@ where its marks sit".
   mm, border 0.5 mm, which grid draws as a circle of radius 1.95 points with a 0.71-point outline.
   **A bar looks like ggplot2's default bar:** filled `#595959`, ink mixed 35% toward paper, with no
   border, its border's width 0.5 mm all the same. The defaults move to the theme with the
-  default-aesthetics stage.
-- **A row's `alpha` makes a point's outline and fill alike that opaque, and a bar's fill alone,
-  its border opaque**, as ggplot2's `GeomPoint` applies `alpha()` to both colours and `GeomRect`
-  `fill_alpha()` to the fill; a row without one, or a table without the column, is opaque, as
-  ggplot2's default alpha, `NA`, leaves a colour.
+  default-aesthetics stage. **A colour a layer sets replaces the default**: a point's colour, a
+  bar's fill and border, a line's colour, read from the rows, where the assembly put it, the same in
+  every row (`Giggly.Geom.Mark.set/3`), so each primitive carries one until a mapped colour needs
+  one per mark.
+- **A row's `alpha` replaces its colour's own alpha: a point's outline and fill alike, a bar's fill
+  alone, a line's stroke**, as ggplot2's `GeomPoint` applies `alpha()` to both colours, `GeomRect`
+  `fill_alpha()` to the fill and `GeomPath` `alpha()` to the line; a row without one, or a table
+  without the column, keeps the colour's own, opaque for a colour with none, as ggplot2's default
+  alpha, `NA`, leaves a colour. **A bar's border is never given the row's alpha**, only its own.
+  `Giggly.Geom.Mark` is the one home of the rule, and a colour reaches the scene as its `#RRGGBB`
+  and an opacity.
+- **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
+  and `GeomPath` drop the rows whose colour is missing, and a bar left unfilled or unbordered,
+  whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's or a line's key draws nothing, and a
+  bar's is left unfilled or unbordered.
 - **A geom draws its own legend key (`draw_key/3`)**, as ggplot2's `draw_key` belongs to the geom:
   handed the key's aesthetic values, the layer's set values among them as ggplot2's key data holds
   its `aes_params`, and its size in points, it draws in the key's cell. A point's key is the point
   at the middle; a bar's is its fill short of the key by its border's width, 0.5 mm, as
-  `draw_key_polygon()` takes `linewidth` millimetres off the key, at the key's alpha; a path's is
-  a segment across the middle from a tenth of the key's width to nine tenths, as
-  `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm, its ends the
-  layer's and its corners round.
+  `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's alpha and
+  its border in its own; a path's is a segment across the middle from a tenth of the key's width
+  to nine tenths, as `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm,
+  its ends the layer's and its corners round.
 - **A path is drawn as ggplot2's `GeomPath` draws one.** Rows missing `x` or `y` at a group's ends
-  are dropped (`keep_mid_true()`), and one in the middle breaks the line; the rows are put in group
-  order, each group's in its own, and munched; a group of fewer than two rows is not drawn. **Where
-  every group keeps one alpha all along it, each group is one polyline in its first row's alpha;
-  where any group's varies, the whole panel is segments**, one from each row to the next of its
-  group, in its start's alpha, a segment touching a missing position left out. A line is black and
-  solid, as wide as the layer's set `linewidth` in millimetres or 0.5 (1.07 points, worked out as
-  ggplot2's `linewidth * .pt` line-width units and svglite's points), with the geom's ends,
-  corners and mitre limit (ggplot2's defaults: butt, round, 10).
+  are dropped (`keep_mid_true()`), and one in the middle breaks the line; the rows are put in
+  group order, each group's in its own, and munched; a group of fewer than two rows is not drawn.
+  **Where every group keeps one alpha all along it, each group is one polyline in its first row's
+  alpha; where any group's varies, the whole panel is segments**, one from each row to the next of
+  its group, in its start's alpha, a segment touching a missing position left out. A line is
+  black, or the layer's set colour, and solid, as wide as the layer's set `linewidth` in
+  millimetres or 0.5 (1.07 points, worked out as ggplot2's `linewidth * .pt` line-width units and
+  svglite's points), with the geom's ends, corners and mitre limit (ggplot2's defaults: butt,
+  round, 10).
 - **A line (`Geom.Line`) is a path whose rows `setup_data/3` puts in order** of panel, group and
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws

@@ -32,12 +32,20 @@ defmodule Giggly.Plot do
   A layer function's options can set an aesthetic to one value for every mark the layer draws, as
   ggplot2's `geom_point(alpha = 0.4)` does: `Giggly.Plot.geom_point(plot, alpha: 0.4)`. A map
   maps and a keyword list sets.
+
+  A colour is written as CSS writes one: a name, such as `"steelblue"`, a hex colour, such as
+  `"#4682B4"`, or `"#4682B480"` with an alpha of its own, or `"transparent"`; `:none` draws
+  nothing, as ggplot2's `NA` does. A name CSS does not define raises, R's `"grey50"` among them,
+  and where R and CSS give a name different colours it is CSS's: `"green"` is `#008000`, not R's
+  `#00FF00`. An alpha, set or mapped, replaces a colour's own, as ggplot2's `alpha()` does,
+  so `geom_point(colour: "#4682B480")` draws half-opaque points, and with `alpha: 1` opaque ones.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, and NimbleOptions, which validates its functions' options at the call,
-  # and nothing that runs it. The five families' roots are protocols that
+  # checks a layer against, NimbleOptions, which validates its functions' options at the call, and
+  # the colour operations, which read a colour an option sets, and nothing that runs it. The five
+  # families' roots are protocols that
   # compute and draw, and `GigglyCredo.Check.PlotRunsNothing` keeps them out of these files, which
   # boundary cannot, since a boundary always exports its root. A layer is read only through
   # `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
@@ -45,6 +53,7 @@ defmodule Giggly.Plot do
   use Boundary,
     deps: [
       Giggly.Aesthetics,
+      Giggly.ColorOperations,
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Facet,
@@ -55,7 +64,7 @@ defmodule Giggly.Plot do
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Geom, Position, Stat}
+  alias Giggly.{Aesthetics, ColorOperations, Coord, DataFrame, Facet, Geom, Position, Stat}
   alias Giggly.Plot.Layer
 
   @enforce_keys [:data, :mapping, :facet, :coord, :theme, :reversed_layers]
@@ -136,6 +145,46 @@ defmodule Giggly.Plot do
         "0.5 when not given."
   ]
 
+  # A colour set for every mark of a layer, as ggplot2's `colour = "steelblue"` sets it, kept in the
+  # one spelling `Giggly.ColorOperations` gives it: uppercase hex, or `:none`.
+  @color_type {:custom, __MODULE__, :validate_color, []}
+
+  # The colours an option that sets one takes.
+  @color_forms ~S(a CSS colour name, such as `"steelblue"`, a hex colour, such as `"#4682B4"`, ) <>
+                 ~S(or `"#4682B480"` with an alpha of its own, `"transparent"`, or `:none` ) <>
+                 "for none, as ggplot2's `NA`"
+
+  @point_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every point, its outline and fill alike, as ggplot2's " <>
+        "`colour = \"steelblue\"` sets it, written `colour:` or `color:`: " <>
+        @color_forms <> "; black when not given."
+  ]
+
+  @bar_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every bar's border, as ggplot2's `colour = \"black\"` sets it, written " <>
+        "`colour:` or `color:`: " <>
+        @color_forms <>
+        "; no border when not given. A border takes no alpha but its colour's own."
+  ]
+
+  @bar_fill_option [
+    type: @color_type,
+    doc:
+      "The colour every bar is filled with, as ggplot2's `fill = \"steelblue\"` sets it: " <>
+        @color_forms <> "; `#595959` when not given."
+  ]
+
+  @line_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every line, as ggplot2's `colour = \"steelblue\"` sets it, written " <>
+        "`colour:` or `color:`: " <> @color_forms <> "; black when not given."
+  ]
+
   # How a layer's lines are drawn at their ends and corners: ggplot2's `lineend`, `linejoin` and
   # `linemitre`, grid's line parameters.
   @line_style_options [
@@ -162,10 +211,10 @@ defmodule Giggly.Plot do
   ]
 
   # The options that set an aesthetic rather than choose how a layer is drawn.
-  @fixed_aesthetics [:alpha, :linewidth]
+  @fixed_aesthetics [:alpha, :color, :fill, :linewidth]
 
   # `geom_point/3`'s options, validated at the call.
-  @point_options NimbleOptions.new!(alpha: @alpha_option)
+  @point_options NimbleOptions.new!(alpha: @alpha_option, color: @point_color_option)
 
   # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
@@ -177,12 +226,15 @@ defmodule Giggly.Plot do
                        "or set side by side within the width one bar takes (`:dodge`), " <>
                        "ggplot2's `position = \"dodge\"`."
                  ],
-                 alpha: @alpha_option
+                 alpha: @alpha_option,
+                 color: @bar_color_option,
+                 fill: @bar_fill_option
                )
 
   # `geom_path/3`'s options, validated at the call.
   @path_options NimbleOptions.new!(
-                  [alpha: @alpha_option, linewidth: @linewidth_option] ++ @line_style_options
+                  [alpha: @alpha_option, color: @line_color_option, linewidth: @linewidth_option] ++
+                    @line_style_options
                 )
 
   # `geom_line/3`'s options, validated at the call.
@@ -197,6 +249,7 @@ defmodule Giggly.Plot do
                           "`orientation = \"y\"` gives."
                     ],
                     alpha: @alpha_option,
+                    color: @line_color_option,
                     linewidth: @linewidth_option
                   ] ++ @line_style_options
                 )
@@ -233,8 +286,9 @@ defmodule Giggly.Plot do
 
   Points use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
   other. A point set or mapped to be transparent is so in its outline and its fill alike, as
-  ggplot2 draws one. A mapping,
-  a map, and options, a keyword list, may each be given alone or both together.
+  ggplot2 draws one, and so is its colour, which `colour:` sets; a colour of `:none` draws no
+  point, as ggplot2 leaves out a point whose colour is `NA`. A mapping, a map, and options, a
+  keyword list, may each be given alone or both together.
 
   ## Options
 
@@ -258,6 +312,15 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.geom_point(alpha: 0.4)
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:alpha)
       [0.4, 0.4]
+
+  A colour is kept as the hex it names:
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point(colour: "steelblue")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#4682B4", "#4682B4"]
   """
   @spec geom_point(t(), mapping_argument() | keyword(), keyword()) :: t()
   def geom_point(plot, mapping_or_options \\ %{}, options \\ [])
@@ -353,7 +416,8 @@ defmodule Giggly.Plot do
   reaches to 0, since every bar starts there.
 
   Bars use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
-  other; a bar's fill takes its alpha, its border not. When `y`
+  other; a bar's fill takes its alpha, its border not. `fill:` sets the fill and `colour:` the
+  border, which bars have none of unless it is set. When `y`
   is the discrete axis and `x` the continuous one, the bars are horizontal, each from 0 to its `x`,
   as ggplot2 decides. A mapping, a map, and options, a keyword list, may each be given alone or both
   together.
@@ -415,8 +479,9 @@ defmodule Giggly.Plot do
   other; each group is a line of its own. A row missing `x` or `y` breaks its line there, and
   those at either end of a group are left out; a group of one row draws nothing. Where a line's
   alpha changes along it, the line is drawn a segment from each row to the next, each as opaque
-  as the row it starts from. A mapping, a map, and options, a keyword list, may each be given
-  alone or both together.
+  as the row it starts from. `colour:` sets the lines' colour; a colour of `:none` draws no line,
+  as ggplot2 leaves out a line whose colour is `NA`. A mapping, a map, and options, a keyword
+  list, may each be given alone or both together.
 
   ## Options
 
@@ -629,6 +694,22 @@ defmodule Giggly.Plot do
 
   def validate_alpha(alpha),
     do: {:error, "expected a number from 0 to 1, got: #{inspect(alpha)}"}
+
+  # NimbleOptions' check of an option that sets a colour: a CSS colour, kept in its one spelling,
+  # uppercase hex, or `:none`.
+  @doc false
+  @spec validate_color(term()) :: {:ok, ColorOperations.t()} | {:error, String.t()}
+  def validate_color(color) do
+    case ColorOperations.parse(color) do
+      {:ok, spelling} ->
+        {:ok, spelling}
+
+      :error ->
+        {:error,
+         "expected a CSS colour: a name such as \"steelblue\", a hex colour such as " <>
+           "\"#4682B4\", \"transparent\", or :none, got: #{inspect(color)}"}
+    end
+  end
 
   # NimbleOptions' check of a `linewidth:` option: a width in millimetres, 0 or more, kept as a
   # float.

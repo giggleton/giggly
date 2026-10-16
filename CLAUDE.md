@@ -48,8 +48,7 @@ here.
 - **The documentation system** (what goes where, the ratchet) — `.claude/rules/docs.md`; the
   `docs-sync` skill.
 - **The aesthetic vocabulary** (spelling, the x/y position families) — `.claude/rules/aesthetics.md`.
-- **The data frame** (the layer-data currency, reading input tables, column types) —
-  `.claude/rules/data_frame.md`.
+- **The data frame** (layer data, input tables, column types) — `.claude/rules/data_frame.md`.
 - **The plot spec and its public API** (`Giggly.Plot`, layers, checking mappings at the call) —
   `.claude/rules/plot.md`.
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
@@ -57,6 +56,7 @@ here.
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.
 - **Scales** (`Giggly.Scale`, kinds, transformations, training, mapping, palettes) —
   `.claude/rules/scale.md`.
+- **Colours** (`Giggly.ColorOperations`, reading a colour) — `.claude/rules/color_operations.md`.
 - **Stats** (`Giggly.Stat`, the protocol a layer's stat runs through) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the protocol a layer's position runs through) —
   `.claude/rules/position.md`.
@@ -85,8 +85,8 @@ here.
   `boundary_declarations_test.exs`), so a boundary's `deps:` is the whole of what it may call,
   outside libraries included. A plot is a value built by `Giggly.Plot` and run by the functions
   in `Giggly`; every other domain is its own boundary, carved when its first module lands, and
-  its `deps:` is its contract. A domain that owns an outside library is a top-level boundary, so
-  the library is listed only where it is used. Arrows run one way, from what runs a plot toward
+  its `deps:` is its contract. A domain that owns an outside library lists it, as the root must
+  too; no other domain lists it. Arrows run one way, from what runs a plot toward
   the data; nothing calls back up. What boundary cannot see — the standard library — the
   `CorePurity` credo check covers over all of `lib/`: no clock, config, unseeded randomness,
   process or IO, an impure module excluded by name.

@@ -198,26 +198,27 @@ semver or the changelog).
     in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed.
 - **Architecture as a compile-time check** (`boundary`): `compilers: [:boundary]` in `mix.exs`
   checks the `use Boundary` declarations, so a forbidden cross-namespace call is a compiler
-  warning and therefore a gate failure. The installed shape was the umbrella `Giggly`
-  (`exports: :all`), with every `Mix.Tasks.*` classified by hand via `classify_to:`. It is now
-  strict everywhere — `boundary: [default: [type: :strict]]` in `mix.exs`, pinned by the
-  declarations test, which also fails on any declaration setting `type: :relaxed` — with each
-  domain a sub-boundary whose `deps:` is its contract, and a domain that owns an outside library
-  a top-level boundary. `mix boundary.spec` prints the current graph. Six constraints govern any
-  change to it, each found by compiling rather than by reading the docs: **(1)** `check: [in:
+  warning and therefore a gate failure. The installed shape was the umbrella `Giggly` (`exports:
+  :all`), with every `Mix.Tasks.*` classified by hand via `classify_to:`. It is now strict
+  everywhere — `boundary: [default: [type: :strict]]` in `mix.exs`, pinned by the declarations
+  test, which also fails on any declaration setting `type: :relaxed` — with each domain a
+  sub-boundary whose `deps:` is its contract, and an outside library listed by the one domain that
+  owns it and by the root. `mix boundary.spec` prints the current graph. Six constraints govern
+  any change to it, each found by compiling rather than by reading the docs: **(1)** `check: [in:
   false]` / `[out: false]` is legal **only on a top-level boundary**, and such a boundary may not
   contain sub-boundaries; **(2)** a boundary with `check.in` false may not be exported from, nor
   listed as anyone's dep; **(3)** a top-level boundary may not name a *sub*-boundary in `deps:` —
-  only siblings, its parent, and its ancestors' deps; **(4)** a parent re-exports a
-  sub-boundary's modules, and a sub-boundary still lists its exports explicitly, because the list
-  is an approval gate; **(5)** strictness belongs to each boundary: a strict parent does not check
-  an outside-library call made from a sub-boundary that is not strict itself, which is why the
+  only siblings, its parent, and its ancestors' deps; **(4)** a parent re-exports a sub-boundary's
+  modules, and a sub-boundary still lists its exports explicitly, because the list is an approval
+  gate; **(5)** strictness belongs to each boundary: a strict parent does not check an
+  outside-library call made from a sub-boundary that is not strict itself, which is why the
   default is set once in `mix.exs` rather than on a declaration; **(6)** a sub-boundary may list
-  an outside library, or a top-level boundary, only when its parent lists it too — so a library
-  listed for one nested domain is open to every module directly in the parent, which is why its
-  owner is lifted to the top level instead. The checker ignores plain **alias references** by
-  default (`check: [aliases: true]` is off), so passing a module as a value crosses a boundary
-  silently; only calls and struct use are caught. And it checks nothing a **protocol
-  implementation** calls until the implementation is classified with `classify_to:`
+  an outside library, or a top-level boundary, only when its parent lists it too — so the root
+  lists each library its owner does, which opens it to the modules directly in the root (`Giggly`
+  alone) and to no domain, since each is strict and calls only what it lists (design-log §4, the
+  entry beginning "A library's owner nests under the umbrella"). The checker ignores plain **alias
+  references** by default (`check: [aliases: true]` is off), so passing a module as a value
+  crosses a boundary silently; only calls and struct use are caught. And it checks nothing a
+  **protocol implementation** calls until the implementation is classified with `classify_to:`
   (`unclassified_protocol_impl?` in its checker; found by compiling a `defimpl` that called a
   module its family does not list), nor any call *to* one.

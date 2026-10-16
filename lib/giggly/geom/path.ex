@@ -20,10 +20,12 @@ defmodule Giggly.Geom.Path do
   # segment from each row to the next, each in the alpha of the row it starts from, and a segment
   # touching a missing position is not drawn.
   #
-  # Every line looks as ggplot2's default line does, until aesthetics such as colour can be mapped
-  # or set: black and solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the
-  # `linewidth` a layer sets, in millimetres. A row's `alpha`, where its table has one, makes its
-  # line that opaque; a row without one is opaque.
+  # Every line looks as ggplot2's default line does, until aesthetics such as colour can be mapped:
+  # solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the `linewidth` a layer
+  # sets, in millimetres, and black, or the colour the layer sets. A row's `alpha`, where its table
+  # has one, makes its line that opaque, replacing its colour's own; a row without one keeps its
+  # colour's (`Giggly.Geom.Mark`). A colour of `:none`, R's `NA`, draws no line, as ggplot2's
+  # `GeomPath` drops the rows whose colour is missing.
 
   @enforce_keys [:line_end, :line_join, :mitre_limit]
   defstruct @enforce_keys
@@ -48,6 +50,7 @@ defmodule Giggly.Geom.Path do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Coord, DataFrame}
+    alias Giggly.Geom.Mark
     alias Giggly.Scene.{Polylines, Segments}
 
     # ggplot2's default line: its width in millimetres and its ink.
@@ -72,6 +75,37 @@ defmodule Giggly.Geom.Path do
 
     @impl Giggly.Geom
     def draw_panel(geom, frame, coord, panel_params) do
+      case Mark.set(frame, :color, @color) do
+        :none -> []
+        color -> draw_lines(geom, frame, coord, panel_params, color)
+      end
+    end
+
+    # A legend's key, in the key's colour at its alpha; a colour of `:none` draws nothing.
+    @impl Giggly.Geom
+    def draw_key(geom, key, _size) do
+      case Map.get(key, :color, @color) do
+        :none ->
+          []
+
+        color ->
+          [
+            %Segments{
+              starts: [@key_start],
+              ends: [@key_end],
+              stroke_width: points(Map.get(key, :linewidth, @line_width)),
+              color: Mark.hex(color),
+              opacity: [Mark.opacity(color, Map.get(key, :alpha))],
+              line_end: geom.line_end,
+              line_join: :round,
+              mitre_limit: 10.0
+            }
+          ]
+      end
+    end
+
+    # The panel's lines in `color`.
+    defp draw_lines(geom, frame, coord, panel_params, color) do
       kept =
         frame
         |> trimmed()
@@ -84,29 +118,13 @@ defmodule Giggly.Geom.Path do
 
       case DataFrame.row_count(drawn) do
         0 -> []
-        _rows -> [draw(geom, drawn, constant?(drawn))]
+        _rows -> [draw(geom, drawn, color, constant?(drawn))]
       end
-    end
-
-    @impl Giggly.Geom
-    def draw_key(geom, key, _size) do
-      [
-        %Segments{
-          starts: [@key_start],
-          ends: [@key_end],
-          stroke_width: points(Map.get(key, :linewidth, @line_width)),
-          color: @color,
-          opacity: [opacity(Map.get(key, :alpha))],
-          line_end: geom.line_end,
-          line_join: :round,
-          mitre_limit: 10.0
-        }
-      ]
     end
 
     # Each group a line, in its first row's alpha, broken where a position is missing, as grid
     # breaks a polyline; a piece of one point draws nothing.
-    defp draw(geom, frame, true) do
+    defp draw(geom, frame, color, true) do
       {lines, opacities} =
         frame
         |> rows()
@@ -118,7 +136,9 @@ defmodule Giggly.Geom.Path do
             [first_row, _second_row | _rest] -> placed?(first_row)
             [_lone_row] -> false
           end)
-          |> Enum.map(fn piece -> {Enum.map(piece, &position/1), opacity(first.alpha)} end)
+          |> Enum.map(fn piece ->
+            {Enum.map(piece, &position/1), Mark.opacity(color, first.alpha)}
+          end)
         end)
         |> Enum.unzip()
 
@@ -126,7 +146,7 @@ defmodule Giggly.Geom.Path do
         lines: lines,
         offsets: :none,
         stroke_width: stroke_width(frame),
-        color: @color,
+        color: Mark.hex(color),
         opacity: opacities,
         line_end: geom.line_end,
         line_join: geom.line_join,
@@ -136,7 +156,7 @@ defmodule Giggly.Geom.Path do
 
     # A segment from each row to the next of its group, in the alpha of the row it starts from; a
     # segment touching a missing position is not drawn.
-    defp draw(geom, frame, false) do
+    defp draw(geom, frame, color, false) do
       segments =
         frame
         |> rows()
@@ -149,8 +169,8 @@ defmodule Giggly.Geom.Path do
         starts: Enum.map(segments, fn [from, _to] -> position(from) end),
         ends: Enum.map(segments, fn [_from, to] -> position(to) end),
         stroke_width: stroke_width(frame),
-        color: @color,
-        opacity: Enum.map(segments, fn [from, _to] -> opacity(from.alpha) end),
+        color: Mark.hex(color),
+        opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(color, from.alpha) end),
         line_end: geom.line_end,
         line_join: geom.line_join,
         mitre_limit: geom.mitre_limit
@@ -250,24 +270,14 @@ defmodule Giggly.Geom.Path do
     # The layer's line width in points, from the width it sets in millimetres, the same in every
     # row, or ggplot2's default.
     defp stroke_width(frame) do
-      if :linewidth in DataFrame.names(frame) do
-        [line_width] =
-          frame
-          |> DataFrame.pull(:linewidth)
-          |> Enum.uniq()
-
-        points(line_width)
-      else
-        points(@line_width)
-      end
+      frame
+      |> Mark.set(:linewidth, @line_width)
+      |> points()
     end
 
     # A line `millimetres` wide, in points, worked out in ggplot2's and svglite's order.
     defp points(millimetres),
       do:
         millimetres * @font_points_per_millimetre / @line_width_units_per_inch * @points_per_inch
-
-    defp opacity(alpha) when is_number(alpha), do: alpha / 1
-    defp opacity(missing) when missing in [nil, :nan], do: 1.0
   end
 end

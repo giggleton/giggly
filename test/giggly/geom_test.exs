@@ -12,6 +12,9 @@ defmodule Giggly.GeomTest do
   @default_width 0.5 * (72.27 / 25.4) / 96 * 72
   @two_millimetres 2.0 * (72.27 / 25.4) / 96 * 72
 
+  # A colour's own alpha of 80, half-opaque: R holds it as the byte 128, so its opacity is 128/255.
+  @half_alpha 128 / 255
+
   describe "draw_panel/4 for points" do
     test "a row missing its x or its y is not drawn" do
       coord = %Coord.Cartesian{}
@@ -42,8 +45,34 @@ defmodule Giggly.GeomTest do
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0])
 
-      assert [%Circles{opacity: [1.0, 1.0]}] =
+      assert [%Circles{opacity: [1.0, 1.0], color: "#000000"}] =
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's points coloured "#FF000080" with an alpha mapped
+    # to 0.2 and NA, through vdiffr 1.0.9: 0.20, and the colour's own 0.50.
+    test "a point is drawn in the colour its layer sets, its row's alpha replacing the colour's own" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [1.0, 2.0],
+          alpha: [0.2, nil],
+          color: ["#FF000080", "#FF000080"]
+        )
+
+      assert [%Circles{color: "#FF0000", opacity: [0.2, @half_alpha]}] =
+               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    test "a colour of :none draws no point, as ggplot2 drops a point whose colour is NA" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], color: [:none, :none])
+
+      assert Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params) === []
     end
   end
 
@@ -85,8 +114,60 @@ defmodule Giggly.GeomTest do
 
       without_alpha = DataFrame.new(xmin: [0.0], xmax: [1.0], ymin: [0.0], ymax: [2.0])
 
-      assert [%Rectangles{fill_opacity: [1.0]}] =
+      assert [%Rectangles{fill_opacity: [1.0], fill: "#595959", color_opacity: +0.0}] =
                Geom.draw_panel(%Geom.Bar{}, without_alpha, coord, panel_params)
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = "#0000FF80", colour =
+    # "#FF000080")` with an alpha of 0.3 and of none, through vdiffr 1.0.9: the fill 0.30 and the
+    # fill's own 0.50, the border its own 0.50 whatever the alpha.
+    test "a bar is filled and bordered as its layer sets, the alpha its fill's alone" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          xmin: [0.0, 2.0],
+          xmax: [1.0, 3.0],
+          ymin: [0.0, 0.0],
+          ymax: [2.0, 4.0],
+          alpha: [0.3, nil],
+          fill: ["#0000FF80", "#0000FF80"],
+          color: ["#FF000080", "#FF000080"]
+        )
+
+      assert [%Rectangles{} = rectangles] =
+               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+
+      assert {rectangles.fill, rectangles.fill_opacity, rectangles.color,
+              rectangles.color_opacity} ===
+               {"#0000FF", [0.3, @half_alpha], "#FF0000", @half_alpha}
+    end
+
+    test "a fill of :none is no fill at all, whatever the alpha" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          xmin: [0.0],
+          xmax: [1.0],
+          ymin: [0.0],
+          ymax: [2.0],
+          alpha: [0.5],
+          fill: [:none],
+          color: ["#FF0000"]
+        )
+
+      assert [
+               %Rectangles{
+                 fill: :none,
+                 fill_opacity: [+0.0],
+                 color: "#FF0000",
+                 color_opacity: 1.0
+               }
+             ] =
+               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
     end
   end
 
@@ -228,8 +309,34 @@ defmodule Giggly.GeomTest do
          %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1])
 
-      assert [%Polylines{opacity: [1.0], stroke_width: @default_width}] =
+      assert [%Polylines{opacity: [1.0], stroke_width: @default_width, color: "#000000"}] =
                Geom.draw_panel(@path, frame, coord, params)
+    end
+
+    test "a line is drawn in the colour its layer sets, its row's alpha replacing the colour's own",
+         %{coord: coord, params: params} do
+      own =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [1.0, 2.0],
+          group: [1, 1],
+          color: ["#FF000080", "#FF000080"]
+        )
+
+      assert [%Polylines{color: "#FF0000", opacity: [@half_alpha]}] =
+               Geom.draw_panel(@path, own, coord, params)
+
+      replaced = DataFrame.put(own, :alpha, [0.2, 0.4])
+
+      assert [%Segments{color: "#FF0000", opacity: [0.2]}] =
+               Geom.draw_panel(@path, replaced, coord, params)
+    end
+
+    test "a colour of :none draws no line, as ggplot2 drops the rows whose colour is NA",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1], color: [:none, :none])
+
+      assert Geom.draw_panel(@path, frame, coord, params) === []
     end
 
     test "a line is drawn as a path through its rows", %{coord: coord, params: params} do
@@ -249,6 +356,16 @@ defmodule Giggly.GeomTest do
                Geom.draw_key(%Geom.Point{}, %{alpha: nil}, {17.28, 17.28})
     end
 
+    test "a point's key is in the colour its layer sets, the key's alpha replacing the colour's own" do
+      assert [%Circles{color: "#4682B4", opacity: [0.2]}] =
+               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"}, {17.28, 17.28})
+
+      assert [%Circles{color: "#4682B4", opacity: [@half_alpha]}] =
+               Geom.draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"}, {17.28, 17.28})
+
+      assert Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}, {17.28, 17.28}) === []
+    end
+
     test "a bar's key is its fill short of the key's edges by its border's width" do
       assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{}, %{alpha: 0.55}, {17.28, 17.28})
 
@@ -258,6 +375,15 @@ defmodule Giggly.GeomTest do
 
       assert {Float.round((xmax - xmin) * 17.28, 2), Float.round(ymin * 17.28, 2),
               key.fill_opacity, key.color} === {15.86, 0.71, [0.55], :none}
+    end
+
+    test "a bar's key is filled and bordered as its layer sets, the key's alpha its fill's alone" do
+      key = %{alpha: 0.3, fill: "#0000FF80", color: "#FF000080"}
+
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key, {17.28, 17.28})
+
+      assert {drawn.fill, drawn.fill_opacity, drawn.color, drawn.color_opacity} ===
+               {"#0000FF", [0.3], "#FF0000", @half_alpha}
     end
 
     # ggplot2's `draw_key_path()`: a segment from a tenth of the key's width to nine tenths, at
@@ -280,6 +406,13 @@ defmodule Giggly.GeomTest do
 
       assert [%Segments{opacity: [1.0], stroke_width: @default_width}] =
                Geom.draw_key(@path, %{alpha: nil}, {17.28, 17.28})
+    end
+
+    test "a path's key is in the colour its layer sets, and a colour of :none draws none" do
+      assert [%Segments{color: "#FF0000", opacity: [@half_alpha]}] =
+               Geom.draw_key(@path, %{alpha: nil, color: "#FF000080"}, {17.28, 17.28})
+
+      assert Geom.draw_key(@path, %{alpha: 0.4, color: :none}, {17.28, 17.28}) === []
     end
   end
 end

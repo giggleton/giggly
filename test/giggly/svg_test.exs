@@ -133,6 +133,7 @@ defmodule Giggly.SVGTest do
         fill: "#595959",
         fill_opacity: [1.0],
         color: :none,
+        color_opacity: 0.0,
         # A 0.5 mm line, as grid draws it in points.
         stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
       }
@@ -173,6 +174,7 @@ defmodule Giggly.SVGTest do
         fill: "#595959",
         fill_opacity: [0.5],
         color: :none,
+        color_opacity: 0.0,
         stroke_width: 1.07
       }
 
@@ -213,8 +215,10 @@ defmodule Giggly.SVGTest do
              ]
     end
 
-    # Golden: svglite's drawing of ggplot2 4.0.3's points and columns at `alpha = 0`, in vdiffr 1.0.9.
-    test "a wholly transparent colour is a stroke of none and no fill, as svglite writes it" do
+    # Golden: svglite's drawing of ggplot2 4.0.3's points and columns at `alpha = 0`, in vdiffr 1.0.9,
+    # which writes no fill and leaves it to its stylesheet's `fill: none`; without that stylesheet
+    # SVG fills a shape black, so the fill is written `none`.
+    test "a wholly transparent colour is a stroke of none and a fill of none" do
       circles = %Circles{
         x: [0.5],
         y: [0.5],
@@ -232,13 +236,76 @@ defmodule Giggly.SVGTest do
         fill: "#595959",
         fill_opacity: [0.0],
         color: :none,
+        color_opacity: 0.0,
         stroke_width: 1.07
       }
 
       drawn = draw(whole([circles, rectangles]))
 
-      assert circles(drawn) === ["style='stroke-width: 0.71; stroke: none;'"]
-      assert drawn =~ "stroke-linecap: butt; stroke-linejoin: miter;' />"
+      assert circles(drawn) === ["style='stroke-width: 0.71; stroke: none; fill: none;'"]
+      assert drawn =~ "stroke-linecap: butt; stroke-linejoin: miter; fill: none;' />"
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = "#0000FF80", colour =
+    # "#FF000080", alpha = 0.3)`, in vdiffr 1.0.9: the border its colour's own alpha, the fill the
+    # layer's.
+    test "a placed rectangle's border carries its own opacity, after its colour" do
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: "#0000FF",
+        fill_opacity: [0.3],
+        color: "#FF0000",
+        color_opacity: 128 / 255,
+        stroke_width: 1.07
+      }
+
+      assert draw(whole([rectangles])) =~
+               "style='stroke-width: 1.07; stroke: #FF0000; stroke-opacity: 0.50; " <>
+                 "stroke-linecap: butt; stroke-linejoin: miter; fill: #0000FF; " <>
+                 "fill-opacity: 0.30;' />"
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = NA, colour = NA)`, in vdiffr
+    # 1.0.9: a border of no colour is `none`, whatever opacity the scene gives it.
+    test "a placed rectangle of no border colour is stroked none, whatever its opacity" do
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: "#595959",
+        fill_opacity: [1.0],
+        color: :none,
+        color_opacity: 1.0,
+        stroke_width: 1.07
+      }
+
+      assert draw(whole([rectangles])) =~
+               "style='stroke-width: 1.07; stroke: none; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; fill: #595959;' />"
+    end
+
+    # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = NA, colour = "red")`, in vdiffr
+    # 1.0.9, which leaves the fill to its stylesheet.
+    test "a placed rectangle of no fill is filled none, whatever its opacity" do
+      rectangles = %Rectangles{
+        xmin: [0.1],
+        xmax: [0.3],
+        ymin: [0.5],
+        ymax: [0.8],
+        fill: :none,
+        fill_opacity: [1.0],
+        color: "#FF0000",
+        color_opacity: 1.0,
+        stroke_width: 1.07
+      }
+
+      assert draw(whole([rectangles])) =~
+               "style='stroke-width: 1.07; stroke: #FF0000; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; fill: none;' />"
     end
 
     # svglite declares these in its stylesheet; a stylesheet inlined in a page styles the whole page,

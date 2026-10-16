@@ -11,12 +11,14 @@ defmodule Giggly.Geom.Point do
   # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
   # panel's edge, where the coordinate system puts it.
   #
-  # Every point looks as ggplot2's default point does, until aesthetics such as colour and size can
-  # be mapped or set: black, size 1.5 mm with a 0.5 mm border, which grid draws as a circle of
-  # radius 1.95 points with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots.
-  # A row's `alpha`, where its table has one, makes the point's outline and fill alike that opaque,
-  # as ggplot2's `alpha()` colours both; a row without one is opaque, as ggplot2's default alpha,
-  # `NA`, leaves a colour.
+  # Every point looks as ggplot2's default point does, until aesthetics such as size can be mapped
+  # or set: size 1.5 mm with a 0.5 mm border, which grid draws as a circle of radius 1.95 points
+  # with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots, and black, or the
+  # colour the layer sets, outline and fill alike. A row's `alpha`, where its table has one, makes
+  # the point that opaque, replacing its colour's own, as ggplot2's `alpha()` colours both; a row
+  # without one keeps its colour's, which is opaque unless the colour carries an alpha, as
+  # ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A colour of `:none`, R's
+  # `NA`, draws no point, as ggplot2's `GeomPoint` drops a row whose colour is missing.
 
   defstruct []
 
@@ -36,6 +38,7 @@ defmodule Giggly.Geom.Point do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Coord, DataFrame}
+    alias Giggly.Geom.Mark
     alias Giggly.Scene.Circles
 
     # ggplot2's default point: size and border width in millimetres, and its ink.
@@ -63,55 +66,55 @@ defmodule Giggly.Geom.Point do
 
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
-      placed = Coord.transform(coord, frame, panel_params)
+      case Mark.set(frame, :color, @color) do
+        :none ->
+          []
 
+        color ->
+          placed = Coord.transform(coord, frame, panel_params)
+          [circles(placed, color)]
+      end
+    end
+
+    # A circle for each row placed in the panel, in `color`.
+    defp circles(placed, color) do
       drawn =
-        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y), opacities(placed)]
+        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y), Mark.opacities(placed, color)]
         |> Enum.zip()
         |> Enum.filter(fn {x_position, y_position, _opacity} ->
           is_number(x_position) and is_number(y_position)
         end)
 
-      [
-        %Circles{
-          x: Enum.map(drawn, fn {x_position, _y_position, _opacity} -> x_position end),
-          y: Enum.map(drawn, fn {_x_position, y_position, _opacity} -> y_position end),
-          radius: @radius,
-          stroke_width: @stroke_width,
-          color: @color,
-          opacity: Enum.map(drawn, fn {_x_position, _y_position, opacity} -> opacity end)
-        }
-      ]
+      %Circles{
+        x: Enum.map(drawn, fn {x_position, _y_position, _opacity} -> x_position end),
+        y: Enum.map(drawn, fn {_x_position, y_position, _opacity} -> y_position end),
+        radius: @radius,
+        stroke_width: @stroke_width,
+        color: Mark.hex(color),
+        opacity: Enum.map(drawn, fn {_x_position, _y_position, opacity} -> opacity end)
+      }
     end
 
     # A legend's key: the point at the middle of the key, as ggplot2's `draw_key_point()` draws
-    # it, at the key's alpha.
+    # it, in the key's colour at its alpha; a colour of `:none` draws nothing.
     @impl Giggly.Geom
     def draw_key(_geom, key, _size) do
-      [
-        %Circles{
-          x: [0.5],
-          y: [0.5],
-          radius: @radius,
-          stroke_width: @stroke_width,
-          color: @color,
-          opacity: [opacity(Map.get(key, :alpha))]
-        }
-      ]
-    end
+      case Map.get(key, :color, @color) do
+        :none ->
+          []
 
-    # Each row's opacity: its alpha, or opaque where its table has none.
-    defp opacities(frame) do
-      if :alpha in DataFrame.names(frame) do
-        frame
-        |> DataFrame.pull(:alpha)
-        |> Enum.map(&opacity/1)
-      else
-        List.duplicate(1.0, DataFrame.row_count(frame))
+        color ->
+          [
+            %Circles{
+              x: [0.5],
+              y: [0.5],
+              radius: @radius,
+              stroke_width: @stroke_width,
+              color: Mark.hex(color),
+              opacity: [Mark.opacity(color, Map.get(key, :alpha))]
+            }
+          ]
       end
     end
-
-    defp opacity(alpha) when is_number(alpha), do: alpha / 1
-    defp opacity(missing) when missing in [nil, :nan], do: 1.0
   end
 end
