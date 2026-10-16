@@ -1,0 +1,92 @@
+# Reference lines: geom_abline
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_abline()`](https://ggplot2.tidyverse.org/reference/geom_abline.html), which covers
+`geom_hline()` and `geom_vline()` too, in the order the page gives them. Each example shows
+ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code
+and names what it is waiting for, so the page is also a list of what remains.
+
+These geoms add reference lines to a plot: vertical ones at an `xintercept`, horizontal ones at a
+`yintercept`, and diagonal ones given a `slope` and an `intercept`. Given as arguments, a line is
+the same in every panel; mapped from a data frame, the lines can differ from panel to panel. Unlike
+other geoms, they take nothing from the plot's mapping and do not change the plot's scales. Giggly
+has none of them yet.
+
+## Vertical and horizontal lines
+
+```r
+p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
+# Fixed values
+p + geom_vline(xintercept = 5)
+p + geom_vline(xintercept = 1:5)
+p + geom_hline(yintercept = 20)
+```
+
+Not in Giggly yet: `geom_vline()` and `geom_hline()`.
+
+## Diagonal lines
+
+```r
+p + geom_abline() # Can't see it - outside the range of the data
+p + geom_abline(intercept = 20)
+```
+
+With no arguments, the line is `y = x`, which runs below the panel, out of sight. Not in Giggly
+yet: `geom_abline()`.
+
+## A line of best fit
+
+```r
+# Calculate slope and intercept of line of best fit
+coef(lm(mpg ~ wt, data = mtcars))
+p + geom_abline(intercept = 37, slope = -5)
+```
+
+R fits `mpg` to `wt` with a linear model and prints its intercept and slope, which the line then
+rounds. Not in Giggly yet: models fitted by `lm()`, and `geom_abline()`.
+
+## Fitting the line with geom_smooth()
+
+```r
+# But this is easier to do with geom_smooth:
+p + geom_smooth(method = "lm", se = FALSE)
+```
+
+Not in Giggly yet: `geom_smooth()`.
+
+## Lines that differ between facets
+
+```r
+# To show different lines in different facets, use aesthetics
+p <- ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  facet_wrap(~ cyl)
+mean_wt <- data.frame(cyl = c(4, 6, 8), wt = c(2.28, 3.11, 4.00))
+p + geom_hline(aes(yintercept = wt), mean_wt)
+```
+
+The facets are in Giggly: `facet_wrap(~ cyl)` is `Giggly.Plot.facet_wrap(plot, :cyl)`. Each line
+comes from the row of `mean_wt` with its panel's `cyl`. Not in Giggly yet: `geom_hline()`, mapping
+`yintercept`, and a layer with data of its own.
+
+## Other aesthetics
+
+```r
+# You can also control other aesthetics
+ggplot(mtcars, aes(mpg, wt, colour = wt)) +
+  geom_point() +
+  geom_hline(aes(yintercept = wt, colour = wt), mean_wt) +
+  facet_wrap(~ cyl)
+```
+
+Not in Giggly yet: `geom_hline()`, mapping `yintercept`, mapping `colour`, the scale that maps it
+and the legend that reads it back, and a layer with data of its own.

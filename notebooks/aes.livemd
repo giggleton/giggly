@@ -1,0 +1,177 @@
+# Aesthetic mappings: aes
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`aes()`](https://ggplot2.tidyverse.org/reference/aes.html), in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+An aesthetic mapping says which of the data's columns each visual property of a layer's marks, its
+aesthetics, is drawn from. ggplot2 builds one with `aes()`, which quotes its arguments, so each is
+an expression evaluated in the data, and standardises the aesthetics' names. A mapping given to
+`ggplot()` applies to every layer, and one given to a layer to that layer alone. A Giggly mapping is
+a plain map from aesthetic to column, `%{x: :displ, y: :hwy}`, a column named by an atom or a
+string; it names columns only, not expressions or constants. The mapping given to
+`Giggly.Plot.new/2` applies to every layer, and a layer's own mapping is laid over it. A plot is
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`. The examples use `Giggly.Datasets.mpg/0`,
+ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, and
+`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
+setup cell binds to `mpg` and `mtcars`, the names ggplot2 and R give them.
+
+## A mapping
+
+```r
+aes(x = mpg, y = wt)
+aes(mpg, wt)
+```
+
+Each call builds the same mapping, which R prints; `x` and `y` may go unnamed. A Giggly mapping is
+a plain map, `%{x: :mpg, y: :wt}`, given to `Giggly.Plot.new/2` or to a layer; no function builds
+it, and every aesthetic is named, `x` and `y` included.
+
+## Expressions of columns
+
+```r
+# You can also map aesthetics to functions of variables
+aes(x = mpg ^ 2, y = wt / cyl)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `mpg ^ 2` or `wt / cyl`.
+
+## Constants
+
+```r
+# Or to constants
+aes(x = 1, colour = "smooth")
+```
+
+Not in Giggly yet: an expression in a mapping, here the constants `1` and `"smooth"`, and mapping
+`colour`. A string in a Giggly mapping names a column, as an atom does.
+
+## Standard names
+
+```r
+# Aesthetic names are automatically standardised
+aes(col = x)
+aes(fg = x)
+aes(color = x)
+aes(colour = x)
+```
+
+ggplot2 rewrites each of these names to `colour`. Giggly takes `colour` and `color` as two
+spellings of one aesthetic, and refuses a mapping that gives both; it does not translate `col` and
+`fg`, names from R's base graphics. Not in Giggly yet: mapping `colour`.
+
+## The plot's mapping or a layer's
+
+```r
+# aes() is passed to either ggplot() or specific layer. Aesthetics supplied
+# to ggplot() are used as defaults for every layer.
+ggplot(mpg, aes(displ, hwy)) + geom_point()
+ggplot(mpg) + geom_point(aes(displ, hwy))
+```
+
+A mapping given to the plot is used by every layer:
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> render.()
+```
+
+Given to the layer instead, it draws the same plot:
+
+```elixir
+mpg
+|> Plot.new()
+|> Plot.geom_point(%{x: :displ, y: :hwy})
+|> render.()
+```
+
+## A wrapper that takes dots
+
+```r
+# Tidy evaluation ----------------------------------------------------
+# aes() automatically quotes all its arguments, so you need to use tidy
+# evaluation to create wrappers around ggplot2 pipelines. The
+# simplest case occurs when your wrapper takes dots:
+scatter_by <- function(data, ...) {
+  ggplot(data) + geom_point(aes(...))
+}
+scatter_by(mtcars, disp, drat)
+```
+
+Giggly's mappings name columns by value, an atom or a string, so a wrapper passes them on as it
+would any other value, and nothing needs quoting. Here the wrapper takes a whole mapping, as the
+dots do.
+
+```elixir
+scatter_by = fn data, mapping ->
+  data
+  |> Plot.new()
+  |> Plot.geom_point(mapping)
+end
+
+mtcars
+|> scatter_by.(%{x: :disp, y: :drat})
+|> render.()
+```
+
+## A wrapper with named arguments
+
+```r
+# If your wrapper has a more specific interface with named arguments,
+# you need the "embrace operator":
+scatter_by <- function(data, x, y) {
+  ggplot(data) + geom_point(aes({{ x }}, {{ y }}))
+}
+scatter_by(mtcars, disp, drat)
+```
+
+Named columns are passed one by one, again as plain values, with no operator.
+
+```elixir
+scatter_by = fn data, x, y ->
+  data
+  |> Plot.new()
+  |> Plot.geom_point(%{x: x, y: y})
+end
+
+mtcars
+|> scatter_by.(:disp, :drat)
+|> render.()
+```
+
+## Functions in a wrapper's arguments
+
+```r
+# Note that users of your wrapper can use their own functions in the
+# quoted expressions and all will resolve as it should!
+cut3 <- function(x) cut_number(x, 3)
+scatter_by(mtcars, cut3(disp), drat)
+```
+
+Not in Giggly yet: `cut_number()`, and an expression in a mapping, such as `cut3(disp)`.

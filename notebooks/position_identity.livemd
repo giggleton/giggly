@@ -1,0 +1,21 @@
+# Unadjusted positions: position_identity
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`position_identity()`](https://ggplot2.tidyverse.org/reference/position_identity.html) has no
+examples, so this notebook says only what the page describes and where Giggly stands.
+
+`position_identity()` adjusts nothing: every row is drawn where its position aesthetics put it,
+whether or not its mark overlaps another. Giggly has no position by that name yet.
+`Giggly.Plot.geom_point/2` draws each point at its row's `x` and `y`, unadjusted, as ggplot2's
+`geom_point()` does by default. `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3` take
+`position: :stack`, their default, or `position: :dodge`, so they cannot yet draw bars over one
+another, as `position = "identity"` does.

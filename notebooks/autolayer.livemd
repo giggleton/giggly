@@ -1,0 +1,19 @@
+# Automatic layers: autolayer
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`autolayer()`](https://ggplot2.tidyverse.org/reference/autolayer.html) has no examples, so this
+notebook says only what the page describes and where Giggly stands.
+
+`autolayer()` makes a ggplot2 layer for an object of a particular class in a single call, the
+class deciding which layer, to be added to a plot. ggplot2 defines it as an S3 generic, and other
+packages write methods for their own classes, as ggplot2's `automatic_plotting` page describes.
+Not in Giggly yet: `autolayer()`.

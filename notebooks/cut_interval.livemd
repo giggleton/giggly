@@ -1,0 +1,59 @@
+# Discretising numbers: cut_interval
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`cut_interval()`](https://ggplot2.tidyverse.org/reference/cut_interval.html), which covers
+`cut_number()` and `cut_width()` too, in the order the page gives them. Each example shows
+ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code
+and names what it is waiting for, so the page is also a list of what remains.
+
+These functions turn a numeric vector into a factor whose levels are ranges of its values:
+`cut_interval()` makes `n` ranges of equal width, `cut_number()` makes `n` ranges holding about
+the same number of values each, and `cut_width()` makes ranges of a given width, placed by the
+centre or the boundary of any one of them. Not in Giggly yet: `cut_interval()`, `cut_number()`
+and `cut_width()`. A Giggly mapping names columns only, so an expression in a mapping, such as
+`cut_width(displ, 1)`, is not in Giggly yet either.
+
+## Ranges of equal width
+
+```r
+table(cut_interval(1:100, 10))
+table(cut_interval(1:100, 11))
+```
+
+`table()` counts the values in each range: the numbers 1 to 100 cut into 10 ranges of equal
+width, then into 11. Not in Giggly yet: `cut_interval()`.
+
+## Ranges holding equal numbers of values
+
+```r
+set.seed(1)
+
+table(cut_number(runif(1000), 10))
+```
+
+With `set.seed(1)` fixing R's random numbers, `runif(1000)` draws 1,000 values between 0 and 1,
+and `cut_number()` cuts them into 10 ranges holding about 100 values each. Not in Giggly yet:
+`cut_number()`.
+
+## Ranges of a given width
+
+```r
+table(cut_width(runif(1000), 0.1))
+table(cut_width(runif(1000), 0.1, boundary = 0))
+table(cut_width(runif(1000), 0.1, center = 0))
+table(cut_width(runif(1000), 0.1, labels = FALSE))
+```
+
+Each line draws 1,000 new random values and cuts them into ranges 0.1 wide. By default a boundary
+falls at half the width; `boundary = 0` puts one at 0 instead, `center = 0` centres a range on 0,
+and `labels = FALSE` gives each value its range's number rather than a factor. Not in Giggly yet:
+`cut_width()`.

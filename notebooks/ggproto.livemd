@@ -1,0 +1,58 @@
+# ggproto objects: ggproto
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`ggproto()`](https://ggplot2.tidyverse.org/reference/ggproto.html), which covers
+`ggproto_parent()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+ggproto is the object system ggplot2 is built with. `ggproto()` makes an object holding fields
+and methods, which may inherit from another object, across packages too; `is_ggproto()` tests for
+one, and `ggproto_parent()` calls a method of the parent from a method that overrides it. A
+method that takes `self` is given the object it is called on. Objects are built on R
+environments, so they change in place rather than being copied. Not in Giggly yet: `ggproto()`.
+
+## An object with a field and a method
+
+```r
+Adder <- ggproto("Adder",
+  x = 0,
+  add = function(self, n) {
+    self$x <- self$x + n
+    self$x
+  }
+ )
+is_ggproto(Adder)
+
+Adder$add(10)
+Adder$add(10)
+```
+
+`Adder` holds a field, `x`, and a method, `add()`, which adds `n` to the object's `x` and returns
+it; `is_ggproto()` returns `TRUE`. The two calls return 10 and then 20, since the object changes
+in place. Not in Giggly yet: `ggproto()`.
+
+## Calling the parent's method
+
+```r
+Doubler <- ggproto("Doubler", Adder,
+  add = function(self, n) {
+    ggproto_parent(Adder, self)$add(n * 2)
+  }
+)
+Doubler$x
+Doubler$add(10)
+```
+
+`Doubler` inherits from `Adder`, so `Doubler$x` reads `Adder`'s `x`, 20. Its own `add()` doubles
+`n` and hands it to `Adder`'s `add()` through `ggproto_parent()`, which adds it to `Doubler`'s
+`x`, so `Doubler$add(10)` returns 40. Not in Giggly yet: `ggproto()` and `ggproto_parent()`.

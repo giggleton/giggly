@@ -1,0 +1,99 @@
+# Labels: labs
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`labs()`](https://ggplot2.tidyverse.org/reference/labs.html), which covers `xlab()`, `ylab()`,
+`ggtitle()` and `get_labs()` too, in the order the page gives them. Each example shows ggplot2's
+code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names
+what it is waiting for, so the page is also a list of what remains.
+
+`labs()` sets the text of a plot's labels: the title of each axis or legend, named by its
+aesthetic, and the plot's title, subtitle, caption and tag. `xlab()`, `ylab()` and `ggtitle()` are
+older shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly
+has none of these yet: an axis is titled by the column mapped to it, or `count` for counted bars,
+and a plot has no legends and no title, subtitle, caption or tag.
+
+## Renaming a legend or an axis
+
+```r
+p <- ggplot(mtcars, aes(mpg, wt, colour = cyl)) + geom_point()
+p + labs(colour = "Cylinders")
+p + labs(x = "New x label")
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and `labs()`. Giggly titles
+each axis by the column mapped to it, here `mpg` and `wt`.
+
+## Labels by column
+
+A `dictionary` relabels by column rather than by aesthetic: a label that is a column's name, here
+`mpg`, `wt` or `cyl`, becomes that column's entry. The plot does not use `disp`, so its entry
+changes nothing.
+
+```r
+# Set labels by variable name instead of aesthetic
+p + labs(dictionary = c(
+  disp = "Displacment", # Not in use
+  cyl  = "Number of cylinders",
+  mpg  = "Miles per gallon",
+  wt   = "Weight (1000 lbs)"
+))
+```
+
+Not in Giggly yet: `labs()` and its `dictionary` option, and mapping `colour` and the legend that
+reads it back.
+
+## A title and subtitle
+
+```r
+# The plot title appears at the top-left, with the subtitle
+# display in smaller text underneath it
+p + labs(title = "New plot title")
+p + labs(title = "New plot title", subtitle = "A subtitle")
+```
+
+Not in Giggly yet: `labs()`, here the plot's title and subtitle, and mapping `colour` and the
+legend that reads it back.
+
+## A caption
+
+```r
+# The caption appears in the bottom-right, and is often used for
+# sources, notes or copyright
+p + labs(caption = "(based on data from ...)")
+```
+
+Not in Giggly yet: `labs()`, here the plot's caption, and mapping `colour` and the legend that
+reads it back.
+
+## A tag
+
+```r
+# The plot tag appears at the top-left, and is typically used
+# for labelling a subplot with a letter.
+p + labs(title = "title", tag = "A")
+```
+
+Not in Giggly yet: `labs()`, here the plot's title and tag, and mapping `colour` and the legend
+that reads it back.
+
+## Removing a label
+
+```r
+# If you want to remove a label, set it to NULL.
+p +
+ labs(title = "title") +
+ labs(title = NULL)
+```
+
+The second `labs()` removes the title the first one set.
+
+Not in Giggly yet: `labs()`, and mapping `colour` and the legend that reads it back.

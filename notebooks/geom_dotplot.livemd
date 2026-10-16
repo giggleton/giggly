@@ -1,0 +1,179 @@
+# Dot plots: geom_dotplot
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_dotplot()`](https://ggplot2.tidyverse.org/reference/geom_dotplot.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+A dot plot shows how one column's values are spread: it bins them and stacks one dot for each
+row in a bin, each dot as wide as the bin. ggplot2 bins in one of two ways: by dot density, where
+the data and a largest bin width decide where the bins fall, or as a histogram does, with bins of
+one width at fixed places. It can bin along `y` instead of `x`, stack the dots up, down or about
+the centre, and stack several groups on one another. Giggly has no dot plots yet. The examples'
+data, R's `mtcars`, is in Giggly already, as `Giggly.Datasets.mtcars/0`.
+
+## A dot plot
+
+```r
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot()
+```
+
+With no `binwidth`, ggplot2 takes a thirtieth of the data's range as the widest a bin may be, and
+says so.
+
+Not in Giggly yet: `geom_dotplot()`.
+
+## The width of the bins
+
+```r
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5)
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option.
+
+## Bins of one width
+
+```r
+# Use fixed-width bins
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(method="histodot", binwidth = 1.5)
+```
+
+`method = "histodot"` puts the bins at fixed places, all as wide as `binwidth`, as a histogram
+does, rather than letting the data decide where each one starts.
+
+Not in Giggly yet: `geom_dotplot()` and its `method` and `binwidth` options.
+
+## Stacking about the centre
+
+```r
+# Some other stacking methods
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5, stackdir = "center")
+
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5, stackdir = "centerwhole")
+```
+
+`"center"` stacks the dots out both ways from the middle rather than up from the axis;
+`"centerwhole"` does too, but keeps the dots of neighbouring stacks in line.
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` and `stackdir` options.
+
+## Hiding the y axis
+
+```r
+# y axis isn't really meaningful, so hide it
+ggplot(mtcars, aes(x = mpg)) + geom_dotplot(binwidth = 1.5) +
+  scale_y_continuous(NULL, breaks = NULL)
+```
+
+The numbers on a dot plot's y axis count nothing, so the example removes the axis's title and
+breaks.
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, and `scale_y_continuous()`.
+
+## Overlapping dots
+
+```r
+# Overlap dots vertically
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5, stackratio = .7)
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` and `stackratio` options.
+
+## Larger dots
+
+```r
+# Expand dot diameter
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5, dotsize = 1.25)
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` and `dotsize` options.
+
+## A dot's fill and border
+
+```r
+# Change dot fill colour, stroke width
+ggplot(mtcars, aes(x = mpg)) +
+  geom_dotplot(binwidth = 1.5, fill = "white", stroke = 2)
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, a fixed `fill` and a fixed
+`stroke`.
+
+## Binning along y
+
+```r
+# Examples with stacking along y axis instead of x
+ggplot(mtcars, aes(x = 1, y = mpg)) +
+  geom_dotplot(binaxis = "y", stackdir = "center")
+
+ggplot(mtcars, aes(x = factor(cyl), y = mpg)) +
+  geom_dotplot(binaxis = "y", stackdir = "center")
+
+ggplot(mtcars, aes(x = factor(cyl), y = mpg)) +
+  geom_dotplot(binaxis = "y", stackdir = "centerwhole")
+```
+
+`binaxis = "y"` bins `mpg` up the y axis and stacks the dots sideways, one stack for each `x`.
+
+Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, and an expression
+in a mapping, such as `1` or `factor(cyl)`.
+
+## Dodging groups
+
+```r
+ggplot(mtcars, aes(x = factor(vs), fill = factor(cyl), y = mpg)) +
+  geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge")
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, an expression in a
+mapping, such as `factor(vs)`, and mapping `fill`, the scale that maps it and the legend that
+reads it back.
+
+## Aligning the bins of groups
+
+```r
+# binpositions="all" ensures that the bins are aligned between groups
+ggplot(mtcars, aes(x = factor(am), y = mpg)) +
+  geom_dotplot(binaxis = "y", stackdir = "center", binpositions="all")
+```
+
+Not in Giggly yet: `geom_dotplot()` and its `binaxis`, `stackdir` and `binpositions` options,
+and an expression in a mapping, such as `factor(am)`.
+
+## Stacking groups
+
+```r
+# Stacking multiple groups, with different fill
+ggplot(mtcars, aes(x = mpg, fill = factor(cyl))) +
+  geom_dotplot(stackgroups = TRUE, binwidth = 1, binpositions = "all")
+
+ggplot(mtcars, aes(x = mpg, fill = factor(cyl))) +
+  geom_dotplot(stackgroups = TRUE, binwidth = 1, method = "histodot")
+
+ggplot(mtcars, aes(x = 1, y = mpg, fill = factor(cyl))) +
+  geom_dotplot(binaxis = "y", stackgroups = TRUE, binwidth = 1, method = "histodot")
+```
+
+`stackgroups = TRUE` stacks each group's dots on the dots of the groups before it, as
+`position = "stack"` would if a dot plot could use it.
+
+Not in Giggly yet: `geom_dotplot()` and its `stackgroups`, `binwidth`, `binpositions`, `method`
+and `binaxis` options, an expression in a mapping, such as `factor(cyl)` or `1`, and mapping
+`fill`, the scale that maps it and the legend that reads it back.

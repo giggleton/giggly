@@ -1,0 +1,35 @@
+# Mathematical labels: label_bquote
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`label_bquote()`](https://ggplot2.tidyverse.org/reference/label_bquote.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list
+of what remains.
+
+`label_bquote()` labels a facet's rows or columns with one of R's plotmath expressions,
+mathematical notation in which a column written `.(column)` is replaced by its value in each
+panel. Giggly has none of it yet: it has no `facet_grid()`, no labellers and no plotmath.
+
+## Expressions in the strips
+
+`alpha ^ .(vs)` draws the Greek letter α raised to the power of the panel's `vs`, 0 or 1.
+
+```r
+# The variables mentioned in the plotmath expression must be
+# backquoted and referred to by their names.
+p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
+p + facet_grid(vs ~ ., labeller = label_bquote(alpha ^ .(vs)))
+p + facet_grid(. ~ vs, labeller = label_bquote(cols = .(vs) ^ .(vs)))
+p + facet_grid(. ~ vs + am, labeller = label_bquote(cols = .(am) ^ .(vs)))
+```
+
+Not in Giggly yet: `facet_grid()`, `label_bquote()` and R's plotmath expressions.

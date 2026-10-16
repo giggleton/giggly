@@ -1,0 +1,125 @@
+# Density contours: geom_density_2d
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_density_2d()`](https://ggplot2.tidyverse.org/reference/geom_density_2d.html), which covers
+`geom_density_2d_filled()`, `stat_density_2d()` and `stat_density_2d_filled()` too, in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list
+of what remains.
+
+These estimate the density of points in two dimensions, with `MASS::kde2d()`, and draw it as
+contours: `geom_density_2d()` as lines and `geom_density_2d_filled()` as filled bands. They are
+the two-dimensional `geom_density()`, and a way through overplotting. With contouring turned off,
+the stats give the density on a grid for other geoms to draw. Giggly has none of this yet.
+
+## Contour lines
+
+```r
+m <- ggplot(faithful, aes(x = eruptions, y = waiting)) +
+ geom_point() +
+ xlim(0.5, 6) +
+ ylim(40, 110)
+# contour lines
+m + geom_density_2d()
+```
+
+Not in Giggly yet: `geom_density_2d()`, `xlim()` and `ylim()`, and the `faithful` dataset.
+
+## Contour bands
+
+```r
+# contour bands
+m + geom_density_2d_filled(alpha = 0.5)
+```
+
+Not in Giggly yet: `geom_density_2d_filled()`, mapping `fill`, the scale that maps it and the
+legend that reads it back, a fixed `alpha`, `xlim()` and `ylim()`, and the `faithful` dataset.
+
+## Bands and lines
+
+```r
+# contour bands and contour lines
+m + geom_density_2d_filled(alpha = 0.5) +
+  geom_density_2d(linewidth = 0.25, colour = "black")
+```
+
+Not in Giggly yet: `geom_density_2d_filled()` and `geom_density_2d()`, mapping `fill`, the scale
+that maps it and the legend that reads it back, a fixed `alpha`, `linewidth` and `colour`, `xlim()`
+and `ylim()`, and the `faithful` dataset.
+
+## Contours for each cut
+
+R samples 1,000 of the diamonds at random, from a seed.
+
+```r
+set.seed(4393)
+dsmall <- diamonds[sample(nrow(diamonds), 1000), ]
+d <- ggplot(dsmall, aes(x, y))
+# If you map an aesthetic to a categorical variable, you will get a
+# set of contours for each value of that variable
+d + geom_density_2d(aes(colour = cut))
+```
+
+Not in Giggly yet: `geom_density_2d()`, mapping `colour`, the scale that maps it and the legend
+that reads it back, and the `diamonds` dataset.
+
+## Filled contours in facets
+
+```r
+# If you draw filled contours across multiple facets, the same bins are
+# used across all facets
+d + geom_density_2d_filled() + facet_wrap(vars(cut))
+```
+
+The facets are in Giggly: `facet_wrap(vars(cut))` is `Giggly.Plot.facet_wrap(plot, :cut)`. Not in
+Giggly yet: `geom_density_2d_filled()`, mapping `fill`, the scale that maps it and the legend that
+reads it back, and the `diamonds` dataset.
+
+## What the contours measure
+
+```r
+# If you want to make sure the peak intensity is the same in each facet,
+# use `contour_var = "ndensity"`.
+d + geom_density_2d_filled(contour_var = "ndensity") + facet_wrap(vars(cut))
+# If you want to scale intensity by the number of observations in each group,
+# use `contour_var = "count"`.
+d + geom_density_2d_filled(contour_var = "count") + facet_wrap(vars(cut))
+```
+
+Not in Giggly yet: `geom_density_2d_filled()` and its `contour_var` option, mapping `fill`, the
+scale that maps it and the legend that reads it back, and the `diamonds` dataset.
+
+## The density as tiles
+
+```r
+# If we turn contouring off, we can use other geoms, such as tiles:
+d + stat_density_2d(
+  geom = "raster",
+  aes(fill = after_stat(density)),
+  contour = FALSE
+) + scale_fill_viridis_c()
+```
+
+Not in Giggly yet: `stat_density_2d()` and its `contour` option, giving a stat a geom by name, here
+`geom = "raster"`, `geom_raster()`, mapping `fill` and the legend that reads it back, an expression
+in a mapping, such as `after_stat(density)`, `scale_fill_viridis_c()`, and the `diamonds` dataset.
+
+## The density as points
+
+```r
+# Or points:
+d + stat_density_2d(geom = "point", aes(size = after_stat(density)), n = 20, contour = FALSE)
+```
+
+Not in Giggly yet: `stat_density_2d()` and its `n` and `contour` options, giving a stat a geom by
+name, here `geom = "point"`, mapping `size`, the scale that maps it and the legend that reads it
+back, an expression in a mapping, such as `after_stat(density)`, and the `diamonds` dataset.

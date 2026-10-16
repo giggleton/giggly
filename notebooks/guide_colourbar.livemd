@@ -1,0 +1,140 @@
+# Colour bars: guide_colourbar
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`guide_colourbar()`](https://ggplot2.tidyverse.org/reference/guide_colourbar.html), which covers
+`guide_colorbar()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+A colour bar is the legend of a continuous colour or fill scale: a bar shaded through the scale's
+colours, with ticks and labels at its breaks. It is chosen in the scale's `guide` argument or in
+`guides()`, by name or by calling `guide_colourbar()`, whose options set the number of bins the
+bar is shaded in, whether the ticks at its ends are drawn, and, through a theme of its own, the
+bar's size and the look and place of its ticks and labels. `guide_colorbar()` is the same
+function. Giggly has none of this yet: it has no `colour` or `fill` aesthetic and no legends, and
+draws every plot in ggplot2's default theme, `theme_gray()`, with no way to change it.
+
+## The basic form
+
+`expand.grid()` makes a row for every pair of `X1` and `X2` from 1 to 10, and `value` is their
+product; `p2` adds points sized by `value`, for the last example. The plots are the same: a
+colour bar is the default guide for a continuous fill, chosen in the scale, by name or by
+function, or in `guides()`.
+
+```r
+df <- expand.grid(X1 = 1:10, X2 = 1:10)
+df$value <- df$X1 * df$X2
+
+p1 <- ggplot(df, aes(X1, X2)) + geom_tile(aes(fill = value))
+p2 <- p1 + geom_point(aes(size = value))
+
+# Basic form
+p1 + scale_fill_continuous(guide = "colourbar")
+p1 + scale_fill_continuous(guide = guide_colourbar())
+p1 + guides(fill = guide_colourbar())
+```
+
+Not in Giggly yet: tiles (`geom_tile()`), mapping `fill`, `scale_fill_continuous()` and its
+`guide` option, `guides()` and `guide_colourbar()`.
+
+## Styling the bar
+
+A guide's `theme` styles only that guide: here the bar's width and height, no labels, no ticks,
+the labels on the left, and blue labels.
+
+```r
+# Control styles
+
+# bar size
+p1 + guides(fill = guide_colourbar(theme = theme(
+  legend.key.width  = unit(0.5, "lines"),
+  legend.key.height = unit(10, "lines")
+)))
+
+# no label
+p1 + guides(fill = guide_colourbar(theme = theme(
+  legend.text = element_blank()
+)))
+
+# no tick marks
+p1 + guides(fill = guide_colourbar(theme = theme(
+  legend.ticks = element_blank()
+)))
+
+# label position
+p1 + guides(fill = guide_colourbar(theme = theme(
+  legend.text.position = "left"
+)))
+
+# label theme
+p1 + guides(fill = guide_colourbar(theme = theme(
+  legend.text = element_text(colour = "blue", angle = 0)
+)))
+```
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, `guides()`, `guide_colourbar()` and its `theme`
+option, and changing the theme.
+
+## The number of bins
+
+```r
+# small number of bins
+p1 + guides(fill = guide_colourbar(nbin = 3))
+
+# large number of bins
+p1 + guides(fill = guide_colourbar(nbin = 100))
+```
+
+`nbin` sets how many steps the bar's shading is drawn in.
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, `guides()`, and `guide_colourbar()` and its
+`nbin` option.
+
+## Hiding the end ticks
+
+```r
+# make top- and bottom-most ticks invisible
+p1 +
+  scale_fill_continuous(
+    limits = c(0,20), breaks = c(0, 5, 10, 15, 20),
+    guide = guide_colourbar(nbin = 100, draw.ulim = FALSE, draw.llim = FALSE)
+  )
+```
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_continuous()` and its `limits`,
+`breaks` and `guide` options, and `guide_colourbar()` and its `nbin`, `draw.ulim` and `draw.llim`
+options.
+
+## A colour bar beside a legend
+
+`p2` has a colour bar for fill and a legend of sizes. Each scale's guide is chosen on its own, in
+the scale or in `guides()`; in the last plot, each guide also takes its own direction.
+
+```r
+# guides can be controlled independently
+p2 +
+  scale_fill_continuous(guide = "colourbar") +
+  scale_size(guide = "legend")
+p2 + guides(fill = "colourbar", size = "legend")
+
+p2 +
+  scale_fill_continuous(guide = guide_colourbar(theme = theme(
+    legend.direction = "horizontal"
+  ))) +
+  scale_size(guide = guide_legend(theme = theme(
+    legend.direction = "vertical"
+  )))
+```
+
+Not in Giggly yet: `geom_tile()`, mapping `fill` and `size`, `scale_fill_continuous()`,
+`scale_size()`, `guides()`, `guide_colourbar()` and `guide_legend()` and their `theme` options,
+and changing the theme.

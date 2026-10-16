@@ -1,0 +1,124 @@
+# Grouping: aes_group_order
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`aes_group_order`](https://ggplot2.tidyverse.org/reference/aes_group_order.html), in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+The `group` aesthetic splits a layer's rows into groups, such as one line or one bar for each.
+By default the groups are the combinations of the plot's discrete variables, such as a discrete
+`x` or a mapped `colour`; where that partitions the data wrongly, or nothing is discrete, mapping
+`group` to a column sets them by hand. Three cases need it: lines through many individuals, lines
+across a discrete axis, and layers grouped differently, such as one fit to all the rows over
+lines for each individual. The later examples show these with `nlme`'s `Oxboys`, the heights of
+26 boys, each measured on nine occasions. Giggly maps `group` to a column, as a layer of points
+or bars takes it, and stacks bars at the same `x`, one for each group; it has none of the other
+aesthetics the examples group by, nor lines, smoothers or boxplots.
+
+## A scatter plot
+
+```r
+p <- ggplot(mtcars, aes(wt, mpg))
+# A basic scatter plot
+p + geom_point(size = 4)
+```
+
+Not in Giggly yet: a fixed `size`.
+
+## Groups by colour and shape
+
+```r
+# Using the colour aesthetic
+p + geom_point(aes(colour = factor(cyl)), size = 4)
+# Using the shape aesthetic
+p + geom_point(aes(shape = factor(cyl)), size = 4)
+```
+
+Not in Giggly yet: mapping `colour` and `shape` and the legends that read them back, an
+expression in a mapping, such as `factor(cyl)`, and a fixed `size`.
+
+## Groups by fill
+
+```r
+# Using fill
+p <- ggplot(mtcars, aes(factor(cyl)))
+p + geom_bar()
+p + geom_bar(aes(fill = factor(cyl)))
+p + geom_bar(aes(fill = factor(vs)))
+```
+
+Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values.
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and mapping `fill` and the
+legend that reads it back.
+
+## Groups by linetype
+
+```r
+# Using linetypes
+ggplot(economics_long, aes(date, value01)) +
+  geom_line(aes(linetype = variable))
+```
+
+Not in Giggly yet: the `economics_long` dataset, dates on an axis, `geom_line()`, and mapping
+`linetype` and the legend that reads it back.
+
+## One line for each boy
+
+```r
+# Multiple groups with one aesthetic
+p <- ggplot(nlme::Oxboys, aes(age, height))
+# The default is not sufficient here. A single line tries to connect all
+# the observations.
+p + geom_line()
+# To fix this, use the group aesthetic to map a different line for each
+# subject.
+p + geom_line(aes(group = Subject))
+```
+
+Not in Giggly yet: the `Oxboys` dataset, from the `nlme` package, and `geom_line()`.
+
+## Different groups on different layers
+
+```r
+# Different groups on different layers
+p <- p + geom_line(aes(group = Subject))
+# Using the group aesthetic with both geom_line() and geom_smooth()
+# groups the data the same way for both layers
+p + geom_smooth(aes(group = Subject), method = "lm", se = FALSE)
+# Changing the group aesthetic for the smoother layer
+# fits a single line of best fit across all boys
+p + geom_smooth(aes(group = 1), size = 2, method = "lm", se = FALSE)
+```
+
+Not in Giggly yet: the `Oxboys` dataset, `geom_line()`, `geom_smooth()` and the straight lines it
+fits with `lm()`, an expression in a mapping, such as the constant `1`, and a fixed `size`.
+
+## Lines across a discrete axis
+
+```r
+# Overriding the default grouping
+# Sometimes the plot has a discrete scale but you want to draw lines
+# that connect across groups. This is the strategy used in interaction
+# plots, profile plots, and parallel coordinate plots, among others.
+# For example, we draw boxplots of height at each measurement occasion.
+p <- ggplot(nlme::Oxboys, aes(Occasion, height)) + geom_boxplot()
+p
+# There is no need to specify the group aesthetic here; the default grouping
+# works because occasion is a discrete variable. To overlay individual
+# trajectories, we again need to override the default grouping for that layer
+# with aes(group = Subject)
+p + geom_line(aes(group = Subject), colour = "blue")
+```
+
+Not in Giggly yet: the `Oxboys` dataset, `geom_boxplot()`, `geom_line()`, and a fixed `colour`.

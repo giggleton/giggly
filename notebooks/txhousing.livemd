@@ -1,0 +1,19 @@
+# Texas housing sales: txhousing
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`txhousing`](https://ggplot2.tidyverse.org/reference/txhousing.html)
+has no examples, so this notebook says only what the page describes and where Giggly stands.
+
+`txhousing` holds information about the housing market in Texas from the TAMU real estate center:
+8,602 rows, each naming a multiple listing service (MLS) area and a month, with the number of
+sales, their total value, the median sale price, the number of active listings, and the months it
+would take to sell them all at the current pace of sales. Not in Giggly yet: the `txhousing`
+dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.

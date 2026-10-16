@@ -1,0 +1,151 @@
+# Smooths: geom_smooth
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_smooth()`](https://ggplot2.tidyverse.org/reference/geom_smooth.html), which covers
+`stat_smooth()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_smooth()` draws a smoothed line through the data, with a band for its confidence interval,
+to help the eye see a pattern among overlapping points. `stat_smooth()` takes the same arguments,
+for drawing the fit with another geom. Left to choose, it fits a local regression, R's `loess()`,
+when the largest group has fewer than 1,000 rows, and otherwise a generalised additive model,
+`mgcv::gam()`; `method` names any other modelling function, such as `lm()`. Giggly has none of
+this yet.
+
+## A smooth through the points
+
+```r
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth()
+```
+
+`mpg` has fewer than 1,000 rows, so the smooth is a `loess()` fit, with a band for its 95%
+confidence interval.
+
+Not in Giggly yet: `geom_smooth()`, and the local regression it fits, R's `loess()`.
+
+## Fitting along the y axis
+
+```r
+# If you need the fitting to be done along the y-axis set the orientation
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(orientation = "y")
+```
+
+Not in Giggly yet: `geom_smooth()` and its `orientation` option.
+
+## How wiggly the smooth is
+
+```r
+# Use span to control the "wiggliness" of the default loess smoother.
+# The span is the fraction of points used to fit each local regression:
+# small numbers make a wigglier curve, larger numbers make a smoother curve.
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(span = 0.3)
+```
+
+Not in Giggly yet: `geom_smooth()` and its `span` option.
+
+## Other models
+
+```r
+# Instead of a loess smooth, you can use any other modelling function:
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(method = lm, se = FALSE)
+
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(method = lm, formula = y ~ splines::bs(x, 3), se = FALSE)
+```
+
+`se = FALSE` leaves out the confidence band. The second fits a linear model to a B-spline of `x`
+from the `splines` package.
+
+Not in Giggly yet: `geom_smooth()` with its `method`, `formula` and `se` options, and the linear
+models R's `lm()` fits.
+
+## A smooth for each group
+
+```r
+# Smooths are automatically fit to each group (defined by categorical
+# aesthetics or the group aesthetic) and for each facet.
+
+ggplot(mpg, aes(displ, hwy, colour = class)) +
+  geom_point() +
+  geom_smooth(se = FALSE, method = lm)
+```
+
+Mapping `colour` to `class` makes a group of each class, and a line is fitted to each.
+
+Not in Giggly yet: `geom_smooth()` with its `se` and `method` options and the linear models R's
+`lm()` fits, and mapping `colour`, the scale that maps it and the legend that reads it back.
+
+## A smooth in each panel
+
+```r
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(span = 0.8) +
+  facet_wrap(~drv)
+```
+
+Not in Giggly yet: `geom_smooth()` and its `span` option. Giggly has the panels, with
+`Giggly.Plot.facet_wrap/3`, where `facet_wrap(~drv)` is `facet_wrap(:drv)`.
+
+## Logistic regression
+
+`binomial_smooth()` is a plain R function returning a `geom_smooth()` layer that fits a logistic
+regression with `glm()`. The `rpart` package's `kyphosis` records children who had spinal
+surgery: their `Age`, in months, and whether a kyphosis was present afterwards, `Kyphosis`, a
+factor of `absent` and `present`.
+
+```r
+binomial_smooth <- function(...) {
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), ...)
+}
+# To fit a logistic regression, you need to coerce the values to
+# a numeric vector lying between 0 and 1.
+ggplot(rpart::kyphosis, aes(Age, Kyphosis)) +
+  geom_jitter(height = 0.05) +
+  binomial_smooth()
+```
+
+Not in Giggly yet: `geom_jitter()` and its `height` option, `geom_smooth()` with its `method` and
+`method.args` options and the logistic regression R's `glm()` fits, and the `kyphosis` dataset
+from the `rpart` package.
+
+## Values between 0 and 1
+
+```r
+ggplot(rpart::kyphosis, aes(Age, as.numeric(Kyphosis) - 1)) +
+  geom_jitter(height = 0.05) +
+  binomial_smooth()
+
+ggplot(rpart::kyphosis, aes(Age, as.numeric(Kyphosis) - 1)) +
+  geom_jitter(height = 0.05) +
+  binomial_smooth(formula = y ~ splines::ns(x, 2))
+
+# But in this case, it's probably better to fit the model yourself
+# so you can exercise more control and see whether or not it's a good model.
+```
+
+`as.numeric(Kyphosis) - 1` makes `absent` 0 and `present` 1. The second fits the logistic
+regression to a natural spline of `x` from the `splines` package.
+
+Not in Giggly yet: an expression in a mapping, such as `as.numeric(Kyphosis) - 1`, `geom_jitter()`
+and its `height` option, `geom_smooth()` with its `method`, `method.args` and `formula` options
+and the logistic regression R's `glm()` fits, and the `kyphosis` dataset from the `rpart` package.

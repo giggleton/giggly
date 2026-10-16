@@ -1,0 +1,120 @@
+# Secondary axes: sec_axis
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`sec_axis()`](https://ggplot2.tidyverse.org/reference/sec_axis.html), which covers `dup_axis()`
+and `derive()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+A secondary axis is drawn opposite a position scale's primary axis and labels the same positions
+through a one-to-one transformation of the primary axis's values, such as a change of unit.
+`sec_axis()` describes one, given to a position scale's `sec.axis` argument; `dup_axis()` copies
+the primary axis; and `derive()`, given for any of a secondary axis's settings, takes that setting
+from the primary axis. Giggly has none of it yet: it has no scale functions and no secondary axes.
+
+## A simple secondary axis
+
+R's formula `~ . + 10` is a function of the primary axis's values, written `.`: each label on the
+right is 10 more than the one opposite it.
+
+```r
+p <- ggplot(mtcars, aes(cyl, mpg)) +
+  geom_point()
+
+# Create a simple secondary axis
+p + scale_y_continuous(sec.axis = sec_axis(~ . + 10))
+```
+
+Not in Giggly yet: `scale_y_continuous()` and `sec_axis()`.
+
+## The primary axis's name
+
+```r
+# Inherit the name from the primary axis
+p + scale_y_continuous("Miles/gallon", sec.axis = sec_axis(~ . + 10, name = derive()))
+```
+
+Not in Giggly yet: `scale_y_continuous()`, here also to title the axis, `sec_axis()`, and
+`derive()`, which gives the secondary axis the same title.
+
+## A copy of the primary axis
+
+```r
+# Duplicate the primary axis
+p + scale_y_continuous(sec.axis = dup_axis())
+```
+
+Not in Giggly yet: `scale_y_continuous()` and `dup_axis()`.
+
+## A formula alone
+
+```r
+# You can pass in a formula as a shorthand
+p + scale_y_continuous(sec.axis = ~ .^2)
+```
+
+Not in Giggly yet: `scale_y_continuous()` and its `sec.axis` option, here a formula alone,
+squaring each value, as shorthand for `sec_axis()`.
+
+## The time of day
+
+`df` holds ten date-times four hours apart, from noon on 29 February 2012, each with a price.
+
+```r
+# Secondary axes work for date and datetime scales too:
+df <- data.frame(
+  dx = seq(
+    as.POSIXct("2012-02-29 12:00:00", tz = "UTC"),
+    length.out = 10,
+    by = "4 hour"
+  ),
+  price = seq(20, 200000, length.out = 10)
+ )
+
+# This may useful for labelling different time scales in the same plot
+ggplot(df, aes(x = dx, y = price)) +
+  geom_line() +
+  scale_x_datetime(
+    "Date",
+    date_labels = "%b %d",
+    date_breaks = "6 hour",
+    sec.axis = dup_axis(
+      name = "Time of Day",
+      labels = scales::label_time("%I %p")
+    )
+  )
+```
+
+Not in Giggly yet: dates on an axis, `geom_line()`, `scale_x_datetime()`, `dup_axis()` and
+`scales::label_time()`, here to label the date on the bottom axis and the time of day on the top.
+
+## Another time zone
+
+Adding `8 * 3600` seconds to each time labels the top axis eight hours ahead, in GMT+8.
+
+```r
+# or to transform axes for different timezones
+ggplot(df, aes(x = dx, y = price)) +
+  geom_line() +
+  scale_x_datetime("
+    GMT",
+    date_labels = "%b %d %I %p",
+    sec.axis = sec_axis(
+      ~ . + 8 * 3600,
+      name = "GMT+8",
+      labels = scales::label_time("%b %d %I %p")
+    )
+  )
+```
+
+Not in Giggly yet: dates on an axis, `geom_line()`, `scale_x_datetime()`, `sec_axis()` and
+`scales::label_time()`.

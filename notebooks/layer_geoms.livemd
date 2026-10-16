@@ -1,0 +1,25 @@
+# Geoms: layer_geoms
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`layer_geoms`](https://ggplot2.tidyverse.org/reference/layer_geoms.html) has no examples, so this
+notebook says only what the page describes and where Giggly stands.
+
+A ggplot2 layer has two main parts: its geom, which decides how the data is displayed, and its
+stat, which decides what is displayed. A layer's geom can be given in five ways: by the geom's own
+function, such as `geom_area()`; as a stat's default; by name, as a string given to a stat; as the
+geom's ggproto object; or to `layer()` itself. A geom turns the layer's data into graphical
+primitives, such as points, lines, rectangles and polygons, styled by aesthetics such as colour,
+fill and linewidth. Many geoms abstract over others, as a ribbon is a special polygon and an area a
+special ribbon, and some compose several, as a boxplot is lines, rectangles and points. Giggly adds
+a layer with a function for each geom: `Giggly.Plot.geom_point/2`, `Giggly.Plot.geom_bar/3`, which
+counts with ggplot2's `stat_count()`, and `Giggly.Plot.geom_col/3`. Every other geom, giving a stat
+a geom by name, `layer()` and `ggproto()` are not in Giggly yet.

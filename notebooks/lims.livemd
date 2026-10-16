@@ -1,0 +1,130 @@
+# Scale limits: lims
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`lims()`](https://ggplot2.tidyverse.org/reference/lims.html), which covers `xlim()` and `ylim()`
+too, in the order the page gives them. Each example shows ggplot2's code first and then Giggly's.
+An example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
+page is also a list of what remains.
+
+`xlim()` and `ylim()` set the limits of the x and y scales, and `lims()` those of any scale, named
+by its aesthetic, without writing out the scale itself. Values outside the limits become missing
+and are dropped from the plot; giving the larger limit first reverses the scale, and `NA` leaves a
+limit to the data. To zoom without dropping data, ggplot2 sets the limits on the coordinate system
+instead, with `coord_cartesian()`. Giggly has none of these yet: it has no scale functions, and a
+position scale is chosen from the data and cannot be set.
+
+## Zooming into a range
+
+```r
+# Zoom into a specified area
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  xlim(15, 20)
+```
+
+ggplot2 drops the cars outside 15 to 20 mpg, and warns that it removed them.
+
+Not in Giggly yet: `xlim()`.
+
+## A reversed scale
+
+```r
+# reverse scale
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  xlim(20, 15)
+```
+
+Not in Giggly yet: `xlim()`, here with the larger limit first, which reverses the axis.
+
+## One limit from the data
+
+```r
+# with automatic lower limit
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  xlim(NA, 20)
+```
+
+Not in Giggly yet: `xlim()`, here with `NA` leaving the lower limit to the data.
+
+## Limits wider than the data
+
+Both plots give the colour scale all three cylinder counts, so a count has the same colour in
+each, although each plot's data has only some of them.
+
+```r
+# You can also supply limits that are larger than the data.
+# This is useful if you want to match scales across different plots
+small <- subset(mtcars, cyl == 4)
+big <- subset(mtcars, cyl > 4)
+
+ggplot(small, aes(mpg, wt, colour = factor(cyl))) +
+  geom_point() +
+  lims(colour = c("4", "6", "8"))
+
+ggplot(big, aes(mpg, wt, colour = factor(cyl))) +
+  geom_point() +
+  lims(colour = c("4", "6", "8"))
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, an expression in a mapping,
+such as `factor(cyl)`, and `lims()`.
+
+## Two ways to limit an axis
+
+`Sys.Date()` is today's date, so the data is the last 60 days, each with a random price, drawn as
+a line with a smoothed curve through it.
+
+```r
+# There are two ways of setting the axis limits: with limits or
+# with coordinate systems. They work in two rather different ways.
+
+set.seed(1)
+last_month <- Sys.Date() - 0:59
+df <- data.frame(
+  date = last_month,
+  price = c(rnorm(30, mean = 15), runif(30) + 0.2 * (1:30))
+)
+
+p <- ggplot(df, aes(date, price)) +
+  geom_line() +
+  stat_smooth()
+
+p
+```
+
+Not in Giggly yet: dates on an axis, `geom_line()` and `stat_smooth()`.
+
+## Limits that drop data
+
+```r
+# Setting the limits with the scale discards all data outside the range.
+p + lims(x= c(Sys.Date() - 30, NA), y = c(10, 20))
+```
+
+The smooth is fitted only to the rows left inside the limits.
+
+Not in Giggly yet: `lims()`, dates on an axis, `geom_line()` and `stat_smooth()`.
+
+## Limits that zoom
+
+```r
+# For changing x or y axis limits **without** dropping data
+# observations use [coord_cartesian()]. Setting the limits on the
+# coordinate system performs a visual zoom.
+p + coord_cartesian(xlim =c(Sys.Date() - 30, NA), ylim = c(10, 20))
+```
+
+Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options, dates on an axis,
+`geom_line()` and `stat_smooth()`. Giggly's plots are in Cartesian coordinates, as ggplot2's are
+by default, but nothing sets their options.

@@ -1,0 +1,32 @@
+# Binned position scales: scale_binned
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_x_binned()`](https://ggplot2.tidyverse.org/reference/scale_binned.html), which covers
+`scale_y_binned()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`scale_x_binned()` and `scale_y_binned()` cut a continuous position into bins, so that a geom
+needing discrete positions can use it: with `geom_bar()`, a binned x scale draws a histogram.
+Giggly has neither yet: it has no scale functions, and a position scale is continuous or discrete
+as it is chosen from the data.
+
+## A histogram from bars
+
+```r
+# Create a histogram by binning the x-axis
+ggplot(mtcars) +
+  geom_bar(aes(mpg)) +
+  scale_x_binned()
+```
+
+Not in Giggly yet: `scale_x_binned()`.

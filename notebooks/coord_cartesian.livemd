@@ -1,0 +1,121 @@
+# Cartesian coordinates: coord_cartesian
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`coord_cartesian()`](https://ggplot2.tidyverse.org/reference/coord_cartesian.html), in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+Cartesian coordinates are the familiar kind, and ggplot2's default: `x` runs across the panel and
+`y` up it. Setting limits on `coord_cartesian()` zooms the drawing, like looking at it through a
+magnifying glass, and leaves the data alone, where setting limits on a scale drops the values
+outside them. Its other options turn off the expansion around the data, reverse an axis, fix the
+aspect ratio and stop the panel clipping what is drawn. Every Giggly plot is drawn in Cartesian
+coordinates unless `Giggly.Plot.coord_radial/1` is added, but Giggly takes none of
+`coord_cartesian()`'s options yet.
+
+## The plot to zoom
+
+```r
+# There are two ways of zooming the plot display: with scales or
+# with coordinate systems.  They work in two rather different ways.
+
+p <- ggplot(mtcars, aes(disp, wt)) +
+  geom_point() +
+  geom_smooth()
+p
+```
+
+Not in Giggly yet: `geom_smooth()`, the smoothed line drawn over the points.
+
+## Limits on a scale
+
+```r
+# Setting the limits on a scale converts all values outside the range to NA.
+p + scale_x_continuous(limits = c(325, 500))
+```
+
+Not in Giggly yet: `geom_smooth()`, and `scale_x_continuous()`, here setting the scale's limits.
+
+## Limits on the coordinate system
+
+```r
+# Setting the limits on the coordinate system performs a visual zoom.
+# The data is unchanged, and we just view a small portion of the original
+# plot. Note how smooth continues past the points visible on this plot.
+p + coord_cartesian(xlim = c(325, 500))
+```
+
+Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `xlim` option.
+
+## Exact limits
+
+```r
+# By default, the same expansion factor is applied as when setting scale
+# limits. You can set the limits precisely by setting expand = FALSE
+p + coord_cartesian(xlim = c(325, 500), expand = FALSE)
+```
+
+Not in Giggly yet: `geom_smooth()`, and `coord_cartesian()`'s `xlim` and `expand` options.
+
+## No expansion
+
+```r
+# Similarly, we can use expand = FALSE to turn off expansion with the
+# default limits
+p + coord_cartesian(expand = FALSE)
+```
+
+Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `expand` option.
+
+## A fixed aspect ratio
+
+```r
+# Using a fixed ratio: 1 y-axis unit is 100 x-axis units
+# Plot window can be resized and aspect ratio will be maintained
+p + coord_cartesian(ratio = 100)
+```
+
+Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `ratio` option.
+
+## A 2d histogram
+
+```r
+# You can see the same thing with this 2d histogram
+d <- ggplot(diamonds, aes(carat, price)) +
+  stat_bin_2d(bins = 25, colour = "white")
+d
+```
+
+Not in Giggly yet: the `diamonds` dataset, `stat_bin_2d()`, and a fixed `colour`.
+
+## Zooming the histogram's scale
+
+```r
+# When zooming the scale, the we get 25 new bins that are the same
+# size on the plot, but represent smaller regions of the data space
+d + scale_x_continuous(limits = c(0, 1))
+```
+
+Not in Giggly yet: the `diamonds` dataset, `stat_bin_2d()`, a fixed `colour`, and
+`scale_x_continuous()`, here setting the scale's limits.
+
+## Zooming the histogram's coordinates
+
+```r
+# When zooming the coordinate system, we see a subset of original 50 bins,
+# displayed bigger
+d + coord_cartesian(xlim = c(0, 1))
+```
+
+Not in Giggly yet: the `diamonds` dataset, `stat_bin_2d()`, a fixed `colour`, and
+`coord_cartesian()`'s `xlim` option.

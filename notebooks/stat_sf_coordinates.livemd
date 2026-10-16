@@ -1,0 +1,58 @@
+# Coordinates of simple features: stat_sf_coordinates
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`stat_sf_coordinates()`](https://ggplot2.tidyverse.org/reference/stat_sf_coordinates.html), in
+the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
+page is also a list of what remains.
+
+`stat_sf_coordinates()` reduces each geometry of an `sf` object, from R's `sf` package, to one
+point, by default a point on its surface, and gives that point's coordinates as `x` and `y`. Text
+and labels need exactly one position for each geometry, so `geom_sf_text()` and `geom_sf_label()`
+place theirs with it. Giggly has none of it yet: it has no `sf` objects.
+
+## A point in each county
+
+The examples read the counties of North Carolina from a shapefile that comes with the `sf`
+package, and run only where that package is installed.
+
+```r
+if (requireNamespace("sf", quietly = TRUE)) {
+nc <- sf::st_read(system.file("shape/nc.shp", package="sf"))
+
+ggplot(nc) +
+  stat_sf_coordinates()
+```
+
+Not in Giggly yet: `sf` objects and `stat_sf_coordinates()`.
+
+## Error bars at each county
+
+```r
+ggplot(nc) +
+  geom_errorbarh(
+    aes(geometry = geometry,
+        xmin = after_stat(x) - 0.1,
+        xmax = after_stat(x) + 0.1,
+        y = after_stat(y),
+        height = 0.04),
+    stat = "sf_coordinates"
+  )
+}
+```
+
+The error bars take their positions from the coordinates the stat computes, through
+`after_stat()`.
+
+Not in Giggly yet: `sf` objects, `stat_sf_coordinates()` given to a geom as
+`stat = "sf_coordinates"`, horizontal error bars, `geom_errorbarh()`, mapping `geometry`, and
+expressions in a mapping, such as `after_stat(x) - 0.1` and the constant `0.04`.

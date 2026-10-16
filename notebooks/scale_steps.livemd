@@ -1,0 +1,67 @@
+# Binned colour gradients: scale_steps
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_steps()`](https://ggplot2.tidyverse.org/reference/scale_steps.html), which covers
+`scale_colour_steps2()`, `scale_colour_stepsn()`, `scale_fill_steps()`, `scale_fill_steps2()`
+and `scale_fill_stepsn()` too, in the order the page gives them. Each example shows ggplot2's code
+first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what
+it is waiting for, so the page is also a list of what remains.
+
+The steps scales are the binned counterparts of the gradient scales: they cut a continuous column
+into bins and give each bin one colour from a gradient. `scale_colour_steps()` runs from a low
+colour to a high one, `scale_colour_steps2()` diverges from a low colour through a middle one to a
+high one, around a midpoint, and `scale_colour_stepsn()` takes its colours from as many as it is
+given; the `fill` versions do the same for fill. Giggly has none of this yet: it has no aesthetic
+but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+
+## A binned gradient
+
+The examples draw from a table of random numbers R makes after `set.seed(1)`.
+
+```r
+set.seed(1)
+df <- data.frame(
+  x = runif(100),
+  y = runif(100),
+  z1 = rnorm(100)
+)
+
+# Use scale_colour_steps for a standard binned gradient
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_steps()
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_steps()` and the legend that reads it back.
+
+## A diverging binned gradient
+
+```r
+# Get a divergent binned scale with the *2 variant
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_steps2()
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_steps2()` and the legend that reads it back.
+
+## Colours of your own
+
+```r
+# Define your own colour ramp to extract binned colours from
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_stepsn(colours = terrain.colors(10))
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_stepsn()`, R's `terrain.colors()` palette and
+the legend that reads it back.

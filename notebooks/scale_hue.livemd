@@ -1,0 +1,112 @@
+# Evenly spaced hues: scale_hue
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_hue()`](https://ggplot2.tidyverse.org/reference/scale_hue.html), which covers
+`scale_fill_hue()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`scale_colour_hue()` maps each value of a discrete column to a hue evenly spaced around the
+colour wheel, all at one chroma and luminance. Its options choose the range of hues, the chroma
+and the luminance, where on the wheel to start and which way round to go, and the colour of
+missing values; the palettes it makes are not safe for readers with colour blindness.
+`scale_fill_hue()` does the same for fill. Giggly has none of this yet: it has no aesthetic but
+`x`, `y`, `group` and `weight`, no legends and no scale functions.
+
+## A sample of diamonds
+
+The examples draw a random sample of the `diamonds` dataset, picked after `set.seed(596)`.
+`clarity` is an ordered factor, which ggplot2 colours with viridis by default rather than with
+hues.
+
+```r
+set.seed(596)
+dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
+(d <- ggplot(dsamp, aes(carat, price)) + geom_point(aes(colour = clarity)))
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
+legend that reads it back.
+
+## The legend's title
+
+```r
+# Change scale label
+d + scale_colour_hue()
+d + scale_colour_hue("clarity")
+d + scale_colour_hue(expression(clarity[beta]))
+```
+
+A scale's first argument titles its legend; `expression()` writes the title as R's plotmath,
+here with a subscript β.
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()`, the legend
+that reads it back, and titles and labels, including R's `expression()` titles.
+
+## Luminance and chroma
+
+```r
+# Adjust luminosity and chroma
+d + scale_colour_hue(l = 40, c = 30)
+d + scale_colour_hue(l = 70, c = 30)
+d + scale_colour_hue(l = 70, c = 150)
+d + scale_colour_hue(l = 80, c = 150)
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()` and its `l` and
+`c` options, and the legend that reads it back.
+
+## A range of hues
+
+```r
+# Change range of hues used
+d + scale_colour_hue(h = c(0, 90))
+d + scale_colour_hue(h = c(90, 180))
+d + scale_colour_hue(h = c(180, 270))
+d + scale_colour_hue(h = c(270, 360))
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, `scale_colour_hue()` and its `h`
+option, and the legend that reads it back.
+
+## Transparency
+
+```r
+# Vary opacity
+# (only works with pdf, quartz and cairo devices)
+d <- ggplot(dsamp, aes(carat, price, colour = clarity))
+d + geom_point(alpha = 0.9)
+d + geom_point(alpha = 0.5)
+d + geom_point(alpha = 0.2)
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
+legend that reads it back, and a fixed `alpha`.
+
+## Missing values
+
+`sample()` gives each car a level from 1 to 5, or a missing value, at random; R draws it without
+a seed, so it differs from run to run. `miss` is a vector of its own, not a column of `mtcars`. A
+missing value is drawn grey unless `na.value` says otherwise.
+
+```r
+# Colour of missing values is controlled with na.value:
+miss <- factor(sample(c(NA, 1:5), nrow(mtcars), replace = TRUE))
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point(aes(colour = miss))
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point(aes(colour = miss)) +
+  scale_colour_hue(na.value = "black")
+```
+
+Not in Giggly yet: mapping `colour`, an expression in a mapping, here `miss`, a vector outside
+the data, `scale_colour_hue()` and its `na.value` option, and the legend that reads it back.

@@ -1,0 +1,171 @@
+# Map projections: coord_map
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`coord_map()`](https://ggplot2.tidyverse.org/reference/coord_map.html), which covers
+`coord_quickmap()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`coord_map()` projects part of the earth, which is roughly a sphere, onto a flat plane, with any
+projection the `mapproj` package defines. A projection need not keep straight lines straight, so
+this takes a good deal of computation. `coord_quickmap()` approximates it more quickly by fixing
+the aspect ratio to the ratio between the lengths of a degree of latitude and a degree of
+longitude, which keeps lines straight and works best for small areas near the equator. Both are
+superseded by `coord_sf()`. Giggly has none of these yet, nor the map data the examples draw.
+
+## New Zealand in Cartesian coordinates
+
+R's `if (require("maps"))` runs an example only when the `maps` package, which holds the map
+data, is installed.
+
+```r
+if (require("maps")) {
+nz <- map_data("nz")
+# Prepare a map of NZ
+nzmap <- ggplot(nz, aes(x = long, y = lat, group = group)) +
+  geom_polygon(fill = "white", colour = "black")
+
+# Plot it in cartesian coordinates
+nzmap
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and a fixed `fill` and
+`colour`.
+
+## The Mercator projection
+
+```r
+if (require("maps")) {
+# With correct mercator projection
+nzmap + coord_map()
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, a fixed `fill` and
+`colour`, and `coord_map()`.
+
+## The aspect ratio approximation
+
+```r
+if (require("maps")) {
+# With the aspect ratio approximation
+nzmap + coord_quickmap()
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, a fixed `fill` and
+`colour`, and `coord_quickmap()`.
+
+## Another projection
+
+```r
+if (require("maps")) {
+# Other projections
+nzmap + coord_map("azequalarea", orientation = c(-36.92, 174.6, 0))
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, a fixed `fill` and
+`colour`, and `coord_map()` with its projections and its `orientation` option.
+
+## The United States in Cartesian coordinates
+
+```r
+if (require("maps")) {
+states <- map_data("state")
+usamap <- ggplot(states, aes(long, lat, group = group)) +
+  geom_polygon(fill = "white", colour = "black")
+
+# Use cartesian coordinates
+usamap
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and a fixed `fill` and
+`colour`.
+
+## The United States in the Mercator projection
+
+```r
+if (require("maps")) {
+# With mercator projection
+usamap + coord_map()
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, a fixed `fill` and
+`colour`, and `coord_map()`.
+
+## Other projections
+
+```r
+if (require("maps")) {
+# See ?mapproject for coordinate systems and their parameters
+usamap + coord_map("gilbert")
+}
+
+if (require("maps")) {
+# For most projections, you'll need to set the orientation yourself
+# as the automatic selection done by mapproject is not available to
+# ggplot
+usamap + coord_map("orthographic")
+}
+
+if (require("maps")) {
+usamap + coord_map("conic", lat0 = 30)
+}
+
+if (require("maps")) {
+usamap + coord_map("bonne", lat0 = 50)
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, a fixed `fill` and
+`colour`, and `coord_map()` with its projections and their parameters.
+
+## A world map seen from above the North Pole
+
+```r
+if (require("maps")) {
+# World map, using geom_path instead of geom_polygon
+world <- map_data("world")
+worldmap <- ggplot(world, aes(x = long, y = lat, group = group)) +
+  geom_path() +
+  scale_y_continuous(breaks = (-2:2) * 30) +
+  scale_x_continuous(breaks = (-4:4) * 45)
+
+# Orthographic projection with default orientation (looking down at North pole)
+worldmap + coord_map("ortho")
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_path()`, `scale_y_continuous()` and
+`scale_x_continuous()`, here setting the scales' breaks, and `coord_map()` with its projections.
+
+## Other orientations
+
+```r
+if (require("maps")) {
+# Looking up up at South Pole
+worldmap + coord_map("ortho", orientation = c(-90, 0, 0))
+}
+
+if (require("maps")) {
+# Centered on New York (currently has issues with closing polygons)
+worldmap + coord_map("ortho", orientation = c(41, -74, 0))
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `geom_path()`, `scale_y_continuous()` and
+`scale_x_continuous()`, here setting the scales' breaks, and `coord_map()` with its projections
+and its `orientation` option.

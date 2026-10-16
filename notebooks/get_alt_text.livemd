@@ -1,0 +1,47 @@
+# Alt text: get_alt_text
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`get_alt_text()`](https://ggplot2.tidyverse.org/reference/get_alt_text.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+`get_alt_text()` returns a plot's alternative text, for a web page to give in place of the
+drawing: the `alt` label set with `labs(alt = ...)`, or an empty string when there is none.
+Giggly has none of this yet: it has no `get_alt_text()`, and no titles and labels, `labs()`, to
+set one with.
+
+## A plot without alt text
+
+```r
+p <- ggplot(mpg, aes(displ, hwy)) +
+  geom_point()
+
+# Returns an empty string
+get_alt_text(p)
+```
+
+Not in Giggly yet: `get_alt_text()`.
+
+## Alt text from labs()
+
+```r
+# A user provided alt text
+p <- p + labs(
+  alt = paste("A scatterplot showing the negative correlation between engine",
+              "displacement as a function of highway miles per gallon")
+)
+
+get_alt_text(p)
+```
+
+Not in Giggly yet: titles and labels, `labs()` and its `alt` label, and `get_alt_text()`.

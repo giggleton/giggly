@@ -1,0 +1,178 @@
+# Paths and lines: geom_path
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_path()`](https://ggplot2.tidyverse.org/reference/geom_path.html), which covers
+`geom_line()` and `geom_step()` too, in the order the page gives them. Each example shows
+ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code
+and names what it is waiting for, so the page is also a list of what remains.
+
+These geoms join observations with lines. `geom_path()` joins them in the order they appear in the
+data, `geom_line()` in order of `x`, and `geom_step()` with stairs that show exactly where the
+value changes. The `group` aesthetic decides which observations make one line, and a missing value
+in the middle of a line breaks it. Giggly has none of them yet.
+
+## A time series
+
+```r
+# geom_line() is suitable for time series
+ggplot(economics, aes(date, unemploy)) + geom_line()
+```
+
+Not in Giggly yet: `geom_line()`, dates on an axis, and the `economics` dataset.
+
+## A line for each series
+
+```r
+# separate by colour and use "timeseries" legend key glyph
+ggplot(economics_long, aes(date, value01, colour = variable)) +
+  geom_line(key_glyph = "timeseries")
+```
+
+Not in Giggly yet: `geom_line()` and its `key_glyph` option, mapping `colour`, the scale that maps
+it and the legend that reads it back, dates on an axis, and the `economics_long` dataset.
+
+## A vertical time series
+
+```r
+# You can get a timeseries that run vertically by setting the orientation
+ggplot(economics, aes(unemploy, date)) + geom_line(orientation = "y")
+```
+
+Not in Giggly yet: `geom_line()` and its `orientation` option, dates on an axis, and the
+`economics` dataset.
+
+## Steps
+
+```r
+# geom_step() is useful when you want to highlight exactly when
+# the y value changes
+recent <- economics[economics$date > as.Date("2013-01-01"), ]
+ggplot(recent, aes(date, unemploy)) + geom_line()
+ggplot(recent, aes(date, unemploy)) + geom_step()
+```
+
+`recent` keeps the months after the start of 2013.
+
+Not in Giggly yet: `geom_line()`, `geom_step()`, dates on an axis, and the `economics` dataset.
+
+## A path through two variables
+
+```r
+# geom_path lets you explore how two variables are related over time,
+# e.g. unemployment and personal savings rate
+m <- ggplot(economics, aes(unemploy/pop, psavert))
+m + geom_path()
+m + geom_path(aes(colour = as.numeric(date)))
+```
+
+`geom_path()` joins the months in the order of the rows, which is the order of their dates, rather
+than in order of `x`.
+
+Not in Giggly yet: `geom_path()`, an expression in a mapping, such as `unemploy/pop` or
+`as.numeric(date)`, mapping `colour`, the scale that maps it and the legend that reads it back,
+and the `economics` dataset.
+
+## A fixed colour
+
+```r
+# Changing parameters ----------------------------------------------
+ggplot(economics, aes(date, unemploy)) +
+  geom_line(colour = "red")
+```
+
+Not in Giggly yet: `geom_line()`, a fixed `colour`, dates on an axis, and the `economics`
+dataset.
+
+## Arrows
+
+```r
+# Use the arrow parameter to add an arrow to the line
+# See ?arrow for more details
+c <- ggplot(economics, aes(x = date, y = pop))
+c + geom_line(arrow = arrow())
+c + geom_line(
+  arrow = arrow(angle = 15, ends = "both", type = "closed")
+)
+```
+
+`arrow()` comes from R's `grid` package and describes the arrowhead: its angle, which ends get one
+and whether it is open or closed.
+
+Not in Giggly yet: `geom_line()` and its `arrow` option, dates on an axis, and the `economics`
+dataset.
+
+## Line ends and joins
+
+```r
+# Control line join parameters
+df <- data.frame(x = 1:3, y = c(4, 1, 9))
+base <- ggplot(df, aes(x, y))
+base + geom_path(linewidth = 10)
+base + geom_path(linewidth = 10, lineend = "round")
+base + geom_path(linewidth = 10, linejoin = "mitre", lineend = "butt")
+```
+
+A wide line shows how its ends and its corner are drawn.
+
+Not in Giggly yet: `geom_path()` and its `lineend` and `linejoin` options, and a fixed
+`linewidth`.
+
+## Missing values break a line
+
+```r
+# You can use NAs to break the line.
+df <- data.frame(x = 1:5, y = c(1, 2, NA, 4, 5))
+ggplot(df, aes(x, y)) + geom_point() + geom_line()
+```
+
+ggplot2 draws the line in two pieces, either side of the row without a `y`, and warns that it
+removed that row's point.
+
+Not in Giggly yet: `geom_line()`.
+
+## Line type and colour
+
+```r
+# Setting line type vs colour/size
+# Line type needs to be applied to a line as a whole, so it can
+# not be used with colour or size that vary across a line
+x <- seq(0.01, .99, length.out = 100)
+df <- data.frame(
+  x = rep(x, 2),
+  y = c(qlogis(x), 2 * qlogis(x)),
+  group = rep(c("a","b"),
+  each = 100)
+)
+p <- ggplot(df, aes(x=x, y=y, group=group))
+# These work
+p + geom_line(linetype = 2)
+p + geom_line(aes(colour = group), linetype = 2)
+p + geom_line(aes(colour = x))
+```
+
+The table holds two curves, `a` and `b`, told apart by `group`; `qlogis()` is the logistic
+distribution's quantile function.
+
+Not in Giggly yet: `geom_line()`, a fixed `linetype`, and mapping `colour`, the scale that maps it
+and the legend that reads it back.
+
+## A line type that cannot vary
+
+```r
+# But this doesn't
+should_stop(p + geom_line(aes(colour = x), linetype=2))
+```
+
+`should_stop()` checks that the code inside it fails, as it does here: a dashed line cannot change
+colour along its length, so ggplot2 stops with an error.
+
+Not in Giggly yet: `geom_line()`, a fixed `linetype`, and mapping `colour`.

@@ -1,0 +1,143 @@
+# Transformed coordinates: coord_transform
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`coord_transform()`](https://ggplot2.tidyverse.org/reference/coord_transform.html), which covers
+`coord_trans()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`coord_transform()` transforms the coordinate system, such as putting an axis on a log scale.
+Unlike transforming a scale, it happens after the statistics are computed, and it changes the
+shapes geoms are drawn in, so a straight line need not stay straight. It transforms continuous
+positions only. `coord_trans()` is its old name, now deprecated. Giggly has neither yet, and no
+transformed scales: its position scales are chosen from the data and cannot be set.
+
+## Transforming the data
+
+```r
+# See ?geom_boxplot for other examples
+
+# Three ways of doing transformation in ggplot:
+#  * by transforming the data
+ggplot(diamonds, aes(log10(carat), log10(price))) +
+  geom_point()
+```
+
+Not in Giggly yet: the `diamonds` dataset, and an expression in a mapping, such as
+`log10(carat)`.
+
+## Transforming the scales
+
+```r
+#  * by transforming the scales
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+Not in Giggly yet: the `diamonds` dataset, and `scale_x_log10()` and `scale_y_log10()`.
+
+## Transforming the coordinate system
+
+```r
+#  * by transforming the coordinate system:
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  coord_transform(x = "log10", y = "log10")
+```
+
+Not in Giggly yet: the `diamonds` dataset and `coord_transform()`.
+
+## A fitted line on transformed scales
+
+R's `subset()` keeps the diamonds over half a carat.
+
+```r
+# The difference between transforming the scales and
+# transforming the coordinate system is that scale
+# transformation occurs BEFORE statistics, and coordinate
+# transformation afterwards.  Coordinate transformation also
+# changes the shape of geoms:
+
+d <- subset(diamonds, carat > 0.5)
+
+ggplot(d, aes(carat, price)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_x_log10() +
+  scale_y_log10()
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`, and
+`scale_x_log10()` and `scale_y_log10()`.
+
+## A fitted line in transformed coordinates
+
+```r
+ggplot(d, aes(carat, price)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  coord_transform(x = "log10", y = "log10")
+
+# Here I used a subset of diamonds so that the smoothed line didn't
+# drop below zero, which obviously causes problems on the log-transformed
+# scale
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`, and
+`coord_transform()`.
+
+## Transforming back
+
+```r
+# With a combination of scale and coordinate transformation, it's
+# possible to do back-transformations:
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  scale_x_log10() +
+  scale_y_log10() +
+  coord_transform(x = scales::transform_exp(10), y = scales::transform_exp(10))
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_smooth()` with a line fitted by `lm()`,
+`scale_x_log10()` and `scale_y_log10()`, and `coord_transform()` with transformations from the
+`scales` package.
+
+## No transformation
+
+```r
+# cf.
+ggplot(diamonds, aes(carat, price)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+```
+
+Not in Giggly yet: the `diamonds` dataset, and `geom_smooth()` with a line fitted by `lm()`.
+
+## A discrete axis
+
+R's `letters` is the 26 lowercase letters, and `abs(rnorm(26))` gives each one a random positive
+number, so `a` is continuous and `letters` discrete. Only the continuous x axis is transformed.
+
+```r
+# Also works with discrete scales
+set.seed(1)
+df <- data.frame(a = abs(rnorm(26)),letters)
+plot <- ggplot(df,aes(a,letters)) + geom_point()
+
+plot + coord_transform(x = "log10")
+plot + coord_transform(x = "sqrt")
+```
+
+Not in Giggly yet: `coord_transform()`.

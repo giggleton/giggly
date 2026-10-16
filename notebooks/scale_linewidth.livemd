@@ -1,0 +1,50 @@
+# Line widths: scale_linewidth
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_linewidth()`](https://ggplot2.tidyverse.org/reference/scale_linewidth.html), which covers
+`scale_linewidth_binned()` too, in the order the page gives them. Each example shows ggplot2's
+code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names
+what it is waiting for, so the page is also a list of what remains.
+
+`scale_linewidth()` maps a continuous column to the width of lines and of polygons' outlines,
+between a thinnest and a thickest width; `scale_linewidth_binned()` cuts the column into bins
+first. The `size` aesthetic can still set a line's width, for historical reasons, but `linewidth`
+keeps the width of a stroke apart from the size of an area. Giggly has none of this yet: of
+ggplot2's geoms it has only points and bars, and it has no aesthetic but `x`, `y`, `group` and
+`weight`, no legends and no scale functions.
+
+## Line width from a column
+
+```r
+p <- ggplot(economics, aes(date, unemploy, linewidth = uempmed)) +
+  geom_line(lineend = "round")
+p
+p + scale_linewidth("Duration of\nunemployment")
+p + scale_linewidth(range = c(0, 4))
+```
+
+A scale's first argument titles its legend, and `range` sets the thinnest and the thickest
+widths.
+
+Not in Giggly yet: the `economics` dataset, dates on an axis, lines (`geom_line()`) and their
+`lineend` option, mapping `linewidth`, `scale_linewidth()` and its `range` option, the legend that
+reads it back, and titles and labels.
+
+## Binned widths
+
+```r
+# Binning can sometimes make it easier to match the scaled data to the legend
+p + scale_linewidth_binned()
+```
+
+Not in Giggly yet: the `economics` dataset, dates on an axis, `geom_line()`, mapping
+`linewidth`, `scale_linewidth_binned()` and the legend that reads it back.

@@ -1,0 +1,45 @@
+# A vector's resolution: resolution
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`resolution()`](https://ggplot2.tidyverse.org/reference/resolution.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`resolution()` gives the smallest non-zero distance between adjacent values of a numeric vector,
+counting 0 among the values unless `zero = FALSE`. A vector with a single unique value, or whose
+differences are all below a small tolerance, has resolution 1, and so has an integer vector,
+which is taken to be discrete; with `discrete = TRUE`, so has a vector mapped with a discrete
+scale. Not in Giggly yet: `resolution()`.
+
+## Counting zero among the values
+
+```r
+resolution(1:10)
+resolution((1:10) - 0.5)
+resolution((1:10) - 0.5, FALSE)
+```
+
+`1:10` is an integer vector, so its resolution is 1. Shifted down by a half its values are
+numbers 1 apart, but 0 counts among them, half a step below the first, so the resolution is 0.5;
+with `zero = FALSE` it is 1. Not in Giggly yet: `resolution()`.
+
+## Numbers and integers
+
+```r
+# Note the difference between numeric and integer vectors
+resolution(c(2, 10, 20, 50))
+resolution(c(2L, 10L, 20L, 50L))
+```
+
+Counting 0, the closest values of `c(2, 10, 20, 50)` are 0 and 2, so its resolution is 2; the same
+values as integers have resolution 1. Not in Giggly yet: `resolution()`.

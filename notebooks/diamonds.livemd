@@ -1,0 +1,19 @@
+# Diamond prices: diamonds
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`diamonds`](https://ggplot2.tidyverse.org/reference/diamonds.html)
+has no examples, so this notebook says only what the page describes and where Giggly stands.
+
+`diamonds` holds the prices and other attributes of almost 54,000 round cut diamonds: price in US
+dollars, weight in carats, the quality of the cut, colour from D (best) to J (worst), clarity,
+length, width and depth in millimetres, the total depth as a percentage of the mean of length and
+width, and the width of the top relative to the widest point. Not in Giggly yet: the `diamonds`
+dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.

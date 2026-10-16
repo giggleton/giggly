@@ -1,0 +1,140 @@
+# Legends: guide_legend
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`guide_legend()`](https://ggplot2.tidyverse.org/reference/guide_legend.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+`guide_legend()` draws a legend: for each of a scale's breaks, a key drawn as the layer's geom
+draws it, beside a label. It is chosen in a scale's `guide` argument or in `guides()`, and the
+legends of several scales are merged into one where they can be. Its options set the title, the
+number of rows or columns, the order of the keys and the aesthetics they are drawn with, and,
+through a theme of its own, where the title and labels go and how they look. Giggly has none of
+this yet: it has no legends, and no aesthetic but `x`, `y`, `group` and `weight`.
+
+## The basic form
+
+`expand.grid()` makes a row for every pair of `X1` and `X2` from 1 to 10, and `value` is their
+product. A continuous fill is read back by a colour bar by default; `guide_legend()` gives it a
+key for each break instead.
+
+```r
+df <- expand.grid(X1 = 1:10, X2 = 1:10)
+df$value <- df$X1 * df$X2
+
+p1 <- ggplot(df, aes(X1, X2)) + geom_tile(aes(fill = value))
+p2 <- p1 + geom_point(aes(size = value))
+
+# Basic form
+p1 + scale_fill_continuous(guide = guide_legend())
+```
+
+Not in Giggly yet: tiles (`geom_tile()`), mapping `fill`, `scale_fill_continuous()` and its
+`guide` option, and `guide_legend()`.
+
+## Styling the title and labels
+
+A guide's `theme` styles only that guide: here the title to the left of the keys, a large red
+italic title, and labels to the left of the keys, aligned right. In the first plot the theme is
+`guide_legend()`'s second argument, given without its name.
+
+```r
+# Control styles
+
+# title position
+p1 + guides(fill = guide_legend(
+  title = "LEFT", theme(legend.title.position = "left")
+))
+
+# title text styles via element_text
+p1 + guides(fill = guide_legend(theme = theme(
+  legend.title = element_text(size = 15, face = "italic", colour = "red")
+)))
+
+# label position
+p1 + guides(fill = guide_legend(theme = theme(
+  legend.text.position = "left",
+  legend.text = element_text(hjust = 1)
+)))
+```
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, `guides()`, `guide_legend()` and its `title`
+and `theme` options, and changing the theme.
+
+## A horizontal legend
+
+```r
+# label styles
+p1 +
+  scale_fill_continuous(
+    breaks = c(5, 10, 15),
+    labels = paste("long", c(5, 10, 15)),
+    guide = guide_legend(theme = theme(
+      legend.direction = "horizontal",
+      legend.title.position = "top",
+      legend.text.position = "bottom",
+      legend.text = element_text(hjust = 0.5, vjust = 1, angle = 90)
+    ))
+  )
+```
+
+The keys run across, with the title above them and each label below its key, turned on its
+side.
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_continuous()` and its `breaks`,
+`labels` and `guide` options, `guide_legend()` and its `theme` option, and changing the theme.
+
+## Keys drawn opaque
+
+```r
+# Set aesthetic of legend key
+# very low alpha value make it difficult to see legend key
+p3 <- ggplot(mtcars, aes(vs, am, colour = factor(cyl))) +
+  geom_jitter(alpha = 1/5, width = 0.01, height = 0.01)
+p3
+# override.aes overwrites the alpha
+p3 + guides(colour = guide_legend(override.aes = list(alpha = 1)))
+```
+
+Keys are drawn as the layer draws its points, here almost transparent; `override.aes` draws them
+with an `alpha` of their own.
+
+Not in Giggly yet: jittered points (`geom_jitter()`), mapping `colour`, an expression in a
+mapping, such as `factor(cyl)`, a fixed `alpha`, `guides()`, and `guide_legend()` and its
+`override.aes` option.
+
+## Rows and columns of keys
+
+```r
+# multiple row/col legends
+df <- data.frame(x = 1:20, y = 1:20, color = letters[1:20])
+p <- ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = color))
+p + guides(col = guide_legend(nrow = 8))
+p + guides(col = guide_legend(ncol = 8))
+p + guides(col = guide_legend(nrow = 8, theme = theme(legend.byrow = TRUE)))
+```
+
+`legend.byrow = TRUE` fills the keys in row by row, rather than column by column.
+
+Not in Giggly yet: mapping `colour`, `guides()`, `guide_legend()` and its `nrow`, `ncol` and
+`theme` options, and changing the theme.
+
+## Keys in reverse order
+
+```r
+# reversed order legend
+p + guides(col = guide_legend(reverse = TRUE))
+```
+
+Not in Giggly yet: mapping `colour`, `guides()`, and `guide_legend()` and its `reverse` option.

@@ -1,0 +1,59 @@
+# Hexagonal bins: geom_hex
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_hex()`](https://ggplot2.tidyverse.org/reference/geom_hex.html), which covers
+`stat_bin_hex()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_hex()` is a heatmap of counts in two dimensions: its stat, `stat_bin_hex()`, divides the
+plane into regular hexagons and counts the rows that fall in each, and the count is mapped to the
+hexagon's `fill`. Hexagons avoid the artefacts the strict alignment of square bins
+(`geom_bin_2d()`) can produce. The size of the bins is set by their number or their width, for
+`x` and `y` together or each on its own. Giggly has none of this yet.
+
+## Counting in hexagons
+
+```r
+d <- ggplot(diamonds, aes(carat, price))
+d + geom_hex()
+```
+
+Each hexagon's count is mapped to its `fill`, so the plot has a legend for the counts.
+
+Not in Giggly yet: `geom_hex()`, mapping `fill`, the scale that maps it and the legend that reads
+it back, and the `diamonds` dataset.
+
+## The number of bins
+
+```r
+# You can control the size of the bins by specifying the number of
+# bins in each direction:
+d + geom_hex(bins = 10)
+d + geom_hex(bins = 30)
+```
+
+Not in Giggly yet: `geom_hex()` and its `bins` option, mapping `fill`, the scale that maps it and
+the legend that reads it back, and the `diamonds` dataset.
+
+## The width of the bins
+
+```r
+# Or by specifying the width of the bins
+d + geom_hex(binwidth = c(1, 1000))
+d + geom_hex(binwidth = c(.1, 500))
+```
+
+A pair of widths gives the width along `x` first, then along `y`.
+
+Not in Giggly yet: `geom_hex()` and its `binwidth` option, mapping `fill`, the scale that maps it
+and the legend that reads it back, and the `diamonds` dataset.

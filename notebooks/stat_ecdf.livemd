@@ -1,0 +1,84 @@
+# Empirical cumulative distributions: stat_ecdf
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`stat_ecdf()`](https://ggplot2.tidyverse.org/reference/stat_ecdf.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`stat_ecdf()` computes the empirical cumulative distribution of `x`, or of `y`: at each value, the
+proportion of the data at or below it, drawn by default as steps rising from 0 to 1. Unlike a
+histogram or a density it needs no tuning, and it takes continuous and discrete values alike. With
+`weight` mapped, each row raises the curve by its share of the total weight rather than by an
+equal share. Giggly has none of it yet.
+
+## Steps
+
+ggplot2's examples draw their data at random, with R's `set.seed(1)`: 100 values from a normal
+distribution with standard deviation 3, then 100 with standard deviation 10, and `gl(2, 100)`
+labels the two halves `1` and `2`.
+
+```r
+set.seed(1)
+df <- data.frame(
+  x = c(rnorm(100, 0, 3), rnorm(100, 0, 10)),
+  g = gl(2, 100)
+)
+ggplot(df, aes(x)) +
+  stat_ecdf(geom = "step")
+```
+
+Not in Giggly yet: `stat_ecdf()` and the steps it draws, `geom_step()`.
+
+## Without padding
+
+```r
+# Don't go to positive/negative infinity
+ggplot(df, aes(x)) +
+  stat_ecdf(geom = "step", pad = FALSE)
+```
+
+By default the curve runs from 0 at the left edge of the panel to 1 at the right edge;
+`pad = FALSE` stops it at the smallest and largest values.
+
+Not in Giggly yet: `stat_ecdf()` and its `pad` option, and `geom_step()`.
+
+## One curve per group
+
+```r
+# Multiple ECDFs
+ggplot(df, aes(x, colour = g)) +
+  stat_ecdf()
+```
+
+Not in Giggly yet: `stat_ecdf()`, and mapping `colour` and the legend that reads it back.
+
+## A weighted ECDF
+
+```r
+# Using weighted eCDF
+weighted <- data.frame(x = 1:10, weights = c(1:5, 5:1))
+plain <- data.frame(x = rep(weighted$x, weighted$weights))
+
+ggplot(plain, aes(x)) +
+  stat_ecdf(linewidth = 1) +
+  stat_ecdf(
+    aes(weight = weights),
+    data = weighted, colour = "green"
+  )
+```
+
+`plain` repeats each `x` of `weighted` as many times as its weight, so the green weighted curve
+falls on the thick unweighted one.
+
+Not in Giggly yet: `stat_ecdf()`, with or without `weight`, a fixed `linewidth` and `colour`, and
+a layer with data of its own.

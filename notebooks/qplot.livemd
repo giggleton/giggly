@@ -1,0 +1,99 @@
+# Quick plots: qplot
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`qplot()`](https://ggplot2.tidyverse.org/reference/qplot.html), which covers `quickplot()` too,
+in the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page
+is also a list of what remains.
+
+`qplot()` makes a plot in one call. Its arguments are the aesthetics, given as expressions, and it
+guesses a geom from the ones given, or draws the geoms it is told to; it also takes facets, axis
+limits, log scales and titles. It takes its data from a data frame or from vectors in the calling
+environment. ggplot2 has deprecated it, to encourage learning `ggplot()`, with which complex
+graphics are easier to make. Giggly has no `qplot()`: a plot is started with `Giggly.Plot.new/2`
+and its layers are added one by one.
+
+## A data frame's columns
+
+```r
+# Use data from data.frame
+qplot(mpg, wt, data = mtcars)
+qplot(mpg, wt, data = mtcars, colour = cyl)
+qplot(mpg, wt, data = mtcars, size = cyl)
+qplot(mpg, wt, data = mtcars, facets = vs ~ am)
+```
+
+Not in Giggly yet: `qplot()`, mapping `colour` and `size` and the legends that read them back, and
+`facet_grid()`, which the two-sided formula `vs ~ am` asks for.
+
+## Vectors instead of a data frame
+
+```r
+set.seed(1)
+qplot(1:10, rnorm(10), colour = runif(10))
+qplot(1:10, letters[1:10])
+mod <- lm(mpg ~ wt, data = mtcars)
+qplot(resid(mod), fitted(mod))
+```
+
+Without `data`, `qplot()` draws vectors: here a sequence, random numbers, the alphabet, and a
+model's residuals and fitted values. Not in Giggly yet: `qplot()`, mapping `colour` and the legend
+that reads it back, and models fitted by `lm()`. A Giggly plot draws the columns of a table.
+
+## Vectors inside a function
+
+```r
+f <- function() {
+   a <- 1:10
+   b <- a ^ 2
+   qplot(a, b)
+}
+f()
+```
+
+`qplot()` finds `a` and `b` among the function's own variables. Not in Giggly yet: `qplot()`.
+
+## Setting an aesthetic
+
+```r
+# To set aesthetics, wrap in I()
+qplot(mpg, wt, data = mtcars, colour = I("red"))
+```
+
+Not in Giggly yet: `qplot()`, and a fixed `colour`.
+
+## The geom qplot() guesses
+
+```r
+# qplot will attempt to guess what geom you want depending on the input
+# both x and y supplied = scatterplot
+qplot(mpg, wt, data = mtcars)
+# just x supplied = histogram
+qplot(mpg, data = mtcars)
+# just y supplied = scatterplot, with x = seq_along(y)
+qplot(y = mpg, data = mtcars)
+```
+
+Not in Giggly yet: `qplot()`, `geom_histogram()`, and an expression in a mapping, such as
+`seq_along(y)`.
+
+## Other geoms
+
+```r
+# Use different geoms
+qplot(mpg, wt, data = mtcars, geom = "path")
+qplot(factor(cyl), wt, data = mtcars, geom = c("boxplot", "jitter"))
+qplot(mpg, data = mtcars, geom = "dotplot")
+```
+
+Not in Giggly yet: `qplot()`, `geom_path()`, `geom_boxplot()`, `geom_jitter()`, `geom_dotplot()`,
+and an expression in a mapping, such as `factor(cyl)`.

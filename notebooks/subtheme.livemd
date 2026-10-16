@@ -1,0 +1,62 @@
+# Theme shortcuts: subtheme
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`theme_sub_axis()`](https://ggplot2.tidyverse.org/reference/subtheme.html), which covers
+`theme_sub_axis_x()`, `theme_sub_axis_y()`, `theme_sub_axis_bottom()`, `theme_sub_axis_top()`,
+`theme_sub_axis_left()`, `theme_sub_axis_right()`, `theme_sub_legend()`, `theme_sub_panel()`,
+`theme_sub_plot()` and `theme_sub_strip()` too, in the order the page gives them. Each example
+shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2
+code and names what it is waiting for, so the page is also a list of what remains.
+
+These functions are shortcuts for `theme()` with shorter argument names: each sets the elements
+of one part of the plot, so `theme_sub_axis_bottom(title = ...)` sets what
+`theme(axis.title.x.bottom = ...)` sets. There is one for all the axes, for both x axes, for both
+y axes and for each of the four, and one each for the legend, the panels, the whole plot and the
+facet strips. Giggly draws every plot in ggplot2's default theme, `theme_gray()`, and has no way
+to change the theme yet: neither these functions nor `theme()`.
+
+## Styling the bottom axis with `theme()`
+
+```r
+# A standard plot
+p <- ggplot(mtcars, aes(disp, mpg, colour = drat)) +
+  geom_point()
+
+red_text <- element_text(colour = "red")
+red_line <- element_line(colour = "red")
+
+# The theme settings below:
+p + theme(
+  axis.title.x.bottom = red_text,
+  axis.text.x.bottom  = red_text,
+  axis.line.x.bottom  = red_line,
+  axis.ticks.x.bottom = red_line
+)
+```
+
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back,
+and changing the theme, here to draw the bottom axis's title, labels, line and ticks in red.
+
+## The same with `theme_sub_axis_bottom()`
+
+```r
+# Are equivalent to these less verbose theme settings
+p + theme_sub_axis_bottom(
+  title = red_text,
+  text  = red_text,
+  line  = red_line,
+  ticks = red_line
+)
+```
+
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back,
+and `theme_sub_axis_bottom()`.

@@ -1,0 +1,167 @@
+# Continuous position scales: scale_continuous
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_x_continuous()`](https://ggplot2.tidyverse.org/reference/scale_continuous.html), which
+covers `scale_y_continuous()`, `scale_x_log10()`, `scale_y_log10()`, `scale_x_reverse()`,
+`scale_y_reverse()`, `scale_x_sqrt()` and `scale_y_sqrt()` too, in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+`scale_x_continuous()` and `scale_y_continuous()` are the default scales for a continuous `x` and
+`y`. Setting one by hand changes its title, limits, breaks or labels, or transforms it; the log10,
+square root and reverse scales are shortcuts for common transformations. Giggly chooses a continuous
+position scale from the data, as ggplot2 does, and titles its axis by the column mapped to it, but
+has no scale functions yet, so nothing else about a scale can be set. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`:
+fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to
+`mpg`, ggplot2's name for it.
+
+## The default scales
+
+Both columns are numbers, so both axes get continuous scales, each titled by its column.
+
+```r
+p1 <- ggplot(mpg, aes(displ, hwy)) +
+  geom_point()
+p1
+```
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> render.()
+```
+
+## Axis titles
+
+```r
+# Manipulating the default position scales lets you:
+#  * change the axis labels
+p1 +
+  scale_x_continuous("Engine displacement (L)") +
+  scale_y_continuous("Highway MPG")
+```
+
+Not in Giggly yet: `scale_x_continuous()` and `scale_y_continuous()`, whose first argument titles
+the axis.
+
+## Removing axis titles
+
+```r
+# You can also use the short-cut labs().
+# Use NULL to suppress axis labels
+p1 + labs(x = NULL, y = NULL)
+```
+
+Not in Giggly yet: `labs()`.
+
+## Axis limits
+
+```r
+#  * modify the axis limits
+p1 + scale_x_continuous(limits = c(2, 6))
+p1 + scale_x_continuous(limits = c(0, 10))
+```
+
+Limits narrower than the data drop the rows outside them; wider ones leave room around the data.
+
+Not in Giggly yet: `scale_x_continuous()` and its `limits` option.
+
+## The xlim() shortcut
+
+```r
+# you can also use the short hand functions `xlim()` and `ylim()`
+p1 + xlim(2, 6)
+```
+
+Not in Giggly yet: `xlim()`.
+
+## Where the ticks go
+
+```r
+#  * choose where the ticks appear
+p1 + scale_x_continuous(breaks = c(2, 4, 6))
+```
+
+Not in Giggly yet: `scale_x_continuous()` and its `breaks` option.
+
+## Labels of your own
+
+```r
+#  * choose your own labels
+p1 + scale_x_continuous(
+  breaks = c(2, 4, 6),
+  label = c("two", "four", "six")
+)
+```
+
+Not in Giggly yet: `scale_x_continuous()` and its `breaks` and `labels` options.
+
+## Formatting labels
+
+The example makes a small table of random numbers with R's `set.seed(1)`, so that its labels have
+large numbers and fractions to format.
+
+```r
+# Typically you'll pass a function to the `labels` argument.
+# Some common formats are built into the scales package:
+set.seed(1)
+df <- data.frame(
+  x = rnorm(10) * 100000,
+  y = seq(0, 1, length.out = 10)
+)
+p2 <- ggplot(df, aes(x, y)) + geom_point()
+p2 + scale_y_continuous(labels = scales::label_percent())
+p2 + scale_y_continuous(labels = scales::label_dollar())
+p2 + scale_x_continuous(labels = scales::label_comma())
+```
+
+Not in Giggly yet: `scale_x_continuous()` and `scale_y_continuous()` and their `labels` option,
+here given label functions from the scales package.
+
+## Transformations
+
+```r
+# You can also override the default linear mapping by using a
+# transformation. There are three shortcuts:
+p1 + scale_y_log10()
+p1 + scale_y_sqrt()
+p1 + scale_y_reverse()
+```
+
+Not in Giggly yet: `scale_y_log10()`, `scale_y_sqrt()` and `scale_y_reverse()`.
+
+## Other transformations
+
+```r
+# Or you can supply a transformation in the `trans` argument:
+p1 + scale_y_continuous(transform = scales::transform_reciprocal())
+
+# You can also create your own. See ?scales::new_transform
+```
+
+Not in Giggly yet: `scale_y_continuous()` and its `transform` option, and transformations from the
+scales package, built in or made with `scales::new_transform()`.

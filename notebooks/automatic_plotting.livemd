@@ -1,0 +1,21 @@
+# Plotting data types: automatic_plotting
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`automatic_plotting`](https://ggplot2.tidyverse.org/reference/automatic_plotting.html) has no
+examples, so this notebook says only what the page describes and where Giggly stands.
+
+The page shows how a package can make its own class of data easy to plot with three S3 generics,
+each a step further than the last: a `fortify()` method reshapes the data into a long data frame
+ggplot2 can use, an `autolayer()` method makes a layer that draws it, and an `autoplot()` method
+makes a complete plot, here from that layer. It works through a `my_heatmap` class wrapping a
+matrix, drawn with `geom_raster()`. Not in Giggly yet: `fortify()`, `autolayer()` and
+`autoplot()`, and `geom_raster()`.

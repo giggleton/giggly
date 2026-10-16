@@ -1,0 +1,142 @@
+# The active theme: get_theme
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`get_theme()`](https://ggplot2.tidyverse.org/reference/get_theme.html), which covers
+`theme_get()`, `set_theme()`, `theme_set()`, `update_theme()`, `theme_update()`,
+`replace_theme()`, `theme_replace()` and `%+replace%` too, in the order the page gives them. Each
+example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its
+ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+ggplot2 keeps an active theme and applies it to every plot when the plot is drawn. `get_theme()`
+returns it, `set_theme()` replaces it whole, and `update_theme()` and `replace_theme()` change
+single elements of it; each of the three returns the theme it replaced, so that theme can be
+restored. `theme_get()`, `theme_set()`, `theme_update()` and `theme_replace()` are other names for
+the same four functions. Themes themselves combine with `+`, which changes only the properties a new
+element sets, or with `%+replace%`, which replaces the element whole. Giggly keeps no global
+settings, since every option is an argument, so there is no active theme to get or set: every plot
+is drawn in ggplot2's default theme, `theme_gray()`, and there is no other theme and no way to
+change one. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns
+an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in these
+examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
+magazine, which the setup cell binds to `mtcars`, R's name for it.
+
+## A plot in the default theme
+
+```r
+p <- ggplot(mtcars, aes(mpg, wt)) +
+  geom_point()
+p
+```
+
+Until the active theme is changed, ggplot2 draws in its default theme, `theme_gray()`, the one
+Giggly draws every plot in.
+
+```elixir
+plot =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt})
+  |> Plot.geom_point()
+
+render.(plot)
+```
+
+## Setting the whole theme
+
+```r
+# Use set_theme() to completely override the current theme.
+# update_theme() and replace_theme() are similar except they
+# apply directly to the current/active theme.
+# update_theme() modifies a particular element of the current theme.
+# Here we have the old theme so we can later restore it.
+# Note that the theme is applied when the plot is drawn, not
+# when it is created.
+old <- set_theme(theme_bw())
+p
+```
+
+`set_theme()` makes `theme_bw()` the active theme and returns the theme it replaced, kept in
+`old`. Giggly keeps no global settings, so there is no active theme to set, and every plot is
+drawn in `theme_gray()`. Not in Giggly yet: `theme_bw()`.
+
+## Updating one element
+
+```r
+set_theme(old)
+update_theme(panel.grid.minor = element_line(colour = "red"))
+p
+```
+
+`update_theme()` sets the colour of the active theme's minor grid lines and keeps the element's
+other properties. Giggly has no active theme to update. Not in Giggly yet: changing the theme,
+here to draw the minor grid lines in red.
+
+## Replacing one element
+
+```r
+set_theme(old)
+replace_theme(panel.grid.minor = element_line(colour = "red"))
+p
+```
+
+`replace_theme()` replaces the element whole, so the properties the new element leaves unset are
+unset in the theme too. Giggly has no active theme to change. Not in Giggly yet: changing the
+theme, here to draw the minor grid lines in red.
+
+## Restoring the theme
+
+```r
+set_theme(old)
+p
+```
+
+`set_theme(old)` puts back the theme the first `set_theme()` replaced, and `p` is drawn in
+`theme_gray()` again, as Giggly draws it.
+
+```elixir
+render.(plot)
+```
+
+## Modifying a theme object
+
+`theme_grey()` is `theme_gray()` under its other spelling.
+
+```r
+# Modifying theme objects -----------------------------------------
+# You can use + and %+replace% to modify a theme object.
+# They differ in how they deal with missing arguments in
+# the theme elements.
+
+add_el <- theme_grey() +
+  theme(text = element_text(family = "Times"))
+add_el$text
+
+rep_el <- theme_grey() %+replace%
+  theme(text = element_text(family = "Times"))
+rep_el$text
+```
+
+Each prints the `text` element of a theme made from `theme_grey()` with its font family set to
+Times. Added with `+`, the element keeps the default theme's other text properties; replaced with
+`%+replace%`, it has only the family, and its other properties are unset. Not in Giggly yet:
+changing the theme, with `+` or `%+replace%`.

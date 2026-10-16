@@ -1,0 +1,19 @@
+# Data from models: fortify
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`fortify()`](https://ggplot2.tidyverse.org/reference/fortify.html)
+has no examples, so this notebook says only what the page describes and where Giggly stands.
+
+`fortify()` turns a model or another R object into a data frame, so that ggplot2 can plot it; it
+is an S3 generic, with methods for particular classes. The page recommends the `broom` package
+instead, which covers a much wider range of objects, and says `fortify()` may be deprecated.
+Giggly takes any table as a plot's data: a keyword list of columns, a map of columns or a list of
+maps. Not in Giggly yet: `fortify()`.

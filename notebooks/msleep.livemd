@@ -1,0 +1,20 @@
+# Mammals' sleep: msleep
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`msleep`](https://ggplot2.tidyverse.org/reference/msleep.html) has
+no examples, so this notebook says only what the page describes and where Giggly stands.
+
+`msleep` is an updated and expanded version of the mammals sleep dataset: 83 mammals, each with
+its common name, genus, order, diet, conservation status, hours of total and REM sleep, length of
+sleep cycle, hours awake, and brain and body weight in kilograms. The updated sleep times and
+weights come from Savage and West (2007); the order, conservation status and diet were added from
+Wikipedia. Not in Giggly yet: the `msleep` dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's
+`mtcars` only.

@@ -491,6 +491,18 @@ written, and git history keeps every version.
   plot show itself. Both drawn examples were checked against ggplot2's drawings of the same code
   and match in every element. The missing-values example draws R's `set.seed(1)` rows, named.
 
+- **Every page of ggplot2's function reference has a notebook, and `notebooks/index.livemd`
+  follows the reference index (2026-10-15, Steve).** The index keeps ggplot2's sections, their
+  descriptions and its order, each entry a relative link to its notebook, which Livebook opens as
+  a notebook of its own; it was written from ggplot2's rendered index for 4.0.3, the release
+  the notebooks follow. Each notebook shows its page's examples verbatim, every line in
+  order, and draws only those whose plot Giggly builds with its own functions, each checked
+  against ggplot2's drawing in R; the rest name what they wait for in the same words everywhere,
+  so a feature that lands finds its examples by search. *Rejected: an index of the built pages
+  only* (recommended, as short and easy to keep true; Steve chose every page). *Rejected for now:
+  ExDoc pages made from the notebooks*: they would show code without drawings, and "Run in
+  Livebook" cannot install a path dependency until Giggly is published.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** *(Since amended: `clip` is a parameter of the coordinate
   system's struct, and the assembly carries one value rather than `panel_clips`; see the entry
@@ -1239,6 +1251,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-15 — Add a notebook for every page of ggplot2's reference; §4: "Every page of
+  ggplot2's function reference has a notebook"
 - 2026-10-15 — Add the geom_bar notebook (bars, step 5) (`6f6b680`); §4: "Bars are Phase 3's
   first increment", "The notebooks follow ggplot2's reference pages"
 - 2026-10-15 — Draw horizontal bars (bars, step 4) (`b5c2d10`); §4: "A geom says where its marks

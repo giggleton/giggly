@@ -1,0 +1,196 @@
+# Summaries: stat_summary
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`stat_summary()`](https://ggplot2.tidyverse.org/reference/stat_summary.html), which covers
+`stat_summary_bin()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`stat_summary()` summarises the `y` values at each unique `x`, or the `x` values at each `y`, and
+`stat_summary_bin()` those in each bin of `x`: where `stat_bin()` only counts, they compute any
+summary. The summary is one function that returns a middle and the ends of a range (`fun.data`),
+or a function for each (`fun`, `fun.min` and `fun.max`); given neither, it is the mean and its
+standard error, `mean_se()`. Each summary is drawn as a point with a line through its range,
+`geom_pointrange()`, unless another geom is given. Giggly has none of it yet; the nearest it has
+is `Giggly.Plot.geom_bar/3`, which counts the rows at each `x` or sums their `weight`.
+
+## Means with bootstrapped intervals
+
+```r
+d <- ggplot(mtcars, aes(cyl, mpg)) + geom_point()
+d + stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size = 3)
+```
+
+`mean_cl_boot()`, from the `Hmisc` package, gives the mean with a confidence interval found by
+resampling the data.
+
+Not in Giggly yet: `stat_summary()` and the point ranges it draws, `geom_pointrange()`, the
+`Hmisc` package's summaries, here `mean_cl_boot()`, and a fixed `colour`, `linewidth` and
+`size`.
+
+## Horizontal summaries
+
+```r
+# Orientation follows the discrete axis
+ggplot(mtcars, aes(mpg, factor(cyl))) +
+  geom_point() +
+  stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size = 3)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `stat_summary()`,
+`geom_pointrange()`, `mean_cl_boot()`, and a fixed `colour`, `linewidth` and `size`.
+
+## One summary function
+
+```r
+# You can supply individual functions to summarise the value at
+# each x:
+d + stat_summary(fun = "median", colour = "red", size = 2, geom = "point")
+d + stat_summary(fun = "mean", colour = "red", size = 2, geom = "point")
+d + aes(colour = factor(vs)) + stat_summary(fun = mean, geom="line")
+```
+
+The last plot adds a mapping to `d` with `+ aes()`, and joins the means of each group with a
+line.
+
+Not in Giggly yet: `stat_summary()` and its `fun` option, a fixed `colour` and `size`, adding a
+mapping with `+ aes()`, an expression in a mapping, such as `factor(vs)`, mapping `colour` and
+the legend that reads it back, and lines, `geom_line()`.
+
+## A range from three functions
+
+```r
+d + stat_summary(fun = mean, fun.min = min, fun.max = max, colour = "red")
+```
+
+Each point is the mean `mpg` of its `cyl`, and its line runs from the smallest `mpg` to the
+largest.
+
+Not in Giggly yet: `stat_summary()` and its `fun`, `fun.min` and `fun.max` options,
+`geom_pointrange()`, and a fixed `colour`.
+
+## Summaries as bars
+
+```r
+d <- ggplot(diamonds, aes(cut))
+d + geom_bar()
+d + stat_summary(aes(y = price), fun = "mean", geom = "bar")
+```
+
+The first plot counts the diamonds of each cut; the second draws the mean price of each cut as a
+bar.
+
+Not in Giggly yet: the `diamonds` dataset, and `stat_summary()` drawn as bars.
+
+## Summaries in bins
+
+```r
+# Orientation of stat_summary_bin is ambiguous and must be specified directly
+ggplot(diamonds, aes(carat, price)) +
+  stat_summary_bin(fun = "mean", geom = "bar", orientation = 'y')
+```
+
+Not in Giggly yet: the `diamonds` dataset, and `stat_summary_bin()` and its `orientation`
+option.
+
+## Zooming in without losing data
+
+```r
+# Don't use ylim to zoom into a summary plot - this throws the
+# data away
+p <- ggplot(mtcars, aes(cyl, mpg)) +
+  stat_summary(fun = "mean", geom = "point")
+p
+p + ylim(15, 30)
+# Instead use coord_cartesian
+p + coord_cartesian(ylim = c(15, 30))
+```
+
+`ylim()` sets the limits of the `y` scale, which drops the rows outside them before the means are
+taken, and so changes the means; `coord_cartesian()` zooms in after the stat, leaving them as
+they were.
+
+Not in Giggly yet: `stat_summary()` and its `fun` option, `ylim()`, and `coord_cartesian()` and
+its `ylim` option.
+
+## Summary functions from Hmisc
+
+```r
+# A set of useful summary functions is provided from the Hmisc package:
+stat_sum_df <- function(fun, geom="crossbar", ...) {
+  stat_summary(fun.data = fun, colour = "red", geom = geom, width = 0.2, ...)
+}
+d <- ggplot(mtcars, aes(cyl, mpg)) + geom_point()
+# The crossbar geom needs grouping to be specified when used with
+# a continuous x axis.
+d + stat_sum_df("mean_cl_boot", mapping = aes(group = cyl))
+d + stat_sum_df("mean_sdl", mapping = aes(group = cyl))
+d + stat_sum_df("mean_sdl", fun.args = list(mult = 1), mapping = aes(group = cyl))
+d + stat_sum_df("median_hilow", mapping = aes(group = cyl))
+```
+
+`stat_sum_df()` is a helper the example writes: a `stat_summary()` drawn as red crossbars.
+`mean_sdl()` is the mean give or take twice the standard deviation, or once with `mult = 1`, and
+`median_hilow()` the median with the range holding the middle 95% of the data.
+
+Not in Giggly yet: `stat_summary()` and its `fun.args` option, crossbars, `geom_crossbar()` and
+its `width` option, a fixed `colour`, and the `Hmisc` package's summaries: `mean_cl_boot()`,
+`mean_sdl()` and `median_hilow()`.
+
+## Skewed distributions
+
+ggplot2's example takes a random sample of the `movies` dataset, from the `ggplot2movies`
+package, with R's `set.seed(596)`, and runs only where that package is installed.
+
+```r
+# An example with highly skewed distributions:
+if (require("ggplot2movies")) {
+set.seed(596)
+mov <- movies[sample(nrow(movies), 1000), ]
+ m2 <-
+   ggplot(mov, aes(x = factor(round(rating)), y = votes)) +
+   geom_point()
+ m2 <-
+   m2 +
+   stat_summary(
+     fun.data = "mean_cl_boot",
+     geom = "crossbar",
+     colour = "red", width = 0.3
+   ) +
+   xlab("rating")
+m2
+# Notice how the overplotting skews off visual perception of the mean
+# supplementing the raw data with summary statistics is _very_ important
+```
+
+Not in Giggly yet: the `movies` dataset, an expression in a mapping, such as
+`factor(round(rating))`, `stat_summary()`, `geom_crossbar()` and its `width` option,
+`mean_cl_boot()`, a fixed `colour`, and titles and labels, here `xlab()`.
+
+## A log scale before or after the stat
+
+```r
+# Next, we'll look at votes on a log scale.
+
+# Transforming the scale means the data are transformed
+# first, after which statistics are computed:
+m2 + scale_y_log10()
+# Transforming the coordinate system occurs after the
+# statistic has been computed. This means we're calculating the summary on the raw data
+# and stretching the geoms onto the log scale.  Compare the widths of the
+# standard errors.
+m2 + coord_transform(y="log10")
+}
+```
+
+Not in Giggly yet: `scale_y_log10()` and `coord_transform()`, and everything the plot above waits
+for.

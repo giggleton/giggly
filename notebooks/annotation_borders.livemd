@@ -1,0 +1,59 @@
+# Map borders: annotation_borders
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`annotation_borders()`](https://ggplot2.tidyverse.org/reference/annotation_borders.html), which
+covers `borders()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`annotation_borders()` is a quick way to put map data from the `maps` package onto a plot: a
+layer of polygons outlining the world's countries, by default, or another of the package's maps,
+such as the US states, to give rough reference lines to data placed by longitude and latitude.
+Its `xlim` and `ylim` pick the part of the map to take. `borders()` is its old name, now
+deprecated. Giggly has none of it yet.
+
+## State capitals
+
+```r
+if (require("maps")) {
+data(us.cities)
+capitals <- subset(us.cities, capital == 2)
+ggplot(capitals, aes(long, lat)) +
+  annotation_borders("state") +
+  geom_point(aes(size = pop)) +
+  scale_size_area() +
+  coord_quickmap()
+}
+```
+
+`require()` runs each example only when the `maps` package is installed; `capital == 2` picks
+the state capitals from its table of US cities.
+
+Not in Giggly yet: map data from the `maps` package, `annotation_borders()`, mapping `size` and
+the legend that reads it back, `scale_size_area()`, and `coord_quickmap()`.
+
+## The world around them
+
+```r
+if (require("maps")) {
+# Same map, with some world context
+ggplot(capitals, aes(long, lat)) +
+  annotation_borders("world", xlim = c(-130, -60), ylim = c(20, 50)) +
+  geom_point(aes(size = pop)) +
+  scale_size_area() +
+  coord_quickmap()
+}
+```
+
+Not in Giggly yet: map data from the `maps` package, `annotation_borders()` and its `xlim` and
+`ylim` options, mapping `size` and the legend that reads it back, `scale_size_area()`, and
+`coord_quickmap()`.

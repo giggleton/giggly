@@ -1,0 +1,123 @@
+# Segments and curves: geom_segment
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_segment()`](https://ggplot2.tidyverse.org/reference/geom_segment.html), which covers
+`geom_curve()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_segment()` draws a straight line for each row, from (`x`, `y`) to (`xend`, `yend`), and
+`geom_curve()` draws a curved one; to join points across rows, ggplot2 has `geom_path()`. Giggly
+has neither yet.
+
+## A curve and a segment
+
+```r
+b <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point()
+
+df <- data.frame(x1 = 2.62, x2 = 3.57, y1 = 21.0, y2 = 15.0)
+b +
+ geom_curve(aes(x = x1, y = y1, xend = x2, yend = y2, colour = "curve"), data = df) +
+ geom_segment(aes(x = x1, y = y1, xend = x2, yend = y2, colour = "segment"), data = df)
+```
+
+Both layers draw a one-row table of their own, `df`, over the points of `mtcars`, and mapping
+`colour` to a constant names each layer in the legend.
+
+Not in Giggly yet: `geom_curve()` and `geom_segment()`, a layer with data of its own, mapping
+`xend`, `yend` and `colour`, an expression in a mapping, such as the constant `"curve"`, and the
+scale that maps the colour and the legend that reads it back.
+
+## Curvature and arrows
+
+```r
+b + geom_curve(aes(x = x1, y = y1, xend = x2, yend = y2), data = df, curvature = -0.2)
+b + geom_curve(aes(x = x1, y = y1, xend = x2, yend = y2), data = df, curvature = 1)
+b + geom_curve(
+  aes(x = x1, y = y1, xend = x2, yend = y2),
+  data = df,
+  arrow = arrow(length = unit(0.03, "npc"))
+)
+```
+
+A negative `curvature` bends the curve to the left, a positive one to the right, and 0 draws a
+straight line; the default is 0.5.
+
+Not in Giggly yet: `geom_curve()` with its `curvature` and `arrow` options, `arrow()`, mapping
+`xend` and `yend`, and a layer with data of its own.
+
+## Seal movements
+
+```r
+if (requireNamespace('maps', quietly = TRUE)) {
+ggplot(seals, aes(long, lat)) +
+  geom_segment(aes(xend = long + delta_long, yend = lat + delta_lat),
+    arrow = arrow(length = unit(0.1,"cm"))) +
+  annotation_borders("state")
+}
+```
+
+ggplot2's `seals` is a vector field of seals' movements: at each point of a grid of longitudes and
+latitudes, the change in longitude and latitude. `annotation_borders("state")` draws the outlines
+of the US states from the `maps` package.
+
+Not in Giggly yet: `geom_segment()` and its `arrow` option, mapping `xend` and `yend`, an
+expression in a mapping, such as `long + delta_long`, `annotation_borders()` and the map data from
+the `maps` package it draws, and the `seals` dataset.
+
+## Line ends and joins
+
+```r
+# Use lineend and linejoin to change the style of the segments
+df2 <- expand.grid(
+  lineend = c('round', 'butt', 'square'),
+  linejoin = c('round', 'mitre', 'bevel'),
+  stringsAsFactors = FALSE
+)
+df2 <- data.frame(df2, y = 1:9)
+ggplot(df2, aes(x = 1, y = y, xend = 2, yend = y, label = paste(lineend, linejoin))) +
+  geom_segment(
+     lineend = df2$lineend, linejoin = df2$linejoin,
+     size = 3, arrow = arrow(length = unit(0.3, "inches"))
+  ) +
+  geom_text(hjust = 'outside', nudge_x = -0.2) +
+  xlim(0.5, 2)
+```
+
+R's `expand.grid()` makes a row for each combination of line end and line join, and each row's
+segment is drawn with its own line end and join, and labelled with their names.
+
+Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, a fixed
+`size`, mapping `xend`, `yend` and `label`, expressions in a mapping, such as the constant `x = 1`
+and `paste(lineend, linejoin)`, `geom_text()` with a fixed `hjust` and its `nudge_x` option, and
+`xlim()`.
+
+## Spikes, as base R draws them
+
+```r
+# You can also use geom_segment to recreate plot(type = "h") :
+set.seed(1)
+counts <- as.data.frame(table(x = rpois(100,5)))
+counts$x <- as.numeric(as.character(counts$x))
+with(counts, plot(x, Freq, type = "h", lwd = 10))
+
+ggplot(counts, aes(x, Freq)) +
+  geom_segment(aes(xend = x, yend = 0), linewidth = 10, lineend = "butt")
+```
+
+R's `rpois()` draws 100 random counts from a Poisson distribution with mean 5, and `table()`
+counts how often each occurs. Base R's `plot(type = "h")` draws a vertical line from 0 up to each
+frequency, and the `ggplot()` call draws the same with segments.
+
+Not in Giggly yet: `geom_segment()` and its `lineend` option, mapping `xend` and `yend`, an
+expression in a mapping, such as the constant `yend = 0`, and a fixed `linewidth`.

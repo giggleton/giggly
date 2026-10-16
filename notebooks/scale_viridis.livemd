@@ -1,0 +1,116 @@
+# Viridis colour scales: scale_viridis
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_viridis_d()`](https://ggplot2.tidyverse.org/reference/scale_viridis.html), which
+covers `scale_fill_viridis_d()`, `scale_colour_viridis_c()`, `scale_fill_viridis_c()`,
+`scale_colour_viridis_b()` and `scale_fill_viridis_b()` too, in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+The viridis scales colour with palettes from the viridisLite package, which change evenly to the
+eye in colour and in black and white, and are designed to be read by people with common forms of
+colour blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
+continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
+palette, viridis by default, and the `fill` versions do the same for fill. Giggly has none of this
+yet: it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+
+## The default for ordered values
+
+The example draws a random sample of the `diamonds` dataset, picked after `set.seed(596)`.
+`clarity` is an ordered factor, so ggplot2 colours it with viridis without being asked.
+
+```r
+# viridis is the default colour/fill scale for ordered factors
+set.seed(596)
+dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
+ggplot(dsamp, aes(carat, price)) +
+  geom_point(aes(colour = clarity))
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour`, the scale that maps it and the
+legend that reads it back.
+
+## Discrete values
+
+`txsamp` keeps the rows of the `txhousing` dataset for the cities named.
+
+```r
+# Use viridis_d with discrete data
+txsamp <- subset(txhousing, city %in%
+  c("Houston", "Fort Worth", "San Antonio", "Dallas", "Austin"))
+(d <- ggplot(data = txsamp, aes(x = sales, y = median)) +
+   geom_point(aes(colour = city)))
+d + scale_colour_viridis_d()
+```
+
+Not in Giggly yet: the `txhousing` dataset, mapping `colour`, the scale that maps it,
+`scale_colour_viridis_d()` and the legend that reads it back.
+
+## The legend's title
+
+```r
+# Change scale label
+d + scale_colour_viridis_d("City\nCenter")
+```
+
+Not in Giggly yet: the `txhousing` dataset, mapping `colour`, `scale_colour_viridis_d()`, the
+legend that reads it back, and titles and labels.
+
+## Other palettes
+
+```r
+# Select palette to use, see ?scales::pal_viridis for more details
+d + scale_colour_viridis_d(option = "plasma")
+d + scale_colour_viridis_d(option = "inferno")
+```
+
+Not in Giggly yet: the `txhousing` dataset, mapping `colour`, `scale_colour_viridis_d()` and its
+`option`, and the legend that reads it back.
+
+## Fill colours
+
+```r
+# scale_fill_viridis_d works just the same as
+# scale_colour_viridis_d but for fill colours
+p <- ggplot(txsamp, aes(x = median, fill = city)) +
+  geom_histogram(position = "dodge", binwidth = 15000)
+p + scale_fill_viridis_d()
+# the order of colour can be reversed
+p + scale_fill_viridis_d(direction = -1)
+```
+
+Not in Giggly yet: the `txhousing` dataset, histograms (`geom_histogram()`) and the binning they
+count with (`stat_bin()`), mapping `fill`, `scale_fill_viridis_d()` and its `direction` option,
+and the legend that reads it back.
+
+## Continuous values
+
+```r
+# Use viridis_c with continuous data
+(v <- ggplot(faithfuld) +
+  geom_tile(aes(waiting, eruptions, fill = density)))
+v + scale_fill_viridis_c()
+v + scale_fill_viridis_c(option = "plasma")
+```
+
+Not in Giggly yet: the `faithfuld` dataset, tiles (`geom_tile()`), mapping `fill`, the scale that
+maps it, `scale_fill_viridis_c()` and its `option`, and the legend that reads it back.
+
+## Binned values
+
+```r
+# Use viridis_b to bin continuous data before mapping
+v + scale_fill_viridis_b()
+```
+
+Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, mapping `fill`,
+`scale_fill_viridis_b()` and the legend that reads it back.

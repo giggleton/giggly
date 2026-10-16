@@ -9,6 +9,13 @@ Mix.install([
 alias Giggly.Plot
 
 mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,12 +28,12 @@ waiting for, so the page is also a list of what remains.
 
 There are two kinds of bar chart. `Giggly.Plot.geom_bar/3` counts: each bar's height is the number
 of rows at its `x`, or the sum of their weights. `Giggly.Plot.geom_col/3` draws heights that are
-already in the data: one bar per row, from 0 to its `y`. A plot is described with `Giggly.Plot`
-and drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
-cell; the setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`. Most examples use
-`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from
-1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it. The rest make small
-tables of their own, as ggplot2's do.
+already in the data: one bar per row, from 0 to its `y`. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
+so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
+cell with `Kino.Image`. Most examples use `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for
+234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name
+for it. The rest make small tables of their own, as ggplot2's do.
 
 ## Counting the cars in each class
 
@@ -45,9 +52,7 @@ plot = Plot.new(mpg, %{x: :class})
 
 plot
 |> Plot.geom_bar()
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Summing a weight
@@ -63,9 +68,7 @@ is still titled `count`, as ggplot2's is.
 ```elixir
 plot
 |> Plot.geom_bar(%{weight: :displ})
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Horizontal bars
@@ -82,9 +85,7 @@ and titles the x axis `count`.
 mpg
 |> Plot.new()
 |> Plot.geom_bar(%{y: :class})
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Stacked bars
@@ -131,9 +132,7 @@ outcomes = [trt: ["a", "b", "c"], outcome: [2.3, 1.9, 3.2]]
 outcomes
 |> Plot.new(%{x: :trt, y: :outcome})
 |> Plot.geom_col()
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## The same data as points
@@ -149,9 +148,7 @@ ggplot(df, aes(trt, outcome)) +
 outcomes
 |> Plot.new(%{x: :trt, y: :outcome})
 |> Plot.geom_point()
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Counting continuous values
@@ -172,9 +169,7 @@ values = List.duplicate(2.9, 5) ++ List.duplicate(3.1, 10) ++ List.duplicate(4.5
 [x: values]
 |> Plot.new(%{x: :x})
 |> Plot.geom_bar()
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## A histogram of the same data

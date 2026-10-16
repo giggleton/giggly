@@ -1,0 +1,120 @@
+# Intervals: geom_linerange
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_linerange()`](https://ggplot2.tidyverse.org/reference/geom_linerange.html), which covers
+`geom_crossbar()`, `geom_errorbar()`, `geom_errorbarh()` and `geom_pointrange()` too, in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list
+of what remains.
+
+These geoms each draw an interval: a range from `ymin` to `ymax` at an `x`, or from `xmin` to
+`xmax` at a `y` when turned on its side. `geom_linerange()` draws it as a line,
+`geom_pointrange()` as a line with a point at `y`, `geom_errorbar()` as a line capped at each end,
+and `geom_crossbar()` as a box with a line across it at `y`. `geom_errorbarh()` is deprecated in
+favour of `geom_errorbar(orientation = "y")`. Giggly has none of them yet.
+
+## Lines, points, crossbars and error bars
+
+```r
+# Create a simple example dataset
+df <- data.frame(
+  trt = factor(c(1, 1, 2, 2)),
+  resp = c(1, 5, 3, 4),
+  group = factor(c(1, 2, 1, 2)),
+  upper = c(1.1, 5.3, 3.3, 4.2),
+  lower = c(0.8, 4.6, 2.4, 3.6)
+)
+
+p <- ggplot(df, aes(trt, resp, colour = group))
+p + geom_linerange(aes(ymin = lower, ymax = upper))
+p + geom_pointrange(aes(ymin = lower, ymax = upper))
+p + geom_crossbar(aes(ymin = lower, ymax = upper), width = 0.2)
+p + geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
+```
+
+Not in Giggly yet: `geom_linerange()`, `geom_pointrange()`, `geom_crossbar()` and
+`geom_errorbar()` and their `width` option, and mapping `colour`, the scale that maps it and the
+legend that reads it back.
+
+## Horizontal intervals
+
+```r
+# Flip the orientation by changing mapping
+ggplot(df, aes(resp, trt, colour = group)) +
+  geom_linerange(aes(xmin = lower, xmax = upper))
+```
+
+Mapping `xmin` and `xmax` rather than `ymin` and `ymax` turns the intervals on their side.
+
+Not in Giggly yet: `geom_linerange()`, and mapping `colour`, the scale that maps it and the legend
+that reads it back.
+
+## Lines through the group means
+
+```r
+# Draw lines connecting group means
+p +
+  geom_line(aes(group = group)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
+```
+
+Not in Giggly yet: `geom_line()`, `geom_errorbar()` and its `width` option, and mapping
+`colour`, the scale that maps it and the legend that reads it back.
+
+## Dodging bars and error bars
+
+```r
+# If you want to dodge bars and errorbars, you need to manually
+# specify the dodge width
+p <- ggplot(df, aes(trt, resp, fill = group))
+p +
+ geom_col(position = "dodge") +
+ geom_errorbar(aes(ymin = lower, ymax = upper), position = "dodge", width = 0.25)
+```
+
+Each layer is dodged by its own width here, so the narrower error bars do not line up with the
+bars.
+
+Not in Giggly yet: `geom_errorbar()` and its `width` option, and mapping `fill`, the scale that
+maps it and the legend that reads it back. Giggly dodges columns already:
+`Giggly.Plot.geom_col/3` with `position: :dodge`.
+
+## Dodging by one width
+
+```r
+# Because the bars and errorbars have different widths
+# we need to specify how wide the objects we are dodging are
+dodge <- position_dodge(width=0.9)
+p +
+  geom_col(position = dodge) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), position = dodge, width = 0.25)
+```
+
+Not in Giggly yet: `position_dodge()`'s options, `geom_errorbar()` and its `width` option, and
+mapping `fill`, the scale that maps it and the legend that reads it back. Giggly names a position
+by an atom, `position: :dodge`, which takes no options.
+
+## Dodging with padding
+
+```r
+# When using geom_errorbar() with position_dodge2(), extra padding will be
+# needed between the error bars to keep them aligned with the bars.
+p +
+geom_col(position = "dodge2") +
+geom_errorbar(
+  aes(ymin = lower, ymax = upper),
+  position = position_dodge2(width = 0.5, padding = 0.5)
+)
+```
+
+Not in Giggly yet: `position_dodge2()` and its options, `geom_errorbar()`, and mapping `fill`,
+the scale that maps it and the legend that reads it back.

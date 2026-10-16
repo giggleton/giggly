@@ -1,0 +1,43 @@
+# Unique rows: stat_unique
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`stat_unique()`](https://ggplot2.tidyverse.org/reference/stat_unique.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+`stat_unique()` removes duplicate rows before they are drawn, so marks that would fall exactly on
+one another are drawn once. It is usually given to a geom as `stat = "unique"`. Giggly has none
+of it yet.
+
+## Overlapping points
+
+```r
+ggplot(mtcars, aes(vs, am)) +
+  geom_point(alpha = 0.1)
+```
+
+`vs` and `am` are each 0 or 1, so the cars pile up at the corners, and each nearly
+transparent point darkens the ones beneath it.
+
+Not in Giggly yet: a fixed `alpha`.
+
+## One point for each distinct row
+
+```r
+ggplot(mtcars, aes(vs, am)) +
+  geom_point(alpha = 0.1, stat = "unique")
+```
+
+With the duplicates removed, each corner has a single faint point.
+
+Not in Giggly yet: a fixed `alpha`, and `stat_unique()` given to a geom as `stat = "unique"`.

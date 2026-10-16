@@ -1,0 +1,21 @@
+# Fuel economy: mpg
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`mpg`](https://ggplot2.tidyverse.org/reference/mpg.html) has no
+examples, so this notebook says only what the page describes and where Giggly stands.
+
+`mpg` is a subset of the fuel economy data the US EPA publishes at fueleconomy.gov: 234 cars of
+38 models, kept because each had a new release every year from 1999 to 2008, which stands in for
+their popularity. Each row gives a car's manufacturer and model, its engine displacement in
+litres, year of manufacture, number of cylinders, transmission, drive train (`f` front-wheel, `r`
+rear-wheel, `4` four-wheel), city and highway miles per gallon, fuel type and class. Giggly has it
+as `Giggly.Datasets.mpg/0`, which returns ggplot2's `mpg` as a keyword list of columns, a table
+`Giggly.Plot.new/2` takes as it is.

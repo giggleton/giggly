@@ -1,0 +1,129 @@
+# Strip labels: labeller
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`labeller()`](https://ggplot2.tidyverse.org/reference/labeller.html), in the order the page gives
+them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet
+keeps its ggplot2 code and names what it is waiting for, so the page is also a list of what
+remains.
+
+A labeller writes the labels in a facet's strips from the values of its columns. `labeller()`
+builds one from a labeller for each column, or one for all the rows' strips and one for all the
+columns', and a default for the rest; each may be a labeller function, a function on strings, or a
+lookup table of the labels to show in place of the values. The result goes to the `labeller`
+argument of `facet_grid()` or `facet_wrap()`. Giggly has none of it yet: it has no `facet_grid()`,
+and `Giggly.Plot.facet_wrap/3` has no `labeller` option.
+
+## A labeller for each column
+
+```r
+p1 <- ggplot(mtcars, aes(x = mpg, y = wt)) + geom_point()
+
+# You can assign different labellers to variables:
+p1 + facet_grid(
+  vs + am ~ gear,
+  labeller = labeller(vs = label_both, am = label_value)
+)
+```
+
+Not in Giggly yet: `facet_grid()`, `labeller()`, `label_both()` and `label_value()`.
+
+## A labeller for the rows and one for the columns
+
+```r
+# Or whole margins:
+p1 + facet_grid(
+  vs + am ~ gear,
+  labeller = labeller(.rows = label_both, .cols = label_value)
+)
+```
+
+Not in Giggly yet: `facet_grid()`, `labeller()`, `label_both()` and `label_value()`.
+
+## A function on strings
+
+`capitalize()` upper-cases the first letter of each label.
+
+```r
+# You can supply functions operating on strings:
+capitalize <- function(string) {
+  substr(string, 1, 1) <- toupper(substr(string, 1, 1))
+  string
+}
+p2 <- ggplot(msleep, aes(x = sleep_total, y = awake)) + geom_point()
+p2 + facet_grid(vore ~ conservation, labeller = labeller(vore = capitalize))
+```
+
+Not in Giggly yet: the `msleep` dataset, `facet_grid()` and `labeller()`.
+
+## A lookup table
+
+The named vector gives each `conservation` code its long form, and `capitalize()` labels the
+other strips.
+
+```r
+# Or use character vectors as lookup tables:
+conservation_status <- c(
+  cd = "Conservation Dependent",
+  en = "Endangered",
+  lc = "Least concern",
+  nt = "Near Threatened",
+  vu = "Vulnerable",
+  domesticated = "Domesticated"
+)
+## Source: http://en.wikipedia.org/wiki/Wikipedia:Conservation_status
+
+p2 + facet_grid(vore ~ conservation, labeller = labeller(
+  .default = capitalize,
+  conservation = conservation_status
+))
+```
+
+Not in Giggly yet: the `msleep` dataset, `facet_grid()` and `labeller()`.
+
+## Wrapping long labels
+
+```r
+# In the following example, we rename the levels to the long form,
+# then apply a wrap labeller to the columns to prevent cropped text
+idx <- match(msleep$conservation, names(conservation_status))
+msleep$conservation2 <- conservation_status[idx]
+
+p3 <- ggplot(msleep, aes(x = sleep_total, y = awake)) + geom_point()
+p3 +
+  facet_grid(vore ~ conservation2,
+    labeller = labeller(conservation2 = label_wrap_gen(10))
+  )
+```
+
+Not in Giggly yet: the `msleep` dataset, `facet_grid()`, `labeller()`, and `label_wrap_gen()`,
+which wraps each label at 10 characters.
+
+## One labeller for several plots
+
+```r
+# labeller() is especially useful to act as a global labeller. You
+# can set it up once and use it on a range of different plots with
+# different facet specifications.
+
+global_labeller <- labeller(
+  vore = capitalize,
+  conservation = conservation_status,
+  conservation2 = label_wrap_gen(10),
+  .default = label_both
+)
+
+p2 + facet_grid(vore ~ conservation, labeller = global_labeller)
+p3 + facet_wrap(~conservation2, labeller = global_labeller)
+```
+
+Not in Giggly yet: the `msleep` dataset, `facet_grid()`, `labeller()`, `label_wrap_gen()`,
+`label_both()`, and `facet_wrap()`'s `labeller` option.

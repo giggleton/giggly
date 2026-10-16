@@ -1,0 +1,180 @@
+# Dodging: position_dodge
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`position_dodge()`](https://ggplot2.tidyverse.org/reference/position_dodge.html), which covers
+`position_dodge2()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+Dodging keeps each mark's vertical position and sets the marks that share an `x` side by side.
+`position_dodge()` dodges by group, so it needs the groups; `position_dodge2()` needs none,
+dodging each mark by its own extent and leaving a little padding between them, which suits box
+plots of different widths. `width` gives the width to dodge within, for marks narrower than the
+bars they sit beside, and `preserve` keeps either the total width at each position or the width
+of each mark. Giggly dodges bars as `position = "dodge"` does: `Giggly.Plot.geom_bar/3` and
+`Giggly.Plot.geom_col/3` take `position: :dodge`, which has no options.
+
+## Dodging without groups
+
+```r
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar(position = "dodge2")
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill` and the
+legend that reads it back, and `position_dodge2()`.
+
+## The width of each bar
+
+```r
+# By default, dodging with `position_dodge2()` preserves the total width of
+# the elements. You can choose to preserve the width of each element with:
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar(position = position_dodge2(preserve = "single"))
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill` and the
+legend that reads it back, and `position_dodge2()` and its `preserve` option.
+
+## Dodged histograms
+
+```r
+ggplot(diamonds, aes(price, fill = cut)) +
+  geom_histogram(position="dodge2")
+# see ?geom_bar for more examples
+```
+
+Not in Giggly yet: the `diamonds` dataset, histograms, `geom_histogram()`, mapping `fill` and the
+legend that reads it back, and `position_dodge2()`.
+
+## Frequency polygons instead
+
+```r
+# In this case a frequency polygon is probably a better choice
+ggplot(diamonds, aes(price, colour = cut)) +
+  geom_freqpoly()
+```
+
+Not in Giggly yet: the `diamonds` dataset, frequency polygons, `geom_freqpoly()`, and mapping
+`colour` and the legend that reads it back.
+
+## Columns dodged by group
+
+```r
+# Dodging with various widths -------------------------------------
+# To dodge items with different widths, you need to be explicit
+df <- data.frame(
+  x = c("a","a","b","b"),
+  y = 2:5,
+  g = rep(1:2, 2)
+)
+p <- ggplot(df, aes(x, y, group = g)) +
+  geom_col(position = "dodge", fill = "grey50", colour = "black")
+p
+```
+
+`rep(1:2, 2)` is `1, 2, 1, 2`, so each `x` has a column for each group.
+
+Not in Giggly yet: a fixed `fill` and `colour`. Dodging the columns by `group` is already
+`Giggly.Plot.geom_col/3` with `position: :dodge`.
+
+## A line range has no width
+
+```r
+# A line range has no width:
+p + geom_linerange(aes(ymin = y - 1, ymax = y + 1), position = "dodge")
+```
+
+With no width to dodge within, the line ranges are not moved apart, and do not sit on their
+columns.
+
+Not in Giggly yet: line ranges, `geom_linerange()`, and an expression in a mapping, such as
+`y - 1`, besides what `p` waits for.
+
+## Giving the width
+
+```r
+# So you must explicitly specify the width
+p + geom_linerange(
+  aes(ymin = y - 1, ymax = y + 1),
+  position = position_dodge(width = 0.9)
+)
+```
+
+Dodged within 0.9, the width the columns take, each line range sits on its column.
+
+Not in Giggly yet: `geom_linerange()`, an expression in a mapping, such as `y - 1`, and
+`position_dodge()`'s options, besides what `p` waits for.
+
+## Error bars
+
+```r
+# The same principle applies to error bars, which are usually
+# narrower than the bars
+p + geom_errorbar(
+  aes(ymin = y - 1, ymax = y + 1),
+  width = 0.2,
+  position = "dodge"
+)
+p + geom_errorbar(
+  aes(ymin = y - 1, ymax = y + 1),
+  width = 0.2,
+  position = position_dodge(width = 0.9)
+)
+```
+
+`"dodge"` sets the error bars side by side within their own width, 0.2, so they huddle at the
+middle of each `x`; dodged within 0.9, each sits on its column.
+
+Not in Giggly yet: error bars, `geom_errorbar()` and its `width` option, an expression in a
+mapping, such as `y - 1`, and `position_dodge()`'s options, besides what `p` waits for.
+
+## Box plots
+
+```r
+# Box plots use position_dodge2 by default, and bars can use it too
+ggplot(mpg, aes(factor(year), displ)) +
+  geom_boxplot(aes(colour = hwy < 30))
+```
+
+Not in Giggly yet: box plots, `geom_boxplot()`, `position_dodge2()`, expressions in a mapping,
+such as `factor(year)` and `hwy < 30`, and mapping `colour` and the legend that reads it back.
+
+## Box plots of different widths
+
+```r
+ggplot(mpg, aes(factor(year), displ)) +
+  geom_boxplot(aes(colour = hwy < 30), varwidth = TRUE)
+```
+
+`varwidth = TRUE` makes each box's width grow with the square root of its number of rows, and
+`position_dodge2()` dodges the boxes by their own widths.
+
+Not in Giggly yet: `geom_boxplot()` and its `varwidth` option, `position_dodge2()`, expressions in
+a mapping, such as `factor(year)` and `hwy < 30`, and mapping `colour` and the legend that reads
+it back.
+
+## Bars dodged the same way
+
+```r
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar(position = position_dodge2(preserve = "single"))
+
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar(position = position_dodge2(preserve = "total"))
+```
+
+Every 8-cylinder car has `vs` 0, so that `x` has one bar: as wide as one bar of a pair with
+`preserve = "single"`, and as wide as the whole pair with `preserve = "total"`.
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill` and the
+legend that reads it back, and `position_dodge2()` and its `preserve` option.

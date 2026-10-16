@@ -1,0 +1,47 @@
+# Fixed aspect ratios: coord_fixed
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`coord_fixed()`](https://ggplot2.tidyverse.org/reference/coord_fixed.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`coord_fixed()` is Cartesian coordinates with a fixed ratio between the length of a unit on the
+y axis and the length of a unit on the x axis. The default, `ratio = 1`, makes a unit the same
+length on both axes; a larger ratio makes the y axis's units longer, a smaller one the x axis's.
+The ratio holds however the plot is resized. It takes `coord_cartesian()`'s options too, such as
+limits. Giggly draws in Cartesian coordinates, as ggplot2 does by default, but has no
+`coord_fixed()` yet.
+
+## Fixed ratios
+
+```r
+# ensures that the ranges of axes are equal to the specified ratio by
+# adjusting the plot aspect ratio
+
+p <- ggplot(mtcars, aes(mpg, wt)) + geom_point()
+p + coord_fixed(ratio = 1)
+p + coord_fixed(ratio = 5)
+p + coord_fixed(ratio = 1/5)
+```
+
+Not in Giggly yet: `coord_fixed()`.
+
+## Limits with a fixed ratio
+
+```r
+p + coord_fixed(xlim = c(15, 30))
+
+# Resize the plot to see that the specified aspect ratio is maintained
+```
+
+Not in Giggly yet: `coord_fixed()`, and the `xlim` option it takes from `coord_cartesian()`.

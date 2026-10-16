@@ -1,0 +1,101 @@
+# Theme elements: element
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`element()`](https://ggplot2.tidyverse.org/reference/element.html), which covers `margin()`,
+`margin_part()`, `margin_auto()`, `element_blank()`, `element_rect()`, `element_line()`,
+`element_text()`, `element_polygon()`, `element_point()`, `element_geom()` and `rel()` too, in the
+order the page gives them. Each example shows ggplot2's code first and then Giggly's. An example
+Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also
+a list of what remains.
+
+In ggplot2's theme system, the `element_` functions say how the parts of a plot that are not data
+are drawn: `element_blank()` draws nothing and takes no space, `element_rect()` draws borders and
+backgrounds, `element_line()` lines and `element_text()` text, and `element_geom()` sets the
+defaults that layers draw with. `element_polygon()` and `element_point()` are not drawn in
+standard plots and serve extensions. `rel()` gives a size relative to the parent element's, and
+`margin()`, `margin_part()` and `margin_auto()` give the margins around an element. Giggly draws
+every plot in ggplot2's default theme, `theme_gray()`, and has none of these yet: there is no way
+to change the theme.
+
+## Blank elements
+
+```r
+# A standard plot
+plot <- ggplot(mpg, aes(displ, hwy)) + geom_point()
+
+# Turning off theme elements by setting them to blank
+plot + theme(
+  panel.background = element_blank(),
+  axis.text = element_blank()
+)
+```
+
+Not in Giggly yet: changing the theme, here to remove the panel's background and the axes' tick
+labels.
+
+## Styling text
+
+```r
+# Text adjustments
+plot + theme(
+  axis.text = element_text(colour = "red", size = rel(1.5))
+)
+```
+
+Not in Giggly yet: changing the theme, here to draw the tick labels in red at a size relative to
+their parent element's, with `rel()`.
+
+## An axis line with an arrow
+
+```r
+# Turning on the axis line with an arrow
+plot + theme(
+  axis.line = element_line(arrow = arrow())
+)
+```
+
+Not in Giggly yet: changing the theme, here to draw each axis's line, ending in an arrow made by
+`grid`'s `arrow()`.
+
+## Backgrounds and margins
+
+```r
+plot + theme(
+  panel.background = element_rect(fill = "white"),
+  plot.margin = margin_auto(2, unit = "cm"),
+  plot.background = element_rect(
+    fill = "grey90",
+    colour = "black",
+    linewidth = 1
+  )
+)
+```
+
+`margin_auto(2, unit = "cm")` gives the same 2 cm margin on all four sides.
+
+Not in Giggly yet: changing the theme, here to give the panel a white background, and the whole
+plot a margin and a light grey background with a black border.
+
+## Defaults for layers
+
+```r
+ggplot(mpg, aes(displ, hwy)) +
+  geom_point() +
+  geom_smooth(formula = y ~ x, method = "lm") +
+  theme(geom = element_geom(
+    ink = "red", accent = "black",
+    pointsize = 1, linewidth = 2
+  ))
+```
+
+Not in Giggly yet: `geom_smooth()`, formulas fitted by `lm()`, and `element_geom()`, which here
+sets the colours, point size and line width the layers draw with.

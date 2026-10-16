@@ -1,0 +1,143 @@
+# Colour, fill and alpha: aes_colour_fill_alpha
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`aes_colour_fill_alpha`](https://ggplot2.tidyverse.org/reference/aes_colour_fill_alpha.html), in
+the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
+page is also a list of what remains.
+
+`colour` and `fill` give a geom its colours, and `alpha` its opacity. `colour` draws lines and
+outlines: points, lines, and the borders of rectangles and polygons. `fill` colours the inside of
+an area: rectangles, polygons, and the point shapes 21 to 25. A colour is one of R's named
+colours, such as `"red"`, an RGB specification, `"#RRGGBB"`, which may add an alpha as
+`"#RRGGBBAA"`, or `NA`, for no colour at all; `alpha` runs from 0, transparent, to 1, opaque.
+Giggly has none of the three yet, mapped to a column or set to a value.
+
+## The default bars
+
+```r
+# Bar chart example
+p <- ggplot(mtcars, aes(factor(cyl)))
+# Default plotting
+p + geom_bar()
+```
+
+`factor(cyl)` makes the number of cylinders discrete, so the axis has a place for each of 4, 6
+and 8.
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+
+## Fill and outline colour
+
+```r
+# To change the interior colouring use fill aesthetic
+p + geom_bar(fill = "red")
+# Compare with the colour aesthetic which changes just the bar outline
+p + geom_bar(colour = "red")
+# Combining both, you can see the changes more clearly
+p + geom_bar(fill = "white", colour = "red")
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and a fixed `fill` and
+`colour`.
+
+## RGB colours, and none
+
+```r
+# Both colour and fill can take an rgb specification.
+p + geom_bar(fill = "#00abff")
+# Use NA for a completely transparent colour.
+p + geom_bar(fill = NA, colour = "#00abff")
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and a fixed `fill` and
+`colour`, here given as RGB specifications and `NA`.
+
+## Mapping fill to a discrete column
+
+```r
+# Colouring scales differ depending on whether a discrete or
+# continuous variable is being mapped. For example, when mapping
+# fill to a factor variable, a discrete colour scale is used.
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) + geom_bar()
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill`, the
+discrete scale that maps it and the legend that reads it back.
+
+## Mapping fill to a continuous column
+
+```r
+# When mapping fill to continuous variable a continuous colour
+# scale is used.
+ggplot(faithfuld, aes(waiting, eruptions)) +
+  geom_raster(aes(fill = density))
+```
+
+Not in Giggly yet: the `faithfuld` dataset, `geom_raster()`, mapping `fill`, the continuous scale
+that maps it and the legend that reads it back.
+
+## Geoms with colour only
+
+```r
+# Some geoms only use the colour aesthetic but not the fill
+# aesthetic (e.g. geom_point() or geom_line()).
+p <- ggplot(economics, aes(x = date, y = unemploy))
+p + geom_line()
+p + geom_line(colour = "green")
+p + geom_point()
+p + geom_point(colour = "red")
+```
+
+Not in Giggly yet: the `economics` dataset, dates on an axis, `geom_line()`, and a fixed
+`colour`.
+
+## Transparency for overplotting
+
+```r
+# For large datasets with overplotting the alpha
+# aesthetic will make the points more transparent.
+set.seed(1)
+df <- data.frame(x = rnorm(5000), y = rnorm(5000))
+p  <- ggplot(df, aes(x,y))
+p + geom_point()
+p + geom_point(alpha = 0.5)
+p + geom_point(alpha = 1/10)
+```
+
+R's `rnorm()` draws the points at random from a normal distribution, the same ones every time
+after `set.seed(1)`.
+
+Not in Giggly yet: a fixed `alpha`.
+
+## Shading with alpha
+
+```r
+# Alpha can also be used to add shading.
+p <- ggplot(economics, aes(x = date, y = unemploy)) + geom_line()
+p
+yrng <- range(economics$unemploy)
+p <- p +
+  geom_rect(
+    aes(NULL, NULL, xmin = start, xmax = end, fill = party),
+    ymin = yrng[1], ymax = yrng[2], data = presidential
+  )
+p
+p + scale_fill_manual(values = alpha(c("blue", "red"), .3))
+```
+
+The rectangles span each president's term, from the `presidential` table, coloured by party and
+as tall as the range of unemployment.
+
+Not in Giggly yet: the `economics` and `presidential` datasets, dates on an axis, `geom_line()`,
+`geom_rect()` as a layer with data of its own, mapping `fill` and the legend that reads it back,
+a fixed `ymin` and `ymax`, and `scale_fill_manual()` with colours made transparent by `alpha()`.

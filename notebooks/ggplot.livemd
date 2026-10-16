@@ -1,0 +1,100 @@
+# New plots: ggplot
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`ggplot()`](https://ggplot2.tidyverse.org/reference/ggplot.html), in the order the page gives
+them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet
+keeps its ggplot2 code and names what it is waiting for, so the page is also a list of what
+remains.
+
+`ggplot()` starts a plot. It declares the data the plot's layers draw and the aesthetic mappings
+they share, unless a layer overrides them. The page names three ways to call it: with the data and
+a mapping, with the data alone, and with neither, each layer then bringing what it needs. Giggly's
+counterpart is `Giggly.Plot.new/2`, which takes the data, any table, and a mapping that applies to
+every layer; a layer's own mapping is laid over it. Every layer draws the plot's data, so the data
+is always given to `Giggly.Plot.new/2`.
+
+## The data and the mapping for every layer
+
+The example's data is 30 random values, ten in each of the groups `a`, `b` and `c`, and a second
+table holding each group's mean.
+
+```r
+# Create a data frame with some sample data, then create a data frame
+# containing the mean value for each group in the sample data.
+set.seed(1)
+sample_df <- data.frame(
+  group = factor(rep(letters[1:3], each = 10)),
+  value = rnorm(30)
+)
+group_means_df <- setNames(
+  aggregate(value ~ group, sample_df, mean),
+  c("group", "group_mean")
+)
+# The following three code blocks create the same graphic, each using one
+# of the three patterns specified above. In each graphic, the sample data
+# are plotted in the first layer and the group means data frame is used to
+# plot larger red points on top of the sample data in the second layer.
+# Pattern 1
+# Both the `data` and `mapping` arguments are passed into the `ggplot()`
+# call. Those arguments are omitted in the first `geom_point()` layer
+# because they get passed along from the `ggplot()` call. Note that the
+# second `geom_point()` layer re-uses the `x = group` aesthetic through
+# that mechanism but overrides the y-position aesthetic.
+ggplot(data = sample_df, mapping = aes(x = group, y = value)) +
+  geom_point() +
+  geom_point(
+    mapping = aes(y = group_mean), data = group_means_df,
+    colour = 'red', size = 3
+  )
+```
+
+Not in Giggly yet: a layer with data of its own, and a fixed `colour` and `size`. Giggly lays a
+layer's mapping over the plot's as ggplot2 does here, the second layer keeping the plot's `x` and
+replacing its `y`.
+
+## The data for every layer, a mapping for each
+
+```r
+# Pattern 2
+# Same plot as above, passing only the `data` argument into the `ggplot()`
+# call. The `mapping` arguments are now required in each `geom_point()`
+# layer because there is no `mapping` argument passed along from the
+# `ggplot()` call.
+ggplot(data = sample_df) +
+  geom_point(mapping = aes(x = group, y = value)) +
+  geom_point(
+    mapping = aes(x = group, y = group_mean), data = group_means_df,
+    colour = 'red', size = 3
+  )
+```
+
+Not in Giggly yet: a layer with data of its own, and a fixed `colour` and `size`.
+
+## Data and a mapping for each layer
+
+```r
+# Pattern 3
+# Same plot as above, passing neither the `data` or `mapping` arguments
+# into the `ggplot()` call. Both those arguments are now required in
+# each `geom_point()` layer. This pattern can be particularly useful when
+# creating more complex graphics with many layers using data from multiple
+# data frames.
+ggplot() +
+  geom_point(mapping = aes(x = group, y = value), data = sample_df) +
+  geom_point(
+    mapping = aes(x = group, y = group_mean), data = group_means_df,
+    colour = 'red', size = 3
+  )
+```
+
+Not in Giggly yet: a layer with data of its own, and a fixed `colour` and `size`. A Giggly plot
+starts from its data, given to `Giggly.Plot.new/2`.

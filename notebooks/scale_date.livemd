@@ -1,0 +1,56 @@
+# Date and time scales: scale_date
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_x_date()`](https://ggplot2.tidyverse.org/reference/scale_date.html), which covers
+`scale_y_date()`, `scale_x_datetime()`, `scale_y_datetime()`, `scale_x_time()` and
+`scale_y_time()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+These are the position scales for dates, date-times and times of day, which ggplot2 adds by itself
+for a column of one of them. Setting one by hand chooses its limits, where its breaks fall and how
+its labels are written, in units of time such as `"1 week"` and formats such as `"%b %d"`. Giggly
+has none of them yet, nor dates and times on an axis.
+
+## Breaks and labels
+
+`Sys.Date()` is today's date, so the data is the last 30 days, each with a random price.
+
+```r
+last_month <- Sys.Date() - 0:29
+set.seed(1)
+df <- data.frame(
+  date = last_month,
+  price = runif(30)
+)
+base <- ggplot(df, aes(date, price)) +
+  geom_line()
+
+# The date scale will attempt to pick sensible defaults for
+# major and minor tick marks. Override with date_breaks, date_labels
+# date_minor_breaks arguments.
+base + scale_x_date(date_labels = "%b %d")
+base + scale_x_date(date_breaks = "1 week", date_labels = "%W")
+base + scale_x_date(date_minor_breaks = "1 day")
+```
+
+Not in Giggly yet: dates on an axis, `geom_line()`, and `scale_x_date()` and its `date_labels`,
+`date_breaks` and `date_minor_breaks` options.
+
+## Limits
+
+```r
+# Set limits
+base + scale_x_date(limits = c(Sys.Date() - 7, NA))
+```
+
+Not in Giggly yet: dates on an axis, `geom_line()`, and `scale_x_date()` and its `limits` option.

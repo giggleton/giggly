@@ -1,0 +1,73 @@
+# Discrete colour scales: scale_colour_discrete
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_discrete()`](https://ggplot2.tidyverse.org/reference/scale_colour_discrete.html),
+which covers `scale_fill_discrete()` too, in the order the page gives them. Each example shows
+ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code
+and names what it is waiting for, so the page is also a list of what remains.
+
+`scale_colour_discrete()` and `scale_fill_discrete()` are the scales ggplot2 uses by default when a
+column of discrete values is mapped to `colour` or `fill`, giving each value its own colour from a
+palette. Their default palette is a setting of the theme. Giggly has none of them yet, nor the
+`colour` and `fill` aesthetics they map, and it draws every plot in ggplot2's default theme,
+`theme_gray()`, with no way to change one.
+
+## A palette given to the scale
+
+`scales::pal_brewer()` is a palette from the scales package, here ColorBrewer's `Dark2`.
+
+```r
+# A standard plot
+p <- ggplot(mpg, aes(displ, hwy, colour = class)) +
+  geom_point()
+
+# You can use the scale to give a palette directly
+p + scale_colour_discrete(palette = scales::pal_brewer(palette = "Dark2"))
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and
+`scale_colour_discrete()` and its `palette` option.
+
+## A palette from the theme
+
+```r
+# The default colours are encoded into the theme
+p + theme(palette.colour.discrete = scales::pal_grey())
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme,
+here its `palette.colour.discrete` setting.
+
+## A default for every plot
+
+`update_theme()` changes the theme every later plot is drawn in, and returns the one it replaced.
+Giggly has no global settings: every option is an argument.
+
+```r
+# You can globally set default colour palette via the theme
+old <- update_theme(palette.colour.discrete = scales::pal_viridis())
+
+# Plot now shows new global default
+p
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme.
+
+## Restoring the theme
+
+```r
+# Restoring the previous theme
+theme_set(old)
+```
+
+`theme_set()` makes the theme saved in `old` the default again, undoing `update_theme()`. It draws
+nothing. Giggly has no global settings, so there is nothing to restore.

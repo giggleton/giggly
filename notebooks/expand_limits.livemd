@@ -1,0 +1,50 @@
+# Expanding limits: expand_limits
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`expand_limits()`](https://ggplot2.tidyverse.org/reference/expand_limits.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list
+of what remains.
+
+`expand_limits()` widens a plot's scales to include the values it is given, in every panel, by
+adding a layer that draws nothing at those values (a `geom_blank()`). ggplot2 now prefers giving a
+scale's `limits` a function instead, such as `scale_x_continuous(limits = ~range(.x, 0))` to
+include zero. Giggly has none of this yet: it has no scale functions, and a position scale is
+chosen from the data and cannot be set.
+
+## Including a value on an axis
+
+```r
+p <- ggplot(mtcars, aes(mpg, wt)) + geom_point()
+p + expand_limits(x = 0)
+p + expand_limits(y = c(1, 9))
+p + expand_limits(x = 0, y = 0)
+```
+
+Not in Giggly yet: `expand_limits()`.
+
+## Widening a colour scale
+
+The first plot widens a continuous colour scale to run from 2 to 10; the second adds 2, 4, 6, 8
+and 10 to a discrete one, so its legend lists them all, though no car has 2 or 10 cylinders.
+
+```r
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point(aes(colour = cyl)) +
+  expand_limits(colour = seq(2, 10, by = 2))
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point(aes(colour = factor(cyl))) +
+  expand_limits(colour = factor(seq(2, 10, by = 2)))
+```
+
+Not in Giggly yet: `expand_limits()`, mapping `colour` and the legend that reads it back, and an
+expression in a mapping, such as `factor(cyl)`.

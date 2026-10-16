@@ -1,0 +1,103 @@
+# Complete themes: ggtheme
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`theme_grey()`](https://ggplot2.tidyverse.org/reference/ggtheme.html), which covers
+`theme_gray()`, `theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`,
+`theme_minimal()`, `theme_classic()`, `theme_void()` and `theme_test()` too, in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+A complete theme sets how everything in a plot that is not data is drawn: backgrounds, gridlines,
+axes, text, legends and strips. `theme_gray()`, also spelt `theme_grey()`, is ggplot2's default:
+a grey panel with white gridlines. The others vary it, from `theme_bw()`'s dark lines on white,
+through `theme_classic()`'s axis lines without gridlines, to `theme_void()`, which draws nothing
+but the data; `theme_test()` is meant for visual tests and should not change. Each takes a base
+font size and family, base sizes for lines and rectangles, and ink, paper and accent colours.
+`theme()` adjusts a theme rather than replacing it. Every Giggly plot is drawn in `theme_gray()`;
+there is no other theme and no way to change one yet.
+
+## The default theme
+
+R's `within()` turns `vs`, `am`, `cyl` and `gear` into factors, giving `vs` and `am` words for
+their values.
+
+```r
+mtcars2 <- within(mtcars, {
+  vs <- factor(vs, labels = c("V-shaped", "Straight"))
+  am <- factor(am, labels = c("Automatic", "Manual"))
+  cyl  <- factor(cyl)
+  gear <- factor(gear)
+})
+
+p1 <- ggplot(mtcars2) +
+  geom_point(aes(x = wt, y = mpg, colour = gear)) +
+  labs(
+    title = "Fuel economy declines as weight increases",
+    subtitle = "(1973-74)",
+    caption = "Data from the 1974 Motor Trend US magazine.",
+    tag = "Figure 1",
+    x = "Weight (1000 lbs)",
+    y = "Fuel economy (mpg)",
+    colour = "Gears"
+  )
+
+p1 + theme_gray() # the default
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, and `labs()`, here the
+plot's title, subtitle, caption and tag and the titles of the axes and the legend. Giggly draws
+every plot in `theme_gray()` already.
+
+## Other complete themes
+
+```r
+p1 + theme_bw()
+p1 + theme_linedraw()
+p1 + theme_light()
+p1 + theme_dark()
+p1 + theme_minimal()
+p1 + theme_classic()
+p1 + theme_void()
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, and the themes
+`theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`, `theme_minimal()`,
+`theme_classic()` and `theme_void()`.
+
+## The default theme with panels
+
+```r
+# Theme examples with panels
+p2 <- p1 + facet_grid(vs ~ am)
+
+p2 + theme_gray() # the default
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, and
+`facet_grid()`.
+
+## Other complete themes with panels
+
+```r
+p2 + theme_bw()
+p2 + theme_linedraw()
+p2 + theme_light()
+p2 + theme_dark()
+p2 + theme_minimal()
+p2 + theme_classic()
+p2 + theme_void()
+```
+
+Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, `facet_grid()`,
+and the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`,
+`theme_minimal()`, `theme_classic()` and `theme_void()`.

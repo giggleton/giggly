@@ -1,0 +1,94 @@
+# Saving plots: ggsave
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`ggsave()`](https://ggplot2.tidyverse.org/reference/ggsave.html), in the order the page gives
+them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet
+keeps its ggplot2 code and names what it is waiting for, so the page is also a list of what
+remains.
+
+`ggsave()` writes a plot to a file: by default the last plot displayed, at the size of the current
+graphics device, in a format it guesses from the file name's extension. Giggly has no `ggsave()`.
+Building or drawing a Giggly plot has no side effects, so nothing is written to a file and no plot
+is remembered as the last; `Giggly.to_svg/2` returns the drawing as an SVG document, the only
+format Giggly draws, and saving it is the caller's `File.write!/2`.
+
+## Saving by file name
+
+```r
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point()
+# here, the device is inferred from the filename extension
+ggsave("mtcars.pdf")
+ggsave("mtcars.png")
+```
+
+ggplot2 saves the plot just drawn, as a PDF and then as a PNG, each format chosen by the file's
+extension. Giggly draws SVG only; a plot is saved by writing what `Giggly.to_svg/2` returns with
+`File.write!/2`.
+
+## The size of the drawing
+
+```r
+# setting dimensions of the plot
+ggsave("mtcars.pdf", width = 4, height = 4)
+ggsave("mtcars.pdf", width = 20, height = 20, units = "cm")
+```
+
+`Giggly.to_svg/2` takes the drawing's size as its `width:` and `height:` options, in pixels.
+
+## Options for the device
+
+```r
+# passing device-specific arguments to '...'
+ggsave("mtcars.pdf", colormodel = "cmyk")
+```
+
+The other arguments go to R's PDF device, here to write the colours as CMYK. Giggly draws SVG only.
+
+## Deleting the files
+
+```r
+# delete files with base::unlink()
+unlink("mtcars.pdf")
+unlink("mtcars.png")
+```
+
+This deletes the files the examples above wrote; it uses nothing of ggplot2's.
+
+## Naming the format
+
+```r
+# specify device when saving to a file with unknown extension
+# (for example a server supplied temporary file)
+file <- tempfile()
+ggsave(file, device = "pdf")
+unlink(file)
+```
+
+A temporary file's name has no extension to guess a format from, so `device` names it. Giggly
+draws SVG only, so there is no format to choose.
+
+## Saving without ggsave()
+
+```r
+# save plot to file without using ggsave
+p <-
+  ggplot(mtcars, aes(mpg, wt)) +
+  geom_point()
+png("mtcars.png")
+print(p)
+dev.off()
+```
+
+R opens a graphics device writing to a PNG file, prints the plot to it and closes it. Giggly has no
+graphics devices: `Giggly.to_svg/2` returns the SVG document itself, and the caller writes it where
+it likes.

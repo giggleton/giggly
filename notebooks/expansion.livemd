@@ -1,0 +1,63 @@
+# Scale expansion: expansion
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`expansion()`](https://ggplot2.tidyverse.org/reference/expansion.html), which covers
+`expand_scale()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`expansion()` builds the value a position scale's `expand` argument takes: the space left between
+the data and the axes, as a multiple of the scale's range (`mult`), as a fixed amount (`add`), or
+both, either the same at each end or different below and above. `expand_scale()` is its older
+name. Giggly has no scale functions yet, so a scale's expansion cannot be set.
+
+## No space below the bars
+
+```r
+# No space below the bars but 10% above them
+ggplot(mtcars) +
+  geom_bar(aes(x = factor(cyl))) +
+  scale_y_continuous(expand = expansion(mult = c(0, .1)))
+```
+
+Not in Giggly yet: `scale_y_continuous()` and its `expand` option, and an expression in a mapping,
+such as `factor(cyl)`.
+
+## Space beside discrete values
+
+```r
+# Add 2 units of space on the left and right of the data
+ggplot(subset(diamonds, carat > 2), aes(cut, clarity)) +
+  geom_jitter() +
+  scale_x_discrete(expand = expansion(add = 2))
+```
+
+Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values (`cut` and
+`clarity` are ordered factors), `geom_jitter()`, and `scale_x_discrete()` and its `expand` option.
+
+## The default expansion
+
+These are the expansions ggplot2 uses when a scale is given none: 0.6 units at each end of a
+discrete scale, and 5% of the range at each end of a continuous one.
+
+```r
+# Reproduce the default range expansion used
+# when the 'expand' argument is not specified
+ggplot(subset(diamonds, carat > 2), aes(cut, price)) +
+  geom_jitter() +
+  scale_x_discrete(expand = expansion(add = .6)) +
+  scale_y_continuous(expand = expansion(mult = .05))
+```
+
+Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values (`cut` is an
+ordered factor), `geom_jitter()`, and `scale_x_discrete()` and `scale_y_continuous()` and their
+`expand` option.

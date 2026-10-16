@@ -1,0 +1,156 @@
+# Rectangles: geom_tile
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_tile()`](https://ggplot2.tidyverse.org/reference/geom_tile.html), which covers
+`geom_raster()` and `geom_rect()` too, in the order the page gives them. Each example shows
+ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and
+names what it is waiting for, so the page is also a list of what remains.
+
+`geom_rect()` and `geom_tile()` both draw a rectangle for each row. `geom_tile()` places it by its
+centre and size (`x`, `y`, `width`, `height`); `geom_rect()` can do the same or place it by its
+corners (`xmin`, `xmax`, `ymin`, `ymax`). `geom_raster()` is a fast special case for tiles that
+are all the same size. Giggly has none of this yet.
+
+## A surface
+
+ggplot2's `faithfuld` is a two-dimensional density estimate of the eruptions of the Old Faithful
+geyser: the density at each point of a grid of waiting times and eruption lengths.
+
+```r
+# The most common use for rectangles is to draw a surface. You always want
+# to use geom_raster here because it's so much faster, and produces
+# smaller output when saving to PDF
+ggplot(faithfuld, aes(waiting, eruptions)) +
+ geom_raster(aes(fill = density))
+```
+
+Not in Giggly yet: `geom_raster()`, mapping `fill`, the scale that maps it and the legend that
+reads it back, and the `faithfuld` dataset.
+
+## Interpolation
+
+```r
+# Interpolation smooths the surface & is most helpful when rendering images.
+ggplot(faithfuld, aes(waiting, eruptions)) +
+ geom_raster(aes(fill = density), interpolate = TRUE)
+```
+
+Not in Giggly yet: `geom_raster()` and its `interpolate` option, mapping `fill`, the scale that
+maps it and the legend that reads it back, and the `faithfuld` dataset.
+
+## Tiles
+
+```r
+# If you want to draw arbitrary rectangles, use geom_tile() or geom_rect()
+df <- data.frame(
+  x = rep(c(2, 5, 7, 9, 12), 2),
+  y = rep(c(1, 2), each = 5),
+  z = factor(rep(1:5, each = 2)),
+  w = rep(diff(c(0, 4, 6, 8, 10, 14)), 2)
+)
+ggplot(df, aes(x, y)) +
+  geom_tile(aes(fill = z), colour = "grey50")
+```
+
+Not in Giggly yet: `geom_tile()`, mapping `fill`, the scale that maps it and the legend that reads
+it back, and a fixed `colour`.
+
+## Tiles of different widths
+
+```r
+ggplot(df, aes(x, y, width = w)) +
+  geom_tile(aes(fill = z), colour = "grey50")
+```
+
+The widths, `w`, are the gaps between 0, 4, 6, 8, 10 and 14, so the tiles centred on the `x`
+values meet edge to edge.
+
+Not in Giggly yet: `geom_tile()`, mapping `width` and `fill`, the scale that maps the fill and the
+legend that reads it back, and a fixed `colour`.
+
+## Rectangles by their corners
+
+```r
+ggplot(df, aes(xmin = x - w / 2, xmax = x + w / 2, ymin = y, ymax = y + 1)) +
+  geom_rect(aes(fill = z), colour = "grey50")
+```
+
+Not in Giggly yet: `geom_rect()`, mapping `xmin`, `xmax`, `ymin`, `ymax` and `fill`, expressions in
+a mapping, such as `x - w / 2`, the scale that maps the fill and the legend that reads it back, and
+a fixed `colour`.
+
+## Anchoring the cells
+
+R's `expand.grid()` makes a 6 by 6 grid, and `runif()` gives each cell a random value.
+
+```r
+# Justification controls where the cells are anchored
+df <- expand.grid(x = 0:5, y = 0:5)
+set.seed(1)
+df$z <- runif(nrow(df))
+# default is compatible with geom_tile()
+ggplot(df, aes(x, y, fill = z)) +
+  geom_raster()
+# zero padding
+ggplot(df, aes(x, y, fill = z)) +
+  geom_raster(hjust = 0, vjust = 0)
+```
+
+By default each cell is centred on its `x` and `y`, as a tile is; `hjust` and `vjust` move the
+cells off centre.
+
+Not in Giggly yet: `geom_raster()` and its `hjust` and `vjust` options, and mapping `fill`, the
+scale that maps it and the legend that reads it back.
+
+## Points along a discrete axis
+
+```r
+# Inspired by the image-density plots of Ken Knoblauch
+cars <- ggplot(mtcars, aes(mpg, factor(cyl)))
+cars + geom_point()
+```
+
+`factor(cyl)` makes the number of cylinders discrete, so the y axis has a level for each.
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+
+## Counting in two dimensions
+
+```r
+cars + stat_bin_2d(aes(fill = after_stat(count)), binwidth = c(3,1))
+cars + stat_bin_2d(aes(fill = after_stat(density)), binwidth = c(3,1))
+```
+
+Not in Giggly yet: `stat_bin_2d()` and its `binwidth` option, mapping `fill`, expressions in a
+mapping, such as `factor(cyl)` and `after_stat(count)`, and the scale that maps the fill and the
+legend that reads it back.
+
+## Densities as a raster
+
+```r
+cars +
+  stat_density(
+    aes(fill = after_stat(density)),
+    geom = "raster",
+    position = "identity"
+   )
+cars +
+  stat_density(
+    aes(fill = after_stat(count)),
+    geom = "raster",
+    position = "identity"
+  )
+```
+
+Not in Giggly yet: `stat_density()` drawn with `geom_raster()`, mapping `fill`, expressions in a
+mapping, such as `factor(cyl)` and `after_stat(density)`, and the scale that maps the fill and the
+legend that reads it back.

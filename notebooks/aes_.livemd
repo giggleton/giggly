@@ -1,0 +1,24 @@
+# Programmatic mappings: aes_
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`aes_()`](https://ggplot2.tidyverse.org/reference/aes_.html), which
+covers `aes_string()` and `aes_q()` too, has no examples, so this notebook says only what the page
+describes and where Giggly stands.
+
+`aes()` captures the names it is given without evaluating them; `aes_()` and `aes_string()` build
+the same aesthetic mapping from inputs quoted explicitly, `aes_string()` from strings and `aes_()`
+from quoted calls or one-sided formulas, which made them easy to call from functions that build
+plots. `aes_q()` is another name for `aes_()`. All three are deprecated: ggplot2 now recommends
+`aes()` with the `.data` pronoun, `aes(.data[[x_var]], .data[[y_var]])`. A Giggly mapping is a
+plain map, `%{x: :wt, y: :mpg}`, given to `Giggly.Plot.new/2` or to a layer; it names each column
+by an atom or a string, so a column name held in a variable goes into it as it is, and no
+function builds it. A mapping names columns only: an expression in a mapping, which `aes_()` can
+quote, is not in Giggly yet.

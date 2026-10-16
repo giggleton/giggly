@@ -1,0 +1,81 @@
+# Sizes: scale_size
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_size()`](https://ggplot2.tidyverse.org/reference/scale_size.html), which covers
+`scale_radius()`, `scale_size_binned()`, `scale_size_area()` and `scale_size_binned_area()` too,
+in the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
+page is also a list of what remains.
+
+The `size` aesthetic is mostly for points and text. `scale_size()` maps a continuous column to
+their area, since area is what readers perceive, while `scale_radius()` maps it to their radius.
+`scale_size_area()` makes a value of 0 an area of 0. `scale_size_binned()` and
+`scale_size_binned_area()` are the binned counterparts of `scale_size()` and `scale_size_area()`,
+cutting the column into bins first. A line's width, once also set by `size`, is now the
+`linewidth` aesthetic. Giggly has none of this yet: every point it draws looks as ggplot2's
+default point does, and it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no
+scale functions.
+
+## Size from a column
+
+```r
+p <- ggplot(mpg, aes(displ, hwy, size = hwy)) +
+   geom_point()
+p
+p + scale_size("Highway mpg")
+p + scale_size(range = c(0, 10))
+```
+
+A scale's first argument titles its legend, and `range` sets the smallest and the largest sizes.
+
+Not in Giggly yet: mapping `size`, `scale_size()` and its `range` option, the legend that reads it
+back, and titles and labels.
+
+## Zero as no size
+
+```r
+# If you want zero value to have zero size, use scale_size_area:
+p + scale_size_area()
+```
+
+Not in Giggly yet: mapping `size`, `scale_size_area()` and the legend that reads it back.
+
+## Binned sizes
+
+```r
+# Binning can sometimes make it easier to match the scaled data to the legend
+p + scale_size_binned()
+```
+
+Not in Giggly yet: mapping `size`, `scale_size_binned()` and the legend that reads it back.
+
+## Sizes from counts
+
+```r
+# This is most useful when size is a count
+ggplot(mpg, aes(class, cyl)) +
+  geom_count() +
+  scale_size_area()
+```
+
+`geom_count()` draws one point for each place that has rows, sized by how many it has.
+
+Not in Giggly yet: `geom_count()`, `scale_size_area()` and the legend that reads the counts back.
+
+## Size as radius
+
+```r
+# If you want to map size to radius (usually bad idea), use scale_radius
+p + scale_radius()
+```
+
+Not in Giggly yet: mapping `size`, `scale_radius()` and the legend that reads it back.

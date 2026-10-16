@@ -1,0 +1,112 @@
+# Overlapping points: geom_count
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_count()`](https://ggplot2.tidyverse.org/reference/geom_count.html), which covers
+`stat_sum()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_count()` is a variant of `geom_point()` for discrete data whose points overlap: `stat_sum()`
+counts the rows at each position, and the count is mapped to the point's area. Giggly has
+`Giggly.Plot.geom_point/2`, one point per row, but not the counting. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The first examples use `Giggly.Datasets.mpg/0`, ggplot2's
+`mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds
+to `mpg`, ggplot2's name for it. The rest use ggplot2's `diamonds`, which is not in Giggly yet.
+
+## Points that overlap
+
+```r
+ggplot(mpg, aes(cty, hwy)) +
+ geom_point()
+```
+
+`cty` and `hwy` are whole numbers of miles per gallon, so many cars share a point, and one point
+drawn over another looks like one.
+
+```elixir
+mpg
+|> Plot.new(%{x: :cty, y: :hwy})
+|> Plot.geom_point()
+|> render.()
+```
+
+## Counting the points
+
+```r
+ggplot(mpg, aes(cty, hwy)) +
+ geom_count()
+```
+
+Not in Giggly yet: `geom_count()` and `stat_sum()`, and mapping `size`, the scale that maps it and
+the legend that reads it back.
+
+## Sizes by area
+
+```r
+# Best used in conjunction with scale_size_area which ensures that
+# counts of zero would be given size 0. Doesn't make much different
+# here because the smallest count is already close to 0.
+ggplot(mpg, aes(cty, hwy)) +
+ geom_count() +
+ scale_size_area()
+```
+
+Not in Giggly yet: `geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it
+back, and `scale_size_area()`.
+
+## Proportions of the whole panel
+
+```r
+# Display proportions instead of counts -------------------------------------
+# By default, all categorical variables in the plot form the groups.
+# Specifying geom_count without a group identifier leads to a plot which is
+# not useful:
+d <- ggplot(diamonds, aes(x = cut, y = clarity))
+d + geom_count(aes(size = after_stat(prop)))
+# To correct this problem and achieve a more desirable plot, we need
+# to specify which group the proportion is to be calculated over.
+d + geom_count(aes(size = after_stat(prop), group = 1)) +
+  scale_size_area(max_size = 10)
+```
+
+With each combination of `cut` and `clarity` a group of its own, every proportion is 1, so every
+point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet:
+`geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it back, an expression in
+a mapping, such as `after_stat(prop)` or the constant `1`, `scale_size_area()` and its `max_size`
+option, and the `diamonds` dataset.
+
+## Proportions of each row or column
+
+```r
+# Or group by x/y variables to have rows/columns sum to 1.
+d + geom_count(aes(size = after_stat(prop), group = cut)) +
+  scale_size_area(max_size = 10)
+d + geom_count(aes(size = after_stat(prop), group = clarity)) +
+  scale_size_area(max_size = 10)
+```
+
+Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: `geom_count()` and
+`stat_sum()`, mapping `size` and the legend that reads it back, an expression in a mapping, such as
+`after_stat(prop)`, `scale_size_area()` and its `max_size` option, and the `diamonds` dataset.

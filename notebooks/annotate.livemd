@@ -1,0 +1,88 @@
+# Annotations: annotate
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`annotate()`](https://ggplot2.tidyverse.org/reference/annotate.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`annotate()` adds a layer whose aesthetics are given as values rather than mapped from the data's
+columns: a label, a shaded rectangle or a segment placed by hand. Any geom can draw it but the
+reference lines, `geom_abline()`, `geom_hline()` and `geom_vline()`, which annotate on their own.
+Its positions take part in the scales, so the axes grow to show it, while every other aesthetic
+is set, so an annotation never appears in a legend. Giggly has no annotations yet: every Giggly
+layer uses the plot's data.
+
+## Text
+
+```r
+p <- ggplot(mtcars, aes(x = wt, y = mpg)) + geom_point()
+p + annotate("text", x = 4, y = 25, label = "Some text")
+p + annotate("text", x = 2:5, y = 25, label = "Some text")
+```
+
+A vector of positions, as `x = 2:5`, places the same text at each.
+
+Not in Giggly yet: `annotate()` and the text it draws, `geom_text()`.
+
+## A shaded rectangle
+
+```r
+p + annotate("rect", xmin = 3, xmax = 4.2, ymin = 12, ymax = 21,
+  alpha = .2)
+```
+
+Not in Giggly yet: `annotate()`, `geom_rect()`, and a fixed `alpha`.
+
+## A segment
+
+```r
+p + annotate("segment", x = 2.5, xend = 4, y = 15, yend = 25,
+  colour = "blue")
+```
+
+Not in Giggly yet: `annotate()`, `geom_segment()`, and a fixed `colour`.
+
+## A point and its range
+
+```r
+p + annotate("pointrange", x = 3.5, y = 20, ymin = 12, ymax = 28,
+  colour = "red", size = 2.5, linewidth = 1.5)
+```
+
+Not in Giggly yet: `annotate()`, `geom_pointrange()`, and a fixed `colour`, `size` and
+`linewidth`.
+
+## A label at each position
+
+```r
+p + annotate("text", x = 2:3, y = 20:21, label = c("my label", "label 2"))
+```
+
+Vectors of positions and labels give one annotation per value, taken in step.
+
+Not in Giggly yet: `annotate()` and `geom_text()`.
+
+## Mathematical labels
+
+```r
+p + annotate("text", x = 4, y = 25, label = "italic(R) ^ 2 == 0.75",
+  parse = TRUE)
+p + annotate("text", x = 4, y = 25,
+  label = "paste(italic(R) ^ 2, \" = .75\")", parse = TRUE)
+```
+
+`parse = TRUE` reads each label as one of R's plotmath expressions, so `italic(R) ^ 2` is drawn
+as an italic R, squared.
+
+Not in Giggly yet: `annotate()`, `geom_text()` and its `parse` option, and R's plotmath
+expressions.

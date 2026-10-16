@@ -1,0 +1,103 @@
+# Logarithmic tick marks: guide_axis_logticks
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`guide_axis_logticks()`](https://ggplot2.tidyverse.org/reference/guide_axis_logticks.html), in
+the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page
+is also a list of what remains.
+
+`guide_axis_logticks()` is an axis guide that places its tick marks at intervals in log10 space,
+in three lengths: long, middle and short. It suits an axis with a log scale or log-transformed
+coordinates; for data logged before plotting, it is told the base of that logarithm. Giggly has
+none of it yet: it has no guides, no scale functions and no coordinate system but Cartesian and
+radial.
+
+## Log scales
+
+```r
+# A standard plot
+p <- ggplot(msleep, aes(bodywt, brainwt)) +
+  geom_point(na.rm = TRUE)
+
+# The logticks axis works well with log scales
+p + scale_x_log10(guide = "axis_logticks") +
+  scale_y_log10(guide = "axis_logticks")
+```
+
+`na.rm = TRUE` only stops ggplot2 warning about the animals in `msleep` that have no brain weight;
+Giggly drops a row missing a position without a warning.
+
+Not in Giggly yet: the `msleep` dataset, the `na.rm` option, `scale_x_log10()`, `scale_y_log10()`
+and `guide_axis_logticks()`.
+
+## Log-transformed coordinates
+
+```r
+# Or with log-transformed coordinates
+p + coord_transform(x = "log10", y = "log10") +
+  guides(x = "axis_logticks", y = "axis_logticks")
+```
+
+Not in Giggly yet: the `msleep` dataset, the `na.rm` option, `coord_transform()`, `guides()` and
+`guide_axis_logticks()`.
+
+## Data logged by hand
+
+```r
+# When data is transformed manually, one should provide `prescale.base`
+# Keep in mind that this axis uses log10 space for placement, not log2
+p + aes(x = log2(bodywt), y = log10(brainwt)) +
+  guides(
+    x = guide_axis_logticks(prescale.base = 2),
+    y = guide_axis_logticks(prescale.base = 10)
+  )
+```
+
+The mapping logs the data itself, base 2 for x and base 10 for y, and `prescale.base` tells each
+axis which base that was.
+
+Not in Giggly yet: the `msleep` dataset, the `na.rm` option, an expression in a mapping, such as
+`log2(bodywt)`, `guides()`, and `guide_axis_logticks()` with its `prescale.base` option.
+
+## A pseudo-log scale
+
+R's `rcauchy()` draws random numbers from the Cauchy distribution, whose tails reach far on both
+sides of 0, and `set.seed(42)` makes them the same on every run. A pseudo-log transformation is
+logarithmic far from 0 and close to linear near it, so it takes 0 and negative values too.
+
+```r
+# A plot with both positive and negative extremes, pseudo-log transformed
+set.seed(42)
+p2 <- ggplot(data.frame(x = rcauchy(1000)), aes(x = x)) +
+  geom_density() +
+  scale_x_continuous(
+    breaks = c(-10^(4:0), 0, 10^(0:4)),
+    transform = "pseudo_log"
+  )
+
+# The log ticks are mirrored when 0 is included
+p2 + guides(x = "axis_logticks")
+```
+
+Not in Giggly yet: `geom_density()`, `scale_x_continuous()`, here to set the breaks and a
+pseudo-log transformation, `guides()` and `guide_axis_logticks()`.
+
+## Ticks near zero
+
+```r
+# To control the tick density around 0, one can set `negative.small`
+p2 + guides(x = guide_axis_logticks(negative.small = 1))
+```
+
+Not in Giggly yet: `geom_density()`, `scale_x_continuous()`, `guides()`, and
+`guide_axis_logticks()` with its `negative.small` option, the smallest absolute value that gets a
+tick.

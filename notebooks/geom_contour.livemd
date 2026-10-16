@@ -1,0 +1,99 @@
+# Contours: geom_contour
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_contour()`](https://ggplot2.tidyverse.org/reference/geom_contour.html), which covers
+`geom_contour_filled()`, `stat_contour()` and `stat_contour_filled()` too, in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+ggplot2 cannot draw a surface in three dimensions, but these draw one in two: `geom_contour()`
+draws lines along which the height, `z`, is constant, and `geom_contour_filled()` fills the bands
+between them; `stat_contour()` and `stat_contour_filled()` compute them. They need `x` and `y` on
+an evenly spaced grid, each combination once, so irregular data must first be interpolated onto
+one. Giggly has none of this yet.
+
+## Contour lines
+
+```r
+# Basic plot
+v <- ggplot(faithfuld, aes(waiting, eruptions, z = density))
+v + geom_contour()
+```
+
+Not in Giggly yet: `geom_contour()`, mapping `z`, and the `faithfuld` dataset.
+
+## Contours of raw data
+
+```r
+# Or compute from raw data
+ggplot(faithful, aes(waiting, eruptions)) +
+  geom_density_2d()
+```
+
+`geom_density_2d()` estimates the density of the points on a grid before drawing its contours.
+Not in Giggly yet: `geom_density_2d()`, and the `faithful` dataset.
+
+## Filled contours
+
+```r
+# use geom_contour_filled() for filled contours
+v + geom_contour_filled()
+```
+
+Not in Giggly yet: `geom_contour_filled()`, mapping `z`, mapping `fill`, the scale that maps it
+and the legend that reads it back, and the `faithfuld` dataset.
+
+## The number of contours
+
+```r
+# Setting bins creates evenly spaced contours in the range of the data
+v + geom_contour(bins = 3)
+v + geom_contour(bins = 5)
+```
+
+Not in Giggly yet: `geom_contour()` and its `bins` option, mapping `z`, and the `faithfuld`
+dataset.
+
+## The distance between contours
+
+```r
+# Setting binwidth does the same thing, parameterised by the distance
+# between contours
+v + geom_contour(binwidth = 0.01)
+v + geom_contour(binwidth = 0.001)
+```
+
+Not in Giggly yet: `geom_contour()` and its `binwidth` option, mapping `z`, and the `faithfuld`
+dataset.
+
+## Coloured contours
+
+```r
+# Other parameters
+v + geom_contour(aes(colour = after_stat(level)))
+v + geom_contour(colour = "red")
+```
+
+Not in Giggly yet: `geom_contour()`, mapping `z`, mapping `colour`, the scale that maps it and the
+legend that reads it back, an expression in a mapping, such as `after_stat(level)`, a fixed
+`colour`, and the `faithfuld` dataset.
+
+## Contours over a raster
+
+```r
+v + geom_raster(aes(fill = density)) +
+  geom_contour(colour = "white")
+```
+
+Not in Giggly yet: `geom_raster()`, mapping `fill`, the scale that maps it and the legend that
+reads it back, `geom_contour()`, mapping `z`, a fixed `colour`, and the `faithfuld` dataset.

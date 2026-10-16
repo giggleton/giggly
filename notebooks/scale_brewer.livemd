@@ -1,0 +1,136 @@
+# ColorBrewer scales: scale_brewer
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_brewer()`](https://ggplot2.tidyverse.org/reference/scale_brewer.html), which covers
+`scale_fill_brewer()`, `scale_colour_distiller()`, `scale_fill_distiller()`,
+`scale_colour_fermenter()` and `scale_fill_fermenter()` too, in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+The brewer scales colour discrete values with ColorBrewer's sequential, diverging and qualitative
+palettes, which were designed for maps. The distiller scales blend a palette smoothly for
+continuous values, and the fermenter scales cut continuous values into bins, one colour each.
+Giggly has none of them yet, nor the `colour` and `fill` aesthetics they map.
+
+## The default brewer palette
+
+The example samples 1,000 diamonds at random, with R's `set.seed(596)`, and colours them by
+clarity: first with ggplot2's default scale for it, then with a brewer one.
+
+```r
+set.seed(596)
+dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
+(d <- ggplot(dsamp, aes(carat, price)) +
+  geom_point(aes(colour = clarity)))
+d + scale_colour_brewer()
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
+choosing the order of a column's values (`clarity` is an ordered factor), and
+`scale_colour_brewer()`.
+
+## Titling the legend
+
+```r
+# Change scale label
+d + scale_colour_brewer("Diamond\nclarity")
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
+choosing the order of a column's values, and `scale_colour_brewer()`, whose first argument titles
+the legend, here over two lines.
+
+## Choosing a palette
+
+```r
+# Select brewer palette to use, see ?scales::pal_brewer for more details
+d + scale_colour_brewer(palette = "Greens")
+d + scale_colour_brewer(palette = "Set1")
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `colour` and the legend that reads it back,
+choosing the order of a column's values, and `scale_colour_brewer()` and its `palette` option.
+
+## Fill colours
+
+```r
+# scale_fill_brewer works just the same as
+# scale_colour_brewer but for fill colours
+p <- ggplot(diamonds, aes(x = price, fill = cut)) +
+  geom_histogram(position = "dodge", binwidth = 1000)
+p + scale_fill_brewer()
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
+reads it back, choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_fill_brewer()`.
+
+## Reversing the palette
+
+```r
+# the order of colour can be reversed
+p + scale_fill_brewer(direction = -1)
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
+reads it back, choosing the order of a column's values, and `scale_fill_brewer()` and its
+`direction` option.
+
+## A dark background
+
+```r
+# the brewer scales look better on a darker background
+p +
+  scale_fill_brewer(direction = -1) +
+  theme_dark()
+```
+
+Not in Giggly yet: the `diamonds` dataset, `geom_histogram()`, mapping `fill` and the legend that
+reads it back, choosing the order of a column's values, `scale_fill_brewer()` and its `direction`
+option, and `theme_dark()`. Giggly draws every plot in ggplot2's default theme, `theme_gray()`.
+
+## Continuous colours
+
+```r
+# Use distiller variant with continuous data
+v <- ggplot(faithfuld) +
+  geom_tile(aes(waiting, eruptions, fill = density))
+v
+v + scale_fill_distiller()
+v + scale_fill_distiller(palette = "Spectral")
+```
+
+Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, mapping `fill` and the legend that
+reads it back, and `scale_fill_distiller()` and its `palette` option.
+
+## Reversing a distiller palette
+
+```r
+# the order of colour can be reversed, but with scale_*_distiller(),
+# the default direction = -1, so to reverse, use direction = 1.
+v + scale_fill_distiller(palette = "Spectral", direction = 1)
+```
+
+Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, mapping `fill` and the legend that
+reads it back, and `scale_fill_distiller()` and its `palette` and `direction` options.
+
+## Binned colours
+
+```r
+# or use blender variants to discretise continuous data
+v + scale_fill_fermenter()
+```
+
+The comment's "blender" means the fermenter scales.
+
+Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, mapping `fill` and the legend that
+reads it back, and `scale_fill_fermenter()`.

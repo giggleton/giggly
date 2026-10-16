@@ -1,0 +1,274 @@
+# Function reference: index
+
+## About this notebook
+
+This notebook follows ggplot2's [function reference](https://ggplot2.tidyverse.org/reference/): its
+sections and their descriptions, in its order, with each of its pages linked to the notebook that
+follows that page's examples. Each notebook shows ggplot2's code for every example, draws with
+Giggly the ones it can draw, and names what the rest are waiting for, so together they are also a
+list of what remains. The descriptions are ggplot2's, about ggplot2.
+
+Livebook opens a linked notebook as a notebook of its own. Each installs Giggly from the folder
+above it, so open this one from a clone of the repository.
+
+## Plot basics
+
+All ggplot2 plots begin with a call to [`ggplot()`](ggplot.livemd), supplying default data and
+aesthetic mappings, specified by [`aes()`](aes.livemd). You then add layers, scales, coords and
+facets with `+`. To save a plot to disk, use [`ggsave()`](ggsave.livemd).
+
+* [`ggplot()`](ggplot.livemd): Create a new ggplot
+* [`aes()`](aes.livemd): Construct aesthetic mappings
+* [`add_gg()` `%+%`](gg-add.livemd): Add components to a plot
+* [`ggsave()`](ggsave.livemd): Save a ggplot (or other grid object) with sensible defaults
+* [`qplot()` `quickplot()`](qplot.livemd): Quick plot
+
+## Layers
+
+### Geoms
+
+A layer combines data, aesthetic mapping, a geom (geometric object), a stat (statistical
+transformation), and a position adjustment. Typically, you will create layers using a `geom_`
+function, overriding the default position and stat if needed.
+
+* [`layer_geoms`](layer_geoms.livemd): Layer geometry display
+* [`geom_abline()` `geom_hline()` `geom_vline()`](geom_abline.livemd): Reference lines: horizontal, vertical, and diagonal
+* [`geom_bar()` `geom_col()` `stat_count()`](geom_bar.livemd): Bar charts
+* [`geom_bin_2d()` `stat_bin_2d()`](geom_bin_2d.livemd): Heatmap of 2d bin counts
+* [`geom_blank()`](geom_blank.livemd): Draw nothing
+* [`geom_boxplot()` `stat_boxplot()`](geom_boxplot.livemd): A box and whiskers plot (in the style of Tukey)
+* [`geom_contour()` `geom_contour_filled()` `stat_contour()` `stat_contour_filled()`](geom_contour.livemd): 2D contours of a 3D surface
+* [`geom_count()` `stat_sum()`](geom_count.livemd): Count overlapping points
+* [`geom_density()` `stat_density()`](geom_density.livemd): Smoothed density estimates
+* [`geom_density_2d()` `geom_density_2d_filled()` `stat_density_2d()` `stat_density_2d_filled()`](geom_density_2d.livemd): Contours of a 2D density estimate
+* [`geom_dotplot()`](geom_dotplot.livemd): Dot plot
+* [`geom_function()` `stat_function()`](geom_function.livemd): Draw a function as a continuous curve
+* [`geom_hex()` `stat_bin_hex()`](geom_hex.livemd): Hexagonal heatmap of 2d bin counts
+* [`geom_freqpoly()` `geom_histogram()` `stat_bin()`](geom_histogram.livemd): Histograms and frequency polygons
+* [`geom_jitter()`](geom_jitter.livemd): Jittered points
+* [`geom_crossbar()` `geom_errorbar()` `geom_errorbarh()` `geom_linerange()` `geom_pointrange()`](geom_linerange.livemd): Vertical intervals: lines, crossbars & errorbars
+* [`geom_map()`](geom_map.livemd): Polygons from a reference map
+* [`geom_path()` `geom_line()` `geom_step()`](geom_path.livemd): Connect observations
+* [`geom_point()`](geom_point.livemd): Points
+* [`geom_polygon()`](geom_polygon.livemd): Polygons
+* [`geom_qq_line()` `stat_qq_line()` `geom_qq()` `stat_qq()`](geom_qq.livemd): A quantile-quantile plot
+* [`geom_quantile()` `stat_quantile()`](geom_quantile.livemd): Quantile regression
+* [`geom_ribbon()` `geom_area()` `stat_align()`](geom_ribbon.livemd): Ribbons and area plots
+* [`geom_rug()`](geom_rug.livemd): Rug plots in the margins
+* [`geom_segment()` `geom_curve()`](geom_segment.livemd): Line segments and curves
+* [`geom_smooth()` `stat_smooth()`](geom_smooth.livemd): Smoothed conditional means
+* [`geom_spoke()`](geom_spoke.livemd): Line segments parameterised by location, direction and distance
+* [`geom_label()` `geom_text()`](geom_text.livemd): Text
+* [`geom_raster()` `geom_rect()` `geom_tile()`](geom_tile.livemd): Rectangles
+* [`geom_violin()` `stat_ydensity()`](geom_violin.livemd): Violin plot
+* [`coord_sf()` `geom_sf()` `geom_sf_label()` `geom_sf_text()` `stat_sf()`](ggsf.livemd): Visualise sf objects
+
+### Stats
+
+A handful of layers are more easily specified with a `stat_` function, drawing attention to the
+statistical transformation rather than the visual appearance. The computed variables can be mapped
+using [`after_stat()`](aes_eval.livemd).
+
+* [`layer_stats`](layer_stats.livemd): Layer statistical transformations
+* [`stat_ecdf()`](stat_ecdf.livemd): Compute empirical cumulative distribution
+* [`stat_ellipse()`](stat_ellipse.livemd): Compute normal data ellipses
+* [`geom_function()` `stat_function()`](geom_function.livemd): Draw a function as a continuous curve
+* [`stat_identity()`](stat_identity.livemd): Leave data as is
+* [`stat_summary_2d()` `stat_summary_hex()`](stat_summary_2d.livemd): Bin and summarise in 2d (rectangle & hexagons)
+* [`stat_summary_bin()` `stat_summary()`](stat_summary.livemd): Summarise y values at unique/binned x
+* [`stat_unique()`](stat_unique.livemd): Remove duplicates
+* [`stat_sf_coordinates()`](stat_sf_coordinates.livemd): Extract coordinates from 'sf' objects
+* [`stat_manual()`](stat_manual.livemd): Manually compute transformations
+* [`stat_connect()`](stat_connect.livemd): Connect observations
+* [`after_stat()` `after_scale()` `from_theme()` `stage()`](aes_eval.livemd): Control aesthetic evaluation
+
+### Position adjustment
+
+All layers have a position adjustment that resolves overlapping geoms. Override the default by using
+the `position` argument to the `geom_` or `stat_` function.
+
+* [`layer_positions`](layer_positions.livemd): Layer position adjustments
+* [`position_dodge()` `position_dodge2()`](position_dodge.livemd): Dodge overlapping objects side-to-side
+* [`position_identity()`](position_identity.livemd): Don't adjust position
+* [`position_jitter()`](position_jitter.livemd): Jitter points to avoid overplotting
+* [`position_jitterdodge()`](position_jitterdodge.livemd): Simultaneously dodge and jitter
+* [`position_nudge()`](position_nudge.livemd): Nudge points a fixed distance
+* [`position_stack()` `position_fill()`](position_stack.livemd): Stack overlapping objects on top of each another
+
+### Annotations
+
+Annotations are a special type of layer that don’t inherit global settings from the plot. They are
+used to add fixed reference data to plots.
+
+* [`geom_abline()` `geom_hline()` `geom_vline()`](geom_abline.livemd): Reference lines: horizontal, vertical, and diagonal
+* [`annotate()`](annotate.livemd): Create an annotation layer
+* [`annotation_custom()`](annotation_custom.livemd): Annotation: Custom grob
+* [`annotation_logticks()`](annotation_logticks.livemd): Annotation: log tick marks
+* [`annotation_map()`](annotation_map.livemd): Annotation: a map
+* [`annotation_raster()`](annotation_raster.livemd): Annotation: high-performance rectangular tiling
+* [`annotation_borders()` `borders()`](annotation_borders.livemd): Create a layer of map borders
+
+## Aesthetics
+
+The following help topics give a broad overview of some of the ways you can use each aesthetic.
+
+* [`aes_colour_fill_alpha` `colour` `color` `fill`](aes_colour_fill_alpha.livemd): Colour related aesthetics: colour, fill, and alpha
+* [`aes_group_order` `group`](aes_group_order.livemd): Aesthetics: grouping
+* [`aes_linetype_size_shape` `linetype` `size` `shape`](aes_linetype_size_shape.livemd): Differentiation related aesthetics: linetype, size, shape
+* [`aes_position` `x` `y` `xmin` `xmax` `ymin` `ymax` `xend` `yend`](aes_position.livemd): Position related aesthetics: x, y, xmin, xmax, ymin, ymax, xend, yend
+
+## Scales
+
+Scales control the details of how data values are translated to visual properties. Override the
+default scales to tweak details like the axis labels or legend keys, or to use a completely
+different translation from data to aesthetic. [`labs()`](labs.livemd) and [`lims()`](lims.livemd)
+are convenient helpers for the most common adjustments to the labels and limits.
+
+* [`labs()` `xlab()` `ylab()` `ggtitle()` `get_labs()`](labs.livemd): Modify axis, legend, and plot labels
+* [`lims()` `xlim()` `ylim()`](lims.livemd): Set scale limits
+* [`expand_limits()`](expand_limits.livemd): Expand the plot limits, using data
+* [`expansion()` `expand_scale()`](expansion.livemd): Generate expansion vector for scales
+* [`scale_alpha()` `scale_alpha_continuous()` `scale_alpha_binned()` `scale_alpha_discrete()` `scale_alpha_ordinal()`](scale_alpha.livemd): Alpha transparency scales
+* [`scale_x_binned()` `scale_y_binned()`](scale_binned.livemd): Positional scales for binning continuous data (x & y)
+* [`scale_colour_brewer()` `scale_fill_brewer()` `scale_colour_distiller()` `scale_fill_distiller()` `scale_colour_fermenter()` `scale_fill_fermenter()`](scale_brewer.livemd): Sequential, diverging and qualitative colour scales from ColorBrewer
+* [`scale_colour_continuous()` `scale_fill_continuous()` `scale_colour_binned()` `scale_fill_binned()`](scale_colour_continuous.livemd): Continuous and binned colour scales
+* [`scale_colour_discrete()` `scale_fill_discrete()`](scale_colour_discrete.livemd): Discrete colour scales
+* [`scale_x_continuous()` `scale_y_continuous()` `scale_x_log10()` `scale_y_log10()` `scale_x_reverse()` `scale_y_reverse()` `scale_x_sqrt()` `scale_y_sqrt()`](scale_continuous.livemd): Position scales for continuous data (x & y)
+* [`scale_x_date()` `scale_y_date()` `scale_x_datetime()` `scale_y_datetime()` `scale_x_time()` `scale_y_time()`](scale_date.livemd): Position scales for date/time data
+* [`scale_x_discrete()` `scale_y_discrete()`](scale_discrete.livemd): Position scales for discrete data
+* [`scale_colour_gradient()` `scale_fill_gradient()` `scale_colour_gradient2()` `scale_fill_gradient2()` `scale_colour_gradientn()` `scale_fill_gradientn()`](scale_gradient.livemd): Gradient colour scales
+* [`scale_colour_grey()` `scale_fill_grey()`](scale_grey.livemd): Sequential grey colour scales
+* [`scale_colour_hue()` `scale_fill_hue()`](scale_hue.livemd): Evenly spaced colours for discrete data
+* [`scale_colour_identity()` `scale_fill_identity()` `scale_shape_identity()` `scale_linetype_identity()` `scale_linewidth_identity()` `scale_alpha_identity()` `scale_size_identity()` `scale_discrete_identity()` `scale_continuous_identity()`](scale_identity.livemd): Use values without scaling
+* [`scale_linetype()` `scale_linetype_binned()` `scale_linetype_continuous()` `scale_linetype_discrete()`](scale_linetype.livemd): Scale for line patterns
+* [`scale_linewidth()` `scale_linewidth_binned()`](scale_linewidth.livemd): Scales for line width
+* [`scale_colour_manual()` `scale_fill_manual()` `scale_size_manual()` `scale_shape_manual()` `scale_linetype_manual()` `scale_linewidth_manual()` `scale_alpha_manual()` `scale_discrete_manual()`](scale_manual.livemd): Create your own discrete scale
+* [`scale_shape()` `scale_shape_binned()`](scale_shape.livemd): Scales for shapes, aka glyphs
+* [`scale_size()` `scale_radius()` `scale_size_binned()` `scale_size_area()` `scale_size_binned_area()`](scale_size.livemd): Scales for area or radius
+* [`scale_colour_steps()` `scale_colour_steps2()` `scale_colour_stepsn()` `scale_fill_steps()` `scale_fill_steps2()` `scale_fill_stepsn()`](scale_steps.livemd): Binned gradient colour scales
+* [`scale_colour_viridis_d()` `scale_fill_viridis_d()` `scale_colour_viridis_c()` `scale_fill_viridis_c()` `scale_colour_viridis_b()` `scale_fill_viridis_b()`](scale_viridis.livemd): Viridis colour scales from viridisLite
+* [`get_alt_text()`](get_alt_text.livemd): Extract alt text from a plot
+
+## Guides: axes and legends
+
+The guides (the axes and legends) help readers interpret your plots. Guides are mostly controlled
+via the scale (e.g. with the `limits`, `breaks`, and `labels` arguments), but sometimes you will
+need additional control over guide appearance. Use [`guides()`](guides.livemd) or the `guide`
+argument to individual scales along with `guide_*()` functions.
+
+* [`draw_key_point()` `draw_key_abline()` `draw_key_rect()` `draw_key_polygon()` `draw_key_blank()` `draw_key_boxplot()` `draw_key_crossbar()` `draw_key_path()` `draw_key_vpath()` `draw_key_dotplot()` `draw_key_linerange()` `draw_key_pointrange()` `draw_key_smooth()` `draw_key_text()` `draw_key_label()` `draw_key_vline()` `draw_key_timeseries()`](draw_key.livemd): Key glyphs for legends
+* [`guide_colourbar()` `guide_colorbar()`](guide_colourbar.livemd): Continuous colour bar guide
+* [`guide_legend()`](guide_legend.livemd): Legend guide
+* [`guide_axis()`](guide_axis.livemd): Axis guide
+* [`guide_axis_logticks()`](guide_axis_logticks.livemd): Axis with logarithmic tick marks
+* [`guide_axis_stack()`](guide_axis_stack.livemd): Stacked axis guides
+* [`guide_axis_theta()`](guide_axis_theta.livemd): Angle axis guide
+* [`guide_bins()`](guide_bins.livemd): A binned version of guide_legend
+* [`guide_coloursteps()` `guide_colorsteps()`](guide_coloursteps.livemd): Discretized colourbar guide
+* [`guide_custom()`](guide_custom.livemd): Custom guides
+* [`guide_none()`](guide_none.livemd): Empty guide
+* [`guides()`](guides.livemd): Set guides for each scale
+* [`sec_axis()` `dup_axis()` `derive()`](sec_axis.livemd): Specify a secondary axis
+
+## Facetting
+
+Facetting generates small multiples, each displaying a different subset of the data. Facets are an
+alternative to aesthetics for displaying additional discrete variables.
+
+* [`facet_grid()`](facet_grid.livemd): Lay out panels in a grid
+* [`facet_wrap()`](facet_wrap.livemd): Wrap a 1d ribbon of panels into 2d
+* [`vars()`](vars.livemd): Quote faceting variables
+
+### Labels
+
+These functions provide a flexible toolkit for controlling the display of the “strip” labels on
+facets.
+
+* [`labeller()`](labeller.livemd): Construct labelling specification
+* [`label_value()` `label_both()` `label_context()` `label_parsed()` `label_wrap_gen()`](labellers.livemd): Useful labeller functions
+* [`label_bquote()`](label_bquote.livemd): Label with mathematical expressions
+
+## Coordinate systems
+
+The coordinate system determines how the `x` and `y` aesthetics combine to position elements in the
+plot. The default coordinate system is Cartesian ([`coord_cartesian()`](coord_cartesian.livemd)),
+which can be tweaked with [`coord_map()`](coord_map.livemd), [`coord_fixed()`](coord_fixed.livemd),
+[`coord_flip()`](coord_flip.livemd), and [`coord_transform()`](coord_transform.livemd), or
+completely replaced with [`coord_polar()`](coord_radial.livemd).
+
+* [`coord_cartesian()`](coord_cartesian.livemd): Cartesian coordinates
+* [`coord_fixed()`](coord_fixed.livemd): Cartesian coordinates with fixed "aspect ratio"
+* [`coord_flip()`](coord_flip.livemd): Cartesian coordinates with x and y flipped
+* [`coord_map()` `coord_quickmap()`](coord_map.livemd): Map projections
+* [`coord_polar()` `coord_radial()`](coord_radial.livemd): Polar coordinates
+* [`coord_transform()` `coord_trans()`](coord_transform.livemd): Transformed Cartesian coordinate system
+
+## Themes
+
+Themes control the display of all non-data elements of the plot. You can override all settings with
+a complete theme like [`theme_bw()`](ggtheme.livemd), or choose to tweak individual settings by
+using [`theme()`](theme.livemd) and the `element_` functions. Use [`theme_set()`](get_theme.livemd)
+to modify the active theme, affecting all future plots.
+
+* [`theme()`](theme.livemd): Modify components of a theme
+* [`theme_grey()` `theme_gray()` `theme_bw()` `theme_linedraw()` `theme_light()` `theme_dark()` `theme_minimal()` `theme_classic()` `theme_void()` `theme_test()`](ggtheme.livemd): Complete themes
+* [`get_theme()` `theme_get()` `set_theme()` `theme_set()` `update_theme()` `theme_update()` `replace_theme()` `theme_replace()` `%+replace%`](get_theme.livemd): Get, set, and modify the active theme
+* [`theme_sub_axis()` `theme_sub_axis_x()` `theme_sub_axis_y()` `theme_sub_axis_bottom()` `theme_sub_axis_top()` `theme_sub_axis_left()` `theme_sub_axis_right()` `theme_sub_legend()` `theme_sub_panel()` `theme_sub_plot()` `theme_sub_strip()`](subtheme.livemd): Shortcuts for theme settings
+* [`margin()` `margin_part()` `margin_auto()` `element()` `element_blank()` `element_rect()` `element_line()` `element_text()` `element_polygon()` `element_point()` `element_geom()` `rel()`](element.livemd): Theme elements
+
+## Programming with ggplot2
+
+These functions provides tools to help you program with ggplot2, creating functions and for-loops
+that generate plots for you.
+
+* [`aes_()` `aes_string()` `aes_q()`](aes_.livemd): Define aesthetic mappings programmatically
+* [`print.ggplot` `plot.ggplot`](print.ggplot.livemd): Explicitly draw plot
+
+## Extending ggplot2
+
+To create your own geoms, stats, scales, and facets, you’ll need to learn a bit about the object
+oriented system that ggplot2 uses. Start by reading
+[`vignette("extending-ggplot2")`](https://ggplot2.tidyverse.org/articles/extending-ggplot2.html)
+then consult these functions for more details.
+
+* [`ggproto()` `ggproto_parent()`](ggproto.livemd): Create a new ggproto object
+* [`print(<ggproto>)` `format(<ggproto>)`](print.ggproto.livemd): Format or print a ggproto object
+
+## Vector helpers
+
+ggplot2 also provides a handful of helpers that are useful for creating visualisations.
+
+* [`cut_interval()` `cut_number()` `cut_width()`](cut_interval.livemd): Discretise numeric data into categorical
+* [`mean_cl_boot()` `mean_cl_normal()` `mean_sdl()` `median_hilow()`](hmisc.livemd): A selection of summary functions from Hmisc
+* [`mean_se()`](mean_se.livemd): Calculate mean and standard error of the mean
+* [`resolution()`](resolution.livemd): Compute the "resolution" of a numeric vector
+
+## Data
+
+ggplot2 comes with a selection of built-in datasets that are used in examples to illustrate various
+visualisation challenges.
+
+* [`diamonds`](diamonds.livemd): Prices of over 50,000 round cut diamonds
+* [`economics` `economics_long`](economics.livemd): US economic time series
+* [`faithfuld`](faithfuld.livemd): 2d density estimate of Old Faithful data
+* [`midwest`](midwest.livemd): Midwest demographics
+* [`mpg`](mpg.livemd): Fuel economy data from 1999 to 2008 for 38 popular models of cars
+* [`msleep`](msleep.livemd): An updated and expanded version of the mammals sleep dataset
+* [`presidential`](presidential.livemd): Terms of 12 presidents from Eisenhower to Trump
+* [`seals`](seals.livemd): Vector field of seal movements
+* [`txhousing`](txhousing.livemd): Housing sales in TX
+* [`luv_colours`](luv_colours.livemd): [`colors()`](https://rdrr.io/r/grDevices/colors.html) in Luv space
+
+## Autoplot and fortify
+
+[`autoplot()`](autoplot.livemd) is an extension mechanism for ggplot2: it provides a way for package
+authors to add methods that work like the base
+[`plot()`](https://rdrr.io/r/graphics/plot.default.html) function, generating useful default plots
+with little user interaction. [`fortify()`](fortify.livemd) turns objects into tidy data frames: it
+has largely been superseded by the [broom package](https://github.com/tidyverse/broom).
+
+* [`autoplot()`](autoplot.livemd): Create a complete ggplot appropriate to a particular data type
+* [`autolayer()`](autolayer.livemd): Create a ggplot layer appropriate to a particular data type
+* [`fortify()`](fortify.livemd): Fortify a model with data.
+* [`map_data()`](map_data.livemd): Create a data frame of map data
+* [`automatic_plotting`](automatic_plotting.livemd): Tailoring plots to particular data types

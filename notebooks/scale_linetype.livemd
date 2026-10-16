@@ -1,0 +1,71 @@
+# Line types: scale_linetype
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_linetype()`](https://ggplot2.tidyverse.org/reference/scale_linetype.html), which covers
+`scale_linetype_binned()`, `scale_linetype_continuous()` and `scale_linetype_discrete()` too, in
+the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
+page is also a list of what remains.
+
+`scale_linetype()` maps a discrete column to line patterns, solid, dashed, dotted and others,
+from a default set supplied by Richard Pearson of the University of Manchester. A continuous
+column can be mapped to line types only through `scale_linetype_binned()`, which cuts it into
+bins first, and since patterns have no order even that is not advised. A line type can be named
+by number, by name or by a string of hex digits, and a missing one is drawn blank. Giggly has
+none of this yet: of ggplot2's geoms it has only points and bars, and it has no aesthetic but
+`x`, `y`, `group` and `weight`, no legends and no scale functions.
+
+## A line type for each series
+
+```r
+base <- ggplot(economics_long, aes(date, value01))
+base + geom_line(aes(group = variable))
+base + geom_line(aes(linetype = variable))
+```
+
+Not in Giggly yet: the `economics_long` dataset, dates on an axis, lines (`geom_line()`), mapping
+`linetype`, the scale that maps it and the legend that reads it back.
+
+## Line types by hand
+
+```r
+# See scale_manual for more flexibility
+```
+
+The comment points to ggplot2's `scale_manual` page, where `scale_linetype_manual()` gives each
+value a pattern chosen by hand. Not in Giggly yet: `scale_linetype_manual()`.
+
+## Common line types
+
+A table of common patterns, as a factor whose levels keep the order they are written in, each
+drawn as a thick horizontal line in a panel of its own. `scale_linetype_identity()` draws each
+line in the pattern its value names, and `theme_void(20)` draws no axes, grid or background, at a
+base font size of 20.
+
+```r
+# Common line types ----------------------------
+df_lines <- data.frame(
+  linetype = factor(
+    1:4,
+    labels = c("solid", "longdash", "dashed", "dotted")
+  )
+)
+ggplot(df_lines) +
+  geom_hline(aes(linetype = linetype, yintercept = 0), linewidth = 2) +
+  scale_linetype_identity() +
+  facet_grid(linetype ~ .) +
+  theme_void(20)
+```
+
+Not in Giggly yet: choosing the order of a column's values, horizontal lines (`geom_hline()`),
+mapping `linetype`, an expression in a mapping, here the constant `yintercept = 0`, a fixed
+`linewidth`, `scale_linetype_identity()`, `facet_grid()` and `theme_void()`.

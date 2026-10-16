@@ -1,0 +1,79 @@
+# Shapes: scale_shape
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_shape()`](https://ggplot2.tidyverse.org/reference/scale_shape.html), which covers
+`scale_shape_binned()` too, in the order the page gives them. Each example shows ggplot2's code
+first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what
+it is waiting for, so the page is also a list of what remains.
+
+`scale_shape()` maps a discrete column to six shapes that are easy to tell apart, solid by
+default or hollow; a seventh value and any after it are not drawn, with a warning, and
+`scale_shape_manual()` gives shapes by hand. A continuous column can be mapped to shapes only
+through `scale_shape_binned()`, which cuts it into bins first, and since shapes have no order even
+that is not advised. A shape can be named by number or by name, and only shapes 21 to 25 take a
+fill. Giggly has none of this yet: every point it draws looks as ggplot2's default point does, a
+solid circle, and it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale
+functions.
+
+## A shape for each cut
+
+The examples draw a random sample of the `diamonds` dataset, picked after `set.seed(596)`.
+
+```r
+set.seed(596)
+dsmall <- diamonds[sample(nrow(diamonds), 100), ]
+
+(d <- ggplot(dsmall, aes(carat, price)) + geom_point(aes(shape = cut)))
+d + scale_shape(solid = TRUE) # the default
+d + scale_shape(solid = FALSE)
+d + scale_shape(name = "Cut of diamond")
+```
+
+`name` titles the legend.
+
+Not in Giggly yet: the `diamonds` dataset, mapping `shape`, `scale_shape()` and its `solid`
+option, the legend that reads it back, and titles and labels.
+
+## The order of the shapes
+
+```r
+# To change order of levels, change order of
+# underlying factor
+levels(dsmall$cut) <- c("Fair", "Good", "Very Good", "Premium", "Ideal")
+
+# Need to recreate plot to pick up new data
+ggplot(dsmall, aes(price, carat)) + geom_point(aes(shape = cut))
+```
+
+Shapes go to a column's values in the order of its levels.
+
+Not in Giggly yet: the `diamonds` dataset, choosing the order of a column's values, mapping
+`shape`, the scale that maps it and the legend that reads it back.
+
+## The available shapes
+
+```r
+# Show a list of available shapes
+df_shapes <- data.frame(shape = 0:24)
+ggplot(df_shapes, aes(0, 0, shape = shape)) +
+  geom_point(aes(shape = shape), size = 5, fill = 'red') +
+  scale_shape_identity() +
+  facet_wrap(~shape) +
+  theme_void()
+```
+
+`scale_shape_identity()` draws each point in the shape its number names, and `facet_wrap()`
+gives each a panel of its own. Giggly has `facet_wrap()`: `facet_wrap(~shape)` is
+`Giggly.Plot.facet_wrap(plot, :shape)`.
+
+Not in Giggly yet: an expression in a mapping, here the constants `0`, mapping `shape`, a fixed
+`size` and `fill`, `scale_shape_identity()` and `theme_void()`.

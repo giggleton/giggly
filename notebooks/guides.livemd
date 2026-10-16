@@ -1,0 +1,121 @@
+# Guides for scales: guides
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`guides()`](https://ggplot2.tidyverse.org/reference/guides.html), in the order the page gives
+them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet
+keeps its ggplot2 code and names what it is waiting for, so the page is also a list of what
+remains.
+
+Every scale is read back through a guide: an axis for a position scale, a legend or a colour bar
+for the others. Each scale's `guide` argument sets its guide; `guides()` sets them all at once, by
+aesthetic, each as a guide's name, such as `"legend"`, or a call to a guide function. A guide set
+to `"none"` is left out, and legends that show the same values under the same title merge into
+one. Giggly has none of it yet: it has no guides, no legends, and no aesthetics but `x`, `y`,
+`group` and `weight`.
+
+## The guides ggplot2 chooses
+
+`p` maps `colour` to a continuous column and `size` and `shape` to discrete ones (`factor()` makes
+a column discrete), so ggplot2 reads `colour` back with a colour bar and the others with legends.
+
+```r
+# ggplot object
+
+dat <- data.frame(x = 1:5, y = 1:5, p = 1:5, q = factor(1:5),
+ r = factor(1:5))
+p <-
+  ggplot(dat, aes(x, y, colour = p, size = q, shape = r)) +
+  geom_point()
+
+# without guide specification
+p
+```
+
+Not in Giggly yet: mapping `colour`, `size` and `shape`, the scales that map them, and the colour
+bar and legends that read them back, `guide_colourbar()` and `guide_legend()`.
+
+## Choosing each guide
+
+```r
+# Show colorbar guide for colour.
+# All these examples below have a same effect.
+
+p + guides(colour = "colorbar", size = "legend", shape = "legend")
+p + guides(colour = guide_colorbar(), size = guide_legend(),
+  shape = guide_legend())
+p +
+ scale_colour_continuous(guide = "colorbar") +
+ scale_size_discrete(guide = "legend") +
+ scale_shape(guide = "legend")
+```
+
+Not in Giggly yet: mapping `colour`, `size` and `shape`, `guides()`, `guide_colourbar()`,
+`guide_legend()`, `scale_colour_continuous()`, `scale_size_discrete()` and `scale_shape()`.
+
+## Removing guides
+
+```r
+ # Remove some guides
+ p + guides(colour = "none")
+ p + guides(colour = "colorbar",size = "none")
+```
+
+Not in Giggly yet: mapping `colour`, `size` and `shape`, legends, and `guides()`, here to leave
+out the colour bar, or the size legend.
+
+## Merged legends
+
+Legends with the same title that show the same values merge into one, each key showing a colour,
+a size and a shape together.
+
+```r
+# Guides are integrated where possible
+
+p +
+  guides(
+    colour = guide_legend("title"),
+    size = guide_legend("title"),
+    shape = guide_legend("title")
+ )
+# same as
+g <- guide_legend("title")
+p + guides(colour = g, size = g, shape = g)
+```
+
+Not in Giggly yet: mapping `colour`, `size` and `shape`, `guides()` and `guide_legend()`.
+
+## Legends below the plot
+
+```r
+p + theme(legend.position = "bottom")
+```
+
+Not in Giggly yet: mapping `colour`, `size` and `shape`, legends, and changing the theme, here to
+put the legends below the plot.
+
+## The order of the legends
+
+```r
+# position of guides
+
+# Set order for multiple guides
+ggplot(mpg, aes(displ, cty)) +
+  geom_point(aes(size = hwy, colour = cyl, shape = drv)) +
+  guides(
+   colour = guide_colourbar(order = 1),
+   shape = guide_legend(order = 2),
+   size = guide_legend(order = 3)
+ )
+```
+
+Not in Giggly yet: mapping `size`, `colour` and `shape`, `guides()`, and `guide_colourbar()` and
+`guide_legend()` with their `order` option, which sets the order the guides are drawn in.

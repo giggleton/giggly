@@ -1,0 +1,40 @@
+# Summaries from Hmisc: hmisc
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`mean_cl_boot()`](https://ggplot2.tidyverse.org/reference/hmisc.html), which covers
+`mean_cl_normal()`, `mean_sdl()` and `median_hilow()` too, in the order the page gives them. Each
+example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps its
+ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+These functions wrap summary functions from the Hmisc package so that `stat_summary()` can use
+them: each takes a numeric vector and returns a data frame of one row, a central value in `y` and
+the ends of an interval around it in `ymin` and `ymax`. `mean_cl_boot()`, `mean_cl_normal()` and
+`mean_sdl()` centre on the mean, and `median_hilow()` on the median. Not in Giggly yet: these
+four functions, and `stat_summary()`.
+
+## Summaries of random values
+
+```r
+if (requireNamespace("Hmisc", quietly = TRUE)) {
+set.seed(1)
+x <- rnorm(100)
+mean_cl_boot(x)
+mean_cl_normal(x)
+mean_sdl(x)
+median_hilow(x)
+}
+```
+
+The example runs only where Hmisc is installed. With `set.seed(1)` fixing R's random numbers,
+`rnorm(100)` draws 100 values from a standard normal distribution, and each function returns its
+summary of them. Not in Giggly yet: `mean_cl_boot()`, `mean_cl_normal()`, `mean_sdl()` and
+`median_hilow()`.

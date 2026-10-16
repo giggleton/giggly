@@ -1,0 +1,50 @@
+# Spokes: geom_spoke
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_spoke()`](https://ggplot2.tidyverse.org/reference/geom_spoke.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+`geom_spoke()` is `geom_segment()` described by a direction and a distance: each row's segment
+starts at its `x` and `y` and runs `radius` in the direction `angle`, in radians, measured
+anticlockwise from east. It suits data that records a direction and a distance, such as movement
+or wind. Giggly has none of this yet.
+
+## A spoke at each point
+
+R's `expand.grid()` makes a 10 by 10 grid of points, and `runif()` gives each a random angle, and
+a random speed whose upper limit grows with `x`.
+
+```r
+df <- expand.grid(x = 1:10, y=1:10)
+
+set.seed(1)
+df$angle <- runif(100, 0, 2*pi)
+df$speed <- runif(100, 0, sqrt(0.1 * df$x))
+
+ggplot(df, aes(x, y)) +
+  geom_point() +
+  geom_spoke(aes(angle = angle), radius = 0.5)
+```
+
+Not in Giggly yet: `geom_spoke()`, mapping `angle`, and a fixed `radius`.
+
+## Spokes of different lengths
+
+```r
+ggplot(df, aes(x, y)) +
+  geom_point() +
+  geom_spoke(aes(angle = angle, radius = speed))
+```
+
+Not in Giggly yet: `geom_spoke()`, and mapping `angle` and `radius`.

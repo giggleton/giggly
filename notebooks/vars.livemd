@@ -1,0 +1,116 @@
+# Faceting columns: vars
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`vars()`](https://ggplot2.tidyverse.org/reference/vars.html), in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+`vars()` names the columns a facet splits the data by, as `aes()` names the columns of a mapping:
+each is a column or an expression computed from the data, and each may be given a name, which goes
+to the facet's labeller. Giggly has no `vars()`: `Giggly.Plot.facet_wrap/3` takes the columns
+themselves, and no expressions. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from
+the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
+
+## Facets by two columns
+
+ggplot2 names the columns to facet by with `vars()`; Giggly names them as a mapping does, by an
+atom or a string, and a list of them gives a panel for each combination of their values that
+occurs.
+
+```r
+p <- ggplot(mtcars, aes(wt, disp)) + geom_point()
+p + facet_wrap(vars(vs, am))
+```
+
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :disp})
+|> Plot.geom_point()
+|> Plot.facet_wrap([:vs, :am])
+|> render.()
+```
+
+## Wrapper functions
+
+```r
+# vars() makes it easy to pass variables from wrapper functions:
+wrap_by <- function(...) {
+  facet_wrap(vars(...), labeller = label_both)
+}
+p + wrap_by(vs)
+p + wrap_by(vs, am)
+```
+
+A Giggly column is a plain value, an atom or a string, so a wrapper function takes columns as
+arguments and passes them on to `Giggly.Plot.facet_wrap/3` without quoting them.
+
+Not in Giggly yet: `facet_wrap()`'s `labeller` option, here `label_both()`, which writes each strip
+as `vs: 0` rather than `0`.
+
+## An expression to facet by
+
+`cut_number(drat, 3)` cuts `drat`, the rear axle ratio, into three ranges holding about the same
+number of cars, and the name `drat` is what `label_both()` writes in the strips.
+
+```r
+# You can also supply expressions to vars(). In this case it's often a
+# good idea to supply a name as well:
+p + wrap_by(drat = cut_number(drat, 3))
+```
+
+Not in Giggly yet: `cut_number()`, an expression where Giggly takes a column, here
+`cut_number(drat, 3)`, and `facet_wrap()`'s `labeller` option.
+
+## A wrapper that cuts
+
+```r
+# Let's create another function for cutting and wrapping a
+# variable. This time it will take a named argument instead of dots,
+# so we'll have to use the "enquote and unquote" pattern:
+wrap_cut <- function(var, n = 3) {
+  # Let's enquote the named argument `var` to make it auto-quoting:
+  var <- enquo(var)
+
+  # `as_label()` will create a nice default name:
+  nm <- as_label(var)
+
+  # Now let's unquote everything at the right place. Note that we also
+  # unquote `n` just in case the data frame has a column named
+  # `n`. The latter would have precedence over our local variable
+  # because the data is always masking the environment.
+  wrap_by(!!nm := cut_number(!!var, !!n))
+}
+
+# Thanks to tidy eval idioms we now have another useful wrapper:
+p + wrap_cut(drat)
+```
+
+R's tidy evaluation (`enquo()`, `as_label()`, `!!` and `:=`) is how an R function passes on a
+column it was given without evaluating it, and names it. A Giggly column is a plain value, so a
+wrapper passes it on as it would any other.
+
+Not in Giggly yet: `cut_number()`, an expression where Giggly takes a column, and `facet_wrap()`'s
+`labeller` option.

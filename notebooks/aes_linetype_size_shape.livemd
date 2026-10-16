@@ -1,0 +1,154 @@
+# Line types, sizes and shapes: aes_linetype_size_shape
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`aes_linetype_size_shape`](https://ggplot2.tidyverse.org/reference/aes_linetype_size_shape.html),
+in the order the page gives them. Each example shows ggplot2's code first and then Giggly's. An
+example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page
+is also a list of what remains.
+
+The `linetype`, `linewidth`, `size` and `shape` aesthetics change how lines and points look: a
+line's dash pattern and width, the size of a point or of text, and the symbol a point is drawn with.
+Each can be set to one value for every mark, or mapped to a column. Giggly has none of them yet, and
+no `geom_line()`: every point it draws looks as ggplot2's default point does. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mtcars/0`, R's `mtcars`:
+32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name
+for it.
+
+## Line types
+
+A line type is a number from 0 to 6 or its name: 2 is `"dashed"`, 4 is `"dotdash"`.
+
+```r
+df <- data.frame(x = 1:10 , y = 1:10)
+p <- ggplot(df, aes(x, y))
+p + geom_line(linetype = 2)
+p + geom_line(linetype = "dotdash")
+```
+
+Not in Giggly yet: `geom_line()` and a fixed `linetype`.
+
+## Dash patterns as hex strings
+
+```r
+# An example with hex strings; the string "33" specifies three units on followed
+# by three off and "3313" specifies three units on followed by three off followed
+# by one on and finally three off.
+p + geom_line(linetype = "3313")
+```
+
+Not in Giggly yet: `geom_line()` and a fixed `linetype`.
+
+## Mapping line type
+
+```r
+# Mapping line type from a grouping variable
+ggplot(economics_long, aes(date, value01)) +
+  geom_line(aes(linetype = variable))
+```
+
+Not in Giggly yet: the `economics_long` dataset, dates on an axis, `geom_line()`, and mapping
+`linetype` and the legend that reads it back.
+
+## Line widths
+
+```r
+# Linewidth examples
+ggplot(economics, aes(date, unemploy)) +
+  geom_line(linewidth = 2, lineend = "round")
+ggplot(economics, aes(date, unemploy)) +
+  geom_line(aes(linewidth = uempmed), lineend = "round")
+```
+
+Not in Giggly yet: the `economics` dataset, dates on an axis, `geom_line()` and its `lineend`
+option, a fixed `linewidth`, and mapping `linewidth` and the legend that reads it back.
+
+## Point sizes
+
+```r
+# Size examples
+p <- ggplot(mtcars, aes(wt, mpg))
+p + geom_point(size = 4)
+p + geom_point(aes(size = qsec))
+p + geom_point(size = 2.5) +
+  geom_hline(yintercept = 25, size = 3.5)
+```
+
+The `size` given to `geom_hline()` is its line's width, which ggplot2 now calls `linewidth`.
+
+Not in Giggly yet: a fixed `size`, mapping `size` and the legend that reads it back,
+`geom_hline()`, and a fixed `linewidth`.
+
+## Point shapes
+
+`p` is still the plot of `mtcars` from the size examples. Without a `shape`, a point is ggplot2's
+default one, which is how Giggly draws every point.
+
+```r
+# Shape examples
+p + geom_point()
+```
+
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point()
+|> render.()
+```
+
+A shape is a number from 0 to 25, a single character drawn as the symbol, `"."` for the smallest
+visible dot, or `NA` for no point at all.
+
+```r
+p + geom_point(shape = 5)
+p + geom_point(shape = "k", size = 3)
+p + geom_point(shape = ".")
+p + geom_point(shape = NA)
+p + geom_point(aes(shape = factor(cyl)))
+```
+
+Not in Giggly yet: a fixed `shape` and a fixed `size`, mapping `shape` and the legend that reads
+it back, and an expression in a mapping, such as `factor(cyl)`.
+
+## The 25 symbols
+
+R's `data.frame()` repeats `x = 1:5` to fill the 25 rows, so the symbols sit in five columns.
+`scale_shape_identity()` uses each value of `z` as a shape number as it stands.
+
+```r
+# A look at all 25 symbols
+df2 <- data.frame(x = 1:5 , y = 1:25, z = 1:25)
+p <- ggplot(df2, aes(x, y))
+p + geom_point(aes(shape = z), size = 4) +
+  scale_shape_identity()
+# While all symbols have a foreground colour, symbols 19-25 also take a
+# background colour (fill)
+p + geom_point(aes(shape = z), size = 4, colour = "Red") +
+  scale_shape_identity()
+p + geom_point(aes(shape = z), size = 4, colour = "Red", fill = "Black") +
+  scale_shape_identity()
+```
+
+Not in Giggly yet: mapping `shape`, `scale_shape_identity()`, and a fixed `size`, `colour` and
+`fill`.

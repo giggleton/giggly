@@ -1,0 +1,277 @@
+# Theme elements: theme
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`theme()`](https://ggplot2.tidyverse.org/reference/theme.html), in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+A theme draws everything in a plot that is not data: titles, labels, fonts, backgrounds, gridlines,
+legends and strips. `theme()` changes parts of one plot's theme. Each part is an element, such as
+`element_text()`, `element_line()`, `element_rect()`, or `element_blank()` to draw nothing, and an
+element takes what it does not set from a more general one: `axis.title.x.bottom` from
+`axis.title.x`, that from `axis.title`, and that from `text`. Every Giggly plot is drawn in
+ggplot2's default theme, `theme_gray()`, and there is no way to change it yet. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
+R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to
+`mtcars`, R's name for it.
+
+## A plot with a title
+
+```r
+p1 <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  labs(title = "Fuel economy declines as weight increases")
+p1
+```
+
+Not in Giggly yet: `labs()`, here a plot title.
+
+## The plot's title and background
+
+```r
+# Plot ---------------------------------------------------------------------
+p1 + theme(plot.title = element_text(size = rel(2)))
+p1 + theme(plot.background = element_rect(fill = "green"))
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here the title's size and the background
+behind the whole plot.
+
+## The panel's background, border and gridlines
+
+```r
+# Panels --------------------------------------------------------------------
+
+p1 + theme(panel.background = element_rect(fill = "white", colour = "grey50"))
+p1 + theme(panel.border = element_rect(linetype = "dashed"))
+p1 + theme(panel.grid.major = element_line(colour = "black"))
+p1 + theme(
+  panel.grid.major.y = element_blank(),
+  panel.grid.minor.y = element_blank()
+)
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here the panel's background, its border and
+its gridlines.
+
+## Gridlines over the data
+
+```r
+# Put gridlines on top of data
+p1 + theme(
+  panel.background = element_rect(fill = NA),
+  panel.grid.major = element_line(colour = "grey50"),
+  panel.ontop = TRUE
+)
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here drawing the panel's gridlines over the
+points.
+
+## Axis lines, text and ticks
+
+```r
+# Axes ----------------------------------------------------------------------
+# Change styles of axes texts and lines
+p1 + theme(axis.line = element_line(linewidth = 3, colour = "grey80"))
+p1 + theme(axis.text = element_text(colour = "blue"))
+p1 + theme(axis.ticks = element_line(linewidth = 2))
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here the axes' lines, text and ticks.
+
+## The y axis's title
+
+```r
+# Change the appearance of the y-axis title
+p1 + theme(axis.title.y = element_text(size = rel(1.5), angle = 90))
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here the size and angle of the y axis's
+title.
+
+## The length and direction of ticks
+
+```r
+# Make ticks point outwards on y-axis and inwards on x-axis
+p1 + theme(
+  axis.ticks.length.y = unit(.25, "cm"),
+  axis.ticks.length.x = unit(-.25, "cm"),
+  axis.text.x = element_text(margin = margin(t = .3, unit = "cm"))
+)
+```
+
+Not in Giggly yet: `labs()`, and changing the theme, here the length of the ticks and the margin
+above the x axis's text.
+
+## A plot with legends
+
+```r
+# Legend --------------------------------------------------------------------
+p2 <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point(aes(colour = factor(cyl), shape = factor(vs))) +
+  labs(
+    x = "Weight (1000 lbs)",
+    y = "Fuel economy (mpg)",
+    colour = "Cylinders",
+    shape = "Transmission"
+   )
+p2
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
+`shape` and the legends that read them back, and `labs()`, here the titles of the axes and the
+legends.
+
+## Where the legends go
+
+```r
+# Position
+p2 + theme(legend.position = "none")
+p2 + theme(legend.justification = "top")
+p2 + theme(legend.position = "bottom")
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
+`shape` and the legends that read them back, `labs()`, and changing the theme, here where the
+legends go.
+
+## Legends inside the panel
+
+```r
+# Or place legends inside the plot using relative coordinates between 0 and 1
+# legend.justification sets the corner that the position refers to
+p2 + theme(
+  legend.position = "inside",
+  legend.position.inside = c(.95, .95),
+  legend.justification = c("right", "top"),
+  legend.box.just = "right",
+  legend.margin = margin_auto(6)
+)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
+`shape` and the legends that read them back, `labs()`, and changing the theme, here placing the
+legends inside the panel.
+
+## A box around the legends
+
+```r
+# The legend.box properties work similarly for the space around
+# all the legends
+p2 + theme(
+  legend.box.background = element_rect(),
+  legend.box.margin = margin_auto(6)
+)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
+`shape` and the legends that read them back, `labs()`, and changing the theme, here the box
+around the legends and its margin.
+
+## Legend keys, text and titles
+
+```r
+# You can also control the display of the keys
+# and the justification related to the plot area can be set
+p2 + theme(legend.key = element_rect(fill = "white", colour = "black"))
+p2 + theme(legend.text = element_text(size = 8, colour = "red"))
+p2 + theme(legend.title = element_text(face = "bold"))
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
+`shape` and the legends that read them back, `labs()`, and changing the theme, here the legends'
+keys, text and titles.
+
+## Strips
+
+ggplot2's `~ cyl` names the column to facet by; Giggly names it as a mapping does, by an atom or
+a string.
+
+```r
+# Strips --------------------------------------------------------------------
+
+p3 <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  facet_wrap(~ cyl)
+p3
+```
+
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point()
+|> Plot.facet_wrap(:cyl)
+|> render.()
+```
+
+```r
+p3 + theme(strip.background = element_rect(colour = "black", fill = "white"))
+p3 + theme(strip.text.x = element_text(colour = "white", face = "bold"))
+# More direct strip.text.x here for top
+# as in the facet_wrap the default strip.position is "top"
+p3 + theme(strip.text.x.top = element_text(colour = "white", face = "bold"))
+p3 + theme(panel.spacing = unit(1, "lines"))
+```
+
+Not in Giggly yet: changing the theme, here the strips' background and text and the space
+between the panels.
+
+## Default colours for layers
+
+```r
+# Colours -------------------------------------------------------------------
+
+p4 <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point() +
+  annotate(label = "Text Annotation", x = 5, y = 30, geom = "text")
+
+# You can use the 'ink' setting to set colour defaults for all layers
+p4 + theme(geom = element_geom(ink = "dodgerblue"))
+```
+
+Not in Giggly yet: `annotate()`, and changing the theme, here the colour every layer draws in.
+
+## Accent and paper colours
+
+```r
+# Alternate colours are derived from the 'accent' and 'paper' settings
+p4 + geom_smooth(method = "lm", formula = y ~ x) +
+  theme(geom = element_geom(accent = "tomato", paper = "orchid"))
+```
+
+Not in Giggly yet: `annotate()`, `geom_smooth()` with a line fitted by `lm()`, and changing the
+theme, here the accent and paper colours layers draw with.
+
+## A default palette
+
+```r
+# You can also set default palettes in the theme
+p4 + aes(colour = drat) +
+  theme(palette.colour.continuous = c("white", "pink", "hotpink"))
+```
+
+Not in Giggly yet: `annotate()`, mapping `colour` and the legend that reads it back, and changing
+the theme, here the palette a continuous `colour` scale draws from.

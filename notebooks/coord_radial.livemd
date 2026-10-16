@@ -1,0 +1,147 @@
+# Polar coordinates: coord_radial
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`coord_radial()`](https://ggplot2.tidyverse.org/reference/coord_radial.html), which covers
+`coord_polar()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting
+for, so the page is also a list of what remains.
+
+In polar coordinates one position becomes an angle around a centre and the other a distance from
+it; a pie chart is a stacked bar chart drawn this way. `coord_polar()` is superseded by
+`coord_radial()`, whose options choose which of `x` and `y` is the angle (`theta`), where the
+circle starts and ends, the limits of the angle and the radius, whether the scales expand, the
+size of a hole in the middle, and where the radius axis goes. `Giggly.Plot.coord_radial/1` is
+ggplot2's `coord_radial()` without options, so it draws as `coord_radial()` does with every
+option at its default. Giggly has no `coord_polar()` yet.
+
+## A pie chart
+
+```r
+# NOTE: Use these plots with caution - polar coordinates has
+# major perceptual problems.  The main point of these examples is
+# to demonstrate how these common plots can be described in the
+# grammar.  Use with EXTREME caution.
+
+# A pie chart = stacked bar chart + polar coordinates
+pie <- ggplot(mtcars, aes(x = factor(1), fill = factor(cyl))) +
+ geom_bar(width = 1)
+pie + coord_radial(theta = "y", expand = FALSE)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(1)` and `factor(cyl)`, mapping
+`fill` and the legend that reads it back, `geom_bar()`'s `width` option, and `coord_radial()`'s
+`theta` and `expand` options.
+
+## A coxcomb plot
+
+```r
+# A coxcomb plot = bar chart + polar coordinates
+cxc <- ggplot(mtcars, aes(x = factor(cyl))) +
+  geom_bar(width = 1, colour = "black")
+cxc + coord_radial(expand = FALSE)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `geom_bar()`'s `width`
+option, a fixed `colour`, and `coord_radial()`'s `expand` option.
+
+## Counts as angles
+
+```r
+# A new type of plot?
+cxc + coord_radial(theta = "y", expand = FALSE)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `geom_bar()`'s `width`
+option, a fixed `colour`, and `coord_radial()`'s `theta` and `expand` options.
+
+## A bullseye chart
+
+```r
+# The bullseye chart
+pie + coord_radial(expand = FALSE)
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(1)` and `factor(cyl)`, mapping
+`fill` and the legend that reads it back, `geom_bar()`'s `width` option, and `coord_radial()`'s
+`expand` option.
+
+## A pie chart's colours and starting angle
+
+```r
+# Hadley's favourite pie chart
+df <- data.frame(
+  variable = c("does not resemble", "resembles"),
+  value = c(20, 80)
+)
+ggplot(df, aes(x = "", y = value, fill = variable)) +
+  geom_col(width = 1) +
+  scale_fill_manual(values = c("red", "yellow")) +
+  coord_radial("y", start = pi / 3, expand =  FALSE) +
+  labs(title = "Pac man")
+```
+
+Not in Giggly yet: an expression in a mapping, such as the constant `""`, mapping `fill` and the
+legend that reads it back, `geom_col()`'s `width` option, `scale_fill_manual()`,
+`coord_radial()`'s `theta`, `start` and `expand` options, and `labs()`, here a plot title.
+
+## A wind rose and a race track
+
+R's `if (require("ggplot2movies"))` runs the example only when the `ggplot2movies` package, which
+holds the `movies` dataset, is installed.
+
+```r
+# Windrose + doughnut plot
+if (require("ggplot2movies")) {
+movies$rrating <- cut_interval(movies$rating, length = 1)
+movies$budgetq <- cut_number(movies$budget, 4)
+
+doh <- ggplot(movies, aes(x = rrating, fill = budgetq))
+
+# Wind rose
+doh + geom_bar(width = 1) + coord_radial(expand = FALSE)
+# Race track plot
+doh + geom_bar(width = 0.9, position = "fill") +
+  coord_radial(theta = "y", expand = FALSE)
+}
+```
+
+Not in Giggly yet: the `movies` dataset, `cut_interval()` and `cut_number()`, mapping `fill` and
+the legend that reads it back, `geom_bar()`'s `width` option, `position_fill()`, and
+`coord_radial()`'s `theta` and `expand` options.
+
+## A partial circle
+
+```r
+# A partial polar plot
+ggplot(mtcars, aes(disp, mpg)) +
+  geom_point() +
+  coord_radial(start = -0.4 * pi, end = 0.4 * pi, inner.radius = 0.3)
+```
+
+Not in Giggly yet: `coord_radial()`'s `start`, `end` and `inner.radius` options.
+
+## Limits
+
+```r
+# Similar with coord_cartesian(), you can set limits.
+ggplot(mtcars, aes(disp, mpg)) +
+  geom_point() +
+  coord_radial(
+    start = -0.4 * pi,
+    end = 0.4 * pi, inner.radius = 0.3,
+    thetalim = c(200, 300),
+    rlim = c(15, 30),
+  )
+```
+
+Not in Giggly yet: `coord_radial()`'s `start`, `end`, `inner.radius`, `thetalim` and `rlim`
+options.

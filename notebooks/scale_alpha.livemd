@@ -1,0 +1,55 @@
+# Transparency scales: scale_alpha
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_alpha()`](https://ggplot2.tidyverse.org/reference/scale_alpha.html), which covers
+`scale_alpha_continuous()`, `scale_alpha_binned()`, `scale_alpha_discrete()` and
+`scale_alpha_ordinal()` too, in the order the page gives them. Each example shows ggplot2's code
+first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it
+is waiting for, so the page is also a list of what remains.
+
+An alpha scale maps a column to transparency, a way to fade the less important observations.
+`scale_alpha()` is short for `scale_alpha_continuous()`, for a column of numbers;
+`scale_alpha_binned()` cuts the numbers into bins first, and `scale_alpha_discrete()` and
+`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of them yet, nor the
+`alpha` aesthetic they map.
+
+## Mapping transparency
+
+```r
+p <- ggplot(mpg, aes(displ, hwy)) +
+  geom_point(aes(alpha = year))
+
+# The default range of 0.1-1.0 leaves all data visible
+p
+```
+
+Not in Giggly yet: mapping `alpha` and the legend that reads it back.
+
+## Invisible points
+
+```r
+# Include 0 in the range to make data invisible
+p + scale_alpha(range = c(0, 1))
+```
+
+Not in Giggly yet: mapping `alpha` and the legend that reads it back, and `scale_alpha()` and its
+`range` option.
+
+## Titling the legend
+
+```r
+# Changing the title
+p + scale_alpha("cylinders")
+```
+
+Not in Giggly yet: mapping `alpha` and the legend that reads it back, and `scale_alpha()`, whose
+first argument titles the legend.

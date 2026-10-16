@@ -1,0 +1,19 @@
+# US presidents: presidential
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`presidential`](https://ggplot2.tidyverse.org/reference/presidential.html) has no examples, so
+this notebook says only what the page describes and where Giggly stands.
+
+`presidential` gives the terms of 12 US presidents from Eisenhower to Trump: each president's last
+name, the dates the term started and ended, and the president's party. Not in Giggly yet: the
+`presidential` dataset, and dates on an axis, which its start and end dates need;
+`Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.

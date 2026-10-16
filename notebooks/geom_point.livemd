@@ -9,6 +9,13 @@ Mix.install([
 alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,11 +26,12 @@ gives them. Each example shows ggplot2's code first and then Giggly's. An exampl
 draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
 what remains.
 
-Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is
-described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document that
-`Kino.Image` shows below the cell; the setup cell aliases `Giggly.Plot`, so the cells write
-`Plot.new/2`. The data in these examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars
-from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
+Points draw a scatter plot: one point per row of the data, at its `x` and `y`. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
+R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to
+`mtcars`, R's name for it.
 
 ## A scatter plot
 
@@ -38,15 +46,13 @@ plot =
   |> Plot.new(%{x: :wt, y: :mpg})
   |> Plot.geom_point()
 
-plot
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+render.(plot)
 ```
 
 ## Mapping colour, shape and size
 
 ```r
+# Add aesthetic mappings
 p + geom_point(aes(colour = factor(cyl)))
 p + geom_point(aes(shape = factor(cyl)))
 # A "bubblechart":
@@ -59,6 +65,7 @@ and the legends that read them back.
 ## Setting an aesthetic to a fixed value
 
 ```r
+# Set aesthetics to fixed value
 ggplot(mtcars, aes(wt, mpg)) + geom_point(colour = "red", size = 3)
 ```
 
@@ -67,6 +74,7 @@ Not in Giggly yet: fixed aesthetics, such as every point's colour or size.
 ## Transparency for large datasets
 
 ```r
+# Varying alpha is useful for large datasets
 d <- ggplot(diamonds, aes(carat, price))
 d + geom_point(alpha = 1/10)
 d + geom_point(alpha = 1/20)
@@ -79,6 +87,9 @@ example that can draw it.
 ## A point's fill and border
 
 ```r
+# For shapes that have a border (like 21), you can colour the inside and
+# outside separately. Use the stroke aesthetic to modify the width of the
+# border
 ggplot(mtcars, aes(wt, mpg)) +
   geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
 ```
@@ -88,6 +99,8 @@ Not in Giggly yet: shapes other than the solid circle, and a point's `fill` and 
 ## A legend that shows the fill
 
 ```r
+# The default shape in legends is not filled, but you can override the shape
+# in the guide to reflect the fill in the legend
 ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
   geom_point(size = 5, stroke = 1) +
   scale_shape_manual(values = 21:25) +
@@ -99,6 +112,8 @@ Not in Giggly yet: mapping `fill` and `shape`, setting a scale by hand, and lege
 ## Layering points of different sizes
 
 ```r
+# You can create interesting shapes by layering multiple points of
+# different sizes
 p <- ggplot(mtcars, aes(mpg, wt, shape = factor(cyl)))
 p +
   geom_point(aes(colour = factor(cyl)), size = 4) +
@@ -118,6 +133,8 @@ ggplot2's example blanks the `mpg` of about a fifth of the cars at random, with 
 `set.seed(1)`, and draws the rest: a row without a `y` has no point.
 
 ```r
+# geom_point warns when missing values have been dropped from the data set
+# and not plotted, you can turn this off by setting na.rm = TRUE
 set.seed(1)
 mtcars2 <- transform(mtcars, mpg = ifelse(runif(32) < 0.2, NA, mpg))
 ggplot(mtcars2, aes(wt, mpg)) +
@@ -140,9 +157,7 @@ mtcars2 = List.keyreplace(mtcars, :mpg, 0, {:mpg, mpg})
 mtcars2
 |> Plot.new(%{x: :wt, y: :mpg})
 |> Plot.geom_point()
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ```r

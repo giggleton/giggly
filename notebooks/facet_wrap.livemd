@@ -9,6 +9,13 @@ Mix.install([
 alias Giggly.Plot
 
 mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -22,11 +29,12 @@ what remains.
 `Giggly.Plot.facet_wrap/3` splits a plot into panels, one for each value of a column, or each
 combination of values of several, that occurs in the data, and wraps them into rows: a
 one-dimensional sequence of panels laid out in two dimensions. Each panel draws the rows with its
-values, and a strip above it says which those are. A plot is described with `Giggly.Plot` and
-drawn with `Giggly.to_svg/2`, which returns an SVG document that `Kino.Image` shows below the
-cell; the setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`. The data in these
-examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular
-models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
+values, and a strip above it says which those are. A plot is described with `Giggly.Plot` and drawn
+with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy
+for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's
+name for it.
 
 ## Facets by one column
 
@@ -47,9 +55,7 @@ plot =
 
 plot
 |> Plot.facet_wrap(:class)
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## The number of rows and columns
@@ -62,9 +68,7 @@ p + facet_wrap(vars(class), nrow = 4)
 ```elixir
 plot
 |> Plot.facet_wrap(:class, nrow: 4)
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Facets by several columns
@@ -81,9 +85,7 @@ ggplot(mpg, aes(displ, hwy)) +
 ```elixir
 plot
 |> Plot.facet_wrap([:cyl, :drv])
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## How strips are labelled
@@ -126,9 +128,7 @@ ggplot(mpg, aes(displ, hwy)) +
 ```elixir
 plot
 |> Plot.facet_wrap(:class, scales: :free)
-|> Giggly.to_svg()
-|> IO.iodata_to_binary()
-|> Kino.Image.new(:svg)
+|> render.()
 ```
 
 ## Axes on every panel

@@ -1,0 +1,66 @@
+# Summaries in 2d bins: stat_summary_2d
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`stat_summary_2d()`](https://ggplot2.tidyverse.org/reference/stat_summary_2d.html), which covers
+`stat_summary_hex()` too, in the order the page gives them. Each example shows ggplot2's code
+first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what
+it is waiting for, so the page is also a list of what remains.
+
+`stat_summary_2d()` divides the panel into rectangular bins by `x` and `y`, summarises the values
+of `z` that fall in each bin with a function, the mean by default, and draws each bin as a tile
+filled by its summary. `stat_summary_hex()` does the same with hexagonal bins. They are the
+two-dimensional form of `stat_summary()`. Giggly has none of it yet.
+
+## The mean in each bin
+
+```r
+d <- ggplot(diamonds, aes(carat, depth, z = price))
+d + stat_summary_2d()
+```
+
+Each tile's fill is the mean price of the diamonds in its bin.
+
+Not in Giggly yet: the `diamonds` dataset, mapping `z`, `stat_summary_2d()` and the tiles it
+draws, `geom_tile()`, and mapping `fill`, the scale that maps it and the legend that reads it
+back.
+
+## Choosing the summary
+
+R takes the summary function in several forms: an anonymous function, a formula, a function's
+name, or a string naming it, with `fun.args` passing it further arguments.
+
+```r
+# Specifying function
+d + stat_summary_2d(fun = \(x) sum(x^2))
+d + stat_summary_2d(fun = ~ sum(.x^2))
+d + stat_summary_2d(fun = var)
+d + stat_summary_2d(fun = "quantile", fun.args = list(probs = 0.1))
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `z`, `stat_summary_2d()` and its `fun` and
+`fun.args` options, `geom_tile()`, and mapping `fill`, the scale that maps it and the legend that
+reads it back.
+
+## Hexagonal bins
+
+These examples run only where R's `hexbin` package, which computes hexagonal bins, is installed.
+
+```r
+if (requireNamespace("hexbin")) {
+d + stat_summary_hex()
+d + stat_summary_hex(fun = ~ sum(.x^2))
+}
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `z`, `stat_summary_hex()` and its `fun`
+option, the hexagons it draws, `geom_hex()`, and mapping `fill`, the scale that maps it and the
+legend that reads it back.

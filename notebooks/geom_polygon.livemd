@@ -1,0 +1,118 @@
+# Polygons: geom_polygon
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_polygon()`](https://ggplot2.tidyverse.org/reference/geom_polygon.html), in the order the
+page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+A polygon is a path whose ends are joined and whose inside is filled. `geom_polygon()` draws one
+polygon for each `group`, through its rows in order, and from R 3.6 a `subgroup` can mark rows
+that cut holes in it. Giggly has none of this yet.
+
+## Polygons from two tables
+
+```r
+# When using geom_polygon, you will typically need two data frames:
+# one contains the coordinates of each polygon (positions),  and the
+# other the values associated with each polygon (values).  An id
+# variable links the two together
+
+ids <- factor(c("1.1", "2.1", "1.2", "2.2", "1.3", "2.3"))
+
+values <- data.frame(
+  id = ids,
+  value = c(3, 3.1, 3.1, 3.2, 3.15, 3.5)
+)
+
+positions <- data.frame(
+  id = rep(ids, each = 4),
+  x = c(2, 1, 1.1, 2.2, 1, 0, 0.3, 1.1, 2.2, 1.1, 1.2, 2.5, 1.1, 0.3,
+  0.5, 1.2, 2.5, 1.2, 1.3, 2.7, 1.2, 0.5, 0.6, 1.3),
+  y = c(-0.5, 0, 1, 0.5, 0, 0.5, 1.5, 1, 0.5, 1, 2.1, 1.7, 1, 1.5,
+  2.2, 2.1, 1.7, 2.1, 3.2, 2.8, 2.1, 2.2, 3.3, 3.2)
+)
+
+# Currently we need to manually merge the two together
+datapoly <- merge(values, positions, by = c("id"))
+
+p <- ggplot(datapoly, aes(x = x, y = y)) +
+  geom_polygon(aes(fill = value, group = id))
+p
+```
+
+`merge()` joins each polygon's value to its corners by `id`, giving one table with a row for each
+corner.
+
+Not in Giggly yet: `geom_polygon()`, and mapping `fill`, the scale that maps it and the legend
+that reads it back.
+
+## A line over the polygons
+
+```r
+# Which seems like a lot of work, but then it's easy to add on
+# other features in this coordinate system, e.g.:
+
+set.seed(1)
+stream <- data.frame(
+  x = cumsum(runif(50, max = 0.1)),
+  y = cumsum(runif(50,max = 0.1))
+)
+
+p + geom_line(data = stream, colour = "grey30", linewidth = 5)
+```
+
+The stream is a random walk: R draws its steps with `runif()`, and `set.seed(1)` makes them the
+same on every run.
+
+Not in Giggly yet: `geom_polygon()`, `geom_line()`, a layer with data of its own, a fixed `colour`
+and `linewidth`, and mapping `fill`, the scale that maps it and the legend that reads it back.
+
+## Map projections
+
+```r
+# And if the positions are in longitude and latitude, you can use
+# coord_map to produce different map projections.
+```
+
+The comment draws nothing; it points to `coord_map()`, which projects longitude and latitude onto
+the plane.
+
+Not in Giggly yet: `coord_map()`.
+
+## Polygons with holes
+
+```r
+if (packageVersion("grid") >= "3.6") {
+  # As of R version 3.6 geom_polygon() supports polygons with holes
+  # Use the subgroup aesthetic to differentiate holes from the main polygon
+
+  holes <- do.call(rbind, lapply(split(datapoly, datapoly$id), function(df) {
+    df$x <- df$x + 0.5 * (mean(df$x) - df$x)
+    df$y <- df$y + 0.5 * (mean(df$y) - df$y)
+    df
+  }))
+  datapoly$subid <- 1L
+  holes$subid <- 2L
+  datapoly <- rbind(datapoly, holes)
+
+  p <- ggplot(datapoly, aes(x = x, y = y)) +
+    geom_polygon(aes(fill = value, group = id, subgroup = subid))
+  p
+}
+```
+
+Each hole is its polygon shrunk halfway towards its centre; `subgroup` tells the outline's rows
+from the hole's.
+
+Not in Giggly yet: `geom_polygon()`, mapping `subgroup`, and mapping `fill`, the scale that maps
+it and the legend that reads it back.

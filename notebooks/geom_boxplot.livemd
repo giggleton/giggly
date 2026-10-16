@@ -1,0 +1,147 @@
+# Box plots: geom_boxplot
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_boxplot()`](https://ggplot2.tidyverse.org/reference/geom_boxplot.html), which covers
+`stat_boxplot()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+A box plot shows the distribution of a continuous column in five numbers: the median, two hinges
+at the first and third quartiles, and two whiskers, each reaching to the furthest value within 1.5
+times the inter-quartile range of its hinge. Every value beyond a whisker is drawn as a point of
+its own, an outlier. `stat_boxplot()` computes the five numbers for each group, and
+`geom_boxplot()` draws them, or draws numbers computed beforehand. Giggly has none of this yet.
+
+## A box for each class
+
+```r
+p <- ggplot(mpg, aes(class, hwy))
+p + geom_boxplot()
+```
+
+Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
+
+## Horizontal boxes
+
+```r
+# Orientation follows the discrete axis
+ggplot(mpg, aes(hwy, class)) + geom_boxplot()
+```
+
+Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
+
+## Notches
+
+```r
+p + geom_boxplot(notch = TRUE)
+```
+
+A notch around each median shows a rough 95% confidence interval for comparing medians. Not in
+Giggly yet: `geom_boxplot()` and its `notch` option.
+
+## Widths that follow the group's size
+
+```r
+p + geom_boxplot(varwidth = TRUE)
+```
+
+Each box's width is in proportion to the square root of its group's number of rows. Not in
+Giggly yet: `geom_boxplot()` and its `varwidth` option.
+
+## A fixed fill and colour
+
+```r
+p + geom_boxplot(fill = "white", colour = "#3366FF")
+```
+
+Not in Giggly yet: `geom_boxplot()`, and a fixed `fill` and `colour`.
+
+## Outliers of their own colour
+
+```r
+# By default, outlier points match the colour of the box. Use
+# outlier.colour to override
+p + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
+```
+
+Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options.
+
+## Boxes over the data's points
+
+```r
+# Remove outliers when overlaying boxplot with original data points
+p + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
+```
+
+Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, and `geom_jitter()`.
+
+## Dodged boxes
+
+```r
+# Boxplots are automatically dodged when any aesthetic is a factor
+p + geom_boxplot(aes(colour = drv))
+```
+
+Not in Giggly yet: `geom_boxplot()`, mapping `colour`, the scale that maps it and the legend that
+reads it back, and `position_dodge2()`, which sets the boxes side by side.
+
+## A continuous x
+
+```r
+# You can also use boxplots with continuous x, as long as you supply
+# a grouping variable. cut_width is particularly useful
+ggplot(diamonds, aes(carat, price)) +
+  geom_boxplot()
+ggplot(diamonds, aes(carat, price)) +
+  geom_boxplot(aes(group = cut_width(carat, 0.25)))
+```
+
+Without a group, the whole of `carat` makes one box. Not in Giggly yet: `geom_boxplot()`,
+`cut_width()`, an expression in a mapping, such as `cut_width(carat, 0.25)`, and the `diamonds`
+dataset.
+
+## Transparent outliers
+
+```r
+# Adjust the transparency of outliers using outlier.alpha
+ggplot(diamonds, aes(carat, price)) +
+  geom_boxplot(aes(group = cut_width(carat, 0.25)), outlier.alpha = 0.1)
+```
+
+Not in Giggly yet: `geom_boxplot()` and its `outlier.alpha` option, `cut_width()`, an expression
+in a mapping, such as `cut_width(carat, 0.25)`, and the `diamonds` dataset.
+
+## Numbers computed beforehand
+
+```r
+# It's possible to draw a boxplot with your own computations if you
+# use stat = "identity":
+set.seed(1)
+y <- rnorm(100)
+df <- data.frame(
+  x = 1,
+  y0 = min(y),
+  y25 = quantile(y, 0.25),
+  y50 = median(y),
+  y75 = quantile(y, 0.75),
+  y100 = max(y)
+)
+ggplot(df, aes(x)) +
+  geom_boxplot(
+   aes(ymin = y0, lower = y25, middle = y50, upper = y75, ymax = y100),
+   stat = "identity"
+ )
+```
+
+R draws 100 random numbers and puts their five numbers in a table of one row, which
+`stat = "identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `ymin`,
+`lower`, `middle`, `upper` and `ymax`, and choosing a layer's stat, here `stat = "identity"`.

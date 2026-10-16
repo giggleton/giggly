@@ -1,0 +1,120 @@
+# Rug plots: geom_rug
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_rug()`](https://ggplot2.tidyverse.org/reference/geom_rug.html), in the order the page
+gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot
+draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
+what remains.
+
+A rug plot adds the two one-dimensional distributions to a two-dimensional display, such as a
+scatter plot: a short line at the edge of the panel for each row's `x`, and another for its `y`. It
+draws every row, so it suits small tables. Giggly has no rugs yet, but `Giggly.Plot.geom_point/2`
+draws the scatter plot they are added to. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The cells draw `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
+
+## A scatter plot
+
+```r
+p <- ggplot(mtcars, aes(wt, mpg)) +
+  geom_point()
+p
+```
+
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point()
+|> render.()
+```
+
+## Rugs along the sides
+
+```r
+p + geom_rug()
+p + geom_rug(sides="b")    # Rug on bottom only
+p + geom_rug(sides="trbl") # All four sides
+```
+
+By default the rug runs along the bottom and the left, `sides = "bl"`.
+
+Not in Giggly yet: `geom_rug()` and its `sides` option.
+
+## Jittering the rug
+
+```r
+# Use jittering to avoid overplotting for smaller datasets
+ggplot(mpg, aes(displ, cty)) +
+  geom_point() +
+  geom_rug()
+
+ggplot(mpg, aes(displ, cty)) +
+  geom_jitter() +
+  geom_rug(alpha = 1/2, position = "jitter")
+```
+
+`displ` and `cty` take few distinct values, so many cars share a point and a rug line. Jittering
+moves each by a small random amount, so they can be told apart.
+
+Not in Giggly yet: `geom_rug()`, `geom_jitter()`, a fixed `alpha`, and `position_jitter()`.
+
+## Rugs outside the panel
+
+```r
+# move the rug tassels to outside the plot
+# remember to set clip = "off".
+p +
+  geom_rug(outside = TRUE) +
+  coord_cartesian(clip = "off")
+```
+
+Not in Giggly yet: `geom_rug()` and its `outside` option, and `coord_cartesian()`'s `clip`
+option.
+
+## Rugs on the top and right
+
+```r
+# set sides to top right, and then move the margins
+p +
+  geom_rug(outside = TRUE, sides = "tr") +
+  coord_cartesian(clip = "off") +
+  theme(plot.margin = margin_auto(1, unit = "cm"))
+```
+
+Not in Giggly yet: `geom_rug()` and its `outside` and `sides` options, `coord_cartesian()`'s
+`clip` option, and changing the theme, here to give the plot a margin of 1 cm on every side.
+
+## Longer rug lines
+
+```r
+# increase the line length and
+# expand axis to avoid overplotting
+p +
+  geom_rug(length = unit(0.05, "npc")) +
+  scale_y_continuous(expand = c(0.1, 0.1))
+```
+
+Not in Giggly yet: `geom_rug()` and its `length` option, and `scale_y_continuous()` and its
+`expand` option.

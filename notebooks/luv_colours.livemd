@@ -1,0 +1,18 @@
+# Colours in Luv space: luv_colours
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`luv_colours`](https://ggplot2.tidyverse.org/reference/luv_colours.html) has no examples, so this
+notebook says only what the page describes and where Giggly stands.
+
+`luv_colours` holds every one of R's built-in `colors()`, 657 of them, translated into the Luv
+colour space: each colour's name and its position in that space, `L`, `u` and `v`. Not in Giggly
+yet: the `luv_colours` dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.

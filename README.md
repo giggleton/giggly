@@ -4,8 +4,9 @@
 
 ## Notebooks
 
-`notebooks/` holds Livebook notebooks that follow ggplot2's reference pages example by example,
-drawing each one Giggly can draw so far: start with `notebooks/geom_point.livemd`.
+`notebooks/` holds a Livebook notebook for every page of ggplot2's function reference, each
+following its page example by example and drawing each one Giggly can draw so far. Start with
+`notebooks/index.livemd`, which follows ggplot2's reference index and links every notebook.
 
 ## Installation
 

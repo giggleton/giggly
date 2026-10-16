@@ -1,0 +1,53 @@
+# 2d bin counts: geom_bin_2d
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_bin_2d()`](https://ggplot2.tidyverse.org/reference/geom_bin_2d.html), which covers
+`stat_bin_2d()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_bin_2d()` divides the plane into rectangles, counts the rows in each, and maps each count to
+its rectangle's fill: a heatmap, useful where too many points overlap to read. `stat_bin_2d()`
+does the counting, in 30 bins each way unless told a number of bins or their width, which can
+differ between the two directions. Giggly has none of this yet.
+
+## Counting in rectangles
+
+```r
+d <- ggplot(diamonds, aes(x, y)) + xlim(4, 10) + ylim(4, 10)
+d + geom_bin_2d()
+```
+
+Not in Giggly yet: `geom_bin_2d()`, mapping `fill`, the scale that maps it and the legend that
+reads it back, `xlim()` and `ylim()`, and the `diamonds` dataset.
+
+## The number of bins
+
+```r
+# You can control the size of the bins by specifying the number of
+# bins in each direction:
+d + geom_bin_2d(bins = 10)
+d + geom_bin_2d(bins = list(x = 30, y = 10))
+```
+
+Not in Giggly yet: `geom_bin_2d()` and its `bins` option, mapping `fill`, the scale that maps it
+and the legend that reads it back, `xlim()` and `ylim()`, and the `diamonds` dataset.
+
+## The width of the bins
+
+```r
+# Or by specifying the width of the bins
+d + geom_bin_2d(binwidth = c(0.1, 0.1))
+```
+
+Not in Giggly yet: `geom_bin_2d()` and its `binwidth` option, mapping `fill`, the scale that maps
+it and the legend that reads it back, `xlim()` and `ylim()`, and the `diamonds` dataset.

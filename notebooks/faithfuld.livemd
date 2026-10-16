@@ -1,0 +1,18 @@
+# Old Faithful density: faithfuld
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for [`faithfuld`](https://ggplot2.tidyverse.org/reference/faithfuld.html)
+has no examples, so this notebook says only what the page describes and where Giggly stands.
+
+`faithfuld` is a two-dimensional density estimate of R's `faithful` data on the Old Faithful
+geyser: 5,625 rows, each a pair of an eruption time and a waiting time to the next eruption, both
+in minutes, with the estimated density there. Not in Giggly yet: the `faithfuld` dataset;
+`Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.

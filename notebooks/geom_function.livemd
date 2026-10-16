@@ -1,0 +1,143 @@
+# Function curves: geom_function
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_function()`](https://ggplot2.tidyverse.org/reference/geom_function.html), which covers
+`stat_function()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_function()` draws a function of `x` as a curve. Its stat, `stat_function()`, calls the
+function at evenly spaced values across the x axis, and the results are joined with a line, or
+drawn with another geom. That makes it easy to lay a curve over a plot of data, such as a
+distribution's density over the data's own. Giggly has neither yet, nor the line a curve is drawn
+with.
+
+## A curve over data
+
+```r
+# geom_function() is useful for overlaying functions
+set.seed(1492)
+ggplot(data.frame(x = rnorm(100)), aes(x)) +
+  geom_density() +
+  geom_function(fun = dnorm, colour = "red")
+```
+
+R draws the data at random from the standard normal distribution, and the curve is that
+distribution's density, `dnorm`.
+
+Not in Giggly yet: `geom_density()`, `geom_function()` and a fixed `colour`.
+
+## A function without data
+
+```r
+# To plot functions without data, specify range of x-axis
+base <-
+  ggplot() +
+  xlim(-5, 5)
+
+base + geom_function(fun = dnorm)
+```
+
+With no data to train the x scale, `xlim()` gives it the range to draw the function over.
+
+Not in Giggly yet: `geom_function()` and `xlim()`.
+
+## Passing arguments to the function
+
+```r
+base + geom_function(fun = dnorm, args = list(mean = 2, sd = .5))
+```
+
+Not in Giggly yet: `geom_function()` and its `args` option, and `xlim()`.
+
+## The points behind the curve
+
+```r
+# The underlying mechanics evaluate the function at discrete points
+# and connect the points with lines
+base + stat_function(fun = dnorm, geom = "point")
+
+base + stat_function(fun = dnorm, geom = "point", n = 20)
+```
+
+`n` is the number of points the function is evaluated at; ggplot2 takes 101 unless told
+otherwise.
+
+Not in Giggly yet: `stat_function()` and its `geom` and `n` options, and `xlim()`.
+
+## A filled curve
+
+```r
+base + stat_function(fun = dnorm, geom = "polygon", color = "blue", fill = "blue", alpha = 0.5)
+```
+
+Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, a fixed `colour`,
+`fill` and `alpha`, and `xlim()`.
+
+## Fewer points on the line
+
+```r
+base + geom_function(fun = dnorm, n = 20)
+```
+
+Not in Giggly yet: `geom_function()` and its `n` option, and `xlim()`.
+
+## Two functions on one plot
+
+```r
+# Two functions on the same plot
+base +
+  geom_function(aes(colour = "normal"), fun = dnorm) +
+  geom_function(aes(colour = "t, df = 1"), fun = dt, args = list(df = 1))
+```
+
+Each layer maps `colour` to a constant, so the legend names each curve.
+
+Not in Giggly yet: `geom_function()` and its `args` option, `xlim()`, an expression in a mapping,
+here the constants `"normal"` and `"t, df = 1"`, and mapping `colour`, the scale that maps it and
+the legend that reads it back.
+
+## A function of your own
+
+```r
+# Using a custom anonymous function
+base + geom_function(fun = \(x) 0.5 * exp(-abs(x)))
+# or using lambda syntax:
+# base + geom_function(fun = ~ 0.5 * exp(-abs(.x)))
+# or using a custom named function:
+# f <- function(x) 0.5 * exp(-abs(x))
+# base + geom_function(fun = f)
+```
+
+The commented lines are two other ways R writes the same function.
+
+Not in Giggly yet: `geom_function()` and `xlim()`.
+
+## The function's own range
+
+```r
+# Using xlim to restrict the range of function
+ggplot(data.frame(x = rnorm(100)), aes(x)) +
+geom_density() +
+geom_function(fun = dnorm, colour = "red", xlim=c(-1, 1))
+
+# Using xlim to widen the range of function
+ggplot(data.frame(x = rnorm(100)), aes(x)) +
+geom_density() +
+geom_function(fun = dnorm, colour = "red", xlim=c(-7, 7))
+```
+
+A layer's `xlim` sets the range the function is evaluated over, narrower or wider than the
+data's.
+
+Not in Giggly yet: `geom_density()`, `geom_function()` and its `xlim` option, and a fixed
+`colour`.

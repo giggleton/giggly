@@ -1,0 +1,90 @@
+# Map annotations: annotation_map
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`annotation_map()`](https://ggplot2.tidyverse.org/reference/annotation_map.html), in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+`annotation_map()` draws a fixed map on a plot: the outlines in a data frame such as `map_data()`
+returns, with a `fill` and `colour` of their own. It predates `geom_sf()` and does not read `sf`
+geometry, but it can be drawn alongside `geom_sf()` layers, or in `coord_sf()`, which projects
+it. Giggly has none of it yet.
+
+## Cities on a state map
+
+The page's examples run only when the `maps` package is installed, and the last two only when the
+`sf` package is too: each `if` opens a brace that closes after the last example.
+
+```r
+if (requireNamespace("maps", quietly = TRUE)) {
+# location of cities in North Carolina
+df <- data.frame(
+  name = c("Charlotte", "Raleigh", "Greensboro"),
+  lat = c(35.227, 35.772, 36.073),
+  long = c(-80.843, -78.639, -79.792)
+)
+
+p <- ggplot(df, aes(x = long, y = lat)) +
+  annotation_map(
+    map_data("state"),
+    fill = "antiquewhite", colour = "darkgrey"
+  ) +
+  geom_point(color = "blue") +
+  geom_text(
+    aes(label = name),
+    hjust = 1.105, vjust = 1.05, color = "blue"
+  )
+
+# use without coord_sf() is possible but not recommended
+p + xlim(-84, -76) + ylim(34, 37.2)
+```
+
+Not in Giggly yet: map data from the `maps` package, `annotation_map()`, `geom_text()` and
+mapping `label`, a fixed `fill`, `colour`, `hjust` and `vjust`, and `xlim()` and `ylim()`.
+
+## A projected map
+
+```r
+if (requireNamespace("sf", quietly = TRUE)) {
+# use with coord_sf() for appropriate projection
+p +
+  coord_sf(
+    crs = sf::st_crs(3347),
+    default_crs = sf::st_crs(4326),  # data is provided as long-lat
+    xlim = c(-84, -76),
+    ylim = c(34, 37.2)
+  )
+```
+
+Not in Giggly yet: everything `p` needs (map data from the `maps` package, `annotation_map()`,
+`geom_text()`), and `coord_sf()`, with coordinate reference systems from the `sf` package.
+
+## Mixing with sf layers
+
+```r
+# you can mix annotation_map() and geom_sf()
+nc <- sf::st_read(system.file("shape/nc.shp", package = "sf"), quiet = TRUE)
+p +
+  geom_sf(
+    data = nc, inherit.aes = FALSE,
+    fill = NA, color = "black", linewidth = 0.1
+  ) +
+  coord_sf(crs = sf::st_crs(3347), default_crs = sf::st_crs(4326))
+}}
+```
+
+`sf::st_read()` reads North Carolina's counties from a file that comes with the `sf` package.
+
+Not in Giggly yet: everything `p` needs (map data from the `maps` package, `annotation_map()`,
+`geom_text()`), `sf` objects, `geom_sf()` as a layer with data of its own that ignores the plot's
+mapping, a fixed `fill`, `colour` and `linewidth`, and `coord_sf()`.

@@ -1,0 +1,18 @@
+# Empty guides: guide_none
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+ggplot2's reference page for
+[`guide_none()`](https://ggplot2.tidyverse.org/reference/guide_none.html) has no examples, so this
+notebook says only what the page describes and where Giggly stands.
+
+`guide_none()` is a guide that draws nothing. Given to a scale's `guide` argument or to
+`guides()`, it leaves that scale without an axis or legend. Giggly has no guides yet, and no way to
+leave out an axis.

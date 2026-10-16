@@ -1,0 +1,112 @@
+# Density estimates: geom_density
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`geom_density()`](https://ggplot2.tidyverse.org/reference/geom_density.html), which covers
+`stat_density()` too, in the order the page gives them. Each example shows ggplot2's code first and
+then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`geom_density()` draws a kernel density estimate, a smoothed version of the histogram, which suits
+continuous data drawn from a smooth distribution; `stat_density()` computes it. Besides the
+density, the stat computes counts, the density times the number of rows, for stacking densities.
+Giggly has none of this yet. Every example uses ggplot2's `diamonds`, which is not in Giggly yet
+either.
+
+## A density curve
+
+```r
+ggplot(diamonds, aes(carat)) +
+  geom_density()
+```
+
+Not in Giggly yet: `geom_density()` and `stat_density()`, and the `diamonds` dataset.
+
+## Horizontal densities
+
+```r
+# Map the values to y to flip the orientation
+ggplot(diamonds, aes(y = carat)) +
+  geom_density()
+```
+
+Not in Giggly yet: `geom_density()` and `stat_density()`, and the `diamonds` dataset.
+
+## Rougher and smoother curves
+
+```r
+ggplot(diamonds, aes(carat)) +
+  geom_density(adjust = 1/5)
+ggplot(diamonds, aes(carat)) +
+  geom_density(adjust = 5)
+```
+
+`adjust` multiplies the bandwidth the density is smoothed over. Not in Giggly yet:
+`geom_density()` and its `adjust` option, and the `diamonds` dataset.
+
+## A curve for each cut
+
+```r
+ggplot(diamonds, aes(depth, colour = cut)) +
+  geom_density() +
+  xlim(55, 70)
+ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
+  geom_density(alpha = 0.1) +
+  xlim(55, 70)
+```
+
+Not in Giggly yet: `geom_density()` and `stat_density()`, mapping `colour` and `fill`, the scales
+that map them and the legends that read them back, a fixed `alpha`, `xlim()`, and the `diamonds`
+dataset.
+
+## Bounded data
+
+```r
+# Use `bounds` to adjust computation for known data limits
+big_diamonds <- diamonds[diamonds$carat >= 1, ]
+ggplot(big_diamonds, aes(carat)) +
+  geom_density(color = 'red') +
+  geom_density(bounds = c(1, Inf), color = 'blue')
+```
+
+The diamonds of a carat or more have no values below 1, which the red curve, knowing no bounds,
+smooths past. Not in Giggly yet: `geom_density()` and its `bounds` option, a fixed `colour`, and
+the `diamonds` dataset.
+
+## Stacked densities
+
+```r
+# Stacked density plots: if you want to create a stacked density plot, you
+# probably want to 'count' (density * n) variable instead of the default
+# density
+# Loses marginal densities
+ggplot(diamonds, aes(carat, fill = cut)) +
+  geom_density(position = "stack")
+# Preserves marginal densities
+ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
+  geom_density(position = "stack")
+```
+
+Not in Giggly yet: `geom_density()` and `stat_density()`, mapping `fill`, the scale that maps it
+and the legend that reads it back, an expression in a mapping, such as `after_stat(count)`, and the
+`diamonds` dataset.
+
+## Conditional densities
+
+```r
+# You can use position="fill" to produce a conditional density estimate
+ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
+  geom_density(position = "fill")
+```
+
+Not in Giggly yet: `geom_density()` and `stat_density()`, `position_fill()`, mapping `fill`, the
+scale that maps it and the legend that reads it back, an expression in a mapping, such as
+`after_stat(count)`, and the `diamonds` dataset.

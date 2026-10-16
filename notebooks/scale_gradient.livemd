@@ -1,0 +1,142 @@
+# Colour gradients: scale_gradient
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`scale_colour_gradient()`](https://ggplot2.tidyverse.org/reference/scale_gradient.html), which
+covers `scale_fill_gradient()`, `scale_colour_gradient2()`, `scale_fill_gradient2()`,
+`scale_colour_gradientn()` and `scale_fill_gradientn()` too, in the order the page gives them.
+Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
+its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
+
+A gradient scale maps a continuous column to colour, or to fill, by blending between colours.
+`scale_colour_gradient()` blends from a low colour to a high one, `scale_colour_gradient2()`
+diverges from a low colour through a middle one to a high one, around a midpoint, and
+`scale_colour_gradientn()` blends through as many colours as it is given; the `fill` versions do
+the same for fill. A missing value is drawn in grey, or in the colour `na.value` gives. The
+legend that reads a gradient back is a colour bar, `guide_colourbar()`. Giggly has none of this
+yet: it has no aesthetic but `x`, `y`, `group` and `weight`, no legends and no scale functions.
+
+## The default gradient
+
+The examples draw from two tables of random numbers R makes after `set.seed(1)`: `df`, and
+`df_na`, whose `z1` is missing in its first ten rows.
+
+```r
+set.seed(1)
+df <- data.frame(
+  x = runif(100),
+  y = runif(100),
+  z1 = rnorm(100),
+  z2 = abs(rnorm(100))
+)
+
+df_na <- data.frame(
+  value = seq(1, 20),
+  x = runif(20),
+  y = runif(20),
+  z1 = c(rep(NA, 10), rnorm(10))
+)
+
+# Default colour scale colours from light blue to dark blue
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z2))
+```
+
+Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
+
+## A diverging gradient
+
+```r
+# For diverging colour scales use gradient2
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_gradient2()
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_gradient2()` and the legend that reads it
+back.
+
+## Colours of your own
+
+```r
+# Use your own colour scale with gradientn
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_gradientn(colours = terrain.colors(10))
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_gradientn()`, R's `terrain.colors()` palette
+and the legend that reads it back.
+
+## Centring the gradient
+
+```r
+# The gradientn scale can be centered by using a rescaler
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z1)) +
+  scale_colour_gradientn(
+    colours = c("blue", "dodgerblue", "white", "orange", "red"),
+    rescaler = ~ scales::rescale_mid(.x, mid = 0)
+  )
+```
+
+`scales::rescale_mid()` puts 0 at the middle of the colours, here white, however far the data
+reaches on either side.
+
+Not in Giggly yet: mapping `colour`, `scale_colour_gradientn()` and its `rescaler` option,
+`scales::rescale_mid()`, and the legend that reads it back.
+
+## Filling with a gradient
+
+```r
+# Equivalent fill scales do the same job for the fill aesthetic
+ggplot(faithfuld, aes(waiting, eruptions)) +
+  geom_raster(aes(fill = density)) +
+  scale_fill_gradientn(colours = terrain.colors(10))
+```
+
+Not in Giggly yet: the `faithfuld` dataset, rasters (`geom_raster()`), mapping `fill`,
+`scale_fill_gradientn()`, R's `terrain.colors()` palette and the legend that reads it back.
+
+## Choosing the low and high colours
+
+```r
+# Adjust colour choices with low and high
+ggplot(df, aes(x, y)) +
+  geom_point(aes(colour = z2)) +
+  scale_colour_gradient(low = "white", high = "black")
+# Avoid red-green colour contrasts because ~10% of men have difficulty
+# seeing them
+```
+
+Not in Giggly yet: mapping `colour`, `scale_colour_gradient()` and its `low` and `high` options,
+and the legend that reads it back.
+
+## Hiding missing values
+
+`geom_bar(stat = "identity")` draws heights already in the data, as `geom_col()` does, which
+Giggly has as `Giggly.Plot.geom_col/3`. With `na.value = NA`, a bar or point whose `z1` is
+missing is not drawn, but still counts towards the axes' ranges.
+
+```r
+# Use `na.value = NA` to hide missing values but keep the original axis range
+ggplot(df_na, aes(x = value, y)) +
+  geom_bar(aes(fill = z1), stat = "identity") +
+  scale_fill_gradient(low = "yellow", high = "red", na.value = NA)
+
+ ggplot(df_na, aes(x, y)) +
+   geom_point(aes(colour = z1)) +
+   scale_colour_gradient(low = "yellow", high = "red", na.value = NA)
+```
+
+Not in Giggly yet: `geom_bar()`'s `stat` option, mapping `fill` and `colour`,
+`scale_fill_gradient()` and `scale_colour_gradient()` with their `low`, `high` and `na.value`
+options, and the legends that read them back.

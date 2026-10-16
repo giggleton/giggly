@@ -1,0 +1,201 @@
+# Stacking: position_stack
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`position_stack()`](https://ggplot2.tidyverse.org/reference/position_stack.html), which covers
+`position_fill()` too, in the order the page gives them. Each example shows ggplot2's code first
+and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
+waiting for, so the page is also a list of what remains.
+
+`position_stack()` stacks bars, areas and other objects that share an `x` on top of one another;
+`position_fill()` stacks them too, then stretches every stack to the same height, so its parts
+show proportions. A stack runs in the reverse order of the `group` aesthetic, so its colours line
+up with the default legend, and positive values stack upward from zero while negative ones stack
+downward. `vjust` places an object that has a position rather than a size, such as a label,
+within its part of the stack, and `reverse` turns the order over. Giggly stacks bars: it is the
+default `position: :stack` of `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3`. It has none
+of the rest yet: no `position_fill()`, no options, and no stacking of other layers.
+
+## Stacking and filling bars
+
+```r
+# Stacking and filling ------------------------------------------------------
+
+# Stacking is the default behaviour for most area plots.
+# Fill makes it easier to compare proportions
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar()
+ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
+  geom_bar(position = "fill")
+```
+
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill` and the
+legend that reads it back, and `position_fill()`.
+
+## Stacking and filling histograms
+
+```r
+ggplot(diamonds, aes(price, fill = cut)) +
+  geom_histogram(binwidth = 500)
+ggplot(diamonds, aes(price, fill = cut)) +
+  geom_histogram(binwidth = 500, position = "fill")
+```
+
+Not in Giggly yet: the `diamonds` dataset, mapping `fill` and the legend that reads it back,
+`geom_histogram()` with the binning it counts by, `stat_bin()`, and `position_fill()`.
+
+## Stacked areas
+
+```r
+# Stacking is also useful for time series
+set.seed(1)
+series <- data.frame(
+  time = c(rep(1, 4),rep(2, 4), rep(3, 4), rep(4, 4)),
+  type = rep(c('a', 'b', 'c', 'd'), 4),
+  value = rpois(16, 10)
+)
+ggplot(series, aes(time, value)) +
+  geom_area(aes(fill = type))
+```
+
+R's `rpois()` draws the values at random, the same ones every time after `set.seed(1)`.
+
+Not in Giggly yet: `geom_area()`, and mapping `fill` and the legend that reads it back.
+
+## Setting the stacking order
+
+```r
+# Stacking order ------------------------------------------------------------
+# The stacking order is carefully designed so that the plot matches
+# the legend.
+
+# You control the stacking order by setting the levels of the underlying
+# factor. See the forcats package for convenient helpers.
+series$type2 <- factor(series$type, levels = c('c', 'b', 'd', 'a'))
+ggplot(series, aes(time, value)) +
+  geom_area(aes(fill = type2))
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, and choosing
+the order of a column's values.
+
+## Ordering the legend
+
+```r
+# You can change the order of the levels in the legend using the scale
+ggplot(series, aes(time, value)) +
+  geom_area(aes(fill = type)) +
+  scale_fill_discrete(breaks = c('a', 'b', 'c', 'd'))
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill`, legends, and `scale_fill_discrete()`, here to
+set the order of the legend's keys.
+
+## Reversing the stack
+
+```r
+# If you've flipped the plot, use reverse = TRUE so the levels
+# continue to match
+ggplot(series, aes(time, value)) +
+  geom_area(aes(fill = type2), position = position_stack(reverse = TRUE)) +
+  coord_flip() +
+  theme(legend.position = "top")
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, choosing the
+order of a column's values, `position_stack()`'s `reverse` option, `coord_flip()`, and changing
+the theme, here to put the legend above the plot.
+
+## Stacking lines and points
+
+```r
+# Non-area plots ------------------------------------------------------------
+
+# When stacking across multiple layers it's a good idea to always set
+# the `group` aesthetic in the ggplot() call. This ensures that all layers
+# are stacked in the same way.
+ggplot(series, aes(time, value, group = type)) +
+  geom_line(aes(colour = type), position = "stack") +
+  geom_point(aes(colour = type), position = "stack")
+```
+
+Not in Giggly yet: `geom_line()`, mapping `colour` and the legend that reads it back, and
+`geom_point()`'s `position` option, here `position = "stack"`.
+
+## A line on each area
+
+```r
+ggplot(series, aes(time, value, group = type)) +
+  geom_area(aes(fill = type)) +
+  geom_line(aes(group = type), position = "stack")
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, and
+`geom_line()`, stacked with `position = "stack"`.
+
+## Stacking labels
+
+```r
+# You can also stack labels, but the default position is suboptimal.
+ggplot(series, aes(time, value, group = type)) +
+  geom_area(aes(fill = type)) +
+  geom_text(aes(label = type), position = "stack")
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, and
+`geom_text()` and mapping `label`, stacked with `position = "stack"`.
+
+## Centring labels
+
+```r
+# You can override this with the vjust parameter. A vjust of 0.5
+# will center the labels inside the corresponding area
+ggplot(series, aes(time, value, group = type)) +
+  geom_area(aes(fill = type)) +
+  geom_text(aes(label = type), position = position_stack(vjust = 0.5))
+```
+
+Not in Giggly yet: `geom_area()`, mapping `fill` and the legend that reads it back, `geom_text()`
+and mapping `label`, and `position_stack()`'s `vjust` option.
+
+## Negative values
+
+```r
+# Negative values -----------------------------------------------------------
+
+df <- data.frame(
+  x = rep(c("a", "b"), 2:3),
+  y = c(1, 2, 1, 3, -1),
+  grp = c("x", "y", "x", "y", "y")
+)
+
+ggplot(data = df, aes(x, y, group = grp)) +
+  geom_col(aes(fill = grp), position = position_stack(reverse = TRUE)) +
+  geom_hline(yintercept = 0)
+```
+
+R's `rep()` repeats `"a"` twice and `"b"` three times. The one negative value stacks downward
+from zero, apart from the positive ones.
+
+Not in Giggly yet: mapping `fill` and the legend that reads it back, `position_stack()`'s
+`reverse` option, and `geom_hline()`.
+
+## Labels in the middle of each part
+
+```r
+ggplot(data = df, aes(x, y, group = grp)) +
+  geom_col(aes(fill = grp)) +
+  geom_hline(yintercept = 0) +
+  geom_text(aes(label = grp), position = position_stack(vjust = 0.5))
+```
+
+Not in Giggly yet: mapping `fill` and the legend that reads it back, `geom_hline()`,
+`geom_text()` and mapping `label`, and `position_stack()`'s `vjust` option.

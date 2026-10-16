@@ -1,0 +1,79 @@
+# Jittered positions: position_jitter
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`position_jitter()`](https://ggplot2.tidyverse.org/reference/position_jitter.html), in the order
+the page gives them. Each example shows ggplot2's code first and then Giggly's. An example Giggly
+cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
+list of what remains.
+
+`position_jitter()` adds a little random noise to each position, which can make a small dataset
+easier to read when at least one of its positions is discrete: points that would sit on top of
+one another spread apart. The noise goes both ways, by up to 40% of the data's resolution unless
+`width` and `height` say otherwise, and a `seed` makes it the same every time. Giggly has none of
+it yet.
+
+## Jittered points beside boxplots
+
+```r
+# Jittering is useful when you have a discrete position, and a relatively
+# small number of points
+# take up as much space as a boxplot or a bar
+ggplot(mpg, aes(class, hwy)) +
+  geom_boxplot(colour = "grey50") +
+  geom_jitter()
+```
+
+`geom_jitter()` is a shortcut for `geom_point(position = "jitter")`.
+
+Not in Giggly yet: `geom_boxplot()`, a fixed `colour`, and `geom_jitter()`, points placed by
+`position_jitter()`.
+
+## Too much jitter
+
+```r
+# If the default jittering is too much, as in this plot:
+ggplot(mtcars, aes(am, vs)) +
+  geom_jitter()
+```
+
+`am` and `vs` are each 0 or 1, so unjittered points would sit on top of one another.
+
+Not in Giggly yet: `geom_jitter()` and `position_jitter()`.
+
+## Less jitter
+
+```r
+# You can adjust it in two ways
+ggplot(mtcars, aes(am, vs)) +
+  geom_jitter(width = 0.1, height = 0.1)
+ggplot(mtcars, aes(am, vs)) +
+  geom_jitter(position = position_jitter(width = 0.1, height = 0.1))
+```
+
+Not in Giggly yet: `geom_jitter()` and `position_jitter()`, with their `width` and `height`
+options.
+
+## Reproducible jitter
+
+```r
+# Create a jitter object for reproducible jitter:
+jitter <- position_jitter(width = 0.1, height = 0.1, seed = 0)
+ggplot(mtcars, aes(am, vs)) +
+  geom_point(position = jitter) +
+  geom_point(position = jitter, color = "red", aes(am + 0.2, vs + 0.2))
+```
+
+With a `seed`, the position jitters both layers the same way, so each red point sits 0.2 above
+and to the right of its black one.
+
+Not in Giggly yet: `position_jitter()` and its `seed` option, `geom_point()`'s `position`
+option, a fixed `colour`, and an expression in a mapping, such as `am + 0.2`.

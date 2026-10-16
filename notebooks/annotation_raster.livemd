@@ -1,0 +1,69 @@
+# Raster annotations: annotation_raster
+
+```elixir
+Mix.install([
+  {:giggly, path: Path.join(__DIR__, "..")},
+  {:kino, "~> 0.19"}
+  ])
+```
+
+## About this notebook
+
+This notebook follows the examples on ggplot2's reference page for
+[`annotation_raster()`](https://ggplot2.tidyverse.org/reference/annotation_raster.html), in the
+order the page gives them. Each example shows ggplot2's code first and then Giggly's. An example
+Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is
+also a list of what remains.
+
+`annotation_raster()` draws a raster, a bitmap image given as a matrix of colours, in a rectangle
+given in data coordinates, the same in every panel. It is a faster `geom_raster()` for static
+annotations: it does not change the scales, so the axes do not grow to fit it, and its colours
+are its own rather than mapped; `-Inf` and `Inf` stretch it to the panel's edges. Giggly has none
+of it yet.
+
+## An image in a rectangle
+
+```r
+# Generate data
+rainbow <- matrix(hcl(seq(0, 360, length.out = 50 * 50), 80, 70), nrow = 50)
+ggplot(mtcars, aes(mpg, wt)) +
+  geom_point() +
+  annotation_raster(rainbow, 15, 20, 3, 4)
+```
+
+R's `hcl()` turns hues from 0 to 360 into the colours of a rainbow, and `matrix()` lays them out
+in 50 rows.
+
+Not in Giggly yet: `annotation_raster()` and the raster it draws, a matrix of colours. The points
+already work.
+
+## Filling the panel
+
+```r
+# To fill up whole plot
+ggplot(mtcars, aes(mpg, wt)) +
+  annotation_raster(rainbow, -Inf, Inf, -Inf, Inf) +
+  geom_point()
+```
+
+Added before the points, the raster is drawn under them.
+
+Not in Giggly yet: `annotation_raster()`.
+
+## Interpolating
+
+```r
+rainbow2 <- matrix(hcl(seq(0, 360, length.out = 10), 80, 70), nrow = 1)
+ggplot(mtcars, aes(mpg, wt)) +
+  annotation_raster(rainbow2, -Inf, Inf, -Inf, Inf) +
+  geom_point()
+rainbow2 <- matrix(hcl(seq(0, 360, length.out = 10), 80, 70), nrow = 1)
+ggplot(mtcars, aes(mpg, wt)) +
+  annotation_raster(rainbow2, -Inf, Inf, -Inf, Inf, interpolate = TRUE) +
+  geom_point()
+```
+
+A single row of colours stretched over the panel shows as bands; `interpolate = TRUE` blends each
+into the next.
+
+Not in Giggly yet: `annotation_raster()` and its `interpolate` option.
