@@ -75,8 +75,13 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
 - **`aspect/2` gives the shape a panel keeps, its height over its width**, from the first
   panel's params, as ggplot2 asks `coord$aspect()`: `:none` for cartesian coordinates, 1 for a
   full circle. The assembly asks once and carries it to rendering, as it carries `clip`.
-- **What waits for its first reader:** `Coord.munch/3` for geoms (the first path geom), and with
-  it munching a spiral, which radial munching refuses until then; axes above or to the right; and
-  every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`; radial `theta`,
-  `start` and `end`, `inner.radius`, `thetalim` and `rlim`, `expand`, `clip = "on"`,
-  `r.axis.inside`, `rotate.angle`, `reverse`).
+- **`munch/3` places a layer's lines, cut first to follow the panel's curves**, as ggplot2's
+  `coord_munch()`: cartesian coordinates place the rows as `transform/3` does; radial ones put an
+  infinite position at its extent's end, cut each piece between two rows of one group as a grid
+  line is cut, leave a piece across a change of group or from a missing position whole, copy every
+  column of a piece's first row into its steps, keep the last row, and then place them.
+- **What waits for its first reader:** munching a spiral, a piece changing both its angle and its
+  radius, which radial munching refuses until the lines increment's second step; axes above or to
+  the right; and every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`;
+  radial `theta`, `start` and `end`, `inner.radius`, `thetalim` and `rlim`, `expand`,
+  `clip = "on"`, `r.axis.inside`, `rotate.angle`, `reverse`).

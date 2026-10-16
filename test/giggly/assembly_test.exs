@@ -25,7 +25,7 @@ defmodule Giggly.AssemblyTest do
                  %{label: "2006", value: 0.8},
                  %{label: "2008", value: 1.0}
                ],
-               geoms: [%Geom.Point{}]
+               layers: [%{geom: %Geom.Point{}, fixed: %{}}]
              }
     end
 
@@ -37,12 +37,12 @@ defmodule Giggly.AssemblyTest do
         |> Assembly.run()
         |> Map.fetch!(:legends)
 
-      assert {legend.keys, legend.geoms} ===
+      assert {legend.keys, legend.layers} ===
                {[
                   %{label: "4", value: 0.1},
                   %{label: "f", value: 0.55},
                   %{label: "r", value: 1.0}
-                ], [%Geom.Bar{}]}
+                ], [%{geom: %Geom.Bar{}, fixed: %{}}]}
     end
 
     test "only the layers that map the aesthetic draw its keys; one that sets it does not" do
@@ -54,7 +54,20 @@ defmodule Giggly.AssemblyTest do
         |> Assembly.run()
         |> Map.fetch!(:legends)
 
-      assert legend.geoms === [%Geom.Bar{}]
+      assert legend.layers === [%{geom: %Geom.Bar{}, fixed: %{}}]
+    end
+
+    # ggplot2's key data holds what a layer sets beside the key's value, so a line's key is as wide
+    # as the lines the layer sets.
+    test "a layer drawing a legend's keys carries what it sets to them" do
+      [legend] =
+        %{"x" => [1, 2], "y" => [1, 2], "a" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y, alpha: :a})
+        |> Plot.geom_line(linewidth: 2)
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert [%{fixed: %{linewidth: 2.0}}] = legend.layers
     end
 
     test "an aesthetic whose every column a stat dropped has no legend" do

@@ -2,7 +2,7 @@ defmodule Giggly.SVGTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Scene, SVG}
-  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Text}
+  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text}
 
   # Golden throughout: grid's own drawing of the same layout or marks, written by vdiffr 1.0.9's
   # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
@@ -114,7 +114,11 @@ defmodule Giggly.SVGTest do
         lines: [[{0.5, 0.25}, {0.5, 0.25}]],
         offsets: [[{0.0, 0.0}, {3.0, -4.0}]],
         stroke_width: 0.75,
-        color: "#000000"
+        color: "#000000",
+        opacity: [1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
       }
 
       assert draw(whole([line])) =~ "<polyline points='360.00,432.00 363.00,436.00 '"
@@ -235,6 +239,99 @@ defmodule Giggly.SVGTest do
 
       assert circles(drawn) === ["style='stroke-width: 0.71; stroke: none;'"]
       assert drawn =~ "stroke-linecap: butt; stroke-linejoin: miter;' />"
+    end
+
+    # svglite declares these in its stylesheet; a stylesheet inlined in a page styles the whole page,
+    # so the root declares them, and every element inherits them.
+    test "the root declares svglite's lines: round ends, round corners and a mitre limit of 10" do
+      assert draw(whole([])) =~
+               ~r/^<svg [^>]* stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'>\n/
+    end
+
+    test "a polyline writes its ends, corners and mitre limit where they differ from the root's" do
+      style = fn line_end, line_join, mitre_limit ->
+        polyline = %Polylines{
+          lines: [[{0.1, 0.1}, {0.2, 0.2}]],
+          offsets: :none,
+          stroke_width: 21.34,
+          color: "#000000",
+          opacity: [1.0],
+          line_end: line_end,
+          line_join: line_join,
+          mitre_limit: mitre_limit
+        }
+
+        [style] =
+          Regex.run(~r/<polyline [^>]*?style='([^']*)'/, draw(whole([polyline])),
+            capture: :all_but_first
+          )
+
+        style
+      end
+
+      assert [
+               style.(:butt, :round, 10.0),
+               style.(:round, :round, 10.0),
+               style.(:square, :bevel, 10.0),
+               style.(:butt, :mitre, 10.0),
+               style.(:butt, :mitre, 4.0),
+               style.(:butt, :mitre, 10.5)
+             ] === [
+               "stroke-width: 21.34; stroke: #000000; stroke-linecap: butt; fill: none;",
+               "stroke-width: 21.34; stroke: #000000; fill: none;",
+               "stroke-width: 21.34; stroke: #000000; stroke-linecap: square; " <>
+                 "stroke-linejoin: bevel; fill: none;",
+               "stroke-width: 21.34; stroke: #000000; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; fill: none;",
+               "stroke-width: 21.34; stroke: #000000; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; stroke-miterlimit: 4.00; fill: none;",
+               "stroke-width: 21.34; stroke: #000000; stroke-linecap: butt; " <>
+                 "stroke-linejoin: miter; stroke-miterlimit: 10.50; fill: none;"
+             ]
+    end
+
+    test "each polyline's stroke carries its own opacity" do
+      polylines = %Polylines{
+        lines: [[{0.1, 0.1}, {0.2, 0.2}], [{0.3, 0.3}, {0.4, 0.4}]],
+        offsets: :none,
+        stroke_width: 1.07,
+        color: "#000000",
+        opacity: [0.1, 1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      assert Regex.scan(~r/<polyline [^>]*?style='([^']*)'/, draw(whole([polylines])),
+               capture: :all_but_first
+             ) === [
+               [
+                 "stroke-width: 1.07; stroke: #000000; stroke-opacity: 0.10; stroke-linecap: butt; fill: none;"
+               ],
+               ["stroke-width: 1.07; stroke: #000000; stroke-linecap: butt; fill: none;"]
+             ]
+    end
+
+    test "a segment is a line from its start to its end, its stroke carrying its opacity" do
+      segments = %Segments{
+        starts: [{0.1, 0.5}],
+        ends: [{0.3, 0.75}],
+        stroke_width: 1.07,
+        color: "#000000",
+        opacity: [0.1],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      drawn = draw(whole([segments]))
+
+      assert String.ends_with?(
+               drawn,
+               "<line x1='72.00' y1='288.00' x2='216.00' y2='144.00' " <>
+                 "style='stroke-width: 1.07; stroke: #000000; stroke-opacity: 0.10; " <>
+                 "stroke-linecap: butt;' />\n</svg>\n"
+             )
     end
 
     test "a polygon is filled round its outline, its border as svglite writes it" do

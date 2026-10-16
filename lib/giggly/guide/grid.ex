@@ -46,6 +46,18 @@ defmodule Giggly.Guide.Grid do
     }
   end
 
-  defp lines(lines, look),
-    do: %Polylines{lines: lines, offsets: :none, stroke_width: look.line_width, color: look.color}
+  # Lines in the theme's look, opaque, their ends cut square and their corners round, as
+  # `theme_gray()`'s `line` element draws every line.
+  defp lines(lines, look) do
+    %Polylines{
+      lines: lines,
+      offsets: :none,
+      stroke_width: look.line_width,
+      color: look.color,
+      opacity: List.duplicate(1.0, length(lines)),
+      line_end: :butt,
+      line_join: :round,
+      mitre_limit: 10.0
+    }
+  end
 end

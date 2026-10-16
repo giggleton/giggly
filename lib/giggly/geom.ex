@@ -16,8 +16,11 @@ defprotocol Giggly.Geom do
   # facts about it that a plot checks a layer's mapping against when the layer is added
   # (`accepted_aesthetics/0`, `required_aesthetics/0`); and its drawing, in a `defimpl Giggly.Geom`
   # whose first line classifies it into this boundary, since boundary checks nothing a protocol
-  # implementation calls until it is classified. There are points (`Giggly.Geom.Point`) and bars
-  # (`Giggly.Geom.Bar`), which `geom_col()` draws with as ggplot2's does.
+  # implementation calls until it is classified. There are points (`Giggly.Geom.Point`), bars
+  # (`Giggly.Geom.Bar`), which `geom_col()` draws with as ggplot2's does, paths
+  # (`Giggly.Geom.Path`) and lines (`Giggly.Geom.Line`), which draw as paths once their rows are in
+  # order, as ggplot2's `GeomLine` is a `GeomPath`. A geom drawing lines places its rows with
+  # `Giggly.Coord.munch/3`, which cuts them to follow the panel's curves.
 
   # A geom places its rows through the coordinate system and draws them as scene primitives, and
   # sizes a mark with no width given from the spacing of its positions (`Giggly.Resolution`).
@@ -26,7 +29,7 @@ defprotocol Giggly.Geom do
   # exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.Coord, Giggly.DataFrame, Giggly.Resolution, Giggly.Scene],
-    exports: [Bar, Point]
+    exports: [Bar, Line, Path, Point]
 
   alias Giggly.{Coord, DataFrame, Scene}
 

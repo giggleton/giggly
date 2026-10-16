@@ -30,8 +30,9 @@ defmodule Giggly.Coord.Radial do
   # along the other aesthetic as ggplot2 runs it; the panel's background is the disc they lie on,
   # run round its corners at infinity. Each is munched as ggplot2's `coord_munch()` munches it:
   # every straight piece is cut into equal steps, as many as its placed length holds a hundredth
-  # of the longest line a panel holds, then each step is placed. Only spokes and circles are cut,
-  # since nothing else is munched yet; a piece changing both its angle and its radius, a spiral,
+  # of the longest line a panel holds, then each step is placed. A layer's lines are munched the
+  # same way (`munch/3`), each step copying the row it starts from. Only pieces along a spoke or
+  # round a circle are cut so far; a piece changing both its angle and its radius, a spiral,
   # fails. The panel is square, its aspect ratio 1, since the circle's bounding box is the panel.
 
   defstruct clip: :off
@@ -113,6 +114,55 @@ defmodule Giggly.Coord.Radial do
       |> DataFrame.put(:y, y_places)
     end
 
+    # Each line cut into steps, then placed, as ggplot2's `coord_munch()` munches data: an infinite
+    # position put at its extent's end, each piece between two rows of one group cut as a grid
+    # line is, a piece between two groups or from a missing position left whole, each step copying
+    # the row it starts from, and the last row kept.
+    @impl Giggly.Coord
+    def munch(coord, frame, params) do
+      positions =
+        frame
+        |> DataFrame.pull(:x)
+        |> Enum.zip_with(DataFrame.pull(frame, :y), fn x_position, y_position ->
+          bounded({x_position, y_position}, params)
+        end)
+
+      counts =
+        positions
+        |> Enum.zip(DataFrame.pull(frame, :group))
+        |> Enum.chunk_every(2, 1, :discard)
+        |> Enum.map(fn
+          [{from, group}, {to, group}] -> step_count(from, to, params)
+          [_from, _to] -> 1
+        end)
+
+      steps =
+        positions
+        |> Enum.chunk_every(2, 1)
+        |> Enum.zip_with(Enum.concat(counts, [1]), fn
+          [from, to], count -> steps(from, to, count)
+          [last], 1 -> [last]
+        end)
+
+      {x_positions, y_positions} =
+        steps
+        |> Enum.concat()
+        |> Enum.unzip()
+
+      rows =
+        steps
+        |> Enum.with_index()
+        |> Enum.flat_map(fn {row_steps, index} -> List.duplicate(index, length(row_steps)) end)
+
+      munched =
+        frame
+        |> DataFrame.slice(rows)
+        |> DataFrame.put(:x, x_positions)
+        |> DataFrame.put(:y, y_positions)
+
+      transform(coord, munched, params)
+    end
+
     # ggplot2 places an axis's breaks as data, the other aesthetic at minus infinity for the radius
     # axis, the angle's start, and at plus infinity for the angle axis, the circle's edge.
     @impl Giggly.Coord
@@ -192,7 +242,7 @@ defmodule Giggly.Coord.Radial do
       |> Enum.map(fn position -> bounded(position, params) end)
       |> Enum.chunk_every(2, 1)
       |> Enum.flat_map(fn
-        [from, to] -> steps(from, to, params)
+        [from, to] -> steps(from, to, step_count(from, to, params))
         [last] -> [last]
       end)
       |> Enum.map(fn position -> place(position, params) end)
@@ -203,13 +253,14 @@ defmodule Giggly.Coord.Radial do
 
     defp bound(:neg_infinity, {low, _high}), do: low
     defp bound(:infinity, {_low, high}), do: high
-    defp bound(position, _extent) when is_number(position), do: position
+    defp bound(position, _extent), do: position
 
-    # A piece's steps, its start and the points that divide it equally, as R's `seq()` divides
-    # 0 to 1: the step count times the reciprocal of the count.
-    defp steps({x_from, y_from} = from, {x_to, y_to} = to, params) do
-      count = step_count(from, to, params)
+    # A piece's `count` steps, its start and the points that divide it equally, as R's `seq()`
+    # divides 0 to 1: the step count times the reciprocal of the count. One step is the start
+    # alone, as ggplot2's `interp()` returns it, whatever the end.
+    defp steps(from, _to, 1), do: [from]
 
+    defp steps({x_from, y_from}, {x_to, y_to}, count) do
       Enum.map(0..(count - 1)//1, fn step ->
         fraction = step * (1 / count)
         {x_from + fraction * (x_to - x_from), y_from + fraction * (y_to - y_from)}
@@ -237,6 +288,10 @@ defmodule Giggly.Coord.Radial do
     # A piece's placed length as a share of the longest line, ggplot2's `dist_polar()` on boosted
     # radii: a piece of a spoke its change of radius, a piece of a circle its radius times its
     # change of angle.
+    defp distance({x_from, y_from}, {x_to, y_to}, _params)
+         when not (is_number(x_from) and is_number(y_from) and is_number(x_to) and is_number(y_to)),
+         do: :none
+
     defp distance(position, position, _params), do: :none
 
     defp distance({x_position, y_from}, {x_position, y_to}, params),

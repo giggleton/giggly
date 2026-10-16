@@ -165,16 +165,19 @@ defmodule Giggly.Render do
 
   # The plot's legend, `:none` for none, or its width and table: each key's glyphs drawn by the
   # geom of every layer that maps the legend's aesthetic, in the order the layers were added, at
-  # the key's value, as ggplot2 draws each such layer's `draw_key` in every key.
+  # the key's value and with what the layer sets, as ggplot2 draws each such layer's `draw_key` in
+  # every key.
   defp draw_legend([], _theme), do: :none
 
-  defp draw_legend([%{aesthetic: aesthetic, title: title, keys: keys, geoms: geoms}], theme) do
+  defp draw_legend([%{aesthetic: aesthetic, title: title, keys: keys, layers: layers}], theme) do
     size = {theme.legend_key_size, theme.legend_key_size}
 
     drawn_keys =
       Enum.map(keys, fn %{label: label, value: value} ->
         glyphs =
-          Enum.flat_map(geoms, fn geom -> Geom.draw_key(geom, %{aesthetic => value}, size) end)
+          Enum.flat_map(layers, fn %{geom: geom, fixed: fixed} ->
+            Geom.draw_key(geom, Map.put(fixed, aesthetic, value), size)
+          end)
 
         {label, glyphs}
       end)

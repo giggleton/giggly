@@ -25,7 +25,9 @@ defmodule Giggly.Scene do
 
   # A scene is values: it calls nothing, and exports the structs that rendering builds and a
   # backend reads.
-  use Boundary, deps: [], exports: [Cell, Circles, Polygons, Polylines, Rect, Rectangles, Text]
+  use Boundary,
+    deps: [],
+    exports: [Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text]
 
   alias Giggly.Scene.Cell
 
@@ -45,6 +47,7 @@ defmodule Giggly.Scene do
           | Giggly.Scene.Polylines.t()
           | Giggly.Scene.Rect.t()
           | Giggly.Scene.Rectangles.t()
+          | Giggly.Scene.Segments.t()
           | Giggly.Scene.Text.t()
           | t()
 

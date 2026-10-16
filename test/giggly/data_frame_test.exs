@@ -178,4 +178,34 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(DataFrame.split(frame, :panel)[1]) == %{x: :float, panel: :integer}
     end
   end
+
+  describe "slice/2" do
+    test "the rows at the indices are taken in that order, repeated or left out, each column whole" do
+      frame = DataFrame.new(x: [1.0, 2.0, 3.0], group: [1, 2, 3])
+
+      sliced = DataFrame.slice(frame, [2, 0, 0])
+
+      assert DataFrame.pull(sliced, :x) === [3.0, 1.0, 1.0]
+      assert DataFrame.pull(sliced, :group) === [3, 1, 1]
+      assert DataFrame.names(sliced) == [:x, :group]
+      assert DataFrame.row_count(sliced) == 3
+    end
+
+    test "a slice keeps each column's type even when its own values would read as another" do
+      frame = DataFrame.new(x: [1, 2.5])
+
+      sliced = DataFrame.slice(frame, [0])
+
+      assert DataFrame.dtypes(sliced) == %{x: :float}
+    end
+
+    test "no indices leave no rows" do
+      sliced =
+        [x: [1.0]]
+        |> DataFrame.new()
+        |> DataFrame.slice([])
+
+      assert DataFrame.row_count(sliced) == 0
+    end
+  end
 end

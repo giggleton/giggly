@@ -923,6 +923,87 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/alpha_bars.svg")
     end
 
+    # Golden: test/golden/line_missing.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/line_missing.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The "Missing values break a line" example on
+    # ggplot2's geom_path page: the line is two polylines either side of the missing y, and the
+    # point with no y is not drawn. It moves with what moves test/golden/point.svg, and with how a
+    # line is drawn or broken.
+    test "a missing y breaks a line in two, and the point with no y is not drawn" do
+      plot =
+        %{"x" => [1, 2, 3, 4, 5], "y" => [1.0, 2.0, nil, 4.0, 5.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_line()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/line_missing.svg")
+    end
+
+    # Golden: test/golden/line_alpha.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/line_alpha.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. A line whose alpha changes along it is a segment
+    # from each row to the next, in the alpha of the row it starts from, and its legend's keys are
+    # segments across their middles. It moves with what moves test/golden/alpha_legend.svg, and
+    # with how a line or its key is drawn.
+    test "a line whose alpha changes along it is drawn segment by segment, its keys as lines" do
+      plot =
+        %{"x" => [1.0, 3.0, 2.0, 4.0], "y" => [1.0, 2.0, 4.0, 3.0], "z" => [1.0, 2.0, 3.0, 4.0]}
+        |> Plot.new(%{x: :x, y: :y, alpha: :z})
+        |> Plot.geom_line()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/line_alpha.svg")
+    end
+
+    # Golden: each key is the one ggplot2 4.0.3 draws for the same plot through vdiffr 1.0.9's
+    # svglite (R 4.6.1), with the black stroke svglite leaves to its stylesheet written out. The
+    # keys are 2 mm wide only because rendering hands each key what its layer sets; it moves with
+    # how a key is drawn.
+    test "a line's legend keys are as wide as the lines the layer sets" do
+      keys =
+        %{"x" => [1.0, 3.0, 2.0, 4.0], "y" => [1.0, 2.0, 4.0, 3.0], "z" => [1.0, 2.0, 3.0, 4.0]}
+        |> Plot.new(%{x: :x, y: :y, alpha: :z})
+        |> Plot.geom_line(linewidth: 2)
+        |> data_lines()
+        |> Enum.take(-4)
+
+      assert keys === [
+               "<line x1='683.12' y1='257.04' x2='696.94' y2='257.04' style='stroke-width: 4.27; " <>
+                 "stroke: #000000; stroke-opacity: 0.10; stroke-linecap: butt;' />",
+               "<line x1='683.12' y1='274.32' x2='696.94' y2='274.32' style='stroke-width: 4.27; " <>
+                 "stroke: #000000; stroke-opacity: 0.40; stroke-linecap: butt;' />",
+               "<line x1='683.12' y1='291.60' x2='696.94' y2='291.60' style='stroke-width: 4.27; " <>
+                 "stroke: #000000; stroke-opacity: 0.70; stroke-linecap: butt;' />",
+               "<line x1='683.12' y1='308.88' x2='696.94' y2='308.88' style='stroke-width: 4.27; " <>
+                 "stroke: #000000; stroke-linecap: butt;' />"
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3's drawing of the same plot through vdiffr 1.0.9 (R 4.6.1), which cuts
+    # the arc into a hundred steps, each a hundredth of the longest line a panel holds or less, and
+    # keeps the last point. It moves with munching, and fails if a path is placed without it.
+    test "in radial coordinates a line round a circle is cut into steps that follow it" do
+      [line] =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_line()
+        |> Plot.coord_radial()
+        |> data_lines()
+
+      points = Regex.scan(~r/[0-9.]+,[0-9.]+/, line)
+
+      assert {length(points), hd(points)} === {101, ["412.00,175.69"]}
+    end
+
     # Golden: test/golden/bar.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/bar.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_bar()'s first example from ggplot2's
@@ -1116,7 +1197,8 @@ defmodule GigglyTest do
 
       assert svg ==
                "<svg xmlns='http://www.w3.org/2000/svg' width='525.00pt' height='324.75pt' " <>
-                 "viewBox='0 0 525.00 324.75'>\n" <>
+                 "viewBox='0 0 525.00 324.75' " <>
+                 "stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'>\n" <>
                  "<defs>\n  <clipPath id='cpMC4wMHw1MjUuMDB8MC4wMHwzMjQuNzU='>\n" <>
                  "    <rect x='0.00' y='0.00' width='525.00' height='324.75' />\n" <>
                  "  </clipPath>\n</defs>\n" <>
@@ -1146,5 +1228,16 @@ defmodule GigglyTest do
 
   defp edges(frame) do
     Map.new([:xmin, :xmax, :ymin, :ymax, :y], fn name -> {name, DataFrame.pull(frame, name)} end)
+  end
+
+  # The lines a plot's layers and legend draw, as its drawing at vdiffr's size writes them: every
+  # polyline and line but the grid's, white, and the ticks', grey.
+  defp data_lines(plot) do
+    plot
+    |> Giggly.to_svg(width: 960, height: 768)
+    |> IO.iodata_to_binary()
+    |> String.split("\n")
+    |> Enum.filter(fn line -> String.starts_with?(line, ["<polyline", "<line "]) end)
+    |> Enum.reject(fn line -> String.contains?(line, ["#FFFFFF", "#333333"]) end)
   end
 end

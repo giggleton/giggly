@@ -91,6 +91,17 @@ defmodule Giggly.DataFrame.Lists do
     |> Map.new(fn {key, row_count} -> {key, part(frame, grouped, key, row_count)} end)
   end
 
+  @impl DataFrame
+  def slice(%__MODULE__{columns: columns} = frame, indices) do
+    sliced =
+      Map.new(columns, fn {name, {dtype, values}} ->
+        by_index = List.to_tuple(values)
+        {name, {dtype, Enum.map(indices, fn index -> elem(by_index, index) end)}}
+      end)
+
+    %{frame | columns: sliced, row_count: length(indices)}
+  end
+
   defp empty(row_count), do: %__MODULE__{reversed_names: [], columns: %{}, row_count: row_count}
 
   # The frame of the `row_count` rows whose key is `key`, from the columns grouped by key.

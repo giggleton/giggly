@@ -67,12 +67,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
   an atom (`position: :stack | :dodge`) and recorded as its kind's struct; its parameters never
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
-- **An option that sets an aesthetic for every mark (`alpha:`) is recorded in the layer's `fixed`,
-  by canonical name**, as ggplot2's `aes_params`, and every geom function takes it; the assembly
-  puts it into every row last. A map maps and a keyword list sets: the two never trade places.
+- **An option that sets an aesthetic for every mark (`alpha:`, `linewidth:`) is recorded in the
+  layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom function takes
+  `alpha:`, and the line functions `linewidth:`, in millimetres. The assembly puts it into every row
+  last. A map maps and a keyword list sets: the two never trade places. **An option that chooses
+  how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`) **is a
+  field of the geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`,
+  `:x`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`; every geom function's `alpha:`),
-  so a misspelt option raises naming it, and a repeated one is refused by
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`; every geom function's `alpha:`;
+  the line functions' `lineend:`, `linejoin:`, `linemitre:` and `linewidth:`; `geom_line/3`'s
+  `orientation:`), so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's struct; a caller never writes
   "absent", so §7's question waits.
@@ -93,5 +98,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   them.** NimbleOptions keeps only the first of a repeated key and checks only that one, so
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
   repeat. NimbleOptions has no number type either: an option taking any number is
-  `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1 through a custom
-  check (`validate_alpha/1`), which takes an integer too and keeps a float, as R keeps a number.
+  `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
+  more and `linemitre:` 1 or more, as grid refuses less, through custom checks
+  (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`), which take an integer too
+  and keep a float, as R keeps a number.

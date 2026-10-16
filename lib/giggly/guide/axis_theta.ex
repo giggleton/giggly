@@ -18,6 +18,9 @@ defmodule Giggly.Guide.AxisTheta do
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Polylines, Text}
 
+  # Ticks are opaque, their ends cut square and their corners round, as `theme_gray()`'s `line`
+  # element draws every line.
+
   # The axis drawn from `breaks`, each its place on the circle's edge, its angle clockwise from
   # 12 o'clock and its label, in `theme`'s look: its primitives, placed in the panel's cell.
   @doc false
@@ -55,7 +58,11 @@ defmodule Giggly.Guide.AxisTheta do
           [{0.0, 0.0}, {tick_length * :math.sin(angle), tick_length * :math.cos(angle)}]
         end),
       stroke_width: ticks_look.line_width,
-      color: ticks_look.color
+      color: ticks_look.color,
+      opacity: List.duplicate(1.0, length(breaks)),
+      line_end: :butt,
+      line_join: :round,
+      mitre_limit: 10.0
     }
 
     Enum.concat(labels, [ticks])

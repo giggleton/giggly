@@ -127,8 +127,42 @@ defmodule Giggly.Plot do
         "`alpha = 0.4` sets it."
   ]
 
+  # A line's width set for every line of a layer, in millimetres, as ggplot2's `linewidth = 2`
+  # sets it, kept as a float.
+  @linewidth_option [
+    type: {:custom, __MODULE__, :validate_linewidth, []},
+    doc:
+      "How wide every line is, in millimetres, as ggplot2's `linewidth = 2` sets it; " <>
+        "0.5 when not given."
+  ]
+
+  # How a layer's lines are drawn at their ends and corners: ggplot2's `lineend`, `linejoin` and
+  # `linemitre`, grid's line parameters.
+  @line_style_options [
+    lineend: [
+      type: {:in, [:butt, :round, :square]},
+      default: :butt,
+      doc:
+        "How a line's ends are drawn: cut square at the end (`:butt`), rounded (`:round`), or " <>
+          "cut square half the line's width beyond it (`:square`)."
+    ],
+    linejoin: [
+      type: {:in, [:round, :mitre, :bevel]},
+      default: :round,
+      doc:
+        "How a line turns a corner: rounded (`:round`), pointed (`:mitre`) or cut off (`:bevel`)."
+    ],
+    linemitre: [
+      type: {:custom, __MODULE__, :validate_linemitre, []},
+      default: 10.0,
+      doc:
+        "How far a pointed corner may reach, in widths of the line, before it is cut off; " <>
+          "1 or more."
+    ]
+  ]
+
   # The options that set an aesthetic rather than choose how a layer is drawn.
-  @fixed_aesthetics [:alpha]
+  @fixed_aesthetics [:alpha, :linewidth]
 
   # `geom_point/3`'s options, validated at the call.
   @point_options NimbleOptions.new!(alpha: @alpha_option)
@@ -145,6 +179,27 @@ defmodule Giggly.Plot do
                  ],
                  alpha: @alpha_option
                )
+
+  # `geom_path/3`'s options, validated at the call.
+  @path_options NimbleOptions.new!(
+                  [alpha: @alpha_option, linewidth: @linewidth_option] ++ @line_style_options
+                )
+
+  # `geom_line/3`'s options, validated at the call.
+  @line_options NimbleOptions.new!(
+                  [
+                    orientation: [
+                      type: {:in, [:x, :y]},
+                      default: :x,
+                      doc:
+                        "Which position the rows are put in order of: `x`, or `y` for a " <>
+                          "line that runs up the panel, as ggplot2's " <>
+                          "`orientation = \"y\"` gives."
+                    ],
+                    alpha: @alpha_option,
+                    linewidth: @linewidth_option
+                  ] ++ @line_style_options
+                )
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
@@ -352,6 +407,113 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of paths: a line through each group's rows in the order the data gives them,
+  ggplot2's `geom_path()`, for a line that may double back, as one through two measures taken
+  over time does. `geom_line/3` puts the rows in order first.
+
+  Paths use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
+  other; each group is a line of its own. A row missing `x` or `y` breaks its line there, and
+  those at either end of a group are left out; a group of one row draws nothing. Where a line's
+  alpha changes along it, the line is drawn a segment from each row to the next, each as opaque
+  as the row it starts from. A mapping, a map, and options, a keyword list, may each be given
+  alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@path_options)}
+
+      iex> plot =
+      ...>   %{"unemploy" => [2.9, 4.1, 3.4], "psavert" => [12.6, 9.4, 11.1]}
+      ...>   |> Giggly.Plot.new(%{x: :unemploy, y: :psavert})
+      ...>   |> Giggly.Plot.geom_path(linewidth: 2)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [2.9, 4.1, 3.4]
+      iex> Giggly.DataFrame.pull(frame, :linewidth)
+      [2.0, 2.0, 2.0]
+  """
+  @spec geom_path(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_path(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_path(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_path(plot, %{}, options)
+
+  def geom_path(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @path_options)
+
+    layer = %Layer{
+      geom: %Geom.Path{
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      mapping: resolve(mapping, plot.data, "Plot.geom_path/3"),
+      fixed: fixed(validated)
+    }
+
+    add_layer(plot, layer, "Plot.geom_path/3",
+      accepted: Geom.Path.accepted_aesthetics(),
+      required: Geom.Path.required_aesthetics()
+    )
+  end
+
+  @doc """
+  Adds a layer of lines: a line through each group's rows in order of their `x`, ggplot2's
+  `geom_line()`, as a series is drawn over time. With `orientation: :y` the rows are put in order
+  of their `y` instead, for a line that runs up the panel. Rows that share a position keep the
+  order the data gives them.
+
+  Lines are drawn as `geom_path/3` draws paths, once their rows are in order, and take what paths
+  take: `:x`, `:y`, `:group` and `:alpha`, needing `:x` and `:y`. A mapping, a map, and options, a
+  keyword list, may each be given alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@line_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1.0, 3.0, 2.0], "y" => [1.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_line()
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [1.0, 2.0, 3.0]
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [1.0, 4.0, 2.0]
+  """
+  @spec geom_line(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_line(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_line(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_line(plot, %{}, options)
+
+  def geom_line(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @line_options)
+
+    layer = %Layer{
+      geom: %Geom.Line{
+        orientation: Keyword.fetch!(validated, :orientation),
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      mapping: resolve(mapping, plot.data, "Plot.geom_line/3"),
+      fixed: fixed(validated)
+    }
+
+    add_layer(plot, layer, "Plot.geom_line/3",
+      accepted: Geom.Line.accepted_aesthetics(),
+      required: Geom.Line.required_aesthetics()
+    )
+  end
+
+  @doc """
   Splits the plot into panels, one for each combination of values of the `facets` columns that
   occurs in the data, laid out in rows: ggplot2's `facet_wrap()`. `facets` is a column, or a list
   of columns, each named as a mapping names one, so `facet_wrap(plot, :class)` is ggplot2's
@@ -467,6 +629,24 @@ defmodule Giggly.Plot do
 
   def validate_alpha(alpha),
     do: {:error, "expected a number from 0 to 1, got: #{inspect(alpha)}"}
+
+  # NimbleOptions' check of a `linewidth:` option: a width in millimetres, 0 or more, kept as a
+  # float.
+  @doc false
+  @spec validate_linewidth(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_linewidth(width) when is_number(width) and width >= 0, do: {:ok, width / 1}
+
+  def validate_linewidth(width),
+    do: {:error, "expected a width in millimetres, 0 or more, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a `linemitre:` option: a number of line widths, 1 or more, as grid
+  # refuses less, kept as a float.
+  @doc false
+  @spec validate_linemitre(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_linemitre(limit) when is_number(limit) and limit >= 1, do: {:ok, limit / 1}
+
+  def validate_linemitre(limit),
+    do: {:error, "expected a number of line widths, 1 or more, got: #{inspect(limit)}"}
 
   defp resolve(mapping, frame, function_name) do
     names = DataFrame.names(frame)

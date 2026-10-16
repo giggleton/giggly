@@ -32,7 +32,8 @@ defmodule Giggly.Assembly do
   #      column through it, as ggplot2 trains and maps its non-position scales once the positions
   #      are final;
   #      it then builds each such scale's legend: a key for each break, labelled, with the value
-  #      it maps to, drawn by the geom of each layer that maps the aesthetic;
+  #      it maps to, drawn by the geom of each layer that maps the aesthetic with what that layer
+  #      sets;
   #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
   #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
@@ -122,14 +123,15 @@ defmodule Giggly.Assembly do
   @typedoc """
   A legend for one aesthetic other than position: its title, the column the first layer to map the
   aesthetic maps it to; a key for each of its scale's breaks, the break's label and the value it
-  maps to; and the geom of each layer that maps the aesthetic, in the order the layers were added,
-  each drawing its glyph in every key, as ggplot2's legend draws a key for each such layer.
+  maps to; and each layer that maps the aesthetic, in the order the layers were added, its geom
+  drawing its glyph in every key with the aesthetics the layer sets, as ggplot2's legend draws a
+  key for each such layer, its `aes_params` among the key's data.
   """
   @type legend :: %{
           aesthetic: Plot.aesthetic(),
           title: String.t(),
           keys: [%{label: String.t(), value: term()}],
-          geoms: [struct()]
+          layers: [%{geom: struct(), fixed: %{optional(Plot.aesthetic()) => term()}}]
         }
 
   # Assembles `plot`, running the stages in order.
@@ -291,11 +293,11 @@ defmodule Giggly.Assembly do
       {values, labels} = Enum.unzip(breaks)
       mapped = Scale.map(scale, values)
 
-      geoms =
+      key_layers =
         for layer <- layers,
             mapping = Plot.computed_mapping(plot, layer),
             Map.has_key?(mapping, aesthetic),
-            do: Plot.layer_geom(layer)
+            do: %{geom: Plot.layer_geom(layer), fixed: Plot.layer_fixed(layer)}
 
       %{
         aesthetic: aesthetic,
@@ -304,7 +306,7 @@ defmodule Giggly.Assembly do
           Enum.zip_with(labels, mapped, fn label, value ->
             %{label: label, value: value}
           end),
-        geoms: geoms
+        layers: key_layers
       }
     end
   end

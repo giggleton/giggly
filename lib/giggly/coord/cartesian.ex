@@ -68,6 +68,11 @@ defmodule Giggly.Coord.Cartesian do
       end)
     end
 
+    # A straight line stays straight, so its points are placed as they are, as ggplot2's
+    # `coord_munch()` only transforms under a linear coordinate system.
+    @impl Giggly.Coord
+    def munch(coord, frame, params), do: transform(coord, frame, params)
+
     @impl Giggly.Coord
     def axes(_coord, %{
           x_range: x_range,

@@ -79,6 +79,33 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative; the older, longer entries stand as
 written, and git history keeps every version.
 
+- **The document's root declares svglite's stylesheet for lines as attributes (2026-10-16,
+  Steve).** svglite gives every line round ends, round corners and a mitre limit of 10 through an
+  embedded stylesheet, and writes a line's own only where it differs. Giggly writes no stylesheet,
+  since one inlined in a page styles the whole page, so a browser would draw SVG's defaults, mitre
+  corners limited at 4, where ggplot2's lines are round. The `<svg>` element carries
+  `stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'`, which every element
+  inherits, so each writes exactly what svglite writes; presentation attributes sit at the bottom of
+  the cascade, so a page's or a future CSS theme's rules outrank them. Every golden's root changed
+  once. *Rejected: writing round corners on each line*, three more things to strip from every
+  comparison with svglite, and grid lines left mitred; *an inline `style` on the root* (Steve's
+  question), which works as well for elements but beats any stylesheet rule aimed at the root.
+
+- **Lines and date axes are Phase 3's third increment, in four steps: paths and lines, lines in
+  radial coordinates, dates on an axis, the notebooks (2026-10-16, Steve, agreeing the proposal;
+  checked against ggplot2 4.0.3 in R).** A line chart over time is the commonest dashboard chart,
+  and Phase 3's roadmap names lines next. `geom_path()` and `geom_line()` take x, y, `group` and
+  `alpha`, a set `linewidth`, `lineend`, `linejoin` and `linemitre`, and `geom_line()` its
+  `orientation`; a panel is drawn as polylines, or as segments where alpha varies along a line,
+  as ggplot2's `GeomPath` decides. `Coord.munch/3` arrives with them, so a radial line curves. A
+  `Date` column gets a continuous scale through a date transformation whose breaks are R's
+  `prettyDate()`, labelled in the format it chose. **Steve's choices:** the line options above
+  ride along. *Rejected: a fixed `linetype` now*, its patterns being the table a mapped `linetype`
+  scale needs; *`geom_step()` now*, which arrives with `stat_ecdf()`; *datetimes now*, which
+  bring sub-day steps and time zones and draw no notebook example; *refusing lines in radial
+  coordinates*, since `coord.md` planned munching for the first path geom. *Deferred:* arrows,
+  `key_glyph`, colour on lines, `scale_x_date()`'s options, `economics_long`, radial bars.
+
 - **Guides become structs of their kind behind a protocol in the increment that brings a second
   kind, expected to be colour (2026-10-16, Steve, agreeing the proposal).** ggplot2 makes each
   guide an object of its kind (`GuideLegend`, `GuideColourbar`, `GuideNone`, the axes), chosen per
@@ -1314,8 +1341,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Draw mapped alpha in the notebooks (alpha, step 4); §4: "Alpha is Phase 3's second
-  increment"
+- 2026-10-16 — Draw paths and lines (lines, step 1); §4: "Lines and date axes are Phase 3's third
+  increment", "The document's root declares svglite's stylesheet for lines"
+- 2026-10-16 — Draw mapped alpha in the notebooks (alpha, step 4) (`af5d981`); §4: "Alpha is Phase
+  3's second increment", "Guides become structs of their kind"
 - 2026-10-16 — Draw alpha's legend (alpha, step 3) (`c64b1e5`); §4: "A legend is a table nested in
   the plot's", "Alpha is Phase 3's second increment"
 - 2026-10-16 — Map alpha through a scale (alpha, step 2) (`c8140fd`); §4: "A scale's palette is a

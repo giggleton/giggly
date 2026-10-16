@@ -83,6 +83,72 @@ defmodule Giggly.CoordTest do
     end
   end
 
+  describe "munch/3" do
+    test "cartesian coordinates place a line's points as they are, adding none" do
+      coord = %Coord.Cartesian{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 3.0], y: [1.0, 3.0], group: [1, 1])
+
+      assert Coord.munch(coord, frame, params) == Coord.transform(coord, frame, params)
+    end
+
+    # Golden: ggplot2 4.0.3's `coord_munch()` under `coord_radial(expand = FALSE)` on the same
+    # rows and ranges (R 4.6.1), printed to 17 significant digits. A spoke from radius 2 to 4 is
+    # too short to cut, the circle at radius 4 from x 1 to 3 is cut into eight steps, each copying
+    # the alpha of the row it starts from, and neither the change of group nor the piece from the
+    # missing position is cut. It moves with the segment length, the boost or the distance.
+    test "radially, each piece of a group is cut into steps, a step copying the row it starts from" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{0.0, 100.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 1.0, 3.0, 3.0, nil, 2.0],
+          y: [2.0, 4.0, 4.0, 3.0, 1.0, 1.0],
+          group: [1, 1, 1, 2, 2, 2],
+          alpha: [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+        )
+
+      munched = Coord.munch(@radial, frame, params)
+
+      assert DataFrame.pull(munched, :x) === [
+               0.508,
+               0.516,
+               0.5147820725201806,
+               0.5113137084989847,
+               0.5061229349178414,
+               0.5,
+               0.49387706508215856,
+               0.4886862915010152,
+               0.4852179274798194,
+               0.484,
+               0.488,
+               nil,
+               0.5
+             ]
+
+      assert DataFrame.pull(munched, :y) === [
+               0.5,
+               0.5,
+               0.49387706508215856,
+               0.4886862915010152,
+               0.4852179274798194,
+               0.484,
+               0.4852179274798194,
+               0.4886862915010152,
+               0.49387706508215856,
+               0.5,
+               0.5,
+               nil,
+               0.496
+             ]
+
+      assert DataFrame.pull(munched, :group) === [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2]
+
+      assert DataFrame.pull(munched, :alpha) ===
+               [0.1, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.3, 0.4, 0.5, 0.6]
+    end
+  end
+
   describe "axes/2" do
     test "a cartesian panel's x axis is at the bottom and its y axis on the left, breaks placed" do
       params =

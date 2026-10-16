@@ -20,7 +20,7 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `split/2` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
+  `split/2`, `slice/2` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
   `@moduledoc false`; offering a user another operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library, and is a top-level boundary because of it.** Its `deps:`
   is `Table` alone, and nothing else in Giggly may call `table`. Nested under `Giggly`, it could
@@ -34,7 +34,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   Code that needs arbitrary Elixir pulls a column with `pull/2` and puts the result back with
   `put/3`.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
-  recombine, the relational operations. Not designed ahead.
+  recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
+  any order, repeated or left out, as a line's geom reorders and drops rows and munching repeats
+  them. Not designed ahead.
 - **The frame knows nothing about plots.** The `panel` and `group` columns belong to the code that
   writes them (the facet, `add_group`), not to the frame.
 - **A frame that exists is well formed**: no name twice, every column `row_count` long, every

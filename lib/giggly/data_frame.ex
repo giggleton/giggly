@@ -40,9 +40,10 @@ defmodule Giggly.DataFrame do
   #
   # This module is both the behaviour an implementation follows and the only module callers use:
   # each operation dispatches on the frame's struct. `Giggly.DataFrame.Lists` is the one
-  # implementation. The operations are relational (choosing, renaming and adding columns), so an
-  # engine such as a database could run them, and none takes an Elixir function, since an engine
-  # cannot run one. Code that needs one pulls a column into a list and puts the result back.
+  # implementation. The operations are relational (choosing, renaming and adding columns, splitting
+  # and taking rows), so an engine such as a database could run them, and none takes an Elixir
+  # function, since an engine cannot run one. Code that needs one pulls a column into a list and
+  # puts the result back.
 
   # Its own boundary, exporting only this module: callers reach a frame through the functions
   # below, so an implementation's struct and functions are private to it and a second
@@ -104,6 +105,10 @@ defmodule Giggly.DataFrame do
   # The rows split by the values of one column, as `split/2` describes.
   @doc false
   @callback split(t(), name()) :: %{optional(term()) => t()}
+
+  # The rows at the given indices, as `slice/2` describes.
+  @doc false
+  @callback slice(t(), [non_neg_integer()]) :: t()
 
   # Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
   # result) into a frame.
@@ -240,4 +245,13 @@ defmodule Giggly.DataFrame do
   @doc false
   @spec split(t(), name()) :: %{optional(term()) => t()}
   def split(%implementation{} = frame, name), do: implementation.split(frame, name)
+
+  # The frame's rows at `indices`, counting from 0, in the order given, as vctrs' `vec_slice()`
+  # takes them: a row may be taken more than once or not at all, as ggplot2's geoms reorder,
+  # drop and repeat the rows they draw. Every column and each column's type are kept. Raises
+  # `ArgumentError` for an index past the last row.
+  @doc false
+  @spec slice(t(), [non_neg_integer()]) :: t()
+  def slice(%implementation{} = frame, indices) when is_list(indices),
+    do: implementation.slice(frame, indices)
 end

@@ -64,4 +64,5 @@ ggplot2's facets' order".
   legend's cell spans the panels' rows, from the first's top to the last's bottom, the strips above
   the first row left out, and its table is centred down it; the cell is drawn last, after the
   titles. Each key's glyphs are drawn by the geom of every layer that maps the legend's aesthetic
-  (`Geom.draw_key/3`), in layer order, at the key's value, and handed to the guide.
+  (`Geom.draw_key/3`), in layer order, at the key's value and with what that layer sets, and handed
+  to the guide.

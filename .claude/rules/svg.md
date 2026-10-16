@@ -27,8 +27,9 @@ size has a weight".
   and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
   bars, with `stroke-linecap: butt; stroke-linejoin: miter` before the `fill`, as `GeomRect` sets
   them, and a `fill-opacity` after it, polygons with `points` and the same `style` as rectangles,
-  polylines with `points` and a `style` of `stroke-width`, `stroke`, `stroke-linecap: butt` and
-  `fill: none`, and text with `x` and `y` (or, turned 90 degrees, `transform='translate(x,y)
+  polylines with `points` and a `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line
+  style below, and `fill: none`, segments as `<line>` with `x1`, `y1`, `x2` and `y2` and the same
+  `style` but `fill`, and text with `x` and `y` (or, turned 90 degrees, `transform='translate(x,y)
   rotate(-90)'`), `text-anchor` (left out for text anchored at its start, as svglite leaves it out),
   a `style` of `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as
   svglite leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
@@ -60,6 +61,12 @@ size has a weight".
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,
   which is not a CSS generic family. Text escapes `&`, `<` and `>`, as svglite does.
 - **The backend measures nothing.** Every size reaches it as points or as a share.
+- **The root declares svglite's stylesheet for lines as attributes: `stroke-linecap='round'
+  stroke-linejoin='round' stroke-miterlimit='10.00'`**, which every element inherits and any CSS
+  outranks (design-log §4, the entry beginning "The document's root declares"). So a line writes
+  only what svglite writes: `stroke-linecap` when its ends are not round, `stroke-linejoin` when its
+  corners are not round (`miter`, `bevel`), and `stroke-miterlimit` only for mitred corners whose
+  limit is not 10.
 - **A polyline is never filled**, as grid's never is: its `style` says `fill: none`, which
   svglite leaves to a stylesheet Giggly does not write, since a stylesheet in an inlined SVG
   styles the whole page; without it SVG would fill a closed line, a radial grid's circle, black.
@@ -71,7 +78,8 @@ size has a weight".
   vdiffr (`test/golden/*.R`), never run by the suite; its header gives the Docker command
   and the element-by-element comparison, which leaves out only what svglite writes and Giggly does
   not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, and a
-  circle's black stroke and a polyline's `fill: none`, which svglite leaves to its stylesheet.
+  black stroke and a polyline's `fill: none`, which svglite leaves to its stylesheet; a golden with
+  lines compares `<line>` elements too.
   Any other difference is a finding or a stated departure, named in the script's header: the
   plain plot's axes drawn in the other order, a background edge written as R's rounding error.
 - **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, its

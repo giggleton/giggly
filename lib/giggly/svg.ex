@@ -18,7 +18,11 @@ defmodule Giggly.SVG do
   # 1.95 points at the size the plot is shown. Numbers are written with two decimals, an opacity as
   # svglite writes a number below 1, and each primitive as svglite writes it, so output can be set
   # beside the SVG ggplot2's own tests snapshot; a polyline also says it is not filled, which
-  # svglite leaves to its stylesheet and SVG would otherwise fill black.
+  # svglite leaves to its stylesheet and SVG would otherwise fill black. svglite's stylesheet also
+  # gives every line round ends, round corners and a mitre limit of 10, and writes a line's own
+  # only where it differs; a stylesheet inlined in a page styles the whole page, so the root
+  # declares those three as attributes, which every element inherits and any CSS outranks, and a
+  # line writes its own ends, corners and limit as svglite does.
   #
   # svglite anchors text only at its start, middle or end, so R's graphics engine hands it the
   # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
@@ -33,7 +37,7 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Text}
+  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text}
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -54,7 +58,7 @@ defmodule Giggly.SVG do
       number(width),
       " ",
       number(height),
-      "'>\n",
+      "' stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'>\n",
       Enum.map(cells, fn cell -> cell(cell, column_spans, row_spans) end),
       "</svg>\n"
     ]
@@ -274,18 +278,50 @@ defmodule Giggly.SVG do
     end)
   end
 
+  # Each line as svglite writes a polyline, its stroke carrying its opacity.
   defp primitive(%Polylines{} = polylines, box) do
-    style = [
-      "style='stroke-width: ",
-      number(polylines.stroke_width),
-      "; stroke: ",
-      polylines.color,
-      "; stroke-linecap: butt; fill: none;'"
-    ]
-
     polylines
     |> placed_lines(box)
-    |> Enum.map(fn line -> ["<polyline points='", points(line), "' ", style, " />\n"] end)
+    |> Enum.zip_with(polylines.opacity, fn line, opacity ->
+      [
+        "<polyline points='",
+        points(line),
+        "' style='stroke-width: ",
+        number(polylines.stroke_width),
+        ";",
+        stroke_style(polylines.color, opacity),
+        line_style(polylines.line_end, polylines.line_join, polylines.mitre_limit),
+        " fill: none;' />\n"
+      ]
+    end)
+  end
+
+  # Each segment as svglite writes a line, from its start to its end, its stroke carrying its
+  # opacity.
+  defp primitive(%Segments{} = segments, box) do
+    style = line_style(segments.line_end, segments.line_join, segments.mitre_limit)
+
+    Enum.zip_with([segments.starts, segments.ends, segments.opacity], fn [start, finish, opacity] ->
+      {x_start, y_start} = place(start, box)
+      {x_finish, y_finish} = place(finish, box)
+
+      [
+        "<line x1='",
+        number(x_start),
+        "' y1='",
+        number(y_start),
+        "' x2='",
+        number(x_finish),
+        "' y2='",
+        number(y_finish),
+        "' style='stroke-width: ",
+        number(segments.stroke_width),
+        ";",
+        stroke_style(segments.color, opacity),
+        style,
+        "' />\n"
+      ]
+    end)
   end
 
   defp primitive(%Polygons{} = polygons, box) do
@@ -381,6 +417,25 @@ defmodule Giggly.SVG do
       [number(x_position), ",", number(y_position), " "]
     end)
   end
+
+  # A line's ends and corners as svglite writes them, leaving out what its stylesheet declares,
+  # round ends, round corners and a mitre limit of 10, which the document's root declares here: a
+  # line's ends when not round, its corners when not round, and its mitre limit only for mitred
+  # corners, when it is not 10.
+  defp line_style(line_end, line_join, mitre_limit),
+    do: [line_end_style(line_end), line_join_style(line_join, mitre_limit)]
+
+  defp line_end_style(:round), do: ""
+  defp line_end_style(:butt), do: " stroke-linecap: butt;"
+  defp line_end_style(:square), do: " stroke-linecap: square;"
+
+  defp line_join_style(:round, _mitre_limit), do: ""
+  defp line_join_style(:bevel, _mitre_limit), do: " stroke-linejoin: bevel;"
+
+  defp line_join_style(:mitre, mitre_limit) when abs(mitre_limit - 10) > 1.0e-3,
+    do: [" stroke-linejoin: miter; stroke-miterlimit: ", number(mitre_limit), ";"]
+
+  defp line_join_style(:mitre, _mitre_limit), do: " stroke-linejoin: miter;"
 
   # A border of `:none` is SVG's `none`, as svglite writes a border whose colour is R's `NA`.
   defp stroke(:none), do: "none"

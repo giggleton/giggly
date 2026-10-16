@@ -24,6 +24,9 @@ defmodule Giggly.Guide.Axis do
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Polylines, Text}
 
+  # Ticks are opaque, their ends cut square and their corners round, as `theme_gray()`'s `line`
+  # element draws every line.
+
   # The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
   # and its label, in `look` (an x axis's below the panel, a y axis's or a radius axis's to its
   # left) and `theme`'s: how far it reaches from the panel, in points, and its primitives, placed
@@ -49,7 +52,11 @@ defmodule Giggly.Guide.Axis do
       lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
       offsets: :none,
       stroke_width: ticks_look.line_width,
-      color: ticks_look.color
+      color: ticks_look.color,
+      opacity: List.duplicate(1.0, length(places)),
+      line_end: :butt,
+      line_join: :round,
+      mitre_limit: 10.0
     }
 
     text = %Text{
@@ -127,7 +134,11 @@ defmodule Giggly.Guide.Axis do
       lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
       offsets: :none,
       stroke_width: ticks_look.line_width,
-      color: ticks_look.color
+      color: ticks_look.color,
+      opacity: List.duplicate(1.0, length(places)),
+      line_end: :butt,
+      line_join: :round,
+      mitre_limit: 10.0
     }
   end
 

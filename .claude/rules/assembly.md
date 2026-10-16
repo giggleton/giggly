@@ -117,8 +117,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
   range, a discrete one's levels, `NA` last), labelled, at the value it maps to, and drawn by every
-  layer that maps the aesthetic, a layer that sets it drawing none. One aesthetic gives one legend;
-  merging legends arrives with a second aesthetic.
+  layer that maps the aesthetic, each carrying what it sets (its `fixed`) for its keys, as
+  ggplot2's key data holds a layer's `aes_params`; a layer that sets the legend's own aesthetic
+  draws none. One aesthetic gives one legend; merging legends arrives with a second aesthetic.
 - **Evaluated columns are `x` and `y` first, then the other aesthetics in name order, then
   `panel`, then `group`**, and the group key follows column order: reordering the aesthetics
   renumbers groups. ggplot2's `aes()` takes `x` and `y` as its first arguments, so its groups are

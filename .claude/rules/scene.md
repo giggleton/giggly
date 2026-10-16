@@ -19,7 +19,7 @@ weight".
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
   rendering builds and a backend reads (`Cell`, `Circles`, `Polygons`, `Polylines`, `Rect`,
-  `Rectangles`, `Text`); nothing in it knows SVG, a font or a theme.
+  `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
   what the fixed sizes leave of the drawing, which a panel takes (grid's `"null"` unit): the
@@ -42,10 +42,17 @@ weight".
   text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor is at its
   `hjust` of the label's width, any fraction from its start (0) to its end (1).
 - **A text carries each label's measured width**, which the backend draws it at.
-- **Circles and placed rectangles carry an opacity for each mark**, from 0 to 1: a circle's
-  `opacity` its outline and fill alike, a rectangle's `fill_opacity` its fill alone, as grid's
-  colours carry the alpha ggplot2 gives them. One per mark, as grid's graphical parameters are,
-  so a mapped aesthetic needs no primitive per value; colour and size will take the same route.
+- **Circles, placed rectangles, polylines and segments carry an opacity for each mark**, from 0 to
+  1: a circle's `opacity` its outline and fill alike, a rectangle's `fill_opacity` its fill alone,
+  a polyline's or segment's `opacity` its stroke, as grid's colours carry the alpha ggplot2 gives
+  them. One per mark, as grid's graphical parameters are, so a mapped aesthetic needs no primitive
+  per value; colour and size will take the same route.
+- **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
+  `polylineGrob()`, a line through points, one per tick, grid line or group) and `Segments`
+  (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it and a
+  path's legend key) say how their ends (`:butt`, `:round`, `:square`) and corners (`:round`,
+  `:mitre`, `:bevel`) are drawn and their mitre limit; the guides' lines are theme_gray()'s, butt
+  and round.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.

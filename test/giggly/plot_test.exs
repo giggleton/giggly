@@ -317,6 +317,160 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_path/3 and geom_line/3" do
+    test "a path layer records its geom with ggplot2's ends, corners and mitre limit by default" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_path(%{group: :cyl})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 mapping: %{group: "cyl"},
+                 fixed: %{}
+               }
+             ]
+    end
+
+    test "a line layer records its geom, oriented along x by default" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_line()
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Line{
+                   orientation: :x,
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0
+                 },
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{}
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "the options choose the geom's ends, corners, mitre limit and orientation" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_line(orientation: :y, lineend: :square, linejoin: :mitre, linemitre: 4)
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Line{
+                   orientation: :y,
+                   line_end: :square,
+                   line_join: :mitre,
+                   mitre_limit: 4.0
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a line width and an alpha are set for every line, whole numbers as floats" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_path(linewidth: 2, alpha: 1)
+
+      assert [%Plot.Layer{fixed: %{linewidth: 2.0, alpha: 1.0}}] = plot.reversed_layers
+    end
+
+    test "a line width below 0, a mitre limit below 1 or an end or corner not taken is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {option, value} <- [
+            linewidth: -0.5,
+            linewidth: "2",
+            linemitre: 0.5,
+            lineend: :flat,
+            linejoin: :miter,
+            orientation: :z
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_line(plot, [{option, value}])
+          end
+
+        assert error.key == option
+      end
+    end
+
+    test "a path takes no orientation, which only lines are put in order of" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_path(plot, orientation: :y)
+        end
+
+      assert error.message =~ "orientation"
+    end
+
+    test "paths and lines accept a group and a mapped alpha" do
+      for add <- [&Plot.geom_path/2, &Plot.geom_line/2] do
+        plot =
+          @rows
+          |> Plot.new(%{x: :wt, y: :mpg})
+          |> add.(%{group: :cyl, alpha: :mpg})
+
+        assert [%Plot.Layer{mapping: %{group: "cyl", alpha: "mpg"}}] = plot.reversed_layers
+      end
+    end
+
+    test "an aesthetic lines cannot use is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_line(plot, %{weight: :cyl}) end
+      assert error.message =~ "Plot.geom_line/3"
+      assert error.message =~ ":weight"
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_path(plot, %{linewidth: :cyl}) end
+      assert error.message =~ "Plot.geom_path/3"
+      assert error.message =~ ":linewidth"
+    end
+
+    test "a column the data does not have is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_path(plot, %{group: :cly}) end
+      assert error.message =~ "Plot.geom_path/3"
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_line(plot, %{group: :cly}) end
+      assert error.message =~ "Plot.geom_line/3"
+    end
+
+    test "x or y mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for {add, function} <- [
+            {&Plot.geom_path/1, "Plot.geom_path/3"},
+            {&Plot.geom_line/1, "Plot.geom_line/3"}
+          ] do
+        error = assert_raise ArgumentError, fn -> add.(plot) end
+        assert error.message =~ function
+        assert error.message =~ ":y"
+      end
+    end
+
+    # grid draws a line 0 wide as the thinnest it can, and refuses a mitre limit below 1.
+    test "a line width of 0 and a mitre limit of 1 are values like any other" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_path(linewidth: 0, linemitre: 1)
+
+      assert [%Plot.Layer{fixed: %{linewidth: +0.0}, geom: %Geom.Path{mitre_limit: 1.0}}] =
+               plot.reversed_layers
+    end
+  end
+
   describe "facet_wrap/3" do
     test "a plot records the wrapped facet with its columns by their names in the data" do
       plot =

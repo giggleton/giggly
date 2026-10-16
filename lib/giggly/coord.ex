@@ -8,13 +8,15 @@ defprotocol Giggly.Coord do
   # each axis's breaks and minor breaks on that extent (`Giggly.Scale.breaks/2`,
   # `Giggly.Scale.minor_breaks/3`). When the plot is rendered, each geom is handed the coordinate
   # system and its panel's params, and hands both with its rows to `transform/3`, which places
-  # positions in the panel, 0 to 1 across its width and height; each axis is drawn from `axes/2`,
-  # which places the breaks the same way and says where each axis is drawn and in whose look; the
-  # panel's grid and background are drawn from `grid/2`, which runs a line through the panel at each
-  # break and minor break and gives the background's shape; `clip/1` says whether what is drawn in
-  # a panel is cut off at its edges; and `aspect/2` whether a panel keeps a shape of its own. A geom
-  # never sees a scale's range, and the params are opaque to everything but the coordinate system
-  # that built them, so a coordinate system that places positions differently changes no geom.
+  # positions in the panel, 0 to 1 across its width and height, or, drawing lines, to `munch/3`,
+  # which first cuts them into steps that follow the panel's curves; each axis is drawn from
+  # `axes/2`, which places the breaks the same way and says where each axis is drawn and in whose
+  # look; the panel's grid and background are drawn from `grid/2`, which runs a line through the
+  # panel at each break and minor break and gives the background's shape; `clip/1` says whether
+  # what is drawn in a panel is cut off at its edges; and `aspect/2` whether a panel keeps a shape
+  # of its own. A geom never sees a scale's range, and the params are opaque to everything but the
+  # coordinate system that built them, so a coordinate system that places positions differently
+  # changes no geom.
   #
   # A plot records its coordinate system as a struct of its kind. Each coordinate system is one
   # module holding everything about it: its struct, whose fields are its parameters, and its
@@ -105,6 +107,16 @@ defprotocol Giggly.Coord do
   @doc false
   @spec transform(t(), DataFrame.t(), panel_params()) :: DataFrame.t()
   def transform(coord, frame, panel_params)
+
+  # The frame's lines placed in the panel, each cut first into steps short enough to follow the
+  # coordinate system's curves: ggplot2's `coord_munch()`, which a geom drawing lines calls in
+  # place of `transform/3`. The rows are the lines' points in order, a change of `group` between
+  # two rows ending one line and starting the next; each step added copies every column of the row
+  # it starts from but its positions. A coordinate system whose straight lines stay straight places
+  # the rows as `transform/3` does.
+  @doc false
+  @spec munch(t(), DataFrame.t(), panel_params()) :: DataFrame.t()
+  def munch(coord, frame, panel_params)
 
   # Each axis by where it is drawn: on a side of the panel, or `:theta`, around a radial panel's
   # circle inside it. Each says the aesthetic it shows, whose title goes with it, the look it is
