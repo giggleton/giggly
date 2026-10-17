@@ -18,14 +18,14 @@ them. Each example shows ggplot2's code first and then Giggly's. An example Gigg
 keeps its ggplot2 code and names what it is waiting for, so the page is also a list of what
 remains.
 
-An identity scale is for data that already holds the aesthetic's values: a column of colour
-names is drawn in those colours, a column of numbers as those sizes, with no scaling between. It
-draws no legend unless it is also given breaks, labels and a guide. Each function works on the
-aesthetic in its name, though `scale_colour_identity()` and `scale_fill_identity()` can serve
-colour and fill at once through their `aesthetics` argument; `scale_discrete_identity()` and
+An identity scale is for data that already holds the aesthetic's values: a column of colour names is
+drawn in those colours, a column of numbers as those sizes, with no scaling between. It draws no
+legend unless it is also given breaks, labels and a guide. Each function works on the aesthetic in
+its name, though `scale_colour_identity()` and `scale_fill_identity()` can serve colour and fill at
+once through their `aesthetics` argument; `scale_discrete_identity()` and
 `scale_continuous_identity()` work on whatever aesthetics that argument names. Giggly has none of
-this yet: it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and
-no scale functions.
+this yet: it has no scale functions, and every column it maps to colour or fill goes through
+ggplot2's default scales.
 
 ## Colours named in the data
 
@@ -39,8 +39,8 @@ ggplot(luv_colours, aes(u, v)) +
   coord_fixed()
 ```
 
-Not in Giggly yet: the `luv_colours` dataset, mapping `colour`, `scale_colour_identity()`, a
-fixed `size` and `coord_fixed()`.
+Not in Giggly yet: the `luv_colours` dataset, `scale_colour_identity()`, a fixed `size` and
+`coord_fixed()`.
 
 ## Fill colours named in the data
 
@@ -60,8 +60,7 @@ ggplot(df, aes(x, y)) +
   scale_fill_identity()
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`), mapping `fill`, the scale that maps it and the legend
-that reads it back, and `scale_fill_identity()`.
+Not in Giggly yet: tiles (`geom_tile()`) and `scale_fill_identity()`.
 
 ## A legend for an identity scale
 
@@ -77,8 +76,8 @@ ggplot(df, aes(x, y)) +
   guide = "legend")
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_identity()` and its `breaks`,
-`labels` and `guide` options, the legend it asks for, `guide_legend()`, and titles and labels.
+Not in Giggly yet: `geom_tile()`, `scale_fill_identity()` and its `breaks`, `labels` and `guide`
+options, the legend it asks for, `guide_legend()`, and titles and labels.
 
 ## Sizes from the data
 

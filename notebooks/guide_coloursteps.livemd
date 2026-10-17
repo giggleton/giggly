@@ -16,9 +16,10 @@ code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot
 what it is waiting for, so the page is also a list of what remains.
 
 `guide_coloursteps()`, or `guide_colorsteps()` spelled the American way, is the legend of a binned
-colour or fill scale: a colour bar, as `guide_colourbar()` draws, but with each bin in one
-constant colour rather than a gradient. It is the default guide for binned colour scales. Giggly
-has none of it yet: it has no legend but alpha's, no scale functions, and neither colour nor fill.
+colour or fill scale: a colour bar, as `guide_colourbar()` draws, but with each bin in one constant
+colour rather than a gradient. It is the default guide for binned colour scales. Giggly has none of
+it yet: it has no binned scales and no scale functions, and draws a continuous colour or fill with
+ggplot2's default gradient and its colour bar.
 
 ## The default for binned colours
 
@@ -35,8 +36,7 @@ p <- ggplot(df, aes(X1, X2)) + geom_tile(aes(fill = value))
 p + scale_fill_binned()
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, the binned scale that maps it,
-`scale_fill_binned()`, and the legend that reads it back, `guide_coloursteps()`.
+Not in Giggly yet: `geom_tile()`, `scale_fill_binned()`, and `guide_coloursteps()`.
 
 ## Bins of equal size
 
@@ -46,8 +46,8 @@ Not in Giggly yet: `geom_tile()`, mapping `fill`, the binned scale that maps it,
 p + scale_fill_binned(breaks = c(10, 25, 50))
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_binned()`, here with breaks of its
-own, and the legend that reads it back, `guide_coloursteps()`.
+Not in Giggly yet: `geom_tile()`, `scale_fill_binned()`, here with breaks of its own, and
+`guide_coloursteps()`.
 
 ## Bins in proportion
 
@@ -59,9 +59,8 @@ p + scale_fill_binned(
 )
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_binned()`, and
-`guide_coloursteps()` with its `even.steps` option, which sizes each bin in the legend in
-proportion to its range in the data.
+Not in Giggly yet: `geom_tile()`, `scale_fill_binned()`, and `guide_coloursteps()` with its
+`even.steps` option, which sizes each bin in the legend in proportion to its range in the data.
 
 ## Showing the limits
 
@@ -73,6 +72,5 @@ p + scale_fill_binned(guide = guide_coloursteps(show.limits = TRUE))
 p + scale_fill_binned(show.limits = TRUE)
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, `scale_fill_binned()`, and
-`guide_coloursteps()`, with the `show.limits` option of the guide or of the scale, which labels the
-ends of the scale too.
+Not in Giggly yet: `geom_tile()`, `scale_fill_binned()`, and `guide_coloursteps()`, with the
+`show.limits` option of the guide or of the scale, which labels the ends of the scale too.

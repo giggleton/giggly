@@ -49,8 +49,8 @@ p <- ggplot(df, aes(x = long, y = lat)) +
 p + xlim(-84, -76) + ylim(34, 37.2)
 ```
 
-Not in Giggly yet: map data from the `maps` package, `annotation_map()`, `geom_text()` and
-mapping `label`, a fixed `fill`, `colour`, `hjust` and `vjust`, and `xlim()` and `ylim()`.
+Not in Giggly yet: map data from the `maps` package, `annotation_map()`, `geom_text()` and mapping
+`label`, a fixed `hjust` and `vjust`, and `xlim()` and `ylim()`.
 
 ## A projected map
 
@@ -87,4 +87,4 @@ p +
 
 Not in Giggly yet: everything `p` needs (map data from the `maps` package, `annotation_map()`,
 `geom_text()`), `sf` objects, `geom_sf()` as a layer with data of its own that ignores the plot's
-mapping, a fixed `fill`, `colour` and `linewidth`, and `coord_sf()`.
+mapping, a fixed `linewidth`, and `coord_sf()`.

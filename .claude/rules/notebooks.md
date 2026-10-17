@@ -21,9 +21,16 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   the example's functions, checked against R; a plot Giggly could only imitate (`qplot()`, a
   computed column standing in for `factor(cyl)`) waits.
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
-  words in every notebook** ("mapping `fill`", "a fixed `colour`", "`geom_line()`", "an
-  expression in a mapping"), so when a feature lands, searching the notebooks for its name finds
-  every example waiting for it, and those are drawn.
+  words in every notebook** ("mapping `shape`", "a fixed `size`", "`geom_boxplot()`", "an
+  expression in a mapping", "a point's `fill`"), so when a feature lands, searching the notebooks
+  for its name finds every example waiting for it, and those are drawn; a verdict still waiting
+  drops the pieces that landed and keeps the rest. **An About sentence says what Giggly has and
+  names what it lacks by that name** ("maps no `shape`", "no scale functions"), never "no X but
+  <what exists>", which a search for the next feature cannot find.
+- **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
+  CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
+  `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`
+  as `"#7F7F7F"`).
 - **`index.livemd` follows ggplot2's reference index**: its sections, their descriptions and its
   entries in its order, each entry a relative link to its page's notebook. It installs nothing.
   A notebook for a new page arrives with its line there.

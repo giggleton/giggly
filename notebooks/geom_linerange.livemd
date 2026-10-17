@@ -41,9 +41,8 @@ p + geom_crossbar(aes(ymin = lower, ymax = upper), width = 0.2)
 p + geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
 ```
 
-Not in Giggly yet: `geom_linerange()`, `geom_pointrange()`, `geom_crossbar()` and
-`geom_errorbar()` and their `width` option, and mapping `colour`, the scale that maps it and the
-legend that reads it back.
+Not in Giggly yet: `geom_linerange()`, `geom_pointrange()`, `geom_crossbar()` and `geom_errorbar()`
+and their `width` option.
 
 ## Horizontal intervals
 
@@ -55,8 +54,7 @@ ggplot(df, aes(resp, trt, colour = group)) +
 
 Mapping `xmin` and `xmax` rather than `ymin` and `ymax` turns the intervals on their side.
 
-Not in Giggly yet: `geom_linerange()`, and mapping `colour`, the scale that maps it and the legend
-that reads it back.
+Not in Giggly yet: `geom_linerange()`.
 
 ## Lines through the group means
 
@@ -67,8 +65,7 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
 ```
 
-Not in Giggly yet: `geom_errorbar()` and its `width` option, and mapping
-`colour`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: `geom_errorbar()` and its `width` option.
 
 ## Dodging bars and error bars
 
@@ -84,8 +81,7 @@ p +
 Each layer is dodged by its own width here, so the narrower error bars do not line up with the
 bars.
 
-Not in Giggly yet: `geom_errorbar()` and its `width` option, and mapping `fill`, the scale that
-maps it and the legend that reads it back. Giggly dodges columns already:
+Not in Giggly yet: `geom_errorbar()` and its `width` option. Giggly dodges columns already:
 `Giggly.Plot.geom_col/3` with `position: :dodge`.
 
 ## Dodging by one width
@@ -99,9 +95,8 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = dodge, width = 0.25)
 ```
 
-Not in Giggly yet: `position_dodge()`'s options, `geom_errorbar()` and its `width` option, and
-mapping `fill`, the scale that maps it and the legend that reads it back. Giggly names a position
-by an atom, `position: :dodge`, which takes no options.
+Not in Giggly yet: `position_dodge()`'s options, and `geom_errorbar()` and its `width` option.
+Giggly names a position by an atom, `position: :dodge`, which takes no options.
 
 ## Dodging with padding
 
@@ -116,5 +111,4 @@ geom_errorbar(
 )
 ```
 
-Not in Giggly yet: `position_dodge2()` and its options, `geom_errorbar()`, and mapping `fill`,
-the scale that maps it and the legend that reads it back.
+Not in Giggly yet: `position_dodge2()` and its options, and `geom_errorbar()`.

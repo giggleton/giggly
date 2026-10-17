@@ -32,8 +32,8 @@ qplot(mpg, wt, data = mtcars, size = cyl)
 qplot(mpg, wt, data = mtcars, facets = vs ~ am)
 ```
 
-Not in Giggly yet: `qplot()`, mapping `colour` and `size` and the legends that read them back, and
-`facet_grid()`, which the two-sided formula `vs ~ am` asks for.
+Not in Giggly yet: `qplot()`, mapping `size` and the legend that reads it back, and `facet_grid()`,
+which the two-sided formula `vs ~ am` asks for.
 
 ## Vectors instead of a data frame
 
@@ -46,8 +46,8 @@ qplot(resid(mod), fitted(mod))
 ```
 
 Without `data`, `qplot()` draws vectors: here a sequence, random numbers, the alphabet, and a
-model's residuals and fitted values. Not in Giggly yet: `qplot()`, mapping `colour` and the legend
-that reads it back, and models fitted by `lm()`. A Giggly plot draws the columns of a table.
+model's residuals and fitted values. Not in Giggly yet: `qplot()` and models fitted by `lm()`. A
+Giggly plot draws the columns of a table.
 
 ## Vectors inside a function
 
@@ -69,7 +69,7 @@ f()
 qplot(mpg, wt, data = mtcars, colour = I("red"))
 ```
 
-Not in Giggly yet: `qplot()`, and a fixed `colour`.
+Not in Giggly yet: `qplot()`.
 
 ## The geom qplot() guesses
 
@@ -95,5 +95,5 @@ qplot(factor(cyl), wt, data = mtcars, geom = c("boxplot", "jitter"))
 qplot(mpg, data = mtcars, geom = "dotplot")
 ```
 
-Not in Giggly yet: `qplot()`, `geom_boxplot()`, `geom_jitter()`, `geom_dotplot()`,
-and an expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `qplot()`, `geom_boxplot()`, `geom_jitter()`, `geom_dotplot()`, and an expression
+in a mapping, such as `factor(cyl)`.

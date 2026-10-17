@@ -53,8 +53,7 @@ p
 `merge()` joins each polygon's value to its corners by `id`, giving one table with a row for each
 corner.
 
-Not in Giggly yet: `geom_polygon()`, and mapping `fill`, the scale that maps it and the legend
-that reads it back.
+Not in Giggly yet: `geom_polygon()`.
 
 ## A line over the polygons
 
@@ -74,8 +73,7 @@ p + geom_line(data = stream, colour = "grey30", linewidth = 5)
 The stream is a random walk: R draws its steps with `runif()`, and `set.seed(1)` makes them the
 same on every run.
 
-Not in Giggly yet: `geom_polygon()`, a layer with data of its own, a fixed `colour`
-and `linewidth`, and mapping `fill`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: `geom_polygon()`, a layer with data of its own, and a fixed `linewidth`.
 
 ## Map projections
 
@@ -114,5 +112,4 @@ if (packageVersion("grid") >= "3.6") {
 Each hole is its polygon shrunk halfway towards its centre; `subgroup` tells the outline's rows
 from the hole's.
 
-Not in Giggly yet: `geom_polygon()`, mapping `subgroup`, and mapping `fill`, the scale that maps
-it and the legend that reads it back.
+Not in Giggly yet: `geom_polygon()` and mapping `subgroup`.

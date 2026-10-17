@@ -67,5 +67,5 @@ regression it fits, the `quantreg` package's `rqss()`, and an expression in a ma
 m + geom_quantile(colour = "red", linewidth = 2, alpha = 0.5)
 ```
 
-Not in Giggly yet: `geom_quantile()`, a fixed `colour` and `linewidth`, and an expression in a
-mapping, such as `1 / hwy`.
+Not in Giggly yet: `geom_quantile()`, a fixed `linewidth`, and an expression in a mapping, such as
+`1 / hwy`.

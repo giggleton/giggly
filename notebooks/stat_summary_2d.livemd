@@ -29,8 +29,7 @@ d + stat_summary_2d()
 
 Each tile's fill is the mean price of the diamonds in its bin.
 
-Not in Giggly yet: mapping `z`, `stat_summary_2d()` and the tiles it draws, `geom_tile()`, and
-mapping `fill`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: mapping `z`, `stat_summary_2d()` and the tiles it draws, and `geom_tile()`.
 
 ## Choosing the summary
 
@@ -45,8 +44,8 @@ d + stat_summary_2d(fun = var)
 d + stat_summary_2d(fun = "quantile", fun.args = list(probs = 0.1))
 ```
 
-Not in Giggly yet: mapping `z`, `stat_summary_2d()` and its `fun` and `fun.args` options,
-`geom_tile()`, and mapping `fill`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: mapping `z`, `stat_summary_2d()` and its `fun` and `fun.args` options, and
+`geom_tile()`.
 
 ## Hexagonal bins
 
@@ -60,4 +59,4 @@ d + stat_summary_hex(fun = ~ sum(.x^2))
 ```
 
 Not in Giggly yet: mapping `z`, `stat_summary_hex()` and its `fun` option, the hexagons it draws,
-`geom_hex()`, and mapping `fill`, the scale that maps it and the legend that reads it back.
+and `geom_hex()`.

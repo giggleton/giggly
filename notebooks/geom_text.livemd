@@ -98,9 +98,8 @@ p + geom_label(aes(fill = factor(cyl)), colour = "white", fontface = "bold")
 
 `scale_colour_hue(l = 40)` darkens the colours by lowering their luminance.
 
-Not in Giggly yet: `geom_text()` and `geom_label()`, mapping `label`, `colour` and `fill`, the
-scales that map them and the legends that read them back, an expression in a mapping, such as
-`factor(cyl)`, `scale_colour_hue()`, and a fixed `colour` and `fontface`.
+Not in Giggly yet: `geom_text()` and `geom_label()`, mapping `label`, an expression in a mapping,
+such as `factor(cyl)`, `scale_colour_hue()`, and a fixed `fontface`.
 
 ## Mapping size
 
@@ -168,8 +167,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = y), position = "dodge")
 ```
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and mapping `fill`, the scale that maps it and
-the legend that reads it back.
+Not in Giggly yet: `geom_text()` and mapping `label`.
 
 ## Dodging labels by the columns' width
 
@@ -182,9 +180,8 @@ ggplot(data = df, aes(x, y, group = grp)) +
 
 Columns are 0.9 wide by default, so dodging the labels by 0.9 puts each over its column.
 
-Not in Giggly yet: `geom_text()`, mapping `label`, `position_dodge()`'s options, and mapping `fill`,
-the scale that maps it and the legend that reads it back. Giggly names a position by an atom,
-`position: :dodge`, which takes no options yet.
+Not in Giggly yet: `geom_text()`, mapping `label`, and `position_dodge()`'s options. Giggly names a
+position by an atom, `position: :dodge`, which takes no options yet.
 
 ## Labels just above the columns
 
@@ -200,8 +197,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
 ```
 
 Not in Giggly yet: `geom_text()`, mapping `label`, an expression in a mapping, such as `y + 0.05`,
-`position_dodge()`'s options, a fixed `vjust`, and mapping `fill`, the scale that maps it and the
-legend that reads it back.
+`position_dodge()`'s options, and a fixed `vjust`.
 
 ## Labels in the middle of stacked columns
 
@@ -213,9 +209,8 @@ ggplot(data = df, aes(x, y, group = grp)) +
  geom_text(aes(label = y), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_text()`, mapping `label`, `position_stack()` and its `vjust` option, and
-mapping `fill`, the scale that maps it and the legend that reads it back. Giggly names a position by
-an atom, `position: :stack`, which takes no options yet.
+Not in Giggly yet: `geom_text()`, mapping `label`, and `position_stack()` and its `vjust` option.
+Giggly names a position by an atom, `position: :stack`, which takes no options yet.
 
 ## Justification
 

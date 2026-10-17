@@ -113,8 +113,7 @@ ggplot(mtcars, aes(x = mpg)) +
   geom_dotplot(binwidth = 1.5, fill = "white", stroke = 2)
 ```
 
-Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, a fixed `fill` and a fixed
-`stroke`.
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, and a fixed `stroke`.
 
 ## Binning along y
 
@@ -142,9 +141,8 @@ ggplot(mtcars, aes(x = factor(vs), fill = factor(cyl), y = mpg)) +
   geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge")
 ```
 
-Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, an expression in a
-mapping, such as `factor(vs)`, and mapping `fill`, the scale that maps it and the legend that
-reads it back.
+Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, and an expression in a
+mapping, such as `factor(vs)`.
 
 ## Aligning the bins of groups
 
@@ -174,6 +172,5 @@ ggplot(mtcars, aes(x = 1, y = mpg, fill = factor(cyl))) +
 `stackgroups = TRUE` stacks each group's dots on the dots of the groups before it, as
 `position = "stack"` would if a dot plot could use it.
 
-Not in Giggly yet: `geom_dotplot()` and its `stackgroups`, `binwidth`, `binpositions`, `method`
-and `binaxis` options, an expression in a mapping, such as `factor(cyl)` or `1`, and mapping
-`fill`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: `geom_dotplot()` and its `stackgroups`, `binwidth`, `binpositions`, `method` and
+`binaxis` options, and an expression in a mapping, such as `factor(cyl)` or `1`.

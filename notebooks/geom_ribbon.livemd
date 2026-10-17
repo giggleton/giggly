@@ -56,7 +56,7 @@ h +
 ```
 
 Not in Giggly yet: `geom_ribbon()`, mapping `ymin` and `ymax`, an expression in a mapping, such as
-`level - 1`, a fixed `fill`, and the `LakeHuron` dataset.
+`level - 1`, and the `LakeHuron` dataset.
 
 ## Groups at different x values
 
@@ -76,8 +76,7 @@ a + geom_point(size = 8) + facet_grid(g ~ .)
 
 `facet_grid(g ~ .)` gives each group a row of its own.
 
-Not in Giggly yet: `geom_area()`, mapping `fill`, the scale that maps it and the legend that reads
-it back, a fixed `size`, and `facet_grid()`.
+Not in Giggly yet: `geom_area()`, a fixed `size`, and `facet_grid()`.
 
 ## Aligned points
 
@@ -89,8 +88,8 @@ a + geom_point(stat = "align", position = "stack", size = 8)
 
 Points drawn with the areas' stat and position show the values `stat_align()` computes, stacked.
 
-Not in Giggly yet: `geom_area()`, mapping `fill`, the scale that maps it and the legend that reads
-it back, `stat_align()`, `geom_point()`'s `stat` and `position` options, and a fixed `size`.
+Not in Giggly yet: `geom_area()`, `stat_align()`, `geom_point()`'s `stat` and `position` options,
+and a fixed `size`.
 
 ## Areas without alignment
 
@@ -100,5 +99,4 @@ ggplot(df, aes(x, y, fill = g)) +
   geom_area(stat = "identity")
 ```
 
-Not in Giggly yet: `geom_area()` and its `stat` option, and mapping `fill`, the scale that maps it
-and the legend that reads it back.
+Not in Giggly yet: `geom_area()` and its `stat` option.

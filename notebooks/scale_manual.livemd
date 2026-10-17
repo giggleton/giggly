@@ -17,12 +17,12 @@ covers `scale_fill_manual()`, `scale_size_manual()`, `scale_shape_manual()`,
 first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what
 it is waiting for, so the page is also a list of what remains.
 
-A manual scale maps each value of a discrete column to an aesthetic value given by hand: a
-colour, a fill, a size, a shape, a line type, a line width or a transparency. Each function works
-on the aesthetic in its name, though `scale_colour_manual()` and `scale_fill_manual()` can serve
-colour and fill at once through their `aesthetics` argument; `scale_discrete_manual()` works on
-whatever aesthetics that argument names. Giggly has none of this yet: it has no aesthetic but `x`,
-`y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
+A manual scale maps each value of a discrete column to an aesthetic value given by hand: a colour, a
+fill, a size, a shape, a line type, a line width or a transparency. Each function works on the
+aesthetic in its name, though `scale_colour_manual()` and `scale_fill_manual()` can serve colour and
+fill at once through their `aesthetics` argument; `scale_discrete_manual()` works on whatever
+aesthetics that argument names. Giggly has none of this yet: it has no scale functions, and every
+column it maps to colour or fill goes through ggplot2's default scales.
 
 ## Colours by hand
 
@@ -34,8 +34,7 @@ p + scale_colour_manual(values = c("red", "blue", "green"))
 
 Unnamed values go to the column's values in order.
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_manual()` and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`.
 
 ## Colours named by value
 
@@ -48,8 +47,7 @@ p + scale_colour_manual(values = cols)
 Named values go to the column's values with those names, whatever order they are written in; a
 name the data lacks, here `"10"`, is unused.
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_manual()` and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`.
 
 ## Colour and fill at once
 
@@ -66,9 +64,8 @@ ggplot(
   )
 ```
 
-Not in Giggly yet: mapping `colour` and `fill`, an expression in a mapping, such as `factor(cyl)`, a
-fixed `shape` and `size`, `scale_colour_manual()` and its `aesthetics` option, and the legend that
-reads them back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, a fixed `shape` and `size`, a
+point's `fill`, and `scale_colour_manual()` and its `aesthetics` option.
 
 ## Breaks and labels
 
@@ -83,8 +80,8 @@ p + scale_colour_manual(
 )
 ```
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_manual()` and its `breaks` and `labels` options, and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `scale_colour_manual()` and
+its `breaks` and `labels` options.
 
 ## Limits
 
@@ -96,5 +93,5 @@ p + scale_colour_manual(values = cols, limits = c("4", "6", "8", "10"))
 
 A value outside `limits` is treated as missing.
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_manual()` and its `limits` option, and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`
+and its `limits` option.

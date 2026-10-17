@@ -34,8 +34,7 @@ ggplot(mpg, aes(class, hwy)) +
 
 `geom_jitter()` is a shortcut for `geom_point(position = "jitter")`.
 
-Not in Giggly yet: `geom_boxplot()`, a fixed `colour`, and `geom_jitter()`, points placed by
-`position_jitter()`.
+Not in Giggly yet: `geom_boxplot()` and `geom_jitter()`, points placed by `position_jitter()`.
 
 ## Too much jitter
 
@@ -75,5 +74,5 @@ ggplot(mtcars, aes(am, vs)) +
 With a `seed`, the position jitters both layers the same way, so each red point sits 0.2 above
 and to the right of its black one.
 
-Not in Giggly yet: `position_jitter()` and its `seed` option, `geom_point()`'s `position`
-option, a fixed `colour`, and an expression in a mapping, such as `am + 0.2`.
+Not in Giggly yet: `position_jitter()` and its `seed` option, `geom_point()`'s `position` option,
+and an expression in a mapping, such as `am + 0.2`.

@@ -15,12 +15,13 @@ This notebook follows the examples on ggplot2's reference page for
 and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
 waiting for, so the page is also a list of what remains.
 
-`scale_colour_hue()` maps each value of a discrete column to a hue evenly spaced around the
-colour wheel, all at one chroma and luminance. Its options choose the range of hues, the chroma
-and the luminance, where on the wheel to start and which way round to go, and the colour of
-missing values; the palettes it makes are not safe for readers with colour blindness.
-`scale_fill_hue()` does the same for fill. Giggly has none of this yet: it has no aesthetic but `x`,
-`y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
+`scale_colour_hue()` maps each value of a discrete column to a hue evenly spaced around the colour
+wheel, all at one chroma and luminance. Its options choose the range of hues, the chroma and the
+luminance, where on the wheel to start and which way round to go, and the colour of missing values;
+the palettes it makes are not safe for readers with colour blindness. `scale_fill_hue()` does the
+same for fill. Giggly colours a discrete column with these hues at ggplot2's defaults,
+`scale_colour_hue()`'s, a missing value in grey50, and reads them back with a legend, but it has no
+scale functions yet, so none of its options.
 
 ## A sample of diamonds
 
@@ -34,7 +35,8 @@ dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
 (d <- ggplot(dsamp, aes(carat, price)) + geom_point(aes(colour = clarity)))
 ```
 
-Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: choosing the order of a column's values (`clarity` is an ordered factor) and
+`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
 
 ## The legend's title
 
@@ -48,8 +50,7 @@ d + scale_colour_hue(expression(clarity[beta]))
 A scale's first argument titles its legend; `expression()` writes the title as R's plotmath,
 here with a subscript β.
 
-Not in Giggly yet: mapping `colour`, `scale_colour_hue()`, the legend that reads it back, and titles
-and labels, including R's `expression()` titles.
+Not in Giggly yet: `scale_colour_hue()`, and titles and labels, including R's `expression()` titles.
 
 ## Luminance and chroma
 
@@ -61,8 +62,7 @@ d + scale_colour_hue(l = 70, c = 150)
 d + scale_colour_hue(l = 80, c = 150)
 ```
 
-Not in Giggly yet: mapping `colour`, `scale_colour_hue()` and its `l` and `c` options, and the
-legend that reads it back.
+Not in Giggly yet: `scale_colour_hue()` and its `l` and `c` options.
 
 ## A range of hues
 
@@ -74,8 +74,7 @@ d + scale_colour_hue(h = c(180, 270))
 d + scale_colour_hue(h = c(270, 360))
 ```
 
-Not in Giggly yet: mapping `colour`, `scale_colour_hue()` and its `h` option, and the legend that
-reads it back.
+Not in Giggly yet: `scale_colour_hue()` and its `h` option.
 
 ## Transparency
 
@@ -88,7 +87,8 @@ d + geom_point(alpha = 0.5)
 d + geom_point(alpha = 0.2)
 ```
 
-Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: choosing the order of a column's values (`clarity` is an ordered factor) and
+`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
 
 ## Missing values
 
@@ -106,5 +106,5 @@ ggplot(mtcars, aes(mpg, wt)) +
   scale_colour_hue(na.value = "black")
 ```
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, here `miss`, a vector outside
-the data, `scale_colour_hue()` and its `na.value` option, and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, here `miss`, a vector outside the data, and
+`scale_colour_hue()` and its `na.value` option.

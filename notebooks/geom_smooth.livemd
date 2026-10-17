@@ -92,7 +92,7 @@ ggplot(mpg, aes(displ, hwy, colour = class)) +
 Mapping `colour` to `class` makes a group of each class, and a line is fitted to each.
 
 Not in Giggly yet: `geom_smooth()` with its `se` and `method` options and the linear models R's
-`lm()` fits, and mapping `colour`, the scale that maps it and the legend that reads it back.
+`lm()` fits.
 
 ## A smooth in each panel
 

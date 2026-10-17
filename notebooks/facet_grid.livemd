@@ -63,7 +63,7 @@ p +
   geom_point(data = df, colour = "red", size = 2)
 ```
 
-Not in Giggly yet: `facet_grid()`, a layer with data of its own, and a fixed `colour` and `size`.
+Not in Giggly yet: `facet_grid()`, a layer with data of its own, and a fixed `size`.
 
 ## Axes on every panel
 
@@ -96,8 +96,7 @@ mt + facet_grid(vars(cyl), scales = "free")
 
 `Giggly.Plot.facet_wrap/3` takes the same `scales` option.
 
-Not in Giggly yet: `facet_grid()`, mapping `colour` and the legend that reads it back, and an
-expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `facet_grid()` and an expression in a mapping, such as `factor(cyl)`.
 
 ## Free space
 

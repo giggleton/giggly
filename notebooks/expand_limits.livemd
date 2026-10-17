@@ -46,5 +46,4 @@ ggplot(mtcars, aes(mpg, wt)) +
   expand_limits(colour = factor(seq(2, 10, by = 2)))
 ```
 
-Not in Giggly yet: `expand_limits()`, mapping `colour` and the legend that reads it back, and an
-expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `expand_limits()` and an expression in a mapping, such as `factor(cyl)`.

@@ -88,5 +88,4 @@ ggplot(mtcars, aes(mpg, wt, colour = wt)) +
   facet_wrap(~ cyl)
 ```
 
-Not in Giggly yet: `geom_hline()`, mapping `yintercept`, mapping `colour`, the scale that maps it
-and the legend that reads it back, and a layer with data of its own.
+Not in Giggly yet: `geom_hline()`, mapping `yintercept`, and a layer with data of its own.

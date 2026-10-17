@@ -43,8 +43,8 @@ p + theme(
 )
 ```
 
-Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back,
-and changing the theme, here to draw the bottom axis's title, labels, line and ticks in red.
+Not in Giggly yet: changing the theme, here to draw the bottom axis's title, labels, line and ticks
+in red.
 
 ## The same with `theme_sub_axis_bottom()`
 
@@ -58,5 +58,4 @@ p + theme_sub_axis_bottom(
 )
 ```
 
-Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back,
-and `theme_sub_axis_bottom()`.
+Not in Giggly yet: `theme_sub_axis_bottom()`.

@@ -155,7 +155,7 @@ ggplot(mpg, aes(displ, hwy)) +
   facet_wrap(vars(class))
 ```
 
-Not in Giggly yet: a layer with data of its own, and a fixed `colour`.
+Not in Giggly yet: a layer with data of its own.
 
 ## Where the strips go
 

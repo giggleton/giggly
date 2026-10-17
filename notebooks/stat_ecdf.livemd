@@ -60,7 +60,7 @@ ggplot(df, aes(x, colour = g)) +
   stat_ecdf()
 ```
 
-Not in Giggly yet: `stat_ecdf()`, and mapping `colour` and the legend that reads it back.
+Not in Giggly yet: `stat_ecdf()`.
 
 ## A weighted ECDF
 
@@ -80,5 +80,5 @@ ggplot(plain, aes(x)) +
 `plain` repeats each `x` of `weighted` as many times as its weight, so the green weighted curve
 falls on the thick unweighted one.
 
-Not in Giggly yet: `stat_ecdf()`, with or without `weight`, a fixed `linewidth` and `colour`, and
-a layer with data of its own.
+Not in Giggly yet: `stat_ecdf()`, with or without `weight`, a fixed `linewidth`, and a layer with
+data of its own.

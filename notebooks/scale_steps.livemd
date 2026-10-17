@@ -20,8 +20,9 @@ The steps scales are the binned counterparts of the gradient scales: they cut a 
 into bins and give each bin one colour from a gradient. `scale_colour_steps()` runs from a low
 colour to a high one, `scale_colour_steps2()` diverges from a low colour through a middle one to a
 high one, around a midpoint, and `scale_colour_stepsn()` takes its colours from as many as it is
-given; the `fill` versions do the same for fill. Giggly has none of this yet: it has no aesthetic
-but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
+given; the `fill` versions do the same for fill. Giggly has none of this yet: it has no binned
+scales and no scale functions, and colours a continuous column with ggplot2's default gradient,
+unbinned.
 
 ## A binned gradient
 
@@ -41,7 +42,7 @@ ggplot(df, aes(x, y)) +
   scale_colour_steps()
 ```
 
-Not in Giggly yet: mapping `colour`, `scale_colour_steps()` and the legend that reads it back.
+Not in Giggly yet: `scale_colour_steps()`.
 
 ## A diverging binned gradient
 
@@ -52,7 +53,7 @@ ggplot(df, aes(x, y)) +
   scale_colour_steps2()
 ```
 
-Not in Giggly yet: mapping `colour`, `scale_colour_steps2()` and the legend that reads it back.
+Not in Giggly yet: `scale_colour_steps2()`.
 
 ## Colours of your own
 
@@ -63,5 +64,4 @@ ggplot(df, aes(x, y)) +
   scale_colour_stepsn(colours = terrain.colors(10))
 ```
 
-Not in Giggly yet: mapping `colour`, `scale_colour_stepsn()`, R's `terrain.colors()` palette and
-the legend that reads it back.
+Not in Giggly yet: `scale_colour_stepsn()` and R's `terrain.colors()` palette.

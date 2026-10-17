@@ -63,8 +63,7 @@ ggplot(economics_long, aes(date, value01, colour = variable)) +
   geom_line(key_glyph = "timeseries")
 ```
 
-Not in Giggly yet: `geom_line()`'s `key_glyph` option, mapping `colour`, the scale that maps it and
-the legend that reads it back, and the `economics_long` dataset.
+Not in Giggly yet: `geom_line()`'s `key_glyph` option and the `economics_long` dataset.
 
 ## A vertical time series
 
@@ -133,8 +132,7 @@ m + geom_path(aes(colour = as.numeric(date)))
 `geom_path()` joins the months in the order of the rows, which is the order of their dates, rather
 than in order of `x`.
 
-Not in Giggly yet: an expression in a mapping, such as `unemploy/pop` or `as.numeric(date)`, and
-mapping `colour`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `unemploy/pop` or `as.numeric(date)`.
 
 ## A fixed colour
 
@@ -144,7 +142,15 @@ ggplot(economics, aes(date, unemploy)) +
   geom_line(colour = "red")
 ```
 
-Not in Giggly yet: a fixed `colour`.
+`colour:` sets the colour of every line, as `colour =` does; `"red"` is the same colour in CSS as
+in R, `#FF0000`.
+
+```elixir
+economics
+|> Plot.new(%{x: :date, y: :unemploy})
+|> Plot.geom_line(colour: "red")
+|> render.()
+```
 
 ## Arrows
 
@@ -241,8 +247,7 @@ p + geom_line(aes(colour = x))
 The table holds two curves, `a` and `b`, told apart by `group`; `qlogis()` is the logistic
 distribution's quantile function.
 
-Not in Giggly yet: a fixed `linetype`, and mapping `colour`, the scale that maps it and the legend
-that reads it back.
+Not in Giggly yet: a fixed `linetype`.
 
 ## A line type that cannot vary
 
@@ -254,4 +259,4 @@ should_stop(p + geom_line(aes(colour = x), linetype=2))
 `should_stop()` checks that the code inside it fails, as it does here: a dashed line cannot change
 colour along its length, so ggplot2 stops with an error.
 
-Not in Giggly yet: a fixed `linetype`, and mapping `colour`.
+Not in Giggly yet: a fixed `linetype`.

@@ -56,8 +56,8 @@ ggplot(mpg, aes(class, hwy)) +
 `after_scale()` takes each box's colour once the scale has mapped `class` to it, and `alpha()`
 makes it translucent.
 
-Not in Giggly yet: box plots, `geom_boxplot()`, mapping `colour` and the legend that reads it
-back, and an expression in a mapping, such as `after_scale(alpha(colour, 0.4))`.
+Not in Giggly yet: box plots, `geom_boxplot()`, and an expression in a mapping, such as
+`after_scale(alpha(colour, 0.4))`.
 
 ## Changing a scaled fill
 
@@ -70,8 +70,8 @@ ggplot(mpg, aes(class, hwy)) +
 `stage()` maps `fill` from `class` at the start, and then makes the colour the scale gives it
 translucent.
 
-Not in Giggly yet: `geom_boxplot()`, mapping `fill` and the legend that reads it back, and an
-expression in a mapping, such as `stage(class, after_scale = alpha(fill, 0.4))`.
+Not in Giggly yet: `geom_boxplot()` and an expression in a mapping, such as `stage(class,
+after_scale = alpha(fill, 0.4))`.
 
 ## A proportional stacked density
 
@@ -92,9 +92,9 @@ ggplot(mpg, aes(cty)) +
 Each group's density is scaled by its share of all the cars, so the stacked densities add up to
 the density of all of them, which the second layer draws.
 
-Not in Giggly yet: densities, `geom_density()` and its `bw` option, stacking them with
-`position = "stack"`, which Giggly does for bars only, mapping `colour` and the legend that reads
-it back, and expressions in a mapping, such as `factor(cyl)`, `after_scale()` and `after_stat()`.
+Not in Giggly yet: densities, `geom_density()` and its `bw` option, stacking them with `position =
+"stack"`, which Giggly does for bars only, and expressions in a mapping, such as `factor(cyl)`,
+`after_scale()` and `after_stat()`.
 
 ## A ridgeline
 
@@ -114,9 +114,9 @@ ggplot(mpg, aes(cty, colour = factor(cyl))) +
 Each group's density, scaled to a peak of 1, rises from a baseline at its group's number, so the
 curves sit one above another.
 
-Not in Giggly yet: ribbons, `geom_ribbon()` and its `outline.type` option, `stat_density()`
-given to a geom as `stat = "density"`, mapping `colour` and the legend that reads it back, and
-expressions in a mapping, such as `factor(cyl)`, `after_scale()` and `after_stat()`.
+Not in Giggly yet: ribbons, `geom_ribbon()` and its `outline.type` option, `stat_density()` given to
+a geom as `stat = "density"`, and expressions in a mapping, such as `factor(cyl)`, `after_scale()`
+and `after_stat()`.
 
 ## Labelling bars with their counts
 

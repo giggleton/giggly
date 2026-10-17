@@ -34,9 +34,8 @@ b +
 Both layers draw a one-row table of their own, `df`, over the points of `mtcars`, and mapping
 `colour` to a constant names each layer in the legend.
 
-Not in Giggly yet: `geom_curve()` and `geom_segment()`, a layer with data of its own, mapping
-`xend`, `yend` and `colour`, an expression in a mapping, such as the constant `"curve"`, and the
-scale that maps the colour and the legend that reads it back.
+Not in Giggly yet: `geom_curve()` and `geom_segment()`, a layer with data of its own, mapping `xend`
+and `yend`, and an expression in a mapping, such as the constant `"curve"`.
 
 ## Curvature and arrows
 

@@ -16,14 +16,13 @@ in the order the page gives them. Each example shows ggplot2's code first and th
 example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
 page is also a list of what remains.
 
-The `size` aesthetic is mostly for points and text. `scale_size()` maps a continuous column to
-their area, since area is what readers perceive, while `scale_radius()` maps it to their radius.
+The `size` aesthetic is mostly for points and text. `scale_size()` maps a continuous column to their
+area, since area is what readers perceive, while `scale_radius()` maps it to their radius.
 `scale_size_area()` makes a value of 0 an area of 0. `scale_size_binned()` and
 `scale_size_binned_area()` are the binned counterparts of `scale_size()` and `scale_size_area()`,
-cutting the column into bins first. A line's width, once also set by `size`, is now the
-`linewidth` aesthetic. Giggly has none of this yet: every point it draws looks as ggplot2's
-default point does, and it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend
-but alpha's and no scale functions.
+cutting the column into bins first. A line's width, once also set by `size`, is now the `linewidth`
+aesthetic. Giggly has none of this yet: every point it draws looks as ggplot2's default point does,
+and it maps no `size` and has no scale functions.
 
 ## Size from a column
 

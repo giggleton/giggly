@@ -61,8 +61,8 @@ p + geom_point(aes(shape = factor(cyl)))
 p + geom_point(aes(size = qsec))
 ```
 
-Not in Giggly yet: mapping `colour`, `shape` or `size` to a column, the scales that map them,
-and the legends that read them back.
+Not in Giggly yet: mapping `shape` or `size` to a column, the scales that map them, and the legends
+that read them back.
 
 ## Setting an aesthetic to a fixed value
 
@@ -71,7 +71,7 @@ and the legends that read them back.
 ggplot(mtcars, aes(wt, mpg)) + geom_point(colour = "red", size = 3)
 ```
 
-Not in Giggly yet: a fixed `colour` and `size`.
+Not in Giggly yet: a fixed `size`.
 
 ## Transparency for large datasets
 
@@ -129,8 +129,8 @@ ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
   scale_fill_ordinal(guide = guide_legend(override.aes = list(shape = 21)))
 ```
 
-Not in Giggly yet: mapping `fill` and `shape` and the legends that read them back, and setting a
-scale by hand.
+Not in Giggly yet: mapping `shape` and the legend that reads it back, a point's `fill`, and setting
+a scale by hand.
 
 ## Layering points of different sizes
 
@@ -147,8 +147,7 @@ p +
   geom_point(aes(shape = factor(cyl)))
 ```
 
-Not in Giggly yet: mapping `shape` and `colour`, and a fixed `colour` and `size`. Several layers of
-points already work.
+Not in Giggly yet: mapping `shape` and a fixed `size`. Several layers of points already work.
 
 ## Missing values
 

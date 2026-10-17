@@ -63,8 +63,7 @@ ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
   xlim(55, 70)
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, mapping `colour` and `fill`, the scales
-that map them and the legends that read them back, and `xlim()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, and `xlim()`.
 
 ## Bounded data
 
@@ -77,7 +76,7 @@ ggplot(big_diamonds, aes(carat)) +
 ```
 
 The diamonds of a carat or more have no values below 1, which the red curve, knowing no bounds,
-smooths past. Not in Giggly yet: `geom_density()` and its `bounds` option and a fixed `colour`.
+smooths past. Not in Giggly yet: `geom_density()` and its `bounds` option.
 
 ## Stacked densities
 
@@ -93,8 +92,8 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "stack")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, mapping `fill`, the scale that maps it and
-the legend that reads it back, and an expression in a mapping, such as `after_stat(count)`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, and an expression in a mapping, such as
+`after_stat(count)`.
 
 ## Conditional densities
 
@@ -104,6 +103,5 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, `position_fill()`, mapping `fill`, the
-scale that maps it and the legend that reads it back, and an expression in a mapping, such as
-`after_stat(count)`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, `position_fill()`, and an expression in a
+mapping, such as `after_stat(count)`.

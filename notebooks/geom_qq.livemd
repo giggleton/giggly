@@ -77,6 +77,5 @@ ggplot(mtcars, aes(sample = mpg, colour = factor(cyl))) +
 Mapping `colour` to the number of cylinders splits the cars into groups, with points and a line
 for each.
 
-Not in Giggly yet: `stat_qq()` and `stat_qq_line()`, mapping `sample` and `colour`, the scale that
-maps the colour and the legend that reads it back, and an expression in a mapping, such as
-`factor(cyl)`.
+Not in Giggly yet: `stat_qq()` and `stat_qq_line()`, mapping `sample`, and an expression in a
+mapping, such as `factor(cyl)`.

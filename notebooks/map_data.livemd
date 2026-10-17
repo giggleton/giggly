@@ -40,8 +40,8 @@ ggplot(choro, aes(long, lat)) +
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, the `USArrests` dataset, `geom_polygon()`,
-mapping `fill`, the scale that maps it and the legend that reads it back, and `coord_map()`.
+Not in Giggly yet: map data from the `maps` package, the `USArrests` dataset, `geom_polygon()`, and
+`coord_map()`.
 
 ## Filling by a ratio
 
@@ -53,6 +53,5 @@ ggplot(choro, aes(long, lat)) +
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, the `USArrests` dataset, `geom_polygon()`,
-mapping `fill`, the scale that maps it and the legend that reads it back, an expression in a
-mapping, such as `assault / murder`, and `coord_map()`.
+Not in Giggly yet: map data from the `maps` package, the `USArrests` dataset, `geom_polygon()`, an
+expression in a mapping, such as `assault / murder`, and `coord_map()`.

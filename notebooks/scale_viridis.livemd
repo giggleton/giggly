@@ -16,13 +16,13 @@ covers `scale_fill_viridis_d()`, `scale_colour_viridis_c()`, `scale_fill_viridis
 Each example shows ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps
 its ggplot2 code and names what it is waiting for, so the page is also a list of what remains.
 
-The viridis scales colour with palettes from the viridisLite package, which change evenly to the
-eye in colour and in black and white, and are designed to be read by people with common forms of
-colour blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
+The viridis scales colour with palettes from the viridisLite package, which change evenly to the eye
+in colour and in black and white, and are designed to be read by people with common forms of colour
+blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
 continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
 palette, viridis by default, and the `fill` versions do the same for fill. Giggly has none of this
-yet: it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no
-scale functions.
+yet: it has no scale functions, and colours a discrete column with ggplot2's default hues and a
+continuous one with its default gradient, whatever its order.
 
 ## The default for ordered values
 
@@ -37,7 +37,8 @@ ggplot(dsamp, aes(carat, price)) +
   geom_point(aes(colour = clarity))
 ```
 
-Not in Giggly yet: mapping `colour`, the scale that maps it and the legend that reads it back.
+Not in Giggly yet: choosing the order of a column's values (`clarity` is an ordered factor) and
+`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
 
 ## Discrete values
 
@@ -52,8 +53,7 @@ txsamp <- subset(txhousing, city %in%
 d + scale_colour_viridis_d()
 ```
 
-Not in Giggly yet: the `txhousing` dataset, mapping `colour`, the scale that maps it,
-`scale_colour_viridis_d()` and the legend that reads it back.
+Not in Giggly yet: the `txhousing` dataset and `scale_colour_viridis_d()`.
 
 ## The legend's title
 
@@ -62,8 +62,7 @@ Not in Giggly yet: the `txhousing` dataset, mapping `colour`, the scale that map
 d + scale_colour_viridis_d("City\nCenter")
 ```
 
-Not in Giggly yet: the `txhousing` dataset, mapping `colour`, `scale_colour_viridis_d()`, the
-legend that reads it back, and titles and labels.
+Not in Giggly yet: the `txhousing` dataset, `scale_colour_viridis_d()`, and titles and labels.
 
 ## Other palettes
 
@@ -73,8 +72,7 @@ d + scale_colour_viridis_d(option = "plasma")
 d + scale_colour_viridis_d(option = "inferno")
 ```
 
-Not in Giggly yet: the `txhousing` dataset, mapping `colour`, `scale_colour_viridis_d()` and its
-`option`, and the legend that reads it back.
+Not in Giggly yet: the `txhousing` dataset, and `scale_colour_viridis_d()` and its `option`.
 
 ## Fill colours
 
@@ -89,8 +87,7 @@ p + scale_fill_viridis_d(direction = -1)
 ```
 
 Not in Giggly yet: the `txhousing` dataset, histograms (`geom_histogram()`) and the binning they
-count with (`stat_bin()`), mapping `fill`, `scale_fill_viridis_d()` and its `direction` option,
-and the legend that reads it back.
+count with (`stat_bin()`), and `scale_fill_viridis_d()` and its `direction` option.
 
 ## Continuous values
 
@@ -102,8 +99,8 @@ v + scale_fill_viridis_c()
 v + scale_fill_viridis_c(option = "plasma")
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, tiles (`geom_tile()`), mapping `fill`, the scale that
-maps it, `scale_fill_viridis_c()` and its `option`, and the legend that reads it back.
+Not in Giggly yet: the `faithfuld` dataset, tiles (`geom_tile()`), and `scale_fill_viridis_c()` and
+its `option`.
 
 ## Binned values
 
@@ -112,5 +109,4 @@ maps it, `scale_fill_viridis_c()` and its `option`, and the legend that reads it
 v + scale_fill_viridis_b()
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, mapping `fill`,
-`scale_fill_viridis_b()` and the legend that reads it back.
+Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_viridis_b()`.

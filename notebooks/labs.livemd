@@ -15,11 +15,11 @@ This notebook follows the examples on ggplot2's reference page for
 code first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names
 what it is waiting for, so the page is also a list of what remains.
 
-`labs()` sets the text of a plot's labels: the title of each axis or legend, named by its
-aesthetic, and the plot's title, subtitle, caption and tag. `xlab()`, `ylab()` and `ggtitle()` are
-older shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly
-has none of these yet: an axis is titled by the column mapped to it, or `count` for counted bars,
-alpha's legend by its column, and a plot has no title, subtitle, caption or tag.
+`labs()` sets the text of a plot's labels: the title of each axis or legend, named by its aesthetic,
+and the plot's title, subtitle, caption and tag. `xlab()`, `ylab()` and `ggtitle()` are older
+shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly has none
+of these yet: an axis is titled by the column mapped to it, or `count` for counted bars, a legend or
+colour bar by its column, and a plot has no title, subtitle, caption or tag.
 
 ## Renaming a legend or an axis
 
@@ -29,8 +29,8 @@ p + labs(colour = "Cylinders")
 p + labs(x = "New x label")
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and `labs()`. Giggly titles
-each axis by the column mapped to it, here `mpg` and `wt`.
+Not in Giggly yet: `labs()`. Giggly titles each axis by the column mapped to it, here `mpg` and
+`wt`.
 
 ## Labels by column
 
@@ -48,8 +48,7 @@ p + labs(dictionary = c(
 ))
 ```
 
-Not in Giggly yet: `labs()` and its `dictionary` option, and mapping `colour` and the legend that
-reads it back.
+Not in Giggly yet: `labs()` and its `dictionary` option.
 
 ## A title and subtitle
 
@@ -60,8 +59,7 @@ p + labs(title = "New plot title")
 p + labs(title = "New plot title", subtitle = "A subtitle")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's title and subtitle, and mapping `colour` and the
-legend that reads it back.
+Not in Giggly yet: `labs()`, here the plot's title and subtitle.
 
 ## A caption
 
@@ -71,8 +69,7 @@ legend that reads it back.
 p + labs(caption = "(based on data from ...)")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's caption, and mapping `colour` and the legend that
-reads it back.
+Not in Giggly yet: `labs()`, here the plot's caption.
 
 ## A tag
 
@@ -82,8 +79,7 @@ reads it back.
 p + labs(title = "title", tag = "A")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's title and tag, and mapping `colour` and the legend
-that reads it back.
+Not in Giggly yet: `labs()`, here the plot's title and tag.
 
 ## Removing a label
 
@@ -96,4 +92,4 @@ p +
 
 The second `labs()` removes the title the first one set.
 
-Not in Giggly yet: `labs()`, and mapping `colour` and the legend that reads it back.
+Not in Giggly yet: `labs()`.

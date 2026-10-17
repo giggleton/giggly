@@ -64,8 +64,7 @@ ggplot(values, aes(fill = value)) +
   expand_limits(positions)
 ```
 
-Not in Giggly yet: `geom_map()`, `expand_limits()`, and mapping `fill`, the scale that maps it
-and the legend that reads it back.
+Not in Giggly yet: `geom_map()` and `expand_limits()`.
 
 ## Limiting the y axis
 
@@ -77,8 +76,7 @@ ggplot(values, aes(fill = value)) +
 
 `ylim(0, 3)` sets the y axis to run from 0 to 3, a shorter range than the map's.
 
-Not in Giggly yet: `geom_map()`, `expand_limits()`, `ylim()`, and mapping `fill`, the scale that
-maps it and the legend that reads it back.
+Not in Giggly yet: `geom_map()`, `expand_limits()`, and `ylim()`.
 
 ## A real map
 
@@ -107,8 +105,8 @@ if (require(maps)) {
     expand_limits(x = states_map$long, y = states_map$lat)
 ```
 
-Not in Giggly yet: `geom_map()`, `expand_limits()`, mapping `fill`, the scale that maps it and the
-legend that reads it back, map data from the `maps` package, and the `USArrests` dataset.
+Not in Giggly yet: `geom_map()`, `expand_limits()`, map data from the `maps` package, and the
+`USArrests` dataset.
 
 ## A map projection
 
@@ -126,8 +124,8 @@ legend that reads it back, map data from the `maps` package, and the `USArrests`
     )
 ```
 
-Not in Giggly yet: `geom_map()`, `coord_sf()`, mapping `fill`, the scale that maps it and the
-legend that reads it back, map data from the `maps` package, and the `USArrests` dataset.
+Not in Giggly yet: `geom_map()`, `coord_sf()`, map data from the `maps` package, and the `USArrests`
+dataset.
 
 ## A map for each column
 
@@ -142,6 +140,5 @@ legend that reads it back, map data from the `maps` package, and the `USArrests`
 }
 ```
 
-Not in Giggly yet: `geom_map()`, `coord_sf()`, mapping `fill`, the scale that maps it and the
-legend that reads it back, map data from the `maps` package, and the `USArrests` dataset. The
-facets are in Giggly already, as `Giggly.Plot.facet_wrap/3`.
+Not in Giggly yet: `geom_map()`, `coord_sf()`, map data from the `maps` package, and the `USArrests`
+dataset. The facets are in Giggly already, as `Giggly.Plot.facet_wrap/3`.

@@ -50,8 +50,7 @@ Not in Giggly yet: `geom_density_2d()`, and the `faithful` dataset.
 v + geom_contour_filled()
 ```
 
-Not in Giggly yet: `geom_contour_filled()`, mapping `z`, mapping `fill`, the scale that maps it
-and the legend that reads it back, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour_filled()`, mapping `z`, and the `faithfuld` dataset.
 
 ## The number of contours
 
@@ -84,9 +83,8 @@ v + geom_contour(aes(colour = after_stat(level)))
 v + geom_contour(colour = "red")
 ```
 
-Not in Giggly yet: `geom_contour()`, mapping `z`, mapping `colour`, the scale that maps it and the
-legend that reads it back, an expression in a mapping, such as `after_stat(level)`, a fixed
-`colour`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour()`, mapping `z`, an expression in a mapping, such as
+`after_stat(level)`, and the `faithfuld` dataset.
 
 ## Contours over a raster
 
@@ -95,5 +93,4 @@ v + geom_raster(aes(fill = density)) +
   geom_contour(colour = "white")
 ```
 
-Not in Giggly yet: `geom_raster()`, mapping `fill`, the scale that maps it and the legend that
-reads it back, `geom_contour()`, mapping `z`, a fixed `colour`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_raster()`, `geom_contour()`, mapping `z`, and the `faithfuld` dataset.

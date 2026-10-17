@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,7 +31,9 @@ expression whose value is a plot draws it. Inside a function or a `for` loop not
 by itself, so a plot made there is drawn only by calling `print()` or `plot()` on it, which
 returns the plot invisibly. A Giggly plot is a value, and building it draws nothing:
 `Giggly.to_svg/2` draws it, returning an SVG document, which in Livebook `Kino.Image` shows below
-the cell.
+the cell. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, defines `render`,
+which draws a plot and makes it a `Kino.Image`, and binds `Giggly.Datasets.mpg/0`, ggplot2's
+`mpg`, to `mpg`, ggplot2's name for it.
 
 ## Plots made in a loop
 
@@ -47,5 +60,18 @@ for (colour in colours) {
 ```
 
 `print()` draws each plot in turn: `hwy` against `displ`, its points coloured by `class`, then by
-`drv`, then by `fl`. Not in Giggly yet: mapping `colour`, the scale that maps it and the legend
-that reads it back.
+`drv`, then by `fl`. A Giggly mapping names its column by value, so the loop's string names it as
+`.data[[colour]]` does, and `Kino.render/1` shows each drawing as the loop makes it, as `print()`
+draws each.
+
+```elixir
+colours = ["class", "drv", "fl"]
+
+Enum.each(colours, fn colour ->
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy, colour: colour})
+  |> Plot.geom_point()
+  |> render.()
+  |> Kino.render()
+end)
+```

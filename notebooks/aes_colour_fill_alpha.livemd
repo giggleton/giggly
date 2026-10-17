@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+economics = Giggly.Datasets.economics()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -16,11 +27,17 @@ example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiti
 page is also a list of what remains.
 
 `colour` and `fill` give a geom its colours, and `alpha` its opacity. `colour` draws lines and
-outlines: points, lines, and the borders of rectangles and polygons. `fill` colours the inside of
-an area: rectangles, polygons, and the point shapes 21 to 25. A colour is one of R's named
-colours, such as `"red"`, an RGB specification, `"#RRGGBB"`, which may add an alpha as
-`"#RRGGBBAA"`, or `NA`, for no colour at all; `alpha` runs from 0, transparent, to 1, opaque.
-Giggly has none of the three yet, mapped to a column or set to a value.
+outlines: points, lines, and the borders of rectangles and polygons. `fill` colours the inside of an
+area: rectangles, polygons, and the point shapes 21 to 25. A colour is one of R's named colours,
+such as `"red"`, an RGB specification, `"#RRGGBB"`, which may add an alpha as `"#RRGGBBAA"`, or
+`NA`, for no colour at all; `alpha` runs from 0, transparent, to 1, opaque. Giggly has all three,
+mapped to a column or set to a value, though no point that takes a fill yet, a set colour written as
+CSS writes one: a name, a hex colour, or `:none` for `NA`. Where R and CSS give a name different
+colours, as `"green"`, it is CSS's, and a name CSS lacks, as R's `"grey50"`, is written as its hex.
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds
+`Giggly.Datasets.economics/0`, ggplot2's `economics`, to `economics`, ggplot2's name for it.
 
 ## The default bars
 
@@ -47,8 +64,7 @@ p + geom_bar(colour = "red")
 p + geom_bar(fill = "white", colour = "red")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and a fixed `fill` and
-`colour`.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
 
 ## RGB colours, and none
 
@@ -59,8 +75,7 @@ p + geom_bar(fill = "#00abff")
 p + geom_bar(fill = NA, colour = "#00abff")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and a fixed `fill` and
-`colour`, here given as RGB specifications and `NA`.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
 
 ## Mapping fill to a discrete column
 
@@ -71,8 +86,7 @@ Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and a fixe
 ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) + geom_bar()
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `fill`, the
-discrete scale that maps it and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
 
 ## Mapping fill to a continuous column
 
@@ -83,8 +97,7 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
   geom_raster(aes(fill = density))
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_raster()`, mapping `fill`, the continuous scale
-that maps it and the legend that reads it back.
+Not in Giggly yet: the `faithfuld` dataset and `geom_raster()`.
 
 ## Geoms with colour only
 
@@ -98,7 +111,35 @@ p + geom_point()
 p + geom_point(colour = "red")
 ```
 
-Not in Giggly yet: a fixed `colour`.
+A line and points take `colour:`, and have no fill to set. A colour is named as CSS names it, and
+`"green"` is CSS's, `#008000`, darker than R's, `#00FF00`, so this line is darker than ggplot2's;
+`"red"` is `#FF0000` in both.
+
+```elixir
+p = Plot.new(economics, %{x: :date, y: :unemploy})
+
+p
+|> Plot.geom_line()
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_line(colour: "green")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point()
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(colour: "red")
+|> render.()
+```
 
 ## Transparency for overplotting
 
@@ -138,6 +179,5 @@ p + scale_fill_manual(values = alpha(c("blue", "red"), .3))
 The rectangles span each president's term, from the `presidential` table, coloured by party and
 as tall as the range of unemployment.
 
-Not in Giggly yet: the `presidential` dataset, `geom_rect()` as a layer with data of its own,
-mapping `fill` and the legend that reads it back, a fixed `ymin` and `ymax`, and
-`scale_fill_manual()` with colours made transparent by `alpha()`.
+Not in Giggly yet: the `presidential` dataset, `geom_rect()` as a layer with data of its own, a
+fixed `ymin` and `ymax`, and `scale_fill_manual()` with colours made transparent by `alpha()`.

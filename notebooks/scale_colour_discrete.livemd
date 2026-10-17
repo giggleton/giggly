@@ -17,9 +17,10 @@ and names what it is waiting for, so the page is also a list of what remains.
 
 `scale_colour_discrete()` and `scale_fill_discrete()` are the scales ggplot2 uses by default when a
 column of discrete values is mapped to `colour` or `fill`, giving each value its own colour from a
-palette. Their default palette is a setting of the theme. Giggly has none of them yet, nor the
-`colour` and `fill` aesthetics they map, and it draws every plot in ggplot2's default theme,
-`theme_gray()`, with no way to change one.
+palette. Their default palette is a setting of the theme. Giggly draws a discrete column mapped to
+`colour` or `fill` as `scale_colour_discrete()` does by default, in hues evenly spaced round the
+colour wheel with a legend, but has none of the functions yet, and draws every plot in ggplot2's
+default theme, `theme_gray()`, with no way to change one.
 
 ## A palette given to the scale
 
@@ -34,8 +35,7 @@ p <- ggplot(mpg, aes(displ, hwy, colour = class)) +
 p + scale_colour_discrete(palette = scales::pal_brewer(palette = "Dark2"))
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and
-`scale_colour_discrete()` and its `palette` option.
+Not in Giggly yet: `scale_colour_discrete()` and its `palette` option.
 
 ## A palette from the theme
 
@@ -44,8 +44,7 @@ Not in Giggly yet: mapping `colour` and the legend that reads it back, and
 p + theme(palette.colour.discrete = scales::pal_grey())
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme,
-here its `palette.colour.discrete` setting.
+Not in Giggly yet: changing the theme, here its `palette.colour.discrete` setting.
 
 ## A default for every plot
 
@@ -60,7 +59,7 @@ old <- update_theme(palette.colour.discrete = scales::pal_viridis())
 p
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme.
+Not in Giggly yet: changing the theme.
 
 ## Restoring the theme
 

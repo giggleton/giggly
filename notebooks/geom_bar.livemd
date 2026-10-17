@@ -97,9 +97,15 @@ mpg
 g + geom_bar(aes(fill = drv))
 ```
 
-Not in Giggly yet: mapping `fill`, the scale that maps it and the legend that reads it back.
-Bars at the same `x` already stack, one for each `group`, but drawn in one grey without borders,
-a stack looks like a single bar.
+Mapping `fill` to `drv` groups each class's cars by drive train and fills each drive train's bars
+in its hue, ggplot2's default for a discrete fill, with a legend of the three. The bars at each
+`x` stack, the first drive train's on top, so the stack reads down in the legend's order.
+
+```elixir
+plot
+|> Plot.geom_bar(%{fill: :drv})
+|> render.()
+```
 
 ## Reversing the stack
 
@@ -111,9 +117,9 @@ ggplot(mpg, aes(y = class)) +
  theme(legend.position = "top")
 ```
 
-Not in Giggly yet: mapping `fill`, `position_stack()` and its `reverse` option, and changing the
-theme, here to put the legend above the plot. Giggly names a position by an atom, `position:
-:stack`, which takes no options yet.
+Not in Giggly yet: `position_stack()` and its `reverse` option, and changing the theme, here to put
+the legend above the plot. Giggly names a position by an atom, `position: :stack`, which takes no
+options yet.
 
 ## Columns
 

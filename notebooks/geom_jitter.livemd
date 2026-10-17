@@ -68,8 +68,7 @@ Not in Giggly yet: `geom_jitter()` and the position it adds, `position_jitter()`
 p + geom_jitter(aes(colour = class))
 ```
 
-Not in Giggly yet: `geom_jitter()`, and mapping `colour`, the scale that maps it and the legend
-that reads it back.
+Not in Giggly yet: `geom_jitter()`.
 
 ## Less jitter
 

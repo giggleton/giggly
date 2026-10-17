@@ -33,8 +33,7 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
  geom_raster(aes(fill = density))
 ```
 
-Not in Giggly yet: `geom_raster()`, mapping `fill`, the scale that maps it and the legend that
-reads it back, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_raster()` and the `faithfuld` dataset.
 
 ## Interpolation
 
@@ -44,8 +43,7 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
  geom_raster(aes(fill = density), interpolate = TRUE)
 ```
 
-Not in Giggly yet: `geom_raster()` and its `interpolate` option, mapping `fill`, the scale that
-maps it and the legend that reads it back, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_raster()` and its `interpolate` option, and the `faithfuld` dataset.
 
 ## Tiles
 
@@ -61,8 +59,7 @@ ggplot(df, aes(x, y)) +
   geom_tile(aes(fill = z), colour = "grey50")
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `fill`, the scale that maps it and the legend that reads
-it back, and a fixed `colour`.
+Not in Giggly yet: `geom_tile()`.
 
 ## Tiles of different widths
 
@@ -74,8 +71,7 @@ ggplot(df, aes(x, y, width = w)) +
 The widths, `w`, are the gaps between 0, 4, 6, 8, 10 and 14, so the tiles centred on the `x`
 values meet edge to edge.
 
-Not in Giggly yet: `geom_tile()`, mapping `width` and `fill`, the scale that maps the fill and the
-legend that reads it back, and a fixed `colour`.
+Not in Giggly yet: `geom_tile()` and mapping `width`.
 
 ## Rectangles by their corners
 
@@ -84,9 +80,8 @@ ggplot(df, aes(xmin = x - w / 2, xmax = x + w / 2, ymin = y, ymax = y + 1)) +
   geom_rect(aes(fill = z), colour = "grey50")
 ```
 
-Not in Giggly yet: `geom_rect()`, mapping `xmin`, `xmax`, `ymin`, `ymax` and `fill`, expressions in
-a mapping, such as `x - w / 2`, the scale that maps the fill and the legend that reads it back, and
-a fixed `colour`.
+Not in Giggly yet: `geom_rect()`, mapping `xmin`, `xmax`, `ymin` and `ymax`, and expressions in a
+mapping, such as `x - w / 2`.
 
 ## Anchoring the cells
 
@@ -108,8 +103,7 @@ ggplot(df, aes(x, y, fill = z)) +
 By default each cell is centred on its `x` and `y`, as a tile is; `hjust` and `vjust` move the
 cells off centre.
 
-Not in Giggly yet: `geom_raster()` and its `hjust` and `vjust` options, and mapping `fill`, the
-scale that maps it and the legend that reads it back.
+Not in Giggly yet: `geom_raster()` and its `hjust` and `vjust` options.
 
 ## Points along a discrete axis
 
@@ -130,9 +124,8 @@ cars + stat_bin_2d(aes(fill = after_stat(count)), binwidth = c(3,1))
 cars + stat_bin_2d(aes(fill = after_stat(density)), binwidth = c(3,1))
 ```
 
-Not in Giggly yet: `stat_bin_2d()` and its `binwidth` option, mapping `fill`, expressions in a
-mapping, such as `factor(cyl)` and `after_stat(count)`, and the scale that maps the fill and the
-legend that reads it back.
+Not in Giggly yet: `stat_bin_2d()` and its `binwidth` option, expressions in a mapping, such as
+`factor(cyl)` and `after_stat(count)`.
 
 ## Densities as a raster
 
@@ -151,6 +144,5 @@ cars +
   )
 ```
 
-Not in Giggly yet: `stat_density()` drawn with `geom_raster()`, mapping `fill`, expressions in a
-mapping, such as `factor(cyl)` and `after_stat(density)`, and the scale that maps the fill and the
-legend that reads it back.
+Not in Giggly yet: `stat_density()` drawn with `geom_raster()`, expressions in a mapping, such as
+`factor(cyl)` and `after_stat(density)`.

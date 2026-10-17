@@ -96,7 +96,7 @@ d <- ggplot(diamonds, aes(carat, price)) +
 d
 ```
 
-Not in Giggly yet: `stat_bin_2d()` and a fixed `colour`.
+Not in Giggly yet: `stat_bin_2d()`.
 
 ## Zooming the histogram's scale
 
@@ -106,8 +106,7 @@ Not in Giggly yet: `stat_bin_2d()` and a fixed `colour`.
 d + scale_x_continuous(limits = c(0, 1))
 ```
 
-Not in Giggly yet: `stat_bin_2d()`, a fixed `colour`, and `scale_x_continuous()`, here setting the
-scale's limits.
+Not in Giggly yet: `stat_bin_2d()` and `scale_x_continuous()`, here setting the scale's limits.
 
 ## Zooming the histogram's coordinates
 
@@ -117,4 +116,4 @@ scale's limits.
 d + coord_cartesian(xlim = c(0, 1))
 ```
 
-Not in Giggly yet: `stat_bin_2d()`, a fixed `colour`, and `coord_cartesian()`'s `xlim` option.
+Not in Giggly yet: `stat_bin_2d()` and `coord_cartesian()`'s `xlim` option.

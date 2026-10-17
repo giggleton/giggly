@@ -44,8 +44,8 @@ p + geom_point(aes(colour = factor(cyl)), size = 4)
 p + geom_point(aes(shape = factor(cyl)), size = 4)
 ```
 
-Not in Giggly yet: mapping `colour` and `shape` and the legends that read them back, an
-expression in a mapping, such as `factor(cyl)`, and a fixed `size`.
+Not in Giggly yet: mapping `shape` and the legend that reads it back, an expression in a mapping,
+such as `factor(cyl)`, and a fixed `size`.
 
 ## Groups by fill
 
@@ -59,8 +59,7 @@ p + geom_bar(aes(fill = factor(vs)))
 
 Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and mapping `fill` and the
-legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
 
 ## Groups by linetype
 
@@ -121,4 +120,4 @@ p
 p + geom_line(aes(group = Subject), colour = "blue")
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, `geom_boxplot()`, and a fixed `colour`.
+Not in Giggly yet: the `Oxboys` dataset and `geom_boxplot()`.

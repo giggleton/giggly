@@ -54,9 +54,8 @@ p1 <- ggplot(mtcars2) +
 p1 + theme_gray() # the default
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and `labs()`, here the
-plot's title, subtitle, caption and tag and the titles of the axes and the legend. Giggly draws
-every plot in `theme_gray()` already.
+Not in Giggly yet: `labs()`, here the plot's title, subtitle, caption and tag and the titles of the
+axes and the legend. Giggly draws every plot in `theme_gray()` already.
 
 ## Other complete themes
 
@@ -70,9 +69,8 @@ p1 + theme_classic()
 p1 + theme_void()
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, and the themes
-`theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`, `theme_minimal()`,
-`theme_classic()` and `theme_void()`.
+Not in Giggly yet: `labs()`, and the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`,
+`theme_dark()`, `theme_minimal()`, `theme_classic()` and `theme_void()`.
 
 ## The default theme with panels
 
@@ -83,8 +81,7 @@ p2 <- p1 + facet_grid(vs ~ am)
 p2 + theme_gray() # the default
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, and
-`facet_grid()`.
+Not in Giggly yet: `labs()` and `facet_grid()`.
 
 ## Other complete themes with panels
 
@@ -98,6 +95,5 @@ p2 + theme_classic()
 p2 + theme_void()
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, `labs()`, `facet_grid()`,
-and the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`,
-`theme_minimal()`, `theme_classic()` and `theme_void()`.
+Not in Giggly yet: `labs()`, `facet_grid()`, and the themes `theme_bw()`, `theme_linedraw()`,
+`theme_light()`, `theme_dark()`, `theme_minimal()`, `theme_classic()` and `theme_void()`.

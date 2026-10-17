@@ -1341,9 +1341,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b); §4:
-  "The colour bar is drawn as ggplot2's gradient form", "R's exact colours come from the `color`
-  package's conversions", "A discrete scale carries its missing value"
+- 2026-10-17 — Draw colours in the notebooks (colour, step 4); §4: "Colour and fill is Phase 3's
+  fourth increment", "Colours are CSS's names and hex forms"
+- 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b)
+  (`5c1aabb`); §4: "The colour bar is drawn as ggplot2's gradient form", "R's exact colours come
+  from the `color` package's conversions", "A discrete scale carries its missing value"
 - 2026-10-17 — Draw guides through a protocol at Giggly.Guide (colour, step 3a) (`47df626`); §4:
   "The guide protocol sits at `Giggly.Guide`"
 - 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up)

@@ -19,9 +19,10 @@ is also a list of what remains.
 `scale_colour_continuous()` and `scale_fill_continuous()` are the scales ggplot2 uses by default
 when a column of numbers is mapped to `colour` or `fill`, blending smoothly through a palette;
 `scale_colour_binned()` and `scale_fill_binned()` cut the numbers into bins and give each bin one
-colour. Their default palette is a setting of the theme. Giggly has none of them yet, nor the
-`colour` and `fill` aesthetics they map, and it draws every plot in ggplot2's default theme,
-`theme_gray()`, with no way to change one.
+colour. Their default palette is a setting of the theme. Giggly draws a column of numbers mapped to
+`colour` or `fill` as `scale_colour_continuous()` does by default, along the gradient from `#132B43`
+to `#56B1F7` with a colour bar, but has none of the functions yet, no binned scales, and draws every
+plot in ggplot2's default theme, `theme_gray()`, with no way to change one.
 
 ## A palette given to the scale
 
@@ -34,8 +35,7 @@ p <- ggplot(mpg, aes(displ, hwy, colour = cty)) +
 p + scale_colour_continuous(palette = c("#FEE0D2", "#FC9272", "#DE2D26"))
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and
-`scale_colour_continuous()` and its `palette` option.
+Not in Giggly yet: `scale_colour_continuous()` and its `palette` option.
 
 ## A palette from the theme
 
@@ -44,8 +44,7 @@ Not in Giggly yet: mapping `colour` and the legend that reads it back, and
 p + theme(palette.colour.continuous = c("#DEEBF7", "#9ECAE1", "#3182BD"))
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme,
-here its `palette.colour.continuous` setting.
+Not in Giggly yet: changing the theme, here its `palette.colour.continuous` setting.
 
 ## A default for every plot
 
@@ -60,7 +59,7 @@ old <- update_theme(palette.colour.continuous = c("#E5F5E0", "#A1D99B", "#31A354
 p
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, and changing the theme.
+Not in Giggly yet: changing the theme.
 
 ## Binned colours
 
@@ -70,8 +69,7 @@ p + scale_colour_binned() +
   theme(palette.colour.continuous = c("#EFEDF5", "#BCBDDC", "#756BB1"))
 ```
 
-Not in Giggly yet: mapping `colour` and the legend that reads it back, `scale_colour_binned()`,
-and changing the theme.
+Not in Giggly yet: `scale_colour_binned()` and changing the theme.
 
 ## Restoring the theme
 

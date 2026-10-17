@@ -34,8 +34,7 @@ p + stat_manual()
 `stat_manual()` draws points by default, so this draws the points of `p` a second time, over
 the first.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and the
-legend that reads it back, and `stat_manual()`.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `stat_manual()`.
 
 ## A hull from a function
 
@@ -56,8 +55,8 @@ p + stat_manual(
 R's `chull()` finds the points on a group's convex hull, the outline that encloses them all, and
 the polygon joins them.
 
-Not in Giggly yet: `stat_manual()` and its `fun` option, polygons, `geom_polygon()`, and a fixed
-`fill`, besides what `p` waits for.
+Not in Giggly yet: `stat_manual()` and its `fun` option, polygons, and `geom_polygon()`, besides
+what `p` waits for.
 
 ## A hull from a quoted expression
 
@@ -75,8 +74,8 @@ p + stat_manual(
 
 `with()` evaluates the quoted expression among each group's columns.
 
-Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, `geom_polygon()`, and a fixed
-`fill`, besides what `p` waits for.
+Not in Giggly yet: `stat_manual()` and its `fun` and `args` options and `geom_polygon()`, besides
+what `p` waits for.
 
 ## Segments to the centre
 
@@ -147,4 +146,4 @@ and `geom_segment()`, besides what `p` waits for.
 ```
 
 Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, the `dplyr` package's verbs,
-`geom_polygon()`, and a fixed `fill`, besides what `p` waits for.
+and `geom_polygon()`, besides what `p` waits for.

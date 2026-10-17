@@ -15,14 +15,13 @@ This notebook follows the examples on ggplot2's reference page for
 first and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what
 it is waiting for, so the page is also a list of what remains.
 
-`scale_shape()` maps a discrete column to six shapes that are easy to tell apart, solid by
-default or hollow; a seventh value and any after it are not drawn, with a warning, and
+`scale_shape()` maps a discrete column to six shapes that are easy to tell apart, solid by default
+or hollow; a seventh value and any after it are not drawn, with a warning, and
 `scale_shape_manual()` gives shapes by hand. A continuous column can be mapped to shapes only
 through `scale_shape_binned()`, which cuts it into bins first, and since shapes have no order even
 that is not advised. A shape can be named by number or by name, and only shapes 21 to 25 take a
 fill. Giggly has none of this yet: every point it draws looks as ggplot2's default point does, a
-solid circle, and it has no aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but
-alpha's and no scale functions.
+solid circle, and it maps no `shape` and has no scale functions.
 
 ## A shape for each cut
 
@@ -76,4 +75,4 @@ gives each a panel of its own. Giggly has `facet_wrap()`: `facet_wrap(~shape)` i
 `Giggly.Plot.facet_wrap(plot, :shape)`.
 
 Not in Giggly yet: an expression in a mapping, here the constants `0`, mapping `shape`, a fixed
-`size` and `fill`, `scale_shape_identity()` and `theme_void()`.
+`size`, a point's `fill`, `scale_shape_identity()` and `theme_void()`.

@@ -63,7 +63,7 @@ Giggly yet: `geom_boxplot()` and its `varwidth` option.
 p + geom_boxplot(fill = "white", colour = "#3366FF")
 ```
 
-Not in Giggly yet: `geom_boxplot()`, and a fixed `fill` and `colour`.
+Not in Giggly yet: `geom_boxplot()`.
 
 ## Outliers of their own colour
 
@@ -91,8 +91,7 @@ Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, and `geom_ji
 p + geom_boxplot(aes(colour = drv))
 ```
 
-Not in Giggly yet: `geom_boxplot()`, mapping `colour`, the scale that maps it and the legend that
-reads it back, and `position_dodge2()`, which sets the boxes side by side.
+Not in Giggly yet: `geom_boxplot()` and `position_dodge2()`, which sets the boxes side by side.
 
 ## A continuous x
 
@@ -141,6 +140,6 @@ ggplot(df, aes(x)) +
  )
 ```
 
-R draws 100 random numbers and puts their five numbers in a table of one row, which
-`stat = "identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `ymin`,
-`lower`, `middle`, `upper` and `ymax`, and choosing a layer's stat, here `stat = "identity"`.
+R draws 100 random numbers and puts their five numbers in a table of one row, which `stat =
+"identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `ymin`, `lower`,
+`middle`, `upper` and `ymax`, and choosing a layer's stat, here `stat = "identity"`.

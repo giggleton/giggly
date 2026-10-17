@@ -34,7 +34,7 @@ ggplot(data.frame(x = rnorm(100)), aes(x)) +
 R draws the data at random from the standard normal distribution, and the curve is that
 distribution's density, `dnorm`.
 
-Not in Giggly yet: `geom_density()`, `geom_function()` and a fixed `colour`.
+Not in Giggly yet: `geom_density()` and `geom_function()`.
 
 ## A function without data
 
@@ -80,8 +80,7 @@ Not in Giggly yet: `stat_function()` and its `geom` and `n` options, and `xlim()
 base + stat_function(fun = dnorm, geom = "polygon", color = "blue", fill = "blue", alpha = 0.5)
 ```
 
-Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, a fixed `colour` and
-`fill`, and `xlim()`.
+Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, and `xlim()`.
 
 ## Fewer points on the line
 
@@ -102,9 +101,8 @@ base +
 
 Each layer maps `colour` to a constant, so the legend names each curve.
 
-Not in Giggly yet: `geom_function()` and its `args` option, `xlim()`, an expression in a mapping,
-here the constants `"normal"` and `"t, df = 1"`, and mapping `colour`, the scale that maps it and
-the legend that reads it back.
+Not in Giggly yet: `geom_function()` and its `args` option, `xlim()`, and an expression in a
+mapping, here the constants `"normal"` and `"t, df = 1"`.
 
 ## A function of your own
 
@@ -139,5 +137,4 @@ geom_function(fun = dnorm, colour = "red", xlim=c(-7, 7))
 A layer's `xlim` sets the range the function is evaluated over, narrower or wider than the
 data's.
 
-Not in Giggly yet: `geom_density()`, `geom_function()` and its `xlim` option, and a fixed
-`colour`.
+Not in Giggly yet: `geom_density()`, and `geom_function()` and its `xlim` option.

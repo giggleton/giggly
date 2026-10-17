@@ -67,8 +67,8 @@ Not in Giggly yet: an expression in a mapping, such as `mpg ^ 2` or `wt / cyl`.
 aes(x = 1, colour = "smooth")
 ```
 
-Not in Giggly yet: an expression in a mapping, here the constants `1` and `"smooth"`, and mapping
-`colour`. A string in a Giggly mapping names a column, as an atom does.
+Not in Giggly yet: an expression in a mapping, here the constants `1` and `"smooth"`. A string in a
+Giggly mapping names a column, as an atom does.
 
 ## Standard names
 
@@ -82,7 +82,7 @@ aes(colour = x)
 
 ggplot2 rewrites each of these names to `colour`. Giggly takes `colour` and `color` as two
 spellings of one aesthetic, and refuses a mapping that gives both; it does not translate `col` and
-`fg`, names from R's base graphics. Not in Giggly yet: mapping `colour`.
+`fg`, names from R's base graphics.
 
 ## The plot's mapping or a layer's
 

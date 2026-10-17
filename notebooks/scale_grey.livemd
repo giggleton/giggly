@@ -16,10 +16,10 @@ and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and 
 waiting for, so the page is also a list of what remains.
 
 `scale_colour_grey()` maps a discrete column to evenly spaced shades of grey, the black-and-white
-counterpart of `scale_colour_gradient()`. Its `start` and `end` give the first shade and the
-last, from black at 0 to white at 1, and a missing value is drawn red unless `na.value` says
-otherwise. `scale_fill_grey()` does the same for fill. Giggly has none of this yet: it has no
-aesthetic but `x`, `y`, `group`, `weight` and `alpha`, no legend but alpha's and no scale functions.
+counterpart of `scale_colour_gradient()`. Its `start` and `end` give the first shade and the last,
+from black at 0 to white at 1, and a missing value is drawn red unless `na.value` says otherwise.
+`scale_fill_grey()` does the same for fill. Giggly has none of this yet: it has no scale functions,
+and colours a discrete column with ggplot2's default hues, `scale_colour_hue()`'s.
 
 ## Shades of grey
 
@@ -31,8 +31,8 @@ p + scale_colour_grey(end = 0)
 
 With `end = 0` the shades run from dark grey to black, rather than to light grey.
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_grey()` and its `end` option, and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_grey()` and
+its `end` option.
 
 ## A white background
 
@@ -41,9 +41,9 @@ Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor
 p + scale_colour_grey() + theme_bw()
 ```
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_grey()`, the legend that reads it back, and `theme_bw()`. Every Giggly plot is drawn
-in ggplot2's default theme, `theme_gray()`, with its grey panel.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `scale_colour_grey()`, and
+`theme_bw()`. Every Giggly plot is drawn in ggplot2's default theme, `theme_gray()`, with its grey
+panel.
 
 ## Missing values
 
@@ -61,5 +61,5 @@ ggplot(mtcars, aes(mpg, wt)) +
   scale_colour_grey(na.value = "green")
 ```
 
-Not in Giggly yet: mapping `colour`, an expression in a mapping, here `miss`, a vector outside
-the data, `scale_colour_grey()` and its `na.value` option, and the legend that reads it back.
+Not in Giggly yet: an expression in a mapping, here `miss`, a vector outside the data, and
+`scale_colour_grey()` and its `na.value` option.

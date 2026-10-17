@@ -100,8 +100,7 @@ p + geom_violin(aes(fill = factor(am)))
 Mapping `fill` to something discrete that varies within each `x`, as `factor(vs)` does, splits a
 violin into one for each value, dodged side by side.
 
-Not in Giggly yet: `geom_violin()`, mapping `fill`, the scales that map it and the legends that
-read it back, and expressions in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and expressions in a mapping, such as `factor(cyl)`.
 
 ## A fixed fill and colour
 
@@ -110,8 +109,7 @@ read it back, and expressions in a mapping, such as `factor(cyl)`.
 p + geom_violin(fill = "grey80", colour = "#3366FF")
 ```
 
-Not in Giggly yet: `geom_violin()`, a fixed `fill` and `colour`, and an expression in a mapping,
-such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and an expression in a mapping, such as `factor(cyl)`.
 
 ## Quartiles
 

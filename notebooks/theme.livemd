@@ -141,9 +141,8 @@ p2 <- ggplot(mtcars, aes(wt, mpg)) +
 p2
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
-`shape` and the legends that read them back, and `labs()`, here the titles of the axes and the
-legends.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
+that reads it back, and `labs()`, here the titles of the axes and the legends.
 
 ## Where the legends go
 
@@ -154,9 +153,8 @@ p2 + theme(legend.justification = "top")
 p2 + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
-`shape` and the legends that read them back, `labs()`, and changing the theme, here where the
-legends go.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
+that reads it back, `labs()`, and changing the theme, here where the legends go.
 
 ## Legends inside the panel
 
@@ -172,9 +170,8 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
-`shape` and the legends that read them back, `labs()`, and changing the theme, here placing the
-legends inside the panel.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
+that reads it back, `labs()`, and changing the theme, here placing the legends inside the panel.
 
 ## A box around the legends
 
@@ -187,9 +184,9 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
-`shape` and the legends that read them back, `labs()`, and changing the theme, here the box
-around the legends and its margin.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
+that reads it back, `labs()`, and changing the theme, here the box around the legends and its
+margin.
 
 ## Legend keys, text and titles
 
@@ -201,9 +198,8 @@ p2 + theme(legend.text = element_text(size = 8, colour = "red"))
 p2 + theme(legend.title = element_text(face = "bold"))
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `colour` and
-`shape` and the legends that read them back, `labs()`, and changing the theme, here the legends'
-keys, text and titles.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
+that reads it back, `labs()`, and changing the theme, here the legends' keys, text and titles.
 
 ## Strips
 
@@ -273,5 +269,5 @@ p4 + aes(colour = drat) +
   theme(palette.colour.continuous = c("white", "pink", "hotpink"))
 ```
 
-Not in Giggly yet: `annotate()`, mapping `colour` and the legend that reads it back, and changing
-the theme, here the palette a continuous `colour` scale draws from.
+Not in Giggly yet: `annotate()` and changing the theme, here the palette a continuous `colour` scale
+draws from.
