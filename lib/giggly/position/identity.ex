@@ -11,6 +11,10 @@ defmodule Giggly.Position.Identity do
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
 
+    # The identity reads no aesthetics of its own.
+    @impl Giggly.Position
+    def default_aesthetics(_position), do: %{}
+
     @impl Giggly.Position
     def compute_layer(_position, frame), do: frame
   end

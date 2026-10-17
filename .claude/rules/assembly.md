@@ -25,10 +25,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet assigns
   `panel` to the raw data → each layer's mapping is evaluated → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
-  stat → `after_stat` → geom reparameterize (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → position →
-  reset and retrain position scales → freeze view scales → map positions again → train
-  non-position scales → build guides → map non-position scales → `after_scale` → fixed values
-  last. A stage arrives with its increment and goes where this order puts it.
+  stat → `after_stat` → geom reparameterize (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → the
+  position's aesthetics into every row → position → reset and retrain position scales → freeze
+  view scales → map positions again → train non-position scales → build guides → map
+  non-position scales → `after_scale` → fixed values last. A stage arrives with its increment
+  and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly calls the families' build functions, never their drawing ones**: the facet's,
@@ -44,6 +45,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **After the stat, each aesthetic the layer leaves unmapped takes the computed column its stat
   names for it** (`Stat.default_mapping/1`), as ggplot2's `map_statistic()` evaluates a stat's
   `after_stat()` defaults: counting's count goes into y.
+- **Just before a layer's position runs, each aesthetic the position reads goes into every
+  row**: the value the layer sets, or else the position's default
+  (`Position.default_aesthetics/1`), as ggplot2's `Position$use_defaults()`, so every text layer's
+  table carries `nudge_x` and `nudge_y`, 0 when unset, as R's `layer_data()` does. **No layer maps
+  one yet, so a column the plot's mapping carried in under its name is replaced** and moves nothing
+  (design-log §4, the entry beginning "A position declares the aesthetics it reads").
 - **The position scales are reset and trained again after the position**, on every layer's
   x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
   `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels

@@ -308,6 +308,20 @@ defmodule Giggly.AssemblyTest do
                {["Mazda RX4", "Datsun 710"], [-1, -1], [-1, -1]}
     end
 
+    # Steve's choice, where ggplot2 4.0.3 nudges each label by its row's `nudge_x`: no layer maps a
+    # nudge yet, so one the plot maps rides into a text layer and is replaced by the default, 0.
+    test "a nudge the plot maps rides into a text layer and moves nothing" do
+      [frame] =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "name" => ["a", "b"], "shift" => [0.5, -0.5]}
+        |> Plot.new(%{x: :x, y: :y, label: :name, nudge_x: :shift})
+        |> Plot.geom_text()
+        |> Assembly.run()
+        |> Map.fetch!(:layer_data)
+
+      assert {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :nudge_x)} ===
+               {[1.0, 2.0], [+0.0, +0.0]}
+    end
+
     # ggplot2 also draws the points in the fill legend, its point knowing `fill`; Giggly's points
     # take no fill until they draw the shapes it fills.
     test "a layer draws in a legend only for the aesthetics it can use" do

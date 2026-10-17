@@ -600,7 +600,7 @@ defmodule Giggly.PlotTest do
   describe "geom_text/3" do
     @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
 
-    test "a text layer records its geom, not checking overlap, the identity stat and position" do
+    test "a text layer records its geom, not checking overlap, the identity stat and nudging" do
       plot =
         @cars
         |> Plot.new(%{x: :wt, y: :mpg})
@@ -610,7 +610,7 @@ defmodule Giggly.PlotTest do
                %Plot.Layer{
                  geom: %Geom.Text{check_overlap: false},
                  stat: %Stat.Identity{},
-                 position: %Position.Identity{},
+                 position: %Position.Nudge{},
                  mapping: %{label: "model"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :label, :x, :y]
@@ -630,7 +630,9 @@ defmodule Giggly.PlotTest do
           vjust: 1,
           family: "Times New Roman",
           colour: "red",
-          alpha: 0.5
+          alpha: 0.5,
+          nudge_x: 0.1,
+          nudge_y: -1
         )
 
       assert [
@@ -643,7 +645,9 @@ defmodule Giggly.PlotTest do
                    vjust: 1.0,
                    family: "Times New Roman",
                    color: "#FF0000",
-                   alpha: 0.5
+                   alpha: 0.5,
+                   nudge_x: 0.1,
+                   nudge_y: -1.0
                  }
                }
              ] = plot.reversed_layers
@@ -682,7 +686,7 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":fill"
     end
 
-    test "a size below 0, an angle or a justification that is not a number or a word is refused" do
+    test "a size below 0, or an angle, justification or nudge of the wrong kind, is refused" do
       plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
 
       for {key, value} <- [
@@ -691,7 +695,9 @@ defmodule Giggly.PlotTest do
             angle: "45",
             hjust: :sideways,
             vjust: "top",
-            family: :serif
+            family: :serif,
+            nudge_x: "0.1",
+            nudge_y: :down
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->

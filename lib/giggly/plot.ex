@@ -261,7 +261,19 @@ defmodule Giggly.Plot do
                          "of the panel by where it falls"
 
   # The options that set an aesthetic rather than choose how a layer is drawn.
-  @fixed_aesthetics [:alpha, :color, :fill, :linewidth, :size, :angle, :hjust, :vjust, :family]
+  @fixed_aesthetics [
+    :alpha,
+    :color,
+    :fill,
+    :linewidth,
+    :size,
+    :angle,
+    :hjust,
+    :vjust,
+    :family,
+    :nudge_x,
+    :nudge_y
+  ]
 
   # `geom_point/3`'s options, validated at the call.
   @point_options NimbleOptions.new!(alpha: @alpha_option, color: @point_color_option)
@@ -346,6 +358,18 @@ defmodule Giggly.Plot do
                       "The font every label is drawn in, by name, such as " <>
                         "`\"Times New Roman\"`; the default sans-serif when not given. A label " <>
                         "is measured as the default font measures it, and drawn at that width."
+                  ],
+                  nudge_x: [
+                    type: {:custom, __MODULE__, :validate_nudge, []},
+                    doc:
+                      "How far every label moves along x from its place, in the units of the " <>
+                        "x axis, as ggplot2's `nudge_x = 0.1` moves it; 0 when not given."
+                  ],
+                  nudge_y: [
+                    type: {:custom, __MODULE__, :validate_nudge, []},
+                    doc:
+                      "How far every label moves along y from its place, in the units of the " <>
+                        "y axis; 0 when not given."
                   ]
                 )
 
@@ -681,6 +705,10 @@ defmodule Giggly.Plot do
   ggplot2's never does. A mapping, a map, and options, a keyword list, may each be given alone or
   both together.
 
+  Each label is moved from its place by `nudge_x:` and `nudge_y:`, in the units of each axis, as
+  ggplot2's text is nudged, and the axes reach the labels where they are drawn. The layer's table
+  says how far every row moved, as `nudge_x` and `nudge_y`, 0 when not given, as ggplot2's does.
+
   ## Options
 
   #{NimbleOptions.docs(@text_options)}
@@ -705,6 +733,16 @@ defmodule Giggly.Plot do
       ...>   |> IO.iodata_to_binary()
       iex> {svg =~ ">21</text>", svg =~ ">1e+05</text>"}
       {true, true}
+
+  Nudged labels sit off the points they name:
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 3.0], "y" => [1.0, 4.0, 2.0], "name" => ["a", "b", "c"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, label: :name})
+      ...>   |> Giggly.Plot.geom_text(nudge_x: 0.1, nudge_y: -0.2)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :y)}
+      {[1.1, 2.1, 3.1], [0.8, 3.8, 1.8]}
   """
   @spec geom_text(t(), mapping_argument() | keyword(), keyword()) :: t()
   def geom_text(plot, mapping_or_options \\ %{}, options \\ [])
@@ -719,7 +757,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)},
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: %Position.Nudge{},
       mapping: resolve(mapping, plot.data, "Plot.geom_text/3"),
       fixed: fixed(validated),
       accepted: Geom.Text.accepted_aesthetics()
@@ -917,6 +955,15 @@ defmodule Giggly.Plot do
   @spec validate_angle(term()) :: {:ok, float()} | {:error, String.t()}
   def validate_angle(angle) when is_number(angle), do: {:ok, angle / 1}
   def validate_angle(angle), do: {:error, "expected a number of degrees, got: #{inspect(angle)}"}
+
+  # NimbleOptions' check of a `nudge_x:` or `nudge_y:` option: any distance along its axis, kept as
+  # a float, as R keeps one.
+  @doc false
+  @spec validate_nudge(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_nudge(distance) when is_number(distance), do: {:ok, distance / 1}
+
+  def validate_nudge(distance),
+    do: {:error, "expected a distance along the axis, a number, got: #{inspect(distance)}"}
 
   # NimbleOptions' check of an `hjust:` or `vjust:` option: a number, kept as a float, as R keeps one
   # and grid takes any, or one of ggplot2's words, as an atom.

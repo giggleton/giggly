@@ -2,6 +2,7 @@
 paths:
   - "lib/giggly/position.ex"
   - "lib/giggly/position/**"
+  - "test/giggly/position_test.exs"
 ---
 
 # Positions
@@ -35,6 +36,15 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
   bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged
   positions come out doubles, as R's are, so a discrete axis's column stays one type.
+- **A position declares the aesthetics it reads, each with its default
+  (`default_aesthetics/1`)**, as ggplot2's position declares its `default_aes`, and reads them
+  from columns the assembly has put into every row before it runs (design-log §4, the entry
+  beginning "A position declares the aesthetics it reads"); a position reading none declares an
+  empty map.
+- **Nudging is ggplot2's `position_nudge()`, `x = NULL`, `y = NULL`**, the text geom's default
+  position, as in ggplot2 4.0: every column in the x family moves by its row's `nudge_x` and every
+  one in the y family by its `nudge_y`, both 0 by default; a position comes out a double, as R's
+  do, and a missing one stays missing.
 - **A position reads a layer's orientation from its `flipped_aes` column**, written by the stat or
   the geom, and moves horizontal bars along y, flipped and flipped back, as ggplot2's positions
   read `flipped_aes`; without the column, bars are vertical.

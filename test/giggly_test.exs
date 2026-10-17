@@ -739,6 +739,57 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17 significant
+  # digits. It moves with `position_nudge()` and the aesthetics it reads.
+  describe "layer_data/2, nudged text" do
+    @points %{"x" => [1, 2, 3], "y" => [1, 4, 2], "name" => ["a", "b", "c"]}
+
+    # R's columns in R's order, but the geom's defaults (colour, family, angle...), which Giggly's
+    # tables do not carry yet.
+    test "a text layer's table says how far each row moved, 0 when nothing sets it" do
+      frame =
+        @points
+        |> Plot.new(%{x: :x, y: :y, label: :name})
+        |> Plot.geom_text(size: 5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) === [
+               :x,
+               :y,
+               :label,
+               :panel,
+               :group,
+               :nudge_x,
+               :nudge_y,
+               :size
+             ]
+
+      assert Enum.map([:x, :y, :nudge_x, :nudge_y], fn name -> DataFrame.pull(frame, name) end) ===
+               [[1.0, 2.0, 3.0], [1.0, 4.0, 2.0], [+0.0, +0.0, +0.0], [+0.0, +0.0, +0.0]]
+    end
+
+    test "a row missing its x stays missing, and an axis nothing nudges keeps its places" do
+      frame =
+        %{"x" => [1.0, nil, 3.0], "y" => [1.0, 4.0, 2.0], "name" => ["a", "b", "c"]}
+        |> Plot.new(%{x: :x, y: :y, label: :name})
+        |> Plot.geom_text(nudge_x: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1.5, nil, 3.5], [1.0, 4.0, 2.0]}
+    end
+
+    test "a date is nudged by days" do
+      frame =
+        %{"day" => [~D[2020-01-01], ~D[2020-01-05]], "y" => [1.0, 2.0], "name" => ["a", "b"]}
+        |> Plot.new(%{x: :day, y: :y, label: :name})
+        |> Plot.geom_text(nudge_x: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) === [18_263.0, 18_267.0]
+    end
+  end
+
   describe "the guides' titles" do
     test "an axis no layer maps is titled by the column a stat puts into it" do
       assembly =
@@ -807,6 +858,32 @@ defmodule GigglyTest do
         |> Giggly.panel_scales()
 
       assert scales.x.range === {-0.80000000000000004, 2.7999999999999998}
+    end
+
+    # Golden: ggplot2 4.0.3's x and y scale ranges in R 4.6.1 for the same plot, printed to 17
+    # significant digits.
+    test "an axis is trained on its nudged labels, not on the places they were nudged from" do
+      scales =
+        %{"x" => [1.0, 2.0, 3.0], "y" => [1.0, 4.0, 2.0], "name" => ["a", "b", "c"]}
+        |> Plot.new(%{x: :x, y: :y, label: :name})
+        |> Plot.geom_text(nudge_x: 0.1, nudge_y: -0.2)
+        |> Giggly.panel_scales()
+
+      assert {scales.x.range, scales.y.range} ===
+               {{1.1000000000000001, 3.1000000000000001},
+                {0.80000000000000004, 3.79999999999999982}}
+    end
+
+    # Golden: ggplot2 4.0.3's y scale in R 4.6.1 for the same plot: its limits and its continuous
+    # range.
+    test "a discrete axis widens its continuous range to its nudged labels" do
+      scales =
+        %{"x" => [1.0, 3.0, 2.0, 5.0], "y" => ["a", "c", "d", "c"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_text(%{label: :y}, nudge_y: 1)
+        |> Giggly.panel_scales()
+
+      assert {scales.y.levels, scales.y.continuous_range} === {["a", "c", "d"], {2.0, 4.0}}
     end
 
     test "an axis's scale is trained on every layer's column on that axis" do
@@ -1569,6 +1646,23 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/text_inward.svg")
+    end
+
+    # Golden: test/golden/text_nudge.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/text_nudge.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. position_nudge()'s "Or, in brief" example: points
+    # on a discrete y axis, each labelled with its level a tenth of a level below it. It moves with
+    # what moves test/golden/text.svg, and with how a label is nudged.
+    test "text nudged down on a discrete axis sits a tenth of a level below its point" do
+      svg =
+        %{"x" => [1.0, 3.0, 2.0, 5.0], "y" => ["a", "c", "d", "c"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_text(%{label: :y}, nudge_y: -0.1)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/text_nudge.svg")
     end
 
     test "a label's &, < and > are escaped, so a level cannot break the document" do

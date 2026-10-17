@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A position declares the aesthetics it reads, with their defaults, and the assembly writes them
+  into every row just before the position runs, as ggplot2 4.0's `Position$use_defaults()`
+  (2026-10-17, Steve).** Nudging reads `nudge_x` and `nudge_y`, which `geom_text/3` sets; the
+  stage writes the layer's value or else the default, 0, so every text layer's table carries both,
+  as R's `layer_data()` does, though no geom's defaults are written yet. No layer maps a nudge yet,
+  so a nudge the plot maps, carried into a text layer, is replaced and moves nothing. *Rejected:
+  writing only a set nudge*, the position reading 0 where the column is absent, which keeps tables
+  free of defaults but differs from R's and gives the position a missing-column case; *writing only
+  where no column exists*, as R does, which lets a plot's nudge mapping move each label while a
+  layer's own is refused: half of a deferred feature, with no check of the column's type.
+
 - **An aesthetic a layer takes from the plot and cannot use rides along unused, as ggplot2 carries
   one (2026-10-17, Steve, settling §7's question as the second geom drawn beside points arrived).**
   A layer's own mapping is checked against what it accepts; the plot's reaches every layer, so a
@@ -1388,10 +1399,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-17 — Draw labels with geom_text (text and titles, step 1); §4: "Text and titles is
-  Phase 3's fifth increment", "An aesthetic a layer takes from the plot"
-- 2026-10-17 — Draw colours in the notebooks (colour, step 4); §4: "Colour and fill is Phase 3's
-  fourth increment", "Colours are CSS's names and hex forms"
+- 2026-10-17 — Nudge labels with nudge_x and nudge_y (text and titles, step 2); §4: "A position
+  declares the aesthetics it reads"
+- 2026-10-17 — Draw labels with geom_text (text and titles, step 1) (`91fe040`); §4: "Text and
+  titles is Phase 3's fifth increment", "An aesthetic a layer takes from the plot"
+- 2026-10-17 — Draw colours in the notebooks (colour, step 4) (`5918137`); §4: "Colour and fill is
+  Phase 3's fourth increment", "Colours are CSS's names and hex forms"
 - 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b)
   (`5c1aabb`); §4: "The colour bar is drawn as ggplot2's gradient form", "R's exact colours come
   from the `color` package's conversions", "A discrete scale carries its missing value"

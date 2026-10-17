@@ -26,6 +26,10 @@ defmodule Giggly.Position.Dodge do
 
     @columns [:panel, :group, :x, :xmin, :xmax]
 
+    # Dodging reads no aesthetics of its own.
+    @impl Giggly.Position
+    def default_aesthetics(_position), do: %{}
+
     @impl Giggly.Position
     def compute_layer(_position, frame) do
       flipped = flipped?(frame)

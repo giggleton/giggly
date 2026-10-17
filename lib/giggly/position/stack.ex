@@ -36,6 +36,10 @@ defmodule Giggly.Position.Stack do
     @columns [:panel, :group, :x, :xmin, :xmax, :y, :ymin, :ymax]
     @placed [:x, :xmin, :xmax, :y, :ymin, :ymax]
 
+    # Stacking reads no aesthetics of its own.
+    @impl Giggly.Position
+    def default_aesthetics(_position), do: %{}
+
     @impl Giggly.Position
     def compute_layer(_position, frame) do
       flipped = flipped?(frame)

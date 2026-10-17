@@ -24,7 +24,9 @@ defmodule Giggly.Assembly do
   #      it, as a count into y;
   #  10. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
   #      bar's edges, told whether each axis is discrete, which decides a bar's orientation;
-  #  11. moves each layer's marks by its position (`Giggly.Position`);
+  #  11. puts into every row each aesthetic a layer's position reads, such as nudging's `nudge_x`,
+  #      the value the layer sets or else the position's default, as ggplot2's `use_defaults()`
+  #      for a position does, then moves the layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
   #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`, `color`,
@@ -183,7 +185,8 @@ defmodule Giggly.Assembly do
   # `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
-  # marks, and each aesthetic a layer sets to one value is put into every row of its table. Last,
+  # marks, once every row holds the aesthetics the position reads, and each aesthetic a layer sets
+  # to one value is put into every row of its table. Last,
   # the plot's coordinate system builds each panel's params from the extents of the scales the
   # layout gives that panel and the breaks and minor breaks each axis draws on its extent. Each axis
   # is titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x`
@@ -242,7 +245,9 @@ defmodule Giggly.Assembly do
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
         statistic = map_statistic(computed, plot, layer)
         set_up = Geom.setup_data(Plot.layer_geom(layer), statistic, axis_kinds)
-        Position.compute_layer(Plot.layer_position(layer), set_up)
+        position = Plot.layer_position(layer)
+        defaulted = set_position_aesthetics(set_up, position, Plot.layer_fixed(layer))
+        Position.compute_layer(position, defaulted)
       end)
 
     # ggplot2 resets the position scales and trains them again on the marks where they now stand,
@@ -500,6 +505,15 @@ defmodule Giggly.Assembly do
         do: DataFrame.put(mapped, aesthetic, Scale.map(scale, DataFrame.pull(mapped, aesthetic))),
         else: mapped
     end)
+  end
+
+  # The layer's table with each aesthetic its position reads given, in every row, the value the
+  # layer sets for it, or else the position's default, as ggplot2's `use_defaults()` for a position
+  # puts them in before the position runs. No layer maps one yet, so a column the plot's mapping
+  # carried in under its name is replaced, and moves nothing.
+  defp set_position_aesthetics(frame, position, fixed) do
+    defaults = Position.default_aesthetics(position)
+    set_fixed(frame, Map.merge(defaults, Map.take(fixed, Map.keys(defaults))))
   end
 
   # The layer's table with each aesthetic the layer sets to one value given that value in every

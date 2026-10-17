@@ -46,9 +46,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
-  chooses others; `coord_radial/1` records `%Coord.Radial{}`). `Plot` builds them and reads a geom's
-  facts to check a layer, but never computes or draws with one; the assembly reads a layer's with
-  `layer_geom/1`, `layer_stat/1`, `layer_position/1` and `layer_fixed/1`, so `Layer` stays private.
+  chooses others; `coord_radial/1` records `%Coord.Radial{}`); `geom_text/3` records
+  `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`. `Plot`
+  builds them and reads a geom's facts to check a layer, but never computes or draws with one; the
+  assembly reads a layer's with `layer_geom/1`, `layer_stat/1`, `layer_position/1` and
+  `layer_fixed/1`, so `Layer` stays private.
   A field holding a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses
   it. The theme is still a name, `theme: :gray`, until a user can set one; what a misspelt name does
   arrives with that option, and it must raise at the call.
@@ -77,15 +79,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar functions `fill:`, the line functions
   `linewidth:`, in millimetres, and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
-  `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), and `family:`.
-  The assembly puts it into every row last. **A colour is resolved
-  at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its uppercase hex or `:none`,
-  never the name written, and a colour CSS does not define raises naming the value. A point
-  neither takes a `fill:` nor maps `:fill`, which only the filled shapes not yet drawn use. A map maps and a keyword list sets:
-  the two never trade places. **An option that chooses how a geom draws** (`lineend:`,
-  `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`, `geom_text/3`'s `check_overlap:`)
-  **is a field of the geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`,
-  `10.0`, `:x`, `false`).
+  `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
+  and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads. The assembly
+  puts it into every row last, and a position's aesthetic also just before the position runs. **A
+  colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its
+  uppercase hex or `:none`, never the name written, and a colour CSS does not define raises
+  naming the value. A point neither takes a `fill:` nor maps `:fill`, which only the filled
+  shapes not yet drawn use. A map maps and a keyword list sets: the two never trade places. **An
+  option that chooses how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s
+  `orientation:`, `geom_text/3`'s `check_overlap:`) **is a field of the geom's struct**, its
+  default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
@@ -115,7 +118,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   repeat. NimbleOptions has no number type either: an option taking any number is
   `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
   more, `linemitre:` 1 or more, as grid refuses less, a text's `size:` 0 or more and `angle:` any
-  number, and `hjust:` and `vjust:` any number or one of ggplot2's words, through custom checks
-  (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`, `validate_size/1`,
-  `validate_angle/1`, `validate_justification/1`), which take an integer too and keep a float, as R
-  keeps a number; `validate_color/1` hands a colour to `Giggly.ColorOperations`.
+  number, `hjust:` and `vjust:` any number or one of ggplot2's words, and `nudge_x:` and
+  `nudge_y:` any number, through custom checks (`validate_alpha/1`, `validate_linewidth/1`,
+  `validate_linemitre/1`, `validate_size/1`, `validate_angle/1`, `validate_justification/1`,
+  `validate_nudge/1`), which take an integer too and keep a float, as R keeps a number;
+  `validate_color/1` hands a colour to `Giggly.ColorOperations`.

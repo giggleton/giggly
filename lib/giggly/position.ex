@@ -14,13 +14,20 @@ defprotocol Giggly.Position do
   # The identity (`Giggly.Position.Identity`) moves nothing, as ggplot2's `geom_point()` defaults
   # `position = "identity"`; a layer records it rather than leaving the position out, so a layer
   # whose marks stay where they are says so. Stacking (`Giggly.Position.Stack`) piles bars that
-  # share an x, as `geom_col()` defaults `position = "stack"`.
+  # share an x, as `geom_col()` defaults `position = "stack"`. Nudging (`Giggly.Position.Nudge`)
+  # moves every mark a set distance, as `geom_text()` defaults `position = "nudge"`.
+  #
+  # A position may read aesthetics of its own, as nudging reads `nudge_x` and `nudge_y`; it declares
+  # them with their defaults, as ggplot2's position declares its `default_aes`, and the assembly
+  # puts them into every row before the position runs.
 
   # A position is handed a layer's table and returns one, reading and writing its columns through
   # the data frame.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.Aesthetics, Giggly.DataFrame], exports: [Dodge, Identity, Stack]
+  use Boundary,
+    deps: [Giggly.Aesthetics, Giggly.DataFrame],
+    exports: [Dodge, Identity, Nudge, Stack]
 
   alias Giggly.DataFrame
 
@@ -28,4 +35,10 @@ defprotocol Giggly.Position do
   @doc false
   @spec compute_layer(t(), DataFrame.t()) :: DataFrame.t()
   def compute_layer(position, frame)
+
+  # The aesthetics `position` reads, each with the value it takes when a layer does not set it:
+  # ggplot2's `default_aes` for a position.
+  @doc false
+  @spec default_aesthetics(t()) :: %{optional(atom()) => term()}
+  def default_aesthetics(position)
 end
