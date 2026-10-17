@@ -43,13 +43,18 @@ defmodule Giggly.Scale do
   #
   # ## Aesthetics other than position
   #
-  # `alpha` is the one so far (`non_position_aesthetics/0`). Its scale is ggplot2's default for
-  # it: a continuous column onto 0.1 to 1, `scale_alpha_continuous()`, and a discrete one spread
-  # from 0.1 to 1, `scale_alpha_ordinal()`, which ggplot2's `scale_alpha_discrete()` uses with a
-  # warning that Giggly, building a plot without side effects, does not give.
+  # `alpha`, `color` and `fill` so far (`non_position_aesthetics/0`), each scale ggplot2's default
+  # for its aesthetic. Alpha's maps a continuous column onto 0.1 to 1, `scale_alpha_continuous()`,
+  # and spreads a discrete one from 0.1 to 1, `scale_alpha_ordinal()`, which ggplot2's
+  # `scale_alpha_discrete()` uses with a warning that Giggly, building a plot without side effects,
+  # does not give. Colour's and fill's give a discrete column `pal_hue()`'s colours, as
+  # `scale_colour_discrete()` falls back to it (`Giggly.Scale.Palette`); a missing value maps to the
+  # scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha. A continuous colour or fill
+  # has no scale yet.
 
-  # Values in, values out: a scale depends on nothing, so it stays extractable.
-  use Boundary, deps: [], exports: []
+  # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
+  # palette its colours, as R's `scales` depends on farver alone, so it stays extractable.
+  use Boundary, deps: [Giggly.ColorOperations], exports: []
 
   alias Giggly.Scale.{Continuous, Discrete, Labels, Transform}
 
@@ -62,8 +67,9 @@ defmodule Giggly.Scale do
   @typedoc "Which kind of scale a column needs, or `:none` when no scale can place it yet."
   @type kind :: :continuous | :discrete | :date | :none
 
-  # The aesthetics other than position that a scale maps.
-  @non_position_aesthetics [:alpha]
+  # The aesthetics other than position that a scale maps, and those of them that are colours.
+  @non_position_aesthetics [:alpha, :color, :fill]
+  @color_aesthetics [:color, :fill]
 
   @continuous_dtypes [:integer, :float, :null]
   @discrete_dtypes [:string, :boolean, :atom]
@@ -86,14 +92,26 @@ defmodule Giggly.Scale do
 
   # The kind of scale a column of type `dtype` needs on `aesthetic`: on a position aesthetic, its
   # `kind/1`; on another, the same but for a date, whose scale on any aesthetic but position
-  # (ggplot2's `scale_alpha_date()`) has not arrived.
+  # (ggplot2's `scale_alpha_date()`) has not arrived, and for a continuous colour or fill, whose
+  # scale (ggplot2's `scale_colour_continuous()`) has not either.
   @doc false
   @spec kind(atom(), atom()) :: kind()
   def kind(:date, aesthetic) when aesthetic in @non_position_aesthetics, do: :none
+
+  def kind(dtype, aesthetic) when aesthetic in @color_aesthetics and dtype in @continuous_dtypes,
+    do: :none
+
   def kind(dtype, _aesthetic), do: kind(dtype)
 
   # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
   @alpha_range {0.1, 1.0}
+
+  # ggplot2's default discrete colour palette, `pal_hue()`'s: hues from 15 degrees round the
+  # circle, chroma 100 and luminance 65.
+  @hue_palette {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}}
+
+  # ggplot2's colour for a missing value, grey50.
+  @color_na_value "#7F7F7F"
 
   # An untrained position scale of the given kind, its palette the identity; a continuous one
   # records the identity transformation, and a date scale, a continuous one, the date
@@ -102,17 +120,34 @@ defmodule Giggly.Scale do
   @spec new(:continuous | :discrete | :date) :: t()
   def new(:continuous), do: %Continuous{range: :none, transform: :identity, palette: :identity}
   def new(:date), do: %Continuous{range: :none, transform: :date, palette: :identity}
-  def new(:discrete), do: %Discrete{levels: [], continuous_range: :none, palette: :identity}
+
+  def new(:discrete),
+    do: %Discrete{levels: [], continuous_range: :none, palette: :identity, na_value: nil}
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
-  # ggplot2's default palette for it.
+  # ggplot2's default palette for it and, for a discrete one, its value for a missing value.
   @doc false
   @spec new(:continuous | :discrete, atom()) :: t()
   def new(:continuous, :alpha),
     do: %Continuous{range: :none, transform: :identity, palette: {:rescale, @alpha_range}}
 
-  def new(:discrete, :alpha),
-    do: %Discrete{levels: [], continuous_range: :none, palette: {:sequence, @alpha_range}}
+  def new(:discrete, :alpha) do
+    %Discrete{
+      levels: [],
+      continuous_range: :none,
+      palette: {:sequence, @alpha_range},
+      na_value: nil
+    }
+  end
+
+  def new(:discrete, aesthetic) when aesthetic in @color_aesthetics do
+    %Discrete{
+      levels: [],
+      continuous_range: :none,
+      palette: @hue_palette,
+      na_value: @color_na_value
+    }
+  end
 
   # The aesthetics other than position that a scale maps, as ggplot2 adds a default scale for each
   # one a layer maps.

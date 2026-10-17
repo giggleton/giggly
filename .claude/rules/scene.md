@@ -29,10 +29,12 @@ weight".
   centred in the drawing, its background covering the table alone. Nothing is measured later, so
   a backend needs no font. The docs say widths and heights, not "tracks".
 - **A cell's box is its rows and columns, unless it hangs.** `hang: {:top, height}` makes the box
-  `height` points tall from the top of its rows, and `hang: {:right, width}` `width` points wide
-  ending at the right of its columns, whatever they measure: ggplot2 measures an axis below a
-  panel with an empty cell under it as taking no room, and the axis hangs into the empty space;
-  and a left axis narrower than its column (free y scales) sits against its panel. Every bottom
+  `height` points tall from the top of its rows, `hang: {:right, width}` `width` points wide
+  ending at the right of its columns, and `hang: {:left, width}` `width` points wide from their
+  left, whatever they measure: ggplot2 measures an axis below a panel with an empty cell under it
+  as taking no room, and the axis hangs into the empty space; a left axis narrower than its column
+  (free y scales) sits against its panel; and a legend narrower than its box hangs from the box's
+  left, as `legend.box.just` justifies it. Every bottom
   axis hangs from its panel's edge at its own height, and every left axis at its own width, which
   are the row's and the column's when it is the one that measures them.
 - **Primitives are placed in their cell's units, 0 to 1 across and up, offset from there in
@@ -42,14 +44,15 @@ weight".
   text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor is at its
   `hjust` of the label's width, any fraction from its start (0) to its end (1).
 - **A text carries each label's measured width**, which the backend draws it at.
-- **Circles, placed rectangles, polylines and segments carry an opacity for each mark**, from 0 to
-  1: a circle's `opacity` its outline and fill alike, a rectangle's `fill_opacity` its fill alone,
-  a polyline's or segment's `opacity` its stroke, as grid's colours carry the alpha ggplot2 gives
-  them. One per mark, as grid's graphical parameters are, so a mapped aesthetic needs no primitive
-  per value; colour and size will take the same route. **A colour is `#RRGGBB` beside its
-  opacity**, never with an alpha of its own: a placed rectangle's border carries one
-  `color_opacity`, its colour's own alpha, since ggplot2 never gives a border the row's; its `fill`
-  and `color` may be `:none`, R's `NA`, which draws none.
+- **Circles, placed rectangles, polylines and segments carry a colour and an opacity for each
+  mark**, the opacity from 0 to 1: a circle's `color` and `opacity` its outline and fill alike, a
+  rectangle's `fill` and `fill_opacity` its fill and its `color` and `color_opacity` its border, a
+  polyline's or segment's `color` and `opacity` its stroke, as grid's colours carry the alpha
+  ggplot2 gives them. One per mark, as grid's graphical parameters are, so a mapped aesthetic needs
+  no primitive per value; size will take the same route. **A colour is `#RRGGBB` beside its
+  opacity**, never with an alpha of its own: a placed rectangle's border's `color_opacity` is its
+  colour's own alpha, since ggplot2 never gives a border the row's; its `fill` and `color` may be
+  `:none`, R's `NA`, which draws none.
 - **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
   `polylineGrob()`, a line through points, one per tick, grid line or group) and `Segments`
   (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it and a

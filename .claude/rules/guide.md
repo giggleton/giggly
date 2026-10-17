@@ -69,4 +69,9 @@ panel's grid lines are placed by the coordinate system".
   right, centred as the title is; the label column as wide as the widest label, or wider when the
   title is, leaving the room at the labels' right. Drawn in ggplot2's order: background, title,
   each key's background and glyphs, then the labels. A guide never calls a geom: rendering hands
-  it each key's glyphs. `legend/3` returns its width and its table; every size is in points.
+  it each key's glyphs. Every size is in points.
+- **A plot's legends are stacked in a box (`legends/2`), as ggplot2's `package_box()` stacks them
+  on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
+  order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,
+  left and top), with no margin or background of its own (`theme_gray()`'s); `legends/2` returns
+  the box's width and its table, which rendering centres down the panels.

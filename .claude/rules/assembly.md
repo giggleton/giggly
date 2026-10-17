@@ -51,15 +51,15 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
   scale id, the trained scale of each aesthetic other than position that a layer maps, by
-  aesthetic (`non_position_scales`), the legend each such scale gives (`legends`), the plot's
-  coordinate system (carried for rendering to hand each geom and guide), each
-  panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
+  aesthetic (`non_position_scales`), the legends those scales give, merged and ordered
+  (`legends`), the plot's coordinate system (carried for rendering to hand each geom and guide),
+  each panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
   (`guide_titles`, the x and y axes' so far), and the name of the plot's theme, which the assembly
   passes on unread for rendering to resolve, the only stage that reads a theme so far; the first
-  build stage to read one (default aesthetics, palettes) brings the resolution here, where ggplot2's
-  build completes the theme.
+  build stage to read one (default aesthetics, or a palette a theme sets, which `theme_gray()`
+  does not) brings the resolution here, where ggplot2's build completes the theme.
 - **The facet and the coordinate system run by the structs the plot records**, the null facet and
   cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
   assembly names no kind.
@@ -117,13 +117,23 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
   the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
-  range, a discrete one's levels, `NA` last), labelled, at the value it maps to, and drawn by every
-  layer that maps the aesthetic, each carrying what it sets (its `fixed`) for its keys, as
-  ggplot2's key data holds a layer's `aes_params`; a layer that sets the legend's own aesthetic
-  draws none. One aesthetic gives one legend; merging legends arrives with a second aesthetic.
-- **Evaluated columns are `x` and `y` first, then the other aesthetics in name order, then
-  `panel`, then `group`**, and the group key follows column order: reordering the aesthetics
-  renumbers groups. ggplot2's `aes()` takes `x` and `y` as its first arguments, so its groups are
-  numbered `x` first whatever order a mapping is written in; a mapping here is a map with no
+  range, a discrete one's levels, `NA` last), labelled, at the value it maps to. **Legends come in
+  the order of their aesthetics' names, and one with the title and labels of an earlier merges
+  into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
+  ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
+  guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets
+  `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, with those it
+  maps, each carrying what it sets (its `fixed`) for its keys, as ggplot2's `matched_aes()` gives a
+  layer only the key's aesthetics it maps and its key data holds a layer's `aes_params`; a layer
+  that sets the legend's own aesthetic draws none. **Not yet ggplot2's:** every such layer draws
+  in every key, where ggplot2 4 leaves a layer out of a key whose value its own column lacks
+  (`keep_key_data()`), as when two layers map one aesthetic to different columns.
+- **Evaluated columns are the layer's own aesthetics, then those it takes from the plot's
+  mapping, each mapping's `x` and `y` first and its others in name order, then `panel`, then
+  `group`** (`Plot.mapping_order/2`), and the group key follows column order: reordering the
+  aesthetics renumbers groups. ggplot2 lays a layer's mapping over the plot's as
+  `defaults(layer$mapping, plot$mapping)`, so a layer's `fill` over the plot's `x` is evaluated
+  first, and `aes()` takes `x` and `y` as its first arguments; a mapping here is a map with no
   written order, so the rest go by name, where ggplot2's follow the writing. A discrete alpha
-  therefore groups within each `x`, as ggplot2's does.
+  mapped with `x` therefore groups within each `x`, and `geom_bar(%{fill: :drv})` over the plot's
+  `x` groups by drive train first, as ggplot2's do.

@@ -17,6 +17,12 @@ defmodule Giggly.Guide.Legend do
   #
   # The legend's background spans the whole table, under everything; then the title, each key's
   # background and glyphs, and the labels, in ggplot2's drawing order.
+  #
+  # A plot's legends are stacked in a box, as ggplot2's `package_box()` stacks those to the right
+  # of the panels: a column as wide as the widest legend, each legend in its own row as tall as it
+  # is, the theme's legend spacing between, each hung from the column's left and its row's top
+  # (`legend.box.just`, left and top for a vertical box). The box has no margin and no background
+  # of its own, as `theme_gray()` gives it none.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene
@@ -61,6 +67,49 @@ defmodule Giggly.Guide.Legend do
 
     {Enum.sum(widths), scene}
   end
+
+  # The legends, each its width and table, stacked in a box: its width in points and its table.
+  @doc false
+  @spec box([{float(), Scene.t()}], Theme.t()) :: {float(), Scene.t()}
+  def box(legends, %Theme{legend_spacing: spacing}) do
+    width =
+      legends
+      |> Enum.map(fn {legend_width, _scene} -> legend_width end)
+      |> Enum.max()
+
+    heights =
+      legends
+      |> Enum.map(fn {_width, scene} -> {:points, height(scene)} end)
+      |> Enum.intersperse({:points, spacing})
+
+    cells =
+      legends
+      |> Enum.with_index()
+      |> Enum.map(fn {{legend_width, scene}, index} ->
+        row = 2 * index + 1
+
+        %Cell{
+          rows: row..row,
+          columns: 1..1,
+          clip: :off,
+          hang: {:left, legend_width},
+          primitives: [scene]
+        }
+      end)
+
+    box = %Scene{
+      widths: [{:points, width}],
+      heights: heights,
+      keep_proportions: false,
+      cells: cells
+    }
+
+    {width, box}
+  end
+
+  # A legend's height in points, the sum of its rows'.
+  defp height(%Scene{heights: heights}),
+    do: Enum.sum(for {:points, height} <- heights, do: height)
 
   defp background(columns, rows, %Theme{legend_background: look}) do
     %Cell{

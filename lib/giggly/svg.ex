@@ -170,12 +170,14 @@ defmodule Giggly.SVG do
   end
 
   # A hanging cell's box: from its rows' top as tall as it says, or as wide as it says ending at its
-  # columns' right.
+  # columns' right or starting at their left.
   defp hang(box, :none), do: box
   defp hang({columns, {top, _height}}, {:top, height}), do: {columns, {top, height}}
 
   defp hang({{left, width}, rows}, {:right, own_width}),
     do: {{left + width - own_width, own_width}, rows}
+
+  defp hang({{left, _width}, rows}, {:left, own_width}), do: {{left, own_width}, rows}
 
   # A cell's start and length in one direction: from its first column's or row's start to its
   # last one's end.
@@ -202,9 +204,12 @@ defmodule Giggly.SVG do
     Enum.map(scene.cells, fn cell -> cell(cell, column_spans, row_spans) end)
   end
 
-  # Each circle's outline and fill carry its opacity, as svglite writes a colour's alpha.
+  # Each circle's outline and fill are its colour at its opacity, as svglite writes a colour's
+  # alpha.
   defp primitive(%Circles{} = circles, box) do
-    Enum.zip_with([circles.x, circles.y, circles.opacity], fn [x_place, y_place, opacity] ->
+    columns = [circles.x, circles.y, circles.color, circles.opacity]
+
+    Enum.zip_with(columns, fn [x_place, y_place, color, opacity] ->
       {x_position, y_position} = place({x_place, y_place}, box)
 
       [
@@ -217,8 +222,8 @@ defmodule Giggly.SVG do
         "' style='stroke-width: ",
         number(circles.stroke_width),
         ";",
-        stroke_style(circles.color, opacity),
-        fill_style(circles.color, opacity),
+        stroke_style(color, opacity),
+        fill_style(color, opacity),
         "' />\n"
       ]
     end)
@@ -246,18 +251,21 @@ defmodule Giggly.SVG do
   end
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
-  # it, its width and height the cell's share of its extent, its border carrying the border's
-  # opacity and its fill its own.
+  # it, its width and height the cell's share of its extent, its border its colour at its opacity
+  # and its fill likewise.
   defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
     columns = [
       rectangles.xmin,
       rectangles.xmax,
       rectangles.ymin,
       rectangles.ymax,
-      rectangles.fill_opacity
+      rectangles.fill,
+      rectangles.fill_opacity,
+      rectangles.color,
+      rectangles.color_opacity
     ]
 
-    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, fill_opacity] ->
+    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, fill, fill_opacity, color, color_opacity] ->
       {x_position, y_position} = place({xmin, ymax}, box)
 
       [
@@ -272,38 +280,39 @@ defmodule Giggly.SVG do
         "' style='stroke-width: ",
         number(rectangles.stroke_width),
         ";",
-        stroke_style(rectangles.color, rectangles.color_opacity),
+        stroke_style(color, color_opacity),
         " stroke-linecap: butt; stroke-linejoin: miter;",
-        fill_style(rectangles.fill, fill_opacity),
+        fill_style(fill, fill_opacity),
         "' />\n"
       ]
     end)
   end
 
-  # Each line as svglite writes a polyline, its stroke carrying its opacity.
+  # Each line as svglite writes a polyline, its stroke its colour at its opacity.
   defp primitive(%Polylines{} = polylines, box) do
-    polylines
-    |> placed_lines(box)
-    |> Enum.zip_with(polylines.opacity, fn line, opacity ->
+    lines = placed_lines(polylines, box)
+
+    Enum.zip_with([lines, polylines.color, polylines.opacity], fn [line, color, opacity] ->
       [
         "<polyline points='",
         points(line),
         "' style='stroke-width: ",
         number(polylines.stroke_width),
         ";",
-        stroke_style(polylines.color, opacity),
+        stroke_style(color, opacity),
         line_style(polylines.line_end, polylines.line_join, polylines.mitre_limit),
         " fill: none;' />\n"
       ]
     end)
   end
 
-  # Each segment as svglite writes a line, from its start to its end, its stroke carrying its
+  # Each segment as svglite writes a line, from its start to its end, its stroke its colour at its
   # opacity.
   defp primitive(%Segments{} = segments, box) do
     style = line_style(segments.line_end, segments.line_join, segments.mitre_limit)
+    columns = [segments.starts, segments.ends, segments.color, segments.opacity]
 
-    Enum.zip_with([segments.starts, segments.ends, segments.opacity], fn [start, finish, opacity] ->
+    Enum.zip_with(columns, fn [start, finish, color, opacity] ->
       {x_start, y_start} = place(start, box)
       {x_finish, y_finish} = place(finish, box)
 
@@ -319,7 +328,7 @@ defmodule Giggly.SVG do
         "' style='stroke-width: ",
         number(segments.stroke_width),
         ";",
-        stroke_style(segments.color, opacity),
+        stroke_style(color, opacity),
         style,
         "' />\n"
       ]

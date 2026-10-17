@@ -66,4 +66,31 @@ defmodule Giggly.ColorOperationsTest do
       end
     end
   end
+
+  # Golden: farver 2.1.2's `encode_colour(cbind(h, c, l), from = "hcl")` in R 4.6.1, as scales
+  # 1.4.0's `pal_hue()` calls it; the same composition matched all 50,400 colours of a grid of hues
+  # every quarter degree, chromas from 0 to 150 and luminances from 0 to 100. It moves only with
+  # farver's constants or the library's conversions.
+  describe "from_hcl/3" do
+    test "a hue, chroma and luminance is the colour farver encodes, as pal_hue() gives it" do
+      assert ColorOperations.from_hcl(15, 100, 65) === "#F8766D"
+      assert ColorOperations.from_hcl(300.0, 50, 80) === "#E9B5F4"
+      assert ColorOperations.from_hcl(250, 30, 20) === "#103155"
+    end
+
+    test "a channel outside sRGB is clamped to a byte, as farver clamps it" do
+      assert ColorOperations.from_hcl(135, 150, 65) === "#00C300"
+      assert ColorOperations.from_hcl(200.25, 150, 20) === "#006B80"
+    end
+
+    # Red is 9, on sRGB's straight segment near black, and blue below 0, clamped.
+    test "a dark channel is companded on sRGB's straight segment" do
+      assert ColorOperations.from_hcl(125, 30, 20) === "#093900"
+    end
+
+    test "luminance 0 is black and luminance 100 without chroma is white" do
+      assert ColorOperations.from_hcl(0, 0, 0) === "#000000"
+      assert ColorOperations.from_hcl(0, 0, 100) === "#FFFFFF"
+    end
+  end
 end

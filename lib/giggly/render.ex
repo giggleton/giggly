@@ -26,17 +26,12 @@ defmodule Giggly.Render do
   # at its edges when the coordinate system clips panels, and each strip's always, as
   # `theme_gray()`'s `strip.clip` says.
   #
-  # A plot with a legend, one for an aesthetic other than position that a layer maps, gives it a
-  # column right of the panels, the theme's legend spacing from them: the legend is a table of its
-  # own (`Giggly.Guide`), its keys' glyphs drawn by each layer's geom that maps the aesthetic
-  # (`Giggly.Geom`), nested in a cell spanning the panels' rows and centred down them, as ggplot2
-  # places its guide box to the right, and drawn last.
-  #
-  # A plot with a legend, one for an aesthetic other than position that a layer maps, gives it a
-  # column right of the panels, the theme's legend spacing from them: the legend is a table of its
-  # own (`Giggly.Guide`), its keys' glyphs drawn by each layer's geom that maps the aesthetic
-  # (`Giggly.Geom`), nested in a cell spanning the panels' rows and centred down them, as ggplot2
-  # places its guide box to the right, and drawn last.
+  # A plot with legends, one for each aesthetic other than position that a layer maps, or for
+  # several merged, gives them a column right of the panels, the theme's legend spacing from them:
+  # each legend is a table of its own, its keys' glyphs drawn by the geom of each layer that maps
+  # one of its aesthetics (`Giggly.Geom`), and the legends are stacked in a box (`Giggly.Guide`),
+  # nested in a cell spanning the panels' rows and centred down them, as ggplot2 places its guide
+  # box to the right, and drawn last.
   #
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
@@ -163,26 +158,31 @@ defmodule Giggly.Render do
     end)
   end
 
-  # The plot's legend, `:none` for none, or its width and table: each key's glyphs drawn by the
-  # geom of every layer that maps the legend's aesthetic, in the order the layers were added, at
-  # the key's value and with what the layer sets, as ggplot2 draws each such layer's `draw_key` in
-  # every key.
+  # The plot's legends stacked in their box, `:none` for none, or its width and table: in each
+  # legend, each key's glyphs drawn by the geom of every layer that maps one of the legend's
+  # aesthetics, in the order the layers were added, at the key's values of the aesthetics it maps
+  # and with what the layer sets, as ggplot2 draws each such layer's `draw_key` in every key.
   defp draw_legend([], _theme), do: :none
 
-  defp draw_legend([%{aesthetic: aesthetic, title: title, keys: keys, layers: layers}], theme) do
+  defp draw_legend(legends, theme) do
     size = {theme.legend_key_size, theme.legend_key_size}
 
-    drawn_keys =
-      Enum.map(keys, fn %{label: label, value: value} ->
-        glyphs =
-          Enum.flat_map(layers, fn %{geom: geom, fixed: fixed} ->
-            Geom.draw_key(geom, Map.put(fixed, aesthetic, value), size)
-          end)
+    legends
+    |> Enum.map(fn %{title: title, keys: keys, layers: layers} ->
+      {title, Enum.map(keys, fn key -> draw_key(key, layers, size) end)}
+    end)
+    |> Guide.legends(theme)
+  end
 
-        {label, glyphs}
+  # A key's label and the glyph each layer draws in it, with the key's values of the aesthetics the
+  # layer maps and what the layer sets.
+  defp draw_key(%{label: label, values: values}, layers, size) do
+    glyphs =
+      Enum.flat_map(layers, fn %{geom: geom, aesthetics: aesthetics, fixed: fixed} ->
+        Geom.draw_key(geom, Map.merge(fixed, Map.take(values, aesthetics)), size)
       end)
 
-    Guide.legend(title, drawn_keys, theme)
+    {label, glyphs}
   end
 
   # The columns, left to right, each named and sized: the margin, the y title, then for each

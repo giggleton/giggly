@@ -35,6 +35,8 @@ size has a weight".
   `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as svglite
   leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
   Output can then be set beside the SVG in ggplot2's own visual-test snapshots.
+- **Each mark is written in its own colour and opacity**, as svglite writes each element's own
+  `gp`, so a mapped colour needs no element of its own per value.
 - **An opacity is written as svglite writes the alpha of an R colour**: R holds it as a byte, the
   opacity times 255 rounded half to even, and svglite writes the byte over 255 as it writes any
   number below 1 (`write_double()`), with as many decimals as reach its first significant digit

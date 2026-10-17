@@ -42,6 +42,7 @@ defmodule Giggly.Theme do
     :legend_key_size,
     :legend_title,
     :legend_text,
+    :legend_spacing,
     :legend_box_spacing
   ]
   defstruct @enforce_keys
@@ -70,7 +71,8 @@ defmodule Giggly.Theme do
   points; the background and text of the strips that label each panel, the text's margin on
   every side of it; and a legend's background, the margin inside it, each key's background and
   size, the title and its margin below, the labels and their margin from the keys, all in points,
-  and the space between the panels and the legend.
+  the space between one legend and the next below it, and the space between the panels and the
+  legends.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -91,6 +93,7 @@ defmodule Giggly.Theme do
           legend_key_size: float(),
           legend_title: text(),
           legend_text: text(),
+          legend_spacing: float(),
           legend_box_spacing: float()
         }
 
@@ -148,7 +151,8 @@ defmodule Giggly.Theme do
   # with `0.8 * half_line` around it on every side.
   #
   # A legend is paper white with no border, `half_line` inside its edge on every side (ggplot2's
-  # `legend.margin`, from the theme's `margins`), and `2 * half_line` right of the panels
+  # `legend.margin`, from the theme's `margins`), `2 * half_line` above the next legend
+  # (`legend.spacing.y`, from `legend.spacing`) and `2 * half_line` right of the panels
   # (`legend.box.spacing`). Each key is 1.2 lines square, as grid works lines out at its own
   # defaults, on the panel's background (`legend.key`, which inherits it). The title is black at
   # the base size with `half_line` below it, and the labels black at 0.8 of it, `half_line` right
@@ -222,6 +226,7 @@ defmodule Giggly.Theme do
         color: @ink,
         margin: @half_line * @points_per_theme_point
       },
+      legend_spacing: 2 * @half_line * @points_per_theme_point,
       legend_box_spacing: 2 * @half_line * @points_per_theme_point
     }
   end

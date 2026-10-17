@@ -37,9 +37,12 @@ a behaviour: the entry beginning "A theme is a function".
   setting a user can make; so does accepting `:grey`.
 - **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
   fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
-  assembly, arrive with the first mapped or set colour or size.
+  assembly, arrive with a default a theme can change, which neither a set nor a mapped colour
+  needed. **Nor are the palettes:** ggplot2 4's `set_palettes()` takes a scale's palette from the
+  theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
 - **A legend's look is `theme_gray()`'s at its defaults**: paper white with no border, `half_line`
-  inside its edge (`legend.margin`, from the theme's `margins`) and `2 * half_line` from the panels
+  inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` above the next
+  legend (`legend.spacing.y`, from `legend.spacing`) and `2 * half_line` from the panels
   (`legend.box.spacing`); keys 1.2 lines square as grid works lines out at its own defaults, a
   12-point font at line height 1.2, 17.28 points, not at the base size, on the panel's background
   (`legend.key` inherits it); the title black at the base size with `half_line` below it, the

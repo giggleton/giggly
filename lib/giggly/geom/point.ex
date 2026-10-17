@@ -4,8 +4,8 @@ defmodule Giggly.Geom.Point do
   # Points, ggplot2's `geom_point()`: one solid circle per row, at its `x` and `y`. It takes no
   # parameters yet. Draw it through `Giggly.Geom`.
   #
-  # Points use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y`; an aesthetic joins the
-  # accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # Points use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`; an aesthetic
+  # joins the accepted list with the scale that maps it, so a mapping never silently does nothing.
   #
   # A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
   # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
@@ -13,12 +13,13 @@ defmodule Giggly.Geom.Point do
   #
   # Every point looks as ggplot2's default point does, until aesthetics such as size can be mapped
   # or set: size 1.5 mm with a 0.5 mm border, which grid draws as a circle of radius 1.95 points
-  # with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots, and black, or the
-  # colour the layer sets, outline and fill alike. A row's `alpha`, where its table has one, makes
-  # the point that opaque, replacing its colour's own, as ggplot2's `alpha()` colours both; a row
-  # without one keeps its colour's, which is opaque unless the colour carries an alpha, as
-  # ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A colour of `:none`, R's
-  # `NA`, draws no point, as ggplot2's `GeomPoint` drops a row whose colour is missing.
+  # with a 0.71-point outline, the figures in ggplot2's own SVG test snapshots, and black, or its
+  # row's colour, mapped or set, outline and fill alike. A row's `alpha`, where its table has one,
+  # makes the point that opaque, replacing its colour's own, as ggplot2's `alpha()` colours both; a
+  # row without one keeps its colour's, which is opaque unless the colour carries an alpha, as
+  # ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A row whose colour is
+  # `:none`, R's `NA`, draws no point, as ggplot2's `GeomPoint` drops a row whose colour is
+  # missing.
 
   defstruct []
 
@@ -27,7 +28,7 @@ defmodule Giggly.Geom.Point do
   # The aesthetics a layer of points can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :group, :x, :y]
 
   # The aesthetics a layer of points cannot be drawn without.
   @doc false
@@ -64,35 +65,35 @@ defmodule Giggly.Geom.Point do
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
+    # A circle for each row placed in the panel, in its colour, but a row whose colour is `:none`.
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
-      case Mark.set(frame, :color, @color) do
-        :none ->
-          []
+      placed = Coord.transform(coord, frame, panel_params)
+      colors = Mark.values(placed, :color, @color)
 
-        color ->
-          placed = Coord.transform(coord, frame, panel_params)
-          [circles(placed, color)]
-      end
-    end
-
-    # A circle for each row placed in the panel, in `color`.
-    defp circles(placed, color) do
       drawn =
-        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y), Mark.opacities(placed, color)]
-        |> Enum.zip()
-        |> Enum.filter(fn {x_position, y_position, _opacity} ->
-          is_number(x_position) and is_number(y_position)
+        [
+          DataFrame.pull(placed, :x),
+          DataFrame.pull(placed, :y),
+          colors,
+          Mark.opacities(placed, colors)
+        ]
+        |> Enum.zip_with(fn row -> row end)
+        |> Enum.filter(fn [x_position, y_position, color, _opacity] ->
+          is_number(x_position) and is_number(y_position) and color != :none
         end)
 
-      %Circles{
-        x: Enum.map(drawn, fn {x_position, _y_position, _opacity} -> x_position end),
-        y: Enum.map(drawn, fn {_x_position, y_position, _opacity} -> y_position end),
-        radius: @radius,
-        stroke_width: @stroke_width,
-        color: Mark.hex(color),
-        opacity: Enum.map(drawn, fn {_x_position, _y_position, opacity} -> opacity end)
-      }
+      [
+        %Circles{
+          x: Enum.map(drawn, fn [x_position, _y_position, _color, _opacity] -> x_position end),
+          y: Enum.map(drawn, fn [_x_position, y_position, _color, _opacity] -> y_position end),
+          radius: @radius,
+          stroke_width: @stroke_width,
+          color:
+            Enum.map(drawn, fn [_x_position, _y_position, color, _opacity] -> Mark.hex(color) end),
+          opacity: Enum.map(drawn, fn [_x_position, _y_position, _color, opacity] -> opacity end)
+        }
+      ]
     end
 
     # A legend's key: the point at the middle of the key, as ggplot2's `draw_key_point()` draws
@@ -110,7 +111,7 @@ defmodule Giggly.Geom.Point do
               y: [0.5],
               radius: @radius,
               stroke_width: @stroke_width,
-              color: Mark.hex(color),
+              color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.get(key, :alpha))]
             }
           ]

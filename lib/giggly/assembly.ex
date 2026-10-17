@@ -27,12 +27,14 @@ defmodule Giggly.Assembly do
   #  11. moves each layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
-  #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`), of the
-  #      kind its columns need, trains it on every layer's column of that aesthetic, and maps each
-  #      column through it, as ggplot2 trains and maps its non-position scales once the positions
-  #      are final;
-  #      it then builds each such scale's legend: a key for each break, labelled, with the value
-  #      it maps to, drawn by the geom of each layer that maps the aesthetic with what that layer
+  #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`, `color`,
+  #      `fill`), of the kind its columns need, trains it on every layer's column of that
+  #      aesthetic, and maps each column through it, as ggplot2 trains and maps its non-position
+  #      scales once the positions are final;
+  #      it then builds the legends: each such scale's, a key for each break, labelled, with the
+  #      value it maps to, in the order of the aesthetics' names, one with the title and labels of
+  #      an earlier merged into it, as ggplot2 merges guides that would read alike; each legend
+  #      is drawn by the geom of each layer that maps one of its aesthetics, with what that layer
   #      sets;
   #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
@@ -121,17 +123,25 @@ defmodule Giggly.Assembly do
         }
 
   @typedoc """
-  A legend for one aesthetic other than position: its title, the column the first layer to map the
-  aesthetic maps it to; a key for each of its scale's breaks, the break's label and the value it
-  maps to; and each layer that maps the aesthetic, in the order the layers were added, its geom
-  drawing its glyph in every key with the aesthetics the layer sets, as ggplot2's legend draws a
-  key for each such layer, its `aes_params` among the key's data.
+  A legend for one or more aesthetics other than position, those whose scales give the same title
+  and labels, in name order: its title, the column the first layer to map the aesthetic maps it
+  to; a key for each of its scales' breaks, the break's label and the value each aesthetic maps it
+  to; and each layer that maps one of its aesthetics, in the order the layers were added, with
+  those it maps, its geom drawing its glyph in every key with the key's values of those aesthetics
+  and the aesthetics the layer sets, as ggplot2's legend draws a key for each such layer, its
+  `aes_params` among the key's data.
   """
   @type legend :: %{
-          aesthetic: Plot.aesthetic(),
+          aesthetics: [Plot.aesthetic()],
           title: String.t(),
-          keys: [%{label: String.t(), value: term()}],
-          layers: [%{geom: struct(), fixed: %{optional(Plot.aesthetic()) => term()}}]
+          keys: [%{label: String.t(), values: %{optional(Plot.aesthetic()) => term()}}],
+          layers: [
+            %{
+              geom: struct(),
+              aesthetics: [Plot.aesthetic()],
+              fixed: %{optional(Plot.aesthetic()) => term()}
+            }
+          ]
         }
 
   # Assembles `plot`, running the stages in order.
@@ -139,9 +149,10 @@ defmodule Giggly.Assembly do
   # The facet first gives each row of the plot's data its panel. Then each layer's mapping is laid
   # over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
   # column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
-  # out `:x` and `:y` first, as ggplot2's `aes()` takes them, then the rest in name order, since a
-  # mapping is a map and has no written order to keep, followed by `:panel` and `:group`, as
-  # ggplot2 orders them. Each axis then gets its scale, and every layer's
+  # out in the order ggplot2 evaluates them, the layer's own before those it takes from the plot,
+  # each mapping's `:x` and `:y` first, as ggplot2's `aes()` takes them, then the rest in name
+  # order, since a mapping is a map and has no written order to keep, followed by `:panel` and
+  # `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
   # marks, and each aesthetic a layer sets to one value is put into every row of its table. Last,
@@ -282,34 +293,77 @@ defmodule Giggly.Assembly do
     |> Stat.default_mapping()
   end
 
-  # The legend each scale of an aesthetic other than position gives, in name order, as ggplot2's
-  # guides build them from the trained scales: a key for each break the scale shows, labelled, with
-  # the value it maps to, drawn by the geom of every layer that maps the aesthetic, as a layer
-  # shows in a legend whose aesthetic it maps. A scale with no breaks, one trained on nothing,
-  # gives none.
+  # The legends the scales of aesthetics other than position give, as ggplot2's guides build them
+  # from the trained scales: each scale's, in the order of the aesthetics' names, a key for each
+  # break the scale shows, labelled, with the value it maps to, merged into an earlier one with the
+  # same title and labels, as ggplot2 merges guides whose title and labels hash alike, which keeps
+  # each key's labels and gathers its values; then each drawn by the geom of every layer that maps
+  # one of its aesthetics, with those it maps, as a layer shows in a legend whose aesthetic it
+  # maps. A scale with no breaks, one trained on nothing, gives none. ggplot2 orders legends by
+  # their hash, which no reader can predict; Giggly orders them by name, and a legend merged from
+  # several stands where its first would.
   defp legends(non_position_scales, plot, layers) do
-    for {aesthetic, scale} <- Enum.sort(non_position_scales),
-        breaks = Scale.legend_breaks(scale),
-        breaks != [] do
-      {values, labels} = Enum.unzip(breaks)
-      mapped = Scale.map(scale, values)
+    scale_legends =
+      for {aesthetic, scale} <- Enum.sort(non_position_scales),
+          breaks = Scale.legend_breaks(scale),
+          breaks != [] do
+        {values, labels} = Enum.unzip(breaks)
+        mapped = Scale.map(scale, values)
 
-      key_layers =
-        for layer <- layers,
-            mapping = Plot.computed_mapping(plot, layer),
-            Map.has_key?(mapping, aesthetic),
-            do: %{geom: Plot.layer_geom(layer), fixed: Plot.layer_fixed(layer)}
+        %{
+          aesthetics: [aesthetic],
+          title: guide_title(plot, layers, aesthetic),
+          keys:
+            Enum.zip_with(labels, mapped, fn label, value ->
+              %{label: label, values: %{aesthetic => value}}
+            end)
+        }
+      end
 
-      %{
-        aesthetic: aesthetic,
-        title: guide_title(plot, layers, aesthetic),
+    scale_legends
+    |> Enum.reduce([], &merged/2)
+    |> Enum.reverse()
+    |> Enum.map(fn legend -> Map.put(legend, :layers, key_layers(legend, plot, layers)) end)
+  end
+
+  # The legends so far, latest first, with `legend` merged into the one with its title and labels,
+  # or else added.
+  defp merged(legend, legends) do
+    if Enum.any?(legends, fn earlier -> reads_alike?(earlier, legend) end),
+      do: Enum.map(legends, fn earlier -> merged_into(earlier, legend) end),
+      else: [legend | legends]
+  end
+
+  defp merged_into(earlier, legend) do
+    if reads_alike?(earlier, legend), do: merge(earlier, legend), else: earlier
+  end
+
+  defp reads_alike?(legend, other),
+    do: legend.title == other.title and labels(legend) == labels(other)
+
+  defp labels(legend), do: Enum.map(legend.keys, fn key -> key.label end)
+
+  # The legend with `other`'s aesthetics after its own, and each key's values with `other`'s.
+  defp merge(legend, other) do
+    %{
+      legend
+      | aesthetics: Enum.concat(legend.aesthetics, other.aesthetics),
         keys:
-          Enum.zip_with(labels, mapped, fn label, value ->
-            %{label: label, value: value}
-          end),
-        layers: key_layers
-      }
-    end
+          Enum.zip_with(legend.keys, other.keys, fn key, other_key ->
+            %{key | values: Map.merge(key.values, other_key.values)}
+          end)
+    }
+  end
+
+  # Each layer that maps one of the legend's aesthetics, in the order the layers were added, with
+  # those it maps, its geom and what it sets.
+  defp key_layers(legend, plot, layers) do
+    for layer <- layers,
+        mapping = Plot.computed_mapping(plot, layer),
+        mapped =
+          Enum.filter(legend.aesthetics, fn aesthetic -> Map.has_key?(mapping, aesthetic) end),
+        mapped != [],
+        do: %{geom: Plot.layer_geom(layer), aesthetics: mapped, fixed: Plot.layer_fixed(layer)}
   end
 
   # A scale for an aesthetic other than position trained on every layer's column of it, in all its
@@ -388,15 +442,19 @@ defmodule Giggly.Assembly do
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across
-  # by name: it is the one raw column every layer keeps. The columns come out `x` and `y` first,
-  # as ggplot2's `aes()` takes them as its first two arguments, then the rest in name order, since
-  # a mapping is a map with no written order to keep; grouping keys on the discrete ones in that
-  # order, so a discrete alpha groups within each `x`, as ggplot2 numbers its groups.
+  # by name: it is the one raw column every layer keeps. The columns come out in the order ggplot2
+  # evaluates them (`Plot.mapping_order/2`): the layer's own aesthetics, then those it takes from
+  # the plot's mapping, each mapping's `x` and `y` first and its others in name order; grouping
+  # keys on the discrete ones in that order, so a discrete alpha mapped with `x` groups within each
+  # `x`, and a fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its
+  # groups.
   defp evaluate(paneled_data, plot, layer) do
+    mapping = Plot.computed_mapping(plot, layer)
+
     renames =
       plot
-      |> Plot.computed_mapping(layer)
-      |> Enum.sort_by(fn {aesthetic, _column} -> {aesthetic not in [:x, :y], aesthetic} end)
+      |> Plot.mapping_order(layer)
+      |> Enum.map(fn aesthetic -> {aesthetic, Map.fetch!(mapping, aesthetic)} end)
 
     panels = DataFrame.pull(paneled_data, :panel)
 

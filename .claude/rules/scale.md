@@ -26,9 +26,11 @@ grid lines are placed by the coordinate system".
 - **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
   it one aesthetic's.** A palette is a value naming its function (`Scale.Palette`), never a
   closure: `:identity` for a position, `{:rescale, {low, high}}` for a continuous aesthetic, R's
-  `pal_rescale()`, and `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high,
-  length.out = n)` as ggplot2's ordinal alpha takes it. `new/1` makes a position scale; `new/2`
-  makes an aesthetic's with ggplot2's default palette for it (`alpha`: 0.1 to 1), one of
+  `pal_rescale()`, `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high,
+  length.out = n)` as ggplot2's ordinal alpha takes it, and `{:hue, %{hue:, chroma:, luminance:}}`
+  for a discrete colour or fill, R's `pal_hue()`. `new/1` makes a position scale; `new/2` makes an
+  aesthetic's with ggplot2's default palette for it (`alpha`: 0.1 to 1; `color` and `fill`:
+  `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65), one of
   `non_position_aesthetics/0`.
 - **A continuous value's place in the range is R's `rescale()` (`Scale.rescale/3`), in R's order
   of operations**, and a range of zero width puts every value at the middle, so one value maps to
@@ -38,18 +40,27 @@ grid lines are placed by the coordinate system".
   continuous scale's are its transformation's breaks inside its trained range, taken as floats as
   R's limits are doubles, one at the low end of a range of zero width, none untrained; a discrete
   scale's are its levels, `nil` last and labelled `NA`, as ggplot2's legend keeps `NA`.
-- **A discrete palette spreads the present levels; `nil` takes no share and maps to `nil`**, as
-  ggplot2's mapping leaves `NA` out of the levels it counts. The spread is R's `seq()`: its ends
-  exact, each value between found by steps from the first (the fourth of seven is
-  0.54999999999999993).
+- **A discrete palette spreads the present levels; `nil` takes no share and maps to the scale's
+  `na_value`**, ggplot2's `na.value`, as ggplot2's mapping leaves `NA` out of the levels it counts:
+  `nil` for alpha (R's `NA`) and grey50, `#7F7F7F`, for colour and fill. `na_value` is a field of
+  `Scale.Discrete`, as ggplot2's scale carries it (design-log §4, the entry beginning "A discrete
+  scale carries its missing value"); a position scale places `nil` as its last level and reads
+  none. The spread is R's `seq()`: its ends exact, each value between found by steps from the
+  first (the fourth of seven is 0.54999999999999993).
+- **The hue palette is exactly R's `pal_hue()`**: the circle's last `360 / n` degrees left off,
+  the hues spread by the same `seq()`, each colour `Giggly.ColorOperations.from_hcl/3`; its test
+  pins R's colours for counts whose last hue lands on 360 and past it. R takes each hue modulo
+  360 first, which changes no colour, cosine and sine repeating, so it is left out.
 - **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
   `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
   the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
   `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`, `MinorBreaks`, `Palette` and
   `Transform`.
-- **A scale sees plain values, never a frame or a plot.** Its boundary lists nothing; the
-  assembly pulls a column and hands its values here, so the namespace stays extractable, as R's
-  `scales` stands beside ggplot2. Anything that needs a frame belongs to the caller.
+- **A scale sees plain values, never a frame or a plot.** Its boundary lists
+  `Giggly.ColorOperations` alone, which gives the hue palette its colours, as R's `scales` lists
+  farver; the assembly pulls a column and hands its values here, so the namespace stays
+  extractable, as R's `scales` stands beside ggplot2. Anything that needs a frame belongs to the
+  caller.
 - **A scale knows no pixel.** It stops at positions in data space: a continuous value as its
   transformation leaves it, a discrete value at its level's position counting from 1. The unit panel is the coordinate
   system's.
@@ -58,7 +69,8 @@ grid lines are placed by the coordinate system".
   scale. A type with no scale yet returns `:none`. A `Date` column is `:date`, as ggplot2's
   `scale_type()` gives a `Date` `"date"`: a continuous scale through the date transformation, so
   dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
-  date has no scale yet (`kind/2` gives `:none`).
+  date has no scale yet (`kind/2` gives `:none`), and nor do numbers on a colour or fill, whose
+  continuous scale arrives with the colour bar.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped); discrete levels are the distinct values, `nil` last.
 - **Discrete values are ordered by `level_key/1` alone**, and the assembly hands the same key to

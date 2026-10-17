@@ -37,7 +37,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence exists once: the layer's column wins over the plot's, and an aesthetic the layer
   sets wins over both, dropped from the mapping as ggplot2's `compute_aesthetics()` drops what
-  `aes_params` set.
+  `aes_params` set. **The order ggplot2 evaluates them in is `mapping_order/2`'s, here alone**:
+  the layer's own aesthetics, then those it takes from the plot, each mapping's `x` and `y` first
+  and its others in name order, as `defaults(layer$mapping, plot$mapping)` lays them.
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
@@ -73,8 +75,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   function takes `alpha:` and `colour:`, the bar functions `fill:`, and the line functions
   `linewidth:`, in millimetres. The assembly puts it into every row last. **A colour is resolved
   at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its uppercase hex or `:none`,
-  never the name written, and a colour CSS does not define raises naming the value. A point takes
-  no `fill:`, which only the filled shapes not yet drawn use. A map maps and a keyword list sets:
+  never the name written, and a colour CSS does not define raises naming the value. A point
+  neither takes a `fill:` nor maps `:fill`, which only the filled shapes not yet drawn use. A map maps and a keyword list sets:
   the two never trade places. **An option that chooses how a geom draws** (`lineend:`,
   `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`) **is a field of the geom's struct**,
   its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`).

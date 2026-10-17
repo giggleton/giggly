@@ -114,7 +114,7 @@ defmodule Giggly.SVGTest do
         lines: [[{0.5, 0.25}, {0.5, 0.25}]],
         offsets: [[{0.0, 0.0}, {3.0, -4.0}]],
         stroke_width: 0.75,
-        color: "#000000",
+        color: ["#000000"],
         opacity: [1.0],
         line_end: :butt,
         line_join: :round,
@@ -130,10 +130,10 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: "#595959",
+        fill: ["#595959"],
         fill_opacity: [1.0],
-        color: :none,
-        color_opacity: 0.0,
+        color: [:none],
+        color_opacity: [0.0],
         # A 0.5 mm line, as grid draws it in points.
         stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
       }
@@ -154,7 +154,7 @@ defmodule Giggly.SVGTest do
         y: [0.5, 0.5],
         radius: 1.95,
         stroke_width: 0.71,
-        color: "#000000",
+        color: List.duplicate("#000000", 2),
         opacity: [1 / 3, 1.0]
       }
 
@@ -165,16 +165,84 @@ defmodule Giggly.SVGTest do
              ]
     end
 
+    # A mapped colour gives one per mark, as grid's `gp` holds one per element and svglite writes
+    # each element's own.
+    test "each circle, rectangle, polyline and segment is written in its own colour" do
+      circles = %Circles{
+        x: [0.25, 0.75],
+        y: [0.5, 0.5],
+        radius: 1.95,
+        stroke_width: 0.71,
+        color: ["#F8766D", "#00BFC4"],
+        opacity: [1.0, 1.0]
+      }
+
+      rectangles = %Rectangles{
+        xmin: [0.1, 0.5],
+        xmax: [0.3, 0.7],
+        ymin: [0.5, 0.5],
+        ymax: [0.8, 0.8],
+        fill: ["#F8766D", "#00BFC4"],
+        fill_opacity: [1.0, 1.0],
+        color: [:none, "#7F7F7F"],
+        color_opacity: [1.0, 1.0],
+        stroke_width: 1.07
+      }
+
+      polylines = %Polylines{
+        lines: [[{0.1, 0.1}, {0.2, 0.2}], [{0.3, 0.3}, {0.4, 0.4}]],
+        offsets: :none,
+        stroke_width: 1.07,
+        color: ["#F8766D", "#00BFC4"],
+        opacity: [1.0, 1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      segments = %Segments{
+        starts: [{0.1, 0.5}, {0.3, 0.5}],
+        ends: [{0.3, 0.75}, {0.5, 0.75}],
+        stroke_width: 1.07,
+        color: ["#00BFC4", "#F8766D"],
+        opacity: [1.0, 1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      drawn = draw(whole([circles, rectangles, polylines, segments]))
+
+      assert circles(drawn) === [
+               "style='stroke-width: 0.71; stroke: #F8766D; fill: #F8766D;'",
+               "style='stroke-width: 0.71; stroke: #00BFC4; fill: #00BFC4;'"
+             ]
+
+      assert drawn =~ "stroke: none; stroke-linecap: butt; stroke-linejoin: miter; fill: #F8766D;"
+
+      assert drawn =~
+               "stroke: #7F7F7F; stroke-linecap: butt; stroke-linejoin: miter; fill: #00BFC4;"
+
+      assert Regex.scan(~r/<(polyline|line) [^>]*?stroke: (#[0-9A-F]{6});/, drawn,
+               capture: :all_but_first
+             ) === [
+               ["polyline", "#F8766D"],
+               ["polyline", "#00BFC4"],
+               ["line", "#00BFC4"],
+               ["line", "#F8766D"]
+             ]
+    end
+
     test "a placed rectangle's fill carries its opacity, and its border none" do
       rectangles = %Rectangles{
         xmin: [0.1],
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: "#595959",
+        fill: ["#595959"],
         fill_opacity: [0.5],
-        color: :none,
-        color_opacity: 0.0,
+        color: [:none],
+        color_opacity: [0.0],
         stroke_width: 1.07
       }
 
@@ -196,7 +264,7 @@ defmodule Giggly.SVGTest do
         y: List.duplicate(0.5, 6),
         radius: 1.95,
         stroke_width: 0.71,
-        color: "#000000",
+        color: List.duplicate("#000000", 6),
         opacity: opacities
       }
 
@@ -224,7 +292,7 @@ defmodule Giggly.SVGTest do
         y: [0.5],
         radius: 1.95,
         stroke_width: 0.71,
-        color: "#000000",
+        color: ["#000000"],
         opacity: [0.0]
       }
 
@@ -233,10 +301,10 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: "#595959",
+        fill: ["#595959"],
         fill_opacity: [0.0],
-        color: :none,
-        color_opacity: 0.0,
+        color: [:none],
+        color_opacity: [0.0],
         stroke_width: 1.07
       }
 
@@ -255,10 +323,10 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: "#0000FF",
+        fill: ["#0000FF"],
         fill_opacity: [0.3],
-        color: "#FF0000",
-        color_opacity: 128 / 255,
+        color: ["#FF0000"],
+        color_opacity: [128 / 255],
         stroke_width: 1.07
       }
 
@@ -276,10 +344,10 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: "#595959",
+        fill: ["#595959"],
         fill_opacity: [1.0],
-        color: :none,
-        color_opacity: 1.0,
+        color: [:none],
+        color_opacity: [1.0],
         stroke_width: 1.07
       }
 
@@ -296,10 +364,10 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
-        fill: :none,
+        fill: [:none],
         fill_opacity: [1.0],
-        color: "#FF0000",
-        color_opacity: 1.0,
+        color: ["#FF0000"],
+        color_opacity: [1.0],
         stroke_width: 1.07
       }
 
@@ -321,7 +389,7 @@ defmodule Giggly.SVGTest do
           lines: [[{0.1, 0.1}, {0.2, 0.2}]],
           offsets: :none,
           stroke_width: 21.34,
-          color: "#000000",
+          color: ["#000000"],
           opacity: [1.0],
           line_end: line_end,
           line_join: line_join,
@@ -362,7 +430,7 @@ defmodule Giggly.SVGTest do
         lines: [[{0.1, 0.1}, {0.2, 0.2}], [{0.3, 0.3}, {0.4, 0.4}]],
         offsets: :none,
         stroke_width: 1.07,
-        color: "#000000",
+        color: List.duplicate("#000000", 2),
         opacity: [0.1, 1.0],
         line_end: :butt,
         line_join: :round,
@@ -384,7 +452,7 @@ defmodule Giggly.SVGTest do
         starts: [{0.1, 0.5}],
         ends: [{0.3, 0.75}],
         stroke_width: 1.07,
-        color: "#000000",
+        color: ["#000000"],
         opacity: [0.1],
         line_end: :butt,
         line_join: :round,

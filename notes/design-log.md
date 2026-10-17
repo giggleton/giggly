@@ -79,6 +79,14 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A discrete scale carries its missing value as a field, `na_value`, as ggplot2's scale carries
+  `na.value` (2026-10-16, Steve).** A missing level takes no share of the palette and maps to it:
+  grey50, `#7F7F7F`, for colour and fill, `nil`, R's `NA`, for alpha and a position, which places
+  `nil` as its last level instead. `Scale.Discrete` is API, so the field is too; `Scale.Continuous`
+  gains it with the continuous colour scale, the first to need grey50. *Rejected: the palette
+  carrying it* (`{:hue, ..., na: ...}`), which keeps the struct as it was, but R's palettes know
+  nothing of `NA`, and a scale function's `na.value` would have to rewrite the palette.
+
 - **A library's owner nests under the umbrella, and the root lists the library (2026-10-16,
   Steve).** boundary lets a sub-boundary list an outside library only when its parent does, so
   `Giggly.DataFrame` lists `Table` and `Giggly.ColorOperations` lists `Color`, and the root lists
@@ -1098,8 +1106,12 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   over its sorted values and nothing else counts; otherwise the combinations of the discrete
   columns that occur are numbered 1..k, sorted column by column; with no discrete column every row
   is `-1`. Values sort with `nil` last (R's `na.last`) and otherwise in Erlang term order. Evaluated
-  columns are `x` and `y` first, as ggplot2's `aes()` takes them, then the rest in aesthetic-name
-  order, and the key follows them, so a discrete alpha groups within each `x`, as in ggplot2. The
+  columns are the layer's own aesthetics, then those it takes from the plot, as ggplot2's
+  `defaults(layer$mapping, plot$mapping)` lays them (2026-10-16, Steve), each mapping's `x` and `y`
+  first, as `aes()` takes them, then the rest in aesthetic-name order, and the key follows them, so
+  a discrete alpha mapped with `x` groups within each `x`, and `geom_bar(aes(fill = drv))` over
+  `aes(class)` by drive train first, as in ggplot2. *Rejected: `x` and `y` first whichever mapping
+  gives them* — the reference page's bars were then numbered, and drawn, class first. The
   integer `panel` column needs
   no exclusion; ggplot2 excludes `PANEL` only because it is a factor. *Rejected: `:none` for "no
   grouping"* — it is a value in the data, not an absent option, and the column must stay integers:
@@ -1324,10 +1336,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-16 — Map discrete columns to colours and fills (colour, step 2); §4: "A discrete scale
+  carries its missing value", "Group ids follow ggplot2's `add_group()`", "The guide protocol sits
+  at `Giggly.Guide`"
 - 2026-10-16 — Set colours and fills on a layer (colour, step 1) (`2841c12`); §4: "Colour and fill
   is Phase 3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come
-  from the
-  `color` package's conversions"
+  from the `color` package's conversions"
 - 2026-10-16 — Draw lines and dates in the notebooks (lines, step 4) (`04e9957`); §4: "Lines and
   date axes are Phase 3's third increment"
 - 2026-10-16 — Put dates on an axis (lines, step 3) (`223c9f1`); §4: "Lines and date axes are Phase

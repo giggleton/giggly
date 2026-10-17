@@ -58,7 +58,7 @@ defmodule Giggly.Guide.AxisTheta do
           [{0.0, 0.0}, {tick_length * :math.sin(angle), tick_length * :math.cos(angle)}]
         end),
       stroke_width: ticks_look.line_width,
-      color: ticks_look.color,
+      color: List.duplicate(ticks_look.color, length(breaks)),
       opacity: List.duplicate(1.0, length(breaks)),
       line_end: :butt,
       line_join: :round,

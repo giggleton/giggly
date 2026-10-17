@@ -4,8 +4,9 @@ defmodule Giggly.Geom.Bar do
   # Bars, ggplot2's `GeomBar`, which `geom_col()` draws with: one rectangle per row, from 0 to its
   # y and centred on its x. It takes no parameters yet. Use it through `Giggly.Geom`.
   #
-  # Bars use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y`; an aesthetic joins the
-  # accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # Bars use `:x`, `:y`, `:group`, `:alpha`, `:color` and `:fill`, and need `:x` and `:y`; an
+  # aesthetic joins the accepted list with the scale that maps it, so a mapping never silently does
+  # nothing.
   #
   # A bar is horizontal when its stat says so in a `flipped_aes` column, as counting along y does,
   # or else when y is the one discrete axis, as ggplot2's `GeomBar` decides (`has_flipped_aes()`);
@@ -20,10 +21,10 @@ defmodule Giggly.Geom.Bar do
   # one missing its y no height, so neither is drawn; an infinite y is not taken yet. The position
   # then stacks or moves those rectangles, and the scales are trained again to cover them.
   #
-  # Every bar looks as ggplot2's default bar does, until its aesthetics can be mapped: filled with
-  # ink mixed 35% toward paper, `#595959`, with no border, its border's width the theme's 0.5 mm all
-  # the same, as ggplot2's snapshots write it, or filled and bordered in the colours the layer sets,
-  # `:none`, R's `NA`, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
+  # Every bar looks as ggplot2's default bar does: filled with ink mixed 35% toward paper,
+  # `#595959`, with no border, its border's width the theme's 0.5 mm all the same, as ggplot2's
+  # snapshots write it, or filled and bordered in its row's colours, mapped or set, `:none`, R's
+  # `NA`, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
   # makes the bar's fill that opaque, replacing the fill's own alpha, and leaves its border in its
   # colour's own, as ggplot2's `GeomRect` applies `fill_alpha()` to the fill alone; a row without one
   # keeps its fill's (`Giggly.Geom.Mark`).
@@ -35,7 +36,7 @@ defmodule Giggly.Geom.Bar do
   # The aesthetics a layer of bars can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :x, :y]
 
   # The aesthetics a layer of bars cannot be drawn without.
   @doc false
@@ -116,31 +117,40 @@ defmodule Giggly.Geom.Bar do
       |> DataFrame.put(:ymax, Enum.map(y_positions, fn y -> toward_zero(y, :higher) end))
     end
 
+    # A rectangle for each row placed in the panel, in its fill and border.
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      fill = Mark.set(placed, :fill, @fill)
-      border = Mark.set(placed, :color, :none)
+      fills = Mark.values(placed, :fill, @fill)
 
       drawn =
         [:xmin, :xmax, :ymin, :ymax]
         |> Enum.map(fn name -> DataFrame.pull(placed, name) end)
-        |> Enum.concat([Mark.opacities(placed, fill)])
-        |> Enum.zip_with(fn row -> row end)
-        |> Enum.filter(fn [xmin, xmax, ymin, ymax, _opacity] ->
-          Enum.all?([xmin, xmax, ymin, ymax], &is_number/1)
+        |> Enum.concat([
+          fills,
+          Mark.opacities(placed, fills),
+          Mark.values(placed, :color, :none)
+        ])
+        |> Enum.zip_with(fn [xmin, xmax, ymin, ymax, fill, fill_opacity, border] ->
+          %{
+            extent: [xmin, xmax, ymin, ymax],
+            fill: fill,
+            fill_opacity: fill_opacity,
+            border: border
+          }
         end)
+        |> Enum.filter(fn bar -> Enum.all?(bar.extent, &is_number/1) end)
 
       [
         %Rectangles{
-          xmin: Enum.map(drawn, fn [xmin, _xmax, _ymin, _ymax, _opacity] -> xmin end),
-          xmax: Enum.map(drawn, fn [_xmin, xmax, _ymin, _ymax, _opacity] -> xmax end),
-          ymin: Enum.map(drawn, fn [_xmin, _xmax, ymin, _ymax, _opacity] -> ymin end),
-          ymax: Enum.map(drawn, fn [_xmin, _xmax, _ymin, ymax, _opacity] -> ymax end),
-          fill: Mark.hex(fill),
-          fill_opacity: Enum.map(drawn, fn [_xmin, _xmax, _ymin, _ymax, opacity] -> opacity end),
-          color: Mark.hex(border),
-          color_opacity: Mark.own_opacity(border),
+          xmin: Enum.map(drawn, fn %{extent: [xmin, _xmax, _ymin, _ymax]} -> xmin end),
+          xmax: Enum.map(drawn, fn %{extent: [_xmin, xmax, _ymin, _ymax]} -> xmax end),
+          ymin: Enum.map(drawn, fn %{extent: [_xmin, _xmax, ymin, _ymax]} -> ymin end),
+          ymax: Enum.map(drawn, fn %{extent: [_xmin, _xmax, _ymin, ymax]} -> ymax end),
+          fill: Enum.map(drawn, fn bar -> Mark.hex(bar.fill) end),
+          fill_opacity: Enum.map(drawn, fn bar -> bar.fill_opacity end),
+          color: Enum.map(drawn, fn bar -> Mark.hex(bar.border) end),
+          color_opacity: Enum.map(drawn, fn bar -> Mark.own_opacity(bar.border) end),
           stroke_width: @stroke_width
         }
       ]
@@ -159,10 +169,10 @@ defmodule Giggly.Geom.Bar do
           xmax: [1 - @key_inset / width],
           ymin: [@key_inset / height],
           ymax: [1 - @key_inset / height],
-          fill: Mark.hex(fill),
+          fill: [Mark.hex(fill)],
           fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
-          color: Mark.hex(border),
-          color_opacity: Mark.own_opacity(border),
+          color: [Mark.hex(border)],
+          color_opacity: [Mark.own_opacity(border)],
           stroke_width: @stroke_width
         }
       ]

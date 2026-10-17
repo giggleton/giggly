@@ -7,25 +7,25 @@ defmodule Giggly.Geom.Path do
   # corner may reach (`mitre_limit`, `linemitre`). Lines (`Giggly.Geom.Line`) draw as a path once
   # their rows are in order. Use it through `Giggly.Geom`.
   #
-  # Paths use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y`; an aesthetic joins the
-  # accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`; an aesthetic
+  # joins the accepted list with the scale that maps it, so a mapping never silently does nothing.
   #
   # A path is drawn as ggplot2's `GeomPath` draws one. Rows missing `x` or `y` (`nil`, or the float
-  # `:nan`) at the start or end of a group are dropped, as `handle_na()` drops them, and one in the
-  # middle breaks the line there, as grid breaks a polyline; ggplot2 also warns of the rows it
-  # drops, which a pure pipeline cannot. The rows are put in group order, keeping each group's own
-  # order, and cut into steps that follow the panel's curves (`Giggly.Coord.munch/3`); a group of
-  # fewer than two rows is not drawn. Where every group's alpha is the same all along it, each group
-  # is one line, drawn in its first row's alpha; where any group's varies, every group is drawn a
-  # segment from each row to the next, each in the alpha of the row it starts from, and a segment
-  # touching a missing position is not drawn.
+  # `:nan`), or whose colour is `:none`, R's `NA`, at the start or end of a group are dropped, as
+  # `handle_na()` drops them, and one missing a position in the middle breaks the line there, as
+  # grid breaks a polyline; ggplot2 also warns of the rows it drops, which a pure pipeline cannot.
+  # The rows are put in group order, keeping each group's own order, and cut into steps that follow
+  # the panel's curves (`Giggly.Coord.munch/3`); a group of fewer than two rows is not drawn. Where
+  # every group keeps one colour and one alpha all along it, each group is one line, drawn in its
+  # first row's colour and alpha; where any group's vary, every group is drawn a segment from each
+  # row to the next, each in the colour and alpha of the row it starts from, and a segment touching
+  # a missing position is not drawn.
   #
-  # Every line looks as ggplot2's default line does, until aesthetics such as colour can be mapped:
-  # solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the `linewidth` a layer
-  # sets, in millimetres, and black, or the colour the layer sets. A row's `alpha`, where its table
-  # has one, makes its line that opaque, replacing its colour's own; a row without one keeps its
-  # colour's (`Giggly.Geom.Mark`). A colour of `:none`, R's `NA`, draws no line, as ggplot2's
-  # `GeomPath` drops the rows whose colour is missing.
+  # Every line looks as ggplot2's default line does, until aesthetics such as linetype can be
+  # mapped: solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the `linewidth` a
+  # layer sets, in millimetres, and black, or its row's colour, mapped or set. A row's `alpha`,
+  # where its table has one, makes its line that opaque, replacing its colour's own; a row without
+  # one keeps its colour's (`Giggly.Geom.Mark`).
 
   @enforce_keys [:line_end, :line_join, :mitre_limit]
   defstruct @enforce_keys
@@ -39,7 +39,7 @@ defmodule Giggly.Geom.Path do
   # The aesthetics a layer of paths can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :group, :x, :y]
 
   # The aesthetics a layer of paths cannot be drawn without.
   @doc false
@@ -73,11 +73,22 @@ defmodule Giggly.Geom.Path do
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
+    # The panel's lines.
     @impl Giggly.Geom
     def draw_panel(geom, frame, coord, panel_params) do
-      case Mark.set(frame, :color, @color) do
-        :none -> []
-        color -> draw_lines(geom, frame, coord, panel_params, color)
+      kept =
+        frame
+        |> trimmed()
+        |> by_group()
+
+      drawn =
+        coord
+        |> Coord.munch(kept, panel_params)
+        |> without_short_groups()
+
+      case DataFrame.row_count(drawn) do
+        0 -> []
+        _rows -> [draw(geom, drawn, constant?(drawn))]
       end
     end
 
@@ -94,7 +105,7 @@ defmodule Giggly.Geom.Path do
               starts: [@key_start],
               ends: [@key_end],
               stroke_width: points(Map.get(key, :linewidth, @line_width)),
-              color: Mark.hex(color),
+              color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.get(key, :alpha))],
               line_end: geom.line_end,
               line_join: :round,
@@ -104,28 +115,10 @@ defmodule Giggly.Geom.Path do
       end
     end
 
-    # The panel's lines in `color`.
-    defp draw_lines(geom, frame, coord, panel_params, color) do
-      kept =
-        frame
-        |> trimmed()
-        |> by_group()
-
-      drawn =
-        coord
-        |> Coord.munch(kept, panel_params)
-        |> without_short_groups()
-
-      case DataFrame.row_count(drawn) do
-        0 -> []
-        _rows -> [draw(geom, drawn, color, constant?(drawn))]
-      end
-    end
-
-    # Each group a line, in its first row's alpha, broken where a position is missing, as grid
-    # breaks a polyline; a piece of one point draws nothing.
-    defp draw(geom, frame, color, true) do
-      {lines, opacities} =
+    # Each group a line, in its first row's colour and alpha, broken where a position is missing, as
+    # grid breaks a polyline; a piece of one point draws nothing.
+    defp draw(geom, frame, true) do
+      {lines, looks} =
         frame
         |> rows()
         |> Enum.chunk_by(fn row -> row.group end)
@@ -136,9 +129,7 @@ defmodule Giggly.Geom.Path do
             [first_row, _second_row | _rest] -> placed?(first_row)
             [_lone_row] -> false
           end)
-          |> Enum.map(fn piece ->
-            {Enum.map(piece, &position/1), Mark.opacity(color, first.alpha)}
-          end)
+          |> Enum.map(fn piece -> {Enum.map(piece, &position/1), first} end)
         end)
         |> Enum.unzip()
 
@@ -146,17 +137,17 @@ defmodule Giggly.Geom.Path do
         lines: lines,
         offsets: :none,
         stroke_width: stroke_width(frame),
-        color: Mark.hex(color),
-        opacity: opacities,
+        color: Enum.map(looks, fn row -> Mark.hex(row.color) end),
+        opacity: Enum.map(looks, fn row -> Mark.opacity(row.color, row.alpha) end),
         line_end: geom.line_end,
         line_join: geom.line_join,
         mitre_limit: geom.mitre_limit
       }
     end
 
-    # A segment from each row to the next of its group, in the alpha of the row it starts from; a
-    # segment touching a missing position is not drawn.
-    defp draw(geom, frame, color, false) do
+    # A segment from each row to the next of its group, in the colour and alpha of the row it starts
+    # from; a segment touching a missing position is not drawn.
+    defp draw(geom, frame, false) do
       segments =
         frame
         |> rows()
@@ -169,8 +160,8 @@ defmodule Giggly.Geom.Path do
         starts: Enum.map(segments, fn [from, _to] -> position(from) end),
         ends: Enum.map(segments, fn [_from, to] -> position(to) end),
         stroke_width: stroke_width(frame),
-        color: Mark.hex(color),
-        opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(color, from.alpha) end),
+        color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
+        opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),
         line_end: geom.line_end,
         line_join: geom.line_join,
         mitre_limit: geom.mitre_limit
@@ -227,38 +218,36 @@ defmodule Giggly.Geom.Path do
       DataFrame.slice(frame, kept)
     end
 
-    # Whether every group keeps one alpha all along it, ggplot2's test for drawing a group as one
-    # line rather than segments; a table without the column is opaque throughout.
+    # Whether every group keeps one colour and one alpha all along it, ggplot2's test for drawing a
+    # group as one line rather than segments; a table without alpha is opaque throughout.
     defp constant?(frame) do
       frame
       |> rows()
-      |> Enum.group_by(fn row -> row.group end, fn row -> row.alpha end)
-      |> Enum.all?(fn {_group, alphas} -> match?([_one], Enum.uniq(alphas)) end)
+      |> Enum.group_by(fn row -> row.group end, fn row -> {row.color, row.alpha} end)
+      |> Enum.all?(fn {_group, looks} -> match?([_one], Enum.uniq(looks)) end)
     end
 
-    # Each row's positions, group and alpha, `nil` for a table without alpha.
+    # Each row's positions, group, colour, black for a table without one, and alpha, `nil` for a
+    # table without one.
     defp rows(frame) do
-      alphas =
-        if :alpha in DataFrame.names(frame),
-          do: DataFrame.pull(frame, :alpha),
-          else: List.duplicate(nil, DataFrame.row_count(frame))
-
       Enum.zip_with(
         [
           DataFrame.pull(frame, :x),
           DataFrame.pull(frame, :y),
           DataFrame.pull(frame, :group),
-          alphas
+          Mark.values(frame, :color, @color),
+          Mark.values(frame, :alpha, nil)
         ],
-        fn [x_position, y_position, group, alpha] ->
-          %{x: x_position, y: y_position, group: group, alpha: alpha}
+        fn [x_position, y_position, group, color, alpha] ->
+          %{x: x_position, y: y_position, group: group, color: color, alpha: alpha}
         end
       )
     end
 
-    # A row with both positions, before it is placed: an infinite one counts, as R's
-    # `complete.cases()` counts it.
-    defp complete?(row), do: not missing?(row.x) and not missing?(row.y)
+    # A row with both positions and a colour, before it is placed, as R's `complete.cases()` finds
+    # one, an infinite position counting as present and a colour of `:none` as missing.
+    defp complete?(row),
+      do: not missing?(row.x) and not missing?(row.y) and row.color != :none
 
     defp missing?(position), do: position in [nil, :nan]
 

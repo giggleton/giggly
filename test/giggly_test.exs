@@ -358,6 +358,53 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
   # `mpg` where it is used, printed to 17 significant digits. It moves with `stat_count()` or the
   # bar geometry.
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, its colours scales 1.4.0's `pal_hue()`.
+  describe "layer_data/2, mapping colour" do
+    test "a discrete colour is each level's hue, a missing one grey50, and groups by them" do
+      frame =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 2, 3, 4], "g" => ["b", "a", nil, "a"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :color), DataFrame.pull(frame, :group)} ===
+               {["#00BFC4", "#F8766D", "#7F7F7F", "#F8766D"], [2, 1, 3, 1]}
+    end
+
+    # ggplot2 lays a layer's mapping over the plot's as `defaults(layer$mapping, plot$mapping)`, so
+    # it evaluates the layer's colour before the plot's x, and numbers groups colour first.
+    test "groups are numbered by a layer's own aesthetics before those it takes from the plot" do
+      rows = %{"x" => ["a", "b", "a", "b"], "y" => [1, 2, 3, 4], "g" => ["q", "q", "p", "p"]}
+
+      in_layer =
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: :g})
+        |> Giggly.layer_data()
+
+      in_plot =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(in_layer, :group), DataFrame.pull(in_plot, :group)} ===
+               {[3, 4, 1, 2], [2, 4, 1, 3]}
+    end
+
+    test "a colour or fill mapped to numbers is refused when the plot is run, until its scale arrives" do
+      plot =
+        %{"x" => [1, 2], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col(%{fill: :y})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~
+               "maps :fill to \"y\", a :integer column, which no scale can place yet"
+    end
+  end
+
   describe "layer_data/2, for geom_bar" do
     test "each bar counts its level's rows, its height the count" do
       frame =
@@ -719,7 +766,8 @@ defmodule GigglyTest do
                x: %Giggly.Scale.Discrete{
                  levels: ["a", "b", "c"],
                  continuous_range: {0.55000000000000004, 3.4500000000000002},
-                 palette: :identity
+                 palette: :identity,
+                 na_value: nil
                },
                y: %Giggly.Scale.Continuous{
                  range: {0.0, 3.2},
@@ -772,12 +820,14 @@ defmodule GigglyTest do
                {%Giggly.Scale.Discrete{
                   levels: ["6", "8"],
                   continuous_range: {1, 2},
-                  palette: :identity
+                  palette: :identity,
+                  na_value: nil
                 },
                 %Giggly.Scale.Discrete{
                   levels: ["4", "6"],
                   continuous_range: {1, 2},
-                  palette: :identity
+                  palette: :identity,
+                  na_value: nil
                 }}
 
       # Each row on its own panel's scale, in row order: "8" is the second level of panel 1's.
@@ -999,6 +1049,90 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/point_colour_legend.svg")
+    end
+
+    # Golden: test/golden/point_colour_alpha.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/point_colour_alpha.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. mpg's points, each in its
+    # class's hue, seven round the circle, and as opaque as its cylinders: two legends stacked down
+    # the right, alpha's above colour's, each left-aligned. It moves with what moves
+    # test/golden/point_colour_legend.svg, with the hue palette, and with how legends stack.
+    test "points are drawn in their class's hue, two legends stacked in their aesthetics' order" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class, alpha: :cyl})
+        |> Plot.geom_point()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_colour_alpha.svg")
+    end
+
+    # Golden: test/golden/bar_fill.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/bar_fill.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_bar()'s example from ggplot2's reference page:
+    # mpg's classes counted and stacked by drive train, each filled in its hue, the layer's fill
+    # numbering the bars before the plot's x, and a legend of bar keys. It moves with what moves
+    # test/golden/alpha_bars.svg, and with the hue palette.
+    test "counted bars are filled in their drive train's hue, a fill the layer maps" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(%{fill: :drv})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/bar_fill.svg")
+    end
+
+    # Golden: test/golden/line_colour_missing.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/line_colour_missing.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. Three lines grouped by their
+    # colour, the one whose colour is missing in grey50, its key last and labelled NA. It moves with
+    # what moves test/golden/line_missing.svg, and with the hue palette.
+    test "lines are drawn in their group's hue, a missing colour in grey50" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 1, 2, 3, 1, 2, 3],
+          "y" => [1, 3, 2, 2, 1, 3, 3, 2, 1],
+          "g" => ["a", "a", "a", "b", "b", "b", nil, nil, nil]
+        }
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_line()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/line_colour_missing.svg")
+    end
+
+    # Golden: test/golden/merged_legend.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/merged_legend.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Columns filled by g and points coloured by
+    # it, whose legends share a title and labels and so merge into one, each key drawn by both
+    # layers, each in the aesthetic it maps alone. It moves with what moves test/golden/col.svg,
+    # with the hue palette, and with how legends merge.
+    test "a fill and a colour of one column merge into one legend, drawn by both layers" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [2, 3, 1], "g" => ["b", "a", "b"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col(%{fill: :g})
+        |> Plot.geom_point(%{colour: :g})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/merged_legend.svg")
     end
 
     # Golden: test/golden/line_missing.svg, checked against ggplot2's drawing of the same plot, made

@@ -53,7 +53,7 @@ defmodule Giggly.Guide.Grid do
       lines: lines,
       offsets: :none,
       stroke_width: look.line_width,
-      color: look.color,
+      color: List.duplicate(look.color, length(lines)),
       opacity: List.duplicate(1.0, length(lines)),
       line_end: :butt,
       line_join: :round,

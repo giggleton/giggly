@@ -39,6 +39,28 @@ defmodule Giggly.Plot do
   and where R and CSS give a name different colours it is CSS's: `"green"` is `#008000`, not R's
   `#00FF00`. An alpha, set or mapped, replaces a colour's own, as ggplot2's `alpha()` does,
   so `geom_point(colour: "#4682B480")` draws half-opaque points, and with `alpha: 1` opaque ones.
+
+  ## Mapping colour
+
+  A discrete column mapped to `:color` (or `:colour`) or `:fill` gives each of its values a hue,
+  evenly spaced round the colour wheel at one chroma and luminance, exactly as ggplot2's default
+  discrete colour scale (`scales::pal_hue()`) gives them, so three values are `#F8766D`, `#00BA38`
+  and `#619CFF`; a missing value is grey50, `#7F7F7F`, and its key in the legend comes last,
+  labelled `NA`. A continuous colour is not mapped yet, and mapping a column of numbers raises when
+  the plot is run.
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "cyl" => ["6", "4", nil]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#00BFC4", "#F8766D", "#7F7F7F"]
+
+  A legend is drawn for each mapped aesthetic, stacked down the right of the panels in the order
+  of the aesthetics' names (`alpha`, `color`, `fill`), and two with the same title and labels, as
+  a colour and a fill mapped to one column, are drawn as one, each layer drawing its keys in the
+  aesthetics it maps. ggplot2 orders its legends by a hash of their contents; `guides(order =)` in
+  R puts them in Giggly's order.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -284,8 +306,8 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
-  other. A point set or mapped to be transparent is so in its outline and its fill alike, as
+  Points use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y` from one mapping
+  or the other. A point set or mapped to be transparent is so in its outline and its fill alike, as
   ggplot2 draws one, and so is its colour, which `colour:` sets; a colour of `:none` draws no
   point, as ggplot2 leaves out a point whose colour is `NA`. A mapping, a map, and options, a
   keyword list, may each be given alone or both together.
@@ -358,9 +380,10 @@ defmodule Giggly.Plot do
   Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   counts along the one mapped, and the count is the other, so mapping `:y` alone draws horizontal
   bars, as ggplot2's `geom_bar(aes(y = class))` does, the x axis titled `count`. A `:weight` column
-  must hold numbers. The bars also take `:alpha`, which reaches a bar where it is the same in every
-  row the bar counts, as ggplot2 keeps it, and so a discrete alpha both groups the rows and shades
-  each group's bar. A mapping, a map, and options, a keyword list, may each be given alone or
+  must hold numbers. The bars also take `:alpha`, `:fill` and `:color`, each of which reaches a bar
+  where it is the same in every row the bar counts, as ggplot2 keeps it, and so a discrete one both
+  groups the rows and shades or colours each group's bar, as ggplot2's `geom_bar(aes(fill = drv))`
+  fills each drive train's. A mapping, a map, and options, a keyword list, may each be given alone or
   both together.
 
   ## Options
@@ -415,9 +438,9 @@ defmodule Giggly.Plot do
   as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
   reaches to 0, since every bar starts there.
 
-  Bars use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
-  other; a bar's fill takes its alpha, its border not. `fill:` sets the fill and `colour:` the
-  border, which bars have none of unless it is set. When `y`
+  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill` and `:color`, and need `:x` and `:y` from one
+  mapping or the other; a bar's fill takes its alpha, its border not. `:fill` fills a bar and
+  `:color` borders it, which bars have none of unless it is mapped or set. When `y`
   is the discrete axis and `x` the continuous one, the bars are horizontal, each from 0 to its `x`,
   as ggplot2 decides. A mapping, a map, and options, a keyword list, may each be given alone or both
   together.
@@ -475,12 +498,13 @@ defmodule Giggly.Plot do
   ggplot2's `geom_path()`, for a line that may double back, as one through two measures taken
   over time does. `geom_line/3` puts the rows in order first.
 
-  Paths use `:x`, `:y`, `:group` and `:alpha`, and need `:x` and `:y` from one mapping or the
-  other; each group is a line of its own. A row missing `x` or `y` breaks its line there, and
-  those at either end of a group are left out; a group of one row draws nothing. Where a line's
-  alpha changes along it, the line is drawn a segment from each row to the next, each as opaque
-  as the row it starts from. `colour:` sets the lines' colour; a colour of `:none` draws no line,
-  as ggplot2 leaves out a line whose colour is `NA`. A mapping, a map, and options, a keyword
+  Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y` from one mapping
+  or the other; each group is a line of its own, and a discrete colour groups the rows, a line in
+  each colour. A row missing `x` or `y` breaks its line there, and those at either end of a group
+  are left out; a group of one row draws nothing. Where a line's colour or alpha changes along it,
+  the line is drawn a segment from each row to the next, each in the colour and alpha of the row
+  it starts from. `colour:` sets the lines' colour; a colour of `:none` draws no line, as ggplot2
+  leaves out a line whose colour is `NA`. A mapping, a map, and options, a keyword
   list, may each be given alone or both together.
 
   ## Options
@@ -664,6 +688,34 @@ defmodule Giggly.Plot do
     |> Map.merge(layer.mapping)
     |> Map.drop(Map.keys(layer.fixed))
   end
+
+  # The aesthetics `computed_mapping/2` maps for `layer`, in the order ggplot2 evaluates them: the
+  # layer's own, then those it takes from the plot's mapping, as `defaults(layer$mapping,
+  # plot$mapping)` lays them, each mapping's x and y first, as `aes()` takes them as its first two
+  # arguments, and its others in name order, since a mapping is a map and keeps no written order.
+  @doc false
+  @spec mapping_order(t(), Layer.t()) :: [aesthetic()]
+  def mapping_order(%__MODULE__{} = plot, %Layer{} = layer) do
+    set = Map.keys(layer.fixed)
+
+    own =
+      layer.mapping
+      |> Map.drop(set)
+      |> Map.keys()
+      |> in_aes_order()
+
+    inherited =
+      plot.mapping
+      |> Map.drop(Map.keys(layer.mapping))
+      |> Map.drop(set)
+      |> Map.keys()
+      |> in_aes_order()
+
+    Enum.concat(own, inherited)
+  end
+
+  defp in_aes_order(aesthetics),
+    do: Enum.sort_by(aesthetics, fn aesthetic -> {aesthetic not in [:x, :y], aesthetic} end)
 
   # The geom `layer` draws with, a struct of its kind (`Giggly.Geom`).
   @doc false

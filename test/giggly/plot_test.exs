@@ -58,20 +58,28 @@ defmodule Giggly.PlotTest do
       assert error.message =~ "Plot.geom_point/3"
     end
 
+    # A point's fill colours only the filled shapes, which Giggly does not draw yet.
     test "an aesthetic points cannot use is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{color: :cyl}) end
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{fill: :cyl}) end
       assert error.message =~ "Plot.geom_point/3"
-      assert error.message =~ ":color"
+      assert error.message =~ ":fill"
       assert error.message =~ ":group"
     end
 
     test "an aesthetic points cannot use is refused when the plot's mapping gives it" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg, color: :cyl})
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, fill: :cyl})
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot) end
-      assert error.message =~ ":color"
+      assert error.message =~ ":fill"
+    end
+
+    test "points map their colour, written colour or color" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{mapping: %{color: "cyl"}}]} =
+               Plot.geom_point(plot, %{colour: :cyl})
     end
 
     test "x or y mapped by neither the layer nor the plot is refused" do
@@ -243,9 +251,16 @@ defmodule Giggly.PlotTest do
     test "an aesthetic bars cannot use is refused, naming the call" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
-      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{color: :wt}) end
+      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{size: :wt}) end
       assert error.message =~ "Plot.geom_col/3"
-      assert error.message =~ ":color"
+      assert error.message =~ ":size"
+    end
+
+    test "bars map their border's colour and their fill" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{mapping: %{color: "wt", fill: "cyl"}}]} =
+               Plot.geom_col(plot, %{colour: :wt, fill: :cyl})
     end
 
     test "y mapped by neither the layer nor the plot is refused, naming the call" do
@@ -273,6 +288,13 @@ defmodule Giggly.PlotTest do
                  fixed: %{}
                }
              ]
+    end
+
+    test "counted bars map their fill and their border's colour" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{mapping: %{color: "cyl", fill: "cyl"}}]} =
+               Plot.geom_bar(plot, %{fill: :cyl, colour: :cyl})
     end
 
     test "options alone choose the position, and dodging records the dodge" do
@@ -390,6 +412,19 @@ defmodule Giggly.PlotTest do
   end
 
   describe "geom_path/3 and geom_line/3" do
+    test "paths and lines map their colour, and refuse a fill, which a line has none of" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{mapping: %{color: "cyl"}}]} =
+               Plot.geom_path(plot, %{colour: :cyl})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{mapping: %{color: "cyl"}}]} =
+               Plot.geom_line(plot, %{colour: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_line(plot, %{fill: :cyl}) end
+      assert error.message =~ ":fill"
+    end
+
     test "a path layer records its geom with ggplot2's ends, corners and mitre limit by default" do
       plot =
         @rows

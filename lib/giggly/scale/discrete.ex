@@ -4,23 +4,31 @@ defmodule Giggly.Scale.Discrete do
   has seen, in level order; the continuous range of the positions it has been handed since its
   levels were placed, such as a bar's edges, `:none` before any: ggplot2's `range_c`, which can
   widen the axis past its levels; and its palette, which turns a level into the value of its
-  aesthetic: `:identity` for a position, each level at its place counting from 1, and
+  aesthetic: `:identity` for a position, each level at its place counting from 1;
   `{:sequence, {low, high}}` for an aesthetic such as alpha, the levels spread evenly from `low` to
-  `high` in level order, a missing value taking none, as ggplot2's ordinal alpha scale spreads
-  them.
+  `high` in level order, as ggplot2's ordinal alpha scale spreads them; and
+  `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance}}` for colour and fill, a colour
+  for each level, its hue spaced evenly round the circle from `low`, as R's `pal_hue()` gives them;
+  and the value a missing value maps to, its `na_value`, ggplot2's `na.value`: `nil`, R's `NA`, for
+  alpha, and grey50, `"#7F7F7F"`, for colour and fill. A missing value takes no share of an
+  aesthetic's palette; a position scale puts it at its last level, and its `na_value` is `nil`.
   """
 
   # Use it through `Giggly.Scale`.
 
   alias Giggly.Scale.{Continuous, Palette}
 
-  @enforce_keys [:levels, :continuous_range, :palette]
+  @enforce_keys [:levels, :continuous_range, :palette, :na_value]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           levels: list(),
           continuous_range: :none | {number(), number()},
-          palette: :identity | {:sequence, {number(), number()}}
+          palette:
+            :identity
+            | {:sequence, {number(), number()}}
+            | {:hue, %{hue: {number(), number()}, chroma: number(), luminance: number()}},
+          na_value: nil | String.t()
         }
 
   # The scale with the distinct `values` merged into its levels, as `Giggly.Scale.train/2`
@@ -46,7 +54,8 @@ defmodule Giggly.Scale.Discrete do
 
   # Each value as `Giggly.Scale.map/2` describes: a position at its level's place counting from 1;
   # for any other palette, its level's value from the palette, which spreads the present levels,
-  # `nil` taking none of them and mapping to `nil`, as ggplot2's `na.value` is `NA`.
+  # `nil` taking none of them and mapping to the scale's `na_value`, as ggplot2's mapping gives `NA`
+  # its `na.value`.
   @doc false
   @spec map(t(), list()) :: list()
   def map(%__MODULE__{levels: levels, palette: :identity}, values) do
@@ -58,7 +67,7 @@ defmodule Giggly.Scale.Discrete do
     Enum.map(values, fn value -> Map.get(position_by_level, value) end)
   end
 
-  def map(%__MODULE__{levels: levels, palette: palette}, values) do
+  def map(%__MODULE__{levels: levels, palette: palette, na_value: na_value}, values) do
     present = Enum.reject(levels, &is_nil/1)
 
     value_by_level =
@@ -66,6 +75,6 @@ defmodule Giggly.Scale.Discrete do
       |> Enum.zip(Palette.discrete(palette, length(present)))
       |> Map.new()
 
-    Enum.map(values, fn value -> Map.get(value_by_level, value) end)
+    Enum.map(values, fn value -> Map.get(value_by_level, value, na_value) end)
   end
 end

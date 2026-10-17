@@ -10,6 +10,13 @@ defmodule Giggly.ScaleTest do
     |> Scale.train(values)
   end
 
+  # A new discrete colour scale trained once on `values`.
+  defp hue_scale(values) do
+    :discrete
+    |> Scale.new(:color)
+    |> Scale.train(values)
+  end
+
   # A new scale of `kind` trained once on `values`.
   defp trained(kind, values) do
     kind
@@ -41,6 +48,16 @@ defmodule Giggly.ScaleTest do
       assert {Scale.kind(:float, :alpha), Scale.kind(:string, :alpha)} ===
                {:continuous, :discrete}
     end
+
+    test "a colour or fill has a discrete scale and none yet for numbers or dates" do
+      assert Enum.map([:string, :boolean, :atom], fn dtype -> Scale.kind(dtype, :color) end) ===
+               [:discrete, :discrete, :discrete]
+
+      assert Enum.map([:integer, :float, :null, :date], fn dtype -> Scale.kind(dtype, :fill) end) ===
+               [:none, :none, :none, :none]
+
+      assert {Scale.kind(:string, :fill), Scale.kind(:integer, :color)} === {:discrete, :none}
+    end
   end
 
   describe "train/2" do
@@ -68,7 +85,8 @@ defmodule Giggly.ScaleTest do
       assert scale === %Scale.Discrete{
                levels: ["a", "b", "c", nil],
                continuous_range: :none,
-               palette: :identity
+               palette: :identity,
+               na_value: nil
              }
     end
 
@@ -82,7 +100,8 @@ defmodule Giggly.ScaleTest do
       assert scale === %Scale.Discrete{
                levels: ["a", "b"],
                continuous_range: {0.55, 2.45},
-               palette: :identity
+               palette: :identity,
+               na_value: nil
              }
     end
   end
@@ -98,7 +117,12 @@ defmodule Giggly.ScaleTest do
 
       assert {Scale.reset(continuous), Scale.reset(discrete)} ===
                {%Scale.Continuous{range: :none, transform: :identity, palette: :identity},
-                %Scale.Discrete{levels: ["a", "b"], continuous_range: :none, palette: :identity}}
+                %Scale.Discrete{
+                  levels: ["a", "b"],
+                  continuous_range: :none,
+                  palette: :identity,
+                  na_value: nil
+                }}
     end
   end
 
@@ -350,8 +374,88 @@ defmodule Giggly.ScaleTest do
                 %Scale.Discrete{
                   levels: [],
                   continuous_range: :none,
-                  palette: {:sequence, {0.1, 1.0}}
+                  palette: {:sequence, {0.1, 1.0}},
+                  na_value: nil
                 }}
+    end
+  end
+
+  # Golden: scales 1.4.0's `pal_hue()(n)` in R 4.6.1, through farver 2.1.2; the palette matched
+  # R's for every count from 1 to 40. A count of 24 ends on a hue of exactly 360, and 40 on 366,
+  # which R takes modulo 360 first. ggplot2's discrete colour scale maps `NA` to grey50.
+  describe "map/2 through the hue palette" do
+    test "a colour or fill scale records pal_hue()'s hues, chroma and luminance, NA grey50" do
+      expected = %Scale.Discrete{
+        levels: [],
+        continuous_range: :none,
+        palette: {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}},
+        na_value: "#7F7F7F"
+      }
+
+      assert {Scale.new(:discrete, :color), Scale.new(:discrete, :fill)} === {expected, expected}
+    end
+
+    test "each present level takes its hue in level order, and a missing value grey50" do
+      scale = hue_scale(["r", "4", nil, "f"])
+
+      assert Scale.map(scale, ["f", nil, "4", "r", "4"]) ===
+               ["#00BA38", "#7F7F7F", "#F8766D", "#619CFF", "#F8766D"]
+    end
+
+    test "the hues are spaced round the circle, its last share left off, as pal_hue() spaces them" do
+      colours = fn count ->
+        levels =
+          Enum.map(1..count, fn index ->
+            index
+            |> Integer.to_string()
+            |> String.pad_leading(2, "0")
+          end)
+
+        levels
+        |> hue_scale()
+        |> Scale.map(levels)
+      end
+
+      assert {colours.(1), colours.(2), colours.(7)} ===
+               {["#F8766D"], ["#F8766D", "#00BFC4"],
+                ["#F8766D", "#C49A00", "#53B400", "#00C094", "#00B6EB", "#A58AFF", "#FB61D7"]}
+
+      assert colours.(24) === [
+               "#F8766D",
+               "#ED813E",
+               "#DE8C00",
+               "#CD9600",
+               "#B79F00",
+               "#9DA700",
+               "#7CAE00",
+               "#49B500",
+               "#00BA38",
+               "#00BE67",
+               "#00C08B",
+               "#00C1A9",
+               "#00BFC4",
+               "#00BBDC",
+               "#00B4F0",
+               "#00A9FF",
+               "#619CFF",
+               "#9F8CFF",
+               "#C77CFF",
+               "#E36EF6",
+               "#F564E3",
+               "#FF61CC",
+               "#FF64B0",
+               "#FF6C91"
+             ]
+
+      forty = colours.(40)
+
+      assert Enum.take(forty, -3) === ["#FF65AA", "#FF6A98", "#FD7083"]
+    end
+
+    test "a scale of missing values alone maps them all to grey50" do
+      scale = hue_scale([nil])
+
+      assert Scale.map(scale, [nil, nil]) === ["#7F7F7F", "#7F7F7F"]
     end
   end
 

@@ -2,8 +2,8 @@ defmodule Giggly.Geom.Mark do
   @moduledoc false
 
   # What a geom reads from its rows to give each mark its look: the value a layer sets for every
-  # mark, which the assembly puts in every row, and a mark's colour and opacity, as ggplot2's
-  # geoms make them with `alpha()`.
+  # mark, which the assembly puts in every row; each row's value of an aesthetic, mapped or set;
+  # and a mark's colour and opacity, as ggplot2's geoms make them with `alpha()`.
   #
   # A row's alpha replaces its colour's own, and a row without one, or a table without the column,
   # keeps the colour's, which for a colour with no alpha of its own is opaque. A colour reaches a
@@ -31,19 +31,24 @@ defmodule Giggly.Geom.Mark do
     end
   end
 
-  # Each row's opacity in `color`: its alpha, or the colour's own where it has none.
+  # Each row's value of `aesthetic` in `frame`: its column, mapped or set, or `default` in every row
+  # where the table has none.
   @doc false
-  @spec opacities(DataFrame.t(), String.t() | :none) :: [float()]
-  def opacities(frame, color) do
-    if :alpha in DataFrame.names(frame) do
-      frame
-      |> DataFrame.pull(:alpha)
-      |> Enum.map(fn alpha -> opacity(color, alpha) end)
-    else
-      color
-      |> own_opacity()
-      |> List.duplicate(DataFrame.row_count(frame))
-    end
+  @spec values(DataFrame.t(), atom(), term()) :: list()
+  def values(frame, aesthetic, default) do
+    if aesthetic in DataFrame.names(frame),
+      do: DataFrame.pull(frame, aesthetic),
+      else: List.duplicate(default, DataFrame.row_count(frame))
+  end
+
+  # Each row's opacity in its colour, one of `colors` for each row: its alpha, or the colour's own
+  # where it has none or the table has no alpha.
+  @doc false
+  @spec opacities(DataFrame.t(), [String.t() | :none]) :: [float()]
+  def opacities(frame, colors) do
+    frame
+    |> values(:alpha, nil)
+    |> Enum.zip_with(colors, fn alpha, color -> opacity(color, alpha) end)
   end
 
   # A mark's opacity in `color`, from 0 to 1: its alpha, or the colour's own where it has none.
