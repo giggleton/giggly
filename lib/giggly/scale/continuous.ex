@@ -7,20 +7,23 @@ defmodule Giggly.Scale.Continuous do
   days; and its palette, which turns a value's place in
   that range into the value of its aesthetic: `:identity` for a position, left where it is for
   the coordinate system to place, and `{:rescale, {low, high}}` for an aesthetic such as alpha,
-  each value's place, from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does.
+  each value's place, from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does; and
+  the guide that draws it, by name, as ggplot2's scale carries `guide`: `:axis` for a position and
+  `:legend` for alpha.
   """
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.
 
   alias Giggly.Scale.{Palette, Transform}
 
-  @enforce_keys [:range, :transform, :palette]
+  @enforce_keys [:range, :transform, :palette, :guide]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
           transform: atom(),
-          palette: :identity | {:rescale, {number(), number()}}
+          palette: :identity | {:rescale, {number(), number()}},
+          guide: :axis | :legend
         }
 
   # The values put through the scale's transformation, as `Giggly.Scale.transform/2` describes.

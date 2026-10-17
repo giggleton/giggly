@@ -113,30 +113,48 @@ defmodule Giggly.Scale do
   # ggplot2's colour for a missing value, grey50.
   @color_na_value "#7F7F7F"
 
-  # An untrained position scale of the given kind, its palette the identity; a continuous one
-  # records the identity transformation, and a date scale, a continuous one, the date
-  # transformation.
+  # An untrained position scale of the given kind, its palette the identity and its guide an axis,
+  # as ggplot2's position scales are drawn by `guide_axis()`; a continuous one records the identity
+  # transformation, and a date scale, a continuous one, the date transformation.
   @doc false
   @spec new(:continuous | :discrete | :date) :: t()
-  def new(:continuous), do: %Continuous{range: :none, transform: :identity, palette: :identity}
-  def new(:date), do: %Continuous{range: :none, transform: :date, palette: :identity}
+  def new(:continuous),
+    do: %Continuous{range: :none, transform: :identity, palette: :identity, guide: :axis}
 
-  def new(:discrete),
-    do: %Discrete{levels: [], continuous_range: :none, palette: :identity, na_value: nil}
+  def new(:date),
+    do: %Continuous{range: :none, transform: :date, palette: :identity, guide: :axis}
+
+  def new(:discrete) do
+    %Discrete{
+      levels: [],
+      continuous_range: :none,
+      palette: :identity,
+      na_value: nil,
+      guide: :axis
+    }
+  end
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
-  # ggplot2's default palette for it and, for a discrete one, its value for a missing value.
+  # ggplot2's default palette and guide for it, a legend, and, for a discrete one, its value for a
+  # missing value.
   @doc false
   @spec new(:continuous | :discrete, atom()) :: t()
-  def new(:continuous, :alpha),
-    do: %Continuous{range: :none, transform: :identity, palette: {:rescale, @alpha_range}}
+  def new(:continuous, :alpha) do
+    %Continuous{
+      range: :none,
+      transform: :identity,
+      palette: {:rescale, @alpha_range},
+      guide: :legend
+    }
+  end
 
   def new(:discrete, :alpha) do
     %Discrete{
       levels: [],
       continuous_range: :none,
       palette: {:sequence, @alpha_range},
-      na_value: nil
+      na_value: nil,
+      guide: :legend
     }
   end
 
@@ -145,7 +163,8 @@ defmodule Giggly.Scale do
       levels: [],
       continuous_range: :none,
       palette: @hue_palette,
-      na_value: @color_na_value
+      na_value: @color_na_value,
+      guide: :legend
     }
   end
 

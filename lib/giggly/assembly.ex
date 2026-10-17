@@ -61,7 +61,7 @@ defmodule Giggly.Assembly do
 
   # The assembly reads a plot and hands each stage its input; what it may call is the plot, the
   # data frame, the aesthetic vocabulary (which columns are x and which y) and the stages, each
-  # named as it arrives.
+  # named as it arrives; the guides it lists only to build the kind of guide a scale names.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
@@ -70,6 +70,7 @@ defmodule Giggly.Assembly do
       Giggly.Facet,
       Giggly.Geom,
       Giggly.Group,
+      Giggly.Guide,
       Giggly.Plot,
       Giggly.Position,
       Giggly.Scale,
@@ -77,7 +78,19 @@ defmodule Giggly.Assembly do
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, Coord, DataFrame, Facet, Geom, Group, Plot, Position, Scale, Stat}
+  alias Giggly.{
+    Aesthetics,
+    Coord,
+    DataFrame,
+    Facet,
+    Geom,
+    Group,
+    Guide,
+    Plot,
+    Position,
+    Scale,
+    Stat
+  }
 
   @enforce_keys [
     :layer_data,
@@ -123,8 +136,9 @@ defmodule Giggly.Assembly do
         }
 
   @typedoc """
-  A legend for one or more aesthetics other than position, those whose scales give the same title
-  and labels, in name order: its title, the column the first layer to map the aesthetic maps it
+  A legend for one or more aesthetics other than position, those whose scales give the same kind of
+  guide, title and labels, in name order: the guide that draws it, a struct of its kind, as the
+  first aesthetic's scale names it (`Giggly.Guide`); its title, the column the first layer to map the aesthetic maps it
   to; a key for each of its scales' breaks, the break's label, the break itself, as the first
   aesthetic's data holds it (ggplot2's `.value`), and the value each aesthetic maps it to; and each
   layer that maps one of its aesthetics, in the order the layers were added, with those it maps,
@@ -133,6 +147,7 @@ defmodule Giggly.Assembly do
   data, and whether it draws in each key, in key order.
   """
   @type legend :: %{
+          guide: struct(),
           aesthetics: [Plot.aesthetic()],
           title: String.t(),
           keys: [
@@ -298,9 +313,10 @@ defmodule Giggly.Assembly do
   end
 
   # The legends the scales of aesthetics other than position give, as ggplot2's guides build them
-  # from the trained scales: each scale's, in the order of the aesthetics' names, a key for each
-  # break the scale shows, labelled, with the value it maps to, merged into an earlier one with the
-  # same title and labels, as ggplot2 merges guides whose title and labels hash alike, which keeps
+  # from the trained scales: each scale's, drawn by the guide the scale names, in the order of the
+  # aesthetics' names, a key for each break the scale shows, labelled, with the value it maps to,
+  # merged into an earlier one with the same kind of guide, title and labels, as ggplot2 merges
+  # guides whose kind, title and labels hash alike, which keeps
   # each key's labels and the first's breaks and gathers its values; then each drawn by the geom of
   # every layer that maps one of its aesthetics, with those it maps, as a layer shows in a legend
   # whose aesthetic it maps, in the keys its data holds. A scale with no breaks, one trained on
@@ -319,6 +335,7 @@ defmodule Giggly.Assembly do
         mapped = Scale.map(scale, values)
 
         %{
+          guide: guide(scale),
           aesthetics: [aesthetic],
           title: guide_title(plot, layers, aesthetic),
           keys:
@@ -348,8 +365,13 @@ defmodule Giggly.Assembly do
     if reads_alike?(earlier, legend), do: merge(earlier, legend), else: earlier
   end
 
-  defp reads_alike?(legend, other),
-    do: legend.title == other.title and labels(legend) == labels(other)
+  defp reads_alike?(legend, other) do
+    legend.guide.__struct__ == other.guide.__struct__ and legend.title == other.title and
+      labels(legend) == labels(other)
+  end
+
+  # The guide a scale names, as a struct of its kind, as `Plot` turns a position's name into one.
+  defp guide(%{guide: :legend}), do: %Guide.Legend{}
 
   defp labels(legend), do: Enum.map(legend.keys, fn key -> key.label end)
 

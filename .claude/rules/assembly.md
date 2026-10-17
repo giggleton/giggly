@@ -35,7 +35,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the coordinate system's `panel_params`, `clip` and `aspect`, each layer's stat and position, and
   each geom's `setup_data`; `draw_panel`, `transform`, `axes` and `grid` are rendering's. It lists
   `Coord` and `Geom` for their build functions, so this holds by review: design-log §4, the entry
-  beginning "A geom says where its marks sit".
+  beginning "A geom says where its marks sit". It lists `Giggly.Guide` only to build the kind of
+  guide a scale names, and never draws one.
 - **Each geom is told each axis's scale kind, discrete or continuous**, which the assembly decides
   once per axis, so a bar's orientation is decided as ggplot2's `has_flipped_aes()` decides it from
   `mapped_discrete` positions; a geom never sees a scale itself. A date axis is continuous to a
@@ -117,9 +118,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
   the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
-  range, a discrete one's levels, `NA` last), labelled, at the value it maps to. **Legends come in
-  the order of their aesthetics' names, and one with the title and labels of an earlier merges
-  into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
+  range, a discrete one's levels, `NA` last), labelled, at the value it maps to, drawn by the kind
+  of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`), as
+  `Plot` builds a position's. **Legends come in the order of their aesthetics' names, and one with
+  the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets
   `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, with those it

@@ -17,8 +17,8 @@ ggplot2's facets' order".
 ## Rules
 
 - **Rendering reads the assembled plot and builds the scene; it computes no positions.** Each
-  layer's geom draws in each panel, and the guide draws the panel's background, grid lines and
-  axes (`Giggly.Guide`), handed the plot's coordinate system and that panel's params, which
+  layer's geom draws in each panel, and the guide's modules draw the panel's background and grid
+  lines (`Guide.Grid`), axes (`Guide.Axis`) and strips (`Guide.Strip`), handed the plot's coordinate system and that panel's params, which
   rendering passes on unread; rendering arranges what they draw into cells, the panel's background
   and grid under its layers and any axis inside the panel over them, as ggplot2's coordinate
   system draws its background and foreground (`render_bg`, `render_fg`). The panel's
@@ -61,8 +61,8 @@ ggplot2's facets' order".
   ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows.
 - **A plot with legends gives them a column right of the panels**, the theme's legend spacing
   from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`.
-  The legends are stacked in the guide's box (`Guide.legends/2`), in the order the assembly gives
-  them; its cell spans the panels' rows, from the first's top to the last's bottom, the strips
+  Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked
+  in the guide's box (`Guide.Box.draw/2`), in the order the assembly gives them; its cell spans the panels' rows, from the first's top to the last's bottom, the strips
   above the first row left out, and its table is centred down it; the cell is drawn last, after
   the titles. Each key's glyphs are drawn by the geom of every layer that maps one of the legend's
   aesthetics and draws in that key (`Geom.draw_key/3`), in layer order, at the key's values of the

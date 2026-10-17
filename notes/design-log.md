@@ -146,15 +146,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **The guide protocol sits at `Giggly.Guide`, a scale names its guide, and legends stack in
   aesthetic order (2026-10-16, Steve, agreeing the proposal).** A protocol module holds nothing but
-  its protocol (checked), so `axes/3`, `axes_inside/3` and `titles/4` move to `Guide.Axis`,
-  `strips/2` to `Guide.Strip` and `grid/3` to `Guide.Grid`, exported for rendering. A scale
-  records its guide by name, as ggplot2's scale carries `guide`; the assembly turns the name into
-  the kind's struct, as `Plot` turns `position: :dodge` into one. Legends stack as
-  `package_box()` stacks them on the right, a column, each left-aligned, `legend.spacing.y` apart,
-  centred on the panels; same kind, title and labels merge (a colour bar's colours too). ggplot2
-  orders them by a hash of title, labels and kind (9 of 20 random title pairs came out
+  its protocol (`defprotocol` allows nothing else), so the axes and their titles move to
+  `Guide.Axis`, the strips to `Guide.Strip`, the grid to `Guide.Grid` and the stacking to
+  `Guide.Box`, exported for rendering. A scale records its guide by name, as ggplot2's scale
+  carries `guide` (`:axis` for a position); the assembly turns the name into the kind's struct, as
+  `Plot` turns `position: :dodge` into one, and works out a guide's keys and a colour bar's colours
+  from the scale (2026-10-17, Steve), so a guide only draws and never sees a scale. Legends stack
+  as `package_box()` stacks them on the right, a column, each left-aligned, `legend.spacing.y`
+  apart, centred on the panels; same kind, title and labels merge (a colour bar's colours too).
+  ggplot2 orders them by a hash of title, labels and kind (9 of 20 random title pairs came out
   alphabetical), so Giggly orders by aesthetic name and a golden's R script sets `guides(order =)`.
-  *Rejected: the protocol in a submodule*, leaving the exports alone; *title order*.
+  *Rejected: the protocol in a submodule*, leaving the exports alone; *title order*; *the kinds
+  extracting their own keys*, as ggplot2's `extract_key()` does, which has `Guide` list
+  `Giggly.Scale` and a guide calling toward the data.
 
 - **The document's root declares svglite's stylesheet for lines as attributes (2026-10-16,
   Steve).** svglite gives every line round ends, round corners and a mitre limit of 10 through an
@@ -490,7 +494,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   read as every title in the plot once a plot title existed. They are the titles guides draw:
   ggplot2's axes and legends are both guides, each titled from the mapping and set with
   `guide_axis(title = …)` or `guide_legend(title = …)`, and `Giggly.Guide` draws them. The field,
-  the private `guide_title/3` that finds one, and `Guide.axes/3`'s argument took the name.
+  the private `guide_title/3` that finds one, and `Guide.Axis.titles/4`'s argument took the name.
   *Rejected: `aesthetic_titles`* — it says how the map is keyed, not what the titles are for;
   *and waiting for `labs/2`* — the rename was cheapest while nothing depended on the name.
 
@@ -1336,8 +1340,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up);
-  §4: none, ggplot2's `keep_key_data()` followed as `assembly.md` says
+- 2026-10-17 — Draw guides through a protocol at Giggly.Guide (colour, step 3a); §4: "The guide
+  protocol sits at `Giggly.Guide`"
+- 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up)
+  (`8e21e24`); §4: none, ggplot2's `keep_key_data()` followed as `assembly.md` says
 - 2026-10-16 — Map discrete columns to colours and fills (colour, step 2) (`5dbd380`); §4: "A
   discrete scale carries its missing value", "Group ids follow ggplot2's `add_group()`", "The
   guide protocol sits at `Giggly.Guide`"

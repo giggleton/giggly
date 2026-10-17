@@ -4,25 +4,33 @@ defmodule Giggly.Guide.Grid do
   # A panel's background and grid, ggplot2's `guide_grid()`: the background, filling the panel or
   # the shape the coordinate system gives it, a radial panel's disc, and a line through it at each
   # break and minor break, all of which the coordinate system has already placed
-  # (`Giggly.Coord.grid/2`). Use it through `Giggly.Guide`.
+  # (`Giggly.Coord.grid/2`), drawn under whatever the panel's layers draw.
   #
   # It looks as the theme says (`Giggly.Theme`): the panel's background, then its minor grid lines
   # and its major ones over them. They are drawn in ggplot2's order: the background, the minor lines
   # at the y axis's minor breaks, then at the x axis's, then the major lines at the y axis's breaks
   # and then at the x axis's, so a major line is drawn over a minor one and an x line over a y.
 
+  alias Giggly.{Coord, Theme}
   alias Giggly.Scene.{Polygons, Polylines, Rect}
-  alias Giggly.Theme
+
+  # The background and grid lines of the panel that `panel_params` describes under `coord`, in
+  # `theme`'s look, in drawing order, placed in the panel's cell.
+  @doc false
+  @spec draw(Coord.t(), Coord.panel_params(), Theme.t()) :: [Giggly.Scene.primitive()]
+  def draw(coord, panel_params, theme) do
+    coord
+    |> Coord.grid(panel_params)
+    |> grid(theme)
+  end
 
   # The panel's background and the lines of `grid`, in `theme`'s look and ggplot2's order, placed in
   # the panel's cell.
-  @doc false
-  @spec draw(Giggly.Coord.grid(), Theme.t()) :: [Giggly.Scene.primitive()]
-  def draw(%{major: major, minor: minor, background: shape}, %Theme{
-        panel_background: background,
-        panel_grid_major: major_look,
-        panel_grid_minor: minor_look
-      }) do
+  defp grid(%{major: major, minor: minor, background: shape}, %Theme{
+         panel_background: background,
+         panel_grid_major: major_look,
+         panel_grid_minor: minor_look
+       }) do
     [
       background(shape, background),
       lines(minor.y, minor_look),

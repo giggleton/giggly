@@ -1,7 +1,7 @@
 defmodule Giggly.AssemblyTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Assembly, Geom, Plot}
+  alias Giggly.{Assembly, Geom, Guide, Plot}
 
   # Golden throughout: ggplot2 4.0.3's `get_guide_data()` for the same plot in R 4.6.1, printed to
   # 17 significant digits. It moves with ggplot2's default alpha scales or how a legend's keys are
@@ -27,6 +27,7 @@ defmodule Giggly.AssemblyTest do
         |> Map.fetch!(:legends)
 
       assert legend === %{
+               guide: %Guide.Legend{},
                aesthetics: [:alpha],
                title: "year",
                keys: [
@@ -97,6 +98,7 @@ defmodule Giggly.AssemblyTest do
         |> Map.fetch!(:legends)
 
       assert legend === %{
+               guide: %Guide.Legend{},
                aesthetics: [:color, :fill],
                title: "g",
                keys: [

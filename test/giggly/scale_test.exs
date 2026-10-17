@@ -71,7 +71,8 @@ defmodule Giggly.ScaleTest do
       assert scale === %Scale.Continuous{
                range: {1.5, 3},
                transform: :identity,
-               palette: :identity
+               palette: :identity,
+               guide: :axis
              }
     end
 
@@ -86,7 +87,8 @@ defmodule Giggly.ScaleTest do
                levels: ["a", "b", "c", nil],
                continuous_range: :none,
                palette: :identity,
-               na_value: nil
+               na_value: nil,
+               guide: :axis
              }
     end
 
@@ -101,7 +103,8 @@ defmodule Giggly.ScaleTest do
                levels: ["a", "b"],
                continuous_range: {0.55, 2.45},
                palette: :identity,
-               na_value: nil
+               na_value: nil,
+               guide: :axis
              }
     end
   end
@@ -116,12 +119,18 @@ defmodule Giggly.ScaleTest do
         |> Scale.train([0.55, 2.45])
 
       assert {Scale.reset(continuous), Scale.reset(discrete)} ===
-               {%Scale.Continuous{range: :none, transform: :identity, palette: :identity},
+               {%Scale.Continuous{
+                  range: :none,
+                  transform: :identity,
+                  palette: :identity,
+                  guide: :axis
+                },
                 %Scale.Discrete{
                   levels: ["a", "b"],
                   continuous_range: :none,
                   palette: :identity,
-                  na_value: nil
+                  na_value: nil,
+                  guide: :axis
                 }}
     end
   end
@@ -359,23 +368,45 @@ defmodule Giggly.ScaleTest do
                {[0.1], [0.1, 1.0], [nil]}
     end
 
-    test "a position scale's palette is the identity" do
-      assert {Scale.new(:continuous).palette, Scale.new(:discrete).palette} ===
-               {:identity, :identity}
+    # A position scale's first training is reset before its second, so nothing a plot draws reads
+    # its untrained range; only the scale itself pins it.
+    test "a position scale is untrained, its palette the identity and its guide an axis" do
+      assert {Scale.new(:continuous), Scale.new(:date), Scale.new(:discrete)} ===
+               {%Scale.Continuous{
+                  range: :none,
+                  transform: :identity,
+                  palette: :identity,
+                  guide: :axis
+                },
+                %Scale.Continuous{
+                  range: :none,
+                  transform: :date,
+                  palette: :identity,
+                  guide: :axis
+                },
+                %Scale.Discrete{
+                  levels: [],
+                  continuous_range: :none,
+                  palette: :identity,
+                  na_value: nil,
+                  guide: :axis
+                }}
     end
 
-    test "an alpha scale records ggplot2's default range, untrained, the identity transformation" do
+    test "an alpha scale records ggplot2's default range and guide, untrained, the identity transformation" do
       assert {Scale.new(:continuous, :alpha), Scale.new(:discrete, :alpha)} ===
                {%Scale.Continuous{
                   range: :none,
                   transform: :identity,
-                  palette: {:rescale, {0.1, 1.0}}
+                  palette: {:rescale, {0.1, 1.0}},
+                  guide: :legend
                 },
                 %Scale.Discrete{
                   levels: [],
                   continuous_range: :none,
                   palette: {:sequence, {0.1, 1.0}},
-                  na_value: nil
+                  na_value: nil,
+                  guide: :legend
                 }}
     end
   end
@@ -384,12 +415,13 @@ defmodule Giggly.ScaleTest do
   # R's for every count from 1 to 40. A count of 24 ends on a hue of exactly 360, and 40 on 366,
   # which R takes modulo 360 first. ggplot2's discrete colour scale maps `NA` to grey50.
   describe "map/2 through the hue palette" do
-    test "a colour or fill scale records pal_hue()'s hues, chroma and luminance, NA grey50" do
+    test "a colour or fill scale records pal_hue()'s hues, chroma and luminance, NA grey50, a legend" do
       expected = %Scale.Discrete{
         levels: [],
         continuous_range: :none,
         palette: {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}},
-        na_value: "#7F7F7F"
+        na_value: "#7F7F7F",
+        guide: :legend
       }
 
       assert {Scale.new(:discrete, :color), Scale.new(:discrete, :fill)} === {expected, expected}

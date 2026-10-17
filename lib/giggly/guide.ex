@@ -1,35 +1,38 @@
-defmodule Giggly.Guide do
+defprotocol Giggly.Guide do
   @moduledoc false
 
   # Guides: what lets a reader turn marks back into data. In ggplot2, axes and legends are both
-  # guides (`guide_axis()`, `guide_legend()`), each drawing what it is given of a scale's breaks;
-  # so far Giggly draws axes (`Giggly.Guide.Axis`), the axis around a radial panel's circle
-  # (`Giggly.Guide.AxisTheta`), ggplot2's `guide_axis_theta()`, the panel's background and grid lines
-  # (`Giggly.Guide.Grid`), which ggplot2 draws with `guide_grid()`, the strips that label a
+  # guides (`guide_axis()`, `guide_legend()`), each drawing what it is given of a scale's breaks.
+  # Giggly draws axes (`Giggly.Guide.Axis`), the axis around a radial panel's circle among them
+  # (`Giggly.Guide.AxisTheta`, ggplot2's `guide_axis_theta()`); the panel's background and grid
+  # lines (`Giggly.Guide.Grid`), which ggplot2 draws with `guide_grid()`; the strips that label a
   # facet's panels with their values (`Giggly.Guide.Strip`), which ggplot2's facets draw with
   # `render_strips()`: a strip, like an axis, tells a reader what data the marks beside it show;
-  # and a legend for aesthetics other than position (`Giggly.Guide.Legend`), `guide_legend()`, its
-  # keys drawn with glyphs rendering has each layer's geom draw, laid out as a table of its own, the
-  # plot's legends stacked in a box, as ggplot2's guides package theirs.
+  # and the guides of the aesthetics other than position, whose kinds this protocol draws, stacked
+  # in a box (`Giggly.Guide.Box`), as ggplot2's guides package theirs.
   #
-  # When a plot is rendered, `axes/3` takes the plot's coordinate system, a panel's params and the
-  # plot's complete theme (`Giggly.Theme`), and draws an axis on each side of the panel that the
-  # coordinate system puts one, from that axis's breaks already placed along the side
-  # (`Giggly.Coord.axes/2`), in the look the coordinate system names, so ticks and marks are placed
-  # by one rule; `axes_inside/3` draws the axes the coordinate system puts inside the panel, over
-  # its layers, a radial panel's angle axis, as ggplot2's coordinate system draws its foreground
-  # (`render_fg()`); `titles/4` draws the title
-  # of the aesthetic the coordinate system says each side shows, once for the plot, however many
-  # panels it has; `strips/2` draws a panel's strips from its labels. Each comes back as a size and
-  # primitives, ready to be cells of the scene beside the panel. `grid/3` draws the panel's
-  # background and its grid lines, placed by the coordinate system (`Giggly.Coord.grid/2`), under
-  # whatever the panel's layers draw.
+  # A scale records its guide by name, as ggplot2's scale carries `guide`, and the assembly turns
+  # the name into a struct of its kind: a legend (`Giggly.Guide.Legend`), `guide_legend()`, so far
+  # the one kind. A kind is one module holding its struct, whose fields are its parameters, and its
+  # drawing, in a `defimpl Giggly.Guide` whose first line classifies it into this boundary. A guide
+  # never sees a scale or calls a geom: the assembly works out its keys from the scale, and
+  # rendering has each layer's geom draw its glyphs in them.
+  #
+  # When a plot is rendered, the axes, their titles, the grid and the strips are drawn through
+  # their modules, each handed the plot's coordinate system and a panel's params, or a panel's
+  # labels, and the plot's complete theme (`Giggly.Theme`); each comes back as a size and
+  # primitives, ready to be cells of the scene beside or in the panel.
 
   # A guide asks the coordinate system where the breaks go, reads its look from the theme,
-  # measures text, and draws primitives.
-  use Boundary, deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme], exports: []
+  # measures text, and draws primitives. It exports the modules rendering draws a panel's axes,
+  # grid and strips with and stacks the guides of other aesthetics in, and the kinds, whose
+  # structs the assembly builds, and nothing a kind draws with: that is in the kinds' protocol
+  # implementations.
+  use Boundary,
+    deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme],
+    exports: [Axis, Box, Grid, Legend, Strip]
 
-  alias Giggly.{Coord, Guide, Scene, Theme}
+  alias Giggly.{Scene, Theme}
 
   @typedoc """
   Something drawn beside the panel: how far it reaches out, in points (its width beside the panel
@@ -38,87 +41,20 @@ defmodule Giggly.Guide do
   """
   @type drawn :: {float(), [Scene.primitive()]}
 
-  # The axis drawn on each side of the panel that `panel_params` describes under `coord`, by side,
-  # in the look the coordinate system names and `theme`'s. An axis with no breaks draws nothing and
-  # takes no room.
+  @typedoc """
+  A guide of an aesthetic other than position, as rendering hands it over: its title and its keys,
+  each its label and the glyphs the layers drawing in it draw, among what the assembly gave each
+  key and the guide.
+  """
+  @type legend :: %{
+          required(:title) => String.t(),
+          required(:keys) => [%{required(:label) => String.t(), required(:glyphs) => list()}],
+          optional(atom()) => term()
+        }
+
+  # The guide `guide` draws for `legend`, in `theme`'s look: its width in points and its table, a
+  # nested `Giggly.Scene` sized in points, for the box of guides right of the panels.
   @doc false
-  @spec axes(Coord.t(), Coord.panel_params(), Theme.t()) :: %{Coord.side() => drawn()}
-  def axes(coord, panel_params, theme) do
-    coord
-    |> sides(panel_params)
-    |> Map.new(fn {side, {_aesthetic, look, breaks}} ->
-      {side, Guide.Axis.draw(breaks, side, look, theme)}
-    end)
-  end
-
-  # The axes drawn inside the panel that `panel_params` describes under `coord`, over its layers,
-  # in `theme`'s look, placed in the panel's cell: a radial panel's angle axis, around its circle;
-  # none for a panel whose axes are all on its sides.
-  @doc false
-  @spec axes_inside(Coord.t(), Coord.panel_params(), Theme.t()) :: [Scene.primitive()]
-  def axes_inside(coord, panel_params, theme) do
-    case Coord.axes(coord, panel_params) do
-      %{theta: {_aesthetic, :theta, breaks}} -> Guide.AxisTheta.draw(breaks, theme)
-      %{} -> []
-    end
-  end
-
-  # The title of the axis on each side of a panel that `panel_params` describes under `coord`, by
-  # side, given each aesthetic's title, `:none` for none, in `theme`'s look. A title of `:none`
-  # draws nothing and takes no room.
-  @doc false
-  @spec titles(
-          Coord.t(),
-          Coord.panel_params(),
-          %{(:x | :y) => String.t() | :none},
-          Theme.t()
-        ) :: %{Coord.side() => drawn()}
-  def titles(coord, panel_params, guide_titles, theme) do
-    coord
-    |> sides(panel_params)
-    |> Map.new(fn {side, {aesthetic, _look, _breaks}} ->
-      title =
-        guide_titles
-        |> Map.fetch!(aesthetic)
-        |> Guide.Axis.title(side, theme)
-
-      {side, title}
-    end)
-  end
-
-  # The axes the coordinate system puts on the panel's sides.
-  defp sides(coord, panel_params) do
-    coord
-    |> Coord.axes(panel_params)
-    |> Map.take([:bottom, :left])
-  end
-
-  # The plot's legends, each its title and a key for each of its keys, the key's label and the
-  # glyphs each layer draws in it, drawn in `theme`'s look, ggplot2's `guide_legend()`, and stacked
-  # in a box in the order given: the box's width in points and its table, for rendering to place
-  # right of the panels, as ggplot2's guides package their box.
-  @doc false
-  @spec legends([{String.t(), [{String.t(), [Scene.primitive()]}]}], Theme.t()) ::
-          {float(), Scene.t()}
-  def legends(legends, theme) do
-    legends
-    |> Enum.map(fn {title, keys} -> Guide.Legend.draw(title, keys, theme) end)
-    |> Guide.Legend.box(theme)
-  end
-
-  # A panel's strips, one for each of `labels`, top to bottom, in `theme`'s look: ggplot2's
-  # `render_strips()` for strips above a panel. A panel with no labels has no strips.
-  @doc false
-  @spec strips([String.t()], Theme.t()) :: [drawn()]
-  def strips(labels, theme), do: Enum.map(labels, fn label -> Guide.Strip.draw(label, theme) end)
-
-  # The background and grid lines of the panel that `panel_params` describes under `coord`, in
-  # `theme`'s look, in drawing order, placed in the panel's cell.
-  @doc false
-  @spec grid(Coord.t(), Coord.panel_params(), Theme.t()) :: [Scene.primitive()]
-  def grid(coord, panel_params, theme) do
-    coord
-    |> Coord.grid(panel_params)
-    |> Guide.Grid.draw(theme)
-  end
+  @spec draw(t(), legend(), Theme.t()) :: {float(), Scene.t()}
+  def draw(guide, legend, theme)
 end

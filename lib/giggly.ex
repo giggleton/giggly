@@ -96,9 +96,15 @@ defmodule Giggly do
           levels: ["4", "6"],
           continuous_range: {1, 2},
           palette: :identity,
-          na_value: nil
+          na_value: nil,
+          guide: :axis
         },
-        y: %Giggly.Scale.Continuous{range: {21.0, 22.8}, transform: :identity, palette: :identity}
+        y: %Giggly.Scale.Continuous{
+          range: {21.0, 22.8},
+          transform: :identity,
+          palette: :identity,
+          guide: :axis
+        }
       }
   """
   @spec panel_scales(Plot.t(), integer()) :: %{x: panel_scale(), y: panel_scale()}

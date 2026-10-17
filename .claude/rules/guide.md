@@ -6,21 +6,34 @@ paths:
 
 # Guides
 
-`Giggly.Guide` draws the axes beside a panel and their titles, ggplot2's `guide_axis()`; the axis
-around a radial panel's circle, ggplot2's `guide_axis_theta()`; the panel's background and grid
-lines, ggplot2's `guide_grid()`; and the strips that label a facet's panels, which ggplot2's facets
-draw with `render_strips()`. Why a domain of its own, and why it is called a guide: design-log §4,
-the entry beginning "Axes are drawn"; which name titles an axis: the entry beginning "An axis is
-titled"; why the grid is drawn here but placed by the coordinate system: the entry beginning "The
+`Giggly.Guide` is the protocol the guides of aesthetics other than position are drawn through, a
+legend (`Guide.Legend`, ggplot2's `guide_legend()`) so far; its namespace also draws the axes
+beside a panel and their titles (`Guide.Axis`, ggplot2's `guide_axis()`), the axis around a radial
+panel's circle (`Guide.AxisTheta`, `guide_axis_theta()`), the panel's background and grid lines
+(`Guide.Grid`, `guide_grid()`), the strips that label a facet's panels (`Guide.Strip`, which
+ggplot2's facets draw with `render_strips()`), and the box the legends stack in (`Guide.Box`,
+`package_box()`). Why a protocol and why a scale names its guide: design-log §4, the entry
+beginning "The guide protocol sits at `Giggly.Guide`"; why a domain of its own, and why it is called
+a guide: the entry beginning "Axes are drawn"; which name titles an axis: the entry beginning "An
+axis is titled"; why the grid is drawn here but placed by the coordinate system: the entry beginning "The
 panel's grid lines are placed by the coordinate system".
 
 ## Rules
 
+- **The root is a protocol and holds nothing else** (`defprotocol` allows only its functions):
+  `draw/3` draws a guide of an aesthetic other than position, as a table of its own, for the box.
+  **A kind is one module**, its struct, whose fields are its parameters, and its drawing, in a
+  `defimpl Giggly.Guide` whose first line classifies it into this boundary. A scale names its guide
+  (`:axis` for a position, `:legend`), and the assembly builds the kind's struct. **A guide never
+  sees a scale or calls a geom**: the assembly works out its keys from the scale, and rendering has
+  each layer's geom draw its glyphs in them. The boundary exports the modules rendering draws with
+  (`Axis`, `Box`, `Grid`, `Strip`) and the kinds, whose structs the assembly builds, never a kind's
+  drawing.
 - **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
   ticks and marks are placed by one rule. Where an axis is drawn, which aesthetic's title goes
   there, and the look it is drawn in are the coordinate system's call; a guide draws the sides it
   is given, in the looks it is given, with the titles it is handed by aesthetic. An axis the
-  coordinate system puts inside the panel (`:theta`) is drawn by `axes_inside/3` over the
+  coordinate system puts inside the panel (`:theta`) is drawn by `Axis.draw_inside/3` over the
   panel's layers, takes no title of its own, and is neither measured nor given room, as ggplot2's
   `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
@@ -53,25 +66,25 @@ panel's grid lines are placed by the coordinate system".
   line of text, so it is as tall as the margin twice, an ascent and the deepest descent. A panel
   has one strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
   stacks them.
-- **An axis is drawn per panel, its title once per plot.** `axes/3` draws one panel's axes;
-  `titles/4` the plot's titles, from any panel's params, since every panel puts the same aesthetic
-  on each side.
+- **An axis is drawn per panel, its title once per plot.** `Axis.draw/3` draws one panel's axes;
+  `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
+  aesthetic on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
-  labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, a guide
-  protocol (the second kind of guide; design-log §4, the entry beginning "Guides become structs of
-  their kind"), and `guide_axis_theta()`'s options and merging its first and last labels when they
-  meet (`expand = FALSE`).
-- **A legend is a table of its own (`Guide.Legend`, a nested `Giggly.Scene`), laid out as
-  ggplot2's `GuideLegend` lays out a vertical legend at its defaults**: the legend margin inside
+  labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, axes as
+  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it), and
+  `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
+  FALSE`).
+- **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
+  `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
+  defaults**: the legend margin inside
   the edge; the title above, as tall as a line of its text, left-aligned and centred down its row
   by half its ascent, as grid centres text, the title's margin below; a row per key, the key
   square on the key background with each layer's glyph over it, its label the text margin to its
   right, centred as the title is; the label column as wide as the widest label, or wider when the
   title is, leaving the room at the labels' right. Drawn in ggplot2's order: background, title,
-  each key's background and glyphs, then the labels. A guide never calls a geom: rendering hands
-  it each key's glyphs. Every size is in points.
-- **A plot's legends are stacked in a box (`legends/2`), as ggplot2's `package_box()` stacks them
+  each key's background and glyphs, then the labels. Every size is in points.
+- **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them
   on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
   order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,
-  left and top), with no margin or background of its own (`theme_gray()`'s); `legends/2` returns
+  left and top), with no margin or background of its own (`theme_gray()`'s); `Box.draw/2` returns
   the box's width and its table, which rendering centres down the panels.

@@ -767,12 +767,14 @@ defmodule GigglyTest do
                  levels: ["a", "b", "c"],
                  continuous_range: {0.55000000000000004, 3.4500000000000002},
                  palette: :identity,
-                 na_value: nil
+                 na_value: nil,
+                 guide: :axis
                },
                y: %Giggly.Scale.Continuous{
                  range: {0.0, 3.2},
                  transform: :identity,
-                 palette: :identity
+                 palette: :identity,
+                 guide: :axis
                }
              }
     end
@@ -821,13 +823,15 @@ defmodule GigglyTest do
                   levels: ["6", "8"],
                   continuous_range: {1, 2},
                   palette: :identity,
-                  na_value: nil
+                  na_value: nil,
+                  guide: :axis
                 },
                 %Giggly.Scale.Discrete{
                   levels: ["4", "6"],
                   continuous_range: {1, 2},
                   palette: :identity,
-                  na_value: nil
+                  na_value: nil,
+                  guide: :axis
                 }}
 
       # Each row on its own panel's scale, in row order: "8" is the second level of panel 1's.
@@ -847,24 +851,28 @@ defmodule GigglyTest do
                   x: %Giggly.Scale.Continuous{
                     range: {1.0, 9.0},
                     transform: :identity,
-                    palette: :identity
+                    palette: :identity,
+                    guide: :axis
                   },
                   y: %Giggly.Scale.Continuous{
                     range: {10.0, 20.0},
                     transform: :identity,
-                    palette: :identity
+                    palette: :identity,
+                    guide: :axis
                   }
                 },
                 %{
                   x: %Giggly.Scale.Continuous{
                     range: {1.0, 9.0},
                     transform: :identity,
-                    palette: :identity
+                    palette: :identity,
+                    guide: :axis
                   },
                   y: %Giggly.Scale.Continuous{
                     range: {30.0, 40.0},
                     transform: :identity,
-                    palette: :identity
+                    palette: :identity,
+                    guide: :axis
                   }
                 }}
     end

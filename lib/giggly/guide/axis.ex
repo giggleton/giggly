@@ -3,7 +3,16 @@ defmodule Giggly.Guide.Axis do
 
   # An axis, ggplot2's `guide_axis()`: a tick at each break, reaching out from the panel's edge,
   # and the break's label beyond it; and the axis's title, beyond the axis in a cell of its own, as
-  # ggplot2 lays its axis titles out. Use it through `Giggly.Guide`.
+  # ggplot2 lays its axis titles out.
+  #
+  # When a plot is rendered, `draw/3` takes the plot's coordinate system, a panel's params and the
+  # plot's complete theme, and draws an axis on each side of the panel that the coordinate system
+  # puts one, from that axis's breaks already placed along the side (`Giggly.Coord.axes/2`), in
+  # the look the coordinate system names, so ticks and marks are placed by one rule;
+  # `draw_inside/3` draws the axes the coordinate system puts inside the panel, over its layers, a
+  # radial panel's angle axis (`Giggly.Guide.AxisTheta`), as ggplot2's coordinate system draws its
+  # foreground (`render_fg()`); and `titles/4` draws the title of the aesthetic the coordinate
+  # system says each side shows, once for the plot, however many panels it has.
   #
   # It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
   # the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
@@ -21,26 +30,78 @@ defmodule Giggly.Guide.Axis do
   # `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and a line of text;
   # an axis with no title takes no room.
 
-  alias Giggly.{Font, Theme}
+  alias Giggly.{Coord, Font, Guide, Scene, Theme}
   alias Giggly.Scene.{Polylines, Text}
 
   # Ticks are opaque, their ends cut square and their corners round, as `theme_gray()`'s `line`
   # element draws every line.
 
+  # The axis drawn on each side of the panel that `panel_params` describes under `coord`, by side,
+  # in the look the coordinate system names and `theme`'s. An axis with no breaks draws nothing and
+  # takes no room.
+  @doc false
+  @spec draw(Coord.t(), Coord.panel_params(), Theme.t()) :: %{Coord.side() => Guide.drawn()}
+  def draw(coord, panel_params, theme) do
+    coord
+    |> sides(panel_params)
+    |> Map.new(fn {side, {_aesthetic, look, breaks}} ->
+      {side, axis(breaks, side, look, theme)}
+    end)
+  end
+
+  # The axes drawn inside the panel that `panel_params` describes under `coord`, over its layers,
+  # in `theme`'s look, placed in the panel's cell: a radial panel's angle axis, around its circle;
+  # none for a panel whose axes are all on its sides.
+  @doc false
+  @spec draw_inside(Coord.t(), Coord.panel_params(), Theme.t()) :: [Scene.primitive()]
+  def draw_inside(coord, panel_params, theme) do
+    case Coord.axes(coord, panel_params) do
+      %{theta: {_aesthetic, :theta, breaks}} -> Guide.AxisTheta.draw(breaks, theme)
+      %{} -> []
+    end
+  end
+
+  # The title of the axis on each side of a panel that `panel_params` describes under `coord`, by
+  # side, given each aesthetic's title, `:none` for none, in `theme`'s look. A title of `:none`
+  # draws nothing and takes no room.
+  @doc false
+  @spec titles(
+          Coord.t(),
+          Coord.panel_params(),
+          %{(:x | :y) => String.t() | :none},
+          Theme.t()
+        ) :: %{Coord.side() => Guide.drawn()}
+  def titles(coord, panel_params, guide_titles, theme) do
+    coord
+    |> sides(panel_params)
+    |> Map.new(fn {side, {aesthetic, _look, _breaks}} ->
+      title =
+        guide_titles
+        |> Map.fetch!(aesthetic)
+        |> title(side, theme)
+
+      {side, title}
+    end)
+  end
+
+  # The axes the coordinate system puts on the panel's sides.
+  defp sides(coord, panel_params) do
+    coord
+    |> Coord.axes(panel_params)
+    |> Map.take([:bottom, :left])
+  end
+
   # The axis drawn on `side` of the panel from `breaks`, each its place along that side, 0 to 1,
   # and its label, in `look` (an x axis's below the panel, a y axis's or a radius axis's to its
   # left) and `theme`'s: how far it reaches from the panel, in points, and its primitives, placed
   # in a cell that deep.
-  @doc false
-  @spec draw([{float(), String.t()}], :bottom | :left, :x | :y | :r, Theme.t()) ::
-          Giggly.Guide.drawn()
-  def draw([], _side, _look, _theme), do: {0.0, []}
+  defp axis([], _side, _look, _theme), do: {0.0, []}
 
-  def draw(breaks, :bottom, :x, %Theme{
-        axis_ticks: ticks_look,
-        axis_ticks_length: tick_length,
-        axis_text: text_look
-      }) do
+  defp axis(breaks, :bottom, :x, %Theme{
+         axis_ticks: ticks_look,
+         axis_ticks_length: tick_length,
+         axis_text: text_look
+       }) do
     {places, labels} = Enum.unzip(breaks)
     height = tick_length + text_look.margin + line_height(text_look.size)
 
@@ -74,12 +135,12 @@ defmodule Giggly.Guide.Axis do
     {height, [ticks, text]}
   end
 
-  def draw(
-        breaks,
-        :left,
-        :y,
-        %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
-      ) do
+  defp axis(
+         breaks,
+         :left,
+         :y,
+         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
+       ) do
     {places, labels} = Enum.unzip(breaks)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     width = Enum.max(label_widths) + text_look.margin + tick_length
@@ -91,12 +152,12 @@ defmodule Giggly.Guide.Axis do
     {width, [text, left_ticks(places, width, theme)]}
   end
 
-  def draw(
-        breaks,
-        :left,
-        :r,
-        %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
-      ) do
+  defp axis(
+         breaks,
+         :left,
+         :r,
+         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
+       ) do
     {places, labels} = Enum.unzip(breaks)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     label_width = Enum.max(label_widths)
@@ -145,16 +206,14 @@ defmodule Giggly.Guide.Axis do
   # The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
   # the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
   # side.
-  @doc false
-  @spec title(String.t() | :none, :bottom | :left, Theme.t()) :: Giggly.Guide.drawn()
-  def title(:none, _side, _theme), do: {0.0, []}
+  defp title(:none, _side, _theme), do: {0.0, []}
 
-  def title(text, :bottom, %Theme{axis_title: title_look}) do
+  defp title(text, :bottom, %Theme{axis_title: title_look}) do
     height = title_look.margin + line_height(title_look.size)
     {height, [title_text(text, {0.5, 1 - title_look.margin / height}, 0, title_look)]}
   end
 
-  def title(text, :left, %Theme{axis_title: title_look}) do
+  defp title(text, :left, %Theme{axis_title: title_look}) do
     width = title_look.margin + line_height(title_look.size)
     {width, [title_text(text, {0.0, 0.5}, 90, title_look)]}
   end

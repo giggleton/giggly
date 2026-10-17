@@ -3,7 +3,7 @@ defmodule Giggly.Guide.AxisTheta do
 
   # The axis around a radial panel's circle, ggplot2's `guide_axis_theta()`: drawn inside the
   # panel, over its layers, a tick at each break reaching out from the circle's edge along the
-  # break's angle, and the break's label beyond it. Use it through `Giggly.Guide`.
+  # break's angle, and the break's label beyond it. `Giggly.Guide.Axis.draw_inside/3` draws it.
   #
   # It looks as an x axis does (`Giggly.Theme`), as ggplot2's `axis.text.theta` and
   # `axis.ticks.theta` inherit the x axis's look: each tick reaches the theme's tick length out from

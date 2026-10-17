@@ -75,7 +75,7 @@ defmodule Giggly.Render do
 
     # Every panel puts the same aesthetic on each side, so any panel's params title the axes.
     %{bottom: bottom_title, left: left_title} =
-      Guide.titles(coord, Map.fetch!(panel_params, hd(panels).panel), guide_titles, theme)
+      Guide.Axis.titles(coord, Map.fetch!(panel_params, hd(panels).panel), guide_titles, theme)
 
     panel_rows = DataFrame.pull(layout, :row)
     panel_columns = DataFrame.pull(layout, :column)
@@ -130,7 +130,7 @@ defmodule Giggly.Render do
     |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
     |> Enum.zip_with(fn [panel, row, column, axis_bottom, axis_left, strip] ->
       params = Map.fetch!(panel_params, panel)
-      %{bottom: bottom_axis, left: left_axis} = Guide.axes(coord, params, theme)
+      %{bottom: bottom_axis, left: left_axis} = Guide.Axis.draw(coord, params, theme)
 
       layer_primitives =
         layer_geoms
@@ -147,44 +147,45 @@ defmodule Giggly.Render do
         # ggplot2's coordinate system draws its background and foreground.
         primitives:
           Enum.concat([
-            Guide.grid(coord, params, theme),
+            Guide.Grid.draw(coord, params, theme),
             layer_primitives,
-            Guide.axes_inside(coord, params, theme)
+            Guide.Axis.draw_inside(coord, params, theme)
           ]),
         bottom: if(axis_bottom, do: bottom_axis, else: :none),
         left: if(axis_left, do: left_axis, else: :none),
-        strips: Guide.strips(strip, theme)
+        strips: Guide.Strip.draw(strip, theme)
       }
     end)
   end
 
-  # The plot's legends stacked in their box, `:none` for none, or its width and table: in each
-  # legend, each key's glyphs drawn by the geom of every layer that maps one of the legend's
-  # aesthetics and draws in that key, in the order the layers were added, at the key's values of
-  # the aesthetics it maps and with what the layer sets, as ggplot2 draws each such layer's
-  # `draw_key` in the keys it keeps.
+  # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none, or its width
+  # and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs
+  # drawn by the geom of every layer that maps one of the legend's aesthetics and draws in that
+  # key, in the order the layers were added, at the key's values of the aesthetics it maps and with
+  # what the layer sets, as ggplot2 draws each such layer's `draw_key` in the keys it keeps.
   defp draw_legend([], _theme), do: :none
 
   defp draw_legend(legends, theme) do
     size = {theme.legend_key_size, theme.legend_key_size}
 
     legends
-    |> Enum.map(fn %{title: title, keys: keys, layers: layers} ->
-      {title, Enum.with_index(keys, fn key, index -> draw_key(key, index, layers, size) end)}
+    |> Enum.map(fn %{guide: guide, keys: keys, layers: layers} = legend ->
+      drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers, size) end)
+      Guide.draw(guide, %{legend | keys: drawn_keys}, theme)
     end)
-    |> Guide.legends(theme)
+    |> Guide.Box.draw(theme)
   end
 
-  # A key's label and the glyph each layer drawing in it draws, with the key's values of the
-  # aesthetics the layer maps and what the layer sets.
-  defp draw_key(%{label: label, values: values}, index, layers, size) do
+  # A key with the glyphs each layer drawing in it draws, with the key's values of the aesthetics
+  # the layer maps and what the layer sets.
+  defp draw_key(%{values: values} = key, index, layers, size) do
     glyphs =
       for %{geom: geom, aesthetics: aesthetics, fixed: fixed, draws: draws} <- layers,
           Enum.at(draws, index),
           glyph <- Geom.draw_key(geom, Map.merge(fixed, Map.take(values, aesthetics)), size),
           do: glyph
 
-    {label, glyphs}
+    Map.put(key, :glyphs, glyphs)
   end
 
   # The columns, left to right, each named and sized: the margin, the y title, then for each

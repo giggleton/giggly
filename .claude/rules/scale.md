@@ -51,6 +51,10 @@ grid lines are placed by the coordinate system".
   the hues spread by the same `seq()`, each colour `Giggly.ColorOperations.from_hcl/3`; its test
   pins R's colours for counts whose last hue lands on 360 and past it. R takes each hue modulo
   360 first, which changes no colour, cosine and sine repeating, so it is left out.
+- **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
+  (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
+  protocol) and `:legend` for alpha and a discrete colour or fill. The assembly turns the name into
+  the kind; a scale never sees a guide.
 - **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
   `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
   the API; their functions are `@doc false`, used through `Giggly.Scale`, which is

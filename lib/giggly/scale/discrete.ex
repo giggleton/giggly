@@ -12,13 +12,15 @@ defmodule Giggly.Scale.Discrete do
   and the value a missing value maps to, its `na_value`, ggplot2's `na.value`: `nil`, R's `NA`, for
   alpha, and grey50, `"#7F7F7F"`, for colour and fill. A missing value takes no share of an
   aesthetic's palette; a position scale puts it at its last level, and its `na_value` is `nil`.
+  Its `guide` is the guide that draws it, by name, as ggplot2's scale carries `guide`: `:axis` for
+  a position and `:legend` for an aesthetic such as alpha or colour.
   """
 
   # Use it through `Giggly.Scale`.
 
   alias Giggly.Scale.{Continuous, Palette}
 
-  @enforce_keys [:levels, :continuous_range, :palette, :na_value]
+  @enforce_keys [:levels, :continuous_range, :palette, :na_value, :guide]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
@@ -28,7 +30,8 @@ defmodule Giggly.Scale.Discrete do
             :identity
             | {:sequence, {number(), number()}}
             | {:hue, %{hue: {number(), number()}, chroma: number(), luminance: number()}},
-          na_value: nil | String.t()
+          na_value: nil | String.t(),
+          guide: :axis | :legend
         }
 
   # The scale with the distinct `values` merged into its levels, as `Giggly.Scale.train/2`
