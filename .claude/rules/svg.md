@@ -30,10 +30,11 @@ size has a weight".
   it, polygons with `points` and the same `style` as rectangles, polylines with `points` and a
   `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line style below, and `fill:
   none`, segments as `<line>` with `x1`, `y1`, `x2` and `y2` and the same `style` but `fill`, and
-  text with `x` and `y` (or, turned 90 degrees, `transform='translate(x,y) rotate(-90)'`),
-  `text-anchor` (left out for text anchored at its start, as svglite leaves it out), a `style` of
-  `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as svglite
-  leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
+  text with `x` and `y` (or, turned, `transform='translate(x,y) rotate(-angle)'`, the angle in
+  whole degrees as vdiffr writes it with `%0.0f`, a tie to the even one), `text-anchor` (left out
+  for text anchored at its start, as svglite leaves it out), a `style` of `font-size` (in `px`, the
+  user unit), `fill` and `fill-opacity` (left out for opaque black, SVG's default, as vdiffr leaves
+  it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
   Output can then be set beside the SVG in ggplot2's own visual-test snapshots.
 - **A gradient is written as svglite writes one**: a `<defs>` of its own holding a
   `<linearGradient>` (`gradientUnits='userSpaceOnUse'`, `spreadMethod='pad'`) from the rectangle's
@@ -70,7 +71,14 @@ size has a weight".
 - **A label is drawn at the width `Giggly.Font` measured** (`textLength`), so the drawing agrees
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,
-  which is not a CSS generic family. Text escapes `&`, `<` and `>`, as svglite does.
+  which is not a CSS generic family; a family a layer names is written alone, quoted, its quotes
+  escaped, and drawn at the measured width all the same. Text escapes `&`, `<` and `>`, as svglite
+  does.
+- **A text checking overlap is drawn as grid's `textGrob(check.overlap = TRUE)` draws one**: each
+  label's box placed and turned with it, in order, and left out when an edge of it crosses an edge
+  of a box drawn before (`intersect()`): two edges along one line cross where they overlap, two
+  others only where each passes strictly between the other's ends (`linesIntersect()`), so a box
+  wholly inside another crosses nothing, as grid's does not.
 - **The backend measures nothing.** Every size reaches it as points or as a share.
 - **The root declares svglite's stylesheet for lines as attributes: `stroke-linecap='round'
   stroke-linejoin='round' stroke-miterlimit='10.00'`**, which every element inherits and any CSS

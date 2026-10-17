@@ -43,7 +43,13 @@ weight".
   its offset: a polyline's points by their `offsets`, `{across, up}` (`:none` for none), and a
   text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor is at its
   `hjust` of the label's width, any fraction from its start (0) to its end (1).
-- **A text carries each label's measured width**, which the backend draws it at.
+- **A text carries each label's measured width**, which the backend draws it at, **and each label's
+  colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label; its size, its
+  `family` (`""` the default sans-serif) and its angle, any number of degrees, are the text's. **A
+  text that checks overlap (`check_overlap`) draws a label only where its box crosses the box of no
+  label drawn before it**, the box its width along the baseline by the text's `ascent` up from
+  it, as grid's `check.overlap` measures a string; which labels cross turns on where they land, so
+  the backend decides it once the table is laid out, as grid does when it draws.
 - **Circles, placed rectangles, polylines and segments carry a colour and an opacity for each
   mark**, the opacity from 0 to 1: a circle's `color` and `opacity` its outline and fill alike, a
   rectangle's `fill` and `fill_opacity` its fill and its `color` and `color_opacity` its border, a

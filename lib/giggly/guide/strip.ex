@@ -32,10 +32,14 @@ defmodule Giggly.Guide.Strip do
       labels: [label],
       widths: [Font.width(label, size)],
       size: size,
-      color: text_look.color,
+      family: "",
+      color: [text_look.color],
+      opacity: [1.0],
       angle: 0,
-      hjust: 0.5,
-      offset: {0.0, -Font.ascent(size) / 2}
+      hjust: [0.5],
+      offset: [{0.0, -Font.ascent(size) / 2}],
+      check_overlap: false,
+      ascent: Font.ascent(size)
     }
 
     {height,

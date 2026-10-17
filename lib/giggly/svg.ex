@@ -27,7 +27,9 @@ defmodule Giggly.SVG do
   #
   # svglite anchors text only at its start, middle or end, so R's graphics engine hands it the
   # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
-  # its width; so does this backend.
+  # its width; so does this backend. A text that checks overlap draws each label only where its box
+  # crosses no box drawn before it, which grid decides once it knows where the labels land, as only
+  # a backend does here.
   #
   # Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
   # Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
@@ -416,56 +418,205 @@ defmodule Giggly.SVG do
   end
 
   defp primitive(%Text{} = text, box) do
-    anchor = 0.5 * Float.floor(2 * text.hjust + 0.5)
-
-    style = [
-      "style='font-size: ",
-      number(text.size),
-      "px;",
-      fill(text.color),
-      " font-family: ",
-      @font_family,
-      ";'"
+    columns = [
+      text.x,
+      text.y,
+      text.labels,
+      text.widths,
+      text.color,
+      text.opacity,
+      text.hjust,
+      text.offset
     ]
 
-    columns = [text.x, text.y, text.labels, text.widths]
-    {along, up} = text.offset
+    columns
+    |> Enum.zip_with(fn [x_place, y_place, label, label_width, color, opacity, hjust, offset] ->
+      %{
+        place: place({x_place, y_place}, box),
+        label: label,
+        width: label_width,
+        color: color,
+        opacity: opacity,
+        hjust: hjust,
+        offset: offset
+      }
+    end)
+    |> drawn_labels(text)
+    |> Enum.map(fn label -> text_label(label, text) end)
+  end
 
-    Enum.zip_with(columns, fn [x_place, y_place, label, label_width] ->
-      # The anchor, moved back along the baseline by the part of the label's width between where
-      # svglite anchors it and its `hjust`.
-      baseline =
-        {x_place, y_place}
-        |> place(box)
-        |> along_text({along - (text.hjust - anchor) * label_width, up}, text.angle)
+  # A label as svglite writes one: anchored at the start, middle or end nearest its `hjust`, and
+  # moved back along its baseline by the part of its width between there and its `hjust`.
+  defp text_label(label, text) do
+    anchor = 0.5 * Float.floor(2 * label.hjust + 0.5)
+    {along, up} = label.offset
 
-      [
-        "<text",
-        text_position(baseline, text.angle),
-        text_anchor(anchor),
-        " ",
-        style,
-        " textLength='",
-        number(label_width),
-        "px' lengthAdjust='spacingAndGlyphs'>",
-        escape(label),
-        "</text>\n"
-      ]
+    baseline =
+      along_text(label.place, {along - (label.hjust - anchor) * label.width, up}, text.angle)
+
+    [
+      "<text",
+      text_position(baseline, text.angle),
+      text_anchor(anchor),
+      " style='font-size: ",
+      number(text.size),
+      "px;",
+      text_fill(label.color, label.opacity),
+      " font-family: ",
+      font_family(text.family),
+      ";' textLength='",
+      number(label.width),
+      "px' lengthAdjust='spacingAndGlyphs'>",
+      escape(label.label),
+      "</text>\n"
+    ]
+  end
+
+  # The labels a text draws: all of them, or, when it checks overlap, each whose box crosses the
+  # box of no label drawn before it, in order, as grid's `textGrob(check.overlap = TRUE)` draws.
+  defp drawn_labels(labels, %Text{check_overlap: false}), do: labels
+
+  defp drawn_labels(labels, %Text{check_overlap: true} = text) do
+    {drawn, _boxes} =
+      Enum.reduce(labels, {[], []}, fn label, so_far ->
+        drawn_unless_crossing(label, so_far, text)
+      end)
+
+    Enum.reverse(drawn)
+  end
+
+  # The labels drawn so far, latest first, and their boxes, with `label` and its box added unless its
+  # box crosses one of theirs.
+  defp drawn_unless_crossing(label, {drawn, boxes}, text) do
+    box = label_box(label, text)
+
+    if Enum.any?(boxes, fn other -> boxes_cross?(box, other) end),
+      do: {drawn, boxes},
+      else: {[label | drawn], [box | boxes]}
+  end
+
+  # A label's box, its corners in order round it, as grid's `textRect()` makes it: as long as the
+  # label's width along its baseline from where its `hjust` puts its start, and as tall as the text's
+  # ascent up from its baseline, turned with the text.
+  defp label_box(label, text) do
+    {along, up} = label.offset
+    start = along - label.hjust * label.width
+    finish = start + label.width
+    top = up + text.ascent
+
+    Enum.map([{start, up}, {finish, up}, {finish, top}, {start, top}], fn corner ->
+      along_text(label.place, corner, text.angle)
     end)
   end
 
-  # A position moved `along` a text's baseline and `up` toward its top, in points: rightward and
-  # up the page for level text, up and leftward for text turned 90 degrees.
-  defp along_text(position, {along, up}, 0), do: moved(position, {along, up})
-  defp along_text(position, {along, up}, 90), do: moved(position, {-up, along})
+  # Whether two boxes cross, as grid's `intersect()` decides: whether an edge of one crosses an edge
+  # of the other. A box wholly inside another crosses nothing, as grid's does not.
+  defp boxes_cross?(box, other) do
+    other_edges = edges(other)
+
+    box
+    |> edges()
+    |> Enum.any?(fn edge ->
+      Enum.any?(other_edges, fn other_edge -> lines_cross?(edge, other_edge) end)
+    end)
+  end
+
+  defp edges([first | _rest] = corners) do
+    corners
+    |> Enum.concat([first])
+    |> Enum.chunk_every(2, 1, :discard)
+  end
+
+  # Whether two edges cross, as grid's `linesIntersect()` decides, by Paul Bourke's method: two that
+  # lie along one line cross where their extents overlap, two that are parallel never, and any
+  # others where each passes strictly between the other's ends.
+  defp lines_cross?([{x1, y1}, {x2, y2}], [{x3, y3}, {x4, y4}]) do
+    denominator = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1)
+    along_first = (x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)
+    along_second = (x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)
+
+    cond do
+      denominator == 0 and along_first == 0 and x1 == x2 ->
+        extents_meet?({y1, y2}, {y3, y4})
+
+      denominator == 0 and along_first == 0 ->
+        extents_meet?({x1, x2}, {x3, x4})
+
+      denominator == 0 ->
+        false
+
+      true ->
+        strictly_inside?(along_first / denominator) and
+          strictly_inside?(along_second / denominator)
+    end
+  end
+
+  defp strictly_inside?(fraction), do: fraction > 0 and fraction < 1
+
+  # Whether the extents of two edges along one line meet, as grid compares them: unless one starts
+  # below the other and ends before the other begins.
+  defp extents_meet?({start, finish}, {other_start, other_finish}) do
+    not ((start < other_start and max(start, finish) < min(other_start, other_finish)) or
+           (other_start < start and max(other_start, other_finish) < min(start, finish)))
+  end
+
+  # A position moved `along` a text's baseline and `up` toward its top, in points, the baseline
+  # turned `angle` degrees anticlockwise from rightward, as R's graphics engine turns it.
+  defp along_text(position, {along, up}, angle) do
+    radians = angle * :math.pi() / 180
+    cosine = :math.cos(radians)
+    sine = :math.sin(radians)
+    moved(position, {along * cosine - up * sine, along * sine + up * cosine})
+  end
 
   # svglite places level text by its `x` and `y`, and turned text by a transform, its angle negated
-  # since SVG turns clockwise.
-  defp text_position({x_position, y_position}, 0),
+  # since SVG turns clockwise and written as vdiffr writes it, a whole number of degrees (`%0.0f`).
+  defp text_position({x_position, y_position}, angle) when angle == 0,
     do: [" x='", number(x_position), "' y='", number(y_position), "'"]
 
-  defp text_position({x_position, y_position}, 90),
-    do: [" transform='translate(", number(x_position), ",", number(y_position), ") rotate(-90)'"]
+  defp text_position({x_position, y_position}, angle) do
+    [
+      " transform='translate(",
+      number(x_position),
+      ",",
+      number(y_position),
+      ") rotate(",
+      whole_degrees(-angle),
+      ")'"
+    ]
+  end
+
+  # A number of degrees as C's `%0.0f` writes it: rounded to the nearest whole number, a tie to the
+  # even one, and a negative number that rounds to 0 written `-0`.
+  defp whole_degrees(degrees) do
+    floor = Float.floor(degrees / 1)
+    rest = degrees - floor
+    rounded = round_whole(floor, rest)
+    sign = if rounded == 0 and degrees < 0, do: "-", else: ""
+
+    whole =
+      rounded
+      |> trunc()
+      |> Integer.to_string()
+
+    [sign, whole]
+  end
+
+  defp round_whole(floor, rest) when rest > 0.5, do: floor + 1
+  defp round_whole(floor, rest) when rest < 0.5, do: floor
+
+  defp round_whole(floor, _half) do
+    if rem(trunc(floor), 2) == 0, do: floor, else: floor + 1
+  end
+
+  # A label's colour as vdiffr writes it: left out for opaque black, SVG's default.
+  defp text_fill("#000000", opacity) when opacity == 1, do: ""
+  defp text_fill(color, opacity), do: fill_style(color, opacity)
+
+  # The default family, `""`, is drawn in the fonts whose widths `Giggly.Font` measures with; any
+  # other is named, quoted, and drawn at those widths all the same.
+  defp font_family(""), do: @font_family
+  defp font_family(family), do: [?", escape_attribute(family), ?"]
 
   # svglite writes no anchor for text anchored at its start, SVG's default.
   defp text_anchor(anchor) when anchor == 0.0, do: ""
@@ -516,15 +667,21 @@ defmodule Giggly.SVG do
   defp stroke(color), do: color
 
   # svglite writes a text's fill only when it is not black, SVG's default.
-  defp fill("#000000"), do: ""
-  defp fill(color), do: [" fill: ", color, ";"]
-
   # The characters svglite escapes in text.
   defp escape(label) do
     label
     |> String.replace("&", "&amp;")
     |> String.replace("<", "&lt;")
     |> String.replace(">", "&gt;")
+  end
+
+  # A font's name inside a single-quoted style attribute and its own double quotes: escaped as
+  # text is, and its quotes too.
+  defp escape_attribute(name) do
+    name
+    |> escape()
+    |> String.replace("\"", "&quot;")
+    |> String.replace("'", "&apos;")
   end
 
   # A stroke or a fill in a colour at an opacity, as svglite writes an R colour, which holds its

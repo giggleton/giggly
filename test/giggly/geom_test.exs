@@ -1,8 +1,8 @@
 defmodule Giggly.GeomTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Geom}
-  alias Giggly.Scene.{Circles, Polylines, Rectangles, Segments}
+  alias Giggly.{Coord, DataFrame, Font, Geom}
+  alias Giggly.Scene.{Circles, Polylines, Rectangles, Segments, Text}
 
   @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
   @line %Geom.Line{orientation: :x, line_end: :butt, line_join: :round, mitre_limit: 10.0}
@@ -423,6 +423,218 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for text" do
+    setup do
+      coord = %Coord.Cartesian{}
+      params = Coord.panel_params(coord, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
+      %{coord: coord, params: params}
+    end
+
+    # Each row's place, label and the text the geom draws it in, from a frame of one row per label.
+    defp text(frame, %{coord: coord, params: params}, geom \\ %Geom.Text{check_overlap: false}) do
+      [%Text{} = text] = Geom.draw_panel(geom, frame, coord, params)
+      text
+    end
+
+    test "a row missing its x, its y or its label is not drawn", context do
+      frame =
+        DataFrame.new(
+          x: [0.2, nil, 0.4, 0.6, 0.8],
+          y: [0.2, 0.2, :nan, 0.6, 0.8],
+          label: ["a", "b", "c", nil, "e"]
+        )
+
+      assert %Text{x: [0.2, 0.8], y: [0.2, 0.8], labels: ["a", "e"]} = text(frame, context)
+    end
+
+    test "a colour of :none draws no label, as ggplot2 drops text whose colour is NA", context do
+      frame =
+        DataFrame.new(x: [0.2, 0.4], y: [0.2, 0.4], label: ["a", "b"], color: [:none, :none])
+
+      assert %Text{labels: []} = text(frame, context)
+    end
+
+    # Golden: R 4.6.1's `as.character()` of the same doubles.
+    test "a number is labelled as R's as.character() writes it", context do
+      values = [
+        21.0,
+        2.62,
+        1 / 3,
+        0.1 + 0.2,
+        1.0e5,
+        123_456.0,
+        123_456.7,
+        1.0e15,
+        1_234_567_890_123.0,
+        0.0001,
+        0.001,
+        1.0e-20,
+        -2.5,
+        100.0,
+        100_000.1,
+        3.14159265358979,
+        6_666_666_666.666666,
+        0.12345678901234568,
+        0.0,
+        -0.0,
+        1.0e100,
+        1.0e-5
+      ]
+
+      halves = List.duplicate(0.5, length(values))
+      frame = DataFrame.new(x: halves, y: halves, label: values)
+
+      assert text(frame, context).labels === [
+               "21",
+               "2.62",
+               "0.333333333333333",
+               "0.3",
+               "1e+05",
+               "123456",
+               "123456.7",
+               "1e+15",
+               "1234567890123",
+               "1e-04",
+               "0.001",
+               "1e-20",
+               "-2.5",
+               "100",
+               "100000.1",
+               "3.14159265358979",
+               "6666666666.66667",
+               "0.123456789012346",
+               "0",
+               "0",
+               "1e+100",
+               "1e-05"
+             ]
+    end
+
+    test "a whole number, a boolean, an atom, a date and an infinity are labelled as R writes them",
+         context do
+      label = fn values ->
+        halves = List.duplicate(0.5, length(values))
+        text(DataFrame.new(x: halves, y: halves, label: values), context).labels
+      end
+
+      assert {label.([100_000, -3]), label.([true, false]), label.([:suv, :compact]),
+              label.([~D[2020-01-02]]), label.([:infinity, :neg_infinity, 1.5])} ===
+               {["100000", "-3"], ["TRUE", "FALSE"], ["suv", "compact"], ["2020-01-02"],
+                ["Inf", "-Inf", "1.5"]}
+    end
+
+    # Golden: ggplot2 4.0.3's `compute_just()` of the same places, each label's x (`a`) and y (`b`),
+    # turned 0, 90, 136 and 270 degrees.
+    test "a label justified inward or outward is justified by where it falls", context do
+      frame =
+        DataFrame.new(
+          x: [0.2, 0.5, 0.8, 0.2, 0.8, 0.4995],
+          y: [0.9, 0.9, 0.1, 0.1, 0.9, 0.9],
+          label: ["a", "b", "c", "d", "e", "f"]
+        )
+
+      hjusts = fn just, angle ->
+        rows = DataFrame.row_count(frame)
+
+        frame
+        |> DataFrame.put(:hjust, List.duplicate(just, rows))
+        |> DataFrame.put(:angle, List.duplicate(angle, rows))
+        |> text(context)
+        |> Map.fetch!(:hjust)
+      end
+
+      assert Enum.map([0.0, 90.0, 136.0, 270.0], fn angle ->
+               {hjusts.(:inward, angle), hjusts.(:outward, angle)}
+             end) === [
+               {[0.0, 0.5, 1.0, 0.0, 1.0, 0.5], [1.0, 0.5, 0.0, 1.0, 0.0, 0.5]},
+               {[1.0, 1.0, 0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0, 0.0, 0.0]},
+               {[1.0, 0.5, 0.0, 1.0, 0.0, 0.5], [0.0, 0.5, 1.0, 0.0, 1.0, 0.5]},
+               {[0.0, 0.0, 1.0, 1.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0, 1.0, 1.0]}
+             ]
+    end
+
+    test "a label's vjust lowers its baseline that part of its ascent, a word by where it falls",
+         context do
+      ascent = Font.ascent(11.0)
+
+      frame =
+        DataFrame.new(
+          x: [0.5, 0.5, 0.5],
+          y: [0.2, 0.9, 0.5],
+          label: ["a", "b", "c"],
+          vjust: [:inward, :inward, :inward]
+        )
+
+      assert text(frame, context).offset === [{0.0, -0.0}, {0.0, -ascent}, {0.0, -0.5 * ascent}]
+
+      numbers = DataFrame.put(frame, :vjust, [0.25, 0.25, 0.25])
+      assert text(numbers, context).offset === List.duplicate({0.0, -0.25 * ascent}, 3)
+    end
+
+    test "the words left, center, right, bottom, middle and top justify a label as numbers do",
+         context do
+      words = [:left, :center, :right, :bottom, :middle, :top]
+      rows = length(words)
+
+      hjusts =
+        Enum.map(words, fn word ->
+          frame = DataFrame.new(x: [0.2], y: [0.2], label: ["a"], hjust: [word])
+          [hjust] = text(frame, context).hjust
+
+          hjust
+        end)
+
+      assert {rows, hjusts} === {6, [0.0, 0.5, 1.0, 0.0, 0.5, 1.0]}
+    end
+
+    test "a label is 11 points, or the layer's size in millimetres times ggplot2's .pt",
+         context do
+      frame = DataFrame.new(x: [0.5], y: [0.5], label: ["Mazda"])
+      sized = DataFrame.put(frame, :size, [5.0])
+
+      points = 5.0 * (72.27 / 25.4)
+      assert {text(frame, context).size, text(sized, context).size} === {11.0, points}
+
+      assert %Text{widths: [width], ascent: ascent} = text(sized, context)
+      assert {width, ascent} === {Font.width("Mazda", points), Font.ascent(points)}
+    end
+
+    test "each label is in its row's colour at its row's alpha, black and opaque by default",
+         context do
+      frame =
+        DataFrame.new(
+          x: [0.2, 0.4, 0.6],
+          y: [0.2, 0.4, 0.6],
+          label: ["a", "b", "c"],
+          color: ["#F8766D", "#00BA3880", "#619CFF"],
+          alpha: [0.5, nil, nil]
+        )
+
+      assert %Text{color: ["#F8766D", "#00BA38", "#619CFF"], opacity: [0.5, @half_alpha, 1.0]} =
+               text(frame, context)
+
+      plain = DataFrame.new(x: [0.2], y: [0.2], label: ["a"])
+      assert %Text{color: ["#000000"], opacity: [1.0]} = text(plain, context)
+    end
+
+    test "the layer's angle and family and the geom's overlap check reach the text", context do
+      frame =
+        DataFrame.new(
+          x: [0.2],
+          y: [0.2],
+          label: ["a"],
+          angle: [30.5],
+          family: ["Times New Roman"]
+        )
+
+      assert %Text{angle: 30.5, family: "Times New Roman", check_overlap: true} =
+               text(frame, context, %Geom.Text{check_overlap: true})
+
+      assert %Text{angle: +0.0, family: "", check_overlap: false} =
+               text(DataFrame.new(x: [0.2], y: [0.2], label: ["a"]), context)
+    end
+  end
+
   describe "draw_key/3" do
     test "a point's key is the point at the middle of the key, at the key's alpha" do
       assert [%Circles{x: [0.5], y: [0.5], opacity: [0.2]}] =
@@ -482,6 +694,66 @@ defmodule Giggly.GeomTest do
 
       assert [%Segments{opacity: [1.0], stroke_width: @default_width}] =
                Geom.draw_key(@path, %{alpha: nil}, {17.28, 17.28})
+    end
+
+    test "a text's key is the letter a at the middle of the key, in its colour at its alpha" do
+      ascent = Font.ascent(11.0)
+
+      assert [%Text{} = key] =
+               Geom.draw_key(
+                 %Geom.Text{check_overlap: false},
+                 %{color: "#F8766D", alpha: 0.5},
+                 {17.28, 17.28}
+               )
+
+      assert {key.labels, key.x, key.y, key.hjust, key.offset, key.color, key.opacity, key.size} ===
+               {["a"], [0.5], [0.5], [0.5], [{0.0, -0.5 * ascent}], ["#F8766D"], [0.5], 11.0}
+
+      assert Geom.draw_key(%Geom.Text{check_overlap: false}, %{color: :none}, {17.28, 17.28}) ===
+               []
+    end
+
+    # Golden: ggplot2 4.0.3's key for text set `hjust = 0, vjust = 1`, through vdiffr 1.0.9: the
+    # letter's start 1.32 points, a tenth of a line of 11-point text 1.2 lines apart, inside the
+    # key's left edge, and its top as far below the key's top.
+    test "a text's key is placed at the layer's justification, a tenth of a line in from its edges" do
+      margin = 0.1 * 11.0 * 1.2
+
+      assert [%Text{} = key] =
+               Geom.draw_key(
+                 %Geom.Text{check_overlap: false},
+                 %{hjust: 0.0, vjust: 1.0},
+                 {17.28, 17.28}
+               )
+
+      assert {key.x, key.y, key.hjust, key.offset} ===
+               {[margin / 17.28], [(17.28 - margin) / 17.28], [0.0], [{0.0, -Font.ascent(11.0)}]}
+    end
+
+    # Golden: ggplot2 4.0.3's keys for text set `hjust = 0, vjust = 1` and turned 100, 200 and 300
+    # degrees, through vdiffr 1.0.9, which Giggly's drawings of the same plots match in every
+    # element: `rotate_just()` puts the anchor at (1 - vjust, hjust) of the key, then at
+    # (1 - hjust, 1 - vjust), then at (vjust, 1 - hjust).
+    test "a turned text's key is placed at its justification turned with it" do
+      places =
+        Enum.map([100.0, 200.0, 300.0], fn angle ->
+          [%Text{x: [x_place], y: [y_place]}] =
+            Geom.draw_key(
+              %Geom.Text{check_overlap: false},
+              %{hjust: 0.0, vjust: 1.0, angle: angle},
+              {100.0, 100.0}
+            )
+
+          {Float.round(x_place, 4), Float.round(y_place, 4)}
+        end)
+
+      margin = 0.1 * 11.0 * 1.2 / 100
+
+      assert places === [
+               {Float.round(margin, 4), Float.round(margin, 4)},
+               {Float.round(1 - margin, 4), Float.round(margin, 4)},
+               {Float.round(1 - margin, 4), Float.round(1 - margin, 4)}
+             ]
     end
 
     test "a path's key is in the colour its layer sets, and a colour of :none draws none" do

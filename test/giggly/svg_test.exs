@@ -1,7 +1,7 @@
 defmodule Giggly.SVGTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Scene, SVG}
+  alias Giggly.{Font, Scene, SVG}
 
   alias Giggly.Scene.{
     Cell,
@@ -73,10 +73,14 @@ defmodule Giggly.SVGTest do
           labels: ["Hello"],
           widths: [20.05],
           size: 8.8,
-          color: "#000000",
+          family: "",
+          color: ["#000000"],
+          opacity: [1.0],
           angle: angle,
-          hjust: hjust,
-          offset: {0.0, 0.0}
+          hjust: [hjust],
+          offset: [{0.0, 0.0}],
+          check_overlap: false,
+          ascent: 6.3
         }
       end
 
@@ -107,16 +111,133 @@ defmodule Giggly.SVGTest do
           labels: ["Hello"],
           widths: [20.05],
           size: 8.8,
-          color: "#000000",
+          family: "",
+          color: ["#000000"],
+          opacity: [1.0],
           angle: angle,
-          hjust: 0.5,
-          offset: {3.0, -4.0}
+          hjust: [0.5],
+          offset: [{3.0, -4.0}],
+          check_overlap: false,
+          ascent: 6.3
         }
       end
 
       assert texts(draw(whole([text.(0), text.(90)]))) === [
                "<text x='103.00' y='480.00' text-anchor='middle'",
                "<text transform='translate(104.00,473.00) rotate(-90)' text-anchor='middle'"
+             ]
+    end
+
+    # Golden: grid's drawing, through vdiffr 1.0.9's svglite (R 4.6.1), of the same labels at the
+    # same places in big points, 11 points, `vjust = 0`, `check.overlap = TRUE`, one call level and
+    # one turned 45 degrees. Level, it keeps A, D, H and the two justified to either side of 297.5,
+    # and leaves out B, whose edges cross A's, C, whose top and bottom lie along A's and overlap
+    # them, and G, whose sides lie along A's and overlap them; H's sides lie along A's line but
+    # above it. Turned, it leaves out the label along the first's baseline and keeps the one to its
+    # side, which would cross the first were the boxes not turned; turned 30 degrees, of two pairs
+    # whose boxes meet only aslant, it keeps the pair that does not cross and leaves out the second of
+    # the pair that does. It moves with grid's test.
+    test "a text checking overlap leaves out each label whose box crosses one drawn before it" do
+      level =
+        overlap_text(
+          [
+            {"MMMM", 100, 100, 0.5},
+            {"MMMM", 110, 103, 0.5},
+            {"M", 100, 100, 0.5},
+            {"MMMM", 160, 100, 0.5},
+            {"MMMM", 100, 103, 0.5},
+            {"MMMM", 100, 120, 0.5},
+            {"MMMM", 300, 100, 0.0},
+            {"MMMM", 295, 100, 1.0}
+          ],
+          0
+        )
+
+      turned =
+        overlap_text(
+          [{"MMMM", 500, 300, 0.5}, {"MMMM", 520, 320, 0.5}, {"MMMM", 530, 300, 0.5}],
+          45
+        )
+
+      apart = overlap_text([{"MMMM", 200, 300, 0.5}, {"MMMM", 170, 318, 0.5}], 30)
+      crossing = overlap_text([{"MMMM", 350, 300, 0.5}, {"MMMM", 369, 309, 0.5}], 30)
+
+      assert texts(draw(whole([level, turned, apart, crossing]))) === [
+               "<text x='100.00' y='476.00' text-anchor='middle'",
+               "<text x='160.00' y='476.00' text-anchor='middle'",
+               "<text x='100.00' y='456.00' text-anchor='middle'",
+               "<text x='300.00' y='476.00'",
+               "<text x='295.00' y='476.00' text-anchor='end'",
+               "<text transform='translate(500.00,276.00) rotate(-45)' text-anchor='middle'",
+               "<text transform='translate(530.00,276.00) rotate(-45)' text-anchor='middle'",
+               "<text transform='translate(200.00,276.00) rotate(-30)' text-anchor='middle'",
+               "<text transform='translate(170.00,258.00) rotate(-30)' text-anchor='middle'",
+               "<text transform='translate(350.00,276.00) rotate(-30)' text-anchor='middle'"
+             ]
+
+      assert length(texts(draw(whole([%{level | check_overlap: false}])))) === 8
+    end
+
+    # Golden: vdiffr 1.0.9 (R 4.6.1) writes a turned label's angle as C's `%0.0f`: ggplot2's text
+    # turned 30.5, 29.5, 91.5, 0.3 and -45 degrees, and grid's turned 29.3 and -0.3.
+    test "a turned label's angle is written in whole degrees, a tie to the even one" do
+      rotations =
+        Enum.map([30.5, 29.5, 91.5, 0.3, -45.0, 29.3, -0.3], fn angle ->
+          [element] =
+            [one_label(%{angle: angle})]
+            |> whole()
+            |> draw()
+            |> texts()
+
+          [rotation] = Regex.run(~r/rotate\(([^)]*)\)/, element, capture: :all_but_first)
+          rotation
+        end)
+
+      assert rotations === ["-30", "-30", "-92", "-0", "45", "-29", "0"]
+    end
+
+    # Not vdiffr's, which writes every family as `sans`: Giggly names the family a layer sets.
+    test "a label's font is the default list, or the family named, quoted and escaped" do
+      families =
+        Enum.map(["", "Times New Roman", ~s(Bob's "Font" & Co)], fn family ->
+          [_whole, style] =
+            Regex.run(
+              ~r/font-family: (.*);' textLength/,
+              draw(whole([one_label(%{family: family})]))
+            )
+
+          style
+        end)
+
+      assert families === [
+               ~s("Liberation Sans", Arial, Helvetica, sans-serif),
+               ~s("Times New Roman"),
+               ~s("Bob&apos;s &quot;Font&quot; &amp; Co")
+             ]
+    end
+
+    # vdiffr writes a label's fill unless it is black and opaque, and its opacity as svglite writes
+    # an R colour's alpha.
+    test "a label's colour is left out only for opaque black, and written with its opacity" do
+      fills =
+        Enum.map(
+          [{"#000000", 1.0}, {"#000000", 0.5}, {"#00BA38", 1.0}, {"#00BA38", 0.0}],
+          fn {color, opacity} ->
+            [_whole, style] =
+              Regex.run(
+                ~r/style='font-size: 11.00px;(.*) font-family/,
+                draw(whole([one_label(%{color: [color], opacity: [opacity]})]))
+              )
+
+            style
+          end
+        )
+
+      assert fills === [
+               "",
+               " fill: #000000; fill-opacity: 0.50;",
+               " fill: #00BA38;",
+               " fill: none;"
              ]
     end
 
@@ -579,6 +700,51 @@ defmodule Giggly.SVGTest do
 
   defp size({:rest, weight}), do: {:rest, weight}
   defp size(points), do: {:points, points}
+
+  # Labels checking overlap, each `{label, x, y, hjust}` at its place in points in the whole drawing,
+  # 11 points tall and black, its baseline on its place, turned `angle` degrees.
+  defp overlap_text(labels, angle) do
+    count = length(labels)
+
+    %Text{
+      x: Enum.map(labels, fn {_label, x_points, _y_points, _hjust} -> x_points / 720 end),
+      y: Enum.map(labels, fn {_label, _x_points, y_points, _hjust} -> y_points / 576 end),
+      labels: Enum.map(labels, fn {label, _x_points, _y_points, _hjust} -> label end),
+      widths:
+        Enum.map(labels, fn {label, _x_points, _y_points, _hjust} -> Font.width(label, 11.0) end),
+      size: 11.0,
+      family: "",
+      color: List.duplicate("#000000", count),
+      opacity: List.duplicate(1.0, count),
+      angle: angle,
+      hjust: Enum.map(labels, fn {_label, _x_points, _y_points, hjust} -> hjust end),
+      offset: List.duplicate({0.0, 0.0}, count),
+      check_overlap: true,
+      ascent: Font.ascent(11.0)
+    }
+  end
+
+  # One label in the middle of the drawing, 11 points and black, with `changes` made to it.
+  defp one_label(changes) do
+    struct!(
+      %Text{
+        x: [0.5],
+        y: [0.5],
+        labels: ["Hello"],
+        widths: [25.68],
+        size: 11.0,
+        family: "",
+        color: ["#000000"],
+        opacity: [1.0],
+        angle: 0,
+        hjust: [0.5],
+        offset: [{0.0, 0.0}],
+        check_overlap: false,
+        ascent: 7.88
+      },
+      changes
+    )
+  end
 
   # Drawn at vdiffr's size, 720 by 576 points.
   defp draw(scene) do

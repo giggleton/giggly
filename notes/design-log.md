@@ -79,6 +79,53 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **An aesthetic a layer takes from the plot and cannot use rides along unused, as ggplot2 carries
+  one (2026-10-17, Steve, settling §7's question as the second geom drawn beside points arrived).**
+  A layer's own mapping is checked against what it accepts; the plot's reaches every layer, so a
+  plot can map `label` for its text and still draw points, as ggplot2's `geom_text` example does.
+  The carried aesthetic is evaluated into the layer's table and drawn by nothing; a discrete one
+  still splits the layer's groups (never `label`, which grouping leaves out), and the layer draws
+  in a legend only for aesthetics it accepts, a legend no layer can draw dropped, as ggplot2's
+  `matched_aes()` and its guides do. ggplot2's point knows `fill` and draws in a fill legend;
+  Giggly's waits for filled shapes. *Rejected: dropping it for that layer*, the same drawing for
+  `label` but not for a plot-level `fill`, which splits a line's groups in ggplot2; *refusing it*,
+  the first geom's rule, which cannot write that example.
+
+- **Text and titles is Phase 3's fifth increment, in six steps: `geom_text()`, nudging, `labs()`,
+  a layer's own table, `annotate()` with `geom_rect()`, the notebooks (2026-10-17, Steve, agreeing
+  the proposal; checked against ggplot2 4.0.3 in R).** It draws 21 of the 591 waiting notebook
+  examples. Titles are the second most-named piece (35 examples) after an expression in a mapping
+  (137), and afterwards 19 examples wait on the theme alone. `geom_rect()` comes because the bar
+  geom already draws its rectangles, and it gives `annotate()` its shaded rectangles. *Rejected:*
+  histograms, box plots and jitter (17 examples, but three stats matched to R's numbers, and a
+  jitter R draws differently on every build); expressions in a mapping (10, two of them printed
+  mappings, and the largest API question left); themes (about 19 of 27: five need a global default
+  theme the pure core rules out, and all need the whole element tree); `geom_label()` now (one
+  example, for a rounded box traced as grid traces it). *Deferred:* `parse = TRUE`, dodging text,
+  `inherit.aes`, mapped text `size`, `key_glyph`, `fontface`, `size.unit`, `labs()`'s `alt` and
+  `dictionary`, `get_labs()`.
+
+- **A layer's own table is public: `data:`, an option of every layer function, as ggplot2's
+  `data =` (2026-10-17, Steve).** `annotate()` needs a layer with a table of its own, drawn in
+  every panel, so the machinery is built either way. Making it public adds the facet layout read
+  from every layer's table (a value only a layer has adds a panel, as in R), a table lacking some
+  facet columns repeated across them, and a check at the call that the layer's table holds the
+  columns the plot maps (R fails with "object not found"). It draws facet_wrap's "The same data in
+  every panel" now, and 14 more waiting examples need it. `inherit.aes` waits for an example that
+  needs it. *Rejected: a table internal to `annotate()`*, recommended first for a reason that did
+  not hold: §7's inherited-mapping question is about aesthetics a geom cannot use, which a layer's
+  own table leaves alone.
+
+- **Giggly exposes no function ggplot2 has superseded or deprecated (2026-10-17, Steve: "generally
+  speaking we aren't going to expose superseded things").** ggplot2 4.0.3 marks `xlab()`, `ylab()`
+  and `ggtitle()` superseded by `labs()` (`lifecycle::signal_stage()`), so Giggly has `labs()`
+  alone. The same holds for `coord_flip()`, `coord_polar()`, `coord_map()`, `expand_limits()` and
+  `annotation_logticks()`, superseded, and for `qplot()`, `coord_trans()`, `borders()`,
+  `geom_errorbarh()` and `aes_string()`, deprecated. A superseded function stays in ggplot2
+  without a warning, but ggplot2 recommends its replacement, and one way to say a thing keeps the
+  API small. *Rejected: the shortcuts for parity* with ggplot2 and with ggity, which had `xlab/2`
+  and `ylab/2`: three more public functions that only rename a key of `labs()`.
+
 - **A discrete scale carries its missing value as a field, `na_value`, as ggplot2's scale carries
   `na.value` (2026-10-16, Steve).** A missing level takes no share of the palette and maps to it:
   grey50, `#7F7F7F`, for colour and fill, `nil`, R's `NA`, for alpha and a position, which places
@@ -1341,6 +1388,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-17 — Draw labels with geom_text (text and titles, step 1); §4: "Text and titles is
+  Phase 3's fifth increment", "An aesthetic a layer takes from the plot"
 - 2026-10-17 — Draw colours in the notebooks (colour, step 4); §4: "Colour and fill is Phase 3's
   fourth increment", "Colours are CSS's names and hex forms"
 - 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b)
@@ -1466,6 +1515,14 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 
 ## 7. Deferred / open questions
 
+- **How a notebook treats an example of a function Giggly will not offer (found 2026-10-17).**
+  Giggly exposes no superseded or deprecated function (§4, the entry beginning "Giggly exposes no
+  function"), yet 33 waiting examples call one, most of them `coord_map()`,
+  `annotation_logticks()`, `expand_limits()`, `qplot()` and `coord_flip()`, and their verdicts
+  say "Not in Giggly yet", which will never become true. Options: draw them with the replacement,
+  as `labs(x:)` for `xlab()`, which `notebooks.md` allows as a counterpart, though `ggplot()` for
+  `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
+  Settled when the first such example could otherwise be drawn.
 - **The datasets should carry R's column types (found 2026-10-15).** Bars follow R's
   `resolution()`, which gives an integer column bars 0.9 wide; Giggly's `mtcars` reads `cyl` and
   `gear` as integers where R stores doubles, so its bars are 0.9 wide where ggplot2's are 1.8.
@@ -1485,13 +1542,6 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   open: which pages follow, and a side quest, a Kino library so a plot value draws itself in a
   cell (Livebook shows the SVG with `Kino.Image` until then), as an optional dependency or a
   package of its own like `kino_vega_lite`, settled when it is built.
-- **What a second geom makes legal in an inherited mapping.** Each geom call checks the plot's
-  mapping with its own, so today an inherited aesthetic the geom cannot use raises. ggplot2
-  evaluates every inherited aesthetic and carries the ones a layer ignores: a plot-level `label`
-  rides along in a point layer, and a discrete one the geom ignores still splits its groups, which
-  is why `add_group()` excludes `label`. Options: drop an inherited aesthetic the layer cannot use
-  before evaluation, or carry it as ggplot2 does. Settled when the second geom arrives; the `label`
-  exclusion from the group key arrives with `geom_text` either way.
 - **How structs order in a mapped `group`.** Group ids sort values in Erlang term order, which
   orders `Date`s by their fields rather than chronologically. Nothing shows group order until a
   position stacks or dodges by it (Phase 3), which settles it.

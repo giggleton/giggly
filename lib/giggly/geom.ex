@@ -19,17 +19,25 @@ defprotocol Giggly.Geom do
   # implementation calls until it is classified. There are points (`Giggly.Geom.Point`), bars
   # (`Giggly.Geom.Bar`), which `geom_col()` draws with as ggplot2's does, paths
   # (`Giggly.Geom.Path`) and lines (`Giggly.Geom.Line`), which draw as paths once their rows are in
-  # order, as ggplot2's `GeomLine` is a `GeomPath`. A geom drawing lines places its rows with
-  # `Giggly.Coord.munch/3`, which cuts them to follow the panel's curves.
+  # order, as ggplot2's `GeomLine` is a `GeomPath`, and text (`Giggly.Geom.Text`). A geom drawing
+  # lines places its rows with `Giggly.Coord.munch/3`, which cuts them to follow the panel's curves.
 
-  # A geom places its rows through the coordinate system and draws them as scene primitives, and
-  # sizes a mark with no width given from the spacing of its positions (`Giggly.Resolution`).
+  # A geom places its rows through the coordinate system and draws them as scene primitives, sizes
+  # a mark with no width given from the spacing of its positions (`Giggly.Resolution`), and measures
+  # the text it draws (`Giggly.Font`), which the scene draws at the width measured.
   # It exports its kinds, whose structs a plot records and whose facts it checks a layer against,
   # and nothing they draw with: that is in their protocol implementations, which no boundary
   # exports.
   use Boundary,
-    deps: [Giggly.Aesthetics, Giggly.Coord, Giggly.DataFrame, Giggly.Resolution, Giggly.Scene],
-    exports: [Bar, Line, Path, Point]
+    deps: [
+      Giggly.Aesthetics,
+      Giggly.Coord,
+      Giggly.DataFrame,
+      Giggly.Font,
+      Giggly.Resolution,
+      Giggly.Scene
+    ],
+    exports: [Bar, Line, Path, Point, Text]
 
   alias Giggly.{Coord, DataFrame, Scene}
 

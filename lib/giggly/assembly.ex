@@ -34,8 +34,9 @@ defmodule Giggly.Assembly do
   #      it then builds the legends: each such scale's, a key for each break, labelled, with the
   #      value it maps to, in the order of the aesthetics' names, one with the title and labels of
   #      an earlier merged into it, as ggplot2 merges guides that would read alike; each legend
-  #      is drawn by the geom of each layer that maps one of its aesthetics, with what that layer
-  #      sets, in the keys whose values the layer's table holds;
+  #      is drawn by the geom of each layer that maps one of its aesthetics and can use it, with
+  #      what that layer sets, in the keys whose values the layer's table holds, and a legend no
+  #      layer can draw is dropped;
   #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
   #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
@@ -358,8 +359,27 @@ defmodule Giggly.Assembly do
     scale_legends
     |> Enum.reduce([], &merged/2)
     |> Enum.reverse()
+    |> Enum.filter(fn legend ->
+      Enum.any?(layers, fn layer -> draws_in?(legend, plot, layer) end)
+    end)
     |> Enum.map(fn legend ->
       Map.put(legend, :layers, key_layers(legend, plot, layers_and_data))
+    end)
+  end
+
+  # Whether `layer` draws in `legend`: whether it maps one of the legend's aesthetics and can use
+  # it. ggplot2 drops a guide no layer draws in, as when every layer takes the aesthetic from the
+  # plot's mapping and none can use it.
+  defp draws_in?(legend, plot, layer), do: drawn_aesthetics(legend, plot, layer) != []
+
+  # The legend's aesthetics that `layer` maps, from its own mapping or the plot's, and can use, as
+  # ggplot2's `matched_aes()` keeps those the layer's geom knows.
+  defp drawn_aesthetics(legend, plot, layer) do
+    mapping = Plot.computed_mapping(plot, layer)
+    accepted = Plot.layer_accepted(layer)
+
+    Enum.filter(legend.aesthetics, fn aesthetic ->
+      Map.has_key?(mapping, aesthetic) and aesthetic in accepted
     end)
   end
 
@@ -417,16 +437,14 @@ defmodule Giggly.Assembly do
     }
   end
 
-  # Each layer that maps one of the legend's aesthetics, in the order the layers were added, with
-  # those it maps, its geom, what it sets, and whether it draws in each key; none for a colour
-  # bar, which draws no layer's glyph, as ggplot2's colour bar keeps none.
+  # Each layer that maps one of the legend's aesthetics and can use it, in the order the layers were
+  # added, with those it maps, its geom, what it sets, and whether it draws in each key; none for a
+  # colour bar, which draws no layer's glyph, as ggplot2's colour bar keeps none.
   defp key_layers(%{guide: %Guide.Colorbar{}}, _plot, _layers_and_data), do: []
 
   defp key_layers(legend, plot, layers_and_data) do
     for {layer, frame} <- layers_and_data,
-        mapping = Plot.computed_mapping(plot, layer),
-        mapped =
-          Enum.filter(legend.aesthetics, fn aesthetic -> Map.has_key?(mapping, aesthetic) end),
+        mapped = drawn_aesthetics(legend, plot, layer),
         mapped != [] do
       %{
         geom: Plot.layer_geom(layer),

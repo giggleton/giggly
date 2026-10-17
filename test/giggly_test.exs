@@ -1496,6 +1496,81 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/facet_wrap_free.svg")
     end
 
+    # Golden: test/golden/text.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/text.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_text()'s "Avoid overlaps" example: each car's
+    # name centred on its weight and mileage, black and 11 points, and the 8 that would cross a name
+    # drawn before them left out. It moves with what moves test/golden/point.svg, with how text is
+    # measured, and with grid's test for crossing boxes.
+    test "text draws each row's label at its place, leaving out those that would cross another" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_text(check_overlap: true)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/text.svg")
+    end
+
+    # Golden: test/golden/text_legend.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/text_legend.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Each car's name in its cylinders' hue, half opaque
+    # and turned 45 degrees; the legend's keys are the letter "a" in each hue at the layer's alpha,
+    # turned with the labels. It moves with what moves test/golden/text.svg, with the hue palette,
+    # and with how a turned label is placed and written.
+    test "text in a mapped colour, turned and transparent, keys its legend with a turned letter" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      cars = %{
+        "model" => Keyword.fetch!(mtcars, :model),
+        "wt" => Keyword.fetch!(mtcars, :wt),
+        "mpg" => Keyword.fetch!(mtcars, :mpg),
+        "cyl" =>
+          mtcars
+          |> Keyword.fetch!(:cyl)
+          |> Enum.map(&Integer.to_string/1)
+      }
+
+      plot =
+        cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model, colour: :cyl})
+        |> Plot.geom_text(angle: 45, alpha: 0.5)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/text_legend.svg")
+    end
+
+    # Golden: test/golden/text_inward.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/text_inward.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_text()'s "Justification" example: labels at
+    # the data's corners and middle, each justified inward both ways. It moves with what moves
+    # test/golden/text.svg, and with how a word justifies a label.
+    test "text justified inward sits inside the panel against its corner, centred in the middle" do
+      plot =
+        %{
+          "x" => [1, 1, 2, 2, 1.5],
+          "y" => [1, 2, 1, 2, 1.5],
+          "text" => ["bottom-left", "top-left", "bottom-right", "top-right", "center"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_text(%{label: :text}, vjust: :inward, hjust: :inward)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/text_inward.svg")
+    end
+
     test "a label's &, < and > are escaped, so a level cannot break the document" do
       svg =
         %{"make" => ["<a & b>"], "mpg" => [21.0]}

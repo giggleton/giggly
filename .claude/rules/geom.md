@@ -85,6 +85,20 @@ where its marks sit".
   millimetres or 0.5 (1.07 points, worked out as ggplot2's `linewidth * .pt` line-width units and
   svglite's points), with the geom's ends, corners and mitre limit (ggplot2's defaults: butt,
   round, 10).
+- **Text (`Geom.Text`) is drawn as ggplot2's `GeomText` draws it**: a label per row at its `x` and
+  `y`, its row's value as R's `as.character()` writes it (a whole number with no point, a float in
+  up to 15 significant digits, scientific notation where it is shorter, `TRUE`, a date); black, or
+  its row's colour at its row's alpha as a point; 11 points, the theme's base size, or the layer's
+  `size` in millimetres times `.pt`; turned the layer's `angle`; justified by the layer's `hjust`
+  along its baseline and `vjust` up the ascent of "M", a number or one of ggplot2's words, and
+  `:inward` and `:outward` by where each label falls in the panel, as `compute_just()` decides. A
+  row missing its place or label, or whose colour is `:none`, is not drawn. **A geom measures the
+  text it draws** (`Giggly.Font`), since the scene draws a label at its measured width; **whether
+  labels overlap is the backend's to decide** (`Scene.Text`'s `check_overlap`), since it turns on
+  the panel's size in points, which no geom sees. Its key is the letter "a" at the layer's
+  justification, turned as `rotate_just()` turns it, a tenth of a line in from the key's edges, as
+  `draw_key_text()` draws it; ggplot2 widens a key for text too big for it, which waits for keys
+  that size themselves.
 - **A line (`Geom.Line`) is a path whose rows `setup_data/3` puts in order** of panel, group and
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws

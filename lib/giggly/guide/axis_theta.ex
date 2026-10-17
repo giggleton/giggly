@@ -42,12 +42,17 @@ defmodule Giggly.Guide.AxisTheta do
           labels: [label],
           widths: [Font.width(label, text_look.size)],
           size: text_look.size,
-          color: text_look.color,
+          family: "",
+          color: [text_look.color],
+          opacity: [1.0],
           angle: 0,
-          hjust: 0.5 - :math.sin(angle) / 2,
-          offset:
+          hjust: [0.5 - :math.sin(angle) / 2],
+          offset: [
             {label_offset * :math.sin(angle),
              label_offset * :math.cos(angle) - vjust * Font.ascent(text_look.size)}
+          ],
+          check_overlap: false,
+          ascent: Font.ascent(text_look.size)
         }
       end)
 

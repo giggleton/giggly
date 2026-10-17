@@ -23,9 +23,12 @@ defmodule Giggly.Plot do
   same column.
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
-  both the plot and layer map takes the layer's column. Which aesthetics a layer can use is checked,
-  on the two mappings together, when the layer is added. Whether a column's type suits an axis is
-  checked when the plot is run.
+  both the plot and layer map takes the layer's column. When a layer is added, its own mapping is
+  checked against the aesthetics it can use, and the two mappings together against those it needs.
+  An aesthetic a layer takes from the plot's mapping that it cannot use rides along unused, as
+  ggplot2 carries one, so a plot can map `:label` for its text and still draw points: it is not
+  drawn, though a discrete one still splits the layer's groups, and the layer draws in no legend of
+  it. Whether a column's type suits an axis is checked when the plot is run.
 
   ## Setting aesthetics
 
@@ -243,8 +246,22 @@ defmodule Giggly.Plot do
     ]
   ]
 
+  @text_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every label, as ggplot2's `colour = \"red\"` sets it, written `colour:` or " <>
+        "`color:`: " <> @color_forms <> "; black when not given."
+  ]
+
+  # How a label is justified, along its baseline (`hjust`) or up its height (`vjust`): a number, or
+  # one of ggplot2's words.
+  @justification_forms "a number from 0 to 1, or one of ggplot2's words: `:left`, `:center` and " <>
+                         "`:right`, `:bottom`, `:middle` and `:top`, or `:inward` and " <>
+                         "`:outward`, which justify each label toward or away from the middle " <>
+                         "of the panel by where it falls"
+
   # The options that set an aesthetic rather than choose how a layer is drawn.
-  @fixed_aesthetics [:alpha, :color, :fill, :linewidth]
+  @fixed_aesthetics [:alpha, :color, :fill, :linewidth, :size, :angle, :hjust, :vjust, :family]
 
   # `geom_point/3`'s options, validated at the call.
   @point_options NimbleOptions.new!(alpha: @alpha_option, color: @point_color_option)
@@ -285,6 +302,51 @@ defmodule Giggly.Plot do
                     color: @line_color_option,
                     linewidth: @linewidth_option
                   ] ++ @line_style_options
+                )
+
+  # `geom_text/3`'s options, validated at the call.
+  @text_options NimbleOptions.new!(
+                  check_overlap: [
+                    type: :boolean,
+                    default: false,
+                    doc:
+                      "Whether to leave out each label that would cross one drawn before it, " <>
+                        "the rows taken in order, as ggplot2's `check_overlap = TRUE` does."
+                  ],
+                  alpha: @alpha_option,
+                  color: @text_color_option,
+                  size: [
+                    type: {:custom, __MODULE__, :validate_size, []},
+                    doc:
+                      "How big every label is, in millimetres, as ggplot2's `size = 5` sets " <>
+                        "it, which is that many times ggplot2's `.pt`, 2.85, in points; 11 " <>
+                        "points, the theme's base size, when not given."
+                  ],
+                  angle: [
+                    type: {:custom, __MODULE__, :validate_angle, []},
+                    doc:
+                      "How far every label is turned, in degrees anticlockwise; 0 when not given."
+                  ],
+                  hjust: [
+                    type: {:custom, __MODULE__, :validate_justification, []},
+                    doc:
+                      "Where along its baseline every label is anchored on its place, 0 its " <>
+                        "start and 1 its end: " <> @justification_forms <> "; 0.5 when not given."
+                  ],
+                  vjust: [
+                    type: {:custom, __MODULE__, :validate_justification, []},
+                    doc:
+                      "Where up its height every label is anchored on its place, 0 its " <>
+                        "baseline and 1 the top of a capital letter: " <>
+                        @justification_forms <> "; 0.5 when not given."
+                  ],
+                  family: [
+                    type: :string,
+                    doc:
+                      "The font every label is drawn in, by name, such as " <>
+                        "`\"Times New Roman\"`; the default sans-serif when not given. A label " <>
+                        "is measured as the default font measures it, and drawn at that width."
+                  ]
                 )
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
@@ -370,13 +432,11 @@ defmodule Giggly.Plot do
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       mapping: resolve(mapping, plot.data, "Plot.geom_point/3"),
-      fixed: fixed(validated)
+      fixed: fixed(validated),
+      accepted: Geom.Point.accepted_aesthetics()
     }
 
-    add_layer(plot, layer, "Plot.geom_point/3",
-      accepted: Geom.Point.accepted_aesthetics(),
-      required: Geom.Point.required_aesthetics()
-    )
+    add_layer(plot, layer, "Plot.geom_point/3", required: Geom.Point.required_aesthetics())
   end
 
   @doc """
@@ -424,12 +484,12 @@ defmodule Giggly.Plot do
       stat: %Stat.Count{},
       position: position(Keyword.fetch!(validated, :position)),
       mapping: resolve(mapping, plot.data, "Plot.geom_bar/3"),
-      fixed: fixed(validated)
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics())
     }
 
     plot
     |> add_layer(layer, "Plot.geom_bar/3",
-      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
       required: Stat.Count.required_aesthetics(),
       exclusive: Stat.Count.exclusive_aesthetics()
     )
@@ -495,13 +555,11 @@ defmodule Giggly.Plot do
       stat: %Stat.Identity{},
       position: position(Keyword.fetch!(validated, :position)),
       mapping: resolve(mapping, plot.data, "Plot.geom_col/3"),
-      fixed: fixed(validated)
+      fixed: fixed(validated),
+      accepted: Geom.Bar.accepted_aesthetics()
     }
 
-    add_layer(plot, layer, "Plot.geom_col/3",
-      accepted: Geom.Bar.accepted_aesthetics(),
-      required: Geom.Bar.required_aesthetics()
-    )
+    add_layer(plot, layer, "Plot.geom_col/3", required: Geom.Bar.required_aesthetics())
   end
 
   @doc """
@@ -551,13 +609,11 @@ defmodule Giggly.Plot do
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       mapping: resolve(mapping, plot.data, "Plot.geom_path/3"),
-      fixed: fixed(validated)
+      fixed: fixed(validated),
+      accepted: Geom.Path.accepted_aesthetics()
     }
 
-    add_layer(plot, layer, "Plot.geom_path/3",
-      accepted: Geom.Path.accepted_aesthetics(),
-      required: Geom.Path.required_aesthetics()
-    )
+    add_layer(plot, layer, "Plot.geom_path/3", required: Geom.Path.required_aesthetics())
   end
 
   @doc """
@@ -604,13 +660,72 @@ defmodule Giggly.Plot do
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       mapping: resolve(mapping, plot.data, "Plot.geom_line/3"),
-      fixed: fixed(validated)
+      fixed: fixed(validated),
+      accepted: Geom.Line.accepted_aesthetics()
     }
 
-    add_layer(plot, layer, "Plot.geom_line/3",
-      accepted: Geom.Line.accepted_aesthetics(),
-      required: Geom.Line.required_aesthetics()
-    )
+    add_layer(plot, layer, "Plot.geom_line/3", required: Geom.Line.required_aesthetics())
+  end
+
+  @doc """
+  Adds a layer of text: each row's `label` at its `x` and `y`, ggplot2's `geom_text()`.
+
+  A label is its row's value as R writes it with `as.character()`: text as it is, a whole number
+  with no decimal point (`21`, not `21.0`), any other number in up to 15 significant digits, in
+  scientific notation when that is shorter (`1e+05`), and `TRUE` or `FALSE`. Each label is centred on
+  its place, black and 11 points tall, the theme's base size, unless the options say otherwise. A
+  row missing its `x`, `y` or label draws nothing.
+
+  Text uses `:x`, `:y`, `:label`, `:group`, `:alpha` and `:color`, and needs `:x`, `:y` and
+  `:label` from one mapping or the other; a label never groups the rows, however many there are, as
+  ggplot2's never does. A mapping, a map, and options, a keyword list, may each be given alone or
+  both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@text_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, label: :model})
+      ...>   |> Giggly.Plot.geom_text(hjust: :inward, size: 5)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :label)
+      ["Mazda RX4", "Datsun 710"]
+      iex> Giggly.DataFrame.pull(frame, :hjust)
+      [:inward, :inward]
+
+  A number is labelled as R writes it:
+
+      iex> svg =
+      ...>   %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "count" => [21.0, 100_000.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, label: :count})
+      ...>   |> Giggly.Plot.geom_text()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">21</text>", svg =~ ">1e+05</text>"}
+      {true, true}
+  """
+  @spec geom_text(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_text(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_text(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_text(plot, %{}, options)
+
+  def geom_text(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @text_options)
+
+    layer = %Layer{
+      geom: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)},
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      mapping: resolve(mapping, plot.data, "Plot.geom_text/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Text.accepted_aesthetics()
+    }
+
+    add_layer(plot, layer, "Plot.geom_text/3", required: Geom.Text.required_aesthetics())
   end
 
   @doc """
@@ -748,6 +863,11 @@ defmodule Giggly.Plot do
   @spec layer_fixed(Layer.t()) :: Layer.fixed()
   def layer_fixed(%Layer{fixed: fixed}), do: fixed
 
+  # The aesthetics `layer` can use, its geom's and its stat's.
+  @doc false
+  @spec layer_accepted(Layer.t()) :: [aesthetic()]
+  def layer_accepted(%Layer{accepted: accepted}), do: accepted
+
   # NimbleOptions' check of an `alpha:` option: a number from 0, invisible, to 1, opaque, kept as a
   # float.
   @doc false
@@ -782,6 +902,37 @@ defmodule Giggly.Plot do
 
   def validate_linewidth(width),
     do: {:error, "expected a width in millimetres, 0 or more, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a text's `size:` option: a size in millimetres, 0 or more, kept as a
+  # float.
+  @doc false
+  @spec validate_size(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_size(size) when is_number(size) and size >= 0, do: {:ok, size / 1}
+
+  def validate_size(size),
+    do: {:error, "expected a size in millimetres, 0 or more, got: #{inspect(size)}"}
+
+  # NimbleOptions' check of an `angle:` option: any number of degrees, kept as a float.
+  @doc false
+  @spec validate_angle(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_angle(angle) when is_number(angle), do: {:ok, angle / 1}
+  def validate_angle(angle), do: {:error, "expected a number of degrees, got: #{inspect(angle)}"}
+
+  # NimbleOptions' check of an `hjust:` or `vjust:` option: a number, kept as a float, as R keeps one
+  # and grid takes any, or one of ggplot2's words, as an atom.
+  @doc false
+  @spec validate_justification(term()) :: {:ok, float() | atom()} | {:error, String.t()}
+  def validate_justification(just) when is_number(just), do: {:ok, just / 1}
+
+  def validate_justification(just)
+      when just in [:left, :center, :right, :bottom, :middle, :top, :inward, :outward],
+      do: {:ok, just}
+
+  def validate_justification(just) do
+    {:error,
+     "expected a number, or one of :left, :center, :right, :bottom, :middle, :top, :inward " <>
+       "and :outward, got: #{inspect(just)}"}
+  end
 
   # NimbleOptions' check of a `linemitre:` option: a number of line widths, 1 or more, as grid
   # refuses less, kept as a float.
@@ -824,12 +975,15 @@ defmodule Giggly.Plot do
       "its columns are #{inspect_all(names)}"
   end
 
-  # The plot with `layer` added, once the mapping it draws with is checked against what the function
-  # that adds it, `function`, accepts and requires. At the front, so adding a layer never walks the
-  # list.
+  # The plot with `layer` added, once its mappings are checked against what the function that adds
+  # it, `function`, accepts and requires: its own mapping against what it accepts, and the mapping it
+  # draws with, its own laid over the plot's, against what it requires. An aesthetic it takes from
+  # the plot's mapping that it cannot use rides along unused, as ggplot2 carries one, since the
+  # plot's mapping reaches every layer and not every layer can use all of it. At the front, so
+  # adding a layer never walks the list.
   defp add_layer(plot, layer, function, facts) do
     combined_mapping = computed_mapping(plot, layer)
-    check_accepted(combined_mapping, Keyword.fetch!(facts, :accepted), function)
+    check_accepted(layer.mapping, layer.accepted, function)
     check_required(combined_mapping, Keyword.fetch!(facts, :required), function)
     check_exclusive(combined_mapping, Keyword.get(facts, :exclusive, []), function)
 
@@ -870,8 +1024,7 @@ defmodule Giggly.Plot do
     plot
   end
 
-  # The plot's mapping reaches every layer, so an aesthetic it maps that the geom cannot use is as
-  # wrong as one the layer maps itself.
+  # An aesthetic a layer maps itself that it cannot use would silently do nothing, so it raises.
   defp check_accepted(mapping, accepted, function) do
     unaccepted =
       mapping
@@ -884,8 +1037,8 @@ defmodule Giggly.Plot do
 
       unaccepted ->
         raise ArgumentError,
-              "#{function} cannot use #{inspect_all(unaccepted)}, mapped by the layer " <>
-                "or by the plot; it accepts #{inspect_all(accepted)}"
+              "#{function} cannot use #{inspect_all(unaccepted)}, which its mapping maps; " <>
+                "it accepts #{inspect_all(accepted)}"
     end
   end
 

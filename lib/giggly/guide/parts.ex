@@ -41,10 +41,14 @@ defmodule Giggly.Guide.Parts do
           labels: [label],
           widths: [width],
           size: look.size,
-          color: look.color,
+          family: "",
+          color: [look.color],
+          opacity: [1.0],
           angle: 0,
-          hjust: 0.0,
-          offset: {0.0, -Font.ascent(look.size) / 2}
+          hjust: [0.0],
+          offset: [{0.0, -Font.ascent(look.size) / 2}],
+          check_overlap: false,
+          ascent: Font.ascent(look.size)
         }
       ]
     }

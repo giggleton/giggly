@@ -28,6 +28,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one
   (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user sees, through
   `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
+- **No function ggplot2 has superseded or deprecated becomes API**; Giggly offers its replacement
+  alone, `labs()` and never `xlab()` (design-log §4, the entry beginning "Giggly exposes no
+  function").
 - **A kind is named after ggplot2's ggproto class without its family prefix, and a class ggplot2
   keeps only as an alias is not a kind:** `geom_col/3` records `%Geom.Bar{}` with
   `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`. A
@@ -72,19 +75,22 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar functions `fill:`, and the line functions
-  `linewidth:`, in millimetres. The assembly puts it into every row last. **A colour is resolved
+  function takes `alpha:` and `colour:`, the bar functions `fill:`, the line functions
+  `linewidth:`, in millimetres, and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
+  `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), and `family:`.
+  The assembly puts it into every row last. **A colour is resolved
   at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its uppercase hex or `:none`,
   never the name written, and a colour CSS does not define raises naming the value. A point
   neither takes a `fill:` nor maps `:fill`, which only the filled shapes not yet drawn use. A map maps and a keyword list sets:
   the two never trade places. **An option that chooses how a geom draws** (`lineend:`,
-  `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`) **is a field of the geom's struct**,
-  its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`).
+  `linejoin:`, `linemitre:`, `geom_line/3`'s `orientation:`, `geom_text/3`'s `check_overlap:`)
+  **is a field of the geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`,
+  `10.0`, `:x`, `false`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
-  `linewidth:`; `geom_line/3`'s `orientation:`), so a misspelt option raises naming it, and a
-  repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
+  `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`), so a misspelt
+  option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
   recorded as a value (`scales: :fixed`). An option not given is recorded as `:none` in the kind's
   struct; a caller never writes "absent", so §7's question waits.
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
@@ -94,10 +100,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   never the atoms the caller wrote.
 - **A column reference is an atom or a string,** compared with the data's names as a string.
   Nothing else is read as a name: `2.5` is not the column `"2.5"`.
-- **The plot's mapping is checked against each layer as the layer is added,** together with the
-  layer's own: an aesthetic either gives that the geom cannot use raises, and so does a required
-  one neither gives. With one geom this is exact; what a second geom makes legal is open
-  (design-log §7).
+- **A layer's own mapping is checked against what it accepts as the layer is added, and its own
+  laid over the plot's against what it requires**: an aesthetic the layer maps that it cannot use
+  raises, and so does a required one neither mapping gives. **An aesthetic it takes from the plot's
+  mapping that it cannot use rides along unused, as ggplot2 carries one** (design-log §4, the entry
+  beginning "An aesthetic a layer takes from the plot"): evaluated into its table and drawn by
+  nothing. Each layer records what it accepts (`accepted`, its geom's and its stat's facts, read
+  with `layer_accepted/1`), which the assembly reads to say which legends it draws in.
 - **A geom accepts only what the pipeline can draw.** An aesthetic joins a geom's accepted list
   with the scale that maps it, so a mapping never silently does nothing.
 - **When keyword options arrive, `Aesthetics.canonicalize/1` runs before NimbleOptions validates
@@ -105,7 +114,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
   repeat. NimbleOptions has no number type either: an option taking any number is
   `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
-  more and `linemitre:` 1 or more, as grid refuses less, through custom checks
-  (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`), which take an integer too
-  and keep a float, as R keeps a number; `validate_color/1` hands a colour to
-  `Giggly.ColorOperations`.
+  more, `linemitre:` 1 or more, as grid refuses less, a text's `size:` 0 or more and `angle:` any
+  number, and `hjust:` and `vjust:` any number or one of ggplot2's words, through custom checks
+  (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`, `validate_size/1`,
+  `validate_angle/1`, `validate_justification/1`), which take an integer too and keep a float, as R
+  keeps a number; `validate_color/1` hands a colour to `Giggly.ColorOperations`.

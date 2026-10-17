@@ -126,10 +126,14 @@ defmodule Giggly.Guide.Axis do
       labels: labels,
       widths: Enum.map(labels, fn label -> Font.width(label, text_look.size) end),
       size: text_look.size,
-      color: text_look.color,
+      family: "",
+      color: List.duplicate(text_look.color, length(places)),
+      opacity: List.duplicate(1.0, length(places)),
       angle: 0,
-      hjust: 0.5,
-      offset: {0.0, -Font.ascent(text_look.size)}
+      hjust: List.duplicate(0.5, length(places)),
+      offset: List.duplicate({0.0, -Font.ascent(text_look.size)}, length(places)),
+      check_overlap: false,
+      ascent: Font.ascent(text_look.size)
     }
 
     {height, [ticks, text]}
@@ -179,10 +183,14 @@ defmodule Giggly.Guide.Axis do
       labels: labels,
       widths: label_widths,
       size: text_look.size,
-      color: text_look.color,
+      family: "",
+      color: List.duplicate(text_look.color, length(places)),
+      opacity: List.duplicate(1.0, length(places)),
       angle: 0,
-      hjust: hjust,
-      offset: {0.0, -Font.ascent(text_look.size) / 2}
+      hjust: List.duplicate(hjust, length(places)),
+      offset: List.duplicate({0.0, -Font.ascent(text_look.size) / 2}, length(places)),
+      check_overlap: false,
+      ascent: Font.ascent(text_look.size)
     }
   end
 
@@ -226,10 +234,14 @@ defmodule Giggly.Guide.Axis do
       labels: [text],
       widths: [Font.width(text, title_look.size)],
       size: title_look.size,
-      color: title_look.color,
+      family: "",
+      color: [title_look.color],
+      opacity: [1.0],
       angle: angle,
-      hjust: 0.5,
-      offset: {0.0, -Font.ascent(title_look.size)}
+      hjust: [0.5],
+      offset: [{0.0, -Font.ascent(title_look.size)}],
+      check_overlap: false,
+      ascent: Font.ascent(title_look.size)
     }
   end
 

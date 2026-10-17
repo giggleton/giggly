@@ -46,7 +46,8 @@ defmodule Giggly.PlotTest do
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
-                 fixed: %{}
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :x, :y]
                }
              ]
     end
@@ -68,11 +69,15 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":group"
     end
 
-    test "an aesthetic points cannot use is refused when the plot's mapping gives it" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg, fill: :cyl})
+    # ggplot2 carries an aesthetic a layer takes from the plot and cannot use, as a plot's `label`
+    # rides along in a point layer under a text layer.
+    test "an aesthetic points cannot use is taken unused from the plot's mapping" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, fill: :cyl})
+        |> Plot.geom_point()
 
-      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot) end
-      assert error.message =~ ":fill"
+      assert [%Plot.Layer{mapping: %{}}] = plot.reversed_layers
     end
 
     test "points map their colour, written colour or color" do
@@ -221,7 +226,8 @@ defmodule Giggly.PlotTest do
                  stat: %Stat.Identity{},
                  position: %Position.Stack{},
                  mapping: %{x: "cyl", y: "mpg"},
-                 fixed: %{}
+                 fixed: %{},
+                 accepted: [:alpha, :color, :fill, :group, :x, :y]
                }
              ]
     end
@@ -285,7 +291,8 @@ defmodule Giggly.PlotTest do
                  stat: %Stat.Count{},
                  position: %Position.Stack{},
                  mapping: %{x: "cyl", weight: "wt"},
-                 fixed: %{}
+                 fixed: %{},
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill]
                }
              ]
     end
@@ -437,7 +444,8 @@ defmodule Giggly.PlotTest do
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
                  mapping: %{group: "cyl"},
-                 fixed: %{}
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :x, :y]
                }
              ]
     end
@@ -586,6 +594,128 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{fixed: %{linewidth: +0.0}, geom: %Geom.Path{mitre_limit: 1.0}}] =
                plot.reversed_layers
+    end
+  end
+
+  describe "geom_text/3" do
+    @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+
+    test "a text layer records its geom, not checking overlap, the identity stat and position" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_text(%{label: :model})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Text{check_overlap: false},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 mapping: %{label: "model"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :label, :x, :y]
+               }
+             ]
+    end
+
+    test "the options set the labels' look for every row, and check overlap" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_text(
+          check_overlap: true,
+          size: 5,
+          angle: 45,
+          hjust: :inward,
+          vjust: 1,
+          family: "Times New Roman",
+          colour: "red",
+          alpha: 0.5
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Text{check_overlap: true},
+                 fixed: %{
+                   size: 5.0,
+                   angle: 45.0,
+                   hjust: :inward,
+                   vjust: 1.0,
+                   family: "Times New Roman",
+                   color: "#FF0000",
+                   alpha: 0.5
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a column the data does not have is refused by the text layer that maps it" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_text(plot, %{label: :modle}) end
+      assert error.message =~ "Plot.geom_text/3"
+      assert error.message =~ ":modle"
+    end
+
+    test "a size of 0 is a size like any other; only one below 0 is refused" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_text(size: 0)
+
+      assert [%Plot.Layer{fixed: %{size: +0.0}}] = plot.reversed_layers
+    end
+
+    test "a label mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_text(plot) end
+      assert error.message =~ "Plot.geom_text/3"
+      assert error.message =~ ":label"
+    end
+
+    test "an aesthetic text cannot use, mapped by the layer, is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_text(plot, %{fill: :model}) end
+      assert error.message =~ "Plot.geom_text/3"
+      assert error.message =~ ":fill"
+    end
+
+    test "a size below 0, an angle or a justification that is not a number or a word is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      for {key, value} <- [
+            size: -1,
+            size: "5",
+            angle: "45",
+            hjust: :sideways,
+            vjust: "top",
+            family: :serif
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_text(plot, [{key, value}])
+          end
+
+        assert error.key == key
+      end
+    end
+
+    test "every word ggplot2 justifies by is taken, as is any number" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      words = [:left, :center, :right, :bottom, :middle, :top, :inward, :outward]
+
+      justified =
+        Enum.map(words ++ [-0.5, 2], fn just ->
+          [%Plot.Layer{fixed: %{hjust: hjust}}] =
+            Plot.geom_text(plot, hjust: just).reversed_layers
+
+          hjust
+        end)
+
+      assert justified === words ++ [-0.5, 2.0]
     end
   end
 

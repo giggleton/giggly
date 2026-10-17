@@ -93,6 +93,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **After evaluation a layer's frame speaks only the aesthetic vocabulary:** one column per
   mapped aesthetic, plus the columns the pipeline writes. The data's own names never appear in a
   frame; only the axes' titles carry them.
+- **A text's `label` never groups**: `Group.add/2` leaves it out of the key whatever its type, as
+  ggplot2's `add_group()` leaves `label` out, so labels that differ in every row do not make every
+  row a group. An aesthetic a layer takes from the plot and cannot use is evaluated like any other,
+  and a discrete one splits its groups, as in ggplot2.
 - **`group` is written once, by `Group.add/2`, straight after evaluation** — before any scale maps
   a discrete position to numbers, after which it no longer looks discrete.
 - **The assembly gives grouping its order.** `Group.add/2` numbers values by the key it is handed;
@@ -128,10 +132,14 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets
-  `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, with those it
-  maps, each carrying what it sets (its `fixed`) for its keys, as ggplot2's `matched_aes()` gives a
-  layer only the key's aesthetics it maps and its key data holds a layer's `aes_params`; a layer
-  that sets the legend's own aesthetic draws none. **Each such layer says whether it draws in each
+  `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics and accepts
+  it (`Plot.layer_accepted/1`), with those it maps and accepts, each carrying what it sets (its
+  `fixed`) for its keys, as ggplot2's `matched_aes()` gives a layer only the key's aesthetics it
+  maps and its geom knows and its key data holds a layer's `aes_params`; a layer that sets the
+  legend's own aesthetic draws none. **A legend no layer draws in is dropped**, either kind, as
+  ggplot2 drops a guide no layer matches: an aesthetic every layer takes from the plot's mapping
+  and none can use has no legend. ggplot2's point knows `fill`, so its points draw in a fill
+  legend; Giggly's points accept no `fill` until they draw the shapes it fills. **Each such layer says whether it draws in each
   key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
   final and before the other aesthetics are mapped: a discrete key only where one of the layer's
   columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as

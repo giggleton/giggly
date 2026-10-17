@@ -279,6 +279,50 @@ defmodule Giggly.AssemblyTest do
                 ]}
     end
 
+    # ggplot2 4.0.3: `geom_path()` under a plot's `fill` it cannot use has groups 1, 2, 3 and no
+    # guide box, since no layer's geom knows `fill`.
+    test "an aesthetic a layer takes from the plot and cannot use groups its rows and draws no legend" do
+      assembly =
+        %{"x" => [1, 2, 3], "y" => [1, 3, 2], "g" => ["a", "b", "c"]}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_path()
+        |> Assembly.run()
+
+      [frame] = assembly.layer_data
+      assert {Giggly.DataFrame.pull(frame, :group), assembly.legends} === {[1, 2, 3], []}
+    end
+
+    # ggplot2 4.0.3: the points under `aes(wt, mpg, label = rownames(mtcars))` carry each label and
+    # are one group, -1, as `add_group()` leaves `label` out.
+    test "a plot's label rides along in a point layer under a text layer, grouping nothing" do
+      [points, text] =
+        %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_point()
+        |> Plot.geom_text()
+        |> Assembly.run()
+        |> Map.fetch!(:layer_data)
+
+      assert {Giggly.DataFrame.pull(points, :label), Giggly.DataFrame.pull(points, :group),
+              Giggly.DataFrame.pull(text, :group)} ===
+               {["Mazda RX4", "Datsun 710"], [-1, -1], [-1, -1]}
+    end
+
+    # ggplot2 also draws the points in the fill legend, its point knowing `fill`; Giggly's points
+    # take no fill until they draw the shapes it fills.
+    test "a layer draws in a legend only for the aesthetics it can use" do
+      [legend] =
+        %{"x" => [1, 2], "y" => [1, 2], "g" => ["a", "b"]}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_col()
+        |> Plot.geom_point()
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert Enum.map(legend.layers, fn layer -> {layer.geom, layer.aesthetics} end) ===
+               [{%Geom.Bar{}, [:fill]}]
+    end
+
     test "legends with different titles stay apart, in the order of their aesthetics' names" do
       legends =
         %{"x" => [1, 2, 3], "y" => [1, 2, 3], "g" => ["b", "a", nil], "h" => ["b", "a", nil]}

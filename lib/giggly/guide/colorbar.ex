@@ -133,10 +133,14 @@ defmodule Giggly.Guide.Colorbar do
             labels: labels,
             widths: label_widths,
             size: text_look.size,
-            color: text_look.color,
+            family: "",
+            color: List.duplicate(text_look.color, length(places)),
+            opacity: List.duplicate(1.0, length(places)),
             angle: 0,
-            hjust: 0.0,
-            offset: {0.0, -Font.ascent(text_look.size) / 2}
+            hjust: List.duplicate(0.0, length(places)),
+            offset: List.duplicate({0.0, -Font.ascent(text_look.size) / 2}, length(places)),
+            check_overlap: false,
+            ascent: Font.ascent(text_look.size)
           }
         ]
       }

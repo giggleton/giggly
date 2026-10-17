@@ -33,6 +33,13 @@ defmodule Giggly.GroupTest do
       assert group_ids(frame) === [2, 1, 2]
     end
 
+    # ggplot2's `add_group()` leaves `label` out of the key, so each label is not a group of its own.
+    test "a text's labels never group, while another discrete column beside them does" do
+      frame = DataFrame.new(label: ["Mazda", "Fiat", "Mazda"], color: ["b", "a", "a"])
+
+      assert group_ids(frame) === [2, 1, 1]
+    end
+
     test "with no discrete column every row is -1, no grouping" do
       frame = DataFrame.new(x: [2.62, 2.875], y: [21.0, 22.8])
 

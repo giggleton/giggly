@@ -15,7 +15,8 @@ defmodule Giggly.Group do
   #   * Otherwise each combination of the discrete columns' values is numbered 1, 2, … in sorted
   #     order, comparing the columns one by one in the frame's column order, and only combinations
   #     that occur get an id. A column is discrete when its type is `:string`, `:boolean` or
-  #     `:atom`.
+  #     `:atom`; a text's `:label` never counts, whatever its type, as `add_group()` leaves it out,
+  #     so labels that differ in every row do not put each row in a group of its own.
   #   * With no discrete column, every row is `-1`, so "no grouping" stays distinguishable from a
   #     grouping that found one group.
   #
@@ -32,6 +33,7 @@ defmodule Giggly.Group do
   alias Giggly.DataFrame
 
   @discrete_dtypes [:string, :boolean, :atom]
+  @never_grouped [:label]
   @no_group -1
 
   # The frame with a `:group` column, replacing a mapped one, numbering values in the order
@@ -50,7 +52,9 @@ defmodule Giggly.Group do
       dtypes ->
         frame
         |> DataFrame.names()
-        |> Enum.filter(fn name -> Map.fetch!(dtypes, name) in @discrete_dtypes end)
+        |> Enum.filter(fn name ->
+          name not in @never_grouped and Map.fetch!(dtypes, name) in @discrete_dtypes
+        end)
     end
   end
 
