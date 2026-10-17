@@ -103,6 +103,7 @@ defmodule Giggly do
           range: {21.0, 22.8},
           transform: :identity,
           palette: :identity,
+          na_value: nil,
           guide: :axis
         }
       }

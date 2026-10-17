@@ -25,9 +25,9 @@ defmodule Giggly.Guide.Legend do
   defimpl Giggly.Guide, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Guide
 
-    alias Giggly.{Font, Theme}
-    alias Giggly.Scene
-    alias Giggly.Scene.{Cell, Rect, Text}
+    alias Giggly.{Font, Scene, Theme}
+    alias Giggly.Guide.Parts
+    alias Giggly.Scene.{Cell, Rect}
 
     # The legend titled `title`, a key for each of `keys`, each its label and the glyphs drawn in
     # it, in `theme`'s look: its width in points, and its table, every size in points.
@@ -50,7 +50,7 @@ defmodule Giggly.Guide.Legend do
 
       heights =
         Enum.concat([
-          [margin, line_height(title_look.size), title_look.margin],
+          [margin, Parts.line_height(title_look.size), title_look.margin],
           key_rows,
           [margin]
         ])
@@ -61,24 +61,14 @@ defmodule Giggly.Guide.Legend do
         keep_proportions: false,
         cells:
           Enum.concat([
-            [background(length(widths), length(heights), theme)],
-            [text_cell(title, title_width, title_look, 2, 2..4)],
+            [Parts.background(length(widths), length(heights), theme)],
+            [Parts.text_cell(title, title_width, title_look, 2, 2..4)],
             key_cells(keys, theme),
             label_cells(labels, label_widths, text_look)
           ])
       }
 
       {Enum.sum(widths), scene}
-    end
-
-    defp background(columns, rows, %Theme{legend_background: look}) do
-      %Cell{
-        rows: 1..rows,
-        columns: 1..columns,
-        clip: :off,
-        hang: :none,
-        primitives: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
-      }
     end
 
     # Each key's cell, its background under its glyphs, in the key rows, which start at the fourth.
@@ -102,33 +92,9 @@ defmodule Giggly.Guide.Legend do
       labels
       |> Enum.zip(label_widths)
       |> Enum.with_index(4)
-      |> Enum.map(fn {{label, width}, row} -> text_cell(label, width, text_look, row, 4..4) end)
+      |> Enum.map(fn {{label, width}, row} ->
+        Parts.text_cell(label, width, text_look, row, 4..4)
+      end)
     end
-
-    # Text left-aligned in its cell and centred down it, as grid centres text with `vjust = 0.5`: its
-    # baseline half its ascent below the middle.
-    defp text_cell(label, width, look, row, columns) do
-      %Cell{
-        rows: row..row,
-        columns: columns,
-        clip: :off,
-        hang: :none,
-        primitives: [
-          %Text{
-            x: [0.0],
-            y: [0.5],
-            labels: [label],
-            widths: [width],
-            size: look.size,
-            color: look.color,
-            angle: 0,
-            hjust: 0.0,
-            offset: {0.0, -Font.ascent(look.size) / 2}
-          }
-        ]
-      }
-    end
-
-    defp line_height(size), do: Font.ascent(size) + Font.descent(size)
   end
 end

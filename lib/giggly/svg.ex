@@ -38,7 +38,18 @@ defmodule Giggly.SVG do
   use Boundary, deps: [Giggly.Scene], exports: []
 
   alias Giggly.Scene
-  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text}
+
+  alias Giggly.Scene.{
+    Cell,
+    Circles,
+    Gradient,
+    Polygons,
+    Polylines,
+    Rect,
+    Rectangles,
+    Segments,
+    Text
+  }
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
 
@@ -247,6 +258,58 @@ defmodule Giggly.SVG do
       "; fill: ",
       rect.fill,
       ";' />\n"
+    ]
+  end
+
+  # A gradient's rectangle fills its cell, filled with a linear gradient up it, as svglite writes
+  # one: the gradient in a `<defs>` of its own, running at the rectangle's middle from its bottom
+  # edge to its top in the drawing's points (`userSpaceOnUse`), each stop at its offset, written as
+  # svglite writes a number below 1, in its colour, opaque; then the rectangle, filled with it and
+  # stroked none. Its id is its content's, `lg` and the MD5 of what it holds, so two drawings on one
+  # page share an id only when they share the gradient and cannot fill each other's bars.
+  defp primitive(%Gradient{} = gradient, {{left, width}, {top, height}}) do
+    middle = left + width / 2
+
+    definition = [
+      "gradientUnits='userSpaceOnUse' spreadMethod='pad' x1='",
+      number(middle),
+      "' y1='",
+      number(top + height),
+      "' x2='",
+      number(middle),
+      "' y2='",
+      number(top),
+      "'>\n",
+      Enum.map(gradient.stops, fn {offset, color} ->
+        ["  <stop offset='", offset(offset), "' stop-color='", color, "' stop-opacity='1.00'/>\n"]
+      end)
+    ]
+
+    digest =
+      definition
+      |> :erlang.md5()
+      |> Base.encode16(case: :lower)
+
+    id = ["lg", digest]
+
+    [
+      "<defs>\n<linearGradient id='",
+      id,
+      "' ",
+      definition,
+      "</linearGradient>\n</defs>\n<rect x='",
+      number(left),
+      "' y='",
+      number(top),
+      "' width='",
+      number(width),
+      "' height='",
+      number(height),
+      "' style='stroke-width: ",
+      number(gradient.stroke_width),
+      "; stroke: none; fill: url(#",
+      id,
+      ");' />\n"
     ]
   end
 
@@ -505,10 +568,15 @@ defmodule Giggly.SVG do
 
   defp number(value), do: :erlang.float_to_binary(value / 1, decimals: 2)
 
+  # A gradient stop's offset, as svglite writes one: as a number below 1 between the ends, and with
+  # two decimals at them.
+  defp offset(value) when value > 0 and value < 1, do: significant(value)
+  defp offset(value), do: number(value)
+
   # A number between 0 and 1 as svglite's `write_double()` writes one: with as many decimals as
   # reach its first significant digit and one more, so 0.0235 is 0.024 and 0.0078 keeps its 78; from
-  # 0.1 up, two. Only an opacity is written so, and an opacity written is always between 0 and 1;
-  # every other number keeps two decimals (`number/1`).
+  # 0.1 up, two. Only an opacity and a gradient stop's offset are written so, and only between 0
+  # and 1; every other number keeps two decimals (`number/1`).
   defp significant(value) when value > 0 and value < 1 do
     decimals = ceil(-:math.log10(value)) + 1
     :erlang.float_to_binary(value, decimals: decimals)

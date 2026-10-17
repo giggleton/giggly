@@ -35,6 +35,13 @@ size has a weight".
   `font-size` (in `px`, the user unit), `fill` (left out for black, SVG's default, as svglite
   leaves it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
   Output can then be set beside the SVG in ggplot2's own visual-test snapshots.
+- **A gradient is written as svglite writes one**: a `<defs>` of its own holding a
+  `<linearGradient>` (`gradientUnits='userSpaceOnUse'`, `spreadMethod='pad'`) from the rectangle's
+  bottom edge to its top at its middle, in the drawing's points, each `<stop>` at its offset,
+  written as an opacity is between 0 and 1 and with two decimals at the ends, in its colour,
+  `stop-opacity='1.00'`; then the `<rect>` filled `url(#…)` and stroked `none`. **Its id comes from
+  its content**, `lg` and the MD5 of what the gradient holds, where svglite's counts up from
+  `pat-0`, so two drawings on one page share an id only when they share the gradient.
 - **Each mark is written in its own colour and opacity**, as svglite writes each element's own
   `gp`, so a mapped colour needs no element of its own per value.
 - **An opacity is written as svglite writes the alpha of an R colour**: R holds it as a byte, the
@@ -83,7 +90,11 @@ size has a weight".
   and the element-by-element comparison, which leaves out only what svglite writes and Giggly does
   not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, and a
   black stroke and a `fill: none`, which svglite leaves to its stylesheet; a golden with lines
-  compares `<line>` elements too.
+  compares `<line>` elements too. **vdiffr's device draws no gradient**, and writes a colour bar's
+  rectangle unfilled: that `fill` is the one difference there, and the gradient is checked against
+  svglite 2.2.2's own drawing (the Docker image `giggly-r:ggplot2-4.0.3-svglite`, with the
+  Liberation fonts), its stops line for line and its ends against its own rectangle, since svglite
+  measures with the font files and sits a hundredth of a point from vdiffr.
   Any other difference is a finding or a stated departure, named in the script's header: the
   plain plot's axes drawn in the other order, a background edge written as R's rounding error.
 - **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, its

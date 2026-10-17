@@ -2,7 +2,18 @@ defmodule Giggly.SVGTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Scene, SVG}
-  alias Giggly.Scene.{Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text}
+
+  alias Giggly.Scene.{
+    Cell,
+    Circles,
+    Gradient,
+    Polygons,
+    Polylines,
+    Rect,
+    Rectangles,
+    Segments,
+    Text
+  }
 
   # Golden throughout: grid's own drawing of the same layout or marks, written by vdiffr 1.0.9's
   # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
@@ -231,6 +242,53 @@ defmodule Giggly.SVGTest do
                ["line", "#00BFC4"],
                ["line", "#F8766D"]
              ]
+    end
+
+    # Golden: svglite 2.2.2's drawing of ggplot2 4.0.3's colour bar in its gradient form (R 4.6.1):
+    # the gradient in a `<defs>` of its own, from the rectangle's bottom edge to its top at its
+    # middle, each stop's offset written as svglite writes a number below 1, then the rectangle
+    # filled with it. Its id is Giggly's, from its content, where svglite's counts up from `pat-0`.
+    test "a gradient fills its cell with a linear gradient up it, as svglite writes one" do
+      gradient = %Gradient{
+        stops: [{0.0, "#132B43"}, {1 / 14, "#17334E"}, {2 / 14, "#1C3C5A"}, {1.0, "#56B1F7"}],
+        stroke_width: 0.75
+      }
+
+      cell = %Cell{rows: 1..1, columns: 1..1, clip: :off, hang: :none, primitives: [gradient]}
+
+      scene = %Giggly.Scene{
+        widths: [{:points, 100.0}, {:points, 17.28}, {:rest, 1}],
+        heights: [{:points, 200.0}, {:points, 86.4}, {:rest, 1}],
+        keep_proportions: false,
+        cells: [%{cell | rows: 2..2, columns: 2..2}]
+      }
+
+      drawn = draw(scene)
+      [_all, id] = Regex.run(~r/<linearGradient id='(lg[0-9a-f]{32})'/, drawn)
+
+      assert drawn =~
+               "<defs>\n<linearGradient id='#{id}' gradientUnits='userSpaceOnUse' " <>
+                 "spreadMethod='pad' x1='108.64' y1='286.40' x2='108.64' y2='200.00'>\n" <>
+                 "  <stop offset='0.00' stop-color='#132B43' stop-opacity='1.00'/>\n" <>
+                 "  <stop offset='0.071' stop-color='#17334E' stop-opacity='1.00'/>\n" <>
+                 "  <stop offset='0.14' stop-color='#1C3C5A' stop-opacity='1.00'/>\n" <>
+                 "  <stop offset='1.00' stop-color='#56B1F7' stop-opacity='1.00'/>\n" <>
+                 "</linearGradient>\n</defs>\n" <>
+                 "<rect x='100.00' y='200.00' width='17.28' height='86.40' " <>
+                 "style='stroke-width: 0.75; stroke: none; fill: url(##{id});' />\n"
+    end
+
+    test "a gradient's id is its content's, the same for the same gradient and another for another" do
+      id = fn stops ->
+        gradient = %Gradient{stops: stops, stroke_width: 0.75}
+        [_all, id] = Regex.run(~r/<linearGradient id='([^']*)'/, draw(whole([gradient])))
+        id
+      end
+
+      same = [{0.0, "#132B43"}, {1.0, "#56B1F7"}]
+
+      assert id.(same) === id.(same)
+      refute id.(same) === id.([{0.0, "#132B43"}, {1.0, "#FFFFFF"}])
     end
 
     test "a placed rectangle's fill carries its opacity, and its border none" do

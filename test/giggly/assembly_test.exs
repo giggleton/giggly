@@ -72,6 +72,63 @@ defmodule Giggly.AssemblyTest do
                 ]}
     end
 
+    # Golden: ggplot2 4.0.3's colour bar params for mpg's `colour = cty` in the gradient form, R
+    # 4.6.1: each key's colour and its place up the bar, and the bar's 15 colours at their values.
+    test "a continuous colour's guide is a colour bar, its keys placed up the bar and its colours sampled" do
+      [legend] =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {legend.guide, legend.title, legend.layers} ===
+               {%Guide.Colorbar{bins: 15}, "cty", []}
+
+      assert Enum.map(legend.keys, fn key -> {key.label, key.values.color, key.place} end) === [
+               {"10", "#153049", 0.038461538461538464},
+               {"15", "#214769", 0.23076923076923078},
+               {"20", "#2E608A", 0.42307692307692307},
+               {"25", "#3B7AAD", 0.6153846153846154},
+               {"30", "#4895D1", 0.8076923076923077},
+               {"35", "#56B1F7", 1.0}
+             ]
+
+      assert Enum.map(legend.decor, fn {_place, color} -> color end) === [
+               "#132B43",
+               "#17334E",
+               "#1C3C5A",
+               "#204566",
+               "#254E72",
+               "#29577E",
+               "#2E618B",
+               "#336A98",
+               "#3874A5",
+               "#3D7EB2",
+               "#4288C0",
+               "#4792CD",
+               "#4C9CDB",
+               "#51A6E9",
+               "#56B1F7"
+             ]
+
+      assert {hd(legend.decor), List.last(legend.decor)} === {{0.0, "#132B43"}, {1.0, "#56B1F7"}}
+    end
+
+    # ggplot2 hashes a guide's kind with its title and labels, so a colour bar and a legend of one
+    # column, with one title and the same labels, stay two guides.
+    test "a colour bar and a legend with the same title and labels stay apart" do
+      legends =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty, alpha: :cty})
+        |> Plot.geom_point()
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert Enum.map(legends, fn legend -> {legend.aesthetics, legend.guide} end) ===
+               [{[:alpha], %Guide.Legend{}}, {[:color], %Guide.Colorbar{bins: 15}}]
+    end
+
     test "a discrete colour's legend has a key for each level in the hue palette, NA last in grey50" do
       [legend] =
         %{"x" => [1, 2, 3], "y" => [1, 2, 3], "g" => ["b", "a", nil]}

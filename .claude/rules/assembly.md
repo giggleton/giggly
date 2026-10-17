@@ -119,8 +119,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
   range, a discrete one's levels, `NA` last), labelled, at the value it maps to, drawn by the kind
-  of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`), as
-  `Plot` builds a position's. **Legends come in the order of their aesthetics' names, and one with
+  of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`,
+  `%Guide.Colorbar{bins: 15}` for `:colorbar`), as `Plot` builds a position's. **A colour bar's
+  keys carry their place up the bar** (`Scale.places/2`, 0 to 1 over the range, the gradient
+  form's), **and the colour bar its colours** (`decor`, `bins` values over the range from
+  `Scale.samples/2`, each its place and colour, `extract_decor()`), worked out here from the scale,
+  never by the guide; it draws no layer, so it has none. **Legends come in the order of their aesthetics' names, and one with
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets

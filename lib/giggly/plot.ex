@@ -46,8 +46,7 @@ defmodule Giggly.Plot do
   evenly spaced round the colour wheel at one chroma and luminance, exactly as ggplot2's default
   discrete colour scale (`scales::pal_hue()`) gives them, so three values are `#F8766D`, `#00BA38`
   and `#619CFF`; a missing value is grey50, `#7F7F7F`, and its key in the legend comes last,
-  labelled `NA`. A continuous colour is not mapped yet, and mapping a column of numbers raises when
-  the plot is run.
+  labelled `NA`.
 
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "cyl" => ["6", "4", nil]}
@@ -56,11 +55,23 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
       ["#00BFC4", "#F8766D", "#7F7F7F"]
 
-  A legend is drawn for each mapped aesthetic, stacked down the right of the panels in the order
-  of the aesthetics' names (`alpha`, `color`, `fill`), and two with the same title and labels, as
-  a colour and a fill mapped to one column, are drawn as one, each layer drawing its keys in the
-  aesthetics it maps. ggplot2 orders its legends by a hash of their contents; `guides(order =)` in
-  R puts them in Giggly's order.
+  A column of numbers mapped to colour or fill gives each value a colour as far along ggplot2's
+  default gradient, from `#132B43` to `#56B1F7`, as the value is through the column's range,
+  blended in L*a*b* as ggplot2 blends it; a missing value is grey50 here too. Its guide is a
+  colour bar, the gradient up a bar with a tick and label at each break.
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "hp" => [110, 93, nil]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#56B1F7", "#132B43", "#7F7F7F"]
+
+  A legend or colour bar is drawn for each mapped aesthetic, stacked down the right of the panels
+  in the order of the aesthetics' names (`alpha`, `color`, `fill`), and two of one kind with the
+  same title and labels, as a colour and a fill mapped to one column, are drawn as one, each layer
+  drawing a legend's keys in the aesthetics it maps. ggplot2 orders its legends by a hash of their
+  contents; `guides(order =)` in R puts them in Giggly's order.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of

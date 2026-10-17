@@ -392,16 +392,34 @@ defmodule GigglyTest do
                {[3, 4, 1, 2], [2, 4, 1, 3]}
     end
 
-    test "a colour or fill mapped to numbers is refused when the plot is run, until its scale arrives" do
+    test "a continuous colour or fill is each value's place along the gradient, a missing one grey50" do
+      rows = %{"x" => [1, 2, 3, 4], "y" => [2, 3, 1, 4], "v" => [1, 2.5, nil, 4]}
+
+      points =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :v})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      columns =
+        rows
+        |> Plot.new(%{x: :x, y: :y, fill: :v})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(points, :color), DataFrame.pull(columns, :fill)} ===
+               {["#132B43", "#336A98", "#7F7F7F", "#56B1F7"],
+                ["#132B43", "#336A98", "#7F7F7F", "#56B1F7"]}
+    end
+
+    test "a colour mapped to dates is refused when the plot is run, until its scale arrives" do
       plot =
-        %{"x" => [1, 2], "y" => [1, 2]}
+        %{"x" => [1, 2], "y" => [1, 2], "d" => [~D[2020-01-01], ~D[2020-02-01]]}
         |> Plot.new(%{x: :x, y: :y})
-        |> Plot.geom_col(%{fill: :y})
+        |> Plot.geom_point(%{colour: :d})
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
-
-      assert error.message =~
-               "maps :fill to \"y\", a :integer column, which no scale can place yet"
+      assert error.message =~ "maps :color to \"d\", a :date column, which no scale can place yet"
     end
   end
 
@@ -774,6 +792,7 @@ defmodule GigglyTest do
                  range: {0.0, 3.2},
                  transform: :identity,
                  palette: :identity,
+                 na_value: nil,
                  guide: :axis
                }
              }
@@ -852,12 +871,14 @@ defmodule GigglyTest do
                     range: {1.0, 9.0},
                     transform: :identity,
                     palette: :identity,
+                    na_value: nil,
                     guide: :axis
                   },
                   y: %Giggly.Scale.Continuous{
                     range: {10.0, 20.0},
                     transform: :identity,
                     palette: :identity,
+                    na_value: nil,
                     guide: :axis
                   }
                 },
@@ -866,12 +887,14 @@ defmodule GigglyTest do
                     range: {1.0, 9.0},
                     transform: :identity,
                     palette: :identity,
+                    na_value: nil,
                     guide: :axis
                   },
                   y: %Giggly.Scale.Continuous{
                     range: {30.0, 40.0},
                     transform: :identity,
                     palette: :identity,
+                    na_value: nil,
                     guide: :axis
                   }
                 }}
@@ -1141,6 +1164,45 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/merged_legend.svg")
+    end
+
+    # Golden: test/golden/point_colourbar.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/point_colourbar.R: every element matches vdiffr's but the colour bar's
+    # fill, which vdiffr's device cannot draw, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path; the gradient's stops match svglite 2.2.2's line for
+    # line, its ends at the bar's middle from bottom to top. mpg's points coloured by city mileage
+    # along ggplot2's default gradient, and a colour bar in its gradient form. It moves with what
+    # moves test/golden/point_colour_legend.svg, with the gradient palette, and with the colour bar.
+    test "a continuous colour draws points along the gradient and a colour bar" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_colourbar.svg")
+    end
+
+    # Golden: test/golden/point_colourbar_alpha.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/point_colourbar_alpha.R, as test/golden/point_colourbar.svg is. A
+    # legend and a colour bar, two kinds of guide, stacked down the right, alpha's above colour's.
+    # It moves with what moves test/golden/point_colourbar.svg and test/golden/point_colour_alpha.svg.
+    test "a colour bar stacks below a legend, each kind drawn by its guide" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty, alpha: :cyl})
+        |> Plot.geom_point()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_colourbar_alpha.svg")
     end
 
     # Golden: test/golden/legend_layer_keys.svg, checked against ggplot2's drawing of the same plot,

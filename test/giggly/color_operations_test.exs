@@ -93,4 +93,29 @@ defmodule Giggly.ColorOperationsTest do
       assert ColorOperations.from_hcl(0, 0, 100) === "#FFFFFF"
     end
   end
+
+  # Golden: farver 2.1.2's `decode_colour(to = "lab")` in R 4.6.1, printed to 17 digits, and the
+  # colours it encodes back; the composition matched every one of 5,001 samples of ggplot2's
+  # default gradient. It moves only with farver's constants or the library's conversions.
+  describe "to_lab/1 and from_lab/1" do
+    test "a colour's L*a*b* is farver's" do
+      {lightness, a, b} = ColorOperations.to_lab("#132B43")
+      assert_in_delta lightness, 16.850779893314083, 1.0e-12
+      assert_in_delta a, -0.2951089752190883, 1.0e-12
+      assert_in_delta b, -17.888407877147195, 1.0e-12
+
+      {lightness, a, b} = ColorOperations.to_lab("#56B1F7")
+      assert_in_delta lightness, 69.565125881010957, 1.0e-12
+      assert_in_delta a, -5.9043049797686269, 1.0e-12
+      assert_in_delta b, -42.778366037596683, 1.0e-12
+    end
+
+    test "a colour's L*a*b* encodes back to the colour" do
+      for colour <- ["#132B43", "#56B1F7", "#7F7F7F", "#000000", "#FFFFFF"] do
+        assert colour
+               |> ColorOperations.to_lab()
+               |> ColorOperations.from_lab() === colour
+      end
+    end
+  end
 end

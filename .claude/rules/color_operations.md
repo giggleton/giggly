@@ -30,8 +30,12 @@ beginning "A library's owner nests".
   forgives (a name with spaces, hex without its `#`) and CSS's functions (`rgb()`) are `:error`, and
   `Plot` raises naming the value.
 - **A palette's colour is exactly farver's, from the library's conversions handed farver's
-  constants** (`from_hcl/3`, `encode_colour(from = "hcl")`): its white point made from D65's
-  chromaticity in farver's arithmetic, its sRGB matrix, and a channel rounded as farver's
-  `double2int()` rounds, by adding and taking away 1.5 times 2^52, a half to the even byte, then
-  clamped. It matched R on every colour of a grid of 50,400, and its tests pin R's colours; a
-  conversion added for another palette is checked against R the same way before it is trusted.
+  constants** (`from_hcl/3`, `encode_colour(from = "hcl")`; `to_lab/1` and `from_lab/1`, its
+  `decode_colour(to = "lab")` and `encode_colour(from = "lab")`): its white point made from D65's
+  chromaticity in farver's arithmetic, its sRGB matrices both ways, and a channel rounded as
+  farver's `double2int()` rounds, by adding and taking away 1.5 times 2^52, a half to the even
+  byte, then clamped. The hue colours matched R on every colour of a grid of 50,400, and the Lab
+  ones every sample of ggplot2's default gradient; below L* 8 farver's conversion from Lab keeps
+  the rounded 0.008856 and 7.787 and the library the exact fractions, one colour in 35,007 of seven
+  R gradients, a gradient no default reaches. Its tests pin R's colours; a conversion added for
+  another palette is checked against R the same way before it is trusted.

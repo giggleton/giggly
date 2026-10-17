@@ -18,8 +18,8 @@ weight".
 ## Rules
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
-  rendering builds and a backend reads (`Cell`, `Circles`, `Polygons`, `Polylines`, `Rect`,
-  `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a theme.
+  rendering builds and a backend reads (`Cell`, `Circles`, `Gradient`, `Polygons`, `Polylines`,
+  `Rect`, `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
   what the fixed sizes leave of the drawing, which a panel takes (grid's `"null"` unit): the
@@ -69,7 +69,10 @@ weight".
   size, which is how ggplot2 draws a background; **rectangles placed and sized within their cell
   (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, as ggplot2's
   `GeomRect` draws a bar. A background that is not rectangular is a polygon (`Polygons`), closed
-  round its outline.
+  round its outline. **A gradient (`Gradient`) is a rectangle filling its cell with a linear
+  gradient running up it**, from the cell's bottom to its top through its stops, each an offset, 0
+  to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled with a
+  `linearGradient()`, as ggplot2's colour bar draws its bar.
 - **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
   as gtable nests one table in another: its sizes in points take their length and its shares split
   what is left of the box, and a table of sizes in points alone is centred in the box both ways,

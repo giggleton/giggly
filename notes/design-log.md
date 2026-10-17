@@ -82,8 +82,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **A discrete scale carries its missing value as a field, `na_value`, as ggplot2's scale carries
   `na.value` (2026-10-16, Steve).** A missing level takes no share of the palette and maps to it:
   grey50, `#7F7F7F`, for colour and fill, `nil`, R's `NA`, for alpha and a position, which places
-  `nil` as its last level instead. `Scale.Discrete` is API, so the field is too; `Scale.Continuous`
-  gains it with the continuous colour scale, the first to need grey50. *Rejected: the palette
+  `nil` as its last level instead. Both scale kinds are API, so the field is too, on
+  `Scale.Discrete` and `Scale.Continuous`, whose missing or non-finite value maps to it as well.
+  *Rejected: the palette
   carrying it* (`{:hue, ..., na: ...}`), which keeps the struct as it was, but R's palettes know
   nothing of `NA`, and a scale function's `na.value` would have to rewrite the palette.
 
@@ -1340,8 +1341,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-17 — Draw guides through a protocol at Giggly.Guide (colour, step 3a); §4: "The guide
-  protocol sits at `Giggly.Guide`"
+- 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b); §4:
+  "The colour bar is drawn as ggplot2's gradient form", "R's exact colours come from the `color`
+  package's conversions", "A discrete scale carries its missing value"
+- 2026-10-17 — Draw guides through a protocol at Giggly.Guide (colour, step 3a) (`47df626`); §4:
+  "The guide protocol sits at `Giggly.Guide`"
 - 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up)
   (`8e21e24`); §4: none, ggplot2's `keep_key_data()` followed as `assembly.md` says
 - 2026-10-16 — Map discrete columns to colours and fills (colour, step 2) (`5dbd380`); §4: "A

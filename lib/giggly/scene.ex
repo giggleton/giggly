@@ -27,7 +27,7 @@ defmodule Giggly.Scene do
   # backend reads.
   use Boundary,
     deps: [],
-    exports: [Cell, Circles, Polygons, Polylines, Rect, Rectangles, Segments, Text]
+    exports: [Cell, Circles, Gradient, Polygons, Polylines, Rect, Rectangles, Segments, Text]
 
   alias Giggly.Scene.Cell
 
@@ -43,6 +43,7 @@ defmodule Giggly.Scene do
   @typedoc "Something drawn in a cell."
   @type primitive ::
           Giggly.Scene.Circles.t()
+          | Giggly.Scene.Gradient.t()
           | Giggly.Scene.Polygons.t()
           | Giggly.Scene.Polylines.t()
           | Giggly.Scene.Rect.t()

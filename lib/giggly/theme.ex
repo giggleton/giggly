@@ -42,6 +42,8 @@ defmodule Giggly.Theme do
     :legend_key_size,
     :legend_title,
     :legend_text,
+    :legend_ticks,
+    :legend_ticks_length,
     :legend_spacing,
     :legend_box_spacing
   ]
@@ -71,8 +73,8 @@ defmodule Giggly.Theme do
   points; the background and text of the strips that label each panel, the text's margin on
   every side of it; and a legend's background, the margin inside it, each key's background and
   size, the title and its margin below, the labels and their margin from the keys, all in points,
-  the space between one legend and the next below it, and the space between the panels and the
-  legends.
+  a colour bar's ticks and how far each reaches into the bar, in points, the space between one
+  legend and the next below it, and the space between the panels and the legends.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -93,6 +95,8 @@ defmodule Giggly.Theme do
           legend_key_size: float(),
           legend_title: text(),
           legend_text: text(),
+          legend_ticks: line(),
+          legend_ticks_length: float(),
           legend_spacing: float(),
           legend_box_spacing: float()
         }
@@ -102,7 +106,8 @@ defmodule Giggly.Theme do
 
   # ggplot2's line widths are millimetres, which grid draws as `.pt` line-width units each, and a
   # line-width unit is 1/96 inch.
-  @points_per_millimetre_of_line 72.27 / 25.4 * (72 / 96)
+  @font_points_per_millimetre 72.27 / 25.4
+  @points_per_millimetre_of_line @font_points_per_millimetre * (72 / 96)
 
   # `theme_gray()`'s arguments.
   @base_size 11.0
@@ -156,7 +161,10 @@ defmodule Giggly.Theme do
   # (`legend.box.spacing`). Each key is 1.2 lines square, as grid works lines out at its own
   # defaults, on the panel's background (`legend.key`, which inherits it). The title is black at
   # the base size with `half_line` below it, and the labels black at 0.8 of it, `half_line` right
-  # of the keys, both ggplot2's `legend.key.spacing`, from the theme's `spacing`.
+  # of the keys, both ggplot2's `legend.key.spacing`, from the theme's `spacing`. A colour bar's
+  # ticks are white and 0.5 / .pt millimetres wide, `guide_colourbar()`'s own default, since
+  # `theme_gray()` sets no `legend.ticks`, and each reaches a fifth of the bar's width into it, its
+  # `legend.ticks.length` of `rel(0.2)`.
   defp gray do
     %__MODULE__{
       plot_background: %{
@@ -226,6 +234,13 @@ defmodule Giggly.Theme do
         color: @ink,
         margin: @half_line * @points_per_theme_point
       },
+      # In R's order of operations, its line-width units, `linewidth * .pt`, over 96 and times 72,
+      # as svglite writes them, which reaches 0.375 where another order falls just short of it.
+      legend_ticks: %{
+        color: @paper,
+        line_width: 0.5 / @font_points_per_millimetre * @font_points_per_millimetre / 96 * 72
+      },
+      legend_ticks_length: 0.2 * @legend_key_size,
       legend_spacing: 2 * @half_line * @points_per_theme_point,
       legend_box_spacing: 2 * @half_line * @points_per_theme_point
     }

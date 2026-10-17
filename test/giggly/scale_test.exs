@@ -10,6 +10,13 @@ defmodule Giggly.ScaleTest do
     |> Scale.train(values)
   end
 
+  # A new continuous colour scale trained once on `values`.
+  defp gradient_scale(values) do
+    :continuous
+    |> Scale.new(:color)
+    |> Scale.train(values)
+  end
+
   # A new discrete colour scale trained once on `values`.
   defp hue_scale(values) do
     :discrete
@@ -49,14 +56,12 @@ defmodule Giggly.ScaleTest do
                {:continuous, :discrete}
     end
 
-    test "a colour or fill has a discrete scale and none yet for numbers or dates" do
+    test "a colour or fill is discrete or continuous as any aesthetic is, and a date has none yet" do
       assert Enum.map([:string, :boolean, :atom], fn dtype -> Scale.kind(dtype, :color) end) ===
                [:discrete, :discrete, :discrete]
 
       assert Enum.map([:integer, :float, :null, :date], fn dtype -> Scale.kind(dtype, :fill) end) ===
-               [:none, :none, :none, :none]
-
-      assert {Scale.kind(:string, :fill), Scale.kind(:integer, :color)} === {:discrete, :none}
+               [:continuous, :continuous, :continuous, :none]
     end
   end
 
@@ -72,6 +77,7 @@ defmodule Giggly.ScaleTest do
                range: {1.5, 3},
                transform: :identity,
                palette: :identity,
+               na_value: nil,
                guide: :axis
              }
     end
@@ -123,6 +129,7 @@ defmodule Giggly.ScaleTest do
                   range: :none,
                   transform: :identity,
                   palette: :identity,
+                  na_value: nil,
                   guide: :axis
                 },
                 %Scale.Discrete{
@@ -376,12 +383,14 @@ defmodule Giggly.ScaleTest do
                   range: :none,
                   transform: :identity,
                   palette: :identity,
+                  na_value: nil,
                   guide: :axis
                 },
                 %Scale.Continuous{
                   range: :none,
                   transform: :date,
                   palette: :identity,
+                  na_value: nil,
                   guide: :axis
                 },
                 %Scale.Discrete{
@@ -399,6 +408,7 @@ defmodule Giggly.ScaleTest do
                   range: :none,
                   transform: :identity,
                   palette: {:rescale, {0.1, 1.0}},
+                  na_value: nil,
                   guide: :legend
                 },
                 %Scale.Discrete{
@@ -488,6 +498,83 @@ defmodule Giggly.ScaleTest do
       scale = hue_scale([nil])
 
       assert Scale.map(scale, [nil, nil]) === ["#7F7F7F", "#7F7F7F"]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `scale_colour_continuous()` in R 4.6.1, `layer_data()`'s colours and
+  # `pal_seq_gradient("#132B43", "#56B1F7")`, through scales 1.4.0 and farver 2.1.2; a missing
+  # value is grey50.
+  describe "map/2 through the gradient" do
+    test "a colour or fill scale records ggplot2's gradient, NA grey50, and a colour bar" do
+      expected = %Scale.Continuous{
+        range: :none,
+        transform: :identity,
+        palette: {:gradient, {"#132B43", "#56B1F7"}},
+        na_value: "#7F7F7F",
+        guide: :colorbar
+      }
+
+      assert {Scale.new(:continuous, :color), Scale.new(:continuous, :fill)} ===
+               {expected, expected}
+    end
+
+    test "each value is its place in the range along the gradient, blended in Lab, a missing one grey50" do
+      scale = gradient_scale([1, 2.5, nil, 4])
+
+      assert Scale.map(scale, [1, 2.5, nil, 4, :nan]) ===
+               ["#132B43", "#336A98", "#7F7F7F", "#56B1F7", "#7F7F7F"]
+    end
+
+    test "places between the ends are blended as R's approxfun blends L*, a* and b*" do
+      scale = gradient_scale([0, 1])
+
+      assert Scale.map(scale, [0.25, 0.75]) === ["#22496C", "#448DC6"]
+    end
+
+    test "a scale of one value maps it to the middle of the gradient" do
+      scale = gradient_scale([3, 3])
+
+      assert Scale.map(scale, [3]) === ["#336A98"]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's colour bar for mpg's `colour = cty` in its gradient form, R 4.6.1:
+  # `extract_decor()`'s 15 values over the range 9 to 35 and `extract_params()`'s places of the
+  # breaks 10 to 35, printed to 17 digits.
+  describe "samples/2 and places/2" do
+    test "samples are R's seq() over the trained range" do
+      scale = gradient_scale([9, 35])
+
+      assert Scale.samples(scale, 15) === [
+               9,
+               10.857142857142858,
+               12.714285714285715,
+               14.571428571428571,
+               16.428571428571431,
+               18.285714285714285,
+               20.142857142857142,
+               22.0,
+               23.857142857142858,
+               25.714285714285715,
+               27.571428571428573,
+               29.428571428571431,
+               31.285714285714285,
+               33.142857142857139,
+               35
+             ]
+    end
+
+    test "a value's place runs from 0 at the range's low end to 1 at its high" do
+      scale = gradient_scale([9, 35])
+
+      assert Scale.places(scale, [10.0, 15.0, 20.0, 25.0, 30.0, 35.0]) === [
+               0.038461538461538464,
+               0.23076923076923078,
+               0.42307692307692307,
+               0.6153846153846154,
+               0.8076923076923077,
+               1.0
+             ]
     end
   end
 

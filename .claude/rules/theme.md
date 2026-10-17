@@ -46,4 +46,7 @@ a behaviour: the entry beginning "A theme is a function".
   (`legend.box.spacing`); keys 1.2 lines square as grid works lines out at its own defaults, a
   12-point font at line height 1.2, 17.28 points, not at the base size, on the panel's background
   (`legend.key` inherits it); the title black at the base size with `half_line` below it, the
-  labels black at 0.8 of it and `half_line` from the keys (`legend.key.spacing`, from `spacing`).
+  labels black at 0.8 of it and `half_line` from the keys (`legend.key.spacing`, from `spacing`);
+  a colour bar's ticks white and 0.5 / .pt millimetres wide, `guide_colourbar()`'s default since
+  `theme_gray()` sets no `legend.ticks`, worked out in R's order of operations to svglite's 0.38,
+  reaching a fifth of the key's width into the bar (`legend.ticks.length`, `rel(0.2)`).

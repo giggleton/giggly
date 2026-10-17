@@ -138,29 +138,37 @@ defmodule Giggly.Assembly do
   @typedoc """
   A legend for one or more aesthetics other than position, those whose scales give the same kind of
   guide, title and labels, in name order: the guide that draws it, a struct of its kind, as the
-  first aesthetic's scale names it (`Giggly.Guide`); its title, the column the first layer to map the aesthetic maps it
-  to; a key for each of its scales' breaks, the break's label, the break itself, as the first
-  aesthetic's data holds it (ggplot2's `.value`), and the value each aesthetic maps it to; and each
-  layer that maps one of its aesthetics, in the order the layers were added, with those it maps,
-  its geom drawing its glyph with the key's values of those aesthetics and the aesthetics the layer
-  sets, as ggplot2's legend draws a key for each such layer, its `aes_params` among the key's
-  data, and whether it draws in each key, in key order.
+  first aesthetic's scale names it (`Giggly.Guide`); its title, the column the first layer to map
+  the aesthetic maps it to; a key for each of its scales' breaks, the break's label, the break
+  itself, as the first aesthetic's data holds it (ggplot2's `.value`), the value each aesthetic
+  maps it to, and, for a colour bar, its place up the bar, 0 to 1; a colour bar's colours, each
+  its place up the bar and its colour (`decor`); and each layer that maps one of its aesthetics,
+  in the order the layers were added, with those it maps, its geom drawing its glyph with the
+  key's values of those aesthetics and the aesthetics the layer sets, as ggplot2's legend draws a
+  key for each such layer, its `aes_params` among the key's data, and whether it draws in each
+  key, in key order; a colour bar has none.
   """
   @type legend :: %{
-          guide: struct(),
-          aesthetics: [Plot.aesthetic()],
-          title: String.t(),
-          keys: [
-            %{label: String.t(), value: term(), values: %{optional(Plot.aesthetic()) => term()}}
+          required(:guide) => struct(),
+          required(:aesthetics) => [Plot.aesthetic()],
+          required(:title) => String.t(),
+          required(:keys) => [
+            %{
+              required(:label) => String.t(),
+              required(:value) => term(),
+              required(:values) => %{optional(Plot.aesthetic()) => term()},
+              optional(:place) => float()
+            }
           ],
-          layers: [
+          required(:layers) => [
             %{
               geom: struct(),
               aesthetics: [Plot.aesthetic()],
               fixed: %{optional(Plot.aesthetic()) => term()},
               draws: [boolean()]
             }
-          ]
+          ],
+          optional(:decor) => [{float(), String.t()}]
         }
 
   # Assembles `plot`, running the stages in order.
@@ -334,7 +342,7 @@ defmodule Giggly.Assembly do
         {values, labels} = Enum.unzip(breaks)
         mapped = Scale.map(scale, values)
 
-        %{
+        legend = %{
           guide: guide(scale),
           aesthetics: [aesthetic],
           title: guide_title(plot, layers, aesthetic),
@@ -343,6 +351,8 @@ defmodule Giggly.Assembly do
               %{label: label, value: value, values: %{aesthetic => mapped_value}}
             end)
         }
+
+        with_guide_data(legend, scale)
       end
 
     scale_legends
@@ -370,8 +380,28 @@ defmodule Giggly.Assembly do
       labels(legend) == labels(other)
   end
 
-  # The guide a scale names, as a struct of its kind, as `Plot` turns a position's name into one.
+  # The guide a scale names, as a struct of its kind, as `Plot` turns a position's name into one: a
+  # colour bar sampling its colours at 15 values, as ggplot2's gradient form does (`nbin`).
   defp guide(%{guide: :legend}), do: %Guide.Legend{}
+  defp guide(%{guide: :colorbar}), do: %Guide.Colorbar{bins: 15}
+
+  # The legend with what its kind of guide draws beyond its keys, worked out from the scale: for a
+  # colour bar, each key's place up the bar, 0 at the low end of the scale's range to 1 at its high
+  # (ggplot2's `extract_params()` in the gradient form), and its colours (`decor`), sampled at the
+  # bar's `bins` values spread evenly over the range, each its place and colour, as
+  # `extract_decor()` takes them. A legend needs nothing more.
+  defp with_guide_data(%{guide: %Guide.Colorbar{bins: bins}, keys: keys} = legend, scale) do
+    places = Scale.places(scale, Enum.map(keys, fn key -> key.value end))
+    samples = Scale.samples(scale, bins)
+    sample_places = Scale.places(scale, samples)
+    placed_keys = Enum.zip_with(keys, places, fn key, place -> Map.put(key, :place, place) end)
+
+    legend
+    |> Map.put(:keys, placed_keys)
+    |> Map.put(:decor, Enum.zip(sample_places, Scale.map(scale, samples)))
+  end
+
+  defp with_guide_data(legend, _scale), do: legend
 
   defp labels(legend), do: Enum.map(legend.keys, fn key -> key.label end)
 
@@ -388,7 +418,10 @@ defmodule Giggly.Assembly do
   end
 
   # Each layer that maps one of the legend's aesthetics, in the order the layers were added, with
-  # those it maps, its geom, what it sets, and whether it draws in each key.
+  # those it maps, its geom, what it sets, and whether it draws in each key; none for a colour
+  # bar, which draws no layer's glyph, as ggplot2's colour bar keeps none.
+  defp key_layers(%{guide: %Guide.Colorbar{}}, _plot, _layers_and_data), do: []
+
   defp key_layers(legend, plot, layers_and_data) do
     for {layer, frame} <- layers_and_data,
         mapping = Plot.computed_mapping(plot, layer),

@@ -20,10 +20,16 @@ defmodule Giggly.ColorOperations do
   # `from_hcl/3` is the colour farver encodes from a hue, chroma and luminance, as `pal_hue()` asks
   # it with `encode_colour(from = "hcl")`: CIE LCh(uv) to Luv, to XYZ against farver's white point,
   # to sRGB through farver's matrix, each channel companded, times 255, rounded half to even and
-  # clamped to a byte, as farver writes one. The conversions are the library's
+  # clamped to a byte, as farver writes one. `to_lab/1` is a colour's CIE L*a*b* as farver decodes
+  # it (`decode_colour(to = "lab")`), each byte over 255 expanded from sRGB's companding, to XYZ
+  # through farver's matrix the other way, to Lab against its white point; and `from_lab/1` the
+  # colour farver encodes from L*a*b*, to XYZ and then as `from_hcl/3` goes on, as R's gradients
+  # (`scales::colour_ramp()`) blend their colours in Lab. The conversions are the library's
   # (`Color.Conversion.Lindbloom`), handed farver's constants: its white point, made from D65's
   # chromaticity in its own arithmetic rather than the textbook 95.047 and 108.883, and its sRGB
-  # matrix. With them it gives R's colours exactly.
+  # matrices. With them it gives R's colours exactly but where L* is below 8, where farver's
+  # conversion from Lab keeps the rounded 0.008856 and 7.787 and the library the exact fractions
+  # (one colour in 35,007 of seven R gradients' samples).
 
   # The library's one caller: it may call `Color` and nothing else, and only a boundary that lists
   # it may call it. `Giggly` lists `Color` too, as boundary lets a sub-boundary list only what its
@@ -45,11 +51,17 @@ defmodule Giggly.ColorOperations do
   # 1.5 times 2^52, farver's rounding constant.
   @rounding 6_755_399_441_055_744.0
 
-  # farver's matrix from XYZ to linear sRGB.
+  # farver's matrices from XYZ to linear sRGB, and back.
   @to_srgb [
     [3.2404542, -1.5371385, -0.4985314],
     [-0.9692660, 1.8760108, 0.0415560],
     [0.0556434, -0.2040259, 1.0572252]
+  ]
+
+  @from_srgb [
+    [0.4124564, 0.3575761, 0.1804375],
+    [0.2126729, 0.7151522, 0.0721750],
+    [0.0193339, 0.1191920, 0.9503041]
   ]
 
   # The names the library's table holds that CSS does not define: chroma-key colours.
@@ -96,15 +108,41 @@ defmodule Giggly.ColorOperations do
     {luminance, chroma, hue}
     |> Lindbloom.lchuv_to_luv()
     |> Lindbloom.luv_to_xyz(@white_point)
-    |> unit_tristimulus()
+    |> from_xyz()
+  end
+
+  # The CIE L*a*b* of `colour`, an opaque `#RRGGBB`, as the opening comment says.
+  @doc false
+  @spec to_lab(String.t()) :: {float(), float(), float()}
+  def to_lab(<<"#", digits::binary-size(6)>>) do
+    {:ok, <<red, green, blue>>} = Base.decode16(digits)
+
+    [red, green, blue]
+    |> Enum.map(fn channel -> Lindbloom.srgb_inverse_compand(channel / 255) * 100 end)
+    |> List.to_tuple()
+    |> Lindbloom.rgb_to_xyz(@from_srgb)
+    |> Lindbloom.xyz_to_lab(@white_point)
+  end
+
+  # The colour, uppercase `#RRGGBB`, that farver encodes from `lab`, its L*, a* and b*, as the
+  # opening comment says.
+  @doc false
+  @spec from_lab({number(), number(), number()}) :: String.t()
+  def from_lab({_lightness, _a, _b} = lab) do
+    lab
+    |> Lindbloom.lab_to_xyz(@white_point)
+    |> from_xyz()
+  end
+
+  # The colour farver writes for XYZ on its scale, Y of 100 for white: through its matrix, each
+  # channel a byte.
+  defp from_xyz({x, y, z}) do
+    {x / 100, y / 100, z / 100}
     |> Lindbloom.xyz_to_rgb(@to_srgb)
     |> Tuple.to_list()
     |> Enum.map_join(fn channel -> hex_pair(byte(channel)) end)
     |> then(fn digits -> "#" <> digits end)
   end
-
-  # XYZ on farver's scale, Y of 100 for white, as farver hands its matrix: Y of 1.
-  defp unit_tristimulus({x, y, z}), do: {x / 100, y / 100, z / 100}
 
   # A linear sRGB channel as farver writes it: companded, times 255, rounded to the nearest whole
   # number, a half to the even one, and clamped to a byte. farver rounds as its `double2int()` does,

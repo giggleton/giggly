@@ -48,15 +48,17 @@ defmodule Giggly.Scale do
   # and spreads a discrete one from 0.1 to 1, `scale_alpha_ordinal()`, which ggplot2's
   # `scale_alpha_discrete()` uses with a warning that Giggly, building a plot without side effects,
   # does not give. Colour's and fill's give a discrete column `pal_hue()`'s colours, as
-  # `scale_colour_discrete()` falls back to it (`Giggly.Scale.Palette`); a missing value maps to the
-  # scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha. A continuous colour or fill
-  # has no scale yet.
+  # `scale_colour_discrete()` falls back to it, and a continuous one the gradient from `#132B43` to
+  # `#56B1F7`, `scale_colour_continuous()`'s, blended in L*a*b* (`Giggly.Scale.Palette`); a missing
+  # value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha. Each
+  # names the guide that draws it, as ggplot2's scales do: a colour bar for a continuous colour or
+  # fill, a legend for the rest.
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
   # palette its colours, as R's `scales` depends on farver alone, so it stays extractable.
   use Boundary, deps: [Giggly.ColorOperations], exports: []
 
-  alias Giggly.Scale.{Continuous, Discrete, Labels, Transform}
+  alias Giggly.Scale.{Continuous, Discrete, Labels, Palette, Transform}
 
   @typedoc "A trained position scale."
   @type t :: Continuous.t() | Discrete.t()
@@ -92,15 +94,10 @@ defmodule Giggly.Scale do
 
   # The kind of scale a column of type `dtype` needs on `aesthetic`: on a position aesthetic, its
   # `kind/1`; on another, the same but for a date, whose scale on any aesthetic but position
-  # (ggplot2's `scale_alpha_date()`) has not arrived, and for a continuous colour or fill, whose
-  # scale (ggplot2's `scale_colour_continuous()`) has not either.
+  # (ggplot2's `scale_alpha_date()` and `scale_colour_date()`) has not arrived.
   @doc false
   @spec kind(atom(), atom()) :: kind()
   def kind(:date, aesthetic) when aesthetic in @non_position_aesthetics, do: :none
-
-  def kind(dtype, aesthetic) when aesthetic in @color_aesthetics and dtype in @continuous_dtypes,
-    do: :none
-
   def kind(dtype, _aesthetic), do: kind(dtype)
 
   # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
@@ -110,6 +107,9 @@ defmodule Giggly.Scale do
   # circle, chroma 100 and luminance 65.
   @hue_palette {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}}
 
+  # ggplot2's default continuous colour palette, `pal_seq_gradient("#132B43", "#56B1F7")`.
+  @gradient_palette {:gradient, {"#132B43", "#56B1F7"}}
+
   # ggplot2's colour for a missing value, grey50.
   @color_na_value "#7F7F7F"
 
@@ -118,11 +118,24 @@ defmodule Giggly.Scale do
   # transformation, and a date scale, a continuous one, the date transformation.
   @doc false
   @spec new(:continuous | :discrete | :date) :: t()
-  def new(:continuous),
-    do: %Continuous{range: :none, transform: :identity, palette: :identity, guide: :axis}
+  def new(:continuous) do
+    %Continuous{
+      range: :none,
+      transform: :identity,
+      palette: :identity,
+      na_value: nil,
+      guide: :axis
+    }
+  end
 
   def new(:date),
-    do: %Continuous{range: :none, transform: :date, palette: :identity, guide: :axis}
+    do: %Continuous{
+      range: :none,
+      transform: :date,
+      palette: :identity,
+      na_value: nil,
+      guide: :axis
+    }
 
   def new(:discrete) do
     %Discrete{
@@ -135,8 +148,8 @@ defmodule Giggly.Scale do
   end
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
-  # ggplot2's default palette and guide for it, a legend, and, for a discrete one, its value for a
-  # missing value.
+  # ggplot2's default palette, value for a missing value and guide for it: a colour bar for a
+  # continuous colour or fill, and a legend for the rest.
   @doc false
   @spec new(:continuous | :discrete, atom()) :: t()
   def new(:continuous, :alpha) do
@@ -144,7 +157,18 @@ defmodule Giggly.Scale do
       range: :none,
       transform: :identity,
       palette: {:rescale, @alpha_range},
+      na_value: nil,
       guide: :legend
+    }
+  end
+
+  def new(:continuous, aesthetic) when aesthetic in @color_aesthetics do
+    %Continuous{
+      range: :none,
+      transform: :identity,
+      palette: @gradient_palette,
+      na_value: @color_na_value,
+      guide: :colorbar
     }
   end
 
@@ -286,6 +310,21 @@ defmodule Giggly.Scale do
 
   def legend_breaks(%Discrete{levels: levels}),
     do: Enum.zip(levels, Labels.levels(levels))
+
+  # `count` values spread evenly over the trained range of a continuous scale, from its low end to
+  # its high, as R's `seq(low, high, length.out = count)` spreads them (`Giggly.Scale.Palette`):
+  # the values ggplot2's colour bar takes its colours at (`extract_decor()`).
+  @doc false
+  @spec samples(Continuous.t(), pos_integer()) :: [number()]
+  def samples(%Continuous{range: {low, high}}, count),
+    do: Palette.discrete({:sequence, {low, high}}, count)
+
+  # Each of `values`' place in the trained range of a continuous scale, from 0 at its low end to 1
+  # at its high (`rescale/3`), as ggplot2's colour bar places its ticks and its colours.
+  @doc false
+  @spec places(Continuous.t(), [number()]) :: [float()]
+  def places(%Continuous{range: {_low, _high} = range}, values),
+    do: Enum.map(values, fn value -> rescale(value, range, {0, 1}) end)
 
   # The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
   # `breaks/2` gives on that extent, in ascending order: ggplot2's `get_breaks_minor()` as its view

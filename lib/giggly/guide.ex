@@ -30,7 +30,7 @@ defprotocol Giggly.Guide do
   # implementations.
   use Boundary,
     deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme],
-    exports: [Axis, Box, Grid, Legend, Strip]
+    exports: [Axis, Box, Colorbar, Grid, Legend, Strip]
 
   alias Giggly.{Scene, Theme}
 

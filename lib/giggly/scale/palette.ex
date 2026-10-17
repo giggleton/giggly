@@ -9,6 +9,11 @@ defmodule Giggly.Scale.Palette do
   #     scales' palette is the identity, and the coordinate system places it.
   #   * `{:rescale, {low, high}}`, a continuous scale's: a value's place in the trained range, from
   #     0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does with `rescale()`.
+  #   * `{:gradient, {low, high}}`, a continuous colour scale's: a value's place in the trained
+  #     range, from 0 to 1, as far from the colour `low` toward `high`, blended in CIE L*a*b*, as R's
+  #     `pal_seq_gradient()` blends them through `colour_ramp()`: each colour's L*, a* and b*
+  #     interpolated as R's `approxfun()` does, its end exact, and the blend turned back into a
+  #     colour (`Giggly.ColorOperations`). ggplot2's default runs from `#132B43` to `#56B1F7`.
   #   * `{:sequence, {low, high}}`, a discrete scale's: given the number of levels, that many
   #     values from `low` to `high`, evenly spaced, as ggplot2's ordinal alpha scale takes R's
   #     `seq(low, high, length.out = n)`.
@@ -28,14 +33,44 @@ defmodule Giggly.Scale.Palette do
   @type t ::
           :identity
           | {:rescale, {number(), number()}}
+          | {:gradient, {String.t(), String.t()}}
           | {:sequence, {number(), number()}}
           | {:hue, %{hue: {number(), number()}, chroma: number(), luminance: number()}}
 
-  # A continuous palette's value for a place from 0 to 1 in the trained range: R's
-  # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it.
+  # A continuous palette's value for a place from 0 to 1 in the trained range: for a rescale, R's
+  # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for a gradient, the
+  # colour that far from its low end to its high, as the opening comment says.
   @doc false
   @spec continuous({:rescale, {number(), number()}}, number()) :: float()
+  @spec continuous({:gradient, {String.t(), String.t()}}, number()) :: String.t()
   def continuous({:rescale, to}, place), do: Giggly.Scale.rescale(place, {0, 1}, to)
+
+  def continuous({:gradient, {_low, high}}, place) when place == 1 do
+    high
+    |> lab_channels()
+    |> List.to_tuple()
+    |> ColorOperations.from_lab()
+  end
+
+  def continuous({:gradient, {low, high}}, place) do
+    low_channels = lab_channels(low)
+
+    blend =
+      Enum.zip_with(low_channels, lab_channels(high), fn low_channel, high_channel ->
+        low_channel + (high_channel - low_channel) * place
+      end)
+
+    blend
+    |> List.to_tuple()
+    |> ColorOperations.from_lab()
+  end
+
+  # A colour's L*, a* and b*, as a list.
+  defp lab_channels(color) do
+    color
+    |> ColorOperations.to_lab()
+    |> Tuple.to_list()
+  end
 
   # A discrete palette's values for `count` levels, in level order.
   #

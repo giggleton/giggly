@@ -7,7 +7,8 @@ paths:
 # Guides
 
 `Giggly.Guide` is the protocol the guides of aesthetics other than position are drawn through, a
-legend (`Guide.Legend`, ggplot2's `guide_legend()`) so far; its namespace also draws the axes
+legend (`Guide.Legend`, ggplot2's `guide_legend()`) and a colour bar (`Guide.Colorbar`,
+`guide_colourbar()` in its gradient form); its namespace also draws the axes
 beside a panel and their titles (`Guide.Axis`, ggplot2's `guide_axis()`), the axis around a radial
 panel's circle (`Guide.AxisTheta`, `guide_axis_theta()`), the panel's background and grid lines
 (`Guide.Grid`, `guide_grid()`), the strips that label a facet's panels (`Guide.Strip`, which
@@ -28,7 +29,8 @@ panel's grid lines are placed by the coordinate system".
   sees a scale or calls a geom**: the assembly works out its keys from the scale, and rendering has
   each layer's geom draw its glyphs in them. The boundary exports the modules rendering draws with
   (`Axis`, `Box`, `Grid`, `Strip`) and the kinds, whose structs the assembly builds, never a kind's
-  drawing.
+  drawing. The parts both kinds' tables are built from (the background, a line of text) are
+  `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's layout.
 - **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
   ticks and marks are placed by one rule. Where an axis is drawn, which aesthetic's title goes
   there, and the look it is drawn in are the coordinate system's call; a guide draws the sides it
@@ -71,9 +73,10 @@ panel's grid lines are placed by the coordinate system".
   aesthetic on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
   labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, axes as
-  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it), and
+  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
-  FALSE`).
+  FALSE`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal bar, and its raster
+  and rectangles displays.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
   defaults**: the legend margin inside
@@ -88,3 +91,11 @@ panel's grid lines are placed by the coordinate system".
   order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,
   left and top), with no margin or background of its own (`theme_gray()`'s); `Box.draw/2` returns
   the box's width and its table, which rendering centres down the panels.
+- **A colour bar is drawn as ggplot2's gradient form at its defaults** (`Guide.Colorbar`, design-log
+  §4, the entry beginning "The colour bar is drawn as ggplot2's gradient form"): laid out as a
+  legend, its one key row the bar, a key wide and five keys long (`legend.key.height` times 5);
+  the bar a `Scene.Gradient` through the colours the assembly sampled (`bins`, 15, ggplot2's
+  `nbin` for the gradient form), from its bottom, the scale's low end, to its top, with no border;
+  a white tick `legend.ticks.length` into each side at each break's place, the right side's and
+  then the left's, each drawn from inside the bar outward; each label the labels' margin right of
+  the bar, centred on its tick. It draws no layer's glyph.
