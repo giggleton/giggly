@@ -35,7 +35,7 @@ defmodule Giggly.Assembly do
   #      value it maps to, in the order of the aesthetics' names, one with the title and labels of
   #      an earlier merged into it, as ggplot2 merges guides that would read alike; each legend
   #      is drawn by the geom of each layer that maps one of its aesthetics, with what that layer
-  #      sets;
+  #      sets, in the keys whose values the layer's table holds;
   #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
   #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
   #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
@@ -125,21 +125,25 @@ defmodule Giggly.Assembly do
   @typedoc """
   A legend for one or more aesthetics other than position, those whose scales give the same title
   and labels, in name order: its title, the column the first layer to map the aesthetic maps it
-  to; a key for each of its scales' breaks, the break's label and the value each aesthetic maps it
-  to; and each layer that maps one of its aesthetics, in the order the layers were added, with
-  those it maps, its geom drawing its glyph in every key with the key's values of those aesthetics
-  and the aesthetics the layer sets, as ggplot2's legend draws a key for each such layer, its
-  `aes_params` among the key's data.
+  to; a key for each of its scales' breaks, the break's label, the break itself, as the first
+  aesthetic's data holds it (ggplot2's `.value`), and the value each aesthetic maps it to; and each
+  layer that maps one of its aesthetics, in the order the layers were added, with those it maps,
+  its geom drawing its glyph with the key's values of those aesthetics and the aesthetics the layer
+  sets, as ggplot2's legend draws a key for each such layer, its `aes_params` among the key's
+  data, and whether it draws in each key, in key order.
   """
   @type legend :: %{
           aesthetics: [Plot.aesthetic()],
           title: String.t(),
-          keys: [%{label: String.t(), values: %{optional(Plot.aesthetic()) => term()}}],
+          keys: [
+            %{label: String.t(), value: term(), values: %{optional(Plot.aesthetic()) => term()}}
+          ],
           layers: [
             %{
               geom: struct(),
               aesthetics: [Plot.aesthetic()],
-              fixed: %{optional(Plot.aesthetic()) => term()}
+              fixed: %{optional(Plot.aesthetic()) => term()},
+              draws: [boolean()]
             }
           ]
         }
@@ -244,7 +248,7 @@ defmodule Giggly.Assembly do
       x_scales: final_x_scales,
       y_scales: final_y_scales,
       non_position_scales: non_position_scales,
-      legends: legends(non_position_scales, plot, layers),
+      legends: legends(non_position_scales, plot, Enum.zip(layers, layer_data)),
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -297,12 +301,16 @@ defmodule Giggly.Assembly do
   # from the trained scales: each scale's, in the order of the aesthetics' names, a key for each
   # break the scale shows, labelled, with the value it maps to, merged into an earlier one with the
   # same title and labels, as ggplot2 merges guides whose title and labels hash alike, which keeps
-  # each key's labels and gathers its values; then each drawn by the geom of every layer that maps
-  # one of its aesthetics, with those it maps, as a layer shows in a legend whose aesthetic it
-  # maps. A scale with no breaks, one trained on nothing, gives none. ggplot2 orders legends by
-  # their hash, which no reader can predict; Giggly orders them by name, and a legend merged from
-  # several stands where its first would.
-  defp legends(non_position_scales, plot, layers) do
+  # each key's labels and the first's breaks and gathers its values; then each drawn by the geom of
+  # every layer that maps one of its aesthetics, with those it maps, as a layer shows in a legend
+  # whose aesthetic it maps, in the keys its data holds. A scale with no breaks, one trained on
+  # nothing, gives none. ggplot2 orders legends by their hash, which no reader can predict; Giggly
+  # orders them by name, and a legend merged from several stands where its first would. Each layer
+  # comes with its table, its positions final and its other aesthetics not yet mapped, as ggplot2's
+  # guides read each layer's data before the scales map it.
+  defp legends(non_position_scales, plot, layers_and_data) do
+    layers = Enum.map(layers_and_data, fn {layer, _frame} -> layer end)
+
     scale_legends =
       for {aesthetic, scale} <- Enum.sort(non_position_scales),
           breaks = Scale.legend_breaks(scale),
@@ -314,8 +322,8 @@ defmodule Giggly.Assembly do
           aesthetics: [aesthetic],
           title: guide_title(plot, layers, aesthetic),
           keys:
-            Enum.zip_with(labels, mapped, fn label, value ->
-              %{label: label, values: %{aesthetic => value}}
+            Enum.zip_with([labels, values, mapped], fn [label, value, mapped_value] ->
+              %{label: label, value: value, values: %{aesthetic => mapped_value}}
             end)
         }
       end
@@ -323,7 +331,9 @@ defmodule Giggly.Assembly do
     scale_legends
     |> Enum.reduce([], &merged/2)
     |> Enum.reverse()
-    |> Enum.map(fn legend -> Map.put(legend, :layers, key_layers(legend, plot, layers)) end)
+    |> Enum.map(fn legend ->
+      Map.put(legend, :layers, key_layers(legend, plot, layers_and_data))
+    end)
   end
 
   # The legends so far, latest first, with `legend` merged into the one with its title and labels,
@@ -356,14 +366,42 @@ defmodule Giggly.Assembly do
   end
 
   # Each layer that maps one of the legend's aesthetics, in the order the layers were added, with
-  # those it maps, its geom and what it sets.
-  defp key_layers(legend, plot, layers) do
-    for layer <- layers,
+  # those it maps, its geom, what it sets, and whether it draws in each key.
+  defp key_layers(legend, plot, layers_and_data) do
+    for {layer, frame} <- layers_and_data,
         mapping = Plot.computed_mapping(plot, layer),
         mapped =
           Enum.filter(legend.aesthetics, fn aesthetic -> Map.has_key?(mapping, aesthetic) end),
-        mapped != [],
-        do: %{geom: Plot.layer_geom(layer), aesthetics: mapped, fixed: Plot.layer_fixed(layer)}
+        mapped != [] do
+      %{
+        geom: Plot.layer_geom(layer),
+        aesthetics: mapped,
+        fixed: Plot.layer_fixed(layer),
+        draws: draws(legend.keys, frame, mapped)
+      }
+    end
+  end
+
+  # Whether a layer draws in each key, as ggplot2's `keep_key_data()` decides: in a key whose break
+  # is a number, a continuous scale's, always; in a discrete key only where one of the layer's
+  # columns of the aesthetics it maps holds the break, `nil` among them, so a layer whose column
+  # lacks a level a second layer's column gave the scale leaves that key to the second; and in
+  # every key where the layer's stat dropped those columns. ggplot2 also keeps the `NA` key for a
+  # layer holding values outside the scale's limits, which the scale maps to `NA`; with no limits
+  # but the trained levels, every value is a key.
+  defp draws(keys, frame, aesthetics) do
+    case Enum.filter(aesthetics, fn aesthetic -> aesthetic in DataFrame.names(frame) end) do
+      [] ->
+        Enum.map(keys, fn _key -> true end)
+
+      present ->
+        held =
+          present
+          |> Enum.flat_map(fn aesthetic -> DataFrame.pull(frame, aesthetic) end)
+          |> MapSet.new()
+
+        Enum.map(keys, fn key -> is_number(key.value) or MapSet.member?(held, key.value) end)
+    end
   end
 
   # A scale for an aesthetic other than position trained on every layer's column of it, in all its

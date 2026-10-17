@@ -125,9 +125,14 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, with those it
   maps, each carrying what it sets (its `fixed`) for its keys, as ggplot2's `matched_aes()` gives a
   layer only the key's aesthetics it maps and its key data holds a layer's `aes_params`; a layer
-  that sets the legend's own aesthetic draws none. **Not yet ggplot2's:** every such layer draws
-  in every key, where ggplot2 4 leaves a layer out of a key whose value its own column lacks
-  (`keep_key_data()`), as when two layers map one aesthetic to different columns.
+  that sets the legend's own aesthetic draws none. **Each such layer says whether it draws in each
+  key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
+  final and before the other aesthetics are mapped: a discrete key only where one of the layer's
+  columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as
+  ggplot2's `.value`), `nil` for the `NA` key, so two layers mapping one aesthetic to different
+  columns each draw their own keys; a continuous key, whose break is a number, always; and every
+  key where the layer's stat dropped those columns. ggplot2's `NA` key for values outside a
+  scale's limits waits for limits.
 - **Evaluated columns are the layer's own aesthetics, then those it takes from the plot's
   mapping, each mapping's `x` and `y` first and its others in name order, then `panel`, then
   `group`** (`Plot.mapping_order/2`), and the group key follows column order: reordering the

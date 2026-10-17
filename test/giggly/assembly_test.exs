@@ -7,6 +7,17 @@ defmodule Giggly.AssemblyTest do
   # 17 significant digits. It moves with ggplot2's default alpha scales or how a legend's keys are
   # chosen.
   describe "run/1, legends" do
+    @keep_rows %{
+      "x" => ["p", "q", "p", "q"],
+      "y" => [1, 3, 2, 4],
+      "g" => ["a", "b", "a", "b"],
+      "h" => ["a", "b", "c", "c"],
+      "m" => [nil, "b", "a", "b"],
+      "n" => [1, 2, 3, 4],
+      "k" => [10, 20, 30, 40],
+      "one" => [1, 1, 1, 1]
+    }
+
     test "a mapped alpha's legend is titled by its column, a key for each break at its alpha" do
       [legend] =
         Giggly.Datasets.mpg()
@@ -19,13 +30,20 @@ defmodule Giggly.AssemblyTest do
                aesthetics: [:alpha],
                title: "year",
                keys: [
-                 %{label: "2000", values: %{alpha: 0.2}},
-                 %{label: "2002", values: %{alpha: 0.4}},
-                 %{label: "2004", values: %{alpha: 0.6}},
-                 %{label: "2006", values: %{alpha: 0.8}},
-                 %{label: "2008", values: %{alpha: 1.0}}
+                 %{label: "2000", value: 2000.0, values: %{alpha: 0.2}},
+                 %{label: "2002", value: 2002.0, values: %{alpha: 0.4}},
+                 %{label: "2004", value: 2004.0, values: %{alpha: 0.6}},
+                 %{label: "2006", value: 2006.0, values: %{alpha: 0.8}},
+                 %{label: "2008", value: 2008.0, values: %{alpha: 1.0}}
                ],
-               layers: [%{geom: %Geom.Point{}, aesthetics: [:alpha], fixed: %{}}]
+               layers: [
+                 %{
+                   geom: %Geom.Point{},
+                   aesthetics: [:alpha],
+                   fixed: %{},
+                   draws: [true, true, true, true, true]
+                 }
+               ]
              }
     end
 
@@ -39,10 +57,18 @@ defmodule Giggly.AssemblyTest do
 
       assert {legend.keys, legend.layers} ===
                {[
-                  %{label: "4", values: %{alpha: 0.1}},
-                  %{label: "f", values: %{alpha: 0.55}},
-                  %{label: "r", values: %{alpha: 1.0}}
-                ], [%{geom: %Geom.Bar{}, aesthetics: [:alpha], fixed: %{}}]}
+                  %{label: "4", value: "4", values: %{alpha: 0.1}},
+                  %{label: "f", value: "f", values: %{alpha: 0.55}},
+                  %{label: "r", value: "r", values: %{alpha: 1.0}}
+                ],
+                [
+                  %{
+                    geom: %Geom.Bar{},
+                    aesthetics: [:alpha],
+                    fixed: %{},
+                    draws: [true, true, true]
+                  }
+                ]}
     end
 
     test "a discrete colour's legend has a key for each level in the hue palette, NA last in grey50" do
@@ -56,9 +82,9 @@ defmodule Giggly.AssemblyTest do
       assert {legend.aesthetics, legend.title, legend.keys} ===
                {[:color], "g",
                 [
-                  %{label: "a", values: %{color: "#F8766D"}},
-                  %{label: "b", values: %{color: "#00BFC4"}},
-                  %{label: "NA", values: %{color: "#7F7F7F"}}
+                  %{label: "a", value: "a", values: %{color: "#F8766D"}},
+                  %{label: "b", value: "b", values: %{color: "#00BFC4"}},
+                  %{label: "NA", value: nil, values: %{color: "#7F7F7F"}}
                 ]}
     end
 
@@ -74,11 +100,18 @@ defmodule Giggly.AssemblyTest do
                aesthetics: [:color, :fill],
                title: "g",
                keys: [
-                 %{label: "a", values: %{color: "#F8766D", fill: "#F8766D"}},
-                 %{label: "b", values: %{color: "#00BFC4", fill: "#00BFC4"}},
-                 %{label: "NA", values: %{color: "#7F7F7F", fill: "#7F7F7F"}}
+                 %{label: "a", value: "a", values: %{color: "#F8766D", fill: "#F8766D"}},
+                 %{label: "b", value: "b", values: %{color: "#00BFC4", fill: "#00BFC4"}},
+                 %{label: "NA", value: nil, values: %{color: "#7F7F7F", fill: "#7F7F7F"}}
                ],
-               layers: [%{geom: %Geom.Bar{}, aesthetics: [:color, :fill], fixed: %{}}]
+               layers: [
+                 %{
+                   geom: %Geom.Bar{},
+                   aesthetics: [:color, :fill],
+                   fixed: %{},
+                   draws: [true, true, true]
+                 }
+               ]
              }
     end
 
@@ -98,6 +131,66 @@ defmodule Giggly.AssemblyTest do
              ]
     end
 
+    # Golden: ggplot2 4.0.3's `keep_key_data()`, each layer's `.draw` in `ggplot_build()`'s guide
+    # params, R 4.6.1. A layer draws in a discrete key only where its own column holds the break.
+    test "a layer draws in a discrete key only where its own column holds the key's break" do
+      [legend] =
+        @keep_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: :g})
+        |> Plot.geom_line(%{colour: :h})
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {Enum.map(legend.keys, fn key -> key.label end),
+              Enum.map(legend.layers, fn layer -> layer.draws end)} ===
+               {["a", "b", "c"], [[true, true, false], [true, true, true]]}
+    end
+
+    test "a layer draws in the NA key only where its own column holds a missing value" do
+      [legend] =
+        @keep_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: :m})
+        |> Plot.geom_line(%{colour: :g})
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {Enum.map(legend.keys, fn key -> key.label end),
+              Enum.map(legend.layers, fn layer -> layer.draws end)} ===
+               {["a", "b", "NA"], [[true, true, true], [true, true, false]]}
+    end
+
+    test "every layer draws in every key of a continuous scale, whatever its column holds" do
+      [legend] =
+        @keep_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{alpha: :n})
+        |> Plot.geom_point(%{alpha: :k})
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {Enum.map(legend.keys, fn key -> key.label end),
+              Enum.map(legend.layers, fn layer -> layer.draws end)} ===
+               {["10", "20", "30", "40"], [[true, true, true, true], [true, true, true, true]]}
+    end
+
+    # The counted bars' colour varies within their one group, so counting drops it, and they draw
+    # in every key, as ggplot2's `keep_key_data()` keeps a layer with no column to look in.
+    test "a layer whose stat dropped the legend's column draws in every key" do
+      [legend] =
+        @keep_rows
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar(%{colour: :h, group: :one})
+        |> Plot.geom_point(%{y: :y, colour: :g})
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {Enum.map(legend.keys, fn key -> key.label end),
+              Enum.map(legend.layers, fn layer -> layer.draws end)} ===
+               {["a", "b"], [[true, true], [true, true]]}
+    end
+
     # ggplot2 draws a layer in a merged legend with only the aesthetics it maps: the columns' key
     # without a colour, the points' without a fill.
     test "a merged legend is drawn by each layer mapping one of its aesthetics, with those it maps" do
@@ -112,8 +205,18 @@ defmodule Giggly.AssemblyTest do
       assert {legend.aesthetics, legend.layers} ===
                {[:color, :fill],
                 [
-                  %{geom: %Geom.Bar{}, aesthetics: [:fill], fixed: %{}},
-                  %{geom: %Geom.Point{}, aesthetics: [:color], fixed: %{}}
+                  %{
+                    geom: %Geom.Bar{},
+                    aesthetics: [:fill],
+                    fixed: %{},
+                    draws: [true, true, true]
+                  },
+                  %{
+                    geom: %Geom.Point{},
+                    aesthetics: [:color],
+                    fixed: %{},
+                    draws: [true, true, true]
+                  }
                 ]}
     end
 
@@ -154,7 +257,14 @@ defmodule Giggly.AssemblyTest do
         |> Assembly.run()
         |> Map.fetch!(:legends)
 
-      assert legend.layers === [%{geom: %Geom.Bar{}, aesthetics: [:alpha], fixed: %{}}]
+      assert legend.layers === [
+               %{
+                 geom: %Geom.Bar{},
+                 aesthetics: [:alpha],
+                 fixed: %{},
+                 draws: [true, true, true, true, true]
+               }
+             ]
     end
 
     # ggplot2's key data holds what a layer sets beside the key's value, so a line's key is as wide

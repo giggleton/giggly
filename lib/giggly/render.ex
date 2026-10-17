@@ -160,8 +160,9 @@ defmodule Giggly.Render do
 
   # The plot's legends stacked in their box, `:none` for none, or its width and table: in each
   # legend, each key's glyphs drawn by the geom of every layer that maps one of the legend's
-  # aesthetics, in the order the layers were added, at the key's values of the aesthetics it maps
-  # and with what the layer sets, as ggplot2 draws each such layer's `draw_key` in every key.
+  # aesthetics and draws in that key, in the order the layers were added, at the key's values of
+  # the aesthetics it maps and with what the layer sets, as ggplot2 draws each such layer's
+  # `draw_key` in the keys it keeps.
   defp draw_legend([], _theme), do: :none
 
   defp draw_legend(legends, theme) do
@@ -169,18 +170,19 @@ defmodule Giggly.Render do
 
     legends
     |> Enum.map(fn %{title: title, keys: keys, layers: layers} ->
-      {title, Enum.map(keys, fn key -> draw_key(key, layers, size) end)}
+      {title, Enum.with_index(keys, fn key, index -> draw_key(key, index, layers, size) end)}
     end)
     |> Guide.legends(theme)
   end
 
-  # A key's label and the glyph each layer draws in it, with the key's values of the aesthetics the
-  # layer maps and what the layer sets.
-  defp draw_key(%{label: label, values: values}, layers, size) do
+  # A key's label and the glyph each layer drawing in it draws, with the key's values of the
+  # aesthetics the layer maps and what the layer sets.
+  defp draw_key(%{label: label, values: values}, index, layers, size) do
     glyphs =
-      Enum.flat_map(layers, fn %{geom: geom, aesthetics: aesthetics, fixed: fixed} ->
-        Geom.draw_key(geom, Map.merge(fixed, Map.take(values, aesthetics)), size)
-      end)
+      for %{geom: geom, aesthetics: aesthetics, fixed: fixed, draws: draws} <- layers,
+          Enum.at(draws, index),
+          glyph <- Geom.draw_key(geom, Map.merge(fixed, Map.take(values, aesthetics)), size),
+          do: glyph
 
     {label, glyphs}
   end

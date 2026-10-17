@@ -1135,6 +1135,32 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/merged_legend.svg")
     end
 
+    # Golden: test/golden/legend_layer_keys.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_layer_keys.R: every element matches it, the x axis drawn before
+    # the y as in test/golden/point.svg, and every clip path. Points coloured by g (a, b) and lines
+    # by h (a, b, c): key c draws the line alone, as ggplot2 4's `keep_key_data()` leaves a layer
+    # out of a key its column lacks. It moves with what moves test/golden/line_colour_missing.svg,
+    # and with which layers draw in a key.
+    test "a legend's key is drawn only by the layers whose columns hold its value" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 4],
+          "y" => [1, 3, 2, 4],
+          "g" => ["a", "b", "a", "b"],
+          "h" => ["a", "b", "c", "c"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: :g})
+        |> Plot.geom_line(%{colour: :h})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/legend_layer_keys.svg")
+    end
+
     # Golden: test/golden/line_missing.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/line_missing.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. The "Missing values break a line" example on

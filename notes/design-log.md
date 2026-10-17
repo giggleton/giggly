@@ -1336,9 +1336,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-16 — Map discrete columns to colours and fills (colour, step 2); §4: "A discrete scale
-  carries its missing value", "Group ids follow ggplot2's `add_group()`", "The guide protocol sits
-  at `Giggly.Guide`"
+- 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up);
+  §4: none, ggplot2's `keep_key_data()` followed as `assembly.md` says
+- 2026-10-16 — Map discrete columns to colours and fills (colour, step 2) (`5dbd380`); §4: "A
+  discrete scale carries its missing value", "Group ids follow ggplot2's `add_group()`", "The
+  guide protocol sits at `Giggly.Guide`"
 - 2026-10-16 — Set colours and fills on a layer (colour, step 1) (`2841c12`); §4: "Colour and fill
   is Phase 3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come
   from the `color` package's conversions"
