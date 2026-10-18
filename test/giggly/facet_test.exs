@@ -251,6 +251,20 @@ defmodule Giggly.FacetTest do
       facet_layout = layout(wrap(["cyl", "drv"]), frame)
       assert DataFrame.pull(facet_layout, :strip) == [["4", "awd"], ["4", "f"], ["NA", "r"]]
     end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 writes the strips of `facet_wrap(~ t + f)` over
+    # `t = c(TRUE, FALSE, TRUE)` and `f = c(0.5, 1e5, 2)` FALSE and 1e+05, TRUE and 0.5, TRUE and 2,
+    # and mtcars' cylinders, doubles, 4, 6 and 8.
+    test "a strip writes its value as R's as.character() does" do
+      frame = DataFrame.new([{"t", [true, false, true]}, {"f", [0.5, 1.0e5, 2.0]}])
+      cylinders = DataFrame.new([{"cyl", [6.0, 4.0, 8.0]}])
+
+      by_flag_and_number = layout(wrap(["t", "f"]), frame)
+      by_cylinders = layout(wrap(["cyl"]), cylinders)
+
+      assert {DataFrame.pull(by_flag_and_number, :strip), DataFrame.pull(by_cylinders, :strip)} ===
+               {[["FALSE", "1e+05"], ["TRUE", "0.5"], ["TRUE", "2"]], [["4"], ["6"], ["8"]]}
+    end
   end
 
   describe "the wrapped layout's free scales" do

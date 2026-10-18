@@ -10,10 +10,9 @@
 #
 # Each car's name in its number of cylinders' hue, half opaque, turned 45 degrees about its middle;
 # the legend's keys are the letter "a" in each hue at the layer's alpha, turned with the labels. The
-# cylinders are text here, as Giggly's mtcars keeps them numbers and an expression in a mapping
-# (`factor(cyl)`) is not in Giggly yet. First checked with ggplot2 4.0.3 and vdiffr 1.0.9: every
-# element and clip path matches but svglite's around the whole drawing, and the one departure is
-# test/golden/point.R's, the x axis drawn before the y.
+# cylinders are written as text, `as.character()`, so the legend is titled `cyl`. First checked with
+# ggplot2 4.0.3 and vdiffr 1.0.9: every element and clip path matches but svglite's around the whole
+# drawing, and the one departure is test/golden/point.R's, the x axis drawn before the y.
 
 library(ggplot2)
 

@@ -74,7 +74,7 @@ words, and `cyl` and `gear` as their numbers written out, so `gear` is discrete 
 lists 3, 4 and 5. Giggly draws every plot in `theme_gray()` already, so it needs no theme added.
 
 ```elixir
-words = %{vs: %{0 => "V-shaped", 1 => "Straight"}, am: %{0 => "Automatic", 1 => "Manual"}}
+words = %{vs: %{0.0 => "V-shaped", 1.0 => "Straight"}, am: %{0.0 => "Automatic", 1.0 => "Manual"}}
 
 mtcars2 =
   Enum.map(mtcars, fn
@@ -82,7 +82,7 @@ mtcars2 =
       {column, Enum.map(values, fn value -> words[column][value] end)}
 
     {column, values} when column in [:cyl, :gear] ->
-      {column, Enum.map(values, &Integer.to_string/1)}
+      {column, Enum.map(values, fn value -> Integer.to_string(round(value)) end)}
 
     unchanged ->
       unchanged

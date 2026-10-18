@@ -10,10 +10,9 @@
 #
 # ggplot2's ggtheme reference page's "The default theme" example: mtcars' fuel economy against
 # weight, coloured by gears, with every label labs() sets: a title, subtitle, caption and tag, both
-# axes' titles and the legend's. Giggly's gears are text, as its mtcars keeps them numbers and an
-# expression in a mapping (`factor(gear)`) is not in Giggly yet. First checked with ggplot2 4.0.3
-# and vdiffr 1.0.9: every element and clip path matches but svglite's around the whole drawing,
-# and the one departure is test/golden/point.R's, the x axis drawn before the y.
+# axes' titles and the legend's, the gears read as a factor in both. First checked with ggplot2
+# 4.0.3 and vdiffr 1.0.9: every element and clip path matches but svglite's around the whole
+# drawing, and the one departure is test/golden/point.R's, the x axis drawn before the y.
 
 library(ggplot2)
 

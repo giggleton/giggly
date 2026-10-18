@@ -32,8 +32,8 @@ defmodule Giggly.Facet.Wrap do
   # margins: below the last row, and below a panel with an empty cell under it, at the end of an
   # unfilled last row; and left of the first column. On a free axis every panel draws its own, since
   # no two share a scale. Each panel has a strip above it for each facet column, in the columns'
-  # order, labelled with its value as ggplot2's `label_value()` writes it, here `to_string/1`, with
-  # a missing value written `NA`.
+  # order, labelled with its value as ggplot2's `label_value()` writes it, R's `as.character()`
+  # (`Giggly.AsCharacter`: `4` for a whole float, `TRUE`), with a missing value written `NA`.
 
   @enforce_keys [:facets, :nrow, :ncol, :scales]
   defstruct @enforce_keys
@@ -48,7 +48,7 @@ defmodule Giggly.Facet.Wrap do
   defimpl Giggly.Facet, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Facet
 
-    alias Giggly.DataFrame
+    alias Giggly.{AsCharacter, DataFrame}
 
     # A fixed axis's one scale.
     @only_scale 1
@@ -254,7 +254,7 @@ defmodule Giggly.Facet.Wrap do
 
     # A value as its strip writes it, ggplot2's `label_value()`.
     defp label(nil), do: "NA"
-    defp label(value), do: to_string(value)
+    defp label(value), do: AsCharacter.text(value)
 
     defp no_panels_message(facets) do
       "facet_wrap by #{inspect_all(facets)} has no panels to make: the tables holding its " <>

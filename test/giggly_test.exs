@@ -998,6 +998,22 @@ defmodule GigglyTest do
   end
 
   describe "layer_data/2, for geom_bar" do
+    # Golden: ggplot2 4.0.3 in R 4.6.1 draws `geom_bar(aes(cyl))` over mtcars, whose cylinders are
+    # doubles, 1.8 wide: 0.9 of their spacing, 2, where an integer column's bars are 0.9.
+    test "mtcars' cylinders are doubles, as R's are, so their bars are as wide as R's" do
+      frame =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :cyl})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      lows = DataFrame.pull(frame, :xmin)
+      highs = DataFrame.pull(frame, :xmax)
+      widths = Enum.zip_with(lows, highs, fn low, high -> Float.round(high - low, 10) end)
+
+      assert widths === [1.8, 1.8, 1.8]
+    end
+
     test "each bar counts its level's rows, its height the count" do
       frame =
         Giggly.Datasets.mpg()
@@ -2461,7 +2477,11 @@ defmodule GigglyTest do
         "cyl" =>
           mtcars
           |> Keyword.fetch!(:cyl)
-          |> Enum.map(&Integer.to_string/1)
+          |> Enum.map(fn cylinders ->
+            cylinders
+            |> round()
+            |> Integer.to_string()
+          end)
       }
 
       plot =
@@ -2506,21 +2526,10 @@ defmodule GigglyTest do
     # labs() sets, the plot's title, subtitle, caption and tag among them. It moves with what moves
     # test/golden/point.svg, with the legend's layout, and with how the plot's labels are drawn.
     test "labs titles the axes and the legend, and gives the plot a title, subtitle, caption and tag" do
-      mtcars = Giggly.Datasets.mtcars()
-
-      gears =
-        mtcars
-        |> Keyword.fetch!(:gear)
-        |> Enum.map(&Integer.to_string/1)
-
       svg =
-        %{
-          "wt" => Keyword.fetch!(mtcars, :wt),
-          "mpg" => Keyword.fetch!(mtcars, :mpg),
-          "gear" => gears
-        }
+        Giggly.Datasets.mtcars()
         |> Plot.new()
-        |> Plot.geom_point(%{x: :wt, y: :mpg, colour: :gear})
+        |> Plot.geom_point(%{x: :wt, y: :mpg, colour: {:factor, [:gear]}})
         |> Plot.labs(
           title: "Fuel economy declines as weight increases",
           subtitle: "(1973-74)",
@@ -2587,7 +2596,11 @@ defmodule GigglyTest do
       gears =
         mtcars
         |> Keyword.fetch!(:gear)
-        |> Enum.map(&Integer.to_string/1)
+        |> Enum.map(fn gear ->
+          gear
+          |> round()
+          |> Integer.to_string()
+        end)
 
       svg =
         %{

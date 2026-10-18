@@ -29,16 +29,16 @@ defmodule Giggly.Datasets do
   @mtcars_types [
     model: :string,
     mpg: :float,
-    cyl: :integer,
+    cyl: :float,
     disp: :float,
-    hp: :integer,
+    hp: :float,
     drat: :float,
     wt: :float,
     qsec: :float,
-    vs: :integer,
-    am: :integer,
-    gear: :integer,
-    carb: :integer
+    vs: :float,
+    am: :float,
+    gear: :float,
+    carb: :float
   ]
 
   # How each of mpg's columns is read; the file's header gives their order.
@@ -177,16 +177,16 @@ defmodule Giggly.Datasets do
       [
         model: "Datsun 710",
         mpg: 22.8,
-        cyl: 4,
+        cyl: 4.0,
         disp: 108.0,
-        hp: 93,
+        hp: 93.0,
         drat: 3.85,
         wt: 2.32,
         qsec: 18.61,
-        vs: 1,
-        am: 1,
-        gear: 4,
-        carb: 1
+        vs: 1.0,
+        am: 1.0,
+        gear: 4.0,
+        carb: 1.0
       ]
   """
   @spec mtcars() :: [{atom(), [String.t() | number()]}]

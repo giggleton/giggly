@@ -94,7 +94,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **R's `as.character()` is a boundary of its own, `Giggly.AsCharacter` (2026-10-18, Steve).** The
   text geom wrote its labels by it and a factor's levels need it in the scales, and neither
   boundary lists the other; it depends on nothing, and both list it, as `Giggly.Resolution` is R's
-  `resolution()`. *Rejected: `Scale.Labels`, with `Geom` listing `Scale`* — a geom would reach
+  `resolution()`, and so does the facet, whose strips are ggplot2's `label_value()`, so `mtcars`'
+  doubles read `4` there too. *Rejected: `Scale.Labels`, with `Geom` listing `Scale`* — a geom would reach
   scales, which its rules keep it from. *Rejected: a copy in each* — two homes for one rule.
 
 - **The mutation pass mirrors `.credo/` into muex's sandboxes, and checks one first with no mutant
@@ -1527,8 +1528,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Read a mapping value as discrete with factor() (expressions, step 2, part 2); §4:
-  "`factor()` reads a value as discrete", "R's `as.character()` is a boundary of its own"
+- 2026-10-18 — Give mtcars R's column types (expressions, step 2, part 3); §4: "R's
+  `as.character()` is a boundary of its own"
+- 2026-10-18 — Read a mapping value as discrete with factor() (expressions, step 2, part 2)
+  (`aaa63ba`); §4: "`factor()` reads a value as discrete", "R's `as.character()` is a boundary of
+  its own"
 - 2026-10-18 — Store a column mixing integers and floats as floats (expressions, step 2, part 1)
   (`dead326`); §4: "Column types belong to the frame"
 - 2026-10-18 — Check the mutation pass's sandbox before it runs, with .credo mirrored (`74b9275`);
@@ -1684,11 +1688,6 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   as `labs(x:)` for `xlab()`, which `notebooks.md` allows as a counterpart, though `ggplot()` for
   `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
   Settled when the first such example could otherwise be drawn.
-- **The datasets should carry R's column types (found 2026-10-15).** Bars follow R's
-  `resolution()`, which gives an integer column bars 0.9 wide; Giggly's `mtcars` reads `cyl` and
-  `gear` as integers where R stores doubles, so its bars are 0.9 wide where ggplot2's are 1.8.
-  Reading them as floats would label them `4.0` where R writes `4`, so it waits for labels that
-  print whole floats as R does.
 - **How a public option says "absent".** CLAUDE.md's sentinel rule (`:none`, never `nil`) came with
   the harness. ggplot2 separates "remove this" (`breaks = NULL`, `guide = "none"`) from "use the
   default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's

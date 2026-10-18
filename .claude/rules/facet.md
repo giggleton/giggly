@@ -48,9 +48,10 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   margins: below the last row and below a panel with an empty cell under it, left of the first
   column. **On a free axis (`scales: :free_x`, `:free_y` or `:free`) each panel has a scale of its
   own, its id the panel's, and draws its own axis**, as ggplot2's layout numbers `SCALE_X` and
-  `SCALE_Y` by panel and its `facet_wrap` draws every axis of a free scale. Its strips are one per facet column, the value written as ggplot2's `label_value()`
-  writes it, here `to_string/1`, a missing value `NA`. The null facet's one panel draws both axes
-  and has no strip.
+  `SCALE_Y` by panel and its `facet_wrap` draws every axis of a free scale. Its strips are one per
+  facet column, the value written as ggplot2's `label_value()` writes it, R's `as.character()`
+  (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`), a missing value
+  `NA`. The null facet's one panel draws both axes and has no strip.
 - **Panels made from values are ordered as a discrete scale orders its levels**, by the key the
   assembly hands the facet (`Scale.level_key/1`): column by column, a missing value last, strings
   by bytes rather than R's locale. Only the combinations the tables make get a panel.

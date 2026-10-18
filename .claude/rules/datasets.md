@@ -18,9 +18,10 @@ pages".
   regenerate it; a value that differs from R's is a bug in the copy.
 - **A dataset is a keyword list of columns, in the dataset's order**, which `Plot.new/2`, Explorer
   and Kino all read as a table. A column takes R's type: integers where R stores integers, floats
-  where it stores doubles, names strings and dates `Date`s, as `mpg`, `diamonds` and `economics`
-  do (`diamonds`' `table` and `economics`' `unemploy` are whole but doubles); `mtcars` still reads
-  R's whole doubles as integers (design-log §7, "The datasets should carry R's column types").
+  where it stores doubles, names strings and dates `Date`s (`diamonds`' `table`, `economics`'
+  `unemploy` and every `mtcars` column but its names are whole but doubles), so a bar's width,
+  which R's `resolution()` takes from a column's type, is R's, and a whole double is written `4`
+  wherever a value is written as text (`Giggly.AsCharacter`).
   R's row names become a first column, and a factor its labels, in no order until level order
   exists.
 - **The file is read once, at compile time** (`@external_resource` and `File.read!/1`), so asking

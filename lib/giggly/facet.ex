@@ -28,10 +28,11 @@ defprotocol Giggly.Facet do
   # by the key the assembly hands it, so panels and axes agree while this namespace names nothing
   # about scales.
 
-  # The facet reads and writes the tables' data frames and nothing else.
+  # The facet reads and writes the tables' data frames, and writes a strip's value as R's
+  # `as.character()` writes it (`Giggly.AsCharacter`), and nothing else.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.DataFrame], exports: [Null, Wrap]
+  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: [Null, Wrap]
 
   alias Giggly.DataFrame
 
