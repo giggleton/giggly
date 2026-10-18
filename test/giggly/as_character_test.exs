@@ -27,7 +27,11 @@ defmodule Giggly.AsCharacterTest do
       0.0,
       -0.0,
       1.0e100,
-      1.0e-5
+      1.0e-5,
+      -0.5,
+      -1.0e5,
+      1.5e-20,
+      -2.5e-20
     ]
 
     assert Enum.map(values, &AsCharacter.text/1) === [
@@ -52,7 +56,11 @@ defmodule Giggly.AsCharacterTest do
              "0",
              "0",
              "1e+100",
-             "1e-05"
+             "1e-05",
+             "-0.5",
+             "-1e+05",
+             "1.5e-20",
+             "-2.5e-20"
            ]
   end
 

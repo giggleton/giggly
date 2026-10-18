@@ -235,8 +235,10 @@ defmodule Giggly.Mapping do
 
   defp column_names(name) when is_binary(name), do: [name]
   defp column_names({:constant, _term}), do: []
-  defp column_names({:factor, [value]}), do: column_names(value)
-  defp column_names({_function, arguments}), do: Enum.flat_map(arguments, &column_names/1)
+
+  # An expression's arguments, or a factor's one value.
+  defp column_names({_function_or_factor, arguments}),
+    do: Enum.flat_map(arguments, &column_names/1)
 
   # The type of the column `value` makes from `table`, where the call can tell it: a column's own
   # and a constant's, as the frame types them; `:category` for a factor, which the frame is told;

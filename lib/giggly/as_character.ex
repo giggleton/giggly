@@ -31,9 +31,8 @@ defmodule Giggly.AsCharacter do
   def text(%Date{} = value), do: Date.to_string(value)
 
   # A float as R writes one: rounded to 15 significant digits, the zeros after its last
-  # significant one dropped, then in plain notation, or in scientific when that is shorter.
-  defp float_text(value) when value == 0, do: "0"
-
+  # significant one dropped, then in plain notation, or in scientific when that is shorter. Zero,
+  # either sign, has no digits left and is written `0`.
   defp float_text(value) do
     [mantissa, exponent] =
       value
