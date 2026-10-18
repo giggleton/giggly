@@ -151,6 +151,22 @@ defmodule GigglyTest do
 
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, a layer drawing
   # a table of its own. It moves with how a layer's table is evaluated or given its panels.
+  describe "layer_data/2, numbers written as integers and as floats" do
+    # R has one kind of number, so `facet_wrap(~n)` over `c(4, 4.0, 6)` draws two panels, `4` and
+    # `6`, and `group = n` makes two groups.
+    test "4 and 4.0 in one column are one value, to the facet and to grouping alike" do
+      frame =
+        %{"x" => [1.0, 2.0, 3.0], "y" => [1.0, 2.0, 3.0], "n" => [4, 4.0, 6]}
+        |> Plot.new(%{x: :x, y: :y, group: :n})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:n)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :panel), DataFrame.pull(frame, :group)} ===
+               {[1, 1, 2], [1, 1, 2]}
+    end
+  end
+
   describe "layer_data/2, a layer's own table" do
     test "the layer draws its own table with the plot's mapping" do
       plot =

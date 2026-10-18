@@ -13,8 +13,10 @@ defmodule Giggly.DataFrame do
 
   ## Values
 
-  A column is a list of values in row order, stored as given and never converted. `nil` is a
-  missing value, which is how every `Table.Reader` source returns a null.
+  A column is a list of values in row order, stored as given, but for one conversion its type
+  makes: an integer in a column of floats becomes a float, as Explorer casts one, so `4` and `4.0`
+  are the same value. `nil` is a missing value, which is how every `Table.Reader` source returns a
+  null.
 
   ## Types
 
@@ -23,8 +25,8 @@ defmodule Giggly.DataFrame do
 
     * the non-missing values are all of one kind, and a column mixing two kinds is refused with an
       `ArgumentError` naming the column and two values that disagree;
-    * integers and floats together are `:float`, and `:nan`, `:infinity` and `:neg_infinity` are
-      floats, as Explorer gives a non-finite float;
+    * integers and floats together are `:float`, the integers stored as floats, and `:nan`,
+      `:infinity` and `:neg_infinity` are floats, as Explorer gives a non-finite float;
     * a column of only `nil`, or of no rows, is `:null`;
     * binaries are `:string`;
     * `Date`, `Time`, `NaiveDateTime` and `DateTime` are `:date`, `:time`, `:naive_datetime` and

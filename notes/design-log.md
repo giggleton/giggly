@@ -1255,22 +1255,24 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Giggly` for the test helpers* — the library could then call it; *or the helpers lifted with
   `top_level?:`* — two exemptions where naming them outside `Giggly` needs none.
 
-- **Column types belong to the frame: `DataFrame.dtypes/1` (2026-10-12, Steve).** Every column
-  has one type, worked out when it enters a frame by Explorer's rules for `Series.from_list/2`
-  (read in its 0.13.0 source): one kind of value plus `nil`; integers with floats are `:float`;
-  `:nan`, `:infinity` and `:neg_infinity` are floats; all-`nil` or empty is `:null`; binaries are
-  `:string`; `Date`, `Time`, `NaiveDateTime` and `DateTime` have their own types. Lists adds `:atom`
-  and `:term` (pandas' and Polars' `object`), and stores each column as `{dtype, values}`. A column
-  mixing two types is refused, by `from_table/1` and beneath it alike. What a type means to a plot
-  is the plot's: `Giggly.Group` reads `:string`, `:boolean` and `:atom` as discrete. *Rejected:
-  deciding discreteness from the values in plotting code* (first proposed for this increment) —
-  what a column holds is the frame's to validate and report, and an engine has the types natively.
-  *Rejected: R's coercion, where numbers mixed with strings make a character column* — Elixir has
-  none, a silently categorical axis hides a messy column, and Explorer's `DataFrame.new` refuses
-  the same input. *Rejected: working types out on demand* — each reader rescans, and a mixed
-  column surfaces wherever it is first read. *Rejected: refusing values with no named type* — an
-  unused JSON or numeric column in a database result would refuse the whole table. *Rejected:
-  Explorer's widths (`{:s, 64}`)* — a list holds unbounded integers and has no width to report.
+- **Column types belong to the frame: `DataFrame.dtypes/1` (2026-10-12, Steve).** Every column has
+  one type, worked out when it enters a frame by Explorer's rules for `Series.from_list/2` (read in
+  its 0.13.0 source): one kind of value plus `nil`; integers with floats are `:float`, the integers
+  stored as floats, as Explorer casts them (2026-10-18, Steve: so `4` and `4.0` make one facet
+  panel, group and level, as in R); `:nan`, `:infinity` and `:neg_infinity` are floats; all-`nil` or
+  empty is `:null`; binaries are `:string`; `Date`, `Time`, `NaiveDateTime` and `DateTime` have
+  their own types. Lists adds `:atom` and `:term` (pandas' and Polars' `object`), and stores each
+  column as `{dtype, values}`. A column mixing two types is refused, by `from_table/1` and beneath
+  it alike. What a type means to a plot is the plot's: `Giggly.Group` reads `:string`, `:boolean`
+  and `:atom` as discrete. *Rejected: deciding discreteness from the values in plotting code* (first
+  proposed for this increment) — what a column holds is the frame's to validate and report, and an
+  engine has the types natively. *Rejected: R's coercion, where numbers mixed with strings make a
+  character column* — Elixir has none, a silently categorical axis hides a messy column, and
+  Explorer's `DataFrame.new` refuses the same input. *Rejected: working types out on demand* — each
+  reader rescans, and a mixed column surfaces wherever it is first read. *Rejected: refusing values
+  with no named type* — an unused JSON or numeric column in a database result would refuse the whole
+  table. *Rejected: Explorer's widths (`{:s, 64}`)* — a list holds unbounded integers and has no
+  width to report.
 
 - **Group ids follow ggplot2's `add_group()` (2026-10-12, Steve).** Checked against
   `R/grouping.R` and `id()`/`id_var()` in `R/compat-plyr.R`. A mapped `group` is renumbered 1..k
@@ -1507,8 +1509,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Check the mutation pass's sandbox before it runs, with .credo mirrored; §4: "The
-  mutation pass mirrors `.credo/`"
+- 2026-10-18 — Store a column mixing integers and floats as floats (expressions, step 2, part 1);
+  §4: "Column types belong to the frame"
+- 2026-10-18 — Check the mutation pass's sandbox before it runs, with .credo mirrored (`74b9275`);
+  §4: "The mutation pass mirrors `.credo/`"
 - 2026-10-18 — Map aesthetics to expressions and constants (expressions, step 1) (`6dc3658`); §4:
   "A mapping value is a column, an expression or a constant", "Expressions in a mapping are Phase
   3's sixth increment"

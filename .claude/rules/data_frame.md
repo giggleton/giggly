@@ -50,5 +50,7 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
   has no type of its own (maps, lists, `Decimal`…), so a column the plot never uses cannot refuse
   the table. When something needs one of those checked or plotted, it gets a named type of its own.
-- **`nil` in a column is a missing value.** Values are stored as given and never converted; the
-  frame classifies them by type and nothing more. `nil` is data, not the `:none` option sentinel.
+- **`nil` in a column is a missing value.** Values are stored as given, but for an integer in a
+  `:float` column, which becomes a float, as Explorer casts a mix of the two: `4` and `4.0` are then
+  one value to every reader that compares them (a facet's panels, the groups, a scale's levels), as
+  R's numbers are; the frame converts nothing else. `nil` is data, not the `:none` option sentinel.

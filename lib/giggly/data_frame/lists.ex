@@ -135,8 +135,16 @@ defmodule Giggly.DataFrame.Lists do
         widen(name, typed_so_far, value)
       end)
 
-    {dtype, values}
+    {dtype, cast(dtype, values)}
   end
+
+  # A column of floats holds only floats: an integer among them becomes one, as Explorer casts a
+  # mix of integers and floats, so `4` and `4.0` are one value wherever values are compared.
+  defp cast(:float, values), do: Enum.map(values, &as_float/1)
+  defp cast(_dtype, values), do: values
+
+  defp as_float(value) when is_integer(value), do: value / 1
+  defp as_float(value), do: value
 
   defp widen(_name, typed_so_far, nil), do: typed_so_far
   defp widen(_name, {:null, _witness}, value), do: {kind(value), value}

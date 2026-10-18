@@ -95,6 +95,15 @@ defmodule Giggly.DataFrameTest do
              }
     end
 
+    # Explorer's `Series.from_list([1, 2.0])` is `f64 [1.0, 2.0]`: a mix of integers and floats is
+    # cast to floats.
+    test "an integer among floats becomes a float, and a column of integers keeps them" do
+      frame = DataFrame.new(mixed: [4, 4.0, nil, :nan], whole: [4, 6, nil, 8])
+
+      assert {DataFrame.pull(frame, :mixed), DataFrame.pull(frame, :whole)} ===
+               {[4.0, 4.0, nil, :nan], [4, 6, nil, 8]}
+    end
+
     test "a name given twice is refused rather than the later column replacing the earlier" do
       assert_raise FunctionClauseError, fn ->
         DataFrame.new(x: [1, 2], x: [3, 4])
