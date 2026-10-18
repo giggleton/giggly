@@ -82,7 +82,9 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_histogram()` and `geom_freqpoly()`.
+Not in Giggly yet: `geom_histogram()` and `geom_freqpoly()`, choosing the order of a column's values
+(`cut` is an ordered factor), and `scale_fill_viridis_d()` and `scale_colour_viridis_d()`, ggplot2's
+default fill and colour scales for an ordered factor.
 
 ## Density instead of count
 
@@ -147,8 +149,8 @@ m +
 Mapping `weight` makes each bar the sum of its rows' votes rather than their number, as it does
 for `Giggly.Plot.geom_bar/3`.
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, titles and labels (`ylab()`),
-and the `movies` dataset.
+Not in Giggly yet: `geom_histogram()` and its `binwidth` option, `ylab()`, and the `movies`
+dataset.
 
 ## Bins on a transformed scale
 

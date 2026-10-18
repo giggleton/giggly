@@ -20,6 +20,8 @@ geom's default, as a string (`position = "jitter"`), as a `position_*()` functio
 carries its options, or through `layer()`; for many layers it is `position_identity()`, which
 leaves them where they are. Giggly has stacking and dodging, for bars:
 `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3` stack by default, or dodge with
-`position: :dodge`, as `position = "dodge"` does. Not in Giggly yet: `position_dodge2()`,
+`position: :dodge`, as `position = "dodge"` does; and nudging, for text: `Giggly.Plot.geom_text/3`
+nudges every label by its `nudge_x:` and `nudge_y:` options, as ggplot2's `geom_text()` does. Not
+in Giggly yet: `position_dodge2()`,
 `position_fill()`, `position_jitter()`, `position_jitterdodge()` and `position_nudge()`, the
 options of `position_stack()` and `position_dodge()`, and `layer()`.

@@ -76,8 +76,8 @@ ggplot(df, aes(x, y)) +
   guide = "legend")
 ```
 
-Not in Giggly yet: `geom_tile()`, `scale_fill_identity()` and its `breaks`, `labels` and `guide`
-options, the legend it asks for, `guide_legend()`, and titles and labels.
+Not in Giggly yet: `geom_tile()`, `scale_fill_identity()`, whose first argument titles the legend,
+and its `breaks`, `labels` and `guide` options, the legend it asks for, and `guide_legend()`.
 
 ## Sizes from the data
 

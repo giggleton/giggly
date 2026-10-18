@@ -50,7 +50,8 @@ d + scale_colour_hue(expression(clarity[beta]))
 A scale's first argument titles its legend; `expression()` writes the title as R's plotmath,
 here with a subscript β.
 
-Not in Giggly yet: `scale_colour_hue()`, and titles and labels, including R's `expression()` titles.
+Not in Giggly yet: `scale_colour_hue()`, whose first argument titles the legend, and R's plotmath
+expressions, here as a title made by `expression()`.
 
 ## Luminance and chroma
 

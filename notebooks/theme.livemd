@@ -46,7 +46,15 @@ p1 <- ggplot(mtcars, aes(wt, mpg)) +
 p1
 ```
 
-Not in Giggly yet: `labs()`, here a plot title.
+```elixir
+p1 =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+  |> Plot.labs(title: "Fuel economy declines as weight increases")
+
+render.(p1)
+```
 
 ## The plot's title and background
 
@@ -56,8 +64,8 @@ p1 + theme(plot.title = element_text(size = rel(2)))
 p1 + theme(plot.background = element_rect(fill = "green"))
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here the title's size and the background
-behind the whole plot.
+Not in Giggly yet: changing the theme, here the title's size and the background behind the whole
+plot.
 
 ## The panel's background, border and gridlines
 
@@ -73,8 +81,7 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here the panel's background, its border and
-its gridlines.
+Not in Giggly yet: changing the theme, here the panel's background, its border and its gridlines.
 
 ## Gridlines over the data
 
@@ -87,8 +94,7 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here drawing the panel's gridlines over the
-points.
+Not in Giggly yet: changing the theme, here drawing the panel's gridlines over the points.
 
 ## Axis lines, text and ticks
 
@@ -100,7 +106,7 @@ p1 + theme(axis.text = element_text(colour = "blue"))
 p1 + theme(axis.ticks = element_line(linewidth = 2))
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here the axes' lines, text and ticks.
+Not in Giggly yet: changing the theme, here the axes' lines, text and ticks.
 
 ## The y axis's title
 
@@ -109,8 +115,7 @@ Not in Giggly yet: `labs()`, and changing the theme, here the axes' lines, text 
 p1 + theme(axis.title.y = element_text(size = rel(1.5), angle = 90))
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here the size and angle of the y axis's
-title.
+Not in Giggly yet: changing the theme, here the size and angle of the y axis's title.
 
 ## The length and direction of ticks
 
@@ -123,8 +128,8 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: `labs()`, and changing the theme, here the length of the ticks and the margin
-above the x axis's text.
+Not in Giggly yet: changing the theme, here the length of the ticks and the margin above the x
+axis's text.
 
 ## A plot with legends
 
@@ -141,8 +146,8 @@ p2 <- ggplot(mtcars, aes(wt, mpg)) +
 p2
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
-that reads it back, and `labs()`, here the titles of the axes and the legends.
+Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and mapping `shape` and the
+legend that reads it back.
 
 ## Where the legends go
 
@@ -154,7 +159,7 @@ p2 + theme(legend.position = "bottom")
 ```
 
 Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
-that reads it back, `labs()`, and changing the theme, here where the legends go.
+that reads it back, and changing the theme, here where the legends go.
 
 ## Legends inside the panel
 
@@ -171,7 +176,7 @@ p2 + theme(
 ```
 
 Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
-that reads it back, `labs()`, and changing the theme, here placing the legends inside the panel.
+that reads it back, and changing the theme, here placing the legends inside the panel.
 
 ## A box around the legends
 
@@ -185,8 +190,7 @@ p2 + theme(
 ```
 
 Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
-that reads it back, `labs()`, and changing the theme, here the box around the legends and its
-margin.
+that reads it back, and changing the theme, here the box around the legends and its margin.
 
 ## Legend keys, text and titles
 
@@ -199,7 +203,7 @@ p2 + theme(legend.title = element_text(face = "bold"))
 ```
 
 Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, mapping `shape` and the legend
-that reads it back, `labs()`, and changing the theme, here the legends' keys, text and titles.
+that reads it back, and changing the theme, here the legends' keys, text and titles.
 
 ## Strips
 
@@ -248,7 +252,7 @@ p4 <- ggplot(mtcars, aes(wt, mpg)) +
 p4 + theme(geom = element_geom(ink = "dodgerblue"))
 ```
 
-Not in Giggly yet: `annotate()`, and changing the theme, here the colour every layer draws in.
+Not in Giggly yet: changing the theme, here the colour every layer draws in.
 
 ## Accent and paper colours
 
@@ -258,8 +262,8 @@ p4 + geom_smooth(method = "lm", formula = y ~ x) +
   theme(geom = element_geom(accent = "tomato", paper = "orchid"))
 ```
 
-Not in Giggly yet: `annotate()`, `geom_smooth()` with a line fitted by `lm()`, and changing the
-theme, here the accent and paper colours layers draw with.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and changing the theme, here the
+accent and paper colours layers draw with.
 
 ## A default palette
 
@@ -269,5 +273,5 @@ p4 + aes(colour = drat) +
   theme(palette.colour.continuous = c("white", "pink", "hotpink"))
 ```
 
-Not in Giggly yet: `annotate()` and changing the theme, here the palette a continuous `colour` scale
-draws from.
+Not in Giggly yet: adding a mapping with `+ aes()`, and changing the theme, here the palette a
+continuous `colour` scale draws from.

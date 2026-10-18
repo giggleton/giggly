@@ -31,7 +31,8 @@ ggplot(diamonds, aes(price, cut)) +
   geom_boxplot()
 ```
 
-Not in Giggly yet: `geom_boxplot()`.
+Not in Giggly yet: `geom_boxplot()`, and choosing the order of a column's values (`cut` is an
+ordered factor).
 
 ## Flipping boxplots
 

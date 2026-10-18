@@ -34,8 +34,8 @@ p + scale_linewidth(range = c(0, 4))
 A scale's first argument titles its legend, and `range` sets the thinnest and the thickest
 widths.
 
-Not in Giggly yet: mapping `linewidth`, `scale_linewidth()` and its `range` option, the legend that
-reads it back, and titles and labels.
+Not in Giggly yet: mapping `linewidth`, `scale_linewidth()`, whose first argument titles the legend,
+and its `range` option, and the legend that reads it back.
 
 ## Binned widths
 

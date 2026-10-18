@@ -71,7 +71,9 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly()
 ```
 
-Not in Giggly yet: frequency polygons and `geom_freqpoly()`.
+Not in Giggly yet: frequency polygons and `geom_freqpoly()`, choosing the order of a column's values
+(`cut` is an ordered factor), and `scale_colour_viridis_d()`, ggplot2's default colour scale for an
+ordered factor.
 
 ## Columns dodged by group
 

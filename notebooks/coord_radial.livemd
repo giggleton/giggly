@@ -88,8 +88,7 @@ ggplot(df, aes(x = "", y = value, fill = variable)) +
 ```
 
 Not in Giggly yet: an expression in a mapping, such as the constant `""`, `geom_col()`'s `width`
-option, `scale_fill_manual()`, `coord_radial()`'s `theta`, `start` and `expand` options, and
-`labs()`, here a plot title.
+option, `scale_fill_manual()`, and `coord_radial()`'s `theta`, `start` and `expand` options.
 
 ## A wind rose and a race track
 

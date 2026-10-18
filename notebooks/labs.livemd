@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -17,9 +28,16 @@ what it is waiting for, so the page is also a list of what remains.
 
 `labs()` sets the text of a plot's labels: the title of each axis or legend, named by its aesthetic,
 and the plot's title, subtitle, caption and tag. `xlab()`, `ylab()` and `ggtitle()` are older
-shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly has none
-of these yet: an axis is titled by the column mapped to it, or `count` for counted bars, a legend or
-colour bar by its column, and a plot has no title, subtitle, caption or tag.
+shortcuts for some of them, and `get_labs()` returns the labels a plot ends up with. Giggly has
+`Giggly.Plot.labs/2`, which sets every one of these labels; unset, an axis is titled by the column
+mapped to it, or `count` for counted bars, a legend or colour bar by its column, and a plot has no
+title, subtitle, caption or tag. ggplot2 has superseded `xlab()`, `ylab()` and `ggtitle()` with
+`labs()`, so Giggly has `labs/2` alone. It has no `get_labs()`. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The data in these examples is
+`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
+setup cell binds to `mtcars`, R's name for it.
 
 ## Renaming a legend or an axis
 
@@ -29,8 +47,25 @@ p + labs(colour = "Cylinders")
 p + labs(x = "New x label")
 ```
 
-Not in Giggly yet: `labs()`. Giggly titles each axis by the column mapped to it, here `mpg` and
-`wt`.
+A label is named by the aesthetic it titles: `colour` titles the colour bar, which would otherwise
+be titled `cyl`, and `x` the x axis, otherwise `mpg`.
+
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt, colour: :cyl})
+  |> Plot.geom_point()
+
+p
+|> Plot.labs(colour: "Cylinders")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.labs(x: "New x label")
+|> render.()
+```
 
 ## Labels by column
 
@@ -48,7 +83,7 @@ p + labs(dictionary = c(
 ))
 ```
 
-Not in Giggly yet: `labs()` and its `dictionary` option.
+Not in Giggly yet: `labs()`'s `dictionary` option.
 
 ## A title and subtitle
 
@@ -59,7 +94,17 @@ p + labs(title = "New plot title")
 p + labs(title = "New plot title", subtitle = "A subtitle")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's title and subtitle.
+```elixir
+p
+|> Plot.labs(title: "New plot title")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.labs(title: "New plot title", subtitle: "A subtitle")
+|> render.()
+```
 
 ## A caption
 
@@ -69,7 +114,11 @@ Not in Giggly yet: `labs()`, here the plot's title and subtitle.
 p + labs(caption = "(based on data from ...)")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's caption.
+```elixir
+p
+|> Plot.labs(caption: "(based on data from ...)")
+|> render.()
+```
 
 ## A tag
 
@@ -79,7 +128,11 @@ Not in Giggly yet: `labs()`, here the plot's caption.
 p + labs(title = "title", tag = "A")
 ```
 
-Not in Giggly yet: `labs()`, here the plot's title and tag.
+```elixir
+p
+|> Plot.labs(title: "title", tag: "A")
+|> render.()
+```
 
 ## Removing a label
 
@@ -90,6 +143,12 @@ p +
  labs(title = NULL)
 ```
 
-The second `labs()` removes the title the first one set.
+The second `labs()` removes the title the first one set. Giggly writes R's `NULL` as `:none`, which
+also takes away the room the title took.
 
-Not in Giggly yet: `labs()`.
+```elixir
+p
+|> Plot.labs(title: "title")
+|> Plot.labs(title: :none)
+|> render.()
+```

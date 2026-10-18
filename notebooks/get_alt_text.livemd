@@ -17,8 +17,8 @@ list of what remains.
 
 `get_alt_text()` returns a plot's alternative text, for a web page to give in place of the
 drawing: the `alt` label set with `labs(alt = ...)`, or an empty string when there is none.
-Giggly has none of this yet: it has no `get_alt_text()`, and no titles and labels, `labs()`, to
-set one with.
+Giggly has none of this yet: it has no `get_alt_text()`, and `Giggly.Plot.labs/2` takes no `alt`
+label.
 
 ## A plot without alt text
 
@@ -44,4 +44,4 @@ p <- p + labs(
 get_alt_text(p)
 ```
 
-Not in Giggly yet: titles and labels, `labs()` and its `alt` label, and `get_alt_text()`.
+Not in Giggly yet: `labs()`'s `alt` label and `get_alt_text()`.

@@ -62,7 +62,8 @@ Not in Giggly yet: the `txhousing` dataset and `scale_colour_viridis_d()`.
 d + scale_colour_viridis_d("City\nCenter")
 ```
 
-Not in Giggly yet: the `txhousing` dataset, `scale_colour_viridis_d()`, and titles and labels.
+Not in Giggly yet: the `txhousing` dataset and `scale_colour_viridis_d()`, whose first argument
+titles the legend, here over two lines.
 
 ## Other palettes
 

@@ -17,5 +17,4 @@ each county's state, area, total population and its density, the population of e
 percentage, the percentages of adults with a high school diploma, a college education or a
 professional degree, poverty rates by age, whether the county is in a metro area, and more. The
 page warns that the columns' original descriptions were not documented, so its own are partly
-speculation. Not in Giggly yet: the `midwest` dataset; `Giggly.Datasets` has ggplot2's `mpg` and
-R's `mtcars` only.
+speculation. Not in Giggly yet: the `midwest` dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics` and `mpg`, and R's `mtcars`.

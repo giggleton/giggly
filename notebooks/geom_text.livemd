@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,7 +29,12 @@ is also a list of what remains.
 `geom_text()` draws each row's `label` as text at its `x` and `y`, and `geom_label()` draws it on
 a rectangle, which makes it easier to read. They label points or bars, or make a scatter plot of
 words. Text has no size in the data's units, so the axes do not grow to fit it, and it keeps its
-size when the plot is resized. Giggly has none of this yet.
+size when the plot is resized. Giggly draws text with `Giggly.Plot.geom_text/3`; it has no
+`geom_label()`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
+defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in
+most examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
+magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## Text at each point
 
@@ -31,7 +47,15 @@ p <- ggplot(mtcars, aes(wt, mpg, label = rownames(mtcars)))
 p + geom_text()
 ```
 
-Not in Giggly yet: `geom_text()` and mapping `label`.
+Each label is centred on its car's weight and mileage.
+
+```elixir
+p = Plot.new(mtcars, %{x: :wt, y: :mpg, label: :model})
+
+p
+|> Plot.geom_text()
+|> render.()
+```
 
 ## Avoiding overlaps
 
@@ -40,9 +64,14 @@ Not in Giggly yet: `geom_text()` and mapping `label`.
 p + geom_text(check_overlap = TRUE)
 ```
 
-`check_overlap = TRUE` leaves out each label that would overlap one already drawn.
+`check_overlap = TRUE` leaves out each label that would overlap one already drawn, the rows taken
+in order.
 
-Not in Giggly yet: `geom_text()` and its `check_overlap` option, and mapping `label`.
+```elixir
+p
+|> Plot.geom_text(check_overlap: true)
+|> render.()
+```
 
 ## Labels with a background
 
@@ -51,7 +80,7 @@ Not in Giggly yet: `geom_text()` and its `check_overlap` option, and mapping `la
 p + geom_label()
 ```
 
-Not in Giggly yet: `geom_label()` and mapping `label`.
+Not in Giggly yet: `geom_label()`.
 
 ## Larger text
 
@@ -60,7 +89,13 @@ Not in Giggly yet: `geom_label()` and mapping `label`.
 p + geom_text(size = 10)
 ```
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and a fixed `size`.
+A text's `size` is in millimetres, so 10 draws labels about 28 points tall.
+
+```elixir
+p
+|> Plot.geom_text(size: 10)
+|> render.()
+```
 
 ## Justifying, nudging and turning text
 
@@ -81,10 +116,39 @@ p +
 ```
 
 `hjust = 0` starts each label at its point, and `nudge_x` moves it a little to the right;
-`vjust = 0` and `nudge_y` do the same upwards.
+`vjust = 0` and `nudge_y` do the same upwards. The axes reach the labels where they are drawn.
 
-Not in Giggly yet: `geom_text()` with its `nudge_x` and `nudge_y` options, mapping `label`, and a
-fixed `hjust`, `vjust`, `angle` and `family`.
+```elixir
+p
+|> Plot.geom_point()
+|> Plot.geom_text(hjust: 0, nudge_x: 0.05)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point()
+|> Plot.geom_text(vjust: 0, nudge_y: 0.5)
+|> render.()
+```
+
+`angle` turns each label anticlockwise about its place, in degrees.
+
+```elixir
+p
+|> Plot.geom_point()
+|> Plot.geom_text(angle: 45)
+|> render.()
+```
+
+`family` names the font. Giggly measures a label as its default font does, and draws it at that
+width in the font named, where the browser has it.
+
+```elixir
+p
+|> Plot.geom_text(family: "Times New Roman")
+|> render.()
+```
 
 ## Mapping colour and fill
 
@@ -98,8 +162,8 @@ p + geom_label(aes(fill = factor(cyl)), colour = "white", fontface = "bold")
 
 `scale_colour_hue(l = 40)` darkens the colours by lowering their luminance.
 
-Not in Giggly yet: `geom_text()` and `geom_label()`, mapping `label`, an expression in a mapping,
-such as `factor(cyl)`, `scale_colour_hue()`, and a fixed `fontface`.
+Not in Giggly yet: `geom_label()`, an expression in a mapping, such as `factor(cyl)`,
+`scale_colour_hue()`, and a fixed `fontface`.
 
 ## Mapping size
 
@@ -112,8 +176,8 @@ p +
   scale_radius(range = c(3,6))
 ```
 
-Not in Giggly yet: `geom_text()` and its `key_glyph` option, mapping `label` and `size`, the scale
-that maps the size and the legend that reads it back, and `scale_radius()`.
+Not in Giggly yet: `geom_text()`'s `key_glyph` option, mapping `size`, the scale that maps the size
+and the legend that reads it back, and `scale_radius()`.
 
 ## Labels as expressions
 
@@ -130,8 +194,8 @@ p +
 
 Each label is written as, say, `2.62^(6)`, which R's plotmath draws as 2.62 with a superscript 6.
 
-Not in Giggly yet: `geom_text()` and its `parse` option, R's plotmath expressions, mapping
-`label`, and an expression in a mapping, such as `paste(wt, "^(", cyl, ")", sep = "")`.
+Not in Giggly yet: `geom_text()`'s `parse` option, R's plotmath expressions, and an expression in a
+mapping, such as `paste(wt, "^(", cyl, ")", sep = "")`.
 
 ## A text annotation
 
@@ -146,9 +210,14 @@ p +
 ```
 
 `annotate()` adds a layer with a single label, its position and look given as values rather than
-mapped from columns.
+mapped from columns. R's `"red"` is CSS's too, `#FF0000`.
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and `annotate()`.
+```elixir
+p
+|> Plot.geom_text()
+|> Plot.annotate(:text, label: "plot mpg vs. wt", x: 2, y: 15, size: 8, colour: "red")
+|> render.()
+```
 
 ## Labels on dodged columns
 
@@ -167,7 +236,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = y), position = "dodge")
 ```
 
-Not in Giggly yet: `geom_text()` and mapping `label`.
+Not in Giggly yet: `geom_text()`'s `position` option, here `position = "dodge"`.
 
 ## Dodging labels by the columns' width
 
@@ -180,8 +249,8 @@ ggplot(data = df, aes(x, y, group = grp)) +
 
 Columns are 0.9 wide by default, so dodging the labels by 0.9 puts each over its column.
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and `position_dodge()`'s options. Giggly names a
-position by an atom, `position: :dodge`, which takes no options yet.
+Not in Giggly yet: `geom_text()`'s `position` option and `position_dodge()`'s options. Giggly names
+a position by an atom, `position: :dodge`, which takes no options yet.
 
 ## Labels just above the columns
 
@@ -196,8 +265,8 @@ ggplot(data = df, aes(x, y, group = grp)) +
   )
 ```
 
-Not in Giggly yet: `geom_text()`, mapping `label`, an expression in a mapping, such as `y + 0.05`,
-`position_dodge()`'s options, and a fixed `vjust`.
+Not in Giggly yet: an expression in a mapping, such as `y + 0.05`, `geom_text()`'s `position`
+option and `position_dodge()`'s options.
 
 ## Labels in the middle of stacked columns
 
@@ -209,8 +278,8 @@ ggplot(data = df, aes(x, y, group = grp)) +
  geom_text(aes(label = y), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and `position_stack()` and its `vjust` option.
-Giggly names a position by an atom, `position: :stack`, which takes no options yet.
+Not in Giggly yet: `geom_text()`'s `position` option, and `position_stack()` and its `vjust`
+option. Giggly names a position by an atom, `position: :stack`, which takes no options yet.
 
 ## Justification
 
@@ -230,4 +299,22 @@ ggplot(df, aes(x, y)) +
 `"inward"` justifies each label towards the centre of the plot, so that the labels at its edges
 stay inside it.
 
-Not in Giggly yet: `geom_text()`, mapping `label`, and a fixed `hjust` and `vjust`.
+```elixir
+df = %{
+  "x" => [1.0, 1.0, 2.0, 2.0, 1.5],
+  "y" => [1.0, 2.0, 1.0, 2.0, 1.5],
+  "text" => ["bottom-left", "top-left", "bottom-right", "top-right", "center"]
+}
+
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_text(%{label: :text})
+|> render.()
+```
+
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_text(%{label: :text}, vjust: :inward, hjust: :inward)
+|> render.()
+```

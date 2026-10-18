@@ -155,7 +155,18 @@ ggplot(mpg, aes(displ, hwy)) +
   facet_wrap(vars(class))
 ```
 
-Not in Giggly yet: a layer with data of its own.
+A layer given a table of its own by `data:` draws that table; here it is `mpg` without its `class`
+column, so the facet repeats every car in every panel, in grey behind the panel's own. R's
+`"grey85"` is a name CSS lacks, so the cell writes its hex, `"#D9D9D9"`.
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point(data: Keyword.delete(mpg, :class), colour: "#D9D9D9")
+|> Plot.geom_point()
+|> Plot.facet_wrap(:class)
+|> render.()
+```
 
 ## Where the strips go
 

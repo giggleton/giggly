@@ -19,8 +19,9 @@ remains.
 they share, unless a layer overrides them. The page names three ways to call it: with the data and
 a mapping, with the data alone, and with neither, each layer then bringing what it needs. Giggly's
 counterpart is `Giggly.Plot.new/2`, which takes the data, any table, and a mapping that applies to
-every layer; a layer's own mapping is laid over it. Every layer draws the plot's data, so the data
-is always given to `Giggly.Plot.new/2`.
+every layer; a layer's own mapping is laid over it. A layer draws the plot's data unless its `data:`
+option gives it a table of its own, as ggplot2's `data =` does. Giggly has no plot with no data, so
+a table is always given to `Giggly.Plot.new/2`.
 
 ## The data and the mapping for every layer
 
@@ -57,8 +58,8 @@ ggplot(data = sample_df, mapping = aes(x = group, y = value)) +
   )
 ```
 
-Not in Giggly yet: a layer with data of its own and a fixed `size`. Giggly lays a layer's mapping
-over the plot's as ggplot2 does here, the second layer keeping the plot's `x` and replacing its `y`.
+Not in Giggly yet: a fixed `size`. Giggly lays a layer's mapping over the plot's as ggplot2 does
+here, the second layer keeping the plot's `x` and replacing its `y`.
 
 ## The data for every layer, a mapping for each
 
@@ -76,7 +77,7 @@ ggplot(data = sample_df) +
   )
 ```
 
-Not in Giggly yet: a layer with data of its own and a fixed `size`.
+Not in Giggly yet: a fixed `size`.
 
 ## Data and a mapping for each layer
 
@@ -95,5 +96,5 @@ ggplot() +
   )
 ```
 
-Not in Giggly yet: a layer with data of its own and a fixed `size`. A Giggly plot starts from its
-data, given to `Giggly.Plot.new/2`.
+Not in Giggly yet: a plot with no data and a fixed `size`. A Giggly plot starts from its data,
+given to `Giggly.Plot.new/2`.

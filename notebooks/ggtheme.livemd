@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -24,7 +35,11 @@ through `theme_classic()`'s axis lines without gridlines, to `theme_void()`, whi
 but the data; `theme_test()` is meant for visual tests and should not change. Each takes a base
 font size and family, base sizes for lines and rectangles, and ink, paper and accent colours.
 `theme()` adjusts a theme rather than replacing it. Every Giggly plot is drawn in `theme_gray()`;
-there is no other theme and no way to change one yet.
+there is no other theme and no way to change one yet. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
+so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
+cell with `Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974
+*Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## The default theme
 
@@ -54,8 +69,41 @@ p1 <- ggplot(mtcars2) +
 p1 + theme_gray() # the default
 ```
 
-Not in Giggly yet: `labs()`, here the plot's title, subtitle, caption and tag and the titles of the
-axes and the legend. Giggly draws every plot in `theme_gray()` already.
+The cell makes `mtcars2` as `within()` does, each factor's values as text: `vs` and `am` as their
+words, and `cyl` and `gear` as their numbers written out, so `gear` is discrete and its legend
+lists 3, 4 and 5. Giggly draws every plot in `theme_gray()` already, so it needs no theme added.
+
+```elixir
+words = %{vs: %{0 => "V-shaped", 1 => "Straight"}, am: %{0 => "Automatic", 1 => "Manual"}}
+
+mtcars2 =
+  Enum.map(mtcars, fn
+    {column, values} when column in [:vs, :am] ->
+      {column, Enum.map(values, fn value -> words[column][value] end)}
+
+    {column, values} when column in [:cyl, :gear] ->
+      {column, Enum.map(values, &Integer.to_string/1)}
+
+    unchanged ->
+      unchanged
+  end)
+
+p1 =
+  mtcars2
+  |> Plot.new()
+  |> Plot.geom_point(%{x: :wt, y: :mpg, colour: :gear})
+  |> Plot.labs(
+    title: "Fuel economy declines as weight increases",
+    subtitle: "(1973-74)",
+    caption: "Data from the 1974 Motor Trend US magazine.",
+    tag: "Figure 1",
+    x: "Weight (1000 lbs)",
+    y: "Fuel economy (mpg)",
+    colour: "Gears"
+  )
+
+render.(p1)
+```
 
 ## Other complete themes
 
@@ -69,8 +117,8 @@ p1 + theme_classic()
 p1 + theme_void()
 ```
 
-Not in Giggly yet: `labs()`, and the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`,
-`theme_dark()`, `theme_minimal()`, `theme_classic()` and `theme_void()`.
+Not in Giggly yet: the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`,
+`theme_minimal()`, `theme_classic()` and `theme_void()`.
 
 ## The default theme with panels
 
@@ -81,7 +129,7 @@ p2 <- p1 + facet_grid(vs ~ am)
 p2 + theme_gray() # the default
 ```
 
-Not in Giggly yet: `labs()` and `facet_grid()`.
+Not in Giggly yet: `facet_grid()`.
 
 ## Other complete themes with panels
 
@@ -95,5 +143,5 @@ p2 + theme_classic()
 p2 + theme_void()
 ```
 
-Not in Giggly yet: `labs()`, `facet_grid()`, and the themes `theme_bw()`, `theme_linedraw()`,
+Not in Giggly yet: `facet_grid()`, and the themes `theme_bw()`, `theme_linedraw()`,
 `theme_light()`, `theme_dark()`, `theme_minimal()`, `theme_classic()` and `theme_void()`.

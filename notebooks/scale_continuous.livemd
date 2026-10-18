@@ -30,8 +30,9 @@ its ggplot2 code and names what it is waiting for, so the page is also a list of
 `scale_x_continuous()` and `scale_y_continuous()` are the default scales for a continuous `x` and
 `y`. Setting one by hand changes its title, limits, breaks or labels, or transforms it; the log10,
 square root and reverse scales are shortcuts for common transformations. Giggly chooses a continuous
-position scale from the data, as ggplot2 does, and titles its axis by the column mapped to it, but
-has no scale functions yet, so nothing else about a scale can be set. A plot is described with
+position scale from the data, as ggplot2 does, and titles its axis by the column mapped to it, or
+as `Giggly.Plot.labs/2` sets it, but has no scale functions yet, so nothing else about a scale can
+be set. A plot is described with
 `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`:
@@ -49,10 +50,12 @@ p1
 ```
 
 ```elixir
-mpg
-|> Plot.new(%{x: :displ, y: :hwy})
-|> Plot.geom_point()
-|> render.()
+p1 =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy})
+  |> Plot.geom_point()
+
+render.(p1)
 ```
 
 ## Axis titles
@@ -76,7 +79,13 @@ the axis.
 p1 + labs(x = NULL, y = NULL)
 ```
 
-Not in Giggly yet: `labs()`.
+Giggly writes R's `NULL` as `:none`, which removes each title and the room it took.
+
+```elixir
+p1
+|> Plot.labs(x: :none, y: :none)
+|> render.()
+```
 
 ## Axis limits
 

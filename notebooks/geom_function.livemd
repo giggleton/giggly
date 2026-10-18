@@ -49,7 +49,7 @@ base + geom_function(fun = dnorm)
 
 With no data to train the x scale, `xlim()` gives it the range to draw the function over.
 
-Not in Giggly yet: `geom_function()` and `xlim()`.
+Not in Giggly yet: a plot with no data, `geom_function()` and `xlim()`.
 
 ## Passing arguments to the function
 
@@ -57,7 +57,7 @@ Not in Giggly yet: `geom_function()` and `xlim()`.
 base + geom_function(fun = dnorm, args = list(mean = 2, sd = .5))
 ```
 
-Not in Giggly yet: `geom_function()` and its `args` option, and `xlim()`.
+Not in Giggly yet: a plot with no data, `geom_function()` and its `args` option, and `xlim()`.
 
 ## The points behind the curve
 
@@ -72,7 +72,8 @@ base + stat_function(fun = dnorm, geom = "point", n = 20)
 `n` is the number of points the function is evaluated at; ggplot2 takes 101 unless told
 otherwise.
 
-Not in Giggly yet: `stat_function()` and its `geom` and `n` options, and `xlim()`.
+Not in Giggly yet: a plot with no data, `stat_function()` and its `geom` and `n` options, and
+`xlim()`.
 
 ## A filled curve
 
@@ -80,7 +81,8 @@ Not in Giggly yet: `stat_function()` and its `geom` and `n` options, and `xlim()
 base + stat_function(fun = dnorm, geom = "polygon", color = "blue", fill = "blue", alpha = 0.5)
 ```
 
-Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, and `xlim()`.
+Not in Giggly yet: a plot with no data, `stat_function()` and its `geom` option, `geom_polygon()`,
+and `xlim()`.
 
 ## Fewer points on the line
 
@@ -88,7 +90,7 @@ Not in Giggly yet: `stat_function()` and its `geom` option, `geom_polygon()`, an
 base + geom_function(fun = dnorm, n = 20)
 ```
 
-Not in Giggly yet: `geom_function()` and its `n` option, and `xlim()`.
+Not in Giggly yet: a plot with no data, `geom_function()` and its `n` option, and `xlim()`.
 
 ## Two functions on one plot
 
@@ -101,8 +103,8 @@ base +
 
 Each layer maps `colour` to a constant, so the legend names each curve.
 
-Not in Giggly yet: `geom_function()` and its `args` option, `xlim()`, and an expression in a
-mapping, here the constants `"normal"` and `"t, df = 1"`.
+Not in Giggly yet: a plot with no data, `geom_function()` and its `args` option, `xlim()`, and an
+expression in a mapping, here the constants `"normal"` and `"t, df = 1"`.
 
 ## A function of your own
 
@@ -118,7 +120,7 @@ base + geom_function(fun = \(x) 0.5 * exp(-abs(x)))
 
 The commented lines are two other ways R writes the same function.
 
-Not in Giggly yet: `geom_function()` and `xlim()`.
+Not in Giggly yet: a plot with no data, `geom_function()` and `xlim()`.
 
 ## The function's own range
 

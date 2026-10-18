@@ -16,4 +16,4 @@ has no examples, so this notebook says only what the page describes and where Gi
 8,602 rows, each naming a multiple listing service (MLS) area and a month, with the number of
 sales, their total value, the median sale price, the number of active listings, and the months it
 would take to sell them all at the current pace of sales. Not in Giggly yet: the `txhousing`
-dataset; `Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.
+dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics` and `mpg`, and R's `mtcars`.

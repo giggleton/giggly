@@ -34,8 +34,8 @@ b +
 Both layers draw a one-row table of their own, `df`, over the points of `mtcars`, and mapping
 `colour` to a constant names each layer in the legend.
 
-Not in Giggly yet: `geom_curve()` and `geom_segment()`, a layer with data of its own, mapping `xend`
-and `yend`, and an expression in a mapping, such as the constant `"curve"`.
+Not in Giggly yet: `geom_curve()` and `geom_segment()`, mapping `xend` and `yend`, and an expression
+in a mapping, such as the constant `"curve"`.
 
 ## Curvature and arrows
 
@@ -52,8 +52,8 @@ b + geom_curve(
 A negative `curvature` bends the curve to the left, a positive one to the right, and 0 draws a
 straight line; the default is 0.5.
 
-Not in Giggly yet: `geom_curve()` with its `curvature` and `arrow` options, `arrow()`, mapping
-`xend` and `yend`, and a layer with data of its own.
+Not in Giggly yet: `geom_curve()` with its `curvature` and `arrow` options, `arrow()`, and mapping
+`xend` and `yend`.
 
 ## Seal movements
 
@@ -97,9 +97,9 @@ R's `expand.grid()` makes a row for each combination of line end and line join, 
 segment is drawn with its own line end and join, and labelled with their names.
 
 Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, a fixed
-`size`, mapping `xend`, `yend` and `label`, expressions in a mapping, such as the constant `x = 1`
-and `paste(lineend, linejoin)`, `geom_text()` with a fixed `hjust` and its `nudge_x` option, and
-`xlim()`.
+`size`, mapping `xend` and `yend`, expressions in a mapping, such as the constant `x = 1` and
+`paste(lineend, linejoin)`, and `xlim()`. ggplot2 knows no `hjust` called `'outside'` and centres
+these labels, as Giggly does by default.
 
 ## Spikes, as base R draws them
 

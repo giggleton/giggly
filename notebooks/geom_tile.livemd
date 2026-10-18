@@ -18,7 +18,8 @@ names what it is waiting for, so the page is also a list of what remains.
 `geom_rect()` and `geom_tile()` both draw a rectangle for each row. `geom_tile()` places it by its
 centre and size (`x`, `y`, `width`, `height`); `geom_rect()` can do the same or place it by its
 corners (`xmin`, `xmax`, `ymin`, `ymax`). `geom_raster()` is a fast special case for tiles that
-are all the same size. Giggly has none of this yet.
+are all the same size. Giggly has `Giggly.Plot.geom_rect/3`, which places each rectangle by its
+corners only; it has no `geom_tile()` or `geom_raster()`, and maps no `width` or `height`.
 
 ## A surface
 
@@ -80,8 +81,7 @@ ggplot(df, aes(xmin = x - w / 2, xmax = x + w / 2, ymin = y, ymax = y + 1)) +
   geom_rect(aes(fill = z), colour = "grey50")
 ```
 
-Not in Giggly yet: `geom_rect()`, mapping `xmin`, `xmax`, `ymin` and `ymax`, and expressions in a
-mapping, such as `x - w / 2`.
+Not in Giggly yet: expressions in a mapping, such as `x - w / 2`.
 
 ## Anchoring the cells
 

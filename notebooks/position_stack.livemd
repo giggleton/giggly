@@ -146,7 +146,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_area()`, and `geom_text()` and mapping `label`, stacked with `position =
+Not in Giggly yet: `geom_area()`, and `geom_text()`'s `position` option, here `position =
 "stack"`.
 
 ## Centring labels
@@ -159,7 +159,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_area()`, `geom_text()` and mapping `label`, and `position_stack()`'s
+Not in Giggly yet: `geom_area()`, `geom_text()`'s `position` option, and `position_stack()`'s
 `vjust` option.
 
 ## Negative values
@@ -192,5 +192,5 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = grp), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_hline()`, `geom_text()` and mapping `label`, and `position_stack()`'s
+Not in Giggly yet: `geom_hline()`, `geom_text()`'s `position` option, and `position_stack()`'s
 `vjust` option.

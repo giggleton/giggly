@@ -21,7 +21,7 @@ between, so they suit base 10 best. It is superseded by `guide_axis_logticks()`.
 already on a log scale, through `scale_x_log10()` and `scale_y_log10()` or by taking logs before
 plotting; under `coord_transform()`, which takes the logs itself, it needs `scaled = FALSE`.
 Giggly has none of it yet: its position scales are chosen from the data and cannot be set, so
-there are no log scales, and it has no annotations.
+there are no log scales.
 
 ## Log ticks on chosen sides
 

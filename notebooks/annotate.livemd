@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,8 +30,13 @@ what remains.
 columns: a label, a shaded rectangle or a segment placed by hand. Any geom can draw it but the
 reference lines, `geom_abline()`, `geom_hline()` and `geom_vline()`, which annotate on their own.
 Its positions take part in the scales, so the axes grow to show it, while every other aesthetic
-is set, so an annotation never appears in a legend. Giggly has no annotations yet: every Giggly
-layer uses the plot's data.
+is set, so an annotation never appears in a legend. Giggly has `Giggly.Plot.annotate/3`, which
+draws with every geom Giggly has: points, bars, paths and lines, text and rectangles. A plot is
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`. The data in these examples is
+`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
+setup cell binds to `mtcars`, R's name for it.
 
 ## Text
 
@@ -30,9 +46,24 @@ p + annotate("text", x = 4, y = 25, label = "Some text")
 p + annotate("text", x = 2:5, y = 25, label = "Some text")
 ```
 
-A vector of positions, as `x = 2:5`, places the same text at each.
+A vector of positions, as `x = 2:5`, places the same text at each; Giggly takes a list.
 
-Not in Giggly yet: `annotate()` and the text it draws, `geom_text()`.
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+
+p
+|> Plot.annotate(:text, x: 4, y: 25, label: "Some text")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.annotate(:text, x: [2, 3, 4, 5], y: 25, label: "Some text")
+|> render.()
+```
 
 ## A shaded rectangle
 
@@ -41,7 +72,11 @@ p + annotate("rect", xmin = 3, xmax = 4.2, ymin = 12, ymax = 21,
   alpha = .2)
 ```
 
-Not in Giggly yet: `annotate()` and `geom_rect()`.
+```elixir
+p
+|> Plot.annotate(:rect, xmin: 3, xmax: 4.2, ymin: 12, ymax: 21, alpha: 0.2)
+|> render.()
+```
 
 ## A segment
 
@@ -50,7 +85,7 @@ p + annotate("segment", x = 2.5, xend = 4, y = 15, yend = 25,
   colour = "blue")
 ```
 
-Not in Giggly yet: `annotate()` and `geom_segment()`.
+Not in Giggly yet: `geom_segment()`.
 
 ## A point and its range
 
@@ -59,7 +94,7 @@ p + annotate("pointrange", x = 3.5, y = 20, ymin = 12, ymax = 28,
   colour = "red", size = 2.5, linewidth = 1.5)
 ```
 
-Not in Giggly yet: `annotate()`, `geom_pointrange()`, and a fixed `size` and `linewidth`.
+Not in Giggly yet: `geom_pointrange()`, and a fixed `size` and `linewidth`.
 
 ## A label at each position
 
@@ -69,7 +104,11 @@ p + annotate("text", x = 2:3, y = 20:21, label = c("my label", "label 2"))
 
 Vectors of positions and labels give one annotation per value, taken in step.
 
-Not in Giggly yet: `annotate()` and `geom_text()`.
+```elixir
+p
+|> Plot.annotate(:text, x: [2, 3], y: [20, 21], label: ["my label", "label 2"])
+|> render.()
+```
 
 ## Mathematical labels
 
@@ -83,5 +122,4 @@ p + annotate("text", x = 4, y = 25,
 `parse = TRUE` reads each label as one of R's plotmath expressions, so `italic(R) ^ 2` is drawn
 as an italic R, squared.
 
-Not in Giggly yet: `annotate()`, `geom_text()` and its `parse` option, and R's plotmath
-expressions.
+Not in Giggly yet: `geom_text()`'s `parse` option and R's plotmath expressions.

@@ -171,7 +171,7 @@ m2
 
 Not in Giggly yet: the `movies` dataset, an expression in a mapping, such as
 `factor(round(rating))`, `stat_summary()`, `geom_crossbar()` and its `width` option,
-`mean_cl_boot()`, and titles and labels, here `xlab()`.
+`mean_cl_boot()`, and `xlab()`.
 
 ## A log scale before or after the stat
 

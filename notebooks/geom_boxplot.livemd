@@ -73,7 +73,8 @@ Not in Giggly yet: `geom_boxplot()`.
 p + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options, and a
+fixed `shape`, here 1, a hollow circle.
 
 ## Boxes over the data's points
 
@@ -141,5 +142,5 @@ ggplot(df, aes(x)) +
 ```
 
 R draws 100 random numbers and puts their five numbers in a table of one row, which `stat =
-"identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `ymin`, `lower`,
-`middle`, `upper` and `ymax`, and choosing a layer's stat, here `stat = "identity"`.
+"identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `lower`, `middle` and
+`upper`, and choosing a layer's stat, here `stat = "identity"`.

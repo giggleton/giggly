@@ -75,8 +75,8 @@ p + geom_hline(aes(yintercept = wt), mean_wt)
 ```
 
 The facets are in Giggly: `facet_wrap(~ cyl)` is `Giggly.Plot.facet_wrap(plot, :cyl)`. Each line
-comes from the row of `mean_wt` with its panel's `cyl`. Not in Giggly yet: `geom_hline()`, mapping
-`yintercept`, and a layer with data of its own.
+comes from the row of `mean_wt` with its panel's `cyl`. Not in Giggly yet: `geom_hline()` and
+mapping `yintercept`.
 
 ## Other aesthetics
 
@@ -88,4 +88,4 @@ ggplot(mtcars, aes(mpg, wt, colour = wt)) +
   facet_wrap(~ cyl)
 ```
 
-Not in Giggly yet: `geom_hline()`, mapping `yintercept`, and a layer with data of its own.
+Not in Giggly yet: `geom_hline()` and mapping `yintercept`.

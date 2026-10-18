@@ -19,7 +19,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   one it cannot keeps its ggplot2 code and names what it waits for, so the notebook is also the
   page's list of what remains. Drawn means the same plot built with Giggly's own counterparts of
   the example's functions, checked against R; a plot Giggly could only imitate (`qplot()`, a
-  computed column standing in for `factor(cyl)`) waits.
+  computed column standing in for `factor(cyl)`) waits. An argument ggplot2 does not recognise,
+  and so draws as its default (`hjust = 'outside'`, centred), is left out of Giggly's cell, and
+  the prose says so (design-log §4, the entry beginning "A notebook leaves out an argument").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
   words in every notebook** ("mapping `shape`", "a fixed `size`", "`geom_boxplot()`", "an
   expression in a mapping", "a point's `fill`"), so when a feature lands, searching the notebooks

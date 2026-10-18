@@ -39,8 +39,8 @@ d + scale_shape(name = "Cut of diamond")
 
 `name` titles the legend.
 
-Not in Giggly yet: mapping `shape`, `scale_shape()` and its `solid` option, the legend that reads it
-back, and titles and labels.
+Not in Giggly yet: mapping `shape`, `scale_shape()` and its `solid` and `name` options, and the
+legend that reads it back.
 
 ## The order of the shapes
 

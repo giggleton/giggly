@@ -28,8 +28,9 @@ what remains.
 
 The position aesthetics say where a geom draws. `x` and `y` place points, and the positions along a
 line or path; `xend` and `yend` say where a segment or curve ends; `xmin`, `xmax`, `ymin` and `ymax`
-give the edges of ranges and rectangles. Giggly maps `x` and `y` to columns, for points, bars, paths
-and lines; the other position aesthetics, and the geoms that read them, are not in Giggly yet. A
+give the edges of ranges and rectangles. Giggly maps `x` and `y` to columns, for points, bars,
+paths, lines and text, and `xmin`, `xmax`, `ymin` and `ymax` for rectangles; it maps no `xend` or
+`yend`, and has no ranges or segments. A
 plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
 document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
 `render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
@@ -61,7 +62,7 @@ ggplot(cuts_df) +
   geom_pointrange()
 ```
 
-Not in Giggly yet: models fitted by `lm()`, `geom_pointrange()`, mapping `ymin` and `ymax`, an
+Not in Giggly yet: models fitted by `lm()`, `geom_pointrange()`, an
 expression in a mapping, such as `fit - se.fit`, and choosing the order of a column's values (`cut`
 is an ordered factor).
 
@@ -87,7 +88,15 @@ p + annotate(
 )
 ```
 
-Not in Giggly yet: `annotate()`, here a rectangle placed by `xmin`, `xmax`, `ymin` and `ymax`.
+R's `"dark grey"` is a name CSS lacks, so the cell writes its hex, `"#A9A9A9"`.
+
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point()
+|> Plot.annotate(:rect, xmin: 2, xmax: 3.5, ymin: 2, ymax: 25, fill: "#A9A9A9", alpha: 0.5)
+|> render.()
+```
 
 ## Segments with arrows
 

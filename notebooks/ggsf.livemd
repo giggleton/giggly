@@ -52,7 +52,7 @@ ggplot() +
 `coord_sf()` projects them back into the first layer's, so the red outlines fall on the counties
 beneath them.
 
-Not in Giggly yet: `sf` objects, `geom_sf()`, `coord_sf()`, and a layer with data of its own.
+Not in Giggly yet: `sf` objects, `geom_sf()`, `coord_sf()`, and a plot with no data.
 
 ## Points among polygons
 
@@ -83,7 +83,7 @@ ggplot(nc_3857) +
 
 EPSG code 4326 is longitude and latitude, so the red point is at 80° west, 35° north.
 
-Not in Giggly yet: `sf` objects, `geom_sf()`, `annotate()`, a fixed `size`, and `coord_sf()` and its
+Not in Giggly yet: `sf` objects, `geom_sf()`, a fixed `size`, and `coord_sf()` and its
 `default_crs` option.
 
 ## Labels
@@ -96,7 +96,7 @@ ggplot(nc_3857[1:3, ]) +
 }
 ```
 
-Not in Giggly yet: `sf` objects, `geom_sf()` and `geom_sf_label()`, and mapping `label`.
+Not in Giggly yet: `sf` objects, and `geom_sf()` and `geom_sf_label()`.
 
 ## The world in two projections
 
@@ -121,5 +121,5 @@ ggplot() + geom_sf(data = world2)
 The second plot projects the world onto a Lambert azimuthal equal-area projection centred on the
 South Pole.
 
-Not in Giggly yet: map data from the `maps` package, `sf` objects, `geom_sf()`, and a layer with
-data of its own.
+Not in Giggly yet: map data from the `maps` package, `sf` objects, `geom_sf()`, and a plot with no
+data.

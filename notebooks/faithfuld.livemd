@@ -15,4 +15,4 @@ has no examples, so this notebook says only what the page describes and where Gi
 `faithfuld` is a two-dimensional density estimate of R's `faithful` data on the Old Faithful
 geyser: 5,625 rows, each a pair of an eruption time and a waiting time to the next eruption, both
 in minutes, with the estimated density there. Not in Giggly yet: the `faithfuld` dataset;
-`Giggly.Datasets` has ggplot2's `mpg` and R's `mtcars` only.
+`Giggly.Datasets` has ggplot2's `diamonds`, `economics` and `mpg`, and R's `mtcars`.

@@ -779,6 +779,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   ExDoc pages made from the notebooks*: they would show code without drawings, and "Run in
   Livebook" cannot install a path dependency until Giggly is published.
 
+- **A notebook leaves out an argument ggplot2 does not recognise, and draws what R draws
+  (2026-10-18, Steve).** geom_segment's example labels its segments with `hjust = 'outside'`, a
+  word ggplot2 does not define: `compute_just()` reads it as `NA`, and R centres the labels exactly
+  as `hjust = 0.5` does. Giggly's cell leaves `hjust` out, its default centring them the same, and
+  the prose says what R does with the word. *Rejected: adding `:outside` to Giggly's
+  justifications*, a word ggplot2 lacks, given a meaning only R's fallback gives it; *naming it as
+  missing*, which would leave the example waiting on something Giggly will never build.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -1449,8 +1457,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Annotate plots and draw rectangles (text and titles, step 5); §4: "`annotate()`
-  draws with every geom Giggly has"
+- 2026-10-18 — Draw text and titles in the notebooks (text and titles, step 6); §4: "Text and
+  titles is Phase 3's fifth increment", "A notebook leaves out an argument ggplot2 does not
+  recognise"
+- 2026-10-18 — Annotate plots and draw rectangles (text and titles, step 5) (`bb57487`); §4:
+  "`annotate()` draws with every geom Giggly has"
 - 2026-10-18 — Give a layer a table of its own with data: (text and titles, step 4) (`4e77ecd`);
   §4: "A layer's own table is public", "A column the plot names is checked against the tables"
 - 2026-10-17 — Label plots with labs (text and titles, step 3) (`d1e8217`); §4: "A title may run

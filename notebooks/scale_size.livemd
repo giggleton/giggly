@@ -36,8 +36,8 @@ p + scale_size(range = c(0, 10))
 
 A scale's first argument titles its legend, and `range` sets the smallest and the largest sizes.
 
-Not in Giggly yet: mapping `size`, `scale_size()` and its `range` option, the legend that reads it
-back, and titles and labels.
+Not in Giggly yet: mapping `size`, `scale_size()`, whose first argument titles the legend, and its
+`range` option, and the legend that reads it back.
 
 ## Zero as no size
 

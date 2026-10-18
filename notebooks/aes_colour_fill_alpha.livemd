@@ -179,5 +179,6 @@ p + scale_fill_manual(values = alpha(c("blue", "red"), .3))
 The rectangles span each president's term, from the `presidential` table, coloured by party and
 as tall as the range of unemployment.
 
-Not in Giggly yet: the `presidential` dataset, `geom_rect()` as a layer with data of its own, a
-fixed `ymin` and `ymax`, and `scale_fill_manual()` with colours made transparent by `alpha()`.
+Not in Giggly yet: the `presidential` dataset, removing the plot's `x` and `y` from a layer's
+mapping, R's `aes(NULL, NULL)`, and `scale_fill_manual()` with colours made transparent by
+`alpha()`.

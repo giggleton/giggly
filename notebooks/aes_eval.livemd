@@ -136,8 +136,8 @@ ggplot(mpg, aes(class)) +
 The text layer counts too, with `stat = "count"`, and writes each count just above its bar. The
 bars alone are the counted bars `Giggly.Plot.geom_bar/3` draws.
 
-Not in Giggly yet: text, `geom_text()`, `stat_count()` given to a geom as `stat = "count"`,
-mapping `label`, and expressions in a mapping, such as `after_stat(count + 2)`.
+Not in Giggly yet: `stat_count()` given to a geom as `stat = "count"`, and expressions in a
+mapping, such as `after_stat(count + 2)`.
 
 ## Labelling a box plot
 
@@ -158,6 +158,5 @@ ggplot(mpg, aes(displ, class)) +
 The text layer computes the box plot's statistics too, with `stat = "boxplot"`: `stage()` gives
 it `displ` to compute them from, and then places each label at the computed `xmax`.
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, `geom_text()` and a fixed
-`hjust`, `stat_boxplot()` given to a geom as `stat = "boxplot"`, mapping `label`, and expressions
-in a mapping, such as `after_stat(xmax)` and `stage()`.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, `stat_boxplot()` given to a
+geom as `stat = "boxplot"`, and expressions in a mapping, such as `after_stat(xmax)` and `stage()`.
