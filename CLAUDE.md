@@ -27,12 +27,12 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
   anything `mix hex.outdated` offers — read the package diffs, never trust semver or the
   changelog), `docs-sync` (run after any substantive change, before reporting done — routes the
   change to the doc surfaces it must update), `elixir-code-review` (run before reporting done on
-  any change touching `test/` or a GenServer — and on any new lint/security
-  waiver; not only when a review is asked for), `test-timing` (measuring the suite, on demand
-  only). **`docs-sync` and `elixir-code-review` are harness-enforced**:
-  `.claude/hooks/commit-gate.sh` (a PreToolUse hook) denies `git commit` on any diff touching
-  those gated paths until both skills' final steps have recorded a pass for the exact working-tree
-  state — a mark that goes stale if any file changes after it.
+  any change touching `test/` or a GenServer — and on any new lint/security waiver; not only when
+  a review is asked for), `mutation-testing` (after each commit, over the code lines it changed),
+  `test-timing` (measuring the suite, on demand only). **`docs-sync`, `elixir-code-review` and
+  `mutation-testing` are harness-enforced**: `.claude/hooks/commit-gate.sh` (a PreToolUse hook)
+  denies `git commit` on a diff touching those gated paths until the review and docs passes are
+  marked for its exact state, and denies any commit while the last one's mutation pass is not.
 - Module documentation is the per-module contract and is kept accurate; trust it: an API
   module's `@moduledoc`, or the comment block at the top of an internal module.
 

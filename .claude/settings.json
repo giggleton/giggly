@@ -23,6 +23,19 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/commit-gate.sh post-commit",
+            "timeout": 15,
+            "statusMessage": "Commit gate: checking whether a mutation pass is due"
+          }
+        ]
+      }
     ]
   }
 }

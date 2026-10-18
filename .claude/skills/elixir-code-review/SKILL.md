@@ -1,6 +1,6 @@
 ---
 name: elixir-code-review
-description: Reviews Elixir code for known architectural problems this codebase cares about — logic in the wrong module, a namespace's internals reached past its public API, a `use Boundary` declaration widened instead of a caller fixed, OTP process hygiene, test quality (brittle, duplicative, or valueless tests, and behavior no test pins, found by mutation-testing the changed code), and suppressed lint/security findings (credo disables, hex.audit ignores). Use this whenever the user asks for a code review, asks you to look over a diff/PR/branch, asks where some logic should live, asks whether tests are worth keeping or are brittle/duplicative, or is about to commit changes touching test files or GenServers. Also use it proactively after you yourself write or modify OTP code or tests, widen a boundary declaration, or add any lint/security suppression, before reporting the work as done.
+description: Reviews Elixir code for known architectural problems this codebase cares about — logic in the wrong module, a namespace's internals reached past its public API, a `use Boundary` declaration widened instead of a caller fixed, OTP process hygiene, test quality (brittle, duplicative, or valueless tests), and suppressed lint/security findings (credo disables, hex.audit ignores). Use this whenever the user asks for a code review, asks you to look over a diff/PR/branch, asks where some logic should live, asks whether tests are worth keeping or are brittle/duplicative, or is about to commit changes touching test files or GenServers. Also use it proactively after you yourself write or modify OTP code or tests, widen a boundary declaration, or add any lint/security suppression, before reporting the work as done.
 ---
 
 # Elixir Code Review
@@ -17,10 +17,12 @@ rule set can grow without bloating this file.
 | OTP process hygiene | `references/otp-processes.md` | `lib/giggly/**/*.ex` |
 | Test quality | `references/test-quality.md` | `test/**/*_test.exs`, `test/support/**` |
 | Suppressions & waivers | `references/suppressions.md` | `lib/**/*.ex`, `.credo.exs`, `mix.exs` |
-| Mutation testing | `references/mutation-testing.md` | `lib/**/*.ex`, and the module under test of a changed `test/**/*_test.exs` |
 
 Read only the reference files whose "Applies to" pattern matches files in scope. Reading
 rules that can't apply wastes context and tends to produce stretched findings.
+
+Mutation testing is not part of this review: the `mutation-testing` skill runs it after the
+commit, over the lines the commit changed.
 
 ## Scope
 
@@ -61,32 +63,27 @@ not from this change" rather than mixing it into the findings.
    lower-layer test file covering the same behavior — the layer and duplication judgments
    depend on both.
 
-4. **Mutation-test the changed code.** When the change touches `lib/` code or the tests of
-   it, run muex over that code and classify every surviving mutant, as
-   `references/mutation-testing.md` describes. Its survivors are candidates for the next step
-   like any other.
-
-5. **Judge each candidate.** Every reference file has a "not a finding" section. Work
+4. **Judge each candidate.** Every reference file has a "not a finding" section. Work
    through it honestly before writing anything up. Precision is worth more than recall — a
    review with one real finding and zero noise gets acted on; a review with one real finding
    buried in six stylistic quibbles gets skimmed and dismissed.
 
-6. **Deduplicate.** Checks overlap by design. When one piece of code trips more than one
+5. **Deduplicate.** Checks overlap by design. When one piece of code trips more than one
    rule, report it **once**, under the most specific check — the one whose suggested fix
    actually applies. Never file the same lines twice under two names; a report that says
    the same thing twice reads as noise and gets discounted wholesale. Each reference file
    names its own precedence in an "Overlap" section.
 
-7. **Report** using the format below. If the diff adds a lint or security waiver, the report
+6. **Report** using the format below. If the diff adds a lint or security waiver, the report
    also carries that waiver's three answers from `references/suppressions.md` — what the code
    needs, what was considered instead and why it was rejected, and the invariant — even when the
    waiver itself is not a finding. A waiver whose rejected alternative was cheaper than the waiver
    is a finding on the construct, not on the comment.
 
-8. **If findings led to code changes**, run the `docs-sync` skill before finishing — a
+7. **If findings led to code changes**, run the `docs-sync` skill before finishing — a
    fix that moves or renames logic invalidates docs the same way any change does.
 
-9. **Record the pass for the commit gate.** Run `mix format` (so the recorded state is the
+8. **Record the pass for the commit gate.** Run `mix format` (so the recorded state is the
    one quality's format step will keep), then:
 
    ```bash
@@ -102,8 +99,7 @@ not from this change" rather than mixing it into the findings.
 ## Report format
 
 Order findings by severity, highest first. If there are no findings, say that in one line
-and stop — don't pad the report with things that are fine. When the mutation step ran, the
-report ends with its survivors section (`references/mutation-testing.md`).
+and stop — don't pad the report with things that are fine.
 
 ```markdown
 ## Review: <branch or file list>

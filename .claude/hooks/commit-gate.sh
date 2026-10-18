@@ -1,36 +1,49 @@
 #!/usr/bin/env bash
 # The commit gate: hard-blocks `git commit` until the review and docs passes are recorded for the
-# EXACT current working tree, and until every area whose code changed has had its rules file
-# looked at.
+# EXACT current working tree, until every area whose code changed has had its rules file looked
+# at, and until the last commit's mutation pass is recorded.
 #
 # Why this exists: CLAUDE.md requires the elixir-code-review and docs-sync skills before reporting
 # done on any change touching `test/` or a GenServer — and that rule gets skipped
 # under wrap-up pressure. A memory is advisory; this hook is enforced by the harness, the same
 # reasoning that gives the repo `mix quality` instead of "keep the suite green" as discipline.
 #
-# Three rules, checked in this order:
-#   1. WAIVER GATE — a new lint/security waiver must carry its `# why:` / `# instead of:` lines
+# The rules, checked in this order:
+#   1. MUTATION — the last commit, when it changed code (`lib/**/*.ex` or `.credo/checks/**/*.ex`,
+#      a deleted file aside), must have had the mutation-testing skill's pass over the lines it
+#      changed before anything else is committed. A merge needs no pass of its own, nor does a
+#      root commit. The rule reads only HEAD, so the last commit of a branch merged with `--no-ff`
+#      is held by the after-commit nudge alone. The pass follows the commit because muex's
+#      `--since` reads committed history only; this rule makes it follow every time, not only
+#      when remembered.
+#   2. WAIVER GATE — a new lint/security waiver must carry its `# why:` / `# instead of:` lines
 #      (waiver-gate.sh documents the fields and enforces them at authoring time; this is the
 #      backstop for an edit made through Bash or sed).
-#   2. PAIRED PATHS — every `.claude/rules/<area>.md` declares in `paths:` the code it describes.
+#   3. PAIRED PATHS — every `.claude/rules/<area>.md` declares in `paths:` the code it describes.
 #      A diff that changes code matching an area's globs without changing that area's rules file
 #      is denied unless the docs mark is current, i.e. docs-sync ran against this exact diff and
 #      decided the rules needed nothing. Only code changes trigger it: `.md` files and anything
 #      under `.claude/` are documentation, so a docs-only commit never has to justify itself. This
 #      is the enforced form of docs-sync's "docs update in the same change".
-#   3. GATED PATHS — a diff touching test/**, or a `use GenServer` module
+#   4. GATED PATHS — a diff touching test/**, or a `use GenServer` module
 #      needs both the review and the docs mark.
 #
 # Protocol:
 #   * `check` — the PreToolUse(Bash) hook entry point. Reads the tool-call JSON on stdin; ignores
 #     anything that isn't a `git commit`.
-#   * `mark review` / `mark docs` — the skills' final step (and ONLY theirs — see below) records the
-#     pass. Marks live under .git/, so they are per-checkout and can never be committed or shared.
+#   * `post-commit` — the PostToolUse(Bash) hook entry point. After a `git commit`, when `HEAD`
+#     needs a mutation pass and has no mark, it tells the agent to run the pass now, naming the
+#     commit and its files: a nudge at the moment the pass is due, where rule 1 is what holds.
+#   * `mark review` / `mark docs` / `mark mutation` — the skills' final step (and ONLY theirs —
+#     see below) records the pass. Marks live under .git/, so they can never be committed or shared.
+#     The review and docs marks are per checkout. A mutation mark names a commit, so it lives in
+#     the repository's common git dir, shared by every worktree: a commit marked in a worktree
+#     stays marked once it is merged.
 #
-# A mark is a hash over EVERY changed path and its content (staged, unstaged, untracked, deletions
-# included), so editing any file after a pass makes the mark stale on purpose: a follow-up tweak
-# owes its own pass ("per change, not per session"). Run `mix format` before marking, so the
-# recorded state is the one quality's format step will keep.
+# A review or docs mark is a hash over EVERY changed path and its content (staged, unstaged,
+# untracked, deletions included), so editing any file after a pass makes the mark stale on
+# purpose: a follow-up tweak owes its own pass ("per change, not per session"). Run `mix format`
+# before marking, so the recorded state is the one quality's format step will keep.
 #
 # Honesty note: nothing can physically stop the agent running `mark` without doing the work — it
 # executes the skills too. The gate's value is that the ONLY documented path to a mark is the final
@@ -43,6 +56,7 @@
 # Requires `jq` and `git` on PATH.
 
 marks_dir="$(git rev-parse --git-dir)/claude-skill-marks"
+mutation_marks_dir="$(git rev-parse --git-common-dir)/claude-skill-marks/mutation"
 hooks_dir="$(dirname "${BASH_SOURCE[0]}")"
 rules_dir=".claude/rules"
 
@@ -51,7 +65,7 @@ changed_paths() {
   git status --porcelain=v1 -uall | sed -e 's/^...//' -e 's/.* -> //'
 }
 
-# The subset rule 3 cares about — mirrors CLAUDE.md's elixir-code-review trigger.
+# The subset rule 4 cares about — mirrors CLAUDE.md's elixir-code-review trigger.
 gated_paths() {
   while IFS= read -r path; do
     [ -z "$path" ] && continue
@@ -83,6 +97,24 @@ state_hash() {
   } | sha256sum | cut -d' ' -f1
 }
 
+# Rule 1's subject: the code files a commit changed, deletions left out — the files its mutation
+# pass mutates. Empty for a root commit or a merge, which need no pass of their own. A git
+# pathspec's `*` crosses `/`, so `lib/*.ex` reaches every depth.
+mutation_files() {
+  local commit="$1"
+  git rev-parse --verify --quiet "$commit^" >/dev/null || return 0
+  git rev-parse --verify --quiet "$commit^2" >/dev/null && return 0
+  git diff --name-only --diff-filter=d "$commit^" "$commit" -- 'lib/*.ex' '.credo/checks/*.ex'
+}
+
+# HEAD's mutation files when it has no mutation mark; nothing when it has one or needs none.
+unmarked_mutation_files() {
+  local head
+  head="$(git rev-parse --verify --quiet HEAD)" || return 0
+  [ -f "$mutation_marks_dir/$head" ] && return 0
+  mutation_files "$head"
+}
+
 # The `paths:` globs declared in a rules file's frontmatter, one per line.
 rules_globs() {
   awk '
@@ -94,7 +126,7 @@ rules_globs() {
   ' "$1"
 }
 
-# Rule 2: for each rules file whose globs match a changed CODE path, and which did not itself
+# Rule 3: for each rules file whose globs match a changed CODE path, and which did not itself
 # change, print "<rules file> (<first matching path>)".
 areas_missing_docs() {
   local changed="$1" rules_file glob path
@@ -139,11 +171,20 @@ command="${1:-check}"
 
 case "$command" in
   mark)
-    kind="${2:?usage: commit-gate.sh mark review|docs}"
-    case "$kind" in review | docs) ;; *) echo "unknown mark kind: $kind" >&2 && exit 1 ;; esac
-    mkdir -p "$marks_dir"
-    changed_paths | sort -u | state_hash >"$marks_dir/$kind"
-    echo "marked $kind for the current working tree"
+    kind="${2:?usage: commit-gate.sh mark review|docs|mutation}"
+    case "$kind" in
+      review | docs)
+        mkdir -p "$marks_dir"
+        changed_paths | sort -u | state_hash >"$marks_dir/$kind"
+        echo "marked $kind for the current working tree"
+        ;;
+      mutation)
+        mkdir -p "$mutation_marks_dir"
+        : >"$mutation_marks_dir/$(git rev-parse HEAD)"
+        echo "marked mutation for commit $(git rev-parse --short HEAD)"
+        ;;
+      *) echo "unknown mark kind: $kind" >&2 && exit 1 ;;
+    esac
     ;;
 
   check)
@@ -157,10 +198,17 @@ case "$command" in
       *) exit 0 ;;
     esac
 
+    # Rule 1.
+    unmarked="$(unmarked_mutation_files)"
+    if [ -n "$unmarked" ]; then
+      deny "MUTATION GATE: the last commit, $(git log -1 --format='%h "%s"'), changed code and its mutation pass is not recorded. Run the mutation-testing skill over it before committing anything else — its final step runs 'bash .claude/hooks/commit-gate.sh mark mutation'. Files it changed:
+$unmarked"
+    fi
+
     changed="$(changed_paths | sort -u)"
     [ -z "$changed" ] && exit 0
 
-    # Rule 1.
+    # Rule 2.
     waivers="$(bash "$hooks_dir/waiver-gate.sh" diff || true)"
     if [ -n "$waivers" ]; then
       deny "WAIVER GATE: this diff adds a lint/security waiver without the two lines that must sit above it — '# why: <what the code needs and the invariant keeping it safe>' and '# instead of: <alternative> — rejected because <reason>'. First ask whether the code needs the flagged construct at all. Offending lines:
@@ -171,14 +219,14 @@ $waivers"
     review_state="$(mark_status "$marks_dir/review" "$current")"
     docs_state="$(mark_status "$marks_dir/docs" "$current")"
 
-    # Rule 2.
+    # Rule 3.
     unpaired="$(areas_missing_docs "$changed")"
     if [ -n "$unpaired" ] && [ "$docs_state" != "ok" ]; then
       deny "PAIRED PATHS: this diff changes code in an area whose rules file did not change (docs mark: $docs_state). Either update the area's .claude/rules file in this change, or run the docs-sync skill for THIS diff — its final step records the docs mark, which is how you say the rules needed nothing. Areas:
 $unpaired"
     fi
 
-    # Rule 3.
+    # Rule 4.
     gated="$(printf '%s\n' "$changed" | gated_paths | sort -u)"
     [ -z "$gated" ] && exit 0
 
@@ -186,12 +234,29 @@ $unpaired"
       exit 0
     fi
 
-    deny "COMMIT GATE: this diff touches review-gated paths (`test/` or a GenServer) and the skill passes are not recorded for its current state (review: $review_state, docs: $docs_state). Run the elixir-code-review skill, then the docs-sync skill, for THIS diff — each ends by running 'bash .claude/hooks/commit-gate.sh mark review' / 'mark docs'. A stale mark means a file changed after the pass: run 'mix format' and re-run the skill for the delta. Gated paths:
+    deny "COMMIT GATE: this diff touches review-gated paths ('test/' or a GenServer) and the skill passes are not recorded for its current state (review: $review_state, docs: $docs_state). Run the elixir-code-review skill, then the docs-sync skill, for THIS diff — each ends by running 'bash .claude/hooks/commit-gate.sh mark review' / 'mark docs'. A stale mark means a file changed after the pass: run 'mix format' and re-run the skill for the delta. Gated paths:
 $gated"
     ;;
 
+  post-commit)
+    input="$(cat)"
+    tool_command="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
+
+    case "$tool_command" in
+      *"git commit"*) ;;
+      *) exit 0 ;;
+    esac
+
+    unmarked="$(unmarked_mutation_files)"
+    [ -z "$unmarked" ] && exit 0
+
+    jq -n --arg context "MUTATION PASS DUE: commit $(git log -1 --format='%h "%s"') changed code. Run the mutation-testing skill over it now, before other work: the commit gate denies the next commit until its pass is marked. Files it changed:
+$unmarked" \
+      '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: $context}}'
+    ;;
+
   *)
-    echo "usage: commit-gate.sh check|mark review|docs" >&2
+    echo "usage: commit-gate.sh check|post-commit|mark review|docs|mutation" >&2
     exit 1
     ;;
 esac

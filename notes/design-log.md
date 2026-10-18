@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Mutation testing runs after each commit, over the lines it changed, and the commit gate holds
+  the next commit until it has run (2026-10-18, Steve).** The `mutation-testing` skill runs muex
+  with `--since HEAD~1` over the commit's changed `lib/` files, then triages, fixes and reports
+  what it found; the fixes are committed when Steve says so. `commit-gate.sh` denies any commit
+  while the last one changed code and has no mutation mark, and an after-commit hook names the
+  pass as due. *Rejected: running it in code review, before the commit, over whole files* — a run
+  took 30–60 minutes, and a comparison on 2026-10-17 found the commit's lines ran about 5% of the
+  mutants at almost no loss. *Rejected: the after-commit hook alone* — the gate exists because a
+  skill step slips under wrap-up pressure, and just after a commit is that moment. *Rejected:
+  whole modules for a commit that changes only tests* — the same cost for the same rare case.
+
 - **A title may run over several lines, drawn a line at a time as R's graphics engine draws them
   (2026-10-17, Steve: "Build multi-line now").** Every title, an axis's, a legend's and the plot's
   own, splits where it breaks and draws each line as a label of its own, 0.9 x 1.2 font sizes below
@@ -1106,7 +1117,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   inverse and domain.
 
 - **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
-  Steve).** The review runs `mix muex` with `--coverage-guided --format json --output` added: each
+  Steve).** The mutation pass runs `mix muex` with `--coverage-guided --format json --output`: each
   test file runs once under `:cover`, each mutant then runs exactly the test files that execute its
   line, and a line no test executes is reported as an uncovered mutant, a fourth kind of finding.
   The JSON report gives each mutant its status, location, test files, and the mutated node before
@@ -1287,10 +1298,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: flagging every deleted declaring file* — deleting an area outright would need an
   approval for a change that opens nothing.
 
-- **Mutation testing runs in code review, with muex, over the changed files; survivors are
-  triaged, not scored (2026-10-11, Steve).** `elixir-code-review` runs `mix muex` with the flags
-  its mutation-testing reference gives over the changed `lib/` files, as one comma-separated
-  `--files`, and its report says of each survivor whether it is a missing test, unreachable or
+- **Mutation testing runs with muex, over the changed code; survivors are triaged, not scored
+  (2026-10-11, Steve).** The `mutation-testing` skill runs `mix muex` with the flags it gives
+  over the changed `lib/` files, as one comma-separated `--files`, and its report says of each
+  survivor whether it is a missing test, unreachable or
   redundant code, an equivalent mutant, or the wording of a message whose datum the tests assert —
   and why. *Rejected: hand-picked mutants* — chosen by
   looking at the tests already written, they never mutated `DataFrame.pull/2`'s guard, the one
@@ -1298,8 +1309,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   quality` step or a `--fail-at` score threshold* — two small files take minutes, and equivalent
   mutants count as survivors, so the score is noise while the survivor list is the signal.
   *Rejected: muex's defaults* — its optimizer reported 100% over five mutants where the full run
-  had a real survivor, and its filter skips any module declaring several callbacks. *Rejected:
-  `--since <ref>`* — it diffs committed history, and review here runs before commit.
+  had a real survivor, and its filter skips any module declaring several callbacks.
   *Rejected: muzak and exavier* — no release since 2022 and 2020. *Rejected: dropping the
   `literal` and `function_call` mutators* (2026-10-12, Steve) — replacing a value and removing or
   rearranging a call are basic mutation operators, and their survivors are judged one by one like
@@ -1457,9 +1467,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Draw text and titles in the notebooks (text and titles, step 6); §4: "Text and
-  titles is Phase 3's fifth increment", "A notebook leaves out an argument ggplot2 does not
-  recognise"
+- 2026-10-18 — Mutation-test each commit after it lands, over the lines it changed; §4:
+  "Mutation testing runs after each commit"
+- 2026-10-18 — Draw text and titles in the notebooks (text and titles, step 6) (`52aa3a2`); §4:
+  "Text and titles is Phase 3's fifth increment", "A notebook leaves out an argument ggplot2 does
+  not recognise"
 - 2026-10-18 — Annotate plots and draw rectangles (text and titles, step 5) (`bb57487`); §4:
   "`annotate()` draws with every geom Giggly has"
 - 2026-10-18 — Give a layer a table of its own with data: (text and titles, step 4) (`4e77ecd`);

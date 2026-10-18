@@ -80,12 +80,12 @@ semver or the changelog).
   is a compiler, so it has to exist wherever `mix compile` runs, including a `:prod` release
   build. Scoping it away from prod makes the release build fail on an unknown compiler.
 - **`muex` is pinned exactly (`==`), not with `~>`.** It is young and releases fast, and the
-  flags in `elixir-code-review`'s `references/mutation-testing.md` exist because its defaults give
-  a confident false pass. So a bump goes through `dependency-updates` like any other, and before
-  the step is trusted again it re-checks what the new version does by default: which mutants the
-  optimizer drops, which modules the filter skips, how `--files` is read, and that each mutant is
-  still built from source in a sandbox of its own and run in a fresh VM, so none reuses another's
-  build.
+  flags in the `mutation-testing` skill exist because its defaults give a confident false pass. So
+  a bump goes through `dependency-updates` like any other, and before the skill is trusted again
+  it re-checks what the new version does by default: which mutants the optimizer drops, which
+  modules the filter skips, how `--files` is read, which lines `--since` keeps, and that each
+  mutant is still built from source in a sandbox of its own and run in a fresh VM, so none reuses
+  another's build.
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored
@@ -170,14 +170,16 @@ semver or the changelog).
 - Giggly's copies of Tack-installed files have changed since the install, and a re-install must
   keep the changes: `waiver-gate.sh` counts declarations, so a removed one is a widening, sorts
   paths before hashing an approval, and passes a `defimpl`'s own `classify_to:`;
-  `elixir-code-review` scopes its review against the local `main` and adds the mutation step;
-  `docs-sync` routes a milestone to one §6 line and mechanism to module documentation.
+  `elixir-code-review` scopes its review against the local `main`; `commit-gate.sh` adds the
+  mutation rule and the `post-commit` entry point, which `settings.json` registers as a
+  PostToolUse hook; `docs-sync` routes a milestone to one §6 line and mechanism to module
+  documentation.
 - The `elixir:` requirement in `mix.exs` is the floor; the **exact** toolchain is pinned in
   `.tool-versions`, which CI reads.
 - The gate's tools: `ex_doc`, `credo` (with the `jump_credo_checks` and `ex_slop` plugins and
   the `tack` checks), and `boundary`. Dependency-advisory scanning is Hex's own
-  `mix hex.audit` — no scanner dependency. `muex` is a review tool, not a gate step:
-  `elixir-code-review` runs it over the changed files.
+  `mix hex.audit` — no scanner dependency. `muex` is not a gate step: the `mutation-testing`
+  skill runs it after each commit, over the lines the commit changed.
 - **The quality gate's steps** are the `quality_steps` list in `mix.exs`, run in order by
   `mix quality` and, minus the formatting write, by CI's `mix quality --check` — so a step added
   there reaches CI with no second list to keep in sync. Why the less obvious ones are there:
