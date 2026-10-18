@@ -37,6 +37,11 @@ defmodule Giggly.DataFrame do
   other structs). A `:term` column's values are not checked against each other; it is the frame's
   equivalent of pandas' and Polars' `object` type, so a column the plot never uses cannot refuse the
   table.
+
+  One more is never worked out from values, only declared when a column is built: `:category`,
+  Explorer's name for a categorical column, which a plot reads as discrete whatever its values
+  are, as R's `factor()` makes a column of levels. Its values are typed, and an integer among
+  floats becomes a float, as any column's; it may hold anything but a `:term`'s values.
   """
 
   # ## Implementations
@@ -76,10 +81,14 @@ defmodule Giggly.DataFrame do
           | :datetime
           | :null
           | :term
+          | :category
 
-  # Builds a frame from `{name, values}` pairs, as `new/1` describes.
+  @typedoc "A column as built: its name and values, and `:category` where it is declared one."
+  @type column :: {name(), list()} | {name(), list(), :category}
+
+  # Builds a frame from columns, as `new/1` describes.
   @doc false
-  @callback new([{name(), list()}]) :: t()
+  @callback new([column()]) :: t()
 
   # The column names, as `names/1` describes.
   @doc false
@@ -187,13 +196,15 @@ defmodule Giggly.DataFrame do
     end
   end
 
-  # Builds a frame from `{name, values}` pairs, keeping their order.
+  # Builds a frame from `{name, values}` pairs, keeping their order, a column declared a category
+  # given as `{name, values, :category}`.
   #
   # This is how the pipeline builds a frame; data from outside it enters through `from_table/1`.
   # Every `values` is a list of the same length and no name appears twice; a call that breaks either
-  # raises `FunctionClauseError`. A column mixing two types raises `ArgumentError`.
+  # raises `FunctionClauseError`. A column mixing two types raises `ArgumentError`, and so does a
+  # category of values with no type of their own.
   @doc false
-  @spec new([{name(), list()}]) :: t()
+  @spec new([column()]) :: t()
   def new(columns) when is_list(columns), do: Lists.new(columns)
 
   @doc "The column names, in column order."

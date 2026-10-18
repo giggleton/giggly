@@ -24,14 +24,16 @@ defprotocol Giggly.Geom do
   # lines places its rows with `Giggly.Coord.munch/3`, which cuts them to follow the panel's curves.
 
   # A geom places its rows through the coordinate system and draws them as scene primitives, sizes
-  # a mark with no width given from the spacing of its positions (`Giggly.Resolution`), and measures
-  # the text it draws (`Giggly.Font`), which the scene draws at the width measured.
+  # a mark with no width given from the spacing of its positions (`Giggly.Resolution`), writes a
+  # text's label as R's `as.character()` writes it (`Giggly.AsCharacter`), and measures the text it
+  # draws (`Giggly.Font`), which the scene draws at the width measured.
   # It exports its kinds, whose structs a plot records and whose facts it checks a layer against,
   # and nothing they draw with: that is in their protocol implementations, which no boundary
   # exports.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
+      Giggly.AsCharacter,
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Font,

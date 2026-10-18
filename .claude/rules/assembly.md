@@ -130,8 +130,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   a refusal names the layer by index, the aesthetic, the value as the plot holds it (a column by
   the name its table gives it), and its type. The plot checks only what it knows (names and which
   aesthetics a geom takes).
-- **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`), never by
-  scanning values.
+- **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`,
+  `:category`), never by scanning values. **A factor's column enters the evaluated frame declared
+  `:category`** (`Mapping.dtype/2` says which), so grouping and the scales' kinds read it as
+  discrete, numbers and all. **A scale is told levels from positions by the stage**: the first
+  training hands it the layers' own values (`Scale.train/2`), the retraining after the position
+  their positions (`Scale.train_positions/2`), so a factor's numbers train levels and a bar's
+  edges a discrete axis's continuous range.
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
@@ -166,8 +171,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   final and before the other aesthetics are mapped: a discrete key only where one of the layer's
   columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as
   ggplot2's `.value`), `nil` for the `NA` key, so two layers mapping one aesthetic to different
-  columns each draw their own keys; a continuous key, whose break is a number, always; and every
-  key where the layer's stat dropped those columns. ggplot2's `NA` key for values outside a
+  columns each draw their own keys; a continuous scale's key always, which the scale's kind says
+  (`Scale.discrete?/1`), never the break's type, since a factor's numeric levels are discrete
+  keys; and every key where the layer's stat dropped those columns. ggplot2's `NA` key for values outside a
   scale's limits waits for limits.
 - **Evaluated columns are the layer's own aesthetics, then those it takes from the plot's
   mapping, each mapping's `x` and `y` first and its others in name order, then `panel`, then

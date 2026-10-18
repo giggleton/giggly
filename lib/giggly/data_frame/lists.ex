@@ -33,9 +33,10 @@ defmodule Giggly.DataFrame.Lists do
   @impl DataFrame
   def new([]), do: empty(0)
 
-  def new([{_name, values} | _rest] = columns) when is_list(values) do
-    Enum.reduce(columns, empty(length(values)), fn {name, values}, frame ->
-      add_column(frame, name, typed(name, values))
+  def new([first | _rest] = columns) when is_list(elem(first, 1)) do
+    Enum.reduce(columns, empty(length(elem(first, 1))), fn column, frame ->
+      {name, entered} = entered(column)
+      add_column(frame, name, entered)
     end)
   end
 
@@ -125,6 +126,23 @@ defmodule Giggly.DataFrame.Lists do
       | reversed_names: [name | frame.reversed_names],
         columns: Map.put(columns, name, column)
     }
+  end
+
+  # A column as `new/1` is given it, typed: a category is typed as any column, then declared one.
+  defp entered({name, values}), do: {name, typed(name, values)}
+
+  defp entered({name, values, :category}) do
+    case typed(name, values) do
+      {:term, typed_values} ->
+        witness = Enum.find(typed_values, fn value -> value != nil end)
+
+        raise ArgumentError,
+              "the column #{inspect(name)} is declared a category, but its values have no type " <>
+                "of their own (#{inspect(witness)})"
+
+      {_dtype, typed_values} ->
+        {name, {:category, typed_values}}
+    end
   end
 
   # Folds the values into the column's type, keeping the first value of that type so a value that

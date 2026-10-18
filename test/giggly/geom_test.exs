@@ -475,73 +475,12 @@ defmodule Giggly.GeomTest do
       assert %Text{labels: []} = text(frame, context)
     end
 
-    # Golden: R 4.6.1's `as.character()` of the same doubles.
-    test "a number is labelled as R's as.character() writes it", context do
-      values = [
-        21.0,
-        2.62,
-        1 / 3,
-        0.1 + 0.2,
-        1.0e5,
-        123_456.0,
-        123_456.7,
-        1.0e15,
-        1_234_567_890_123.0,
-        0.0001,
-        0.001,
-        1.0e-20,
-        -2.5,
-        100.0,
-        100_000.1,
-        3.14159265358979,
-        6_666_666_666.666666,
-        0.12345678901234568,
-        0.0,
-        -0.0,
-        1.0e100,
-        1.0e-5
-      ]
+    test "a label is written as R's as.character() writes its value", context do
+      frame = DataFrame.new(x: [0.5, 0.5], y: [0.5, 0.5], label: [1.0e5, 21.0])
+      flags = DataFrame.new(x: [0.5], y: [0.5], label: [true])
 
-      halves = List.duplicate(0.5, length(values))
-      frame = DataFrame.new(x: halves, y: halves, label: values)
-
-      assert text(frame, context).labels === [
-               "21",
-               "2.62",
-               "0.333333333333333",
-               "0.3",
-               "1e+05",
-               "123456",
-               "123456.7",
-               "1e+15",
-               "1234567890123",
-               "1e-04",
-               "0.001",
-               "1e-20",
-               "-2.5",
-               "100",
-               "100000.1",
-               "3.14159265358979",
-               "6666666666.66667",
-               "0.123456789012346",
-               "0",
-               "0",
-               "1e+100",
-               "1e-05"
-             ]
-    end
-
-    test "a whole number, a boolean, an atom, a date and an infinity are labelled as R writes them",
-         context do
-      label = fn values ->
-        halves = List.duplicate(0.5, length(values))
-        text(DataFrame.new(x: halves, y: halves, label: values), context).labels
-      end
-
-      assert {label.([100_000, -3]), label.([true, false]), label.([:suv, :compact]),
-              label.([~D[2020-01-02]]), label.([:infinity, :neg_infinity, 1.5])} ===
-               {["100000", "-3"], ["TRUE", "FALSE"], ["suv", "compact"], ["2020-01-02"],
-                ["Inf", "-Inf", "1.5"]}
+      assert {text(frame, context).labels, text(flags, context).labels} ===
+               {["1e+05", "21"], ["TRUE"]}
     end
 
     # Golden: ggplot2 4.0.3's `compute_just()` of the same places, each label's x (`a`) and y (`b`),

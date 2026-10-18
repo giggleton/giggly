@@ -33,12 +33,13 @@ defmodule Giggly.ScaleTest do
 
   describe "kind/1 and kind/2" do
     test "a column's type decides its scale's kind, and a type with no scale yet gets none" do
-      dtypes = [:integer, :float, :null, :string, :boolean, :atom, :date, :time, :term]
+      dtypes = [:integer, :float, :null, :string, :boolean, :atom, :category, :date, :time, :term]
 
       assert Enum.map(dtypes, &Scale.kind/1) == [
                :continuous,
                :continuous,
                :continuous,
+               :discrete,
                :discrete,
                :discrete,
                :discrete,
@@ -57,8 +58,9 @@ defmodule Giggly.ScaleTest do
     end
 
     test "a colour or fill is discrete or continuous as any aesthetic is, and a date has none yet" do
-      assert Enum.map([:string, :boolean, :atom], fn dtype -> Scale.kind(dtype, :color) end) ===
-               [:discrete, :discrete, :discrete]
+      assert Enum.map([:string, :boolean, :atom, :category], fn dtype ->
+               Scale.kind(dtype, :color)
+             end) === [:discrete, :discrete, :discrete, :discrete]
 
       assert Enum.map([:integer, :float, :null, :date], fn dtype -> Scale.kind(dtype, :fill) end) ===
                [:continuous, :continuous, :continuous, :none]
@@ -98,12 +100,20 @@ defmodule Giggly.ScaleTest do
              }
     end
 
+    # Golden: R 4.6.1's `levels(factor(c(10, 9, 100, NA)))` is `9 10 100`, `NA` kept last by
+    # ggplot2's legend.
+    test "a discrete scale takes numbers as levels, in order of value, nil last" do
+      assert trained(:discrete, [10, 9, nil, 100, 9]).levels === [9, 10, 100, nil]
+    end
+  end
+
+  describe "train_positions/2" do
     test "a discrete scale handed positions widens its continuous range, not its levels" do
       scale =
         :discrete
         |> trained(["b", "a"])
-        |> Scale.train([1, 2])
-        |> Scale.train([0.55, nil, 2.45])
+        |> Scale.train_positions([1, 2])
+        |> Scale.train_positions([0.55, nil, 2.45])
 
       assert scale === %Scale.Discrete{
                levels: ["a", "b"],
@@ -122,7 +132,7 @@ defmodule Giggly.ScaleTest do
       discrete =
         :discrete
         |> trained(["b", "a"])
-        |> Scale.train([0.55, 2.45])
+        |> Scale.train_positions([0.55, 2.45])
 
       assert {Scale.reset(continuous), Scale.reset(discrete)} ===
                {%Scale.Continuous{
@@ -201,12 +211,12 @@ defmodule Giggly.ScaleTest do
       narrow =
         :discrete
         |> trained(levels)
-        |> Scale.train([0.55, 7.45])
+        |> Scale.train_positions([0.55, 7.45])
 
       wide =
         :discrete
         |> trained(["a", "b", "c"])
-        |> Scale.train([0.25, 3.75])
+        |> Scale.train_positions([0.25, 3.75])
 
       assert {Scale.dimension(narrow), Scale.dimension(wide)} === {{0.4, 7.6}, {0.25, 3.75}}
     end

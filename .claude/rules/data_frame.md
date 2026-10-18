@@ -47,6 +47,10 @@ column names become strings", "Column types belong to the frame" and "Every boun
   column enters (`new/1`, `put/3`; `select/2` carries it), by Explorer's rules for a series built
   from a list, written out in the moduledoc. What a type *means* to a plot (discrete or not, which
   scale) is the caller's, never the frame's.
+- **`:category` is the one type never worked out from values: `new/1` is told it**, a column
+  given as `{name, values, :category}`, its values typed and cast as any column's first, a
+  `:term`'s refused. It is Explorer's name for a categorical column; what it means (discrete) is
+  the plot's. `select/2`, `split/2` and `slice/2` carry it; `put/3` works a type out afresh.
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
   has no type of its own (maps, lists, `Decimal`…), so a column the plot never uses cannot refuse
   the table. When something needs one of those checked or plotted, it gets a named type of its own.

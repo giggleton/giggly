@@ -167,6 +167,67 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, factor()" do
+    @factor_rows %{
+      "x" => [1.0, 2.0, 3.0, 4.0],
+      "y" => [1.0, 2.0, 3.0, 4.0],
+      "v" => [10, 9, 100, nil],
+      "w" => [4, 4, 6, 6],
+      "b" => [true, false, true, false]
+    }
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 colours `colour = factor(v)` over `v = c(10, 9, 100, NA)`
+    # #00BA38, #F8766D, #619CFF and grey50, groups the rows 2, 1, 3, 4, and labels its legend
+    # `factor(v)`, keys 9, 10, 100 and NA.
+    test "a factor of numbers is a discrete colour, its levels in order of value, NA last" do
+      plot =
+        @factor_rows
+        |> Plot.new(%{x: :x, y: :y, colour: {:factor, [:v]}})
+        |> Plot.geom_point()
+
+      frame = Giggly.layer_data(plot)
+      [legend] = Giggly.Assembly.run(plot).legends
+
+      assert {DataFrame.pull(frame, :color), DataFrame.pull(frame, :group), legend.title,
+              Enum.map(legend.keys, fn key -> key.label end)} ===
+               {["#00BA38", "#F8766D", "#619CFF", "#7F7F7F"], [2, 1, 3, 4], "factor(v)",
+                ["9", "10", "100", "NA"]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 places `aes(factor(w), y)` over `w = c(4L, 4L, 6L, 6L)` at
+    # 1, 1, 2, 2, counts `geom_bar()` of it 2 and 2, and titles the axis `factor(w)`.
+    test "a factor of numbers on x is a discrete axis, counted and titled as R does" do
+      points =
+        @factor_rows
+        |> Plot.new(%{x: {:factor, [:w]}, y: :y})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      bars =
+        @factor_rows
+        |> Plot.new(%{x: {:factor, [:w]}})
+        |> Plot.geom_bar()
+
+      counted = Giggly.layer_data(bars)
+
+      assert {DataFrame.pull(points, :x), DataFrame.pull(counted, :count),
+              Giggly.Assembly.run(bars).guide_titles} ===
+               {[1, 1, 2, 2], [2.0, 2.0], %{x: "factor(w)", y: "count"}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 labels a colour legend of `TRUE` and `FALSE` `FALSE`, `TRUE`.
+    test "a column of true and false is labelled as R writes it" do
+      [legend] =
+        @factor_rows
+        |> Plot.new(%{x: :x, y: :y, colour: :b})
+        |> Plot.geom_point()
+        |> Giggly.Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert Enum.map(legend.keys, fn key -> key.label end) === ["FALSE", "TRUE"]
+    end
+  end
+
   describe "layer_data/2, a layer's own table" do
     test "the layer draws its own table with the plot's mapping" do
       plot =

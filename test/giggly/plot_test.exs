@@ -115,6 +115,17 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":string"
     end
 
+    # ggplot2 4.0.3 in R 4.6.1 fails `stat_count()` for `weight = factor(wt)`: `rowsum()`'s "'x'
+    # must be numeric".
+    test "a factor's weight is refused at the call, its type a category" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{weight: {:factor, [:wt]}}) end
+
+      assert error.message =~ ":category"
+    end
+
     test "an expression's weight is not checked at the call, its type known only when run" do
       plot = Plot.new(@rows, %{x: :cyl})
 

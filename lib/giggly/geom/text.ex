@@ -9,10 +9,8 @@ defmodule Giggly.Geom.Text do
   # `:label`; a layer may also set its `size`, `angle`, `hjust`, `vjust` and `family` for every
   # label, which reach the geom in every row, as ggplot2's `aes_params` do.
   #
-  # A label is its row's value written as R's `as.character()` writes it: text as it is, a whole
-  # number with no decimal point, a float in up to 15 significant digits, in plain or scientific
-  # notation whichever is shorter, a tie going to plain (`21`, `2.62`, `0.333333333333333`, `1e+05`,
-  # `123456`), `TRUE` and `FALSE`, a date as `2020-01-02`. A row missing its `x`, `y` or label
+  # A label is its row's value written as R's `as.character()` writes it (`Giggly.AsCharacter`):
+  # `21`, `2.62`, `0.333333333333333`, `1e+05`, `TRUE`. A row missing its `x`, `y` or label
   # (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops it, nor is one whose colour is
   # `:none`, R's `NA`.
   #
@@ -47,7 +45,7 @@ defmodule Giggly.Geom.Text do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Coord, DataFrame, Font}
+    alias Giggly.{AsCharacter, Coord, DataFrame, Font}
     alias Giggly.Geom.Mark
     alias Giggly.Scene.Text
 
@@ -100,7 +98,7 @@ defmodule Giggly.Geom.Text do
             color != :none
         end)
         |> Enum.map(fn [x_position, y_position, label, color, opacity] ->
-          text = label_text(label)
+          text = AsCharacter.text(label)
 
           %{
             x: x_position,
@@ -230,66 +228,6 @@ defmodule Giggly.Geom.Text do
         turn < 270 -> {1 - hjust, 1 - vjust}
         true -> {vjust, 1 - hjust}
       end
-    end
-
-    # A row's label as R's `as.character()` writes its value.
-    defp label_text(label) when is_binary(label), do: label
-    defp label_text(label) when is_integer(label), do: Integer.to_string(label)
-    defp label_text(true), do: "TRUE"
-    defp label_text(false), do: "FALSE"
-    defp label_text(:infinity), do: "Inf"
-    defp label_text(:neg_infinity), do: "-Inf"
-    defp label_text(label) when is_float(label), do: float_text(label)
-    defp label_text(label) when is_atom(label), do: Atom.to_string(label)
-    defp label_text(%Date{} = label), do: Date.to_string(label)
-
-    # A float as R writes one: rounded to 15 significant digits, the zeros after its last
-    # significant one dropped, then in plain notation, or in scientific when that is shorter.
-    defp float_text(value) when value == 0, do: "0"
-
-    defp float_text(value) do
-      [mantissa, exponent] =
-        value
-        |> abs()
-        |> :erlang.float_to_binary(scientific: 14)
-        |> String.split("e")
-
-      digits =
-        mantissa
-        |> String.replace(".", "")
-        |> String.trim_trailing("0")
-
-      exponent = String.to_integer(exponent)
-      plain = plain_notation(digits, exponent)
-      scientific = scientific_notation(digits, exponent)
-      sign = if value < 0, do: "-", else: ""
-
-      if String.length(plain) <= String.length(scientific),
-        do: sign <> plain,
-        else: sign <> scientific
-    end
-
-    defp plain_notation(digits, exponent) when exponent < 0,
-      do: "0." <> String.duplicate("0", -exponent - 1) <> digits
-
-    defp plain_notation(digits, exponent) do
-      whole = String.pad_trailing(digits, exponent + 1, "0")
-      {integer_part, fraction} = String.split_at(whole, exponent + 1)
-      if fraction == "", do: integer_part, else: integer_part <> "." <> fraction
-    end
-
-    defp scientific_notation(digits, exponent) do
-      {first, rest} = String.split_at(digits, 1)
-      mantissa = if rest == "", do: first, else: first <> "." <> rest
-      sign = if exponent < 0, do: "-", else: "+"
-
-      exponent_digits =
-        exponent
-        |> abs()
-        |> Integer.to_string()
-        |> String.pad_leading(2, "0")
-
-      mantissa <> "e" <> sign <> exponent_digits
     end
   end
 end

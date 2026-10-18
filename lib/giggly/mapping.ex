@@ -19,6 +19,12 @@ defmodule Giggly.Mapping do
       a time is a constant written alone; a string or an atom would name a column, so a constant
       one is written `{:constant, "smooth"}`, as ggplot2's `aes(colour = "smooth")` maps every row
       to one level.
+    * **A factor**, `{:factor, [value]}`, is the value read as discrete, as ggplot2's
+      `aes(colour = factor(cyl))` reads a column of numbers as levels: a discrete scale whatever
+      the values, its levels in order of value with a missing one last, each written as R writes
+      it (`4`, `0.5`, `TRUE`), and the rows grouped by them. A factor reads a whole column, so it
+      is the whole of a mapping value or a factor's own, never an expression's argument, where R
+      hands a function its levels' codes rather than its values.
 
   A constant is a value a column can hold: `nil`, a list, and a value with no column type of its
   own (a map, a tuple, a struct other than a date or a time) are refused, and so are a function
@@ -46,6 +52,7 @@ defmodule Giggly.Mapping do
       names, `:math.log10(carat)`, as `inspect/1` names it;
     * an expression whose function is a closure, such as `fn hwy -> hwy * 2 end`, has no text, so
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
+    * a factor by its value's text inside `factor()`, `factor(cyl)`;
     * a constant by its aesthetic's name, `color`, unless another layer maps the aesthetic to a
       column or an expression, whose title wins, as ggplot2 titles a constant.
 
@@ -62,14 +69,15 @@ defmodule Giggly.Mapping do
       true
   """
 
-  # The grammar of a mapping value, and the one place its shapes are matched: `Giggly.Plot`
-  # resolves each value as it enters (`resolve/1`) and checks the columns it reads (`columns/1`)
-  # and, for a weight, its type where the call can tell it (`dtype/2`); the assembly evaluates it
-  # against a layer's table (`evaluate/2`) and titles its guide (`title/2`). A value is held
-  # resolved: a column by its name as a string, a constant as `{:constant, term}`, an expression as
-  # its function and its resolved arguments. A value's kinds differ in what they are, not in how
-  # they run, so they are function clauses rather than a protocol. `Plot` calls only the checks;
-  # that holds by review, as the assembly's calls into `Coord` and `Geom` do.
+  # The grammar of a mapping value, and the one place its shapes are matched: `Giggly.Plot` resolves
+  # each value as it enters (`resolve/1`) and checks the columns it reads (`columns/1`) and, for a
+  # weight, its type where the call can tell it (`dtype/2`); the assembly evaluates it against a
+  # layer's table (`evaluate/2`) and titles its guide (`title/2`). A value is held resolved: a
+  # column by its name as a string, a constant as `{:constant, term}`, a factor as
+  # `{:factor, [resolved]}`, an expression as its function and its resolved arguments. A value's
+  # kinds differ in what they are, not in how they run, so they are function clauses rather than a
+  # protocol. `Plot` calls only the checks; that holds by review, as the assembly's calls into
+  # `Coord` and `Geom` do.
   use Boundary, deps: [Giggly.DataFrame], exports: []
 
   alias Giggly.DataFrame
@@ -124,14 +132,18 @@ defmodule Giggly.Mapping do
           | NaiveDateTime.t()
           | DateTime.t()
 
-  @typedoc "A value as written: a column, an expression or a constant."
-  @type value :: column() | expression() | constant()
+  @typedoc "A factor: a value read as discrete."
+  @type factor :: {:factor, [value()]}
+
+  @typedoc "A value as written: a column, an expression, a constant or a factor."
+  @type value :: column() | expression() | constant() | factor()
 
   @typedoc """
   A value as a plot holds it: a column by its name as a string, a constant as `{:constant, term}`,
   and an expression as its function and its arguments, each held so.
   """
-  @type resolved :: String.t() | {:constant, term()} | {function(), [resolved()]}
+  @type resolved ::
+          String.t() | {:constant, term()} | {:factor, [resolved()]} | {function(), [resolved()]}
 
   @typedoc "A mapping as a plot holds it: aesthetic to resolved value."
   @type t :: %{optional(atom()) => resolved()}
@@ -144,6 +156,10 @@ defmodule Giggly.Mapping do
   def resolve(nil), do: constant(nil)
   def resolve(value) when is_atom(value), do: {:ok, Atom.to_string(value)}
   def resolve({:constant, term}), do: constant(term)
+  def resolve({:factor, [value]}), do: factor(value)
+
+  def resolve({:factor, _arguments}),
+    do: {:error, "a factor reads one value, written {:factor, [value]}"}
 
   def resolve({function, arguments}) when is_function(function) and is_list(arguments),
     do: expression(function, arguments)
@@ -158,7 +174,7 @@ defmodule Giggly.Mapping do
   def resolve(value), do: constant(value)
 
   defp expression(function, arguments) when is_function(function, length(arguments)) do
-    resolved = Enum.map(arguments, &resolve/1)
+    resolved = Enum.map(arguments, &argument/1)
 
     case Enum.find(resolved, fn result -> match?({:error, _reason}, result) end) do
       nil -> {:ok, {function, Enum.map(resolved, fn {:ok, argument} -> argument end)}}
@@ -172,6 +188,20 @@ defmodule Giggly.Mapping do
     {:error,
      "#{inspect(function)} takes #{arity} argument(s), and the expression gives it " <>
        "#{length(arguments)}"}
+  end
+
+  # An expression's argument: any value but a factor, which reads a whole column as discrete, as
+  # R hands a function its level codes, where a function applied in each row sees one value.
+  defp argument({:factor, _arguments}),
+    do: {:error, "a factor reads a whole column, so it is not an expression's argument"}
+
+  defp argument(value), do: resolve(value)
+
+  defp factor(value) do
+    case resolve(value) do
+      {:ok, resolved} -> {:ok, {:factor, [resolved]}}
+      error -> error
+    end
   end
 
   defp constant(nil), do: {:error, "nil is a missing value, not a column or a constant"}
@@ -205,11 +235,12 @@ defmodule Giggly.Mapping do
 
   defp column_names(name) when is_binary(name), do: [name]
   defp column_names({:constant, _term}), do: []
+  defp column_names({:factor, [value]}), do: column_names(value)
   defp column_names({_function, arguments}), do: Enum.flat_map(arguments, &column_names/1)
 
   # The type of the column `value` makes from `table`, where the call can tell it: a column's own
-  # and a constant's, as the frame types them; `:computed` for an expression, whose function
-  # decides it when the plot is run.
+  # and a constant's, as the frame types them; `:category` for a factor, which the frame is told;
+  # `:computed` for an expression, whose function decides it when the plot is run.
   @doc false
   @spec dtype(resolved(), DataFrame.t()) :: DataFrame.dtype() | :computed
   def dtype(name, table) when is_binary(name) do
@@ -219,6 +250,7 @@ defmodule Giggly.Mapping do
   end
 
   def dtype({:constant, term}, _table), do: dtype_of(term)
+  def dtype({:factor, [_value]}, _table), do: :category
   def dtype({_function, _arguments}, _table), do: :computed
 
   # The type the frame gives a column of `term`, read by building one.
@@ -239,6 +271,8 @@ defmodule Giggly.Mapping do
   def evaluate({:constant, term}, frame),
     do: List.duplicate(term, DataFrame.row_count(frame))
 
+  def evaluate({:factor, [value]}, frame), do: evaluate(value, frame)
+
   def evaluate({function, []}, frame) do
     rows = DataFrame.row_count(frame)
 
@@ -254,7 +288,7 @@ defmodule Giggly.Mapping do
   end
 
   # The title `value` gives the guide of `aesthetic`, as ggplot2's `make_labels()` gives it:
-  # `{:title, text}` for a column or an expression, its text, or `:none` for an expression with a
+  # `{:title, text}` for a column, an expression or a factor, its text, or `:none` for one with a
   # closure in it, which has none; `{:fallback, name}` for a constant, the aesthetic's own name,
   # which ggplot2 marks as a fallback any layer's title replaces.
   @doc false
@@ -264,6 +298,13 @@ defmodule Giggly.Mapping do
 
   defp text(name) when is_binary(name), do: name
   defp text({:constant, term}), do: inspect(term)
+
+  defp text({:factor, [value]}) do
+    case text(value) do
+      :none -> :none
+      written -> "factor(#{written})"
+    end
+  end
 
   defp text({function, arguments}) do
     texts = Enum.map(arguments, &text/1)

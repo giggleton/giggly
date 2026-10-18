@@ -35,17 +35,10 @@ defmodule Giggly.Scale.Discrete do
         }
 
   # The scale with the distinct `values` merged into its levels, as `Giggly.Scale.train/2`
-  # describes; or, handed positions, its continuous range widened to cover them, as ggplot2's
-  # discrete position scale trains a numeric column on `range_c` rather than its levels.
+  # describes.
   @doc false
   @spec train(t(), list()) :: t()
-  def train(%__MODULE__{continuous_range: range} = scale, values) do
-    if Enum.any?(values, fn value -> is_number(value) end),
-      do: %{scale | continuous_range: Continuous.train_range(range, values)},
-      else: train_levels(scale, values)
-  end
-
-  defp train_levels(%__MODULE__{levels: levels} = scale, values) do
+  def train(%__MODULE__{levels: levels} = scale, values) do
     merged =
       levels
       |> Enum.concat(values)
@@ -54,6 +47,13 @@ defmodule Giggly.Scale.Discrete do
 
     %{scale | levels: merged}
   end
+
+  # The scale with its continuous range widened to cover the positions `values`, its levels left
+  # alone, as `Giggly.Scale.train_positions/2` describes.
+  @doc false
+  @spec train_positions(t(), list()) :: t()
+  def train_positions(%__MODULE__{continuous_range: range} = scale, values),
+    do: %{scale | continuous_range: Continuous.train_range(range, values)}
 
   # Each value as `Giggly.Scale.map/2` describes: a position at its level's place counting from 1;
   # for any other palette, its level's value from the palette, which spreads the present levels,

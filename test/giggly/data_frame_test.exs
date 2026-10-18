@@ -117,6 +117,39 @@ defmodule Giggly.DataFrameTest do
     end
   end
 
+  describe "new/1, a category" do
+    test "a column declared a category is typed :category, its values typed and cast as any" do
+      frame = DataFrame.new([{:cyl, [4, 4.0, nil, 6], :category}, {:wt, [2.6, 2.9, 3.2, 3.4]}])
+
+      assert {DataFrame.dtypes(frame), DataFrame.pull(frame, :cyl)} ===
+               {%{cyl: :category, wt: :float}, [4.0, 4.0, nil, 6.0]}
+    end
+
+    test "a category keeps its type through select/2, split/2 and slice/2" do
+      frame = DataFrame.new([{:cyl, [4, 6], :category}, {:panel, [1, 2]}])
+      selected = DataFrame.select(frame, [{:x, :cyl}])
+      sliced = DataFrame.slice(frame, [1])
+
+      part =
+        frame
+        |> DataFrame.split(:panel)
+        |> Map.fetch!(1)
+
+      assert {DataFrame.dtypes(selected), DataFrame.dtypes(part)[:cyl],
+              DataFrame.dtypes(sliced)[:cyl]} === {%{x: :category}, :category, :category}
+    end
+
+    test "a category of values with no type of their own is refused, naming the column" do
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:payload, [nil, %{id: 1}], :category}])
+        end
+
+      assert error.message =~ ":payload"
+      assert error.message =~ "%{id: 1}"
+    end
+  end
+
   describe "select/2" do
     test "columns are chosen and renamed, one may be chosen twice, and each keeps its type" do
       frame = DataFrame.from_table(%{"wt" => [2.62, 2.875], "cyl" => ["6", "4"]})

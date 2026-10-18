@@ -69,6 +69,33 @@ defmodule Giggly.MappingTest do
       assert reason =~ "gives it 2"
     end
 
+    test "a factor is held with its value resolved, a factor's own included" do
+      add = &Kernel.+/2
+
+      assert {Mapping.resolve({:factor, [:cyl]}), Mapping.resolve({:factor, [{add, [:cyl, 1]}]}),
+              Mapping.resolve({:factor, [{:factor, [:cyl]}]})} ===
+               {{:ok, {:factor, ["cyl"]}}, {:ok, {:factor, [{add, ["cyl", {:constant, 1}]}]}},
+                {:ok, {:factor, [{:factor, ["cyl"]}]}}}
+    end
+
+    test "a factor of anything but one value is refused" do
+      for value <- [{:factor, [:cyl, :gear]}, {:factor, []}, {:factor, :cyl}] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "a factor reads one value"
+      end
+    end
+
+    # R hands a function a factor's level codes: `as.numeric(factor(c(10, 9, 100)))` is 2, 1, 3.
+    test "a factor as an expression's argument is refused, since it reads a whole column" do
+      assert {:error, reason} = Mapping.resolve({&Kernel.+/2, [{:factor, [:cyl]}, 1]})
+      assert reason =~ "a factor reads a whole column"
+    end
+
+    test "a factor's refused value refuses it, with the value's reason" do
+      assert {:error, reason} = Mapping.resolve({:factor, [nil]})
+      assert reason =~ "nil is a missing value"
+    end
+
     test "a refused argument refuses the expression, with the argument's reason" do
       assert {:error, reason} = Mapping.resolve({&Kernel.//2, [:hwy, nil]})
       assert reason =~ "nil is a missing value"
@@ -79,8 +106,8 @@ defmodule Giggly.MappingTest do
     test "the columns a value reads, each once, in the order it reads them" do
       {:ok, value} = Mapping.resolve({&Kernel.//2, [{&Kernel.-/2, [:hwy, :cty]}, :hwy]})
 
-      assert {Mapping.columns(value), Mapping.columns("cty"), Mapping.columns({:constant, 7})} ===
-               {["hwy", "cty"], ["cty"], []}
+      assert {Mapping.columns(value), Mapping.columns("cty"), Mapping.columns({:constant, 7}),
+              Mapping.columns({:factor, ["cyl"]})} === {["hwy", "cty"], ["cty"], [], ["cyl"]}
     end
   end
 
@@ -90,6 +117,10 @@ defmodule Giggly.MappingTest do
 
       assert {Mapping.dtype("class", @frame), Mapping.dtype({:constant, 2.5}, @frame),
               Mapping.dtype(expression, @frame)} === {:string, :float, :computed}
+    end
+
+    test "a factor's type is a category, whatever its value's" do
+      assert Mapping.dtype({:factor, ["hwy"]}, @frame) === :category
     end
   end
 
@@ -103,6 +134,10 @@ defmodule Giggly.MappingTest do
       {:ok, value} = Mapping.resolve({&Kernel.-/2, [{&Kernel.*/2, [:hwy, 2]}, :cty]})
 
       assert Mapping.evaluate(value, @frame) === [40, 32, 41]
+    end
+
+    test "a factor is its value's values, which the frame is told are a category" do
+      assert Mapping.evaluate({:factor, ["hwy"]}, @frame) === [29, 24, 31]
     end
 
     test "a function of no arguments gives a value in every row" do
@@ -171,6 +206,14 @@ defmodule Giggly.MappingTest do
       assert {Mapping.title({&:math.log10/1, ["carat"]}, :x),
               Mapping.title({&String.pad_leading/2, ["class", {:constant, 3}]}, :x)} ===
                {{:title, ":math.log10(carat)"}, {:title, "String.pad_leading(class, 3)"}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(colour = factor(cyl))` `factor(cyl)`.
+    test "a factor is titled factor() around its value's text, a constant's as written" do
+      assert {Mapping.title({:factor, ["cyl"]}, :color),
+              Mapping.title({:factor, [{:constant, 4}]}, :color),
+              Mapping.title({:factor, [{fn hwy -> hwy end, ["hwy"]}]}, :color)} ===
+               {{:title, "factor(cyl)"}, {:title, "factor(4)"}, {:title, :none}}
     end
 
     test "a closure has no text, so neither has an expression with one inside it" do

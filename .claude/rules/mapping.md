@@ -33,8 +33,13 @@ column, an expression or a constant".
   expression whose arguments are not a list, and a function whose arity is not its arguments'
   count. A refused argument refuses its expression.
 - **Kinds of value are function clauses, not a protocol**: they differ in what they are, not in
-  how they run. A head that acts on a whole column (`:factor`, when it lands) is a clause that
-  sees the column, never a function applied per row.
+  how they run. A head that acts on a whole column is a clause that sees the column, never a
+  function applied per row.
+- **`{:factor, [value]}` reads its value as discrete: its column is declared `:category`**, which
+  the frame cannot read from values, so `dtype/2` says so and the assembly declares it when the
+  column enters the evaluated frame. It is the whole of a mapping value or a factor's own, never
+  an expression's argument, refused at the call, since R hands a function a factor's level codes.
+  Its title is `factor()` around its value's text.
 - **An expression's type is the frame's**, decided when its column enters the evaluated frame, so
   it is known only when the plot is run; a check that needs it runs then (the axis's kind, a
   computed weight). `dtype/2` answers at the call for a column and a constant and says `:computed`

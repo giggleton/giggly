@@ -16,9 +16,10 @@ where its marks sit".
 
 ## Rules
 
-- **A geom never sees a panel's size, a pixel, a scale's range or a facet.** It is handed one
-  panel's rows, the plot's coordinate system and that panel's params, as ggplot2's `draw_panel()`
-  is, places the rows with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
+- **A geom never sees a panel's size, a pixel, a scale's range or a facet.** Its boundary lists
+  `Giggly.AsCharacter` for the text it writes, never a scale. It is handed one panel's rows, the
+  plot's coordinate system and that panel's params, as ggplot2's `draw_panel()` is, places the rows
+  with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
 - **A geom has a say during the build: `setup_data/3`** gives each row the extent it is drawn
   over in data space, after the stat and before the position, as ggplot2's `setup_data()` does, so
   a position stacks or dodges that extent and the scales, trained again after the position, cover
@@ -87,19 +88,19 @@ where its marks sit".
   svglite's points), with the geom's ends, corners and mitre limit (ggplot2's defaults: butt,
   round, 10).
 - **Text (`Geom.Text`) is drawn as ggplot2's `GeomText` draws it**: a label per row at its `x` and
-  `y`, its row's value as R's `as.character()` writes it (a whole number with no point, a float in
-  up to 15 significant digits, scientific notation where it is shorter, `TRUE`, a date); black, or
-  its row's colour at its row's alpha as a point; 11 points, the theme's base size, or the layer's
-  `size` in millimetres times `.pt`; turned the layer's `angle`; justified by the layer's `hjust`
-  along its baseline and `vjust` up the ascent of "M", a number or one of ggplot2's words, and
-  `:inward` and `:outward` by where each label falls in the panel, as `compute_just()` decides. A
-  row missing its place or label, or whose colour is `:none`, is not drawn. **A geom measures the
-  text it draws** (`Giggly.Font`), since the scene draws a label at its measured width; **whether
-  labels overlap is the backend's to decide** (`Scene.Text`'s `check_overlap`), since it turns on
-  the panel's size in points, which no geom sees. Its key is the letter "a" at the layer's
-  justification, turned as `rotate_just()` turns it, a tenth of a line in from the key's edges, as
-  `draw_key_text()` draws it; ggplot2 widens a key for text too big for it, which waits for keys
-  that size themselves.
+  `y`, its row's value as R's `as.character()` writes it (`Giggly.AsCharacter`, which the scales'
+  discrete levels share: a whole number with no point, a float in up to 15 significant digits,
+  scientific notation where it is shorter, `TRUE`, a date); black, or its row's colour at its row's
+  alpha as a point; 11 points, the theme's base size, or the layer's `size` in millimetres times
+  `.pt`; turned the layer's `angle`; justified by the layer's `hjust` along its baseline and `vjust`
+  up the ascent of "M", a number or one of ggplot2's words, and `:inward` and `:outward` by where
+  each label falls in the panel, as `compute_just()` decides. A row missing its place or label, or
+  whose colour is `:none`, is not drawn. **A geom measures the text it draws** (`Giggly.Font`),
+  since the scene draws a label at its measured width; **whether labels overlap is the backend's to
+  decide** (`Scene.Text`'s `check_overlap`), since it turns on the panel's size in points, which no
+  geom sees. Its key is the letter "a" at the layer's justification, turned as `rotate_just()` turns
+  it, a tenth of a line in from the key's edges, as `draw_key_text()` draws it; ggplot2 widens a key
+  for text too big for it, which waits for keys that size themselves.
 - **A line (`Geom.Line`) is a path whose rows `setup_data/3` puts in order** of panel, group and
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws

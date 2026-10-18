@@ -17,6 +17,14 @@ defmodule Giggly.GroupTest do
       assert group_ids(frame) === [2, 1, 2, 3]
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 groups `colour = factor(v)` over
+    # `v = c(10, 9, 100, NA)` 2, 1, 3, 4: the levels in order of value, `NA` last.
+    test "a category's values are discrete, numbers among them, in order of value" do
+      frame = DataFrame.new([{:color, [10, 9, 100, nil], :category}, {:y, [1.0, 2.0, 3.0, 4.0]}])
+
+      assert group_ids(frame) === [2, 1, 3, 4]
+    end
+
     test "two discrete columns are compared one at a time in column order" do
       frame =
         DataFrame.new(

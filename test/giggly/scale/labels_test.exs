@@ -38,8 +38,11 @@ defmodule Giggly.Scale.LabelsTest do
   end
 
   describe "levels/1" do
-    test "a level is written with to_string/1 and a missing one as NA" do
-      assert Labels.levels(["manual", :auto, true, nil]) == ["manual", "auto", "true", "NA"]
+    # Golden: R 4.6.1's `levels(factor(...))` of the same values: `4`, `0.5`, `TRUE`, `1e+05`; a
+    # missing level is labelled `NA`, as ggplot2's legend labels it.
+    test "a level is written as R's as.character() writes it, and a missing one as NA" do
+      assert Labels.levels(["manual", :auto, true, 4.0, 0.5, 1.0e5, nil]) ===
+               ["manual", "auto", "TRUE", "4", "0.5", "1e+05", "NA"]
     end
   end
 end

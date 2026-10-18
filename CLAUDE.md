@@ -58,12 +58,12 @@ invariants. Add a line here when an area gets its rules file; nothing else about
   `.claude/rules/scale.md`.
 - **Colours** (`Giggly.ColorOperations`, reading a colour) — `.claude/rules/color_operations.md`.
 - **Stats** (`Giggly.Stat`, the protocol a layer's stat runs through) — `.claude/rules/stat.md`.
-- **Positions** (`Giggly.Position`, the protocol a layer's position runs through) —
-  `.claude/rules/position.md`.
+- **Positions** (`Giggly.Position`, the protocol positions run through) — `.claude/rules/position.md`.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
   `.claude/rules/coord.md`.
 - **Geoms** (`Giggly.Geom`, drawing a panel's rows as primitives) — `.claude/rules/geom.md`.
 - **Resolution** (`Giggly.Resolution`, ggplot2's `resolution()`) — `.claude/rules/resolution.md`.
+- **Values as R writes them** (`Giggly.AsCharacter`) — `.claude/rules/as_character.md`.
 - **Guides** (`Giggly.Guide`, axes, legends, every title) — `.claude/rules/guide.md`.
 - **The theme** (`Giggly.Theme`, the complete theme everything but the marks is drawn in) —
   `.claude/rules/theme.md`.

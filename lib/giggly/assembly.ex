@@ -260,8 +260,8 @@ defmodule Giggly.Assembly do
         )
       end)
 
-    x_scales = train(untrained_x_scales, x_routes, :x, transformed_data)
-    y_scales = train(untrained_y_scales, y_routes, :y, transformed_data)
+    x_scales = train(untrained_x_scales, x_routes, :x, transformed_data, &Scale.train/2)
+    y_scales = train(untrained_y_scales, y_routes, :y, transformed_data, &Scale.train/2)
 
     layer_data =
       Enum.zip_with(layers, transformed_data, fn layer, frame ->
@@ -421,7 +421,7 @@ defmodule Giggly.Assembly do
       Enum.any?(layers, fn layer -> draws_in?(legend, plot, layer) end)
     end)
     |> Enum.map(fn legend ->
-      Map.put(legend, :layers, key_layers(legend, plot, layers_and_data))
+      Map.put(legend, :layers, key_layers(legend, non_position_scales, plot, layers_and_data))
     end)
   end
 
@@ -498,9 +498,14 @@ defmodule Giggly.Assembly do
   # Each layer that maps one of the legend's aesthetics and can use it, in the order the layers were
   # added, with those it maps, its geom, what it sets, and whether it draws in each key; none for a
   # colour bar, which draws no layer's glyph, as ggplot2's colour bar keeps none.
-  defp key_layers(%{guide: %Guide.Colorbar{}}, _plot, _layers_and_data), do: []
+  defp key_layers(%{guide: %Guide.Colorbar{}}, _scales, _plot, _layers_and_data), do: []
 
-  defp key_layers(legend, plot, layers_and_data) do
+  defp key_layers(legend, scales, plot, layers_and_data) do
+    discrete =
+      scales
+      |> Map.fetch!(hd(legend.aesthetics))
+      |> Scale.discrete?()
+
     for {layer, frame} <- layers_and_data,
         mapped = drawn_aesthetics(legend, plot, layer),
         mapped != [] do
@@ -508,19 +513,21 @@ defmodule Giggly.Assembly do
         geom: Plot.layer_geom(layer),
         aesthetics: mapped,
         fixed: Plot.layer_fixed(layer),
-        draws: draws(legend.keys, frame, mapped)
+        draws: draws(legend.keys, frame, mapped, discrete)
       }
     end
   end
 
-  # Whether a layer draws in each key, as ggplot2's `keep_key_data()` decides: in a key whose break
-  # is a number, a continuous scale's, always; in a discrete key only where one of the layer's
-  # columns of the aesthetics it maps holds the break, `nil` among them, so a layer whose column
-  # lacks a level a second layer's column gave the scale leaves that key to the second; and in
-  # every key where the layer's stat dropped those columns. ggplot2 also keeps the `NA` key for a
-  # layer holding values outside the scale's limits, which the scale maps to `NA`; with no limits
-  # but the trained levels, every value is a key.
-  defp draws(keys, frame, aesthetics) do
+  # Whether a layer draws in each key, as ggplot2's `keep_key_data()` decides: in a continuous
+  # scale's key always, whatever its break; in a discrete key, a factor's number among them, only
+  # where one of the layer's columns of the aesthetics it maps holds the break, `nil` among them, so
+  # a layer whose column lacks a level a second layer's column gave the scale leaves that key to the
+  # second; and in every key where the layer's stat dropped those columns. ggplot2 also keeps the
+  # `NA` key for a layer holding values outside the scale's limits, which the scale maps to `NA`;
+  # with no limits but the trained levels, every value is a key.
+  defp draws(keys, _frame, _aesthetics, false), do: Enum.map(keys, fn _key -> true end)
+
+  defp draws(keys, frame, aesthetics, true) do
     case Enum.filter(aesthetics, fn aesthetic -> aesthetic in DataFrame.names(frame) end) do
       [] ->
         Enum.map(keys, fn _key -> true end)
@@ -531,7 +538,7 @@ defmodule Giggly.Assembly do
           |> Enum.flat_map(fn aesthetic -> DataFrame.pull(frame, aesthetic) end)
           |> MapSet.new()
 
-        Enum.map(keys, fn key -> is_number(key.value) or MapSet.member?(held, key.value) end)
+        Enum.map(keys, fn key -> MapSet.member?(held, key.value) end)
     end
   end
 
@@ -665,7 +672,7 @@ defmodule Giggly.Assembly do
   # discrete ones in that order, so a discrete alpha mapped with `x` groups within each `x`, and a
   # fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its groups. Each
   # column is typed as it enters the frame, so an expression whose results mix two kinds is refused
-  # there, naming its aesthetic.
+  # there, naming its aesthetic, and a factor's is declared a category.
   defp evaluate(paneled_data, plot, layer) do
     mapping = Plot.computed_mapping(plot, layer)
 
@@ -673,17 +680,24 @@ defmodule Giggly.Assembly do
       plot
       |> Plot.mapping_order(layer)
       |> Enum.map(fn aesthetic ->
-        values =
-          mapping
-          |> Map.fetch!(aesthetic)
-          |> Mapping.evaluate(paneled_data)
-
-        {aesthetic, values}
+        value = Map.fetch!(mapping, aesthetic)
+        evaluated_column(aesthetic, value, paneled_data)
       end)
 
     columns
     |> Enum.concat([{:panel, DataFrame.pull(paneled_data, :panel)}])
     |> DataFrame.new()
+  end
+
+  # The column `value` makes from the table under `aesthetic`'s name, declared a category where
+  # it is a factor, whose type the frame cannot read from its values.
+  defp evaluated_column(aesthetic, value, paneled_data) do
+    values = Mapping.evaluate(value, paneled_data)
+
+    case Mapping.dtype(value, paneled_data) do
+      :category -> {aesthetic, values, :category}
+      _read_from_values -> {aesthetic, values}
+    end
   end
 
   # Which of the axis's scales each panel uses, by panel: the layout's `:scale_x` or `:scale_y`,
@@ -711,13 +725,15 @@ defmodule Giggly.Assembly do
 
   # Each scale folds in, from every layer's columns on its axis, the values in the rows of the
   # panels that use it, as ggplot2's `train_position()` trains each panel scale on its panels.
-  defp train(scales, routes, family, layer_data) do
+  # `training` is `Scale.train/2` for the layers' own values, a discrete axis's levels, and
+  # `Scale.train_positions/2` once they are positions.
+  defp train(scales, routes, family, layer_data, training) do
     Map.new(scales, fn {scale_id, untrained} ->
       trained =
         layer_data
         |> family_columns(family)
         |> Enum.reduce(untrained, fn {frame, name}, scale ->
-          Scale.train(scale, values_on(frame, name, routes, scale_id))
+          training.(scale, values_on(frame, name, routes, scale_id))
         end)
 
       {scale_id, trained}
@@ -729,7 +745,7 @@ defmodule Giggly.Assembly do
   defp retrain(scales, routes, family, layer_data) do
     scales
     |> Map.new(fn {scale_id, scale} -> {scale_id, Scale.reset(scale)} end)
-    |> train(routes, family, layer_data)
+    |> train(routes, family, layer_data, &Scale.train_positions/2)
   end
 
   # The column's values in the rows whose panel uses the scale `scale_id`.

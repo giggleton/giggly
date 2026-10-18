@@ -70,8 +70,8 @@ grid lines are placed by the coordinate system".
   `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`, `MinorBreaks`, `Palette` and
   `Transform`.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists
-  `Giggly.ColorOperations` alone, which gives the hue palette its colours, as R's `scales` lists
-  farver; the assembly pulls a column and hands its values here, so the namespace stays
+  `Giggly.ColorOperations`, which gives the hue palette its colours, as R's `scales` lists farver,
+  and `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a column and hands its values here, so the namespace stays
   extractable, as R's `scales` stands beside ggplot2. Anything that needs a frame belongs to the
   caller.
 - **A scale knows no pixel.** It stops at positions in data space: a continuous value as its
@@ -80,12 +80,18 @@ grid lines are placed by the coordinate system".
 - **`kind/1` is the one rule for which column types an axis can place, and `kind/2` for an
   aesthetic**, read by the assembly to refuse a column when the plot is run and to choose the
   scale. A type with no scale yet returns `:none`. A `Date` column is `:date`, as ggplot2's
-  `scale_type()` gives a `Date` `"date"`: a continuous scale through the date transformation, so
+  `scale_type()` gives a `Date` `"date"`, and `:category`, a factor's column, is `:discrete`
+  whatever its values: a date's is a continuous scale through the date transformation, so
   dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
   date has no scale yet (`kind/2` gives `:none`), ggplot2's `scale_colour_date()` and
   `scale_alpha_date()`.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
-  the non-finite floats skipped); discrete levels are the distinct values, `nil` last.
+  the non-finite floats skipped); discrete levels are the distinct values, `nil` last, numbers
+  among them, as a factor's are. **Which a discrete scale is handed, levels or positions, the
+  caller says** by the function it calls, never by the values' type: `train/2` for a layer's own
+  values, its levels, and `train_positions/2` for positions once the levels are mapped, which
+  widen its continuous range alone. `discrete?/1` tells the two kinds apart for a caller that
+  must, as a legend's key drawing does.
 - **Discrete values are ordered by `level_key/1` alone**, and the assembly hands the same key to
   grouping, which orders its combinations by it, so group ids and axis positions agree. The rule
   exists once, and grouping does not depend on scales to use it.
@@ -140,8 +146,11 @@ grid lines are placed by the coordinate system".
   regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
 - **Labels are written the Elixir way, not R's** (`Scale.Labels`): `inspect`'s plain decimals,
   rounded to 15 significant digits, as many decimals on every label as the most precise needs,
-  none when all are whole, negative zero as `0`, never scientific, no thousands separators. A
-  discrete level is `to_string/1` of its value, and a missing level is `NA`.
+  none when all are whole, negative zero as `0`, never scientific, no thousands separators. **A
+  discrete level is written as R's `as.character()` writes its value** (`Giggly.AsCharacter`),
+  as `factor()` labels its levels: `4`, `0.5`, `1e+05`, `TRUE`; a missing level is `NA`. The
+  scale lists `Giggly.AsCharacter` for it, and the text geom lists it too, so the rule has one
+  home.
 - **A discrete scale keeps a continuous range beside its levels**, ggplot2's `range_c`: handed
   positions, such as a bar's edges once its levels are mapped, it widens that range and leaves
   its levels alone. `reset/1` empties a continuous scale's range and a discrete one's continuous

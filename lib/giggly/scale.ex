@@ -15,7 +15,8 @@ defmodule Giggly.Scale do
   #
   #   * `:integer` and `:float` get a continuous scale (`Giggly.Scale.Continuous`), and so does an
   #     all-`nil` (`:null`) column, matching ggplot2's continuous fallback;
-  #   * `:string`, `:boolean` and `:atom` get a discrete scale (`Giggly.Scale.Discrete`);
+  #   * `:string`, `:boolean`, `:atom` and `:category`, a factor's column, get a discrete scale
+  #     (`Giggly.Scale.Discrete`);
   #   * `:date` gets a date scale, a continuous scale of the days since 1970-01-01 through the
   #     date transformation, as ggplot2's `scale_type()` gives a `Date` `"date"`; on an aesthetic
   #     other than position it gets none yet;
@@ -55,8 +56,9 @@ defmodule Giggly.Scale do
   # fill, a legend for the rest.
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
-  # palette its colours, as R's `scales` depends on farver alone, so it stays extractable.
-  use Boundary, deps: [Giggly.ColorOperations], exports: []
+  # palette its colours, as R's `scales` depends on farver, and R's `as.character()`, which writes
+  # a discrete level, so it stays extractable.
+  use Boundary, deps: [Giggly.AsCharacter, Giggly.ColorOperations], exports: []
 
   alias Giggly.Scale.{Continuous, Discrete, Labels, Palette, Transform}
 
@@ -74,7 +76,7 @@ defmodule Giggly.Scale do
   @color_aesthetics [:color, :fill]
 
   @continuous_dtypes [:integer, :float, :null]
-  @discrete_dtypes [:string, :boolean, :atom]
+  @discrete_dtypes [:string, :boolean, :atom, :category]
 
   # ggplot2's default expansion, as {multiple of the width, constant}: `expansion(mult = 0.05)`
   # for a continuous scale and `expansion(add = 0.6)` for a discrete one.
@@ -205,13 +207,26 @@ defmodule Giggly.Scale do
   def transform(%Continuous{} = scale, values), do: Continuous.transform(scale, values)
   def transform(%Discrete{}, values), do: values
 
-  # The scale widened to cover `values`. A discrete scale handed positions, such as a bar's edges
-  # once its levels are mapped, widens its continuous range instead of its levels, as ggplot2's
-  # discrete position scale trains `range_c`.
+  # The scale widened to cover `values` as a layer's table gives them: a continuous scale's range,
+  # and a discrete scale's levels, numbers among them, as ggplot2 trains a factor's levels.
   @doc false
   @spec train(t(), list()) :: t()
   def train(%Continuous{} = scale, values), do: Continuous.train(scale, values)
   def train(%Discrete{} = scale, values), do: Discrete.train(scale, values)
+
+  # Whether `scale` is discrete, its legend's keys its levels, rather than continuous.
+  @doc false
+  @spec discrete?(t()) :: boolean()
+  def discrete?(%Discrete{}), do: true
+  def discrete?(%Continuous{}), do: false
+
+  # The scale widened to cover positions, such as a bar's edges once its levels are mapped: a
+  # continuous scale's range, as `train/2` widens it, and a discrete scale's continuous range, its
+  # levels left alone, as ggplot2's discrete position scale trains `range_c`.
+  @doc false
+  @spec train_positions(t(), list()) :: t()
+  def train_positions(%Continuous{} = scale, values), do: Continuous.train(scale, values)
+  def train_positions(%Discrete{} = scale, values), do: Discrete.train_positions(scale, values)
 
   # The scale as ggplot2 resets it before training it again on the positioned marks: a continuous
   # scale forgets its range, and a discrete one its continuous range, keeping its levels, since

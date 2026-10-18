@@ -39,8 +39,8 @@ defmodule Giggly.Plot do
   A mapping is a map from aesthetic to column, `%{x: :wt, y: :mpg}`. A column is named by an atom
   or a string and compared with the table's column names as a string, so `:wt` and `"wt"` name the
   same column. An aesthetic may also be mapped to an expression computed in each row from columns,
-  such as `{&Kernel.//2, [:hwy, :cty]}`, or to a constant, such as `{:constant, "smooth"}` or `7`,
-  as `Giggly.Mapping` describes.
+  such as `{&Kernel.//2, [:hwy, :cty]}`, to a constant, such as `{:constant, "smooth"}` or `7`, or
+  to a value read as discrete, such as `{:factor, [:cyl]}`, as `Giggly.Mapping` describes.
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
   both the plot and layer map takes the layer's value. When a layer is added, every column it

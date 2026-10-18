@@ -11,8 +11,11 @@ defmodule Giggly.Scale.Labels do
   # `0.30000000000000004`), and a negative zero is written `0`. This differs from ggplot2, whose
   # labels come from R's `format()` (`1e+05` where this writes `100000`).
   #
-  # A discrete level is written with `to_string/1`, and a missing one (`nil`) as `NA`, as ggplot2
-  # labels a missing level.
+  # A discrete level is written as R's `as.character()` writes its value (`Giggly.AsCharacter`),
+  # as `factor()` labels its levels: `4` for a whole float, `TRUE` for `true`; a missing one
+  # (`nil`) as `NA`, as ggplot2 labels a missing level.
+
+  alias Giggly.AsCharacter
 
   @significant_digits 15
 
@@ -38,7 +41,7 @@ defmodule Giggly.Scale.Labels do
   def levels(levels), do: Enum.map(levels, &level/1)
 
   defp level(nil), do: "NA"
-  defp level(value), do: to_string(value)
+  defp level(value), do: AsCharacter.text(value)
 
   # Rounds through the 15-significant-digit scientific form; a zero of either sign becomes 0.0.
   # `:erlang.float_to_binary/2` takes a negative `scientific:` precision without complaint and uses

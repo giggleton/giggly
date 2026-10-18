@@ -227,6 +227,22 @@ defmodule Giggly.AssemblyTest do
                {["a", "b", "c"], [[true, true, false], [true, true, true]]}
     end
 
+    # Golden: the same `.draw` for `geom_point(aes(colour = factor(n))) + geom_line(aes(colour =
+    # factor(one), group = 1))`: a factor's numbers are levels, so the line draws in key 1 alone.
+    test "a factor's numbers are keys like any level, drawn only where a layer holds them" do
+      [legend] =
+        @keep_rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: {:factor, [:n]}})
+        |> Plot.geom_line(%{colour: {:factor, [:one]}, group: 1})
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {Enum.map(legend.keys, fn key -> key.label end),
+              Enum.map(legend.layers, fn layer -> layer.draws end)} ===
+               {["1", "2", "3", "4"], [[true, true, true, true], [true, false, false, false]]}
+    end
+
     test "a layer draws in the NA key only where its own column holds a missing value" do
       [legend] =
         @keep_rows
