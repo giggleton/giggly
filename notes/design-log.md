@@ -1542,8 +1542,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3);
-  §4: "An after_stat reads its stat's computed variables"
+- 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3)
+  (`c6dc492`); §4: "An after_stat reads its stat's computed variables"
 - 2026-10-18 — Give mtcars R's column types (expressions, step 2, part 3) (`37e6e07`); §4: "R's
   `as.character()` is a boundary of its own"
 - 2026-10-18 — Read a mapping value as discrete with factor() (expressions, step 2, part 2)

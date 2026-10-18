@@ -189,6 +189,7 @@ defmodule Giggly.PlotTest do
           Plot.geom_bar(plot, %{weight: {:after_stat, [:count]}})
         end
 
+      assert error.message =~ ~s(maps :weight to {:after_stat, ["count"]})
       assert error.message =~ "its stat consumes :weight as it computes"
     end
 

@@ -1080,7 +1080,11 @@ defmodule GigglyTest do
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
 
-      assert error.message =~ ~s(index 0 maps :fill to {:after_stat, ["count"]}, a continuous)
+      assert String.starts_with?(
+               error.message,
+               ~s(the layer at index 0 maps :fill to {:after_stat, ["count"]}, a continuous)
+             )
+
       assert error.message =~ ~s(index 1 maps :fill to "drv", a discrete)
     end
 
@@ -1125,6 +1129,24 @@ defmodule GigglyTest do
       assert DataFrame.pull(frame, :y) === [1.0, 1.0, 2.0]
       assert error.message =~ "a :string column, but the y axis's scale, chosen before the stat, "
       assert error.message =~ "is discrete, and takes a value computed after the stat as a number"
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 puts `y = after_stat(as.Date(rep(NA, length(count))))` over
+    # a date y axis at NA and NA, refusing nothing: a column of no values suits any axis.
+    test "a value of missing values only on a date axis is taken, missing" do
+      dated = %{
+        "day" => [~D[2020-01-01], ~D[2020-01-01], ~D[2020-01-03]],
+        "class" => ["a", "b", "a"]
+      }
+
+      frame =
+        dated
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :class, y: :day})
+        |> Plot.geom_bar(%{x: :class, y: {:after_stat, [{fn _count -> nil end, [:count]}]}})
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.pull(frame, :y) === [nil, nil]
     end
 
     # ggplot2 4.0.3 in R 4.6.1 puts `y = after_stat(as.Date("2020-01-01") + count)` over a date y
