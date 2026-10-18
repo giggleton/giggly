@@ -17,7 +17,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics`,
-  `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets, and the five
+  `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
+  `Giggly.Mapping`, whose checks resolve each mapping value at the call, and the five
   families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
   `Giggly.Position`, `Giggly.Stat`), and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
@@ -64,9 +65,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   function resolves its own mapping against the table it draws, its own or the plot's, and checks
   what the geom can use there, so a misspelt column or an unusable aesthetic is reported by the
   line that has it, never later when the plot is run. A missing column's message names the
-  aesthetic, the reference as the caller wrote it, which table lacks it, and that table's columns.
+  aesthetic, the value as the caller wrote it, the column it lacks, which table lacks it, and that
+  table's columns.
   **The plot's mapping is checked by the layers that take it** (design-log §4, the entry beginning
-  "A column the plot names"): `new/2` refuses only a value that is not a column reference, and each
+  "A column the plot names"): `new/2` refuses only a value the mapping grammar refuses, and each
   layer function checks every column it takes from the plot's mapping, for an aesthetic it neither
   maps nor sets, against its table, one it cannot use included, as ggplot2 evaluates them all and
   fails with "object not found"; so the plot's mapping may name a column only layers' own tables
@@ -81,8 +83,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken),
   accepting too what its geom draws (`:alpha`), which counting carries. A
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
-  allows at most one. A weight's column must hold numbers, read from the layer's table and refused
-  at the call, where R would fail inside the stat and draw nothing.
+  allows at most one. A weight must hold numbers: a column's type, read from the layer's table, and
+  a constant's are refused at the call, where R would fail inside the stat and draw nothing; an
+  expression's type is known only once it has run, so counting refuses it then.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
@@ -127,11 +130,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   plot's (`layer_table/2`), so nothing past this API sees a `Table.Reader`. R also takes a function
   or formula as a layer's data, which waits.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
-  runs on every mapping as it enters), and mapping values are string column names, never the atoms
-  the caller wrote: a layer's, of the table it draws; the plot's, checked against each table that
-  takes them.
-- **A column reference is an atom or a string,** compared with the data's names as a string.
-  Nothing else is read as a name: `2.5` is not the column `"2.5"`.
+  runs on every mapping as it enters), and each value is held as `Giggly.Mapping.resolve/1` gives
+  it, its columns named as strings, never the atoms the caller wrote: a layer's checked against
+  the table it draws; the plot's, against each table that takes them. What a value may be is
+  `.claude/rules/mapping.md`'s; `Plot` never matches a value's shape itself.
+- **A facet's column reference is an atom or a string,** compared with the data's names as a
+  string.
 - **A layer's own mapping is checked against what it accepts as the layer is added, and its own
   laid over the plot's against what it requires**: an aesthetic the layer maps that it cannot use
   raises, and so does a required one neither mapping gives nor an option sets, as ggplot2 checks a

@@ -38,10 +38,12 @@ defmodule Giggly.Plot do
 
   A mapping is a map from aesthetic to column, `%{x: :wt, y: :mpg}`. A column is named by an atom
   or a string and compared with the table's column names as a string, so `:wt` and `"wt"` name the
-  same column.
+  same column. An aesthetic may also be mapped to an expression computed in each row from columns,
+  such as `{&Kernel.//2, [:hwy, :cty]}`, or to a constant, such as `{:constant, "smooth"}` or `7`,
+  as `Giggly.Mapping` describes.
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
-  both the plot and layer map takes the layer's column. When a layer is added, every column it
+  both the plot and layer map takes the layer's value. When a layer is added, every column it
   draws with, from its own mapping and those it takes from the plot's, is checked against the table
   it draws, its own or the plot's; its own mapping is checked against the aesthetics it can use,
   and the two mappings together against those it needs. So the plot's mapping is checked by the
@@ -106,16 +108,19 @@ defmodule Giggly.Plot do
 
   ## Labels
 
-  Each axis is titled by the column mapped to it, and each legend by the column its aesthetic is
-  mapped to. `labs/2` titles them otherwise, and gives the plot a title, a subtitle, a caption and a
-  tag, as ggplot2's `labs()` does.
+  Each axis is titled by what is mapped to it, and each legend by what its aesthetic is mapped to:
+  a column by its name, an expression by its text, a constant by its aesthetic's name, as
+  `Giggly.Mapping` describes. `labs/2` titles them otherwise, and gives the plot a title, a
+  subtitle, a caption and a tag, as ggplot2's `labs()` does.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, NimbleOptions, which validates its functions' options at the call, and
-  # the colour operations, which read a colour an option sets, and nothing that runs it. The five
-  # families' roots are protocols that
+  # checks a layer against, NimbleOptions, which validates its functions' options at the call, the
+  # colour operations, which read a colour an option sets, and the mapping grammar, whose checks
+  # resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never the
+  # evaluation, which holds by review), and nothing that runs it. The five families' roots are
+  # protocols that
   # compute and draw, and `GigglyCredo.Check.PlotRunsNothing` keeps them out of these files, which
   # boundary cannot, since a boundary always exports its root. A layer is read only through
   # `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
@@ -128,13 +133,25 @@ defmodule Giggly.Plot do
       Giggly.DataFrame,
       Giggly.Facet,
       Giggly.Geom,
+      Giggly.Mapping,
       Giggly.Position,
       Giggly.Stat,
       NimbleOptions
     ],
     exports: []
 
-  alias Giggly.{Aesthetics, ColorOperations, Coord, DataFrame, Facet, Geom, Position, Stat}
+  alias Giggly.{
+    Aesthetics,
+    ColorOperations,
+    Coord,
+    DataFrame,
+    Facet,
+    Geom,
+    Mapping,
+    Position,
+    Stat
+  }
+
   alias Giggly.Plot.Layer
 
   @enforce_keys [:data, :mapping, :facet, :coord, :theme, :labels, :reversed_layers]
@@ -144,9 +161,10 @@ defmodule Giggly.Plot do
   @type aesthetic :: atom()
 
   @typedoc """
-  A mapping as stored: aesthetic to a column's name, as a string, in the table the layer draws.
+  A mapping as stored: aesthetic to its value resolved, each column it reads named as a string, in
+  the table the layer draws.
   """
-  @type mapping :: %{optional(aesthetic()) => String.t()}
+  @type mapping :: Mapping.t()
 
   @typedoc "How the plot's rows are split into panels: a facet's struct."
   @type facet :: struct()
@@ -181,8 +199,8 @@ defmodule Giggly.Plot do
   @typedoc "A column of a table as written: its name as an atom or a string."
   @type column_reference :: atom() | String.t()
 
-  @typedoc "A mapping as written: aesthetic to column."
-  @type mapping_argument :: %{optional(aesthetic()) => column_reference()}
+  @typedoc "A mapping as written: aesthetic to a column, an expression or a constant."
+  @type mapping_argument :: %{optional(aesthetic()) => Mapping.value()}
 
   # `facet_wrap/3`'s options, validated at the call as every public function's are.
   @facet_wrap_options NimbleOptions.new!(
@@ -590,9 +608,10 @@ defmodule Giggly.Plot do
   @doc """
   A plot of `data` with the aesthetics in `mapping` applying to every layer.
 
-  Each column the mapping names is checked by the layers that take it, against the table each
+  Each column the mapping reads is checked by the layers that take it, against the table each
   draws, so a misspelt column is reported by the first layer function to take it. Raises
-  `ArgumentError` here for a value that is not a column reference, an atom or a string.
+  `ArgumentError` here for a value that is not a column, an expression or a constant
+  (`Giggly.Mapping`).
 
       iex> plot =
       ...>   Giggly.Plot.new(
@@ -1245,10 +1264,10 @@ defmodule Giggly.Plot do
   Sets the plot's labels, ggplot2's `labs()`: the title of an axis or a legend, named by its
   aesthetic, and the plot's title, subtitle, caption and tag.
 
-  An axis or legend is otherwise titled by the column mapped to it; a label set here replaces that
-  title, whichever layer maps the aesthetic and whether the layer was added before or after. A
-  label of `:none` removes the title and the room it took, as ggplot2's `NULL` does, and `""`
-  keeps the room and draws nothing. A label for an aesthetic no layer maps titles nothing. Each
+  An axis or legend is otherwise titled by what is mapped to it (`Giggly.Mapping`); a label set
+  here replaces that title, whichever layer maps the aesthetic and whether the layer was added
+  before or after. A label of `:none` removes the title and the room it took, as ggplot2's `NULL`
+  does, and `""` keeps the room and draws nothing. A label for an aesthetic no layer maps titles nothing. Each
   call sets only the labels it is given, so a later call replaces an earlier one's label and keeps
   the rest. A label breaking over several lines (`"Fuel\\neconomy"`) is drawn a line at a time.
 
@@ -1527,20 +1546,20 @@ defmodule Giggly.Plot do
   def validate_linemitre(limit),
     do: {:error, "expected a number of line widths, 1 or more, got: #{inspect(limit)}"}
 
-  # A mapping as the plot holds it: its keys canonical and each column by its name as a string,
-  # each value refused unless it is a column reference. The plot's mapping is held so, and checked
-  # against a table by each layer that takes it.
+  # A mapping as the plot holds it: its keys canonical and each value resolved
+  # (`Giggly.Mapping`), a value the grammar refuses raising. The plot's mapping is held so, and
+  # checked against a table by each layer that takes it.
   defp references(mapping, function_name) do
     mapping
     |> Aesthetics.canonicalize()
-    |> Map.new(fn {aesthetic, reference} ->
-      {aesthetic, reference_name(function_name, aesthetic, reference)}
+    |> Map.new(fn {aesthetic, value} ->
+      {aesthetic, resolved_value(function_name, aesthetic, value)}
     end)
   end
 
-  # A layer's own mapping, its keys canonical and each column by its name as a string, each checked
-  # against the table the layer draws, its own `data` or else the plot's, a refusal naming the
-  # reference as written.
+  # A layer's own mapping, held as the plot's is, each column its values read checked against the
+  # table the layer draws, its own `data` or else the plot's, a refusal naming the value as
+  # written.
   defp resolve(mapping, plot, data, function_name) do
     names =
       plot
@@ -1549,27 +1568,36 @@ defmodule Giggly.Plot do
 
     mapping
     |> Aesthetics.canonicalize()
-    |> Map.new(fn {aesthetic, reference} ->
-      name = reference_name(function_name, aesthetic, reference)
+    |> Map.new(fn {aesthetic, value} ->
+      resolved = resolved_value(function_name, aesthetic, value)
 
-      if name in names do
-        {aesthetic, name}
-      else
-        raise ArgumentError,
-              "#{function_name} maps #{inspect(aesthetic)} to #{inspect(reference)}, but " <>
-                missing_column_message(name, data, names)
+      case missing_columns(resolved, names) do
+        [] ->
+          {aesthetic, resolved}
+
+        [missing | _others] ->
+          raise ArgumentError,
+                "#{function_name} maps #{inspect(aesthetic)} to #{inspect(value)}, but " <>
+                  missing_column_message(missing, data, names)
       end
     end)
   end
 
-  defp reference_name(_function_name, _aesthetic, reference)
-       when is_column_reference(reference),
-       do: to_string(reference)
+  defp resolved_value(function_name, aesthetic, value) do
+    case Mapping.resolve(value) do
+      {:ok, resolved} ->
+        resolved
 
-  defp reference_name(function_name, aesthetic, reference) do
-    raise ArgumentError,
-          "#{function_name} maps #{inspect(aesthetic)} to #{inspect(reference)}, " <>
-            "but a mapping names a column, as an atom or a string"
+      {:error, reason} ->
+        raise ArgumentError,
+              "#{function_name} maps #{inspect(aesthetic)} to #{inspect(value)}, but #{reason}"
+    end
+  end
+
+  defp missing_columns(value, names) do
+    value
+    |> Mapping.columns()
+    |> Enum.reject(fn name -> name in names end)
   end
 
   defp missing_column_message(name, data, names) do
@@ -1726,19 +1754,17 @@ defmodule Giggly.Plot do
   end
 
   # A weight is summed, so the column a layer's weight comes from must hold numbers, missing ones
-  # included.
+  # included, where the call can tell its type: a column's or a constant's. An expression's is its
+  # function's to decide, and counting refuses one that is not a number when the plot is run.
   defp check_weight(plot, layer) do
     mapping = computed_mapping(plot, layer)
+    table = drawn_table(plot, layer.data)
 
-    dtypes =
-      plot
-      |> drawn_table(layer.data)
-      |> DataFrame.dtypes()
-
-    with {:ok, column} <- Map.fetch(mapping, :weight),
-         dtype when dtype not in [:integer, :float, :null] <- Map.fetch!(dtypes, column) do
+    with {:ok, value} <- Map.fetch(mapping, :weight),
+         dtype when dtype not in [:integer, :float, :null, :computed] <-
+           Mapping.dtype(value, table) do
       raise ArgumentError,
-            "Plot.geom_bar/3 maps :weight to #{inspect(column)}, a #{inspect(dtype)} column, " <>
+            "Plot.geom_bar/3 maps :weight to #{inspect(value)}, a #{inspect(dtype)} column, " <>
               "but a weight is summed, so it must be a number"
     end
 
@@ -1758,16 +1784,20 @@ defmodule Giggly.Plot do
       combined_mapping
       |> Map.drop(Map.keys(layer.mapping))
       |> Enum.sort()
-      |> Enum.reject(fn {_aesthetic, name} -> name in names end)
+      |> Enum.flat_map(fn {aesthetic, value} ->
+        value
+        |> missing_columns(names)
+        |> Enum.map(fn name -> {aesthetic, value, name} end)
+      end)
 
     case missing do
       [] ->
         :ok
 
-      [{aesthetic, name} | _others] ->
+      [{aesthetic, value, name} | _others] ->
         raise ArgumentError,
               "#{function} takes #{inspect(aesthetic)} from the plot's mapping, which maps it " <>
-                "to #{inspect(name)}, but " <> missing_column_message(name, layer.data, names)
+                "to #{inspect(value)}, but " <> missing_column_message(name, layer.data, names)
     end
   end
 

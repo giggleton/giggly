@@ -33,13 +33,15 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   (ggplot2 also warns, which a pure pipeline cannot).
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
-  into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it when no
-  layer maps the aesthetic itself. A user's own `after_stat()` arrives with its first reader.
+  into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a
+  fallback, which any layer's column or expression replaces. A user's own `after_stat()` arrives
+  with its first reader.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the
   rows there or the sum of their weights, missing weights adding nothing, its `prop` the count's
   share of its group's total (NaN for a total of zero), and its `width` 0.9 of the layer's x
-  spacing counting from zero (`Giggly.Resolution`). A row missing its x, or at an infinite one, is
-  not counted. Counts are doubles, as R's `rowsum()` gives them. **It counts along whichever of x
-  and y is mapped**, exactly one, as `stat_count()` decides its orientation, and writes that in a
-  `flipped_aes` column for the bar geom and the positions; a horizontal layer is counted as a
-  vertical one, flipped and flipped back, and its count goes into x.
+  spacing counting from zero (`Giggly.Resolution`). A weight that is not a number is refused when
+  the plot is run, an expression's, whose type the call cannot know. A row missing its x, or at an
+  infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives them. **It counts
+  along whichever of x and y is mapped**, exactly one, as `stat_count()` decides its orientation,
+  and writes that in a `flipped_aes` column for the bar geom and the positions; a horizontal layer
+  is counted as a vertical one, flipped and flipped back, and its count goes into x.

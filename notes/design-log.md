@@ -79,6 +79,32 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A mapping value is a column, an expression or a constant, as plain data, and
+  `Giggly.Mapping` holds the grammar (2026-10-18, Steve; the `{function, [values]}` shape his).**
+  An atom or a string is a column; `{function, [values]}` applies a capture or a closure per row;
+  `{:factor, [value]}` and `{:after_stat, [value]}` are heads; `{:constant, term}` wraps a string
+  or atom constant, and a number, boolean or date is one alone. Data keeps a plot a value that
+  prints, and a wrapper goes only where the type is ambiguous: ergonomics over regularity. A guide
+  is titled by a value's text (`hwy / cty`, `:math.log10(carat)`), a closure's by nothing until
+  `labs()`, and a constant's by its aesthetic's name as a fallback, as R's `make_labels()` does
+  (checked in R; the constant's own text was assumed first). *Rejected:* builder functions on
+  `Plot` (names without brevity, in the biggest file); an `aes` macro (sugar over the same data
+  later, perhaps); MFA tuples (a capture is the MFA as a value); `{columns, closure}` alone
+  (nothing prints or titles); `{:constant, [term]}` (a list holds what is evaluated); a protocol
+  for the heads (`:factor` acts on the column, not per row).
+
+- **Expressions in a mapping are Phase 3's sixth increment, in four steps: the grammar with
+  constants, computed columns and titles; `factor()`; `after_stat()`; the notebooks (2026-10-18,
+  Steve).** 119 of the 591 waiting notebook examples name an expression, the most-named piece; the
+  scope covers about 95 of the 109 forms named, and about a dozen examples wait on nothing else.
+  Checked in R first: `map_statistic()` puts an `after_stat()` value through the scale, reading the
+  stat's output back in data units, and `factor()` prints a double's level as R prints the number
+  (`4`, `1e+05`). A computed weight's type is known only when run, so counting refuses a non-number
+  then, where R warns and draws nothing. *Out:* whole-column work (`cut_width()`, `reorder()`,
+  `interaction()`, `max(count)` in `after_stat()`; it needs a head that sees the column), a list as
+  an inline column, `stage()`, `after_scale()`, ordering a factor's levels, `aes(colour = NULL)`,
+  plotmath; `..count..` never (superseded).
+
 - **Mutation testing runs after each commit, over the lines it changed, and the commit gate holds
   the next commit until it has run (2026-10-18, Steve).** The `mutation-testing` skill runs muex
   with `--since HEAD~1` over the commit's changed `lib/` files, then triages, fixes and reports
@@ -163,17 +189,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   own table leaves alone.
 
 - **A column the plot names is checked against the tables that use it, as ggplot2 checks it
-  (2026-10-18, Steve, asking "Why not follow R here?").** `new/2` checks only that each value of
-  its mapping is a column reference; each layer function checks every column it draws with, its
-  own mapping's and those it takes from the plot's, against the table it draws, raising at its
+  (2026-10-18, Steve, asking "Why not follow R here?").** `new/2` checks only that each value of its
+  mapping is one the mapping grammar takes; each layer function checks every column it draws with,
+  its own mapping's and those it takes from the plot's, against the table it draws, raising at its
   call. `facet_wrap/3` checks the form of its columns at the call, and whether the plot's data or
   some layer's own table holds them all is the facet's question, raised when the plot is run, as
-  ggplot2's "At least one layer must contain all faceting variables". So both may name a column
-  only a layer's table holds, as R 4.6.1 with ggplot2 4.0.3 draws them; the cost is a misspelt
-  facet column reported at run time. *Rejected: checking both against the plot's data at the
-  call*, recommended first: stricter than R, it would have to move once a plot may have no data,
-  and its reason, that a mistake raises from the line that wrote it, is a rule of Giggly's own,
-  which the mapping's check still keeps at the layer's call.
+  ggplot2's "At least one layer must contain all faceting variables". So both may name a column only
+  a layer's table holds, as R 4.6.1 with ggplot2 4.0.3 draws them; the cost is a misspelt facet
+  column reported at run time. *Rejected: checking both against the plot's data at the call*,
+  recommended first: stricter than R, it would have to move once a plot may have no data, and its
+  reason, that a mistake raises from the line that wrote it, is a rule of Giggly's own, which the
+  mapping's check still keeps at the layer's call.
 
 - **`annotate()` draws with every geom Giggly has, from values recycled as R recycles them
   (2026-10-18, Steve).** Its positions become a table of its own, a row per annotation, mapped as
@@ -1467,8 +1493,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Mutation-test each commit after it lands, over the lines it changed; §4:
-  "Mutation testing runs after each commit"
+- 2026-10-18 — Map aesthetics to expressions and constants (expressions, step 1); §4: "A mapping
+  value is a column, an expression or a constant", "Expressions in a mapping are Phase 3's sixth
+  increment"
+- 2026-10-18 — Mutation-test each commit after it lands, over the lines it changed (`8a82a46`);
+  §4: "Mutation testing runs after each commit"
 - 2026-10-18 — Draw text and titles in the notebooks (text and titles, step 6) (`52aa3a2`); §4:
   "Text and titles is Phase 3's fifth increment", "A notebook leaves out an argument ggplot2 does
   not recognise"

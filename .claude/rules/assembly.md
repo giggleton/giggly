@@ -24,7 +24,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   root → `SVG` → `Scene`, and nothing calls back up.
 - **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet lays the
   panels out from the plot's data and every layer's table and assigns `panel` to each layer's
-  table, raw → each layer's mapping is evaluated → `Group.add/2` writes `group` →
+  table, raw → each layer's mapping is evaluated (`Giggly.Mapping.evaluate/2`) → `Group.add/2`
+  writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
   stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
   ggplot2's `GeomRect$setup_data()` fills them in) → geom reparameterize (a bar to
@@ -78,14 +79,18 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A label `Plot.labs/2` sets titles an axis or a legend over everything else**, `:none` among
   them, as a plot's labels win in ggplot2's `setup_plot_labels()`, whenever the call came; so a
   label decides which legends merge, as they merge by title. Otherwise:
-- **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**, an
-  annotation never (`Plot.layer_annotation?/1`), as ggplot2's `annotate()` mapping is unlabelled,
-  read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
+- **Each axis's title is the title of what the first layer to map the axis's aesthetic to a
+  column or an expression maps it to** (`Giggly.Mapping.title/2`: a column's name, an
+  expression's text, `:none` for a closure's, which no later layer replaces), an annotation never
+  (`Plot.layer_annotation?/1`), as ggplot2's `annotate()` mapping is unlabelled, read through
+  `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
   `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
   which reads the scale's first aesthetic, so `:xmin` alone titles nothing. **Failing that, it is
-  the computed column a stat puts into the aesthetic, the last layer's to do so** (`count`), which
-  ggplot2 keeps as a fallback any layer's own mapping replaces; else `:none`. The titles are the
-  only place the data's own column names survive the assembly.
+  the last layer's fallback**: the aesthetic's own name where that layer maps it to a constant, or
+  else the computed column its stat puts into the aesthetic (`count`), as ggplot2 marks both as
+  fallbacks any layer's own title replaces (checked in R: `geom_point(aes(y = 10)) + geom_bar()`
+  titles y `count`, the other way round `y`); else `:none`. The titles are the only place the
+  data's own column names survive the assembly.
 - **A plot with no layers trains no scale, so its axes have no breaks and no titles.** ggplot2
   builds such a plot with a `geom_blank()` layer that inherits the plot's mapping, so its axes
   span the mapped columns and are titled; Giggly follows when a geom that draws nothing arrives.
@@ -121,9 +126,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   be configured, the assembly hands over the configured order.
 - **Whether a column suits an axis is checked here, when the plot is run.** Before training, every
   column on an axis must be a type `Scale.kind/1` can place and all of one kind, each layer's
-  types read from the table it draws (`Plot.layer_table/2`), its own or the plot's; a refusal
-  names the layer by index, the aesthetic, the column as its table names it, and its type. The plot
-  checks only what it knows (names and which aesthetics a geom takes).
+  types read from its evaluated frame, since an expression's type is known only once it has run;
+  a refusal names the layer by index, the aesthetic, the value as the plot holds it (a column by
+  the name its table gives it), and its type. The plot checks only what it knows (names and which
+  aesthetics a geom takes).
 - **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`), never by
   scanning values.
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
@@ -136,8 +142,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
-  the trained scales: titled by its label, or else by the column the first layer to map the
-  aesthetic maps it to (`:none` takes no room), a key
+  the trained scales: titled by its label, or else as an axis is (`:none` takes no room), a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
   range, a discrete one's levels, `NA` last), labelled, at the value it maps to, drawn by the kind
   of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`,

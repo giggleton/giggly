@@ -8,13 +8,13 @@
 #
 # and compare the two drawings element by element, as test/golden/point.R describes.
 #
-# geom_rect()'s "Rectangles by their corners" example, its corners worked out in the table, since
-# Giggly takes no expression in a mapping: each rectangle filled by its level and bordered in
-# grey50, the fill legend's keys drawn as rectangles; and a second layer of one row whose corners
+# geom_rect()'s "Rectangles by their corners" example, its corners worked out in the table rather
+# than in the mapping, as R's example computes them: each rectangle filled by its level and bordered
+# in grey50, the fill legend's keys drawn as rectangles; and a second layer of one row whose corners
 # are set, from the panel's foot (R's -Inf) up to 2, which widens the x axis to 16. Mapping only
-# corners, the plot titles neither axis. First checked with ggplot2 4.0.3 and vdiffr 1.0.9:
-# every element matches, the x axis drawn before the y as test/golden/point.R describes, and every
-# clip path.
+# corners, the plot titles neither axis. First checked with ggplot2 4.0.3 and vdiffr 1.0.9: every
+# element matches, the x axis drawn before the y as test/golden/point.R describes, and every clip
+# path.
 
 library(ggplot2)
 

@@ -1,0 +1,47 @@
+---
+paths:
+  - "lib/giggly/mapping.ex"
+  - "test/giggly/mapping_test.exs"
+---
+
+# The mapping grammar
+
+`Giggly.Mapping` is what a mapping maps each aesthetic to: a column, an expression computed in
+each row, or a constant, and the title each gives its guide. Why the grammar is plain data, where
+its wrappers go, and what was rejected: design-log §4, the entry beginning "A mapping value is a
+column, an expression or a constant".
+
+## Rules
+
+- **A value's shape is matched here and nowhere else.** `Plot` and the assembly ask this module
+  (`resolve/1`, `columns/1`, `dtype/2`, `evaluate/2`, `title/2`) and never match a tuple or a
+  string themselves. Its boundary lists `Giggly.DataFrame` alone; `Plot` lists it for the checks at
+  the call and the assembly for evaluation and titles. **`Plot` calls only the checks**, never
+  `evaluate/2` or `title/2`, which holds by review, as the assembly's calls into `Coord` and `Geom`
+  do.
+- **A plot holds each value resolved, and the mapping stays a map** (`Mapping.t()`, no struct): a
+  column by its name as a string, a constant as `{:constant, term}`, an expression as its function
+  and its resolved arguments. A string in a held mapping is always a column.
+- **An atom or a string is a column; nothing else is read as a name.** `true`, `false` and `nil`
+  are atoms and name none, and `2.5` is a constant, never the column `"2.5"`.
+- **A wrapper only where the type is ambiguous.** A number, a boolean, a date or a time is a
+  constant written alone; a string or an atom constant needs `{:constant, term}`. A list holds only
+  things to evaluate, so a constant's term is never one.
+- **Refused at the call, each with a reason worded to follow "maps :x to …, but"**, which the
+  caller raises with its function's name: `nil`, a list (kept free for an inline column), a
+  function alone, a constant the frame would type `:term`, a tuple of an unknown head, an
+  expression whose arguments are not a list, and a function whose arity is not its arguments'
+  count. A refused argument refuses its expression.
+- **Kinds of value are function clauses, not a protocol**: they differ in what they are, not in
+  how they run. A head that acts on a whole column (`:factor`, when it lands) is a clause that
+  sees the column, never a function applied per row.
+- **An expression's type is the frame's**, decided when its column enters the evaluated frame, so
+  it is known only when the plot is run; a check that needs it runs then (the axis's kind, a
+  computed weight). `dtype/2` answers at the call for a column and a constant and says `:computed`
+  for an expression.
+- **A value's title is ggplot2's `make_labels()` read for Elixir**: a column's name; an
+  expression's text, a capture of a `Kernel` operator written as the operator whether or not the
+  compiler inlined it, an operand that is itself an operator's call in parentheses, any other
+  capture as `inspect/1` names its function; `:none` for an expression with a closure anywhere in
+  it; and for a constant its aesthetic's canonical name, as a fallback (`{:fallback, name}`),
+  which the assembly ranks below any layer's title.

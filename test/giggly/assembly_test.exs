@@ -48,6 +48,27 @@ defmodule Giggly.AssemblyTest do
              }
     end
 
+    # Golden: `get_guide_data(plot, "colour")` for `geom_point(aes(colour = "smooth"))` is one key,
+    # `smooth`, #F8766D, and for `aes(colour = 7)` one key, `7`, #336A98, at 0.5 of the bar.
+    test "a constant's legend has one key" do
+      legend = fn mapping ->
+        [legend] =
+          Giggly.Datasets.mpg()
+          |> Plot.new(%{x: :displ, y: :hwy})
+          |> Plot.geom_point(mapping)
+          |> Assembly.run()
+          |> Map.fetch!(:legends)
+
+        {legend.guide, legend.keys}
+      end
+
+      assert {legend.(%{colour: {:constant, "smooth"}}), legend.(%{colour: 7})} ===
+               {{%Guide.Legend{},
+                 [%{label: "smooth", value: "smooth", values: %{color: "#F8766D"}}]},
+                {%Guide.Colorbar{bins: 15},
+                 [%{label: "7", value: 7.0, values: %{color: "#336A98"}, place: 0.5}]}}
+    end
+
     test "a discrete alpha's legend has a key for each level, spread from 0.1 to 1" do
       [legend] =
         Giggly.Datasets.mpg()

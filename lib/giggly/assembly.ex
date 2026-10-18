@@ -12,7 +12,8 @@ defmodule Giggly.Assembly do
   #   1. lays the panels out from the plot's data and every layer's table, and assigns each row of
   #      each layer's table its panel, repeating the rows of a table that lacks a column the facet
   #      splits on in each panel they fit (`Giggly.Facet`);
-  #   2. evaluates each layer's mapping against its table;
+  #   2. evaluates each layer's mapping against its table (`Giggly.Mapping`): a column, an
+  #      expression computed in each row, or a constant in every row;
   #   3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
   #      discrete scale gives its levels, so group ids follow axis and legend order;
   #   4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
@@ -61,15 +62,16 @@ defmodule Giggly.Assembly do
   # that a layer maps, by aesthetic, and the legend each gives; the plot's coordinate system, which rendering hands each
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
-  # axis's title, the name of the column the first layer to map the axis's aesthetic maps it to
+  # axis's title, the text of what the first layer to map the axis's aesthetic maps it to
   # (ggplot2's `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering,
   # the only stage that reads a theme so far. The data's own column names appear only as titles.
   #
   # Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
 
   # The assembly reads a plot and hands each stage its input; what it may call is the plot, the
-  # data frame, the aesthetic vocabulary (which columns are x and which y) and the stages, each
-  # named as it arrives; the guides it lists only to build the kind of guide a scale names.
+  # data frame, the aesthetic vocabulary (which columns are x and which y), the mapping grammar,
+  # which evaluates and titles each mapping value, and the stages, each named as it arrives; the
+  # guides it lists only to build the kind of guide a scale names.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
@@ -79,6 +81,7 @@ defmodule Giggly.Assembly do
       Giggly.Geom,
       Giggly.Group,
       Giggly.Guide,
+      Giggly.Mapping,
       Giggly.Plot,
       Giggly.Position,
       Giggly.Scale,
@@ -94,6 +97,7 @@ defmodule Giggly.Assembly do
     Geom,
     Group,
     Guide,
+    Mapping,
     Plot,
     Position,
     Scale,
@@ -155,7 +159,8 @@ defmodule Giggly.Assembly do
   A legend for one or more aesthetics other than position, those whose scales give the same kind of
   guide, title and labels, in name order: the guide that draws it, a struct of its kind, as the
   first aesthetic's scale names it (`Giggly.Guide`); its title, the label `Plot.labs/2` sets for
-  the first aesthetic, or else the column the first layer to map it maps it to, `:none` for none;
+  the first aesthetic, or else the title an axis would take from the layers' mappings (a column's
+  name, an expression's text, a constant's aesthetic name as a fallback), `:none` for none;
   a key for each of its scales' breaks, the break's label, the break
   itself, as the first aesthetic's data holds it (ggplot2's `.value`), the value each aesthetic
   maps it to, and, for a colour bar, its place up the bar, 0 to 1; a colour bar's colours, each
@@ -239,9 +244,9 @@ defmodule Giggly.Assembly do
 
     x_routes = routes(layout, :x)
     y_routes = routes(layout, :y)
-    scale_kinds = %{x: axis_kind(plot, :x), y: axis_kind(plot, :y)}
+    scale_kinds = %{x: axis_kind(plot, grouped_data, :x), y: axis_kind(plot, grouped_data, :y)}
     axis_kinds = Map.new(scale_kinds, fn {axis, kind} -> {axis, discreteness(kind)} end)
-    non_position_kinds = non_position_kinds(plot)
+    non_position_kinds = non_position_kinds(plot, grouped_data)
     untrained_x_scales = add_scales(scale_kinds.x, x_routes)
     untrained_y_scales = add_scales(scale_kinds.y, y_routes)
 
@@ -320,42 +325,53 @@ defmodule Giggly.Assembly do
 
   # The title of an aesthetic's guide, an axis's or a legend's: the label `Plot.labs/2` sets for it,
   # which wins over every other, `:none` among them, as a plot's labels win in ggplot2's
-  # `setup_plot_labels()`; else the column the first layer to map the aesthetic maps it to, through
-  # the layer's computed mapping, an annotation never, as ggplot2's `annotate()` mapping is
-  # unlabelled; failing that, the computed column a stat puts into it by default, the last layer's
-  # to do so, as `count`; or `:none`. A layer's own label is never replaced by a later layer's and
-  # replaces a stat's default, which ggplot2 marks as a fallback, read as `resolve_label()` reads
-  # it, by the scale's first aesthetic. The plot holds each mapping's column by the name the data
-  # gives it, which is the title.
+  # `setup_plot_labels()`; else the title of what the first layer to map the aesthetic to a column
+  # or an expression maps it to (`Giggly.Mapping.title/2`), through the layer's computed mapping,
+  # `:none` for a closure's, an annotation never, as ggplot2's `annotate()` mapping is unlabelled;
+  # failing that, the last layer's fallback: the aesthetic's own name where the layer maps it to a
+  # constant, or else the computed column its stat puts into it by default, as `count`; or `:none`.
+  # A layer's own title is never replaced by a later layer's and replaces every fallback, which
+  # ggplot2 marks as one, read as `resolve_label()` reads it, by the scale's first aesthetic.
   defp guide_title(%Plot{labels: labels} = plot, layers, aesthetic) do
     Map.get_lazy(labels, aesthetic, fn -> data_title(plot, layers, aesthetic) end)
   end
 
   defp data_title(plot, layers, aesthetic) do
-    mapped =
+    titles =
       layers
       |> Enum.reject(&Plot.layer_annotation?/1)
-      |> Enum.find_value(fn layer ->
-        plot
-        |> Plot.computed_mapping(layer)
-        |> Map.get(aesthetic)
-      end)
+      |> Enum.flat_map(fn layer -> layer_title(plot, layer, aesthetic) end)
 
-    computed =
-      layers
-      |> Enum.reverse()
-      |> Enum.find_value(fn layer ->
-        layer
-        |> default_mapping()
-        |> Map.get(aesthetic)
-      end)
+    case Keyword.fetch(titles, :title) do
+      {:ok, title} ->
+        title
 
-    title(mapped, computed)
+      :error ->
+        titles
+        |> Keyword.get_values(:fallback)
+        |> List.last(:none)
+    end
   end
 
-  defp title(nil, nil), do: :none
-  defp title(nil, computed), do: Atom.to_string(computed)
-  defp title(mapped, _computed), do: mapped
+  # The title `layer` gives `aesthetic`'s guide, as ggplot2's `make_labels()` gives it, its
+  # mapping's before its stat's default, which is a fallback; none where it gives neither.
+  defp layer_title(plot, layer, aesthetic) do
+    mapped =
+      plot
+      |> Plot.computed_mapping(layer)
+      |> Map.fetch(aesthetic)
+
+    defaulted =
+      layer
+      |> default_mapping()
+      |> Map.fetch(aesthetic)
+
+    case {mapped, defaulted} do
+      {{:ok, value}, _default} -> [Mapping.title(value, aesthetic)]
+      {:error, {:ok, column}} -> [fallback: Atom.to_string(column)]
+      {:error, :error} -> []
+    end
+  end
 
   defp default_mapping(layer) do
     layer
@@ -640,26 +656,34 @@ defmodule Giggly.Assembly do
     {extent, breaks, Scale.minor_breaks(scale, breaks, extent)}
   end
 
-  # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across
-  # by name: it is the one raw column every layer keeps. The table is the layer's, its own or the
-  # plot's, with its panels assigned. The columns come out in the order ggplot2 evaluates them
+  # Evaluation keeps only the mapped aesthetics, each the column its value makes from the table
+  # (`Giggly.Mapping.evaluate/2`), so the panel the facet assigned is carried across by name: it is
+  # the one raw column every layer keeps. The table is the layer's, its own or the plot's, with its
+  # panels assigned. The columns come out in the order ggplot2 evaluates them
   # (`Plot.mapping_order/2`): the layer's own aesthetics, then those it takes from the plot's
   # mapping, each mapping's `x` and `y` first and its others in name order; grouping keys on the
   # discrete ones in that order, so a discrete alpha mapped with `x` groups within each `x`, and a
-  # fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its groups.
+  # fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its groups. Each
+  # column is typed as it enters the frame, so an expression whose results mix two kinds is refused
+  # there, naming its aesthetic.
   defp evaluate(paneled_data, plot, layer) do
     mapping = Plot.computed_mapping(plot, layer)
 
-    renames =
+    columns =
       plot
       |> Plot.mapping_order(layer)
-      |> Enum.map(fn aesthetic -> {aesthetic, Map.fetch!(mapping, aesthetic)} end)
+      |> Enum.map(fn aesthetic ->
+        values =
+          mapping
+          |> Map.fetch!(aesthetic)
+          |> Mapping.evaluate(paneled_data)
 
-    panels = DataFrame.pull(paneled_data, :panel)
+        {aesthetic, values}
+      end)
 
-    paneled_data
-    |> DataFrame.select(renames)
-    |> DataFrame.put(:panel, panels)
+    columns
+    |> Enum.concat([{:panel, DataFrame.pull(paneled_data, :panel)}])
+    |> DataFrame.new()
   end
 
   # Which of the axis's scales each panel uses, by panel: the layout's `:scale_x` or `:scale_y`,
@@ -736,8 +760,10 @@ defmodule Giggly.Assembly do
   defp discreteness(:discrete), do: :discrete
   defp discreteness(_continuous), do: :continuous
 
-  defp axis_kind(plot, family) do
-    case mapped_columns(plot, fn aesthetic -> Aesthetics.family(aesthetic) == family end) do
+  defp axis_kind(plot, layer_frames, family) do
+    selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
+
+    case mapped_columns(plot, layer_frames, selected?) do
       [] -> :continuous
       columns -> checked_kind(columns, "an axis has one scale")
     end
@@ -746,30 +772,33 @@ defmodule Giggly.Assembly do
   # The kind of scale each aesthetic other than position needs, for those a layer maps: as an
   # axis's, every column of it must be a type some scale can map, and all of one kind, the first
   # deciding, as ggplot2 adds a scale for the first layer's and refuses a column it cannot map.
-  defp non_position_kinds(plot) do
+  defp non_position_kinds(plot, layer_frames) do
     for aesthetic <- Scale.non_position_aesthetics(),
-        columns = mapped_columns(plot, fn mapped -> mapped == aesthetic end),
+        columns = mapped_columns(plot, layer_frames, fn mapped -> mapped == aesthetic end),
         columns != [],
         into: %{},
         do: {aesthetic, checked_kind(columns, "an aesthetic has one scale")}
   end
 
   # Each column a layer maps to one of the aesthetics `selected?` chooses, in layer order, with what
-  # a refusal names: the layer's index, the aesthetic, the column as its table names it, its type
-  # and the kind of scale that type needs. The plot's mappings are read rather than the evaluated
-  # frames, so a refusal can name each column as its table names it, each layer's type read from
-  # the table it draws.
-  defp mapped_columns(plot, selected?) do
-    layers = Enum.reverse(plot.reversed_layers)
+  # a refusal names: the layer's index, the aesthetic, the value it is mapped to as the plot holds
+  # it, a column by the name its table gives it, its type and the kind of scale that type needs.
+  # The type is read from the layer's evaluated frame, `layer_frames` in layer order, since an
+  # expression's is known only once its function has run; the value from the plot's mapping, so a
+  # refusal names what the caller mapped rather than the aesthetic's column.
+  defp mapped_columns(plot, layer_frames, selected?) do
+    layers_and_frames =
+      plot.reversed_layers
+      |> Enum.reverse()
+      |> Enum.zip(layer_frames)
 
-    for {layer, index} <- Enum.with_index(layers),
-        table = Plot.layer_table(plot, layer),
-        dtypes = DataFrame.dtypes(table),
+    for {{layer, frame}, index} <- Enum.with_index(layers_and_frames),
+        dtypes = DataFrame.dtypes(frame),
         mapping = Plot.computed_mapping(plot, layer),
-        {aesthetic, column} <- Enum.sort(mapping),
+        {aesthetic, value} <- Enum.sort(mapping),
         selected?.(aesthetic),
-        dtype = Map.fetch!(dtypes, column),
-        do: {index, aesthetic, column, dtype, Scale.kind(dtype, aesthetic)}
+        dtype = Map.fetch!(dtypes, aesthetic),
+        do: {index, aesthetic, value, dtype, Scale.kind(dtype, aesthetic)}
   end
 
   defp checked_kind(

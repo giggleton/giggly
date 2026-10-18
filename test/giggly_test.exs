@@ -7,6 +7,11 @@ defmodule GigglyTest do
 
   @rows %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "qsec" => [16.46, 17.02]}
   @mixed_rows %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
+  @mpg_rows %{
+    "displ" => [1.8, 2.0, 5.7],
+    "hwy" => [29, 26, 17],
+    "class" => ["compact", "compact", "suv"]
+  }
 
   describe "layer_data/2" do
     test "a layer's mapping takes an aesthetic the plot also maps" do
@@ -764,6 +769,107 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, expressions and constants" do
+    # Golden: ggplot2 4.0.3's `layer_data()` for `ggplot(d, aes(cty, hwy / cty)) +
+    # geom_point(aes(colour = "smooth"))` in R 4.6.1 puts every row in group 1. The values it
+    # computes are `Giggly.Mapping`'s doctest.
+    test "a string constant is one level in every row, so the layer's rows are one group" do
+      frame =
+        %{"hwy" => [29, 24], "cty" => [18, 16]}
+        |> Plot.new(%{x: :cty, y: {&Kernel.//2, [:hwy, :cty]}})
+        |> Plot.geom_point(%{colour: {:constant, "smooth"}})
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :group) === [1, 1]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 puts every point of `aes(1, hwy)` at x 1, and colours every
+    # one of `aes(colour = 7)` #336A98, the gradient's middle, one value having no range.
+    test "a number constant is that position in every row, and its colour the gradient's middle" do
+      frame =
+        @rows
+        |> Plot.new(%{x: 1, y: :mpg, colour: 7})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :color)} ===
+               {[1, 1], ["#336A98", "#336A98"]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 groups `aes(toupper(class), hwy)` 2, 1, 2.
+    test "an expression that computes strings places its rows on a discrete axis, and groups them" do
+      frame =
+        %{"class" => ["suv", "compact", "suv"], "hwy" => [20, 29, 18]}
+        |> Plot.new(%{x: {&String.upcase/1, [:class]}, y: :hwy})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :group)} === {[2, 1, 2], [2, 1, 2]}
+    end
+
+    test "an expression whose results are of two types is refused when run, naming its aesthetic" do
+      either = fn value -> if value == 1, do: 1, else: "a" end
+
+      plot =
+        %{"x" => [1, 2], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: {either, [:x]}})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ ":color"
+    end
+
+    test "an axis's kinds disagreeing is refused naming each value as the plot holds it" do
+      plot =
+        %{"class" => ["suv", "compact"], "hwy" => [20, 29], "displ" => [1.8, 2.0]}
+        |> Plot.new(%{y: :hwy})
+        |> Plot.geom_point(%{x: :displ})
+        |> Plot.geom_point(%{x: {&String.upcase/1, [:class]}})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ ~s(index 1 maps :x to {&String.upcase/1, ["class"]})
+      assert error.message =~ ~s(index 0 maps :x to "displ")
+    end
+
+    test "a constant no scale can place is refused when run, naming the constant" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(%{colour: ~D[2020-01-01]})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~
+               "maps :color to {:constant, ~D[2020-01-01]}, a :date column, which no scale"
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 counts `aes(class, weight = w * 2)` 8 for compact and 6 for
+    # suv.
+    test "a computed weight is summed" do
+      frame =
+        %{"class" => ["suv", "suv", "compact"], "w" => [1, 2, 4]}
+        |> Plot.new(%{x: :class, weight: {&Kernel.*/2, [:w, 2]}})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) === [8.0, 6.0]
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 warns "Computation failed in `stat_count()`" for `geom_bar(aes(class,
+    # weight = as.character(hwy)))`, `rowsum()` refusing a weight that is not a number, and draws
+    # nothing of the layer; Giggly cannot warn, so it refuses, as it refuses a column at the call.
+    test "a computed weight that is not a number is refused when the plot is run" do
+      plot =
+        %{"class" => ["suv", "compact"], "w" => [1, 2]}
+        |> Plot.new(%{x: :class, weight: {&Kernel.to_string/1, [:w]}})
+        |> Plot.geom_bar()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "weight"
+      assert error.message =~ ":string"
+    end
+  end
+
   describe "layer_data/2, for geom_bar" do
     test "each bar counts its level's rows, its height the count" do
       frame =
@@ -1161,6 +1267,76 @@ defmodule GigglyTest do
         |> Giggly.Assembly.run()
 
       assert assembly.guide_titles === %{x: "x", y: "y"}
+    end
+
+    test "an expression titles its axis by its text, and one with a closure titles none" do
+      assembly =
+        %{"hwy" => [29, 24], "cty" => [18, 16]}
+        |> Plot.new(%{x: {&Kernel.//2, [:hwy, :cty]}, y: {fn hwy -> hwy * 2 end, [:hwy]}})
+        |> Plot.geom_point()
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles === %{x: "hwy / cty", y: :none}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles the colour legend `colour` for `aes(colour =
+    # "smooth")` alone, and `class` with a layer mapping colour to `class` before it or after.
+    test "a constant titles by its aesthetic's name where no layer's column titles it" do
+      legend_title = fn layers ->
+        [legend] =
+          layers
+          |> Enum.reduce(Plot.new(@mpg_rows, %{x: :displ, y: :hwy}), fn mapping, plot ->
+            Plot.geom_point(plot, mapping)
+          end)
+          |> Giggly.Assembly.run()
+          |> Map.fetch!(:legends)
+          |> Enum.filter(fn legend -> legend.aesthetics == [:color] end)
+
+        legend.title
+      end
+
+      constant = %{colour: {:constant, "smooth"}}
+      column = %{colour: :class}
+
+      assert Enum.map([[constant], [constant, column], [column, constant]], legend_title) ===
+               ["color", "class", "class"]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles y `count` for `geom_point(aes(y = 10)) + geom_bar()`
+    # and `y` for the two the other way round: of the fallbacks, the last layer's wins; and
+    # `hwy/displ` for `geom_point(aes(y = hwy / displ)) + geom_point(aes(y = hwy))`.
+    test "the last layer's fallback titles, a constant's or a stat's; a first expression's wins" do
+      y_title = fn plot -> Giggly.Assembly.run(plot).guide_titles.y end
+      plot = Plot.new(@mpg_rows, %{x: :class})
+
+      constant_first =
+        plot
+        |> Plot.geom_point(%{y: 10})
+        |> Plot.geom_bar()
+
+      count_first =
+        plot
+        |> Plot.geom_bar()
+        |> Plot.geom_point(%{y: 10})
+
+      expression_first =
+        plot
+        |> Plot.geom_point(%{y: {&Kernel.//2, [:hwy, :displ]}})
+        |> Plot.geom_point(%{y: :hwy})
+
+      assert Enum.map([constant_first, count_first, expression_first], y_title) ===
+               ["count", "y", "hwy / displ"]
+    end
+
+    test "a closure's title is the first layer's, so a later column does not title the axis" do
+      assembly =
+        @mpg_rows
+        |> Plot.new(%{x: :displ})
+        |> Plot.geom_point(%{y: {fn hwy -> hwy * 2 end, [:hwy]}})
+        |> Plot.geom_point(%{y: :hwy})
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles.y === :none
     end
 
     # ggplot2 4.0.3 titles the axes `wt` and `mpg` with the annotation added before the points, and

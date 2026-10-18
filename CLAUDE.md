@@ -40,8 +40,7 @@ Giggly is a grammar-of-graphics plotting library for Elixir, modelled on R's ggp
 
 Everything below is **built and merged to `main`** unless marked otherwise. Histories: the commit
 messages, indexed in design-log.md §6. Each line names the area's rules file, which carries its
-invariants. Add a line here when an area gets its rules file; nothing else about the area belongs
-here.
+invariants. Add a line here when an area gets its rules file; nothing else about it belongs here.
 
 - **Dependencies, toolchain, the quality gate's steps, lint and security waivers** —
   `.claude/rules/dependencies.md`; the `dependency-updates` skill.
@@ -51,6 +50,7 @@ here.
 - **The data frame** (layer data, input tables, column types) — `.claude/rules/data_frame.md`.
 - **The plot spec and its public API** (`Giggly.Plot`, layers, checking mappings at the call) —
   `.claude/rules/plot.md`.
+- **Mapping values** (`Giggly.Mapping`, expressions, constants) — `.claude/rules/mapping.md`.
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
   `Giggly`) — `.claude/rules/assembly.md`.
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.

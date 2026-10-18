@@ -26,12 +26,80 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{mapping: %{}}] = plot.reversed_layers
     end
 
-    test "a value that is not a column reference is refused rather than read as a column's name" do
+    test "a number is a constant rather than read as a column's name" do
       rows = %{"2.5" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
 
-      error = assert_raise ArgumentError, fn -> Plot.new(rows, %{x: 2.5, y: :mpg}) end
-      assert error.message =~ ":x"
-      assert error.message =~ "2.5"
+      assert Plot.new(rows, %{x: 2.5, y: :mpg}).mapping === %{x: {:constant, 2.5}, y: "mpg"}
+    end
+
+    test "a value the mapping grammar refuses is refused here, naming the call and the value" do
+      error = assert_raise ArgumentError, fn -> Plot.new(@rows, %{x: :wt, colour: nil}) end
+      assert error.message =~ "Plot.new/2"
+      assert error.message =~ ":color to nil"
+    end
+  end
+
+  describe "mappings of expressions and constants" do
+    test "a layer holds each value resolved, an expression's columns by name as strings" do
+      divide = &Kernel.//2
+      plot = Plot.new(@rows, %{x: :wt})
+
+      assert [%Plot.Layer{mapping: mapping}] =
+               Plot.geom_point(plot, %{y: {divide, [:mpg, :wt]}, colour: {:constant, "a"}}).reversed_layers
+
+      assert mapping === %{y: {divide, ["mpg", "wt"]}, color: {:constant, "a"}}
+    end
+
+    test "a column an expression reads is checked against the layer's table, naming the column" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_point(plot, %{y: {&Kernel.//2, [:mpg, :weight]}})
+        end
+
+      assert error.message =~ "Plot.geom_point/3"
+      assert error.message =~ ":y"
+      assert error.message =~ ~s("weight")
+      assert error.message =~ "the plot's data"
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails to build `ggplot(df, aes(wt, mpg / cyl)) +
+    # geom_point(data = df2)` where df2 lacks `cyl`: "object 'cyl' not found".
+    test "a column an expression from the plot's mapping reads is checked against each layer's" do
+      plot = Plot.new(@rows, %{x: :wt, y: {&Kernel.//2, [:mpg, :cyl]}})
+      own = %{"wt" => [3.0], "mpg" => [20.0]}
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, data: own) end
+
+      assert error.message =~ ":y"
+      assert error.message =~ "plot's mapping"
+      assert error.message =~ ~s("cyl")
+      assert error.message =~ "own data"
+    end
+
+    test "a constant reads no column, so a layer's own table needs none for it" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: {:constant, "smooth"}})
+
+      assert [%Plot.Layer{}] =
+               Plot.geom_point(plot, data: %{"wt" => [3.0], "mpg" => [20.0]}).reversed_layers
+    end
+
+    test "a constant weight that is not a number is refused at the call, naming its type" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{weight: {:constant, "a"}}) end
+
+      assert error.message =~ ~s({:constant, "a"})
+      assert error.message =~ ":string"
+    end
+
+    test "an expression's weight is not checked at the call, its type known only when run" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      assert [%Plot.Layer{}] =
+               Plot.geom_bar(plot, %{weight: {&Kernel.to_string/1, [:wt]}}).reversed_layers
     end
   end
 

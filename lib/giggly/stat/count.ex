@@ -60,12 +60,29 @@ defmodule Giggly.Stat.Count do
 
     @impl Giggly.Stat
     def compute_layer(_stat, frame) do
+      check_weight(frame)
       flipped = :x not in DataFrame.names(frame)
 
       frame
       |> flip(flipped)
       |> count(flipped)
       |> flip(flipped)
+    end
+
+    # A weight is summed, so it must hold numbers. `Giggly.Plot` refuses a column or a constant
+    # that does not at the call; an expression's type is known only once it has run, so one that
+    # computes anything else is refused here, where ggplot2's `rowsum()` refuses it inside the
+    # stat and ggplot2 warns and draws nothing of the layer, which a pure pipeline cannot.
+    defp check_weight(frame) do
+      case DataFrame.dtypes(frame) do
+        %{weight: dtype} when dtype not in [:integer, :float, :null] ->
+          raise ArgumentError,
+                "counting sums each row's weight, so a weight must be a number, but the " <>
+                  "layer's weight is a #{inspect(dtype)} column"
+
+        _numbers_or_no_weight ->
+          :ok
+      end
     end
 
     defp flip(frame, false), do: frame
