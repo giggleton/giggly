@@ -74,5 +74,5 @@ ggplot(df_shapes, aes(0, 0, shape = shape)) +
 gives each a panel of its own. Giggly has `facet_wrap()`: `facet_wrap(~shape)` is
 `Giggly.Plot.facet_wrap(plot, :shape)`.
 
-Not in Giggly yet: an expression in a mapping, here the constants `0`, mapping `shape`, a fixed
-`size`, a point's `fill`, `scale_shape_identity()` and `theme_void()`.
+Not in Giggly yet: mapping `shape`, a fixed `size`, a point's `fill`, `scale_shape_identity()` and
+`theme_void()`.

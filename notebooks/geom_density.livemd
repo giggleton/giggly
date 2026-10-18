@@ -92,8 +92,7 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "stack")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, and an expression in a mapping, such as
-`after_stat(count)`.
+Not in Giggly yet: `geom_density()` and `stat_density()`.
 
 ## Conditional densities
 
@@ -103,5 +102,4 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, `position_fill()`, and an expression in a
-mapping, such as `after_stat(count)`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, and `position_fill()`.

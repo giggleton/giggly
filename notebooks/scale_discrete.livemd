@@ -134,8 +134,8 @@ ggplot(mpg, aes(reorder(manufacturer, displ), cty)) +
   geom_point()
 ```
 
-Not in Giggly yet: choosing the order of a column's values, and an expression in a mapping, such
-as `reorder(manufacturer, cty)`.
+Not in Giggly yet: choosing the order of a column's values, and a whole-column function in a
+mapping, such as `reorder(manufacturer, cty)`.
 
 ## Abbreviated labels
 
@@ -146,6 +146,6 @@ ggplot(mpg, aes(reorder(manufacturer, displ), cty)) +
   scale_x_discrete(labels = abbreviate)
 ```
 
-Not in Giggly yet: choosing the order of a column's values, an expression in a mapping, such as
-`reorder(manufacturer, displ)`, and `scale_x_discrete()` and its `labels` option, here given R's
-`abbreviate()` to shorten each name.
+Not in Giggly yet: choosing the order of a column's values, a whole-column function in a mapping,
+such as `reorder(manufacturer, displ)`, and `scale_x_discrete()` and its `labels` option, here given
+R's `abbreviate()` to shorten each name.

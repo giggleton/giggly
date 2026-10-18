@@ -95,7 +95,7 @@ ggplot(diamonds, aes(price, after_stat(density), colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_freqpoly()` and an expression in a mapping, here `after_stat(density)`.
+Not in Giggly yet: `geom_freqpoly()`.
 
 ## Bins of unequal width
 
@@ -116,8 +116,7 @@ ggplot(diamonds, aes(price, after_stat(count / width))) +
 With the count as its height, every bar is about as tall as the next and the widest look the
 biggest; dividing each count by its bin's width makes each bar's area its count instead.
 
-Not in Giggly yet: `geom_histogram()` and its `breaks` option, and an expression in a mapping, here
-`after_stat(count / width)`.
+Not in Giggly yet: `geom_histogram()` and its `breaks` option.
 
 ## Movies by rating
 

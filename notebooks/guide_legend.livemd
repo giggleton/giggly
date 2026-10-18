@@ -110,8 +110,8 @@ p3 + guides(colour = guide_legend(override.aes = list(alpha = 1)))
 Keys are drawn as the layer draws its points, here almost transparent; `override.aes` draws them
 with an `alpha` of their own.
 
-Not in Giggly yet: jittered points (`geom_jitter()`), an expression in a mapping, such as
-`factor(cyl)`, `guides()`, and `guide_legend()` and its `override.aes` option.
+Not in Giggly yet: jittered points (`geom_jitter()`), `guides()`, and `guide_legend()` and its
+`override.aes` option.
 
 ## Rows and columns of keys
 

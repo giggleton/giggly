@@ -162,8 +162,7 @@ p + geom_label(aes(fill = factor(cyl)), colour = "white", fontface = "bold")
 
 `scale_colour_hue(l = 40)` darkens the colours by lowering their luminance.
 
-Not in Giggly yet: `geom_label()`, an expression in a mapping, such as `factor(cyl)`,
-`scale_colour_hue()`, and a fixed `fontface`.
+Not in Giggly yet: `geom_label()`, `scale_colour_hue()`, and a fixed `fontface`.
 
 ## Mapping size
 
@@ -194,8 +193,7 @@ p +
 
 Each label is written as, say, `2.62^(6)`, which R's plotmath draws as 2.62 with a superscript 6.
 
-Not in Giggly yet: `geom_text()`'s `parse` option, R's plotmath expressions, and an expression in a
-mapping, such as `paste(wt, "^(", cyl, ")", sep = "")`.
+Not in Giggly yet: `geom_text()`'s `parse` option and R's plotmath expressions.
 
 ## A text annotation
 
@@ -265,8 +263,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
   )
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `y + 0.05`, `geom_text()`'s `position`
-option and `position_dodge()`'s options.
+Not in Giggly yet: `geom_text()`'s `position` option and `position_dodge()`'s options.
 
 ## Labels in the middle of stacked columns
 

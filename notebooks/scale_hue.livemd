@@ -107,5 +107,5 @@ ggplot(mtcars, aes(mpg, wt)) +
   scale_colour_hue(na.value = "black")
 ```
 
-Not in Giggly yet: an expression in a mapping, here `miss`, a vector outside the data, and
-`scale_colour_hue()` and its `na.value` option.
+Not in Giggly yet: a vector outside the data in a mapping, here `miss`, and `scale_colour_hue()` and
+its `na.value` option.

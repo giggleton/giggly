@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -15,15 +26,18 @@ the page gives them. Each example shows ggplot2's code first and then Giggly's. 
 cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a
 list of what remains.
 
-The `group` aesthetic splits a layer's rows into groups, such as one line or one bar for each.
-By default the groups are the combinations of the plot's discrete variables, such as a discrete
-`x` or a mapped `colour`; where that partitions the data wrongly, or nothing is discrete, mapping
-`group` to a column sets them by hand. Three cases need it: lines through many individuals, lines
-across a discrete axis, and layers grouped differently, such as one fit to all the rows over
-lines for each individual. The later examples show these with `nlme`'s `Oxboys`, the heights of
-26 boys, each measured on nine occasions. Giggly maps `group` to a column, as a layer of points
-or bars takes it, and stacks bars at the same `x`, one for each group; it has none of the other
-aesthetics the examples group by, nor lines, smoothers or boxplots.
+The `group` aesthetic splits a layer's rows into groups, such as one line or one bar for each. By
+default the groups are the combinations of the plot's discrete variables, such as a discrete `x` or
+a mapped `colour`; where that partitions the data wrongly, or nothing is discrete, mapping `group`
+to a column sets them by hand. Three cases need it: lines through many individuals, lines across a
+discrete axis, and layers grouped differently, such as one fit to all the rows over lines for each
+individual. The later examples show these with `nlme`'s `Oxboys`, the heights of 26 boys, each
+measured on nine occasions. Giggly maps `group` to a column, as a layer of points, bars or lines
+takes it, and stacks bars at the same `x`, one for each group; it maps no `shape` or `linetype`, and
+has no `geom_smooth()` or `geom_boxplot()`. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
 
 ## A scatter plot
 
@@ -44,8 +58,7 @@ p + geom_point(aes(colour = factor(cyl)), size = 4)
 p + geom_point(aes(shape = factor(cyl)), size = 4)
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, an expression in a mapping,
-such as `factor(cyl)`, and a fixed `size`.
+Not in Giggly yet: mapping `shape` and the legend that reads it back, and a fixed `size`.
 
 ## Groups by fill
 
@@ -57,9 +70,28 @@ p + geom_bar(aes(fill = factor(cyl)))
 p + geom_bar(aes(fill = factor(vs)))
 ```
 
-Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values.
+Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values. Giggly
+writes `factor(cyl)` as `{:factor, [:cyl]}`.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+```elixir
+p = Plot.new(mtcars, %{x: {:factor, [:cyl]}})
+
+p
+|> Plot.geom_bar()
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_bar(%{fill: {:factor, [:cyl]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_bar(%{fill: {:factor, [:vs]}})
+|> render.()
+```
 
 ## Groups by linetype
 
@@ -100,8 +132,8 @@ p + geom_smooth(aes(group = Subject), method = "lm", se = FALSE)
 p + geom_smooth(aes(group = 1), size = 2, method = "lm", se = FALSE)
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, `geom_smooth()` and the straight lines it
-fits with `lm()`, an expression in a mapping, such as the constant `1`, and a fixed `size`.
+Not in Giggly yet: the `Oxboys` dataset, `geom_smooth()` and the straight lines it fits with `lm()`,
+and a fixed `size`.
 
 ## Lines across a discrete axis
 

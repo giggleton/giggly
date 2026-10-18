@@ -45,8 +45,8 @@ ggplot(mtcars, aes(mpg, factor(cyl))) +
   stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size = 3)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `stat_summary()`,
-`geom_pointrange()`, `mean_cl_boot()`, and a fixed `linewidth` and `size`.
+Not in Giggly yet: `stat_summary()`, `geom_pointrange()`, `mean_cl_boot()`, and a fixed `linewidth`
+and `size`.
 
 ## One summary function
 
@@ -61,8 +61,8 @@ d + aes(colour = factor(vs)) + stat_summary(fun = mean, geom="line")
 The last plot adds a mapping to `d` with `+ aes()`, and joins the means of each group with a
 line.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, a fixed `size`, adding a mapping with `+
-aes()`, and an expression in a mapping, such as `factor(vs)`.
+Not in Giggly yet: `stat_summary()` and its `fun` option, a fixed `size`, and adding a mapping with
+`+ aes()`.
 
 ## A range from three functions
 
@@ -169,8 +169,7 @@ m2
 # supplementing the raw data with summary statistics is _very_ important
 ```
 
-Not in Giggly yet: the `movies` dataset, an expression in a mapping, such as
-`factor(round(rating))`, `stat_summary()`, `geom_crossbar()` and its `width` option,
+Not in Giggly yet: the `movies` dataset, `stat_summary()`, `geom_crossbar()` and its `width` option,
 `mean_cl_boot()`, and `xlab()`.
 
 ## A log scale before or after the stat

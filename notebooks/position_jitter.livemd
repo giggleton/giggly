@@ -74,5 +74,5 @@ ggplot(mtcars, aes(am, vs)) +
 With a `seed`, the position jitters both layers the same way, so each red point sits 0.2 above
 and to the right of its black one.
 
-Not in Giggly yet: `position_jitter()` and its `seed` option, `geom_point()`'s `position` option,
-and an expression in a mapping, such as `am + 0.2`.
+Not in Giggly yet: `position_jitter()` and its `seed` option, and `geom_point()`'s `position`
+option.

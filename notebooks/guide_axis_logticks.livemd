@@ -65,8 +65,8 @@ p + aes(x = log2(bodywt), y = log10(brainwt)) +
 The mapping logs the data itself, base 2 for x and base 10 for y, and `prescale.base` tells each
 axis which base that was.
 
-Not in Giggly yet: the `msleep` dataset, the `na.rm` option, an expression in a mapping, such as
-`log2(bodywt)`, `guides()`, and `guide_axis_logticks()` with its `prescale.base` option.
+Not in Giggly yet: the `msleep` dataset, the `na.rm` option, `guides()`, and `guide_axis_logticks()`
+with its `prescale.base` option.
 
 ## A pseudo-log scale
 

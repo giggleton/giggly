@@ -87,9 +87,9 @@ b <- ggplot(msleep, aes(log10(bodywt), log10(brainwt))) +
 b + annotation_logticks()
 ```
 
-Not in Giggly yet: the `msleep` dataset, an expression in a mapping, such as `log10(bodywt)`,
-`scale_x_continuous()` and `scale_y_continuous()` with titles and labels from the `scales`
-package, `theme_bw()`, changing the theme, and `annotation_logticks()`.
+Not in Giggly yet: the `msleep` dataset, `scale_x_continuous()` and `scale_y_continuous()` with
+titles and labels from the `scales` package, `theme_bw()`, changing the theme, and
+`annotation_logticks()`.
 
 ## Log coordinates
 

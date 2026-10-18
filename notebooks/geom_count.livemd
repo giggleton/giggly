@@ -93,9 +93,8 @@ d + geom_count(aes(size = after_stat(prop), group = 1)) +
 
 With each combination of `cut` and `clarity` a group of its own, every proportion is 1, so every
 point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet:
-`geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it back, an expression in
-a mapping, such as `after_stat(prop)` or the constant `1`, and `scale_size_area()` and its
-`max_size` option.
+`geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it back, and
+`scale_size_area()` and its `max_size` option.
 
 ## Proportions of each row or column
 
@@ -108,5 +107,5 @@ d + geom_count(aes(size = after_stat(prop), group = clarity)) +
 ```
 
 Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: `geom_count()` and
-`stat_sum()`, mapping `size` and the legend that reads it back, an expression in a mapping, such as
-`after_stat(prop)`, and `scale_size_area()` and its `max_size` option.
+`stat_sum()`, mapping `size` and the legend that reads it back, and `scale_size_area()` and its
+`max_size` option.

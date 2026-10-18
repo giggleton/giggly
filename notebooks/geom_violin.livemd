@@ -27,7 +27,7 @@ p <- ggplot(mtcars, aes(factor(cyl), mpg))
 p + geom_violin()
 ```
 
-Not in Giggly yet: `geom_violin()`, and an expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()`.
 
 ## Horizontal violins
 
@@ -37,7 +37,7 @@ ggplot(mtcars, aes(mpg, factor(cyl))) +
   geom_violin()
 ```
 
-Not in Giggly yet: `geom_violin()`, and an expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()`.
 
 ## Violins with jittered points
 
@@ -45,8 +45,7 @@ Not in Giggly yet: `geom_violin()`, and an expression in a mapping, such as `fac
 p + geom_violin() + geom_jitter(height = 0, width = 0.1)
 ```
 
-Not in Giggly yet: `geom_violin()`, `geom_jitter()` with its `height` and `width` options, and an
-expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and `geom_jitter()` with its `height` and `width` options.
 
 ## Scaling the widths
 
@@ -60,8 +59,7 @@ p + geom_violin(scale = "width")
 
 By default every violin has the same area, `scale = "area"`.
 
-Not in Giggly yet: `geom_violin()` and its `scale` option, and an expression in a mapping, such as
-`factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and its `scale` option.
 
 ## Untrimmed tails
 
@@ -70,8 +68,7 @@ Not in Giggly yet: `geom_violin()` and its `scale` option, and an expression in 
 p + geom_violin(trim = FALSE)
 ```
 
-Not in Giggly yet: `geom_violin()` and its `trim` option, and an expression in a mapping, such as
-`factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and its `trim` option.
 
 ## A smaller bandwidth
 
@@ -82,8 +79,7 @@ p + geom_violin(adjust = .5)
 
 `adjust` multiplies the bandwidth the density estimate would otherwise use.
 
-Not in Giggly yet: `geom_violin()` and its `adjust` option, and an expression in a mapping, such
-as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and its `adjust` option.
 
 ## Mapping fill
 
@@ -100,7 +96,7 @@ p + geom_violin(aes(fill = factor(am)))
 Mapping `fill` to something discrete that varies within each `x`, as `factor(vs)` does, splits a
 violin into one for each value, dodged side by side.
 
-Not in Giggly yet: `geom_violin()` and expressions in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()`.
 
 ## A fixed fill and colour
 
@@ -109,7 +105,7 @@ Not in Giggly yet: `geom_violin()` and expressions in a mapping, such as `factor
 p + geom_violin(fill = "grey80", colour = "#3366FF")
 ```
 
-Not in Giggly yet: `geom_violin()` and an expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()`.
 
 ## Quartiles
 
@@ -120,8 +116,7 @@ p + geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))
 
 ggplot2 has deprecated `draw_quantiles`, in favour of `quantiles` and `quantile.linetype`.
 
-Not in Giggly yet: `geom_violin()` and its `draw_quantiles` option, and an expression in a mapping,
-such as `factor(cyl)`.
+Not in Giggly yet: `geom_violin()` and its `draw_quantiles` option.
 
 ## Scale and coordinate transformations
 
@@ -151,8 +146,8 @@ m +
 `cut_width(rating, 0.5)` groups the films into bins of rating half a point wide, a violin for
 each.
 
-Not in Giggly yet: `geom_violin()`, an expression in a mapping, such as `cut_width(rating, 0.5)`,
-`cut_width()`, `scale_y_log10()`, `coord_transform()`, and the `movies` dataset from the
+Not in Giggly yet: `geom_violin()`, a whole-column function in a mapping, such as `cut_width(rating,
+0.5)`, `cut_width()`, `scale_y_log10()`, `coord_transform()`, and the `movies` dataset from the
 `ggplot2movies` package.
 
 ## Violins along a continuous x
@@ -167,5 +162,6 @@ ggplot(movies, aes(year, budget)) +
 }
 ```
 
-Not in Giggly yet: `geom_violin()` and its `scale` option, an expression in a mapping, such as
-`cut_width(year, 10)`, `cut_width()`, and the `movies` dataset from the `ggplot2movies` package.
+Not in Giggly yet: `geom_violin()` and its `scale` option, a whole-column function in a mapping,
+such as `cut_width(year, 10)`, `cut_width()`, and the `movies` dataset from the `ggplot2movies`
+package.

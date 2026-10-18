@@ -43,8 +43,7 @@ ggplot(faithful, aes(waiting, eruptions, color = eruptions > 3)) +
 `eruptions > 3` parts the short eruptions from the long, and colouring by it also groups by it,
 so each group gets an ellipse of its own.
 
-Not in Giggly yet: the `faithful` dataset, `stat_ellipse()`, and an expression in a mapping, such as
-`eruptions > 3`.
+Not in Giggly yet: the `faithful` dataset and `stat_ellipse()`.
 
 ## Normal and t ellipses
 
@@ -55,8 +54,8 @@ ggplot(faithful, aes(waiting, eruptions, color = eruptions > 3)) +
   stat_ellipse(type = "t")
 ```
 
-Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` option, a fixed
-`linetype`, and an expression in a mapping, such as `eruptions > 3`.
+Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` option, and a fixed
+`linetype`.
 
 ## A circle
 
@@ -72,7 +71,7 @@ ggplot(faithful, aes(waiting, eruptions, color = eruptions > 3)) +
 because `coord_fixed()` gives a unit of `x` the same length on the page as a unit of `y`.
 
 Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` and `level` options, a
-fixed `linetype`, `coord_fixed()`, and an expression in a mapping, such as `eruptions > 3`.
+fixed `linetype`, and `coord_fixed()`.
 
 ## Filled ellipses
 
@@ -81,5 +80,4 @@ ggplot(faithful, aes(waiting, eruptions, fill = eruptions > 3)) +
   stat_ellipse(geom = "polygon")
 ```
 
-Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` drawn as polygons, `geom_polygon()`, and
-an expression in a mapping, such as `eruptions > 3`.
+Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` drawn as polygons, and `geom_polygon()`.

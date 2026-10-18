@@ -30,15 +30,16 @@ An aesthetic mapping says which of the data's columns each visual property of a 
 aesthetics, is drawn from. ggplot2 builds one with `aes()`, which quotes its arguments, so each is
 an expression evaluated in the data, and standardises the aesthetics' names. A mapping given to
 `ggplot()` applies to every layer, and one given to a layer to that layer alone. A Giggly mapping is
-a plain map from aesthetic to column, `%{x: :displ, y: :hwy}`, a column named by an atom or a
-string; it names columns only, not expressions or constants. The mapping given to
-`Giggly.Plot.new/2` applies to every layer, and a layer's own mapping is laid over it. A plot is
-described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
-setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
-a plot and shows it below the cell with `Kino.Image`. The examples use `Giggly.Datasets.mpg/0`,
-ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, and
-`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
-setup cell binds to `mpg` and `mtcars`, the names ggplot2 and R give them.
+a plain map from aesthetic to value, `%{x: :displ, y: :hwy}`: a column, named by an atom or a
+string, an expression, a function and the values it is applied to in each row, or a constant
+(`Giggly.Mapping`); it has no whole-column function in a mapping, such as `cut_number()`. The
+mapping given to `Giggly.Plot.new/2` applies to every layer, and a layer's own mapping is laid over
+it. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The examples use
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
+to 2008, and `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
+magazine, which the setup cell binds to `mpg` and `mtcars`, the names ggplot2 and R give them.
 
 ## A mapping
 
@@ -58,7 +59,10 @@ it, and every aesthetic is named, `x` and `y` included.
 aes(x = mpg ^ 2, y = wt / cyl)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `mpg ^ 2` or `wt / cyl`.
+A Giggly mapping writes an expression as a function and the values it is applied to in each row,
+`%{x: {&Kernel.**/2, [:mpg, 2]}, y: {&Kernel.//2, [:wt, :cyl]}}`, each value a column, a constant
+or another expression. A capture names its function, so the axes are titled as Elixir writes the
+call, `mpg ** 2` and `wt / cyl`, where ggplot2 writes `mpg^2` and `wt/cyl`.
 
 ## Constants
 
@@ -67,8 +71,9 @@ Not in Giggly yet: an expression in a mapping, such as `mpg ^ 2` or `wt / cyl`.
 aes(x = 1, colour = "smooth")
 ```
 
-Not in Giggly yet: an expression in a mapping, here the constants `1` and `"smooth"`. A string in a
-Giggly mapping names a column, as an atom does.
+A number is a constant written alone; a string or an atom would name a column, so a constant one
+is wrapped: `%{x: 1, colour: {:constant, "smooth"}}`. As in ggplot2, `"smooth"` is one level in
+every row, and a constant's guide is titled by its aesthetic's name.
 
 ## Standard names
 
@@ -174,4 +179,4 @@ cut3 <- function(x) cut_number(x, 3)
 scatter_by(mtcars, cut3(disp), drat)
 ```
 
-Not in Giggly yet: `cut_number()`, and an expression in a mapping, such as `cut3(disp)`.
+Not in Giggly yet: `cut_number()` and a whole-column function in a mapping, here `cut3(disp)`.

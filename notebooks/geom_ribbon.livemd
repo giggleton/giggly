@@ -33,8 +33,7 @@ h + geom_ribbon(aes(ymin=0, ymax=level))
 h + geom_area(aes(y = level))
 ```
 
-Not in Giggly yet: `geom_ribbon()` and `geom_area()`, an expression in a mapping, such as the
-constant `ymin = 0`, and the `LakeHuron` dataset.
+Not in Giggly yet: `geom_ribbon()` and `geom_area()`, and the `LakeHuron` dataset.
 
 ## A horizontal area
 
@@ -55,8 +54,7 @@ h +
   geom_line(aes(y = level))
 ```
 
-Not in Giggly yet: `geom_ribbon()`, an expression in a mapping, such as `level - 1`, and the
-`LakeHuron` dataset.
+Not in Giggly yet: `geom_ribbon()` and the `LakeHuron` dataset.
 
 ## Groups at different x values
 

@@ -77,7 +77,7 @@ ggplot(big, aes(mpg, wt, colour = factor(cyl))) +
   lims(colour = c("4", "6", "8"))
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `lims()`.
+Not in Giggly yet: `lims()`.
 
 ## Two ways to limit an axis
 

@@ -131,8 +131,7 @@ ggplot(mtcars, aes(x = factor(cyl), y = mpg)) +
 
 `binaxis = "y"` bins `mpg` up the y axis and stacks the dots sideways, one stack for each `x`.
 
-Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, and an expression
-in a mapping, such as `1` or `factor(cyl)`.
+Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options.
 
 ## Dodging groups
 
@@ -141,8 +140,7 @@ ggplot(mtcars, aes(x = factor(vs), fill = factor(cyl), y = mpg)) +
   geom_dotplot(binaxis = "y", stackdir = "center", position = "dodge")
 ```
 
-Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options, and an expression in a
-mapping, such as `factor(vs)`.
+Not in Giggly yet: `geom_dotplot()` and its `binaxis` and `stackdir` options.
 
 ## Aligning the bins of groups
 
@@ -152,8 +150,7 @@ ggplot(mtcars, aes(x = factor(am), y = mpg)) +
   geom_dotplot(binaxis = "y", stackdir = "center", binpositions="all")
 ```
 
-Not in Giggly yet: `geom_dotplot()` and its `binaxis`, `stackdir` and `binpositions` options,
-and an expression in a mapping, such as `factor(am)`.
+Not in Giggly yet: `geom_dotplot()` and its `binaxis`, `stackdir` and `binpositions` options.
 
 ## Stacking groups
 
@@ -173,4 +170,4 @@ ggplot(mtcars, aes(x = 1, y = mpg, fill = factor(cyl))) +
 `position = "stack"` would if a dot plot could use it.
 
 Not in Giggly yet: `geom_dotplot()` and its `stackgroups`, `binwidth`, `binpositions`, `method` and
-`binaxis` options, and an expression in a mapping, such as `factor(cyl)` or `1`.
+`binaxis` options.

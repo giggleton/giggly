@@ -34,8 +34,7 @@ b +
 Both layers draw a one-row table of their own, `df`, over the points of `mtcars`, and mapping
 `colour` to a constant names each layer in the legend.
 
-Not in Giggly yet: `geom_curve()` and `geom_segment()`, mapping `xend` and `yend`, and an expression
-in a mapping, such as the constant `"curve"`.
+Not in Giggly yet: `geom_curve()` and `geom_segment()`, and mapping `xend` and `yend`.
 
 ## Curvature and arrows
 
@@ -70,9 +69,8 @@ ggplot2's `seals` is a vector field of seals' movements: at each point of a grid
 latitudes, the change in longitude and latitude. `annotation_borders("state")` draws the outlines
 of the US states from the `maps` package.
 
-Not in Giggly yet: `geom_segment()` and its `arrow` option, mapping `xend` and `yend`, an
-expression in a mapping, such as `long + delta_long`, `annotation_borders()` and the map data from
-the `maps` package it draws, and the `seals` dataset.
+Not in Giggly yet: `geom_segment()` and its `arrow` option, mapping `xend` and `yend`,
+`annotation_borders()` and the map data from the `maps` package it draws, and the `seals` dataset.
 
 ## Line ends and joins
 
@@ -97,9 +95,8 @@ R's `expand.grid()` makes a row for each combination of line end and line join, 
 segment is drawn with its own line end and join, and labelled with their names.
 
 Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, a fixed
-`size`, mapping `xend` and `yend`, expressions in a mapping, such as the constant `x = 1` and
-`paste(lineend, linejoin)`, and `xlim()`. ggplot2 knows no `hjust` called `'outside'` and centres
-these labels, as Giggly does by default.
+`size`, mapping `xend` and `yend`, and `xlim()`. ggplot2 knows no `hjust` called `'outside'` and
+centres these labels, as Giggly does by default.
 
 ## Spikes, as base R draws them
 
@@ -118,5 +115,5 @@ R's `rpois()` draws 100 random counts from a Poisson distribution with mean 5, a
 counts how often each occurs. Base R's `plot(type = "h")` draws a vertical line from 0 up to each
 frequency, and the `ggplot()` call draws the same with segments.
 
-Not in Giggly yet: `geom_segment()` and its `lineend` option, mapping `xend` and `yend`, an
-expression in a mapping, such as the constant `yend = 0`, and a fixed `linewidth`.
+Not in Giggly yet: `geom_segment()` and its `lineend` option, mapping `xend` and `yend`, and a fixed
+`linewidth`.

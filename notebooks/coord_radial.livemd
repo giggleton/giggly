@@ -37,8 +37,8 @@ pie <- ggplot(mtcars, aes(x = factor(1), fill = factor(cyl))) +
 pie + coord_radial(theta = "y", expand = FALSE)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(1)` and `factor(cyl)`, `geom_bar()`'s
-`width` option, and `coord_radial()`'s `theta` and `expand` options.
+Not in Giggly yet: `geom_bar()`'s `width` option and `coord_radial()`'s `theta` and `expand`
+options.
 
 ## A coxcomb plot
 
@@ -49,8 +49,7 @@ cxc <- ggplot(mtcars, aes(x = factor(cyl))) +
 cxc + coord_radial(expand = FALSE)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `geom_bar()`'s `width` option,
-and `coord_radial()`'s `expand` option.
+Not in Giggly yet: `geom_bar()`'s `width` option and `coord_radial()`'s `expand` option.
 
 ## Counts as angles
 
@@ -59,8 +58,8 @@ and `coord_radial()`'s `expand` option.
 cxc + coord_radial(theta = "y", expand = FALSE)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `geom_bar()`'s `width` option,
-and `coord_radial()`'s `theta` and `expand` options.
+Not in Giggly yet: `geom_bar()`'s `width` option and `coord_radial()`'s `theta` and `expand`
+options.
 
 ## A bullseye chart
 
@@ -69,8 +68,7 @@ and `coord_radial()`'s `theta` and `expand` options.
 pie + coord_radial(expand = FALSE)
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(1)` and `factor(cyl)`, `geom_bar()`'s
-`width` option, and `coord_radial()`'s `expand` option.
+Not in Giggly yet: `geom_bar()`'s `width` option and `coord_radial()`'s `expand` option.
 
 ## A pie chart's colours and starting angle
 
@@ -87,8 +85,8 @@ ggplot(df, aes(x = "", y = value, fill = variable)) +
   labs(title = "Pac man")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as the constant `""`, `geom_col()`'s `width`
-option, `scale_fill_manual()`, and `coord_radial()`'s `theta`, `start` and `expand` options.
+Not in Giggly yet: `geom_col()`'s `width` option, `scale_fill_manual()`, and `coord_radial()`'s
+`theta`, `start` and `expand` options.
 
 ## A wind rose and a race track
 

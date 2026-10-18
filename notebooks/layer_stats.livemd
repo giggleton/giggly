@@ -15,12 +15,12 @@ this notebook says only what the page describes and where Giggly stands.
 
 A layer's stat computes on its data before anything is drawn: the stat decides what is shown, and
 the geom how. ggplot2 takes a layer's stat from a `stat_*()` function, from a geom's default, as a
-string given to a geom (`geom_line(stat = "density")`), as a ggproto object, or through
-`layer()`. Some geoms are paired with a stat of their own, as `geom_histogram()` is with
-`stat_bin()` and `geom_boxplot()` with `stat_boxplot()`, and most use `stat_identity()`, which
-leaves the data as it is. The variables a stat computes can be mapped with `after_stat()`. Of
-ggplot2's stats, Giggly computes one: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums
-their `weight`, as `geom_bar()` and `stat_count()` do; its points, columns, paths and lines draw the
-data as it is, as `geom_point()`, `geom_col()`, `geom_path()` and `geom_line()` do with
-`stat_identity()`. Not in Giggly yet: every other stat, giving a layer its stat by name, `layer()`,
-and an expression in a mapping, such as `after_stat(count)`.
+string given to a geom (`geom_line(stat = "density")`), as a ggproto object, or through `layer()`.
+Some geoms are paired with a stat of their own, as `geom_histogram()` is with `stat_bin()` and
+`geom_boxplot()` with `stat_boxplot()`, and most use `stat_identity()`, which leaves the data as it
+is. The variables a stat computes can be mapped with `after_stat()`. Of ggplot2's stats, Giggly
+computes one: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums their `weight`, as
+`geom_bar()` and `stat_count()` do; its points, columns, paths and lines draw the data as it is, as
+`geom_point()`, `geom_col()`, `geom_path()` and `geom_line()` do with `stat_identity()`. A mapping
+reads what counting computes, `count` and `prop`, with `{:after_stat, [:prop]}`. Not in Giggly yet:
+every other stat, giving a layer its stat by name, and `layer()`.

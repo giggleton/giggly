@@ -83,8 +83,7 @@ v + geom_contour(aes(colour = after_stat(level)))
 v + geom_contour(colour = "red")
 ```
 
-Not in Giggly yet: `geom_contour()`, mapping `z`, an expression in a mapping, such as
-`after_stat(level)`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour()`, mapping `z`, and the `faithfuld` dataset.
 
 ## Contours over a raster
 

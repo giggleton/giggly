@@ -17,8 +17,8 @@ describes and where Giggly stands.
 the same aesthetic mapping from inputs quoted explicitly, `aes_string()` from strings and `aes_()`
 from quoted calls or one-sided formulas, which made them easy to call from functions that build
 plots. `aes_q()` is another name for `aes_()`. All three are deprecated: ggplot2 now recommends
-`aes()` with the `.data` pronoun, `aes(.data[[x_var]], .data[[y_var]])`. A Giggly mapping is a
-plain map, `%{x: :wt, y: :mpg}`, given to `Giggly.Plot.new/2` or to a layer; it names each column
-by an atom or a string, so a column name held in a variable goes into it as it is, and no
-function builds it. A mapping names columns only: an expression in a mapping, which `aes_()` can
-quote, is not in Giggly yet.
+`aes()` with the `.data` pronoun, `aes(.data[[x_var]], .data[[y_var]])`. A Giggly mapping is a plain
+map, `%{x: :wt, y: :mpg}`, given to `Giggly.Plot.new/2` or to a layer; it names each column by an
+atom or a string, so a column name held in a variable goes into it as it is, and no function builds
+it. An expression is plain data too, a function and the values it is applied to in each row
+(`Giggly.Mapping`), so what `aes_()` quotes a function builds as it would any other value.

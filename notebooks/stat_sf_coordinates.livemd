@@ -53,6 +53,5 @@ ggplot(nc) +
 The error bars take their positions from the coordinates the stat computes, through
 `after_stat()`.
 
-Not in Giggly yet: `sf` objects, `stat_sf_coordinates()` given to a geom as
-`stat = "sf_coordinates"`, horizontal error bars, `geom_errorbarh()`, mapping `geometry`, and
-expressions in a mapping, such as `after_stat(x) - 0.1` and the constant `0.04`.
+Not in Giggly yet: `sf` objects, `stat_sf_coordinates()` given to a geom as `stat =
+"sf_coordinates"`, horizontal error bars, `geom_errorbarh()`, and mapping `geometry`.

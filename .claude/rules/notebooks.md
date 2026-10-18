@@ -19,16 +19,22 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   one it cannot keeps its ggplot2 code and names what it waits for, so the notebook is also the
   page's list of what remains. Drawn means the same plot built with Giggly's own counterparts of
   the example's functions, checked against R; a plot Giggly could only imitate (`qplot()`, a
-  computed column standing in for `factor(cyl)`) waits. An argument ggplot2 does not recognise,
-  and so draws as its default (`hjust = 'outside'`, centred), is left out of Giggly's cell, and
-  the prose says so (design-log §4, the entry beginning "A notebook leaves out an argument").
+  computed column standing in for `cut_width(carat, 0.25)`) waits. An argument ggplot2 does not
+  recognise, and so draws as its default (`hjust = 'outside'`, centred), is left out of Giggly's
+  cell, and the prose says so (design-log §4, the entry beginning "A notebook leaves out an
+  argument").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
-  words in every notebook** ("mapping `shape`", "a fixed `size`", "`geom_boxplot()`", "an
-  expression in a mapping", "a point's `fill`"), so when a feature lands, searching the notebooks
-  for its name finds every example waiting for it, and those are drawn; a verdict still waiting
-  drops the pieces that landed and keeps the rest. **An About sentence says what Giggly has and
+  words in every notebook** ("mapping `shape`", "a fixed `size`", "`geom_boxplot()`", "a
+  whole-column function in a mapping", "a point's `fill`"), so when a feature lands, searching the
+  notebooks for its name finds every example waiting for it, and those are drawn; a verdict still
+  waiting drops the pieces that landed and keeps the rest (design-log §4, the entry beginning "A
+  verdict names a missing expression"). **An About sentence says what Giggly has and
   names what it lacks by that name** ("maps no `shape`", "no scale functions"), never "no X but
   <what exists>", which a search for the next feature cannot find.
+- **An expression is written as a capture wherever one function computes it**
+  (`{&:math.log10/1, [:carat]}`), so its guide is titled by the call; a closure only beside
+  `labs/2`, which titles it. The prose says where the title differs from R's (`:math.log10(carat)`
+  for `log10(carat)`, `unemploy / pop` for `unemploy/pop`), as the drawing otherwise matches.
 - **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
   CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
   `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`

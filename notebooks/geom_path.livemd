@@ -130,9 +130,27 @@ m + geom_path(aes(colour = as.numeric(date)))
 ```
 
 `geom_path()` joins the months in the order of the rows, which is the order of their dates, rather
-than in order of `x`.
+than in order of `x`. `{&Kernel.//2, [:unemploy, :pop]}` divides in each row, and titles the x
+axis as Elixir writes it, `unemploy / pop`, where ggplot2 writes `unemploy/pop`.
 
-Not in Giggly yet: an expression in a mapping, such as `unemploy/pop` or `as.numeric(date)`.
+```elixir
+m = Plot.new(economics, %{x: {&Kernel.//2, [:unemploy, :pop]}, y: :psavert})
+
+m
+|> Plot.geom_path()
+|> render.()
+```
+
+R's `as.numeric(date)` is a date's days since 1970-01-01, which `Date.diff/2` counts from that
+date, given as a constant. The colours are ggplot2's; the legend is titled by the call,
+`Date.diff(date, ~D[1970-01-01])`, where ggplot2's reads `as.numeric(date)`, so it is wider and
+the panel narrower.
+
+```elixir
+m
+|> Plot.geom_path(%{colour: {&Date.diff/2, [:date, ~D[1970-01-01]]}})
+|> render.()
+```
 
 ## A fixed colour
 

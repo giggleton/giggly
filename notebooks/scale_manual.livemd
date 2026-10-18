@@ -34,7 +34,7 @@ p + scale_colour_manual(values = c("red", "blue", "green"))
 
 Unnamed values go to the column's values in order.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`.
+Not in Giggly yet: `scale_colour_manual()`.
 
 ## Colours named by value
 
@@ -47,7 +47,7 @@ p + scale_colour_manual(values = cols)
 Named values go to the column's values with those names, whatever order they are written in; a
 name the data lacks, here `"10"`, is unused.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`.
+Not in Giggly yet: `scale_colour_manual()`.
 
 ## Colour and fill at once
 
@@ -64,8 +64,8 @@ ggplot(
   )
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, a fixed `shape` and `size`, a
-point's `fill`, and `scale_colour_manual()` and its `aesthetics` option.
+Not in Giggly yet: a fixed `shape` and `size`, a point's `fill`, and `scale_colour_manual()` and its
+`aesthetics` option.
 
 ## Breaks and labels
 
@@ -80,8 +80,7 @@ p + scale_colour_manual(
 )
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, `scale_colour_manual()` and
-its `breaks` and `labels` options.
+Not in Giggly yet: `scale_colour_manual()` and its `breaks` and `labels` options.
 
 ## Limits
 
@@ -93,5 +92,4 @@ p + scale_colour_manual(values = cols, limits = c("4", "6", "8", "10"))
 
 A value outside `limits` is treated as missing.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `scale_colour_manual()`
-and its `limits` option.
+Not in Giggly yet: `scale_colour_manual()` and its `limits` option.

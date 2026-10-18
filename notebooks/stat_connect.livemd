@@ -50,5 +50,4 @@ ggplot(head(economics, 10), aes(date, unemploy)) +
 `smooth` is an S-shaped curve and `zigzag` goes up, down and up again. Mapping `colour` to a
 constant names each layer in the legend.
 
-Not in Giggly yet: `stat_connect()` and its `connection` option given as a matrix, and an expression
-in a mapping, such as the constant `"zigzag"`.
+Not in Giggly yet: `stat_connect()` and its `connection` option given as a matrix.

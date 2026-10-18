@@ -103,8 +103,7 @@ base +
 
 Each layer maps `colour` to a constant, so the legend names each curve.
 
-Not in Giggly yet: a plot with no data, `geom_function()` and its `args` option, `xlim()`, and an
-expression in a mapping, here the constants `"normal"` and `"t, df = 1"`.
+Not in Giggly yet: a plot with no data, `geom_function()` and its `args` option, and `xlim()`.
 
 ## A function of your own
 

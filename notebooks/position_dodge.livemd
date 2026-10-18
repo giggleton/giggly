@@ -39,7 +39,7 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = "dodge2")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `position_dodge2()`.
+Not in Giggly yet: `position_dodge2()`.
 
 ## The width of each bar
 
@@ -50,8 +50,7 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = position_dodge2(preserve = "single"))
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `position_dodge2()` and
-its `preserve` option.
+Not in Giggly yet: `position_dodge2()` and its `preserve` option.
 
 ## Dodged histograms
 
@@ -115,8 +114,7 @@ p + geom_linerange(aes(ymin = y - 1, ymax = y + 1), position = "dodge")
 With no width to dodge within, the line ranges are not moved apart, and do not sit on their
 columns.
 
-Not in Giggly yet: line ranges, `geom_linerange()`, and an expression in a mapping, such as
-`y - 1`.
+Not in Giggly yet: line ranges and `geom_linerange()`.
 
 ## Giving the width
 
@@ -130,8 +128,7 @@ p + geom_linerange(
 
 Dodged within 0.9, the width the columns take, each line range sits on its column.
 
-Not in Giggly yet: `geom_linerange()`, an expression in a mapping, such as `y - 1`, and
-`position_dodge()`'s options.
+Not in Giggly yet: `geom_linerange()` and `position_dodge()`'s options.
 
 ## Error bars
 
@@ -153,8 +150,8 @@ p + geom_errorbar(
 `"dodge"` sets the error bars side by side within their own width, 0.2, so they huddle at the
 middle of each `x`; dodged within 0.9, each sits on its column.
 
-Not in Giggly yet: error bars, `geom_errorbar()` and its `width` option, an expression in a
-mapping, such as `y - 1`, and `position_dodge()`'s options.
+Not in Giggly yet: error bars, `geom_errorbar()` and its `width` option, and `position_dodge()`'s
+options.
 
 ## Box plots
 
@@ -164,8 +161,7 @@ ggplot(mpg, aes(factor(year), displ)) +
   geom_boxplot(aes(colour = hwy < 30))
 ```
 
-Not in Giggly yet: box plots, `geom_boxplot()`, `position_dodge2()`, expressions in a mapping, such
-as `factor(year)` and `hwy < 30`.
+Not in Giggly yet: box plots, `geom_boxplot()`, and `position_dodge2()`.
 
 ## Box plots of different widths
 
@@ -177,8 +173,7 @@ ggplot(mpg, aes(factor(year), displ)) +
 `varwidth = TRUE` makes each box's width grow with the square root of its number of rows, and
 `position_dodge2()` dodges the boxes by their own widths.
 
-Not in Giggly yet: `geom_boxplot()` and its `varwidth` option, `position_dodge2()`, expressions in a
-mapping, such as `factor(year)` and `hwy < 30`.
+Not in Giggly yet: `geom_boxplot()` and its `varwidth` option, and `position_dodge2()`.
 
 ## Bars dodged the same way
 
@@ -193,5 +188,4 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
 Every 8-cylinder car has `vs` 0, so that `x` has one bar: as wide as one bar of a pair with
 `preserve = "single"`, and as wide as the whole pair with `preserve = "total"`.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `position_dodge2()` and
-its `preserve` option.
+Not in Giggly yet: `position_dodge2()` and its `preserve` option.

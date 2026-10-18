@@ -19,7 +19,10 @@ ggplot2 evaluates a mapping at one of three stages: at the start, from the layer
 stat, from the variables the stat computes, with `after_stat()`; or after the scales, from the
 aesthetics already mapped, with `after_scale()`. `stage()` maps one aesthetic at more than one of
 them, and `from_theme()` takes a colour from the theme's settings for geoms. Giggly maps at the
-start only: a mapping names a column, and takes no expressions.
+start and after the stat: a mapping value is a column, an expression or a constant evaluated from
+the layer's data, or `{:after_stat, [value]}`, a value evaluated from what its stat computes, which
+`Giggly.Plot.geom_bar/3`'s counting is so far. It has no `after_scale()`, `stage()` or
+`from_theme()`, and no whole-column function in a mapping, such as `max(count)`.
 
 ## The default histogram
 
@@ -31,8 +34,7 @@ ggplot(mpg, aes(displ)) +
 
 `after_stat(count)` is what `geom_histogram()` maps `y` to anyway.
 
-Not in Giggly yet: histograms, `geom_histogram()`, and an expression in a mapping, such as
-`after_stat(count)`.
+Not in Giggly yet: histograms and `geom_histogram()`.
 
 ## The tallest bin scaled to 1
 
@@ -42,8 +44,8 @@ ggplot(mpg, aes(displ)) +
   geom_histogram(aes(y = after_stat(count / max(count))))
 ```
 
-Not in Giggly yet: `geom_histogram()`, and an expression in a mapping, such as
-`after_stat(count / max(count))`.
+Not in Giggly yet: `geom_histogram()` and a whole-column function in a mapping, here `max(count)`
+inside `after_stat()`.
 
 ## A fill made from the colour
 
@@ -56,8 +58,7 @@ ggplot(mpg, aes(class, hwy)) +
 `after_scale()` takes each box's colour once the scale has mapped `class` to it, and `alpha()`
 makes it translucent.
 
-Not in Giggly yet: box plots, `geom_boxplot()`, and an expression in a mapping, such as
-`after_scale(alpha(colour, 0.4))`.
+Not in Giggly yet: box plots, `geom_boxplot()`, and `after_scale()`.
 
 ## Changing a scaled fill
 
@@ -70,8 +71,7 @@ ggplot(mpg, aes(class, hwy)) +
 `stage()` maps `fill` from `class` at the start, and then makes the colour the scale gives it
 translucent.
 
-Not in Giggly yet: `geom_boxplot()` and an expression in a mapping, such as `stage(class,
-after_scale = alpha(fill, 0.4))`.
+Not in Giggly yet: `geom_boxplot()` and `stage()`.
 
 ## A proportional stacked density
 
@@ -93,8 +93,8 @@ Each group's density is scaled by its share of all the cars, so the stacked dens
 the density of all of them, which the second layer draws.
 
 Not in Giggly yet: densities, `geom_density()` and its `bw` option, stacking them with `position =
-"stack"`, which Giggly does for bars only, and expressions in a mapping, such as `factor(cyl)`,
-`after_scale()` and `after_stat()`.
+"stack"`, which Giggly does for bars only, `after_scale()`, and a whole-column function in a
+mapping, here `sum(n[!duplicated(group)])` inside `after_stat()`.
 
 ## A ridgeline
 
@@ -115,8 +115,7 @@ Each group's density, scaled to a peak of 1, rises from a baseline at its group'
 curves sit one above another.
 
 Not in Giggly yet: ribbons, `geom_ribbon()` and its `outline.type` option, `stat_density()` given to
-a geom as `stat = "density"`, and expressions in a mapping, such as `factor(cyl)`, `after_scale()`
-and `after_stat()`.
+a geom as `stat = "density"`, `after_scale()`, and `after_stat()` reading `group`.
 
 ## Labelling bars with their counts
 
@@ -136,8 +135,7 @@ ggplot(mpg, aes(class)) +
 The text layer counts too, with `stat = "count"`, and writes each count just above its bar. The
 bars alone are the counted bars `Giggly.Plot.geom_bar/3` draws.
 
-Not in Giggly yet: `stat_count()` given to a geom as `stat = "count"`, and expressions in a
-mapping, such as `after_stat(count + 2)`.
+Not in Giggly yet: `stat_count()` given to a geom as `stat = "count"`.
 
 ## Labelling a box plot
 
@@ -158,5 +156,5 @@ ggplot(mpg, aes(displ, class)) +
 The text layer computes the box plot's statistics too, with `stat = "boxplot"`: `stage()` gives
 it `displ` to compute them from, and then places each label at the computed `xmax`.
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, `stat_boxplot()` given to a
-geom as `stat = "boxplot"`, and expressions in a mapping, such as `after_stat(xmax)` and `stage()`.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, `stat_boxplot()` given to a geom
+as `stat = "boxplot"`, and `stage()`.

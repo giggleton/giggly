@@ -83,7 +83,7 @@ qplot(mpg, data = mtcars)
 qplot(y = mpg, data = mtcars)
 ```
 
-Not in Giggly yet: `qplot()`, `geom_histogram()`, and an expression in a mapping, such as
+Not in Giggly yet: `qplot()`, `geom_histogram()`, and a whole-column function in a mapping, here
 `seq_along(y)`.
 
 ## Other geoms
@@ -95,5 +95,4 @@ qplot(factor(cyl), wt, data = mtcars, geom = c("boxplot", "jitter"))
 qplot(mpg, data = mtcars, geom = "dotplot")
 ```
 
-Not in Giggly yet: `qplot()`, `geom_boxplot()`, `geom_jitter()`, `geom_dotplot()`, and an expression
-in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: `qplot()`, `geom_boxplot()`, `geom_jitter()`, and `geom_dotplot()`.

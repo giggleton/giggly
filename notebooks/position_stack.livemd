@@ -37,7 +37,7 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = "fill")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `position_fill()`.
+Not in Giggly yet: `position_fill()`.
 
 ## Stacking and filling histograms
 

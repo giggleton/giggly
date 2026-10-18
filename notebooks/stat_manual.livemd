@@ -34,7 +34,7 @@ p + stat_manual()
 `stat_manual()` draws points by default, so this draws the points of `p` a second time, over
 the first.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`, and `stat_manual()`.
+Not in Giggly yet: `stat_manual()`.
 
 ## A hull from a function
 

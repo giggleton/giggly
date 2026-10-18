@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 economics = Giggly.Datasets.economics()
+mtcars = Giggly.Datasets.mtcars()
 
 render = fn plot ->
   plot
@@ -37,7 +38,8 @@ colours, as `"green"`, it is CSS's, and a name CSS lacks, as R's `"grey50"`, is 
 A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
 document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
 `render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds
-`Giggly.Datasets.economics/0`, ggplot2's `economics`, to `economics`, ggplot2's name for it.
+`Giggly.Datasets.economics/0`, ggplot2's `economics`, and `Giggly.Datasets.mtcars/0`, R's
+`mtcars`, to `economics` and `mtcars`, the names ggplot2 and R give them.
 
 ## The default bars
 
@@ -49,9 +51,15 @@ p + geom_bar()
 ```
 
 `factor(cyl)` makes the number of cylinders discrete, so the axis has a place for each of 4, 6
-and 8.
+and 8. Giggly writes it `{:factor, [:cyl]}`, and titles the axis `factor(cyl)`, as ggplot2 does.
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+```elixir
+p = Plot.new(mtcars, %{x: {:factor, [:cyl]}})
+
+p
+|> Plot.geom_bar()
+|> render.()
+```
 
 ## Fill and outline colour
 
@@ -64,7 +72,26 @@ p + geom_bar(colour = "red")
 p + geom_bar(fill = "white", colour = "red")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+`fill:` and `colour:` set every bar's inside and border; `"red"` and `"white"` are the same
+colours in CSS as in R.
+
+```elixir
+p
+|> Plot.geom_bar(fill: "red")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_bar(colour: "red")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_bar(fill: "white", colour: "red")
+|> render.()
+```
 
 ## RGB colours, and none
 
@@ -75,7 +102,19 @@ p + geom_bar(fill = "#00abff")
 p + geom_bar(fill = NA, colour = "#00abff")
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+A hex colour is written as R writes it, and `:none` is R's `NA`, no colour at all.
+
+```elixir
+p
+|> Plot.geom_bar(fill: "#00abff")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_bar(fill: :none, colour: "#00abff")
+|> render.()
+```
 
 ## Mapping fill to a discrete column
 
@@ -86,7 +125,15 @@ Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
 ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) + geom_bar()
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `factor(cyl)`.
+`factor(vs)` reads the engine shape, 0 or 1, as two levels, so the fill takes a discrete scale and
+each bar a stack of two.
+
+```elixir
+mtcars
+|> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar()
+|> render.()
+```
 
 ## Mapping fill to a continuous column
 

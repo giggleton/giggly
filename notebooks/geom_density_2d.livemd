@@ -105,8 +105,7 @@ d + stat_density_2d(
 ```
 
 Not in Giggly yet: `stat_density_2d()` and its `contour` option, giving a stat a geom by name, here
-`geom = "raster"`, `geom_raster()`, an expression in a mapping, such as `after_stat(density)`, and
-`scale_fill_viridis_c()`.
+`geom = "raster"`, `geom_raster()`, and `scale_fill_viridis_c()`.
 
 ## The density as points
 
@@ -116,5 +115,5 @@ d + stat_density_2d(geom = "point", aes(size = after_stat(density)), n = 20, con
 ```
 
 Not in Giggly yet: `stat_density_2d()` and its `n` and `contour` options, giving a stat a geom by
-name, here `geom = "point"`, mapping `size`, the scale that maps it and the legend that reads it
-back, and an expression in a mapping, such as `after_stat(density)`.
+name, here `geom = "point"`, mapping `size`, and the scale that maps it and the legend that reads it
+back.

@@ -146,6 +146,7 @@ ggplot(rpart::kyphosis, aes(Age, as.numeric(Kyphosis) - 1)) +
 `as.numeric(Kyphosis) - 1` makes `absent` 0 and `present` 1. The second fits the logistic
 regression to a natural spline of `x` from the `splines` package.
 
-Not in Giggly yet: an expression in a mapping, such as `as.numeric(Kyphosis) - 1`, `geom_jitter()`
-and its `height` option, `geom_smooth()` with its `method`, `method.args` and `formula` options
-and the logistic regression R's `glm()` fits, and the `kyphosis` dataset from the `rpart` package.
+Not in Giggly yet: a whole-column function in a mapping, here `as.numeric(Kyphosis)`, a factor's
+level codes, `geom_jitter()` and its `height` option, `geom_smooth()` with its `method`,
+`method.args` and `formula` options and the logistic regression R's `glm()` fits, and the `kyphosis`
+dataset from the `rpart` package.

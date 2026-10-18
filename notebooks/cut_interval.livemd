@@ -16,11 +16,11 @@ ggplot2's code first and then Giggly's. An example Giggly cannot draw yet keeps 
 and names what it is waiting for, so the page is also a list of what remains.
 
 These functions turn a numeric vector into a factor whose levels are ranges of its values:
-`cut_interval()` makes `n` ranges of equal width, `cut_number()` makes `n` ranges holding about
-the same number of values each, and `cut_width()` makes ranges of a given width, placed by the
-centre or the boundary of any one of them. Not in Giggly yet: `cut_interval()`, `cut_number()`
-and `cut_width()`. A Giggly mapping names columns only, so an expression in a mapping, such as
-`cut_width(displ, 1)`, is not in Giggly yet either.
+`cut_interval()` makes `n` ranges of equal width, `cut_number()` makes `n` ranges holding about the
+same number of values each, and `cut_width()` makes ranges of a given width, placed by the centre or
+the boundary of any one of them. Not in Giggly yet: `cut_interval()`, `cut_number()` and
+`cut_width()`. Nor is a whole-column function in a mapping, such as `cut_width(displ, 1)`: Giggly
+applies an expression in each row, where these read the whole column.
 
 ## Ranges of equal width
 

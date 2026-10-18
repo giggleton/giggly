@@ -140,8 +140,8 @@ p + geom_point(shape = NA)
 p + geom_point(aes(shape = factor(cyl)))
 ```
 
-Not in Giggly yet: a fixed `shape` and a fixed `size`, mapping `shape` and the legend that reads
-it back, and an expression in a mapping, such as `factor(cyl)`.
+Not in Giggly yet: a fixed `shape` and a fixed `size`, and mapping `shape` and the legend that reads
+it back.
 
 ## The 25 symbols
 

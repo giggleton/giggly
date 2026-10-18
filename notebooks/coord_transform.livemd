@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -15,11 +26,16 @@ This notebook follows the examples on ggplot2's reference page for
 and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and names what it is
 waiting for, so the page is also a list of what remains.
 
-`coord_transform()` transforms the coordinate system, such as putting an axis on a log scale.
-Unlike transforming a scale, it happens after the statistics are computed, and it changes the
-shapes geoms are drawn in, so a straight line need not stay straight. It transforms continuous
-positions only. `coord_trans()` is its old name, now deprecated. Giggly has neither yet, and no
-transformed scales: its position scales are chosen from the data and cannot be set.
+`coord_transform()` transforms the coordinate system, such as putting an axis on a log scale. Unlike
+transforming a scale, it happens after the statistics are computed, and it changes the shapes geoms
+are drawn in, so a straight line need not stay straight. It transforms continuous positions only.
+`coord_trans()` is its old name, now deprecated. Giggly has neither yet, and no transformed scales:
+its position scales are chosen from the data and cannot be set. It can transform the data, with an
+expression in the mapping. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
+which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
+`Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.diamonds/0`, ggplot2's `diamonds`, to `diamonds`, ggplot2's
+name for it.
 
 ## Transforming the data
 
@@ -32,7 +48,16 @@ ggplot(diamonds, aes(log10(carat), log10(price))) +
   geom_point()
 ```
 
-Not in Giggly yet: an expression in a mapping, such as `log10(carat)`.
+`&:math.log10/1` is Erlang's base-10 logarithm, applied in each row. An expression is titled as
+Elixir writes the call, so the axes read `:math.log10(carat)` and `:math.log10(price)` where
+ggplot2's read `log10(carat)` and `log10(price)`; the points are where ggplot2 puts them.
+
+```elixir
+diamonds
+|> Plot.new(%{x: {&:math.log10/1, [:carat]}, y: {&:math.log10/1, [:price]}})
+|> Plot.geom_point()
+|> render.()
+```
 
 ## Transforming the scales
 

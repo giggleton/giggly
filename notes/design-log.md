@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A verdict names a missing expression by what it needs, never as "an expression in a mapping"
+  (2026-10-18, Steve).** Once columns, per-row expressions, constants, `factor()` and `after_stat()`
+  landed, the phrase named something Giggly has, so step 4's sweep took it out of every verdict:
+  where nothing else waited the example is drawn, a capture wherever one function computes it and
+  its title noted where it differs from R's; elsewhere the piece is dropped, an `after_stat()`
+  waiting only on its stat included. What is still missing is named by the feature that would
+  unlock it: `after_scale()`, `stage()`, "a whole-column function in a mapping, such as
+  `reorder(manufacturer, cty)`" (one head that sees a column), "a vector outside the data in a
+  mapping, such as `miss`", and "`after_stat()` reading `group`". *Rejected: keeping "an
+  expression in a mapping, such as …" for these*: one familiar term, but a search for it would
+  find landed and waiting examples alike, and the next sweep would read every one to tell them
+  apart.
+
 - **An after_stat reads its stat's computed variables as ggplot2 documents them, checked at the
   call (2026-10-18, Steve's choice; checked in R).** `{:after_stat, [value]}` is left out of
   evaluation and grouping, evaluated against the stat's output, and put through its aesthetic's
@@ -1542,6 +1555,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-18 — Draw expressions in the notebooks (expressions, step 4); §4: "A verdict names a
+  missing expression by what it needs"
 - 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3)
   (`c6dc492`); §4: "An after_stat reads its stat's computed variables"
 - 2026-10-18 — Give mtcars R's column types (expressions, step 2, part 3) (`37e6e07`); §4: "R's
