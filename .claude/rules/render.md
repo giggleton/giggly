@@ -49,12 +49,19 @@ ggplot2's facets' order".
   its own size, so a left axis narrower than its column sits against its panel. The titles are
   drawn once each, centred on the span of panels, not the strips above them, as ggplot2 spans its
   title cells over the panel rows and columns.
+- **The plot's labels (`Guide.Title`) take rows and a column of their own**, as ggplot2's
+  `table_add_titles()` and `table_add_tag()` add them: the title's and the subtitle's rows above
+  the panels and the caption's below the x title, each spanning the panels' columns
+  (`plot.title.position = "panel"`), and the tag's row above everything and column left of
+  everything inside the margin, its cell where they cross (`plot.tag.position = "topleft"`). A
+  label of `:none` takes a row or column of no size.
 - **Every plot's cells are drawn in ggplot2's facets' order**: the background first, over the
   whole table, margin included, as ggplot2's `table_add_background()` adds it; then the panels
   column by column; the strips from the last row of panels to the first, left to right; the bottom
   axes in that order; the left axes from the last column to the first, top to bottom; then the x
-  title and the y title. ggplot2's plot without a facet draws its y axis before its x axis, which
-  Giggly does not follow (design-log §4).
+  title and the y title, the legends, and the plot's subtitle, title, caption and tag. ggplot2's
+  plot without a facet draws its y axis before its x axis, which Giggly does not follow
+  (design-log §4).
 - **Layers are drawn in the order they were added**, so a later layer is drawn over an earlier
   one.
 - **A layer's rows are split by panel, and each panel's are drawn by the layer's geom alone**, as
@@ -62,9 +69,10 @@ ggplot2's facets' order".
 - **A plot with legends gives them a column right of the panels**, the theme's legend spacing
   from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`.
   Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked
-  in the guide's box (`Guide.Box.draw/2`), in the order the assembly gives them; its cell spans the panels' rows, from the first's top to the last's bottom, the strips
-  above the first row left out, and its table is centred down it; the cell is drawn last, after
-  the titles. Each key's glyphs are drawn by the geom of every layer that maps one of the legend's
-  aesthetics and draws in that key (`Geom.draw_key/3`), in layer order, at the key's values of the
-  aesthetics that layer maps and with what it sets, and handed to the guide; a key no layer draws
-  in keeps its background and label.
+  in the guide's box (`Guide.Box.draw/2`), in the order the assembly gives them; its cell spans
+  the panels' rows, from the first's top to the last's bottom, the strips above the first row left
+  out, and its table is centred down it; the cell is drawn after the axes' titles and before the
+  plot's labels. Each key's glyphs are drawn by the geom of every layer that maps one of the
+  legend's aesthetics and draws in that key (`Geom.draw_key/3`), in layer order, at the key's
+  values of the aesthetics that layer maps and with what it sets, and handed to the guide; a key
+  no layer draws in keeps its background and label.

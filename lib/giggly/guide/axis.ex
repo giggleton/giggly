@@ -27,10 +27,12 @@ defmodule Giggly.Guide.Axis do
   #
   # A title sits the title's margin beyond its axis, centred on the panel's side: below the panel
   # hanging from the top of its cell, to its left turned 90 degrees with its top to the left, as
-  # `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and a line of text;
+  # `theme_gray()` turns the y axis's title. Its cell is as deep as the margin and its lines
+  # (`Giggly.Guide.Parts`), each line centred on the side, the first nearest the cell's far edge;
   # an axis with no title takes no room.
 
   alias Giggly.{Coord, Font, Guide, Scene, Theme}
+  alias Giggly.Guide.Parts
   alias Giggly.Scene.{Polylines, Text}
 
   # Ticks are opaque, their ends cut square and their corners round, as `theme_gray()`'s `line`
@@ -103,7 +105,7 @@ defmodule Giggly.Guide.Axis do
          axis_text: text_look
        }) do
     {places, labels} = Enum.unzip(breaks)
-    height = tick_length + text_look.margin + line_height(text_look.size)
+    height = tick_length + text_look.margin + Parts.line_height(text_look.size)
 
     # A cell's y runs up from its bottom; the panel's edge is the cell's top.
     tick_end = 1 - tick_length / height
@@ -216,35 +218,16 @@ defmodule Giggly.Guide.Axis do
   # side.
   defp title(:none, _side, _theme), do: {0.0, []}
 
+  # A title hangs from its place, the top of its first line, toward the axis, each line centred
+  # along the panel's side (`Giggly.Guide.Parts`).
   defp title(text, :bottom, %Theme{axis_title: title_look}) do
-    height = title_look.margin + line_height(title_look.size)
-    {height, [title_text(text, {0.5, 1 - title_look.margin / height}, 0, title_look)]}
+    height = title_look.margin + Parts.title_height(text, title_look)
+    place = {0.5, 1 - title_look.margin / height}
+    {height, [Parts.title_text(text, place, 0, {0.5, 1.0}, title_look)]}
   end
 
   defp title(text, :left, %Theme{axis_title: title_look}) do
-    width = title_look.margin + line_height(title_look.size)
-    {width, [title_text(text, {0.0, 0.5}, 90, title_look)]}
+    width = title_look.margin + Parts.title_height(text, title_look)
+    {width, [Parts.title_text(text, {0.0, 0.5}, 90, {0.5, 1.0}, title_look)]}
   end
-
-  # A title hangs from its point, the top of the text's box, toward the axis.
-  defp title_text(text, {x_place, y_place}, angle, title_look) do
-    %Text{
-      x: [x_place],
-      y: [y_place],
-      labels: [text],
-      widths: [Font.width(text, title_look.size)],
-      size: title_look.size,
-      family: "",
-      color: [title_look.color],
-      opacity: [1.0],
-      angle: angle,
-      hjust: [0.5],
-      offset: [{0.0, -Font.ascent(title_look.size)}],
-      check_overlap: false,
-      ascent: Font.ascent(title_look.size)
-    }
-  end
-
-  # How deep a line of text is, ggplot2's `titleGrob` measure: its ascent and its deepest descent.
-  defp line_height(size), do: Font.ascent(size) + Font.descent(size)
 end

@@ -29,7 +29,8 @@ defmodule Giggly.SVG do
   # nearest of those to a label's `hjust` and moves the label along its baseline by the rest of
   # its width; so does this backend. A text that checks overlap draws each label only where its box
   # crosses no box drawn before it, which grid decides once it knows where the labels land, as only
-  # a backend does here.
+  # a backend does here. An empty label is not written, as svglite writes none, though it keeps the
+  # room measured for it.
   #
   # Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
   # Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
@@ -442,6 +443,7 @@ defmodule Giggly.SVG do
       }
     end)
     |> drawn_labels(text)
+    |> Enum.reject(fn label -> label.label == "" end)
     |> Enum.map(fn label -> text_label(label, text) end)
   end
 

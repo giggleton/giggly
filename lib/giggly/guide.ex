@@ -9,7 +9,9 @@ defprotocol Giggly.Guide do
   # facet's panels with their values (`Giggly.Guide.Strip`), which ggplot2's facets draw with
   # `render_strips()`: a strip, like an axis, tells a reader what data the marks beside it show;
   # and the guides of the aesthetics other than position, whose kinds this protocol draws, stacked
-  # in a box (`Giggly.Guide.Box`), as ggplot2's guides package theirs.
+  # in a box (`Giggly.Guide.Box`), as ggplot2's guides package theirs. It also draws the plot's own
+  # labels (`Giggly.Guide.Title`), its title, subtitle, caption and tag, as the axes' titles are
+  # drawn here, each of which, like every title a guide draws, may run over several lines.
   #
   # A scale records its guide by name, as ggplot2's scale carries `guide`, and the assembly turns
   # the name into a struct of its kind: a legend (`Giggly.Guide.Legend`), `guide_legend()`, so far
@@ -25,12 +27,12 @@ defprotocol Giggly.Guide do
 
   # A guide asks the coordinate system where the breaks go, reads its look from the theme,
   # measures text, and draws primitives. It exports the modules rendering draws a panel's axes,
-  # grid and strips with and stacks the guides of other aesthetics in, and the kinds, whose
-  # structs the assembly builds, and nothing a kind draws with: that is in the kinds' protocol
-  # implementations.
+  # grid and strips and the plot's labels with and stacks the guides of other aesthetics in, and
+  # the kinds, whose structs the assembly builds, and nothing a kind draws with: that is in the
+  # kinds' protocol implementations.
   use Boundary,
     deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme],
-    exports: [Axis, Box, Colorbar, Grid, Legend, Strip]
+    exports: [Axis, Box, Colorbar, Grid, Legend, Strip, Title]
 
   alias Giggly.{Scene, Theme}
 

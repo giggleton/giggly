@@ -20,11 +20,13 @@ defmodule Giggly.Render do
   # axis below a panel with an empty cell under it is not measured, as ggplot2 measures it, so it
   # hangs into the empty space and the rest of the row takes no room for it. The axes' titles are
   # drawn once, centred on the span of panels, the x title below them and the y title to their
-  # left; around the whole table is the theme's plot margin, and the plot's background is drawn
-  # first, under everything, over the whole table, margin included, as ggplot2 adds it
-  # (`table_add_background()`), cut off at the table's edges as it is. Each panel's cell is cut off
-  # at its edges when the coordinate system clips panels, and each strip's always, as
-  # `theme_gray()`'s `strip.clip` says.
+  # left. The plot's title and subtitle are drawn above the panels and its caption below the x
+  # title, each spanning the panels' columns, and its tag in a row and a column of its own at the
+  # table's top left (`Giggly.Guide.Title`). Around the whole table is the theme's plot margin,
+  # and the plot's background is drawn first, under everything, over the whole table, margin
+  # included, as ggplot2 adds it (`table_add_background()`), cut off at the table's edges as it is.
+  # Each panel's cell is cut off at its edges when the coordinate system clips panels, and each
+  # strip's always, as `theme_gray()`'s `strip.clip` says.
   #
   # A plot with legends, one for each aesthetic other than position that a layer maps, or for
   # several merged, gives them a column right of the panels, the theme's legend spacing from them:
@@ -36,8 +38,9 @@ defmodule Giggly.Render do
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
   # bottom axes in the same order; the left axes, from the last column to the first, top to
-  # bottom; then the x title and the y title. ggplot2's plot without a facet draws its y axis
-  # before its x axis; Giggly draws every plot in its facets' order.
+  # bottom; then the x title and the y title, the legends, and the plot's subtitle, title, caption
+  # and tag. ggplot2's plot without a facet draws its y axis before its x axis; Giggly draws every
+  # plot in its facets' order.
   #
   # Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
   # here.
@@ -67,11 +70,13 @@ defmodule Giggly.Render do
           coord: coord,
           panel_params: panel_params,
           guide_titles: guide_titles,
+          plot_labels: plot_labels,
           theme: theme_name
         } = assembly
       ) do
     theme = Theme.complete(theme_name)
     panels = draw_panels(assembly, theme)
+    labels = Guide.Title.draw(plot_labels, theme)
 
     # Every panel puts the same aesthetic on each side, so any panel's params title the axes.
     %{bottom: bottom_title, left: left_title} =
@@ -97,8 +102,8 @@ defmodule Giggly.Render do
     }
 
     legend = draw_legend(assembly.legends, theme)
-    widths = widths(panels, grid, left_title, legend, theme)
-    heights = heights(panels, grid, bottom_title, theme)
+    widths = widths(panels, grid, {left_title, labels}, legend, theme)
+    heights = heights(panels, grid, {bottom_title, labels}, theme)
 
     %Scene{
       widths: Enum.map(widths, fn {_name, size} -> size end),
@@ -108,7 +113,8 @@ defmodule Giggly.Render do
         cells(panels, grid, indexes(widths), indexes(heights), {bottom_title, left_title}, theme,
           clip: assembly.clip,
           extent: {length(widths), length(heights)},
-          legend: legend
+          legend: legend,
+          labels: labels
         )
     }
   end
@@ -188,10 +194,12 @@ defmodule Giggly.Render do
     Map.put(key, :glyphs, glyphs)
   end
 
-  # The columns, left to right, each named and sized: the margin, the y title, then for each
-  # column of panels its left axes and its panels, the panel spacing between, then any legend
+  # The columns, left to right, each named and sized: the margin, the tag, the y title, then for
+  # each column of panels its left axes and its panels, the panel spacing between, then any legend
   # beyond the theme's spacing from the panels, then the margin.
-  defp widths(panels, grid, {title_width, _title}, legend, theme) do
+  defp widths(panels, grid, {{title_width, _title}, labels}, legend, theme) do
+    %{tag: {{tag_width, _tag_height}, _tag}} = labels
+
     panel_columns =
       Enum.map(1..grid.columns//1, fn column ->
         [
@@ -213,17 +221,28 @@ defmodule Giggly.Render do
       end
 
     Enum.concat([
-      [{:margin, {:points, theme.plot_margin}}, {:title_left, {:points, title_width}}],
+      [
+        {:margin, {:points, theme.plot_margin}},
+        {:tag, {:points, tag_width}},
+        {:title_left, {:points, title_width}}
+      ],
       spaced(panel_columns, theme),
       legend_columns,
       [{:margin, {:points, theme.plot_margin}}]
     ])
   end
 
-  # The rows, top to bottom, each named and sized: the margin, then for each row of panels its
-  # strips, its panels and its bottom axes, the panel spacing between, then the x title and the
-  # margin.
-  defp heights(panels, grid, {title_height, _title}, theme) do
+  # The rows, top to bottom, each named and sized: the margin, the tag, the plot's title and its
+  # subtitle, then for each row of panels its strips, its panels and its bottom axes, the panel
+  # spacing between, then the x title, the plot's caption and the margin.
+  defp heights(panels, grid, {{title_height, _title}, labels}, theme) do
+    %{
+      tag: {{_tag_width, tag_height}, _tag},
+      title: {plot_title_height, _plot_title},
+      subtitle: {subtitle_height, _subtitle},
+      caption: {caption_height, _caption}
+    } = labels
+
     layers =
       panels
       |> Enum.map(fn panel -> length(panel.strips) end)
@@ -251,9 +270,18 @@ defmodule Giggly.Render do
       end)
 
     Enum.concat([
-      [{:margin, {:points, theme.plot_margin}}],
+      [
+        {:margin, {:points, theme.plot_margin}},
+        {:tag, {:points, tag_height}},
+        {:plot_title, {:points, plot_title_height}},
+        {:plot_subtitle, {:points, subtitle_height}}
+      ],
       spaced(panel_rows, theme),
-      [{:title_bottom, {:points, title_height}}, {:margin, {:points, theme.plot_margin}}]
+      [
+        {:title_bottom, {:points, title_height}},
+        {:plot_caption, {:points, caption_height}},
+        {:margin, {:points, theme.plot_margin}}
+      ]
     ])
   end
 
@@ -384,8 +412,39 @@ defmodule Giggly.Render do
       bottom_axis_cells,
       left_axis_cells,
       titles,
-      legend_cells(Keyword.fetch!(options, :legend), grid, columns, rows)
+      legend_cells(Keyword.fetch!(options, :legend), grid, columns, rows),
+      label_cells(Keyword.fetch!(options, :labels), grid, columns, rows)
     ])
+  end
+
+  # The plot's own labels, after the legends, as ggplot2 adds them to its table: the subtitle, the
+  # title and the caption, each spanning the panels' columns, then the tag in its corner.
+  defp label_cells(labels, grid, columns, rows) do
+    %{
+      title: {_title_height, title},
+      subtitle: {_subtitle_height, subtitle},
+      caption: {_caption_height, caption},
+      tag: {_tag_size, tag}
+    } = labels
+
+    panel_columns =
+      Map.fetch!(columns, {:panel_column, 1})..Map.fetch!(columns, {:panel_column, grid.columns})
+
+    spanning =
+      Enum.map([plot_subtitle: subtitle, plot_title: title, plot_caption: caption], fn {row,
+                                                                                        drawn} ->
+        row_index = Map.fetch!(rows, row)
+
+        %Cell{
+          rows: row_index..row_index,
+          columns: panel_columns,
+          clip: :off,
+          hang: :none,
+          primitives: drawn
+        }
+      end)
+
+    Enum.concat(spanning, [cell(rows, :tag, columns, :tag, primitives: tag)])
   end
 
   # The legend's cell, last, as ggplot2 adds its guide box: right of the panels, spanning their

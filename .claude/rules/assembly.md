@@ -64,13 +64,18 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   each panel's params keyed by panel id, whether panels are clipped (`Coord.clip/1`) and the aspect ratio
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
-  (`guide_titles`, the x and y axes' so far), and the name of the plot's theme, which the assembly
+  (`guide_titles`, the x and y axes' so far), the plot's own labels (`plot_labels`: its title,
+  subtitle, caption and tag, `:none` for each `labs/2` does not set), and the name of the plot's
+  theme, which the assembly
   passes on unread for rendering to resolve, the only stage that reads a theme so far; the first
   build stage to read one (default aesthetics, or a palette a theme sets, which `theme_gray()`
   does not) brings the resolution here, where ggplot2's build completes the theme.
 - **The facet and the coordinate system run by the structs the plot records**, the null facet and
   cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
   assembly names no kind.
+- **A label `Plot.labs/2` sets titles an axis or a legend over everything else**, `:none` among
+  them, as a plot's labels win in ggplot2's `setup_plot_labels()`, whenever the call came; so a
+  label decides which legends merge, as they merge by title. Otherwise:
 - **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,
   read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
   `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
@@ -127,7 +132,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
-  the trained scales: titled by the column the first layer to map the aesthetic maps it to, a key
+  the trained scales: titled by its label, or else by the column the first layer to map the
+  aesthetic maps it to (`:none` takes no room), a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
   range, a discrete one's levels, `NA` last), labelled, at the value it maps to, drawn by the kind
   of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`,

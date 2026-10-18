@@ -40,6 +40,12 @@ a behaviour: the entry beginning "A theme is a function".
   assembly, arrive with a default a theme can change, which neither a set nor a mapped colour
   needed. **Nor are the palettes:** ggplot2 4's `set_palettes()` takes a scale's palette from the
   theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
+- **A title's look carries its line spacing** (`Theme.title()`: `line_spacing`, the points from
+  one line's baseline to the next's, 0.9 x 1.2 times its size, ggplot2's `lineheight` as R's
+  graphics engine reads it), since only titles break over lines: the axes' and the legends'
+  titles, and the plot's own, `theme_gray()`'s `plot.title` (1.2 times the base size, `half_line`
+  below it), `plot.subtitle` (the base size, `half_line` below), `plot.caption` (0.8 of it,
+  `half_line` above) and `plot.tag` (1.2 times it, no margin), all black.
 - **A legend's look is `theme_gray()`'s at its defaults**: paper white with no border, `half_line`
   inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` above the next
   legend (`legend.spacing.y`, from `legend.spacing`) and `2 * half_line` from the panels

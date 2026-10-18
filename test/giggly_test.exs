@@ -821,6 +821,35 @@ defmodule GigglyTest do
 
       assert assembly.guide_titles === %{x: "x", y: "y"}
     end
+
+    # ggplot2 4.0.3: `labs(x = "Class", y = NULL)` set before the layer titles x "Class" and y
+    # nothing, over the column and the count.
+    test "a label titles an axis over its column and a stat's, set before the layer or after" do
+      assembly =
+        %{"class" => ["suv", "compact"]}
+        |> Plot.new(%{x: :class})
+        |> Plot.labs(x: "Class", y: :none)
+        |> Plot.geom_bar()
+        |> Giggly.Assembly.run()
+
+      assert assembly.guide_titles === %{x: "Class", y: :none}
+    end
+
+    test "the plot's own labels are carried for drawing, :none for those labs/2 does not set" do
+      assembly =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(title: "Title", caption: "Caption")
+        |> Giggly.Assembly.run()
+
+      assert assembly.plot_labels === %{
+               title: "Title",
+               subtitle: :none,
+               caption: "Caption",
+               tag: :none
+             }
+    end
   end
 
   describe "panel_scales/2" do
@@ -1646,6 +1675,145 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/text_inward.svg")
+    end
+
+    # Golden: test/golden/labs.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/labs.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. ggtheme's "The default theme" example: every label
+    # labs() sets, the plot's title, subtitle, caption and tag among them. It moves with what moves
+    # test/golden/point.svg, with the legend's layout, and with how the plot's labels are drawn.
+    test "labs titles the axes and the legend, and gives the plot a title, subtitle, caption and tag" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      gears =
+        mtcars
+        |> Keyword.fetch!(:gear)
+        |> Enum.map(&Integer.to_string/1)
+
+      svg =
+        %{
+          "wt" => Keyword.fetch!(mtcars, :wt),
+          "mpg" => Keyword.fetch!(mtcars, :mpg),
+          "gear" => gears
+        }
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :wt, y: :mpg, colour: :gear})
+        |> Plot.labs(
+          title: "Fuel economy declines as weight increases",
+          subtitle: "(1973-74)",
+          caption: "Data from the 1974 Motor Trend US magazine.",
+          tag: "Figure 1",
+          x: "Weight (1000 lbs)",
+          y: "Fuel economy (mpg)",
+          colour: "Gears"
+        )
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/labs.svg")
+    end
+
+    # Golden: test/golden/labs_none.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/labs_none.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. scale_continuous()'s "Removing axis titles"
+    # example. It moves with what moves test/golden/point.svg.
+    test "a label of :none removes an axis's title and the room it took" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.labs(x: :none, y: :none)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/labs_none.svg")
+    end
+
+    # Golden: test/golden/labs_lines.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/labs_lines.R: every element matches it, and every clip path. Every label over two
+    # lines, on mpg faceted by year. It moves with what moves test/golden/labs.svg and
+    # test/golden/facet_wrap.svg, and with how a label's lines are spaced.
+    test "a label breaking over lines is drawn a line at a time, spanning the panels" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.labs(
+          title: "Fuel economy\nby engine size",
+          subtitle: "Highway mileage,\nby year",
+          caption: "Source:\nggplot2's mpg",
+          tag: "A\nB",
+          x: "Engine\ndisplacement (l)",
+          y: "Highway\nmpg",
+          colour: "Drive\ntrain"
+        )
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/labs_lines.svg")
+    end
+
+    # Golden: test/golden/labs_untitled.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/labs_untitled.R: every element matches it but the colour bar's fill, which
+    # vdiffr's device cannot draw, the x axis drawn before the y as in test/golden/point.svg, and
+    # every clip path. It moves with the legend's and the colour bar's layouts.
+    test "a legend and a colour bar whose labels are :none take no room for a title" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      gears =
+        mtcars
+        |> Keyword.fetch!(:gear)
+        |> Enum.map(&Integer.to_string/1)
+
+      svg =
+        %{
+          "wt" => Keyword.fetch!(mtcars, :wt),
+          "mpg" => Keyword.fetch!(mtcars, :mpg),
+          "qsec" => Keyword.fetch!(mtcars, :qsec),
+          "gear" => gears
+        }
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :qsec, alpha: :gear})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: :none, alpha: :none)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/labs_untitled.svg")
+    end
+
+    # Golden: ggplot2 4.0.3's drawing with vdiffr 1.0.9 of the same plot: the tag's lines centred at
+    # 37.04 points, the margin and half the longer line's width, and the panel from 103.26.
+    test "a title over several lines is as wide as its widest line" do
+      svg =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(tag: "A\nLonger tag")
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg =~ "<text x='37.04' y='15.93' text-anchor='middle'"
+      assert svg =~ "<text x='37.04' y='30.19' text-anchor='middle'"
+      assert svg =~ "<rect x='103.26' y='31.56' width='611.27' height='513.55'"
+    end
+
+    # ggplot2 4.0.3 with vdiffr 1.0.9: `labs(x = "")` places every other element where a one-line
+    # title leaves it, and writes no text for the title.
+    test "an empty label keeps its title's room and draws nothing" do
+      draw = fn title ->
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(x: title)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+      end
+
+      titled = draw.("Weight")
+      [titled_element] = Regex.run(~r/<text[^\n]*>Weight<\/text>\n/, titled)
+
+      assert String.replace(titled, titled_element, "") == draw.("")
     end
 
     # Golden: test/golden/text_nudge.svg, checked against ggplot2's drawing of the same plot, made

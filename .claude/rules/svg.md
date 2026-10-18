@@ -72,8 +72,9 @@ size has a weight".
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,
   which is not a CSS generic family; a family a layer names is written alone, quoted, its quotes
-  escaped, and drawn at the measured width all the same. Text escapes `&`, `<` and `>`, as svglite
-  does.
+  escaped, and drawn at the measured width all the same. **An empty label is not written**, as
+  svglite writes none, though the room measured for it stays. Text escapes `&`, `<` and `>`, as
+  svglite does.
 - **A text checking overlap is drawn as grid's `textGrob(check.overlap = TRUE)` draws one**: each
   label's box placed and turned with it, in order, and left out when an edge of it crosses an edge
   of a box drawn before (`intersect()`): two edges along one line cross where they overlap, two

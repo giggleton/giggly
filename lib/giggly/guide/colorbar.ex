@@ -10,8 +10,9 @@ defmodule Giggly.Guide.Colorbar do
   # laid out as ggplot2 lays out a vertical colour bar through its legend's layout:
   #
   #   * the theme's legend margin inside the edge on every side;
-  #   * the title, as tall as a line of its text, left-aligned and centred down its row as grid
-  #     centres text, then the title's margin below it;
+  #   * the title, as deep as its lines (`Giggly.Guide.Parts`), left-aligned and centred down its
+  #     row as grid centres text, then the title's margin below it; a title of `:none` takes
+  #     neither;
   #   * the bar, as wide as a key and five keys long (`legend.key.height` times 5), the gradient
   #     filling it from its bottom, the scale's low end, to its top, with no border;
   #   * a white tick at each break's place up the bar, across each side, reaching the theme's tick
@@ -57,18 +58,13 @@ defmodule Giggly.Guide.Colorbar do
       labels = Enum.map(keys, fn key -> key.label end)
       places = Enum.map(keys, fn key -> key.place end)
       label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
-      title_width = Font.width(title, title_look.size)
+      title_width = Parts.legend_title_width(title, title_look)
       label_column = max(Enum.max(label_widths), title_width - key_size - text_look.margin)
+      {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
+      bar_row = 2 + length(title_rows)
 
       widths = [margin, key_size, text_look.margin, label_column, margin]
-
-      heights = [
-        margin,
-        Parts.line_height(title_look.size),
-        title_look.margin,
-        @bar_keys * key_size,
-        margin
-      ]
+      heights = Enum.concat([[margin], title_rows, [@bar_keys * key_size, margin]])
 
       columns = length(widths)
       background = Parts.background(columns, length(heights), theme)
@@ -77,19 +73,22 @@ defmodule Giggly.Guide.Colorbar do
         widths: Enum.map(widths, fn width -> {:points, width} end),
         heights: Enum.map(heights, fn height -> {:points, height} end),
         keep_proportions: false,
-        cells: [
-          background,
-          Parts.text_cell(title, title_width, title_look, 2, 2..4),
-          bar_cell(decor, places, key_size, theme),
-          label_cell(labels, label_widths, places, text_look)
-        ]
+        cells:
+          Enum.concat([
+            [background],
+            title_cells,
+            [
+              bar_cell(decor, places, {bar_row, key_size}, theme),
+              label_cell(labels, label_widths, {bar_row, places}, text_look)
+            ]
+          ])
       }
 
       {Enum.sum(widths), scene}
     end
 
-    # The bar and its ticks, in the bar's row, the fourth, and the second column.
-    defp bar_cell(decor, places, bar_width, %Theme{} = theme) do
+    # The bar and its ticks, in the bar's row and the second column.
+    defp bar_cell(decor, places, {row, bar_width}, %Theme{} = theme) do
       %Theme{legend_ticks: ticks_look, legend_ticks_length: tick_length} = theme
       reach = tick_length / bar_width
 
@@ -98,7 +97,7 @@ defmodule Giggly.Guide.Colorbar do
       lines = Enum.concat(right, left)
 
       %Cell{
-        rows: 4..4,
+        rows: row..row,
         columns: 2..2,
         clip: :off,
         hang: :none,
@@ -120,9 +119,9 @@ defmodule Giggly.Guide.Colorbar do
 
     # The labels, each at its tick's place up the bar's row, left-aligned in the label column and
     # centred on its tick as grid centres text, its baseline half its ascent below the place.
-    defp label_cell(labels, label_widths, places, text_look) do
+    defp label_cell(labels, label_widths, {row, places}, text_look) do
       %Cell{
-        rows: 4..4,
+        rows: row..row,
         columns: 4..4,
         clip: :off,
         hang: :none,

@@ -7,8 +7,9 @@ defmodule Giggly.Guide.Legend do
   # title above and its labels right of its keys:
   #
   #   * the theme's legend margin inside the edge on every side;
-  #   * the title, as tall as a line of its text, left-aligned and centred down its row as grid
-  #     centres text, by half its ascent, then the title's margin below it;
+  #   * the title, as deep as its lines (`Giggly.Guide.Parts`), left-aligned and centred down its
+  #     row as grid centres text, then the title's margin below it; a title of `:none` takes
+  #     neither;
   #   * a row for each key, as tall as a key, the key square and on the key background, the glyph
   #     of each layer drawn over it, and its label right of it, the labels' margin from the key,
   #     centred on it as the title is;
@@ -42,18 +43,14 @@ defmodule Giggly.Guide.Legend do
 
       labels = Enum.map(keys, fn key -> key.label end)
       label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
-      title_width = Font.width(title, title_look.size)
+      title_width = Parts.legend_title_width(title, title_look)
       label_column = max(Enum.max(label_widths), title_width - key_size - text_look.margin)
+      {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
+      first_key_row = 2 + length(title_rows)
 
       widths = [margin, key_size, text_look.margin, label_column, margin]
       key_rows = List.duplicate(key_size, length(keys))
-
-      heights =
-        Enum.concat([
-          [margin, Parts.line_height(title_look.size), title_look.margin],
-          key_rows,
-          [margin]
-        ])
+      heights = Enum.concat([[margin], title_rows, key_rows, [margin]])
 
       scene = %Scene{
         widths: Enum.map(widths, fn width -> {:points, width} end),
@@ -62,19 +59,20 @@ defmodule Giggly.Guide.Legend do
         cells:
           Enum.concat([
             [Parts.background(length(widths), length(heights), theme)],
-            [Parts.text_cell(title, title_width, title_look, 2, 2..4)],
-            key_cells(keys, theme),
-            label_cells(labels, label_widths, text_look)
+            title_cells,
+            key_cells(keys, first_key_row, theme),
+            label_cells(labels, label_widths, text_look, first_key_row)
           ])
       }
 
       {Enum.sum(widths), scene}
     end
 
-    # Each key's cell, its background under its glyphs, in the key rows, which start at the fourth.
-    defp key_cells(keys, %Theme{legend_key: look}) do
+    # Each key's cell, its background under its glyphs, in the key rows, which start at
+    # `first_row`.
+    defp key_cells(keys, first_row, %Theme{legend_key: look}) do
       keys
-      |> Enum.with_index(4)
+      |> Enum.with_index(first_row)
       |> Enum.map(fn {%{glyphs: glyphs}, row} ->
         %Cell{
           rows: row..row,
@@ -88,10 +86,10 @@ defmodule Giggly.Guide.Legend do
       end)
     end
 
-    defp label_cells(labels, label_widths, text_look) do
+    defp label_cells(labels, label_widths, text_look, first_row) do
       labels
       |> Enum.zip(label_widths)
-      |> Enum.with_index(4)
+      |> Enum.with_index(first_row)
       |> Enum.map(fn {{label, width}, row} ->
         Parts.text_cell(label, width, text_look, row, 4..4)
       end)

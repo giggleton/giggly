@@ -45,7 +45,11 @@ defmodule Giggly.Theme do
     :legend_ticks,
     :legend_ticks_length,
     :legend_spacing,
-    :legend_box_spacing
+    :legend_box_spacing,
+    :plot_title,
+    :plot_subtitle,
+    :plot_caption,
+    :plot_tag
   ]
   defstruct @enforce_keys
 
@@ -67,6 +71,12 @@ defmodule Giggly.Theme do
   @type text :: %{size: float(), color: String.t(), margin: float()}
 
   @typedoc """
+  A title's text, which may run over several lines: its `size`, `color` and `margin`, as text's,
+  and its `line_spacing`, the distance in points from one line's baseline to the next's.
+  """
+  @type title :: %{size: float(), color: String.t(), margin: float(), line_spacing: float()}
+
+  @typedoc """
   A complete theme: the plot's background, drawn over the whole drawing, and the margin around
   what is drawn on it, in points; the panel's background and its major and minor grid lines; each
   axis's ticks, their length in points, its labels and its title; the space between panels, in
@@ -74,7 +84,9 @@ defmodule Giggly.Theme do
   every side of it; and a legend's background, the margin inside it, each key's background and
   size, the title and its margin below, the labels and their margin from the keys, all in points,
   a colour bar's ticks and how far each reaches into the bar, in points, the space between one
-  legend and the next below it, and the space between the panels and the legends.
+  legend and the next below it, and the space between the panels and the legends; and the plot's
+  title and subtitle, each with its margin below it, its caption, with its margin above it, and its
+  tag.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -85,7 +97,7 @@ defmodule Giggly.Theme do
           axis_ticks: line(),
           axis_ticks_length: float(),
           axis_text: text(),
-          axis_title: text(),
+          axis_title: title(),
           panel_spacing: float(),
           strip_background: rect(),
           strip_text: text(),
@@ -93,12 +105,16 @@ defmodule Giggly.Theme do
           legend_margin: float(),
           legend_key: rect(),
           legend_key_size: float(),
-          legend_title: text(),
+          legend_title: title(),
           legend_text: text(),
           legend_ticks: line(),
           legend_ticks_length: float(),
           legend_spacing: float(),
-          legend_box_spacing: float()
+          legend_box_spacing: float(),
+          plot_title: title(),
+          plot_subtitle: title(),
+          plot_caption: title(),
+          plot_tag: title()
         }
 
   # Scene points per TeX point (grid's "pt"), the unit ggplot2's theme gives lengths in.
@@ -117,6 +133,10 @@ defmodule Giggly.Theme do
   @paper "#FFFFFF"
 
   @half_line @base_size / 2
+
+  # ggplot2's `lineheight` for every text, 0.9, a share of grid's line, which R's graphics engine
+  # takes as 1.2 font sizes: lines of text are 0.9 x 1.2 font sizes apart.
+  @line_spacing_per_size 0.9 * 1.2
 
   # grid's `unit(1.2, "lines")`, ggplot2's `legend.key.size`, which grid works out at its own
   # defaults, a 12-point font at a line height of 1.2, not at the theme's base size: 17.28 points.
@@ -165,6 +185,11 @@ defmodule Giggly.Theme do
   # ticks are white and 0.5 / .pt millimetres wide, `guide_colourbar()`'s own default, since
   # `theme_gray()` sets no `legend.ticks`, and each reaches a fifth of the bar's width into it, its
   # `legend.ticks.length` of `rel(0.2)`.
+  #
+  # The plot's title is black at 1.2 times the base size with `half_line` below it, its subtitle at
+  # the base size with `half_line` below it, its caption at 0.8 of it with `half_line` above it,
+  # and its tag at 1.2 times it with no margin. A title, an axis's or a legend's or the plot's, may
+  # run over several lines, 0.9 lines of R's graphics engine apart, ggplot2's `lineheight`.
   defp gray do
     %__MODULE__{
       plot_background: %{
@@ -196,11 +221,7 @@ defmodule Giggly.Theme do
         color: @ink_toward_paper_30_2,
         margin: 0.8 * @half_line / 2 * @points_per_theme_point
       },
-      axis_title: %{
-        size: @base_size,
-        color: @ink,
-        margin: @half_line / 2 * @points_per_theme_point
-      },
+      axis_title: title(@base_size, @half_line / 2),
       panel_spacing: @half_line * @points_per_theme_point,
       strip_background: %{
         fill: @ink_toward_paper_85,
@@ -224,11 +245,7 @@ defmodule Giggly.Theme do
         line_width: @base_rect_size * @points_per_millimetre_of_line
       },
       legend_key_size: @legend_key_size,
-      legend_title: %{
-        size: @base_size,
-        color: @ink,
-        margin: @half_line * @points_per_theme_point
-      },
+      legend_title: title(@base_size, @half_line),
       legend_text: %{
         size: 0.8 * @base_size,
         color: @ink,
@@ -242,7 +259,21 @@ defmodule Giggly.Theme do
       },
       legend_ticks_length: 0.2 * @legend_key_size,
       legend_spacing: 2 * @half_line * @points_per_theme_point,
-      legend_box_spacing: 2 * @half_line * @points_per_theme_point
+      legend_box_spacing: 2 * @half_line * @points_per_theme_point,
+      plot_title: title(1.2 * @base_size, @half_line),
+      plot_subtitle: title(@base_size, @half_line),
+      plot_caption: title(0.8 * @base_size, @half_line),
+      plot_tag: title(1.2 * @base_size, 0)
+    }
+  end
+
+  # A title in black ink at `size` points, `margin` TeX points from what it labels.
+  defp title(size, margin) do
+    %{
+      size: size,
+      color: @ink,
+      margin: margin * @points_per_theme_point,
+      line_spacing: @line_spacing_per_size * size
     }
   end
 end

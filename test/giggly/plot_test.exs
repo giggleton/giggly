@@ -786,4 +786,47 @@ defmodule Giggly.PlotTest do
       assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
     end
   end
+
+  describe "labs/2" do
+    test "a plot has no labels until labs/2 sets them" do
+      assert Plot.new(@rows).labels === %{}
+    end
+
+    test "labels are recorded by canonical name, and a later call replaces only what it sets" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.labs(x: "first", title: "Title", colour: "Cylinders")
+        |> Plot.labs(x: "second", title: :none, tag: "A\nB")
+
+      assert plot.labels === %{
+               x: "second",
+               title: :none,
+               color: "Cylinders",
+               tag: "A\nB"
+             }
+    end
+
+    test "a label that is neither text nor :none is refused" do
+      plot = Plot.new(@rows)
+
+      for {key, value} <- [x: 5, title: :centre] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.labs(plot, [{key, value}]) end
+
+        assert error.key == key
+      end
+    end
+
+    test "a label for nothing a guide or the plot shows is refused, a misspelling among them" do
+      plot = Plot.new(@rows)
+
+      for key <- [:shape, :titel] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.labs(plot, [{key, "A"}]) end
+
+        assert error.key == [key]
+      end
+    end
+  end
 end

@@ -79,6 +79,28 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A title may run over several lines, drawn a line at a time as R's graphics engine draws them
+  (2026-10-17, Steve: "Build multi-line now").** Every title, an axis's, a legend's and the plot's
+  own, splits where it breaks and draws each line as a label of its own, 0.9 x 1.2 font sizes below
+  the one before (ggplot2's `lineheight`), stacked by `vjust` as the engine stacks lines; it is as
+  deep as its lines spaced out and a line of text, ggplot2's `titleGrob` measure, and as wide as
+  its widest line. The scene and the backend learn nothing: a text's per-label offsets place each
+  line. Tick labels, strips and `geom_text()` labels stay one line. *Rejected: refusing a label
+  that breaks at the call* until multi-line text arrived, recommended because no waiting example
+  needs one; a title breaking over lines is common in ggplot2 practice.
+
+- **`labs/2` takes the titles of the aesthetics a guide shows and the plot's title, subtitle,
+  caption and tag, as text or `:none`, and the plot's labels are drawn in `Giggly.Guide`
+  (2026-10-17, Steve, agreeing the proposal and the widening).** A key Giggly shows nothing for, a
+  misspelling or an aesthetic it maps no guide for, raises at the call, as every option does, and a
+  number is refused where R writes it; a label for an aesthetic no layer maps titles nothing, as R
+  ignores it. Calls merge, the latest winning per key, and a label wins over the mapped column and
+  a stat's, so a label decides which legends merge. `Guide.Title`, which the guide boundary
+  exports, measures and draws them as `Guide.Axis` draws the axes' titles; rendering lays out its
+  cells. *Rejected: accepting any key, as ggplot2 does,* which lets a misspelt `titel:` draw
+  nothing; *the plot's labels in `Guide.Axis`*, which they are not part of; *measured in
+  rendering*, which computes no sizes.
+
 - **A position declares the aesthetics it reads, with their defaults, and the assembly writes them
   into every row just before the position runs, as ggplot2 4.0's `Position$use_defaults()`
   (2026-10-17, Steve).** Nudging reads `nudge_x` and `nudge_y`, which `geom_text/3` sets; the
@@ -113,8 +135,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   mappings, and the largest API question left); themes (about 19 of 27: five need a global default
   theme the pure core rules out, and all need the whole element tree); `geom_label()` now (one
   example, for a rounded box traced as grid traces it). *Deferred:* `parse = TRUE`, dodging text,
-  `inherit.aes`, mapped text `size`, `key_glyph`, `fontface`, `size.unit`, `labs()`'s `alt` and
-  `dictionary`, `get_labs()`.
+  `inherit.aes`, mapped text `size`, `key_glyph`, `fontface`, `size.unit`, `labs()`'s `alt`,
+  `alt_insight` and `dictionary`, a function as a label (formatting the default title, `labs(x =
+  toupper)`) and `waiver()` (the default title, asked for), `get_labs()`; multi-line tick labels,
+  strips and text labels.
 
 - **A layer's own table is public: `data:`, an option of every layer function, as ggplot2's
   `data =` (2026-10-17, Steve).** `annotate()` needs a layer with a table of its own, drawn in
@@ -891,8 +915,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   retitle the plot. *Rejected: titles drawn by rendering* — it computes no positions; *or by a
   domain of their own* — ggplot2's `guide_axis(title = …)` sets an axis's title, and legends draw
   their own. *Deferred to first reader:* the search past a layer that leaves the axis unmapped (a
-  geom such as `geom_hline()`); `labs/2` and a title set by hand (NimbleOptions and §7's "absent"
-  question come with it); the plot's title; and titles of other aesthetics (legends).
+  geom such as `geom_hline()`).
 
 - **Axes are drawn from breaks the scale computes and the coordinate system places, by a guide
   that measures its labels with the glyph table ggplot2's own snapshots were measured with
@@ -1399,8 +1422,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-17 — Nudge labels with nudge_x and nudge_y (text and titles, step 2); §4: "A position
-  declares the aesthetics it reads"
+- 2026-10-17 — Label plots with labs (text and titles, step 3); §4: "A title may run over several
+  lines", "`labs/2` takes the titles"
+- 2026-10-17 — Nudge labels with nudge_x and nudge_y (text and titles, step 2) (`dabca48`); §4: "A
+  position declares the aesthetics it reads"
 - 2026-10-17 — Draw labels with geom_text (text and titles, step 1) (`91fe040`); §4: "Text and
   titles is Phase 3's fifth increment", "An aesthetic a layer takes from the plot"
 - 2026-10-17 — Draw colours in the notebooks (colour, step 4) (`5918137`); §4: "Colour and fill is
@@ -1547,7 +1572,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
   internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`). The
   first public "remove this" is `colour: :none` and `fill: :none`, ggplot2's `NA` (2026-10-16,
-  Steve, with the colour increment).
+  Steve, with the colour increment); the second is a `labs/2` label of `:none`, ggplot2's `NULL`
+  (2026-10-17), where "use the default" is still a label left out.
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

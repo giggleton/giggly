@@ -23,11 +23,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
-- **The API is `new/2`, the geom functions, the facet functions (`facet_wrap/3`) and the coordinate
-  functions (`coord_radial/1`).** `computed_mapping/2` and the `layer_*` accessors exist for the
-  assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one
-  (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user sees, through
-  `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
+- **The API is `new/2`, the geom functions, the facet functions (`facet_wrap/3`), the coordinate
+  functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2` and the `layer_*` accessors
+  exist for the assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names
+  no hidden one (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user
+  sees, through `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a
+  kind's struct.
 - **No function ggplot2 has superseded or deprecated becomes API**; Giggly offers its replacement
   alone, `labs()` and never `xlab()` (design-log §4, the entry beginning "Giggly exposes no
   function").
@@ -92,10 +93,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
-  `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`), so a misspelt
-  option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate default is
-  recorded as a value (`scales: :fixed`). An option not given is recorded as `:none` in the kind's
+  `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3` and of `labs/2`),
+  so a misspelt option raises naming it, and a repeated one is refused by
+  `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
+  :fixed`). An option not given is recorded as `:none` in the kind's
   struct; a caller never writes "absent", so §7's question waits.
+- **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
+  aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`) or the plot's `title`, `subtitle`,
+  `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a call replaces only
+  the labels it gives. Any other key raises, and so does a label that is not text or `:none`
+  (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not checked,
+  since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2` takes
+  the titles").
 - **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
   this API sees a `Table.Reader`.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`

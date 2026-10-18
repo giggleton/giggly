@@ -108,6 +108,7 @@ defmodule Giggly.Assembly do
     :clip,
     :aspect_ratio,
     :guide_titles,
+    :plot_labels,
     :theme
   ]
   defstruct @enforce_keys
@@ -120,7 +121,8 @@ defmodule Giggly.Assembly do
   coordinate system, each panel's params keyed by panel id, whether panels
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
   for none; the title of each aesthetic's guide, the x and y axes' so far,
-  `:none` for an axis no layer maps; and the name of the plot's theme, which rendering resolves.
+  `:none` for an axis no layer maps; the plot's own labels, its title, subtitle, caption and tag,
+  `:none` for each it has not; and the name of the plot's theme, which rendering resolves.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -135,14 +137,21 @@ defmodule Giggly.Assembly do
           clip: Coord.clip(),
           aspect_ratio: Coord.aspect(),
           guide_titles: %{x: String.t() | :none, y: String.t() | :none},
+          plot_labels: %{
+            title: String.t() | :none,
+            subtitle: String.t() | :none,
+            caption: String.t() | :none,
+            tag: String.t() | :none
+          },
           theme: Plot.theme()
         }
 
   @typedoc """
   A legend for one or more aesthetics other than position, those whose scales give the same kind of
   guide, title and labels, in name order: the guide that draws it, a struct of its kind, as the
-  first aesthetic's scale names it (`Giggly.Guide`); its title, the column the first layer to map
-  the aesthetic maps it to; a key for each of its scales' breaks, the break's label, the break
+  first aesthetic's scale names it (`Giggly.Guide`); its title, the label `Plot.labs/2` sets for
+  the first aesthetic, or else the column the first layer to map it maps it to, `:none` for none;
+  a key for each of its scales' breaks, the break's label, the break
   itself, as the first aesthetic's data holds it (ggplot2's `.value`), the value each aesthetic
   maps it to, and, for a colour bar, its place up the bar, 0 to 1; a colour bar's colours, each
   its place up the bar and its colour (`decor`); and each layer that maps one of its aesthetics,
@@ -154,7 +163,7 @@ defmodule Giggly.Assembly do
   @type legend :: %{
           required(:guide) => struct(),
           required(:aesthetics) => [Plot.aesthetic()],
-          required(:title) => String.t(),
+          required(:title) => String.t() | :none,
           required(:keys) => [
             %{
               required(:label) => String.t(),
@@ -189,8 +198,9 @@ defmodule Giggly.Assembly do
   # to one value is put into every row of its table. Last,
   # the plot's coordinate system builds each panel's params from the extents of the scales the
   # layout gives that panel and the breaks and minor breaks each axis draws on its extent. Each axis
-  # is titled by the first layer, in the order added, whose mapping laid over the plot's maps `:x`
-  # (or `:y`); a later layer never retitles it, and an axis no layer maps has no title.
+  # is titled by the label `Plot.labs/2` sets for it, or else by the first layer, in the order
+  # added, whose mapping laid over the plot's maps `:x` (or `:y`); a later layer never retitles it,
+  # and an axis no layer maps has no title. The plot's own labels are carried for drawing.
   #
   # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   # date, or to a column whose kind (continuous or discrete) disagrees with the first column on
@@ -285,18 +295,27 @@ defmodule Giggly.Assembly do
       aspect_ratio: Coord.aspect(coord, Map.fetch!(panel_params, 1)),
       guide_titles:
         Map.new([:x, :y], fn aesthetic -> {aesthetic, guide_title(plot, layers, aesthetic)} end),
+      plot_labels:
+        Map.new([:title, :subtitle, :caption, :tag], fn name ->
+          {name, Map.get(plot.labels, name, :none)}
+        end),
       theme: theme
     }
   end
 
-  # The title of an aesthetic's guide, an axis's so far: the column the first layer to map the
-  # aesthetic maps it to, through the layer's computed mapping; failing that, the computed column a
-  # stat puts into it by default, the last layer's to do so, as `count`; or `:none`. It is ggplot2's
-  # `setup_plot_labels()`, where a layer's own label is never replaced by a later layer's and
-  # replaces a stat's default, which ggplot2 marks as a fallback, read as `resolve_label()` reads it,
-  # by the scale's first aesthetic. The plot holds each mapping's column by the name the data gives
-  # it, which is the title.
-  defp guide_title(plot, layers, aesthetic) do
+  # The title of an aesthetic's guide, an axis's or a legend's: the label `Plot.labs/2` sets for it,
+  # which wins over every other, `:none` among them, as a plot's labels win in ggplot2's
+  # `setup_plot_labels()`; else the column the first layer to map the aesthetic maps it to, through
+  # the layer's computed mapping; failing that, the computed column a stat puts into it by default,
+  # the last layer's to do so, as `count`; or `:none`. A layer's own label is never replaced by a
+  # later layer's and replaces a stat's default, which ggplot2 marks as a fallback, read as
+  # `resolve_label()` reads it, by the scale's first aesthetic. The plot holds each mapping's column
+  # by the name the data gives it, which is the title.
+  defp guide_title(%Plot{labels: labels} = plot, layers, aesthetic) do
+    Map.get_lazy(labels, aesthetic, fn -> data_title(plot, layers, aesthetic) end)
+  end
+
+  defp data_title(plot, layers, aesthetic) do
     mapped =
       Enum.find_value(layers, fn layer ->
         plot

@@ -12,8 +12,9 @@ legend (`Guide.Legend`, ggplot2's `guide_legend()`) and a colour bar (`Guide.Col
 beside a panel and their titles (`Guide.Axis`, ggplot2's `guide_axis()`), the axis around a radial
 panel's circle (`Guide.AxisTheta`, `guide_axis_theta()`), the panel's background and grid lines
 (`Guide.Grid`, `guide_grid()`), the strips that label a facet's panels (`Guide.Strip`, which
-ggplot2's facets draw with `render_strips()`), and the box the legends stack in (`Guide.Box`,
-`package_box()`). Why a protocol and why a scale names its guide: design-log §4, the entry
+ggplot2's facets draw with `render_strips()`), the box the legends stack in (`Guide.Box`,
+`package_box()`), and the plot's own labels, its title, subtitle, caption and tag (`Guide.Title`),
+which `labs()` sets. Why a protocol and why a scale names its guide: design-log §4, the entry
 beginning "The guide protocol sits at `Giggly.Guide`"; why a domain of its own, and why it is called
 a guide: the entry beginning "Axes are drawn"; which name titles an axis: the entry beginning "An
 axis is titled"; why the grid is drawn here but placed by the coordinate system: the entry beginning "The
@@ -28,9 +29,17 @@ panel's grid lines are placed by the coordinate system".
   (`:axis` for a position, `:legend`), and the assembly builds the kind's struct. **A guide never
   sees a scale or calls a geom**: the assembly works out its keys from the scale, and rendering has
   each layer's geom draw its glyphs in them. The boundary exports the modules rendering draws with
-  (`Axis`, `Box`, `Grid`, `Strip`) and the kinds, whose structs the assembly builds, never a kind's
-  drawing. The parts both kinds' tables are built from (the background, a line of text) are
-  `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's layout.
+  (`Axis`, `Box`, `Grid`, `Strip`, `Title`) and the kinds, whose structs the assembly builds, never
+  a kind's drawing. The parts both kinds' tables are built from (the background, the title's rows,
+  a line of text) are `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's
+  layout, and so is the title every guide draws.
+- **Every title is drawn by `Parts.title_text/5` and measured by `Parts.title_height/2` and
+  `title_width/2`**, an axis's, a legend's or the plot's own, so each may break over lines
+  (design-log §4, the entry beginning "A title may run over several lines"): each line a label of
+  its own, a line spacing (the theme's `line_spacing`) below the one before, stacked `vjust` of the
+  way down from its top as R's graphics engine stacks lines and justified `hjust` by its own width;
+  the title as deep as its lines spaced out and a line of text, and as wide as its widest line.
+  Tick labels and strips stay one line.
 - **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
   ticks and marks are placed by one rule. Where an axis is drawn, which aesthetic's title goes
   there, and the look it is drawn in are the coordinate system's call; a guide draws the sides it
@@ -40,7 +49,14 @@ panel's grid lines are placed by the coordinate system".
   `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
   out its axis titles: centred on the panel's side, hanging from the cell's edge away from the
-  axis, turned 90 degrees on the left. A title of `:none` draws nothing and takes no room.
+  axis, turned 90 degrees on the left, its first line farthest from the axis. A title of `:none`
+  draws nothing and takes no room; `""` takes a line's room and draws nothing.
+- **The plot's labels are drawn by `Guide.Title`, as `theme_gray()` draws `plot.title`,
+  `plot.subtitle`, `plot.caption` and `plot.tag`**: the title and the subtitle hanging left-aligned
+  from their cells' tops, their margins below; the caption hanging right-aligned from its margin
+  below its cell's top; the tag centred both ways in a cell as wide as its widest line and as deep
+  as its lines. It reports each one's depth, and the tag's width, in points, for rendering to lay
+  out; a label of `:none` takes no room.
 - **The grid's lines and the background's shape come from the coordinate system** (`Coord.grid/2`):
   a background filling the panel is a rectangle, any other the polygon round its outline. The guide
   gives them the theme's look and ggplot2's order: the panel's background, the minor lines at the y
@@ -72,18 +88,18 @@ panel's grid lines are placed by the coordinate system".
   `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
   aesthetic on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
-  labels, the axis line (blank in `theme_grey()`), minor ticks, a title set by `labs/2`, axes as
-  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
+  labels, the axis line (blank in `theme_grey()`), minor ticks, axes as kinds of the protocol
+  (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
   FALSE`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal bar, and its raster
   and rectangles displays.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
-  defaults**: the legend margin inside
-  the edge; the title above, as tall as a line of its text, left-aligned and centred down its row
-  by half its ascent, as grid centres text, the title's margin below; a row per key, the key
-  square on the key background with each layer's glyph over it, its label the text margin to its
-  right, centred as the title is; the label column as wide as the widest label, or wider when the
+  defaults**: the legend margin inside the edge; the title above, as deep as its lines,
+  left-aligned and centred down its row, as grid centres text, the title's margin below, or neither
+  for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key square on
+  the key background with each layer's glyph over it, its label the text margin to its right,
+  centred as the title is; the label column as wide as the widest label, or wider when the
   title is, leaving the room at the labels' right. Drawn in ggplot2's order: background, title,
   each key's background and glyphs, then the labels. Every size is in points.
 - **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them

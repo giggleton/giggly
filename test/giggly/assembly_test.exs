@@ -308,6 +308,25 @@ defmodule Giggly.AssemblyTest do
                {["Mazda RX4", "Datsun 710"], [-1, -1], [-1, -1]}
     end
 
+    # ggplot2 4.0.3: bars coloured and filled by one column have one guide; `labs(fill = "F")` gives
+    # them two, `labs(fill = "F", colour = "F")` one again, and `labs(colour = NULL)` two, one with
+    # no title.
+    test "a label titles a legend, so legends it titles apart are drawn apart and alike as one" do
+      legends = fn labels ->
+        %{"x" => ["a", "b"], "y" => [1, 2], "g" => ["p", "q"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :g, fill: :g})
+        |> Plot.geom_col()
+        |> Plot.labs(labels)
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+        |> Enum.map(fn legend -> {legend.aesthetics, legend.title} end)
+      end
+
+      assert {legends.(fill: "F"), legends.(fill: "F", colour: "F"), legends.(colour: :none)} ===
+               {[{[:color], "g"}, {[:fill], "F"}], [{[:color, :fill], "F"}],
+                [{[:color], :none}, {[:fill], "g"}]}
+    end
+
     # Steve's choice, where ggplot2 4.0.3 nudges each label by its row's `nudge_x`: no layer maps a
     # nudge yet, so one the plot maps rides into a text layer and is replaced by the default, 0.
     test "a nudge the plot maps rides into a text layer and moves nothing" do

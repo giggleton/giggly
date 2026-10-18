@@ -75,6 +75,12 @@ defmodule Giggly.Plot do
   same title and labels, as a colour and a fill mapped to one column, are drawn as one, each layer
   drawing a legend's keys in the aesthetics it maps. ggplot2 orders its legends by a hash of their
   contents; `guides(order =)` in R puts them in Giggly's order.
+
+  ## Labels
+
+  Each axis is titled by the column mapped to it, and each legend by the column its aesthetic is
+  mapped to. `labs/2` titles them otherwise, and gives the plot a title, a subtitle, a caption and a
+  tag, as ggplot2's `labs()` does.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -103,7 +109,7 @@ defmodule Giggly.Plot do
   alias Giggly.{Aesthetics, ColorOperations, Coord, DataFrame, Facet, Geom, Position, Stat}
   alias Giggly.Plot.Layer
 
-  @enforce_keys [:data, :mapping, :facet, :coord, :theme, :reversed_layers]
+  @enforce_keys [:data, :mapping, :facet, :coord, :theme, :labels, :reversed_layers]
   defstruct @enforce_keys
 
   @typedoc "An aesthetic's name, such as `:x`, `:y` or `:color`."
@@ -124,8 +130,15 @@ defmodule Giggly.Plot do
   @type theme :: :gray
 
   @typedoc """
-  A plot: its data, its mapping, its facet, coordinate system and theme, and its layers newest
-  first (each function adds one at the front; they are assembled in the order they were added).
+  The labels `labs/2` sets, by what each titles: an aesthetic's guide, or the plot's `:title`,
+  `:subtitle`, `:caption` or `:tag`; each its text, or `:none` for none.
+  """
+  @type labels :: %{optional(atom()) => String.t() | :none}
+
+  @typedoc """
+  A plot: its data, its mapping, its facet, coordinate system and theme, the labels `labs/2` sets,
+  and its layers newest first (each function adds one at the front; they are assembled in the order
+  they were added).
   """
   @type t :: %__MODULE__{
           data: DataFrame.t(),
@@ -133,6 +146,7 @@ defmodule Giggly.Plot do
           facet: facet(),
           coord: coord(),
           theme: theme(),
+          labels: labels(),
           reversed_layers: [struct()]
         }
 
@@ -373,6 +387,22 @@ defmodule Giggly.Plot do
                   ]
                 )
 
+  # `labs/2`'s options: a title for each aesthetic a guide shows, and the plot's own.
+  @label_option [type: {:custom, __MODULE__, :validate_label, []}]
+  @labs_options NimbleOptions.new!(
+                  x: [doc: "The x axis's title."] ++ @label_option,
+                  y: [doc: "The y axis's title."] ++ @label_option,
+                  color:
+                    [doc: "The colour legend's or colour bar's title (`colour:` too)."] ++
+                      @label_option,
+                  fill: [doc: "The fill legend's or colour bar's title."] ++ @label_option,
+                  alpha: [doc: "The alpha legend's title."] ++ @label_option,
+                  title: [doc: "The plot's title, above the panels."] ++ @label_option,
+                  subtitle: [doc: "The plot's subtitle, below its title."] ++ @label_option,
+                  caption: [doc: "The plot's caption, below the panels."] ++ @label_option,
+                  tag: [doc: "The plot's tag, at its top left."] ++ @label_option
+                )
+
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   @doc """
@@ -396,6 +426,7 @@ defmodule Giggly.Plot do
       facet: %Facet.Null{},
       coord: %Coord.Cartesian{},
       theme: :gray,
+      labels: %{},
       reversed_layers: []
     }
   end
@@ -842,6 +873,44 @@ defmodule Giggly.Plot do
   @spec coord_radial(t()) :: t()
   def coord_radial(%__MODULE__{} = plot), do: %{plot | coord: %Coord.Radial{}}
 
+  @doc """
+  Sets the plot's labels, ggplot2's `labs()`: the title of an axis or a legend, named by its
+  aesthetic, and the plot's title, subtitle, caption and tag.
+
+  An axis or legend is otherwise titled by the column mapped to it; a label set here replaces that
+  title, whichever layer maps the aesthetic and whether the layer was added before or after. A
+  label of `:none` removes the title and the room it took, as ggplot2's `NULL` does, and `""`
+  keeps the room and draws nothing. A label for an aesthetic no layer maps titles nothing. Each
+  call sets only the labels it is given, so a later call replaces an earlier one's label and keeps
+  the rest. A label breaking over several lines (`"Fuel\\neconomy"`) is drawn a line at a time.
+
+  The title and subtitle are drawn above the panels, from their left edge; the caption below them,
+  to their right edge, and the tag at the plot's top left, as `theme_gray()` draws them.
+
+  ## Options
+
+  #{NimbleOptions.docs(@labs_options)}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.labs(x: "Weight (1000 lbs)", y: :none, title: "Fuel economy")
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">Weight (1000 lbs)</text>", svg =~ ">mpg</text>", svg =~ ">Fuel economy</text>"}
+      {true, false, true}
+  """
+  @spec labs(t(), keyword()) :: t()
+  def labs(%__MODULE__{labels: labels} = plot, options) when is_list(options) do
+    validated =
+      options
+      |> Aesthetics.canonicalize()
+      |> NimbleOptions.validate!(@labs_options)
+
+    %{plot | labels: Map.merge(labels, Map.new(validated))}
+  end
+
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
   # the layer's column is used, and less any aesthetic the layer sets to one value, which wins over
   # a mapping, as ggplot2's `compute_aesthetics()` drops the aesthetics a layer's `aes_params` set.
@@ -964,6 +1033,14 @@ defmodule Giggly.Plot do
 
   def validate_nudge(distance),
     do: {:error, "expected a distance along the axis, a number, got: #{inspect(distance)}"}
+
+  # NimbleOptions' check of a `labs/2` option: a label's text, or `:none` for none.
+  @doc false
+  @spec validate_label(term()) :: {:ok, String.t() | :none} | {:error, String.t()}
+  def validate_label(label) when is_binary(label) or label == :none, do: {:ok, label}
+
+  def validate_label(label),
+    do: {:error, "expected a label, a string or :none, got: #{inspect(label)}"}
 
   # NimbleOptions' check of an `hjust:` or `vjust:` option: a number, kept as a float, as R keeps one
   # and grid takes any, or one of ggplot2's words, as an atom.
