@@ -217,6 +217,27 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for rectangles" do
+    test "a rectangle is placed between its corners as given, reversed or infinite" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          xmin: [1.0, :neg_infinity, nil],
+          xmax: [0.0, 2.0, 1.0],
+          ymin: [4.0, 1.0, 0.0],
+          ymax: [2.0, :infinity, 1.0]
+        )
+
+      assert [%Rectangles{} = rectangles] =
+               Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+
+      assert {rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax} ===
+               {[0.25, 0.0], [0.0, 0.5], [1.0, 0.25], [0.5, 1.0]}
+    end
+  end
+
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
   # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
   describe "setup_data/3 for lines" do

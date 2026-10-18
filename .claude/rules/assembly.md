@@ -26,11 +26,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   panels out from the plot's data and every layer's table and assigns `panel` to each layer's
   table, raw → each layer's mapping is evaluated → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
-  stat → `after_stat` → geom reparameterize (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → the
-  position's aesthetics into every row → position → reset and retrain position scales → freeze
-  view scales → map positions again → train non-position scales → build guides → map
-  non-position scales → `after_scale` → fixed values last. A stage arrives with its increment
-  and goes where this order puts it.
+  stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
+  ggplot2's `GeomRect$setup_data()` fills them in) → geom reparameterize (a bar to
+  `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position → reset and
+  retrain position scales → freeze view scales → map positions again → train non-position scales
+  → build guides → map non-position scales → `after_scale` → fixed values last. A stage arrives
+  with its increment and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly calls the families' build functions, never their drawing ones**: the facet's,
@@ -77,7 +78,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A label `Plot.labs/2` sets titles an axis or a legend over everything else**, `:none` among
   them, as a plot's labels win in ggplot2's `setup_plot_labels()`, whenever the call came; so a
   label decides which legends merge, as they merge by title. Otherwise:
-- **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**,
+- **Each axis's title is the column the first layer to map the axis's aesthetic maps it to**, an
+  annotation never (`Plot.layer_annotation?/1`), as ggplot2's `annotate()` mapping is unlabelled,
   read through `Plot.computed_mapping/2` in the order the layers were added, as ggplot2's
   `setup_plot_labels()`, where a later layer never replaces an earlier one's, and `resolve_label()`,
   which reads the scale's first aesthetic, so `:xmin` alone titles nothing. **Failing that, it is
@@ -171,3 +173,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   written order, so the rest go by name, where ggplot2's follow the writing. A discrete alpha
   mapped with `x` therefore groups within each `x`, and `geom_bar(%{fill: :drv})` over the plot's
   `x` groups by drive train first, as ggplot2's do.
+- **The values a layer sets go in last, one value in every row or an annotation's list, one value
+  per row**, as ggplot2's `use_defaults()` applies `aes_params`, so a line's set colours land on
+  its rows once `setup_data/3` has put them in order, as in R. Under a facet that repeats an
+  annotation's rows across several panels a list holds too few, and the run raises naming the
+  layer and the aesthetic, as ggplot2 fails with "Aesthetics must be either length 1 or the same
+  as the data".

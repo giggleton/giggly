@@ -73,12 +73,12 @@ weight".
   (`.claude/rules/render.md`).
 - **A rectangle (`Rect`) fills its cell**, as grid's `rectGrob()` does at its default place and
   size, which is how ggplot2 draws a background; **rectangles placed and sized within their cell
-  (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, as ggplot2's
-  `GeomRect` draws a bar. A background that is not rectangular is a polygon (`Polygons`), closed
-  round its outline. **A gradient (`Gradient`) is a rectangle filling its cell with a linear
-  gradient running up it**, from the cell's bottom to its top through its stops, each an offset, 0
-  to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled with a
-  `linearGradient()`, as ggplot2's colour bar draws its bar.
+  (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, either way
+  round, as ggplot2's `GeomRect` draws a bar or a rectangle. A background that is not rectangular is
+  a polygon (`Polygons`), closed round its outline. **A gradient (`Gradient`) is a rectangle filling
+  its cell with a linear gradient running up it**, from the cell's bottom to its top through its
+  stops, each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled
+  with a `linearGradient()`, as ggplot2's colour bar draws its bar.
 - **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
   as gtable nests one table in another: its sizes in points take their length and its shares split
   what is left of the box, and a table of sizes in points alone is centred in the box both ways,

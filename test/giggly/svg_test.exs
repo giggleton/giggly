@@ -280,6 +280,29 @@ defmodule Giggly.SVGTest do
              )
     end
 
+    # Golden: ggplot2 4.0.3's drawing, through vdiffr 1.0.9, of `geom_rect()` with each row's
+    # corners swapped is the drawing of the rows as given, element for element.
+    test "a rectangle whose corners are reversed is written as the one they bound" do
+      rectangles = fn {xmin, xmax, ymin, ymax} ->
+        %Rectangles{
+          xmin: [xmin],
+          xmax: [xmax],
+          ymin: [ymin],
+          ymax: [ymax],
+          fill: ["#595959"],
+          fill_opacity: [1.0],
+          color: [:none],
+          color_opacity: [0.0],
+          stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
+        }
+      end
+
+      reversed = draw(whole([rectangles.({0.3, 0.1, 0.8, 0.5})]))
+
+      assert reversed == draw(whole([rectangles.({0.1, 0.3, 0.5, 0.8})]))
+      assert reversed =~ "<rect x='72.00' y='115.20' width='144.00' height='172.80' "
+    end
+
     test "a circle's outline and fill carry its opacity, as svglite writes a colour's alpha" do
       circles = %Circles{
         x: [0.25, 0.75],

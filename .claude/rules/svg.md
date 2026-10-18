@@ -20,22 +20,23 @@ size has a weight".
 - **The output is the product, so its strings are behaviour.** An attribute, an element or a
   number's format that changes changes the golden; a surviving mutant in a literal here is a
   finding, never message wording.
-- **The document's unit is the point, written as svglite writes it:** `width` and `height` in
-  `pt`, a `viewBox` of the size in points, numbers with two decimals, circles with `cx`/`cy`/`r`
-  and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`,
-  rectangles with `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none`
-  for no border) and `fill`, placed rectangles likewise, hung from their top left corner as grid
-  hangs ggplot2's bars, a `stroke-opacity` after the `stroke` and `stroke-linecap: butt;
-  stroke-linejoin: miter` before the `fill`, as `GeomRect` sets them, and a `fill-opacity` after
-  it, polygons with `points` and the same `style` as rectangles, polylines with `points` and a
-  `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line style below, and `fill:
-  none`, segments as `<line>` with `x1`, `y1`, `x2` and `y2` and the same `style` but `fill`, and
-  text with `x` and `y` (or, turned, `transform='translate(x,y) rotate(-angle)'`, the angle in
-  whole degrees as vdiffr writes it with `%0.0f`, a tie to the even one), `text-anchor` (left out
-  for text anchored at its start, as svglite leaves it out), a `style` of `font-size` (in `px`, the
-  user unit), `fill` and `fill-opacity` (left out for opaque black, SVG's default, as vdiffr leaves
-  it out) and `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`.
-  Output can then be set beside the SVG in ggplot2's own visual-test snapshots.
+- **The document's unit is the point, written as svglite writes it:** `width` and `height` in `pt`,
+  a `viewBox` of the size in points, numbers with two decimals, circles with `cx`/`cy`/`r` and a
+  `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`, rectangles with
+  `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border)
+  and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
+  bars, whichever way round their corners are given, as svglite writes one, a `stroke-opacity` after
+  the `stroke` and `stroke-linecap: butt; stroke-linejoin: miter` before the `fill`, as `GeomRect`
+  sets them, and a `fill-opacity` after it, polygons with `points` and the same `style` as
+  rectangles, polylines with `points` and a `style` of `stroke-width`, `stroke` and
+  `stroke-opacity`, the line style below, and `fill: none`, segments as `<line>` with `x1`, `y1`,
+  `x2` and `y2` and the same `style` but `fill`, and text with `x` and `y` (or, turned,
+  `transform='translate(x,y) rotate(-angle)'`, the angle in whole degrees as vdiffr writes it with
+  `%0.0f`, a tie to the even one), `text-anchor` (left out for text anchored at its start, as
+  svglite leaves it out), a `style` of `font-size` (in `px`, the user unit), `fill` and
+  `fill-opacity` (left out for opaque black, SVG's default, as vdiffr leaves it out) and
+  `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`. Output can then be set
+  beside the SVG in ggplot2's own visual-test snapshots.
 - **A gradient is written as svglite writes one**: a `<defs>` of its own holding a
   `<linearGradient>` (`gradientUnits='userSpaceOnUse'`, `spreadMethod='pad'`) from the rectangle's
   bottom edge to its top at its middle, in the drawing's points, each `<stop>` at its offset,

@@ -23,9 +23,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
-- **The API is `new/2`, the geom functions, the facet functions (`facet_wrap/3`), the coordinate
-  functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2`, `mapping_order/2` and the
-  `layer_*` accessors (`layer_table/2` the table a layer draws) exist for the assembly and are
+- **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
+  the coordinate functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2`,
+  `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
+  `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
   not `Aesthetics.name/0`). An example in the docs shows what a user
   sees, through `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a
@@ -49,7 +50,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
   chooses others; `coord_radial/1` records `%Coord.Radial{}`); `geom_text/3` records
-  `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`. `Plot`
+  `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and
+  `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
+  the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
+  identity stat and position, as ggplot2's `annotate()` does, so its text is never nudged. `Plot`
   builds them and reads a geom's facts to check a layer, but never computes or draws with one; the
   assembly reads a layer's with `layer_geom/1`, `layer_stat/1`, `layer_position/1` and
   `layer_fixed/1`, so `Layer` stays private.
@@ -86,14 +90,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar functions `fill:`, the line functions
+  function takes `alpha:` and `colour:`, the bar and rectangle functions `fill:`, the line functions
   `linewidth:`, in millimetres, and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
-  and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads. The assembly
-  puts it into every row last, and a position's aesthetic also just before the position runs. **A
-  colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer holds its
-  uppercase hex or `:none`, never the name written, and a colour CSS does not define raises
-  naming the value. A point neither takes a `fill:` nor maps `:fill`, which only the filled
+  and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
+  `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
+  `:neg_infinity`, in the units of each axis. The assembly puts it into every row last, a
+  position's aesthetic also just before the position runs, and a set corner, an x- or y-family
+  aesthetic, before the geom's setup, so it widens the axes as ggplot2 4.0's `GeomRect` fills its
+  corners in. **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
+  holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
+  raises naming the value. A point neither takes a `fill:` nor maps `:fill`, which only the filled
   shapes not yet drawn use. A map maps and a keyword list sets: the two never trade places. **An
   option that chooses how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s
   `orientation:`, `geom_text/3`'s `check_overlap:`) **is a field of the geom's struct**, its
@@ -101,8 +108,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `data:`, `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`,
-  `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3` and
-  of `labs/2`),
+  `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`,
+  `geom_rect/3`, `annotate/3` and `labs/2`),
   so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's
@@ -127,7 +134,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   Nothing else is read as a name: `2.5` is not the column `"2.5"`.
 - **A layer's own mapping is checked against what it accepts as the layer is added, and its own
   laid over the plot's against what it requires**: an aesthetic the layer maps that it cannot use
-  raises, and so does a required one neither mapping gives. **An aesthetic it takes from the plot's
+  raises, and so does a required one neither mapping gives nor an option sets, as ggplot2 checks a
+  layer's columns and its `aes_params` together. **An aesthetic it takes from the plot's
   mapping that it cannot use rides along unused, as ggplot2 carries one** (design-log §4, the entry
   beginning "An aesthetic a layer takes from the plot"): evaluated into its table and drawn by
   nothing. Each layer records what it accepts (`accepted`, its geom's and its stat's facts, read
@@ -145,3 +153,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `validate_linemitre/1`, `validate_size/1`, `validate_angle/1`, `validate_justification/1`,
   `validate_nudge/1`), which take an integer too and keep a float, as R keeps a number;
   `validate_color/1` hands a colour to `Giggly.ColorOperations`.
+- **An annotation (`annotate/3`, `annotation: true`) is a layer drawn from values given in the
+  call** (design-log §4, the entry beginning "`annotate()` draws with every geom"): its positions
+  become a table of its own, a row per annotation, its mapping naming each position's column, as
+  ggplot2 maps `aes_all()` of its data, so they train the scales and repeat in every panel; its
+  other aesthetics are set, in `fixed`. It takes nothing from the plot's mapping
+  (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
+  or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
+  one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
+  `alpha`, `fill`) take a list, which `fixed` holds as one value per annotation. A list's values
+  are of one type, checked by building its column (`Giggly.DataFrame`) at the call. A position is
+  kept as a float where it is a number, as an option's number is. The options are each geom's
+  function's but `data:`, `position:` and nudging, so one its geom cannot use raises, where ggplot2
+  warns and ignores it.

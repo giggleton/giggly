@@ -318,7 +318,9 @@ defmodule Giggly.SVG do
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
   # it, its width and height the cell's share of its extent, its border its colour at its opacity
-  # and its fill likewise.
+  # and its fill likewise. A rectangle whose `xmin` is past its `xmax`, or `ymin` past its `ymax`,
+  # is written from its left and top all the same, as svglite writes one, its width and height
+  # never negative.
   defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
     columns = [
       rectangles.xmin,
@@ -332,7 +334,7 @@ defmodule Giggly.SVG do
     ]
 
     Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, fill, fill_opacity, color, color_opacity] ->
-      {x_position, y_position} = place({xmin, ymax}, box)
+      {x_position, y_position} = place({min(xmin, xmax), max(ymin, ymax)}, box)
 
       [
         "<rect x='",
@@ -340,9 +342,9 @@ defmodule Giggly.SVG do
         "' y='",
         number(y_position),
         "' width='",
-        number((xmax - xmin) * width),
+        number(abs(xmax - xmin) * width),
         "' height='",
-        number((ymax - ymin) * height),
+        number(abs(ymax - ymin) * height),
         "' style='stroke-width: ",
         number(rectangles.stroke_width),
         ";",

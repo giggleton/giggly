@@ -21,13 +21,8 @@ defmodule Giggly.Geom.Bar do
   # one missing its y no height, so neither is drawn; an infinite y is not taken yet. The position
   # then stacks or moves those rectangles, and the scales are trained again to cover them.
   #
-  # Every bar looks as ggplot2's default bar does: filled with ink mixed 35% toward paper,
-  # `#595959`, with no border, its border's width the theme's 0.5 mm all the same, as ggplot2's
-  # snapshots write it, or filled and bordered in its row's colours, mapped or set, `:none`, R's
-  # `NA`, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
-  # makes the bar's fill that opaque, replacing the fill's own alpha, and leaves its border in its
-  # colour's own, as ggplot2's `GeomRect` applies `fill_alpha()` to the fill alone; a row without one
-  # keeps its fill's (`Giggly.Geom.Mark`).
+  # A bar is then drawn, and its legend key too, as a rectangle (`Giggly.Geom.Rect`), as ggplot2's
+  # `GeomBar` draws with its parent `GeomRect`, so a bar looks as ggplot2's default bar does.
 
   defstruct []
 
@@ -46,20 +41,13 @@ defmodule Giggly.Geom.Bar do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Aesthetics, Coord, DataFrame, Resolution}
-    alias Giggly.Geom.Mark
-    alias Giggly.Scene.Rectangles
+    alias Giggly.{Aesthetics, DataFrame, Geom, Resolution}
+    alias Giggly.Geom.Rect
 
     # ggplot2's default bar: its share of the spacing of the x positions, centred on its x
-    # (`just = 0.5`), its fill, and its border's width, 0.5 mm, in points as grid draws a line.
+    # (`just = 0.5`).
     @width_share 0.9
     @just 0.5
-    @fill "#595959"
-    @stroke_width 0.5 * 72.27 / 25.4 * 72 / 96
-
-    # A key's fill is its border's width, 0.5 mm, short of the key each way, as ggplot2's
-    # `draw_key_polygon()` takes `linewidth` millimetres off it: half each side, in points.
-    @key_inset 0.5 * 72 / 25.4 / 2
 
     @impl Giggly.Geom
     def setup_data(_geom, frame, axis_kinds) do
@@ -117,66 +105,14 @@ defmodule Giggly.Geom.Bar do
       |> DataFrame.put(:ymax, Enum.map(y_positions, fn y -> toward_zero(y, :higher) end))
     end
 
-    # A rectangle for each row placed in the panel, in its fill and border.
+    # Each bar as a rectangle, ggplot2's `GeomRect` drawing it.
     @impl Giggly.Geom
-    def draw_panel(_geom, frame, coord, panel_params) do
-      placed = Coord.transform(coord, frame, panel_params)
-      fills = Mark.values(placed, :fill, @fill)
+    def draw_panel(_geom, frame, coord, panel_params),
+      do: Geom.draw_panel(%Rect{}, frame, coord, panel_params)
 
-      drawn =
-        [:xmin, :xmax, :ymin, :ymax]
-        |> Enum.map(fn name -> DataFrame.pull(placed, name) end)
-        |> Enum.concat([
-          fills,
-          Mark.opacities(placed, fills),
-          Mark.values(placed, :color, :none)
-        ])
-        |> Enum.zip_with(fn [xmin, xmax, ymin, ymax, fill, fill_opacity, border] ->
-          %{
-            extent: [xmin, xmax, ymin, ymax],
-            fill: fill,
-            fill_opacity: fill_opacity,
-            border: border
-          }
-        end)
-        |> Enum.filter(fn bar -> Enum.all?(bar.extent, &is_number/1) end)
-
-      [
-        %Rectangles{
-          xmin: Enum.map(drawn, fn %{extent: [xmin, _xmax, _ymin, _ymax]} -> xmin end),
-          xmax: Enum.map(drawn, fn %{extent: [_xmin, xmax, _ymin, _ymax]} -> xmax end),
-          ymin: Enum.map(drawn, fn %{extent: [_xmin, _xmax, ymin, _ymax]} -> ymin end),
-          ymax: Enum.map(drawn, fn %{extent: [_xmin, _xmax, _ymin, ymax]} -> ymax end),
-          fill: Enum.map(drawn, fn bar -> Mark.hex(bar.fill) end),
-          fill_opacity: Enum.map(drawn, fn bar -> bar.fill_opacity end),
-          color: Enum.map(drawn, fn bar -> Mark.hex(bar.border) end),
-          color_opacity: Enum.map(drawn, fn bar -> Mark.own_opacity(bar.border) end),
-          stroke_width: @stroke_width
-        }
-      ]
-    end
-
-    # A legend's key: the bar's fill short of the key's edges by its border's width, as ggplot2's
-    # `draw_key_polygon()` draws it, in the key's fill at its alpha and its border's colour.
+    # A legend's key, as a rectangle draws one.
     @impl Giggly.Geom
-    def draw_key(_geom, key, {width, height}) do
-      fill = Map.get(key, :fill, @fill)
-      border = Map.get(key, :color, :none)
-
-      [
-        %Rectangles{
-          xmin: [@key_inset / width],
-          xmax: [1 - @key_inset / width],
-          ymin: [@key_inset / height],
-          ymax: [1 - @key_inset / height],
-          fill: [Mark.hex(fill)],
-          fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
-          color: [Mark.hex(border)],
-          color_opacity: [Mark.own_opacity(border)],
-          stroke_width: @stroke_width
-        }
-      ]
-    end
+    def draw_key(_geom, key, size), do: Geom.draw_key(%Rect{}, key, size)
 
     # Each row's width, ggplot2's `compute_data_size()`: the `width` its stat gave it, as counting
     # does, or else the closest spacing of the x positions in each panel, the smallest of them,

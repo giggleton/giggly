@@ -64,6 +64,13 @@ defmodule Giggly.Plot do
   `#00FF00`. An alpha, set or mapped, replaces a colour's own, as ggplot2's `alpha()` does,
   so `geom_point(colour: "#4682B480")` draws half-opaque points, and with `alpha: 1` opaque ones.
 
+  ## Annotations
+
+  `annotate/3` adds a layer drawn from values given in the call rather than from a table's columns,
+  as ggplot2's `annotate()` does: a label, a shaded rectangle or a line placed by hand. Its
+  positions take part in the scales, so the axes reach them; it takes nothing from the plot's
+  mapping, titles no axis and is in no legend.
+
   ## Mapping colour
 
   A discrete column mapped to `:color` (or `:colour`) or `:fill` gives each of its values a hue,
@@ -319,7 +326,12 @@ defmodule Giggly.Plot do
     :vjust,
     :family,
     :nudge_x,
-    :nudge_y
+    :nudge_y,
+    :label,
+    :xmin,
+    :xmax,
+    :ymin,
+    :ymax
   ]
 
   # `geom_point/3`'s options, validated at the call.
@@ -355,81 +367,207 @@ defmodule Giggly.Plot do
                   ] ++ @line_style_options
                 )
 
+  # Which position a line's rows are put in order of, ggplot2's `orientation`.
+  @orientation_option [
+    type: {:in, [:x, :y]},
+    default: :x,
+    doc:
+      "Which position the rows are put in order of: `x`, or `y` for a line that runs up the " <>
+        "panel, as ggplot2's `orientation = \"y\"` gives."
+  ]
+
   # `geom_line/3`'s options, validated at the call.
   @line_options NimbleOptions.new!(
                   [
                     data: @data_option,
-                    orientation: [
-                      type: {:in, [:x, :y]},
-                      default: :x,
-                      doc:
-                        "Which position the rows are put in order of: `x`, or `y` for a " <>
-                          "line that runs up the panel, as ggplot2's " <>
-                          "`orientation = \"y\"` gives."
-                    ],
+                    orientation: @orientation_option,
                     alpha: @alpha_option,
                     color: @line_color_option,
                     linewidth: @linewidth_option
                   ] ++ @line_style_options
                 )
 
+  # Whether text leaves out the labels that would cross one drawn before it.
+  @check_overlap_option [
+    type: :boolean,
+    default: false,
+    doc:
+      "Whether to leave out each label that would cross one drawn before it, the rows taken " <>
+        "in order, as ggplot2's `check_overlap = TRUE` does."
+  ]
+
+  # How every label of a layer is drawn, each set once for the layer.
+  @text_style_options [
+    size: [
+      type: {:custom, __MODULE__, :validate_size, []},
+      doc:
+        "How big every label is, in millimetres, as ggplot2's `size = 5` sets it, which is " <>
+          "that many times ggplot2's `.pt`, 2.85, in points; 11 points, the theme's base " <>
+          "size, when not given."
+    ],
+    angle: [
+      type: {:custom, __MODULE__, :validate_angle, []},
+      doc: "How far every label is turned, in degrees anticlockwise; 0 when not given."
+    ],
+    hjust: [
+      type: {:custom, __MODULE__, :validate_justification, []},
+      doc:
+        "Where along its baseline every label is anchored on its place, 0 its start and 1 " <>
+          "its end: " <> @justification_forms <> "; 0.5 when not given."
+    ],
+    vjust: [
+      type: {:custom, __MODULE__, :validate_justification, []},
+      doc:
+        "Where up its height every label is anchored on its place, 0 its baseline and 1 " <>
+          "the top of a capital letter: " <> @justification_forms <> "; 0.5 when not given."
+    ],
+    family: [
+      type: :string,
+      doc:
+        "The font every label is drawn in, by name, such as `\"Times New Roman\"`; the " <>
+          "default sans-serif when not given. A label is measured as the default font " <>
+          "measures it, and drawn at that width."
+    ]
+  ]
+
   # `geom_text/3`'s options, validated at the call.
   @text_options NimbleOptions.new!(
+                  [
+                    data: @data_option,
+                    check_overlap: @check_overlap_option,
+                    alpha: @alpha_option,
+                    color: @text_color_option
+                  ] ++
+                    @text_style_options ++
+                    [
+                      nudge_x: [
+                        type: {:custom, __MODULE__, :validate_nudge, []},
+                        doc:
+                          "How far every label moves along x from its place, in the units of the " <>
+                            "x axis, as ggplot2's `nudge_x = 0.1` moves it; 0 when not given."
+                      ],
+                      nudge_y: [
+                        type: {:custom, __MODULE__, :validate_nudge, []},
+                        doc:
+                          "How far every label moves along y from its place, in the units of the " <>
+                            "y axis; 0 when not given."
+                      ]
+                    ]
+                )
+
+  @rect_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every rectangle's border, as ggplot2's `colour = \"black\"` sets it, " <>
+        "written `colour:` or `color:`: " <>
+        @color_forms <>
+        "; no border when not given. A border takes no alpha but its colour's own."
+  ]
+
+  @rect_fill_option [
+    type: @color_type,
+    doc:
+      "The colour every rectangle is filled with, as ggplot2's `fill = \"steelblue\"` sets " <>
+        "it: " <> @color_forms <> "; `#595959` when not given."
+  ]
+
+  # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
+  @corner_type {:custom, __MODULE__, :validate_corner, []}
+
+  # `geom_rect/3`'s options, validated at the call.
+  @rect_options NimbleOptions.new!(
                   data: @data_option,
-                  check_overlap: [
-                    type: :boolean,
-                    default: false,
-                    doc:
-                      "Whether to leave out each label that would cross one drawn before it, " <>
-                        "the rows taken in order, as ggplot2's `check_overlap = TRUE` does."
-                  ],
                   alpha: @alpha_option,
-                  color: @text_color_option,
-                  size: [
-                    type: {:custom, __MODULE__, :validate_size, []},
+                  color: @rect_color_option,
+                  fill: @rect_fill_option,
+                  xmin: [
+                    type: @corner_type,
                     doc:
-                      "How big every label is, in millimetres, as ggplot2's `size = 5` sets " <>
-                        "it, which is that many times ggplot2's `.pt`, 2.85, in points; 11 " <>
-                        "points, the theme's base size, when not given."
+                      "Every rectangle's `xmin`, in the units of the x axis, as ggplot2's " <>
+                        "`xmin = 3` sets it: a number, or `:infinity` or `:neg_infinity`, R's " <>
+                        "`Inf` and `-Inf`, which reach the panel's edge."
                   ],
-                  angle: [
-                    type: {:custom, __MODULE__, :validate_angle, []},
-                    doc:
-                      "How far every label is turned, in degrees anticlockwise; 0 when not given."
+                  xmax: [
+                    type: @corner_type,
+                    doc: "Every rectangle's `xmax`, as `xmin:` sets one."
                   ],
-                  hjust: [
-                    type: {:custom, __MODULE__, :validate_justification, []},
+                  ymin: [
+                    type: @corner_type,
                     doc:
-                      "Where along its baseline every label is anchored on its place, 0 its " <>
-                        "start and 1 its end: " <> @justification_forms <> "; 0.5 when not given."
+                      "Every rectangle's `ymin`, in the units of the y axis, as `xmin:` sets " <>
+                        "an `xmin`."
                   ],
-                  vjust: [
-                    type: {:custom, __MODULE__, :validate_justification, []},
-                    doc:
-                      "Where up its height every label is anchored on its place, 0 its " <>
-                        "baseline and 1 the top of a capital letter: " <>
-                        @justification_forms <> "; 0.5 when not given."
-                  ],
-                  family: [
-                    type: :string,
-                    doc:
-                      "The font every label is drawn in, by name, such as " <>
-                        "`\"Times New Roman\"`; the default sans-serif when not given. A label " <>
-                        "is measured as the default font measures it, and drawn at that width."
-                  ],
-                  nudge_x: [
-                    type: {:custom, __MODULE__, :validate_nudge, []},
-                    doc:
-                      "How far every label moves along x from its place, in the units of the " <>
-                        "x axis, as ggplot2's `nudge_x = 0.1` moves it; 0 when not given."
-                  ],
-                  nudge_y: [
-                    type: {:custom, __MODULE__, :validate_nudge, []},
-                    doc:
-                      "How far every label moves along y from its place, in the units of the " <>
-                        "y axis; 0 when not given."
+                  ymax: [
+                    type: @corner_type,
+                    doc: "Every rectangle's `ymax`, as `ymin:` sets one."
                   ]
                 )
+
+  # An annotation's position, a value or a list of values, one per annotation, as ggplot2's
+  # `annotate()` takes a vector.
+  @annotation_position [type: {:custom, __MODULE__, :validate_annotation_positions, []}]
+
+  # The aesthetics an annotation's geom draws row by row, as a mapped one, which may each be given a
+  # list, one value per annotation, every value checked as a layer function checks the one it sets.
+  @annotation_alpha [type: {:custom, __MODULE__, :validate_per_annotation, [:validate_alpha]}]
+  @annotation_color [type: {:custom, __MODULE__, :validate_per_annotation, [:validate_color]}]
+  @annotation_label [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_annotation_label]}
+  ]
+  @per_annotation_aesthetics [:alpha, :color, :fill, :label]
+
+  # `annotate/3`'s options for each geom it draws with, validated at the call: the positions the
+  # geom draws at and the options its function takes but `data:` and `position:`, and nudging, which
+  # ggplot2's annotations ignore.
+  @point_annotation [
+    x: @annotation_position,
+    y: @annotation_position,
+    alpha: @annotation_alpha,
+    color: @annotation_color
+  ]
+  @bar_annotation [
+    x: @annotation_position,
+    y: @annotation_position,
+    alpha: @annotation_alpha,
+    color: @annotation_color,
+    fill: @annotation_color
+  ]
+  @path_annotation [
+                     x: @annotation_position,
+                     y: @annotation_position,
+                     alpha: @annotation_alpha,
+                     color: @annotation_color,
+                     linewidth: @linewidth_option
+                   ] ++ @line_style_options
+  @annotation_geoms [:point, :col, :bar, :path, :line, :text, :rect]
+  @annotation_options %{
+    point: NimbleOptions.new!(@point_annotation),
+    col: NimbleOptions.new!(@bar_annotation),
+    bar: NimbleOptions.new!(@bar_annotation),
+    path: NimbleOptions.new!(@path_annotation),
+    line: NimbleOptions.new!([orientation: @orientation_option] ++ @path_annotation),
+    text:
+      NimbleOptions.new!(
+        [
+          x: @annotation_position,
+          y: @annotation_position,
+          label: @annotation_label,
+          check_overlap: @check_overlap_option,
+          alpha: @annotation_alpha,
+          color: @annotation_color
+        ] ++ @text_style_options
+      ),
+    rect:
+      NimbleOptions.new!(
+        xmin: @annotation_position,
+        xmax: @annotation_position,
+        ymin: @annotation_position,
+        ymax: @annotation_position,
+        alpha: @annotation_alpha,
+        color: @annotation_color,
+        fill: @annotation_color
+      )
+  }
 
   # `labs/2`'s options: a title for each aesthetic a guide shows, and the plot's own.
   @label_option [type: {:custom, __MODULE__, :validate_label, []}]
@@ -538,7 +676,8 @@ defmodule Giggly.Plot do
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_point/3"),
       fixed: fixed(validated),
-      accepted: Geom.Point.accepted_aesthetics()
+      accepted: Geom.Point.accepted_aesthetics(),
+      annotation: false
     }
 
     add_layer(plot, layer, "Plot.geom_point/3", required: Geom.Point.required_aesthetics())
@@ -592,7 +731,8 @@ defmodule Giggly.Plot do
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_bar/3"),
       fixed: fixed(validated),
-      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics())
+      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      annotation: false
     }
 
     plot
@@ -665,7 +805,8 @@ defmodule Giggly.Plot do
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_col/3"),
       fixed: fixed(validated),
-      accepted: Geom.Bar.accepted_aesthetics()
+      accepted: Geom.Bar.accepted_aesthetics(),
+      annotation: false
     }
 
     add_layer(plot, layer, "Plot.geom_col/3", required: Geom.Bar.required_aesthetics())
@@ -711,17 +852,14 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Path{
-        line_end: Keyword.fetch!(validated, :lineend),
-        line_join: Keyword.fetch!(validated, :linejoin),
-        mitre_limit: Keyword.fetch!(validated, :linemitre)
-      },
+      geom: path_geom(validated),
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_path/3"),
       fixed: fixed(validated),
-      accepted: Geom.Path.accepted_aesthetics()
+      accepted: Geom.Path.accepted_aesthetics(),
+      annotation: false
     }
 
     add_layer(plot, layer, "Plot.geom_path/3", required: Geom.Path.required_aesthetics())
@@ -763,18 +901,14 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Line{
-        orientation: Keyword.fetch!(validated, :orientation),
-        line_end: Keyword.fetch!(validated, :lineend),
-        line_join: Keyword.fetch!(validated, :linejoin),
-        mitre_limit: Keyword.fetch!(validated, :linemitre)
-      },
+      geom: line_geom(validated),
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_line/3"),
       fixed: fixed(validated),
-      accepted: Geom.Line.accepted_aesthetics()
+      accepted: Geom.Line.accepted_aesthetics(),
+      annotation: false
     }
 
     add_layer(plot, layer, "Plot.geom_line/3", required: Geom.Line.required_aesthetics())
@@ -845,16 +979,182 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)},
+      geom: text_geom(validated),
       stat: %Stat.Identity{},
       position: %Position.Nudge{},
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_text/3"),
       fixed: fixed(validated),
-      accepted: Geom.Text.accepted_aesthetics()
+      accepted: Geom.Text.accepted_aesthetics(),
+      annotation: false
     }
 
     add_layer(plot, layer, "Plot.geom_text/3", required: Geom.Text.required_aesthetics())
+  end
+
+  @doc """
+  Adds a layer of rectangles, one per row, each from its `xmin` to its `xmax` and its `ymin` to its
+  `ymax`: ggplot2's `geom_rect()`, for rectangles whose corners are in the data or set.
+
+  Each corner is mapped to a column, or set to one value for every rectangle by the option of its
+  name, in the units of its axis, as ggplot2's `geom_rect(xmin = 3)` sets one; a set corner widens
+  the axes as a mapped one does, as ggplot2's does. `:infinity` and `:neg_infinity`, R's `Inf` and
+  `-Inf`, reach the panel's edge, so a band can be shaded across the whole panel. A rectangle whose
+  `xmin` is past its `xmax`, or `ymin` past its `ymax`, is drawn between them all the same, and a
+  row missing a corner draws nothing.
+
+  Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill` and `:color`, and
+  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do: filled `#595959`
+  with no border unless a colour is mapped or set, the fill taking the alpha and the border not. A
+  mapping, a map, and options, a keyword list, may each be given alone or both together.
+
+  ## Options
+
+  #{NimbleOptions.docs(@rect_options)}
+
+      iex> frame =
+      ...>   %{"start" => [1.0, 3.0], "end" => [2.0, 5.0], "low" => [0.0, 1.0], "high" => [4.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{xmin: :start, xmax: :end, ymin: :low, ymax: :high})
+      ...>   |> Giggly.Plot.geom_rect()
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :ymax)}
+      {[1.0, 3.0], [4.0, 2.0]}
+
+  Corners set for every rectangle shade one band behind every row:
+
+      iex> frame =
+      ...>   %{"start" => [1.0, 3.0], "end" => [2.0, 5.0]}
+      ...>   |> Giggly.Plot.new(%{xmin: :start, xmax: :end})
+      ...>   |> Giggly.Plot.geom_rect(ymin: 0, ymax: :infinity)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :ymin), Giggly.DataFrame.pull(frame, :ymax)}
+      {[0.0, 0.0], [:infinity, :infinity]}
+  """
+  @spec geom_rect(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_rect(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_rect(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_rect(plot, %{}, options)
+
+  def geom_rect(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @rect_options)
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Rect{},
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_rect/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Rect.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_rect/3",
+      required: Geom.Rect.required_aesthetics(),
+      unmet: "neither its mapping nor the plot's maps it, and no option sets it"
+    )
+  end
+
+  @doc """
+  Adds an annotation: a layer drawn from values given here rather than from the data's columns,
+  ggplot2's `annotate()`, for a label, a shaded rectangle or a line placed by hand. `geom` names
+  what draws it, as ggplot2's `annotate("text")` does: `:point`, `:col` or `:bar`, `:path`,
+  `:line`, `:text` or `:rect`.
+
+  An annotation's positions take part in the scales as the data's do, so the axes reach them, and
+  every other aesthetic is set, so it is in no legend. It takes nothing from the plot's mapping,
+  titles no axis, and under a facet is drawn in every panel. It is drawn where it is placed, as
+  ggplot2 draws one: text is not nudged, and bars at one `x` are not stacked.
+
+  Each option takes one value, or a list of them, one per annotation, as ggplot2 takes a vector:
+  every list holds as many values as the others, and a single value is used for every annotation,
+  so `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
+  R's `Inf` and `-Inf`, which reach the panel's edge, `nil` for none, a string on a discrete axis,
+  `true` or `false`, or a date on a date axis. Of the other aesthetics, those a geom draws row by row,
+  `label:`, `colour:`, `alpha:` and `fill:`, each take a list, its values of one type, so a list of
+  colours is all colours or all `:none`; the rest take one value. Under a facet that makes more than
+  one panel, an annotation given such a list raises when the plot is run, as ggplot2 fails, since
+  its rows are drawn once in each panel and the list holds one value per annotation.
+
+  Each geom takes the positions it draws at and the options its own function takes but `data:`
+  and `position:`, and `geom_text/3`'s nudging:
+
+    * `:point`: `x:`, `y:`, `alpha:` and `colour:`;
+    * `:col` and `:bar`, each a bar from 0 to its `y` as `geom_col/3` draws one: `x:`, `y:`,
+      `alpha:`, `colour:` and `fill:`;
+    * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `lineend:`, `linejoin:` and
+      `linemitre:`, and `:line` those and `orientation:`;
+    * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
+      `hjust:`, `vjust:` and `family:`;
+    * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:` and `fill:`.
+
+  Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, as
+  ggplot2's "Unequal parameter lengths", for a list whose values are not of one type, and for an
+  aesthetic the geom needs and is not given; `NimbleOptions.ValidationError` for an option the
+  geom does not take, where ggplot2 warns and ignores it, or a value it cannot draw.
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.annotate(:text, x: [2.0, 3.0], y: 25.0, label: ["my label", "label 2"])
+      ...>   |> Giggly.layer_data(1)
+      iex> {Giggly.DataFrame.pull(frame, :y), Giggly.DataFrame.pull(frame, :label)}
+      {[25.0, 25.0], ["my label", "label 2"]}
+  """
+  @spec annotate(t(), atom(), keyword()) :: t()
+  def annotate(%__MODULE__{} = plot, geom, options)
+      when geom in @annotation_geoms and is_list(options) do
+    validated = layer_options(options, Map.fetch!(@annotation_options, geom))
+    {kind, accepted, required} = annotation_geom(geom, validated)
+    {positions, others} = Enum.split_with(validated, &position?/1)
+
+    per_row = Keyword.take(others, @per_annotation_aesthetics)
+
+    count =
+      positions
+      |> Enum.concat(per_row)
+      |> annotation_count()
+
+    table =
+      positions
+      |> Enum.map(fn {aesthetic, values} ->
+        {Atom.to_string(aesthetic), recycled(values, count)}
+      end)
+      |> DataFrame.new()
+
+    fixed =
+      others
+      |> fixed()
+      |> Map.new(fn {aesthetic, value} -> {aesthetic, per_row(value)} end)
+
+    check_columns(fixed)
+
+    layer = %Layer{
+      geom: kind,
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: table,
+      mapping:
+        Map.new(positions, fn {aesthetic, _values} -> {aesthetic, Atom.to_string(aesthetic)} end),
+      fixed: fixed,
+      accepted: accepted,
+      annotation: true
+    }
+
+    add_layer(plot, layer, "Plot.annotate/3",
+      required: required,
+      unmet: "#{inspect(geom)} is given no value for it"
+    )
+  end
+
+  def annotate(%__MODULE__{}, geom, options) when is_list(options) do
+    raise ArgumentError,
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :text or :rect, " <>
+            "got: #{inspect(geom)}"
   end
 
   @doc """
@@ -982,13 +1282,19 @@ defmodule Giggly.Plot do
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
   # the layer's column is used, and less any aesthetic the layer sets to one value, which wins over
   # a mapping, as ggplot2's `compute_aesthetics()` drops the aesthetics a layer's `aes_params` set.
+  # An annotation takes nothing from the plot's mapping, as ggplot2's `annotate()` sets
+  # `inherit.aes = FALSE`.
   @doc false
   @spec computed_mapping(t(), Layer.t()) :: mapping()
   def computed_mapping(%__MODULE__{} = plot, %Layer{} = layer) do
-    plot.mapping
+    plot
+    |> inherited_mapping(layer)
     |> Map.merge(layer.mapping)
     |> Map.drop(Map.keys(layer.fixed))
   end
+
+  defp inherited_mapping(%__MODULE__{}, %Layer{annotation: true}), do: %{}
+  defp inherited_mapping(%__MODULE__{mapping: mapping}, %Layer{annotation: false}), do: mapping
 
   # The aesthetics `computed_mapping/2` maps for `layer`, in the order ggplot2 evaluates them: the
   # layer's own, then those it takes from the plot's mapping, as `defaults(layer$mapping,
@@ -1006,7 +1312,8 @@ defmodule Giggly.Plot do
       |> in_aes_order()
 
     inherited =
-      plot.mapping
+      plot
+      |> inherited_mapping(layer)
       |> Map.drop(Map.keys(layer.mapping))
       |> Map.drop(set)
       |> Map.keys()
@@ -1047,6 +1354,12 @@ defmodule Giggly.Plot do
   @doc false
   @spec layer_accepted(Layer.t()) :: [aesthetic()]
   def layer_accepted(%Layer{accepted: accepted}), do: accepted
+
+  # Whether `layer` is an annotation, which `annotate/3` adds: its mapping, made from the values it
+  # was given, titles no guide, as ggplot2's `aes_all()` mapping is unlabelled.
+  @doc false
+  @spec layer_annotation?(Layer.t()) :: boolean()
+  def layer_annotation?(%Layer{annotation: annotation}), do: annotation
 
   # NimbleOptions' check of an `alpha:` option: a number from 0, invisible, to 1, opaque, kept as a
   # float.
@@ -1131,6 +1444,80 @@ defmodule Giggly.Plot do
        "and :outward, got: #{inspect(just)}"}
   end
 
+  # NimbleOptions' check of a rectangle's corner set for every rectangle: a number, kept as a float,
+  # or `:infinity` or `:neg_infinity`, R's `Inf` and `-Inf`.
+  @doc false
+  @spec validate_corner(term()) ::
+          {:ok, float() | :infinity | :neg_infinity} | {:error, String.t()}
+  def validate_corner(corner) when is_number(corner), do: {:ok, corner / 1}
+  def validate_corner(corner) when corner in [:infinity, :neg_infinity], do: {:ok, corner}
+
+  def validate_corner(corner) do
+    {:error,
+     "expected a position on the axis: a number, :infinity or :neg_infinity, got: " <>
+       inspect(corner)}
+  end
+
+  # NimbleOptions' check of an annotation's position: a value a scale places, or a list of them,
+  # one per annotation, kept as given.
+  @doc false
+  @spec validate_annotation_positions(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_annotation_positions(values) when is_list(values),
+    do: validate_per_annotation(values, :validate_annotation_position)
+
+  def validate_annotation_positions(value), do: validate_annotation_position(value)
+
+  # One of an annotation's positions: a number, kept as a float, as R keeps a number written in a
+  # call, `:infinity` or `:neg_infinity`, `nil` for none, a string, `true` or `false`, or a date.
+  @doc false
+  @spec validate_annotation_position(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_annotation_position(value) when is_number(value), do: {:ok, value / 1}
+
+  def validate_annotation_position(value)
+      when is_binary(value) or is_boolean(value) or value in [nil, :infinity, :neg_infinity],
+      do: {:ok, value}
+
+  def validate_annotation_position(%Date{} = value), do: {:ok, value}
+
+  def validate_annotation_position(value) do
+    {:error,
+     "expected a position, or a list of them: a number, :infinity or :neg_infinity, nil, a " <>
+       "string, true or false, or a date, got: #{inspect(value)}"}
+  end
+
+  # NimbleOptions' check of an annotation's label: a string, a number, or `true` or `false`, which
+  # text writes as R's `as.character()` does, kept as given.
+  @doc false
+  @spec validate_annotation_label(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_annotation_label(label)
+      when is_binary(label) or is_number(label) or is_boolean(label),
+      do: {:ok, label}
+
+  def validate_annotation_label(label) do
+    {:error, "expected a label: a string, a number, true or false, got: #{inspect(label)}"}
+  end
+
+  # NimbleOptions' check of an annotation's option that takes a list, one value per annotation:
+  # each value checked by `check`, a check of this module's; a single value is checked alone.
+  # Whether a list's values are of one type is the table's question (`check_columns/1`).
+  @doc false
+  @spec validate_per_annotation(term(), atom()) :: {:ok, term()} | {:error, String.t()}
+  def validate_per_annotation(values, check) when is_list(values) do
+    values
+    |> Enum.reduce_while({:ok, []}, fn value, {:ok, checked} ->
+      case apply(__MODULE__, check, [value]) do
+        {:ok, kept} -> {:cont, {:ok, [kept | checked]}}
+        {:error, message} -> {:halt, {:error, message}}
+      end
+    end)
+    |> kept_in_order()
+  end
+
+  def validate_per_annotation(value, check), do: apply(__MODULE__, check, [value])
+
+  defp kept_in_order({:ok, reversed}), do: {:ok, Enum.reverse(reversed)}
+  defp kept_in_order(error), do: error
+
   # NimbleOptions' check of a `linemitre:` option: a number of line widths, 1 or more, as grid
   # refuses less, kept as a float.
   @doc false
@@ -1212,9 +1599,16 @@ defmodule Giggly.Plot do
   # adding a layer never walks the list.
   defp add_layer(plot, layer, function, facts) do
     combined_mapping = computed_mapping(plot, layer)
+
+    given =
+      combined_mapping
+      |> Map.keys()
+      |> Enum.concat(Map.keys(layer.fixed))
+
+    unmet = Keyword.get(facts, :unmet, "neither its mapping nor the plot's maps it")
     check_inherited(plot, layer, combined_mapping, function)
     check_accepted(layer.mapping, layer.accepted, function)
-    check_required(combined_mapping, Keyword.fetch!(facts, :required), function)
+    check_required(given, Keyword.fetch!(facts, :required), function, unmet)
     check_exclusive(combined_mapping, Keyword.get(facts, :exclusive, []), function)
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
@@ -1237,6 +1631,99 @@ defmodule Giggly.Plot do
 
   defp position(:stack), do: %Position.Stack{}
   defp position(:dodge), do: %Position.Dodge{}
+
+  defp path_geom(validated) do
+    %Geom.Path{
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.fetch!(validated, :linejoin),
+      mitre_limit: Keyword.fetch!(validated, :linemitre)
+    }
+  end
+
+  defp line_geom(validated) do
+    %Geom.Line{
+      orientation: Keyword.fetch!(validated, :orientation),
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.fetch!(validated, :linejoin),
+      mitre_limit: Keyword.fetch!(validated, :linemitre)
+    }
+  end
+
+  defp text_geom(validated),
+    do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
+
+  # The geom an annotation draws with, a struct of its kind, with the aesthetics it accepts and
+  # those it needs, as a layer function of the same geom records them.
+  defp annotation_geom(:point, _validated),
+    do: {%Geom.Point{}, Geom.Point.accepted_aesthetics(), Geom.Point.required_aesthetics()}
+
+  defp annotation_geom(bar, _validated) when bar in [:col, :bar],
+    do: {%Geom.Bar{}, Geom.Bar.accepted_aesthetics(), Geom.Bar.required_aesthetics()}
+
+  defp annotation_geom(:path, validated),
+    do: {path_geom(validated), Geom.Path.accepted_aesthetics(), Geom.Path.required_aesthetics()}
+
+  defp annotation_geom(:line, validated),
+    do: {line_geom(validated), Geom.Line.accepted_aesthetics(), Geom.Line.required_aesthetics()}
+
+  defp annotation_geom(:text, validated),
+    do: {text_geom(validated), Geom.Text.accepted_aesthetics(), Geom.Text.required_aesthetics()}
+
+  defp annotation_geom(:rect, _validated),
+    do: {%Geom.Rect{}, Geom.Rect.accepted_aesthetics(), Geom.Rect.required_aesthetics()}
+
+  defp position?({aesthetic, _values}), do: Aesthetics.family(aesthetic) != :none
+
+  # How many annotations the options give, as ggplot2's `annotate()` counts them: every option
+  # given several values holds as many as each other such, a single value counting once, so their
+  # count is the one, or 1 where none has several.
+  defp annotation_count(options) do
+    several =
+      options
+      |> Enum.map(fn {aesthetic, values} -> {aesthetic, value_count(values)} end)
+      |> Enum.reject(fn {_aesthetic, count} -> count == 1 end)
+
+    case Enum.uniq_by(several, fn {_aesthetic, count} -> count end) do
+      [] ->
+        1
+
+      [{_aesthetic, count}] ->
+        count
+
+      _unequal ->
+        raise ArgumentError,
+              "Plot.annotate/3 gives " <>
+                Enum.map_join(several, " and ", fn {aesthetic, count} ->
+                  "#{inspect(aesthetic)} #{count} values"
+                end) <>
+                "; an option takes one value, or one per annotation, and these disagree on how " <>
+                "many annotations there are"
+    end
+  end
+
+  defp value_count(values) when is_list(values), do: length(values)
+  defp value_count(_value), do: 1
+
+  # A position's values, one per annotation: a list of `count` as given, or one value repeated.
+  defp recycled(values, count) when is_list(values) and length(values) == count, do: values
+  defp recycled([value], count), do: List.duplicate(value, count)
+  defp recycled(value, count), do: List.duplicate(value, count)
+
+  # An aesthetic's set value: one value, or a list of several, one per row of the annotation's
+  # table.
+  defp per_row([value]), do: value
+  defp per_row(value), do: value
+
+  # Each list an annotation's aesthetic is given becomes a column of the layer's table when the plot
+  # is run, so its values are checked here, at the call, as a table checks a column's, of one type,
+  # by building that column: `Giggly.DataFrame` raises naming two values that disagree.
+  defp check_columns(fixed) do
+    fixed
+    |> Enum.filter(fn {_aesthetic, value} -> is_list(value) end)
+    |> DataFrame.new()
+
+    :ok
+  end
 
   # A weight is summed, so the column a layer's weight comes from must hold numbers, missing ones
   # included.
@@ -1303,23 +1790,23 @@ defmodule Giggly.Plot do
   end
 
   # A required aesthetic is a name, or a list of names of which one is enough, as ggplot2 writes
-  # `"x|y"`.
-  defp check_required(mapping, required, function) do
-    case Enum.reject(required, fn needed -> mapped?(mapping, needed) end) do
+  # `"x|y"`, and is met by an aesthetic the layer maps or sets, `given`, as ggplot2 checks the
+  # layer's columns and its `aes_params` together; `unmet` says why one is missing.
+  defp check_required(given, required, function, unmet) do
+    case Enum.reject(required, fn needed -> given?(given, needed) end) do
       [] ->
         :ok
 
       missing ->
         raise ArgumentError,
-              "#{function} needs #{Enum.map_join(missing, ", ", &needed_message/1)}, " <>
-                "but neither its mapping nor the plot's maps it"
+              "#{function} needs #{Enum.map_join(missing, ", ", &needed_message/1)}, but #{unmet}"
     end
   end
 
-  defp mapped?(mapping, alternatives) when is_list(alternatives),
-    do: Enum.any?(alternatives, fn aesthetic -> Map.has_key?(mapping, aesthetic) end)
+  defp given?(given, alternatives) when is_list(alternatives),
+    do: Enum.any?(alternatives, fn aesthetic -> aesthetic in given end)
 
-  defp mapped?(mapping, aesthetic), do: Map.has_key?(mapping, aesthetic)
+  defp given?(given, aesthetic), do: aesthetic in given
 
   defp needed_message(alternatives) when is_list(alternatives),
     do: "one of #{inspect_all(alternatives)}"

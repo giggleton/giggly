@@ -205,6 +205,286 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` for the same plot, in R 4.6.1.
+  describe "layer_data/2, an annotation" do
+    test "a single value is given to every annotation the lists make" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:text, x: [2, 3, 4, 5], y: 25, label: "Some text")
+        |> Giggly.layer_data(1)
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y), DataFrame.pull(frame, :label),
+              DataFrame.pull(frame, :group)} ===
+               {[2.0, 3.0, 4.0, 5.0], [25.0, 25.0, 25.0, 25.0], List.duplicate("Some text", 4),
+                [-1, -1, -1, -1]}
+    end
+
+    test "lists are taken in step, and a set aesthetic's list alone makes as many annotations" do
+      in_step =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:text, x: [2, 3], y: [20, 21], label: ["my label", "label 2"])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(in_step, :x), DataFrame.pull(in_step, :y),
+              DataFrame.pull(in_step, :label)} ===
+               {[2.0, 3.0], [20.0, 21.0], ["my label", "label 2"]}
+
+      by_label =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:text, x: 1, y: 1, label: ["a", "b"])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(by_label, :x), DataFrame.pull(by_label, :label)} ===
+               {[1.0, 1.0], ["a", "b"]}
+    end
+
+    test "a list of one value is one value, given to every annotation" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:text, x: [2], y: [20, 21], label: ["a"])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :label)} ===
+               {[2.0, 2.0], ["a", "a"]}
+    end
+
+    test "an empty list makes no annotations, and draws nothing" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:text, x: [], y: 10, label: "a")
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.row_count(frame) == 0
+    end
+
+    test "a list may hold infinite positions beside finite ones" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:rect,
+          xmin: [:neg_infinity, 3],
+          xmax: [2, :infinity],
+          ymin: :neg_infinity,
+          ymax: :infinity
+        )
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[:neg_infinity, 3.0], [2.0, :infinity]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` and x scale range in R 4.6.1 for the same plot. R's
+    # dates count days from 1970, so 2000-07-01 is 11139 on the axis, which runs from 10957 to
+    # 11323, 2000-01-01 to 2001-01-01.
+    test "a date is placed on a date axis" do
+      plot =
+        [d: [~D[2000-01-01], ~D[2001-01-01]], v: [1.0, 2.0]]
+        |> Plot.new(%{x: :d, y: :v})
+        |> Plot.geom_line()
+        |> Plot.annotate(:text, x: ~D[2000-07-01], y: 1.5, label: "mid")
+
+      frame = Giggly.layer_data(plot, 1)
+      assert DataFrame.pull(frame, :x) === [11_139.0]
+      assert Giggly.panel_scales(plot).x.range === {10_957.0, 11_323.0}
+    end
+
+    test "colours and alphas are set row by row, in step with the positions" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:point, x: [1, 2], y: 10, colour: ["red", "blue"], alpha: [0.2, 0.8])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :color), DataFrame.pull(frame, :alpha)} ===
+               {["#FF0000", "#0000FF"], [0.2, 0.8]}
+    end
+
+    # R sets a line's colours on its rows once they are in order of x, so the second colour goes to
+    # the second x, not to the row it was given beside.
+    test "a line's colours are set on its rows once they are in order, as ggplot2 sets them" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:line, x: [1, 3, 2], y: [10, 30, 20], colour: ["red", "green", "blue"])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y), DataFrame.pull(frame, :color)} ===
+               {[1.0, 2.0, 3.0], [10.0, 20.0, 30.0], ["#FF0000", "#008000", "#0000FF"]}
+    end
+
+    test "a line takes its orientation, and its rows go in order of y" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:line, x: [1, 3, 2], y: [10, 30, 20], orientation: :y)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :y) === [10.0, 20.0, 30.0]
+    end
+
+    test "a path keeps its rows' order and takes its width" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:path, x: [1, 3, 2], y: [10, 30, 20], linewidth: 2)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :linewidth)} ===
+               {[1.0, 3.0, 2.0], [2.0, 2.0, 2.0]}
+    end
+
+    test "bars at one x overlap, each from 0 to its y, as an annotation places them" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:col, x: [1, 1, 2], y: [2, 3, 4], fill: "red")
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :ymin),
+              DataFrame.pull(frame, :ymax)} ===
+               {[0.55000000000000004, 0.55000000000000004, 1.55], [0.0, 0.0, 0.0],
+                [2.0, 3.0, 4.0]}
+
+      bar =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:bar, x: [1, 2], y: [-2, 3])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(bar, :ymin), DataFrame.pull(bar, :ymax)} ===
+               {[-2.0, 0.0], [0.0, 3.0]}
+    end
+
+    test "a rectangle's corners may be infinite" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:rect,
+          xmin: :neg_infinity,
+          xmax: 2,
+          ymin: :neg_infinity,
+          ymax: :infinity
+        )
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax),
+              DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[:neg_infinity], [2.0], [:neg_infinity], [:infinity]}
+    end
+
+    test "it takes nothing from the plot's mapping, so maps no colour and makes no groups" do
+      frame =
+        @mixed_rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_point()
+        |> Plot.annotate(:text, x: 4, y: 25, label: "a")
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.names(frame) == [:x, :y, :panel, :group, :label]
+      assert DataFrame.pull(frame, :group) == [-1]
+    end
+
+    test "under a facet it is drawn in every panel" do
+      frame =
+        @mixed_rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:cyl)
+        |> Plot.annotate(:text, x: 4, y: 25, label: "a")
+        |> Giggly.layer_data(1)
+
+      assert {DataFrame.pull(frame, :panel), DataFrame.pull(frame, :label)} ==
+               {[1, 2], ["a", "a"]}
+    end
+
+    # ggplot2 fails here too: "Aesthetics must be either length 1 or the same as the data (6)".
+    test "under a facet of several panels, an aesthetic set to a list raises when run" do
+      plot =
+        @mixed_rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:cyl)
+        |> Plot.annotate(:text, x: [2, 3], y: [20, 21], label: ["a", "b"])
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot, 1) end
+      assert error.message =~ "the layer at index 1 sets :label to 2 values"
+      assert error.message =~ "draws 4 rows"
+    end
+
+    test "under a facet of one panel, an aesthetic's list is set row by row" do
+      frame =
+        %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "am" => [1, 1]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:am)
+        |> Plot.annotate(:text, x: [2, 3], y: [20, 21], label: ["a", "b"])
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.pull(frame, :label) == ["a", "b"]
+    end
+
+    # Golden: mpg's `class` against `hwy`, whose seven classes put "suv" seventh; a value the data
+    # lacks is placed after them.
+    test "a string is placed on a discrete axis, at its level or after the data's" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+
+      suv =
+        plot
+        |> Plot.annotate(:text, x: "suv", y: 40, label: "a")
+        |> Giggly.layer_data(1)
+
+      beyond =
+        plot
+        |> Plot.annotate(:text, x: "zzz", y: 40, label: "a")
+        |> Giggly.layer_data(1)
+
+      assert {DataFrame.pull(suv, :x), DataFrame.pull(beyond, :x), DataFrame.pull(beyond, :group)} ==
+               {[7], [8], [1]}
+    end
+  end
+
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot.
+  describe "layer_data/2, for geom_rect" do
+    test "each rectangle keeps its corners as mapped, reversed or missing ones too" do
+      frame =
+        %{
+          "a" => [1.0, 5.0, nil],
+          "b" => [2.0, 3.0, 3.0],
+          "c" => [0.0, 2.0, 0.0],
+          "d" => [4.0, 1.0, 1.0]
+        }
+        |> Plot.new(%{xmin: :a, xmax: :b, ymin: :c, ymax: :d})
+        |> Plot.geom_rect()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax),
+              DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ==
+               {[1.0, 5.0, nil], [2.0, 3.0, 3.0], [0.0, 2.0, 0.0], [4.0, 1.0, 1.0]}
+    end
+
+    test "corners set for every rectangle sit in every row beside the plot's positions" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_rect(xmin: 3, xmax: 4.2, ymin: 12, ymax: 21, alpha: 0.2)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :xmin),
+              DataFrame.pull(frame, :ymax), DataFrame.pull(frame, :alpha)} ===
+               {[2.62, 2.875], [3.0, 3.0], [21.0, 21.0], [0.2, 0.2]}
+    end
+  end
+
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
   # significant digits. It moves with ggplot2's bar geometry or stacking.
   describe "layer_data/2, for geom_col" do
@@ -883,6 +1163,26 @@ defmodule GigglyTest do
       assert assembly.guide_titles === %{x: "x", y: "y"}
     end
 
+    # ggplot2 4.0.3 titles the axes `wt` and `mpg` with the annotation added before the points, and
+    # draws no title with the annotation alone, its mapping unlabelled.
+    test "an annotation titles no axis, added first or alone" do
+      first =
+        %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:text, x: 4, y: 25, label: "zz")
+        |> Plot.geom_point()
+        |> Giggly.Assembly.run()
+
+      alone =
+        %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8]}
+        |> Plot.new()
+        |> Plot.annotate(:text, x: 4, y: 25, label: "zz")
+        |> Giggly.Assembly.run()
+
+      assert {first.guide_titles, alone.guide_titles} ===
+               {%{x: "wt", y: "mpg"}, %{x: :none, y: :none}}
+    end
+
     # ggplot2 4.0.3: `labs(x = "Class", y = NULL)` set before the layer titles x "Class" and y
     # nothing, over the column and the count.
     test "a label titles an axis over its column and a stat's, set before the layer or after" do
@@ -937,6 +1237,54 @@ defmodule GigglyTest do
                  guide: :axis
                }
              }
+    end
+
+    # Golden: ggplot2 4.0.3's x and y scale ranges in R 4.6.1 for the same plot, on mtcars' first
+    # three cars: corners set for every rectangle are filled in before the scales are trained again,
+    # so the axes reach them, as ggplot2 4.0's `GeomRect` fills them in.
+    test "corners set for every rectangle widen the axes, as mapped ones do" do
+      scales =
+        %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 21.0, 22.8]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rect(xmin: 3, xmax: 4.2, ymin: 12, ymax: 21, alpha: 0.2)
+        |> Giggly.panel_scales()
+
+      assert {scales.x.range, scales.y.range} === {{2.32, 4.2}, {12.0, 22.8}}
+
+      mixed =
+        %{"a" => [1.0, 3.0], "b" => [2.0, 5.0]}
+        |> Plot.new(%{xmin: :a, xmax: :b})
+        |> Plot.geom_rect(ymin: 0, ymax: 10)
+        |> Giggly.panel_scales()
+
+      assert {mixed.x.range, mixed.y.range} === {{1.0, 5.0}, {0.0, 10.0}}
+    end
+
+    # Golden: ggplot2 4.0.3's x and y scale ranges in R 4.6.1, on mtcars' first three cars.
+    test "an annotation's positions widen the axes, and its infinite ones do not" do
+      beyond =
+        %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 21.0, 22.8]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:text, x: 6, y: 35, label: "beyond")
+        |> Giggly.panel_scales()
+
+      assert {beyond.x.range, beyond.y.range} === {{2.32, 6.0}, {21.0, 35.0}}
+
+      band =
+        %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 21.0, 22.8]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:rect,
+          xmin: :neg_infinity,
+          xmax: 2,
+          ymin: :neg_infinity,
+          ymax: :infinity
+        )
+        |> Giggly.panel_scales()
+
+      assert {band.x.range, band.y.range} === {{2.0, 2.875}, {21.0, 22.8}}
     end
 
     # Golden: ggplot2 4.0.3's x scale range in R 4.6.1 for the same plot.
@@ -1694,6 +2042,84 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/facet_wrap_layer_data.svg")
+    end
+
+    # Golden: test/golden/annotate.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/annotate.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. annotate()'s examples on six points: a band shaded
+    # from the panel's left edge to 2, foot to top, its corners infinite; the shaded rectangle under
+    # the points; one text at four places; two labels in step with their places and colours; and a
+    # label beyond the data, which both axes reach. No annotation titles an axis, so the points'
+    # mapping does. It moves with what moves test/golden/point.svg and test/golden/text.svg, and
+    # with how an annotation's values become its table.
+    test "annotations draw their values, the axes reaching them, and title no axis" do
+      plot =
+        [wt: [2.62, 2.32, 3.215, 3.44, 5.25, 1.615], mpg: [21.0, 22.8, 21.4, 18.7, 10.4, 30.4]]
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:rect,
+          xmin: :neg_infinity,
+          xmax: 2,
+          ymin: :neg_infinity,
+          ymax: :infinity,
+          fill: "steelblue",
+          alpha: 0.2
+        )
+        |> Plot.annotate(:rect, xmin: 3, xmax: 4.2, ymin: 12, ymax: 21, alpha: 0.2)
+        |> Plot.geom_point()
+        |> Plot.annotate(:text, x: [2, 3, 4, 5], y: 25, label: "Some text")
+        |> Plot.annotate(:text,
+          x: [2, 3],
+          y: [15, 16],
+          label: ["my label", "label 2"],
+          colour: ["red", "blue"]
+        )
+        |> Plot.annotate(:text, x: 6, y: 35, label: "beyond")
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/annotate.svg")
+    end
+
+    # Golden: test/golden/rect.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/rect.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_rect()'s "Rectangles by their corners" with
+    # its corners in the table: each rectangle filled by its level and bordered in grey50, the
+    # legend's keys drawn as rectangles; and a layer of one row with its corners set, from the
+    # panel's foot to 2, which widens the x axis to 16. Mapping only corners, the plot titles no
+    # axis. It moves with how a bar or rectangle is drawn, with the hue palette and the legend.
+    test "rectangles are drawn between their corners, mapped or set" do
+      xs = [2.0, 5.0, 7.0, 9.0, 12.0, 2.0, 5.0, 7.0, 9.0, 12.0]
+      widths = [4.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 2.0, 4.0]
+      ys = [1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+
+      plot =
+        [
+          left: Enum.zip_with(xs, widths, fn x, width -> x - width / 2 end),
+          right: Enum.zip_with(xs, widths, fn x, width -> x + width / 2 end),
+          bottom: ys,
+          top: Enum.map(ys, fn y -> y + 1 end),
+          z: ["1", "1", "2", "2", "3", "3", "4", "4", "5", "6"]
+        ]
+        |> Plot.new(%{xmin: :left, xmax: :right, ymin: :bottom, ymax: :top})
+        |> Plot.geom_rect(%{fill: :z}, colour: "#7F7F7F")
+        |> Plot.geom_rect(
+          data: [a: [1]],
+          xmin: 14,
+          xmax: 16,
+          ymin: :neg_infinity,
+          ymax: 2,
+          fill: "steelblue"
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/rect.svg")
     end
 
     # Golden: test/golden/text.svg, checked against ggplot2's drawing of the same plot, made by

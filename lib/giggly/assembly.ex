@@ -24,8 +24,9 @@ defmodule Giggly.Assembly do
   #   8. computes each layer's stat (`Giggly.Stat`) on its table;
   #   9. puts into each aesthetic the layer leaves unmapped the computed column its stat names for
   #      it, as a count into y;
-  #  10. has each layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a
-  #      bar's edges, told whether each axis is discrete, which decides a bar's orientation;
+  #  10. puts into every row each position a layer sets, as a rectangle's corners, then has each
+  #      layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a bar's
+  #      edges, told whether each axis is discrete, which decides a bar's orientation;
   #  11. puts into every row each aesthetic a layer's position reads, such as nudging's `nudge_x`,
   #      the value the layer sets or else the position's default, as ggplot2's `use_defaults()`
   #      for a position does, then moves the layer's marks by its position (`Giggly.Position`);
@@ -41,8 +42,10 @@ defmodule Giggly.Assembly do
   #      is drawn by the geom of each layer that maps one of its aesthetics and can use it, with
   #      what that layer sets, in the keys whose values the layer's table holds, and a legend no
   #      layer can draw is dropped;
-  #  14. puts each aesthetic a layer sets to one value, such as `alpha`, into every row of its
-  #      table, last, as ggplot2's geoms apply a layer's `aes_params` once every scale has run;
+  #  14. puts each aesthetic a layer sets, such as `alpha`, into every row of its table, last, as
+  #      ggplot2's geoms apply a layer's `aes_params` once every scale has run: one value in every
+  #      row, or an annotation's list, one value per row, refused where a facet has repeated the
+  #      annotation's rows across its panels, as ggplot2 refuses it;
   #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
@@ -198,17 +201,19 @@ defmodule Giggly.Assembly do
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
   # marks, once every row holds the aesthetics the position reads, and each aesthetic a layer sets
-  # to one value is put into every row of its table. Last,
-  # the plot's coordinate system builds each panel's params from the extents of the scales the
-  # layout gives that panel and the breaks and minor breaks each axis draws on its extent. Each axis
-  # is titled by the label `Plot.labs/2` sets for it, or else by the first layer, in the order
-  # added, whose mapping laid over the plot's maps `:x` (or `:y`); a later layer never retitles it,
-  # and an axis no layer maps has no title. The plot's own labels are carried for drawing.
+  # is put into every row of its table. Last, the plot's coordinate system builds each panel's
+  # params from the extents of the scales the layout gives that panel and the breaks and minor
+  # breaks each axis draws on its extent. Each axis is titled by the label `Plot.labs/2` sets for
+  # it, or else by the first layer, in the order added, an annotation never, whose mapping laid over
+  # the plot's maps `:x` (or `:y`); a later layer never retitles it, and an axis no layer maps has
+  # no title. The plot's own labels are carried for drawing.
   #
   # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
   # date, or to a column whose kind (continuous or discrete) disagrees with the first column on
   # that axis. The message names the layer by its index, counting from 0, the aesthetic, the column
-  # as the data names it, and its type.
+  # as the data names it, and its type. Raises it too for an annotation given a list of values for
+  # an aesthetic under a facet that repeats its rows across several panels, naming the layer and
+  # the aesthetic.
   @doc false
   @spec run(Plot.t()) :: t()
   def run(
@@ -258,9 +263,13 @@ defmodule Giggly.Assembly do
         mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
         computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
         statistic = map_statistic(computed, plot, layer)
-        set_up = Geom.setup_data(Plot.layer_geom(layer), statistic, axis_kinds)
+        fixed = Plot.layer_fixed(layer)
+
+        set_up =
+          Geom.setup_data(Plot.layer_geom(layer), set_positions(statistic, fixed), axis_kinds)
+
         position = Plot.layer_position(layer)
-        defaulted = set_position_aesthetics(set_up, position, Plot.layer_fixed(layer))
+        defaulted = set_position_aesthetics(set_up, position, fixed)
         Position.compute_layer(position, defaulted)
       end)
 
@@ -276,10 +285,12 @@ defmodule Giggly.Assembly do
       end)
 
     fixed_data =
-      Enum.zip_with(layers, layer_data, fn layer, frame ->
+      layers
+      |> Enum.with_index()
+      |> Enum.zip_with(layer_data, fn {layer, index}, frame ->
         frame
         |> map_non_position(non_position_scales)
-        |> set_fixed(Plot.layer_fixed(layer))
+        |> set_fixed_last(Plot.layer_fixed(layer), index)
       end)
 
     panel_params = panel_params(coord, layout, final_x_scales, final_y_scales)
@@ -310,18 +321,21 @@ defmodule Giggly.Assembly do
   # The title of an aesthetic's guide, an axis's or a legend's: the label `Plot.labs/2` sets for it,
   # which wins over every other, `:none` among them, as a plot's labels win in ggplot2's
   # `setup_plot_labels()`; else the column the first layer to map the aesthetic maps it to, through
-  # the layer's computed mapping; failing that, the computed column a stat puts into it by default,
-  # the last layer's to do so, as `count`; or `:none`. A layer's own label is never replaced by a
-  # later layer's and replaces a stat's default, which ggplot2 marks as a fallback, read as
-  # `resolve_label()` reads it, by the scale's first aesthetic. The plot holds each mapping's column
-  # by the name the data gives it, which is the title.
+  # the layer's computed mapping, an annotation never, as ggplot2's `annotate()` mapping is
+  # unlabelled; failing that, the computed column a stat puts into it by default, the last layer's
+  # to do so, as `count`; or `:none`. A layer's own label is never replaced by a later layer's and
+  # replaces a stat's default, which ggplot2 marks as a fallback, read as `resolve_label()` reads
+  # it, by the scale's first aesthetic. The plot holds each mapping's column by the name the data
+  # gives it, which is the title.
   defp guide_title(%Plot{labels: labels} = plot, layers, aesthetic) do
     Map.get_lazy(labels, aesthetic, fn -> data_title(plot, layers, aesthetic) end)
   end
 
   defp data_title(plot, layers, aesthetic) do
     mapped =
-      Enum.find_value(layers, fn layer ->
+      layers
+      |> Enum.reject(&Plot.layer_annotation?/1)
+      |> Enum.find_value(fn layer ->
         plot
         |> Plot.computed_mapping(layer)
         |> Map.get(aesthetic)
@@ -539,18 +553,55 @@ defmodule Giggly.Assembly do
     set_fixed(frame, Map.merge(defaults, Map.take(fixed, Map.keys(defaults))))
   end
 
-  # The layer's table with each aesthetic the layer sets to one value given that value in every
-  # row, in name order, as ggplot2's `use_defaults()` applies a layer's `aes_params` after every
-  # scale has mapped its aesthetics.
+  # The layer's table with each position the layer sets, an x- or y-family aesthetic, given its
+  # value in every row just before its geom's setup, as ggplot2's `GeomRect$setup_data()` fills a
+  # rectangle's missing corners from the layer's parameters: so the position moves it and the
+  # scales, trained again after the position, cover it, as a rectangle's set corners need.
+  defp set_positions(frame, fixed) do
+    positions =
+      Map.filter(fixed, fn {aesthetic, _value} -> Aesthetics.family(aesthetic) != :none end)
+
+    set_fixed(frame, positions)
+  end
+
+  # The layer's table with each aesthetic the layer sets given its value, last, as ggplot2's
+  # `use_defaults()` applies a layer's `aes_params` after every scale has mapped its aesthetics.
+  # An annotation's list holds one value per annotation, so it must hold one per row; under a facet
+  # of more than one panel its rows are repeated in each, so it holds too few, and the layer, at
+  # `index`, is refused, as ggplot2 fails with "Aesthetics must be either length 1 or the same as
+  # the data".
+  defp set_fixed_last(frame, fixed, index) do
+    rows = DataFrame.row_count(frame)
+
+    Enum.each(fixed, fn {aesthetic, value} -> check_per_row(value, rows, aesthetic, index) end)
+    set_fixed(frame, fixed)
+  end
+
+  defp check_per_row(values, rows, aesthetic, index)
+       when is_list(values) and length(values) != rows do
+    raise ArgumentError,
+          "the layer at index #{index} sets #{inspect(aesthetic)} to #{length(values)} values, " <>
+            "one per annotation, but draws #{rows} rows, its annotations repeated in each panel " <>
+            "of the facet; give #{inspect(aesthetic)} one value, as ggplot2 requires one or one " <>
+            "per row"
+  end
+
+  defp check_per_row(_value, _rows, _aesthetic, _index), do: :ok
+
+  # The layer's table with each aesthetic the layer sets given its value in every row, in name
+  # order: one value repeated, or a list holding one per row.
   defp set_fixed(frame, fixed) do
     rows = DataFrame.row_count(frame)
 
     fixed
     |> Enum.sort()
     |> Enum.reduce(frame, fn {aesthetic, value}, set ->
-      DataFrame.put(set, aesthetic, List.duplicate(value, rows))
+      DataFrame.put(set, aesthetic, row_values(value, rows))
     end)
   end
+
+  defp row_values(values, _rows) when is_list(values), do: values
+  defp row_values(value, rows), do: List.duplicate(value, rows)
 
   # The layer's table with each aesthetic its own and the plot's mappings leave unmapped given the
   # computed column its stat puts into it by default, as ggplot2's `map_statistic()` evaluates a

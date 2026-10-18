@@ -164,6 +164,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and its reason, that a mistake raises from the line that wrote it, is a rule of Giggly's own,
   which the mapping's check still keeps at the layer's call.
 
+- **`annotate()` draws with every geom Giggly has, from values recycled as R recycles them
+  (2026-10-18, Steve).** Its positions become a table of its own, a row per annotation, mapped as
+  ggplot2's `aes_all()`, so they train the scales and repeat in every panel; it takes nothing from
+  the plot's mapping (`inherit.aes = FALSE`), titles no axis (an unlabelled mapping) and is in no
+  legend. Each option takes one value or a list, every list as long as the others. An option its
+  geom cannot use raises, where ggplot2 warns, its position still widening the axis. Steve chose
+  point, col and bar, path, line, text and rect; *rejected:* text and rect alone, recommended, as
+  the waiting examples use no other. A list only for what a geom draws row by row (`label`,
+  `colour`, `alpha`, `fill`); *rejected:* every aesthetic, as R, which needs text drawn at its own
+  size, angle and font per label. A list under a facet of several panels raises when run, as
+  ggplot2's "Aesthetics must be either length 1 or the same as the data"; *rejected:* drawing it
+  in every panel, which carries set values past the colour scales.
+
 - **Giggly exposes no function ggplot2 has superseded or deprecated (2026-10-17, Steve: "generally
   speaking we aren't going to expose superseded things").** ggplot2 4.0.3 marks `xlab()`, `ylab()`
   and `ggtitle()` superseded by `labs()` (`lifecycle::signal_stage()`), so Giggly has `labs()`
@@ -1436,8 +1449,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Give a layer a table of its own with data: (text and titles, step 4); §4: "A
-  layer's own table is public", "A column the plot names is checked against the tables"
+- 2026-10-18 — Annotate plots and draw rectangles (text and titles, step 5); §4: "`annotate()`
+  draws with every geom Giggly has"
+- 2026-10-18 — Give a layer a table of its own with data: (text and titles, step 4) (`4e77ecd`);
+  §4: "A layer's own table is public", "A column the plot names is checked against the tables"
 - 2026-10-17 — Label plots with labs (text and titles, step 3) (`d1e8217`); §4: "A title may run
   over several lines", "`labs/2` takes the titles"
 - 2026-10-17 — Nudge labels with nudge_x and nudge_y (text and titles, step 2) (`dabca48`); §4: "A

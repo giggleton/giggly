@@ -46,12 +46,13 @@ where its marks sit".
   so how a dropped row is reported is open until something can report it.
 - **A point looks like ggplot2's default point until aesthetics can change it:** black, size 1.5
   mm, border 0.5 mm, which grid draws as a circle of radius 1.95 points with a 0.71-point outline.
-  **A bar looks like ggplot2's default bar:** filled `#595959`, ink mixed 35% toward paper, with no
-  border, its border's width 0.5 mm all the same. The defaults move to the theme with the
-  default-aesthetics stage. **A row's colour, mapped or set, replaces the default**: a point's
-  colour, a bar's fill and border, a line's colour, read from each row (`Giggly.Geom.Mark.values/3`),
-  where the assembly put it, so the scene carries one per mark. A point takes `color` and no `fill`,
-  which colours only the filled shapes not yet drawn; a bar takes both; a line takes `color`.
+  **A bar looks like ggplot2's default bar, and a rectangle like its default rectangle:** filled
+  `#595959`, ink mixed 35% toward paper, with no border, its border's width 0.5 mm all the same.
+  The defaults move to the theme with the default-aesthetics stage. **A row's colour, mapped or
+  set, replaces the default**: a point's colour, a bar's fill and border, a line's colour, read
+  from each row (`Giggly.Geom.Mark.values/3`), where the assembly put it, so the scene carries one
+  per mark. A point takes `color` and no `fill`, which colours only the filled shapes not yet
+  drawn; a bar takes both; a line takes `color`.
 - **A row's `alpha` replaces its colour's own alpha: a point's outline and fill alike, a bar's fill
   alone, a line's stroke**, as ggplot2's `GeomPoint` applies `alpha()` to both colours, `GeomRect`
   `fill_alpha()` to the fill and `GeomPath` `alpha()` to the line; a row without one, or a table
@@ -104,3 +105,11 @@ where its marks sit".
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws
   and keys as a `Geom.Path` with its parameters, as ggplot2's `GeomLine` is a `GeomPath`. Its
   orientation is the layer's; one a stat names arrives with the first such stat.
+- **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
+  rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
+  rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). A
+  rectangle's corners are left as they are by the build and drawn between, an `xmin` past its
+  `xmax` included, as grid draws one; a row missing a corner is not drawn, and an infinite one is
+  at the panel's edge, where the coordinate system puts it. Its corners are `xmin`, `xmax`,
+  `ymin` and `ymax`; ggplot2 4.0 also places one by `x` and `width`, `y` and `height`, which
+  waits, and so does a rectangle in radial coordinates, drawn square as a bar is.

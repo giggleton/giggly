@@ -50,7 +50,8 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :x, :y]
+                 accepted: [:alpha, :color, :group, :x, :y],
+                 annotation: false
                }
              ]
     end
@@ -231,7 +232,8 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :x, :y]
+                 accepted: [:alpha, :color, :fill, :group, :x, :y],
+                 annotation: false
                }
              ]
     end
@@ -297,7 +299,8 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "cyl", weight: "wt"},
                  fixed: %{},
-                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill]
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill],
+                 annotation: false
                }
              ]
     end
@@ -451,7 +454,8 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :x, :y]
+                 accepted: [:alpha, :color, :group, :x, :y],
+                 annotation: false
                }
              ]
     end
@@ -620,7 +624,8 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{label: "model"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :label, :x, :y]
+                 accepted: [:alpha, :color, :group, :label, :x, :y],
+                 annotation: false
                }
              ]
     end
@@ -744,7 +749,10 @@ defmodule Giggly.PlotTest do
             fn plot -> Plot.geom_col(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_path(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_line(plot, %{y: :mpg}, data: @own) end,
-            fn plot -> Plot.geom_text(plot, %{y: :mpg, label: :name}, data: @own) end
+            fn plot -> Plot.geom_text(plot, %{y: :mpg, label: :name}, data: @own) end,
+            fn plot ->
+              Plot.geom_rect(plot, %{xmin: :mpg, xmax: :mpg}, data: @own, ymin: 0, ymax: 1)
+            end
           ] do
         %Plot{reversed_layers: [layer]} = drawn = add_layer.(plot)
         table = Plot.layer_table(drawn, layer)
@@ -828,6 +836,214 @@ defmodule Giggly.PlotTest do
 
       assert_raise ArgumentError, ~r/expected a table/, fn ->
         Plot.geom_point(plot, data: [1, 2])
+      end
+    end
+  end
+
+  describe "geom_rect/3" do
+    test "a rectangle layer records its geom, the identity stat and position, and its corners" do
+      plot =
+        @rows
+        |> Plot.new(%{xmin: :wt})
+        |> Plot.geom_rect(%{xmax: :mpg}, ymin: 0, ymax: :infinity)
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Rect{},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{xmax: "mpg"},
+                 fixed: %{ymin: 0.0, ymax: :infinity},
+                 accepted: [:alpha, :color, :fill, :group, :xmax, :xmin, :ymax, :ymin],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "a corner neither mapped nor set is refused, naming the call and the corner" do
+      plot = Plot.new(@rows, %{xmin: :wt, xmax: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_rect(plot, ymin: 0) end
+      assert error.message =~ "Plot.geom_rect/3 needs :ymax"
+      assert error.message =~ "no option sets it"
+    end
+
+    test "a corner is set to a number or an infinity, and nothing else" do
+      plot = Plot.new(@rows, %{xmin: :wt, xmax: :mpg})
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a position on the axis/, fn ->
+        Plot.geom_rect(plot, ymin: "0", ymax: 1)
+      end
+    end
+
+    # ggplot2 4.0 places a rectangle by its x and width too, which waits.
+    test "a rectangle's own mapping of x is refused, naming the call" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_rect(plot, %{x: :wt}, xmin: 0, xmax: 1, ymin: 0, ymax: 1)
+        end
+
+      assert error.message =~ "Plot.geom_rect/3 cannot use :x"
+    end
+  end
+
+  describe "annotate/3" do
+    test "an annotation records its geom, the identity stat and position, and a table of its values" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.annotate(:text, x: [2, 3], y: 25, label: "a", size: 5, check_overlap: true)
+
+      [layer] = plot.reversed_layers
+
+      assert %Plot.Layer{
+               geom: %Geom.Text{check_overlap: true},
+               stat: %Stat.Identity{},
+               position: %Position.Identity{},
+               mapping: %{x: "x", y: "y"},
+               fixed: %{label: "a", size: 5.0},
+               accepted: [:alpha, :color, :group, :label, :x, :y],
+               annotation: true
+             } = layer
+
+      table = Plot.layer_table(plot, layer)
+
+      assert {DataFrame.pull(table, "x"), DataFrame.pull(table, "y")} ===
+               {[2.0, 3.0], [25.0, 25.0]}
+
+      assert Plot.computed_mapping(plot, layer) == %{x: "x", y: "y"}
+    end
+
+    test "each geom records the kind the function of its name records, with its parameters" do
+      plot = Plot.new(@rows)
+
+      kinds =
+        for {geom, options} <- [
+              point: [x: 1, y: 1],
+              col: [x: 1, y: 1],
+              bar: [x: 1, y: 1],
+              path: [x: [1, 2], y: [1, 2], lineend: :round],
+              line: [x: [1, 2], y: [1, 2], orientation: :y],
+              rect: [xmin: 1, xmax: 2, ymin: 1, ymax: 2]
+            ] do
+          %Plot{reversed_layers: [layer]} = Plot.annotate(plot, geom, options)
+          Plot.layer_geom(layer)
+        end
+
+      assert kinds == [
+               %Geom.Point{},
+               %Geom.Bar{},
+               %Geom.Bar{},
+               %Geom.Path{line_end: :round, line_join: :round, mitre_limit: 10.0},
+               %Geom.Line{orientation: :y, line_end: :butt, line_join: :round, mitre_limit: 10.0},
+               %Geom.Rect{}
+             ]
+    end
+
+    test "a geom it does not draw with is refused, naming the geoms it does" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :segment, x: 1, y: 1) end
+      assert error.message =~ ":point, :col, :bar, :path, :line, :text or :rect, got: :segment"
+    end
+
+    # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
+    # "Ignoring unknown parameters: `label`" for a rectangle; and ignores `nudge_x`, as an
+    # annotation is not nudged.
+    test "an option its geom does not take is refused, naming it" do
+      plot = Plot.new(@rows)
+
+      for {geom, options, refused} <- [
+            {:text, [x: 1, y: 1, label: "a", xmin: 0], ":xmin"},
+            {:rect, [xmin: 1, xmax: 2, ymin: 1, ymax: 2, label: "a"], ":label"},
+            {:text, [x: 1, y: 1, label: "a", nudge_x: 1], ":nudge_x"},
+            {:col, [x: 1, y: 1, position: :dodge], ":position"},
+            {:point, [x: 1, y: 1, data: @rows], ":data"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.annotate(plot, geom, options)
+          end
+
+        assert error.message =~ "unknown options [#{refused}]"
+      end
+    end
+
+    # ggplot2 4.0.3: "Unequal parameter lengths: x (2) and y (3)", and "x (2) and label (3)".
+    test "options given different numbers of values are refused, naming each" do
+      plot = Plot.new(@rows)
+
+      positions =
+        assert_raise ArgumentError, fn ->
+          Plot.annotate(plot, :text, x: [1, 2], y: [1, 2, 3], label: "a")
+        end
+
+      assert positions.message =~ "Plot.annotate/3 gives :x 2 values and :y 3 values"
+
+      labels =
+        assert_raise ArgumentError, fn ->
+          Plot.annotate(plot, :text, x: [1, 2], y: 1, label: ["a", "b", "c"])
+        end
+
+      assert labels.message =~ ":x 2 values and :label 3 values"
+    end
+
+    # ggplot2 4.0.3: "`geom_text()` requires the following missing aesthetics: label". An
+    # annotation takes no position from the plot's mapping, so that mapping gives it none.
+    test "an aesthetic its geom needs and is not given is refused, the plot's mapping giving none" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      label = assert_raise ArgumentError, fn -> Plot.annotate(plot, :text, x: 1, y: 1) end
+      assert label.message =~ "Plot.annotate/3 needs :label, but :text is given no value for it"
+
+      position = assert_raise ArgumentError, fn -> Plot.annotate(plot, :text, label: "a") end
+      assert position.message =~ "Plot.annotate/3 needs :x, :y"
+    end
+
+    test "an aesthetic its geom sets once for the layer takes one value, not a list" do
+      plot = Plot.new(@rows)
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :size option/, fn ->
+        Plot.annotate(plot, :text, x: [1, 2], y: 1, label: "a", size: [3, 5])
+      end
+    end
+
+    test "a list's values are of one type, as a column of the layer's table holds" do
+      plot = Plot.new(@rows)
+
+      assert_raise ArgumentError, ~r/the column :fill .*\(:none and "#FF0000"\)/, fn ->
+        Plot.annotate(plot, :rect, xmin: 1, xmax: 2, ymin: 1, ymax: 2, fill: [:none, "red"])
+      end
+
+      assert_raise ArgumentError, ~r/the column :label .*\("a" and 1\)/, fn ->
+        Plot.annotate(plot, :text, x: [1, 2], y: 1, label: ["a", 1])
+      end
+
+      assert_raise ArgumentError, ~r/the column "x" .*\(1.0 and "a"\)/, fn ->
+        Plot.annotate(plot, :text, x: [1, "a"], y: 1, label: "a")
+      end
+    end
+
+    test "each value of a list is checked as one value is" do
+      plot = Plot.new(@rows)
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a number from 0 to 1, got: 2/, fn ->
+        Plot.annotate(plot, :point, x: [1, 2], y: 1, alpha: [0.5, 2])
+      end
+    end
+
+    test "a position is a value a scale places, and a label one text writes" do
+      plot = Plot.new(@rows)
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a position.*got: 2\.\.5/, fn ->
+        Plot.annotate(plot, :text, x: 2..5, y: 1, label: "a")
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a label.*got: %\{\}/, fn ->
+        Plot.annotate(plot, :text, x: 1, y: 1, label: %{})
       end
     end
   end
