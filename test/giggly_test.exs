@@ -997,6 +997,171 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, after_stat" do
+    @classes %{
+      "class" => ["suv", "compact", "suv", "midsize"],
+      "n" => [1, 2, 3, 4],
+      "drv" => ["4", "f", "f", "4"]
+    }
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles the y axis of `ggplot(d, aes(class, after_stat(prop),
+    # group = 1)) + geom_bar() + geom_point(aes(y = n))` `prop`, where counting's own count, a
+    # fallback, gives way to `n`. The values it computes are `Giggly.Mapping`'s doctest.
+    test "a stat's computed variable titles the axis it maps, as its own title, not a fallback" do
+      titles =
+        @classes
+        |> Plot.new(%{x: :class, y: {:after_stat, [:prop]}, group: 1})
+        |> Plot.geom_bar()
+        |> Plot.geom_point(%{y: :n})
+        |> Giggly.Assembly.run()
+        |> Map.fetch!(:guide_titles)
+
+      assert titles === %{x: "class", y: "prop"}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 puts `geom_bar(aes(y = class, x = after_stat(prop), group =
+    # 1))` at x 0.25, 0.25, 0.5.
+    test "horizontal bars take the variable into x" do
+      frame =
+        @classes
+        |> Plot.new(%{y: :class, x: {:after_stat, [:prop]}, group: 1})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) === [0.25, 0.25, 0.5]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(d, aes(class, fill =
+    # after_stat(count))) + geom_bar()`: groups 1, 2, 3 and props of 1, the fill computed after the
+    # stat; fills #132B43, #132B43, #56B1F7; columns count, prop, x, flipped_aes, PANEL, group, fill,
+    # y, the layer's after_stat before the stat's count; a colour bar titled `count`.
+    test "an aesthetic computed after the stat takes no part in grouping, and gets its own scale" do
+      plot =
+        @classes
+        |> Plot.new(%{x: :class, fill: {:after_stat, [:count]}})
+        |> Plot.geom_bar()
+
+      frame = Giggly.layer_data(plot)
+      [legend] = Giggly.Assembly.run(plot).legends
+      names = DataFrame.names(frame)
+
+      assert {DataFrame.pull(frame, :group), DataFrame.pull(frame, :prop),
+              DataFrame.pull(frame, :fill), Enum.take(names, 8), legend.guide, legend.title} ===
+               {[1, 2, 3], [1.0, 1.0, 1.0], ["#132B43", "#132B43", "#56B1F7"],
+                [:count, :prop, :x, :flipped_aes, :panel, :group, :fill, :y],
+                %Giggly.Guide.Colorbar{bins: 15}, "count"}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fills `after_stat(factor(count))` #F8766D, #F8766D, #00BFC4
+    # on a discrete scale and titles it `factor(count)`.
+    test "a factor computed after the stat is a discrete scale's levels" do
+      plot =
+        @classes
+        |> Plot.new(%{x: :class, fill: {:after_stat, [{:factor, [:count]}]}})
+        |> Plot.geom_bar()
+
+      frame = Giggly.layer_data(plot)
+      [legend] = Giggly.Assembly.run(plot).legends
+
+      assert {DataFrame.pull(frame, :fill), legend.title,
+              Enum.map(legend.keys, fn key -> key.label end)} ===
+               {["#F8766D", "#F8766D", "#00BFC4"], "factor(count)", ["1", "2"]}
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 adds the fill scale for the second layer's `fill = drv` before any
+    # stat runs, then refuses the first's `after_stat(count)`: "Continuous value supplied to a
+    # discrete scale."
+    test "a scale is chosen by the columns evaluated before the stats, then those computed after" do
+      plot =
+        @classes
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(%{fill: {:after_stat, [:count]}})
+        |> Plot.geom_col(%{y: :n, fill: :drv})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~ ~s(index 0 maps :fill to {:after_stat, ["count"]}, a continuous)
+      assert error.message =~ ~s(index 1 maps :fill to "drv", a discrete)
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 adds a discrete y scale for `y = after_stat(as.character(count))`,
+    # nothing having mapped y before the stat; here the axis's scale is chosen before it.
+    test "a value on an axis that its scale cannot take is refused when the plot is run" do
+      plot =
+        @classes
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(%{y: {:after_stat, [{&Float.to_string/1, [:count]}]}})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~ ~s(maps :y to {:after_stat, [{&Float.to_string/1, ["count"]}]})
+      assert error.message =~ "a :string column"
+      assert error.message =~ "is continuous, so it takes numbers"
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 puts `geom_bar(aes(class, after_stat(prop * 4), group = 1))` over a
+    # discrete y axis at 1, 1, 2, positions among its levels; it reads strings there as more levels,
+    # which it maps after the position, where here the stat's values are positions already.
+    test "a value on a discrete axis is a number, a position, and anything else is refused" do
+      points =
+        @classes
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :class, y: :drv})
+
+      times_four = {&Kernel.*/2, [:prop, 4]}
+
+      frame =
+        points
+        |> Plot.geom_bar(%{x: :class, y: {:after_stat, [times_four]}, group: 1})
+        |> Giggly.layer_data(1)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          points
+          |> Plot.geom_bar(%{x: :class, y: {:after_stat, [{&Float.to_string/1, [:count]}]}})
+          |> Giggly.layer_data(1)
+        end
+
+      assert DataFrame.pull(frame, :y) === [1.0, 1.0, 2.0]
+      assert error.message =~ "a :string column, but the y axis's scale, chosen before the stat, "
+      assert error.message =~ "is discrete, and takes a value computed after the stat as a number"
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 puts `y = after_stat(as.Date("2020-01-01") + count)` over a date y
+    # axis at 18264 and 18263, its days; and reads `geom_bar()`'s counts there as days too, warning
+    # "A <numeric> value was passed to a Date scale", which a pure pipeline cannot.
+    test "a value on a date axis is put through its scale, and a number there is refused" do
+      dated = %{
+        "day" => [~D[2020-01-01], ~D[2020-01-01], ~D[2020-01-03]],
+        "class" => ["a", "b", "a"]
+      }
+
+      dates = fn count -> Date.add(~D[2020-01-01], trunc(count)) end
+
+      points =
+        dated
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :class, y: :day})
+
+      frame =
+        points
+        |> Plot.geom_bar(%{x: :class, y: {:after_stat, [{dates, [:count]}]}})
+        |> Giggly.layer_data(1)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          points
+          |> Plot.geom_bar(%{x: :class})
+          |> Giggly.layer_data(1)
+        end
+
+      assert DataFrame.pull(frame, :y) === [18_264.0, 18_263.0]
+
+      assert error.message =~ "index 1 puts its stat's :count into :y, a :float column"
+      assert error.message =~ "is a date scale, so it takes dates"
+    end
+  end
+
   describe "layer_data/2, for geom_bar" do
     # Golden: ggplot2 4.0.3 in R 4.6.1 draws `geom_bar(aes(cyl))` over mtcars, whose cylinders are
     # doubles, 1.8 wide: 0.9 of their spacing, 2, where an integer column's bars are 0.9.

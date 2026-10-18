@@ -722,6 +722,13 @@ defmodule Giggly.Plot do
   fills each drive train's. A mapping, a map, and options, a keyword list, may each be given alone or
   both together.
 
+  Counting computes two variables a mapping can read with an after_stat (`Giggly.Mapping`): `count`
+  and `prop`, the count's share of its group's total, as ggplot2's `after_stat(prop)`. So
+  `%{x: :class, y: {:after_stat, [:prop]}, group: 1}` draws each class's share of all the rows,
+  its rows one group, and `%{x: :class, fill: {:after_stat, [:count]}}` shades each bar by its
+  count. An after_stat is evaluated once the rows are counted, so it is neither the `:x` or `:y`
+  counted along nor a `:weight`.
+
   ## Options
 
   #{NimbleOptions.docs(@bar_options)}
@@ -759,7 +766,9 @@ defmodule Giggly.Plot do
     plot
     |> add_layer(layer, "Plot.geom_bar/3",
       required: Stat.Count.required_aesthetics(),
-      exclusive: Stat.Count.exclusive_aesthetics()
+      exclusive: Stat.Count.exclusive_aesthetics(),
+      computed: Stat.Count.computed_variables(),
+      dropped: Stat.Count.dropped_aesthetics()
     )
     |> check_weight(layer)
   end
@@ -1552,7 +1561,8 @@ defmodule Giggly.Plot do
 
   # A layer's own mapping, held as the plot's is, each column its values read checked against the
   # table the layer draws, its own `data` or else the plot's, a refusal naming the value as
-  # written.
+  # written. An after_stat reads its stat's output, not the table, and is checked as the layer is
+  # added.
   defp resolve(mapping, plot, data, function_name) do
     names =
       plot
@@ -1588,9 +1598,15 @@ defmodule Giggly.Plot do
   end
 
   defp missing_columns(value, names) do
-    value
-    |> Mapping.columns()
-    |> Enum.reject(fn name -> name in names end)
+    case Mapping.stage(value) do
+      :start ->
+        value
+        |> Mapping.columns()
+        |> Enum.reject(fn name -> name in names end)
+
+      :after_stat ->
+        []
+    end
   end
 
   defp missing_column_message(name, data, names) do
@@ -1614,23 +1630,32 @@ defmodule Giggly.Plot do
 
   # The plot with `layer` added, once its mappings are checked against what the function that adds
   # it, `function`, accepts and requires: its own mapping against what it accepts, and the mapping it
-  # draws with, its own laid over the plot's, against what it requires. An aesthetic it takes from
-  # the plot's mapping that it cannot use rides along unused, as ggplot2 carries one, since the
-  # plot's mapping reaches every layer and not every layer can use all of it. At the front, so
-  # adding a layer never walks the list.
+  # draws with, its own laid over the plot's, against what it requires and, for each after_stat in
+  # it, against the variables its stat computes (`computed:`, none unless given) and the aesthetics
+  # its stat consumes (`dropped:`). What a stat requires is met, and what it takes only one of is
+  # counted, by the aesthetics mapped before it runs, never by an after_stat, as ggplot2's stats
+  # see only those. An aesthetic it takes from the plot's mapping that it cannot use rides along
+  # unused, as ggplot2 carries one, since the plot's mapping reaches every layer and not every
+  # layer can use all of it. At the front, so adding a layer never walks the list.
   defp add_layer(plot, layer, function, facts) do
     combined_mapping = computed_mapping(plot, layer)
 
+    {after_stat, before_stat} =
+      Map.split_with(combined_mapping, fn {_aesthetic, value} ->
+        Mapping.stage(value) == :after_stat
+      end)
+
     given =
-      combined_mapping
+      before_stat
       |> Map.keys()
       |> Enum.concat(Map.keys(layer.fixed))
 
     unmet = Keyword.get(facts, :unmet, "neither its mapping nor the plot's maps it")
-    check_inherited(plot, layer, combined_mapping, function)
+    check_inherited(plot, layer, before_stat, function)
+    check_after_stat(layer, after_stat, function, facts)
     check_accepted(layer.mapping, layer.accepted, function)
-    check_required(given, Keyword.fetch!(facts, :required), function, unmet)
-    check_exclusive(combined_mapping, Keyword.get(facts, :exclusive, []), function)
+    check_required(given, Keyword.fetch!(facts, :required), function, unmet, Map.keys(after_stat))
+    check_exclusive(before_stat, Keyword.get(facts, :exclusive, []), function)
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
@@ -1766,15 +1791,16 @@ defmodule Giggly.Plot do
 
   # Each column the layer takes from the plot's mapping, for an aesthetic it neither maps nor sets,
   # must be in the table it draws, as ggplot2 evaluates them there and fails with "object not
-  # found"; one the layer cannot use is evaluated too, so it is checked as well.
-  defp check_inherited(plot, layer, combined_mapping, function) do
+  # found"; one the layer cannot use is evaluated too, so it is checked as well. `before_stat` is
+  # the mapping it draws with less its after_stats, which read the stat's output instead.
+  defp check_inherited(plot, layer, before_stat, function) do
     names =
       plot
       |> drawn_table(layer.data)
       |> DataFrame.names()
 
     missing =
-      combined_mapping
+      before_stat
       |> Map.drop(Map.keys(layer.mapping))
       |> Enum.sort()
       |> Enum.flat_map(fn {aesthetic, value} ->
@@ -1792,6 +1818,61 @@ defmodule Giggly.Plot do
               "#{function} takes #{inspect(aesthetic)} from the plot's mapping, which maps it " <>
                 "to #{inspect(value)}, but " <> missing_column_message(name, layer.data, names)
     end
+  end
+
+  # Each after_stat the layer draws with, its own or one it takes from the plot's mapping, reads
+  # only the variables its stat computes, as ggplot2 documents them, where ggplot2 fails when the
+  # plot is built ("Aesthetics must be valid computed stats", or "object not found"); and gives no
+  # aesthetic its stat consumes, such as counting's weight, which ggplot2 puts in after the stat,
+  # where it does nothing.
+  defp check_after_stat(layer, after_stat, function, facts) do
+    computed =
+      facts
+      |> Keyword.get(:computed, [])
+      |> Enum.map(&Atom.to_string/1)
+
+    dropped = Keyword.get(facts, :dropped, [])
+
+    after_stat
+    |> Enum.sort()
+    |> Enum.each(fn {aesthetic, value} ->
+      unread =
+        value
+        |> Mapping.columns()
+        |> Enum.reject(fn name -> name in computed end)
+
+      case {aesthetic in dropped, unread} do
+        {true, _unread} ->
+          raise ArgumentError,
+                "#{given_message(layer, aesthetic, value, function)}, but its stat consumes " <>
+                  "#{inspect(aesthetic)} as it computes, so a value given after it reaches nothing"
+
+        {false, []} ->
+          :ok
+
+        {false, [name | _others]} ->
+          raise ArgumentError,
+                "#{given_message(layer, aesthetic, value, function)}, but " <>
+                  uncomputed_message(name, computed)
+      end
+    end)
+  end
+
+  # How the layer comes to draw `aesthetic` with `value`: its own mapping, or the plot's.
+  defp given_message(layer, aesthetic, value, function) do
+    if Map.has_key?(layer.mapping, aesthetic),
+      do: "#{function} maps #{inspect(aesthetic)} to #{inspect(value)}",
+      else:
+        "#{function} takes #{inspect(aesthetic)} from the plot's mapping, which maps it to " <>
+          inspect(value)
+  end
+
+  defp uncomputed_message(_name, []),
+    do: "its stat computes no variables, so an after_stat has none to read"
+
+  defp uncomputed_message(name, computed) do
+    "its stat computes no variable #{inspect(name)}; an after_stat reads one it computes: " <>
+      inspect_all(computed)
   end
 
   # An aesthetic a layer maps itself that it cannot use would silently do nothing, so it raises.
@@ -1813,16 +1894,34 @@ defmodule Giggly.Plot do
   end
 
   # A required aesthetic is a name, or a list of names of which one is enough, as ggplot2 writes
-  # `"x|y"`, and is met by an aesthetic the layer maps or sets, `given`, as ggplot2 checks the
-  # layer's columns and its `aes_params` together; `unmet` says why one is missing.
-  defp check_required(given, required, function, unmet) do
+  # `"x|y"`, and is met by an aesthetic the layer maps before its stat or sets, `given`, as ggplot2
+  # checks the layer's columns and its `aes_params` together; `unmet` says why one is missing,
+  # unless the layer maps it only after its stat (`late`), which needed it to compute, as ggplot2's
+  # `stat_count()` "requires an x or y aesthetic".
+  defp check_required(given, required, function, unmet, late) do
     case Enum.reject(required, fn needed -> given?(given, needed) end) do
       [] ->
         :ok
 
       missing ->
         raise ArgumentError,
-              "#{function} needs #{Enum.map_join(missing, ", ", &needed_message/1)}, but #{unmet}"
+              "#{function} needs #{Enum.map_join(missing, ", ", &needed_message/1)}, but " <>
+                unmet_message(missing, late, unmet)
+    end
+  end
+
+  defp unmet_message(missing, late, unmet) do
+    mapped_late =
+      Enum.filter(late, fn aesthetic ->
+        Enum.any?(missing, fn needed -> given?([aesthetic], needed) end)
+      end)
+
+    case mapped_late do
+      [] ->
+        unmet
+
+      _mapped ->
+        "it maps #{inspect_all(mapped_late)} only after its stat, which needs it to compute"
     end
   end
 

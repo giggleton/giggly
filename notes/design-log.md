@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **An after_stat reads its stat's computed variables as ggplot2 documents them, checked at the
+  call (2026-10-18, Steve's choice; checked in R).** `{:after_stat, [value]}` is left out of
+  evaluation and grouping, evaluated against the stat's output, and put through its aesthetic's
+  scale, as `map_statistic()` does. Its names are the stat's documented variables (counting's
+  `count` and `prop`), so a misspelt one is refused by the layer function, and a layer whose stat
+  computes nothing refuses every after_stat. Neither name is a position, so R's read-back into
+  data units arrives with the first stat documenting one (`stat_boxplot()`). An axis's scale is
+  still chosen before the stat: a value on it must be numbers (dates on a date axis), else refused
+  when run, where R adds a scale or warns. An aesthetic only an after_stat maps gets its scale
+  after the stat; `weight`, which counting consumes, is refused. *Rejected: every column counting
+  writes* (`x` or `y`, `width`, `flipped_aes`): the list turns with the bars, and none is of use.
+  *Rejected: R's whole reading* (carried columns, `group`): not checkable at the call. *Rejected:
+  an after_stat inside an expression*, which R allows: one way to write it, the value inside.
+
 - **`factor()` reads a value as discrete through a declared `:category` column type (2026-10-18,
   Steve, agreeing the step-2 proposal; checked in R).** `{:factor, [value]}` evaluates its value
   and the assembly declares the column `:category`, a type the frame never reads from values, so
@@ -437,7 +451,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   integer columns included (Steve): an integer column's bars are 0.9 wide. *Rejected: width from
   the values alone*, which departs from ggplot2 for R's integer columns. *Deferred:* bars under
   `coord_radial()` (Steve), with `Coord.munch/3` and the radial options every radial bar example
-  needs; `position_fill`; user-written `after_stat()`; `geom_bar`'s options; histograms.
+  needs; `position_fill`; `geom_bar`'s options; histograms.
 
 - **A geom says where its marks sit in data space during the build (`Geom.setup_data/2`), and
   the assembly calls only the families' build functions (2026-10-15, Steve).** ggplot2 calls a
@@ -1172,8 +1186,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   member now* — it would bring keyword options, NimbleOptions' placement, the "absent" sentinel,
   `resolution()` and a default seed (ggplot2's `seed = NA` draws a fresh one per build, which a
   pure pipeline cannot) into a Phase 1 scatter plot; it belongs with stack and dodge. *Deferred to
-  first reader:* `after_stat`; a stat's or position's further arguments; and a transformation's
-  inverse and domain.
+  first reader:* a stat's or position's further arguments; and a transformation's inverse and
+  domain.
 
 - **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
   Steve).** The mutation pass runs `mix muex` with `--coverage-guided --format json --output`: each
@@ -1528,7 +1542,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Give mtcars R's column types (expressions, step 2, part 3); §4: "R's
+- 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3);
+  §4: "An after_stat reads its stat's computed variables"
+- 2026-10-18 — Give mtcars R's column types (expressions, step 2, part 3) (`37e6e07`); §4: "R's
   `as.character()` is a boundary of its own"
 - 2026-10-18 — Read a mapping value as discrete with factor() (expressions, step 2, part 2)
   (`aaa63ba`); §4: "`factor()` reads a value as discrete", "R's `as.character()` is a boundary of

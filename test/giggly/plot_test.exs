@@ -134,6 +134,77 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "mappings of after_stat" do
+    # ggplot2 4.0.3 in R 4.6.1 counts `geom_bar(aes(class, after_stat(prop)))`: the stat sees only
+    # x, so it counts along x and takes y for no second position.
+    test "an after_stat names no column of the table, and is neither counted along nor exclusive" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      assert [%Plot.Layer{mapping: %{y: {:after_stat, ["prop"]}}}] =
+               Plot.geom_bar(plot, %{y: {:after_stat, [:prop]}}).reversed_layers
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 documents `stat_count()`'s computed variables as `count` and `prop`;
+    # its table also holds `width`, which a mapping here cannot read.
+    test "an after_stat naming a variable its stat does not compute is refused, listing those it does" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{y: {:after_stat, [:width]}}) end
+
+      assert error.message =~ ~s(maps :y to {:after_stat, ["width"]})
+      assert error.message =~ ~s(no variable "width")
+      assert error.message =~ ~s("count", "prop")
+    end
+
+    test "an after_stat the layer takes from the plot's mapping is checked against its stat" do
+      plot = Plot.new(@rows, %{x: :cyl, y: {:after_stat, [:density]}})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot) end
+
+      assert error.message =~ ~s(takes :y from the plot's mapping, which maps it to {:after_stat)
+      assert error.message =~ ~s(no variable "density")
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 lets `geom_point(aes(colour = after_stat(y)))` read the layer's own
+    # aesthetics; the identity stat documents no computed variables, so here it has none.
+    test "a layer whose stat computes nothing refuses every after_stat" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_point(plot, %{colour: {:after_stat, [:count]}})
+        end
+
+      assert error.message =~ "its stat computes no variables, so an after_stat has none to read"
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 puts `weight = after_stat(count)` into the counted table, where it
+    # does nothing: `stat_count()`'s `dropped_aes` is "weight".
+    test "an after_stat for an aesthetic its stat consumes is refused" do
+      plot = Plot.new(@rows, %{x: :cyl})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_bar(plot, %{weight: {:after_stat, [:count]}})
+        end
+
+      assert error.message =~ "its stat consumes :weight as it computes"
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 refuses `geom_bar(aes(x = after_stat(count)))`: "`stat_count()`
+    # requires an x or y aesthetic."
+    test "an aesthetic mapped only after the stat does not meet what the stat requires" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_bar(plot, %{x: {:after_stat, [:count]}}) end
+
+      assert error.message =~ "needs one of :x, :y"
+      assert error.message =~ "maps :x only after its stat"
+    end
+  end
+
   describe "geom_point/3" do
     test "a point layer records its geom, the identity stat and position, and its resolved mapping" do
       plot =

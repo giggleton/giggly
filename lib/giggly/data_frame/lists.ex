@@ -65,12 +65,22 @@ defmodule Giggly.DataFrame.Lists do
   end
 
   @impl DataFrame
-  def put(%__MODULE__{columns: columns, row_count: row_count} = frame, name, values)
-      when is_map_key(columns, name) and length(values) == row_count do
-    %{frame | columns: Map.put(columns, name, typed(name, values))}
+  def put(%__MODULE__{} = frame, name, values), do: put_entered(frame, entered({name, values}))
+
+  @impl DataFrame
+  def put(%__MODULE__{} = frame, name, values, :category),
+    do: put_entered(frame, entered({name, values, :category}))
+
+  # A column replaced where it is, or else added.
+  defp put_entered(
+         %__MODULE__{columns: columns, row_count: row_count} = frame,
+         {name, {_dtype, values} = column}
+       )
+       when is_map_key(columns, name) and length(values) == row_count do
+    %{frame | columns: Map.put(columns, name, column)}
   end
 
-  def put(%__MODULE__{} = frame, name, values), do: add_column(frame, name, typed(name, values))
+  defp put_entered(%__MODULE__{} = frame, {name, column}), do: add_column(frame, name, column)
 
   @impl DataFrame
   def split(%__MODULE__{columns: columns} = frame, name) do
@@ -128,7 +138,8 @@ defmodule Giggly.DataFrame.Lists do
     }
   end
 
-  # A column as `new/1` is given it, typed: a category is typed as any column, then declared one.
+  # A column as `new/1` or `put/3` and `put/4` are given it, typed: a category is typed as any
+  # column, then declared one.
   defp entered({name, values}), do: {name, typed(name, values)}
 
   defp entered({name, values, :category}) do

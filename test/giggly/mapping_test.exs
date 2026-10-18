@@ -7,6 +7,9 @@ defmodule Giggly.MappingTest do
 
   @frame DataFrame.new([{"hwy", [29, 24, 31]}, {"cty", [18, 16, 21]}, {"class", ["a", "b", "a"]}])
 
+  # A stat's output, its columns named by atoms as every column Giggly computes is.
+  @statistic DataFrame.new(count: [1.0, 3.0], prop: [0.25, 0.75], x: [1, 2])
+
   describe "resolve/1" do
     test "a column named by an atom or a string is held by its name as a string" do
       assert {Mapping.resolve(:hwy), Mapping.resolve("hwy")} === {{:ok, "hwy"}, {:ok, "hwy"}}
@@ -100,6 +103,53 @@ defmodule Giggly.MappingTest do
       assert {:error, reason} = Mapping.resolve({&Kernel.//2, [:hwy, nil]})
       assert reason =~ "nil is a missing value"
     end
+
+    test "an after_stat is held with its value resolved, an expression or a factor in it too" do
+      multiply = &Kernel.*/2
+
+      assert {Mapping.resolve({:after_stat, [:prop]}),
+              Mapping.resolve({:after_stat, [{multiply, [:prop, 100]}]}),
+              Mapping.resolve({:after_stat, [{:factor, [:count]}]})} ===
+               {{:ok, {:after_stat, ["prop"]}},
+                {:ok, {:after_stat, [{multiply, ["prop", {:constant, 100}]}]}},
+                {:ok, {:after_stat, [{:factor, ["count"]}]}}}
+    end
+
+    test "an after_stat of anything but one value is refused" do
+      for value <- [{:after_stat, [:count, :prop]}, {:after_stat, []}, {:after_stat, :count}] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "an after_stat reads one value"
+      end
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 computes `after_stat(count) * 2` as `after_stat(count * 2)`; the
+    # grammar has one way to write it, the whole value inside.
+    test "an after_stat inside an expression, a factor or another after_stat is refused" do
+      after_stat = {:after_stat, [:count]}
+
+      for value <- [
+            {&Kernel.*/2, [after_stat, 2]},
+            {:factor, [after_stat]},
+            {:after_stat, [after_stat]}
+          ] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "an after_stat is the whole of a mapping value"
+      end
+    end
+
+    test "an after_stat's refused value refuses it, with the value's reason" do
+      assert {:error, reason} = Mapping.resolve({:after_stat, [nil]})
+      assert reason =~ "nil is a missing value"
+    end
+  end
+
+  describe "stage/1" do
+    test "an after_stat is evaluated after the stat, every other value at the start" do
+      assert Enum.map(
+               [{:after_stat, ["count"]}, "cty", {:constant, 7}, {:factor, ["cyl"]}],
+               &Mapping.stage/1
+             ) === [:after_stat, :start, :start, :start]
+    end
   end
 
   describe "columns/1" do
@@ -108,6 +158,12 @@ defmodule Giggly.MappingTest do
 
       assert {Mapping.columns(value), Mapping.columns("cty"), Mapping.columns({:constant, 7}),
               Mapping.columns({:factor, ["cyl"]})} === {["hwy", "cty"], ["cty"], [], ["cyl"]}
+    end
+
+    test "an after_stat's columns are the stat's variables its value reads" do
+      {:ok, value} = Mapping.resolve({:after_stat, [{&Kernel.//2, [:count, :prop]}]})
+
+      assert Mapping.columns(value) === ["count", "prop"]
     end
   end
 
@@ -121,6 +177,12 @@ defmodule Giggly.MappingTest do
 
     test "a factor's type is a category, whatever its value's" do
       assert Mapping.dtype({:factor, ["hwy"]}, @frame) === :category
+    end
+
+    test "an after_stat's type is its value's in the stat's output, whose columns are atoms" do
+      assert {Mapping.dtype({:after_stat, ["count"]}, @statistic),
+              Mapping.dtype({:after_stat, [{:factor, ["count"]}]}, @statistic)} ===
+               {:float, :category}
     end
   end
 
@@ -142,6 +204,14 @@ defmodule Giggly.MappingTest do
 
     test "a function of no arguments gives a value in every row" do
       assert Mapping.evaluate({fn -> 1 end, []}, @frame) === [1, 1, 1]
+    end
+
+    test "an after_stat is its value in each row of the stat's output, read by its names" do
+      {:ok, value} = Mapping.resolve({:after_stat, [{&Kernel.*/2, [:prop, 100]}]})
+
+      assert {Mapping.evaluate(value, @statistic),
+              Mapping.evaluate({:after_stat, ["count"]}, @statistic)} ===
+               {[25.0, 75.0], [1.0, 3.0]}
     end
   end
 
@@ -214,6 +284,16 @@ defmodule Giggly.MappingTest do
               Mapping.title({:factor, [{:constant, 4}]}, :color),
               Mapping.title({:factor, [{fn hwy -> hwy end, ["hwy"]}]}, :color)} ===
                {{:title, "factor(cyl)"}, {:title, "factor(4)"}, {:title, :none}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `after_stat(prop)` `prop`, `after_stat(factor(count))`
+    # `factor(count)` and `after_stat(1)` `1`, which is no fallback: an after_stat is no constant.
+    test "an after_stat is titled by its value's text, a constant's as written" do
+      assert {Mapping.title({:after_stat, ["prop"]}, :y),
+              Mapping.title({:after_stat, [{:factor, ["count"]}]}, :fill),
+              Mapping.title({:after_stat, [{:constant, 1}]}, :y),
+              Mapping.title({:after_stat, [{fn prop -> prop end, ["prop"]}]}, :y)} ===
+               {{:title, "prop"}, {:title, "factor(count)"}, {:title, "1"}, {:title, :none}}
     end
 
     test "a closure has no text, so neither has an expression with one inside it" do

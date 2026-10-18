@@ -13,7 +13,8 @@ defmodule Giggly.Assembly do
   #      each layer's table its panel, repeating the rows of a table that lacks a column the facet
   #      splits on in each panel they fit (`Giggly.Facet`);
   #   2. evaluates each layer's mapping against its table (`Giggly.Mapping`): a column, an
-  #      expression computed in each row, or a constant in every row;
+  #      expression computed in each row, or a constant in every row, an after_stat left until its
+  #      stat has run;
   #   3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
   #      discrete scale gives its levels, so group ids follow axis and legend order;
   #   4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
@@ -23,8 +24,9 @@ defmodule Giggly.Assembly do
   #   6. trains each scale over those columns, in the rows of the panels that use it;
   #   7. maps them to their positions, each row on its panel's scale;
   #   8. computes each layer's stat (`Giggly.Stat`) on its table;
-  #   9. puts into each aesthetic the layer leaves unmapped the computed column its stat names for
-  #      it, as a count into y;
+  #   9. puts into each aesthetic the layer maps to an after_stat its value, evaluated against the
+  #      stat's output, and into each it leaves unmapped the computed column its stat names for it,
+  #      as a count into y, each on an axis checked against the axis's scale and put through it;
   #  10. puts into every row each position a layer sets, as a rectangle's corners, then has each
   #      layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a bar's
   #      edges, told whether each axis is discrete, which decides a bar's orientation;
@@ -34,7 +36,8 @@ defmodule Giggly.Assembly do
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
   #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`, `color`,
-  #      `fill`), of the kind its columns need, trains it on every layer's column of that
+  #      `fill`), of the kind its columns need, those evaluated before the stats and then those
+  #      computed after, trains it on every layer's column of that
   #      aesthetic, and maps each column through it, as ggplot2 trains and maps its non-position
   #      scales once the positions are final;
   #      it then builds the legends: each such scale's, a key for each break, labelled, with the
@@ -246,7 +249,6 @@ defmodule Giggly.Assembly do
     y_routes = routes(layout, :y)
     scale_kinds = %{x: axis_kind(plot, grouped_data, :x), y: axis_kind(plot, grouped_data, :y)}
     axis_kinds = Map.new(scale_kinds, fn {axis, kind} -> {axis, discreteness(kind)} end)
-    non_position_kinds = non_position_kinds(plot, grouped_data)
     untrained_x_scales = add_scales(scale_kinds.x, x_routes)
     untrained_y_scales = add_scales(scale_kinds.y, y_routes)
 
@@ -263,11 +265,22 @@ defmodule Giggly.Assembly do
     x_scales = train(untrained_x_scales, x_routes, :x, transformed_data, &Scale.train/2)
     y_scales = train(untrained_y_scales, y_routes, :y, transformed_data, &Scale.train/2)
 
+    axes = %{x: {x_scales, x_routes}, y: {y_scales, y_routes}}
+
+    statistic_data =
+      layers
+      |> Enum.with_index()
+      |> Enum.zip_with(transformed_data, fn {layer, index}, frame ->
+        stat = Plot.layer_stat(layer)
+        mapped = through_scales(frame, axes.x, axes.y, &Scale.map/2)
+        computed = Stat.compute_layer(stat, mapped)
+        map_statistic(computed, {plot, layer, index}, scale_kinds, axes)
+      end)
+
+    non_position_kinds = non_position_kinds(plot, grouped_data, statistic_data)
+
     layer_data =
-      Enum.zip_with(layers, transformed_data, fn layer, frame ->
-        mapped = through_scales(frame, {x_scales, x_routes}, {y_scales, y_routes}, &Scale.map/2)
-        computed = Stat.compute_layer(Plot.layer_stat(layer), mapped)
-        statistic = map_statistic(computed, plot, layer)
+      Enum.zip_with(layers, statistic_data, fn layer, statistic ->
         fixed = Plot.layer_fixed(layer)
 
         set_up =
@@ -626,20 +639,111 @@ defmodule Giggly.Assembly do
   defp row_values(values, _rows) when is_list(values), do: values
   defp row_values(value, rows), do: List.duplicate(value, rows)
 
-  # The layer's table with each aesthetic its own and the plot's mappings leave unmapped given the
-  # computed column its stat puts into it by default, as ggplot2's `map_statistic()` evaluates a
-  # stat's `after_stat()` defaults: counting puts its count into y when no mapping gives y.
-  defp map_statistic(frame, plot, layer) do
-    mapped = Plot.computed_mapping(plot, layer)
+  # The stat's output, `frame`, with each aesthetic it gives, as ggplot2's `map_statistic()` puts
+  # them in once the stat has run: each the layer maps to an after_stat, in the order ggplot2
+  # evaluates them (`Plot.mapping_order/2`), then each it leaves unmapped that its stat names a
+  # computed column for (`Stat.default_mapping/1`), in name order, as counting puts its count into
+  # y; each replaced where the table has it, or else added after its last column, a factor's
+  # declared a category. An after_stat is evaluated against the output as it stands: ggplot2 reads
+  # the output back in data units first, but an after_stat reads only the variables a stat
+  # documents as computed, and no stat's here is a position. Each on an axis is then checked
+  # against the axis's scale and put through it, as ggplot2's `transform_df()` puts it; one on
+  # another aesthetic waits for its scale, added after the position, whose transformation is the
+  # identity. `layer_at` is the plot, the layer and its index, which a refusal names.
+  defp map_statistic(frame, {plot, layer, _index} = layer_at, scale_kinds, axes) do
+    mapping = Plot.computed_mapping(plot, layer)
 
-    layer
-    |> default_mapping()
-    |> Enum.reject(fn {aesthetic, _column} -> Map.has_key?(mapped, aesthetic) end)
-    |> Enum.sort()
-    |> Enum.reduce(frame, fn {aesthetic, column}, statistic ->
-      DataFrame.put(statistic, aesthetic, DataFrame.pull(statistic, column))
+    after_stat =
+      plot
+      |> Plot.mapping_order(layer)
+      |> Enum.map(fn aesthetic -> {aesthetic, Map.fetch!(mapping, aesthetic)} end)
+      |> Enum.filter(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
+      |> Enum.map(fn {aesthetic, value} ->
+        {{:mapped, value}, evaluated_column(aesthetic, value, frame)}
+      end)
+
+    defaulted =
+      layer
+      |> default_mapping()
+      |> Enum.reject(fn {aesthetic, _column} -> Map.has_key?(mapping, aesthetic) end)
+      |> Enum.sort()
+      |> Enum.map(fn {aesthetic, column} ->
+        {{:default, column}, {aesthetic, DataFrame.pull(frame, column)}}
+      end)
+
+    after_stat
+    |> Enum.concat(defaulted)
+    |> Enum.reduce(frame, fn {source, column}, statistic ->
+      aesthetic = elem(column, 0)
+
+      statistic
+      |> put_column(column)
+      |> through_axis(aesthetic, source, {layer_at, scale_kinds}, axes)
     end)
   end
+
+  defp put_column(frame, {name, values}), do: DataFrame.put(frame, name, values)
+
+  defp put_column(frame, {name, values, :category}),
+    do: DataFrame.put(frame, name, values, :category)
+
+  # The column of `aesthetic`, computed from the stat's output, put through its axis's scale where
+  # it is an x- or y-family aesthetic, each row on the scale its panel uses, once it is checked: an
+  # axis's scale is chosen before the stat runs, so the column must be one it takes, numbers on a
+  # continuous axis and on a discrete one, where a number is a position among the levels, and
+  # dates on a date axis, which its scale turns into numbers. ggplot2 adds a discrete or a date
+  # scale for an axis nothing mapped before the stat; here such an axis is continuous, as
+  # ggplot2's `add_missing()` makes one, so it takes numbers alone. Numbers on a date axis, such as
+  # counting's count, ggplot2 reads as days since 1970-01-01 and warns ("A <numeric> value was
+  # passed to a Date scale"), which a pure pipeline cannot, so they are refused. A column of no
+  # values is any.
+  defp through_axis(statistic, aesthetic, source, {layer_at, scale_kinds}, axes) do
+    case Aesthetics.family(aesthetic) do
+      :none ->
+        statistic
+
+      family ->
+        dtype =
+          statistic
+          |> DataFrame.dtypes()
+          |> Map.fetch!(aesthetic)
+
+        scale_kind = Map.fetch!(scale_kinds, family)
+
+        if dtype != :null and Scale.kind(dtype) != statistic_kind(scale_kind),
+          do:
+            raise(
+              ArgumentError,
+              unplaced_statistic_message(layer_at, aesthetic, source, dtype, scale_kind)
+            )
+
+        through_scale(statistic, aesthetic, Map.fetch!(axes, family), &Scale.transform/2)
+    end
+  end
+
+  # The kind of column a value computed after the stat must be on an axis of `scale_kind`.
+  defp statistic_kind(:date), do: :date
+  defp statistic_kind(_continuous_or_discrete), do: :continuous
+
+  defp unplaced_statistic_message({_plot, _layer, index}, aesthetic, source, dtype, scale_kind) do
+    family = Aesthetics.family(aesthetic)
+
+    "the layer at index #{index} #{statistic_source(aesthetic, source)}, a #{inspect(dtype)} " <>
+      "column, but the #{family} axis's scale, chosen before the stat, " <>
+      takes_message(scale_kind)
+  end
+
+  defp statistic_source(aesthetic, {:default, column}),
+    do: "puts its stat's #{inspect(column)} into #{inspect(aesthetic)}"
+
+  defp statistic_source(aesthetic, {:mapped, value}),
+    do: "maps #{inspect(aesthetic)} to #{inspect(value)}"
+
+  defp takes_message(:continuous), do: "is continuous, so it takes numbers"
+  defp takes_message(:date), do: "is a date scale, so it takes dates"
+
+  defp takes_message(:discrete),
+    do: "is discrete, and takes a value computed after the stat as a number, a position"
 
   # Each panel's params, from the scales its layout row names: ggplot2's `setup_panel_params()`,
   # after the positions have run.
@@ -672,25 +776,27 @@ defmodule Giggly.Assembly do
   # discrete ones in that order, so a discrete alpha mapped with `x` groups within each `x`, and a
   # fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its groups. Each
   # column is typed as it enters the frame, so an expression whose results mix two kinds is refused
-  # there, naming its aesthetic, and a factor's is declared a category.
+  # there, naming its aesthetic, and a factor's is declared a category. An after_stat is left out,
+  # evaluated once the stat has run (`map_statistic/4`), so it takes no part in grouping or in the
+  # stat, as ggplot2's `compute_aesthetics()` leaves out calculated aesthetics.
   defp evaluate(paneled_data, plot, layer) do
     mapping = Plot.computed_mapping(plot, layer)
 
     columns =
       plot
       |> Plot.mapping_order(layer)
-      |> Enum.map(fn aesthetic ->
-        value = Map.fetch!(mapping, aesthetic)
-        evaluated_column(aesthetic, value, paneled_data)
-      end)
+      |> Enum.map(fn aesthetic -> {aesthetic, Map.fetch!(mapping, aesthetic)} end)
+      |> Enum.filter(fn {_aesthetic, value} -> Mapping.stage(value) == :start end)
+      |> Enum.map(fn {aesthetic, value} -> evaluated_column(aesthetic, value, paneled_data) end)
 
     columns
     |> Enum.concat([{:panel, DataFrame.pull(paneled_data, :panel)}])
     |> DataFrame.new()
   end
 
-  # The column `value` makes from the table under `aesthetic`'s name, declared a category where
-  # it is a factor, whose type the frame cannot read from its values.
+  # The column `value` makes from the table it is evaluated against, the layer's or, for an
+  # after_stat, the stat's output, under `aesthetic`'s name, declared a category where it is a
+  # factor, whose type the frame cannot read from its values.
   defp evaluated_column(aesthetic, value, paneled_data) do
     values = Mapping.evaluate(value, paneled_data)
 
@@ -779,7 +885,7 @@ defmodule Giggly.Assembly do
   defp axis_kind(plot, layer_frames, family) do
     selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
 
-    case mapped_columns(plot, layer_frames, selected?) do
+    case mapped_columns(plot, layer_frames, selected?, :start) do
       [] -> :continuous
       columns -> checked_kind(columns, "an axis has one scale")
     end
@@ -788,21 +894,28 @@ defmodule Giggly.Assembly do
   # The kind of scale each aesthetic other than position needs, for those a layer maps: as an
   # axis's, every column of it must be a type some scale can map, and all of one kind, the first
   # deciding, as ggplot2 adds a scale for the first layer's and refuses a column it cannot map.
-  defp non_position_kinds(plot, layer_frames) do
+  # The columns evaluated before the stats come first, read from `layer_frames`, and those computed
+  # after, from `statistic_frames`, each in layer order, as ggplot2 adds the scales of every layer's
+  # evaluated aesthetics before any stat runs and an after_stat's as its layer's stat is mapped.
+  defp non_position_kinds(plot, layer_frames, statistic_frames) do
     for aesthetic <- Scale.non_position_aesthetics(),
-        columns = mapped_columns(plot, layer_frames, fn mapped -> mapped == aesthetic end),
+        selected? = fn mapped -> mapped == aesthetic end,
+        evaluated = mapped_columns(plot, layer_frames, selected?, :start),
+        computed = mapped_columns(plot, statistic_frames, selected?, :after_stat),
+        columns = Enum.concat(evaluated, computed),
         columns != [],
         into: %{},
         do: {aesthetic, checked_kind(columns, "an aesthetic has one scale")}
   end
 
-  # Each column a layer maps to one of the aesthetics `selected?` chooses, in layer order, with what
-  # a refusal names: the layer's index, the aesthetic, the value it is mapped to as the plot holds
-  # it, a column by the name its table gives it, its type and the kind of scale that type needs.
-  # The type is read from the layer's evaluated frame, `layer_frames` in layer order, since an
-  # expression's is known only once its function has run; the value from the plot's mapping, so a
-  # refusal names what the caller mapped rather than the aesthetic's column.
-  defp mapped_columns(plot, layer_frames, selected?) do
+  # Each column a layer maps to one of the aesthetics `selected?` chooses, with a value of `stage`
+  # (`Mapping.stage/1`), in layer order, with what a refusal names: the layer's index, the
+  # aesthetic, the value it is mapped to as the plot holds it, a column by the name its table gives
+  # it, its type and the kind of scale that type needs. The type is read from the layer's frame,
+  # `layer_frames` in layer order, evaluated or, for an after_stat, the stat's output with it put
+  # in, since an expression's is known only once its function has run; the value from the plot's
+  # mapping, so a refusal names what the caller mapped rather than the aesthetic's column.
+  defp mapped_columns(plot, layer_frames, selected?, stage) do
     layers_and_frames =
       plot.reversed_layers
       |> Enum.reverse()
@@ -813,6 +926,7 @@ defmodule Giggly.Assembly do
         mapping = Plot.computed_mapping(plot, layer),
         {aesthetic, value} <- Enum.sort(mapping),
         selected?.(aesthetic),
+        Mapping.stage(value) == stage,
         dtype = Map.fetch!(dtypes, aesthetic),
         do: {index, aesthetic, value, dtype, Scale.kind(dtype, aesthetic)}
   end

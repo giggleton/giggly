@@ -9,16 +9,17 @@ paths:
 `Giggly.Mapping` is what a mapping maps each aesthetic to: a column, an expression computed in
 each row, or a constant, and the title each gives its guide. Why the grammar is plain data, where
 its wrappers go, and what was rejected: design-log §4, the entry beginning "A mapping value is a
-column, an expression or a constant".
+column, an expression or a constant"; why an after_stat reads only documented variables: the
+entry beginning "An after_stat reads its stat's computed variables".
 
 ## Rules
 
 - **A value's shape is matched here and nowhere else.** `Plot` and the assembly ask this module
-  (`resolve/1`, `columns/1`, `dtype/2`, `evaluate/2`, `title/2`) and never match a tuple or a
-  string themselves. Its boundary lists `Giggly.DataFrame` alone; `Plot` lists it for the checks at
-  the call and the assembly for evaluation and titles. **`Plot` calls only the checks**, never
-  `evaluate/2` or `title/2`, which holds by review, as the assembly's calls into `Coord` and `Geom`
-  do.
+  (`resolve/1`, `columns/1`, `stage/1`, `dtype/2`, `evaluate/2`, `title/2`) and never match a
+  tuple or a string themselves. Its boundary lists `Giggly.DataFrame` alone; `Plot` lists it for
+  the checks at the call and the assembly for evaluation and titles. **`Plot` calls only the
+  checks**, never `evaluate/2` or `title/2`, which holds by review, as the assembly's calls into
+  `Coord` and `Geom` do.
 - **A plot holds each value resolved, and the mapping stays a map** (`Mapping.t()`, no struct): a
   column by its name as a string, a constant as `{:constant, term}`, an expression as its function
   and its resolved arguments. A string in a held mapping is always a column.
@@ -30,16 +31,24 @@ column, an expression or a constant".
 - **Refused at the call, each with a reason worded to follow "maps :x to …, but"**, which the
   caller raises with its function's name: `nil`, a list (kept free for an inline column), a
   function alone, a constant the frame would type `:term`, a tuple of an unknown head, an
-  expression whose arguments are not a list, and a function whose arity is not its arguments'
-  count. A refused argument refuses its expression.
+  expression whose arguments are not a list, a function whose arity is not its arguments' count,
+  a factor or an after_stat of other than one value, and an after_stat inside another value. A
+  refused argument refuses its expression.
 - **Kinds of value are function clauses, not a protocol**: they differ in what they are, not in
   how they run. A head that acts on a whole column is a clause that sees the column, never a
   function applied per row.
 - **`{:factor, [value]}` reads its value as discrete: its column is declared `:category`**, which
   the frame cannot read from values, so `dtype/2` says so and the assembly declares it when the
-  column enters the evaluated frame. It is the whole of a mapping value or a factor's own, never
-  an expression's argument, refused at the call, since R hands a function a factor's level codes.
-  Its title is `factor()` around its value's text.
+  column enters the evaluated frame. It is the whole of a mapping value, a factor's own or an
+  after_stat's, never an expression's argument, refused at the call, since R hands a function a
+  factor's level codes. Its title is `factor()` around its value's text.
+- **`{:after_stat, [value]}` is evaluated against its stat's output, once the stat has run**:
+  `stage/1` says `:after_stat`, and the assembly leaves it out of evaluation and grouping. Its
+  names are the stat's computed variables, held as strings like a column's and compared with the
+  output's atom names as strings (`dtype/2` and `evaluate/2` handed that output); which names a
+  stat offers is `Plot`'s check at the call, `columns/1` naming them. It is the whole of a mapping
+  value, never inside another, so it is refused in an expression, a factor or an after_stat;
+  inside it, any value but another after_stat, a factor included.
 - **An expression's type is the frame's**, decided when its column enters the evaluated frame, so
   it is known only when the plot is run; a check that needs it runs then (the axis's kind, a
   computed weight). `dtype/2` answers at the call for a column and a constant and says `:computed`
@@ -47,6 +56,7 @@ column, an expression or a constant".
 - **A value's title is ggplot2's `make_labels()` read for Elixir**: a column's name; an
   expression's text, a capture of a `Kernel` operator written as the operator whether or not the
   compiler inlined it, an operand that is itself an operator's call in parentheses, any other
-  capture as `inspect/1` names its function; `:none` for an expression with a closure anywhere in
-  it; and for a constant its aesthetic's canonical name, as a fallback (`{:fallback, name}`),
-  which the assembly ranks below any layer's title.
+  capture as `inspect/1` names its function; an after_stat's its value's, as ggplot2 strips
+  `after_stat()`, never a fallback; `:none` for an expression with a closure anywhere in it; and
+  for a constant its aesthetic's canonical name, as a fallback (`{:fallback, name}`), which the
+  assembly ranks below any layer's title.

@@ -21,7 +21,9 @@ defprotocol Giggly.Stat do
   # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
   # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
   # aesthetic the layer maps to nothing, and the aesthetic's guide is titled by it when no layer
-  # maps the aesthetic itself.
+  # maps the aesthetic itself. Its kind's module also names the variables a mapping's after_stat
+  # can read, as ggplot2 documents them (`computed_variables/0`), and the aesthetics it consumes
+  # (`dropped_aesthetics/0`), which `Giggly.Plot` checks a layer against at the call.
 
   # A stat is handed a layer's table and returns one, reading and building tables through the data
   # frame, and sizes what it counts at by the spacing of its positions (`Giggly.Resolution`).

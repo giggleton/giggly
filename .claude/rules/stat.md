@@ -34,8 +34,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
   into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a
-  fallback, which any layer's column or expression replaces. A user's own `after_stat()` arrives
-  with its first reader.
+  fallback, which any layer's column or expression replaces.
+- **A stat names what a mapping's after_stat can read: its computed variables as ggplot2
+  documents them** (`computed_variables/0`: counting's `count` and `prop`, not the `width` and
+  `flipped_aes` its table also holds), **and the aesthetics it consumes** (`dropped_aesthetics/0`,
+  ggplot2's `dropped_aes`: counting's `weight`), module functions beside its accepted aesthetics,
+  which `Plot` reads at the call. A stat with neither, the identity, computes nothing an
+  after_stat can read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the
   rows there or the sum of their weights, missing weights adding nothing, its `prop` the count's
   share of its group's total (NaN for a total of zero), and its `width` 0.9 of the layer's x

@@ -23,13 +23,22 @@ defmodule Giggly.Mapping do
       `aes(colour = factor(cyl))` reads a column of numbers as levels: a discrete scale whatever
       the values, its levels in order of value with a missing one last, each written as R writes
       it (`4`, `0.5`, `TRUE`), and the rows grouped by them. A factor reads a whole column, so it
-      is the whole of a mapping value or a factor's own, never an expression's argument, where R
-      hands a function its levels' codes rather than its values.
+      is the whole of a mapping value, a factor's own or an after_stat's, never an expression's
+      argument, where R hands a function its levels' codes rather than its values.
+    * **An after_stat**, `{:after_stat, [value]}`, is the value computed from what the layer's stat
+      computes, as ggplot2's `aes(y = after_stat(prop))` maps each bar's share of its group's rows
+      into y: its names are the stat's computed variables, as ggplot2 documents them for the stat
+      (counting's are `count` and `prop`), and it is evaluated once the stat has run, so it takes
+      no part in grouping or in what the stat computes. Its value is put through its aesthetic's
+      scale, as ggplot2's `map_statistic()` puts it. It is the whole of a mapping value, never
+      inside another, so ggplot2's `after_stat(prop) * 100` is written
+      `{:after_stat, [{&Kernel.*/2, [:prop, 100]}]}`.
 
   A constant is a value a column can hold: `nil`, a list, and a value with no column type of its
   own (a map, a tuple, a struct other than a date or a time) are refused, and so are a function
   alone, a tuple that is neither an expression nor a constant, and a function given a number of
-  arguments it does not take.
+  arguments it does not take. A layer whose stat computes nothing, and so documents no variables,
+  refuses every after_stat.
 
       iex> plot =
       ...>   %{"hwy" => [29, 24], "cty" => [18, 16]}
@@ -40,6 +49,17 @@ defmodule Giggly.Mapping do
       [1.6111111111111112, 1.5]
       iex> Giggly.DataFrame.pull(frame, :color)
       ["#F8766D", "#F8766D"]
+
+  ggplot2's `ggplot(mpg, aes(class, after_stat(prop), group = 1)) + geom_bar()` draws each class's
+  share of all the rows:
+
+      iex> plot =
+      ...>   %{"class" => ["suv", "compact", "suv", "midsize"]}
+      ...>   |> Giggly.Plot.new(%{x: :class, y: {:after_stat, [:prop]}, group: 1})
+      ...>   |> Giggly.Plot.geom_bar()
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [0.25, 0.25, 0.5]
 
   ## Titles
 
@@ -53,6 +73,7 @@ defmodule Giggly.Mapping do
     * an expression whose function is a closure, such as `fn hwy -> hwy * 2 end`, has no text, so
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
     * a factor by its value's text inside `factor()`, `factor(cyl)`;
+    * an after_stat by its value's text, `prop`, as ggplot2 titles `after_stat(prop)`;
     * a constant by its aesthetic's name, `color`, unless another layer maps the aesthetic to a
       column or an expression, whose title wins, as ggplot2 titles a constant.
 
@@ -74,7 +95,9 @@ defmodule Giggly.Mapping do
   # weight, its type where the call can tell it (`dtype/2`); the assembly evaluates it against a
   # layer's table (`evaluate/2`) and titles its guide (`title/2`). A value is held resolved: a
   # column by its name as a string, a constant as `{:constant, term}`, a factor as
-  # `{:factor, [resolved]}`, an expression as its function and its resolved arguments. A value's
+  # `{:factor, [resolved]}`, an after_stat as `{:after_stat, [resolved]}`, an expression as its
+  # function and its resolved arguments. When a value is evaluated is its stage (`stage/1`): an
+  # after_stat's against its stat's output, every other against the layer's data. A value's
   # kinds differ in what they are, not in how they run, so they are function clauses rather than a
   # protocol. `Plot` calls only the checks; that holds by review, as the assembly's calls into
   # `Coord` and `Geom` do.
@@ -135,15 +158,22 @@ defmodule Giggly.Mapping do
   @typedoc "A factor: a value read as discrete."
   @type factor :: {:factor, [value()]}
 
-  @typedoc "A value as written: a column, an expression, a constant or a factor."
-  @type value :: column() | expression() | constant() | factor()
+  @typedoc "An after_stat: a value computed from the stat's computed variables."
+  @type after_stat :: {:after_stat, [value()]}
+
+  @typedoc "A value as written: a column, an expression, a constant, a factor or an after_stat."
+  @type value :: column() | expression() | constant() | factor() | after_stat()
 
   @typedoc """
   A value as a plot holds it: a column by its name as a string, a constant as `{:constant, term}`,
   and an expression as its function and its arguments, each held so.
   """
   @type resolved ::
-          String.t() | {:constant, term()} | {:factor, [resolved()]} | {function(), [resolved()]}
+          String.t()
+          | {:constant, term()}
+          | {:factor, [resolved()]}
+          | {:after_stat, [resolved()]}
+          | {function(), [resolved()]}
 
   @typedoc "A mapping as a plot holds it: aesthetic to resolved value."
   @type t :: %{optional(atom()) => resolved()}
@@ -160,6 +190,11 @@ defmodule Giggly.Mapping do
 
   def resolve({:factor, _arguments}),
     do: {:error, "a factor reads one value, written {:factor, [value]}"}
+
+  def resolve({:after_stat, [value]}), do: wrapped(:after_stat, value)
+
+  def resolve({:after_stat, _arguments}),
+    do: {:error, "an after_stat reads one value, written {:after_stat, [value]}"}
 
   def resolve({function, arguments}) when is_function(function) and is_list(arguments),
     do: expression(function, arguments)
@@ -190,19 +225,33 @@ defmodule Giggly.Mapping do
        "#{length(arguments)}"}
   end
 
-  # An expression's argument: any value but a factor, which reads a whole column as discrete, as
-  # R hands a function its level codes, where a function applied in each row sees one value.
+  # An expression's argument: any value inside another but a factor, which reads a whole column as
+  # discrete, as R hands a function its level codes, where a function applied in each row sees one
+  # value.
   defp argument({:factor, _arguments}),
     do: {:error, "a factor reads a whole column, so it is not an expression's argument"}
 
-  defp argument(value), do: resolve(value)
+  defp argument(value), do: inner(value)
 
-  defp factor(value) do
-    case resolve(value) do
-      {:ok, resolved} -> {:ok, {:factor, [resolved]}}
+  defp factor(value), do: wrapped(:factor, value)
+
+  defp wrapped(head, value) do
+    case inner(value) do
+      {:ok, resolved} -> {:ok, {head, [resolved]}}
       error -> error
     end
   end
+
+  # A value inside another: any but an after_stat, which is evaluated once the stat has run, so it
+  # has nothing around it: an expression and a factor are evaluated against the data, and inside an
+  # after_stat everything already is against the stat's output.
+  defp inner({:after_stat, _arguments}),
+    do:
+      {:error,
+       "an after_stat is the whole of a mapping value, never inside another; put what is " <>
+         "around it inside it, {:after_stat, [value]}"}
+
+  defp inner(value), do: resolve(value)
 
   defp constant(nil), do: {:error, "nil is a missing value, not a column or a constant"}
 
@@ -224,7 +273,8 @@ defmodule Giggly.Mapping do
     end
   end
 
-  # The columns `value` reads, each once, in the order it reads them.
+  # The columns `value` reads, each once, in the order it reads them: the layer's data's, or an
+  # after_stat's, the stat's computed variables (`stage/1` says which).
   @doc false
   @spec columns(resolved()) :: [String.t()]
   def columns(value) do
@@ -236,13 +286,14 @@ defmodule Giggly.Mapping do
   defp column_names(name) when is_binary(name), do: [name]
   defp column_names({:constant, _term}), do: []
 
-  # An expression's arguments, or a factor's one value.
-  defp column_names({_function_or_factor, arguments}),
+  # An expression's arguments, or a factor's or an after_stat's one value.
+  defp column_names({_function_or_head, arguments}),
     do: Enum.flat_map(arguments, &column_names/1)
 
-  # The type of the column `value` makes from `table`, where the call can tell it: a column's own
-  # and a constant's, as the frame types them; `:category` for a factor, which the frame is told;
-  # `:computed` for an expression, whose function decides it when the plot is run.
+  # The type of the column `value` makes from `table`, the table it is evaluated against (the stat's
+  # output for an after_stat, which is known only when the plot is run), where it can be told: a
+  # column's own and a constant's, as the frame types them; `:category` for a factor, which the
+  # frame is told; `:computed` for an expression, whose function decides it when the plot is run.
   @doc false
   @spec dtype(resolved(), DataFrame.t()) :: DataFrame.dtype() | :computed
   def dtype(name, table) when is_binary(name) do
@@ -253,6 +304,7 @@ defmodule Giggly.Mapping do
 
   def dtype({:constant, term}, _table), do: dtype_of(term)
   def dtype({:factor, [_value]}, _table), do: :category
+  def dtype({:after_stat, [value]}, statistic), do: dtype(value, by_name(statistic))
   def dtype({_function, _arguments}, _table), do: :computed
 
   # The type the frame gives a column of `term`, read by building one.
@@ -265,7 +317,7 @@ defmodule Giggly.Mapping do
 
   # What `value` is in each row of `frame`, in row order: a column's values, a constant in every
   # row, or an expression's function applied in each row to its arguments' values there, a
-  # function of no arguments called once per row.
+  # function of no arguments called once per row. An after_stat's `frame` is its stat's output.
   @doc false
   @spec evaluate(resolved(), DataFrame.t()) :: list()
   def evaluate(name, frame) when is_binary(name), do: DataFrame.pull(frame, name)
@@ -274,6 +326,7 @@ defmodule Giggly.Mapping do
     do: List.duplicate(term, DataFrame.row_count(frame))
 
   def evaluate({:factor, [value]}, frame), do: evaluate(value, frame)
+  def evaluate({:after_stat, [value]}, statistic), do: evaluate(value, by_name(statistic))
 
   def evaluate({function, []}, frame) do
     rows = DataFrame.row_count(frame)
@@ -289,8 +342,27 @@ defmodule Giggly.Mapping do
     |> Enum.zip_with(fn row -> apply(function, row) end)
   end
 
+  # The stat's output with its columns, which Giggly names by atoms, named by strings, as a mapping
+  # holds the names its values read.
+  defp by_name(statistic) do
+    renames =
+      statistic
+      |> DataFrame.names()
+      |> Enum.map(fn name -> {Atom.to_string(name), name} end)
+
+    DataFrame.select(statistic, renames)
+  end
+
+  # When `value` is evaluated, its stage, as ggplot2's `stage()` names them: `:after_stat` against
+  # its stat's output, once the stat has run; `:start`, every other, against the layer's data.
+  @doc false
+  @spec stage(resolved()) :: :start | :after_stat
+  def stage({:after_stat, [_value]}), do: :after_stat
+  def stage(_value), do: :start
+
   # The title `value` gives the guide of `aesthetic`, as ggplot2's `make_labels()` gives it:
-  # `{:title, text}` for a column, an expression or a factor, its text, or `:none` for one with a
+  # `{:title, text}` for a column, an expression, a factor or an after_stat, its text (an
+  # after_stat's its value's, as ggplot2 strips `after_stat()`), or `:none` for one with a
   # closure in it, which has none; `{:fallback, name}` for a constant, the aesthetic's own name,
   # which ggplot2 marks as a fallback any layer's title replaces.
   @doc false
@@ -300,6 +372,8 @@ defmodule Giggly.Mapping do
 
   defp text(name) when is_binary(name), do: name
   defp text({:constant, term}), do: inspect(term)
+
+  defp text({:after_stat, [value]}), do: text(value)
 
   defp text({:factor, [value]}) do
     case text(value) do

@@ -114,6 +114,10 @@ defmodule Giggly.DataFrame do
   @doc false
   @callback put(t(), name(), list()) :: t()
 
+  # Adds or replaces a column declared a category, as `put/4` describes.
+  @doc false
+  @callback put(t(), name(), list(), :category) :: t()
+
   # The rows split by the values of one column, as `split/2` describes.
   @doc false
   @callback split(t(), name()) :: %{optional(term()) => t()}
@@ -252,6 +256,14 @@ defmodule Giggly.DataFrame do
   @doc false
   @spec put(t(), name(), list()) :: t()
   def put(%implementation{} = frame, name, values), do: implementation.put(frame, name, values)
+
+  # The frame with the column `name` holding `values`, declared a category, as `new/1` declares a
+  # column given as `{name, values, :category}`: replaced where it is, or added after the last
+  # column. Raises as `put/3` does, and `ArgumentError` for values with no type of their own.
+  @doc false
+  @spec put(t(), name(), list(), :category) :: t()
+  def put(%implementation{} = frame, name, values, :category),
+    do: implementation.put(frame, name, values, :category)
 
   # The frame's rows split by the values of the column `name`, as R's `split()` splits ggplot2's
   # layer data by panel: for each value the column holds, a frame of the rows holding it, in their

@@ -201,6 +201,28 @@ defmodule Giggly.DataFrameTest do
     end
   end
 
+  describe "put/4" do
+    test "a column put as a category is declared one, added or replacing in its place" do
+      frame =
+        [x: [1, 2]]
+        |> DataFrame.new()
+        |> DataFrame.put(:fill, [4, 6.0], :category)
+        |> DataFrame.put(:x, ["a", "b"], :category)
+
+      assert DataFrame.names(frame) == [:x, :fill]
+      assert DataFrame.dtypes(frame) == %{x: :category, fill: :category}
+      assert DataFrame.pull(frame, :fill) === [4.0, 6.0]
+    end
+
+    test "a category of values with no type of their own is refused" do
+      frame = DataFrame.new(x: [1])
+
+      assert_raise ArgumentError, ~r/declared a category/, fn ->
+        DataFrame.put(frame, :fill, [%{}], :category)
+      end
+    end
+  end
+
   describe "split/2" do
     test "each value's rows keep their order, every column and each column's type" do
       frame = DataFrame.new(x: [1.0, 2.0, 3.0, 4.0], panel: [2, 1, 2, 1])

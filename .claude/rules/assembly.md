@@ -24,8 +24,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   root → `SVG` → `Scene`, and nothing calls back up.
 - **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet lays the
   panels out from the plot's data and every layer's table and assigns `panel` to each layer's
-  table, raw → each layer's mapping is evaluated (`Giggly.Mapping.evaluate/2`) → `Group.add/2`
-  writes `group` →
+  table, raw → each layer's mapping is evaluated (`Giggly.Mapping.evaluate/2`), an after_stat
+  left for after the stat (`Mapping.stage/1`) → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
   stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
   ggplot2's `GeomRect$setup_data()` fills them in) → geom reparameterize (a bar to
@@ -45,9 +45,17 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   once per axis, so a bar's orientation is decided as ggplot2's `has_flipped_aes()` decides it from
   `mapped_discrete` positions; a geom never sees a scale itself. A date axis is continuous to a
   geom, as ggplot2's geoms see a date as not discrete; the axis's scale is a date scale.
-- **After the stat, each aesthetic the layer leaves unmapped takes the computed column its stat
-  names for it** (`Stat.default_mapping/1`), as ggplot2's `map_statistic()` evaluates a stat's
-  `after_stat()` defaults: counting's count goes into y.
+- **After the stat, each aesthetic the layer maps to an after_stat takes its value evaluated
+  against the stat's output, in `Plot.mapping_order/2`'s order, then each it leaves unmapped the
+  computed column its stat names for it** (`Stat.default_mapping/1`), in name order, as ggplot2's
+  `map_statistic()`: counting's count goes into y. Each replaces its column in place or follows
+  the last, a factor's declared `:category`. The output is read as it stands; ggplot2 reads it
+  back in data units first, which waits for a stat whose documented variables are positions.
+  **Each on an axis is checked against the axis's scale, chosen before the stat, and put through
+  it** (`Scale.transform/2`, each row on its panel's scale): numbers on a continuous or a discrete
+  axis, dates on a date one, and anything else refused when run, naming the layer, the aesthetic,
+  the value or the stat's column, and its type, where ggplot2 adds a scale for an axis nothing
+  mapped before the stat, or warns at numbers on a date axis.
 - **Just before a layer's position runs, each aesthetic the position reads goes into every
   row**: the value the layer sets, or else the position's default
   (`Position.default_aesthetics/1`), as ggplot2's `Position$use_defaults()`, so every text layer's
@@ -141,9 +149,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
 - **Each aesthetic other than position that a layer maps gets one scale for the whole plot**,
-  added when a layer maps it, of the kind its first column needs, every column of it checked as
-  an axis's are, trained once the positions are final on every layer's column of it (a column a
-  stat dropped trains nothing), and each column mapped through it, then the set values on top: a
+  added when a layer maps it, of the kind its first column needs, the columns evaluated before the
+  stats first and those computed after them next, each in layer order, as ggplot2 adds the scales
+  of evaluated aesthetics before any stat runs; every column of it checked as an axis's are,
+  trained once the positions are final on every layer's column of it (a column a stat dropped
+  trains nothing), and each column mapped through it, then the set values on top: a
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from

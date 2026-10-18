@@ -81,7 +81,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
   column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
   (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken),
-  accepting too what its geom draws (`:alpha`), which counting carries. A
+  accepting too what its geom draws (`:alpha`), which counting carries. **An after_stat, the
+  layer's own or the plot's, is checked at the call against the variables the layer's stat
+  documents** (`Stat.Count.computed_variables/0`; none for a layer that computes nothing, which
+  refuses every one), never against the table, and refused for an aesthetic its stat consumes
+  (`dropped_aesthetics/0`, counting's `:weight`). What a stat requires is met, and what it takes
+  only one of is counted, by the aesthetics mapped before it runs: `x` beside an after_stat `y`
+  counts along x, and an after_stat alone meets nothing, as ggplot2's stat sees only those. A
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
   allows at most one. A weight must hold numbers: a column's type, read from the layer's table, and
   a constant's are refused at the call, where R would fail inside the stat and draw nothing; an

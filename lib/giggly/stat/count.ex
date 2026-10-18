@@ -6,8 +6,9 @@ defmodule Giggly.Stat.Count do
   # that x, or the sum of their weights where the layer maps `weight`, and its `prop` the count's
   # share of its group's total; its `width` is 0.9 of the closest spacing of the layer's x
   # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. Counts are
-  # doubles, as R's `rowsum()` gives them. y takes the count by default (`after_stat(count)`). It
-  # takes no parameters yet. Run it through `Giggly.Stat`.
+  # doubles, as R's `rowsum()` gives them. y takes the count by default (`after_stat(count)`), and
+  # a mapping's after_stat reads `count` and `prop`, the variables ggplot2 documents. It takes no
+  # parameters yet. Run it through `Giggly.Stat`.
   #
   # Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   # counts along the one mapped, so a layer mapping `:y` alone is counted along y and drawn
@@ -43,6 +44,19 @@ defmodule Giggly.Stat.Count do
   @doc false
   @spec exclusive_aesthetics() :: [[atom()]]
   def exclusive_aesthetics, do: [[:x, :y]]
+
+  # The variables counting computes that a mapping's after_stat can read, as ggplot2 documents
+  # `stat_count()`'s: `count` and `prop`. Its table holds others, the position counted at, `width`
+  # and `flipped_aes`, which ggplot2 documents for no aesthetic to read.
+  @doc false
+  @spec computed_variables() :: [atom()]
+  def computed_variables, do: [:count, :prop]
+
+  # The aesthetics counting consumes, ggplot2's `dropped_aes`: a weight is summed into the count, so
+  # one given after the stat reaches nothing.
+  @doc false
+  @spec dropped_aesthetics() :: [atom()]
+  def dropped_aesthetics, do: [:weight]
 
   defimpl Giggly.Stat, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Stat
