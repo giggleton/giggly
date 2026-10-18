@@ -949,6 +949,17 @@ defmodule Giggly.PlotTest do
              ]
     end
 
+    test "a column its own mapping names that the data lacks is refused, naming the call" do
+      plot = Plot.new(@rows, %{xmin: :wt})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_rect(plot, %{xmax: :weight}, ymin: 0, ymax: 1)
+        end
+
+      assert error.message =~ "Plot.geom_rect/3 maps :xmax"
+    end
+
     test "a corner neither mapped nor set is refused, naming the call and the corner" do
       plot = Plot.new(@rows, %{xmin: :wt, xmax: :mpg})
 

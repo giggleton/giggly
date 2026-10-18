@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The mutation pass mirrors `.credo/` into muex's sandboxes, and checks one first with no mutant
+  (2026-10-18, Steve).** A plain project's sandbox links only the entries muex names, `.credo/` not
+  among them, so `test/credo_checks_test.exs`, which loads its checks from there, failed in every
+  sandbox; where coverage has no data for a line muex can run every test file, the credo test
+  failed first, and the mutant was "killed" with no test of `lib/` tried. Every pass since
+  2026-10-15 had such kills; `bb57487`'s had 541 of 1,441, and of `6dc3658`'s 99, 64 survived once
+  rerun. muex's baseline, the suite once in a sandbox with no mutant, would have refused those runs
+  but runs for an umbrella only, so the skill runs it itself, in a sandbox muex builds with Giggly's
+  build copied in: seconds, and 19 failures without `--mirror .credo`. *Rejected: leaving the
+  credo test out with `--test-paths`* — a list of test paths that drifts. *Rejected: the test
+  finding `.credo/` another way* — only muex's symlinks lead back. *Rejected: scanning the kills
+  for one test failing on its own* — muex clips each error before its stack trace, and real kills
+  share errors too, so it flagged a dozen real groups beside the false.
+
 - **A mapping value is a column, an expression or a constant, as plain data, and
   `Giggly.Mapping` holds the grammar (2026-10-18, Steve; the `{function, [values]}` shape his).**
   An atom or a string is a column; `{function, [values]}` applies a capture or a closure per row;
@@ -1493,9 +1507,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Map aesthetics to expressions and constants (expressions, step 1); §4: "A mapping
-  value is a column, an expression or a constant", "Expressions in a mapping are Phase 3's sixth
-  increment"
+- 2026-10-18 — Check the mutation pass's sandbox before it runs, with .credo mirrored; §4: "The
+  mutation pass mirrors `.credo/`"
+- 2026-10-18 — Map aesthetics to expressions and constants (expressions, step 1) (`6dc3658`); §4:
+  "A mapping value is a column, an expression or a constant", "Expressions in a mapping are Phase
+  3's sixth increment"
 - 2026-10-18 — Mutation-test each commit after it lands, over the lines it changed (`8a82a46`);
   §4: "Mutation testing runs after each commit"
 - 2026-10-18 — Draw text and titles in the notebooks (text and titles, step 6) (`52aa3a2`); §4:

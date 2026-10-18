@@ -83,9 +83,10 @@ semver or the changelog).
   flags in the `mutation-testing` skill exist because its defaults give a confident false pass. So
   a bump goes through `dependency-updates` like any other, and before the skill is trusted again
   it re-checks what the new version does by default: which mutants the optimizer drops, which
-  modules the filter skips, how `--files` is read, which lines `--since` keeps, and that each
-  mutant is still built from source in a sandbox of its own and run in a fresh VM, so none reuses
-  another's build.
+  modules the filter skips, how `--files` is read, which lines `--since` keeps, which top-level
+  entries a sandbox links and whether its baseline runs for a plain project (the skill's
+  `--mirror .credo` rests on both), and that each mutant is still built from source in a sandbox
+  of its own and run in a fresh VM, so none reuses another's build.
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored

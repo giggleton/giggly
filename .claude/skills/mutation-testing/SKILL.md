@@ -32,8 +32,27 @@ anything, stop and say so: the pass is of the commit, not of the working tree.
 
 ## Running it
 
+**First, the baseline**: the whole suite, once, with no mutant, in a sandbox muex builds as it
+builds one for each mutant, with the run's `--mirror`. It must pass. muex runs this check itself
+only for an umbrella, since a plain project's sandbox links the real build; so Giggly's build is
+copied in first, and nothing is written to the real one:
+
 ```bash
-mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided \
+base=<scratchpad>/muex-baseline && rm -rf "$base"
+MIX_ENV=test mix run --no-start -e \
+  'Muex.Sandbox.create_sandbox(hd(System.argv()), File.cwd!(), "test", ["test"], [".credo"])' "$base"
+rm "$base/_build/test/lib/giggly" && cp -R _build/test/lib/giggly "$base/_build/test/lib/giggly"
+(cd "$base" && MIX_ENV=test mix test)
+```
+
+A test that fails there fails in every mutant's sandbox, and each mutant it judges is reported
+killed with no test of `lib/` tried, since a run stops at its first failure: stop and fix the
+sandbox or the test before running muex, and say so. It takes seconds.
+
+Then the run:
+
+```bash
+mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided --mirror .credo \
   --format json --output <scratchpad>/muex.json \
   --files "$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'lib/*.ex' | paste -sd, -)"
 ```
@@ -67,7 +86,15 @@ Every flag there carries weight:
   `doctest Mod`. A module linked to some test files then runs only those, so a test file that
   exercises it under a grouped alias never runs against its mutants and they "survive" it; that
   happened to `Plot.computed_mapping/2`. Coverage also reports the lines no test executes at all.
-  The run leaves `cover/muex_cov_*.coverdata`, which git ignores.
+  The run leaves `cover/muex_cov_*.coverdata`, which git ignores. A line coverage holds no data
+  for (a multi-line expression's later lines, a module attribute, a protocol implementation's
+  body) falls back to the scan, which can choose every test file.
+- **`--mirror .credo`** — a plain project's sandbox links only the top-level entries muex names
+  (`Muex.Sandbox`'s `symlink_top_level/3`), not `.credo/`, and `test/credo_checks_test.exs`
+  requires its checks from `.credo/checks/` beside its own directory, so in a sandbox without it
+  every one of its tests fails. A mutant whose tests include it is then reported killed by that
+  failure before any test of `lib/` runs, since a run stops at its first failure. The baseline
+  above is what says so (design-log §4, "The mutation pass mirrors `.credo/`").
 - **`--format json --output`** — the terminal report gives only a count of the uncovered
   mutants. The JSON report gives every mutant its `status`, `location`, the `test_files` that ran,
   and a `patch` of the mutated node `before` and `after`. A statement deletion's node is the whole

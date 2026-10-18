@@ -523,7 +523,9 @@ defmodule Giggly.Plot do
 
   # An annotation's position, a value or a list of values, one per annotation, as ggplot2's
   # `annotate()` takes a vector.
-  @annotation_position [type: {:custom, __MODULE__, :validate_annotation_positions, []}]
+  @annotation_position [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_annotation_position]}
+  ]
 
   # The aesthetics an annotation's geom draws row by row, as a mapped one, which may each be given a
   # list, one value per annotation, every value checked as a layer function checks the one it sets.
@@ -1476,15 +1478,6 @@ defmodule Giggly.Plot do
      "expected a position on the axis: a number, :infinity or :neg_infinity, got: " <>
        inspect(corner)}
   end
-
-  # NimbleOptions' check of an annotation's position: a value a scale places, or a list of them,
-  # one per annotation, kept as given.
-  @doc false
-  @spec validate_annotation_positions(term()) :: {:ok, term()} | {:error, String.t()}
-  def validate_annotation_positions(values) when is_list(values),
-    do: validate_per_annotation(values, :validate_annotation_position)
-
-  def validate_annotation_positions(value), do: validate_annotation_position(value)
 
   # One of an annotation's positions: a number, kept as a float, as R keeps a number written in a
   # call, `:infinity` or `:neg_infinity`, `nil` for none, a string, `true` or `false`, or a date.

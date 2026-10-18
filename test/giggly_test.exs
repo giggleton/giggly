@@ -226,6 +226,44 @@ defmodule GigglyTest do
                 [-1, -1, -1, -1]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 gives `annotate("text", x = 1, y = 1, label =
+    # "a", alpha = c(0.2, 0.8))` two rows, alpha 0.2 and 0.8, and likewise two for colours
+    # `c("red", "blue")` and for a rectangle's fills `c("red", "blue")`.
+    test "a list of alphas, colours or fills alone makes one annotation per value" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      alphas =
+        plot
+        |> Plot.annotate(:text, x: 1, y: 1, label: "a", alpha: [0.2, 0.8])
+        |> Giggly.layer_data()
+
+      colours =
+        plot
+        |> Plot.annotate(:text, x: 1, y: 1, label: "a", colour: ["red", "blue"])
+        |> Giggly.layer_data()
+
+      fills =
+        plot
+        |> Plot.annotate(:rect, xmin: 0, xmax: 1, ymin: 0, ymax: 1, fill: ["red", "blue"])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(alphas, :alpha), DataFrame.pull(colours, :color),
+              DataFrame.pull(fills, :fill)} ===
+               {[0.2, 0.8], ["#FF0000", "#0000FF"], ["#FF0000", "#0000FF"]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 draws `annotate("text", x = 1, y = 1, label = TRUE)` as `TRUE`.
+    test "a label of true or false is taken, and written as R writes it" do
+      svg =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.annotate(:text, x: 3, y: 21, label: true)
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      assert svg =~ ">TRUE</text>"
+    end
+
     test "lists are taken in step, and a set aesthetic's list alone makes as many annotations" do
       in_step =
         @rows
