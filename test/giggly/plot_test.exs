@@ -1,7 +1,7 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, Facet, Geom, Plot, Position, Stat}
+  alias Giggly.{Coord, DataFrame, Facet, Geom, Plot, Position, Stat}
 
   doctest Giggly.Plot
 
@@ -15,13 +15,15 @@ defmodule Giggly.PlotTest do
                {%Facet.Null{}, %Coord.Cartesian{clip: :on}, :gray}
     end
 
-    test "a missing column's refusal names the call, the aesthetic, the column as written and the columns" do
-      error = assert_raise ArgumentError, fn -> Plot.new(@rows, %{x: :wt, y: :mgp}) end
+    # Golden: ggplot2 4.0.3 in R 4.6.1 draws `ggplot(df, aes(wt, height)) + geom_point(data = df2)`
+    # where only df2 has `height`, taking x and y from df2.
+    test "the mapping may name a column only a layer's own table holds" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :height})
+        |> Plot.geom_point(data: %{"wt" => [1.0, 2.0], "height" => [10.0, 11.0]})
 
-      assert error.message =~ "Plot.new/2"
-      assert error.message =~ ":y"
-      assert error.message =~ ":mgp"
-      assert error.message =~ ~s("mpg")
+      assert [%Plot.Layer{mapping: %{}}] = plot.reversed_layers
     end
 
     test "a value that is not a column reference is refused rather than read as a column's name" do
@@ -45,6 +47,7 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Point{},
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
+                 data: :none,
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :x, :y]
@@ -225,6 +228,7 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Bar{},
                  stat: %Stat.Identity{},
                  position: %Position.Stack{},
+                 data: :none,
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
                  accepted: [:alpha, :color, :fill, :group, :x, :y]
@@ -290,6 +294,7 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Bar{},
                  stat: %Stat.Count{},
                  position: %Position.Stack{},
+                 data: :none,
                  mapping: %{x: "cyl", weight: "wt"},
                  fixed: %{},
                  accepted: [:group, :weight, :x, :y, :alpha, :color, :fill]
@@ -443,6 +448,7 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0},
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
+                 data: :none,
                  mapping: %{group: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :x, :y]
@@ -611,6 +617,7 @@ defmodule Giggly.PlotTest do
                  geom: %Geom.Text{check_overlap: false},
                  stat: %Stat.Identity{},
                  position: %Position.Nudge{},
+                 data: :none,
                  mapping: %{label: "model"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :label, :x, :y]
@@ -725,6 +732,106 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "a layer's own table" do
+    @own %{"wt" => [4.0, 3.0], "mpg" => [16.0, 15.0], "name" => ["p", "q"]}
+
+    test "each layer function draws the table its data: option gives in place of the plot's" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for add_layer <- [
+            fn plot -> Plot.geom_point(plot, %{y: :mpg}, data: @own) end,
+            fn plot -> Plot.geom_bar(plot, data: @own) end,
+            fn plot -> Plot.geom_col(plot, %{y: :mpg}, data: @own) end,
+            fn plot -> Plot.geom_path(plot, %{y: :mpg}, data: @own) end,
+            fn plot -> Plot.geom_line(plot, %{y: :mpg}, data: @own) end,
+            fn plot -> Plot.geom_text(plot, %{y: :mpg, label: :name}, data: @own) end
+          ] do
+        %Plot{reversed_layers: [layer]} = drawn = add_layer.(plot)
+        table = Plot.layer_table(drawn, layer)
+        assert DataFrame.pull(table, "wt") == [4.0, 3.0]
+      end
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails to build `ggplot(df, aes(wt, mpg, colour = cyl)) +
+    # geom_point(data = df2)` where df2 lacks `cyl`: "object 'cyl' not found".
+    test "a column the plot's mapping names is refused at the call when the layer's own table lacks it" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, data: @own) end
+      assert error.message =~ "Plot.geom_point/3"
+      assert error.message =~ ":color"
+      assert error.message =~ "plot's mapping"
+      assert error.message =~ ~s("cyl")
+      assert error.message =~ "own data"
+      assert error.message =~ ~s("name")
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails the same way when the plot maps `label`, which points
+    # cannot use, to a column the layer's own table lacks: it evaluates every inherited aesthetic.
+    test "an aesthetic the layer takes from the plot and cannot use still needs its column" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, label: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, data: @own) end
+      assert error.message =~ ":label"
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 builds `geom_point(data = df2, colour = "red")` under a plot
+    # mapping colour to a column df2 lacks, every point red.
+    test "an aesthetic the layer sets needs no column in its own table" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: :cyl})
+
+      assert [%Plot.Layer{}] = Plot.geom_point(plot, data: @own, colour: "red").reversed_layers
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 builds `geom_point(aes(colour = mpg), data = df2)` under a
+    # plot mapping colour to a column df2 lacks.
+    test "an aesthetic the layer maps itself needs only its own column" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: :cyl})
+
+      assert [%Plot.Layer{mapping: %{color: "mpg"}}] =
+               Plot.geom_point(plot, %{colour: :mpg}, data: @own).reversed_layers
+    end
+
+    test "a column the layer's own mapping names is refused when its own table lacks it" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{colour: :cyl}, data: @own) end
+
+      assert error.message =~ ":color"
+      assert error.message =~ ":cyl"
+      assert error.message =~ "own data"
+    end
+
+    test "a misspelt column in the plot's mapping is refused by the first layer to take it" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mgp})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot) end
+      assert error.message =~ "Plot.geom_point/3"
+      assert error.message =~ ":y"
+      assert error.message =~ "plot's mapping"
+      assert error.message =~ ~s("mgp")
+      assert error.message =~ "the plot's data"
+      assert error.message =~ ~s("mpg")
+    end
+
+    test "a weight's column is read from the layer's own table" do
+      plot = Plot.new(%{"cyl" => ["6", "4"], "weight" => [1.0, 2.0]}, %{x: :cyl, weight: :weight})
+      own = %{"cyl" => ["6", "4"], "weight" => ["heavy", "light"]}
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_bar(plot, data: own) end
+      assert error.message =~ ":string"
+    end
+
+    test "a data: option that is not a table is refused at the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert_raise ArgumentError, ~r/expected a table/, fn ->
+        Plot.geom_point(plot, data: [1, 2])
+      end
+    end
+  end
+
   describe "facet_wrap/3" do
     test "a plot records the wrapped facet with its columns by their names in the data" do
       plot =
@@ -749,13 +856,15 @@ defmodule Giggly.PlotTest do
       assert plot.facet == %Facet.Wrap{facets: ["cyl"], nrow: 3, ncol: :none, scales: :free_y}
     end
 
-    test "a column the data does not have is refused, naming it and the data's columns" do
-      plot = Plot.new(@rows)
+    # Golden: ggplot2 4.0.3 in R 4.6.1 facets `ggplot(df) + geom_point(data = df2)` by a column only
+    # df2 has; whether some table has every column is checked when the plot is run.
+    test "a column the plot's data lacks is taken, since a layer's own table may hold it" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.facet_wrap(:gear)
 
-      error = assert_raise ArgumentError, fn -> Plot.facet_wrap(plot, :cly) end
-      assert error.message =~ "Plot.facet_wrap/3"
-      assert error.message =~ ":cly"
-      assert error.message =~ ~s("cyl")
+      assert plot.facet == %Facet.Wrap{facets: ["gear"], nrow: :none, ncol: :none, scales: :fixed}
     end
 
     test "a value that is not a column reference is refused" do

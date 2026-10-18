@@ -6,8 +6,9 @@ defmodule Giggly.DataFrame do
 
   ## Column names
 
-  The data a plot is given is read once, when the plot is created (`Giggly.Plot.new/2`), and its
-  column names become strings whatever the source used. Every column Giggly computes is named by
+  The data a plot is given is read once, when the plot is created (`Giggly.Plot.new/2`), and so is
+  a layer's own table, by its function's `data:` option; their column names become strings
+  whatever the source used. Every column Giggly computes is named by
   an atom, such as the aesthetic `:x`, so a user column called `"x"` can never be mistaken for one.
 
   ## Values

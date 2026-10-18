@@ -151,6 +151,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   not hold: §7's inherited-mapping question is about aesthetics a geom cannot use, which a layer's
   own table leaves alone.
 
+- **A column the plot names is checked against the tables that use it, as ggplot2 checks it
+  (2026-10-18, Steve, asking "Why not follow R here?").** `new/2` checks only that each value of
+  its mapping is a column reference; each layer function checks every column it draws with, its
+  own mapping's and those it takes from the plot's, against the table it draws, raising at its
+  call. `facet_wrap/3` checks the form of its columns at the call, and whether the plot's data or
+  some layer's own table holds them all is the facet's question, raised when the plot is run, as
+  ggplot2's "At least one layer must contain all faceting variables". So both may name a column
+  only a layer's table holds, as R 4.6.1 with ggplot2 4.0.3 draws them; the cost is a misspelt
+  facet column reported at run time. *Rejected: checking both against the plot's data at the
+  call*, recommended first: stricter than R, it would have to move once a plot may have no data,
+  and its reason, that a mistake raises from the line that wrote it, is a rule of Giggly's own,
+  which the mapping's check still keeps at the layer's call.
+
 - **Giggly exposes no function ggplot2 has superseded or deprecated (2026-10-17, Steve: "generally
   speaking we aren't going to expose superseded things").** ggplot2 4.0.3 marks `xlab()`, `ylab()`
   and `ggtitle()` superseded by `labs()` (`lifecycle::signal_stage()`), so Giggly has `labs()`
@@ -468,8 +481,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **`facet_wrap` is built in steps after the conversion to structs, and the facet says where each
   panel's axes and strips go as data, which rendering arranges and the guide draws (2026-10-14,
   Steve, agreeing the proposal's recommendations).** Step 1 is panels as data:
-  `Plot.facet_wrap(plot, facets, options)` with `facets` a column or a list of them, resolved at
-  the call as a mapping is, and `nrow:` and `ncol:` validated by NimbleOptions, which `Plot` will
+  `Plot.facet_wrap(plot, facets, options)` with `facets` a column or a list of them, named at the
+  call as a mapping names one, and `nrow:` and `ncol:` validated by NimbleOptions, which `Plot` will
   list; panels are the combinations of values present, ordered as a discrete scale orders its
   levels by the key the assembly hands in (`Scale.level_key/1`, as for `Group.add/2`), `nil` its
   own panel labelled `NA`, laid out by ggplot2's `wrap_dims()`. Too few cells for the panels
@@ -1114,11 +1127,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   need:* user scale functions and their options (so NimbleOptions and the "absent" sentinel).
 
 - **The facet assigns panels first; the layout table arrives with scale training (2026-10-12,
-  Steve).** The facet runs first in the assembly and gives every row of the plot's data its panel,
-  as ggplot2's `map_data()` does (`panel = 1` without a facet), which evaluation carries into every
-  layer frame, ordered as ggplot2 orders them: aesthetics, `panel`, `group`. Checked against
-  `R/facet-null.R`, `R/facet-.R` (`layout_null()`) and `R/layout.R`. *Rejected: the layout table
-  now* (the Phase 1 plan's draft)
+  Steve).** The facet runs first in the assembly and gives every row of each layer's table its
+  panel, as ggplot2's `map_data()` does (`panel = 1` without a facet), which evaluation carries
+  into every layer frame, ordered as ggplot2 orders them: aesthetics, `panel`, `group`. Checked
+  against `R/facet-null.R`, `R/facet-.R` (`layout_null()`) and `R/layout.R`. *Rejected: the
+  layout table now* (the Phase 1 plan's draft)
   — its `scale_x`/`scale_y` columns are first read by scale training (increment 5), which routes
   each panel's rows to a scale through them, and its `row`/`col` by the scene (increment 8);
   built now, nothing would read it. *Rejected: a mutable
@@ -1211,12 +1224,13 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   rank alone is what an engine backend would add, which is deferred.
 
 - **The table is read when the plot is created, and each call checks the mapping it is given
-  (2026-10-12, Steve).** `Giggly.Plot.new/2` reads the `Table.Reader` into a frame; `new/2` and
-  each geom function resolve their mapping against it, raising `ArgumentError` that names the
-  aesthetic, the reference as written and the data's columns; a layer's mapping is checked with
-  the plot's as the layer is added. ggplot2 converts its data at construction too (`fortify(data)`
-  in `ggplot.default`, `R/plot.R`, and again in `layer()`); only expression evaluation waits for
-  the build.
+  (2026-10-12, Steve).** `Giggly.Plot.new/2` reads the `Table.Reader` into a frame, and a layer
+  function its `data:` option's; each geom function resolves its mapping against the table its
+  layer draws, raising `ArgumentError` that names the aesthetic, the reference as written and the
+  table's columns, and checks there the columns it takes from the plot's mapping, which `new/2`
+  leaves to the layers (the entry beginning "A column the plot names"). ggplot2 converts its data
+  at construction too (`fortify(data)` in `ggplot.default`, `R/plot.R`, and again in `layer()`);
+  only expression evaluation waits for the build.
   *Rejected: reading at build start* — a misspelt column surfaced at
   render, its stack trace pointing at the wrong line, and the build held a `Table.Reader` rather
   than a checked frame. *Rejected: "did you mean"* — the list of columns already puts the right
@@ -1370,7 +1384,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Giggly.Frame`* (Phase 0's proposal, amended at ratification).
 
 - **Input is anything implementing `Table.Reader`, read once, by `Plot.new/2` (2026-10-11,
-  Steve).**
+  Steve), and a layer's own by its function's `data:` (2026-10-17).**
   The `table` package is tiny, stable, and implemented by Explorer, Dux, the database drivers and
   plain lists of maps, because Livebook requires it — so it survives whichever dataframe library
   is maintained in three years. Mapping values may be atoms or strings and are resolved against the
@@ -1422,8 +1436,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-17 — Label plots with labs (text and titles, step 3); §4: "A title may run over several
-  lines", "`labs/2` takes the titles"
+- 2026-10-18 — Give a layer a table of its own with data: (text and titles, step 4); §4: "A
+  layer's own table is public", "A column the plot names is checked against the tables"
+- 2026-10-17 — Label plots with labs (text and titles, step 3) (`d1e8217`); §4: "A title may run
+  over several lines", "`labs/2` takes the titles"
 - 2026-10-17 — Nudge labels with nudge_x and nudge_y (text and titles, step 2) (`dabca48`); §4: "A
   position declares the aesthetics it reads"
 - 2026-10-17 — Draw labels with geom_text (text and titles, step 1) (`91fe040`); §4: "Text and

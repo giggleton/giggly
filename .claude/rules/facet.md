@@ -17,9 +17,25 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
 
 ## Rules
 
-- **The facet runs first, on the plot's data as read,** before any mapping is evaluated: a facet
-  splits on the data's own columns, which evaluation discards. It writes `:panel`; nothing else
-  writes it, and every later stage works panel by panel from that column alone.
+- **The facet runs first, on the tables as read,** before any mapping is evaluated: a facet
+  splits on the data's own columns, which evaluation discards. It lays the panels out from the
+  plot's data and every layer's table together, the plot's first and then each layer's in the
+  order added (`layout/3`), and then gives each layer's table its panels (`assign_panels/3`). It
+  writes `:panel`; nothing else writes it, and every later stage works panel by panel from that
+  column alone.
+- **The panels are those every table makes, as ggplot2's `combine_vars()` makes them** (checked
+  in R 4.6.1 with ggplot2 4.0.3): each combination in a table holding every facet column, then,
+  table by table, each combination of the columns a table holds only some of with each of the
+  others' values made so far, so a value only a layer's table holds makes a panel, and the plot's
+  data makes panels though no layer draws it. A table holding none of the columns, or no rows,
+  makes none. **Unless some table holds every facet column the layout raises**, naming what each
+  table lacks, as ggplot2's "At least one layer must contain all faceting variables": this, not
+  `facet_wrap/3`, is where a misspelt facet column is reported (design-log §4, the entry beginning
+  "A column the plot names").
+- **A table lacking some facet columns is repeated in each panel of the values it has**, as
+  ggplot2's `map_data()` repeats it: all its rows, in their order, once for each combination of
+  the missing columns' values in the layout, in panel order, so one lacking them all is drawn in
+  every panel, and the table a stage sees may have more rows than the one given.
 - **No stage sees the facet.** A geom, stat, scale or coordinate system reads `panel` and the
   layout table; never the facet's settings or the variables it splits on.
 - **The layout table holds only what a stage reads.** One row per panel: `panel`; the `row` and
@@ -37,12 +53,12 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   and has no strip.
 - **Panels made from values are ordered as a discrete scale orders its levels**, by the key the
   assembly hands the facet (`Scale.level_key/1`): column by column, a missing value last, strings
-  by bytes rather than R's locale. Only the combinations that occur get a panel.
+  by bytes rather than R's locale. Only the combinations the tables make get a panel.
 - **`facet_wrap` lays its panels out as ggplot2 does**, row by row: with neither `nrow:` nor
   `ncol:`, by R's `n2mfrow()` with rows and columns swapped, as ggplot2's `wrap_dims()` takes it;
   given one, the other is as many as the panels need; given both, they must hold every panel, or
-  the layout raises when the plot is run, as ggplot2's does. Data with no rows makes no panel and
-  raises too.
+  the layout raises when the plot is run, as ggplot2's does. Tables with no rows make no panel,
+  and that raises too.
 - **A panel id is an integer.** It is never discrete, so it never enters the group key, and a
   layer with no rows in a panel still lines up with the others through the layout table.
 - **A plot always records its facet as a struct of its kind, `%Facet.Null{}` included.**

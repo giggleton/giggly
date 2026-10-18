@@ -141,7 +141,7 @@ defmodule Giggly.Render do
       layer_primitives =
         layer_geoms
         |> Enum.zip_with(layers_by_panel, fn geom, frames ->
-          Geom.draw_panel(geom, Map.fetch!(frames, panel), coord, params)
+          draw_layer(geom, Map.fetch(frames, panel), coord, params)
         end)
         |> Enum.concat()
 
@@ -163,6 +163,14 @@ defmodule Giggly.Render do
       }
     end)
   end
+
+  # A layer's rows in one panel drawn by its geom; a panel where the layer has none, as one whose
+  # own table holds no row there, draws nothing of it, as ggplot2's `draw_layer()` gives such a
+  # panel an empty grob.
+  defp draw_layer(geom, {:ok, frame}, coord, params),
+    do: Geom.draw_panel(geom, frame, coord, params)
+
+  defp draw_layer(_geom, :error, _coord, _params), do: []
 
   # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none, or its width
   # and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs

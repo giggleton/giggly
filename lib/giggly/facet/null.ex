@@ -21,7 +21,7 @@ defmodule Giggly.Facet.Null do
     @only_scale 1
 
     @impl Giggly.Facet
-    def layout(_facet, _frame, _order_key) do
+    def layout(_facet, _frames, _order_key) do
       DataFrame.new(
         panel: [@only_panel],
         row: [@only_row],

@@ -9,8 +9,10 @@ defmodule Giggly.Assembly do
   # The stages run in one fixed order, each adjacent pair a semantic chosen on purpose, and they
   # arrive one at a time. Today the assembly:
   #
-  #   1. lays the panels out and assigns each row of the plot's data its panel (`Giggly.Facet`);
-  #   2. evaluates each layer's mapping against that data;
+  #   1. lays the panels out from the plot's data and every layer's table, and assigns each row of
+  #      each layer's table its panel, repeating the rows of a table that lacks a column the facet
+  #      splits on in each panel they fit (`Giggly.Facet`);
+  #   2. evaluates each layer's mapping against its table;
   #   3. adds each layer's `:group` column (`Giggly.Group`), numbering values in the order a
   #      discrete scale gives its levels, so group ids follow axis and legend order;
   #   4. adds one x scale and one y scale per scale id in the layout (`Giggly.Scale`), of the kind
@@ -185,13 +187,14 @@ defmodule Giggly.Assembly do
 
   # Assembles `plot`, running the stages in order.
   #
-  # The facet first gives each row of the plot's data its panel. Then each layer's mapping is laid
-  # over the plot's (the layer's column wins), chooses and renames the data's columns, the panel
-  # column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The aesthetics come
-  # out in the order ggplot2 evaluates them, the layer's own before those it takes from the plot,
-  # each mapping's `:x` and `:y` first, as ggplot2's `aes()` takes them, then the rest in name
-  # order, since a mapping is a map and has no written order to keep, followed by `:panel` and
-  # `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
+  # The facet first lays the panels out from the plot's data and each layer's table, the layer's own
+  # or else the plot's, and gives each row of a layer's table its panel. Then each layer's mapping
+  # is laid over the plot's (the layer's column wins), chooses and renames its table's columns, the
+  # panel column is carried across, and `Giggly.Group.add/2` adds the `:group` column. The
+  # aesthetics come out in the order ggplot2 evaluates them, the layer's own before those it takes
+  # from the plot, each mapping's `:x` and `:y` first, as ggplot2's `aes()` takes them, then the
+  # rest in name order, since a mapping is a map and has no written order to keep, followed by
+  # `:panel` and `:group`, as ggplot2 orders them. Each axis then gets its scale, and every layer's
   # columns in that axis's family are put through the scale's transformation, trained on, and mapped
   # to their positions. Each layer's stat then computes on its table, and its position moves the
   # marks, once every row holds the aesthetics the position reads, and each aesthetic a layer sets
@@ -217,13 +220,14 @@ defmodule Giggly.Assembly do
           reversed_layers: reversed_layers
         } = plot
       ) do
-    layout = Facet.layout(facet, data, &Scale.level_key/1)
-    paneled_data = Facet.assign_panels(facet, data, layout)
     layers = Enum.reverse(reversed_layers)
+    tables = Enum.map(layers, fn layer -> Plot.layer_table(plot, layer) end)
+    layout = Facet.layout(facet, [data | tables], &Scale.level_key/1)
 
     grouped_data =
-      Enum.map(layers, fn layer ->
-        paneled_data
+      Enum.zip_with(layers, tables, fn layer, table ->
+        facet
+        |> Facet.assign_panels(table, layout)
         |> evaluate(plot, layer)
         |> Group.add(&Scale.level_key/1)
       end)
@@ -586,12 +590,12 @@ defmodule Giggly.Assembly do
   end
 
   # Evaluation keeps only the mapped aesthetics, so the panel the facet assigned is carried across
-  # by name: it is the one raw column every layer keeps. The columns come out in the order ggplot2
-  # evaluates them (`Plot.mapping_order/2`): the layer's own aesthetics, then those it takes from
-  # the plot's mapping, each mapping's `x` and `y` first and its others in name order; grouping
-  # keys on the discrete ones in that order, so a discrete alpha mapped with `x` groups within each
-  # `x`, and a fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its
-  # groups.
+  # by name: it is the one raw column every layer keeps. The table is the layer's, its own or the
+  # plot's, with its panels assigned. The columns come out in the order ggplot2 evaluates them
+  # (`Plot.mapping_order/2`): the layer's own aesthetics, then those it takes from the plot's
+  # mapping, each mapping's `x` and `y` first and its others in name order; grouping keys on the
+  # discrete ones in that order, so a discrete alpha mapped with `x` groups within each `x`, and a
+  # fill a layer maps over the plot's `x` groups by fill first, as ggplot2 numbers its groups.
   defp evaluate(paneled_data, plot, layer) do
     mapping = Plot.computed_mapping(plot, layer)
 
@@ -700,14 +704,16 @@ defmodule Giggly.Assembly do
   end
 
   # Each column a layer maps to one of the aesthetics `selected?` chooses, in layer order, with what
-  # a refusal names: the layer's index, the aesthetic, the column as the data names it, its type and
-  # the kind of scale that type needs. The plot's mappings are read rather than the evaluated
-  # frames, so a refusal can name each column as the data names it.
+  # a refusal names: the layer's index, the aesthetic, the column as its table names it, its type
+  # and the kind of scale that type needs. The plot's mappings are read rather than the evaluated
+  # frames, so a refusal can name each column as its table names it, each layer's type read from
+  # the table it draws.
   defp mapped_columns(plot, selected?) do
-    dtypes = DataFrame.dtypes(plot.data)
     layers = Enum.reverse(plot.reversed_layers)
 
     for {layer, index} <- Enum.with_index(layers),
+        table = Plot.layer_table(plot, layer),
+        dtypes = DataFrame.dtypes(table),
         mapping = Plot.computed_mapping(plot, layer),
         {aesthetic, column} <- Enum.sort(mapping),
         selected?.(aesthetic),

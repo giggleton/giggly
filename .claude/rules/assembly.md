@@ -22,8 +22,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   `panel_scales/2`, `to_svg/2`), each taking a finished plot; `Plot` describes and never runs, and
   nothing outside Giggly calls `Assembly`. Arrows run root → `Render` → `Assembly` → `Plot` and
   root → `SVG` → `Scene`, and nothing calls back up.
-- **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet assigns
-  `panel` to the raw data → each layer's mapping is evaluated → `Group.add/2` writes `group` →
+- **The stages run in one fixed order**, each pair a semantic chosen in §4: the facet lays the
+  panels out from the plot's data and every layer's table and assigns `panel` to each layer's
+  table, raw → each layer's mapping is evaluated → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
   stat → `after_stat` → geom reparameterize (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → the
   position's aesthetics into every row → position → reset and retrain position scales → freeze
@@ -117,8 +118,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the same key, so panels made from a column's values follow the same order. When level order can
   be configured, the assembly hands over the configured order.
 - **Whether a column suits an axis is checked here, when the plot is run.** Before training, every
-  column on an axis must be a type `Scale.kind/1` can place and all of one kind; a refusal names
-  the layer by index, the aesthetic, the column as the data names it, and its type. The plot
+  column on an axis must be a type `Scale.kind/1` can place and all of one kind, each layer's
+  types read from the table it draws (`Plot.layer_table/2`), its own or the plot's; a refusal
+  names the layer by index, the aesthetic, the column as its table names it, and its type. The plot
   checks only what it knows (names and which aesthetics a geom takes).
 - **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`), never by
   scanning values.

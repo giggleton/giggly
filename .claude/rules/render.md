@@ -65,7 +65,9 @@ ggplot2's facets' order".
 - **Layers are drawn in the order they were added**, so a later layer is drawn over an earlier
   one.
 - **A layer's rows are split by panel, and each panel's are drawn by the layer's geom alone**, as
-  ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows.
+  ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows. A panel
+  where the layer has no rows, as one only another table makes, draws nothing of it, as ggplot2
+  gives it an empty grob, and its geom is not called.
 - **A plot with legends gives them a column right of the panels**, the theme's legend spacing
   from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`.
   Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked

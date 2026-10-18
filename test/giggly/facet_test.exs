@@ -15,7 +15,17 @@ defmodule Giggly.FacetTest do
     }
   end
 
-  defp layout(facet, frame), do: Facet.layout(facet, frame, &Scale.level_key/1)
+  defp layout(facet, frame), do: Facet.layout(facet, [frame], &Scale.level_key/1)
+
+  # The layout over several tables: the plot's data first, then each layer's.
+  defp layout_of(facet, frames), do: Facet.layout(facet, frames, &Scale.level_key/1)
+
+  # Each row's panel once the facet has given a table its panels, and the value of `name` in each,
+  # in row order.
+  defp panels(facet, frame, facet_layout, name) do
+    paneled = Facet.assign_panels(facet, frame, facet_layout)
+    {DataFrame.pull(paneled, :panel), DataFrame.pull(paneled, name)}
+  end
 
   # Each panel's row and column, in panel order.
   defp places(layout) do
@@ -112,6 +122,116 @@ defmodule Giggly.FacetTest do
 
       paneled = Facet.assign_panels(facet, frame, facet_layout)
       assert DataFrame.pull(paneled, :panel) == [5, 1, 3, 2, 4]
+    end
+  end
+
+  # Golden: each answer is ggplot2 4.0.3's in R 4.6.1, read from `ggplot_build(plot)$layout$layout`
+  # and each layer's `PANEL` for a plot whose layers draw tables of their own. It moves with how
+  # the tables make the panels or a table's rows are repeated across them.
+  describe "the wrapped panels over the plot's data and every layer's table" do
+    setup do
+      %{
+        plot_data: DataFrame.new([{"wt", [2.62, 2.875, 2.32]}, {"cyl", [6, 4, 4]}]),
+        cylinders_and_gears:
+          DataFrame.new([
+            {"wt", [2.62, 2.875, 2.32, 3.2, 3.4, 3.5]},
+            {"cyl", [6, 4, 4, 8, 6, 8]},
+            {"am", [1, 1, 0, 0, 0, 1]}
+          ])
+      }
+    end
+
+    test "a value only a layer's table holds makes a panel", %{plot_data: plot_data} do
+      extra = DataFrame.new([{"wt", [5.0]}, {"cyl", [10]}])
+      facet = wrap(["cyl"])
+      facet_layout = layout_of(facet, [plot_data, plot_data, extra])
+
+      assert DataFrame.pull(facet_layout, "cyl") == [4, 6, 10]
+      assert panels(facet, extra, facet_layout, "wt") == {[3], [5.0]}
+    end
+
+    test "the plot's data makes panels though no layer draws it", %{plot_data: plot_data} do
+      only_four = DataFrame.new([{"wt", [1.0, 2.0]}, {"cyl", [4, 4]}])
+      facet_layout = layout_of(wrap(["cyl"]), [plot_data, only_four])
+
+      assert DataFrame.pull(facet_layout, "cyl") == [4, 6]
+    end
+
+    test "a table lacking the column makes no panel, and every panel draws all its rows, in turn",
+         %{plot_data: plot_data} do
+      every = DataFrame.new([{"wt", [1.0, 2.0]}])
+      facet = wrap(["cyl"])
+      facet_layout = layout_of(facet, [plot_data, every])
+
+      assert DataFrame.pull(facet_layout, "cyl") == [4, 6]
+      assert panels(facet, every, facet_layout, "wt") == {[1, 1, 2, 2], [1.0, 2.0, 1.0, 2.0]}
+    end
+
+    test "a table lacking one of two columns is drawn in each panel of its values, a row at a time",
+         %{cylinders_and_gears: data} do
+      partial = DataFrame.new([{"wt", [1.0, 2.0]}, {"am", [1, 0]}])
+      facet = wrap(["cyl", "am"])
+      facet_layout = layout_of(facet, [data, data, partial])
+
+      assert DataFrame.pull(facet_layout, :panel) == [1, 2, 3, 4, 5, 6]
+
+      assert panels(facet, partial, facet_layout, "wt") ==
+               {[2, 1, 4, 3, 6, 5], [1.0, 2.0, 1.0, 2.0, 1.0, 2.0]}
+    end
+
+    test "a value only such a table holds makes a panel with each value of the other column",
+         %{cylinders_and_gears: data} do
+      facet = wrap(["cyl", "am"])
+      new_gear = DataFrame.new([{"wt", [1.0]}, {"am", [2]}])
+      new_cylinders = DataFrame.new([{"wt", [1.0]}, {"cyl", [10]}])
+      by_gear = layout_of(facet, [data, data, new_gear])
+      by_cylinders = layout_of(facet, [data, data, new_cylinders])
+
+      assert {DataFrame.pull(by_gear, "cyl"), DataFrame.pull(by_gear, "am")} ==
+               {[4, 4, 4, 6, 6, 6, 8, 8, 8], [0, 1, 2, 0, 1, 2, 0, 1, 2]}
+
+      assert panels(facet, new_gear, by_gear, "wt") == {[3, 6, 9], [1.0, 1.0, 1.0]}
+
+      assert {DataFrame.pull(by_cylinders, "cyl"), DataFrame.pull(by_cylinders, "am")} ==
+               {[4, 4, 6, 6, 8, 8, 10, 10], [0, 1, 0, 1, 0, 1, 0, 1]}
+
+      assert panels(facet, new_cylinders, by_cylinders, "wt") == {[7, 8], [1.0, 1.0]}
+    end
+
+    test "a column only a layer's table holds makes the panels, the plot's data drawn in each",
+         %{plot_data: plot_data} do
+      geared = DataFrame.new([{"wt", [1.0, 2.0]}, {"gear", [3, 5]}])
+      facet = wrap(["gear"])
+      facet_layout = layout_of(facet, [plot_data, plot_data, geared])
+
+      assert DataFrame.pull(facet_layout, "gear") == [3, 5]
+      assert panels(facet, geared, facet_layout, "wt") == {[1, 2], [1.0, 2.0]}
+
+      assert panels(facet, plot_data, facet_layout, "wt") ==
+               {[1, 1, 1, 2, 2, 2], [2.62, 2.875, 2.32, 2.62, 2.875, 2.32]}
+    end
+
+    test "unless some table holds every column, the layout is refused naming what each lacks",
+         %{plot_data: plot_data} do
+      error =
+        assert_raise ArgumentError, fn ->
+          layout_of(wrap(["gear"]), [plot_data, plot_data])
+        end
+
+      assert error.message =~ "the plot's data"
+      assert error.message =~ "index 0"
+      assert error.message =~ ~s("gear")
+    end
+
+    test "a table with no rows makes no panel and draws in none", %{plot_data: plot_data} do
+      empty_with = DataFrame.new([{"wt", []}, {"cyl", []}])
+      empty_without = DataFrame.new([{"wt", []}])
+      facet = wrap(["cyl"])
+      facet_layout = layout_of(facet, [plot_data, empty_with, empty_without])
+
+      assert DataFrame.pull(facet_layout, "cyl") == [4, 6]
+      assert panels(facet, empty_with, facet_layout, "wt") == {[], []}
+      assert panels(facet, empty_without, facet_layout, "wt") == {[], []}
     end
   end
 

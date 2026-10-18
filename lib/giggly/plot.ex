@@ -16,15 +16,36 @@ defmodule Giggly.Plot do
   data frame, a database result. `new/2` reads it once, into a `Giggly.DataFrame` whose column
   names are strings.
 
+  A layer may draw a table of its own in place of the plot's, given by its function's `data:`
+  option, as ggplot2's `data =` gives one, and read once there. The plot's mapping applies to it as
+  to the plot's data, so it must hold every column the plot's mapping names for an aesthetic the
+  layer neither maps nor sets, as ggplot2 fails with "object not found" when it lacks one; a layer
+  that sets the aesthetic, or maps it to a column of its own, needs no such column. Under a facet,
+  a table lacking the columns the plot is faceted by is drawn in every panel:
+
+      iex> mtcars = %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => [6, 4, 8]}
+      iex> frame =
+      ...>   mtcars
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point(data: %{"wt" => [3.0], "mpg" => [20.0]}, colour: "#D9D9D9")
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.facet_wrap(:cyl)
+      ...>   |> Giggly.layer_data(0)
+      iex> Giggly.DataFrame.pull(frame, :panel)
+      [1, 2, 3]
+
   ## Mappings
 
   A mapping is a map from aesthetic to column, `%{x: :wt, y: :mpg}`. A column is named by an atom
-  or a string and compared with the data's column names as a string, so `:wt` and `"wt"` name the
+  or a string and compared with the table's column names as a string, so `:wt` and `"wt"` name the
   same column.
 
   The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
-  both the plot and layer map takes the layer's column. When a layer is added, its own mapping is
-  checked against the aesthetics it can use, and the two mappings together against those it needs.
+  both the plot and layer map takes the layer's column. When a layer is added, every column it
+  draws with, from its own mapping and those it takes from the plot's, is checked against the table
+  it draws, its own or the plot's; its own mapping is checked against the aesthetics it can use,
+  and the two mappings together against those it needs. So the plot's mapping is checked by the
+  layers that take it, and may name a column only the layers' own tables hold, as ggplot2's may.
   An aesthetic a layer takes from the plot's mapping that it cannot use rides along unused, as
   ggplot2 carries one, so a plot can map `:label` for its text and still draw points: it is not
   drawn, though a discrete one still splits the layer's groups, and the layer draws in no legend of
@@ -116,7 +137,7 @@ defmodule Giggly.Plot do
   @type aesthetic :: atom()
 
   @typedoc """
-  A mapping as stored: aesthetic to the name of a column in the plot's data.
+  A mapping as stored: aesthetic to a column's name, as a string, in the table the layer draws.
   """
   @type mapping :: %{optional(aesthetic()) => String.t()}
 
@@ -150,7 +171,7 @@ defmodule Giggly.Plot do
           reversed_layers: [struct()]
         }
 
-  @typedoc "A column of the plot's data as written: its name as an atom or a string."
+  @typedoc "A column of a table as written: its name as an atom or a string."
   @type column_reference :: atom() | String.t()
 
   @typedoc "A mapping as written: aesthetic to column."
@@ -175,6 +196,18 @@ defmodule Giggly.Plot do
                               "(`:free`), and draws its own axis for each."
                         ]
                       )
+
+  # A table of a layer's own, an option of every function that adds a layer, as ggplot2's `data =`
+  # gives one; read after validation, as `new/2` reads the plot's.
+  @data_option [
+    type: :any,
+    doc:
+      "A table for the layer to draw in place of the plot's data, anything implementing " <>
+        "`Table.Reader`, as ggplot2's `data =` gives one. The plot's mapping applies to it, so " <>
+        "it must hold each column the plot's mapping names for an aesthetic the layer neither " <>
+        "maps nor sets. Under a facet, a table lacking a column the plot is faceted by is drawn " <>
+        "in every panel of that column's values, and a value only it holds makes a panel."
+  ]
 
   # An aesthetic set to one value for every mark of a layer, an option of the function that adds
   # the layer, as ggplot2's `geom_point(alpha = 0.4)` sets it. A number from 0 to 1 is kept as a
@@ -290,10 +323,15 @@ defmodule Giggly.Plot do
   ]
 
   # `geom_point/3`'s options, validated at the call.
-  @point_options NimbleOptions.new!(alpha: @alpha_option, color: @point_color_option)
+  @point_options NimbleOptions.new!(
+                   data: @data_option,
+                   alpha: @alpha_option,
+                   color: @point_color_option
+                 )
 
   # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
+                 data: @data_option,
                  position: [
                    type: {:in, [:stack, :dodge]},
                    default: :stack,
@@ -309,13 +347,18 @@ defmodule Giggly.Plot do
 
   # `geom_path/3`'s options, validated at the call.
   @path_options NimbleOptions.new!(
-                  [alpha: @alpha_option, color: @line_color_option, linewidth: @linewidth_option] ++
-                    @line_style_options
+                  [
+                    data: @data_option,
+                    alpha: @alpha_option,
+                    color: @line_color_option,
+                    linewidth: @linewidth_option
+                  ] ++ @line_style_options
                 )
 
   # `geom_line/3`'s options, validated at the call.
   @line_options NimbleOptions.new!(
                   [
+                    data: @data_option,
                     orientation: [
                       type: {:in, [:x, :y]},
                       default: :x,
@@ -332,6 +375,7 @@ defmodule Giggly.Plot do
 
   # `geom_text/3`'s options, validated at the call.
   @text_options NimbleOptions.new!(
+                  data: @data_option,
                   check_overlap: [
                     type: :boolean,
                     default: false,
@@ -408,6 +452,10 @@ defmodule Giggly.Plot do
   @doc """
   A plot of `data` with the aesthetics in `mapping` applying to every layer.
 
+  Each column the mapping names is checked by the layers that take it, against the table each
+  draws, so a misspelt column is reported by the first layer function to take it. Raises
+  `ArgumentError` here for a value that is not a column reference, an atom or a string.
+
       iex> plot =
       ...>   Giggly.Plot.new(
       ...>     %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]},
@@ -422,7 +470,7 @@ defmodule Giggly.Plot do
 
     %__MODULE__{
       data: frame,
-      mapping: resolve(mapping, frame, "Plot.new/2"),
+      mapping: references(mapping, "Plot.new/2"),
       facet: %Facet.Null{},
       coord: %Coord.Cartesian{},
       theme: :gray,
@@ -481,12 +529,14 @@ defmodule Giggly.Plot do
   def geom_point(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @point_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Point{},
       stat: %Stat.Identity{},
       position: %Position.Identity{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_point/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_point/3"),
       fixed: fixed(validated),
       accepted: Geom.Point.accepted_aesthetics()
     }
@@ -533,12 +583,14 @@ defmodule Giggly.Plot do
   def geom_bar(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @bar_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Count{},
       position: position(Keyword.fetch!(validated, :position)),
-      mapping: resolve(mapping, plot.data, "Plot.geom_bar/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_bar/3"),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics())
     }
@@ -604,12 +656,14 @@ defmodule Giggly.Plot do
   def geom_col(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @bar_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Bar{},
       stat: %Stat.Identity{},
       position: position(Keyword.fetch!(validated, :position)),
-      mapping: resolve(mapping, plot.data, "Plot.geom_col/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_col/3"),
       fixed: fixed(validated),
       accepted: Geom.Bar.accepted_aesthetics()
     }
@@ -654,6 +708,7 @@ defmodule Giggly.Plot do
   def geom_path(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @path_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Path{
@@ -663,7 +718,8 @@ defmodule Giggly.Plot do
       },
       stat: %Stat.Identity{},
       position: %Position.Identity{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_path/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_path/3"),
       fixed: fixed(validated),
       accepted: Geom.Path.accepted_aesthetics()
     }
@@ -704,6 +760,7 @@ defmodule Giggly.Plot do
   def geom_line(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @line_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Line{
@@ -714,7 +771,8 @@ defmodule Giggly.Plot do
       },
       stat: %Stat.Identity{},
       position: %Position.Identity{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_line/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_line/3"),
       fixed: fixed(validated),
       accepted: Geom.Line.accepted_aesthetics()
     }
@@ -784,12 +842,14 @@ defmodule Giggly.Plot do
   def geom_text(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
     validated = layer_options(options, @text_options)
+    data = own_data(validated)
 
     layer = %Layer{
       geom: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)},
       stat: %Stat.Identity{},
       position: %Position.Nudge{},
-      mapping: resolve(mapping, plot.data, "Plot.geom_text/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_text/3"),
       fixed: fixed(validated),
       accepted: Geom.Text.accepted_aesthetics()
     }
@@ -804,12 +864,17 @@ defmodule Giggly.Plot do
   `facet_wrap(vars(class))` and `facet_wrap(plot, [:cyl, :drv])` its `facet_wrap(vars(cyl, drv))`.
   It replaces the plot's facet, which is one panel until a plot is faceted.
 
-  Each layer's rows are drawn in the panel of their values. The panels are ordered by the first
-  column's values, then the next's, as an axis orders its levels, with a missing value (`nil`)
-  given a panel of its own, last. They fill the rows left to right. With neither `nrow:` nor
-  `ncol:`, the panels are laid out as ggplot2 lays them out: in one row up to three panels, two
-  rows up to six, three up to twelve, and beyond that in a square or nearly one. Given one of the
-  two, the other is as many as the panels need.
+  Each layer's rows are drawn in the panel of their values. The panels are those the plot's data
+  and every layer's own table make together, as ggplot2's are: a combination only a layer's table
+  holds makes a panel, and so does the plot's data though no layer draws it. A table lacking some of
+  the columns is drawn in every panel of the values it has, each of its rows once in each, so one
+  lacking them all is drawn in every panel, as ggplot2 draws the same data in every panel; a value
+  only such a table holds makes a panel with each combination of the other columns' values. The
+  panels are ordered by the first column's values, then the next's, as an axis orders its levels,
+  with a missing value (`nil`) given a panel of its own, last. They fill the rows left to right.
+  With neither `nrow:` nor `ncol:`, the panels are laid out as ggplot2 lays them out: in one row
+  up to three panels, two rows up to six, three up to twelve, and beyond that in a square or nearly
+  one. Given one of the two, the other is as many as the panels need.
 
   The panels share each axis's scale, so the same position means the same value in every panel,
   and an axis is drawn only at the edges of the panels. Free scales give each panel a scale of its
@@ -820,10 +885,13 @@ defmodule Giggly.Plot do
 
   #{NimbleOptions.docs(@facet_wrap_options)}
 
-  Raises `ArgumentError` for a column the data does not have, a column named twice or none at all,
-  and `NimbleOptions.ValidationError` for an option it does not take or a count that is not a
-  positive whole number. When the plot is run, `nrow:` and `ncol:` that together hold fewer
-  panels than there are raise `ArgumentError`, as does data with no rows to make a panel from.
+  Raises `ArgumentError` for a column named twice or none at all, or a value that is not a column
+  reference, and `NimbleOptions.ValidationError` for an option it does not take or a count that is
+  not a positive whole number. Whether a table holds the columns is checked when the plot is run,
+  since a layer added later may bring it, as ggplot2 checks: `ArgumentError` unless the plot's
+  data or some layer's own table holds every one of them, which is how a misspelt column is
+  reported. So is `ArgumentError` for `nrow:` and `ncol:` that together hold fewer panels than
+  there are, and for tables with no rows to make a panel from.
 
       iex> plot =
       ...>   %{"wt" => [2.32, 2.62, 3.44, 2.2], "mpg" => [22.8, 21.0, 18.7, 32.4], "cyl" => [4, 6, 8, 4]}
@@ -834,11 +902,11 @@ defmodule Giggly.Plot do
       [1, 2, 3, 1]
   """
   @spec facet_wrap(t(), column_reference() | [column_reference()], keyword()) :: t()
-  def facet_wrap(%__MODULE__{data: data} = plot, facets, options \\ []) when is_list(options) do
+  def facet_wrap(%__MODULE__{} = plot, facets, options \\ []) when is_list(options) do
     options = NimbleOptions.validate!(options, @facet_wrap_options)
 
     facet = %Facet.Wrap{
-      facets: facet_columns(facets, data),
+      facets: facet_columns(facets),
       nrow: Keyword.get(options, :nrow, :none),
       ncol: Keyword.get(options, :ncol, :none),
       scales: Keyword.fetch!(options, :scales)
@@ -970,6 +1038,11 @@ defmodule Giggly.Plot do
   @spec layer_fixed(Layer.t()) :: Layer.fixed()
   def layer_fixed(%Layer{fixed: fixed}), do: fixed
 
+  # The table `layer` draws: its own, which its function's `data:` option gave, or else the plot's.
+  @doc false
+  @spec layer_table(t(), Layer.t()) :: DataFrame.t()
+  def layer_table(%__MODULE__{} = plot, %Layer{data: data}), do: drawn_table(plot, data)
+
   # The aesthetics `layer` can use, its geom's and its stat's.
   @doc false
   @spec layer_accepted(Layer.t()) :: [aesthetic()]
@@ -1067,37 +1140,69 @@ defmodule Giggly.Plot do
   def validate_linemitre(limit),
     do: {:error, "expected a number of line widths, 1 or more, got: #{inspect(limit)}"}
 
-  defp resolve(mapping, frame, function_name) do
-    names = DataFrame.names(frame)
+  # A mapping as the plot holds it: its keys canonical and each column by its name as a string,
+  # each value refused unless it is a column reference. The plot's mapping is held so, and checked
+  # against a table by each layer that takes it.
+  defp references(mapping, function_name) do
+    mapping
+    |> Aesthetics.canonicalize()
+    |> Map.new(fn {aesthetic, reference} ->
+      {aesthetic, reference_name(function_name, aesthetic, reference)}
+    end)
+  end
+
+  # A layer's own mapping, its keys canonical and each column by its name as a string, each checked
+  # against the table the layer draws, its own `data` or else the plot's, a refusal naming the
+  # reference as written.
+  defp resolve(mapping, plot, data, function_name) do
+    names =
+      plot
+      |> drawn_table(data)
+      |> DataFrame.names()
 
     mapping
     |> Aesthetics.canonicalize()
     |> Map.new(fn {aesthetic, reference} ->
-      {aesthetic, column(function_name, aesthetic, reference, names)}
+      name = reference_name(function_name, aesthetic, reference)
+
+      if name in names do
+        {aesthetic, name}
+      else
+        raise ArgumentError,
+              "#{function_name} maps #{inspect(aesthetic)} to #{inspect(reference)}, but " <>
+                missing_column_message(name, data, names)
+      end
     end)
   end
 
-  defp column(function_name, aesthetic, reference, names) when is_column_reference(reference) do
-    name = to_string(reference)
+  defp reference_name(_function_name, _aesthetic, reference)
+       when is_column_reference(reference),
+       do: to_string(reference)
 
-    if name in names do
-      name
-    else
-      raise ArgumentError, missing_column_message(function_name, aesthetic, reference, names)
-    end
-  end
-
-  defp column(function_name, aesthetic, reference, _names) do
+  defp reference_name(function_name, aesthetic, reference) do
     raise ArgumentError,
           "#{function_name} maps #{inspect(aesthetic)} to #{inspect(reference)}, " <>
             "but a mapping names a column, as an atom or a string"
   end
 
-  defp missing_column_message(function_name, aesthetic, reference, names) do
-    "#{function_name} maps #{inspect(aesthetic)} to #{inspect(reference)}, " <>
-      "but the data has no column #{inspect(to_string(reference))}; " <>
-      "its columns are #{inspect_all(names)}"
+  defp missing_column_message(name, data, names) do
+    "#{table_name(data)} has no column #{inspect(name)}; its columns are #{inspect_all(names)}"
   end
+
+  defp table_name(:none), do: "the plot's data"
+  defp table_name(_own), do: "the layer's own data"
+
+  # The table a layer function's `data:` option gives, read as `new/2` reads the plot's, or `:none`
+  # when the layer draws the plot's data.
+  defp own_data(validated) do
+    case Keyword.fetch(validated, :data) do
+      {:ok, table} -> DataFrame.from_table(table)
+      :error -> :none
+    end
+  end
+
+  defp drawn_table(%__MODULE__{data: data}, :none), do: data
+  defp drawn_table(%__MODULE__{}, own), do: own
 
   # The plot with `layer` added, once its mappings are checked against what the function that adds
   # it, `function`, accepts and requires: its own mapping against what it accepts, and the mapping it
@@ -1107,6 +1212,7 @@ defmodule Giggly.Plot do
   # adding a layer never walks the list.
   defp add_layer(plot, layer, function, facts) do
     combined_mapping = computed_mapping(plot, layer)
+    check_inherited(plot, layer, combined_mapping, function)
     check_accepted(layer.mapping, layer.accepted, function)
     check_required(combined_mapping, Keyword.fetch!(facts, :required), function)
     check_exclusive(combined_mapping, Keyword.get(facts, :exclusive, []), function)
@@ -1136,7 +1242,11 @@ defmodule Giggly.Plot do
   # included.
   defp check_weight(plot, layer) do
     mapping = computed_mapping(plot, layer)
-    dtypes = DataFrame.dtypes(plot.data)
+
+    dtypes =
+      plot
+      |> drawn_table(layer.data)
+      |> DataFrame.dtypes()
 
     with {:ok, column} <- Map.fetch(mapping, :weight),
          dtype when dtype not in [:integer, :float, :null] <- Map.fetch!(dtypes, column) do
@@ -1146,6 +1256,32 @@ defmodule Giggly.Plot do
     end
 
     plot
+  end
+
+  # Each column the layer takes from the plot's mapping, for an aesthetic it neither maps nor sets,
+  # must be in the table it draws, as ggplot2 evaluates them there and fails with "object not
+  # found"; one the layer cannot use is evaluated too, so it is checked as well.
+  defp check_inherited(plot, layer, combined_mapping, function) do
+    names =
+      plot
+      |> drawn_table(layer.data)
+      |> DataFrame.names()
+
+    missing =
+      combined_mapping
+      |> Map.drop(Map.keys(layer.mapping))
+      |> Enum.sort()
+      |> Enum.reject(fn {_aesthetic, name} -> name in names end)
+
+    case missing do
+      [] ->
+        :ok
+
+      [{aesthetic, name} | _others] ->
+        raise ArgumentError,
+              "#{function} takes #{inspect(aesthetic)} from the plot's mapping, which maps it " <>
+                "to #{inspect(name)}, but " <> missing_column_message(name, layer.data, names)
+    end
   end
 
   # An aesthetic a layer maps itself that it cannot use would silently do nothing, so it raises.
@@ -1207,31 +1343,19 @@ defmodule Giggly.Plot do
     end
   end
 
-  # The columns a facet splits on, by the names the data gives them, in the order written.
-  defp facet_columns(facets, frame) do
-    names = DataFrame.names(frame)
+  # The columns a facet splits on, by name as strings, in the order written. Whether a table holds
+  # them is the facet's question, answered when the plot is run, since a layer added later may
+  # bring one, as ggplot2 asks it.
+  defp facet_columns(facets) do
     references = List.wrap(facets)
-
-    columns =
-      Enum.map(references, fn reference -> facet_column(reference, names) end)
-
+    columns = Enum.map(references, &facet_column/1)
     check_facet_columns(columns, references)
     columns
   end
 
-  defp facet_column(reference, names) when is_column_reference(reference) do
-    name = to_string(reference)
+  defp facet_column(reference) when is_column_reference(reference), do: to_string(reference)
 
-    if name in names do
-      name
-    else
-      raise ArgumentError,
-            "Plot.facet_wrap/3 facets by #{inspect(reference)}, but the data has no column " <>
-              "#{inspect(name)}; its columns are #{inspect_all(names)}"
-    end
-  end
-
-  defp facet_column(reference, _names) do
+  defp facet_column(reference) do
     raise ArgumentError,
           "Plot.facet_wrap/3 facets by #{inspect(reference)}, " <>
             "but a facet names a column, as an atom or a string"

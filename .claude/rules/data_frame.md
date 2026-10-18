@@ -34,8 +34,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `put/3`.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
-  any order, repeated or left out, as a line's geom reorders and drops rows and munching repeats
-  them. Not designed ahead.
+  any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
+  them, and the facet repeats a table across the panels. Not designed ahead.
 - **The frame knows nothing about plots.** The `panel` and `group` columns belong to the code that
   writes them (the facet, `add_group`), not to the frame.
 - **A frame that exists is well formed**: no name twice, every column `row_count` long, every

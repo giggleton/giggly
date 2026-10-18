@@ -24,9 +24,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and draw, out of its files** — no call, no module passed as a value, no `import` — which
   boundary cannot, since a boundary always exports its root. It knows nothing about scales.
 - **The API is `new/2`, the geom functions, the facet functions (`facet_wrap/3`), the coordinate
-  functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2` and the `layer_*` accessors
-  exist for the assembly and are `@doc false`, and `Layer` is `@moduledoc false`; an API type names
-  no hidden one (`aesthetic`, not `Aesthetics.name/0`). An example in the docs shows what a user
+  functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2`, `mapping_order/2` and the
+  `layer_*` accessors (`layer_table/2` the table a layer draws) exist for the assembly and are
+  `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
+  not `Aesthetics.name/0`). An example in the docs shows what a user
   sees, through `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a
   kind's struct.
 - **No function ggplot2 has superseded or deprecated becomes API**; Giggly offers its replacement
@@ -55,22 +56,29 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   A field holding a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses
   it. The theme is still a name, `theme: :gray`, until a user can set one; what a misspelt name does
   arrives with that option, and it must raise at the call.
-- **A mistake raises from the call that wrote it.** Each function resolves the mapping it is
-  given against the data and checks what the geom can use there, so a misspelt column or an
-  unusable aesthetic is reported by the line that has it, never later when the plot is run. A
-  missing column's message names the aesthetic, the reference as the caller wrote it, and the
-  data's columns. This covers what the plot itself knows — names, and which aesthetics a geom
-  takes and needs; whether a column's type suits an axis is the scales' question, answered when
-  the plot is run. A facet's columns are resolved the same way, at the call, and none, or one named
-  twice, is refused there; whether `nrow:` and `ncol:` hold the panels is the facet's question,
-  since counting the panels is its computation, answered when the plot is run.
+- **A mistake raises from the call that wrote it, or from the layer that draws it.** Each layer
+  function resolves its own mapping against the table it draws, its own or the plot's, and checks
+  what the geom can use there, so a misspelt column or an unusable aesthetic is reported by the
+  line that has it, never later when the plot is run. A missing column's message names the
+  aesthetic, the reference as the caller wrote it, which table lacks it, and that table's columns.
+  **The plot's mapping is checked by the layers that take it** (design-log §4, the entry beginning
+  "A column the plot names"): `new/2` refuses only a value that is not a column reference, and each
+  layer function checks every column it takes from the plot's mapping, for an aesthetic it neither
+  maps nor sets, against its table, one it cannot use included, as ggplot2 evaluates them all and
+  fails with "object not found"; so the plot's mapping may name a column only layers' own tables
+  hold. This covers what the plot itself knows — names, and which aesthetics a geom takes and
+  needs; whether a column's type suits an axis is the scales' question, answered when the plot is
+  run. A facet's columns are named at the call, and none, one named twice, or a value that is not a
+  column reference is refused there; whether some table holds them all, and whether `nrow:` and
+  `ncol:` hold the panels, are the facet's questions, answered when the plot is run, since a layer
+  added later may bring a column and counting the panels is its computation.
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
   column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
   (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken),
   accepting too what its geom draws (`:alpha`), which counting carries. A
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
-  allows at most one. A weight's column must hold numbers, refused at the call, where R would fail
-  inside the stat and draw nothing.
+  allows at most one. A weight's column must hold numbers, read from the layer's table and refused
+  at the call, where R would fail inside the stat and draw nothing.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
@@ -92,8 +100,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
-  function's `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
-  `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3` and of `labs/2`),
+  function's `data:`, `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`,
+  `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3` and
+  of `labs/2`),
   so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's
@@ -105,11 +114,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not checked,
   since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2` takes
   the titles").
-- **The table is read once, by `new/2`.** The plot holds a `Giggly.DataFrame`, so nothing past
-  this API sees a `Table.Reader`.
+- **Each table is read once, by the call that gives it**: the plot's by `new/2`, a layer's own by
+  its function's `data:`, any `Table.Reader`, read after the options are validated, as ggplot2's
+  `data =`. The plot holds a `Giggly.DataFrame` and each layer its own or `:none`, which draws the
+  plot's (`layer_table/2`), so nothing past this API sees a `Table.Reader`. R also takes a function
+  or formula as a layer's data, which waits.
 - **The plot holds what was resolved.** Mapping keys are canonical (`Aesthetics.canonicalize/1`
-  runs on every mapping as it enters), and mapping values are the data's string column names,
-  never the atoms the caller wrote.
+  runs on every mapping as it enters), and mapping values are string column names, never the atoms
+  the caller wrote: a layer's, of the table it draws; the plot's, checked against each table that
+  takes them.
 - **A column reference is an atom or a string,** compared with the data's names as a string.
   Nothing else is read as a name: `2.5` is not the column `"2.5"`.
 - **A layer's own mapping is checked against what it accepts as the layer is added, and its own

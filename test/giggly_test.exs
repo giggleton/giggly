@@ -144,6 +144,67 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, a layer drawing
+  # a table of its own. It moves with how a layer's table is evaluated or given its panels.
+  describe "layer_data/2, a layer's own table" do
+    test "the layer draws its own table with the plot's mapping" do
+      plot =
+        %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => [6, 4]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_point(data: %{"wt" => [3.0, 4.0], "mpg" => [15.0, 16.0]})
+
+      frame = Giggly.layer_data(plot, 1)
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} == {[3.0, 4.0], [15.0, 16.0]}
+    end
+
+    test "groups are numbered within each layer's table, and one colour scale spans the tables" do
+      plot =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "k" => ["b", "c"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :k})
+        |> Plot.geom_point()
+        |> Plot.geom_point(data: %{"x" => [3.0, 4.0], "y" => [3.0, 4.0], "k" => ["a", "c"]})
+
+      first = Giggly.layer_data(plot, 0)
+      second = Giggly.layer_data(plot, 1)
+
+      assert {DataFrame.pull(first, :color), DataFrame.pull(first, :group)} ==
+               {["#00BA38", "#619CFF"], [1, 2]}
+
+      assert {DataFrame.pull(second, :color), DataFrame.pull(second, :group)} ==
+               {["#F8766D", "#619CFF"], [1, 2]}
+    end
+
+    test "the facet makes its panels from the plot's data and every layer's table" do
+      plot =
+        %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "cyl" => [6, 4, 4]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(data: %{"wt" => [1.0, 2.0], "mpg" => [10.0, 11.0], "cyl" => [4, 4]})
+        |> Plot.geom_point(data: %{"wt" => [5.0, 6.0], "mpg" => [12.0, 13.0]})
+        |> Plot.facet_wrap(:cyl)
+
+      own = Giggly.layer_data(plot, 0)
+      repeated = Giggly.layer_data(plot, 1)
+
+      assert DataFrame.pull(own, :panel) == [1, 1]
+
+      assert {DataFrame.pull(repeated, :x), DataFrame.pull(repeated, :panel)} ==
+               {[5.0, 6.0, 5.0, 6.0], [1, 1, 2, 2]}
+    end
+
+    test "each layer's columns are typed from its own table, so an axis refuses a second kind" do
+      plot =
+        %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_point(data: %{"wt" => ["a", "b"], "mpg" => [1.0, 2.0]})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "index 1"
+      assert error.message =~ "discrete"
+    end
+  end
+
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
   # significant digits. It moves with ggplot2's bar geometry or stacking.
   describe "layer_data/2, for geom_col" do
@@ -1600,6 +1661,39 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/facet_wrap_free.svg")
+    end
+
+    # Golden: test/golden/facet_wrap_layer_data.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/facet_wrap_layer_data.R: every element, in order, and every clip
+    # path match it. facet_wrap()'s "The same data in every panel" on test/golden/facet_wrap.svg's
+    # points: the first layer's table lacks the facet column, so all nine points are drawn grey in
+    # every panel, under each panel's own three, and the text layer's table holds a value the data
+    # lacks, which makes a fourth panel where the other layers draw nothing but the grey points. It
+    # moves with what moves test/golden/facet_wrap.svg and test/golden/text.svg, and with how the
+    # tables make the panels or a table is repeated across them.
+    test "a layer's own table is drawn in every panel without the facet column, or makes one" do
+      data = [
+        wt: [0.0, 4.0, 7.0, 10.0, 2.0, 5.0, 8.0, 3.0, 6.0],
+        mpg: [0.0, 50.0, 20.0, 35.0, 10.0, 40.0, 25.0, 15.0, 30.0],
+        cyl: [4, 4, 4, 6, 6, 6, 8, 8, 8]
+      ]
+
+      plot =
+        data
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(data: Keyword.delete(data, :cyl), colour: "#D9D9D9")
+        |> Plot.geom_point()
+        |> Plot.geom_text(%{label: :label},
+          data: [wt: [5.0], mpg: [25.0], cyl: [10], label: ["ten"]]
+        )
+        |> Plot.facet_wrap(:cyl)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/facet_wrap_layer_data.svg")
     end
 
     # Golden: test/golden/text.svg, checked against ggplot2's drawing of the same plot, made by
