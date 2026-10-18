@@ -65,17 +65,37 @@ defmodule Giggly.PlotTest do
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 fails to build `ggplot(df, aes(wt, mpg / cyl)) +
-    # geom_point(data = df2)` where df2 lacks `cyl`: "object 'cyl' not found".
+    # geom_point(data = df2)` where df2 lacks `cyl`: "object 'cyl' not found". The expression here
+    # is a capture the compiler does not inline, so the message shows it as it was written.
     test "a column an expression from the plot's mapping reads is checked against each layer's" do
-      plot = Plot.new(@rows, %{x: :wt, y: {&Kernel.//2, [:mpg, :cyl]}})
+      plot = Plot.new(@rows, %{x: :wt, y: {&Float.round/2, [:mpg, :cyl]}})
       own = %{"wt" => [3.0], "mpg" => [20.0]}
 
       error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, data: own) end
 
-      assert error.message =~ ":y"
-      assert error.message =~ "plot's mapping"
-      assert error.message =~ ~s("cyl")
+      assert error.message =~ "takes :y from"
+      assert error.message =~ ~s(to {&Float.round/2, ["mpg", "cyl"]})
+      assert error.message =~ ~s(no column "cyl")
       assert error.message =~ "own data"
+    end
+
+    test "a value the grammar refuses in a layer's own mapping is refused by the layer function" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{y: :mpg, colour: nil}) end
+
+      assert String.starts_with?(error.message, "Plot.geom_point/3 maps :color to nil, but ")
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 counts a weight of whole numbers (`1L, 2L, 4L`) and one of missing
+    # values only (`NA_real_`) without complaint: 4 and 3, and 0 and 0.
+    test "a weight column of whole numbers, or of missing values only, is accepted at the call" do
+      rows = %{"class" => ["suv", "suv", "compact"], "w" => [1, 2, 4], "none" => [nil, nil, nil]}
+      plot = Plot.new(rows, %{x: :class})
+
+      assert [%Plot.Layer{}] = Plot.geom_bar(plot, %{weight: :w}).reversed_layers
+      assert [%Plot.Layer{}] = Plot.geom_bar(plot, %{weight: :none}).reversed_layers
     end
 
     test "a constant reads no column, so a layer's own table needs none for it" do

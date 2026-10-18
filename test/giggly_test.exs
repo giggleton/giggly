@@ -858,6 +858,18 @@ defmodule GigglyTest do
     # ggplot2 4.0.3 in R 4.6.1 warns "Computation failed in `stat_count()`" for `geom_bar(aes(class,
     # weight = as.character(hwy)))`, `rowsum()` refusing a weight that is not a number, and draws
     # nothing of the layer; Giggly cannot warn, so it refuses, as it refuses a column at the call.
+    # Golden: ggplot2 4.0.3 in R 4.6.1 counts a weight of missing values only (`NA_real_`) 0 at each
+    # x.
+    test "a computed weight of missing values only counts nothing, refused by nothing" do
+      frame =
+        %{"class" => ["suv", "suv", "compact"], "w" => [1, 2, 4]}
+        |> Plot.new(%{x: :class, weight: {fn _weight -> nil end, [:w]}})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) === [0.0, 0.0]
+    end
+
     test "a computed weight that is not a number is refused when the plot is run" do
       plot =
         %{"class" => ["suv", "compact"], "w" => [1, 2]}

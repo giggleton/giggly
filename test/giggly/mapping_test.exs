@@ -63,9 +63,10 @@ defmodule Giggly.MappingTest do
       assert reason =~ "arguments are a list"
     end
 
-    test "a function given a number of arguments it does not take is refused, saying how many" do
-      assert {:error, reason} = Mapping.resolve({&Kernel.//2, [:hwy]})
-      assert reason =~ "takes 2 argument(s), and the expression gives it 1"
+    test "a function given a number of arguments it does not take is refused, naming it" do
+      assert {:error, reason} = Mapping.resolve({&String.upcase/1, [:class, :hwy]})
+      assert reason =~ "&String.upcase/1 takes 1"
+      assert reason =~ "gives it 2"
     end
 
     test "a refused argument refuses the expression, with the argument's reason" do
@@ -115,20 +116,47 @@ defmodule Giggly.MappingTest do
                {{:title, "cty"}, {:fallback, "color"}}
     end
 
-    # The compiler inlines `&Kernel.!=/2` as `&:erlang."/="/2`; a capture built when the program
-    # runs names Kernel's own function. Both are titled as Elixir writes the operator.
-    test "a capture of Kernel's operator is titled as the operator, inlined or not" do
-      inlined = {&Kernel.!=/2, ["class", {:constant, "suv"}]}
-      built = {Function.capture(Kernel, :!=, 2), ["class", {:constant, "suv"}]}
+    # The compiler inlines most of these (`&Kernel.!=/2` is `&:erlang."/="/2`); a capture built when
+    # the program runs names Kernel's own function. Both are titled as Elixir writes the operator,
+    # a unary one before its operand, a word one with a space.
+    test "every one of Kernel's operators is titled as itself, inlined or not" do
+      operators = [
+        {"a != b", :!=, &Kernel.!=/2},
+        {"a !== b", :!==, &Kernel.!==/2},
+        {"a * b", :*, &Kernel.*/2},
+        {"a ** b", :**, &Kernel.**/2},
+        {"+a", :+, &Kernel.+/1},
+        {"a + b", :+, &Kernel.+/2},
+        {"a ++ b", :++, &Kernel.++/2},
+        {"-a", :-, &Kernel.-/1},
+        {"a - b", :-, &Kernel.-/2},
+        {"a -- b", :--, &Kernel.--/2},
+        {"a / b", :/, &Kernel.//2},
+        {"a < b", :<, &Kernel.</2},
+        {"a <= b", :<=, &Kernel.<=/2},
+        {"a == b", :==, &Kernel.==/2},
+        {"a === b", :===, &Kernel.===/2},
+        {"a =~ b", :=~, &Kernel.=~/2},
+        {"a > b", :>, &Kernel.>/2},
+        {"a >= b", :>=, &Kernel.>=/2},
+        {"not a", :not, &Kernel.not/1}
+      ]
 
-      assert {Mapping.title(inlined, :x), Mapping.title(built, :x)} ===
-               {{:title, ~s(class != "suv")}, {:title, ~s(class != "suv")}}
+      mistitled =
+        for {text, operator, inlined} <- operators,
+            {:arity, arity} = Function.info(inlined, :arity),
+            function <- [inlined, Function.capture(Kernel, operator, arity)],
+            title = Mapping.title({function, Enum.take(["a", "b"], arity)}, :x),
+            title != {:title, text},
+            do: {text, function, title}
+
+      assert mistitled === []
     end
 
-    test "a unary operator is written before its operand, a word one with a space" do
-      assert {Mapping.title({&Kernel.-/1, ["hwy"]}, :x),
-              Mapping.title({&Kernel.not/1, ["manual"]}, :x)} ===
-               {{:title, "-hwy"}, {:title, "not manual"}}
+    test "a constant inside an expression is written as Elixir writes the term" do
+      assert {Mapping.title({&Kernel.!=/2, ["class", {:constant, "suv"}]}, :x),
+              Mapping.title({&Kernel.*/2, ["hwy", {:constant, 2.5}]}, :x)} ===
+               {{:title, ~s(class != "suv")}, {:title, "hwy * 2.5"}}
     end
 
     test "an operator's operand that is itself an operator's call is put in parentheses" do
