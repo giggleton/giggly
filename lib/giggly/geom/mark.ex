@@ -10,7 +10,8 @@ defmodule Giggly.Geom.Mark do
   # geom in the spelling `Giggly.Plot` gives it, uppercase `#RRGGBB` or `#RRGGBBAA`, or `:none`,
   # R's `NA`, which draws nothing whatever the alpha, as `alpha(NA, 0.5)` is `NA`; it reaches the
   # scene as its `#RRGGBB` and an opacity, which the backend writes as svglite writes an R colour's
-  # alpha.
+  # alpha. A missing colour, which a scale's `na_value: :none` leaves in the table as R's mapped
+  # column holds `NA`, is read as `:none` (`colors/3`).
 
   alias Giggly.DataFrame
 
@@ -39,6 +40,16 @@ defmodule Giggly.Geom.Mark do
     if aesthetic in DataFrame.names(frame),
       do: DataFrame.pull(frame, aesthetic),
       else: List.duplicate(default, DataFrame.row_count(frame))
+  end
+
+  # Each row's colour for `aesthetic` (`:color` or `:fill`) in `frame`, as `values/3` reads it, a
+  # missing one read as `:none`.
+  @doc false
+  @spec colors(DataFrame.t(), atom(), String.t() | :none) :: [String.t() | :none]
+  def colors(frame, aesthetic, default) do
+    frame
+    |> values(aesthetic, default)
+    |> Enum.map(fn color -> color || :none end)
   end
 
   # Each row's opacity in its colour, one of `colors` for each row: its alpha, or the colour's own

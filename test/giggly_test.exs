@@ -367,6 +367,32 @@ defmodule GigglyTest do
                {[0.2, 0.8], ["#FF0000", "#0000FF"], ["#FF0000", "#0000FF"]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 gives `annotate("rect", ..., fill = c(NA,
+    # "red"))` the fills `NA` and `red`, and `annotate("point", ..., colour = c("red", NA))` the
+    # colours `red` and `NA`; vdiffr's drawing of the rectangles has only the red one.
+    test "a list's :none beside a colour is a missing colour, as R's NA is" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      fills =
+        plot
+        |> Plot.annotate(:rect,
+          xmin: [1, 3],
+          xmax: [2, 4],
+          ymin: 1,
+          ymax: 2,
+          fill: [:none, "red"]
+        )
+        |> Giggly.layer_data()
+
+      colours =
+        plot
+        |> Plot.annotate(:point, x: [1, 2], y: 3, colour: ["red", :none])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(fills, :fill), DataFrame.pull(colours, :color)} ===
+               {[nil, "#FF0000"], ["#FF0000", nil]}
+    end
+
     # Golden: ggplot2 4.0.3 in R 4.6.1 draws `annotate("text", x = 1, y = 1, label = TRUE)` as `TRUE`.
     test "a label of true or false is taken, and written as R writes it" do
       svg =
@@ -962,6 +988,36 @@ defmodule GigglyTest do
 
       assert {Enum.map(legend.keys, fn key -> key.label end), layer.draws} ===
                {["4", "NA"], [true, true]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 under `na.value = NA`: the missing value's
+    # colour `NA` under `scale_colour_hue()`, its fill `NA` under `scale_fill_gradient()`.
+    test "a value its scale maps to :none is missing in the layer's table, as R's is NA" do
+      rows = %{"x" => [1, 2, 3], "y" => [1, 2, 3], "v" => ["a", nil, "b"], "z" => [1, nil, 2]}
+
+      hue =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :v})
+        |> Plot.geom_point()
+        |> Plot.scale_color_hue(na_value: :none)
+
+      gradient =
+        rows
+        |> Plot.new(%{x: :x, y: :y, fill: :z})
+        |> Plot.geom_col()
+        |> Plot.scale_fill_gradient(na_value: :none)
+
+      colors =
+        hue
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:color)
+
+      fills =
+        gradient
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:fill)
+
+      assert {colors, fills} === {["#F8766D", nil, "#00BFC4"], ["#132B43", nil, "#56B1F7"]}
     end
 
     # Golden: the legends' backgrounds in ggplot2 4.0.3's drawings of the same plots through
@@ -3347,6 +3403,21 @@ defmodule GigglyTest do
         |> Plot.scale_color_gradientn(colors: terrain, limits: {10, 30})
 
       assert to_svg(plot) == File.read!("test/golden/scale_gradientn.svg")
+    end
+
+    # Golden: test/golden/scale_gradient_na_none.svg, checked as test/golden/scale_gradient.svg
+    # is, against test/golden/scale_gradient_na_none.R's drawings. Six points from yellow to red,
+    # the two whose value is missing mapped to none and so not drawn, though the axes span them;
+    # the colour bar spans the four values there are. It moves with what moves
+    # test/golden/scale_gradient.svg, and with how a point whose colour is none is left out.
+    test "a value its scale maps to :none draws no point, though the axes span it" do
+      plot =
+        %{"x" => Enum.to_list(1..6), "y" => [2, 4, 3, 6, 5, 1], "z" => [nil, 1, 2, nil, 3, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{colour: :z})
+        |> Plot.scale_color_gradient(low: "yellow", high: "red", na_value: :none)
+
+      assert to_svg(plot) == File.read!("test/golden/scale_gradient_na_none.svg")
     end
 
     # Golden: test/golden/colorbar_unlabelled.svg, checked as test/golden/scale_gradient.svg is,

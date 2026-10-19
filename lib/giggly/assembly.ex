@@ -622,16 +622,33 @@ defmodule Giggly.Assembly do
   end
 
   # The layer's table with each column of an aesthetic other than position mapped through its
-  # scale, as ggplot2's `map_df()` maps them, in name order.
+  # scale, as ggplot2's `map_df()` maps them, in name order. A value mapped to `:none`, a scale's
+  # `na_value: :none`, is put in as `nil`, the table's missing value, as R's mapped column holds
+  # `NA`: a column holds one type, so `:none` beside a colour would be refused, and a geom reads a
+  # missing colour as none (`Giggly.Geom.Mark.colors/3`).
   defp map_non_position(frame, scales) do
     scales
     |> Enum.sort()
     |> Enum.reduce(frame, fn {aesthetic, scale}, mapped ->
       if aesthetic in DataFrame.names(mapped),
-        do: DataFrame.put(mapped, aesthetic, Scale.map(scale, DataFrame.pull(mapped, aesthetic))),
+        do:
+          DataFrame.put(
+            mapped,
+            aesthetic,
+            mapped_values(scale, DataFrame.pull(mapped, aesthetic))
+          ),
         else: mapped
     end)
   end
+
+  defp mapped_values(scale, values) do
+    scale
+    |> Scale.map(values)
+    |> Enum.map(&missing_for_none/1)
+  end
+
+  defp missing_for_none(:none), do: nil
+  defp missing_for_none(value), do: value
 
   # The layer's table with each aesthetic its position reads given, in every row, the value the
   # layer sets for it, or else the position's default, as ggplot2's `use_defaults()` for a position

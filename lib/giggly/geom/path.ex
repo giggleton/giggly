@@ -11,15 +11,15 @@ defmodule Giggly.Geom.Path do
   # joins the accepted list with the scale that maps it, so a mapping never silently does nothing.
   #
   # A path is drawn as ggplot2's `GeomPath` draws one. Rows missing `x` or `y` (`nil`, or the float
-  # `:nan`), or whose colour is `:none`, R's `NA`, at the start or end of a group are dropped, as
-  # `handle_na()` drops them, and one missing a position in the middle breaks the line there, as
-  # grid breaks a polyline; ggplot2 also warns of the rows it drops, which a pure pipeline cannot.
-  # The rows are put in group order, keeping each group's own order, and cut into steps that follow
-  # the panel's curves (`Giggly.Coord.munch/3`); a group of fewer than two rows is not drawn. Where
-  # every group keeps one colour and one alpha all along it, each group is one line, drawn in its
-  # first row's colour and alpha; where any group's vary, every group is drawn a segment from each
-  # row to the next, each in the colour and alpha of the row it starts from, and a segment touching
-  # a missing position is not drawn.
+  # `:nan`), or whose colour is `:none`, R's `NA`, or missing, at the start or end of a group are
+  # dropped, as `handle_na()` drops them, and one missing a position in the middle breaks the line
+  # there, as grid breaks a polyline; ggplot2 also warns of the rows it drops, which a pure
+  # pipeline cannot. The rows are put in group order, keeping each group's own order, and cut into
+  # steps that follow the panel's curves (`Giggly.Coord.munch/3`); a group of fewer than two rows
+  # is not drawn. Where every group keeps one colour and one alpha all along it, each group is one
+  # line, drawn in its first row's colour and alpha; where any group's vary, every group is drawn a
+  # segment from each row to the next, each in the colour and alpha of the row it starts from, and
+  # a segment touching a missing position is not drawn.
   #
   # Every line looks as ggplot2's default line does, until aesthetics such as linetype can be
   # mapped: solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the `linewidth` a
@@ -235,7 +235,7 @@ defmodule Giggly.Geom.Path do
           DataFrame.pull(frame, :x),
           DataFrame.pull(frame, :y),
           DataFrame.pull(frame, :group),
-          Mark.values(frame, :color, @color),
+          Mark.colors(frame, :color, @color),
           Mark.values(frame, :alpha, nil)
         ],
         fn [x_position, y_position, group, color, alpha] ->
@@ -245,7 +245,8 @@ defmodule Giggly.Geom.Path do
     end
 
     # A row with both positions and a colour, before it is placed, as R's `complete.cases()` finds
-    # one, an infinite position counting as present and a colour of `:none` as missing.
+    # one, an infinite position counting as present and a colour of `:none` as missing, a colour
+    # read by `Mark.colors/3` so a missing one is `:none` too.
     defp complete?(row),
       do: not missing?(row.x) and not missing?(row.y) and row.color != :none
 

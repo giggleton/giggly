@@ -165,7 +165,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
   it checked as an axis's are,
   trained once the positions are final on every layer's column of it (a column a stat dropped
-  trains nothing), and each column mapped through it, then the set values on top: a
+  trains nothing), and each column mapped through it, a value mapped to `:none` put in as `nil`,
+  the table's missing value, as R's mapped column holds `NA`, then the set values on top: a
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
 - **Each non-position scale gives a legend unless its guide is `:none` or it has no breaks**,

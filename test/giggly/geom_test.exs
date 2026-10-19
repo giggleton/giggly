@@ -87,10 +87,10 @@ defmodule Giggly.GeomTest do
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
-    test "a colour of :none draws no point, as ggplot2 drops a point whose colour is NA" do
+    test "a colour of :none, or a missing one, draws no point, as ggplot2 drops one whose colour is NA" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
-      frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], color: [:none, :none])
+      frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], color: [:none, nil])
 
       drawn = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
@@ -190,27 +190,27 @@ defmodule Giggly.GeomTest do
                 [1.0, @half_alpha]}
     end
 
-    test "a fill of :none is no fill at all, whatever the alpha" do
+    test "a fill or border of :none, or a missing one, is none at all, whatever the alpha" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
 
       frame =
         DataFrame.new(
-          xmin: [0.0],
-          xmax: [1.0],
-          ymin: [0.0],
-          ymax: [2.0],
-          alpha: [0.5],
-          fill: [:none],
-          color: ["#FF0000"]
+          xmin: [0.0, 1.0],
+          xmax: [1.0, 2.0],
+          ymin: [0.0, 0.0],
+          ymax: [2.0, 2.0],
+          alpha: [0.5, 0.5],
+          fill: [:none, nil],
+          color: ["#FF0000", nil]
         )
 
       assert [
                %Rectangles{
-                 fill: [:none],
-                 fill_opacity: [+0.0],
-                 color: ["#FF0000"],
-                 color_opacity: [1.0]
+                 fill: [:none, :none],
+                 fill_opacity: [+0.0, +0.0],
+                 color: ["#FF0000", :none],
+                 color_opacity: [1.0, +0.0]
                }
              ] =
                Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
@@ -429,11 +429,22 @@ defmodule Giggly.GeomTest do
       assert segments.opacity === [1.0, 1.0, 1.0]
     end
 
-    test "a colour of :none draws no line, as ggplot2 drops the rows whose colour is NA",
+    test "a colour of :none, or a missing one, draws no line, as ggplot2 drops rows whose colour is NA",
          %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1], color: [:none, :none])
 
+      missing =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [1.0, 2.0, 3.0],
+          group: [1, 1, 1],
+          color: [nil, "#FF0000", "#FF0000"]
+        )
+
       assert Geom.draw_panel(@path, frame, coord, params) === []
+
+      assert [%Polylines{lines: [[{0.5, 0.5}, {0.75, 0.75}]], color: ["#FF0000"]}] =
+               Geom.draw_panel(@path, missing, coord, params)
     end
 
     test "a line is drawn as a path through its rows", %{coord: coord, params: params} do
@@ -468,9 +479,9 @@ defmodule Giggly.GeomTest do
       assert %Text{x: [0.2, 0.8], y: [0.2, 0.8], labels: ["a", "e"]} = text(frame, context)
     end
 
-    test "a colour of :none draws no label, as ggplot2 drops text whose colour is NA", context do
-      frame =
-        DataFrame.new(x: [0.2, 0.4], y: [0.2, 0.4], label: ["a", "b"], color: [:none, :none])
+    test "a colour of :none, or a missing one, draws no label, as ggplot2 drops text whose colour is NA",
+         context do
+      frame = DataFrame.new(x: [0.2, 0.4], y: [0.2, 0.4], label: ["a", "b"], color: [:none, nil])
 
       assert %Text{labels: []} = text(frame, context)
     end

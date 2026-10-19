@@ -229,7 +229,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
   `alpha`, `fill`) take a list, which `fixed` holds as one value per annotation. A list's values
-  are of one type, checked by building its column (`Giggly.DataFrame`) at the call. A position is
-  kept as a float where it is a number, as an option's number is. The options are each geom's
-  function's but `data:`, `position:` and nudging, so one its geom cannot use raises, where ggplot2
-  warns and ignores it.
+  are of one type, checked by building its column (`Giggly.DataFrame`) at the call, a colour's
+  `:none` in a list held as `nil`, the column's missing value, as R's `c(NA, "red")` holds `NA`.
+  A position is kept as a float where it is a number, as an option's number is. The options are
+  each geom's function's but `data:`, `position:` and nudging, so one its geom cannot use raises,
+  where ggplot2 warns and ignores it.

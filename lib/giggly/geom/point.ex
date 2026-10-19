@@ -18,8 +18,8 @@ defmodule Giggly.Geom.Point do
   # makes the point that opaque, replacing its colour's own, as ggplot2's `alpha()` colours both; a
   # row without one keeps its colour's, which is opaque unless the colour carries an alpha, as
   # ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A row whose colour is
-  # `:none`, R's `NA`, draws no point, as ggplot2's `GeomPoint` drops a row whose colour is
-  # missing.
+  # `:none`, R's `NA`, or missing, as a scale's `na_value: :none` leaves it, draws no point, as
+  # ggplot2's `GeomPoint` drops a row whose colour is missing.
 
   defstruct []
 
@@ -69,7 +69,7 @@ defmodule Giggly.Geom.Point do
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      colors = Mark.values(placed, :color, @color)
+      colors = Mark.colors(placed, :color, @color)
 
       drawn =
         [

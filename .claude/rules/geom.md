@@ -51,7 +51,7 @@ where its marks sit".
   `#595959`, ink mixed 35% toward paper, with no border, its border's width 0.5 mm all the same.
   The defaults move to the theme with the default-aesthetics stage. **A row's colour, mapped or
   set, replaces the default**: a point's colour, a bar's fill and border, a line's colour, read
-  from each row (`Giggly.Geom.Mark.values/3`), where the assembly put it, so the scene carries one
+  from each row (`Giggly.Geom.Mark.colors/3`), where the assembly put it, so the scene carries one
   per mark. A point takes `color` and no `fill`, which colours only the filled shapes not yet
   drawn; a bar takes both; a line takes `color`.
 - **A row's `alpha` replaces its colour's own alpha: a point's outline and fill alike, a bar's fill
@@ -64,9 +64,10 @@ where its marks sit".
 - **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
   and `GeomPath` drop the rows whose colour is missing (`handle_na()`, a path's at a group's ends),
   and a bar left unfilled or unbordered, whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's
-  or a line's key draws nothing, and a bar's is left unfilled or unbordered. A frame's column holds
-  one type, so `:none` fills a whole column, as a set `colour: :none` does, and never sits beside a
-  mapped colour, which is never `NA` (a missing value maps to grey50).
+  or a line's key draws nothing, and a bar's is left unfilled or unbordered. **A missing colour
+  draws as `:none` does** (`Mark.colors/3`): a frame's column holds one type, so a set `colour:
+  :none` fills its whole column, and a value a scale maps to `:none` (`na_value: :none`), or an
+  annotation's list's `:none`, is held as `nil`, as R's column holds `NA`.
 - **A geom draws its own legend key (`draw_key/3`)**, as ggplot2's `draw_key` belongs to the geom:
   handed the key's aesthetic values, the layer's set values among them as ggplot2's key data holds
   its `aes_params`, and its size in points, it draws in the key's cell. A point's key is the point

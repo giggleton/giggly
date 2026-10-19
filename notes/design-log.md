@@ -131,6 +131,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Deferred: a palette by name* (R's registry of 138, `"viridis"`), with the brewer and viridis
   palettes most of its names point to.
 
+- **A colour of `:none` beside others in a column is held as `nil`, and a geom reads a missing
+  colour as `:none` (2026-10-19, Steve: "Fix"; found by step 7's notebook sweep).** Step 5's
+  `na_value: :none` raised whenever a value was missing, and an annotation's list such as `fill:
+  [:none, "red"]` was refused at the call: each made a column of colours beside `:none`, and a
+  column holds one type. R's column holds `NA`, so `nil`, the table's missing value, is the same
+  value, and the two `layer_data()`s agree: the assembly puts a value a scale maps to `:none` in
+  as `nil`, and `annotate/3` holds a list's `:none` so. `Geom.Mark.colors/3` reads it as
+  `:none`, which every geom already draws as R draws `NA`: no point, line or label, a rectangle
+  unfilled or unbordered. A scale still maps to `:none`, so a legend's key keeps it, and a set
+  `colour: :none` still fills its column. *Rejected: the frame taking `:none` beside a string*:
+  the frame knows nothing about plots, and `nil` already means missing. *Rejected: a transparent
+  colour*: R draws no mark for `NA`, where a transparent colour is a mark.
+
 - **The hue scale's options are spelled out: `hue:`, `chroma:`, `luminance:` and `direction:`
   (2026-10-19, Steve).** `scale_color_hue(hue: {0, 90}, luminance: 40)`, as the hue palette
   records them and as Giggly names things, no abbreviation or single letter: `hue:` the range of
@@ -1755,6 +1768,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Draw a colour of :none beside others as R draws NA (scale functions, step 7a);
+  §4: "A colour of `:none` beside others in a column is held as `nil`"
 - 2026-10-19 — Let a plot choose its guides (scale functions, step 6); §4: "A guide is chosen by a
   scale's `guide:` and by `guides/2`", "`Plot` lists `Giggly.Guide` to build a legend's struct"
 - 2026-10-19 — Give a plot colour, fill and alpha scales (scale functions, step 5); §4: "Colour,

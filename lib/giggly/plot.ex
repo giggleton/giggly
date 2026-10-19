@@ -3742,9 +3742,15 @@ defmodule Giggly.Plot do
   defp recycled(value, count), do: List.duplicate(value, count)
 
   # An aesthetic's set value: one value, or a list of several, one per row of the annotation's
-  # table.
+  # table, a colour's `:none` in it held as `nil`, the missing value of the column it becomes, as
+  # R's `c(NA, "red")` holds `NA`, so it sits beside a colour; a geom reads a missing colour as
+  # none.
   defp per_row([value]), do: value
+  defp per_row(values) when is_list(values), do: Enum.map(values, &missing_for_none/1)
   defp per_row(value), do: value
+
+  defp missing_for_none(:none), do: nil
+  defp missing_for_none(value), do: value
 
   # Each list an annotation's aesthetic is given becomes a column of the layer's table when the plot
   # is run, so its values are checked here, at the call, as a table checks a column's, of one type,

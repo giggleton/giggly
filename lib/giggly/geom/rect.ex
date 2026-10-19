@@ -18,7 +18,7 @@ defmodule Giggly.Geom.Rect do
   # Every rectangle looks as ggplot2's default rectangle does: filled with ink mixed 35% toward
   # paper, `#595959`, with no border, its border's width the theme's 0.5 mm all the same, as
   # ggplot2's snapshots write it, or filled and bordered in its row's colours, mapped or set,
-  # `:none`, R's `NA`, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
+  # `:none`, R's `NA`, or missing, leaving it unfilled or unbordered. A row's `alpha`, where its table has one,
   # makes the rectangle's fill that opaque, replacing the fill's own alpha, and leaves its border in
   # its colour's own, as ggplot2's `GeomRect` applies `fill_alpha()` to the fill alone; a row
   # without one keeps its fill's (`Giggly.Geom.Mark`). Its legend key is its fill short of the key
@@ -61,7 +61,7 @@ defmodule Giggly.Geom.Rect do
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      fills = Mark.values(placed, :fill, @fill)
+      fills = Mark.colors(placed, :fill, @fill)
 
       drawn =
         [:xmin, :xmax, :ymin, :ymax]
@@ -69,7 +69,7 @@ defmodule Giggly.Geom.Rect do
         |> Enum.concat([
           fills,
           Mark.opacities(placed, fills),
-          Mark.values(placed, :color, :none)
+          Mark.colors(placed, :color, :none)
         ])
         |> Enum.zip_with(fn [xmin, xmax, ymin, ymax, fill, fill_opacity, border] ->
           %{

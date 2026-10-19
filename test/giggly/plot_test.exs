@@ -1196,10 +1196,6 @@ defmodule Giggly.PlotTest do
     test "a list's values are of one type, as a column of the layer's table holds" do
       plot = Plot.new(@rows)
 
-      assert_raise ArgumentError, ~r/the column :fill .*\(:none and "#FF0000"\)/, fn ->
-        Plot.annotate(plot, :rect, xmin: 1, xmax: 2, ymin: 1, ymax: 2, fill: [:none, "red"])
-      end
-
       assert_raise ArgumentError, ~r/the column :label .*\("a" and 1\)/, fn ->
         Plot.annotate(plot, :text, x: [1, 2], y: 1, label: ["a", 1])
       end

@@ -12,7 +12,7 @@ defmodule Giggly.Geom.Text do
   # A label is its row's value written as R's `as.character()` writes it (`Giggly.AsCharacter`):
   # `21`, `2.62`, `0.333333333333333`, `1e+05`, `TRUE`. A row missing its `x`, `y` or label
   # (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops it, nor is one whose colour is
-  # `:none`, R's `NA`.
+  # `:none`, R's `NA`, or missing.
   #
   # Every label is drawn as ggplot2's default text is, until aesthetics can change it: black, or its
   # row's colour, at its row's alpha as a point is (`Giggly.Geom.Mark`); 11 points, the theme's
@@ -82,7 +82,7 @@ defmodule Giggly.Geom.Text do
       angle = Mark.set(placed, :angle, 0.0)
       hjust = Mark.set(placed, :hjust, 0.5)
       vjust = Mark.set(placed, :vjust, 0.5)
-      colors = Mark.values(placed, :color, @color)
+      colors = Mark.colors(placed, :color, @color)
 
       drawn =
         [
