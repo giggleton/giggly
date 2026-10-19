@@ -28,7 +28,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   its root. A plot writes a scale and never runs one.
 - **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
   the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
-  `scale_y_continuous/2`, `xlim/3`, `ylim/3`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
+  `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `xlim/3`, `ylim/3`,
+  `lims/2`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -65,7 +66,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   it. **The plot records a scale per aesthetic a scale function gives one** (`scales`, `%{}` until
   then): an untrained `%Scale.Continuous{}` with the options given, built by `struct!/2` so an
   option not given keeps the struct's default; a later scale for the aesthetic replaces it whole,
-  `xlim/3` and `lims/2` included, as ggplot2's does. The theme is still a name, `theme: :gray`,
+  `xlim/3` and `lims/2` included, as ggplot2's does. **Limits, breaks and minor breaks are
+  recorded in data units, as given**, for the scale to transform; a shortcut records its
+  transformation in `transform`, and takes every other option `scale_x_continuous/2` does; limits
+  in either order are recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair
+  given high to low, as ggplot2's `limits()` does (design-log §4, the entry beginning
+  "Transformations are"). The theme is still a name, `theme: :gray`,
   until a user can set one; what a misspelt name does arrives with that option, and it must raise
   at the call.
 - **A mistake raises from the call that wrote it, or from the layer that draws it.** Each layer

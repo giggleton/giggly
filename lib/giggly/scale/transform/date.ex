@@ -20,6 +20,13 @@ defmodule Giggly.Scale.Transform.Date do
   @impl Giggly.Scale.Transform
   def transform(values), do: Enum.map(values, &days/1)
 
+  # A position's date, its whole days since 1970-01-01, as a date's label writes it.
+  @impl Giggly.Scale.Transform
+  def inverse(positions), do: Enum.map(positions, &date/1)
+
+  @impl Giggly.Scale.Transform
+  def domain, do: {:neg_infinity, :infinity}
+
   @impl Giggly.Scale.Transform
   def breaks(extent) do
     {dates, _format} = DateBreaks.pretty(extent)
@@ -34,11 +41,13 @@ defmodule Giggly.Scale.Transform.Date do
     {_dates, format} = DateBreaks.pretty(extent)
 
     Enum.map(breaks, fn day ->
-      @epoch
-      |> Date.add(trunc(day))
+      day
+      |> date()
       |> DateBreaks.label(format)
     end)
   end
+
+  defp date(day), do: Date.add(@epoch, trunc(day))
 
   # A date's days since 1970-01-01, a double as R stores it.
   defp days(nil), do: nil

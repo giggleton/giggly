@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Transformations are log10, sqrt, reverse and reciprocal, R's transformation objects ported
+  whole (2026-10-19, Steve).** `scale_x_continuous/2`'s `transform:` takes `:identity`, `:log10`,
+  `:sqrt`, `:reverse` or `:reciprocal`, and `scale_x_log10/2`, `scale_x_sqrt/2`,
+  `scale_x_reverse/2` and their y twins set it: the scale_continuous page draws each, reciprocal
+  its own example. Breaks are found in data units on the extent turned back, labels written from
+  breaks turned back, a labels function handed those; limits, given breaks and minor breaks are
+  given in data units and transformed, limits then sorted, as ggplot2 sorts them, so a scale
+  function takes either order, and `xlim/3`, `ylim/3` and `lims/2` reverse an axis given high to
+  low, as ggplot2's `limits()` does. A value outside the domain is R's: `log10(0)` is minus
+  infinity, at the panel's edge, a NaN missing. *Rejected: R's other transformations* (log, log2,
+  exp, pseudo_log): no example draws one. *Rejected: transformations a user defines*: `Transform`
+  made API, built from closures. *Rejected: refusing high-to-low limits on a scale function*: the
+  order means nothing once transformed (`scale_x_reverse` takes both).
+
 - **`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**
   `currency`, since scales 1.4.0 supersedes `label_dollar()` with it, the output the same (the
@@ -1630,7 +1644,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Write a scale's labels as R's formatters do (scale functions, step 2); §4:
+- 2026-10-19 — Give a plot transformed scales: log10, sqrt, reverse and reciprocal (scale
+  functions, step 3); §4: "Transformations are log10, sqrt, reverse and reciprocal"
+- 2026-10-18 — Write a scale's labels as R's formatters do (scale functions, step 2) (`7486f22`); §4:
   "`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option", "`labels:`
   takes a list"
 - 2026-10-18 — Give a plot continuous position scales (scale functions, step 1) (`1d650df`); §4:

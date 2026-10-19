@@ -1368,12 +1368,63 @@ defmodule Giggly.PlotTest do
                 }}
     end
 
-    # ggplot2 4.0.3 takes `xlim(3, 3)`, an axis of zero width, which is widened as a single value.
-    test "limits may be equal, but not from high to low" do
+    # ggplot2 4.0.3 takes `xlim(3, 3)`, an axis of zero width, which is widened as a single value;
+    # its `limits()` reverses an axis given high to low, and a scale function sorts its limits once
+    # transformed, so they are kept as given.
+    test "limits may be equal, and given high to low reverse the axis xlim/3 or lims/2 sets" do
       plot = Plot.new(@rows)
 
-      assert Plot.xlim(plot, 3, 3).scales.x.limits === {3.0, 3.0}
-      assert_raise NimbleOptions.ValidationError, fn -> Plot.xlim(plot, 3.5, 3) end
+      assert Plot.xlim(plot, 3, 3).scales.x === %Scale.Continuous{limits: {3.0, 3.0}}
+
+      assert Plot.xlim(plot, 3.5, 3).scales.x ===
+               %Scale.Continuous{limits: {3.5, 3.0}, transform: :reverse}
+
+      assert Plot.ylim(plot, 6, nil).scales.y === %Scale.Continuous{limits: {6.0, nil}}
+
+      assert Plot.lims(plot, y: {6, 1}).scales.y ===
+               %Scale.Continuous{limits: {6.0, 1.0}, transform: :reverse}
+
+      assert Plot.scale_x_continuous(plot, limits: {5, 2}).scales.x ===
+               %Scale.Continuous{limits: {5.0, 2.0}}
+    end
+
+    test "a transformed scale's function records its transformation and its options as given" do
+      plot = Plot.new(@rows)
+
+      for {function, aesthetic, transform} <- [
+            {&Plot.scale_x_log10/2, :x, :log10},
+            {&Plot.scale_y_log10/2, :y, :log10},
+            {&Plot.scale_x_sqrt/2, :x, :sqrt},
+            {&Plot.scale_y_sqrt/2, :y, :sqrt},
+            {&Plot.scale_x_reverse/2, :x, :reverse},
+            {&Plot.scale_y_reverse/2, :y, :reverse}
+          ] do
+        assert function.(plot, name: "Mileage", limits: {30, 10}).scales ===
+                 %{
+                   aesthetic => %Scale.Continuous{
+                     transform: transform,
+                     name: "Mileage",
+                     limits: {30.0, 10.0}
+                   }
+                 }
+      end
+
+      assert Plot.scale_x_continuous(plot, transform: :reciprocal).scales.x ===
+               %Scale.Continuous{transform: :reciprocal}
+    end
+
+    test "a transformed scale's function takes no transformation, and names itself" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.scale_y_log10(plot, transform: :sqrt)
+        end
+
+      assert error.key == [:transform]
+
+      labels = assert_raise ArgumentError, fn -> Plot.scale_y_sqrt(plot, labels: ["a"]) end
+      assert labels.message =~ "Plot.scale_y_sqrt/2"
     end
 
     test "ylim/3 sets the y scale's limits, nil leaving an end to the data" do
@@ -1392,7 +1443,6 @@ defmodule Giggly.PlotTest do
       # Each option, its value, and the part of it the refusal shows.
       for {key, value, shown} <- [
             {:name, 5, "5"},
-            {:limits, {5, 2}, "{5, 2}"},
             {:limits, {"a", 3}, ~s({"a", 3})},
             {:limits, [2, 5], "[2, 5]"},
             {:breaks, [1, "a"], ~s(got: "a" in it)},
@@ -1406,7 +1456,9 @@ defmodule Giggly.PlotTest do
             {:expand, [mult: "a"], ~s([mult: "a"])},
             {:expand, [mult: {0, "a"}], ~s([mult: {0, "a"}])},
             {:expand, [0, 0.05], "[0, 0.05]"},
-            {:expand, 0.05, "got: 0.05"}
+            {:expand, 0.05, "got: 0.05"},
+            {:transform, :log2, ":log2"},
+            {:transform, "log10", ~s("log10")}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
@@ -1428,9 +1480,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for limit <- [
-            fn -> Plot.xlim(plot, 6, 1) end,
             fn -> Plot.ylim(plot, "a", 1) end,
-            fn -> Plot.lims(plot, x: {6, 1}) end,
             fn -> Plot.lims(plot, z: {1, 6}) end
           ] do
         assert_raise NimbleOptions.ValidationError, limit

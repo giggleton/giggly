@@ -75,13 +75,16 @@ grid lines are placed by the coordinate system".
   untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
   records the untrained scale"). Its field defaults are a position scale's, so `%Continuous{}` is
   `new(:continuous)`. `kind_of/1` says which kind a scale is, as `kind/1` says which a column needs.
-- **Limits replace the range end by end, and a position outside them is censored.** An end of
-  `nil` takes the range's (R's `get_limits()`), and with both ends an axis exists before any data.
+- **Limits replace the range end by end, and a position outside them is censored.** Given in
+  data units, they are transformed and, both given, sorted, as ggplot2 transforms and sorts them
+  (`Continuous.limits/1`); a given end outside the domain raises, where R fails. An end of `nil`
+  takes the range's (R's `get_limits()`), and with both ends an axis exists before any data.
   `map/2` turns a position outside the limits into `nil` before the stat, and `censor/2` does once
   the positions are final, as ggplot2 maps them twice with `oob = censor` (finite values only):
   `:infinity` and `:neg_infinity` are kept, and a discrete scale's positions are never censored.
-- **Given breaks are kept in the order given wherever they fall inside the widened extent**, even
-  beyond the limits, as R keeps 1.4 on mtcars' weights from 1.513; given labels go with their
+- **Given breaks are kept in the order given wherever they fall inside the widened extent**, in
+  data units and transformed, one outside the transformation's domain dropped, even beyond the
+  limits, as R keeps 1.4 on mtcars' weights from 1.513; given labels go with their
   breaks by index, so a break left out takes its label with it; a labels function is handed every
   break drawn at once, as R's are, and must return a string for each, or the run raises; `:none`
   gives no breaks (so no minor breaks), no minor breaks, or `{position, :none}` for each break,
@@ -114,18 +117,29 @@ grid lines are placed by the coordinate system".
   exists once, and grouping does not depend on scales to use it.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
-  `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`. A
+  `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`; a
+  plot's scale may name `:log10`, `:sqrt`, `:reverse` or `:reciprocal`. A
   discrete scale has none, as in ggplot2, and `transform/2` returns its values as given.
 - **A scale trains and maps in transformed space.** The assembly puts an axis's columns through
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
-  there, and carries its axis's default breaks, minor breaks and labels, as R's object carries
-  `breaks`, `minor_breaks` and `format`. **A label is made from the break and the extent**
-  (`format/2`), since a date's format is the step chosen for the whole axis; a number's ignores
-  the extent and is written once the breaks outside it are dropped. What else R's object carries
-  (the inverse, the domain) joins the behaviour with its first reader outside a transformation:
-  the date transformation finds its breaks in days and turns them back into dates itself.
+  there, and carries what R's object carries and a scale reads: the transformation, its inverse,
+  its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
+  `format`). **A label is made from the break and the extent** (`format/2`), since a date's
+  format is the step chosen for the whole axis; a number's ignores the extent and is written once
+  the breaks outside it are dropped. **Breaks follow ggplot2's `get_breaks()`**: the extent
+  squished into the transformed domain (log10 from -100, sqrt from 0), turned back into data
+  units, broken there, and transformed back, **in the order that leaves them**, so reverse's and
+  reciprocal's descend, as R draws them; labels are written, and a labels function handed, the
+  breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
+  log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
+  `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
+- **log10's breaks are exactly R's `breaks_log()`, five wanted** (`Transform.Log10`): every power
+  of ten, or every second, third and so on, the widest step leaving three inside; else
+  `log_sub_breaks()`'s multiples, evenest in log space first, keeping one each side; else
+  extended breaks in data units. Its test pins R's own axis for each branch. sqrt, reverse and
+  reciprocal take extended breaks on the data range, as R's `extended_breaks()` does.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`; it trains, expands and
   is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly
@@ -152,8 +166,10 @@ grid lines are placed by the coordinate system".
   minor breaks kept inside the extent, ends included (R's `discard()`), less the breaks
   themselves, which ggplot2's grid takes out of its minor lines and nothing here reads. A discrete
   scale has none, as in ggplot2.
-- **The identity's minor breaks are R's `scales::regular_minor_breaks()`** (`Scale.MinorBreaks`)
-  with two intervals per gap: one more step past an outermost break the extent reaches beyond,
+- **Every transformation's minor breaks are R's `scales::regular_minor_breaks()`**
+  (`Scale.MinorBreaks`), in transformed space, with two intervals per gap, on the breaks in the
+  transformation's order, the first gap's step added before and after them as R adds it, with
+  `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
 - **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
@@ -163,7 +179,8 @@ grid lines are placed by the coordinate system".
   regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
 - **Labels are written the Elixir way, not R's** (`Scale.Labels`): `inspect`'s plain decimals,
   rounded to 15 significant digits, as many decimals on every label as the most precise needs,
-  none when all are whole, negative zero as `0`, never scientific, no thousands separators. **A
+  none when all are whole, negative zero as `0`, never scientific, no thousands separators, so a
+  log axis's `1e+05` is written `100000`. **A
   discrete level is written as R's `as.character()` writes its value** (`Giggly.AsCharacter`),
   as `factor()` labels its levels: `4`, `0.5`, `1e+05`, `TRUE`; a missing level is `NA`. The
   scale lists `Giggly.AsCharacter` for it, and the text geom lists it too, so the rule has one

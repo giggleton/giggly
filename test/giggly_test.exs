@@ -1650,6 +1650,34 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, under a transformed scale" do
+    # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data() of ggplot(mpg, aes(class)) + geom_bar() with
+    # scale_y_log10() and with scale_y_reverse(): each class's count is put through the scale and
+    # the bar set up on it afterwards, so on a log axis it stands from 0, a count of 1, and on a
+    # reversed one from 0 down to minus its count. They move only if ggplot2's bars do.
+    test "a bar is set up from zero once its count is transformed" do
+      log10 =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Plot.scale_y_log10()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(log10, :y) == Enum.map([5, 47, 41, 11, 33, 35, 62], &:math.log10/1)
+      assert DataFrame.pull(log10, :ymin) == List.duplicate(0.0, 7)
+
+      reversed =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Plot.scale_y_reverse()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(reversed, :ymin) == [-5.0, -47.0, -41.0, -11.0, -33.0, -35.0, -62.0]
+      assert DataFrame.pull(reversed, :ymax) == List.duplicate(0.0, 7)
+    end
+  end
+
   describe "the guides' titles" do
     # ggplot2 4.0.3 titles the axis by the scale's name whether `labs()` comes before or after it.
     test "a scale's name titles its axis over a label, whichever comes first, :none included" do
@@ -2719,6 +2747,46 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/scale_bars_cut.svg")
+    end
+
+    # Golden: test/golden/scale_log10.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/scale_log10.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's highway mileage on a base-10 log axis, too
+    # short a span for powers of ten, so marked at 20, 30 and 40, with minor grid lines midway in
+    # log space. It moves with what moves test/golden/point.svg, and with the log transformation.
+    test "a log axis is marked at multiples of ten in data units, its grid even in log space" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.scale_y_log10()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_log10.svg")
+    end
+
+    # Golden: test/golden/scale_reverse.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_reverse.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. mtcars' mileage against weight with
+    # xlim(20, 15), so the x axis runs from 20 down to 15 and the cars outside it are not drawn. It
+    # moves with what moves test/golden/point.svg, and with the reverse transformation.
+    test "limits given high to low run the axis from high to low" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point()
+        |> Plot.xlim(20, 15)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_reverse.svg")
     end
 
     test "a labels function that gives no string for each break is refused when drawn" do

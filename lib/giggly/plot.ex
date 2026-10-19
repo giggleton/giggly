@@ -557,53 +557,72 @@ defmodule Giggly.Plot do
   @limits_type {:custom, __MODULE__, :validate_limits, []}
 
   # The continuous scale functions' options, validated at the call; an option not given keeps the
-  # scale's default, `Giggly.Scale.Continuous`'s.
-  @continuous_scale_options NimbleOptions.new!(
-                              name: [
-                                type: {:custom, __MODULE__, :validate_label, []},
+  # scale's default, `Giggly.Scale.Continuous`'s. A transformed scale's function takes them all but
+  # `transform:`, which it sets.
+  @scale_option_specs [
+    name: [
+      type: {:custom, __MODULE__, :validate_label, []},
+      doc:
+        "The axis's title, or `:none` for none; the title its " <>
+          "mapping gives when not given."
+    ],
+    limits: [
+      type: @limits_type,
+      doc:
+        "`{low, high}`: the values the axis spans whatever the " <>
+          "data, in data units, `nil` for an end the data decides; " <>
+          "either order names the same axis. A value outside them is " <>
+          "missing, so its mark is not drawn."
+    ],
+    breaks: [
+      type: {:custom, __MODULE__, :validate_breaks, []},
+      doc:
+        "The values the axis marks with a tick, a label and a grid " <>
+          "line, a list of numbers in data units, or `:none` for " <>
+          "none; chosen from the limits when not given. A break is " <>
+          "drawn wherever it falls inside the widened axis."
+    ],
+    minor_breaks: [
+      type: {:custom, __MODULE__, :validate_breaks, []},
+      doc:
+        "The values the panel draws a minor grid line at, a list of " <>
+          "numbers in data units, or `:none` for none; midway " <>
+          "between the breaks, once transformed, when not given."
+    ],
+    labels: [
+      type: {:custom, __MODULE__, :validate_scale_labels, []},
+      doc:
+        "The breaks' labels: a list of strings, one for each of " <>
+          "`breaks:`; a function handed every break drawn, a list of " <>
+          "numbers in data units, that returns a string for each, as " <>
+          "`Giggly.Format`'s do; or `:none` for ticks with no labels."
+    ],
+    expand: [
+      type: {:custom, __MODULE__, :validate_expand, []},
+      doc:
+        "How far the axis reaches beyond its limits, `[mult: m, add: " <>
+          "a]`: at each end, that multiple of the limits' width plus " <>
+          "that constant, each a number or `{low, high}` for the two " <>
+          "ends; `[mult: 0.05]` when not given."
+    ]
+  ]
+
+  @continuous_scale_options @scale_option_specs
+                            |> Enum.concat(
+                              transform: [
+                                type: {:in, [:identity, :log10, :sqrt, :reverse, :reciprocal]},
                                 doc:
-                                  "The axis's title, or `:none` for none; the title its " <>
-                                    "mapping gives when not given."
-                              ],
-                              limits: [
-                                type: @limits_type,
-                                doc:
-                                  "`{low, high}`: the values the axis spans whatever the " <>
-                                    "data, `nil` for an end the data decides. A value outside " <>
-                                    "them is missing, so its mark is not drawn."
-                              ],
-                              breaks: [
-                                type: {:custom, __MODULE__, :validate_breaks, []},
-                                doc:
-                                  "The values the axis marks with a tick, a label and a grid " <>
-                                    "line, a list of numbers, or `:none` for none; chosen from " <>
-                                    "the limits when not given. A break is drawn wherever it " <>
-                                    "falls inside the widened axis."
-                              ],
-                              minor_breaks: [
-                                type: {:custom, __MODULE__, :validate_breaks, []},
-                                doc:
-                                  "The values the panel draws a minor grid line at, a list of " <>
-                                    "numbers, or `:none` for none; midway between the breaks " <>
-                                    "when not given."
-                              ],
-                              labels: [
-                                type: {:custom, __MODULE__, :validate_scale_labels, []},
-                                doc:
-                                  "The breaks' labels: a list of strings, one for each of " <>
-                                    "`breaks:`; a function handed every break drawn, a list of " <>
-                                    "numbers, that returns a string for each, as " <>
-                                    "`Giggly.Format`'s do; or `:none` for ticks with no labels."
-                              ],
-                              expand: [
-                                type: {:custom, __MODULE__, :validate_expand, []},
-                                doc:
-                                  "How far the axis reaches beyond its limits, `[mult: m, add: " <>
-                                    "a]`: at each end, that multiple of the limits' width plus " <>
-                                    "that constant, each a number or `{low, high}` for the two " <>
-                                    "ends; `[mult: 0.05]` when not given."
+                                  "What each value is put through before it is placed: " <>
+                                    "`:identity`, the value itself; `:log10`, its base-10 " <>
+                                    "logarithm; `:sqrt`, its square root; `:reverse`, so the " <>
+                                    "axis runs from high to low; or `:reciprocal`, one over " <>
+                                    "it. `:identity` when not given. The axis is marked and " <>
+                                    "labelled in data units, and widened in transformed space."
                               ]
                             )
+                            |> NimbleOptions.new!()
+
+  @transformed_scale_options NimbleOptions.new!(@scale_option_specs)
 
   # `lims/2`'s options: each axis's limits.
   @lims_options NimbleOptions.new!(
@@ -1286,8 +1305,135 @@ defmodule Giggly.Plot do
     do: continuous_scale(plot, :y, options, "Plot.scale_y_continuous/2")
 
   @doc """
+  Gives the plot a continuous x scale through a base-10 logarithm, replacing any x scale it had,
+  as `scale_x_continuous(plot, transform: :log10)` does: each value is placed at its logarithm,
+  and the axis marked at powers of ten, or at multiples of them where too few powers fall on it,
+  and labelled in data units. Zero is placed at minus infinity, the panel's edge, and a negative
+  value is missing.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1, 10, 100], "y" => [3, 1, 2]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_log10()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [0.0, 1.0, 2.0]
+  """
+  @spec scale_x_log10(t(), keyword()) :: t()
+  def scale_x_log10(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :x, :log10, options, "Plot.scale_x_log10/2")
+
+  @doc """
+  Gives the plot a continuous y scale through a base-10 logarithm, replacing any y scale it had,
+  as `scale_x_log10/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [3, 1, 2], "y" => [1, 10, 100]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_log10()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
+      [0.0, 1.0, 2.0]
+  """
+  @spec scale_y_log10(t(), keyword()) :: t()
+  def scale_y_log10(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :y, :log10, options, "Plot.scale_y_log10/2")
+
+  @doc """
+  Gives the plot a continuous x scale through a square root, replacing any x scale it had, as
+  `scale_x_continuous(plot, transform: :sqrt)` does: each value is placed at its square root, and
+  the axis marked and labelled in data units. A negative value is missing.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1, 4, 9], "y" => [3, 1, 2]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_sqrt()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [1.0, 2.0, 3.0]
+  """
+  @spec scale_x_sqrt(t(), keyword()) :: t()
+  def scale_x_sqrt(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :x, :sqrt, options, "Plot.scale_x_sqrt/2")
+
+  @doc """
+  Gives the plot a continuous y scale through a square root, replacing any y scale it had, as
+  `scale_x_sqrt/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [3, 1, 2], "y" => [1, 4, 9]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_sqrt()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
+      [1.0, 2.0, 3.0]
+  """
+  @spec scale_y_sqrt(t(), keyword()) :: t()
+  def scale_y_sqrt(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :y, :sqrt, options, "Plot.scale_y_sqrt/2")
+
+  @doc """
+  Gives the plot a continuous x scale running from high to low, replacing any x scale it had, as
+  `scale_x_continuous(plot, transform: :reverse)` does: each value is placed at its negation, and
+  the axis marked and labelled in data units.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1.5, 2.5, 3.5], "y" => [3, 1, 2]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_reverse()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [-1.5, -2.5, -3.5]
+  """
+  @spec scale_x_reverse(t(), keyword()) :: t()
+  def scale_x_reverse(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :x, :reverse, options, "Plot.scale_x_reverse/2")
+
+  @doc """
+  Gives the plot a continuous y scale running from high to low, replacing any y scale it had, as
+  `scale_x_reverse/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@transformed_scale_options)}
+
+      iex> plot =
+      ...>   %{"x" => [3, 1, 2], "y" => [1.5, 2.5, 3.5]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_reverse()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
+      [-1.5, -2.5, -3.5]
+  """
+  @spec scale_y_reverse(t(), keyword()) :: t()
+  def scale_y_reverse(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: transformed_scale(plot, :y, :reverse, options, "Plot.scale_y_reverse/2")
+
+  @doc """
   Gives the plot a continuous x scale from `low` to `high`, replacing any x scale it had, as
-  `scale_x_continuous(plot, limits: {low, high})` does; `nil` leaves an end to the data.
+  `scale_x_continuous(plot, limits: {low, high})` does; `nil` leaves an end to the data. Given
+  high to low, the axis runs from high to low, as `transform: :reverse` runs it, each value
+  placed at its negation.
 
       iex> plot =
       ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
@@ -1296,6 +1442,16 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.xlim(nil, 4)
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
       [1.5, 2.6, 3.4]
+
+  A reversed axis:
+
+      iex> plot =
+      ...>   %{"mpg" => [21.0, 22.8, 18.7], "wt" => [2.62, 2.32, 3.44]}
+      ...>   |> Giggly.Plot.new(%{x: :mpg, y: :wt})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.xlim(20, 15)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [nil, nil, -18.7]
   """
   @spec xlim(t(), number() | nil, number() | nil) :: t()
   def xlim(%__MODULE__{} = plot, low, high), do: lims(plot, x: {low, high})
@@ -1337,9 +1493,17 @@ defmodule Giggly.Plot do
     options
     |> NimbleOptions.validate!(@lims_options)
     |> Enum.reduce(plot, fn {aesthetic, limits}, limited ->
-      put_scale(limited, aesthetic, %Scale.Continuous{limits: limits})
+      scale = %Scale.Continuous{limits: limits, transform: limits_transform(limits)}
+      put_scale(limited, aesthetic, scale)
     end)
   end
+
+  # Limits given high to low reverse the axis, as ggplot2's `limits()` chooses
+  # `transform = "reverse"` for them; any others leave it as it is.
+  defp limits_transform({low, high}) when is_number(low) and is_number(high) and low > high,
+    do: :reverse
+
+  defp limits_transform(_limits), do: :identity
 
   @doc """
   Sets the plot's labels: the title of an axis or a legend, named by its aesthetic, and the plot's
@@ -1520,13 +1684,10 @@ defmodule Giggly.Plot do
     do: {:error, "expected a distance along the axis, a number, got: #{inspect(distance)}"}
 
   # NimbleOptions' check of a scale's limits: `{low, high}`, each a number, kept as a float, or
-  # `nil` for an end the data decides, the low end no higher than the high.
+  # `nil` for an end the data decides, in either order, which the scale sorts once transformed.
   @doc false
   @spec validate_limits(term()) ::
           {:ok, {float() | nil, float() | nil}} | {:error, String.t()}
-  def validate_limits({low, high}) when is_number(low) and is_number(high) and low > high,
-    do: {:error, "expected limits from low to high, got: #{inspect({low, high})}"}
-
   def validate_limits({low, high})
       when (is_number(low) or is_nil(low)) and (is_number(high) or is_nil(high)),
       do: {:ok, {limit(low), limit(high)}}
@@ -2121,6 +2282,14 @@ defmodule Giggly.Plot do
     validated = NimbleOptions.validate!(options, @continuous_scale_options)
     check_scale_labels(validated, function)
     put_scale(plot, aesthetic, struct!(Scale.Continuous, validated))
+  end
+
+  # The plot with a continuous scale for `aesthetic` through `transform`, from the options a
+  # transformed scale's function was given, as `continuous_scale/4` makes one.
+  defp transformed_scale(plot, aesthetic, transform, options, function) do
+    validated = NimbleOptions.validate!(options, @transformed_scale_options)
+    check_scale_labels(validated, function)
+    put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, transform} | validated]))
   end
 
   defp put_scale(%__MODULE__{scales: scales} = plot, aesthetic, scale),

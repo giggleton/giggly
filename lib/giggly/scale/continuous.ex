@@ -4,9 +4,10 @@ defmodule Giggly.Scale.Continuous do
   given and no range, and `Giggly.panel_scales/2` returns an axis's trained. Its fields:
 
     * `range`: the range of the finite numbers it has seen, or `:none` before it has seen any.
-    * `transform`: the transformation its values are put through before it sees them,
-      `:identity` for numbers and `:date` for dates, which it sees as days since 1970-01-01, so a
-      date axis's range is in days.
+    * `transform`: the transformation its values are put through before it sees them, so its
+      range is in transformed space: `:identity` for numbers; `:date` for dates, which it sees as
+      days since 1970-01-01; or `:log10`, `:sqrt`, `:reverse` (each value negated) or
+      `:reciprocal`, as a plot's scale names one.
     * `palette`: what turns a value's place in the range into its aesthetic's value: `:identity`
       for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
       aesthetic such as alpha, each place, from 0 to 1, rescaled onto `low` to `high`; and
@@ -18,12 +19,13 @@ defmodule Giggly.Scale.Continuous do
       `:colorbar` for colour and fill.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
-    * `limits`: `{low, high}`, the values it spans whatever the data, `nil` at an end the data
-      decides. A value outside them is missing, so its row is not drawn.
-    * `breaks` and `minor_breaks`: the values an axis marks, `:none` for none, or `:default` for
-      those its transformation chooses.
-    * `labels`: a label for each break, a function handed every break drawn that returns their
-      labels, `:none` for none, or `:default` for its transformation's.
+    * `limits`: `{low, high}`, the values it spans whatever the data, in data units, `nil` at an
+      end the data decides; once transformed, the two are sorted. A value outside them is
+      missing, so its row is not drawn.
+    * `breaks` and `minor_breaks`: the values an axis marks, in data units, `:none` for none, or
+      `:default` for those its transformation chooses.
+    * `labels`: a label for each break, a function handed every break drawn, in data units, that
+      returns their labels, `:none` for none, or `:default` for its transformation's.
     * `expand`: how far an axis reaches beyond its limits, `[mult: {low, high}, add: {low, high}]`:
       at each end, that multiple of the limits' width plus that constant.
   """
@@ -49,7 +51,7 @@ defmodule Giggly.Scale.Continuous do
 
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
-          transform: atom(),
+          transform: :identity | :date | :log10 | :sqrt | :reverse | :reciprocal,
           palette:
             :identity | {:rescale, {number(), number()}} | {:gradient, {String.t(), String.t()}},
           na_value: nil | String.t(),
@@ -96,8 +98,33 @@ defmodule Giggly.Scale.Continuous do
   # so a rectangle reaching the panel's edge still does.
   @doc false
   @spec censor(t(), list()) :: list()
-  def censor(%__MODULE__{limits: {low, high}}, values),
-    do: Enum.map(values, fn value -> censored(value, low, high) end)
+  def censor(%__MODULE__{} = scale, values) do
+    {low, high} = limits(scale)
+    Enum.map(values, fn value -> censored(value, low, high) end)
+  end
+
+  # The scale's limits in transformed space, as ggplot2 transforms a scale's limits when it makes
+  # the scale: each end given put through the transformation, `nil` where the data decides, and
+  # the two sorted when both are given, so either order names the same axis. A given end outside
+  # the transformation's domain cannot be placed, and raises, where ggplot2 fails.
+  @doc false
+  @spec limits(t()) :: {number() | nil, number() | nil}
+  def limits(%__MODULE__{limits: {low, high} = given, transform: name}) do
+    [low_position, high_position] = Transform.transform(name, [low, high])
+
+    unless placed?(low, low_position) and placed?(high, high_position) do
+      raise ArgumentError,
+            "a scale's limits #{inspect(given)} fall outside its #{name} transformation's domain"
+    end
+
+    sorted(low_position, high_position)
+  end
+
+  defp placed?(nil, nil), do: true
+  defp placed?(_given, position), do: is_number(position)
+
+  defp sorted(low, high) when is_number(low) and is_number(high) and low > high, do: {high, low}
+  defp sorted(low, high), do: {low, high}
 
   defp censored(value, low, _high) when is_number(value) and is_number(low) and value < low,
     do: nil

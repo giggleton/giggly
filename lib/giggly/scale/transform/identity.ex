@@ -17,6 +17,12 @@ defmodule Giggly.Scale.Transform.Identity do
   def transform(values), do: values
 
   @impl Giggly.Scale.Transform
+  def inverse(positions), do: positions
+
+  @impl Giggly.Scale.Transform
+  def domain, do: {:neg_infinity, :infinity}
+
+  @impl Giggly.Scale.Transform
   def breaks(extent), do: Breaks.extended(extent)
 
   @impl Giggly.Scale.Transform
