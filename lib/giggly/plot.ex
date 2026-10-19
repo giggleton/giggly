@@ -1298,8 +1298,7 @@ defmodule Giggly.Plot do
       [1.5, 2.6, 3.4]
   """
   @spec xlim(t(), number() | nil, number() | nil) :: t()
-  def xlim(%__MODULE__{} = plot, low, high),
-    do: continuous_scale(plot, :x, [limits: {low, high}], "Plot.xlim/3")
+  def xlim(%__MODULE__{} = plot, low, high), do: lims(plot, x: {low, high})
 
   @doc """
   Gives the plot a continuous y scale from `low` to `high`, replacing any y scale it had, as
@@ -1314,8 +1313,7 @@ defmodule Giggly.Plot do
       [nil, 21.0, 18.7]
   """
   @spec ylim(t(), number() | nil, number() | nil) :: t()
-  def ylim(%__MODULE__{} = plot, low, high),
-    do: continuous_scale(plot, :y, [limits: {low, high}], "Plot.ylim/3")
+  def ylim(%__MODULE__{} = plot, low, high), do: lims(plot, y: {low, high})
 
   @doc """
   Gives the plot a continuous scale with the given limits for each axis named, replacing any

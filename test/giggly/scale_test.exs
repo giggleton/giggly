@@ -382,7 +382,11 @@ defmodule Giggly.ScaleTest do
     end
 
     test "a labels function that does not give a string for each break is refused" do
-      for labeller <- [fn _breaks -> ["one"] end, fn breaks -> breaks end] do
+      for labeller <- [
+            fn _breaks -> ["one"] end,
+            fn breaks -> breaks end,
+            fn [_first | rest] -> ["2" | rest] end
+          ] do
         scale = weights(labels: labeller)
 
         assert_raise ArgumentError, ~r/must return a string for each of the breaks/, fn ->

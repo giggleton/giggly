@@ -96,8 +96,6 @@ defmodule Giggly.Scale.Continuous do
   # so a rectangle reaching the panel's edge still does.
   @doc false
   @spec censor(t(), list()) :: list()
-  def censor(%__MODULE__{limits: {nil, nil}}, values), do: values
-
   def censor(%__MODULE__{limits: {low, high}}, values),
     do: Enum.map(values, fn value -> censored(value, low, high) end)
 

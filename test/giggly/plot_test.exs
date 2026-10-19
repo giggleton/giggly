@@ -1312,7 +1312,7 @@ defmodule Giggly.PlotTest do
           minor_breaks: :none,
           labels: labeller
         )
-        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {0, 0.05}, add: 1])
+        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {0.5, 1}, add: 2])
 
       assert plot.scales === %{
                x: %Scale.Continuous{
@@ -1322,7 +1322,7 @@ defmodule Giggly.PlotTest do
                  minor_breaks: :none,
                  labels: labeller
                },
-               y: %Scale.Continuous{labels: :none, expand: [mult: {0.0, 0.05}, add: {1.0, 1.0}]}
+               y: %Scale.Continuous{labels: :none, expand: [mult: {0.5, 1.0}, add: {2.0, 2.0}]}
              }
     end
 
@@ -1331,15 +1331,18 @@ defmodule Giggly.PlotTest do
         @rows
         |> Plot.new()
         |> Plot.scale_x_continuous()
+        |> Plot.scale_y_continuous()
 
-      assert plot.scales.x === %Scale.Continuous{
-               name: :default,
-               limits: {nil, nil},
-               breaks: :default,
-               minor_breaks: :default,
-               labels: :default,
-               expand: [mult: {0.05, 0.05}, add: {0, 0}]
-             }
+      default = %Scale.Continuous{
+        name: :default,
+        limits: {nil, nil},
+        breaks: :default,
+        minor_breaks: :default,
+        labels: :default,
+        expand: [mult: {0.05, 0.05}, add: {0, 0}]
+      }
+
+      assert plot.scales === %{x: default, y: default}
     end
 
     # ggplot2 replaces a scale added for an aesthetic that has one ("Scale for x is already
@@ -1365,6 +1368,14 @@ defmodule Giggly.PlotTest do
                 }}
     end
 
+    # ggplot2 4.0.3 takes `xlim(3, 3)`, an axis of zero width, which is widened as a single value.
+    test "limits may be equal, but not from high to low" do
+      plot = Plot.new(@rows)
+
+      assert Plot.xlim(plot, 3, 3).scales.x.limits === {3.0, 3.0}
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.xlim(plot, 3.5, 3) end
+    end
+
     test "ylim/3 sets the y scale's limits, nil leaving an end to the data" do
       plot =
         @rows
@@ -1374,31 +1385,35 @@ defmodule Giggly.PlotTest do
       assert plot.scales === %{y: %Scale.Continuous{limits: {nil, 25.0}}}
     end
 
-    test "an option a scale cannot take is refused, naming it" do
+    test "an option a scale cannot take is refused, naming it and what was wrong with it" do
       plot = Plot.new(@rows)
+      two_arguments = fn _break, _index -> "label" end
 
-      for {key, value} <- [
-            name: 5,
-            limits: {5, 2},
-            limits: {"a", 3},
-            limits: [2, 5],
-            breaks: ["a"],
-            breaks: 3,
-            minor_breaks: [:a],
-            labels: [1, 2],
-            labels: fn _break, _index -> "label" end,
-            labels: "label",
-            expand: [mult: 1, mult: 2],
-            expand: [scale: 1],
-            expand: [mult: "a"],
-            expand: 0.05
+      # Each option, its value, and the part of it the refusal shows.
+      for {key, value, shown} <- [
+            {:name, 5, "5"},
+            {:limits, {5, 2}, "{5, 2}"},
+            {:limits, {"a", 3}, ~s({"a", 3})},
+            {:limits, [2, 5], "[2, 5]"},
+            {:breaks, [1, "a"], ~s(got: "a" in it)},
+            {:breaks, 3, "got: 3"},
+            {:minor_breaks, [:a], "got: :a in it"},
+            {:labels, ["a", 1], "got: 1 in it"},
+            {:labels, two_arguments, inspect(two_arguments)},
+            {:labels, "label", ~s(got: "label")},
+            {:expand, [mult: 1, mult: 2], "[mult: 1, mult: 2]"},
+            {:expand, [scale: 1], "[scale: 1]"},
+            {:expand, [mult: "a"], ~s([mult: "a"])},
+            {:expand, [mult: {0, "a"}], ~s([mult: {0, "a"}])},
+            {:expand, [0, 0.05], "[0, 0.05]"},
+            {:expand, 0.05, "got: 0.05"}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Plot.scale_x_continuous(plot, [{key, value}])
           end
 
-        assert error.key == key
+        assert {error.key, error.message =~ shown} == {key, true}
       end
 
       misspelt =
@@ -1438,6 +1453,9 @@ defmodule Giggly.PlotTest do
       assert_raise ArgumentError, ~r/got: :none/, fn ->
         Plot.scale_x_continuous(plot, labels: ["a"], breaks: :none)
       end
+
+      assert Plot.scale_x_continuous(plot, labels: ["a", "b"], breaks: [1, 2]).scales.x.labels ===
+               ["a", "b"]
     end
   end
 
