@@ -181,10 +181,11 @@ defmodule Giggly.FormatTest do
     test "counts a carry as printing fewer digits only from 1e8 to 1e27, more than half below" do
       # label_comma(trim = FALSE, big.mark = "", accuracy = a)(c(x, 1)) for each row: 999.99996
       # carries to 1000 but prints its three whole digits, so R pads it; 99999999.5 is exactly
-      # half below 1e8; past 1e27 R asks no more
+      # half below 1e8, and 99999999.25 more than half; past 1e27 R asks no more
       for {breaks, accuracy, expected} <- [
             {[999.99996, 1], 1.0e-5, [" 999.99996", "   1.00000"]},
             {[99_999_999.5, 1], 0.5, [" 99999999.5", "        1.0"]},
+            {[99_999_999.25, 1], 0.25, ["99999999.2", "       1.0"]},
             {[9.999_999_6e26, 1], 1,
              ["999999959999999953822810112", "                          1"]},
             {[9.999_999_6e27, 1], 1,
