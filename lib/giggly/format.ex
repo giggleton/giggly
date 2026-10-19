@@ -509,8 +509,6 @@ defmodule Giggly.Format do
   end
 
   # A label for each value, in order.
-  defp label([], _settings), do: []
-
   defp label(values, settings) do
     values
     |> scaled(settings)
@@ -527,10 +525,7 @@ defmodule Giggly.Format do
   defp scaled(values, %{scale_cut: steps} = settings) do
     scale = settings.scale * 1.0
 
-    sorted =
-      steps
-      |> Enum.map(fn {suffix, threshold} -> {suffix, threshold * 1.0 + 0.0} end)
-      |> Enum.sort_by(fn {_suffix, threshold} -> threshold end)
+    sorted = Enum.sort_by(steps, fn {_suffix, threshold} -> threshold end)
 
     Enum.map(values, fn value ->
       name = refined_step(value, scale, step_reached(value, scale, sorted), sorted)

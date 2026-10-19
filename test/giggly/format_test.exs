@@ -32,6 +32,22 @@ defmodule Giggly.FormatTest do
       assert Format.comma([-1500.5, 0, 2000]) == ["-1,500", "0", "2,000"]
     end
 
+    test "reads the smallest gap however the breaks come: repeated, unsorted, between any two" do
+      # label_comma()(c(0.5, 0.5, 1)); c(1, 0.5); c(0, 1, 1.25)
+      assert Format.comma([0.5, 0.5, 1]) == ["0.5", "0.5", "1.0"]
+      assert Format.comma([1, 0.5]) == ["1.0", "0.5"]
+      assert Format.comma([0, 1, 1.25]) == ["0.00", "1.00", "1.25"]
+    end
+
+    test "takes a gap of exactly the rounding error's size as a gap" do
+      # label_comma()(c(0, sqrt(.Machine$double.eps))); c(3, 3 + 1e-9), a gap below it, whose
+      # accuracy of 1 leaves 3 as it is
+      assert Format.comma([0, :math.sqrt(2.220446049250313e-16)]) ==
+               ["0.000000000", "0.000000015"]
+
+      assert Format.comma([3, 3 + 1.0e-9]) == ["3", "3"]
+    end
+
     test "counts a negative zero and a zero as one break" do
       # label_comma()(c(-0, 0, 1))
       assert Format.comma([-0.0, 0.0, 1]) == ["0", "0", "1"]
@@ -64,6 +80,22 @@ defmodule Giggly.FormatTest do
                ["1,234,567.2", "1,234,567.5"]
     end
 
+    test "counts seven significant digits, no more and no fewer, from the first" do
+      # label_comma(accuracy = 0.25)(c(12345.25, 12345.5)), seven digits;
+      # c(123456.25, 123456.5), eight; accuracy = 1.25e-6 on c(0.1234575, 0.25), seven below 1
+      assert Format.comma([12_345.25, 12_345.5], accuracy: 0.25) == ["12,345.25", "12,345.50"]
+      assert Format.comma([123_456.25, 123_456.5], accuracy: 0.25) == ["123,456.2", "123,456.5"]
+
+      assert Format.comma([0.1234575, 0.25], accuracy: 1.25e-6) == ["0.1234575", "0.2500000"]
+    end
+
+    test "prints a last digit halfway between two as the even one" do
+      # label_comma(accuracy = 0.25)(c(1234567.75, 1234568.25)): 12345677.5 tenths up to
+      # 12345678, 12345682.5 down to 12345682
+      assert Format.comma([1_234_567.75, 1_234_568.25], accuracy: 0.25) ==
+               ["1,234,567.8", "1,234,568.2"]
+    end
+
     test "leaves no sign on a number that rounds to zero" do
       # label_comma(accuracy = 1)(c(-0.001, 0.001, -1))
       assert Format.comma([-0.001, 0.001, -1], accuracy: 1) == ["0", "0", "-1"]
@@ -77,6 +109,8 @@ defmodule Giggly.FormatTest do
                ["100,000,000,000,000,000,000", "200,000,000,000,000,000,000"]
 
       assert Format.comma([1000, 2500]) == ["1,000", "2,500"]
+      # label_comma()(c(3e15, 1))
+      assert Format.comma([3.0e15, 1]) == ["3,000,000,000,000,000", "1"]
     end
 
     test "takes the marks given, even a comma as both" do
@@ -120,6 +154,8 @@ defmodule Giggly.FormatTest do
       assert Format.comma([1, 1000], trim: false) == ["    1", "1,000"]
       assert Format.comma([1, 1.0e6], trim: false, big_mark: "") == ["      1", "1000000"]
       assert Format.comma([-0.5, 1000.25, 12], trim: false) == ["    0", "1,000", "   12"]
+      # label_comma(trim = FALSE)(c(0, 0.5)): zero shows one whole digit
+      assert Format.comma([0, 0.5], trim: false) == ["0.0", "0.5"]
     end
 
     test "pads to the width R estimates, a digit wider when rounding carries a number up" do
@@ -140,6 +176,22 @@ defmodule Giggly.FormatTest do
 
       assert Format.comma([99_999_996, 1], trim: false, accuracy: 1, big_mark: "") ==
                ["99999996", "       1"]
+    end
+
+    test "counts a carry as printing fewer digits only from 1e8 to 1e27, more than half below" do
+      # label_comma(trim = FALSE, big.mark = "", accuracy = a)(c(x, 1)) for each row: 999.99996
+      # carries to 1000 but prints its three whole digits, so R pads it; 99999999.5 is exactly
+      # half below 1e8; past 1e27 R asks no more
+      for {breaks, accuracy, expected} <- [
+            {[999.99996, 1], 1.0e-5, [" 999.99996", "   1.00000"]},
+            {[99_999_999.5, 1], 0.5, [" 99999999.5", "        1.0"]},
+            {[9.999_999_6e26, 1], 1,
+             ["999999959999999953822810112", "                          1"]},
+            {[9.999_999_6e27, 1], 1,
+             [" 9999999600000000362861821952", "                            1"]}
+          ] do
+        assert Format.comma(breaks, trim: false, big_mark: "", accuracy: accuracy) == expected
+      end
     end
 
     test "counts characters, not bytes, in a wide mark" do
@@ -186,9 +238,11 @@ defmodule Giggly.FormatTest do
       assert Format.currency([-2.0e5, 0, 1.5]) == ["-$200,000", "$0", "$2"]
       assert Format.currency([100_000.5]) == ["$100,000"]
       assert Format.currency([0.125, 1], scale: 100) == ["$12.50", "$100.00"]
+      # label_currency(scale = 1000)(c(0.5, 1)): whole once scaled
+      assert Format.currency([0.5, 1], scale: 1000) == ["$500", "$1,000"]
     end
 
-    test "move with largest_with_fractional and give way to accuracy" do
+    test "move with largest_with_fractional and give way to accuracy: and scale_cut:" do
       # label_currency(largest_with_fractional = 10)(c(1.5, 20)); accuracy = 1 on
       # c(0.25, 1.75); scale = 1e-6, suffix = "M", accuracy = 0.1 on c(0, 2.5e6, 5e6)
       assert Format.currency([1.5, 20], largest_with_fractional: 10) == ["$2", "$20"]
@@ -196,6 +250,11 @@ defmodule Giggly.FormatTest do
 
       assert Format.currency([0, 2.5e6, 5.0e6], scale: 1.0e-6, suffix: "M", accuracy: 0.1) ==
                ["$0.0M", "$2.5M", "$5.0M"]
+
+      # label_currency(scale_cut = cut_short_scale())(c(0, 1.5e6, 2e6)): the millions' own
+      # accuracy, not whole dollars
+      assert Format.currency([0, 1.5e6, 2.0e6], scale_cut: Format.cut_short_scale()) ==
+               ["$0", "$1.5M", "$2.0M"]
     end
   end
 
@@ -259,6 +318,25 @@ defmodule Giggly.FormatTest do
                ["2 mg", "2 g", "2 kg"]
     end
 
+    test "takes steps in any order, and an empty suffix on any step as no step" do
+      # label_comma(scale_cut = c(M = 1e6, K = 1e3, 0))(c(500, 1500, 2e6));
+      # scale_cut = c(x = 0, 1000) on c(500, 1500), whose 1000 R never finds by its empty name
+      steps = [{"M", 1.0e6}, {"K", 1000}, {"", 0}]
+      assert Format.comma([500, 1500, 2.0e6], scale_cut: steps) == ["500", "2K", "2M"]
+
+      assert Format.comma([500, 1500], scale_cut: [{"x", 0}, {"", 1000}]) == ["500x", "1,500"]
+    end
+
+    test "steps down only for a whole number of the step below, after scale:" do
+      # label_comma(scale = 60, scale_cut = cut_time_scale())(c(1.5, 2)); scale_cut =
+      # c(0, a = 2, b = 5) on 6, steps 2.5 apart; cut_time_scale() on 5430, not a whole minute
+      assert Format.comma([1.5, 2], scale: 60, scale_cut: Format.cut_time_scale()) ==
+               ["90s", "2m"]
+
+      assert Format.comma([6], scale_cut: [{"", 0}, {"a", 2}, {"b", 5}]) == ["3a"]
+      assert Format.comma([5430], scale_cut: Format.cut_time_scale()) == ["2h"]
+    end
+
     test "writes the step's suffix before suffix:, and takes accuracy: for every step" do
       # label_comma(scale_cut = cut_short_scale(), suffix = " t")(c(0, 1500));
       # scale_cut = c(0, K = 1e3), accuracy = 0.1 on c(500, 1500);
@@ -281,6 +359,8 @@ defmodule Giggly.FormatTest do
                ["0%", "500%", "1K%", "2K%"]
 
       assert Format.percent([0, 0.0125], scale_cut: Format.cut_short_scale()) == ["0%", "1%"]
+      # label_comma(scale_cut = cut_short_scale())(c(0, 0.5)): zero shares 0.5's scale of 1
+      assert Format.comma([0, 0.5], scale_cut: Format.cut_short_scale()) == ["0.0", "0.5"]
 
       assert Format.comma([0, 0.5, 30], scale_cut: Format.cut_time_scale(space: true)) ==
                ["0 ", "500 ms", "30 s"]
@@ -357,6 +437,11 @@ defmodule Giggly.FormatTest do
         assert error.message =~ "Format.comma/2"
         assert error.message =~ inspect(breaks)
       end
+
+      percent = assert_raise ArgumentError, fn -> Format.percent([1, nil]) end
+      assert percent.message =~ "Format.percent/2"
+      currency = assert_raise ArgumentError, fn -> Format.currency([1, nil]) end
+      assert currency.message =~ "Format.currency/2"
     end
 
     test "names an option the formatter does not take, and the ones it does" do
@@ -404,6 +489,7 @@ defmodule Giggly.FormatTest do
         end
 
       assert no_zero.message =~ "threshold 0"
+      assert no_zero.message =~ inspect([{"K", 1000}])
 
       twice =
         assert_raise NimbleOptions.ValidationError, fn ->
@@ -411,14 +497,16 @@ defmodule Giggly.FormatTest do
         end
 
       assert twice.message =~ "twice"
+      assert twice.message =~ ~s({"J", 1000.0})
 
-      for steps <- [[], [{"", -1}], [{:k, 0}], %{"" => 0}] do
+      for steps <- [[], [{"", -1}], [{:k, 0}], [{"", 0}, {:k, 1000}], [{"", 0}, "K"], %{"" => 0}] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Format.comma([1], scale_cut: steps)
           end
 
         assert error.message =~ "{suffix, threshold} pairs"
+        assert error.message =~ inspect(steps)
       end
     end
 
@@ -432,6 +520,7 @@ defmodule Giggly.FormatTest do
 
       error = assert_raise ArgumentError, fn -> Format.cut_si(:g) end
       assert error.message =~ "unit"
+      assert error.message =~ ":g"
     end
   end
 end

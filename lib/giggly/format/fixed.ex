@@ -17,7 +17,9 @@ defmodule Giggly.Format.Fixed do
   # - Untrimmed, each is padded on the left to the width `formatReal()` estimates from the whole
   #   digits, which is one wider than printed when rounding to seven digits carries a number to a
   #   power of ten its printed form does not reach (` 99999999.9` at one decimal); when marks
-  #   lengthen any number, all are padded to the longest, counting characters.
+  #   lengthen any number, all are padded to the longest, counting characters. No number prints
+  #   wider than the estimate, so padding every number to the longest after marking is the same,
+  #   and a number below 1, which R counts as one whole digit, needs no such floor here.
   #
   # R falls back to scientific notation when a plain number would be some hundred characters
   # wider than its scientific form (beyond about 1e105, or an accuracy below about 1e-100); this
@@ -52,25 +54,21 @@ defmodule Giggly.Format.Fixed do
       |> Enum.map(fn {whole_digits, significant} -> significant - whole_digits end)
       |> Enum.max()
 
-    shown = Enum.max([right, decimals, 0])
+    shown = max(right, decimals)
     plain = Enum.map(values, fn value -> fixed(value, shown) end)
 
     if settings.trim do
-      Enum.map(plain, fn text ->
-        {marked, _lengthened} = marked(text, settings)
-        marked
-      end)
+      Enum.map(plain, fn text -> marked(text, settings) end)
     else
       padded(plain, digits, shown, settings)
     end
   end
 
-  # Padding to the width R estimates from the whole digits, then, when marks lengthened any
-  # number, to the longest.
+  # Padding to the width R estimates from the whole digits, then, once marked, to the longest.
   defp padded(plain, digits, shown, settings) do
     whole =
       digits
-      |> Enum.map(fn {whole_digits, _significant} -> max(whole_digits, 1) end)
+      |> Enum.map(fn {whole_digits, _significant} -> whole_digits end)
       |> Enum.max()
 
     width = whole + shown + if(shown > 0, do: 1, else: 0)
@@ -82,20 +80,16 @@ defmodule Giggly.Format.Fixed do
         |> marked(settings)
       end)
 
-    if Enum.any?(marked, fn {_text, lengthened} -> lengthened end) do
-      longest =
-        marked
-        |> Enum.map(fn {text, _lengthened} -> String.length(text) end)
-        |> Enum.max()
+    longest =
+      marked
+      |> Enum.map(&String.length/1)
+      |> Enum.max()
 
-      Enum.map(marked, fn {text, _lengthened} -> String.pad_leading(text, longest) end)
-    else
-      Enum.map(marked, fn {text, _lengthened} -> text end)
-    end
+    Enum.map(marked, fn text -> String.pad_leading(text, longest) end)
   end
 
   # A plain number with `big_mark` between each three digits of its whole part and
-  # `decimal_mark` before its decimals, and whether marks lengthened it.
+  # `decimal_mark` before its decimals.
   defp marked(text, settings) do
     {whole, decimals} =
       case String.split(text, ".") do
@@ -105,16 +99,12 @@ defmodule Giggly.Format.Fixed do
 
     digits = String.trim_leading(whole)
     blanks = String.duplicate(" ", String.length(whole) - String.length(digits))
-    grouped = thousands(digits, settings.big_mark)
-    marked_whole = blanks <> grouped
+    marked_whole = blanks <> thousands(digits, settings.big_mark)
 
-    text =
-      case decimals do
-        :none -> marked_whole
-        decimals -> marked_whole <> settings.decimal_mark <> decimals
-      end
-
-    {text, grouped != digits}
+    case decimals do
+      :none -> marked_whole
+      decimals -> marked_whole <> settings.decimal_mark <> decimals
+    end
   end
 
   defp thousands(digits, big_mark) do
@@ -145,9 +135,8 @@ defmodule Giggly.Format.Fixed do
       |> Float.floor()
       |> trunc()
 
-    {power, scaled_numerator, scaled_denominator} =
-      seven_digits(estimate - @significant_digits + 1, numerator, denominator)
-
+    power = estimate - @significant_digits + 1
+    {scaled_numerator, scaled_denominator} = scaled(numerator, denominator, power)
     alpha = round_ratio(scaled_numerator, scaled_denominator)
     {significant, power} = significant_count(alpha, power)
     exponent = power + @significant_digits - 1
@@ -155,18 +144,14 @@ defmodule Giggly.Format.Fixed do
     {exponent + 1 - widened, significant}
   end
 
-  # The number divided by 10^power, and multiplied by ten more when that leaves it under seven
-  # digits.
-  defp seven_digits(power, numerator, denominator) do
-    {scaled_numerator, scaled_denominator} =
-      if power >= 0,
-        do: {numerator, denominator * 10 ** power},
-        else: {numerator * 10 ** -power, denominator}
+  # The number divided by 10^power. R multiplies by ten more when that leaves it under seven
+  # digits, which the floor of its log10 never does here: log10 is exact at a power of ten and
+  # rounds up only within a float's error below one, where six digits round to 10^6 as seven
+  # round to 10^7, and give the same count.
+  defp scaled(numerator, denominator, power) when power >= 0,
+    do: {numerator, denominator * 10 ** power}
 
-    if scaled_numerator < 10 ** (@significant_digits - 1) * scaled_denominator,
-      do: {power - 1, scaled_numerator * 10, scaled_denominator},
-      else: {power, scaled_numerator, scaled_denominator}
-  end
+  defp scaled(numerator, denominator, power), do: {numerator * 10 ** -power, denominator}
 
   # The significant digits of a seven-digit integer, its trailing zeros dropped; when rounding
   # carried it to 10^7, one digit a power higher.
@@ -179,25 +164,19 @@ defmodule Giggly.Format.Fixed do
     end
   end
 
-  defp trailing_zeros(alpha, count) when count < @significant_digits and rem(alpha, 10) == 0,
+  defp trailing_zeros(alpha, count) when rem(alpha, 10) == 0,
     do: trailing_zeros(div(alpha, 10), count + 1)
 
   defp trailing_zeros(_alpha, count), do: count
 
   # Whether rounding to seven digits carried the number to a power of ten it does not reach in
-  # plain notation, so it shows one whole digit fewer than its exponent says.
+  # plain notation, so it shows one whole digit fewer than its exponent says. R asks whether the
+  # number is more than `0.5 / 10^max(7 - exponent, 0)` below 10^exponent, up to its `KP_MAX`;
+  # below 10^8 that margin is the half of a seventh digit whose carry gave the exponent, so no
+  # such number is ever below it, and from 10^8 the margin is a half.
   defp widens?(numerator, denominator, exponent)
-       when exponent > 0 and exponent <= @largest_power do
-    right =
-      (@significant_digits - exponent)
-      |> max(0)
-      |> min(@largest_power)
-
-    {fuzz_numerator, fuzz_denominator} = exact(0.5 / 10 ** right)
-
-    numerator * fuzz_denominator <
-      denominator * (10 ** exponent * fuzz_denominator - fuzz_numerator)
-  end
+       when exponent > @significant_digits and exponent <= @largest_power,
+       do: 2 * numerator < denominator * (2 * 10 ** exponent - 1)
 
   defp widens?(_numerator, _denominator, _exponent), do: false
 
