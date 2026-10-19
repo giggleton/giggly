@@ -65,14 +65,14 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **Resolution** (`Giggly.Resolution`, ggplot2's `resolution()`) — `.claude/rules/resolution.md`.
 - **Values as R writes them** (`Giggly.AsCharacter`) — `.claude/rules/as_character.md`.
 - **Guides** (`Giggly.Guide`, axes, legends, every title) — `.claude/rules/guide.md`.
-- **The theme** (`Giggly.Theme`, the complete theme everything but the marks is drawn in) —
-  `.claude/rules/theme.md`.
+- **The theme** (`Giggly.Theme`, the complete theme all but the marks are drawn in) — `.claude/rules/theme.md`.
 - **Text measurement** (`Giggly.Font`, the glyph table ggplot2's snapshots measure with) —
   `.claude/rules/font.md`.
 - **Rendering** (`Giggly.Render`, an assembled plot into a scene) — `.claude/rules/render.md`.
 - **The scene** (`Giggly.Scene`, the table of cells and its primitives) — `.claude/rules/scene.md`.
 - **The SVG backend** (`Giggly.SVG`, `Giggly.to_svg/2`, the goldens) — `.claude/rules/svg.md`.
 - **Datasets** (`Giggly.Datasets`, R's tables for examples and users) — `.claude/rules/datasets.md`.
+- **Formatters** (`Giggly.Format`, a scale's labels as R writes them) — `.claude/rules/format.md`.
 - **Notebooks** (`notebooks/`, Livebooks following ggplot2's reference pages) —
   `.claude/rules/notebooks.md`.
 
@@ -86,10 +86,10 @@ invariants. Add a line here when an area gets its rules file; nothing else about
   outside libraries included. A plot is a value built by `Giggly.Plot` and run by the functions
   in `Giggly`; every other domain is its own boundary, carved when its first module lands, and
   its `deps:` is its contract. A domain that owns an outside library lists it, as the root must
-  too; no other domain lists it. Arrows run one way, from what runs a plot toward
-  the data; nothing calls back up. What boundary cannot see — the standard library — the
-  `CorePurity` credo check covers over all of `lib/`: no clock, config, unseeded randomness,
-  process or IO, an impure module excluded by name.
+  too; no other domain lists it but NimbleOptions, listed by any with options of its own. Arrows
+  run one way, from what runs a plot toward the data; nothing calls back up. What boundary cannot
+  see — the standard library — the `CorePurity` credo check covers over all of `lib/`: no clock,
+  config, unseeded randomness, process or IO, an impure module excluded by name.
   **`mix boundary.spec` prints the graph**, and no list here restates it. Widening a boundary's
   `deps:` or `exports:` is a decision for the user, and `.claude/hooks/waiver-gate.sh` stops the
   edit until it has been explained in conversation (`.claude/rules/dependencies.md`).

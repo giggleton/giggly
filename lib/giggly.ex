@@ -13,10 +13,10 @@ defmodule Giggly do
   # sub-boundary may list only what its parent does; nothing here calls either, and no other
   # domain lists them. `panel_scales/2` reads the layout table through `Giggly.DataFrame`, which a
   # parent may call without listing it. It lists `NimbleOptions`, which validates `to_svg/2`'s
-  # options and which a sub-boundary may list in turn when its own options arrive. It exports
-  # `Plot`, the description the run functions take; what a user of Giggly calls is the documented
-  # API (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `DataFrame`'s
-  # readers and the scales `panel_scales/2` returns.
+  # options and which a sub-boundary with options of its own lists in turn, as `Giggly.Format`
+  # does. It exports `Plot`, the description the run functions take; what a user of Giggly calls
+  # is the documented API (CLAUDE.md, Conventions), which reaches past boundary exports to
+  # `Datasets`, `Format`, `DataFrame`'s readers and the scales `panel_scales/2` returns.
   use Boundary, deps: [Color, NimbleOptions, Table], exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}

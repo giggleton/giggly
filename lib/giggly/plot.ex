@@ -592,8 +592,8 @@ defmodule Giggly.Plot do
                                 doc:
                                   "The breaks' labels: a list of strings, one for each of " <>
                                     "`breaks:`; a function handed every break drawn, a list of " <>
-                                    "numbers, that returns a string for each; or `:none` for " <>
-                                    "ticks with no labels."
+                                    "numbers, that returns a string for each, as " <>
+                                    "`Giggly.Format`'s do; or `:none` for ticks with no labels."
                               ],
                               expand: [
                                 type: {:custom, __MODULE__, :validate_expand, []},

@@ -79,6 +79,23 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
+  1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**
+  `currency`, since scales 1.4.0 supersedes `label_dollar()` with it, the output the same (the
+  entry beginning "Giggly exposes no function" holds for scales too); the notebook draws
+  `label_dollar()` with it. Each takes `accuracy:`, `scale:`, `prefix:`, `suffix:`, `big_mark:`,
+  `decimal_mark:`, `trim:`, `style_negative:`, `style_positive:` and `scale_cut:`, and currency
+  `largest_with_fractional:` (Steve: "do the options you were going to defer"). `scale_cut:` is a
+  list of `{suffix, threshold}` pairs, which R's `cut_short_scale/1`, `cut_long_scale/1`,
+  `cut_si/1` and `cut_time_scale/1` return; it must hold a threshold of 0, since without one R
+  misaligns the step below (`c(m = 60, h = 3600)` writes 5400 as `5 400NA`). Its options are
+  NimbleOptions schemas, as every public option in Giggly is, so its boundary lists NimbleOptions
+  (Steve). *Rejected: `dollar/2`*, the name ggplot2's example calls: superseded. *Rejected: the
+  first four options alone*: separators, padding, sign styles and cuts are R's too. *Rejected:
+  `scale_cut: :short_scale`*: two shapes in one option. *Rejected: any list, each value taking
+  its own lower step*: a label R never writes. *Rejected: options checked by hand, so the
+  boundary lists nothing*: a second error for a bad option, and docs kept beside the checks.
+
 - **Scale functions are Phase 3's seventh increment, in seven steps: continuous position scales,
   formatters, transformations, discrete and date position scales, colour, fill and alpha
   scales, guides, the notebooks (2026-10-18, Steve, agreeing the proposal; checked against
@@ -109,10 +126,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **`labels:` takes a list, a function handed every break drawn, or `:none`; Giggly's formatters
   are list functions in `Giggly.Format` (2026-10-18, Steve).** A function sees every break at
   once, as R's do, so a formatter can give them shared decimals (R's `precision()`:
-  `label_comma()` writes 0.5, 1 and 1.25 as `0.50`, `1.00`, `1.25`) and `dollar` can drop cents
-  only when every break is whole; it returns one label per break, or the run raises. `comma/2`,
-  `percent/2` and `dollar/2` are plain functions shipped for convenience (Steve), matching R's
-  `label_*()` output. A label list needs a breaks list of its length, checked at the call.
+  `label_comma()` writes 0.5, 1 and 1.25 as `0.50`, `1.00`, `1.25`) and `currency` can drop
+  cents only when every break is whole; it returns one label per break, or the run raises.
+  `comma/2`, `percent/2` and `currency/2` are plain functions shipped for convenience (Steve),
+  matching R's `label_*()` output. A label list needs a breaks list of its length, checked at the call.
   *Rejected: a function called per break*: shorter to write, but no formatter could share
   decimals. *Rejected: formatters named by value* (`labels: :comma`, ggity's): a second
   contract. *Rejected: `Giggly.Labels`*: it shares its last segment with `Giggly.Scale.Labels`,
@@ -1613,9 +1630,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Give a plot continuous position scales (scale functions, step 1); §4: "Scale
-  functions are Phase 3's seventh increment", "A scale function records the untrained scale",
-  "`labels:` takes a list", "\"Absent\" in a public option"
+- 2026-10-18 — Write a scale's labels as R's formatters do (scale functions, step 2); §4:
+  "`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option", "`labels:`
+  takes a list"
+- 2026-10-18 — Give a plot continuous position scales (scale functions, step 1) (`1d650df`); §4:
+  "Scale functions are Phase 3's seventh increment", "A scale function records the untrained
+  scale", "`labels:` takes a list", "\"Absent\" in a public option"
 - 2026-10-18 — Describe Giggly on its own terms in the API docs (`d344408`); §4: "API docs
   describe Giggly on its own terms"
 - 2026-10-18 — Draw expressions in the notebooks (expressions, step 4) (`a6f8a79`); §4: "A verdict
