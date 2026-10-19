@@ -964,6 +964,54 @@ defmodule GigglyTest do
                {["4", "NA"], [true, true]}
     end
 
+    # Golden: the legends' backgrounds in ggplot2 4.0.3's drawings of the same plots through
+    # vdiffr 1.0.9 (R 4.6.1), whose rectangles these match: with no labels and a title narrower
+    # than a key, a legend and a colour bar are each a key and the legend margin either side, 28.24
+    # points; with labels and a title wider than the bar and its labels, a colour bar is the title
+    # and the margins, 96.55. They move with the legend's layout or its place.
+    test "a guide is as wide as its keys, labels or title need, the labels' room only with labels" do
+      backgrounds = fn plot ->
+        plot
+        |> to_svg()
+        |> String.split("\n")
+        |> Enum.filter(fn line -> String.ends_with?(line, "stroke: none; fill: #FFFFFF;' />") end)
+      end
+
+      mtcars = Plot.new(Giggly.Datasets.mtcars(), %{x: :mpg, y: :wt})
+
+      legend =
+        mtcars
+        |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+        |> Plot.labs(colour: "c")
+        |> Plot.scale_color_discrete(labels: :none)
+
+      bar =
+        mtcars
+        |> Plot.geom_point(%{colour: :disp})
+        |> Plot.labs(colour: "c")
+        |> Plot.scale_color_continuous(labels: :none)
+
+      labelled =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: "a much wider title")
+
+      assert {backgrounds.(legend), backgrounds.(bar), backgrounds.(labelled)} ===
+               {[
+                  "<rect x='686.28' y='236.23' width='28.24' height='78.13' " <>
+                    "style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />"
+                ],
+                [
+                  "<rect x='686.28' y='218.95' width='28.24' height='112.69' " <>
+                    "style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />"
+                ],
+                [
+                  "<rect x='617.97' y='218.95' width='96.55' height='112.69' " <>
+                    "style='stroke-width: 1.07; stroke: none; fill: #FFFFFF;' />"
+                ]}
+    end
+
     test "a scale's name titles its legend over a label, whichever comes first" do
       plot =
         @cylinders

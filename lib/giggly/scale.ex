@@ -229,11 +229,13 @@ defmodule Giggly.Scale do
   @spec map(t(), list()) :: list()
   def map(%Continuous{palette: :identity} = scale, values), do: Continuous.censor(scale, values)
 
+  # A scale with no limits, every value it was trained on missing, is handed none but missing
+  # values, which are not numbers, so `placed_inside?/2` never asks about its bounds.
   def map(%Continuous{palette: palette, na_value: na_value} = scale, values) do
     bounds = limits(scale)
 
     Enum.map(values, fn value ->
-      if bounds != :none and placed_inside?(value, bounds),
+      if placed_inside?(value, bounds),
         do: Palette.continuous(palette, place(value, bounds, scale.midpoint)),
         else: na_value
     end)

@@ -1860,11 +1860,28 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert {Plot.scale_color_discrete(plot).scales.color,
+              Plot.scale_fill_discrete(plot).scales.fill,
+              Plot.scale_color_continuous(plot).scales.color,
               Plot.scale_fill_continuous(plot).scales.fill,
               Plot.scale_alpha_discrete(plot).scales.alpha,
               Plot.scale_alpha_continuous(plot).scales.alpha} ===
-               {Scale.new(:discrete, :color), Scale.new(:continuous, :fill),
+               {Scale.new(:discrete, :color), Scale.new(:discrete, :fill),
+                Scale.new(:continuous, :color), Scale.new(:continuous, :fill),
                 Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha)}
+    end
+
+    test "a manual or gradientn scale given no colours is refused, naming the option it needs" do
+      plot = Plot.new(@rows)
+
+      for {call, option} <- [
+            {fn -> Plot.scale_color_manual(plot) end, ":values"},
+            {fn -> Plot.scale_fill_manual(plot) end, ":values"},
+            {fn -> Plot.scale_color_gradientn(plot) end, ":colors"},
+            {fn -> Plot.scale_fill_gradientn(plot) end, ":colors"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, call
+        assert error.message =~ "required #{option} option not found"
+      end
     end
 
     test "each records the colours and options it is given" do
@@ -1952,23 +1969,27 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for {function, options, shown} <- [
-            {&Plot.scale_color_manual/2, [], "required :values option not found"},
             {&Plot.scale_color_manual/2, [values: []], "at least one colour"},
+            {&Plot.scale_color_manual/2, [values: ~D[2020-01-01]],
+             "or a map from a value to its colour, got: ~D[2020-01-01]"},
             {&Plot.scale_color_manual/2, [values: %{}], "or a map from a value to its colour"},
             {&Plot.scale_color_manual/2, [values: ["grey50"]], ~s(got: "grey50")},
             {&Plot.scale_fill_manual/2, [values: %{4 => "red", 4.0 => "blue"}], "more than once"},
             {&Plot.scale_fill_manual/2, [values: %{4 => "grey50"}], ~s(got: "grey50")},
             {&Plot.scale_color_hue/2, [hue: 5], "expected {first, last}, two numbers, got: 5"},
+            {&Plot.scale_color_hue/2, [hue: {"a", 90}], ~s(two numbers, got: {"a", 90})},
+            {&Plot.scale_fill_hue/2, [hue: {0, "b"}], ~s(two numbers, got: {0, "b"})},
             {&Plot.scale_color_hue/2, [chroma: "a"], ~s(expected a number, got: "a")},
             {&Plot.scale_fill_hue/2, [direction: 0], "expected one of [1, -1], got: 0"},
             {&Plot.scale_color_hue/2, [expand: [add: 1]], "unknown options [:expand]"},
             {&Plot.scale_color_gray/2, [start: 2], "from 0, black, to 1, white, got: 2"},
             {&Plot.scale_fill_gray/2, [end: -0.1], "got: -0.1"},
-            {&Plot.scale_color_discrete/2, [palette: []], "at least one colour"},
-            {&Plot.scale_color_gradient/2, [low: "#FF000080"], "no alpha of its own"},
+            {&Plot.scale_color_discrete/2, [palette: []], "at least one colour, got: []"},
+            {&Plot.scale_color_gradient/2, [low: "#FF000080"],
+             ~s(no alpha of its own, since a gradient blends colours alone, got: "#FF000080")},
+            {&Plot.scale_color_gradient/2, [high: "grey50"], ~s(got: "grey50")},
             {&Plot.scale_fill_gradient2/2, [mid: :none], "no alpha of its own"},
             {&Plot.scale_color_gradient2/2, [midpoint: "a"], ~s(expected a number, got: "a")},
-            {&Plot.scale_color_gradientn/2, [], "required :colors option not found"},
             {&Plot.scale_fill_gradientn/2, [colors: "red"], ~s(got: "red")},
             {&Plot.scale_color_continuous/2, [palette: ["red", "#FF000080"]], "no alpha"},
             {&Plot.scale_color_continuous/2, [limits: [1, 2]], "got: [1, 2]"},
@@ -2007,13 +2028,56 @@ defmodule Giggly.PlotTest do
                Plot.scale_alpha_discrete(plot, limits: ["a", "b"]).scales.alpha
     end
 
+    # ggplot2 4.0.3's `limits()` reverses a scale only for limits strictly high to low, so
+    # `lims(colour = c(5, 5))` keeps the identity.
+    test "lims/2 takes a colour scale's limits of one value, which run neither way" do
+      plot = Plot.new(@rows)
+
+      assert Plot.lims(plot, color: {5, 5}).scales.color ===
+               Plot.scale_color_continuous(plot, limits: {5, 5}).scales.color
+    end
+
+    test "a list of labels the wrong length is refused naming the function that was given it" do
+      plot = Plot.new(@rows)
+      discrete = [breaks: ["4", "6"], labels: ["four"]]
+      continuous = [labels: ["a"]]
+
+      for {function, name, options} <- [
+            {&Plot.scale_color_manual/2, "scale_color_manual", [values: ["red"]] ++ discrete},
+            {&Plot.scale_fill_manual/2, "scale_fill_manual", [values: ["red"]] ++ discrete},
+            {&Plot.scale_color_hue/2, "scale_color_hue", discrete},
+            {&Plot.scale_fill_hue/2, "scale_fill_hue", discrete},
+            {&Plot.scale_color_gray/2, "scale_color_gray", discrete},
+            {&Plot.scale_fill_gray/2, "scale_fill_gray", discrete},
+            {&Plot.scale_color_discrete/2, "scale_color_discrete", discrete},
+            {&Plot.scale_fill_discrete/2, "scale_fill_discrete", discrete},
+            {&Plot.scale_alpha_discrete/2, "scale_alpha_discrete", discrete},
+            {&Plot.scale_color_gradient/2, "scale_color_gradient", continuous},
+            {&Plot.scale_fill_gradient/2, "scale_fill_gradient", continuous},
+            {&Plot.scale_color_gradient2/2, "scale_color_gradient2", continuous},
+            {&Plot.scale_fill_gradient2/2, "scale_fill_gradient2", continuous},
+            {&Plot.scale_color_gradientn/2, "scale_color_gradientn",
+             [colors: ["red"]] ++ continuous},
+            {&Plot.scale_fill_gradientn/2, "scale_fill_gradientn",
+             [colors: ["red"]] ++ continuous},
+            {&Plot.scale_color_continuous/2, "scale_color_continuous", continuous},
+            {&Plot.scale_fill_continuous/2, "scale_fill_continuous", continuous},
+            {&Plot.scale_alpha_continuous/2, "scale_alpha_continuous", continuous}
+          ] do
+        error = assert_raise ArgumentError, fn -> function.(plot, options) end
+        assert error.message =~ "Plot.#{name}/2 is given 1 labels"
+      end
+    end
+
     # ggplot2 4.0.3's `lims(colour = c(10, 1))` reverses the colours through a reverse
     # transformation, which Giggly's colour, fill and alpha scales do not have yet.
     test "lims/2 refuses a colour, fill or alpha scale's limits high to low, or dates" do
       plot = Plot.new(@rows)
 
       for {options, shown} <- [
-            {[color: {10, 1}], "low first, since a colour, fill or alpha scale cannot run"},
+            {[color: {10, 1}],
+             "low first, since a colour, fill or alpha scale cannot run from high to low, " <>
+               "got: {10, 1}"},
             {[fill: {~D[2026-01-01], nil}], "two numbers, each nil"},
             {[alpha: "a"], ~s(got: "a")}
           ] do

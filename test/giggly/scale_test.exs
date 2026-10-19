@@ -1085,10 +1085,10 @@ defmodule Giggly.ScaleTest do
 
     test "a list of too few colours for the levels cannot be drawn" do
       scale = palette_scale({:manual, ["#FF0000", "#0000FF"]}, [4, 6, 8])
+      error = assert_raise ArgumentError, fn -> Scale.map(scale, [4]) end
 
-      assert_raise ArgumentError, ~r/needs a value for each of its 3 levels, but has 2/, fn ->
-        Scale.map(scale, [4])
-      end
+      assert error.message =~
+               ~s(needs a value for each of its 3 levels, but has 2: ["#FF0000", "#0000FF"])
     end
 
     test "a map colours each value by name, a number naming the value equal to it" do
