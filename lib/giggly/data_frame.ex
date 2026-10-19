@@ -40,8 +40,8 @@ defmodule Giggly.DataFrame do
 
   One more is never worked out from values, only declared when a column is built: `:category`,
   Explorer's name for a categorical column, which a plot reads as discrete whatever its values
-  are, as R's `factor()` makes a column of levels. Its values are typed, and an integer among
-  floats becomes a float, as any column's; it may hold anything but a `:term`'s values.
+  are. Its values are typed, and an integer among floats becomes a float, as any column's; it may
+  hold anything but a `:term`'s values.
   """
 
   # ## Implementations

@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **API docs describe Giggly on its own terms; comparing with ggplot2 is the notebooks' job
+  (2026-10-18, Steve).** A public moduledoc, `@doc`, `@typedoc` or option doc says what Giggly
+  does: what a function draws, its aesthetics and options, an example or two. It names no ggplot2
+  counterpart, R function it ports or difference from R; the notebooks show each ggplot2 example
+  beside Giggly's and note where the drawing differs. How a port follows R stays where its
+  maintainers read it, an internal module's comment block and its rules file. A dataset still
+  says whose table it copies. *Rejected: the docs as written until then*, each function tied to
+  its ggplot2 counterpart with R's mechanics spelled out (72 "as ggplot2" in `plot.ex`'s 1,990
+  lines, a sentence repeated in seven functions): they read as a specification and restated what
+  the notebooks already show.
+
 - **A verdict names a missing expression by what it needs, never as "an expression in a mapping"
   (2026-10-18, Steve).** Once columns, per-row expressions, constants, `factor()` and `after_stat()`
   landed, the phrase named something Giggly has, so step 4's sweep took it out of every verdict:
@@ -1555,6 +1566,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-18 — Describe Giggly on its own terms in the API docs; §4: "API docs describe Giggly
+  on its own terms"
 - 2026-10-18 — Draw expressions in the notebooks (expressions, step 4) (`a6f8a79`); §4: "A verdict
   names a missing expression by what it needs"
 - 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3)

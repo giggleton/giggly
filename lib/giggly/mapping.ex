@@ -1,37 +1,31 @@
 defmodule Giggly.Mapping do
   @moduledoc """
   What a mapping maps each aesthetic to: a column, an expression computed from columns in each
-  row, or a constant. A mapping is a map from aesthetic to value, as ggplot2's `aes()` is:
+  row, or a constant. A mapping is a map from aesthetic to value:
 
       %{x: :displ, y: {&Kernel.//2, [:hwy, :cty]}, colour: {:constant, "smooth"}}
-
-  is ggplot2's `aes(displ, hwy / cty, colour = "smooth")`.
 
   ## Values
 
     * **A column** is named by an atom or a string, compared with the table's column names as a
       string, so `:hwy` and `"hwy"` name the same column. `true`, `false` and `nil` name none.
     * **An expression**, `{function, [value, ...]}`, is the function applied in each row to what
-      its arguments are in that row, as ggplot2's `aes(y = hwy / cty)` divides each row's `hwy` by
+      its arguments are in that row, so `{&Kernel.//2, [:hwy, :cty]}` divides each row's `hwy` by
       its `cty`. Each argument is a value, so it may be a column, a constant or another expression,
       and the function takes as many arguments as it is given.
     * **A constant**, `{:constant, term}`, is the term in every row. A number, a boolean, a date or
       a time is a constant written alone; a string or an atom would name a column, so a constant
-      one is written `{:constant, "smooth"}`, as ggplot2's `aes(colour = "smooth")` maps every row
-      to one level.
-    * **A factor**, `{:factor, [value]}`, is the value read as discrete, as ggplot2's
-      `aes(colour = factor(cyl))` reads a column of numbers as levels: a discrete scale whatever
-      the values, its levels in order of value with a missing one last, each written as R writes
-      it (`4`, `0.5`, `TRUE`), and the rows grouped by them. A factor reads a whole column, so it
-      is the whole of a mapping value, a factor's own or an after_stat's, never an expression's
-      argument, where R hands a function its levels' codes rather than its values.
+      one is written `{:constant, "smooth"}`.
+    * **A factor**, `{:factor, [value]}`, is the value read as discrete, so a column of numbers
+      maps as levels: a discrete scale whatever the values, its levels in order of value with a
+      missing one last, each written as text (a whole number without a decimal point, `4`; a
+      boolean as `TRUE` or `FALSE`), and the rows grouped by them. A factor reads a whole column, so it is the whole of a mapping
+      value, a factor's own or an after_stat's, never an expression's argument.
     * **An after_stat**, `{:after_stat, [value]}`, is the value computed from what the layer's stat
-      computes, as ggplot2's `aes(y = after_stat(prop))` maps each bar's share of its group's rows
-      into y: its names are the stat's computed variables, as ggplot2 documents them for the stat
-      (counting's are `count` and `prop`), and it is evaluated once the stat has run, so it takes
-      no part in grouping or in what the stat computes. Its value is put through its aesthetic's
-      scale, as ggplot2's `map_statistic()` puts it. It is the whole of a mapping value, never
-      inside another, so ggplot2's `after_stat(prop) * 100` is written
+      computes: its names are the stat's computed variables (counting's are `count` and `prop`),
+      and it is evaluated once the stat has run, so it takes no part in grouping or in what the
+      stat computes. Its value is put through its aesthetic's scale. It is the whole of a mapping
+      value, never inside another, so the share as a percentage is written
       `{:after_stat, [{&Kernel.*/2, [:prop, 100]}]}`.
 
   A constant is a value a column can hold: `nil`, a list, and a value with no column type of its
@@ -50,8 +44,7 @@ defmodule Giggly.Mapping do
       iex> Giggly.DataFrame.pull(frame, :color)
       ["#F8766D", "#F8766D"]
 
-  ggplot2's `ggplot(mpg, aes(class, after_stat(prop), group = 1)) + geom_bar()` draws each class's
-  share of all the rows:
+  Each class's share of all the rows, counted as one group:
 
       iex> plot =
       ...>   %{"class" => ["suv", "compact", "suv", "midsize"]}
@@ -63,8 +56,7 @@ defmodule Giggly.Mapping do
 
   ## Titles
 
-  A guide is titled by what its aesthetic is mapped to, as ggplot2 titles it by the expression's
-  text:
+  A guide is titled by what its aesthetic is mapped to:
 
     * a column by its name, `cty`;
     * an expression by its text, as Elixir writes the call: a capture of one of `Kernel`'s
@@ -73,9 +65,9 @@ defmodule Giggly.Mapping do
     * an expression whose function is a closure, such as `fn hwy -> hwy * 2 end`, has no text, so
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
     * a factor by its value's text inside `factor()`, `factor(cyl)`;
-    * an after_stat by its value's text, `prop`, as ggplot2 titles `after_stat(prop)`;
+    * an after_stat by its value's text, `prop`;
     * a constant by its aesthetic's name, `color`, unless another layer maps the aesthetic to a
-      column or an expression, whose title wins, as ggplot2 titles a constant.
+      column or an expression, whose title wins.
 
   So a capture is the form to write where the title should say what was computed, and a closure
   the form to write inline, with a title from `labs/2`.

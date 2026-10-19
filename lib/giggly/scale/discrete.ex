@@ -1,19 +1,20 @@
 defmodule Giggly.Scale.Discrete do
   @moduledoc """
-  A trained discrete scale, as `Giggly.panel_scales/2` returns an axis's: the distinct values it
-  has seen, in level order; the continuous range of the positions it has been handed since its
-  levels were placed, such as a bar's edges, `:none` before any: ggplot2's `range_c`, which can
-  widen the axis past its levels; and its palette, which turns a level into the value of its
-  aesthetic: `:identity` for a position, each level at its place counting from 1;
-  `{:sequence, {low, high}}` for an aesthetic such as alpha, the levels spread evenly from `low` to
-  `high` in level order, as ggplot2's ordinal alpha scale spreads them; and
-  `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance}}` for colour and fill, a colour
-  for each level, its hue spaced evenly round the circle from `low`, as R's `pal_hue()` gives them;
-  and the value a missing value maps to, its `na_value`, ggplot2's `na.value`: `nil`, R's `NA`, for
-  alpha, and grey50, `"#7F7F7F"`, for colour and fill. A missing value takes no share of an
-  aesthetic's palette; a position scale puts it at its last level, and its `na_value` is `nil`.
-  Its `guide` is the guide that draws it, by name, as ggplot2's scale carries `guide`: `:axis` for
-  a position and `:legend` for an aesthetic such as alpha or colour.
+  A trained discrete scale, as `Giggly.panel_scales/2` returns an axis's. Its fields:
+
+    * `levels`: the distinct values it has seen, in level order.
+    * `continuous_range`: the range of the positions it has been handed since its levels were
+      placed, such as a bar's edges, which can widen the axis past its levels; `:none` before any.
+    * `palette`: what turns a level into its aesthetic's value: `:identity` for a position, each
+      level at its place counting from 1; `{:sequence, {low, high}}` for an aesthetic such as
+      alpha, the levels spread evenly from `low` to `high` in level order; and
+      `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance}}` for colour and fill, a
+      colour for each level, its hue spaced evenly round the circle from `low`.
+    * `na_value`: what a missing value maps to: `nil` for alpha, grey, `"#7F7F7F"`, for colour and
+      fill. A missing value takes no share of the palette; a position scale puts it at its last
+      level, and its `na_value` is `nil`.
+    * `guide`: the guide that draws it: `:axis` for a position and `:legend` for an aesthetic such
+      as alpha or colour.
   """
 
   # Use it through `Giggly.Scale`.

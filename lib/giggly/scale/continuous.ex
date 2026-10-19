@@ -1,19 +1,20 @@
 defmodule Giggly.Scale.Continuous do
   @moduledoc """
-  A trained continuous scale, as `Giggly.panel_scales/2` returns an axis's: the range of the
-  finite numbers it has seen, or `:none` before it has seen any; the name of the transformation
-  its values are put through before it sees them, `:identity` for numbers and `:date` for dates,
-  which it sees as their days since 1970-01-01, as R stores a date, so a date axis's range is in
-  days; and its palette, which turns a value's place in
-  that range into the value of its aesthetic: `:identity` for a position, left where it is for
-  the coordinate system to place, and `{:rescale, {low, high}}` for an aesthetic such as alpha,
-  each value's place, from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does, and
-  `{:gradient, {low, high}}` for colour and fill, each value's place the colour as far from `low`
-  toward `high`, blended in L*a*b*, as R's `pal_seq_gradient()` blends them; the value a missing
-  value, or one not a finite number, maps to, its `na_value`, ggplot2's `na.value`: `nil`, R's
-  `NA`, for a position and alpha, and grey50, `"#7F7F7F"`, for colour and fill; and the guide that
-  draws it, by name, as ggplot2's scale carries `guide`: `:axis` for a position, `:legend` for
-  alpha and `:colorbar` for colour and fill.
+  A trained continuous scale, as `Giggly.panel_scales/2` returns an axis's. Its fields:
+
+    * `range`: the range of the finite numbers it has seen, or `:none` before it has seen any.
+    * `transform`: the transformation its values are put through before it sees them,
+      `:identity` for numbers and `:date` for dates, which it sees as days since 1970-01-01, so a
+      date axis's range is in days.
+    * `palette`: what turns a value's place in the range into its aesthetic's value: `:identity`
+      for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
+      aesthetic such as alpha, each place, from 0 to 1, rescaled onto `low` to `high`; and
+      `{:gradient, {low, high}}` for colour and fill, the colour as far from `low` toward `high`,
+      blended in L*a*b*.
+    * `na_value`: what a missing value, or one not a finite number, maps to: `nil` for a position
+      and alpha, grey, `"#7F7F7F"`, for colour and fill.
+    * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha and
+      `:colorbar` for colour and fill.
   """
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.

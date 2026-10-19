@@ -1,13 +1,13 @@
 defmodule Giggly.Datasets do
   @moduledoc """
-  Datasets to plot, for the examples in Giggly's notebooks and for your own: the tables R and
-  ggplot2 ship and their documentation draws, so an example reads as it does there.
+  Datasets to plot, for the examples in Giggly's notebooks and for your own: copies of tables R
+  and ggplot2 ship.
 
   Each dataset is a keyword list of columns, in the dataset's own order, which `Giggly.Plot.new/2`
-  reads as a table, as do Explorer's `DataFrame.new/1` and Kino's data table. Whole numbers are
-  integers and measurements floats; a name is a string, and a date a `Date`. A dataset is a copy of R's, kept in
-  Giggly's `priv/datasets` with a header saying where it came from, and read when Giggly compiles,
-  so asking for one reads nothing. Each arrives with the first notebook example that draws it.
+  reads as a table, as do Explorer's `DataFrame.new/1` and Kino's data table. A column of numbers
+  holds integers or floats, as each dataset's doc shows; a name is a string, and a date a `Date`.
+  Each is kept in Giggly's `priv/datasets` with a header saying where it came from, and read when
+  Giggly compiles, so asking for one reads nothing.
   """
 
   # A dataset is data: it calls nothing, and nothing in Giggly calls it.
@@ -160,8 +160,8 @@ defmodule Giggly.Datasets do
 
   @doc """
   R's `mtcars`: fuel consumption and ten aspects of design and performance for 32 cars (1973-74
-  models), from the 1974 *Motor Trend* US magazine (Henderson and Velleman, 1981). R keeps each
-  car's name as a row name; here it is the first column, `model`.
+  models), from the 1974 *Motor Trend* US magazine (Henderson and Velleman, 1981). Every number
+  is a float.
 
   The columns: `model`; `mpg`, miles per US gallon; `cyl`, cylinders; `disp`, displacement in
   cubic inches; `hp`, gross horsepower; `drat`, rear axle ratio; `wt`, weight in thousands of
@@ -227,17 +227,16 @@ defmodule Giggly.Datasets do
   def mpg, do: Map.fetch!(@datasets, :mpg)
 
   @doc """
-  ggplot2's `diamonds`: the prices and other attributes of 53,940 round cut diamonds, the dataset
-  ggplot2's examples reach for when a plot has too many points to see each one.
+  ggplot2's `diamonds`: the prices and other attributes of 53,940 round cut diamonds.
 
   The columns: `carat`, the weight; `cut`, the quality of the cut, from `"Fair"`, `"Good"`,
   `"Very Good"` and `"Premium"` to `"Ideal"`; `color`, from `"D"`, the best, to `"J"`, the worst;
   `clarity`, how clear, from `"I1"`, the worst, through `"SI2"`, `"SI1"`, `"VS2"`, `"VS1"`,
   `"VVS2"` and `"VVS1"` to `"IF"`, the best; `depth`, the total depth as a percentage of the
   mean width, `2 * z / (x + y)`; `table`, the width of the top relative to the widest point;
-  `price`, in US dollars; and `x`, `y` and `z`, the length, width and depth in millimetres. R
-  keeps `cut`, `color` and `clarity` as ordered factors; here they are their labels, which sort
-  alphabetically. It is kept compressed and decoded each time it is asked for, in a few tens of
+  `price`, in US dollars; and `x`, `y` and `z`, the length, width and depth in millimetres.
+  `cut`, `color` and `clarity` are strings, so they sort alphabetically, not in the order given
+  here. It is kept compressed and decoded each time it is asked for, in a few tens of
   milliseconds, so bind it once.
 
       iex> diamonds = Giggly.Datasets.diamonds()
@@ -270,8 +269,7 @@ defmodule Giggly.Datasets do
   The columns: `date`, the month, as a `Date` on its first day; `pce`, personal consumption
   expenditures, in billions of dollars; `pop`, the total population, in thousands; `psavert`, the
   personal savings rate; `uempmed`, the median duration of unemployment, in weeks; and `unemploy`,
-  the number unemployed, in thousands. R stores every number as a double, `pop` and `unemploy`
-  whole as most of their values are, so each is a float.
+  the number unemployed, in thousands. Every number is a float.
 
       iex> economics = Giggly.Datasets.economics()
       iex> Keyword.keys(economics)

@@ -1,27 +1,20 @@
 defmodule Giggly.Plot do
   @moduledoc """
-  The public API for describing a plot. A plot starts from data and a mapping, and layers are
-  added with a pipe:
+  Describes a plot: its data, a mapping from aesthetics to columns, and layers added with a pipe.
 
       rows
       |> Giggly.Plot.new(%{x: :wt, y: :mpg})
       |> Giggly.Plot.geom_point()
 
-  A plot describes and runs nothing. The functions in `Giggly` take a finished plot and run it:
-  `Giggly.layer_data/2` shows the table a layer computes, as ggplot2's `get_layer_data()` does.
+  A plot is a value and draws nothing itself: `Giggly.to_svg/2` draws it, and
+  `Giggly.layer_data/2` shows the table a layer computes.
 
   ## Data
 
   The data is anything implementing `Table.Reader`: a list of maps, a map of columns, an Explorer
-  data frame, a database result. `new/2` reads it once, into a `Giggly.DataFrame` whose column
-  names are strings.
-
-  A layer may draw a table of its own in place of the plot's, given by its function's `data:`
-  option, as ggplot2's `data =` gives one, and read once there. The plot's mapping applies to it as
-  to the plot's data, so it must hold every column the plot's mapping names for an aesthetic the
-  layer neither maps nor sets, as ggplot2 fails with "object not found" when it lacks one; a layer
-  that sets the aesthetic, or maps it to a column of its own, needs no such column. Under a facet,
-  a table lacking the columns the plot is faceted by is drawn in every panel:
+  data frame. `new/2` reads it once, into a `Giggly.DataFrame`. A layer can draw a table of its
+  own instead, given by its `data:` option; under a facet, a table lacking the faceting columns
+  is drawn in every panel:
 
       iex> mtcars = %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => [6, 4, 8]}
       iex> frame =
@@ -34,52 +27,27 @@ defmodule Giggly.Plot do
       iex> Giggly.DataFrame.pull(frame, :panel)
       [1, 2, 3]
 
-  ## Mappings
+  ## Mapping and setting aesthetics
 
-  A mapping is a map from aesthetic to column, `%{x: :wt, y: :mpg}`. A column is named by an atom
-  or a string and compared with the table's column names as a string, so `:wt` and `"wt"` name the
-  same column. An aesthetic may also be mapped to an expression computed in each row from columns,
-  such as `{&Kernel.//2, [:hwy, :cty]}`, to a constant, such as `{:constant, "smooth"}` or `7`, or
-  to a value read as discrete, such as `{:factor, [:cyl]}`, as `Giggly.Mapping` describes.
+  Every layer function takes a mapping, a map, and options, a keyword list, either or both. A map
+  maps an aesthetic to a column, `%{x: :wt}`, or to an expression or a constant, as
+  `Giggly.Mapping` describes; a keyword list sets it to one value for every mark, `alpha: 0.4`.
+  The plot's mapping applies to every layer, and a layer's own mapping is laid over it.
 
-  The plot's mapping applies to every layer, and a layer's mapping is laid over it: an aesthetic
-  both the plot and layer map takes the layer's value. When a layer is added, every column it
-  draws with, from its own mapping and those it takes from the plot's, is checked against the table
-  it draws, its own or the plot's; its own mapping is checked against the aesthetics it can use,
-  and the two mappings together against those it needs. So the plot's mapping is checked by the
-  layers that take it, and may name a column only the layers' own tables hold, as ggplot2's may.
-  An aesthetic a layer takes from the plot's mapping that it cannot use rides along unused, as
-  ggplot2 carries one, so a plot can map `:label` for its text and still draw points: it is not
-  drawn, though a discrete one still splits the layer's groups, and the layer draws in no legend of
-  it. Whether a column's type suits an axis is checked when the plot is run.
+  A misspelt column, or an aesthetic a layer cannot use, raises from the function that names it.
+  An aesthetic the plot maps that a layer cannot use is ignored by that layer, so a plot can map
+  `:label` for its text and still draw points. Whether a column's type suits an axis is checked
+  when the plot is run.
 
-  ## Setting aesthetics
+  ## Colours
 
-  A layer function's options can set an aesthetic to one value for every mark the layer draws, as
-  ggplot2's `geom_point(alpha = 0.4)` does: `Giggly.Plot.geom_point(plot, alpha: 0.4)`. A map
-  maps and a keyword list sets.
-
-  A colour is written as CSS writes one: a name, such as `"steelblue"`, a hex colour, such as
-  `"#4682B4"`, or `"#4682B480"` with an alpha of its own, or `"transparent"`; `:none` draws
-  nothing, as ggplot2's `NA` does. A name CSS does not define raises, R's `"grey50"` among them,
-  and where R and CSS give a name different colours it is CSS's: `"green"` is `#008000`, not R's
-  `#00FF00`. An alpha, set or mapped, replaces a colour's own, as ggplot2's `alpha()` does,
-  so `geom_point(colour: "#4682B480")` draws half-opaque points, and with `alpha: 1` opaque ones.
-
-  ## Annotations
-
-  `annotate/3` adds a layer drawn from values given in the call rather than from a table's columns,
-  as ggplot2's `annotate()` does: a label, a shaded rectangle or a line placed by hand. Its
-  positions take part in the scales, so the axes reach them; it takes nothing from the plot's
-  mapping, titles no axis and is in no legend.
-
-  ## Mapping colour
+  A colour is a CSS colour name, such as `"steelblue"`, a hex colour, such as `"#4682B4"`, or
+  `"#4682B480"` with an alpha of its own, or `"transparent"`; `:none` draws nothing. A name CSS
+  does not define raises. An alpha, set or mapped, replaces a colour's own.
 
   A discrete column mapped to `:color` (or `:colour`) or `:fill` gives each of its values a hue,
-  evenly spaced round the colour wheel at one chroma and luminance, exactly as ggplot2's default
-  discrete colour scale (`scales::pal_hue()`) gives them, so three values are `#F8766D`, `#00BA38`
-  and `#619CFF`; a missing value is grey50, `#7F7F7F`, and its key in the legend comes last,
-  labelled `NA`.
+  evenly spaced round the colour wheel, so three values are `#F8766D`, `#00BA38` and `#619CFF`; a
+  missing value is grey, `#7F7F7F`, and its key in the legend comes last, labelled `NA`.
 
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "cyl" => ["6", "4", nil]}
@@ -88,10 +56,9 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
       ["#00BFC4", "#F8766D", "#7F7F7F"]
 
-  A column of numbers mapped to colour or fill gives each value a colour as far along ggplot2's
-  default gradient, from `#132B43` to `#56B1F7`, as the value is through the column's range,
-  blended in L*a*b* as ggplot2 blends it; a missing value is grey50 here too. Its guide is a
-  colour bar, the gradient up a bar with a tick and label at each break.
+  A column of numbers mapped to colour or fill gives each value a colour as far along a gradient
+  from `#132B43` to `#56B1F7` as the value is through the column's range; a missing value is grey
+  here too. Its guide is a colour bar.
 
       iex> plot =
       ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "hp" => [110, 93, nil]}
@@ -101,17 +68,13 @@ defmodule Giggly.Plot do
       ["#56B1F7", "#132B43", "#7F7F7F"]
 
   A legend or colour bar is drawn for each mapped aesthetic, stacked down the right of the panels
-  in the order of the aesthetics' names (`alpha`, `color`, `fill`), and two of one kind with the
-  same title and labels, as a colour and a fill mapped to one column, are drawn as one, each layer
-  drawing a legend's keys in the aesthetics it maps. ggplot2 orders its legends by a hash of their
-  contents; `guides(order =)` in R puts them in Giggly's order.
+  in the order of the aesthetics' names (`alpha`, `color`, `fill`). Two with the same title and
+  labels, such as a colour and a fill mapped to one column, are drawn as one.
 
   ## Labels
 
-  Each axis is titled by what is mapped to it, and each legend by what its aesthetic is mapped to:
-  a column by its name, an expression by its text, a constant by its aesthetic's name, as
-  `Giggly.Mapping` describes. `labs/2` titles them otherwise, and gives the plot a title, a
-  subtitle, a caption and a tag, as ggplot2's `labs()` does.
+  Each axis and legend is titled by what is mapped to it, as `Giggly.Mapping` describes. `labs/2`
+  titles them otherwise, and gives the plot a title, a subtitle, a caption and a tag.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -227,11 +190,10 @@ defmodule Giggly.Plot do
   @data_option [
     type: :any,
     doc:
-      "A table for the layer to draw in place of the plot's data, anything implementing " <>
-        "`Table.Reader`, as ggplot2's `data =` gives one. The plot's mapping applies to it, so " <>
-        "it must hold each column the plot's mapping names for an aesthetic the layer neither " <>
-        "maps nor sets. Under a facet, a table lacking a column the plot is faceted by is drawn " <>
-        "in every panel of that column's values, and a value only it holds makes a panel."
+      "A table for the layer to draw instead of the plot's data, anything implementing " <>
+        "`Table.Reader`. The plot's mapping applies to it, so it must hold each column the " <>
+        "plot's mapping names for an aesthetic the layer neither maps nor sets. Under a facet, " <>
+        "a table lacking a faceting column is drawn in every panel of that column's values."
   ]
 
   # An aesthetic set to one value for every mark of a layer, an option of the function that adds
@@ -239,18 +201,14 @@ defmodule Giggly.Plot do
   # float, as R keeps it.
   @alpha_option [
     type: {:custom, __MODULE__, :validate_alpha, []},
-    doc:
-      "How opaque every mark is, from 0, invisible, to 1, opaque, as ggplot2's " <>
-        "`alpha = 0.4` sets it."
+    doc: "How opaque every mark is, from 0, invisible, to 1, opaque."
   ]
 
   # A line's width set for every line of a layer, in millimetres, as ggplot2's `linewidth = 2`
   # sets it, kept as a float.
   @linewidth_option [
     type: {:custom, __MODULE__, :validate_linewidth, []},
-    doc:
-      "How wide every line is, in millimetres, as ggplot2's `linewidth = 2` sets it; " <>
-        "0.5 when not given."
+    doc: "How wide every line is, in millimetres; 0.5 when not given."
   ]
 
   # A colour set for every mark of a layer, as ggplot2's `colour = "steelblue"` sets it, kept in the
@@ -260,37 +218,33 @@ defmodule Giggly.Plot do
   # The colours an option that sets one takes.
   @color_forms ~S(a CSS colour name, such as `"steelblue"`, a hex colour, such as `"#4682B4"`, ) <>
                  ~S(or `"#4682B480"` with an alpha of its own, `"transparent"`, or `:none` ) <>
-                 "for none, as ggplot2's `NA`"
+                 "for none"
 
   @point_color_option [
     type: @color_type,
     doc:
-      "The colour of every point, its outline and fill alike, as ggplot2's " <>
-        "`colour = \"steelblue\"` sets it, written `colour:` or `color:`: " <>
+      "The colour of every point, its outline and fill alike, written `colour:` or `color:`: " <>
         @color_forms <> "; black when not given."
   ]
 
   @bar_color_option [
     type: @color_type,
     doc:
-      "The colour of every bar's border, as ggplot2's `colour = \"black\"` sets it, written " <>
-        "`colour:` or `color:`: " <>
+      "The colour of every bar's border, written `colour:` or `color:`: " <>
         @color_forms <>
         "; no border when not given. A border takes no alpha but its colour's own."
   ]
 
   @bar_fill_option [
     type: @color_type,
-    doc:
-      "The colour every bar is filled with, as ggplot2's `fill = \"steelblue\"` sets it: " <>
-        @color_forms <> "; `#595959` when not given."
+    doc: "The colour every bar is filled with: " <> @color_forms <> "; `#595959` when not given."
   ]
 
   @line_color_option [
     type: @color_type,
     doc:
-      "The colour of every line, as ggplot2's `colour = \"steelblue\"` sets it, written " <>
-        "`colour:` or `color:`: " <> @color_forms <> "; black when not given."
+      "The colour of every line, written `colour:` or `color:`: " <>
+        @color_forms <> "; black when not given."
   ]
 
   # How a layer's lines are drawn at their ends and corners: ggplot2's `lineend`, `linejoin` and
@@ -321,13 +275,13 @@ defmodule Giggly.Plot do
   @text_color_option [
     type: @color_type,
     doc:
-      "The colour of every label, as ggplot2's `colour = \"red\"` sets it, written `colour:` or " <>
-        "`color:`: " <> @color_forms <> "; black when not given."
+      "The colour of every label, written `colour:` or `color:`: " <>
+        @color_forms <> "; black when not given."
   ]
 
   # How a label is justified, along its baseline (`hjust`) or up its height (`vjust`): a number, or
   # one of ggplot2's words.
-  @justification_forms "a number from 0 to 1, or one of ggplot2's words: `:left`, `:center` and " <>
+  @justification_forms "a number from 0 to 1, or one of the words `:left`, `:center` and " <>
                          "`:right`, `:bottom`, `:middle` and `:top`, or `:inward` and " <>
                          "`:outward`, which justify each label toward or away from the middle " <>
                          "of the panel by where it falls"
@@ -367,8 +321,7 @@ defmodule Giggly.Plot do
                    default: :stack,
                    doc:
                      "How bars that share an `x` are placed: piled on one another (`:stack`), " <>
-                       "or set side by side within the width one bar takes (`:dodge`), " <>
-                       "ggplot2's `position = \"dodge\"`."
+                       "or set side by side within the width one bar takes (`:dodge`)."
                  ],
                  alpha: @alpha_option,
                  color: @bar_color_option,
@@ -391,7 +344,7 @@ defmodule Giggly.Plot do
     default: :x,
     doc:
       "Which position the rows are put in order of: `x`, or `y` for a line that runs up the " <>
-        "panel, as ggplot2's `orientation = \"y\"` gives."
+        "panel."
   ]
 
   # `geom_line/3`'s options, validated at the call.
@@ -411,7 +364,7 @@ defmodule Giggly.Plot do
     default: false,
     doc:
       "Whether to leave out each label that would cross one drawn before it, the rows taken " <>
-        "in order, as ggplot2's `check_overlap = TRUE` does."
+        "in order."
   ]
 
   # How every label of a layer is drawn, each set once for the layer.
@@ -419,9 +372,8 @@ defmodule Giggly.Plot do
     size: [
       type: {:custom, __MODULE__, :validate_size, []},
       doc:
-        "How big every label is, in millimetres, as ggplot2's `size = 5` sets it, which is " <>
-          "that many times ggplot2's `.pt`, 2.85, in points; 11 points, the theme's base " <>
-          "size, when not given."
+        "How big every label is, in millimetres, each 2.85 points; 11 points, the theme's " <>
+          "base size, when not given."
     ],
     angle: [
       type: {:custom, __MODULE__, :validate_angle, []},
@@ -462,7 +414,7 @@ defmodule Giggly.Plot do
                         type: {:custom, __MODULE__, :validate_nudge, []},
                         doc:
                           "How far every label moves along x from its place, in the units of the " <>
-                            "x axis, as ggplot2's `nudge_x = 0.1` moves it; 0 when not given."
+                            "x axis; 0 when not given."
                       ],
                       nudge_y: [
                         type: {:custom, __MODULE__, :validate_nudge, []},
@@ -476,8 +428,7 @@ defmodule Giggly.Plot do
   @rect_color_option [
     type: @color_type,
     doc:
-      "The colour of every rectangle's border, as ggplot2's `colour = \"black\"` sets it, " <>
-        "written `colour:` or `color:`: " <>
+      "The colour of every rectangle's border, written `colour:` or `color:`: " <>
         @color_forms <>
         "; no border when not given. A border takes no alpha but its colour's own."
   ]
@@ -485,8 +436,8 @@ defmodule Giggly.Plot do
   @rect_fill_option [
     type: @color_type,
     doc:
-      "The colour every rectangle is filled with, as ggplot2's `fill = \"steelblue\"` sets " <>
-        "it: " <> @color_forms <> "; `#595959` when not given."
+      "The colour every rectangle is filled with: " <>
+        @color_forms <> "; `#595959` when not given."
   ]
 
   # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
@@ -501,9 +452,8 @@ defmodule Giggly.Plot do
                   xmin: [
                     type: @corner_type,
                     doc:
-                      "Every rectangle's `xmin`, in the units of the x axis, as ggplot2's " <>
-                        "`xmin = 3` sets it: a number, or `:infinity` or `:neg_infinity`, R's " <>
-                        "`Inf` and `-Inf`, which reach the panel's edge."
+                      "Every rectangle's `xmin`, in the units of the x axis: a number, or " <>
+                        "`:infinity` or `:neg_infinity`, which reach the panel's edge."
                   ],
                   xmax: [
                     type: @corner_type,
@@ -608,12 +558,11 @@ defmodule Giggly.Plot do
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   @doc """
-  A plot of `data` with the aesthetics in `mapping` applying to every layer.
+  A plot of `data`, with `mapping` applying to every layer.
 
-  Each column the mapping reads is checked by the layers that take it, against the table each
-  draws, so a misspelt column is reported by the first layer function to take it. Raises
-  `ArgumentError` here for a value that is not a column, an expression or a constant
-  (`Giggly.Mapping`).
+  The mapping's columns are checked by the layers that use them, so a misspelt column is reported
+  by the first layer function to take it. Raises `ArgumentError` for a value that is not a column,
+  an expression or a constant (`Giggly.Mapping`).
 
       iex> plot =
       ...>   Giggly.Plot.new(
@@ -641,11 +590,8 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y` from one mapping
-  or the other. A point set or mapped to be transparent is so in its outline and its fill alike, as
-  ggplot2 draws one, and so is its colour, which `colour:` sets; a colour of `:none` draws no
-  point, as ggplot2 leaves out a point whose colour is `NA`. A mapping, a map, and options, a
-  keyword list, may each be given alone or both together.
+  Points use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`. A point's colour
+  and alpha apply to its outline and fill alike; a colour of `:none` draws no point.
 
   ## Options
 
@@ -705,29 +651,19 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of bars counting the rows at each `x`: ggplot2's `geom_bar()`. Each bar runs from 0
-  to the number of rows at its `x`, or, where `:weight` is mapped, to the sum of their weights, and
-  the y axis is titled `count`. A row missing its `x` is not counted.
-
-  Bars are drawn as `geom_col/3` draws them: 0.9 as wide as the closest spacing of the `x`
-  positions, counting from zero, and stacked where groups share an `x`, the highest group at the
-  bottom, or set side by side with `position: :dodge`.
+  Adds a layer of bars counting the rows at each `x`. Each bar runs from 0 to the number of rows at
+  its `x`, or, where `:weight` is mapped, to the sum of their weights, and the y axis is titled
+  `count`. A row missing its `x` is not counted. The bars are drawn as `geom_col/3` draws them.
 
   Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
-  counts along the one mapped, and the count is the other, so mapping `:y` alone draws horizontal
-  bars, as ggplot2's `geom_bar(aes(y = class))` does, the x axis titled `count`. A `:weight` column
-  must hold numbers. The bars also take `:alpha`, `:fill` and `:color`, each of which reaches a bar
-  where it is the same in every row the bar counts, as ggplot2 keeps it, and so a discrete one both
-  groups the rows and shades or colours each group's bar, as ggplot2's `geom_bar(aes(fill = drv))`
-  fills each drive train's. A mapping, a map, and options, a keyword list, may each be given alone or
-  both together.
+  counts along the one mapped, so mapping `:y` alone draws horizontal bars. A `:weight` column must
+  hold numbers. The bars also take `:alpha`, `:fill` and `:color`; one reaches a bar only where it
+  is the same in every row the bar counts, so a discrete one groups the rows and gives each group
+  its own bar.
 
-  Counting computes two variables a mapping can read with an after_stat (`Giggly.Mapping`): `count`
-  and `prop`, the count's share of its group's total, as ggplot2's `after_stat(prop)`. So
-  `%{x: :class, y: {:after_stat, [:prop]}, group: 1}` draws each class's share of all the rows,
-  its rows one group, and `%{x: :class, fill: {:after_stat, [:count]}}` shades each bar by its
-  count. An after_stat is evaluated once the rows are counted, so it is neither the `:x` or `:y`
-  counted along nor a `:weight`.
+  Counting computes `count` and `prop`, the count's share of its group's total, which a mapping
+  reads with an after_stat (`Giggly.Mapping`): `%{x: :class, y: {:after_stat, [:prop]}, group: 1}`
+  draws each class's share of all the rows.
 
   ## Options
 
@@ -774,24 +710,18 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`: ggplot2's
-  `geom_col()`, for bars whose heights are in the data. Bars at the same `x` are stacked, those
-  above zero upward and those below it downward, ordered by group so the highest group is at the
-  bottom of each stack, as ggplot2 orders them to match the legend; with `position: :dodge` they
-  are set side by side within the width one bar takes, ordered by group from the left, an `x` with
-  one group keeping its whole width.
+  Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`, for bars whose
+  heights are in the data. Bars at the same `x` are stacked, those below zero downward, the
+  highest group at the bottom; with `position: :dodge` they are set side by side within one bar's
+  width, an `x` with one group keeping its whole width.
 
-  Each bar is 0.9 as wide as the closest spacing of the `x` positions: 0.9 on a discrete axis,
-  whose values sit 1 apart, and on a continuous one the closest pair's gap times 0.9 for every bar,
-  as ggplot2's `resolution()` gives it, a column of integers counting as 1 apart. The `y` axis
-  reaches to 0, since every bar starts there.
+  Each bar is 0.9 times the closest spacing of the `x` positions wide: 0.9 on a discrete axis, and
+  on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart. The `y`
+  axis reaches 0.
 
-  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill` and `:color`, and need `:x` and `:y` from one
-  mapping or the other; a bar's fill takes its alpha, its border not. `:fill` fills a bar and
-  `:color` borders it, which bars have none of unless it is mapped or set. When `y`
-  is the discrete axis and `x` the continuous one, the bars are horizontal, each from 0 to its `x`,
-  as ggplot2 decides. A mapping, a map, and options, a keyword list, may each be given alone or both
-  together.
+  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill` and `:color`, and need `:x` and `:y`. `:fill`
+  fills a bar and takes its alpha; `:color` borders it, and bars have no border unless it is
+  mapped or set. With a discrete `y` and a continuous `x`, the bars are horizontal.
 
   ## Options
 
@@ -843,18 +773,13 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of paths: a line through each group's rows in the order the data gives them,
-  ggplot2's `geom_path()`, for a line that may double back, as one through two measures taken
-  over time does. `geom_line/3` puts the rows in order first.
+  Adds a layer of paths: a line through each group's rows in the order the data gives them, for a
+  line that may double back. `geom_line/3` puts the rows in order first.
 
-  Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y` from one mapping
-  or the other; each group is a line of its own, and a discrete colour groups the rows, a line in
-  each colour. A row missing `x` or `y` breaks its line there, and those at either end of a group
-  are left out; a group of one row draws nothing. Where a line's colour or alpha changes along it,
-  the line is drawn a segment from each row to the next, each in the colour and alpha of the row
-  it starts from. `colour:` sets the lines' colour; a colour of `:none` draws no line, as ggplot2
-  leaves out a line whose colour is `NA`. A mapping, a map, and options, a keyword
-  list, may each be given alone or both together.
+  Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`. Each group is a
+  line of its own, and a discrete colour groups the rows. A row missing `x` or `y` breaks its line;
+  a group of one row draws nothing. Where colour or alpha changes along a line, each segment takes
+  the colour and alpha of the row it starts from. A colour of `:none` draws no line.
 
   ## Options
 
@@ -896,14 +821,9 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of lines: a line through each group's rows in order of their `x`, ggplot2's
-  `geom_line()`, as a series is drawn over time. With `orientation: :y` the rows are put in order
-  of their `y` instead, for a line that runs up the panel. Rows that share a position keep the
-  order the data gives them.
-
-  Lines are drawn as `geom_path/3` draws paths, once their rows are in order, and take what paths
-  take: `:x`, `:y`, `:group` and `:alpha`, needing `:x` and `:y`. A mapping, a map, and options, a
-  keyword list, may each be given alone or both together.
+  Adds a layer of lines: a line through each group's rows in order of their `x`, as a series over
+  time is drawn, or of their `y` with `orientation: :y`. Rows that share a position keep the order
+  the data gives them. Lines are drawn as `geom_path/3` draws paths and take the same aesthetics.
 
   ## Options
 
@@ -945,22 +865,16 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of text: each row's `label` at its `x` and `y`, ggplot2's `geom_text()`.
+  Adds a layer of text: each row's `label` at its `x` and `y`.
 
-  A label is its row's value as R writes it with `as.character()`: text as it is, a whole number
-  with no decimal point (`21`, not `21.0`), any other number in up to 15 significant digits, in
-  scientific notation when that is shorter (`1e+05`), and `TRUE` or `FALSE`. Each label is centred on
-  its place, black and 11 points tall, the theme's base size, unless the options say otherwise. A
-  row missing its `x`, `y` or label draws nothing.
+  Text is written as it is; a whole number has no decimal point (`21`, not `21.0`), any other
+  number up to 15 significant digits, in scientific notation when that is shorter (`1e+05`), and a
+  boolean is `TRUE` or `FALSE`. Each label is centred on its place, black and 11 points tall,
+  unless the options say otherwise. A row missing its `x`, `y` or label draws nothing.
 
   Text uses `:x`, `:y`, `:label`, `:group`, `:alpha` and `:color`, and needs `:x`, `:y` and
-  `:label` from one mapping or the other; a label never groups the rows, however many there are, as
-  ggplot2's never does. A mapping, a map, and options, a keyword list, may each be given alone or
-  both together.
-
-  Each label is moved from its place by `nudge_x:` and `nudge_y:`, in the units of each axis, as
-  ggplot2's text is nudged, and the axes reach the labels where they are drawn. The layer's table
-  says how far every row moved, as `nudge_x` and `nudge_y`, 0 when not given, as ggplot2's does.
+  `:label`; a label never groups the rows. `nudge_x:` and `nudge_y:` move every label, in the
+  units of each axis, and the axes reach the labels where they are drawn.
 
   ## Options
 
@@ -976,7 +890,7 @@ defmodule Giggly.Plot do
       iex> Giggly.DataFrame.pull(frame, :hjust)
       [:inward, :inward]
 
-  A number is labelled as R writes it:
+  A whole number is labelled without a decimal point, and a large one in scientific notation:
 
       iex> svg =
       ...>   %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "count" => [21.0, 100_000.0]}
@@ -1024,19 +938,15 @@ defmodule Giggly.Plot do
 
   @doc """
   Adds a layer of rectangles, one per row, each from its `xmin` to its `xmax` and its `ymin` to its
-  `ymax`: ggplot2's `geom_rect()`, for rectangles whose corners are in the data or set.
+  `ymax`.
 
-  Each corner is mapped to a column, or set to one value for every rectangle by the option of its
-  name, in the units of its axis, as ggplot2's `geom_rect(xmin = 3)` sets one; a set corner widens
-  the axes as a mapped one does, as ggplot2's does. `:infinity` and `:neg_infinity`, R's `Inf` and
-  `-Inf`, reach the panel's edge, so a band can be shaded across the whole panel. A rectangle whose
-  `xmin` is past its `xmax`, or `ymin` past its `ymax`, is drawn between them all the same, and a
-  row missing a corner draws nothing.
+  Each corner is mapped to a column, or set for every rectangle by the option of its name, in the
+  units of its axis; a set corner widens the axes as a mapped one does. `:infinity` and
+  `:neg_infinity` reach the panel's edge, so a band can shade the whole panel. A row missing a
+  corner draws nothing.
 
   Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill` and `:color`, and
-  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do: filled `#595959`
-  with no border unless a colour is mapped or set, the fill taking the alpha and the border not. A
-  mapping, a map, and options, a keyword list, may each be given alone or both together.
+  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do.
 
   ## Options
 
@@ -1090,24 +1000,20 @@ defmodule Giggly.Plot do
 
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
-  ggplot2's `annotate()`, for a label, a shaded rectangle or a line placed by hand. `geom` names
-  what draws it, as ggplot2's `annotate("text")` does: `:point`, `:col` or `:bar`, `:path`,
-  `:line`, `:text` or `:rect`.
+  for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
+  `:col` or `:bar`, `:path`, `:line`, `:text` or `:rect`.
 
-  An annotation's positions take part in the scales as the data's do, so the axes reach them, and
-  every other aesthetic is set, so it is in no legend. It takes nothing from the plot's mapping,
-  titles no axis, and under a facet is drawn in every panel. It is drawn where it is placed, as
-  ggplot2 draws one: text is not nudged, and bars at one `x` are not stacked.
+  An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
+  mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
+  where it is placed: text is not nudged, and bars at one `x` are not stacked.
 
-  Each option takes one value, or a list of them, one per annotation, as ggplot2 takes a vector:
-  every list holds as many values as the others, and a single value is used for every annotation,
-  so `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
-  R's `Inf` and `-Inf`, which reach the panel's edge, `nil` for none, a string on a discrete axis,
-  `true` or `false`, or a date on a date axis. Of the other aesthetics, those a geom draws row by row,
-  `label:`, `colour:`, `alpha:` and `fill:`, each take a list, its values of one type, so a list of
-  colours is all colours or all `:none`; the rest take one value. Under a facet that makes more than
-  one panel, an annotation given such a list raises when the plot is run, as ggplot2 fails, since
-  its rows are drawn once in each panel and the list holds one value per annotation.
+  Each option takes one value, or a list of them, one per annotation: every list holds as many
+  values as the others, and a single value is used for every annotation, so
+  `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
+  which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
+  a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
+  a list, its values of one type; the rest take one value. Under a facet that makes more than one
+  panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
   and `position:`, and `geom_text/3`'s nudging:
@@ -1121,10 +1027,9 @@ defmodule Giggly.Plot do
       `hjust:`, `vjust:` and `family:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:` and `fill:`.
 
-  Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, as
-  ggplot2's "Unequal parameter lengths", for a list whose values are not of one type, and for an
-  aesthetic the geom needs and is not given; `NimbleOptions.ValidationError` for an option the
-  geom does not take, where ggplot2 warns and ignores it, or a value it cannot draw.
+  Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, for a
+  list whose values are not of one type, and for an aesthetic the geom needs and is not given;
+  `NimbleOptions.ValidationError` for an option the geom does not take, or a value it cannot draw.
 
       iex> frame =
       ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7]}
@@ -1189,27 +1094,19 @@ defmodule Giggly.Plot do
 
   @doc """
   Splits the plot into panels, one for each combination of values of the `facets` columns that
-  occurs in the data, laid out in rows: ggplot2's `facet_wrap()`. `facets` is a column, or a list
-  of columns, each named as a mapping names one, so `facet_wrap(plot, :class)` is ggplot2's
-  `facet_wrap(vars(class))` and `facet_wrap(plot, [:cyl, :drv])` its `facet_wrap(vars(cyl, drv))`.
-  It replaces the plot's facet, which is one panel until a plot is faceted.
+  occurs in the data, laid out in rows. `facets` is a column, or a list of columns, each named as
+  a mapping names one: `facet_wrap(plot, :class)` or `facet_wrap(plot, [:cyl, :drv])`.
 
   Each layer's rows are drawn in the panel of their values. The panels are those the plot's data
-  and every layer's own table make together, as ggplot2's are: a combination only a layer's table
-  holds makes a panel, and so does the plot's data though no layer draws it. A table lacking some of
-  the columns is drawn in every panel of the values it has, each of its rows once in each, so one
-  lacking them all is drawn in every panel, as ggplot2 draws the same data in every panel; a value
-  only such a table holds makes a panel with each combination of the other columns' values. The
-  panels are ordered by the first column's values, then the next's, as an axis orders its levels,
-  with a missing value (`nil`) given a panel of its own, last. They fill the rows left to right.
-  With neither `nrow:` nor `ncol:`, the panels are laid out as ggplot2 lays them out: in one row
-  up to three panels, two rows up to six, three up to twelve, and beyond that in a square or nearly
-  one. Given one of the two, the other is as many as the panels need.
+  and every layer's own table make together; a table lacking some of the columns is drawn in every
+  panel of the values it has, so one lacking them all is drawn in every panel. The panels are
+  ordered by the first column's values, then the next's, as an axis orders its levels, with a
+  missing value (`nil`) last, and fill the rows left to right. With neither `nrow:` nor `ncol:`,
+  up to three panels make one row, up to six two rows, up to twelve three, and more a square or
+  nearly one; given one of the two, the other is as many as the panels need.
 
-  The panels share each axis's scale, so the same position means the same value in every panel,
-  and an axis is drawn only at the edges of the panels. Free scales give each panel a scale of its
-  own, trained on its rows alone, which makes patterns within a panel easier to see and comparisons
-  between panels harder; each panel then draws its own axis.
+  The panels share each axis's scale, and an axis is drawn only at the panels' outer edges. Free
+  scales give each panel a scale of its own, trained on its rows alone, and its own axis.
 
   ## Options
 
@@ -1217,11 +1114,10 @@ defmodule Giggly.Plot do
 
   Raises `ArgumentError` for a column named twice or none at all, or a value that is not a column
   reference, and `NimbleOptions.ValidationError` for an option it does not take or a count that is
-  not a positive whole number. Whether a table holds the columns is checked when the plot is run,
-  since a layer added later may bring it, as ggplot2 checks: `ArgumentError` unless the plot's
-  data or some layer's own table holds every one of them, which is how a misspelt column is
-  reported. So is `ArgumentError` for `nrow:` and `ncol:` that together hold fewer panels than
-  there are, and for tables with no rows to make a panel from.
+  not a positive whole number. When the plot is run, since a layer added later may bring a column,
+  it raises `ArgumentError` unless the plot's data or some layer's own table holds every column,
+  when `nrow:` and `ncol:` together hold fewer panels than there are, and when no table has a row
+  to make a panel from.
 
       iex> plot =
       ...>   %{"wt" => [2.32, 2.62, 3.44, 2.2], "mpg" => [22.8, 21.0, 18.7, 32.4], "cyl" => [4, 6, 8, 4]}
@@ -1246,17 +1142,14 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Draws the plot in radial coordinates, ggplot2's `coord_radial()`: x is the angle, running
-  clockwise round a full circle from 12 o'clock, and y the radius, out from the centre. It
-  replaces the plot's coordinate system, which is cartesian until a plot says otherwise.
+  Draws the plot in radial coordinates: x is the angle, running clockwise round a full circle from
+  12 o'clock, and y the radius, out from the centre. A plot is cartesian until this is called.
 
   The scales are expanded as cartesian ones are, so the marks keep clear of the circle's edge and
-  centre, and the first and last positions on x are a gap apart at 12 o'clock rather than meeting.
-  Each panel is square. Its grid is a circle at each of y's breaks and a spoke at each of x's, on
-  a disc; x's axis is drawn round the circle inside the panel, and y's to the panel's left, up the
-  radius at 12 o'clock. Nothing is clipped at the panel's edges, ggplot2's default for radial
-  coordinates. `coord_radial()`'s options (its start and end angles, an inner radius, which of x
-  and y is the angle) are not taken yet.
+  centre, and the first and last positions on x are a gap apart at 12 o'clock. Each panel is
+  square, its grid a circle at each of y's breaks and a spoke at each of x's, on a disc; x's axis
+  is drawn round the circle inside the panel, and y's to its left, up the radius at 12 o'clock.
+  Nothing is clipped at the panel's edges.
 
       iex> svg =
       ...>   %{"wt" => [2.32, 2.62, 3.44], "mpg" => [22.8, 21.0, 18.7]}
@@ -1272,18 +1165,17 @@ defmodule Giggly.Plot do
   def coord_radial(%__MODULE__{} = plot), do: %{plot | coord: %Coord.Radial{}}
 
   @doc """
-  Sets the plot's labels, ggplot2's `labs()`: the title of an axis or a legend, named by its
-  aesthetic, and the plot's title, subtitle, caption and tag.
+  Sets the plot's labels: the title of an axis or a legend, named by its aesthetic, and the plot's
+  title, subtitle, caption and tag.
 
   An axis or legend is otherwise titled by what is mapped to it (`Giggly.Mapping`); a label set
-  here replaces that title, whichever layer maps the aesthetic and whether the layer was added
-  before or after. A label of `:none` removes the title and the room it took, as ggplot2's `NULL`
-  does, and `""` keeps the room and draws nothing. A label for an aesthetic no layer maps titles nothing. Each
-  call sets only the labels it is given, so a later call replaces an earlier one's label and keeps
-  the rest. A label breaking over several lines (`"Fuel\\neconomy"`) is drawn a line at a time.
+  here replaces that title, whether the layer was added before or after. A label of `:none`
+  removes the title and the room it took, and `""` keeps the room and draws nothing. A label for an
+  aesthetic no layer maps titles nothing. Each call sets only the labels it is given, keeping the
+  rest. A label breaking over several lines (`"Fuel\\neconomy"`) is drawn a line at a time.
 
   The title and subtitle are drawn above the panels, from their left edge; the caption below them,
-  to their right edge, and the tag at the plot's top left, as `theme_gray()` draws them.
+  to their right edge; and the tag at the plot's top left.
 
   ## Options
 

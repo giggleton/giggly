@@ -3,9 +3,8 @@ defmodule Giggly do
   Giggly is a grammar-of-graphics plotting library for Elixir, modelled on ggplot2.
 
   A plot is described with `Giggly.Plot`, which builds a value and runs nothing, and the functions
-  here take a finished plot and run it, as ggplot2's `ggsave()` and `get_layer_data()` take a
-  finished ggplot. `layer_data/2` shows the table a layer computes, `panel_scales/2` the scales
-  a panel is drawn on, and `to_svg/2` draws the plot.
+  here take a finished plot and run it: `layer_data/2` shows the table a layer computes,
+  `panel_scales/2` the scales a panel is drawn on, and `to_svg/2` draws the plot.
   """
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
@@ -44,13 +43,13 @@ defmodule Giggly do
 
   @doc """
   The table the layer at `index` computes, counting from 0 in the order the layers were added; the
-  first layer when no index is given. It is ggplot2's `get_layer_data()`.
+  first layer when no index is given.
 
   Its columns are named by aesthetic, plus the `:panel` each row is drawn in and its `:group`, the
-  series it belongs to; the data's own column names do not appear. Its x and y columns
-  hold positions on the panel's scales: a discrete value is its level's position, counting from
-  1, as in ggplot2. Raises `ArgumentError` when the plot has no layer at `index`; a
-  negative index is refused too, not counted from the end.
+  series it belongs to; the data's own column names do not appear. Its x and y columns hold
+  positions on the panel's scales: a discrete value is its level's position, counting from 1.
+  Raises `ArgumentError` when the plot has no layer at `index`; a negative index is refused too,
+  not counted from the end.
 
       iex> plot =
       ...>   %{"cyl" => ["6", "4", "6"], "mpg" => [21.0, 22.8, 21.4]}
@@ -81,10 +80,8 @@ defmodule Giggly do
   end
 
   @doc """
-  The trained x and y scales of the panel with id `panel`, the first panel when no id is given. It
-  is ggplot2's `get_panel_scales()`, which finds a panel by its row and column; here a panel is
-  found by its id, counting from 1 as panel ids do. Raises `ArgumentError` when the plot has no
-  such panel.
+  The trained x and y scales of the panel with id `panel`, counting from 1 as panel ids do; the
+  first panel when no id is given. Raises `ArgumentError` when the plot has no such panel.
 
       iex> plot =
       ...>   %{"cyl" => ["6", "4", "6"], "mpg" => [21.0, 22.8, 21.4]}
@@ -128,16 +125,11 @@ defmodule Giggly do
   end
 
   @doc """
-  The plot drawn as an SVG document. It is ggplot2's `ggsave()` to an SVG file, returned as iodata
-  rather than written.
+  The plot drawn as an SVG document, as iodata.
 
-  The drawing's size is given in pixels, the unit Livebook, VegaLite and the web size things in,
-  and written in the document in points, svglite's unit, at 96 pixels to the inch. The default,
-  700 by 433 pixels, is the size ggplot2's online reference draws its examples at (pkgdown's
-  default: 700 pixels wide at 96 dots per inch, the golden ratio's height), so the notebooks look
-  as those pages do. ggplot2's own visual tests snapshot at 960 by 768 pixels (vdiffr's 10 by 8
-  inches). Text, points and lines keep their sizes in points whatever the size, so a smaller
-  drawing gives them more of it, as ggplot2's does.
+  The drawing's size is given in pixels and written in the document in points, at 96 pixels to
+  the inch. Text, points and lines keep their sizes in points whatever the drawing's size, so a
+  smaller drawing gives them more of it.
 
   ## Options
 
@@ -145,14 +137,6 @@ defmodule Giggly do
 
   Raises `NimbleOptions.ValidationError` for an option it does not take or a size that is not a
   positive whole number of pixels.
-
-  Today a plot is drawn as its panels and their axes in its theme's look: each layer's marks, placed
-  by the coordinate system in each panel over its background and grid lines, with the x axis below
-  it and the y axis to its left, each a tick and a label at every break and titled by the column
-  it shows, inside the theme's plot margin, on the theme's plot background. In radial coordinates
-  (`Giggly.Plot.coord_radial/1`) each panel is square, its background a disc, and its x axis is
-  drawn round the circle inside it; the plot is centred in the drawing, which it fills only one
-  way. The plot's title arrives in turn.
   """
   @spec to_svg(Plot.t(), keyword()) :: iodata()
   def to_svg(%Plot{} = plot, options \\ []) when is_list(options) do
