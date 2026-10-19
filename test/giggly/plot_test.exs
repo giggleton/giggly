@@ -1409,8 +1409,10 @@ defmodule Giggly.PlotTest do
                  }
       end
 
-      assert Plot.scale_x_continuous(plot, transform: :reciprocal).scales.x ===
-               %Scale.Continuous{transform: :reciprocal}
+      for transform <- [:identity, :log10, :sqrt, :reverse, :reciprocal] do
+        assert Plot.scale_x_continuous(plot, transform: transform).scales.x ===
+                 %Scale.Continuous{transform: transform}
+      end
     end
 
     test "a transformed scale's function takes no transformation, and names itself" do
@@ -1423,8 +1425,17 @@ defmodule Giggly.PlotTest do
 
       assert error.key == [:transform]
 
-      labels = assert_raise ArgumentError, fn -> Plot.scale_y_sqrt(plot, labels: ["a"]) end
-      assert labels.message =~ "Plot.scale_y_sqrt/2"
+      for {function, name} <- [
+            {&Plot.scale_x_log10/2, "Plot.scale_x_log10/2"},
+            {&Plot.scale_y_log10/2, "Plot.scale_y_log10/2"},
+            {&Plot.scale_x_sqrt/2, "Plot.scale_x_sqrt/2"},
+            {&Plot.scale_y_sqrt/2, "Plot.scale_y_sqrt/2"},
+            {&Plot.scale_x_reverse/2, "Plot.scale_x_reverse/2"},
+            {&Plot.scale_y_reverse/2, "Plot.scale_y_reverse/2"}
+          ] do
+        labels = assert_raise ArgumentError, fn -> function.(plot, labels: ["a"]) end
+        assert labels.message =~ name
+      end
     end
 
     test "ylim/3 sets the y scale's limits, nil leaving an end to the data" do

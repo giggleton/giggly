@@ -10,8 +10,8 @@ defmodule Giggly.Scale.Transform.Log10 do
   # Its breaks are R's `breaks_log()`, five wanted (`log_breaks/1`): the powers of ten at or around
   # the data's range, every one, or every second, third and so on, the widest step that leaves at
   # least three inside the range; where no step does, R's `log_sub_breaks()` adds multiples of
-  # each power, 1 and 5 first, then 2 and the rest, each the one that keeps the steps evenest in
-  # log space, until three fall inside, keeping one more each side; and where even nine multiples
+  # each power, one at a time, each the one that keeps the steps evenest in log space (3 first,
+  # nearest the middle of a decade), until three fall inside; and where even nine multiples
   # leave fewer than three, extended Wilkinson breaks on the range itself. Its minor breaks are
   # R's regular ones in log space, and its labels the breaks in data units, plain decimals
   # (`Giggly.Scale.Labels`).
@@ -95,11 +95,12 @@ defmodule Giggly.Scale.Transform.Log10 do
   end
 
   # R's `log_sub_breaks()`: multiples added to each power, one at a time, until three fall inside
-  # the range, then those inside and one more each side; or, failing that, extended Wilkinson
-  # breaks on the range in data units.
+  # the range, all of them in order; or, failing that, extended Wilkinson breaks on the range in
+  # data units. R keeps only those inside and one more each side, which the scale drops with
+  # every break outside the extent.
   defp sub_breaks(first, last, range) do
     case add_multiples([1], @multiples, first, last, range) do
-      {:enough, breaks} -> around_range(Enum.sort(breaks), range)
+      {:enough, breaks} -> Enum.sort(breaks)
       :too_few -> extended(range)
     end
   end
@@ -128,22 +129,6 @@ defmodule Giggly.Scale.Transform.Log10 do
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [lower, upper] -> upper - lower end)
     |> Enum.min()
-  end
-
-  # The sorted breaks inside the range, with the one before and the one after where there are.
-  defp around_range(sorted, {low, high}) do
-    first_inside = Enum.find_index(sorted, fn value -> power(low) <= value end)
-
-    last_inside =
-      sorted
-      |> Enum.with_index()
-      |> Enum.filter(fn {value, _index} -> value <= power(high) end)
-      |> Enum.map(fn {_value, index} -> index end)
-      |> Enum.max()
-
-    from = max(first_inside - 1, 0)
-    to = min(last_inside + 1, length(sorted) - 1)
-    Enum.slice(sorted, from..to)
   end
 
   defp extended({low, high}), do: Breaks.extended({power(low), power(high)})

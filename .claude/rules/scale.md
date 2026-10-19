@@ -135,11 +135,14 @@ grid lines are placed by the coordinate system".
   breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
   log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
   `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
-- **log10's breaks are exactly R's `breaks_log()`, five wanted** (`Transform.Log10`): every power
-  of ten, or every second, third and so on, the widest step leaving three inside; else
-  `log_sub_breaks()`'s multiples, evenest in log space first, keeping one each side; else
-  extended breaks in data units. Its test pins R's own axis for each branch. sqrt, reverse and
-  reciprocal take extended breaks on the data range, as R's `extended_breaks()` does.
+- **log10's breaks are exactly R's `breaks_log()`, five wanted** (`Transform.Log10`), those
+  inside the extent: every power of ten, or every second, third and so on, the widest step
+  leaving three inside; else `log_sub_breaks()`'s multiples, evenest in log space first (3); else
+  extended breaks in data units. R's one break kept each side of the range is left out, since the
+  scale drops it. Its test pins R's own axis for each branch; a surviving mutant there is judged
+  against `breaks_log()` on hundreds of random extents, and the first where it departs joins the
+  tests, as extended Wilkinson's are judged (below). sqrt, reverse and reciprocal take extended
+  breaks on the data range, as R's `extended_breaks()` does.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`; it trains, expands and
   is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly

@@ -2,7 +2,7 @@ defmodule Giggly.Scale.TransformTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Datasets, Scale}
-  alias Giggly.Scale.Continuous
+  alias Giggly.Scale.{Continuous, Transform}
 
   # Golden: every axis below is R's own, from R 4.6.1 with ggplot2 4.0.3 and scales 1.4.0 (the
   # image `giggly-r:ggplot2-4.0.3`): `ggplot_build()`'s panel params for the plot in the comment
@@ -106,6 +106,47 @@ defmodule Giggly.Scale.TransformTest do
                {0.43933269383026263, "2.75"},
                {0.47712125471966244, "3.00"}
              ]
+    end
+
+    # Golden: scales 1.4.0's `breaks_log()(10^extent)`, those inside the extent, in log space, on
+    # extents chosen from 600 random ones (seed 20261019) as the first where a slip in R's port
+    # departs from R: the first step's size, how many breaks are enough, how evenness is measured,
+    # the multiples tried, the fallback, and how many powers a step leaves; and an extent ending
+    # exactly on powers of ten, which count as inside.
+    test "breaks inside the extent are R's breaks_log() wherever a slip would show" do
+      for {extent, expected} <- [
+            {{3.7012828388251364, 15.141030670586783}, [6.0, 9.0, 12.0, 15.0]},
+            {{-1.989977743010968, 6.0139288976533276}, [0.0, 2.0, 4.0, 6.0]},
+            {{-0.74079247051849961, -0.0016752352783626634},
+             [-0.69897000433601875, -0.52287874528033751, -0.3010299956639812]},
+            {{-2.67495376477018, -2.5310531331511439},
+             [-2.6575773191777938, -2.6197887582883941, -2.5850266520291818, -2.5528419686577806]},
+            {{2.9382192031480372, 3.0423576763965769},
+             [2.9542425094393248, 2.9777236052888476, 3.0, 3.0211892990699383, 3.0413926851582249]},
+            {{6.8817255878821015, 7.2213514697328911},
+             [6.9030899869919438, 6.9542425094393252, 7.0]},
+            {{1.0, 3.0}, [1.0, 2.0, 3.0]}
+          ] do
+        {low, high} = extent
+
+        inside =
+          :log10
+          |> Transform.breaks(extent)
+          |> Enum.filter(fn position -> position >= low and position <= high end)
+
+        assert inside == expected
+      end
+    end
+
+    test "finds its breaks from 1e-100 up, R's domain" do
+      # data.frame(y = c(1e-120, 1e-80)) with scale_y_log10(): the extent from -122 is squished
+      # to -100 before its breaks are found
+      {extent, breaks, _minor} = axis(:log10, [1.0e-120, 1.0e-80])
+
+      assert extent == {-122.0, -78.0}
+
+      assert Enum.map(breaks, fn {position, _label} -> position end) ==
+               [-100.0, -95.0, -90.0, -85.0, -80.0]
     end
 
     test "takes limits, breaks and minor breaks in data units" do
@@ -234,8 +275,16 @@ defmodule Giggly.Scale.TransformTest do
     end
 
     test "places zero at plus infinity and either infinity at zero" do
-      assert Scale.transform(%Continuous{transform: :reciprocal}, [0, 4, :infinity, nil]) ==
-               [:infinity, 0.25, 0.0, nil]
+      assert Scale.transform(%Continuous{transform: :reciprocal}, [0, 4, :infinity, :neg_infinity]) ==
+               [:infinity, 0.25, 0.0, 0.0]
+    end
+
+    test "finds its breaks on the data's finite end where the extent reaches zero" do
+      # data.frame(y = c(Inf, 4)) with scale_y_continuous(transform =
+      # scales::transform_reciprocal(), expand = c(0, 0)): R's extended breaks on the one finite
+      # end, 4, give it five times
+      assert axis(:reciprocal, [:infinity, 4], expand: [mult: {0, 0}, add: {0, 0}]) ==
+               {{0.0, 0.25}, List.duplicate({0.25, "4"}, 5), []}
     end
   end
 
@@ -272,13 +321,35 @@ defmodule Giggly.Scale.TransformTest do
       assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
     end
 
-    test "a limit outside the transformation's domain cannot be placed" do
+    test "a limit outside the transformation's domain cannot be placed, at either end" do
       # scale_y_log10(limits = c(0, 100)) fails in R: 'from' must be a finite number
-      scale = %Continuous{transform: :log10, limits: {0, 100}, range: {0.0, 2.0}}
+      for limits <- [{0, 100}, {100, 0}] do
+        scale = %Continuous{transform: :log10, limits: limits, range: {0.0, 2.0}}
 
-      error = assert_raise ArgumentError, fn -> Scale.dimension(scale) end
-      assert error.message =~ "{0, 100}"
-      assert error.message =~ "log10"
+        error = assert_raise ArgumentError, fn -> Scale.dimension(scale) end
+        assert error.message =~ inspect(limits)
+        assert error.message =~ "log10"
+      end
+    end
+
+    test "limits are sorted once transformed, so either order names the same axis" do
+      # ggplot(mtcars, aes(mpg, wt)) + geom_point() + scale_x_continuous(limits = c(20, 15)):
+      # 14.75 to 20.25; under scale_x_reverse(), c(15, 20) and c(20, 15) both -20.25 to -14.75
+      mpg = column(Datasets.mtcars(), :mpg)
+      {identity_extent, _breaks, _minor} = axis(:identity, mpg, limits: {20, 15})
+      {reverse_extent, _breaks, _minor} = axis(:reverse, mpg, limits: {15, 20})
+
+      assert {identity_extent, reverse_extent} == {{14.75, 20.25}, {-20.25, -14.75}}
+    end
+
+    test "a labels function's refusal shows the breaks in data units" do
+      scale = %Continuous{transform: :log10, labels: fn _breaks -> ["one"] end}
+      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)))
+
+      error =
+        assert_raise ArgumentError, fn -> Scale.breaks(trained, Scale.dimension(trained)) end
+
+      assert error.message =~ "[20.0"
     end
   end
 end
