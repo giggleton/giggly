@@ -40,9 +40,11 @@ defmodule Giggly.Assembly do
   #      computed after, trains it on every layer's column of that
   #      aesthetic, and maps each column through it, as ggplot2 trains and maps its non-position
   #      scales once the positions are final;
-  #      it then builds the legends: each such scale's, a key for each break, labelled, with the
-  #      value it maps to, in the order of the aesthetics' names, one with the title and labels of
-  #      an earlier merged into it, as ggplot2 merges guides that would read alike; each legend
+  #      it then builds the legends: each such scale's, drawn by the guide `guides/2` sets for its
+  #      aesthetic or else the one the scale names, none for `:none`, a key for each break,
+  #      labelled, with the value it maps to, last first for a legend reversed, in the order of
+  #      the aesthetics' names, one with the title and labels of an earlier merged into it, as
+  #      ggplot2 merges guides that would read alike; each legend
   #      is drawn by the geom of each layer that maps one of its aesthetics and can use it, with
   #      what that layer sets, in the keys whose values the layer's table holds, and a legend no
   #      layer can draw is dropped;
@@ -411,9 +413,10 @@ defmodule Giggly.Assembly do
   end
 
   # The legends the scales of aesthetics other than position give, as ggplot2's guides build them
-  # from the trained scales: each scale's, drawn by the guide the scale names, in the order of the
-  # aesthetics' names, a key for each break the scale shows, labelled, with the value it maps to,
-  # merged into an earlier one with the same kind of guide, title and labels, as ggplot2 merges
+  # from the trained scales: each scale's, drawn by its guide (`guide/3`), none for `:none`, in the
+  # order of the aesthetics' names, a key for each break the scale shows, labelled, with the value
+  # it maps to, last first where the guide reverses them, merged into an earlier one with the same
+  # kind of guide, title and labels, as ggplot2 merges
   # guides whose kind, title and labels hash alike, which keeps
   # each key's labels and the first's breaks and gathers its values; then each drawn by the geom of
   # every layer that maps one of its aesthetics, with those it maps, as a layer shows in a legend
@@ -427,13 +430,15 @@ defmodule Giggly.Assembly do
 
     scale_legends =
       for {aesthetic, scale} <- Enum.sort(non_position_scales),
+          guide = guide(Map.get(plot.guides, aesthetic, scale.guide), scale, aesthetic),
+          guide != :none,
           breaks = Scale.legend_breaks(scale),
           breaks != [] do
         {values, labels} = Enum.unzip(breaks)
         mapped = Scale.map(scale, values)
 
         legend = %{
-          guide: guide(scale),
+          guide: guide,
           aesthetics: [aesthetic],
           title: guide_title(plot, layers, aesthetic),
           keys:
@@ -442,7 +447,9 @@ defmodule Giggly.Assembly do
             end)
         }
 
-        with_guide_data(legend, scale)
+        legend
+        |> with_guide_data(scale)
+        |> in_key_order()
       end
 
     scale_legends
@@ -489,10 +496,30 @@ defmodule Giggly.Assembly do
       labels(legend) == labels(other)
   end
 
-  # The guide a scale names, as a struct of its kind, as `Plot` turns a position's name into one: a
-  # colour bar sampling its colours at 15 values, as ggplot2's gradient form does (`nbin`).
-  defp guide(%{guide: :legend}), do: %Guide.Legend{}
-  defp guide(%{guide: :colorbar}), do: %Guide.Colorbar{bins: 15}
+  # The guide that reads `aesthetic`'s scale back, `guide` the one `guides/2` set for it or else
+  # the one the scale names, as ggplot2 takes `guides()` over a scale's `guide`: `:none`, or a
+  # struct of its kind, as `Plot` turns a position's name into one, a colour bar sampling its
+  # colours at 15 values, as ggplot2's gradient form does (`nbin`). A colour bar for a discrete
+  # scale, which only `guides/2` can give, the scale functions refusing one, raises, where ggplot2
+  # warns and draws none.
+  defp guide(:none, _scale, _aesthetic), do: :none
+  defp guide(:legend, _scale, _aesthetic), do: %Guide.Legend{}
+  defp guide(%Guide.Legend{} = legend, _scale, _aesthetic), do: legend
+  defp guide(:colorbar, %Scale.Continuous{}, _aesthetic), do: %Guide.Colorbar{bins: 15}
+
+  defp guide(:colorbar, %Scale.Discrete{}, aesthetic) do
+    raise ArgumentError,
+          "Plot.guides/2 gives #{aesthetic} a colour bar, which shows a continuous scale, and " <>
+            "#{aesthetic}'s scale is discrete; give it :legend"
+  end
+
+  # The legend's keys in the order its guide reads them: last break first for a legend reversed,
+  # the missing value's key among them, as ggplot2's `extract_params()` turns its key table upside
+  # down, before legends merge, so two read alike only in the same order.
+  defp in_key_order(%{guide: %Guide.Legend{reverse: true}, keys: keys} = legend),
+    do: %{legend | keys: Enum.reverse(keys)}
+
+  defp in_key_order(legend), do: legend
 
   # The legend with what its kind of guide draws beyond its keys, worked out from the scale: for a
   # colour bar, each key's place up the bar, 0 at the low end of the scale's limits to 1 at their

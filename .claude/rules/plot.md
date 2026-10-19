@@ -20,20 +20,24 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
   `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five
   families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
-  `Giggly.Position`, `Giggly.Stat`), and `Giggly.Scale`, whose `Continuous` and `Discrete`
-  structs it writes and whose `Discrete.key/1` it reads to refuse a discrete value named twice,
-  and exports nothing beyond `Plot`.
+  `Giggly.Position`, `Giggly.Stat`), `Giggly.Guide`, whose legend's struct `guide_legend/1`
+  builds, and `Giggly.Scale`, whose `Continuous` and `Discrete` structs it writes and whose
+  `Discrete.key/1` it reads to refuse a discrete value named twice, and exports nothing beyond
+  `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
-  and draw, and `Giggly.Scale`'s root, which trains and maps, out of its files** — no call, no
-  module passed as a value, no `import` — which boundary cannot, since a boundary always exports
-  its root. A plot writes a scale and never runs one.
+  and draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root,
+  which trains and maps, out of its files** — no call, no module passed as a value, no `import` —
+  which boundary cannot, since a boundary always exports its root and every export to all its
+  dependents (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a
+  scale and never runs one.
 - **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
   the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
   `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `scale_x_discrete/2`,
   `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales `scale_color_manual/2`,
   `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and `_continuous`, each
   with its `scale_fill_` twin, `scale_alpha_continuous/2`, `scale_alpha_discrete/2`, `xlim/3`,
-  `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
+  `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`), the guide functions (`guides/2`, `guide_legend/1`) and
+  `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -82,8 +86,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   defaults, R's function defaults** (gray's missing value red, gradient2's ends `muted()`), since
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
   palette live here as values, and a test pins the discrete and continuous functions' to
-  `Scale.new/2`'s. A colour scale names a colour bar (`guide`) when continuous and a legend when
-  discrete, alpha a legend, until a scale function takes `guide:`. A manual scale's list beside a list of `breaks:` is recorded as a map from each
+  `Scale.new/2`'s. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
+  `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
+  its default, the others' `:legend`; a colour bar for a discrete scale or for alpha is refused at
+  the call, where R warns and draws none (design-log §4, the entry beginning "A guide is chosen").
+  A manual scale's list beside a list of `breaks:` is recorded as a map from each
   break to the colour at its place, as R's `manual_scale()` names them. **`lims/2` takes `color:`
   (`colour:`, canonicalized first), `fill:` and `alpha:`**: a list records what the aesthetic's
   `_discrete` function records with those limits, two numbers its `_continuous` one's; numbers
@@ -154,7 +161,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `data:`, `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`,
   `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`,
-  `geom_rect/3`, `annotate/3`, the scale functions and `labs/2`),
+  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions and `labs/2`),
   so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's
@@ -172,6 +179,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not checked,
   since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2` takes
   the titles").
+- **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
+  until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
+  `fill` and `alpha` alone, each as a scale's `guide:` takes it, a colour bar for alpha refused at
+  the call; whether a colour or fill scale it gives a colour bar is continuous is known only when
+  the plot is run, so the assembly refuses one that is not. Which aesthetic a layer maps is not
+  checked. The axes take no guide yet: they wait for `guide_axis()`'s options.
 - **Each table is read once, by the call that gives it**: the plot's by `new/2`, a layer's own by
   its function's `data:`, any `Table.Reader`, read after the options are validated, as ggplot2's
   `data =`. The plot holds a `Giggly.DataFrame` and each layer its own or `:none`, which draws the

@@ -26,13 +26,16 @@ panel's grid lines are placed by the coordinate system".
   `draw/3` draws a guide of an aesthetic other than position, as a table of its own, for the box.
   **A kind is one module**, its struct, whose fields are its parameters, and its drawing, in a
   `defimpl Giggly.Guide` whose first line classifies it into this boundary. A scale names its guide
-  (`:axis` for a position, `:legend`), and the assembly builds the kind's struct. **A guide never
-  sees a scale or calls a geom**: the assembly works out its keys from the scale, and rendering has
-  each layer's geom draw its glyphs in them. The boundary exports the modules rendering draws with
-  (`Axis`, `Box`, `Grid`, `Strip`, `Title`) and the kinds, whose structs the assembly builds, never
-  a kind's drawing. The parts both kinds' tables are built from (the background, the title's rows,
-  a line of text) are `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's
-  layout, and so is the title every guide draws.
+  (`:axis` for a position, `:legend`, `:colorbar`, `:none`) or holds a legend's struct, which
+  `Plot.guide_legend/1` builds, and `Plot.guides/2` names one by aesthetic over it; the assembly
+  builds the kind's struct from a name. **A guide never sees a scale or calls a geom**: the
+  assembly works out its keys from the scale, and rendering has each layer's geom draw its glyphs
+  in them. The boundary exports the modules rendering draws with (`Axis`, `Box`, `Grid`, `Strip`,
+  `Title`) and the kinds, whose structs the assembly and `Plot` build, never a kind's drawing;
+  `Plot` may build a kind's struct and call nothing that draws (`PlotRunsNothing`). The parts both
+  kinds' tables are built from (the background, the title's rows, a line of text) are
+  `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's layout, and so is the
+  title every guide draws.
 - **Every title is drawn by `Parts.title_text/5` and measured by `Parts.title_height/2` and
   `title_width/2`**, an axis's, a legend's or the plot's own, so each may break over lines
   (design-log §4, the entry beginning "A title may run over several lines"): each line a label of
@@ -94,8 +97,9 @@ panel's grid lines are placed by the coordinate system".
   labels, the axis line (blank in `theme_grey()`), minor ticks, axes as kinds of the protocol
   (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
-  FALSE`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal bar, and its raster
-  and rectangles displays.
+  FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `nrow`, `ncol`,
+  `override.aes`, `theme`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal
+  bar, and its raster and rectangles displays.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
   defaults**: the legend margin inside the edge; the title above, as deep as its lines,
@@ -107,7 +111,9 @@ panel's grid lines are placed by the coordinate system".
   labels' margin and column take no room but what a wider title needs right of the keys**, as
   ggplot2 leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
   `label_margin/2`, which the colour bar shares). Drawn in ggplot2's order: background, title,
-  each key's background and glyphs, then the labels. Every size is in points.
+  each key's background and glyphs, then the labels. Every size is in points. **Its one parameter,
+  `reverse`, is the assembly's to apply**, handing the keys over last first, so the drawing takes
+  them in the order given.
 - **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them
   on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
   order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,

@@ -3247,6 +3247,55 @@ defmodule GigglyTest do
       assert to_svg(plot) == File.read!("test/golden/legend_unlabelled.svg")
     end
 
+    # Golden: test/golden/guide_legend_reverse.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/guide_legend_reverse.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. guide_legend()'s reference
+    # page's reversed legend, twenty keys from t at the top down to a. It moves with what moves
+    # test/golden/point_colour_legend.svg.
+    test "a legend reversed by guides/2 runs from its last key to its first" do
+      letters = Enum.map(?a..?t, fn code -> <<code>> end)
+
+      plot =
+        %{"x" => Enum.to_list(1..20), "y" => Enum.to_list(1..20), "color" => letters}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{color: :color})
+        |> Plot.guides(color: Plot.guide_legend(reverse: true))
+
+      assert to_svg(plot) == File.read!("test/golden/guide_legend_reverse.svg")
+    end
+
+    # Golden: test/golden/legend_continuous_reverse.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/legend_continuous_reverse.R: every element matches it, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. mtcars's points
+    # coloured by horsepower along the default gradient, read back by a reversed legend in place
+    # of the colour bar: a point key for each break, the highest at the top. It moves with what
+    # moves test/golden/point_colour_legend.svg, and with a gradient's colours.
+    test "a continuous colour scale's guide: may be a legend, its keys at its breaks" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt, colour: :hp})
+        |> Plot.geom_point()
+        |> Plot.scale_color_gradient(guide: Plot.guide_legend(reverse: true))
+
+      assert to_svg(plot) == File.read!("test/golden/legend_continuous_reverse.svg")
+    end
+
+    # Golden: test/golden/legends_reverse_unmerged.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/legends_reverse_unmerged.R: every element matches it, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. mpg's classes
+    # counted, each bar outlined and filled by drive train, the colour's legend reversed, so its
+    # labels no longer read as the fill's and the two stack apart. It moves with what moves
+    # test/golden/bar_fill.svg, and with how legends merge.
+    test "a reversed legend merges with none whose keys run the other way" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, fill: :drv, colour: :drv})
+        |> Plot.geom_bar()
+        |> Plot.guides(color: Plot.guide_legend(reverse: true))
+
+      assert to_svg(plot) == File.read!("test/golden/legends_reverse_unmerged.svg")
+    end
+
     # Golden: test/golden/scale_gradient.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/scale_gradient.R: every element matches vdiffr's but the colour bar's
     # fill, which vdiffr cannot draw, every gradient stop matches svglite's, the gradient at the

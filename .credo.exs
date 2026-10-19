@@ -9,21 +9,29 @@
 
 # The roots `GigglyCredo.Check.PlotRunsNothing` keeps out of `Giggly.Plot`: every protocol Giggly
 # defines, each the root of a family of kinds (facets, coordinate systems, geoms, stats,
-# positions) that computes or draws. Derived rather than listed, so a family added later is covered
-# without a second list to keep in step; it raises on a build with nothing to read, or with no
-# protocol in it, rather than check against nothing.
-giggly_protocols =
+# positions, guides) that computes or draws; and every module of the guides' namespace that holds
+# no struct, since `Plot` lists `Giggly.Guide` to build a legend's struct (`guide_legend/1`) and
+# the guides' boundary exports, beside the kinds, the modules that draw the axes, the grid, the
+# strips, the plot's labels and the box of legends (design-log §4, the entry beginning "`Plot`
+# lists `Giggly.Guide`"). Derived rather than listed, so a family or a drawing module added later
+# is covered without a second list to keep in step; it raises on a build with nothing to read, or
+# with no protocol or no guide drawing module in it, rather than check against nothing.
+plot_runs_nothing_roots =
   with load when load in [:ok, {:error, {:already_loaded, :giggly}}] <- Application.load(:giggly),
        {:ok, modules} <- :application.get_key(:giggly, :modules),
+       loaded = Enum.filter(modules, &Code.ensure_loaded?/1),
        [_ | _] = protocols <-
-         Enum.filter(modules, fn module ->
-           Code.ensure_loaded?(module) and function_exported?(module, :__protocol__, 1)
+         Enum.filter(loaded, fn module -> function_exported?(module, :__protocol__, 1) end),
+       [_ | _] = guide_drawing <-
+         Enum.filter(loaded, fn module ->
+           String.starts_with?(Atom.to_string(module), "Elixir.Giggly.Guide.") and
+             not function_exported?(module, :__struct__, 0)
          end) do
-    protocols
+    Enum.concat(protocols, guide_drawing)
   else
     _not_compiled ->
-      raise "the PlotRunsNothing check reads Giggly's protocols from the build, and found none: " <>
-              "run `mix compile` first"
+      raise "the PlotRunsNothing check reads Giggly's protocols and the guides' drawing modules " <>
+              "from the build, and found none: run `mix compile` first"
   end
 
 %{
@@ -247,15 +255,16 @@ giggly_protocols =
             # `MapJoin` is scoped.
             {GigglyCredo.Check.ZipMap, []},
             # A plot describes and runs nothing (`.claude/rules/plot.md`): `Giggly.Plot` builds the
-            # kinds' structs and reads their facts, and calls no family's root, which `boundary`
-            # cannot forbid while it lets `Plot` use the kinds. `Giggly.Scale` is a root too, though
-            # not a protocol: `Plot` writes a scale's struct (`Scale.Continuous`) and never trains or
-            # maps one (design-log §4, the entry beginning "A scale function records the untrained
-            # scale"). Scoped to `Plot`'s files, the only ones the rule is about.
+            # kinds' structs and reads their facts, and calls no family's root nor any module that
+            # draws a guide, which `boundary` cannot forbid while it lets `Plot` use the kinds.
+            # `Giggly.Scale` is a root too, though not a protocol: `Plot` writes a scale's struct
+            # (`Scale.Continuous`) and never trains or maps one (design-log §4, the entry beginning
+            # "A scale function records the untrained scale"). Scoped to `Plot`'s files, the only
+            # ones the rule is about.
             {GigglyCredo.Check.PlotRunsNothing,
              [
                files: %{included: ["lib/giggly/plot.ex", "lib/giggly/plot/"]},
-               roots: [Giggly.Scale | giggly_protocols]
+               roots: [Giggly.Scale | plot_runs_nothing_roots]
              ]},
 
             #

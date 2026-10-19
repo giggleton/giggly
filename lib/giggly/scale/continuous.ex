@@ -21,7 +21,8 @@ defmodule Giggly.Scale.Continuous do
       to: `nil` for a position and alpha, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no
       colour.
     * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha and
-      `:colorbar` for colour and fill.
+      `:colorbar` for colour and fill unless a scale function chooses `:legend`, `:none` for
+      none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
     * `limits`: `{low, high}`, the values it spans whatever the data, in data units, `nil` at an
@@ -66,7 +67,7 @@ defmodule Giggly.Scale.Continuous do
           palette: :identity | {:rescale, {number(), number()}} | {:gradient, [String.t()]},
           midpoint: :none | number(),
           na_value: nil | number() | String.t() | :none,
-          guide: :axis | :legend | :colorbar,
+          guide: :axis | :legend | :colorbar | :none | struct(),
           name: :default | :none | String.t(),
           limits: {number() | Date.t() | nil, number() | Date.t() | nil},
           breaks: :default | :none | [number() | Date.t()] | {:width, date_step()},

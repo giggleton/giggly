@@ -40,7 +40,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   each geom's `setup_data`; `draw_panel`, `transform`, `axes` and `grid` are rendering's. It lists
   `Coord` and `Geom` for their build functions, so this holds by review: design-log §4, the entry
   beginning "A geom says where its marks sit". It lists `Giggly.Guide` only to build the kind of
-  guide a scale names, and never draws one.
+  guide a name chooses and to read a legend's struct the plot holds, and never draws one.
 - **Each geom is told each axis's scale kind, discrete or continuous**, which the assembly decides
   once per axis, so a bar's orientation is decided as ggplot2's `has_flipped_aes()` decides it from
   `mapped_discrete` positions; a geom never sees a scale itself. A date axis is continuous to a
@@ -168,13 +168,20 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   trains nothing), and each column mapped through it, then the set values on top: a
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
   (`Plot.computed_mapping/2`).
-- **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
-  the trained scales: titled by its label, or else as an axis is (`:none` takes no room), a key
-  for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
-  limits, a discrete one's breaks among its limits, each from the scale's options), labelled as
-  its `labels` give, at the value it maps to, drawn by the kind
-  of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`,
-  `%Guide.Colorbar{bins: 15}` for `:colorbar`), as `Plot` builds a position's. **A colour bar's
+- **Each non-position scale gives a legend unless its guide is `:none` or it has no breaks**,
+  ggplot2's guides built from the trained scales, **its guide the one `Plot.guides/2` sets for its
+  aesthetic, else the one its scale names, in whatever order they were given**, as ggplot2 takes
+  `guides()` over a scale's `guide` (design-log §4, the entry beginning "A guide is chosen"):
+  titled by its label, or else as an axis is (`:none` takes no room), a key for each break the
+  scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its limits, a discrete
+  one's breaks among its limits, each from the scale's options), labelled as its `labels` give, at
+  the value it maps to, drawn by that kind of guide, the struct the plot holds or the one the
+  assembly builds from a name (`%Guide.Legend{}` for `:legend`, `%Guide.Colorbar{bins: 15}` for
+  `:colorbar`), as `Plot` builds a position's. **A colour bar for a discrete scale raises**, naming
+  the aesthetic, where ggplot2 warns and draws none; only `guides/2` can give one, the scale
+  functions refusing it. **A reversed legend hands its keys over last first**, the missing value's
+  among them, before legends merge, so two read alike only in the same order, as ggplot2's
+  `extract_params()` turns its key upside down. **A colour bar's
   keys carry their place up the bar** (`Scale.places/2`, 0 to 1 over the limits, the gradient
   form's), **and the colour bar its colours** (`decor`, `bins` values over the limits from
   `Scale.samples/2`, each its place and colour, `extract_decor()`), worked out here from the scale,

@@ -1,7 +1,7 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Facet, Geom, Plot, Position, Scale, Stat}
+  alias Giggly.{Coord, DataFrame, Facet, Geom, Guide, Plot, Position, Scale, Stat}
 
   doctest Giggly.Plot
 
@@ -2083,6 +2083,111 @@ defmodule Giggly.PlotTest do
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, options) end
         assert error.message =~ shown
+      end
+    end
+  end
+
+  describe "a scale's guide:, guide_legend/1 and guides/2" do
+    # Each colour, fill and alpha scale function, with the options it needs, and whether its scale
+    # is a continuous colour or fill scale, the one kind a colour bar shows.
+    @guided_scale_functions [
+      {&Plot.scale_color_manual/2, [values: ["red"]], :discrete},
+      {&Plot.scale_fill_manual/2, [values: ["red"]], :discrete},
+      {&Plot.scale_color_hue/2, [], :discrete},
+      {&Plot.scale_fill_hue/2, [], :discrete},
+      {&Plot.scale_color_gray/2, [], :discrete},
+      {&Plot.scale_fill_gray/2, [], :discrete},
+      {&Plot.scale_color_discrete/2, [], :discrete},
+      {&Plot.scale_fill_discrete/2, [], :discrete},
+      {&Plot.scale_alpha_discrete/2, [], :alpha},
+      {&Plot.scale_color_gradient/2, [], :continuous},
+      {&Plot.scale_fill_gradient/2, [], :continuous},
+      {&Plot.scale_color_gradient2/2, [], :continuous},
+      {&Plot.scale_fill_gradient2/2, [], :continuous},
+      {&Plot.scale_color_gradientn/2, [colors: ["red"]], :continuous},
+      {&Plot.scale_fill_gradientn/2, [colors: ["red"]], :continuous},
+      {&Plot.scale_color_continuous/2, [], :continuous},
+      {&Plot.scale_fill_continuous/2, [], :continuous},
+      {&Plot.scale_alpha_continuous/2, [], :alpha}
+    ]
+
+    test "each scale function records the guide it is given" do
+      plot = Plot.new(@rows)
+      reversed = Plot.guide_legend(reverse: true)
+
+      for {function, options, kind} <- @guided_scale_functions,
+          guide <- [:none, :legend, reversed | if(kind == :continuous, do: [:colorbar], else: [])] do
+        [scale] = Map.values(function.(plot, [{:guide, guide} | options]).scales)
+        assert scale.guide === guide
+      end
+    end
+
+    # ggplot2 4.0.3 warns "`guide_colourbar()` needs continuous scales." for a discrete colour
+    # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and draws
+    # no guide.
+    test "a colour bar is refused for a discrete scale and for alpha, saying why" do
+      plot = Plot.new(@rows)
+
+      for {function, options, kind} <- @guided_scale_functions, kind != :continuous do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            function.(plot, [{:guide, :colorbar} | options])
+          end
+
+        assert error.message =~
+                 if(kind == :alpha,
+                   do: "a colour bar shows colour or fill, never alpha; give :legend",
+                   else: "a colour bar shows a continuous scale, and this one is discrete"
+                 )
+      end
+    end
+
+    test "a guide that is not one is refused, naming what a guide can be" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.scale_color_hue(plot, guide: :legnd)
+        end
+
+      assert error.message =~
+               "expected :legend, :colorbar, :none or a legend Plot.guide_legend/1 makes, " <>
+                 "got: :legnd"
+    end
+
+    test "guide_legend/1 makes a legend, its keys reversed when asked" do
+      assert {Plot.guide_legend(), Plot.guide_legend(reverse: true)} ===
+               {%Guide.Legend{reverse: false}, %Guide.Legend{reverse: true}}
+
+      for options <- [[reverse: 1], [order: 1]] do
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.guide_legend(options) end
+      end
+    end
+
+    test "guides/2 records each guide by canonical name, and a later call replaces only what it sets" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.guides(colour: :none, fill: :legend)
+        |> Plot.guides(fill: :colorbar, alpha: Plot.guide_legend(reverse: true))
+
+      assert {Plot.new(@rows).guides, plot.guides} ===
+               {%{}, %{color: :none, fill: :colorbar, alpha: %Guide.Legend{reverse: true}}}
+    end
+
+    test "guides/2 refuses an alpha colour bar, and an aesthetic it chooses no guide for" do
+      plot = Plot.new(@rows)
+
+      alpha =
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, alpha: :colorbar) end
+
+      assert alpha.message =~ "a colour bar shows colour or fill, never alpha"
+
+      for key <- [:x, :size] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, [{key, :none}]) end
+
+        assert error.key == [key]
       end
     end
   end

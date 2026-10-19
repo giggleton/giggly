@@ -79,6 +79,30 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
+  Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
+  alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
+  `guide_legend/1` builds (`reverse:`), as a position's parameters will come by constructor (the
+  entry beginning "A layer chooses its position"). `guides/2` takes `color:`, `fill:` and
+  `alpha:` the same way; it beats the scale's whatever the pipe order, and a later call replaces
+  only what it names, R's `guides() > scale > default`. A colour bar for alpha or a discrete
+  scale is refused, at the call where the call can tell and otherwise when run, where R warns and
+  draws none. `reverse` flips every key, the missing-value key included, before legends merge,
+  so a reversed colour beside an unreversed fill on one column draws two legends, as R does.
+  *Rejected: `{:legend, reverse: true}`*, no new function, but a second way of writing a kind
+  with options. *Rejected: the axes in `guides/2` now* (`x: :none` keeps the title alone, as R):
+  no waiting example draws from it; axes join with `guide_axis()`'s options. *Rejected: the
+  last call wins.* *Deferred:* every guide option but `reverse`, the colour bar's included.
+
+- **`Plot` lists `Giggly.Guide` to build a legend's struct, and `PlotRunsNothing` refuses
+  `Guide`'s modules that hold no struct (2026-10-19, Steve).** `guide_legend/1` returns
+  `%Guide.Legend{}`, as a plot records each kind as a struct. Listing `Guide` lets `Plot` call
+  every module `Guide` exports, `Axis`, `Box`, `Grid`, `Strip` and `Title` among them, which
+  draw; the check's roots, derived from the build in `.credo.exs`, gain every `Giggly.Guide.*`
+  module defining no struct, beside the protocols and `Giggly.Scale`, so `Plot` may write a
+  kind's struct and call nothing that draws. *Rejected: plain data the assembly turns into the
+  struct*, no widening, but a kind that is not a struct in the plot.
+
 - **Colour, fill and alpha scales are the scale functions' step 5, each option checked against
   ggplot2 4.0.3 in R (2026-10-19, Steve, agreeing the proposal).** `scale_color_manual/2`
   (`values:`, a list, or a map from value to colour as R's named vector, whose keys narrow the
@@ -1731,6 +1755,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Let a plot choose its guides (scale functions, step 6); §4: "A guide is chosen by a
+  scale's `guide:` and by `guides/2`", "`Plot` lists `Giggly.Guide` to build a legend's struct"
 - 2026-10-19 — Give a plot colour, fill and alpha scales (scale functions, step 5); §4: "Colour,
   fill and alpha scales are the scale functions' step 5", "`palette:` takes a list of colours",
   "The hue scale's options are spelled out", "A gradient is one palette of any number of colours"

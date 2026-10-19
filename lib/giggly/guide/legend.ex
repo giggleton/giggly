@@ -1,10 +1,12 @@
 defmodule Giggly.Guide.Legend do
   @moduledoc false
 
-  # A legend, ggplot2's `guide_legend()`, a kind of guide (`Giggly.Guide`) with no parameters yet,
-  # drawn as a table of its own (`Giggly.Scene`) for the box of guides beside the panels, laid out
-  # as ggplot2's `GuideLegend` lays one out at theme_gray()'s defaults, a vertical legend with its
-  # title above and its labels right of its keys:
+  # A legend, ggplot2's `guide_legend()`, a kind of guide (`Giggly.Guide`) whose one parameter,
+  # `reverse`, is the assembly's to apply: it hands the keys over last break first, as ggplot2's
+  # `extract_params()` turns the key table upside down before legends merge. Drawn as a table of
+  # its own (`Giggly.Scene`) for the box of guides beside the panels, laid out as ggplot2's
+  # `GuideLegend` lays one out at theme_gray()'s defaults, a vertical legend with its title above
+  # and its labels right of its keys:
   #
   #   * the theme's legend margin inside the edge on every side;
   #   * the title, as deep as its lines (`Giggly.Guide.Parts`), left-aligned and centred down its
@@ -21,9 +23,9 @@ defmodule Giggly.Guide.Legend do
   # The legend's background spans the whole table, under everything; then the title, each key's
   # background and glyphs, and the labels, in ggplot2's drawing order.
 
-  defstruct []
+  defstruct reverse: false
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{reverse: boolean()}
 
   defimpl Giggly.Guide, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Guide

@@ -14,11 +14,14 @@ defprotocol Giggly.Guide do
   # drawn here, each of which, like every title a guide draws, may run over several lines.
   #
   # A scale records its guide by name, as ggplot2's scale carries `guide`, and the assembly turns
-  # the name into a struct of its kind: a legend (`Giggly.Guide.Legend`), `guide_legend()`, so far
-  # the one kind. A kind is one module holding its struct, whose fields are its parameters, and its
-  # drawing, in a `defimpl Giggly.Guide` whose first line classifies it into this boundary. A guide
-  # never sees a scale or calls a geom: the assembly works out its keys from the scale, and
-  # rendering has each layer's geom draw its glyphs in them.
+  # the name into a struct of its kind: a legend (`Giggly.Guide.Legend`), `guide_legend()`, or a
+  # colour bar (`Giggly.Guide.Colorbar`), `guide_colourbar()`; a legend with options is built by
+  # `Giggly.Plot.guide_legend/1` and recorded as its struct, which the assembly takes as it is,
+  # and `Plot.guides/2` names one by aesthetic over the scale's. A kind is one module holding its
+  # struct, whose fields are its parameters, and its drawing, in a `defimpl Giggly.Guide` whose
+  # first line classifies it into this boundary. A guide never sees a scale or calls a geom: the
+  # assembly works out its keys from the scale, and rendering has each layer's geom draw its
+  # glyphs in them.
   #
   # When a plot is rendered, the axes, their titles, the grid and the strips are drawn through
   # their modules, each handed the plot's coordinate system and a panel's params, or a panel's
@@ -28,8 +31,9 @@ defprotocol Giggly.Guide do
   # A guide asks the coordinate system where the breaks go, reads its look from the theme,
   # measures text, and draws primitives. It exports the modules rendering draws a panel's axes,
   # grid and strips and the plot's labels with and stacks the guides of other aesthetics in, and
-  # the kinds, whose structs the assembly builds, and nothing a kind draws with: that is in the
-  # kinds' protocol implementations.
+  # the kinds, whose structs the assembly builds and `Giggly.Plot` builds a legend's, and nothing a
+  # kind draws with: that is in the kinds' protocol implementations. `Plot` listing this boundary
+  # may call its drawing modules too, which `GigglyCredo.Check.PlotRunsNothing` forbids.
   use Boundary,
     deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme],
     exports: [Axis, Box, Colorbar, Grid, Legend, Strip, Title]

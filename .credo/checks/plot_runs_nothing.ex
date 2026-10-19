@@ -31,7 +31,7 @@ defmodule GigglyCredo.Check.PlotRunsNothing do
       The check reads the code as written: a module name built at runtime is not seen.
       """,
       params: [
-        roots: "The modules no reference may resolve to, the protocols at the families' roots."
+        roots: "The modules no reference may resolve to: the families' roots, and what draws."
       ]
     ]
 

@@ -18,7 +18,7 @@ defmodule Giggly.Scale.Discrete do
       grey, `"#7F7F7F"`, for colour and fill, or `:none`, no colour. A missing value takes no share
       of the palette; a position scale puts it at its last level, and its `na_value` is `nil`.
     * `guide`: the guide that draws it: `:axis` for a position and `:legend` for an aesthetic such
-      as alpha or colour.
+      as alpha or colour, `:none` for none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
     * `limits`: the values it shows, in the order shown, whatever the data, or `:default` for its
@@ -70,7 +70,7 @@ defmodule Giggly.Scale.Discrete do
             | {:gray, {number(), number()}}
             | {:manual, [String.t() | :none] | %{term() => String.t() | :none}},
           na_value: nil | number() | String.t() | :none,
-          guide: :axis | :legend,
+          guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),
           limits: :default | [term()],
           breaks: :default | :none | [term()],

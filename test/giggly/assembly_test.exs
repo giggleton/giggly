@@ -463,4 +463,136 @@ defmodule Giggly.AssemblyTest do
       assert assembly.legends === []
     end
   end
+
+  # Golden throughout: ggplot2 4.0.3's `get_guide_data()` for the same plot in R 4.6.1, `NULL`
+  # where it draws no guide, and its legend count from `ggplot_build()`.
+  describe "run/1, guides" do
+    @guide_rows %{"x" => [1, 2, 3, 4], "y" => [1, 2, 3, 4], "g" => ["a", "b", "c", nil]}
+
+    # The legends `plot` gives, each as its kind of guide, its aesthetics, and its keys' labels and
+    # values.
+    defp guide_keys(plot) do
+      plot
+      |> Assembly.run()
+      |> Map.fetch!(:legends)
+      |> Enum.map(fn legend ->
+        {legend.guide.__struct__, legend.aesthetics,
+         Enum.map(legend.keys, fn key -> {key.label, key.values} end)}
+      end)
+    end
+
+    defp guided(mapping) do
+      @guide_rows
+      |> Plot.new(mapping)
+      |> Plot.geom_point()
+    end
+
+    test "a guide guides/2 sets wins over its scale's, whichever is given first" do
+      discrete = guided(%{x: :x, y: :y, colour: :g})
+
+      guides_last =
+        discrete
+        |> Plot.scale_color_discrete(guide: :none)
+        |> Plot.guides(color: :legend)
+
+      guides_first =
+        discrete
+        |> Plot.guides(color: :none)
+        |> Plot.scale_color_discrete(guide: :legend)
+
+      reversed_first =
+        discrete
+        |> Plot.guides(color: Plot.guide_legend(reverse: true))
+        |> Plot.scale_color_discrete(guide: :none)
+
+      assert [{Guide.Legend, [:color], [{"a", _a}, {"b", _b}, {"c", _c}, {"NA", _missing}]}] =
+               guide_keys(guides_last)
+
+      assert guide_keys(guides_first) === []
+
+      assert [{Guide.Legend, [:color], [{"NA", _missing}, {"c", _c}, {"b", _b}, {"a", _a}]}] =
+               guide_keys(reversed_first)
+    end
+
+    test "a guide of :none draws none, given by the scale or by guides/2" do
+      continuous = guided(%{x: :x, y: :y, colour: :x})
+      by_scale = Plot.scale_color_continuous(continuous, guide: :none)
+      by_guides = Plot.guides(continuous, color: :none)
+      other_aesthetic = Plot.guides(continuous, fill: :none)
+
+      assert {guide_keys(by_scale), guide_keys(by_guides), length(guide_keys(other_aesthetic))} ===
+               {[], [], 1}
+    end
+
+    test "a reversed legend's keys run from the last break, the missing value's key first" do
+      discrete = guided(%{x: :x, y: :y, colour: :g})
+      plot = Plot.guides(discrete, color: Plot.guide_legend(reverse: true))
+
+      assert guide_keys(plot) === [
+               {Guide.Legend, [:color],
+                [
+                  {"NA", %{color: "#7F7F7F"}},
+                  {"c", %{color: "#619CFF"}},
+                  {"b", %{color: "#00BA38"}},
+                  {"a", %{color: "#F8766D"}}
+                ]}
+             ]
+    end
+
+    test "a continuous colour scale read by a legend has a key for each break, reversed or not" do
+      continuous = guided(%{x: :x, y: :y, colour: :x})
+      by_scale = Plot.scale_color_gradient(continuous, guide: :legend)
+      by_guides = Plot.guides(continuous, color: :legend)
+      reversed = Plot.guides(continuous, color: Plot.guide_legend(reverse: true))
+
+      keys = [
+        {"1", %{color: "#132B43"}},
+        {"2", %{color: "#28547A"}},
+        {"3", %{color: "#3E81B7"}},
+        {"4", %{color: "#56B1F7"}}
+      ]
+
+      assert {guide_keys(by_scale), guide_keys(by_guides), guide_keys(reversed)} ===
+               {[{Guide.Legend, [:color], keys}], [{Guide.Legend, [:color], keys}],
+                [{Guide.Legend, [:color], Enum.reverse(keys)}]}
+    end
+
+    test "a colour bar guides/2 gives a discrete scale is refused when the plot is run" do
+      discrete = guided(%{x: :x, y: :y, colour: :g})
+      plot = Plot.guides(discrete, color: :colorbar)
+
+      error = assert_raise ArgumentError, fn -> Assembly.run(plot) end
+
+      assert error.message ==
+               "Plot.guides/2 gives color a colour bar, which shows a continuous scale, and " <>
+                 "color's scale is discrete; give it :legend"
+    end
+
+    test "legends reversed alike merge, and one reversed beside one not stays apart" do
+      plot =
+        @guide_rows
+        |> Plot.new(%{x: :x, y: :y, colour: :g, fill: :g})
+        |> Plot.geom_col()
+
+      reversed = Plot.guide_legend(reverse: true)
+      both = Plot.guides(plot, color: reversed, fill: reversed)
+      one = Plot.guides(plot, color: reversed)
+
+      assert {guide_keys(both), length(guide_keys(one))} ===
+               {[
+                  {Guide.Legend, [:color, :fill],
+                   [
+                     {"NA", %{color: "#7F7F7F", fill: "#7F7F7F"}},
+                     {"c", %{color: "#619CFF", fill: "#619CFF"}},
+                     {"b", %{color: "#00BA38", fill: "#00BA38"}},
+                     {"a", %{color: "#F8766D", fill: "#F8766D"}}
+                   ]}
+                ], 2}
+    end
+
+    test "a guide for an aesthetic no layer maps draws nothing" do
+      unmapped = guided(%{x: :x, y: :y})
+      assert guide_keys(Plot.guides(unmapped, color: :legend)) === []
+    end
+  end
 end

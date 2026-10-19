@@ -86,7 +86,9 @@ grid lines are placed by the coordinate system".
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
   protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha and a discrete
-  colour or fill. The assembly turns the name into the kind; a scale never sees a guide.
+  colour or fill, by default; a plot's scale may name `:none`, a legend for a continuous colour or
+  fill, or carry the legend's struct `Plot.guide_legend/1` builds, typed `struct()`. The assembly
+  turns a name into the kind; a scale never reads its guide, so the boundary lists no guide.
   **`samples/2` and `places/2` give what a colour bar draws from a continuous scale**: values spread
   evenly over its limits by R's `seq()`, as `extract_decor()` takes them, and each value's place in
   the limits, 0 to 1, whatever the midpoint, as the gradient form places its ticks and colours.

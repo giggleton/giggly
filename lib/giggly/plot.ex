@@ -71,6 +71,13 @@ defmodule Giggly.Plot do
   in the order of the aesthetics' names (`alpha`, `color`, `fill`). Two with the same title and
   labels, such as a colour and a fill mapped to one column, are drawn as one.
 
+  ## Guides
+
+  A guide reads a scale back: a legend, a key for each break, or, for a continuous colour or fill,
+  a colour bar. Each scale function's `guide:` chooses its scale's, `:legend`, `:colorbar`,
+  `:none` for none, or a legend `guide_legend/1` makes, whose keys may run in reverse; `guides/2`
+  chooses them by aesthetic over whatever the scales say.
+
   ## Scales
 
   Each axis gets a scale from the type of what is mapped to it: a continuous scale for numbers, a
@@ -99,11 +106,12 @@ defmodule Giggly.Plot do
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, the scales, whose untrained structs it writes, NimbleOptions, which
-  # validates its functions' options at the call, the colour operations, which read a colour an
-  # option sets, and the mapping grammar, whose checks resolve each mapping value as it enters
-  # (`Giggly.Mapping`; it calls those alone, never the evaluation, which holds by review), and
-  # nothing that runs it. The five families' roots are protocols that compute and draw, and the
+  # checks a layer against, the guides, whose legend's struct it builds, the scales, whose
+  # untrained structs it writes, NimbleOptions, which validates its functions' options at the
+  # call, the colour operations, which read a colour an option sets, and the mapping grammar, whose
+  # checks resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never
+  # the evaluation, which holds by review), and nothing that runs it. The six families' roots are
+  # protocols that compute and draw, the guides' other modules that hold no struct draw, and the
   # scales' root trains and maps; `GigglyCredo.Check.PlotRunsNothing` keeps them all out of these
   # files, which boundary cannot, since a boundary always exports its root. A layer is read only
   # through `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so
@@ -116,6 +124,7 @@ defmodule Giggly.Plot do
       Giggly.DataFrame,
       Giggly.Facet,
       Giggly.Geom,
+      Giggly.Guide,
       Giggly.Mapping,
       Giggly.Position,
       Giggly.Scale,
@@ -131,6 +140,7 @@ defmodule Giggly.Plot do
     DataFrame,
     Facet,
     Geom,
+    Guide,
     Mapping,
     Position,
     Scale,
@@ -139,7 +149,17 @@ defmodule Giggly.Plot do
 
   alias Giggly.Plot.Layer
 
-  @enforce_keys [:data, :mapping, :facet, :coord, :scales, :theme, :labels, :reversed_layers]
+  @enforce_keys [
+    :data,
+    :mapping,
+    :facet,
+    :coord,
+    :scales,
+    :guides,
+    :theme,
+    :labels,
+    :reversed_layers
+  ]
   defstruct @enforce_keys
 
   @typedoc "An aesthetic's name, such as `:x`, `:y` or `:color`."
@@ -160,6 +180,15 @@ defmodule Giggly.Plot do
   @typedoc "The scales the plot sets, by aesthetic: each a scale's struct, as yet untrained."
   @type scales :: %{optional(aesthetic()) => struct()}
 
+  @typedoc """
+  The guide that reads an aesthetic's scale back: `:legend`, `:colorbar`, `:none` for none, or a
+  legend `guide_legend/1` makes.
+  """
+  @type guide :: :none | :legend | :colorbar | struct()
+
+  @typedoc "The guides `guides/2` sets, by aesthetic, each winning over its scale's own."
+  @type guides :: %{optional(aesthetic()) => guide()}
+
   @typedoc "The look everything but the marks is drawn in."
   @type theme :: :gray
 
@@ -170,8 +199,8 @@ defmodule Giggly.Plot do
   @type labels :: %{optional(atom()) => String.t() | :none}
 
   @typedoc """
-  A plot: its data, its mapping, its facet, coordinate system, scales and theme, the labels
-  `labs/2` sets, and its layers newest first (each function adds one at the front; they are
+  A plot: its data, its mapping, its facet, coordinate system, scales, the guides `guides/2`
+  sets, its theme, the labels `labs/2` sets, and its layers newest first (each function adds one at the front; they are
   assembled in the order they were added).
   """
   @type t :: %__MODULE__{
@@ -180,6 +209,7 @@ defmodule Giggly.Plot do
           facet: facet(),
           coord: coord(),
           scales: scales(),
+          guides: guides(),
           theme: theme(),
           labels: labels(),
           reversed_layers: [struct()]
@@ -814,6 +844,41 @@ defmodule Giggly.Plot do
     ]
   ]
 
+  # A scale's `guide:`, the guide that reads it back, checked by `validate_guide/2` for the kind of
+  # scale it reads: a colour bar for a continuous colour or fill scale alone. Each default is the
+  # one the scale gets with no scale function, a deliberate default recorded as a value.
+  @guide_doc_tail "or a legend `guide_legend/1` makes, or `:none` for none; `guides/2` sets one " <>
+                    "over it."
+
+  @discrete_color_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:discrete]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  @continuous_color_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:continuous]},
+    default: :colorbar,
+    doc:
+      "What reads the scale back: `:colorbar`, a bar the colours run up; `:legend`, a key for " <>
+        "each break; " <> @guide_doc_tail
+  ]
+
+  @alpha_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:alpha]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  @discrete_color_legend_option_specs Enum.concat(
+                                        @discrete_legend_option_specs,
+                                        guide: @discrete_color_guide_spec
+                                      )
+  @continuous_color_legend_option_specs Enum.concat(
+                                          @continuous_legend_option_specs,
+                                          guide: @continuous_color_guide_spec
+                                        )
+
   # A colour scale's missing value, grey unless a function says otherwise.
   @color_na_value_doc "The colour of a missing value, or of one outside the limits, or `:none` for none, which draws nothing."
   @color_na_value_type {:custom, __MODULE__, :validate_color, []}
@@ -845,7 +910,7 @@ defmodule Giggly.Plot do
                                   "`na_value:`."
                             ],
                             na_value: @color_na_value_spec
-                          ] ++ @discrete_legend_option_specs
+                          ] ++ @discrete_color_legend_option_specs
                         )
 
   @hue_scale_options NimbleOptions.new!(
@@ -875,7 +940,7 @@ defmodule Giggly.Plot do
                            doc: "1 to give the colours to the values in order, -1 in reverse."
                          ],
                          na_value: @color_na_value_spec
-                       ] ++ @discrete_legend_option_specs
+                       ] ++ @discrete_color_legend_option_specs
                      )
 
   @gray_scale_options NimbleOptions.new!(
@@ -891,7 +956,7 @@ defmodule Giggly.Plot do
                             doc: "The last value's grey, from 0, black, to 1, white."
                           ],
                           na_value: Keyword.put(@color_na_value_spec, :default, "#FF0000")
-                        ] ++ @discrete_legend_option_specs
+                        ] ++ @discrete_color_legend_option_specs
                       )
 
   @discrete_color_scale_options NimbleOptions.new!(
@@ -904,7 +969,7 @@ defmodule Giggly.Plot do
                                           "given."
                                     ],
                                     na_value: @color_na_value_spec
-                                  ] ++ @discrete_legend_option_specs
+                                  ] ++ @discrete_color_legend_option_specs
                                 )
 
   @gradient_scale_options NimbleOptions.new!(
@@ -920,7 +985,7 @@ defmodule Giggly.Plot do
                                 doc: "The colour at the high end of the limits."
                               ],
                               na_value: @color_na_value_spec
-                            ] ++ @continuous_legend_option_specs
+                            ] ++ @continuous_color_legend_option_specs
                           )
 
   @gradient2_scale_options NimbleOptions.new!(
@@ -948,7 +1013,7 @@ defmodule Giggly.Plot do
                                  doc: "The value the middle colour stands at."
                                ],
                                na_value: @color_na_value_spec
-                             ] ++ @continuous_legend_option_specs
+                             ] ++ @continuous_color_legend_option_specs
                            )
 
   @gradientn_scale_options NimbleOptions.new!(
@@ -961,7 +1026,7 @@ defmodule Giggly.Plot do
                                      "limits to the high."
                                ],
                                na_value: @color_na_value_spec
-                             ] ++ @continuous_legend_option_specs
+                             ] ++ @continuous_color_legend_option_specs
                            )
 
   @continuous_color_scale_options NimbleOptions.new!(
@@ -975,7 +1040,7 @@ defmodule Giggly.Plot do
                                             "`#132B43` to `#56B1F7` when not given."
                                       ],
                                       na_value: @color_na_value_spec
-                                    ] ++ @continuous_legend_option_specs
+                                    ] ++ @continuous_color_legend_option_specs
                                   )
 
   @alpha_range_spec [
@@ -993,13 +1058,53 @@ defmodule Giggly.Plot do
 
   @continuous_alpha_scale_options NimbleOptions.new!(
                                     [range: @alpha_range_spec, na_value: @alpha_na_value_spec] ++
-                                      @continuous_legend_option_specs
+                                      Enum.concat(
+                                        @continuous_legend_option_specs,
+                                        guide: @alpha_guide_spec
+                                      )
                                   )
 
   @discrete_alpha_scale_options NimbleOptions.new!(
                                   [range: @alpha_range_spec, na_value: @alpha_na_value_spec] ++
-                                    @discrete_legend_option_specs
+                                    Enum.concat(
+                                      @discrete_legend_option_specs,
+                                      guide: @alpha_guide_spec
+                                    )
                                 )
+
+  # `guide_legend/1`'s options.
+  @guide_legend_options NimbleOptions.new!(
+                          reverse: [
+                            type: :boolean,
+                            default: false,
+                            doc:
+                              "Whether the keys run from the last break down to the first, " <>
+                                "the key of a missing value first."
+                          ]
+                        )
+
+  # `guides/2`'s options: the guide of each aesthetic other than position, checked by
+  # `validate_guide/2`; a colour bar for a colour or fill scale that turns out discrete is refused
+  # when the plot is run, since which kind of scale it gets may be known only then.
+  @guides_options NimbleOptions.new!(
+                    color: [
+                      type: {:custom, __MODULE__, :validate_guide, [:continuous]},
+                      doc:
+                        "The colour scale's guide (`colour:` too), as `scale_color_continuous/2`'s " <>
+                          "`guide:` takes it; a colour bar for a continuous scale alone."
+                    ],
+                    fill: [
+                      type: {:custom, __MODULE__, :validate_guide, [:continuous]},
+                      doc:
+                        "The fill scale's guide, as `scale_fill_continuous/2`'s `guide:` takes " <>
+                          "it; a colour bar for a continuous scale alone."
+                    ],
+                    alpha: [
+                      type: {:custom, __MODULE__, :validate_guide, [:alpha]},
+                      doc:
+                        "The alpha scale's guide, as `scale_alpha_continuous/2`'s `guide:` takes it."
+                    ]
+                  )
 
   # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values, and the limits
   # of a colour, fill or alpha scale.
@@ -1081,6 +1186,7 @@ defmodule Giggly.Plot do
       facet: %Facet.Null{},
       coord: %Coord.Cartesian{},
       scales: %{},
+      guides: %{},
       theme: :gray,
       labels: %{},
       reversed_layers: []
@@ -2196,10 +2302,11 @@ defmodule Giggly.Plot do
   scale it had.
 
   Each value takes the colour as far along the gradient as the value is through the limits,
-  blended in CIE L*a*b*, which spaces colours evenly to the eye; its guide is a colour bar. Raises
-  `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not define or
-  one with an alpha of its own, and `ArgumentError` for a list of labels without a list of breaks
-  as long; a column that is not numbers is refused when the plot is run.
+  blended in CIE L*a*b*, which spaces colours evenly to the eye; its guide is a colour bar unless
+  `guide:` names another. Raises `NimbleOptions.ValidationError` for an option it does not take, a
+  colour CSS does not define or one with an alpha of its own, and `ArgumentError` for a list of
+  labels without a list of breaks as long; a column that is not numbers is refused when the plot is
+  run.
 
   ## Options
 
@@ -2259,10 +2366,10 @@ defmodule Giggly.Plot do
 
   A value's colour is as far toward its side's end as the value is from the midpoint, the end of
   the limits further from the midpoint taking its colour in full and the nearer only as far as it
-  reaches; its guide is a colour bar. Raises `NimbleOptions.ValidationError` for an option it does
-  not take, a colour CSS does not define or one with an alpha of its own, and `ArgumentError` for a
-  list of labels without a list of breaks as long; a column that is not numbers is refused when the
-  plot is run.
+  reaches; its guide is a colour bar unless `guide:` names another. Raises
+  `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not define or
+  one with an alpha of its own, and `ArgumentError` for a list of labels without a list of breaks
+  as long; a column that is not numbers is refused when the plot is run.
 
   ## Options
 
@@ -2321,10 +2428,10 @@ defmodule Giggly.Plot do
   any colour scale it had.
 
   The colours are spaced evenly over the limits, the first at the low end and the last at the high,
-  and blended in CIE L*a*b* between neighbours; its guide is a colour bar. Raises
-  `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not define or
-  one with an alpha of its own, and `ArgumentError` for a list of labels without a list of breaks
-  as long; a column that is not numbers is refused when the plot is run.
+  and blended in CIE L*a*b* between neighbours; its guide is a colour bar unless `guide:` names
+  another. Raises `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does
+  not define or one with an alpha of its own, and `ArgumentError` for a list of labels without a
+  list of breaks as long; a column that is not numbers is refused when the plot is run.
 
   ## Options
 
@@ -2443,9 +2550,10 @@ defmodule Giggly.Plot do
   Gives the plot a continuous alpha scale, replacing any alpha scale it had.
 
   Each value is drawn as opaque as it is far from the first of `range:` to the second through the
-  limits; its guide is a legend. Raises `NimbleOptions.ValidationError` for an option it does not
-  take or an opacity outside 0 to 1, and `ArgumentError` for a list of labels without a list of
-  breaks as long; a column that is not numbers is refused when the plot is run.
+  limits; its guide is a legend unless `guide:` says otherwise. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, an
+  opacity outside 0 to 1 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels
+  without a list of breaks as long; a column that is not numbers is refused when the plot is run.
 
   ## Options
 
@@ -2475,9 +2583,10 @@ defmodule Giggly.Plot do
   Gives the plot a discrete alpha scale, replacing any alpha scale it had.
 
   The values' opacities are spaced evenly from the first of `range:` to the second, in order; its
-  guide is a legend. Raises `NimbleOptions.ValidationError` for an option it does not take or an
-  opacity outside 0 to 1, and `ArgumentError` for a list of labels not one for each break or limit
-  given; a column of numbers is refused when the plot is run.
+  guide is a legend unless `guide:` says otherwise. Raises `NimbleOptions.ValidationError` for an
+  option it does not take or a value it cannot use, an opacity outside 0 to 1 or a `guide:` of
+  `:colorbar`, and `ArgumentError` for a list of labels not one for each break or limit given; a
+  column of numbers is refused when the plot is run.
 
   ## Options
 
@@ -2691,6 +2800,66 @@ defmodule Giggly.Plot do
       |> NimbleOptions.validate!(@labs_options)
 
     %{plot | labels: Map.merge(labels, Map.new(validated))}
+  end
+
+  @doc """
+  Sets the guide that reads each aesthetic's scale back: `:legend`, a key for each break;
+  `:colorbar`, a bar a continuous colour or fill scale's colours run up; a legend
+  `guide_legend/1` makes; or `:none` for none.
+
+  A guide set here wins over the one its scale's `guide:` chooses, before or after the scale is
+  given. Each call sets only the guides it is given, keeping the rest. A colour bar for alpha
+  raises here, and one for a colour or fill scale that is discrete raises when the plot is run. A
+  guide for an aesthetic no layer maps reads nothing.
+
+  ## Options
+
+  #{NimbleOptions.docs(@guides_options)}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.guides(color: :none)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> svg =~ ">cyl</text>"
+      false
+  """
+  @spec guides(t(), keyword()) :: t()
+  def guides(%__MODULE__{guides: guides} = plot, options) when is_list(options) do
+    validated =
+      options
+      |> Aesthetics.canonicalize()
+      |> NimbleOptions.validate!(@guides_options)
+
+    %{plot | guides: Map.merge(guides, Map.new(validated))}
+  end
+
+  @doc """
+  A legend for a scale's `guide:` or for `guides/2`, with options: a key for each of the scale's
+  breaks, labelled, as `:legend` draws, its keys in the order the options choose.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use.
+
+  ## Options
+
+  #{NimbleOptions.docs(@guide_legend_options)}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875, 2.32], "mpg" => [21.0, 22.8, 22.8], "drv" => ["f", "r", "4"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :drv})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.guides(color: Giggly.Plot.guide_legend(reverse: true))
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> Regex.scan(~r{>([fr4])</text>}, svg, capture: :all_but_first)
+      [["r"], ["f"], ["4"]]
+  """
+  @spec guide_legend(keyword()) :: struct()
+  def guide_legend(options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, @guide_legend_options)
+    struct!(Guide.Legend, validated)
   end
 
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
@@ -3252,6 +3421,29 @@ defmodule Giggly.Plot do
   def validate_label(label),
     do: {:error, "expected a label, a string or :none, got: #{inspect(label)}"}
 
+  # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
+  # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` for a
+  # continuous colour or fill scale alone, as a colour bar shows a continuous scale's colours, so a
+  # discrete scale's is refused, and an alpha scale's whatever its kind.
+  @doc false
+  @spec validate_guide(term(), :continuous | :discrete | :alpha) ::
+          {:ok, guide()} | {:error, String.t()}
+  def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
+  def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
+  def validate_guide(:colorbar, :continuous), do: {:ok, :colorbar}
+
+  def validate_guide(:colorbar, :discrete),
+    do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
+
+  def validate_guide(:colorbar, :alpha),
+    do: {:error, "a colour bar shows colour or fill, never alpha; give :legend"}
+
+  def validate_guide(guide, _kind) do
+    {:error,
+     "expected :legend, :colorbar, :none or a legend Plot.guide_legend/1 makes, got: " <>
+       inspect(guide)}
+  end
+
   # NimbleOptions' check of an `hjust:` or `vjust:` option: a number, kept as a float, as R keeps one
   # and grid takes any, or one of ggplot2's words, as an atom.
   @doc false
@@ -3811,13 +4003,15 @@ defmodule Giggly.Plot do
   defp check_labels(%Scale.Discrete{}, validated, function),
     do: check_discrete_labels(validated, function)
 
-  # A discrete scale with a legend, its palette `palette`, the rest of its fields `options`.
+  # A discrete scale, its palette `palette`, the rest of its fields, its guide among them,
+  # `options`.
   defp discrete_legend(palette, options),
-    do: struct!(Scale.Discrete, [palette: palette, guide: :legend] ++ options)
+    do: struct!(Scale.Discrete, [{:palette, palette} | options])
 
-  # A continuous scale with `guide`, its palette `palette`, the rest of its fields `options`.
-  defp continuous_legend(palette, guide, options),
-    do: struct!(Scale.Continuous, [palette: palette, guide: guide] ++ options)
+  # A continuous scale, its palette `palette`, the rest of its fields, its guide among them,
+  # `options`.
+  defp continuous_legend(palette, options),
+    do: struct!(Scale.Continuous, [{:palette, palette} | options])
 
   defp manual_scale(validated) do
     {values, options} = Keyword.pop!(validated, :values)
@@ -3858,27 +4052,27 @@ defmodule Giggly.Plot do
   defp gradient2_scale(validated), do: gradient_through(validated, [:low, :mid, :high])
 
   # A continuous colour scale with a gradient through the colours of the options `names`, in that
-  # order, and a colour bar.
+  # order.
   defp gradient_through(validated, names) do
     {colors, options} = Keyword.split(validated, names)
     ordered = Enum.map(names, fn name -> Keyword.fetch!(colors, name) end)
-    continuous_legend({:gradient, ordered}, :colorbar, options)
+    continuous_legend({:gradient, ordered}, options)
   end
 
   defp gradientn_scale(validated) do
     {colors, options} = Keyword.pop!(validated, :colors)
-    continuous_legend({:gradient, colors}, :colorbar, options)
+    continuous_legend({:gradient, colors}, options)
   end
 
   # A continuous colour scale through its palette's colours, or the default gradient.
   defp continuous_color_scale(validated) do
     {colors, options} = Keyword.pop(validated, :palette, Keyword.values(@gradient_defaults))
-    continuous_legend({:gradient, colors}, :colorbar, options)
+    continuous_legend({:gradient, colors}, options)
   end
 
   defp continuous_alpha_scale(validated) do
     {range, options} = Keyword.pop!(validated, :range)
-    continuous_legend({:rescale, range}, :legend, options)
+    continuous_legend({:rescale, range}, options)
   end
 
   defp discrete_alpha_scale(validated) do
