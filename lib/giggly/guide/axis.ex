@@ -99,28 +99,30 @@ defmodule Giggly.Guide.Axis do
   # in a cell that deep.
   defp axis([], _side, _look, _theme), do: {0.0, []}
 
-  defp axis(breaks, :bottom, :x, %Theme{
-         axis_ticks: ticks_look,
-         axis_ticks_length: tick_length,
-         axis_text: text_look
-       }) do
+  # An axis whose scale has no labels draws its ticks alone and reaches only as far as they do, as
+  # ggplot2's leaves out the labels and their room.
+  defp axis([{_place, :none} | _rest] = breaks, side, _look, theme) do
+    places = Enum.map(breaks, fn {place, _label} -> place end)
+    tick_length = theme.axis_ticks_length
+
+    case side do
+      :bottom -> {tick_length, [bottom_ticks(places, tick_length, theme)]}
+      :left -> {tick_length, [left_ticks(places, tick_length, theme)]}
+    end
+  end
+
+  defp axis(
+         breaks,
+         :bottom,
+         :x,
+         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
+       ) do
     {places, labels} = Enum.unzip(breaks)
     height = tick_length + text_look.margin + Parts.line_height(text_look.size)
 
     # A cell's y runs up from its bottom; the panel's edge is the cell's top.
-    tick_end = 1 - tick_length / height
     label_top = 1 - (tick_length + text_look.margin) / height
-
-    ticks = %Polylines{
-      lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
-      offsets: :none,
-      stroke_width: ticks_look.line_width,
-      color: List.duplicate(ticks_look.color, length(places)),
-      opacity: List.duplicate(1.0, length(places)),
-      line_end: :butt,
-      line_join: :round,
-      mitre_limit: 10.0
-    }
+    ticks = bottom_ticks(places, height, theme)
 
     text = %Text{
       x: places,
@@ -193,6 +195,23 @@ defmodule Giggly.Guide.Axis do
       offset: List.duplicate({0.0, -Font.ascent(text_look.size) / 2}, length(places)),
       check_overlap: false,
       ascent: Font.ascent(text_look.size)
+    }
+  end
+
+  # The ticks of an axis `height` points deep below the panel, reaching down from the panel's edge,
+  # the cell's top.
+  defp bottom_ticks(places, height, %Theme{axis_ticks: ticks_look, axis_ticks_length: tick_length}) do
+    tick_end = 1 - tick_length / height
+
+    %Polylines{
+      lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
+      offsets: :none,
+      stroke_width: ticks_look.line_width,
+      color: List.duplicate(ticks_look.color, length(places)),
+      opacity: List.duplicate(1.0, length(places)),
+      line_end: :butt,
+      line_join: :round,
+      mitre_limit: 10.0
     }
   end
 

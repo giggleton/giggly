@@ -248,12 +248,14 @@ giggly_protocols =
             {GigglyCredo.Check.ZipMap, []},
             # A plot describes and runs nothing (`.claude/rules/plot.md`): `Giggly.Plot` builds the
             # kinds' structs and reads their facts, and calls no family's root, which `boundary`
-            # cannot forbid while it lets `Plot` use the kinds. Scoped to `Plot`'s files, the only
-            # ones the rule is about.
+            # cannot forbid while it lets `Plot` use the kinds. `Giggly.Scale` is a root too, though
+            # not a protocol: `Plot` writes a scale's struct (`Scale.Continuous`) and never trains or
+            # maps one (design-log §4, the entry beginning "A scale function records the untrained
+            # scale"). Scoped to `Plot`'s files, the only ones the rule is about.
             {GigglyCredo.Check.PlotRunsNothing,
              [
                files: %{included: ["lib/giggly/plot.ex", "lib/giggly/plot/"]},
-               roots: giggly_protocols
+               roots: [Giggly.Scale | giggly_protocols]
              ]},
 
             #

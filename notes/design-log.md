@@ -79,6 +79,53 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Scale functions are Phase 3's seventh increment, in seven steps: continuous position scales,
+  formatters, transformations, discrete and date position scales, colour, fill and alpha
+  scales, guides, the notebooks (2026-10-18, Steve, agreeing the proposal; checked against
+  ggplot2 4.0.3 in R).** Scales were Giggly's thinnest part: no user-facing option, and the spec
+  the entry beginning "Scales are three values" names had never existed. 30 of the 571 waiting
+  notebook examples wait on scale functions alone and 125 name one. The functions are `Plot`'s,
+  in `plot.ex` (Steve), and American only, `scale_color_*` (Steve: "America"), as the theme is
+  `:gray`; options still take `colour:`. *Rejected:* histograms and box plots (18 alone; next in
+  line), the theme (about 16 drawable), size, shape and linetype (15), `facet_grid()` (11); two
+  increments, position then colour (they share no example, so a split moved only a notebook
+  sweep); British aliases (R exports 22 of each, the notebooks write `scale_colour_` 154 times to
+  once): every alias is API surface. *Deferred:* binned scales, viridis and brewer, ordered
+  factors, `sec_axis()`, datetimes, `oob`, identity scales, guide options but `reverse`, legend
+  position, `coord_cartesian()` zoom, size, shape and linetype scales, and extracting R's
+  `scales` half into a package (Steve: later).
+
+- **A scale function records the untrained scale as its spec: a `%Scale.Continuous{}` carrying
+  its options, its range `:none` (2026-10-18, Steve).** The entry beginning "Scales are three
+  values" has the trained scale as the spec plus a range, as ggplot2 copies the scale a user adds
+  and trains the copy; so the assembly starts from the plot's scale for an aesthetic, or
+  `Scale.new/1` from the column's type, and `Giggly.panel_scales/2` shows the options. `Plot`
+  lists `Giggly.Scale`, which exports its kinds, and `PlotRunsNothing` keeps `Scale`'s root out
+  of `Plot`'s files, so the plot writes a struct and never trains or maps one, as with coordinate
+  systems and facets: that answers why `Plot` was kept from listing `Scale` on 2026-10-12 (the
+  entry beginning "Position scales are chosen by column type"). *Rejected: the options as plain
+  data the assembly builds a scale from*: no grant, but every option in two shapes.
+
+- **`labels:` takes a list, a function handed every break drawn, or `:none`; Giggly's formatters
+  are list functions in `Giggly.Format` (2026-10-18, Steve).** A function sees every break at
+  once, as R's do, so a formatter can give them shared decimals (R's `precision()`:
+  `label_comma()` writes 0.5, 1 and 1.25 as `0.50`, `1.00`, `1.25`) and `dollar` can drop cents
+  only when every break is whole; it returns one label per break, or the run raises. `comma/2`,
+  `percent/2` and `dollar/2` are plain functions shipped for convenience (Steve), matching R's
+  `label_*()` output. A label list needs a breaks list of its length, checked at the call.
+  *Rejected: a function called per break*: shorter to write, but no formatter could share
+  decimals. *Rejected: formatters named by value* (`labels: :comma`, ggity's): a second
+  contract. *Rejected: `Giggly.Labels`*: it shares its last segment with `Giggly.Scale.Labels`,
+  and it owns no table.
+
+- **"Absent" in a public option: `:none` removes, an option left out is the default, and a limit
+  the data supplies is `nil` (2026-10-18, Steve).** `breaks: :none` draws no breaks, as R's
+  `NULL` does, beside `colour: :none` and `labs(x: :none)`; nothing stands for R's `waiver()`,
+  since leaving the option out is the default. `limits: {nil, 4}` and `xlim(plot, nil, 4)` take
+  the low end from the data, as R's `NA` does, since `nil` is already Giggly's missing value.
+  *Rejected: `:none` for the open limit*: it would mean "remove" in one option and "the data
+  decides" in another. *Rejected: `nil` for "remove"*: it already means a missing value.
+
 - **API docs describe Giggly on its own terms; comparing with ggplot2 is the notebooks' job
   (2026-10-18, Steve).** A public moduledoc, `@doc`, `@typedoc` or option doc says what Giggly
   does: what a function draws, its aesthetics and options, an example or two. It names no ggplot2
@@ -1566,8 +1613,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
-- 2026-10-18 — Describe Giggly on its own terms in the API docs; §4: "API docs describe Giggly
-  on its own terms"
+- 2026-10-18 — Give a plot continuous position scales (scale functions, step 1); §4: "Scale
+  functions are Phase 3's seventh increment", "A scale function records the untrained scale",
+  "`labels:` takes a list", "\"Absent\" in a public option"
+- 2026-10-18 — Describe Giggly on its own terms in the API docs (`d344408`); §4: "API docs
+  describe Giggly on its own terms"
 - 2026-10-18 — Draw expressions in the notebooks (expressions, step 4) (`a6f8a79`); §4: "A verdict
   names a missing expression by what it needs"
 - 2026-10-18 — Map an aesthetic to what its stat computes with after_stat (expressions, step 3)
@@ -1732,14 +1782,6 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   as `labs(x:)` for `xlab()`, which `notebooks.md` allows as a counterpart, though `ggplot()` for
   `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
   Settled when the first such example could otherwise be drawn.
-- **How a public option says "absent".** CLAUDE.md's sentinel rule (`:none`, never `nil`) came with
-  the harness. ggplot2 separates "remove this" (`breaks = NULL`, `guide = "none"`) from "use the
-  default" (`waiver()`), and ggity spelled them `nil` and `:waivers`. Unresolved: the atoms Giggly's
-  options use for each, and whether `nil` is acceptable at the public API while `:none` stays the
-  internal sentinel. Settled by the first scale options that need both (`breaks:`, `labels:`). The
-  first public "remove this" is `colour: :none` and `fill: :none`, ggplot2's `NA` (2026-10-16,
-  Steve, with the colour increment); the second is a `labs/2` label of `:none`, ggplot2's `NULL`
-  (2026-10-17), where "use the default" is still a label left out.
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

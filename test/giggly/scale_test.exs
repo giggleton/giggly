@@ -310,6 +310,128 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's view of mtcars' weights, 1.513 to 5.424, under the same
+  # options in R 4.6.1 (`layer_data()` and the first panel's params), of mpg's class counts, 0 to
+  # 62, and of a plot with no rows (`xlim(NA, 5)` spans the empty axis's -0.05 to 1.05 with no
+  # breaks); labels are Giggly's own. They move with how ggplot2 widens limits, chooses breaks or
+  # censors a position.
+  describe "a continuous scale's options" do
+    # A continuous position scale with `options` set, trained on mtcars' lightest and heaviest
+    # weights.
+    defp weights(options) do
+      Scale.Continuous
+      |> struct!(options)
+      |> Scale.train([1.513, 5.424])
+    end
+
+    test "limits replace the range before it is widened, and a nil end is the range's" do
+      both = weights(limits: {2.0, 5.0})
+      upper = weights(limits: {nil, 4.0})
+
+      assert {Scale.dimension(both), Scale.dimension(upper)} ===
+               {{1.85, 5.15}, {1.38865, 4.12435}}
+    end
+
+    test "limits with both ends give an axis before any data, and one end alone does not" do
+      assert {Scale.dimension(%Scale.Continuous{limits: {2.0, 5.0}}),
+              Scale.dimension(%Scale.Continuous{limits: {nil, 5.0}})} ===
+               {{1.85, 5.15}, {-0.05, 1.05}}
+    end
+
+    test "expansion is set at each end, a multiple of the width plus a constant" do
+      counts =
+        Scale.train(%Scale.Continuous{expand: [mult: {0.0, 0.05}, add: {0.0, 0.0}]}, [0, 62])
+
+      none = weights(expand: [mult: {0.0, 0.0}, add: {0.0, 0.0}])
+      added = weights(expand: [mult: {0.0, 0.0}, add: {2.0, 1.0}])
+
+      assert {Scale.dimension(counts), Scale.dimension(none), Scale.dimension(added)} ===
+               {{0.0, 65.1}, {1.513, 5.424}, {-0.4870000000000001, 6.424}}
+    end
+
+    test "given breaks are kept, in the order given, wherever they fall inside the extent" do
+      scale = weights(breaks: [5.5, 1.0, 3.0, 1.4, 7.0])
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{5.5, "5.5"}, {3.0, "3.0"}, {1.4, "1.4"}]
+    end
+
+    test "breaks of :none give no breaks, and so no minor breaks either" do
+      scale = weights(breaks: :none)
+      extent = Scale.dimension(scale)
+      breaks = Scale.breaks(scale, extent)
+
+      assert {breaks, Scale.minor_breaks(scale, breaks, extent)} === {[], []}
+    end
+
+    test "given labels go with their breaks, those of breaks left out going with them" do
+      scale = weights(breaks: [1.0, 3.0, 5.0], labels: ["one", "three", "five"])
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) === [{3.0, "three"}, {5.0, "five"}]
+    end
+
+    test "a labels function is handed every break drawn at once and labels each" do
+      labeller = fn breaks ->
+        Enum.map(breaks, fn break -> "#{round(break)} of #{length(breaks)}" end)
+      end
+
+      scale = weights(labels: labeller)
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{2.0, "2 of 4"}, {3.0, "3 of 4"}, {4.0, "4 of 4"}, {5.0, "5 of 4"}]
+    end
+
+    test "a labels function that does not give a string for each break is refused" do
+      for labeller <- [fn _breaks -> ["one"] end, fn breaks -> breaks end] do
+        scale = weights(labels: labeller)
+
+        assert_raise ArgumentError, ~r/must return a string for each of the breaks/, fn ->
+          Scale.breaks(scale, Scale.dimension(scale))
+        end
+      end
+    end
+
+    test "labels of :none leave each break unlabelled" do
+      scale = weights(limits: {2.0, 3.0}, labels: :none)
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{2.0, :none}, {2.25, :none}, {2.5, :none}, {2.75, :none}, {3.0, :none}]
+    end
+
+    test "given minor breaks are kept inside the extent, less the breaks; :none gives none" do
+      given = weights(minor_breaks: [2.25, 3.0, 4.25, 9.0])
+      none = weights(minor_breaks: :none)
+      extent = Scale.dimension(given)
+
+      assert {Scale.minor_breaks(given, Scale.breaks(given, extent), extent),
+              Scale.minor_breaks(none, Scale.breaks(none, extent), extent)} === {[2.25, 4.25], []}
+    end
+
+    test "a position outside the limits is censored, an infinite one kept" do
+      both = weights(limits: {2.0, 5.0})
+      upper = weights(limits: {nil, 4.0})
+      values = [1.513, 2.0, 3.5, 5.0, 5.424, nil, :infinity, :neg_infinity]
+
+      assert {Scale.map(both, values), Scale.censor(both, values), Scale.censor(upper, values)} ===
+               {[nil, 2.0, 3.5, 5.0, nil, nil, :infinity, :neg_infinity],
+                [nil, 2.0, 3.5, 5.0, nil, nil, :infinity, :neg_infinity],
+                [1.513, 2.0, 3.5, nil, nil, nil, :infinity, :neg_infinity]}
+    end
+
+    test "a discrete scale's positions are not censored" do
+      scale = trained(:discrete, ["a", "b"])
+
+      assert Scale.censor(scale, [0.55, 2.45, 9.0]) === [0.55, 2.45, 9.0]
+    end
+
+    test "a scale's kind is discrete, date or continuous" do
+      assert Enum.map([:discrete, :date, :continuous], fn kind ->
+               Scale.kind_of(Scale.new(kind))
+             end) ===
+               [:discrete, :date, :continuous]
+    end
+  end
+
   # Golden throughout: R 4.6.1's `scales` 1.4.0 and ggplot2 4.0.3, printed to 17 significant
   # digits: `scales::rescale()`, `seq(0.1, 1, length.out = n)` and the alpha `layer_data()` of the
   # same values. They move only with R's arithmetic, or with ggplot2's default alpha range.

@@ -30,9 +30,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
   ggplot2's `GeomRect$setup_data()` fills them in) → geom reparameterize (a bar to
   `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position → reset and
-  retrain position scales → freeze view scales → map positions again → train non-position scales
-  → build guides → map non-position scales → `after_scale` → fixed values last. A stage arrives
-  with its increment and goes where this order puts it.
+  retrain position scales → map positions again, censoring what limits cut → freeze view scales →
+  train non-position scales → build guides → map non-position scales → `after_scale` → fixed
+  values last. A stage arrives with its increment and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly calls the families' build functions, never their drawing ones**: the facet's,
@@ -65,8 +65,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The position scales are reset and trained again after the position**, on every layer's
   x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
   `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels
-  and widens its continuous range. ggplot2 maps the positions again after; a scale maps a position
-  to itself, so nothing here does.
+  and widens its continuous range. **The positions are then mapped again** (`Scale.censor/2`), as
+  ggplot2 maps them, which leaves out what a scale's limits cut: a bar reaching past the y axis's
+  limit is missing its end, so it is not drawn; the non-position scales train on what remains.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
   scale id, the trained scale of each aesthetic other than position that a layer maps, by
@@ -84,9 +85,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The facet and the coordinate system run by the structs the plot records**, the null facet and
   cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
   assembly names no kind.
-- **A label `Plot.labs/2` sets titles an axis or a legend over everything else**, `:none` among
-  them, as a plot's labels win in ggplot2's `setup_plot_labels()`, whenever the call came; so a
-  label decides which legends merge, as they merge by title. Otherwise:
+- **A scale's name titles its axis over everything else**, `:none` among them, as ggplot2's
+  scale name beats `labs()` whichever came first. **Then a label `Plot.labs/2` sets titles an axis
+  or a legend**, `:none` among them, as a plot's labels win in ggplot2's `setup_plot_labels()`,
+  whenever the call came; so a label decides which legends merge, as they merge by title.
+  Otherwise:
 - **Each axis's title is the title of what the first layer to map the axis's aesthetic to a
   column or an expression maps it to** (`Giggly.Mapping.title/2`: a column's name, an
   expression's text, `:none` for a closure's, which no later layer replaces), an annotation never
@@ -105,10 +108,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each panel's params are built once, after the positions, from the scales its layout row
   names, trained again:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing
   that extent draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`.
-- **Each axis's scale is added after grouping, of the kind its columns need; every layer's
-  columns in the axis's family are then put through the scale's transformation, trained on, and
-  mapped to positions.** Which columns belong to an axis is `Aesthetics.family/1`'s answer, never
-  a name compared with `:x`.
+- **Each axis's scale is added after grouping, of the kind its columns need, or is the plot's own
+  scale for the aesthetic, refused when run if it is of another kind ("the plot's x scale is
+  continuous, but the layer at index 0 maps :x to "class", a discrete column", where ggplot2
+  refuses a discrete value and draws a date as days); every layer's columns in the axis's family
+  are then put through the scale's transformation, trained on, and mapped to positions**, a
+  continuous scale censoring those outside its limits. Which columns belong to an axis is
+  `Aesthetics.family/1`'s answer, never a name compared with `:x`.
 - **A layer's stat and position run by the structs the layer records**, read with
   `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/2` and
   `Position.compute_layer/2`; the assembly names no stat or position kind.

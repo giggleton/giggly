@@ -69,6 +69,23 @@ grid lines are placed by the coordinate system".
   the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
   `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`, `MinorBreaks`, `Palette` and
   `Transform`.
+- **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
+  `minor_breaks`, `labels` and `expand`, each `:default` until given, `limits` `{nil, nil}` and
+  `expand` ggplot2's `[mult: {0.05, 0.05}, add: {0, 0}]`; `Giggly.Plot` writes the struct,
+  untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
+  records the untrained scale"). Its field defaults are a position scale's, so `%Continuous{}` is
+  `new(:continuous)`. `kind_of/1` says which kind a scale is, as `kind/1` says which a column needs.
+- **Limits replace the range end by end, and a position outside them is censored.** An end of
+  `nil` takes the range's (R's `get_limits()`), and with both ends an axis exists before any data.
+  `map/2` turns a position outside the limits into `nil` before the stat, and `censor/2` does once
+  the positions are final, as ggplot2 maps them twice with `oob = censor` (finite values only):
+  `:infinity` and `:neg_infinity` are kept, and a discrete scale's positions are never censored.
+- **Given breaks are kept in the order given wherever they fall inside the widened extent**, even
+  beyond the limits, as R keeps 1.4 on mtcars' weights from 1.513; given labels go with their
+  breaks by index, so a break left out takes its label with it; a labels function is handed every
+  break drawn at once, as R's are, and must return a string for each, or the run raises; `:none`
+  gives no breaks (so no minor breaks), no minor breaks, or `{position, :none}` for each break,
+  which the axis draws as ticks alone.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists
   `Giggly.ColorOperations`, which gives the hue palette its colours, as R's `scales` lists farver,
   and `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a column and hands its values here, so the namespace stays
@@ -158,9 +175,11 @@ grid lines are placed by the coordinate system".
   positioned marks.
 - **An untrained continuous scale's range is `:none`.** The empty axis's 0 to 1 is
   `dimension/1`'s, as it is ggplot2's `get_limits()`'s.
-- **`dimension/1` is an axis's extent widened by ggplot2's default expansion**, in transformed
-  positions: a continuous range by 5% of its width at each end, discrete levels (1 to n) by 0.6,
-  a range of zero width (R's `zero_range()`, rounding error included) as if its width were 1;
+- **`dimension/1` is an axis's extent widened by the scale's expansion**, in transformed
+  positions: a continuous scale's limits by its `expand`, at each end `width * mult + add` (R's
+  `expand_range4()`; a negative amount narrows it, as R's `expansion()` allows), 5% of the width
+  by default, discrete levels (1 to n) by 0.6,
+  limits of zero width (R's `zero_range()`, rounding error included) as if their width were 1;
   a discrete scale's extent then reaches as far as its continuous range does, unwidened, as
   ggplot2's `expand_limits_discrete()` takes the range of both. `zero_range?/2` is the one home of
   R's `zero_range()`; `Giggly.Resolution` asks it.
@@ -168,5 +187,5 @@ grid lines are placed by the coordinate system".
   value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every
   value on it at the panel's middle, and equal ends are how the coordinate system is told, so
   `zero_range()` stays in this namespace alone. The coordinate system maps the extent onto the
-  panel and adds nothing; a scale's own `expand`, and the
-  coordinate system's switch to turn expansion off, arrive with options.
+  panel and adds nothing; the coordinate system's switch to turn expansion off arrives with its
+  options.

@@ -37,8 +37,11 @@ defprotocol Giggly.Coord do
   @typedoc "An axis's extent in positions, already widened: `{low, high}`."
   @type dimension :: {number(), number()}
 
-  @typedoc "A break on an axis: its position, or once placed its place along the panel's side, and its label."
-  @type break :: {number(), String.t()}
+  @typedoc """
+  A break on an axis: its position, or once placed its place along the panel's side, and its label,
+  `:none` where the scale has no labels.
+  """
+  @type break :: {number(), String.t() | :none}
 
   @typedoc """
   An axis as the assembly hands it over: its extent, and its breaks and the positions of its minor
@@ -59,7 +62,7 @@ defprotocol Giggly.Coord do
   A break on an axis drawn around a radial panel's circle: its place in the panel, `{x, y}`, its
   angle in radians clockwise from 12 o'clock, the way the axis faces out, and its label.
   """
-  @type theta_break :: {{float(), float()}, float(), String.t()}
+  @type theta_break :: {{float(), float()}, float(), String.t() | :none}
 
   @typedoc """
   An axis as the coordinate system places it: the aesthetic it shows, whose title goes with it,

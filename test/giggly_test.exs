@@ -1567,7 +1567,112 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots of mpg. They
+  # move with how a continuous scale's limits censor a position.
+  describe "layer_data/2, under a scale's limits" do
+    test "a row outside the limits is missing before counting, so it is not counted" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ})
+        |> Plot.geom_bar()
+        |> Plot.xlim(2, 5)
+        |> Giggly.layer_data()
+
+      counts = DataFrame.pull(frame, :count)
+
+      assert Enum.sum(counts) === 176.0
+    end
+
+    test "a bar the limits cut once it is placed is missing its end, so it is not drawn" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Plot.ylim(0, 50)
+        |> Giggly.layer_data()
+
+      counts = DataFrame.pull(frame, :count)
+      ends = DataFrame.pull(frame, :ymax)
+
+      assert Enum.zip(counts, ends) === [
+               {5.0, 5.0},
+               {47.0, 47.0},
+               {41.0, 41.0},
+               {11.0, 11.0},
+               {33.0, 33.0},
+               {35.0, 35.0},
+               {62.0, nil}
+             ]
+    end
+
+    test "an infinite end is kept whatever the limits" do
+      frame =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:rect,
+          xmin: :neg_infinity,
+          xmax: 3,
+          ymin: :neg_infinity,
+          ymax: :infinity
+        )
+        |> Plot.xlim(2, 5)
+        |> Giggly.layer_data(1)
+
+      assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn name -> DataFrame.pull(frame, name) end) ===
+               [[:neg_infinity], [3.0], [:neg_infinity], [:infinity]]
+    end
+
+    # ggplot2 refuses "Discrete value supplied to a continuous scale"; a date column under a
+    # continuous scale, which ggplot2 draws as numbers of days, is refused too.
+    test "a column on the axis of another kind than the plot's scale is refused when run" do
+      discrete =
+        @mpg_rows
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous()
+
+      dated =
+        %{"date" => [~D[2020-01-01], ~D[2020-02-01]], "value" => [1.0, 2.0]}
+        |> Plot.new(%{x: :date, y: :value})
+        |> Plot.geom_line()
+        |> Plot.xlim(nil, 5)
+
+      assert_raise ArgumentError,
+                   ~r/x scale is continuous.* :x to "class", a discrete column/,
+                   fn ->
+                     Giggly.layer_data(discrete)
+                   end
+
+      assert_raise ArgumentError, ~r/maps :x to "date", a date column/, fn ->
+        Giggly.layer_data(dated)
+      end
+    end
+  end
+
   describe "the guides' titles" do
+    # ggplot2 4.0.3 titles the axis by the scale's name whether `labs()` comes before or after it.
+    test "a scale's name titles its axis over a label, whichever comes first, :none included" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+
+      before =
+        plot
+        |> Plot.labs(x: "from labs", y: "from labs")
+        |> Plot.scale_x_continuous(name: "from scale")
+        |> Plot.scale_y_continuous(name: :none)
+
+      later =
+        plot
+        |> Plot.scale_x_continuous(name: "from scale")
+        |> Plot.labs(x: "from labs")
+
+      assert {Giggly.Assembly.run(before).guide_titles, Giggly.Assembly.run(later).guide_titles} ===
+               {%{x: "from scale", y: :none}, %{x: "from scale", y: "mpg"}}
+    end
+
     test "an axis no layer maps is titled by the column a stat puts into it" do
       assembly =
         %{"class" => ["suv", "compact"]}
@@ -1720,6 +1825,23 @@ defmodule GigglyTest do
   end
 
   describe "panel_scales/2" do
+    test "a scale the plot sets is trained with its options" do
+      labeller = fn breaks -> Enum.map(breaks, &Float.to_string/1) end
+
+      scales =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous(limits: {2, nil}, labels: labeller)
+        |> Giggly.panel_scales()
+
+      assert scales.x === %Giggly.Scale.Continuous{
+               range: {2.62, 2.875},
+               limits: {2.0, nil},
+               labels: labeller
+             }
+    end
+
     test "the scales are trained again on the marks, so a discrete axis holds its bars' edges" do
       scales =
         %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
@@ -2548,6 +2670,67 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/facet_wrap_layer_data.svg")
+    end
+
+    # Golden: test/golden/scale_continuous.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_continuous.R: every element matches it, the x axis drawn before the
+    # y as in test/golden/point.svg, and every clip path. An x scale named "Weight", which titles
+    # the axis over labs(), from 2 to 5, so the points at 1.615 and 5.25 are not drawn, its breaks
+    # given (1.9, below the limits but inside the widened axis, drawn; 1, outside it, not) and two
+    # minor breaks given; a y scale with no labels, its ticks alone, and no room below its data. It
+    # moves with what moves test/golden/point.svg, and with a continuous scale's options.
+    test "a continuous scale's options set its axis's limits, breaks, labels, title and room" do
+      plot =
+        [wt: [2.62, 2.32, 3.215, 3.44, 5.25, 1.615], mpg: [21.0, 22.8, 21.4, 18.7, 10.4, 30.4]]
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(x: "not drawn")
+        |> Plot.scale_x_continuous(
+          name: "Weight",
+          limits: {2, 5},
+          breaks: [1, 1.9, 3, 3.5, 5],
+          minor_breaks: [2.25, 4.25]
+        )
+        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {0, 0.05}])
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_continuous.svg")
+    end
+
+    # Golden: test/golden/scale_bars_cut.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_bars_cut.R: every element matches it and every clip path. mpg's
+    # classes counted under a y scale from 0 to 50 with no breaks: the suv bar, 62 rows, reaches
+    # past the limit once it is placed, so it is not drawn, and the y axis draws nothing and takes
+    # no room. It moves with what moves test/golden/bar.svg, and with how limits censor a bar.
+    test "a bar the limits cut is not drawn, and an axis with no breaks takes no room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+        |> Plot.scale_y_continuous(limits: {0, 50}, breaks: :none)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_bars_cut.svg")
+    end
+
+    test "a labels function that gives no string for each break is refused when drawn" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous(labels: fn _breaks -> ["only one"] end)
+
+      assert_raise ArgumentError, ~r/labels function must return a string for each/, fn ->
+        Giggly.to_svg(plot)
+      end
     end
 
     # Golden: test/golden/annotate.svg, checked against ggplot2's drawing of the same plot, made by

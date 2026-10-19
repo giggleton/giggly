@@ -32,8 +32,11 @@ defmodule Giggly.Guide.AxisTheta do
       }) do
     label_offset = tick_length + text_look.margin
 
+    # A scale with no labels has a tick at each break and nothing beside it.
     labels =
-      Enum.map(breaks, fn {{x_place, y_place}, angle, label} ->
+      breaks
+      |> Enum.reject(fn {_place, _angle, label} -> label == :none end)
+      |> Enum.map(fn {{x_place, y_place}, angle, label} ->
         vjust = 0.5 - :math.cos(angle) / 2
 
         %Text{

@@ -1,6 +1,7 @@
 defmodule Giggly.Scale.Continuous do
   @moduledoc """
-  A trained continuous scale, as `Giggly.panel_scales/2` returns an axis's. Its fields:
+  A continuous scale. `Giggly.Plot.scale_x_continuous/2` records one with the options it is
+  given and no range, and `Giggly.panel_scales/2` returns an axis's trained. Its fields:
 
     * `range`: the range of the finite numbers it has seen, or `:none` before it has seen any.
     * `transform`: the transformation its values are put through before it sees them,
@@ -15,14 +16,36 @@ defmodule Giggly.Scale.Continuous do
       and alpha, grey, `"#7F7F7F"`, for colour and fill.
     * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha and
       `:colorbar` for colour and fill.
+    * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
+      gives.
+    * `limits`: `{low, high}`, the values it spans whatever the data, `nil` at an end the data
+      decides. A value outside them is missing, so its row is not drawn.
+    * `breaks` and `minor_breaks`: the values an axis marks, `:none` for none, or `:default` for
+      those its transformation chooses.
+    * `labels`: a label for each break, a function handed every break drawn that returns their
+      labels, `:none` for none, or `:default` for its transformation's.
+    * `expand`: how far an axis reaches beyond its limits, `[mult: {low, high}, add: {low, high}]`:
+      at each end, that multiple of the limits' width plus that constant.
   """
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.
 
   alias Giggly.Scale.{Palette, Transform}
 
-  @enforce_keys [:range, :transform, :palette, :na_value, :guide]
-  defstruct @enforce_keys
+  # Every field's default is a position scale's before it has seen any data: the identity
+  # transformation and palette, an axis, and every option the default, ggplot2's 5% of the
+  # limits' width at each end among them.
+  defstruct range: :none,
+            transform: :identity,
+            palette: :identity,
+            na_value: nil,
+            guide: :axis,
+            name: :default,
+            limits: {nil, nil},
+            breaks: :default,
+            minor_breaks: :default,
+            labels: :default,
+            expand: [mult: {0.05, 0.05}, add: {0, 0}]
 
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
@@ -30,7 +53,13 @@ defmodule Giggly.Scale.Continuous do
           palette:
             :identity | {:rescale, {number(), number()}} | {:gradient, {String.t(), String.t()}},
           na_value: nil | String.t(),
-          guide: :axis | :legend | :colorbar
+          guide: :axis | :legend | :colorbar,
+          name: :default | :none | String.t(),
+          limits: {number() | nil, number() | nil},
+          breaks: :default | :none | [number()],
+          minor_breaks: :default | :none | [number()],
+          labels: :default | :none | [String.t()] | ([number()] -> [String.t()]),
+          expand: [mult: {number(), number()}, add: {number(), number()}]
         }
 
   # The values put through the scale's transformation, as `Giggly.Scale.transform/2` describes.
@@ -51,16 +80,34 @@ defmodule Giggly.Scale.Continuous do
   @spec train_range(:none | {number(), number()}, list()) :: :none | {number(), number()}
   def train_range(range, values), do: Enum.reduce(values, range, &widen/2)
 
-  # Each value as `Giggly.Scale.map/2` describes: a position unchanged, until limits can censor
-  # it; for any other palette, the value's place in the range, as R's `rescale()` finds it, put
-  # through the palette, and the scale's `na_value` for a missing value or one that is not a finite
-  # number, as ggplot2 maps such a value to its `na.value`.
+  # Each value as `Giggly.Scale.map/2` describes: a position left where it is, `nil` where it is
+  # outside the limits (`censor/2`); for any other palette, the value's place in the range, as R's
+  # `rescale()` finds it, put through the palette, and the scale's `na_value` for a missing value
+  # or one that is not a finite number, as ggplot2 maps such a value to its `na.value`.
   @doc false
   @spec map(t(), list()) :: list()
-  def map(%__MODULE__{palette: :identity}, values), do: values
+  def map(%__MODULE__{palette: :identity} = scale, values), do: censor(scale, values)
 
   def map(%__MODULE__{} = scale, values),
     do: Enum.map(values, fn value -> through_palette(value, scale) end)
+
+  # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
+  # (`oob = censor`, finite values only): an infinite end, `:infinity` or `:neg_infinity`, is kept,
+  # so a rectangle reaching the panel's edge still does.
+  @doc false
+  @spec censor(t(), list()) :: list()
+  def censor(%__MODULE__{limits: {nil, nil}}, values), do: values
+
+  def censor(%__MODULE__{limits: {low, high}}, values),
+    do: Enum.map(values, fn value -> censored(value, low, high) end)
+
+  defp censored(value, low, _high) when is_number(value) and is_number(low) and value < low,
+    do: nil
+
+  defp censored(value, _low, high) when is_number(value) and is_number(high) and value > high,
+    do: nil
+
+  defp censored(value, _low, _high), do: value
 
   defp through_palette(value, %__MODULE__{range: {_low, _high} = range, palette: palette})
        when is_number(value) do

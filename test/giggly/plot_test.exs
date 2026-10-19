@@ -1,7 +1,7 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Facet, Geom, Plot, Position, Stat}
+  alias Giggly.{Coord, DataFrame, Facet, Geom, Plot, Position, Scale, Stat}
 
   doctest Giggly.Plot
 
@@ -1291,6 +1291,153 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
+    end
+  end
+
+  describe "scale_x_continuous/2, scale_y_continuous/2, xlim/3, ylim/3 and lims/2" do
+    test "a plot has no scales until a scale function gives it one" do
+      assert Plot.new(@rows).scales === %{}
+    end
+
+    test "a scale function records an untrained continuous scale with the options given" do
+      labeller = fn breaks -> Enum.map(breaks, &Float.to_string/1) end
+
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.scale_x_continuous(
+          name: "Weight",
+          limits: {2, nil},
+          breaks: [2, 3.5],
+          minor_breaks: :none,
+          labels: labeller
+        )
+        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {0, 0.05}, add: 1])
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 name: "Weight",
+                 limits: {2.0, nil},
+                 breaks: [2.0, 3.5],
+                 minor_breaks: :none,
+                 labels: labeller
+               },
+               y: %Scale.Continuous{labels: :none, expand: [mult: {0.0, 0.05}, add: {1.0, 1.0}]}
+             }
+    end
+
+    test "an option not given keeps the scale's default" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_continuous()
+
+      assert plot.scales.x === %Scale.Continuous{
+               name: :default,
+               limits: {nil, nil},
+               breaks: :default,
+               minor_breaks: :default,
+               labels: :default,
+               expand: [mult: {0.05, 0.05}, add: {0, 0}]
+             }
+    end
+
+    # ggplot2 replaces a scale added for an aesthetic that has one ("Scale for x is already
+    # present"): in R 4.6.1, breaks set before xlim() are lost, and limits set before a scale.
+    test "a later scale for an aesthetic replaces the earlier, xlim/3 and lims/2 included" do
+      plot = Plot.new(@rows)
+
+      breaks_then_limits =
+        plot
+        |> Plot.scale_x_continuous(breaks: [2, 4])
+        |> Plot.xlim(1, 6)
+
+      limits_then_breaks =
+        plot
+        |> Plot.lims(x: {1, 6}, y: {0, 30})
+        |> Plot.scale_x_continuous(breaks: [2, 4])
+
+      assert {breaks_then_limits.scales, limits_then_breaks.scales} ===
+               {%{x: %Scale.Continuous{limits: {1.0, 6.0}}},
+                %{
+                  x: %Scale.Continuous{breaks: [2.0, 4.0]},
+                  y: %Scale.Continuous{limits: {0.0, 30.0}}
+                }}
+    end
+
+    test "ylim/3 sets the y scale's limits, nil leaving an end to the data" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.ylim(nil, 25)
+
+      assert plot.scales === %{y: %Scale.Continuous{limits: {nil, 25.0}}}
+    end
+
+    test "an option a scale cannot take is refused, naming it" do
+      plot = Plot.new(@rows)
+
+      for {key, value} <- [
+            name: 5,
+            limits: {5, 2},
+            limits: {"a", 3},
+            limits: [2, 5],
+            breaks: ["a"],
+            breaks: 3,
+            minor_breaks: [:a],
+            labels: [1, 2],
+            labels: fn _break, _index -> "label" end,
+            labels: "label",
+            expand: [mult: 1, mult: 2],
+            expand: [scale: 1],
+            expand: [mult: "a"],
+            expand: 0.05
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_x_continuous(plot, [{key, value}])
+          end
+
+        assert error.key == key
+      end
+
+      misspelt =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.scale_x_continuous(plot, limit: {2, 5})
+        end
+
+      assert misspelt.key == [:limit]
+    end
+
+    test "limits xlim/3, ylim/3 and lims/2 cannot take are refused" do
+      plot = Plot.new(@rows)
+
+      for limit <- [
+            fn -> Plot.xlim(plot, 6, 1) end,
+            fn -> Plot.ylim(plot, "a", 1) end,
+            fn -> Plot.lims(plot, x: {6, 1}) end,
+            fn -> Plot.lims(plot, z: {1, 6}) end
+          ] do
+        assert_raise NimbleOptions.ValidationError, limit
+      end
+    end
+
+    test "a list of labels needs a list of breaks as long" do
+      plot = Plot.new(@rows)
+
+      assert_raise ArgumentError, ~r/scale_x_continuous.* 2 labels.* has none/, fn ->
+        Plot.scale_x_continuous(plot, labels: ["a", "b"])
+      end
+
+      assert_raise ArgumentError,
+                   ~r/scale_y_continuous.* 2 labels.*got: \[1\.0, 2\.0, 3\.0\]/,
+                   fn ->
+                     Plot.scale_y_continuous(plot, labels: ["a", "b"], breaks: [1, 2, 3])
+                   end
+
+      assert_raise ArgumentError, ~r/got: :none/, fn ->
+        Plot.scale_x_continuous(plot, labels: ["a"], breaks: :none)
+      end
     end
   end
 

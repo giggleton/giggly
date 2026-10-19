@@ -100,8 +100,8 @@ invariants. Add a line here when an area gets its rules file; nothing else about
   functions validate their options with NimbleOptions and raise on anything invalid, since a pipe
   cannot carry `{:error, reason}`. The functions beneath take already-validated data, return
   **plain structs**, and raise (`FunctionClauseError`, via guards) on programmer error. Validation
-  uses guards (incl. custom `defguard`s) rather than `cond`. `:none` is the "absent" sentinel
-  (not `nil`) — open for public options, design-log §7.
+  uses guards (incl. custom `defguard`s) rather than `cond`. `:none` is the "absent" sentinel,
+  not `nil`; a limit the data supplies is `nil` (design-log §4, the entry beginning "Absent").
 
 ## Conventions
 

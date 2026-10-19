@@ -18,14 +18,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics`,
   `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
-  `Giggly.Mapping`, whose checks resolve each mapping value at the call, and the five
+  `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five
   families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
-  `Giggly.Position`, `Giggly.Stat`), and exports nothing beyond `Plot`.
+  `Giggly.Position`, `Giggly.Stat`), and `Giggly.Scale`, whose `Continuous` struct it writes,
+  and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
-  and draw, out of its files** — no call, no module passed as a value, no `import` — which
-  boundary cannot, since a boundary always exports its root. It knows nothing about scales.
+  and draw, and `Giggly.Scale`'s root, which trains and maps, out of its files** — no call, no
+  module passed as a value, no `import` — which boundary cannot, since a boundary always exports
+  its root. A plot writes a scale and never runs one.
 - **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
-  the coordinate functions (`coord_radial/1`) and `labs/2`.** `computed_mapping/2`,
+  the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
+  `scale_y_continuous/2`, `xlim/3`, `ylim/3`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -59,8 +62,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   assembly reads a layer's with `layer_geom/1`, `layer_stat/1`, `layer_position/1` and
   `layer_fixed/1`, so `Layer` stays private.
   A field holding a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses
-  it. The theme is still a name, `theme: :gray`, until a user can set one; what a misspelt name does
-  arrives with that option, and it must raise at the call.
+  it. **The plot records a scale per aesthetic a scale function gives one** (`scales`, `%{}` until
+  then): an untrained `%Scale.Continuous{}` with the options given, built by `struct!/2` so an
+  option not given keeps the struct's default; a later scale for the aesthetic replaces it whole,
+  `xlim/3` and `lims/2` included, as ggplot2's does. The theme is still a name, `theme: :gray`,
+  until a user can set one; what a misspelt name does arrives with that option, and it must raise
+  at the call.
 - **A mistake raises from the call that wrote it, or from the layer that draws it.** Each layer
   function resolves its own mapping against the table it draws, its own or the plot's, and checks
   what the geom can use there, so a misspelt column or an unusable aesthetic is reported by the
@@ -118,11 +125,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
   function's `data:`, `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`,
   `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`,
-  `geom_rect/3`, `annotate/3` and `labs/2`),
+  `geom_rect/3`, `annotate/3`, the scale functions and `labs/2`),
   so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's
-  struct; a caller never writes "absent", so §7's question waits.
+  struct, but a scale's, whose `:none` removes, is `:default`. A scale's list of labels needs a
+  list of breaks as long, checked at the call, since its default breaks are known only when run.
+  A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and `nil`
+  only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
   aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`) or the plot's `title`, `subtitle`,
   `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a call replaces only

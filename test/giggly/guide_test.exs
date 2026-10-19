@@ -13,6 +13,30 @@ defmodule Giggly.GuideTest do
               Guide.Axis.titles(coord, params, %{x: :none, y: :none}, theme)} ===
                {%{bottom: {0.0, []}, left: {0.0, []}}, %{bottom: {0.0, []}, left: {0.0, []}}}
     end
+
+    # Golden: in ggplot2 4.0.3 (R 4.6.1), `scale_x_continuous(labels = NULL)` leaves the x axis
+    # 2.74 points deep, its ticks' length, where its labels make it 13.37.
+    test "an axis with no labels draws its ticks alone and reaches only as far as they do" do
+      coord = %Coord.Cartesian{}
+      breaks = [{2.0, :none}, {3.0, :none}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, breaks, []})
+      theme = Theme.complete(:gray)
+      %{bottom: {height, bottom}, left: {width, left}} = Guide.Axis.draw(coord, params, theme)
+
+      assert {Float.round(height, 2), width == height,
+              Enum.map(bottom ++ left, fn primitive -> primitive.__struct__ end)} ===
+               {2.74, true, [Giggly.Scene.Polylines, Giggly.Scene.Polylines]}
+    end
+
+    test "an axis around a radial panel with no labels draws its ticks alone" do
+      coord = %Coord.Radial{}
+      breaks = [{2.0, :none}, {3.0, :none}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
+
+      assert coord
+             |> Guide.Axis.draw_inside(params, Theme.complete(:gray))
+             |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
+    end
   end
 
   # Golden: the legend boxes ggplot2 4.0.3 draws through vdiffr 1.0.9 (R 4.6.1) for `alpha = year`

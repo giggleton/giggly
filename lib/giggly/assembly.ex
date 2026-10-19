@@ -249,8 +249,12 @@ defmodule Giggly.Assembly do
     y_routes = routes(layout, :y)
     scale_kinds = %{x: axis_kind(plot, grouped_data, :x), y: axis_kind(plot, grouped_data, :y)}
     axis_kinds = Map.new(scale_kinds, fn {axis, kind} -> {axis, discreteness(kind)} end)
-    untrained_x_scales = add_scales(scale_kinds.x, x_routes)
-    untrained_y_scales = add_scales(scale_kinds.y, y_routes)
+
+    untrained_x_scales =
+      add_scales(position_scale(plot, grouped_data, :x, scale_kinds.x), x_routes)
+
+    untrained_y_scales =
+      add_scales(position_scale(plot, grouped_data, :y, scale_kinds.y), y_routes)
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
@@ -292,20 +296,30 @@ defmodule Giggly.Assembly do
       end)
 
     # ggplot2 resets the position scales and trains them again on the marks where they now stand,
-    # so an axis covers every bar's edges; it maps the positions again after, which changes nothing
-    # here, since a scale maps a position to itself.
+    # so an axis covers every bar's edges, then maps the positions again, which leaves out a mark
+    # the scale's limits cut, as a bar taller than the y axis's.
     final_x_scales = retrain(x_scales, x_routes, :x, layer_data)
     final_y_scales = retrain(y_scales, y_routes, :y, layer_data)
 
+    positioned_data =
+      Enum.map(layer_data, fn frame ->
+        through_scales(
+          frame,
+          {final_x_scales, x_routes},
+          {final_y_scales, y_routes},
+          &Scale.censor/2
+        )
+      end)
+
     non_position_scales =
       Map.new(non_position_kinds, fn {aesthetic, kind} ->
-        {aesthetic, train_non_position(Scale.new(kind, aesthetic), aesthetic, layer_data)}
+        {aesthetic, train_non_position(Scale.new(kind, aesthetic), aesthetic, positioned_data)}
       end)
 
     fixed_data =
       layers
       |> Enum.with_index()
-      |> Enum.zip_with(layer_data, fn {layer, index}, frame ->
+      |> Enum.zip_with(positioned_data, fn {layer, index}, frame ->
         frame
         |> map_non_position(non_position_scales)
         |> set_fixed_last(Plot.layer_fixed(layer), index)
@@ -320,7 +334,7 @@ defmodule Giggly.Assembly do
       x_scales: final_x_scales,
       y_scales: final_y_scales,
       non_position_scales: non_position_scales,
-      legends: legends(non_position_scales, plot, Enum.zip(layers, layer_data)),
+      legends: legends(non_position_scales, plot, Enum.zip(layers, positioned_data)),
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -336,8 +350,9 @@ defmodule Giggly.Assembly do
     }
   end
 
-  # The title of an aesthetic's guide, an axis's or a legend's: the label `Plot.labs/2` sets for it,
-  # which wins over every other, `:none` among them, as a plot's labels win in ggplot2's
+  # The title of an aesthetic's guide, an axis's or a legend's: the name of the plot's scale for it,
+  # `:none` among them, as ggplot2's scale name wins over every label; else the label `Plot.labs/2`
+  # sets for it, `:none` among them, as a plot's labels win in ggplot2's
   # `setup_plot_labels()`; else the title of what the first layer to map the aesthetic to a column
   # or an expression maps it to (`Giggly.Mapping.title/2`), through the layer's computed mapping,
   # `:none` for a closure's, an annotation never, as ggplot2's `annotate()` mapping is unlabelled;
@@ -345,8 +360,11 @@ defmodule Giggly.Assembly do
   # constant, or else the computed column its stat puts into it by default, as `count`; or `:none`.
   # A layer's own title is never replaced by a later layer's and replaces every fallback, which
   # ggplot2 marks as one, read as `resolve_label()` reads it, by the scale's first aesthetic.
-  defp guide_title(%Plot{labels: labels} = plot, layers, aesthetic) do
-    Map.get_lazy(labels, aesthetic, fn -> data_title(plot, layers, aesthetic) end)
+  defp guide_title(%Plot{scales: scales, labels: labels} = plot, layers, aesthetic) do
+    case Map.fetch(scales, aesthetic) do
+      {:ok, %{name: name}} when name != :default -> name
+      _no_name -> Map.get_lazy(labels, aesthetic, fn -> data_title(plot, layers, aesthetic) end)
+    end
   end
 
   defp data_title(plot, layers, aesthetic) do
@@ -818,12 +836,9 @@ defmodule Giggly.Assembly do
     |> Map.new()
   end
 
-  # One untrained scale per scale id the layout gives this axis, every one of the kind the axis's
-  # columns need, as ggplot2 adds its default scales before transforming anything and clones the
-  # axis's scale for each scale id.
-  defp add_scales(kind, routes) do
-    untrained = Scale.new(kind)
-
+  # One copy of the axis's untrained scale per scale id the layout gives the axis, as ggplot2 clones
+  # the axis's scale for each scale id.
+  defp add_scales(untrained, routes) do
     routes
     |> Map.values()
     |> Map.new(fn scale_id -> {scale_id, untrained} end)
@@ -873,6 +888,31 @@ defmodule Giggly.Assembly do
         name <- DataFrame.names(frame),
         Aesthetics.family(name) == family,
         do: {frame, name}
+  end
+
+  # The untrained scale of the axis of `family`: the plot's own scale for the aesthetic, which
+  # must be of the kind the axis's columns need, `kind`, or else a new scale of that kind, as
+  # ggplot2 adds a default scale only for an aesthetic the plot has none for, before transforming
+  # anything. A plot's scale of another kind is refused when the plot is run, naming the first
+  # column on the axis, as ggplot2 refuses "Discrete value supplied to a continuous scale".
+  defp position_scale(%Plot{scales: scales} = plot, layer_frames, family, kind) do
+    case Map.fetch(scales, family) do
+      {:ok, scale} -> checked_scale(scale, Scale.kind_of(scale), plot, layer_frames, family, kind)
+      :error -> Scale.new(kind)
+    end
+  end
+
+  defp checked_scale(scale, kind, _plot, _layer_frames, _family, kind), do: scale
+
+  defp checked_scale(_scale, scale_kind, plot, layer_frames, family, _kind) do
+    selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
+
+    [{index, aesthetic, column, _dtype, column_kind} | _rest] =
+      mapped_columns(plot, layer_frames, selected?, :start)
+
+    raise ArgumentError,
+          "the plot's #{family} scale is #{scale_kind}, but the layer at index #{index} maps " <>
+            "#{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
   end
 
   # An axis has one scale, so every column on it must be a type some scale can place, and all of

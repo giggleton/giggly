@@ -71,23 +71,31 @@ defmodule Giggly.Plot do
   in the order of the aesthetics' names (`alpha`, `color`, `fill`). Two with the same title and
   labels, such as a colour and a fill mapped to one column, are drawn as one.
 
+  ## Scales
+
+  Each axis gets a scale from the type of what is mapped to it. `scale_x_continuous/2` and
+  `scale_y_continuous/2` set a continuous axis's title, limits, breaks, labels and how far it
+  reaches; `xlim/3`, `ylim/3` and `lims/2` set its limits alone. A value outside the limits is
+  missing, so its mark is not drawn.
+
   ## Labels
 
   Each axis and legend is titled by what is mapped to it, as `Giggly.Mapping` describes. `labs/2`
-  titles them otherwise, and gives the plot a title, a subtitle, a caption and a tag.
+  titles them otherwise, and gives the plot a title, a subtitle, a caption and a tag; a scale's
+  name titles its axis over both.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, NimbleOptions, which validates its functions' options at the call, the
-  # colour operations, which read a colour an option sets, and the mapping grammar, whose checks
-  # resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never the
-  # evaluation, which holds by review), and nothing that runs it. The five families' roots are
-  # protocols that
-  # compute and draw, and `GigglyCredo.Check.PlotRunsNothing` keeps them out of these files, which
-  # boundary cannot, since a boundary always exports its root. A layer is read only through
-  # `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer` stays
-  # private.
+  # checks a layer against, the scales, whose untrained structs it writes, NimbleOptions, which
+  # validates its functions' options at the call, the colour operations, which read a colour an
+  # option sets, and the mapping grammar, whose checks resolve each mapping value as it enters
+  # (`Giggly.Mapping`; it calls those alone, never the evaluation, which holds by review), and
+  # nothing that runs it. The five families' roots are protocols that compute and draw, and the
+  # scales' root trains and maps; `GigglyCredo.Check.PlotRunsNothing` keeps them all out of these
+  # files, which boundary cannot, since a boundary always exports its root. A layer is read only
+  # through `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so
+  # `Layer` stays private.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
@@ -98,6 +106,7 @@ defmodule Giggly.Plot do
       Giggly.Geom,
       Giggly.Mapping,
       Giggly.Position,
+      Giggly.Scale,
       Giggly.Stat,
       NimbleOptions
     ],
@@ -112,12 +121,13 @@ defmodule Giggly.Plot do
     Geom,
     Mapping,
     Position,
+    Scale,
     Stat
   }
 
   alias Giggly.Plot.Layer
 
-  @enforce_keys [:data, :mapping, :facet, :coord, :theme, :labels, :reversed_layers]
+  @enforce_keys [:data, :mapping, :facet, :coord, :scales, :theme, :labels, :reversed_layers]
   defstruct @enforce_keys
 
   @typedoc "An aesthetic's name, such as `:x`, `:y` or `:color`."
@@ -135,6 +145,9 @@ defmodule Giggly.Plot do
   @typedoc "How positions are placed in each panel: a coordinate system's struct."
   @type coord :: struct()
 
+  @typedoc "The scales the plot sets, by aesthetic: each a scale's struct, as yet untrained."
+  @type scales :: %{optional(aesthetic()) => struct()}
+
   @typedoc "The look everything but the marks is drawn in."
   @type theme :: :gray
 
@@ -145,15 +158,16 @@ defmodule Giggly.Plot do
   @type labels :: %{optional(atom()) => String.t() | :none}
 
   @typedoc """
-  A plot: its data, its mapping, its facet, coordinate system and theme, the labels `labs/2` sets,
-  and its layers newest first (each function adds one at the front; they are assembled in the order
-  they were added).
+  A plot: its data, its mapping, its facet, coordinate system, scales and theme, the labels
+  `labs/2` sets, and its layers newest first (each function adds one at the front; they are
+  assembled in the order they were added).
   """
   @type t :: %__MODULE__{
           data: DataFrame.t(),
           mapping: mapping(),
           facet: facet(),
           coord: coord(),
+          scales: scales(),
           theme: theme(),
           labels: labels(),
           reversed_layers: [struct()]
@@ -539,6 +553,64 @@ defmodule Giggly.Plot do
       )
   }
 
+  # A continuous scale's limits, as `limits:`, `xlim/3`, `ylim/3` and `lims/2` take them.
+  @limits_type {:custom, __MODULE__, :validate_limits, []}
+
+  # The continuous scale functions' options, validated at the call; an option not given keeps the
+  # scale's default, `Giggly.Scale.Continuous`'s.
+  @continuous_scale_options NimbleOptions.new!(
+                              name: [
+                                type: {:custom, __MODULE__, :validate_label, []},
+                                doc:
+                                  "The axis's title, or `:none` for none; the title its " <>
+                                    "mapping gives when not given."
+                              ],
+                              limits: [
+                                type: @limits_type,
+                                doc:
+                                  "`{low, high}`: the values the axis spans whatever the " <>
+                                    "data, `nil` for an end the data decides. A value outside " <>
+                                    "them is missing, so its mark is not drawn."
+                              ],
+                              breaks: [
+                                type: {:custom, __MODULE__, :validate_breaks, []},
+                                doc:
+                                  "The values the axis marks with a tick, a label and a grid " <>
+                                    "line, a list of numbers, or `:none` for none; chosen from " <>
+                                    "the limits when not given. A break is drawn wherever it " <>
+                                    "falls inside the widened axis."
+                              ],
+                              minor_breaks: [
+                                type: {:custom, __MODULE__, :validate_breaks, []},
+                                doc:
+                                  "The values the panel draws a minor grid line at, a list of " <>
+                                    "numbers, or `:none` for none; midway between the breaks " <>
+                                    "when not given."
+                              ],
+                              labels: [
+                                type: {:custom, __MODULE__, :validate_scale_labels, []},
+                                doc:
+                                  "The breaks' labels: a list of strings, one for each of " <>
+                                    "`breaks:`; a function handed every break drawn, a list of " <>
+                                    "numbers, that returns a string for each; or `:none` for " <>
+                                    "ticks with no labels."
+                              ],
+                              expand: [
+                                type: {:custom, __MODULE__, :validate_expand, []},
+                                doc:
+                                  "How far the axis reaches beyond its limits, `[mult: m, add: " <>
+                                    "a]`: at each end, that multiple of the limits' width plus " <>
+                                    "that constant, each a number or `{low, high}` for the two " <>
+                                    "ends; `[mult: 0.05]` when not given."
+                              ]
+                            )
+
+  # `lims/2`'s options: each axis's limits.
+  @lims_options NimbleOptions.new!(
+                  x: [type: @limits_type, doc: "The x axis's limits, as `xlim/3` takes them."],
+                  y: [type: @limits_type, doc: "The y axis's limits, as `ylim/3` takes them."]
+                )
+
   # `labs/2`'s options: a title for each aesthetic a guide shows, and the plot's own.
   @label_option [type: {:custom, __MODULE__, :validate_label, []}]
   @labs_options NimbleOptions.new!(
@@ -581,6 +653,7 @@ defmodule Giggly.Plot do
       mapping: references(mapping, "Plot.new/2"),
       facet: %Facet.Null{},
       coord: %Coord.Cartesian{},
+      scales: %{},
       theme: :gray,
       labels: %{},
       reversed_layers: []
@@ -1165,6 +1238,112 @@ defmodule Giggly.Plot do
   def coord_radial(%__MODULE__{} = plot), do: %{plot | coord: %Coord.Radial{}}
 
   @doc """
+  Gives the plot a continuous x scale with the given options, replacing any x scale it had.
+
+  A value outside the limits is missing, so its mark is not drawn: a point, or a bar counted from
+  it, and a bar whose ends the limits cut once it is placed. An end at `:infinity` or
+  `:neg_infinity` is kept. The scale's name titles the axis whatever `labs/2` says. Raises
+  `ArgumentError` for a list of labels without a list of breaks as long; a column on the axis
+  that is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_scale_options)}
+
+      iex> frame =
+      ...>   %{"wt" => [1.5, 2.6, 3.4, 5.4], "mpg" => [30.4, 21.0, 18.7, 10.4]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_continuous(limits: {2, 5})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [nil, 2.6, 3.4, nil]
+  """
+  @spec scale_x_continuous(t(), keyword()) :: t()
+  def scale_x_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: continuous_scale(plot, :x, options, "Plot.scale_x_continuous/2")
+
+  @doc """
+  Gives the plot a continuous y scale with the given options, replacing any y scale it had, as
+  `scale_x_continuous/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_scale_options)}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_continuous(name: "Miles per gallon", breaks: [21, 22])
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">Miles per gallon</text>", svg =~ ">21</text>", svg =~ ">22</text>"}
+      {true, true, true}
+  """
+  @spec scale_y_continuous(t(), keyword()) :: t()
+  def scale_y_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: continuous_scale(plot, :y, options, "Plot.scale_y_continuous/2")
+
+  @doc """
+  Gives the plot a continuous x scale from `low` to `high`, replacing any x scale it had, as
+  `scale_x_continuous(plot, limits: {low, high})` does; `nil` leaves an end to the data.
+
+      iex> plot =
+      ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.xlim(nil, 4)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [1.5, 2.6, 3.4]
+  """
+  @spec xlim(t(), number() | nil, number() | nil) :: t()
+  def xlim(%__MODULE__{} = plot, low, high),
+    do: continuous_scale(plot, :x, [limits: {low, high}], "Plot.xlim/3")
+
+  @doc """
+  Gives the plot a continuous y scale from `low` to `high`, replacing any y scale it had, as
+  `xlim/3` gives an x scale.
+
+      iex> plot =
+      ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.ylim(15, 25)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
+      [nil, 21.0, 18.7]
+  """
+  @spec ylim(t(), number() | nil, number() | nil) :: t()
+  def ylim(%__MODULE__{} = plot, low, high),
+    do: continuous_scale(plot, :y, [limits: {low, high}], "Plot.ylim/3")
+
+  @doc """
+  Gives the plot a continuous scale with the given limits for each axis named, replacing any
+  scale it had for it, as `xlim/3` and `ylim/3` do.
+
+  ## Options
+
+  #{NimbleOptions.docs(@lims_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.lims(x: {2, 4}, y: {15, 25})
+      iex> frame = Giggly.layer_data(plot)
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :y)}
+      {[nil, 2.6, 3.4], [nil, 21.0, 18.7]}
+  """
+  @spec lims(t(), keyword()) :: t()
+  def lims(%__MODULE__{} = plot, options) when is_list(options) do
+    options
+    |> NimbleOptions.validate!(@lims_options)
+    |> Enum.reduce(plot, fn {aesthetic, limits}, limited ->
+      put_scale(limited, aesthetic, %Scale.Continuous{limits: limits})
+    end)
+  end
+
+  @doc """
   Sets the plot's labels: the title of an axis or a legend, named by its aesthetic, and the plot's
   title, subtitle, caption and tag.
 
@@ -1341,6 +1520,98 @@ defmodule Giggly.Plot do
 
   def validate_nudge(distance),
     do: {:error, "expected a distance along the axis, a number, got: #{inspect(distance)}"}
+
+  # NimbleOptions' check of a scale's limits: `{low, high}`, each a number, kept as a float, or
+  # `nil` for an end the data decides, the low end no higher than the high.
+  @doc false
+  @spec validate_limits(term()) ::
+          {:ok, {float() | nil, float() | nil}} | {:error, String.t()}
+  def validate_limits({low, high}) when is_number(low) and is_number(high) and low > high,
+    do: {:error, "expected limits from low to high, got: #{inspect({low, high})}"}
+
+  def validate_limits({low, high})
+      when (is_number(low) or is_nil(low)) and (is_number(high) or is_nil(high)),
+      do: {:ok, {limit(low), limit(high)}}
+
+  def validate_limits(limits) do
+    {:error,
+     "expected {low, high}, each a number or nil for an end the data decides, got: " <>
+       inspect(limits)}
+  end
+
+  defp limit(nil), do: nil
+  defp limit(number), do: number / 1
+
+  # NimbleOptions' check of a scale's breaks or minor breaks: a list of numbers, each kept as a
+  # float, or `:none` for none.
+  @doc false
+  @spec validate_breaks(term()) :: {:ok, [float()] | :none} | {:error, String.t()}
+  def validate_breaks(:none), do: {:ok, :none}
+
+  def validate_breaks(breaks) when is_list(breaks) do
+    case Enum.reject(breaks, &is_number/1) do
+      [] -> {:ok, Enum.map(breaks, fn break -> break / 1 end)}
+      [other | _rest] -> {:error, "expected a list of numbers, got: #{inspect(other)} in it"}
+    end
+  end
+
+  def validate_breaks(breaks),
+    do: {:error, "expected a list of numbers or :none, got: #{inspect(breaks)}"}
+
+  # NimbleOptions' check of a scale's labels: a list of strings, a function of one argument, which
+  # is handed the breaks, or `:none` for none.
+  @doc false
+  @spec validate_scale_labels(term()) ::
+          {:ok, [String.t()] | (list() -> list()) | :none} | {:error, String.t()}
+  def validate_scale_labels(:none), do: {:ok, :none}
+  def validate_scale_labels(labeller) when is_function(labeller, 1), do: {:ok, labeller}
+
+  def validate_scale_labels(labels) when is_list(labels) do
+    case Enum.reject(labels, &is_binary/1) do
+      [] -> {:ok, labels}
+      [other | _rest] -> {:error, "expected a list of strings, got: #{inspect(other)} in it"}
+    end
+  end
+
+  def validate_scale_labels(labels) do
+    {:error,
+     "expected a list of strings, a function of one argument or :none, got: " <>
+       inspect(labels)}
+  end
+
+  # NimbleOptions' check of a scale's `expand:`: `mult:` and `add:`, each once, each a number or
+  # `{low, high}`, kept as floats for each end, 0 for one not given; a negative one draws the axis
+  # short of its limits, as R's `expansion()` allows.
+  @doc false
+  @spec validate_expand(term()) ::
+          {:ok, [mult: {float(), float()}, add: {float(), float()}]} | {:error, String.t()}
+  def validate_expand(expansion) when is_list(expansion) do
+    with true <- Keyword.keyword?(expansion),
+         [] <- Keyword.keys(expansion) -- [:mult, :add],
+         {:ok, mult} <- expansion_ends(Keyword.get_values(expansion, :mult)),
+         {:ok, add} <- expansion_ends(Keyword.get_values(expansion, :add)) do
+      {:ok, [mult: mult, add: add]}
+    else
+      _invalid -> expansion_error(expansion)
+    end
+  end
+
+  def validate_expand(expansion), do: expansion_error(expansion)
+
+  defp expansion_ends([]), do: {:ok, {0.0, 0.0}}
+
+  defp expansion_ends([amount]) when is_number(amount), do: {:ok, {amount / 1, amount / 1}}
+
+  defp expansion_ends([{low, high}]) when is_number(low) and is_number(high),
+    do: {:ok, {low / 1, high / 1}}
+
+  defp expansion_ends(_invalid), do: :error
+
+  defp expansion_error(expansion) do
+    {:error,
+     "expected [mult: m, add: a], each given once, a number or {low, high}, got: " <>
+       inspect(expansion)}
+  end
 
   # NimbleOptions' check of a `labs/2` option: a label's text, or `:none` for none.
   @doc false
@@ -1843,6 +2114,39 @@ defmodule Giggly.Plot do
         :ok
     end
   end
+
+  # The plot with a continuous scale for `aesthetic` from the options `function` was given,
+  # replacing any scale it had for it, as ggplot2 replaces a scale added for an aesthetic that has
+  # one. A list of labels needs a list of breaks as long, since the default breaks are not known
+  # until the plot is run.
+  defp continuous_scale(plot, aesthetic, options, function) do
+    validated = NimbleOptions.validate!(options, @continuous_scale_options)
+    check_scale_labels(validated, function)
+    put_scale(plot, aesthetic, struct!(Scale.Continuous, validated))
+  end
+
+  defp put_scale(%__MODULE__{scales: scales} = plot, aesthetic, scale),
+    do: %{plot | scales: Map.put(scales, aesthetic, scale)}
+
+  defp check_scale_labels(validated, function) do
+    case {Keyword.get(validated, :labels), Keyword.fetch(validated, :breaks)} do
+      {labels, {:ok, breaks}}
+      when is_list(labels) and is_list(breaks) and
+             length(labels) == length(breaks) ->
+        :ok
+
+      {labels, breaks} when is_list(labels) ->
+        raise ArgumentError,
+              "#{function} is given #{length(labels)} labels, which need breaks: a list of " <>
+                "#{length(labels)} breaks to label, #{given_breaks(breaks)}"
+
+      _no_list ->
+        :ok
+    end
+  end
+
+  defp given_breaks({:ok, breaks}), do: "got: #{inspect(breaks)}"
+  defp given_breaks(:error), do: "and it has none"
 
   # The columns a facet splits on, by name as strings, in the order written. Whether a table holds
   # them is the facet's question, answered when the plot is run, since a layer added later may

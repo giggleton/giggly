@@ -76,7 +76,10 @@ panel's grid lines are placed by the coordinate system".
   hung from its tick, the radius axis's labels centred between two margins (`axis.text.r`), the
   angle axis's labels justified by their angles, and the y title's 90-degree turn are the guide's
   until a theme can set them.
-- **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early.
+- **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early. **One
+  whose scale has no labels** (`{place, :none}` breaks) **draws its ticks alone and reaches only as
+  far as they do**, as ggplot2's `labels = NULL` leaves the labels' room out (2.74 points, the
+  ticks' length, where labels make 13.37); around a radial panel, its ticks alone.
 - **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
   and round a radial panel's circle the labels and then the ticks.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
