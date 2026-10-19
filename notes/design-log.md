@@ -79,6 +79,46 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`date_breaks:` and `date_minor_breaks:` are a step as `Date.shift/2` takes one, `[week: 1]`,
+  and `date_labels:` is a `Calendar.strftime/3` format (2026-10-19, Steve).** A step is one of
+  `day`, `week`, `month` and `year`, R's units, with a positive whole count; its breaks run from
+  the extent's start rounded down to the unit to its end rounded up, as R's `breaks_width()` runs
+  them. A format is written by `Calendar.strftime/3` as it is, and checked at the call by writing
+  a date with it, so one it cannot write raises there; the default labels still follow R's
+  `format()`, a year unpadded. *Rejected: R's `"1 week"`*: a small grammar parsed inside an Elixir
+  API. *Rejected: `{1, :week}`*: no Elixir API writes a date step so. *Rejected: R's `format()`,
+  every conversion and flag the C library writes for a date ported*: it would draw scale_date's
+  `"%W"` plot, which waits on it; where the two differ (`%x`, `%z`, a year under 1000), a
+  format's labels differ from R's.
+
+- **A discrete axis names its values as the column holds them (2026-10-19, Steve).** `limits:`,
+  `breaks:`, a labels map's keys and a discrete `xlim/2` name each value as it is: `factor(cyl)`'s
+  levels as `[8, 4]`, a boolean as `true`, the missing value as `nil`; a column of strings, the
+  common case, reads alike either way. The entry beginning "`factor()` reads a value as discrete"
+  kept a factor's numbers as values because text sorts `10` before `9`; naming them by value keeps
+  one identity for a level from the column to the axis, its text only how the axis writes it.
+  *Rejected: by text, as R matches `as.character()` of each value* (`limits = c("8", "4")`): a
+  level would have two names, and `"NA"` would collide with the missing value.
+
+- **Discrete and date position scales are the scale functions' step 4, each option checked
+  against ggplot2 4.0.3 in R (2026-10-19, Steve, agreeing the proposal).** `scale_x_discrete/2`
+  and `scale_y_discrete/2` take `name:`, `limits:` (the values shown, in order; one left out is
+  missing, `nil` places the missing value), `breaks:`, `labels:` (a list, a map from value to
+  label as R's named vector, a function, or `:none`; a list of the wrong length raises, where R
+  pads it with `NA`) and `expand:`. `scale_x_date/2` and `scale_y_date/2` take `name:`,
+  `limits:` (sorted, never reversed: R's `limits()` reverses numbers only), `breaks:`,
+  `date_breaks:`, `labels:`, `date_labels:`, `minor_breaks:`, `date_minor_breaks:` and
+  `expand:`; an option given with its `date_` twin is refused at the call, where R takes the
+  twin. `Giggly.Scale` exports `Discrete`, which `Plot` writes (Steve). A list in `xlim/2`,
+  `ylim/2` or `lims/2` gives a discrete scale's limits and two dates a date scale's. A date under
+  `scale_x_continuous/2` is placed at its days, labelled as numbers, as R draws it; under another
+  transformation it is refused, where R fails. *Rejected: `Discrete` unexported, the assembly
+  building it from options in another shape*: every option in two shapes. *Rejected:
+  `xlim(plot, "I1", "IF")`*: a second form of the list, for R's loose arguments. *Deferred:*
+  `na.translate`, `drop`, a discrete `palette`, `continuous.limits`, discrete minor breaks, `oob`,
+  `position`, `sec.axis`, and numbers on a discrete axis, which R places and Giggly refuses, an
+  axis being one kind.
+
 - **Transformations are log10, sqrt, reverse and reciprocal, R's transformation objects ported
   whole (2026-10-19, Steve).** `scale_x_continuous/2`'s `transform:` takes `:identity`, `:log10`,
   `:sqrt`, `:reverse` or `:reciprocal`, and `scale_x_log10/2`, `scale_x_sqrt/2`,
@@ -480,7 +520,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   scale needs; *`geom_step()` now*, which arrives with `stat_ecdf()`; *datetimes now*, which
   bring sub-day steps and time zones and draw no notebook example; *refusing lines in radial
   coordinates*, since `coord.md` planned munching for the first path geom. *Deferred:* arrows,
-  `key_glyph`, colour on lines, `scale_x_date()`'s options, `economics_long`, radial bars.
+  `key_glyph`, colour on lines, `economics_long`, radial bars.
 
 - **Guides become structs of their kind behind a protocol in the increment that brings a second
   kind, expected to be colour (2026-10-16, Steve, agreeing the proposal).** ggplot2 makes each
@@ -1644,6 +1684,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Give a plot discrete and date position scales (scale functions, step 4); §4:
+  "Discrete and date position scales are the scale functions' step 4", "A discrete axis names its
+  values as the column holds them", "`date_breaks:` and `date_minor_breaks:` are a step"
 - 2026-10-19 — Give a plot transformed scales: log10, sqrt, reverse and reciprocal (scale
   functions, step 3); §4: "Transformations are log10, sqrt, reverse and reciprocal"
 - 2026-10-18 — Write a scale's labels as R's formatters do (scale functions, step 2) (`7486f22`); §4:

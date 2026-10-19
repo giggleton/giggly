@@ -1520,6 +1520,271 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "scale_x_discrete/2 and scale_y_discrete/2" do
+    test "a discrete scale function records an untrained discrete scale with the options given" do
+      labeller = fn values -> Enum.map(values, &to_string/1) end
+
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.scale_x_discrete(
+          name: "Cylinders",
+          limits: ["8", nil, "4"],
+          breaks: ["4"],
+          labels: labeller,
+          expand: [add: 2]
+        )
+        |> Plot.scale_y_discrete(labels: %{4 => "four", nil => "none"})
+
+      assert plot.scales === %{
+               x: %Scale.Discrete{
+                 name: "Cylinders",
+                 limits: ["8", nil, "4"],
+                 breaks: ["4"],
+                 labels: labeller,
+                 expand: [mult: {0.0, 0.0}, add: {2.0, 2.0}]
+               },
+               y: %Scale.Discrete{labels: %{4 => "four", nil => "none"}}
+             }
+    end
+
+    test "an option not given keeps a discrete position scale's default" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_y_discrete()
+
+      assert plot.scales.y === %Scale.Discrete{
+               levels: [],
+               continuous_range: :none,
+               palette: :identity,
+               na_value: nil,
+               guide: :axis,
+               name: :default,
+               limits: :default,
+               breaks: :default,
+               labels: :default,
+               expand: [mult: {0, 0}, add: {0.6, 0.6}]
+             }
+    end
+
+    test "an option a discrete scale cannot take is refused, naming it and what was wrong with it" do
+      plot = Plot.new(@rows)
+
+      for {key, value, shown} <- [
+            {:name, 5, "got: 5"},
+            {:limits, [], "got: []"},
+            {:limits, {"a", "b"}, ~s(got: {"a", "b"})},
+            {:limits, ["a", ~D[2020-01-01]], "got: ~D[2020-01-01] in"},
+            {:limits, ["a", "b", "a"], ~s(got: "a" more than once)},
+            {:limits, [4, 4.0], "got: 4.0 more than once"},
+            {:breaks, "a", ~s(got: "a")},
+            {:breaks, [{1, 2}], "got: {1, 2} in"},
+            {:breaks, [nil, nil], "got: nil more than once"},
+            {:labels, ["a", 1], "got: 1 in it"},
+            {:labels, %{"a" => 1}, "got: 1 in"},
+            {:labels, %{["a"] => "b"}, ~s(got: ["a"] in)},
+            {:labels, "a",
+             ~s(a map from a value to its label, a function of one argument or :none, got: "a")},
+            {:expand, [mult: "a"], ~s([mult: "a"])}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_x_discrete(plot, [{key, value}])
+          end
+
+        assert {error.key, error.message =~ shown} == {key, true}
+      end
+
+      minor =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.scale_x_discrete(plot, minor_breaks: ["a"])
+        end
+
+      assert minor.key == [:minor_breaks]
+    end
+
+    # ggplot2 4.0.3 pads a list of labels short of the breaks with NA and drops one past them, or
+    # with breaks given fails ("`breaks` and `labels` must have the same length"); a list is
+    # refused at the call wherever the count of breaks is known there.
+    test "a list of labels is one for each break given, or else for each limit given" do
+      plot = Plot.new(@rows)
+
+      assert_raise ArgumentError,
+                   ~r/scale_x_discrete.* 1 labels.* each of its 2 breaks, \["4", "6"\]/,
+                   fn ->
+                     Plot.scale_x_discrete(plot, labels: ["a"], breaks: ["4", "6"], limits: ["4"])
+                   end
+
+      assert_raise ArgumentError, ~r/scale_y_discrete.* 3 labels.* each of its 2 limits/, fn ->
+        Plot.scale_y_discrete(plot, labels: ["a", "b", "c"], limits: ["4", "6"])
+      end
+
+      assert Plot.scale_x_discrete(plot, labels: ["a", "b"], limits: ["4", "6"]).scales.x.labels ===
+               ["a", "b"]
+
+      assert Plot.scale_x_discrete(plot, labels: ["a"], breaks: :none, limits: ["4", "6"]).scales.x.labels ===
+               ["a"]
+
+      assert Plot.scale_x_discrete(plot, labels: ["a", "b", "c"]).scales.x.labels ===
+               ["a", "b", "c"]
+    end
+  end
+
+  describe "scale_x_date/2 and scale_y_date/2" do
+    test "a date scale function records an untrained date scale with the options given" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_date(
+          name: "Day",
+          limits: {~D[2026-10-19], nil},
+          breaks: [~D[2026-10-01]],
+          labels: ["first"],
+          minor_breaks: :none,
+          expand: [mult: 0]
+        )
+        |> Plot.scale_y_date()
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 transform: :date,
+                 name: "Day",
+                 limits: {~D[2026-10-19], nil},
+                 breaks: [~D[2026-10-01]],
+                 labels: ["first"],
+                 minor_breaks: :none,
+                 expand: [mult: {0.0, 0.0}, add: {0.0, 0.0}]
+               },
+               y: %Scale.Continuous{transform: :date}
+             }
+    end
+
+    test "a step records a width of breaks and a format the labels it writes" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_date(date_breaks: [week: 2], date_minor_breaks: [day: 1])
+        |> Plot.scale_y_date(date_labels: "%b %d", breaks: :none)
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 transform: :date,
+                 breaks: {:width, [week: 2]},
+                 minor_breaks: {:width, [day: 1]}
+               },
+               y: %Scale.Continuous{transform: :date, labels: {:format, "%b %d"}, breaks: :none}
+             }
+    end
+
+    # ggplot2 4.0.3 takes the `date_` option of the two and ignores the other; each is refused
+    # beside its twin, naming both.
+    test "an option given beside its date_ twin is refused" do
+      plot = Plot.new(@rows)
+
+      for {options, named} <- [
+            {[breaks: [~D[2026-10-01]], date_breaks: [week: 1]], ":breaks and :date_breaks"},
+            {[labels: :none, date_labels: "%d"], ":labels and :date_labels"},
+            {[minor_breaks: :none, date_minor_breaks: [day: 1]],
+             ":minor_breaks and :date_minor_breaks"}
+          ] do
+        error = assert_raise ArgumentError, fn -> Plot.scale_x_date(plot, options) end
+        assert error.message =~ "Plot.scale_x_date/2 is given both #{named}"
+      end
+
+      assert_raise ArgumentError, ~r/scale_y_date.* 1 labels.* has none/, fn ->
+        Plot.scale_y_date(plot, labels: ["a"], date_breaks: [month: 1])
+      end
+    end
+
+    # Calendar.strftime/3 raises on a directive it lacks, such as R's %W, and on a time's for a
+    # date, such as %H; either is refused at the call, its own message passed on unasserted.
+    test "an option a date scale cannot take is refused, naming it and what was wrong with it" do
+      plot = Plot.new(@rows)
+
+      for {key, value, shown} <- [
+            {:limits, {~D[2026-10-01], 3}, "got: {~D[2026-10-01], 3}"},
+            {:limits, {1, 3}, "each a date or nil"},
+            {:breaks, [~D[2026-10-01], 3], "got: 3 in it"},
+            {:breaks, ~D[2026-10-01], "got: ~D[2026-10-01]"},
+            {:minor_breaks, [1.5], "got: 1.5 in it"},
+            {:date_breaks, [weeks: 1], "got: [weeks: 1]"},
+            {:date_breaks, [week: 0], "got: [week: 0]"},
+            {:date_breaks, [week: 1.5], "got: [week: 1.5]"},
+            {:date_breaks, [week: 1, day: 2], "got: [week: 1, day: 2]"},
+            {:date_breaks, [hour: 1], "got: [hour: 1]"},
+            {:date_breaks, "1 week", ~s(got: "1 week")},
+            {:date_minor_breaks, [quarter: 1], "got: [quarter: 1]"},
+            {:date_labels, "%W", ~s(got: "%W", which it cannot)},
+            {:date_labels, "%H", ~s(got: "%H", which it cannot)},
+            {:date_labels, :short, "got: :short"},
+            {:labels, %{"a" => "b"}, ~s(got: %{"a" => "b"})}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_x_date(plot, [{key, value}])
+          end
+
+        assert {error.key, error.message =~ shown} == {key, true}
+      end
+
+      transformed =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.scale_x_date(plot, transform: :log10)
+        end
+
+      assert transformed.key == [:transform]
+    end
+  end
+
+  describe "xlim/2, ylim/2 and lims/2 of a discrete axis's values, and xlim/3 of dates" do
+    test "a list of values gives a discrete scale those limits" do
+      plot = Plot.new(@rows)
+
+      assert Plot.xlim(plot, ["8", "4"]).scales === %{x: %Scale.Discrete{limits: ["8", "4"]}}
+      assert Plot.ylim(plot, [nil, 4]).scales === %{y: %Scale.Discrete{limits: [nil, 4]}}
+
+      assert Plot.lims(plot, x: [true, false], y: {1, 2}).scales === %{
+               x: %Scale.Discrete{limits: [true, false]},
+               y: %Scale.Continuous{limits: {1.0, 2.0}}
+             }
+    end
+
+    # ggplot2 4.0.3's `limits()` reverses an axis given numbers high to low and never one given
+    # dates, which its date scale sorts.
+    test "two dates give a date scale those limits, in either order, a nil end left to the data" do
+      plot = Plot.new(@rows)
+
+      assert Plot.xlim(plot, ~D[2026-10-19], ~D[2026-10-01]).scales.x ===
+               %Scale.Continuous{transform: :date, limits: {~D[2026-10-19], ~D[2026-10-01]}}
+
+      assert Plot.ylim(plot, nil, ~D[2026-10-01]).scales.y ===
+               %Scale.Continuous{transform: :date, limits: {nil, ~D[2026-10-01]}}
+
+      assert Plot.lims(plot, x: {~D[2026-10-01], nil}).scales.x ===
+               %Scale.Continuous{transform: :date, limits: {~D[2026-10-01], nil}}
+
+      assert Plot.xlim(plot, nil, nil).scales.x === %Scale.Continuous{}
+    end
+
+    # R's `xlim("I1", "IF")` takes any number of values as separate arguments; Elixir has no
+    # such call, so a discrete axis's limits are one list, and two strings are refused naming it.
+    test "two strings, a date beside a number, or no values are refused" do
+      plot = Plot.new(@rows)
+
+      for {limit, shown} <- [
+            {fn -> Plot.xlim(plot, "I1", "IF") end,
+             ~s(or a list of a discrete axis's values, got: {"I1", "IF"})},
+            {fn -> Plot.ylim(plot, ~D[2026-10-01], 4) end, "each a date or nil"},
+            {fn -> Plot.xlim(plot, []) end, "at least one value"},
+            {fn -> Plot.lims(plot, y: ["a", "a"]) end, ~s(got: "a" more than once)}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, limit
+        assert error.message =~ shown
+      end
+    end
+  end
+
   describe "labs/2" do
     test "a plot has no labels until labs/2 sets them" do
       assert Plot.new(@rows).labels === %{}

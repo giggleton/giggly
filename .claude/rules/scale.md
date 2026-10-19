@@ -45,7 +45,8 @@ grid lines are placed by the coordinate system".
 - **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`): a
   continuous scale's are its transformation's breaks inside its trained range, taken as floats as
   R's limits are doubles, one at the low end of a range of zero width, none untrained; a discrete
-  scale's are its levels, `nil` last and labelled `NA`, as ggplot2's legend keeps `NA`.
+  scale's are its limits (`Discrete.limits/1`), `nil` last and labelled `NA`, as ggplot2's legend
+  keeps `NA`.
 - **A discrete palette spreads the present levels; `nil` takes no share and maps to the scale's
   `na_value`**, ggplot2's `na.value`, as ggplot2's mapping leaves `NA` out of the levels it counts:
   `nil` for alpha (R's `NA`) and grey50, `#7F7F7F`, for colour and fill. `na_value` is a field of
@@ -64,17 +65,38 @@ grid lines are placed by the coordinate system".
   **`samples/2` and `places/2` give what a colour bar draws from a continuous scale**: values spread
   evenly over the trained range by R's `seq()`, as `extract_decor()` takes them, and each value's
   place in the range, 0 to 1, as the gradient form places its ticks and colours.
-- **`Scale.Continuous` and `Scale.Discrete` are API; the rest of the namespace is not.**
-  `Giggly.panel_scales/2` returns them, so their fields are documented and changing one changes
-  the API; their functions are `@doc false`, used through `Giggly.Scale`, which is
-  `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`, `MinorBreaks`, `Palette` and
-  `Transform`.
+- **`Scale.Continuous` and `Scale.Discrete` are API, and the boundary exports both; the rest of
+  the namespace is not.** `Giggly.panel_scales/2` returns them and `Giggly.Plot` writes them, so
+  their fields are documented and changing one changes the API; their functions are `@doc false`,
+  used through `Giggly.Scale`, which is `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`,
+  `MinorBreaks`, `Palette` and `Transform`. The one exception is `Discrete.key/1`, the rule for
+  which values a discrete scale counts as one (a number as a float, so `2` and `2.0` are one),
+  which `Plot` reads as a fact of the kind to refuse a value named twice, so the rule has one
+  home.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
   `minor_breaks`, `labels` and `expand`, each `:default` until given, `limits` `{nil, nil}` and
   `expand` ggplot2's `[mult: {0.05, 0.05}, add: {0, 0}]`; `Giggly.Plot` writes the struct,
   untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
   records the untrained scale"). Its field defaults are a position scale's, so `%Continuous{}` is
   `new(:continuous)`. `kind_of/1` says which kind a scale is, as `kind/1` says which a column needs.
+  **A date scale's breaks and minor breaks may be a width, `{:width, [week: 1]}`, and its labels
+  a format, `{:format, "%b %d"}`**, as `Plot.scale_x_date/2` records `date_breaks:`,
+  `date_minor_breaks:` and `date_labels:` (design-log §4, the entry beginning "`date_breaks:` and
+  `date_minor_breaks:` are a step"): a width's breaks are `DateBreaks.width/2` on the extent,
+  those inside it kept, and a format's labels each date written by `Calendar.strftime/3` as it is.
+- **A discrete scale carries the options a plot gives it**, `name`, `limits`, `breaks`, `labels`
+  and `expand`, each `:default` until given but `expand`, ggplot2's `[mult: {0, 0}, add: {0.6,
+  0.6}]`; its field defaults are a position scale's, so `%Discrete{}` is `new(:discrete)`.
+  **Its limits are the values it shows** (`Discrete.limits/1`, R's `get_limits()`): given, they
+  replace its levels, in their order, every reader (`map/2`, `breaks/2`, `dimension/1`,
+  `legend_breaks/1`) going through them; a value not among them maps to `nil`, so its row is not
+  drawn, `nil` among them places the missing value, and one the data lacks keeps its place. A
+  value is matched by `Discrete.key/1`, as the column holds it (design-log §4, the entry beginning
+  "A discrete axis names its values"). **Its breaks are the given values among its limits, in the
+  order given, at their limits' places**, or every limit; **its labels** go with given breaks by
+  place, a break left out taking its label with it, a list one for each candidate break or the run
+  raises (R pads it with `NA`); a map labels the values it holds, the rest written as a level is;
+  a function is handed the breaks' values, `nil` among them.
 - **Limits replace the range end by end, and a position outside them is censored.** Given in
   data units, they are transformed and, both given, sorted, as ggplot2 transforms and sorts them
   (`Continuous.limits/1`); a given end outside the domain raises, where R fails. An end of `nil`
@@ -104,7 +126,10 @@ grid lines are placed by the coordinate system".
   whatever its values: a date's is a continuous scale through the date transformation, so
   dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
   date has no scale yet (`kind/2` gives `:none`), ggplot2's `scale_colour_date()` and
-  `scale_alpha_date()`.
+  `scale_alpha_date()`. **`takes?/2` is the one rule for which kind of column a plot's scale
+  takes**: its own kind, and a continuous scale through the identity a date's, which the identity
+  places at its days since 1970-01-01, as R's untransformed continuous scale draws a date; under
+  any other transformation a date is refused, where R fails.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped); discrete levels are the distinct values, `nil` last, numbers
   among them, as a factor's are. **Which a discrete scale is handed, levels or positions, the
@@ -128,7 +153,9 @@ grid lines are placed by the coordinate system".
   its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
   `format`). **A label is made from the break and the extent** (`format/2`), since a date's
   format is the step chosen for the whole axis; a number's ignores the extent and is written once
-  the breaks outside it are dropped. **Breaks follow ggplot2's `get_breaks()`**: the extent
+  the breaks outside it are dropped. Breaks the transformation did not choose, given or laid by a
+  width, are handed `:given` instead of the extent, and a date writes them in full, `2026-09-21`,
+  as R's `format()` writes a date its pretty breaks did not name. **Breaks follow ggplot2's `get_breaks()`**: the extent
   squished into the transformed domain (log10 from -100, sqrt from 0), turned back into data
   units, broken there, and transformed back, **in the order that leaves them**, so reverse's and
   reciprocal's descend, as R draws them; labels are written, and a labels function handed, the
@@ -155,11 +182,17 @@ grid lines are placed by the coordinate system".
   widening, finer step and trimming no date extent needs. Its minor breaks are the identity's
   (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
   extended-breaks one is (below): its test pins R's own breaks for each case and for each random
-  extent where a mutant departed.
+  extent where a mutant departed. **A width's breaks are exactly R's `breaks_width()` for dates**
+  (`DateBreaks.width/2`, `fullseq()`): from the extent's start rounded down to the step's unit —
+  a day count to the nearest multiple of the step's days since 1970-01-01, half to even, a week
+  to its Monday, a month to its 1st, a year to 1 January, whatever the count — to its end plus
+  the count of a unit's most days (1, 7, 31, 365) rounded down, every step; its test pins R's
+  own output for each unit and each rounding.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and
-  the extent's low end alone when it has zero width; a discrete scale's are its levels at 1..n.
+  the extent's low end alone when it has zero width; a discrete scale's are its breaks among its
+  limits, at their places 1..n.
   Positions and labels travel as pairs so they cannot drift apart. A surviving mutant there is
   judged against R: applied to a scratch copy and compared with `labeling::extended()` on many
   random and degenerate ranges, it is equivalent only if it matches R on all of them; otherwise
@@ -198,10 +231,12 @@ grid lines are placed by the coordinate system".
 - **`dimension/1` is an axis's extent widened by the scale's expansion**, in transformed
   positions: a continuous scale's limits by its `expand`, at each end `width * mult + add` (R's
   `expand_range4()`; a negative amount narrows it, as R's `expansion()` allows), 5% of the width
-  by default, discrete levels (1 to n) by 0.6,
+  by default, a discrete scale's limits (1 to n) by its `expand`, 0.6 by default,
   limits of zero width (R's `zero_range()`, rounding error included) as if their width were 1;
   a discrete scale's extent then reaches as far as its continuous range does, unwidened, as
-  ggplot2's `expand_limits_discrete()` takes the range of both. `zero_range?/2` is the one home of
+  ggplot2's `expand_limits_discrete()` takes the range of both, and **a discrete scale with no
+  limits widens its continuous range alone by its `expand`, or else 0 to 1**, as
+  `expand_limits_discrete_trans()` does for counts a stat puts on an axis no layer mapped. `zero_range?/2` is the one home of
   R's `zero_range()`; `Giggly.Resolution` asks it.
   **An extent still zero wide once widened is returned as its middle, both ends equal** (a single
   value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every

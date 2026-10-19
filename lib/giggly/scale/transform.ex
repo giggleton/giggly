@@ -16,9 +16,10 @@ defmodule Giggly.Scale.Transform do
   # `Transform.Reverse`, `Transform.Reciprocal`), which a plot's scale names. Each finds its
   # breaks as ggplot2's `get_breaks()` does, on the extent turned back into data units, and returns
   # them transformed, in the order that leaves them, so a reversing transformation's descend; its
-  # labels are written from the breaks turned back. A break's label may depend on the extent as
-  # well as the break, as a date's format does on the step chosen for the whole axis, so `format/2`
-  # is handed both.
+  # labels are written from the breaks turned back. A default break's label may depend on the
+  # extent as well as the break, as a date's format does on the step chosen for the whole axis, so
+  # `format/2` is handed both, or `:given` for breaks it did not choose, which a date writes in
+  # full.
 
   alias Giggly.Scale.Transform
 
@@ -52,9 +53,10 @@ defmodule Giggly.Scale.Transform do
   @doc false
   @callback minor_breaks(breaks :: [float()], extent :: {float(), float()}) :: [float()]
 
-  # Each break's label, in the order given, on an axis showing `extent`.
+  # Each break's label, in the order given: the transformation's own breaks on an axis showing
+  # `extent`, or, for `:given`, breaks a plot gave or a width laid.
   @doc false
-  @callback format(breaks :: [float()], extent :: {float(), float()}) :: [String.t()]
+  @callback format(breaks :: [float()], extent :: {float(), float()} | :given) :: [String.t()]
 
   # The values put through the transformation named `name`.
   @doc false
@@ -87,10 +89,10 @@ defmodule Giggly.Scale.Transform do
   @spec minor_breaks(name(), [float()], {float(), float()}) :: [float()]
   def minor_breaks(name, breaks, extent), do: module(name).minor_breaks(breaks, extent)
 
-  # The default labels of `breaks` on an axis showing `extent` under the transformation named
-  # `name`.
+  # The default labels of `breaks` under the transformation named `name`: its own breaks on an axis
+  # showing `extent`, or, for `:given`, breaks it did not choose.
   @doc false
-  @spec format(name(), [float()], {float(), float()}) :: [String.t()]
+  @spec format(name(), [float()], {float(), float()} | :given) :: [String.t()]
   def format(name, breaks, extent), do: module(name).format(breaks, extent)
 
   defp module(:identity), do: Transform.Identity

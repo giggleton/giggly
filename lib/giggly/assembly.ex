@@ -217,11 +217,11 @@ defmodule Giggly.Assembly do
   # no title. The plot's own labels are carried for drawing.
   #
   # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
-  # date, or to a column whose kind (continuous or discrete) disagrees with the first column on
-  # that axis. The message names the layer by its index, counting from 0, the aesthetic, the column
-  # as the data names it, and its type. Raises it too for an annotation given a list of values for
-  # an aesthetic under a facet that repeats its rows across several panels, naming the layer and
-  # the aesthetic.
+  # time, to a column whose kind (continuous, discrete or date) disagrees with the first column on
+  # that axis, or to one the plot's scale for the axis does not take. The message names the layer
+  # by its index, counting from 0, the aesthetic, the column as the data names it, and its type.
+  # Raises it too for an annotation given a list of values for an aesthetic under a facet that
+  # repeats its rows across several panels, naming the layer and the aesthetic.
   @doc false
   @spec run(Plot.t()) :: t()
   def run(
@@ -247,14 +247,13 @@ defmodule Giggly.Assembly do
 
     x_routes = routes(layout, :x)
     y_routes = routes(layout, :y)
-    scale_kinds = %{x: axis_kind(plot, grouped_data, :x), y: axis_kind(plot, grouped_data, :y)}
+    x_scale = position_scale(plot, grouped_data, :x)
+    y_scale = position_scale(plot, grouped_data, :y)
+    scale_kinds = %{x: Scale.kind_of(x_scale), y: Scale.kind_of(y_scale)}
     axis_kinds = Map.new(scale_kinds, fn {axis, kind} -> {axis, discreteness(kind)} end)
 
-    untrained_x_scales =
-      add_scales(position_scale(plot, grouped_data, :x, scale_kinds.x), x_routes)
-
-    untrained_y_scales =
-      add_scales(position_scale(plot, grouped_data, :y, scale_kinds.y), y_routes)
+    untrained_x_scales = add_scales(x_scale, x_routes)
+    untrained_y_scales = add_scales(y_scale, y_routes)
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
@@ -891,42 +890,61 @@ defmodule Giggly.Assembly do
   end
 
   # The untrained scale of the axis of `family`: the plot's own scale for the aesthetic, which
-  # must be of the kind the axis's columns need, `kind`, or else a new scale of that kind, as
-  # ggplot2 adds a default scale only for an aesthetic the plot has none for, before transforming
-  # anything. A plot's scale of another kind is refused when the plot is run, naming the first
-  # column on the axis, as ggplot2 refuses "Discrete value supplied to a continuous scale".
-  defp position_scale(%Plot{scales: scales} = plot, layer_frames, family, kind) do
-    case Map.fetch(scales, family) do
-      {:ok, scale} -> checked_scale(scale, Scale.kind_of(scale), plot, layer_frames, family, kind)
-      :error -> Scale.new(kind)
+  # must take the kind of column the axis's columns need (`Scale.takes?/2`), or else a new scale of
+  # that kind, as ggplot2 adds a default scale only for an aesthetic the plot has none for, before
+  # transforming anything; on an axis no layer maps, the plot's scale whatever its kind, or a
+  # continuous one, as ggplot2's is. A plot's scale that does not take the axis's columns is
+  # refused when the plot is run, naming the first column on the axis, as ggplot2 refuses
+  # "Discrete value supplied to a continuous scale".
+  defp position_scale(%Plot{scales: scales} = plot, layer_frames, family) do
+    case {Map.fetch(scales, family), axis_kind(plot, layer_frames, family)} do
+      {{:ok, scale}, :unmapped} -> scale
+      {{:ok, scale}, kind} -> checked_scale(scale, kind, plot, layer_frames, family)
+      {:error, :unmapped} -> Scale.new(:continuous)
+      {:error, kind} -> Scale.new(kind)
     end
   end
 
-  defp checked_scale(scale, kind, _plot, _layer_frames, _family, kind), do: scale
+  defp checked_scale(scale, kind, plot, layer_frames, family) do
+    if Scale.takes?(scale, kind) do
+      scale
+    else
+      selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
 
-  defp checked_scale(_scale, scale_kind, plot, layer_frames, family, _kind) do
-    selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
+      [{index, aesthetic, column, _dtype, column_kind} | _rest] =
+        mapped_columns(plot, layer_frames, selected?, :start)
 
-    [{index, aesthetic, column, _dtype, column_kind} | _rest] =
-      mapped_columns(plot, layer_frames, selected?, :start)
-
-    raise ArgumentError,
-          "the plot's #{family} scale is #{scale_kind}, but the layer at index #{index} maps " <>
-            "#{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
+      raise ArgumentError,
+            "the plot's #{family} scale is #{scale_description(scale)}, but the layer at index " <>
+              "#{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
+    end
   end
 
-  # An axis has one scale, so every column on it must be a type some scale can place, and all of
-  # one kind; the first column decides, and an axis no layer maps is continuous, as ggplot2's is.
+  # A scale's kind, and a continuous scale's transformation where it has one, which a refusal names
+  # since a continuous scale through the identity takes a date.
+  defp scale_description(%Scale.Continuous{transform: transform})
+       when transform not in [:identity, :date],
+       do: "continuous through #{transform}"
+
+  defp scale_description(scale) do
+    scale
+    |> Scale.kind_of()
+    |> Atom.to_string()
+  end
+
   # Whether an axis of a scale of `kind` is discrete or continuous, all a geom is told: a date
   # scale is continuous, as ggplot2's geoms see a date axis as not discrete.
   defp discreteness(:discrete), do: :discrete
   defp discreteness(_continuous), do: :continuous
 
+  # The kind of scale the axis's columns need: an axis has one scale, so every column on it must
+  # be a type some scale can place, and all of one kind, the first column deciding; `:unmapped`
+  # for an axis no layer maps before the stat.
   defp axis_kind(plot, layer_frames, family) do
     selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
 
     case mapped_columns(plot, layer_frames, selected?, :start) do
-      [] -> :continuous
+      [] -> :unmapped
       columns -> checked_kind(columns, "an axis has one scale")
     end
   end

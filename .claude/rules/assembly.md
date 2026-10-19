@@ -109,9 +109,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   names, trained again:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing
   that extent draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`.
 - **Each axis's scale is added after grouping, of the kind its columns need, or is the plot's own
-  scale for the aesthetic, refused when run if it is of another kind ("the plot's x scale is
-  continuous, but the layer at index 0 maps :x to "class", a discrete column", where ggplot2
-  refuses a discrete value and draws a date as days); every layer's columns in the axis's family
+  scale for the aesthetic, refused when run unless it takes their kind (`Scale.takes?/2`: a
+  continuous scale through the identity takes a date, at its days, as ggplot2 draws one; "the
+  plot's x scale is continuous through log10, but the layer at index 0 maps :x to "day", a date
+  column", where ggplot2 fails), and on an axis no layer maps before the stat the plot's scale
+  whatever its kind; the axis's kind, which each geom and the after-stat check are told, is its
+  scale's (`Scale.kind_of/1`); every layer's columns in the axis's family
   are then put through the scale's transformation, trained on, and mapped to positions**, a
   continuous scale censoring those outside its limits. Which columns belong to an axis is
   `Aesthetics.family/1`'s answer, never a name compared with `:x`.

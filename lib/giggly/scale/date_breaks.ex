@@ -3,7 +3,9 @@ defmodule Giggly.Scale.DateBreaks do
 
   # A date axis's breaks: R's `pretty()` for dates (grDevices' `prettyDate()`), which ggplot2's
   # date scales take through `scales::breaks_pretty()`, about five breaks on calendar boundaries
-  # and the format their labels are written in. Use it through `Giggly.Scale.Transform`.
+  # and the format their labels are written in, used through `Giggly.Scale.Transform`; and a break
+  # every step of a width a plot gives (`width/2`), as R's `breaks_width()` lays them, used by
+  # `Giggly.Scale` for a scale's `{:width, step}`.
   #
   # The extent is in days since 1970-01-01, as R stores a date, and is worked in seconds, as R
   # turns a date into a time at midnight GMT. An extent of five days or less is every day it
@@ -57,6 +59,11 @@ defmodule Giggly.Scale.DateBreaks do
 
   @last_step length(@steps) - 1
 
+  # A width's units: the most days each holds, which `scales`' `ceiling_date()` adds before
+  # rounding down, and the unit a date is truncated to, as R's `cut()` truncates it.
+  @most_days %{day: 1, week: 7, month: 31, year: 365}
+  @truncations %{week: :weeks, month: :months, year: :years}
+
   # The breaks of an axis showing `extent`, in days, as dates in ascending order, some of them
   # outside it, and the format their labels are written in.
   @doc false
@@ -92,6 +99,34 @@ defmodule Giggly.Scale.DateBreaks do
     {chosen, dates} = choose(first, breaks, limits)
     {dates, format(Enum.at(@steps, chosen), span)}
   end
+
+  # A break every step of `step`, one of a day, a week, a month or a year and how many of it
+  # (`[week: 2]`), on an axis showing `extent`, in days, as dates in ascending order, some outside
+  # it: R's `breaks_width()` for dates (`fullseq()`), from the extent's start rounded down to the
+  # step's unit to its end rounded up, as `scales`' `floor_date()` and `ceiling_date()` round them.
+  # A day count rounds to the nearest multiple of the step's days since 1970-01-01, half to even,
+  # as R's `round_any()` rounds it; a week to the Monday on or before it, a month to its 1st and a
+  # year to 1 January, as R's `cut()` truncates a date, whatever the count. Rounding up adds the
+  # count of a unit's most days (a day, 7, 31, 365) before rounding down, as `ceiling_date()` adds
+  # them, so 1 January of a leap year rounds up to itself.
+  @doc false
+  @spec width([{:day | :week | :month | :year, pos_integer()}], {number(), number()}) ::
+          [Date.t()]
+  def width([{unit, count}], {low, high}) do
+    last = rounded_down(high + count * Map.fetch!(@most_days, unit), unit, count)
+
+    low
+    |> rounded_down(unit, count)
+    |> sequence(seconds(last), stride(unit, count))
+  end
+
+  defp rounded_down(day, :day, count), do: Date.add(@epoch, round_half_even(day / count) * count)
+  defp rounded_down(day, unit, _count), do: truncate(day * @day, Map.fetch!(@truncations, unit))
+
+  defp stride(:day, count), do: {:days, count}
+  defp stride(:week, count), do: {:days, 7 * count}
+  defp stride(:month, count), do: {:months, count}
+  defp stride(:year, count), do: {:years, count}
 
   # The step's breaks, or the neighbouring step's where they come closer to five intervals: a
   # coarser one for too many, a finer one for too few.

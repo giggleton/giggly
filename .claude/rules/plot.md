@@ -20,7 +20,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
   `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five
   families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
-  `Giggly.Position`, `Giggly.Stat`), and `Giggly.Scale`, whose `Continuous` struct it writes,
+  `Giggly.Position`, `Giggly.Stat`), and `Giggly.Scale`, whose `Continuous` and `Discrete`
+  structs it writes and whose `Discrete.key/1` it reads to refuse a discrete value named twice,
   and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, and `Giggly.Scale`'s root, which trains and maps, out of its files** — no call, no
@@ -28,8 +29,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   its root. A plot writes a scale and never runs one.
 - **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
   the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
-  `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `xlim/3`, `ylim/3`,
-  `lims/2`) and `labs/2`.** `computed_mapping/2`,
+  `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `scale_x_discrete/2`,
+  `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, `xlim/3`, `xlim/2`, `ylim/3`,
+  `ylim/2`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -64,9 +66,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `layer_fixed/1`, so `Layer` stays private.
   A field holding a kind is typed `struct()`: a protocol's `t()` is any term, and the check refuses
   it. **The plot records a scale per aesthetic a scale function gives one** (`scales`, `%{}` until
-  then): an untrained `%Scale.Continuous{}` with the options given, built by `struct!/2` so an
-  option not given keeps the struct's default; a later scale for the aesthetic replaces it whole,
-  `xlim/3` and `lims/2` included, as ggplot2's does. **Limits, breaks and minor breaks are
+  then): an untrained `%Scale.Continuous{}` or `%Scale.Discrete{}` with the options given, built
+  by `struct!/2` so an option not given keeps the struct's default; a later scale for the
+  aesthetic replaces it whole, `xlim/3` and `lims/2` included, as ggplot2's does. **A date scale
+  is a `%Scale.Continuous{}` through `:date`**, its `date_breaks:` and `date_minor_breaks:`
+  recorded as `{:width, step}` in `breaks` and `minor_breaks` and its `date_labels:` as
+  `{:format, format}` in `labels`, each refused beside its plain twin, where R takes the `date_`
+  one. **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and
+  `xlim/3`, `ylim/3` and `lims/2` two dates a date scale's**, sorted, never reversed, as R's
+  `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
+  the entry beginning "Discrete and date position scales"). **Limits, breaks and minor breaks are
   recorded in data units, as given**, for the scale to transform; a shortcut records its
   transformation in `transform`, and takes every other option `scale_x_continuous/2` does; limits
   in either order are recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair
@@ -135,8 +144,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   so a misspelt option raises naming it, and a repeated one is refused by
   `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
   :fixed`). An option not given is recorded as `:none` in the kind's
-  struct, but a scale's, whose `:none` removes, is `:default`. A scale's list of labels needs a
-  list of breaks as long, checked at the call, since its default breaks are known only when run.
+  struct, but a scale's, whose `:none` removes, is `:default`. A continuous or date scale's list
+  of labels needs a list of breaks as long, checked at the call, since its default breaks are
+  known only when run; a discrete scale's is one for each break given, or else each limit given,
+  checked at the call, and otherwise when run. `date_labels:` is checked at the call by writing a
+  date in it with `Calendar.strftime/3`, so a format it cannot write (`"%W"`) raises there.
   A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and `nil`
   only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an

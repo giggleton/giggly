@@ -8,8 +8,10 @@ defmodule Giggly.Scale.Transform.Date do
   #
   # Its axis takes R's `pretty()` breaks for dates (`Giggly.Scale.DateBreaks`), on calendar
   # boundaries, each labelled in the format of the step chosen for the whole axis, which is why
-  # its labels need the extent; and its minor breaks are R's regular ones on the days, midway
-  # between them (`Giggly.Scale.MinorBreaks`), as `transform_date()` keeps the default.
+  # its labels need the extent; breaks it did not choose, given or laid by a width, are written in
+  # full, `2026-09-21`, as R's `format()` writes a date with no format; and its minor breaks are
+  # R's regular ones on the days, midway between them (`Giggly.Scale.MinorBreaks`), as
+  # `transform_date()` keeps the default.
 
   @behaviour Giggly.Scale.Transform
 
@@ -37,6 +39,14 @@ defmodule Giggly.Scale.Transform.Date do
   def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Giggly.Scale.Transform
+  def format(breaks, :given) do
+    Enum.map(breaks, fn day ->
+      day
+      |> date()
+      |> DateBreaks.label("%Y-%m-%d")
+    end)
+  end
+
   def format(breaks, extent) do
     {_dates, format} = DateBreaks.pretty(extent)
 

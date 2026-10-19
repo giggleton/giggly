@@ -73,10 +73,13 @@ defmodule Giggly.Plot do
 
   ## Scales
 
-  Each axis gets a scale from the type of what is mapped to it. `scale_x_continuous/2` and
-  `scale_y_continuous/2` set a continuous axis's title, limits, breaks, labels and how far it
-  reaches; `xlim/3`, `ylim/3` and `lims/2` set its limits alone. A value outside the limits is
-  missing, so its mark is not drawn.
+  Each axis gets a scale from the type of what is mapped to it: a continuous scale for numbers, a
+  discrete one for text, booleans and factors, a date one for dates. `scale_x_continuous/2`,
+  `scale_x_discrete/2` and `scale_x_date/2`, and their y twins, set an axis's title, limits,
+  breaks, labels and how far it reaches; `xlim/3`, `ylim/3` and `lims/2` set its limits alone, two
+  ends for a continuous or a date axis and, with `xlim/2` and `ylim/2`, a list of values for a
+  discrete one. A value outside the limits is missing, so its mark is not drawn. A continuous scale
+  given a column of dates places each at its days since 1970-01-01.
 
   ## Labels
 
@@ -556,16 +559,20 @@ defmodule Giggly.Plot do
   # A continuous scale's limits, as `limits:`, `xlim/3`, `ylim/3` and `lims/2` take them.
   @limits_type {:custom, __MODULE__, :validate_limits, []}
 
+  # Every scale function's `name:`.
+  @scale_name_spec [
+    type: {:custom, __MODULE__, :validate_label, []},
+    doc: "The axis's title, or `:none` for none; the title its mapping gives when not given."
+  ]
+
+  # Every scale function's `expand:`, its default the scale's.
+  @scale_expand_type {:custom, __MODULE__, :validate_expand, []}
+
   # The continuous scale functions' options, validated at the call; an option not given keeps the
   # scale's default, `Giggly.Scale.Continuous`'s. A transformed scale's function takes them all but
   # `transform:`, which it sets.
   @scale_option_specs [
-    name: [
-      type: {:custom, __MODULE__, :validate_label, []},
-      doc:
-        "The axis's title, or `:none` for none; the title its " <>
-          "mapping gives when not given."
-    ],
+    name: @scale_name_spec,
     limits: [
       type: @limits_type,
       doc:
@@ -598,7 +605,7 @@ defmodule Giggly.Plot do
           "`Giggly.Format`'s do; or `:none` for ticks with no labels."
     ],
     expand: [
-      type: {:custom, __MODULE__, :validate_expand, []},
+      type: @scale_expand_type,
       doc:
         "How far the axis reaches beyond its limits, `[mult: m, add: " <>
           "a]`: at each end, that multiple of the limits' width plus " <>
@@ -624,10 +631,132 @@ defmodule Giggly.Plot do
 
   @transformed_scale_options NimbleOptions.new!(@scale_option_specs)
 
-  # `lims/2`'s options: each axis's limits.
+  # The discrete scale functions' options; an option not given keeps the scale's default,
+  # `Giggly.Scale.Discrete`'s.
+  @discrete_scale_options NimbleOptions.new!(
+                            name: @scale_name_spec,
+                            limits: [
+                              type: {:custom, __MODULE__, :validate_discrete_limits, []},
+                              doc:
+                                "The values the axis shows, a list in the order shown, " <>
+                                  "whatever the data; each value as the column holds it, " <>
+                                  "`nil` for the missing value, a number naming the value " <>
+                                  "equal to it. A value not among them is missing, so its " <>
+                                  "mark is not drawn; one the data lacks leaves its place " <>
+                                  "empty. Every value the data holds, in order, when not given."
+                            ],
+                            breaks: [
+                              type: {:custom, __MODULE__, :validate_discrete_breaks, []},
+                              doc:
+                                "The values the axis marks with a tick and a label, a list " <>
+                                  "in the order given, those not among the limits left out, " <>
+                                  "or `:none` for none; every one of the limits when not given."
+                            ],
+                            labels: [
+                              type: {:custom, __MODULE__, :validate_discrete_labels, []},
+                              doc:
+                                "The breaks' labels: a list of strings, one for each break, " <>
+                                  "or for each limit when no breaks are given; a map from a " <>
+                                  "value to its label, a value it does not hold keeping its " <>
+                                  "own; a function handed every break drawn, a list of " <>
+                                  "values, that returns a string for each; or `:none` for " <>
+                                  "ticks with no labels. Each value written as text when not " <>
+                                  "given."
+                            ],
+                            expand: [
+                              type: @scale_expand_type,
+                              doc:
+                                "How far the axis reaches beyond its first and last values, " <>
+                                  "`[mult: m, add: a]`: at each end, that multiple of the " <>
+                                  "distance between them plus that constant, each a number " <>
+                                  "or `{low, high}` for the two ends; `[add: 0.6]` when not " <>
+                                  "given."
+                            ]
+                          )
+
+  # The date scale functions' options; an option not given keeps a date scale's default. A
+  # `date_` option and its plain twin choose the same thing, so only one may be given.
+  @date_step_type {:custom, __MODULE__, :validate_date_step, []}
+  @date_scale_options NimbleOptions.new!(
+                        name: @scale_name_spec,
+                        limits: [
+                          type: {:custom, __MODULE__, :validate_date_limits, []},
+                          doc:
+                            "`{low, high}`: the dates the axis spans whatever the data, `nil` " <>
+                              "for an end the data decides; either order names the same axis. " <>
+                              "A value outside them is missing, so its mark is not drawn."
+                        ],
+                        breaks: [
+                          type: {:custom, __MODULE__, :validate_dates, []},
+                          doc:
+                            "The dates the axis marks with a tick, a label and a grid line, a " <>
+                              "list, or `:none` for none; chosen from the limits when neither " <>
+                              "this nor `date_breaks:` is given. A break is drawn wherever it " <>
+                              "falls inside the widened axis."
+                        ],
+                        date_breaks: [
+                          type: @date_step_type,
+                          doc:
+                            "A break every step, `[week: 1]`: one of `:day`, `:week`, `:month` " <>
+                              "and `:year` and how many of it, laid from the widened axis's " <>
+                              "start, rounded down to a multiple of the days since 1970-01-01, " <>
+                              "a Monday, the 1st of a month or 1 January, to its end. Not with " <>
+                              "`breaks:`."
+                        ],
+                        labels: [
+                          type: {:custom, __MODULE__, :validate_scale_labels, []},
+                          doc:
+                            "The breaks' labels: a list of strings, one for each of " <>
+                              "`breaks:`; a function handed every break drawn, a list of " <>
+                              "dates, that returns a string for each; or `:none` for ticks " <>
+                              "with no labels. Not with `date_labels:`. When neither is given, " <>
+                              "the breaks the axis chooses are written as suits their step " <>
+                              "(`Sep 21`, `2026`) and others in full (`2026-09-21`)."
+                        ],
+                        date_labels: [
+                          type: {:custom, __MODULE__, :validate_date_format, []},
+                          doc:
+                            "The format every break's label is written in, as " <>
+                              "`Calendar.strftime/3` takes it, such as `\"%b %d\"`. Not with " <>
+                              "`labels:`."
+                        ],
+                        minor_breaks: [
+                          type: {:custom, __MODULE__, :validate_dates, []},
+                          doc:
+                            "The dates the panel draws a minor grid line at, a list, or " <>
+                              "`:none` for none; midway between the breaks when neither this " <>
+                              "nor `date_minor_breaks:` is given."
+                        ],
+                        date_minor_breaks: [
+                          type: @date_step_type,
+                          doc:
+                            "A minor grid line every step, as `date_breaks:` lays breaks. Not " <>
+                              "with `minor_breaks:`."
+                        ],
+                        expand: [
+                          type: @scale_expand_type,
+                          doc:
+                            "How far the axis reaches beyond its limits, `[mult: m, add: a]`: " <>
+                              "at each end, that multiple of the limits' width plus that " <>
+                              "constant, each a number or `{low, high}` for the two ends; " <>
+                              "`[mult: 0.05]` when not given."
+                        ]
+                      )
+
+  # A date scale's options that choose what their plain twins choose.
+  @date_twins [breaks: :date_breaks, labels: :date_labels, minor_breaks: :date_minor_breaks]
+
+  # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values.
+  @axis_limits_type {:custom, __MODULE__, :validate_axis_limits, []}
   @lims_options NimbleOptions.new!(
-                  x: [type: @limits_type, doc: "The x axis's limits, as `xlim/3` takes them."],
-                  y: [type: @limits_type, doc: "The y axis's limits, as `ylim/3` takes them."]
+                  x: [
+                    type: @axis_limits_type,
+                    doc: "The x axis's limits, as `xlim/3` or `xlim/2` takes them."
+                  ],
+                  y: [
+                    type: @axis_limits_type,
+                    doc: "The y axis's limits, as `ylim/3` or `ylim/2` takes them."
+                  ]
                 )
 
   # `labs/2`'s options: a title for each aesthetic a guide shows, and the plot's own.
@@ -647,6 +776,9 @@ defmodule Giggly.Plot do
                 )
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
+
+  # An end of a date scale's limits: a date, or `nil` for one the data decides.
+  defguardp is_date_limit(limit) when is_struct(limit, Date) or is_nil(limit)
 
   @doc """
   A plot of `data`, with `mapping` applying to every layer.
@@ -1430,10 +1562,123 @@ defmodule Giggly.Plot do
     do: transformed_scale(plot, :y, :reverse, options, "Plot.scale_y_reverse/2")
 
   @doc """
-  Gives the plot a continuous x scale from `low` to `high`, replacing any x scale it had, as
-  `scale_x_continuous(plot, limits: {low, high})` does; `nil` leaves an end to the data. Given
-  high to low, the axis runs from high to low, as `transform: :reverse` runs it, each value
-  placed at its negation.
+  Gives the plot a discrete x scale with the given options, replacing any x scale it had.
+
+  A discrete axis places each value at its own position, 1, 2, 3 and so on, in order: text
+  alphabetically, numbers by size, the missing value last. `limits:` chooses which values it shows
+  and in what order; a value it leaves out is missing, so its mark is not drawn, a point or a bar
+  counted from it. Each value is named as the column holds it: `factor(cyl)`'s as `4`, `6` and
+  `8`, a missing value as `nil`. The scale's name titles the axis whatever `labs/2` says. Raises
+  `ArgumentError` for a list of labels not one for each break, or for each limit when no breaks
+  are given; a column on the axis that is not discrete is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_scale_options)}
+
+      iex> frame =
+      ...>   %{"class" => ["suv", "compact", "midsize", "suv"], "hwy" => [17, 29, 26, 20]}
+      ...>   |> Giggly.Plot.new(%{x: :class, y: :hwy})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_discrete(limits: ["suv", "compact"])
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [1, 2, nil, 1]
+
+  Labels given by value:
+
+      iex> svg =
+      ...>   %{"class" => ["suv", "compact"], "hwy" => [17, 29]}
+      ...>   |> Giggly.Plot.new(%{x: :class, y: :hwy})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_x_discrete(labels: %{"suv" => "SUV"})
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">SUV</text>", svg =~ ">compact</text>"}
+      {true, true}
+  """
+  @spec scale_x_discrete(t(), keyword()) :: t()
+  def scale_x_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: discrete_scale(plot, :x, options, "Plot.scale_x_discrete/2")
+
+  @doc """
+  Gives the plot a discrete y scale with the given options, replacing any y scale it had, as
+  `scale_x_discrete/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_scale_options)}
+
+      iex> frame =
+      ...>   %{"hwy" => [17, 29, 26], "class" => ["suv", "compact", "midsize"]}
+      ...>   |> Giggly.Plot.new(%{x: :hwy, y: :class})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_discrete(limits: ["suv", "midsize", "compact"])
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [1, 3, 2]
+  """
+  @spec scale_y_discrete(t(), keyword()) :: t()
+  def scale_y_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: discrete_scale(plot, :y, options, "Plot.scale_y_discrete/2")
+
+  @doc """
+  Gives the plot a date x scale with the given options, replacing any x scale it had.
+
+  A date axis places each date at its days since 1970-01-01 and marks it on calendar boundaries:
+  every day, week, month or year, as suits its span, or every step of `date_breaks:`. Its labels
+  are written as suits the breaks, or in the format `date_labels:` gives. A value outside the
+  limits is missing, so its mark is not drawn. The scale's name titles the axis whatever `labs/2`
+  says. Raises `ArgumentError` for an option given beside its `date_` twin, or a list of labels
+  without a list of breaks as long; a column on the axis that is not dates is refused when the
+  plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@date_scale_options)}
+
+      iex> svg =
+      ...>   %{"day" => [~D[2026-09-20], ~D[2026-10-19]], "price" => [0.3, 0.8]}
+      ...>   |> Giggly.Plot.new(%{x: :day, y: :price})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_x_date(date_breaks: [week: 2], date_labels: "%d %b")
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">28 Sep</text>", svg =~ ">12 Oct</text>"}
+      {true, true}
+  """
+  @spec scale_x_date(t(), keyword()) :: t()
+  def scale_x_date(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: date_scale(plot, :x, options, "Plot.scale_x_date/2")
+
+  @doc """
+  Gives the plot a date y scale with the given options, replacing any y scale it had, as
+  `scale_x_date/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@date_scale_options)}
+
+      iex> frame =
+      ...>   %{"price" => [0.3, 0.8, 0.5], "day" => [~D[2026-09-20], ~D[2026-10-19], ~D[2026-10-01]]}
+      ...>   |> Giggly.Plot.new(%{x: :price, y: :day})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_date(limits: {~D[2026-10-01], nil})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [nil, 20745.0, 20727.0]
+  """
+  @spec scale_y_date(t(), keyword()) :: t()
+  def scale_y_date(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: date_scale(plot, :y, options, "Plot.scale_y_date/2")
+
+  @doc """
+  Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
+  for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
+  as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
+  given high to low run the axis from high to low, as `transform: :reverse` runs it, each value
+  placed at its negation; dates given so name the same axis as low to high. A discrete axis's
+  limits are a list of its values, which `xlim/2` takes.
 
       iex> plot =
       ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
@@ -1452,13 +1697,38 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.xlim(20, 15)
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
       [nil, nil, -18.7]
+
+  Dates:
+
+      iex> plot =
+      ...>   %{"day" => [~D[2024-01-01], ~D[2024-01-11]], "value" => [1, 2]}
+      ...>   |> Giggly.Plot.new(%{x: :day, y: :value})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.xlim(~D[2024-01-05], nil)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [nil, 19733.0]
   """
-  @spec xlim(t(), number() | nil, number() | nil) :: t()
+  @spec xlim(t(), number() | Date.t() | nil, number() | Date.t() | nil) :: t()
   def xlim(%__MODULE__{} = plot, low, high), do: lims(plot, x: {low, high})
 
   @doc """
-  Gives the plot a continuous y scale from `low` to `high`, replacing any y scale it had, as
-  `xlim/3` gives an x scale.
+  Gives the plot a discrete x scale showing `values`, in the order given, replacing any x scale it
+  had, as `scale_x_discrete(plot, limits: values)` does.
+
+      iex> plot =
+      ...>   %{"cut" => ["Fair", "Good", "Ideal"], "price" => [3000, 4000, 3500]}
+      ...>   |> Giggly.Plot.new(%{x: :cut, y: :price})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.xlim(["Ideal", "Fair"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
+      [2, nil, 1]
+  """
+  @spec xlim(t(), list()) :: t()
+  def xlim(%__MODULE__{} = plot, values) when is_list(values), do: lims(plot, x: values)
+
+  @doc """
+  Gives the plot a y scale from `low` to `high`, replacing any y scale it had, as `xlim/3` gives
+  an x scale.
 
       iex> plot =
       ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
@@ -1468,12 +1738,28 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
       [nil, 21.0, 18.7]
   """
-  @spec ylim(t(), number() | nil, number() | nil) :: t()
+  @spec ylim(t(), number() | Date.t() | nil, number() | Date.t() | nil) :: t()
   def ylim(%__MODULE__{} = plot, low, high), do: lims(plot, y: {low, high})
 
   @doc """
-  Gives the plot a continuous scale with the given limits for each axis named, replacing any
-  scale it had for it, as `xlim/3` and `ylim/3` do.
+  Gives the plot a discrete y scale showing `values`, in the order given, replacing any y scale it
+  had, as `xlim/2` gives an x scale.
+
+      iex> plot =
+      ...>   %{"price" => [3000, 4000, 3500], "cut" => ["Fair", "Good", "Ideal"]}
+      ...>   |> Giggly.Plot.new(%{x: :price, y: :cut})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.ylim(["Good", "Fair"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
+      [2, 1, nil]
+  """
+  @spec ylim(t(), list()) :: t()
+  def ylim(%__MODULE__{} = plot, values) when is_list(values), do: lims(plot, y: values)
+
+  @doc """
+  Gives the plot a scale with the given limits for each axis named, replacing any scale it had for
+  it, as `xlim/3`, `xlim/2`, `ylim/3` and `ylim/2` do: `{low, high}` for a continuous or a date
+  scale, a list of values for a discrete one.
 
   ## Options
 
@@ -1493,10 +1779,19 @@ defmodule Giggly.Plot do
     options
     |> NimbleOptions.validate!(@lims_options)
     |> Enum.reduce(plot, fn {aesthetic, limits}, limited ->
-      scale = %Scale.Continuous{limits: limits, transform: limits_transform(limits)}
-      put_scale(limited, aesthetic, scale)
+      put_scale(limited, aesthetic, limits_scale(limits))
     end)
   end
+
+  # The scale limits give: a discrete one for a list of values; a date one for dates; else a
+  # continuous one.
+  defp limits_scale(values) when is_list(values), do: %Scale.Discrete{limits: values}
+
+  defp limits_scale({low, high} = limits) when is_struct(low, Date) or is_struct(high, Date),
+    do: %Scale.Continuous{limits: limits, transform: :date}
+
+  defp limits_scale(limits),
+    do: %Scale.Continuous{limits: limits, transform: limits_transform(limits)}
 
   # Limits given high to low reverse the axis, as ggplot2's `limits()` chooses
   # `transform = "reverse"` for them; any others leave it as it is.
@@ -1770,6 +2065,176 @@ defmodule Giggly.Plot do
     {:error,
      "expected [mult: m, add: a], each given once, a number or {low, high}, got: " <>
        inspect(expansion)}
+  end
+
+  # NimbleOptions' check of a discrete scale's limits: a list of at least one value, each named
+  # once (`discrete_values/1`).
+  @doc false
+  @spec validate_discrete_limits(term()) :: {:ok, list()} | {:error, String.t()}
+  def validate_discrete_limits([_first | _rest] = values), do: discrete_values(values)
+
+  def validate_discrete_limits(values) do
+    {:error,
+     "expected a list of at least one value, each a string, a number, an atom or nil, got: " <>
+       inspect(values)}
+  end
+
+  # NimbleOptions' check of a discrete scale's breaks: a list of values, each named once
+  # (`discrete_values/1`), or `:none` for none.
+  @doc false
+  @spec validate_discrete_breaks(term()) :: {:ok, list() | :none} | {:error, String.t()}
+  def validate_discrete_breaks(:none), do: {:ok, :none}
+  def validate_discrete_breaks(values) when is_list(values), do: discrete_values(values)
+
+  def validate_discrete_breaks(values) do
+    {:error,
+     "expected a list of values, each a string, a number, an atom or nil, or :none, got: " <>
+       inspect(values)}
+  end
+
+  # A list of a discrete axis's values, each a string, a number or an atom, `nil` and the booleans
+  # among them, as a discrete column holds them, and none named twice, a number and the float
+  # equal to it being one value, as the scale matches them (`Scale.Discrete.key/1`).
+  defp discrete_values(values) do
+    case Enum.reject(values, &discrete_value?/1) do
+      [] ->
+        distinct_values(values)
+
+      [other | _rest] ->
+        {:error,
+         "expected values, each a string, a number, an atom or nil, got: #{inspect(other)} in #{inspect(values)}"}
+    end
+  end
+
+  defp distinct_values(values) do
+    case values -- Enum.uniq_by(values, &Scale.Discrete.key/1) do
+      [] ->
+        {:ok, values}
+
+      [repeated | _rest] ->
+        {:error,
+         "expected each value once, got: #{inspect(repeated)} more than once in #{inspect(values)}"}
+    end
+  end
+
+  defp discrete_value?(value), do: is_binary(value) or is_number(value) or is_atom(value)
+
+  # NimbleOptions' check of a discrete scale's labels: a list of strings, a map from a value
+  # (`discrete_values/1`) to its label, a function of one argument, which is handed the breaks, or
+  # `:none` for none.
+  @doc false
+  @spec validate_discrete_labels(term()) ::
+          {:ok, [String.t()] | map() | (list() -> list()) | :none} | {:error, String.t()}
+  def validate_discrete_labels(labels) when is_map(labels) and not is_struct(labels) do
+    values = Map.keys(labels)
+    texts = Map.values(labels)
+
+    with {:ok, _values} <- discrete_values(values),
+         [] <- Enum.reject(texts, &is_binary/1) do
+      {:ok, labels}
+    else
+      {:error, _message} = error ->
+        error
+
+      [other | _rest] ->
+        {:error, "expected each label a string, got: #{inspect(other)} in #{inspect(labels)}"}
+    end
+  end
+
+  def validate_discrete_labels(labels)
+      when is_list(labels) or is_function(labels, 1) or labels == :none,
+      do: validate_scale_labels(labels)
+
+  def validate_discrete_labels(labels) do
+    {:error,
+     "expected a list of strings, a map from a value to its label, a function of one argument " <>
+       "or :none, got: #{inspect(labels)}"}
+  end
+
+  # NimbleOptions' check of a date scale's limits: `{low, high}`, each a date or `nil` for an end
+  # the data decides, in either order, which the scale sorts once transformed.
+  @doc false
+  @spec validate_date_limits(term()) ::
+          {:ok, {Date.t() | nil, Date.t() | nil}} | {:error, String.t()}
+  def validate_date_limits({low, high} = limits) when is_date_limit(low) and is_date_limit(high),
+    do: {:ok, limits}
+
+  def validate_date_limits(limits) do
+    {:error,
+     "expected {low, high}, each a date or nil for an end the data decides, got: " <>
+       inspect(limits)}
+  end
+
+  # NimbleOptions' check of a date scale's breaks or minor breaks: a list of dates, or `:none` for
+  # none.
+  @doc false
+  @spec validate_dates(term()) :: {:ok, [Date.t()] | :none} | {:error, String.t()}
+  def validate_dates(:none), do: {:ok, :none}
+
+  def validate_dates(dates) when is_list(dates) do
+    case Enum.reject(dates, fn date -> is_struct(date, Date) end) do
+      [] -> {:ok, dates}
+      [other | _rest] -> {:error, "expected a list of dates, got: #{inspect(other)} in it"}
+    end
+  end
+
+  def validate_dates(dates),
+    do: {:error, "expected a list of dates or :none, got: #{inspect(dates)}"}
+
+  # NimbleOptions' check of a date scale's step between breaks: one of a day, a week, a month and a
+  # year and how many of it, a positive whole number.
+  @doc false
+  @spec validate_date_step(term()) ::
+          {:ok, [{:day | :week | :month | :year, pos_integer()}]} | {:error, String.t()}
+  def validate_date_step([{unit, count}] = step)
+      when unit in [:day, :week, :month, :year] and is_integer(count) and count > 0,
+      do: {:ok, step}
+
+  def validate_date_step(step) do
+    {:error,
+     "expected one of :day, :week, :month and :year and how many of it, a positive whole " <>
+       "number, such as [week: 1], got: #{inspect(step)}"}
+  end
+
+  # NimbleOptions' check of a date scale's label format: a string `Calendar.strftime/3` writes a
+  # date in, tried on one, so a format it cannot write raises at the call rather than when the
+  # plot is run.
+  @doc false
+  @spec validate_date_format(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def validate_date_format(format) when is_binary(format) do
+    Calendar.strftime(~D[1970-01-01], format)
+    {:ok, format}
+  rescue
+    exception ->
+      {:error,
+       "expected a format Calendar.strftime/3 can write a date in, got: #{inspect(format)}, " <>
+         "which it cannot: #{Exception.message(exception)}"}
+  end
+
+  def validate_date_format(format),
+    do: {:error, "expected a format, a string, got: #{inspect(format)}"}
+
+  # NimbleOptions' check of an axis's limits as `lims/2` takes them: a list of a discrete axis's
+  # values, `{low, high}` of dates or `nil` for a date axis, or else of numbers or `nil` for a
+  # continuous one.
+  @doc false
+  @spec validate_axis_limits(term()) :: {:ok, list() | tuple()} | {:error, String.t()}
+  def validate_axis_limits(values) when is_list(values), do: validate_discrete_limits(values)
+
+  def validate_axis_limits({low, high} = limits)
+      when is_struct(low, Date) or is_struct(high, Date),
+      do: validate_date_limits(limits)
+
+  def validate_axis_limits(limits) do
+    case validate_limits(limits) do
+      {:ok, _limits} = valid ->
+        valid
+
+      {:error, _message} ->
+        {:error,
+         "expected {low, high}, two numbers or two dates, each nil for an end the data " <>
+           "decides, or a list of a discrete axis's values, got: #{inspect(limits)}"}
+    end
   end
 
   # NimbleOptions' check of a `labs/2` option: a label's text, or `:none` for none.
@@ -2292,8 +2757,65 @@ defmodule Giggly.Plot do
     put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, transform} | validated]))
   end
 
+  # The plot with a discrete scale for `aesthetic` from the options `function` was given. A list
+  # of labels is one for each break given, or else for each limit given; with neither, the number
+  # of values is known only when the plot is run.
+  defp discrete_scale(plot, aesthetic, options, function) do
+    validated = NimbleOptions.validate!(options, @discrete_scale_options)
+    check_discrete_labels(validated, function)
+    put_scale(plot, aesthetic, struct!(Scale.Discrete, validated))
+  end
+
+  # The plot with a date scale for `aesthetic` from the options `function` was given, a width
+  # recorded as the breaks or minor breaks it lays and a format as the labels it writes. An option
+  # and its `date_` twin choose the same thing, so both are refused.
+  defp date_scale(plot, aesthetic, options, function) do
+    validated = NimbleOptions.validate!(options, @date_scale_options)
+    Enum.each(@date_twins, fn twins -> check_twins(validated, twins, function) end)
+    check_scale_labels(validated, function)
+
+    recorded =
+      Enum.map(validated, fn
+        {:date_breaks, step} -> {:breaks, {:width, step}}
+        {:date_minor_breaks, step} -> {:minor_breaks, {:width, step}}
+        {:date_labels, format} -> {:labels, {:format, format}}
+        option -> option
+      end)
+
+    put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, :date} | recorded]))
+  end
+
   defp put_scale(%__MODULE__{scales: scales} = plot, aesthetic, scale),
     do: %{plot | scales: Map.put(scales, aesthetic, scale)}
+
+  defp check_twins(validated, {plain, dated}, function) do
+    if Keyword.has_key?(validated, plain) and Keyword.has_key?(validated, dated) do
+      raise ArgumentError,
+            "#{function} is given both #{inspect(plain)} and #{inspect(dated)}, which choose " <>
+              "the same thing; give one"
+    end
+  end
+
+  defp check_discrete_labels(validated, function) do
+    labels = Keyword.get(validated, :labels)
+
+    counted =
+      case {Keyword.fetch(validated, :breaks), Keyword.fetch(validated, :limits)} do
+        {{:ok, breaks}, _limits} when is_list(breaks) -> {"breaks", breaks}
+        {:error, {:ok, limits}} -> {"limits", limits}
+        _no_list -> :unknown
+      end
+
+    case counted do
+      {name, values} when is_list(labels) and length(labels) != length(values) ->
+        raise ArgumentError,
+              "#{function} is given #{length(labels)} labels, which must be one for each of its " <>
+                "#{length(values)} #{name}, #{inspect(values)}"
+
+      _matched ->
+        :ok
+    end
+  end
 
   defp check_scale_labels(validated, function) do
     case {Keyword.get(validated, :labels), Keyword.fetch(validated, :breaks)} do

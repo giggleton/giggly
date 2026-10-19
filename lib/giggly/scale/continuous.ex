@@ -1,7 +1,8 @@
 defmodule Giggly.Scale.Continuous do
   @moduledoc """
-  A continuous scale. `Giggly.Plot.scale_x_continuous/2` records one with the options it is
-  given and no range, and `Giggly.panel_scales/2` returns an axis's trained. Its fields:
+  A continuous scale. `Giggly.Plot.scale_x_continuous/2` and `Giggly.Plot.scale_x_date/2` record
+  one with the options they are given and no range, and `Giggly.panel_scales/2` returns an axis's
+  trained. Its fields:
 
     * `range`: the range of the finite numbers it has seen, or `:none` before it has seen any.
     * `transform`: the transformation its values are put through before it sees them, so its
@@ -22,10 +23,12 @@ defmodule Giggly.Scale.Continuous do
     * `limits`: `{low, high}`, the values it spans whatever the data, in data units, `nil` at an
       end the data decides; once transformed, the two are sorted. A value outside them is
       missing, so its row is not drawn.
-    * `breaks` and `minor_breaks`: the values an axis marks, in data units, `:none` for none, or
-      `:default` for those its transformation chooses.
-    * `labels`: a label for each break, a function handed every break drawn, in data units, that
-      returns their labels, `:none` for none, or `:default` for its transformation's.
+    * `breaks` and `minor_breaks`: the values an axis marks, in data units; on a date axis,
+      `{:width, [week: 1]}` for a break every step, one of `:day`, `:week`, `:month` and `:year`
+      and how many of it; `:none` for none; or `:default` for those its transformation chooses.
+    * `labels`: a label for each break; a function handed every break drawn, in data units, that
+      returns their labels; on a date axis, `{:format, format}`, each date written in `format` by
+      `Calendar.strftime/3`; `:none` for none; or `:default` for its transformation's.
     * `expand`: how far an axis reaches beyond its limits, `[mult: {low, high}, add: {low, high}]`:
       at each end, that multiple of the limits' width plus that constant.
   """
@@ -49,6 +52,9 @@ defmodule Giggly.Scale.Continuous do
             labels: :default,
             expand: [mult: {0.05, 0.05}, add: {0, 0}]
 
+  @typedoc "A date axis's step between breaks: one unit and how many of it, `[week: 1]`."
+  @type date_step :: [{:day | :week | :month | :year, pos_integer()}]
+
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
           transform: :identity | :date | :log10 | :sqrt | :reverse | :reciprocal,
@@ -57,10 +63,15 @@ defmodule Giggly.Scale.Continuous do
           na_value: nil | String.t(),
           guide: :axis | :legend | :colorbar,
           name: :default | :none | String.t(),
-          limits: {number() | nil, number() | nil},
-          breaks: :default | :none | [number()],
-          minor_breaks: :default | :none | [number()],
-          labels: :default | :none | [String.t()] | ([number()] -> [String.t()]),
+          limits: {number() | Date.t() | nil, number() | Date.t() | nil},
+          breaks: :default | :none | [number() | Date.t()] | {:width, date_step()},
+          minor_breaks: :default | :none | [number() | Date.t()] | {:width, date_step()},
+          labels:
+            :default
+            | :none
+            | [String.t()]
+            | ([number() | Date.t()] -> [String.t()])
+            | {:format, String.t()},
           expand: [mult: {number(), number()}, add: {number(), number()}]
         }
 

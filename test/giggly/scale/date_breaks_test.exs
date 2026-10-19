@@ -120,6 +120,147 @@ defmodule Giggly.Scale.DateBreaksTest do
      ["Jan 2021", "Apr 2021", "Jul 2021", "Oct 2021", "Jan 2022", "Apr 2022"]}
   ]
 
+  # Golden: R's own `scales::breaks_width()` on `as.Date()` of each extent, in days since
+  # 1970-01-01 (scales 1.4.0, R 4.6.1), each a step R's `"1 week"` writes. The extents reach a day
+  # count rounded to a multiple of three and of two, halves rounding to even both ways, before
+  # 1970, a Thursday and a Sunday's Monday, the 1st of a month and 1 January from a day well into
+  # them, ten-year steps from the extent's own year, not its decade, and 1 January of a leap year,
+  # which `ceiling_date()` rounds up to itself where the day after it rounds up a year. It moves
+  # only if the port stops matching R, which is a bug.
+  @r_widths [
+    {{20_714.55, 20_746.45}, [week: 1],
+     [
+       ~D[2026-09-14],
+       ~D[2026-09-21],
+       ~D[2026-09-28],
+       ~D[2026-10-05],
+       ~D[2026-10-12],
+       ~D[2026-10-19],
+       ~D[2026-10-26]
+     ]},
+    {{20_714.55, 20_746.45}, [week: 2],
+     [~D[2026-09-14], ~D[2026-09-28], ~D[2026-10-12], ~D[2026-10-26]]},
+    {{20_714.55, 20_746.45}, [day: 3],
+     [
+       ~D[2026-09-19],
+       ~D[2026-09-22],
+       ~D[2026-09-25],
+       ~D[2026-09-28],
+       ~D[2026-10-01],
+       ~D[2026-10-04],
+       ~D[2026-10-07],
+       ~D[2026-10-10],
+       ~D[2026-10-13],
+       ~D[2026-10-16],
+       ~D[2026-10-19],
+       ~D[2026-10-22]
+     ]},
+    {{20_714.5, 20_716.5}, [day: 1],
+     [~D[2026-09-18], ~D[2026-09-19], ~D[2026-09-20], ~D[2026-09-21], ~D[2026-09-22]]},
+    {{20_715.5, 20_717.5}, [day: 1], [~D[2026-09-20], ~D[2026-09-21], ~D[2026-09-22]]},
+    {{-1787.05, 17_398.05}, [year: 10],
+     [
+       ~D[1965-01-01],
+       ~D[1975-01-01],
+       ~D[1985-01-01],
+       ~D[1995-01-01],
+       ~D[2005-01-01],
+       ~D[2015-01-01],
+       ~D[2025-01-01]
+     ]},
+    {{-1787.05, 17_398.05}, [year: 5],
+     [
+       ~D[1965-01-01],
+       ~D[1970-01-01],
+       ~D[1975-01-01],
+       ~D[1980-01-01],
+       ~D[1985-01-01],
+       ~D[1990-01-01],
+       ~D[1995-01-01],
+       ~D[2000-01-01],
+       ~D[2005-01-01],
+       ~D[2010-01-01],
+       ~D[2015-01-01],
+       ~D[2020-01-01]
+     ]},
+    {{19_717.0, 20_047.0}, [month: 1],
+     [
+       ~D[2023-12-01],
+       ~D[2024-01-01],
+       ~D[2024-02-01],
+       ~D[2024-03-01],
+       ~D[2024-04-01],
+       ~D[2024-05-01],
+       ~D[2024-06-01],
+       ~D[2024-07-01],
+       ~D[2024-08-01],
+       ~D[2024-09-01],
+       ~D[2024-10-01],
+       ~D[2024-11-01],
+       ~D[2024-12-01]
+     ]},
+    {{19_717.0, 20_047.0}, [month: 3],
+     [~D[2023-12-01], ~D[2024-03-01], ~D[2024-06-01], ~D[2024-09-01], ~D[2024-12-01]]},
+    {{-30.4, 12.2}, [week: 1],
+     [
+       ~D[1969-12-01],
+       ~D[1969-12-08],
+       ~D[1969-12-15],
+       ~D[1969-12-22],
+       ~D[1969-12-29],
+       ~D[1970-01-05],
+       ~D[1970-01-12],
+       ~D[1970-01-19]
+     ]},
+    {{-30.4, 12.2}, [day: 2],
+     [
+       ~D[1969-12-02],
+       ~D[1969-12-04],
+       ~D[1969-12-06],
+       ~D[1969-12-08],
+       ~D[1969-12-10],
+       ~D[1969-12-12],
+       ~D[1969-12-14],
+       ~D[1969-12-16],
+       ~D[1969-12-18],
+       ~D[1969-12-20],
+       ~D[1969-12-22],
+       ~D[1969-12-24],
+       ~D[1969-12-26],
+       ~D[1969-12-28],
+       ~D[1969-12-30],
+       ~D[1970-01-01],
+       ~D[1970-01-03],
+       ~D[1970-01-05],
+       ~D[1970-01-07],
+       ~D[1970-01-09],
+       ~D[1970-01-11],
+       ~D[1970-01-13],
+       ~D[1970-01-15]
+     ]},
+    {{18_627.0, 18_640.0}, [week: 1],
+     [~D[2020-12-28], ~D[2021-01-04], ~D[2021-01-11], ~D[2021-01-18]]},
+    {{19_722.9, 19_724.0}, [year: 1], [~D[2023-01-01], ~D[2024-01-01], ~D[2025-01-01]]},
+    {{19_723.0, 19_724.0}, [year: 1], [~D[2024-01-01], ~D[2025-01-01]]},
+    {{19_358.0, 19_725.0}, [year: 1], [~D[2023-01-01], ~D[2024-01-01], ~D[2025-01-01]]},
+    {{19_020.2, 19_110.8}, [month: 1],
+     [~D[2022-01-01], ~D[2022-02-01], ~D[2022-03-01], ~D[2022-04-01], ~D[2022-05-01]]}
+  ]
+
+  describe "width/2" do
+    test "a break every step is R's breaks_width() for every unit" do
+      for {extent, step, dates} <- @r_widths do
+        assert {extent, step, DateBreaks.width(step, extent)} === {extent, step, dates}
+      end
+    end
+
+    # R's `ceiling_date()` adds a year of 365 days, so 1 January of a leap year rounds up to itself
+    # and the axis's last break is its first: R's breaks_width("1 year") on 2024-01-01 alone.
+    test "1 January of a leap year rounds up to itself" do
+      assert DateBreaks.width([year: 1], {19_723.0, 19_723.0}) === [~D[2024-01-01]]
+    end
+  end
+
   describe "pretty/1 and label/2" do
     test "the breaks and their labels are R's for every case of prettyDate()" do
       epoch = ~D[1970-01-01]

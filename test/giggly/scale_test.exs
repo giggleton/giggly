@@ -439,6 +439,250 @@ defmodule Giggly.ScaleTest do
   # Golden throughout: R 4.6.1's `scales` 1.4.0 and ggplot2 4.0.3, printed to 17 significant
   # digits: `scales::rescale()`, `seq(0.1, 1, length.out = n)` and the alpha `layer_data()` of the
   # same values. They move only with R's arithmetic, or with ggplot2's default alpha range.
+  describe "a discrete scale's options" do
+    # A discrete position scale with `options` set, trained on p, q, r and a missing value.
+    defp letters(options) do
+      Scale.Discrete
+      |> struct!(options)
+      |> Scale.train(["p", "q", "r", nil])
+    end
+
+    # Each scale's map of p, q, r and the missing value, its breaks and its extent.
+    defp drawn(scale) do
+      {Scale.map(scale, ["p", "q", "r", nil]), Scale.breaks(scale, Scale.dimension(scale)),
+       Scale.dimension(scale)}
+    end
+
+    # Golden: ggplot2 4.0.3's layer_data() x and panel x breaks, labels and range in R 4.6.1 for
+    # points at "p", "q", "r" and NA under scale_x_discrete(limits = ...).
+    test "limits choose the values shown and their order, a value left out mapping to nil" do
+      assert drawn(letters(limits: ["r", "p"])) ===
+               {[2, nil, 1, nil], [{1, "r"}, {2, "p"}], {0.4, 2.6}}
+
+      assert drawn(letters(limits: ["r", "z", "p"])) ===
+               {[3, nil, 1, nil], [{1, "r"}, {2, "z"}, {3, "p"}], {0.4, 3.6}}
+
+      assert drawn(letters(limits: ["r", nil, "p"])) ===
+               {[3, nil, 1, 2], [{1, "r"}, {2, "NA"}, {3, "p"}], {0.4, 3.6}}
+    end
+
+    # Golden: as above, under scale_x_discrete(breaks = ...), with limits = c("p", "q") in the last.
+    test "breaks mark the values given among the limits, in the order given" do
+      given = letters(breaks: ["q", "p"])
+      outside = letters(limits: ["p", "q"], breaks: ["q", "r"])
+      none = letters(breaks: :none)
+
+      assert {Scale.breaks(given, {0.4, 4.6}), Scale.breaks(outside, {0.4, 2.6}),
+              Scale.breaks(none, {0.4, 4.6})} === {[{2, "q"}, {1, "p"}], [{2, "q"}], []}
+    end
+
+    # Golden: as above, under scale_x_discrete(labels = ...): R's named vector is matched by
+    # value, a value it does not hold keeping its own label, and an unnamed one goes with the
+    # breaks by place, one left out taking its label with it. R cannot name its missing value; a
+    # map can.
+    test "labels are given by place, by value, by a function, or left out" do
+      by_place = letters(breaks: ["q", "p"], labels: ["Q", "P"])
+      dropped = letters(limits: ["p", "q"], breaks: ["q", "r"], labels: ["Q", "R"])
+      by_value = letters(labels: %{"q" => "Q", "zz" => "Z"})
+      missing = letters(labels: %{nil => "none"})
+      none = letters(labels: :none)
+
+      assert Enum.map([by_place, dropped, by_value, missing, none], fn scale ->
+               Scale.breaks(scale, Scale.dimension(scale))
+             end) === [
+               [{2, "Q"}, {1, "P"}],
+               [{2, "Q"}],
+               [{1, "p"}, {2, "Q"}, {3, "r"}, {4, "NA"}],
+               [{1, "p"}, {2, "q"}, {3, "r"}, {4, "none"}],
+               [{1, :none}, {2, :none}, {3, :none}, {4, :none}]
+             ]
+    end
+
+    test "a labels function is handed every break's value, the missing value among them" do
+      labeller = fn values -> Enum.map(values, &inspect/1) end
+      scale = letters(labels: labeller)
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{1, ~s("p")}, {2, ~s("q")}, {3, ~s("r")}, {4, "nil"}]
+    end
+
+    test "a list of labels not one for each break, or a function's wrong count, is refused" do
+      short = letters(labels: ["P", "Q"])
+      counted = letters(labels: fn [first | _rest] -> [to_string(first)] end)
+
+      assert_raise ArgumentError, ~r/2 labels must be one for each of its 4 breaks/, fn ->
+        Scale.breaks(short, Scale.dimension(short))
+      end
+
+      assert_raise ArgumentError, ~r/labels function must return a string for each/, fn ->
+        Scale.breaks(counted, Scale.dimension(counted))
+      end
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1, the panel's x range and labels for factor(c(4, 6, 8, 10))
+    # with labels = c("10" = "ten") and limits = c("8", "4"), which name the numbers by their text.
+    test "a number names the value equal to it, an integer a float's level" do
+      factor =
+        :discrete
+        |> trained([4.0, 6.0, 8.0, 10.0])
+        |> struct!(labels: %{10 => "ten"})
+
+      limited =
+        :discrete
+        |> trained([4, 6, 8])
+        |> struct!(limits: [8.0, 4.0])
+
+      assert {Scale.breaks(factor, Scale.dimension(factor)), Scale.map(limited, [4, 6, 8])} ===
+               {[{1, "4"}, {2, "6"}, {3, "8"}, {4, "ten"}], [2, nil, 1]}
+    end
+
+    # Golden: as above, the panel's x range under expansion(mult = 0.1) and expansion(add = 2).
+    test "expansion is set at each end, a multiple of the distance from first to last plus a constant" do
+      mult = letters(expand: [mult: {0.1, 0.1}, add: {0.0, 0.0}])
+      add = letters(expand: [mult: {0.0, 0.0}, add: {2.0, 2.0}])
+
+      assert {Scale.dimension(mult), Scale.dimension(add)} === {{0.7, 4.3}, {-1.0, 6.0}}
+    end
+
+    # Golden: ggplot2 4.0.3's x range in R 4.6.1 for ggplot(s, aes(y = a)) + geom_bar() +
+    # scale_x_discrete(), the counts its only values, and ggplot2's `expand_limits_discrete()` on
+    # no values at all.
+    test "with no values, a continuous range alone is widened, or else 0 to 1" do
+      empty = Scale.new(:discrete)
+      counts = Scale.train_positions(empty, [0.0, 1.0])
+
+      assert {Scale.dimension(counts), Scale.dimension(empty)} === {{-0.6, 1.6}, {-0.6, 1.6}}
+    end
+
+    test "a discrete legend's breaks are its limits" do
+      scale =
+        :discrete
+        |> Scale.new(:color)
+        |> struct!(limits: ["r", "p"])
+        |> Scale.train(["p", "q", "r"])
+
+      assert Scale.legend_breaks(scale) === [{"r", "r"}, {"p", "p"}]
+    end
+  end
+
+  describe "a date scale's options" do
+    # A date scale with `options` set, trained on the 30 days to 2026-10-19, and its axis's
+    # extent, as the scale_date page's `last_month` spans.
+    defp last_month(options) do
+      scale =
+        Scale.Continuous
+        |> struct!([{:transform, :date} | options])
+        |> Scale.train([20_716.0, 20_745.0])
+
+      {scale, Scale.dimension(scale)}
+    end
+
+    # Golden: ggplot2 4.0.3's panel x breaks and labels in R 4.6.1 for the scale_date page's
+    # `base` on that month: given breaks and a width's are written in full, as R's `format()`
+    # writes a date with no format, and the default breaks as suits their step.
+    test "breaks the scale did not choose are labelled in full, its own as suits their step" do
+      {given, extent} = last_month(breaks: [~D[2026-09-25], ~D[2026-10-10]])
+      {width, _extent} = last_month(breaks: {:width, [week: 2]})
+      {default, _extent} = last_month([])
+
+      assert {extent, Scale.breaks(given, extent), Scale.breaks(width, extent),
+              Scale.breaks(default, extent)} ===
+               {{20_714.55, 20_746.45}, [{20_721.0, "2026-09-25"}, {20_736.0, "2026-10-10"}],
+                [{20_724.0, "2026-09-28"}, {20_738.0, "2026-10-12"}],
+                [
+                  {20_717.0, "Sep 21"},
+                  {20_724.0, "Sep 28"},
+                  {20_731.0, "Oct 05"},
+                  {20_738.0, "Oct 12"},
+                  {20_745.0, "Oct 19"}
+                ]}
+    end
+
+    # Golden: as above, with date_labels = "%d" beside date_breaks = "1 week", and with
+    # date_labels = "%b %d" alone.
+    test "a format writes every break's label, by width or by default" do
+      {width, extent} = last_month(breaks: {:width, [week: 1]}, labels: {:format, "%d"})
+      {default, _extent} = last_month(labels: {:format, "%b %d"})
+
+      assert {Scale.breaks(width, extent), Scale.breaks(default, extent)} ===
+               {[
+                  {20_717.0, "21"},
+                  {20_724.0, "28"},
+                  {20_731.0, "05"},
+                  {20_738.0, "12"},
+                  {20_745.0, "19"}
+                ],
+                [
+                  {20_717.0, "Sep 21"},
+                  {20_724.0, "Sep 28"},
+                  {20_731.0, "Oct 05"},
+                  {20_738.0, "Oct 12"},
+                  {20_745.0, "Oct 19"}
+                ]}
+    end
+
+    test "a labels function is handed the breaks as dates" do
+      {scale, extent} =
+        last_month(
+          breaks: {:width, [week: 2]},
+          labels: fn dates -> Enum.map(dates, &Date.to_iso8601/1) end
+        )
+
+      assert Scale.breaks(scale, extent) ===
+               [{20_724.0, "2026-09-28"}, {20_738.0, "2026-10-12"}]
+    end
+
+    # Golden: as above, with date_minor_breaks = "1 day": a minor line every day inside the
+    # extent, the breaks among them, which the grid leaves out.
+    test "a width of minor breaks gives one every step inside the extent, less the breaks" do
+      {scale, extent} = last_month(minor_breaks: {:width, [day: 1]})
+      breaks = Scale.breaks(scale, extent)
+      major = [20_717.0, 20_724.0, 20_731.0, 20_738.0, 20_745.0]
+
+      assert Scale.minor_breaks(scale, breaks, extent) ===
+               Enum.map(20_715..20_746, fn day -> day / 1 end) -- major
+    end
+  end
+
+  describe "takes?/2 and a date under the identity" do
+    test "a scale takes its own kind of column, and an untransformed continuous one a date's" do
+      assert Enum.map(
+               [
+                 {Scale.new(:continuous), :continuous},
+                 {Scale.new(:continuous), :date},
+                 {%Scale.Continuous{transform: :log10}, :date},
+                 {%Scale.Continuous{transform: :reverse}, :date},
+                 {Scale.new(:date), :date},
+                 {Scale.new(:date), :continuous},
+                 {Scale.new(:discrete), :discrete},
+                 {Scale.new(:discrete), :continuous},
+                 {Scale.new(:discrete), :date},
+                 {Scale.new(:continuous), :discrete}
+               ],
+               fn {scale, kind} -> Scale.takes?(scale, kind) end
+             ) === [true, true, false, false, true, false, true, false, false, false]
+    end
+
+    # Golden: ggplot2 4.0.3's layer_data() x and panel x range, breaks and labels in R 4.6.1 for
+    # points on 2024-01-01, 2024-01-11 and 2024-02-15 under scale_x_continuous().
+    test "an untransformed continuous scale places a date at its days and labels them as numbers" do
+      scale = Scale.new(:continuous)
+      days = Scale.transform(scale, [~D[2024-01-01], ~D[2024-01-11], ~D[2024-02-15], nil])
+      trained = Scale.train(scale, days)
+      extent = Scale.dimension(trained)
+
+      assert {days, extent, Scale.breaks(trained, extent)} ===
+               {[19_723.0, 19_733.0, 19_768.0, nil], {19_720.75, 19_770.25},
+                [
+                  {19_730.0, "19730"},
+                  {19_740.0, "19740"},
+                  {19_750.0, "19750"},
+                  {19_760.0, "19760"},
+                  {19_770.0, "19770"}
+                ]}
+    end
+  end
+
   describe "rescale/3" do
     test "a value moves linearly from one range to another, in R's order of operations" do
       rescaled =

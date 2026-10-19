@@ -19,7 +19,8 @@ defmodule Giggly.Scale do
   #     (`Giggly.Scale.Discrete`);
   #   * `:date` gets a date scale, a continuous scale of the days since 1970-01-01 through the
   #     date transformation, as ggplot2's `scale_type()` gives a `Date` `"date"`; on an aesthetic
-  #     other than position it gets none yet;
+  #     other than position it gets none yet. A plot's continuous scale through the identity takes
+  #     one too, placing each date at its days, as R stores a date (`takes?/2`);
   #   * times, datetimes and `:term` get none yet.
   #
   # ## Transformation
@@ -49,7 +50,14 @@ defmodule Giggly.Scale do
   #
   # A continuous scale carries the options a plot gives it (`Giggly.Scale.Continuous`): its
   # limits replace its trained range end by end, its expansion widens them, and its breaks, minor
-  # breaks and labels replace its transformation's, or `:none` leaves them out.
+  # breaks and labels replace its transformation's, or `:none` leaves them out. A date scale's
+  # breaks and minor breaks may be a width, `{:width, [week: 1]}`, a break every week, and its
+  # labels a format, `{:format, "%b %d"}`, each date written in it by `Calendar.strftime/3`.
+  #
+  # A discrete scale carries them too (`Giggly.Scale.Discrete`): its limits replace its levels,
+  # choosing the values it shows and their order, its breaks the values an axis marks among them,
+  # its labels their text, given as a list, by value in a map, or by a function, and its expansion
+  # its room beside the first and last.
   #
   # ## Aesthetics other than position
   #
@@ -66,11 +74,13 @@ defmodule Giggly.Scale do
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
   # palette its colours, as R's `scales` depends on farver, and R's `as.character()`, which writes
-  # a discrete level, so it stays extractable. It exports the continuous scale's struct, which
+  # a discrete level, so it stays extractable. It exports the two kinds' structs, which
   # `Giggly.Plot` writes with a user's options and `Giggly.panel_scales/2` returns.
-  use Boundary, deps: [Giggly.AsCharacter, Giggly.ColorOperations], exports: [Continuous]
+  use Boundary,
+    deps: [Giggly.AsCharacter, Giggly.ColorOperations],
+    exports: [Continuous, Discrete]
 
-  alias Giggly.Scale.{Continuous, Discrete, Labels, Palette, Transform}
+  alias Giggly.Scale.{Continuous, DateBreaks, Discrete, Labels, Palette, Transform}
 
   @typedoc "A trained position scale."
   @type t :: Continuous.t() | Discrete.t()
@@ -87,11 +97,6 @@ defmodule Giggly.Scale do
 
   @continuous_dtypes [:integer, :float, :null]
   @discrete_dtypes [:string, :boolean, :atom, :category]
-
-  # ggplot2's default expansion for a discrete scale, `expansion(add = 0.6)`: at each end, a
-  # multiple of the width and a constant. A continuous scale's, `expansion(mult = 0.05)`, is its
-  # struct's default `expand`.
-  @discrete_expansion [mult: {0, 0}, add: {0.6, 0.6}]
 
   # R's `zero_range()` tolerance: 1000 times the double-precision machine epsilon.
   @zero_range_tolerance 1000 * 2.220446049250313e-16
@@ -132,16 +137,7 @@ defmodule Giggly.Scale do
   @spec new(:continuous | :discrete | :date) :: t()
   def new(:continuous), do: %Continuous{}
   def new(:date), do: %Continuous{transform: :date}
-
-  def new(:discrete) do
-    %Discrete{
-      levels: [],
-      continuous_range: :none,
-      palette: :identity,
-      na_value: nil,
-      guide: :axis
-    }
-  end
+  def new(:discrete), do: %Discrete{}
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
   # ggplot2's default palette, value for a missing value and guide for it: a colour bar for a
@@ -154,25 +150,10 @@ defmodule Giggly.Scale do
   def new(:continuous, aesthetic) when aesthetic in @color_aesthetics,
     do: %Continuous{palette: @gradient_palette, na_value: @color_na_value, guide: :colorbar}
 
-  def new(:discrete, :alpha) do
-    %Discrete{
-      levels: [],
-      continuous_range: :none,
-      palette: {:sequence, @alpha_range},
-      na_value: nil,
-      guide: :legend
-    }
-  end
+  def new(:discrete, :alpha), do: %Discrete{palette: {:sequence, @alpha_range}, guide: :legend}
 
-  def new(:discrete, aesthetic) when aesthetic in @color_aesthetics do
-    %Discrete{
-      levels: [],
-      continuous_range: :none,
-      palette: @hue_palette,
-      na_value: @color_na_value,
-      guide: :legend
-    }
-  end
+  def new(:discrete, aesthetic) when aesthetic in @color_aesthetics,
+    do: %Discrete{palette: @hue_palette, na_value: @color_na_value, guide: :legend}
 
   # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a date scale,
   # or another continuous scale.
@@ -181,6 +162,15 @@ defmodule Giggly.Scale do
   def kind_of(%Discrete{}), do: :discrete
   def kind_of(%Continuous{transform: :date}), do: :date
   def kind_of(%Continuous{}), do: :continuous
+
+  # Whether `scale` takes a column that needs a scale of `kind` (`kind/1`): a scale of that kind
+  # does, and so does a continuous scale through the identity a date's, placing each date at its
+  # days since 1970-01-01, as R stores a date and its continuous scale places one; through another
+  # transformation a date is refused, where R fails.
+  @doc false
+  @spec takes?(t(), kind()) :: boolean()
+  def takes?(%Continuous{transform: :identity}, :date), do: true
+  def takes?(scale, kind), do: kind_of(scale) == kind
 
   # The aesthetics other than position that a scale maps, as ggplot2 adds a default scale for each
   # one a layer maps.
@@ -241,9 +231,13 @@ defmodule Giggly.Scale do
 
   # The extent of the axis in positions, widened as ggplot2 widens it before drawing: a continuous
   # scale's limits, each end its `limits`' or else its range's, by its `expand`, 5% of their width
-  # at each end unless it says otherwise; and discrete levels, at positions 1 to n, by 0.6, then
+  # at each end unless it says otherwise; and a discrete scale's limits, its levels unless it
+  # gives them, at positions 1 to n, by its `expand`, 0.6 at each end unless it says otherwise, then
   # reaching further where its continuous range does, which is not widened: a bar wider than its
   # level's slot widens the axis, as ggplot2's `expand_limits_discrete()` takes the range of both.
+  # A discrete scale with no limits widens its continuous range alone by its `expand`, such as
+  # counts a stat puts on the axis, or else 0 to 1, as ggplot2 widens an axis it has no values
+  # for.
   # Limits of zero width are widened as though their width were 1, as R's `expand_range()` does, so
   # one value, zero included, spans 0.05 either side of it; a continuous scale that has seen no data
   # spans 0 to 1 before it is widened, ggplot2's default for an empty axis, unless its limits give
@@ -269,12 +263,21 @@ defmodule Giggly.Scale do
     end
   end
 
-  def dimension(%Discrete{levels: levels, continuous_range: :none}),
-    do: expand({1, length(levels)}, @discrete_expansion)
+  def dimension(%Discrete{expand: expansion, continuous_range: range} = scale) do
+    case {Discrete.limits(scale), range} do
+      {[], :none} ->
+        expand({0, 1}, expansion)
 
-  def dimension(%Discrete{levels: levels, continuous_range: {range_low, range_high}}) do
-    {low, high} = expand({1, length(levels)}, @discrete_expansion)
-    {min(low, range_low), max(high, range_high)}
+      {[], range} ->
+        expand(range, expansion)
+
+      {limits, :none} ->
+        expand({1, length(limits)}, expansion)
+
+      {limits, {range_low, range_high}} ->
+        {low, high} = expand({1, length(limits)}, expansion)
+        {min(low, range_low), max(high, range_high)}
+    end
   end
 
   # The breaks an axis showing `extent` of the scale draws, each its position and its label:
@@ -287,11 +290,14 @@ defmodule Giggly.Scale do
   # `extent` are kept (ggplot2 computes breaks on the widened extent and drops the rest), a break
   # exactly at an end included, so a given break beyond the limits but inside the widened axis is
   # drawn, and one outside the domain is not. A scale with no limits yet has none by default, and
-  # an extent of zero width one, at its end, as in ggplot2. `breaks: :none` gives none. Each is
-  # labelled by `labels/4`.
+  # an extent of zero width one, at its end, as in ggplot2. A date scale's width, `{:width, step}`,
+  # gives a break every step (`Giggly.Scale.DateBreaks.width/2`) on the extent, those inside it
+  # kept. `breaks: :none` gives none. Each is labelled by `labels/4`.
   #
-  # A discrete scale has a break at each level, whatever the extent, labelled as
-  # `Giggly.Scale.Labels` writes a level.
+  # A discrete scale has a break at each value its `breaks` gives among its limits, in the order
+  # given, or else at each of its limits, its levels unless it gives them, whatever the extent;
+  # `:none` gives none. Each is at its value's place among the limits and labelled by
+  # `discrete_labels/3`.
   @doc false
   @spec breaks(t(), {float(), float()}) :: [break()]
   def breaks(%Continuous{breaks: :none}, _extent), do: []
@@ -313,19 +319,81 @@ defmodule Giggly.Scale do
     Enum.zip(positions, labels(scale, positions, :default, extent))
   end
 
-  def breaks(%Discrete{levels: levels}, _extent) do
-    levels
-    |> Labels.levels()
-    |> Enum.with_index(1)
-    |> Enum.map(fn {label, position} -> {position, label} end)
+  def breaks(%Continuous{breaks: {:width, step}, transform: transform} = scale, extent) do
+    positions =
+      transform
+      |> Transform.transform(DateBreaks.width(step, extent))
+      |> Enum.filter(fn position -> placed_inside?(position, extent) end)
+
+    Enum.zip(positions, labels(scale, positions, :width, extent))
   end
+
+  def breaks(%Discrete{breaks: :none}, _extent), do: []
+
+  def breaks(%Discrete{} = scale, _extent) do
+    limits = Discrete.limits(scale)
+
+    position_by_key =
+      limits
+      |> Enum.with_index(1)
+      |> Map.new(fn {limit, position} -> {Discrete.key(limit), position} end)
+
+    candidates = discrete_candidates(scale, limits)
+
+    {values, indexes} =
+      candidates
+      |> Enum.with_index()
+      |> Enum.filter(fn {value, _index} -> Map.has_key?(position_by_key, Discrete.key(value)) end)
+      |> Enum.unzip()
+
+    positions = Enum.map(values, fn value -> Map.fetch!(position_by_key, Discrete.key(value)) end)
+    Enum.zip(positions, discrete_labels(scale, values, {indexes, length(candidates)}))
+  end
+
+  # The values a discrete scale may mark: its breaks where given, else its limits.
+  defp discrete_candidates(%Discrete{breaks: :default}, limits), do: limits
+  defp discrete_candidates(%Discrete{breaks: given}, _limits), do: given
+
+  # The labels of a discrete scale's breaks `values`, which are the candidates at `indexes` among
+  # `count` (its given breaks, or its limits): written as `Giggly.Scale.Labels` writes a level by
+  # default; `:none` for each where it has none; its list's labels at those indexes, a list one for
+  # each candidate, or the plot cannot be drawn; its map's label for each value it holds, the
+  # default for the rest; or what its function returns for the values.
+  defp discrete_labels(%Discrete{labels: :default}, values, _indexes), do: Labels.levels(values)
+
+  defp discrete_labels(%Discrete{labels: :none}, values, _indexes),
+    do: List.duplicate(:none, length(values))
+
+  defp discrete_labels(%Discrete{labels: given}, _values, {indexes, count})
+       when is_list(given) and length(given) == count,
+       do: Enum.map(indexes, fn index -> Enum.at(given, index) end)
+
+  defp discrete_labels(%Discrete{labels: given}, _values, {_indexes, count})
+       when is_list(given) do
+    raise ArgumentError,
+          "a discrete scale's #{length(given)} labels must be one for each of its " <>
+            "#{count} breaks, got: #{inspect(given)}"
+  end
+
+  defp discrete_labels(%Discrete{labels: given}, values, _indexes) when is_map(given) do
+    label_by_key = Map.new(given, fn {value, label} -> {Discrete.key(value), label} end)
+
+    Enum.zip_with(values, Labels.levels(values), fn value, own ->
+      Map.get(label_by_key, Discrete.key(value), own)
+    end)
+  end
+
+  defp discrete_labels(%Discrete{labels: labeller}, values, _indexes)
+       when is_function(labeller, 1),
+       do: labelled(labeller, values)
 
   # The breaks a legend of the scale shows, in its transformation's order, each the value in the
   # data and its label: ggplot2's `get_breaks()` and `get_labels()` on the scale's limits, its
   # trained range or levels, not an axis's widened extent. A continuous scale's are its
   # transformation's breaks inside the range, taken as floats as R's limits are doubles, one at
   # its low end when it has zero width, and none when untrained; a discrete scale's are its
-  # levels, `nil` last and labelled `NA`, as ggplot2's legend keeps `NA`.
+  # limits, its levels unless it gives them, `nil` last and labelled `NA`, as ggplot2's legend
+  # keeps `NA`.
   @doc false
   @spec legend_breaks(t()) :: [{term(), String.t()}]
   def legend_breaks(%Continuous{range: :none}), do: []
@@ -333,8 +401,10 @@ defmodule Giggly.Scale do
   def legend_breaks(%Continuous{range: {low, high}} = scale),
     do: breaks(scale, {low / 1, high / 1})
 
-  def legend_breaks(%Discrete{levels: levels}),
-    do: Enum.zip(levels, Labels.levels(levels))
+  def legend_breaks(%Discrete{} = scale) do
+    limits = Discrete.limits(scale)
+    Enum.zip(limits, Labels.levels(limits))
+  end
 
   # `count` values spread evenly over the trained range of a continuous scale, from its low end to
   # its high, as R's `seq(low, high, length.out = count)` spreads them (`Giggly.Scale.Palette`):
@@ -356,8 +426,9 @@ defmodule Giggly.Scale do
   # less the breaks themselves, which ggplot2's grid leaves out of its minor lines.
   #
   # A continuous scale takes those its `minor_breaks` gives, in data units, put through its
-  # transformation, or by default its transformation's (`Giggly.Scale.Transform`), and keeps
-  # those inside `extent`, its ends included; `:none` gives none. By default they fall midway
+  # transformation, or a date scale's every step of its width, or by default its transformation's
+  # (`Giggly.Scale.Transform`), and keeps those inside `extent`, its ends included; `:none` gives
+  # none. By default they fall midway
   # between breaks in transformed space, and between the outermost breaks and the extent's ends,
   # and an axis with fewer than two breaks has none.
   #
@@ -384,6 +455,13 @@ defmodule Giggly.Scale do
        )
        when is_list(given),
        do: Transform.transform(transform, given)
+
+  defp candidate_minor_breaks(
+         %Continuous{minor_breaks: {:width, step}, transform: transform},
+         _positions,
+         extent
+       ),
+       do: Transform.transform(transform, DateBreaks.width(step, extent))
 
   defp candidate_minor_breaks(%Continuous{transform: transform}, positions, extent),
     do: Transform.minor_breaks(transform, positions, extent)
@@ -417,24 +495,47 @@ defmodule Giggly.Scale do
   end
 
   # The labels of the breaks at `positions`, which are the given breaks at `indexes` in the order
-  # given, or else the default breaks (`:default`): the scale's `labels` at those indexes, what its
-  # function returns for the positions, `:none` for each where it has none, or its
-  # transformation's (`Transform.format/3`). A function must return a string for each break, or
-  # the plot cannot be drawn. A function is handed the breaks in data units, turned back from
-  # their positions, as ggplot2 hands them.
-  defp labels(%Continuous{labels: :none}, positions, _indexes, _extent),
+  # given, the breaks a date scale's width gives (`:width`), or else the default breaks
+  # (`:default`): the scale's `labels` at those indexes, what its function returns for the
+  # positions, each break written in its format by `Calendar.strftime/3`, `:none` for each where it
+  # has none, or its transformation's (`Transform.format/3`), told whether they are the default
+  # breaks, since a date's default breaks take the format of the step they were chosen by and any
+  # others are written in full. A function must return a string for each break, or the plot cannot
+  # be drawn. A function and a format are handed the breaks in data units, turned back from their
+  # positions, as ggplot2 hands them.
+  defp labels(%Continuous{labels: :none}, positions, _origin, _extent),
     do: List.duplicate(:none, length(positions))
 
   defp labels(%Continuous{labels: given}, _positions, indexes, _extent)
        when is_list(given) and is_list(indexes),
        do: Enum.map(indexes, fn index -> Enum.at(given, index) end)
 
-  defp labels(%Continuous{labels: labeller, transform: transform}, positions, _indexes, _extent)
-       when is_function(labeller, 1) do
-    breaks = Transform.inverse(transform, positions)
+  defp labels(%Continuous{labels: labeller, transform: transform}, positions, _origin, _extent)
+       when is_function(labeller, 1),
+       do: labelled(labeller, Transform.inverse(transform, positions))
+
+  defp labels(
+         %Continuous{labels: {:format, format}, transform: transform},
+         positions,
+         _origin,
+         _extent
+       ) do
+    transform
+    |> Transform.inverse(positions)
+    |> Enum.map(fn date -> Calendar.strftime(date, format) end)
+  end
+
+  defp labels(%Continuous{labels: :default, transform: transform}, positions, :default, extent),
+    do: Transform.format(transform, positions, extent)
+
+  defp labels(%Continuous{labels: :default, transform: transform}, positions, _given, _extent),
+    do: Transform.format(transform, positions, :given)
+
+  # What a labels function returns for `breaks`, which must be a string for each.
+  defp labelled(labeller, breaks) do
     labelled = labeller.(breaks)
 
-    if is_list(labelled) and length(labelled) == length(positions) and
+    if is_list(labelled) and length(labelled) == length(breaks) and
          Enum.all?(labelled, &is_binary/1) do
       labelled
     else
@@ -443,9 +544,6 @@ defmodule Giggly.Scale do
               "#{inspect(breaks)}, got: #{inspect(labelled)}"
     end
   end
-
-  defp labels(%Continuous{labels: :default, transform: transform}, positions, _indexes, extent),
-    do: Transform.format(transform, positions, extent)
 
   defp inside?(position, {low, high}), do: position >= low and position <= high
 

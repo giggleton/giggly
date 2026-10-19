@@ -13,6 +13,44 @@ defmodule GigglyTest do
     "class" => ["compact", "compact", "suv"]
   }
 
+  # The scale_date reference page's `df`: the 30 days to 2026-10-19, latest first, rather than to
+  # the day it runs, and the prices R 4.6.1's runif(30) gives after set.seed(1).
+  @last_month %{
+    "date" => Enum.map(0..29, fn back -> Date.add(~D[2026-10-19], -back) end),
+    "price" => [
+      0.26550866314209998,
+      0.37212389963679016,
+      0.57285336335189641,
+      0.90820778999477625,
+      0.2016819310374558,
+      0.89838968496769667,
+      0.94467526860535145,
+      0.66079779248684645,
+      0.62911404389888048,
+      0.061786270467564464,
+      0.20597457489930093,
+      0.17655675252899528,
+      0.68702284665778279,
+      0.38410371821373701,
+      0.76984141999855638,
+      0.49769924208521843,
+      0.71761850826442242,
+      0.9919060948304832,
+      0.38003517943434417,
+      0.77744522131979465,
+      0.93470523110590875,
+      0.21214252128265798,
+      0.65167376608587801,
+      0.12555509596131742,
+      0.26722066872753203,
+      0.3861140925437212,
+      0.013390333158895373,
+      0.38238795707002282,
+      0.86969084572046995,
+      0.34034899668768048
+    ]
+  }
+
   describe "layer_data/2" do
     test "a layer's mapping takes an aesthetic the plot also maps" do
       plot =
@@ -1623,30 +1661,103 @@ defmodule GigglyTest do
                [[:neg_infinity], [3.0], [:neg_infinity], [:infinity]]
     end
 
-    # ggplot2 refuses "Discrete value supplied to a continuous scale"; a date column under a
-    # continuous scale, which ggplot2 draws as numbers of days, is refused too.
-    test "a column on the axis of another kind than the plot's scale is refused when run" do
-      discrete =
-        @mpg_rows
-        |> Plot.new(%{x: :class, y: :hwy})
-        |> Plot.geom_point()
-        |> Plot.scale_x_continuous()
+    # In R 4.6.1, ggplot2 4.0.3 refuses "Discrete value supplied to a continuous scale", fails on a
+    # date under a reversed or a discrete scale ("unary - is not defined for "Date" objects",
+    # "Can't convert `x` <date> to <double>") and on text under a date scale; it reads numbers on
+    # a date scale as days with a warning, and puts numbers on a discrete axis without breaks,
+    # which Giggly refuses, an axis having one kind.
+    test "a column on the axis of a kind the plot's scale does not take is refused when run" do
+      dates = %{"date" => [~D[2020-01-01], ~D[2020-02-01]], "value" => [1.0, 2.0]}
 
-      dated =
-        %{"date" => [~D[2020-01-01], ~D[2020-02-01]], "value" => [1.0, 2.0]}
-        |> Plot.new(%{x: :date, y: :value})
-        |> Plot.geom_line()
-        |> Plot.xlim(nil, 5)
-
-      assert_raise ArgumentError,
-                   ~r/x scale is continuous.* :x to "class", a discrete column/,
-                   fn ->
-                     Giggly.layer_data(discrete)
-                   end
-
-      assert_raise ArgumentError, ~r/maps :x to "date", a date column/, fn ->
-        Giggly.layer_data(dated)
+      for {plot, refusal} <- [
+            {@mpg_rows
+             |> Plot.new(%{x: :class, y: :hwy})
+             |> Plot.geom_point()
+             |> Plot.scale_x_continuous(),
+             ~s(x scale is continuous, but the layer at index 0 maps :x to "class", a discrete)},
+            {dates
+             |> Plot.new(%{x: :date, y: :value})
+             |> Plot.geom_line()
+             |> Plot.xlim(5, 1),
+             ~s(x scale is continuous through reverse, but the layer at index 0 maps :x to "date")},
+            {dates
+             |> Plot.new(%{x: :value, y: :date})
+             |> Plot.geom_point()
+             |> Plot.scale_y_log10(),
+             ~s(y scale is continuous through log10, but the layer at index 0 maps :y to "date")},
+            {dates
+             |> Plot.new(%{x: :date, y: :value})
+             |> Plot.geom_point()
+             |> Plot.scale_x_discrete(),
+             ~s(x scale is discrete, but the layer at index 0 maps :x to "date", a date column)},
+            {@mpg_rows
+             |> Plot.new(%{x: :hwy, y: :class})
+             |> Plot.geom_point()
+             |> Plot.ylim(["suv"])
+             |> Plot.xlim(["1"]),
+             ~s(x scale is discrete, but the layer at index 0 maps :x to "hwy", a continuous)},
+            {@mpg_rows
+             |> Plot.new(%{x: :hwy, y: :class})
+             |> Plot.geom_point()
+             |> Plot.scale_x_date(),
+             ~s(x scale is date, but the layer at index 0 maps :x to "hwy", a continuous column)},
+            {@mpg_rows
+             |> Plot.new(%{x: :class, y: :hwy})
+             |> Plot.geom_point()
+             |> Plot.scale_x_date(),
+             ~s(x scale is date, but the layer at index 0 maps :x to "class", a discrete column)}
+          ] do
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ refusal
       end
+    end
+  end
+
+  describe "layer_data/2, under a discrete or a date scale" do
+    # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data() of ggplot(s, aes(a)) + geom_bar() +
+    # scale_x_discrete(limits = c("r", "p")), `s` holding a row each of "p", "q", "r" and NA: the
+    # rows the limits leave out are not counted, and each bar stands at its value's place among
+    # them.
+    test "a discrete scale's limits leave out the values they do not name, and place the rest" do
+      frame =
+        %{"a" => ["p", "q", "r", nil]}
+        |> Plot.new(%{x: :a})
+        |> Plot.geom_bar()
+        |> Plot.scale_x_discrete(limits: ["r", "p"])
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :count, :xmin, :xmax], fn name -> DataFrame.pull(frame, name) end) ===
+               [[2, 1], [1.0, 1.0], [1.55, 0.55], [2.45, 1.45]]
+    end
+
+    # Golden: as above, for points on 2024-01-01, 2024-01-11 and 2024-02-15 under
+    # scale_x_continuous(limits = c(19725, NA)): each date at its days, the first outside.
+    test "a continuous scale places a date at its days since 1970-01-01" do
+      frame =
+        %{"day" => [~D[2024-01-01], ~D[2024-01-11], ~D[2024-02-15]], "value" => [1, 2, 3]}
+        |> Plot.new(%{x: :day, y: :value})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous(limits: {19_725, nil})
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) === [nil, 19_733.0, 19_768.0]
+    end
+
+    # Golden: as above, for ggplot(s, aes(y = a)) + geom_bar() + scale_x_discrete(): the counts go
+    # on a discrete x axis as positions, and the axis spans them alone, widened by 0.6.
+    test "a plot's scale is kept on an axis no layer maps, whatever its kind" do
+      plot =
+        %{"a" => ["p", "q", "r", nil]}
+        |> Plot.new(%{y: :a})
+        |> Plot.geom_bar()
+        |> Plot.scale_x_discrete()
+
+      frame = Giggly.layer_data(plot)
+
+      assert {Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(frame, name) end),
+              Giggly.panel_scales(plot).x} ===
+               {[[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]],
+                %Giggly.Scale.Discrete{continuous_range: {0.0, 1.0}}}
     end
   end
 
@@ -2787,6 +2898,123 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/scale_reverse.svg")
+    end
+
+    # Golden: test/golden/scale_date_width.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_date_width.R: every element matches it, the x axis drawn before
+    # the y as in test/golden/point.svg, and every clip path. The scale_date page's `base`, its 30
+    # days ending on 2026-10-19 and its prices R's runif(30) after set.seed(1), with a break every
+    # week, each labelled by its day of the month, and a minor grid line every day. It moves with
+    # what moves test/golden/date_line.svg, and with a date scale's width and format.
+    test "a date scale's breaks every week, labelled in a format, and minor lines every day" do
+      plot =
+        @last_month
+        |> Plot.new(%{x: :date, y: :price})
+        |> Plot.geom_line()
+        |> Plot.scale_x_date(
+          date_breaks: [week: 1],
+          date_labels: "%d",
+          date_minor_breaks: [day: 1]
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_date_width.svg")
+    end
+
+    # Golden: test/golden/scale_date_limits.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_date_limits.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. The same month from a week
+    # before its last day, the line through the earlier days not drawn, breaks every second day.
+    # It moves with what moves test/golden/date_line.svg, and with a date scale's limits.
+    test "a date scale's limits cut the line outside them" do
+      plot =
+        @last_month
+        |> Plot.new(%{x: :date, y: :price})
+        |> Plot.geom_line()
+        |> Plot.scale_x_date(limits: {~D[2026-10-12], nil})
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_date_limits.svg")
+    end
+
+    # Golden: test/golden/scale_continuous_dates.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_continuous_dates.R: every element matches it, the x axis
+    # drawn before the y as in test/golden/point.svg, and every clip path. economics's
+    # unemployment under a continuous x scale, each date at its days since 1970-01-01 and the axis
+    # labelled as numbers. It moves with what moves test/golden/date_line.svg, and with how a
+    # continuous scale places a date.
+    test "a continuous scale places dates at their days and labels them as numbers" do
+      plot =
+        Giggly.Datasets.economics()
+        |> Plot.new(%{x: :date, y: :unemploy})
+        |> Plot.geom_line()
+        |> Plot.scale_x_continuous()
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_continuous_dates.svg")
+    end
+
+    # Golden: test/golden/scale_discrete.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_discrete.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. mpg's highway mileage by class on a
+    # discrete x scale named "Class" showing suv, wagon and compact: the other classes not drawn,
+    # wagon's place empty, suv labelled by value. It moves with what moves
+    # test/golden/point.svg, and with a discrete scale's options.
+    test "a discrete scale's limits choose its values and their order, and its labels their text" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.scale_x_discrete(
+          name: "Class",
+          limits: ["suv", "wagon", "compact"],
+          labels: %{"suv" => "SUV"}
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_discrete.svg")
+    end
+
+    # Golden: test/golden/scale_discrete_bars.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_discrete_bars.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. mpg's classes counted along y
+    # on a discrete y scale showing suv, compact and midsize, marking compact and suv alone,
+    # labelled by place, a whole level's room beside the first and last. It moves with what moves
+    # test/golden/horizontal_bar.svg, and with a discrete scale's breaks, labels and expansion.
+    test "a discrete scale's breaks mark some of its values, and its expansion sets its room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{y: :class})
+        |> Plot.geom_bar()
+        |> Plot.scale_y_discrete(
+          limits: ["suv", "compact", "midsize"],
+          breaks: ["compact", "suv"],
+          labels: ["Compact", "SUV"],
+          expand: [add: 1]
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_discrete_bars.svg")
     end
 
     test "a labels function that gives no string for each break is refused when drawn" do
