@@ -157,10 +157,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
-- **Each aesthetic other than position that a layer maps gets one scale for the whole plot**,
-  added when a layer maps it, of the kind its first column needs, the columns evaluated before the
-  stats first and those computed after them next, each in layer order, as ggplot2 adds the scales
-  of evaluated aesthetics before any stat runs; every column of it checked as an axis's are,
+- **Each aesthetic other than position that a layer maps gets one scale for the whole plot**:
+  the plot's own scale for it, refused when run unless it takes the kind of column the first
+  column needs (`Scale.takes?/2`, naming that column, where ggplot2 fails with "Continuous value
+  supplied to a discrete scale"), or else ggplot2's default for that kind (`Scale.new/2`), the
+  columns evaluated before the stats first and those computed after them next, each in layer
+  order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
+  it checked as an axis's are,
   trained once the positions are final on every layer's column of it (a column a stat dropped
   trains nothing), and each column mapped through it, then the set values on top: a
   value a layer sets wins, its mapping of the aesthetic dropped before evaluation
@@ -168,11 +171,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each non-position scale gives a legend unless it has no breaks**, ggplot2's guides built from
   the trained scales: titled by its label, or else as an axis is (`:none` takes no room), a key
   for each break the scale shows (`Scale.legend_breaks/1`: a continuous scale's breaks inside its
-  range, a discrete one's levels, `NA` last), labelled, at the value it maps to, drawn by the kind
+  limits, a discrete one's breaks among its limits, each from the scale's options), labelled as
+  its `labels` give, at the value it maps to, drawn by the kind
   of guide its scale names, whose struct the assembly builds (`%Guide.Legend{}` for `:legend`,
   `%Guide.Colorbar{bins: 15}` for `:colorbar`), as `Plot` builds a position's. **A colour bar's
-  keys carry their place up the bar** (`Scale.places/2`, 0 to 1 over the range, the gradient
-  form's), **and the colour bar its colours** (`decor`, `bins` values over the range from
+  keys carry their place up the bar** (`Scale.places/2`, 0 to 1 over the limits, the gradient
+  form's), **and the colour bar its colours** (`decor`, `bins` values over the limits from
   `Scale.samples/2`, each its place and colour, `extract_decor()`), worked out here from the scale,
   never by the guide; it draws no layer, so it has none. **Legends come in the order of their aesthetics' names, and one with
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
@@ -189,11 +193,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
   final and before the other aesthetics are mapped: a discrete key only where one of the layer's
   columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as
-  ggplot2's `.value`), `nil` for the `NA` key, so two layers mapping one aesthetic to different
-  columns each draw their own keys; a continuous scale's key always, which the scale's kind says
-  (`Scale.discrete?/1`), never the break's type, since a factor's numeric levels are discrete
-  keys; and every key where the layer's stat dropped those columns. ggplot2's `NA` key for values outside a
-  scale's limits waits for limits.
+  ggplot2's `.value`), matched as the scale matches values (`Scale.Discrete.key/1`, a limit of `4`
+  a column's `4.0`, as R compares them as text), `nil` for the `NA` key, so two layers mapping one
+  aesthetic to different columns each draw their own keys; the `NA` key also where one of those
+  columns holds a value no key shows, outside the scale's limits or breaks, which the scale maps
+  to its missing value, as `keep_key_data()` keeps it; a continuous scale's key always, which the
+  scale's kind says (`Scale.discrete?/1`), never the break's type, since a factor's numeric
+  levels are discrete keys; and every key where the layer's stat dropped those columns.
 - **Evaluated columns are the layer's own aesthetics, then those it takes from the plot's
   mapping, each mapping's `x` and `y` first and its others in name order, then `panel`, then
   `group`** (`Plot.mapping_order/2`), and the group key follows column order: reordering the

@@ -42,9 +42,9 @@ defmodule Giggly.Scale do
   # their bytes. A position scale's palette is the identity: mapping leaves a continuous value as
   # it is, or `nil` outside the scale's limits, and puts a discrete value at its level's position,
   # counting from 1, as ggplot2 does before the coordinate system rescales anything. Any other
-  # aesthetic's scale maps through its palette: a continuous value's place in the range, from 0 to
-  # 1 (R's `rescale()`), onto the palette's range, and a discrete value to its level's share of the
-  # palette's spread.
+  # aesthetic's scale maps through its palette: a continuous value's place in the scale's limits,
+  # from 0 to 1 (R's `rescale()`), onto the palette's range, and a discrete value to its level's
+  # share of the palette's spread.
   #
   # ## Options
   #
@@ -61,16 +61,20 @@ defmodule Giggly.Scale do
   #
   # ## Aesthetics other than position
   #
-  # `alpha`, `color` and `fill` so far (`non_position_aesthetics/0`), each scale ggplot2's default
-  # for its aesthetic. Alpha's maps a continuous column onto 0.1 to 1, `scale_alpha_continuous()`,
-  # and spreads a discrete one from 0.1 to 1, `scale_alpha_ordinal()`, which ggplot2's
-  # `scale_alpha_discrete()` uses with a warning that Giggly, building a plot without side effects,
-  # does not give. Colour's and fill's give a discrete column `pal_hue()`'s colours, as
-  # `scale_colour_discrete()` falls back to it, and a continuous one the gradient from `#132B43` to
-  # `#56B1F7`, `scale_colour_continuous()`'s, blended in L*a*b* (`Giggly.Scale.Palette`); a missing
-  # value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha. Each
-  # names the guide that draws it, as ggplot2's scales do: a colour bar for a continuous colour or
-  # fill, a legend for the rest.
+  # `alpha`, `color` and `fill` so far (`non_position_aesthetics/0`), each scale, unless the plot
+  # gives one, ggplot2's default for its aesthetic. Alpha's maps a continuous column onto 0.1 to
+  # 1, `scale_alpha_continuous()`, and spreads a discrete one from 0.1 to 1,
+  # `scale_alpha_ordinal()`, which ggplot2's `scale_alpha_discrete()` uses with a warning that
+  # Giggly, building a plot without side effects, does not give. Colour's and fill's give a
+  # discrete column `pal_hue()`'s colours, as `scale_colour_discrete()` falls back to it, and a
+  # continuous one the gradient from `#132B43` to `#56B1F7`, `scale_colour_continuous()`'s,
+  # blended in L*a*b* (`Giggly.Scale.Palette`). A plot's scale may carry another palette: manual,
+  # grey, another hue range or gradient. A continuous value's place runs over the scale's limits,
+  # or about its midpoint (R's `rescale_mid()`), and one outside them is censored, as ggplot2's
+  # `oob = censor`; a missing or censored value maps to the scale's `na_value`, grey50 for a
+  # colour, `nil`, R's `NA`, for alpha. Each names the guide that draws it, as ggplot2's scales
+  # do: a colour bar for a continuous colour or fill, a legend for the rest, whose breaks and
+  # labels are the scale's on its limits.
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
   # palette its colours, as R's `scales` depends on farver, and R's `as.character()`, which writes
@@ -121,11 +125,11 @@ defmodule Giggly.Scale do
   @alpha_range {0.1, 1.0}
 
   # ggplot2's default discrete colour palette, `pal_hue()`'s: hues from 15 degrees round the
-  # circle, chroma 100 and luminance 65.
-  @hue_palette {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}}
+  # circle, chroma 100 and luminance 65, in order.
+  @hue_palette {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
 
   # ggplot2's default continuous colour palette, `pal_seq_gradient("#132B43", "#56B1F7")`.
-  @gradient_palette {:gradient, {"#132B43", "#56B1F7"}}
+  @gradient_palette {:gradient, ["#132B43", "#56B1F7"]}
 
   # ggplot2's colour for a missing value, grey50.
   @color_na_value "#7F7F7F"
@@ -215,11 +219,42 @@ defmodule Giggly.Scale do
   def reset(%Discrete{} = scale), do: %{scale | continuous_range: :none}
 
   # Each value's position on the scale's axis: a continuous value unchanged, or `nil` outside the
-  # scale's limits, a discrete one at its level's position counting from 1.
+  # scale's limits, a discrete one at its level's position counting from 1. For an aesthetic other
+  # than position, each value through the scale's palette: a continuous one's place in the scale's
+  # limits (`limits/1`), from 0 to 1, by R's `rescale()`, or, where the scale has a midpoint, by
+  # `rescale_mid()`, put through the palette, and the scale's `na_value` for a missing value, one
+  # that is not a finite number, or one outside the limits, which ggplot2 censors and maps to its
+  # `na.value`; a discrete one as `Giggly.Scale.Discrete` maps it.
   @doc false
   @spec map(t(), list()) :: list()
-  def map(%Continuous{} = scale, values), do: Continuous.map(scale, values)
+  def map(%Continuous{palette: :identity} = scale, values), do: Continuous.censor(scale, values)
+
+  def map(%Continuous{palette: palette, na_value: na_value} = scale, values) do
+    bounds = limits(scale)
+
+    Enum.map(values, fn value ->
+      if bounds != :none and placed_inside?(value, bounds),
+        do: Palette.continuous(palette, place(value, bounds, scale.midpoint)),
+        else: na_value
+    end)
+  end
+
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
+
+  # A value's place in `bounds`, from 0 to 1: R's `rescale()`; or, about a midpoint, R's
+  # `rescale_mid()`, `(value - midpoint) / extent + 0.5`, `extent` twice the further end's distance
+  # from it, in that order of operations, so the further end is at 0 or 1 and the midpoint at the
+  # middle; bounds of zero width put every value at the middle.
+  defp place(value, bounds, :none), do: rescale(value, bounds, {0, 1})
+
+  defp place(value, {low, high}, midpoint) do
+    if zero_range?(low, high) do
+      0.5
+    else
+      extent = 2 * max(abs(low - midpoint), abs(high - midpoint))
+      (value - midpoint) / extent + 0.5
+    end
+  end
 
   # Each position, `nil` where a continuous scale's limits leave it out, `:infinity` and
   # `:neg_infinity` kept: ggplot2's second mapping of the positions, once they are final, which
@@ -328,8 +363,6 @@ defmodule Giggly.Scale do
     Enum.zip(positions, labels(scale, positions, :width, extent))
   end
 
-  def breaks(%Discrete{breaks: :none}, _extent), do: []
-
   def breaks(%Discrete{} = scale, _extent) do
     limits = Discrete.limits(scale)
 
@@ -338,16 +371,35 @@ defmodule Giggly.Scale do
       |> Enum.with_index(1)
       |> Map.new(fn {limit, position} -> {Discrete.key(limit), position} end)
 
+    scale
+    |> discrete_breaks(limits)
+    |> Enum.map(fn {value, label} ->
+      {Map.fetch!(position_by_key, Discrete.key(value)), label}
+    end)
+  end
+
+  # A discrete scale's breaks among `limits`, each the limit's value and its label: the values its
+  # `breaks` gives among the limits, in the order given, or else every limit; none for `:none`.
+  # Each is the limit as the scale holds it, which a given break names by value (`Discrete.key/1`),
+  # so a break of `4` is a level of `4.0`. Each is labelled by `discrete_labels/3`.
+  defp discrete_breaks(%Discrete{breaks: :none}, _limits), do: []
+
+  defp discrete_breaks(%Discrete{} = scale, limits) do
+    limit_by_key = Map.new(limits, fn limit -> {Discrete.key(limit), limit} end)
     candidates = discrete_candidates(scale, limits)
 
     {values, indexes} =
       candidates
       |> Enum.with_index()
-      |> Enum.filter(fn {value, _index} -> Map.has_key?(position_by_key, Discrete.key(value)) end)
+      |> Enum.flat_map(fn {value, index} ->
+        case Map.fetch(limit_by_key, Discrete.key(value)) do
+          {:ok, limit} -> [{limit, index}]
+          :error -> []
+        end
+      end)
       |> Enum.unzip()
 
-    positions = Enum.map(values, fn value -> Map.fetch!(position_by_key, Discrete.key(value)) end)
-    Enum.zip(positions, discrete_labels(scale, values, {indexes, length(candidates)}))
+    Enum.zip(values, discrete_labels(scale, values, {indexes, length(candidates)}))
   end
 
   # The values a discrete scale may mark: its breaks where given, else its limits.
@@ -388,38 +440,44 @@ defmodule Giggly.Scale do
        do: labelled(labeller, values)
 
   # The breaks a legend of the scale shows, in its transformation's order, each the value in the
-  # data and its label: ggplot2's `get_breaks()` and `get_labels()` on the scale's limits, its
-  # trained range or levels, not an axis's widened extent. A continuous scale's are its
-  # transformation's breaks inside the range, taken as floats as R's limits are doubles, one at
-  # its low end when it has zero width, and none when untrained; a discrete scale's are its
-  # limits, its levels unless it gives them, `nil` last and labelled `NA`, as ggplot2's legend
-  # keeps `NA`.
+  # data and its label: ggplot2's `get_breaks()` and `get_labels()` on the scale's limits
+  # (`limits/1`), not an axis's widened extent, so given breaks outside them are left out. A
+  # continuous scale's are its breaks, given or its transformation's, inside its limits, taken as
+  # floats as R's limits are doubles, one at the low end of limits of zero width, and none before
+  # the scale has limits; a discrete scale's are its breaks among its limits, `nil` labelled `NA`,
+  # as ggplot2's legend keeps `NA`; `:none` gives none.
   @doc false
-  @spec legend_breaks(t()) :: [{term(), String.t()}]
-  def legend_breaks(%Continuous{range: :none}), do: []
-
-  def legend_breaks(%Continuous{range: {low, high}} = scale),
-    do: breaks(scale, {low / 1, high / 1})
-
-  def legend_breaks(%Discrete{} = scale) do
-    limits = Discrete.limits(scale)
-    Enum.zip(limits, Labels.levels(limits))
+  @spec legend_breaks(t()) :: [{term(), String.t() | :none}]
+  def legend_breaks(%Continuous{} = scale) do
+    case limits(scale) do
+      :none -> []
+      {low, high} -> breaks(scale, {low / 1, high / 1})
+    end
   end
 
-  # `count` values spread evenly over the trained range of a continuous scale, from its low end to
-  # its high, as R's `seq(low, high, length.out = count)` spreads them (`Giggly.Scale.Palette`):
-  # the values ggplot2's colour bar takes its colours at (`extract_decor()`).
+  def legend_breaks(%Discrete{} = scale), do: discrete_breaks(scale, Discrete.limits(scale))
+
+  # `count` values spread evenly over a continuous scale's limits (`limits/1`), from their low end
+  # to their high, as R's `seq(low, high, length.out = count)` spreads them
+  # (`Giggly.Scale.Palette`): the values ggplot2's colour bar takes its colours at
+  # (`extract_decor()`).
   @doc false
   @spec samples(Continuous.t(), pos_integer()) :: [number()]
-  def samples(%Continuous{range: {low, high}}, count),
-    do: Palette.discrete({:sequence, {low, high}}, count)
+  def samples(%Continuous{} = scale, count) do
+    scale
+    |> limits()
+    |> Palette.spread(count)
+  end
 
-  # Each of `values`' place in the trained range of a continuous scale, from 0 at its low end to 1
-  # at its high (`rescale/3`), as ggplot2's colour bar places its ticks and its colours.
+  # Each of `values`' place in a continuous scale's limits (`limits/1`), from 0 at their low end
+  # to 1 at their high (`rescale/3`), as ggplot2's colour bar places its ticks and its colours,
+  # whatever the scale's midpoint.
   @doc false
   @spec places(Continuous.t(), [number()]) :: [float()]
-  def places(%Continuous{range: {_low, _high} = range}, values),
-    do: Enum.map(values, fn value -> rescale(value, range, {0, 1}) end)
+  def places(%Continuous{} = scale, values) do
+    bounds = limits(scale)
+    Enum.map(values, fn value -> rescale(value, bounds, {0, 1}) end)
+  end
 
   # The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
   # `breaks/2` gives on that extent: ggplot2's `get_breaks_minor()` as its view scale calls it,

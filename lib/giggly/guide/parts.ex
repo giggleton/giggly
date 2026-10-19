@@ -5,7 +5,8 @@ defmodule Giggly.Guide.Parts do
   # legend (`Giggly.Guide.Legend`) and a colour bar (`Giggly.Guide.Colorbar`), as ggplot2's
   # `GuideColourbar` lays itself out through `GuideLegend`'s measuring and arranging: the
   # background over the whole table, the title's rows above the keys, a line of text left-aligned
-  # in its cell and centred down it, and how tall a line of text is.
+  # in its cell and centred down it, how wide the labels are and how far from the keys, and how
+  # tall a line of text is.
   #
   # And a title, which every guide and the plot's own titles (`Giggly.Guide.Title`) draw alike: a
   # label that may run over several lines, split where it breaks, each line drawn by itself as R's
@@ -139,6 +140,24 @@ defmodule Giggly.Guide.Parts do
         }
       ]
     }
+  end
+
+  # Each of a guide's `labels`' width in points, set in `look`, a label of `:none` taking none.
+  @doc false
+  @spec label_widths([String.t() | :none], Theme.text()) :: [float()]
+  def label_widths(labels, look) do
+    Enum.map(labels, fn
+      :none -> 0.0
+      label -> Font.width(label, look.size)
+    end)
+  end
+
+  # The margin between a guide's keys and its labels, in `look`: none when every label is `:none`,
+  # as ggplot2 leaves out the labels' column and its margin for a scale with no labels.
+  @doc false
+  @spec label_margin([String.t() | :none], Theme.text()) :: float()
+  def label_margin(labels, look) do
+    if Enum.all?(labels, fn label -> label == :none end), do: 0.0, else: look.margin
   end
 
   # How tall a line of text `size` points is: its ascent and its deepest descent.

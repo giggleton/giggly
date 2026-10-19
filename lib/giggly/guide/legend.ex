@@ -14,7 +14,9 @@ defmodule Giggly.Guide.Legend do
   #     of each layer drawn over it, and its label right of it, the labels' margin from the key,
   #     centred on it as the title is;
   #   * the label column as wide as the widest label, or wider when the title is wider than the
-  #     keys and their labels, which leaves the room at the labels' right.
+  #     keys and their labels, which leaves the room at the labels' right; with no labels, neither
+  #     the column nor its margin, but the room a wider title needs right of the keys, as ggplot2
+  #     leaves them out for a scale with no labels.
   #
   # The legend's background spans the whole table, under everything; then the title, each key's
   # background and glyphs, and the labels, in ggplot2's drawing order.
@@ -26,8 +28,8 @@ defmodule Giggly.Guide.Legend do
   defimpl Giggly.Guide, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Guide
 
-    alias Giggly.{Font, Scene, Theme}
     alias Giggly.Guide.Parts
+    alias Giggly.{Scene, Theme}
     alias Giggly.Scene.{Cell, Rect}
 
     # The legend titled `title`, a key for each of `keys`, each its label and the glyphs drawn in
@@ -42,13 +44,14 @@ defmodule Giggly.Guide.Legend do
       } = theme
 
       labels = Enum.map(keys, fn key -> key.label end)
-      label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
+      label_widths = Parts.label_widths(labels, text_look)
+      label_margin = Parts.label_margin(labels, text_look)
       title_width = Parts.legend_title_width(title, title_look)
-      label_column = max(Enum.max(label_widths), title_width - key_size - text_look.margin)
+      label_column = max(Enum.max(label_widths), title_width - key_size - label_margin)
       {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
       first_key_row = 2 + length(title_rows)
 
-      widths = [margin, key_size, text_look.margin, label_column, margin]
+      widths = [margin, key_size, label_margin, label_column, margin]
       key_rows = List.duplicate(key_size, length(keys))
       heights = Enum.concat([[margin], title_rows, key_rows, [margin]])
 
@@ -86,10 +89,12 @@ defmodule Giggly.Guide.Legend do
       end)
     end
 
+    # Each key's label in its row, a key of no label drawing none.
     defp label_cells(labels, label_widths, text_look, first_row) do
       labels
       |> Enum.zip(label_widths)
       |> Enum.with_index(first_row)
+      |> Enum.reject(fn {{label, _width}, _row} -> label == :none end)
       |> Enum.map(fn {{label, width}, row} ->
         Parts.text_cell(label, width, text_look, row, 4..4)
       end)

@@ -79,6 +79,53 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Colour, fill and alpha scales are the scale functions' step 5, each option checked against
+  ggplot2 4.0.3 in R (2026-10-19, Steve, agreeing the proposal).** `scale_color_manual/2`
+  (`values:`, a list, or a map from value to colour as R's named vector, whose keys narrow the
+  default limits to the values the data holds; a list takes its names from `breaks:`, as R's
+  does), `scale_color_hue/2`, `scale_color_gray/2` (`start:`, `end:`; American, as the theme's
+  `:gray`, though R spells it only grey), `scale_color_discrete/2`, `scale_color_gradient/2`,
+  `scale_color_gradient2/2`, `scale_color_gradientn/2` (`colors:`), `scale_color_continuous/2`,
+  each with its `scale_fill_` twin, and `scale_alpha_continuous/2` and `scale_alpha_discrete/2`
+  (`range:`), each with `name:`, `limits:`, `breaks:`, `labels:` and `na_value:`, R's function
+  defaults (gray's missing value is red). `lims/2` takes `color:`, `fill:` and `alpha:`. A
+  legend shows the scale's breaks among its limits, labelled as given; a continuous scale maps
+  over its limits, censoring outside them. *Rejected: `guide:` in this step* (Steve: step 6,
+  beside `guides/2`, so which guide fits which scale is decided once). *Rejected:
+  `scale_alpha/2`*, R's alias. *Deferred:* `h.start`, gradientn's `values` and `rescaler`,
+  `aesthetics`, a transformation on these scales (so `lims/2` refuses numbers high to low for
+  them, which R reverses), `scale_alpha_manual()`, a gradient through colours with an alpha.
+
+- **`palette:` takes a list of colours (2026-10-19, Steve).** On `scale_color_continuous/2` it
+  is a gradient through them, the palette `scale_color_gradientn/2` records, as R's vector of
+  colours draws exactly gradientn's; on `scale_color_discrete/2` it gives the levels their
+  colours in order, the palette a manual scale's list records, and too few raise when the plot is
+  run, as R's manual scale fails (its discrete palette warns and leaves the points undrawn). A
+  palette stays a value naming its function (the entry beginning "A scale's palette is a
+  field"). *Rejected: a function as well* (`fn count -> colors end`), as R takes one: the scale
+  would hold a closure, and it draws nothing more, its one example needing brewer's colours.
+  *Deferred: a palette by name* (R's registry of 138, `"viridis"`), with the brewer and viridis
+  palettes most of its names point to.
+
+- **The hue scale's options are spelled out: `hue:`, `chroma:`, `luminance:` and `direction:`
+  (2026-10-19, Steve).** `scale_color_hue(hue: {0, 90}, luminance: 40)`, as the hue palette
+  records them and as Giggly names things, no abbreviation or single letter: `hue:` the range of
+  hues in degrees, spread end to end unless it spans the circle, `direction: -1` handing the
+  colours out in reverse, R's own name and values. *Rejected: R's `h:`, `c:` and `l:`*, what a
+  ggplot2 user types, from R's `hcl()`: three single-letter names in the API.
+
+- **A gradient is one palette of any number of colours, and gradient2's midpoint is the scale's
+  (2026-10-19, part of the agreed step 5).** R's three gradients are one palette,
+  `pal_gradient_n()`: each colour in L*a*b*, a straight line between neighbours as `approxfun()`
+  draws it, exact at each colour. So `{:gradient, colors}` replaces `{:gradient, {low, high}}`;
+  generalised from two colours, Giggly's blend matches R on all 30,054 colours sampled from six
+  colour sets, through the `color` library with farver's constants, no new library. gradient2
+  centres its colours on the midpoint by R's `rescale_mid()`, which R keeps on the scale as its
+  rescaler, so `Scale.Continuous` gains `midpoint`, `:none` otherwise; its colour bar's ticks are
+  placed over the limits, as R places them, ignoring it. *Rejected: a palette per function*,
+  three copies of one blend. *Rejected: the midpoint in the palette*: a palette takes a place
+  from 0 to 1, and the ticks never go through the midpoint.
+
 - **`date_breaks:` and `date_minor_breaks:` are a step as `Date.shift/2` takes one, `[week: 1]`,
   and `date_labels:` is a `Calendar.strftime/3` format (2026-10-19, Steve).** A step is one of
   `day`, `week`, `month` and `year`, R's units, with a positive whole count; its breaks run from
@@ -1684,6 +1731,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Give a plot colour, fill and alpha scales (scale functions, step 5); §4: "Colour,
+  fill and alpha scales are the scale functions' step 5", "`palette:` takes a list of colours",
+  "The hue scale's options are spelled out", "A gradient is one palette of any number of colours"
 - 2026-10-19 — Give a plot discrete and date position scales (scale functions, step 4); §4:
   "Discrete and date position scales are the scale functions' step 4", "A discrete axis names its
   values as the column holds them", "`date_breaks:` and `date_minor_breaks:` are a step"

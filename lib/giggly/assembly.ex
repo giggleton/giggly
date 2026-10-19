@@ -280,7 +280,7 @@ defmodule Giggly.Assembly do
         map_statistic(computed, {plot, layer, index}, scale_kinds, axes)
       end)
 
-    non_position_kinds = non_position_kinds(plot, grouped_data, statistic_data)
+    non_position_columns = non_position_columns(plot, grouped_data, statistic_data)
 
     layer_data =
       Enum.zip_with(layers, statistic_data, fn layer, statistic ->
@@ -311,8 +311,9 @@ defmodule Giggly.Assembly do
       end)
 
     non_position_scales =
-      Map.new(non_position_kinds, fn {aesthetic, kind} ->
-        {aesthetic, train_non_position(Scale.new(kind, aesthetic), aesthetic, positioned_data)}
+      Map.new(non_position_columns, fn {aesthetic, first_column} ->
+        untrained = non_position_scale(plot, aesthetic, first_column)
+        {aesthetic, train_non_position(untrained, aesthetic, positioned_data)}
       end)
 
     fixed_data =
@@ -494,9 +495,9 @@ defmodule Giggly.Assembly do
   defp guide(%{guide: :colorbar}), do: %Guide.Colorbar{bins: 15}
 
   # The legend with what its kind of guide draws beyond its keys, worked out from the scale: for a
-  # colour bar, each key's place up the bar, 0 at the low end of the scale's range to 1 at its high
-  # (ggplot2's `extract_params()` in the gradient form), and its colours (`decor`), sampled at the
-  # bar's `bins` values spread evenly over the range, each its place and colour, as
+  # colour bar, each key's place up the bar, 0 at the low end of the scale's limits to 1 at their
+  # high (ggplot2's `extract_params()` in the gradient form), and its colours (`decor`), sampled at
+  # the bar's `bins` values spread evenly over the limits, each its place and colour, as
   # `extract_decor()` takes them. A legend needs nothing more.
   defp with_guide_data(%{guide: %Guide.Colorbar{bins: bins}, keys: keys} = legend, scale) do
     places = Scale.places(scale, Enum.map(keys, fn key -> key.value end))
@@ -550,11 +551,13 @@ defmodule Giggly.Assembly do
 
   # Whether a layer draws in each key, as ggplot2's `keep_key_data()` decides: in a continuous
   # scale's key always, whatever its break; in a discrete key, a factor's number among them, only
-  # where one of the layer's columns of the aesthetics it maps holds the break, `nil` among them, so
-  # a layer whose column lacks a level a second layer's column gave the scale leaves that key to the
-  # second; and in every key where the layer's stat dropped those columns. ggplot2 also keeps the
-  # `NA` key for a layer holding values outside the scale's limits, which the scale maps to `NA`;
-  # with no limits but the trained levels, every value is a key.
+  # where one of the layer's columns of the aesthetics it maps holds the break, a value matched as
+  # the scale matches it (`Scale.Discrete.key/1`, so a limit of `4` is a column's `4.0`, as R
+  # matches the two as text), `nil` among them, so a layer whose column lacks a level a second
+  # layer's column gave the scale leaves that key to the second; in the `NA` key, also where one
+  # of those columns holds a value no key shows, one outside the scale's limits or breaks, which
+  # the scale maps to its missing value; and in every key where the layer's stat dropped those
+  # columns.
   defp draws(keys, _frame, _aesthetics, false), do: Enum.map(keys, fn _key -> true end)
 
   defp draws(keys, frame, aesthetics, true) do
@@ -566,9 +569,15 @@ defmodule Giggly.Assembly do
         held =
           present
           |> Enum.flat_map(fn aesthetic -> DataFrame.pull(frame, aesthetic) end)
-          |> MapSet.new()
+          |> MapSet.new(&Scale.Discrete.key/1)
 
-        Enum.map(keys, fn key -> MapSet.member?(held, key.value) end)
+        shown = MapSet.new(keys, fn key -> Scale.Discrete.key(key.value) end)
+        unshown? = not MapSet.subset?(held, shown)
+
+        Enum.map(keys, fn key ->
+          MapSet.member?(held, Scale.Discrete.key(key.value)) or
+            (is_nil(key.value) and unshown?)
+        end)
     end
   end
 
@@ -910,14 +919,33 @@ defmodule Giggly.Assembly do
       scale
     else
       selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
-
-      [{index, aesthetic, column, _dtype, column_kind} | _rest] =
-        mapped_columns(plot, layer_frames, selected?, :start)
-
-      raise ArgumentError,
-            "the plot's #{family} scale is #{scale_description(scale)}, but the layer at index " <>
-              "#{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
+      [first_column | _rest] = mapped_columns(plot, layer_frames, selected?, :start)
+      raise ArgumentError, untaken_message(scale, family, first_column)
     end
+  end
+
+  # The untrained scale of `aesthetic`, one other than position that a layer maps: the plot's own
+  # scale for it, which must take the kind of column its first column needs, or else ggplot2's
+  # default for the aesthetic and that kind, as ggplot2 adds a default scale only for an aesthetic
+  # the plot has none for. A plot's scale that does not take it is refused when the plot is run,
+  # naming that column, as ggplot2 refuses "Continuous value supplied to a discrete scale".
+  defp non_position_scale(%Plot{scales: scales}, aesthetic, first_column) do
+    {_index, _aesthetic, _column, _dtype, kind} = first_column
+
+    case Map.fetch(scales, aesthetic) do
+      {:ok, scale} ->
+        if Scale.takes?(scale, kind),
+          do: scale,
+          else: raise(ArgumentError, untaken_message(scale, aesthetic, first_column))
+
+      :error ->
+        Scale.new(kind, aesthetic)
+    end
+  end
+
+  defp untaken_message(scale, scale_name, {index, aesthetic, column, _dtype, column_kind}) do
+    "the plot's #{scale_name} scale is #{scale_description(scale)}, but the layer at index " <>
+      "#{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
   end
 
   # A scale's kind, and a continuous scale's transformation where it has one, which a refusal names
@@ -945,21 +973,24 @@ defmodule Giggly.Assembly do
     end
   end
 
-  # The kind of scale each aesthetic other than position needs, for those a layer maps: as an
-  # axis's, every column of it must be a type some scale can map, and all of one kind, the first
-  # deciding, as ggplot2 adds a scale for the first layer's and refuses a column it cannot map.
+  # The first column of each aesthetic other than position that a layer maps, which decides the
+  # kind of scale it needs: as an axis's, every column of it must be a type some scale can map,
+  # and all of one kind, the first deciding, as ggplot2 adds a scale for the first layer's and
+  # refuses a column it cannot map.
   # The columns evaluated before the stats come first, read from `layer_frames`, and those computed
   # after, from `statistic_frames`, each in layer order, as ggplot2 adds the scales of every layer's
   # evaluated aesthetics before any stat runs and an after_stat's as its layer's stat is mapped.
-  defp non_position_kinds(plot, layer_frames, statistic_frames) do
+  defp non_position_columns(plot, layer_frames, statistic_frames) do
     for aesthetic <- Scale.non_position_aesthetics(),
         selected? = fn mapped -> mapped == aesthetic end,
         evaluated = mapped_columns(plot, layer_frames, selected?, :start),
         computed = mapped_columns(plot, statistic_frames, selected?, :after_stat),
         columns = Enum.concat(evaluated, computed),
         columns != [],
-        into: %{},
-        do: {aesthetic, checked_kind(columns, "an aesthetic has one scale")}
+        into: %{} do
+      checked_kind(columns, "an aesthetic has one scale")
+      {aesthetic, hd(columns)}
+    end
   end
 
   # Each column a layer maps to one of the aesthetics `selected?` chooses, with a value of `stage`

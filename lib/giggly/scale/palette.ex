@@ -7,22 +7,37 @@ defmodule Giggly.Scale.Palette do
   #
   #   * `:identity`, a position's: the value is left where the scale puts it, as ggplot2's position
   #     scales' palette is the identity, and the coordinate system places it.
-  #   * `{:rescale, {low, high}}`, a continuous scale's: a value's place in the trained range, from
-  #     0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does with `rescale()`.
-  #   * `{:gradient, {low, high}}`, a continuous colour scale's: a value's place in the trained
-  #     range, from 0 to 1, as far from the colour `low` toward `high`, blended in CIE L*a*b*, as R's
-  #     `pal_seq_gradient()` blends them through `colour_ramp()`: each colour's L*, a* and b*
-  #     interpolated as R's `approxfun()` does, its end exact, and the blend turned back into a
-  #     colour (`Giggly.ColorOperations`). ggplot2's default runs from `#132B43` to `#56B1F7`.
+  #   * `{:rescale, {low, high}}`, a continuous scale's: a value's place in the scale's limits,
+  #     from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does with `rescale()`.
+  #   * `{:gradient, colors}`, a continuous colour scale's: a value's place in the limits, from 0
+  #     to 1, along a gradient through `colors`, spaced evenly from 0 to 1, as R's
+  #     `pal_gradient_n()` blends them through `colour_ramp()`, which its two- and three-colour
+  #     gradients are too: each colour's L*, a* and b* (`Giggly.ColorOperations`), the place's
+  #     channels interpolated between the two colours either side as R's `approxfun()` does, a
+  #     place at a colour taking that colour's exactly, and the blend turned back into a colour. One
+  #     colour is every place's. ggplot2's default runs from `#132B43` to `#56B1F7`.
   #   * `{:sequence, {low, high}}`, a discrete scale's: given the number of levels, that many
   #     values from `low` to `high`, evenly spaced, as ggplot2's ordinal alpha scale takes R's
   #     `seq(low, high, length.out = n)`.
-  #   * `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance}}`, a discrete colour
-  #     scale's: given the number of levels, that many colours of one chroma and luminance, their
-  #     hues spaced evenly round the circle from `low`, as R's `pal_hue()` gives them. ggplot2's
-  #     default is `pal_hue()`'s, hues from 15 round to 375, chroma 100 and luminance 65; `high` is
-  #     a full circle on from `low`, the one range a plot can give until a scale function can set
-  #     another.
+  #   * `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}`,
+  #     a discrete colour scale's: given the number of levels, that many colours of one chroma and
+  #     luminance, their hues spaced evenly from `low` to `high`, as R's `pal_hue()` gives them,
+  #     handed out in reverse for a `direction` of -1. A range spanning the whole circle, less than
+  #     a degree short of it or past it, leaves its last share off, since its end is its start.
+  #     ggplot2's default is hues from 15 round to 375, chroma 100 and luminance 65.
+  #   * `{:gray, {start, finish}}`, a discrete colour scale's: given the number of levels, that
+  #     many greys from the level `start` to `finish`, 0 black and 1 white, as R's `pal_grey()`
+  #     takes them from `grey.colors()`: the levels spaced evenly once raised to the power 2.2,
+  #     each brought back by the power `1 / 2.2` and written as R's `gray()` writes it, its byte
+  #     `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which finds the second half
+  #     by steps back from the end, where `seq()` steps on from the start; the bytes are the same
+  #     either way, for every one of 20,000 random ranges and counts, so they are spaced as `seq()`
+  #     spaces them.
+  #   * `{:manual, colors}`, a discrete colour scale's, `colors` a list: its first colours, one for
+  #     each level in level order, as R's manual palette gives them. A manual palette may instead
+  #     be a map from a value to its colour, each level taking its own by value (`named/3`). Either
+  #     way, more levels than colours cannot be drawn, as R's manual scale fails whatever its
+  #     colours' names.
   #
   # Use it through `Giggly.Scale`.
 
@@ -33,36 +48,67 @@ defmodule Giggly.Scale.Palette do
   @type t ::
           :identity
           | {:rescale, {number(), number()}}
-          | {:gradient, {String.t(), String.t()}}
+          | {:gradient, [String.t()]}
           | {:sequence, {number(), number()}}
-          | {:hue, %{hue: {number(), number()}, chroma: number(), luminance: number()}}
+          | {:hue,
+             %{
+               hue: {number(), number()},
+               chroma: number(),
+               luminance: number(),
+               direction: 1 | -1
+             }}
+          | {:gray, {number(), number()}}
+          | {:manual, [ColorOperations.t()] | %{term() => ColorOperations.t()}}
 
-  # A continuous palette's value for a place from 0 to 1 in the trained range: for a rescale, R's
+  # R's gamma for `grey.colors()`.
+  @gray_gamma 2.2
+
+  # A continuous palette's value for a place from 0 to 1 in the scale's limits: for a rescale, R's
   # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for a gradient, the
-  # colour that far from its low end to its high, as the opening comment says.
+  # colour that far along it, as the opening comment says.
   @doc false
   @spec continuous({:rescale, {number(), number()}}, number()) :: float()
-  @spec continuous({:gradient, {String.t(), String.t()}}, number()) :: String.t()
+  @spec continuous({:gradient, [String.t()]}, number()) :: String.t()
   def continuous({:rescale, to}, place), do: Giggly.Scale.rescale(place, {0, 1}, to)
 
-  def continuous({:gradient, {_low, high}}, place) when place == 1 do
-    high
-    |> lab_channels()
-    |> List.to_tuple()
-    |> ColorOperations.from_lab()
+  def continuous({:gradient, [color]}, _place), do: color
+
+  def continuous({:gradient, colors}, place) do
+    knots = spread({0.0, 1.0}, length(colors))
+
+    lab =
+      case Enum.find_index(knots, fn knot -> knot == place end) do
+        nil ->
+          blend(Enum.zip(knots, colors), place)
+
+        index ->
+          colors
+          |> Enum.at(index)
+          |> ColorOperations.to_lab()
+      end
+
+    ColorOperations.from_lab(lab)
   end
 
-  def continuous({:gradient, {low, high}}, place) do
-    low_channels = lab_channels(low)
-
-    blend =
-      Enum.zip_with(low_channels, lab_channels(high), fn low_channel, high_channel ->
-        low_channel + (high_channel - low_channel) * place
+  # The L*a*b* `place` of the way between the two colours either side of it, each a knot and its
+  # colour, as R's `approxfun()` interpolates: `low + (high - low) * ((place - low_knot) /
+  # (high_knot - low_knot))`, channel by channel, in that order of operations.
+  defp blend(knotted, place) do
+    [{low_knot, low_color}, {high_knot, high_color}] =
+      knotted
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.find(fn [{low_knot, _low}, {high_knot, _high}] ->
+        place > low_knot and place < high_knot
       end)
 
-    blend
+    fraction = (place - low_knot) / (high_knot - low_knot)
+
+    low_color
+    |> lab_channels()
+    |> Enum.zip_with(lab_channels(high_color), fn low_channel, high_channel ->
+      low_channel + (high_channel - low_channel) * fraction
+    end)
     |> List.to_tuple()
-    |> ColorOperations.from_lab()
   end
 
   # A colour's L*, a* and b*, as a list.
@@ -74,40 +120,102 @@ defmodule Giggly.Scale.Palette do
 
   # A discrete palette's values for `count` levels, in level order.
   #
-  # A sequence's are R's `seq(low, high, length.out = count)`, none for no levels, the first `low`
-  # and the last `high` exactly, and each one between `low` plus its index times the step, in that
-  # order of operations, as R's `seq.default()` computes it, so the fourth of seven is
-  # 0.54999999999999993, not 0.55.
+  # A sequence's are R's `seq(low, high, length.out = count)` (`spread/2`).
   #
-  # A hue palette's are `pal_hue()`'s: the circle's last `360 / count` degrees left off, since its
-  # end is its start, the hues spread over the rest by the same `seq()`, and each colour made by
-  # `ColorOperations.from_hcl/3`, as `pal_hue()` has farver encode it. R takes each hue modulo 360
-  # first; a hue is turned through its cosine and sine, which repeat every 360 degrees, so the
-  # colours are the same without it, as they are for every count from 1 to 400. A scale whose every
-  # value is missing has no levels to ask for, and ggplot2 then maps every value to its NA value
-  # without asking its palette, so no levels give none.
+  # A hue palette's are `pal_hue()`'s: the circle's last `360 / count` degrees left off where the
+  # range, taken modulo 360 as R's `%%` takes it, is less than a degree, since its end is then its
+  # start; the hues spread over the range by `spread/2`; each colour made by
+  # `ColorOperations.from_hcl/3`, as `pal_hue()` has farver encode it; and the colours reversed for
+  # a direction of -1. R takes each hue modulo 360 first; a hue is turned through its cosine and
+  # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
+  # every range, chroma, luminance and count its test pins.
+  #
+  # A grey palette's are `grey.colors()`'s and a manual one's its first colours, as the opening
+  # comment says; a manual palette of too few colours raises.
+  #
+  # A scale whose every value is missing has no levels to ask for, and ggplot2 then maps every
+  # value to its NA value without asking its palette, so no levels give none.
   @doc false
   @spec discrete({:sequence, {number(), number()}}, non_neg_integer()) :: [number()]
-  @spec discrete({:hue, map()}, non_neg_integer()) :: [String.t()]
-  def discrete({:sequence, {_low, _high}}, 0), do: []
-  def discrete({:sequence, {low, _high}}, 1), do: [low]
-  def discrete({:sequence, {low, high}}, 2), do: [low, high]
+  @spec discrete({:hue | :gray | :manual, term()}, non_neg_integer()) :: [ColorOperations.t()]
+  def discrete({:sequence, range}, count), do: spread(range, count)
 
-  def discrete({:sequence, {low, high}}, count) when count > 2 do
+  def discrete({:hue, _parameters}, 0), do: []
+
+  def discrete({:hue, %{hue: {low, high}} = parameters}, count) when count > 0 do
+    %{chroma: chroma, luminance: luminance, direction: direction} = parameters
+    high = if modulo(high - low, 360) < 1, do: high - 360 / count, else: high
+
+    {low, high}
+    |> spread(count)
+    |> Enum.map(fn hue -> ColorOperations.from_hcl(hue, chroma, luminance) end)
+    |> directed(direction)
+  end
+
+  def discrete({:gray, _range}, 0), do: []
+
+  def discrete({:gray, {start, finish}}, count) when count > 0 do
+    {:math.pow(start, @gray_gamma), :math.pow(finish, @gray_gamma)}
+    |> spread(count)
+    |> Enum.map(fn level -> gray(:math.pow(level, 1 / @gray_gamma)) end)
+  end
+
+  def discrete({:manual, colors}, count) when is_list(colors) do
+    check_enough(colors, count)
+    Enum.take(colors, count)
+  end
+
+  # A manual palette's map's colour for each of `keys`, the present levels' keys as the scale
+  # matches them (`Giggly.Scale.Discrete.key/1`), the map's keys turned so too, or `missing` for
+  # a level the map has no colour for; a map of fewer colours than levels raises, as the opening
+  # comment says.
+  @doc false
+  @spec named(%{term() => ColorOperations.t()}, [term()], term()) :: [term()]
+  def named(color_by_key, keys, missing) do
+    check_enough(color_by_key, length(keys))
+    Enum.map(keys, fn key -> Map.get(color_by_key, key, missing) end)
+  end
+
+  defp check_enough(colors, count) when is_list(colors) and count <= length(colors), do: :ok
+  defp check_enough(colors, count) when is_map(colors) and count <= map_size(colors), do: :ok
+
+  defp check_enough(colors, count) do
+    raise ArgumentError,
+          "a manual scale needs a value for each of its #{count} levels, " <>
+            "but has #{Enum.count(colors)}: #{inspect(colors)}"
+  end
+
+  # `count` values from `low` to `high`, evenly spaced, as R's `seq(low, high, length.out =
+  # count)` spaces them: none for no levels, the first `low` and the last `high` exactly, and each
+  # one between `low` plus its index times the step, in that order of operations, as R's
+  # `seq.default()` computes it, so the fourth of seven from 0.1 to 1 is 0.54999999999999993, not
+  # 0.55; one for one level, `low`.
+  @doc false
+  @spec spread({number(), number()}, non_neg_integer()) :: [number()]
+  def spread({_low, _high}, 0), do: []
+  def spread({low, _high}, 1), do: [low]
+  def spread({low, high}, 2), do: [low, high]
+
+  def spread({low, high}, count) when count > 2 do
     step = (high - low) / (count - 1)
     between = Enum.map(1..(count - 2), fn index -> low + index * step end)
     Enum.concat([[low], between, [high]])
   end
 
-  def discrete({:hue, _parameters}, 0), do: []
+  # A grey of `level`, 0 black to 1 white, as R's `gray()` writes it.
+  defp gray(level) do
+    digits =
+      (255 * level + 0.5)
+      |> trunc()
+      |> Integer.to_string(16)
+      |> String.pad_leading(2, "0")
 
-  def discrete(
-        {:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance}},
-        count
-      )
-      when high - low == 360 and count > 0 do
-    {:sequence, {low, high - 360 / count}}
-    |> discrete(count)
-    |> Enum.map(fn hue -> ColorOperations.from_hcl(hue, chroma, luminance) end)
+    "#" <> String.duplicate(digits, 3)
   end
+
+  defp directed(colors, 1), do: colors
+  defp directed(colors, -1), do: Enum.reverse(colors)
+
+  # `value` modulo `divisor`, its sign the divisor's, as R's `%%` takes it.
+  defp modulo(value, divisor), do: value - Float.floor(value / divisor) * divisor
 end

@@ -922,6 +922,88 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2 and the legends under a plot's colour, fill or alpha scale" do
+    @cylinders %{"mpg" => [22.8, 24.4, 32.4], "wt" => [2.32, 3.19, 2.2], "cyl" => [4.0, 4.0, 4.0]}
+
+    # Golden: ggplot2 4.0.3's lims page in R 4.6.1, `lims(colour = c("4", "6", "8"))` over the
+    # rows of mtcars with four cylinders: their colour the first of three hues, the legend's keys
+    # 4, 6 and 8, a point drawn only in 4's, as vdiffr's drawing has twelve circles for eleven rows.
+    test "a colour scale's limits give the legend a key for each, glyphs only where data is" do
+      plot =
+        @cylinders
+        |> Plot.new(%{x: :mpg, y: :wt, colour: {:factor, [:cyl]}})
+        |> Plot.geom_point()
+        |> Plot.lims(colour: [4, 6, 8])
+
+      [legend] = Giggly.Assembly.run(plot).legends
+      [layer] = legend.layers
+      frame = Giggly.layer_data(plot)
+      colors = DataFrame.pull(frame, :color)
+
+      assert {colors, Enum.map(legend.keys, fn key -> {key.label, key.values.color} end),
+              layer.draws} ===
+               {["#F8766D", "#F8766D", "#F8766D"],
+                [{"4", "#F8766D"}, {"6", "#00BA38"}, {"8", "#619CFF"}], [true, false, false]}
+    end
+
+    # Golden: ggplot2 4.0.3's `keep_key_data()` in R 4.6.1, `scale_colour_hue(limits = c("4",
+    # NA))` over the values 4, 6 and 8: the legend's keys 4 and NA, a point drawn in both, as
+    # vdiffr's drawing has five circles for three rows, since 6 and 8, outside the limits, map to
+    # the missing value.
+    test "a layer draws in the NA key where it holds a value no key shows" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [1, 2, 3], "v" => ["4", "6", "8"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :v})
+        |> Plot.geom_point()
+        |> Plot.scale_color_hue(limits: ["4", nil])
+
+      [legend] = Giggly.Assembly.run(plot).legends
+      [layer] = legend.layers
+
+      assert {Enum.map(legend.keys, fn key -> key.label end), layer.draws} ===
+               {["4", "NA"], [true, true]}
+    end
+
+    test "a scale's name titles its legend over a label, whichever comes first" do
+      plot =
+        @cylinders
+        |> Plot.new(%{x: :mpg, y: :wt, fill: {:factor, [:cyl]}})
+        |> Plot.geom_col()
+        |> Plot.labs(fill: "from labs")
+        |> Plot.scale_fill_hue(name: "from the scale")
+
+      [legend] = Giggly.Assembly.run(plot).legends
+      assert legend.title === "from the scale"
+    end
+
+    # ggplot2 4.0.3 in R 4.6.1 refuses `scale_colour_manual()` over a column of numbers
+    # ("Continuous value supplied to a discrete scale") and `scale_colour_gradient()` over
+    # `factor(cyl)` ("Discrete value supplied to a continuous scale").
+    test "a column of a kind the plot's scale does not take is refused when the plot is run" do
+      discrete =
+        @cylinders
+        |> Plot.new(%{x: :mpg, y: :wt, colour: :cyl})
+        |> Plot.geom_point()
+        |> Plot.scale_color_manual(values: ["red"])
+
+      continuous =
+        @cylinders
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point(%{alpha: {:factor, [:cyl]}})
+        |> Plot.scale_alpha_continuous()
+
+      for {plot, scale, column} <- [
+            {discrete, "color scale is discrete", ~s(maps :color to "cyl", a continuous column)},
+            {continuous, "alpha scale is continuous",
+             ~s(maps :alpha to {:factor, ["cyl"]}, a discrete column)}
+          ] do
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ scale
+        assert error.message =~ column
+      end
+    end
+  end
+
   describe "layer_data/2, expressions and constants" do
     # Golden: ggplot2 4.0.3's `layer_data()` for `ggplot(d, aes(cty, hwy / cty)) +
     # geom_point(aes(colour = "smooth"))` in R 4.6.1 puts every row in group 1. The values it
@@ -3017,6 +3099,178 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/scale_discrete_bars.svg")
     end
 
+    # Golden: test/golden/scale_manual.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/scale_manual.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. ggplot2's scale_manual example: mtcars's points
+    # coloured by their cylinders through named colours, CSS's agreeing with R's for these four,
+    # the legend's keys the breaks given, labelled as given. It moves with what moves
+    # test/golden/point.svg, with a manual scale, and with a legend's breaks and labels.
+    test "a manual colour scale colours each value by name, its legend's keys its breaks" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+        |> Plot.scale_color_manual(
+          values: %{8 => "red", 4 => "blue", 6 => "darkgreen", 10 => "orange"},
+          breaks: [4, 6, 8],
+          labels: ["four", "six", "eight"]
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/scale_manual.svg")
+    end
+
+    # Golden: test/golden/scale_manual_limits.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_manual_limits.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. A manual scale's limits name
+    # 10, which mtcars lacks: its key is drawn on its background, orange, with no point in it. It
+    # moves with what moves test/golden/scale_manual.svg, and with which keys a layer draws in.
+    test "a manual scale's limit the data lacks has a key with no glyph in it" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+        |> Plot.scale_color_manual(
+          values: %{8 => "red", 4 => "blue", 6 => "darkgreen", 10 => "orange"},
+          limits: [4, 6, 8, 10]
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/scale_manual_limits.svg")
+    end
+
+    # Golden: test/golden/scale_hue.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/scale_hue.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's points coloured by drive train through
+    # hues from 0 to 90 degrees, spread end to end, chroma 150 and luminance 70, in reverse. It
+    # moves with what moves test/golden/point.svg, and with the hue palette.
+    test "a hue scale's options choose its hues, chroma, luminance and direction" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.scale_color_hue(hue: {0, 90}, luminance: 70, chroma: 150, direction: -1)
+
+      assert to_svg(plot) == File.read!("test/golden/scale_hue.svg")
+    end
+
+    # Golden: test/golden/scale_gray_bars.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_gray_bars.R: every element matches it, the x axis drawn before the
+    # y as in test/golden/point.svg, and every clip path. mpg's classes counted, each bar stacked
+    # by drive train and filled in greys from 0.2 to 0.8, as R's grey.colors() spaces them. It
+    # moves with what moves test/golden/bar_fill.svg, and with the grey palette.
+    test "a grey fill scale fills each value in a grey, spaced evenly to the eye" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, fill: :drv})
+        |> Plot.geom_bar()
+        |> Plot.scale_fill_gray()
+
+      assert to_svg(plot) == File.read!("test/golden/scale_gray_bars.svg")
+    end
+
+    # Golden: test/golden/scale_alpha_range.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_alpha_range.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. ggplot2's scale_alpha
+    # examples in one: each point as opaque as its year on 0 to 1, 1999's invisible, the legend
+    # titled by the scale's name. It moves with what moves test/golden/alpha_legend.svg, and with
+    # an alpha scale's options.
+    test "an alpha scale's range sets its opacities, and its name titles its legend" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point(%{alpha: :year})
+        |> Plot.scale_alpha_continuous(name: "cylinders", range: {0, 1})
+
+      assert to_svg(plot) == File.read!("test/golden/scale_alpha_range.svg")
+    end
+
+    # Golden: test/golden/legend_unlabelled.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_unlabelled.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. A colour legend with no
+    # labels: its keys alone under its title, the labels' column and margin left out, so the panel
+    # is that much wider. It moves with what moves test/golden/point_colour_legend.svg, and with a
+    # legend's layout.
+    test "a legend with no labels leaves out their column and its margin" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+        |> Plot.scale_color_discrete(labels: :none)
+
+      assert to_svg(plot) == File.read!("test/golden/legend_unlabelled.svg")
+    end
+
+    # Golden: test/golden/scale_gradient.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/scale_gradient.R: every element matches vdiffr's but the colour bar's
+    # fill, which vdiffr cannot draw, every gradient stop matches svglite's, the gradient at the
+    # middle of its own rectangle in each, and every clip path matches. mpg's points coloured by
+    # city mileage from white to black, blended in Lab. It moves with what moves
+    # test/golden/point_colourbar.svg, and with a gradient's colours.
+    test "a gradient scale blends from its low colour to its high" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.scale_color_gradient(low: "white", high: "black")
+
+      assert to_svg(plot) == File.read!("test/golden/scale_gradient.svg")
+    end
+
+    # Golden: test/golden/scale_gradient2.svg, checked as test/golden/scale_gradient.svg is, against
+    # test/golden/scale_gradient2.R's drawings. City mileage diverging from white at 20: 35, the
+    # end further from it, dark blue in full, 9 only as far toward dark red as it reaches; the
+    # colour bar's ticks at the breaks given, labelled as given, placed over the range whatever
+    # the midpoint. It moves with what moves test/golden/scale_gradient.svg, and with a midpoint.
+    test "a diverging gradient centres its colours on its midpoint" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.scale_color_gradient2(
+          midpoint: 20,
+          breaks: [10, 20, 30],
+          labels: ["ten", "twenty", "thirty"]
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/scale_gradient2.svg")
+    end
+
+    # Golden: test/golden/scale_gradientn.svg, checked as test/golden/scale_gradient.svg is, against
+    # test/golden/scale_gradientn.R's drawings. City mileage through R's terrain.colors(10),
+    # written out, spaced evenly over limits of 10 to 30: the cars outside them grey50, the colour
+    # bar spanning the limits. It moves with what moves test/golden/scale_gradient.svg, and with a
+    # continuous colour scale's limits.
+    test "a gradient through many colours spans the limits, a value outside them grey" do
+      terrain =
+        ~w(#00A600 #2DB600 #63C600 #A0D600 #E6E600 #E8C32E #EBB25E #EDB48E #F0C9C0 #F2F2F2)
+
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.scale_color_gradientn(colors: terrain, limits: {10, 30})
+
+      assert to_svg(plot) == File.read!("test/golden/scale_gradientn.svg")
+    end
+
+    # Golden: test/golden/colorbar_unlabelled.svg, checked as test/golden/scale_gradient.svg is,
+    # against test/golden/colorbar_unlabelled.R's drawings. A colour bar through a palette of three
+    # colours with no labels, under a title wider than the bar: its ticks drawn, the labels'
+    # column and margin left out, the bar at the title's left. It moves with what moves
+    # test/golden/scale_gradient.svg, and with a colour bar's layout.
+    test "a colour bar with no labels keeps its ticks and leaves out the labels' room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.scale_color_continuous(
+          name: "a much wider title",
+          palette: ["#FEE0D2", "#FC9272", "#DE2D26"],
+          labels: :none
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/colorbar_unlabelled.svg")
+    end
+
     test "a labels function that gives no string for each break is refused when drawn" do
       plot =
         @rows
@@ -3399,6 +3653,13 @@ defmodule GigglyTest do
 
   defp edges(frame) do
     Map.new([:xmin, :xmax, :ymin, :ymax, :y], fn name -> {name, DataFrame.pull(frame, name)} end)
+  end
+
+  # The plot drawn at vdiffr's size, 720 by 576 points, as its goldens are.
+  defp to_svg(plot) do
+    plot
+    |> Giggly.to_svg(width: 960, height: 768)
+    |> IO.iodata_to_binary()
   end
 
   # The lines a plot's layers and legend draw, as its drawing at vdiffr's size writes them: every

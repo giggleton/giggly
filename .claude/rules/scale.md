@@ -26,27 +26,39 @@ grid lines are placed by the coordinate system".
 - **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
   it one aesthetic's.** A palette is a value naming its function (`Scale.Palette`), never a
   closure: `:identity` for a position, `{:rescale, {low, high}}` for a continuous aesthetic, R's
-  `pal_rescale()`, `{:gradient, {low, high}}` for a continuous colour or fill, R's
-  `pal_seq_gradient()`, `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high,
-  length.out = n)` as ggplot2's ordinal alpha takes it, and `{:hue, %{hue:, chroma:, luminance:}}`
-  for a discrete colour or fill, R's `pal_hue()`. `new/1` makes a position scale; `new/2` makes an
-  aesthetic's with ggplot2's default palette for it (`alpha`: 0.1 to 1; `color` and `fill`: the
-  gradient from `#132B43` to `#56B1F7`, or `pal_hue()`'s hues from 15 round to 375, chroma 100,
-  luminance 65), one of `non_position_aesthetics/0`.
-- **The gradient is exactly R's `pal_seq_gradient()`**: a place from 0 to 1 blended from the low
-  colour to the high in CIE L*a*b* (`Giggly.ColorOperations`), each channel interpolated as R's
-  `approxfun()` does, the high end exact at 1, as `colour_ramp()` blends; its tests pin R's
-  colours.
-- **A continuous value's place in the range is R's `rescale()` (`Scale.rescale/3`), in R's order
-  of operations**, and a range of zero width puts every value at the middle, so one value maps to
-  the middle of its palette (0.55 for alpha); the rescale palette calls the same function. A
-  missing value, or one that is not a finite number, maps to the scale's `na_value`, ggplot2's
-  `na.value`: `nil` for a position and alpha, grey50 for a colour or fill.
-- **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`): a
-  continuous scale's are its transformation's breaks inside its trained range, taken as floats as
-  R's limits are doubles, one at the low end of a range of zero width, none untrained; a discrete
-  scale's are its limits (`Discrete.limits/1`), `nil` last and labelled `NA`, as ggplot2's legend
-  keeps `NA`.
+  `pal_rescale()`, `{:gradient, colors}` for a continuous colour or fill, R's `pal_gradient_n()`,
+  `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high, length.out = n)` as
+  ggplot2's ordinal alpha takes it, and for a discrete colour or fill `{:hue, %{hue:, chroma:,
+  luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`, or
+  `{:manual, colors}`, a list or a map from value to colour, R's manual palette. `new/1` makes a
+  position scale; `new/2` makes an aesthetic's with ggplot2's default palette for it (`alpha`: 0.1
+  to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or `pal_hue()`'s hues from
+  15 round to 375, chroma 100, luminance 65, as floats, as `Plot`'s scale functions record them),
+  one of `non_position_aesthetics/0`.
+- **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient
+  is one palette"), which R's two- and three-colour gradients are too: its colours spaced evenly
+  from 0 to 1 by R's `seq()`, a place between two neighbours blended in CIE L*a*b*
+  (`Giggly.ColorOperations`), each channel interpolated as R's `approxfun()` does, and a place at
+  a colour taking that colour exactly, as `colour_ramp()` blends; one colour is every place's. It
+  matched R on every place sampled; its tests pin R's colours.
+- **A continuous value's place is R's `rescale()` (`Scale.rescale/3`) over the scale's limits**
+  (`limits/1`, R's `get_limits()`: each given end, else the trained range's), **in R's order of
+  operations**, and limits of zero width put every value at the middle, so one value maps to the
+  middle of its palette (0.55 for alpha); the rescale palette calls the same function. **A scale
+  with a `midpoint` places each value by R's `rescale_mid()`**, `(value - midpoint) / extent +
+  0.5`, `extent` twice the further limit's distance from it, as gradient2's rescaler does; the
+  midpoint is the scale's, not the palette's, since a palette takes a place and the colour bar's
+  ticks never go through the midpoint. A missing value, one that is not a finite number, or one
+  outside the limits, which ggplot2 censors (`oob = censor`), maps to the scale's `na_value`,
+  ggplot2's `na.value`: `nil` for a position and alpha, grey50 for a colour or fill, or what a
+  plot's scale gives, `:none` among them.
+- **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`),
+  from its options as an axis's are: a continuous scale's are its breaks, given or its
+  transformation's, inside its limits, taken as floats as R's limits are doubles, one at the low
+  end of limits of zero width, none before it has limits; a discrete scale's are its breaks among
+  its limits (`Discrete.limits/1`), in the order given, `nil` labelled `NA`, as ggplot2's legend
+  keeps `NA`; each labelled by the scale's `labels`, `:none` among them; `breaks: :none` gives no
+  legend, as R's `breaks = NULL` draws no guide.
 - **A discrete palette spreads the present levels; `nil` takes no share and maps to the scale's
   `na_value`**, ggplot2's `na.value`, as ggplot2's mapping leaves `NA` out of the levels it counts:
   `nil` for alpha (R's `NA`) and grey50, `#7F7F7F`, for colour and fill. `na_value` is a field of
@@ -54,27 +66,41 @@ grid lines are placed by the coordinate system".
   scale carries its missing value"); a position scale places `nil` as its last level and reads
   none. The spread is R's `seq()`: its ends exact, each value between found by steps from the
   first (the fourth of seven is 0.54999999999999993).
-- **The hue palette is exactly R's `pal_hue()`**: the circle's last `360 / n` degrees left off,
-  the hues spread by the same `seq()`, each colour `Giggly.ColorOperations.from_hcl/3`; its test
-  pins R's colours for counts whose last hue lands on 360 and past it. R takes each hue modulo
-  360 first, which changes no colour, cosine and sine repeating, so it is left out.
+- **The hue palette is exactly R's `pal_hue()`**: a range less than a degree short of the whole
+  circle, taken modulo 360 as R's `%%` takes it, leaves its last `360 / n` degrees off, any other
+  is spread end to end, the hues by the same `seq()`, each colour
+  `Giggly.ColorOperations.from_hcl/3`, reversed for a `direction` of -1; it matched R on every
+  range, chroma, luminance, direction and count sampled, and its tests pin R's colours for counts
+  whose last hue lands on 360 and past it and for ranges either side of the degree. R takes each
+  hue modulo 360 first, which changes no colour, cosine and sine repeating, so it is left out.
+- **The grey palette is exactly R's `pal_grey()`, `grey.colors()`**: the levels spaced evenly
+  once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
+  byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, whose second half steps back
+  from the end; spacing them with `seq()` changes no byte on any range and count sampled
+  (`Scale.Palette`'s comment), so `seq()` it is.
+- **A manual palette gives a list's colours to the levels in order, and a map's by value**
+  (`Discrete.key/1`), a level the map lacks taking the `na_value`; a map with no given limits
+  narrows the scale's limits to the levels it names, the missing value kept, as ggplot2's manual
+  scale limits itself to its values' names. Either kind with fewer colours than limits raises when
+  the plot is run, named or not, as R fails ("Insufficient values in manual scale").
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
   protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha and a discrete
   colour or fill. The assembly turns the name into the kind; a scale never sees a guide.
   **`samples/2` and `places/2` give what a colour bar draws from a continuous scale**: values spread
-  evenly over the trained range by R's `seq()`, as `extract_decor()` takes them, and each value's
-  place in the range, 0 to 1, as the gradient form places its ticks and colours.
+  evenly over its limits by R's `seq()`, as `extract_decor()` takes them, and each value's place in
+  the limits, 0 to 1, whatever the midpoint, as the gradient form places its ticks and colours.
 - **`Scale.Continuous` and `Scale.Discrete` are API, and the boundary exports both; the rest of
   the namespace is not.** `Giggly.panel_scales/2` returns them and `Giggly.Plot` writes them, so
   their fields are documented and changing one changes the API; their functions are `@doc false`,
   used through `Giggly.Scale`, which is `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`,
   `MinorBreaks`, `Palette` and `Transform`. The one exception is `Discrete.key/1`, the rule for
   which values a discrete scale counts as one (a number as a float, so `2` and `2.0` are one),
-  which `Plot` reads as a fact of the kind to refuse a value named twice, so the rule has one
-  home.
+  which `Plot` reads as a fact of the kind to refuse a value named twice, and the assembly to
+  match a legend's key against a layer's column, so the rule has one home.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
-  `minor_breaks`, `labels` and `expand`, each `:default` until given, `limits` `{nil, nil}` and
+  `minor_breaks`, `labels`, `expand` and `midpoint`, each `:default` until given but `midpoint`,
+  `:none`, there being none, `limits` `{nil, nil}` and
   `expand` ggplot2's `[mult: {0.05, 0.05}, add: {0, 0}]`; `Giggly.Plot` writes the struct,
   untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
   records the untrained scale"). Its field defaults are a position scale's, so `%Continuous{}` is
@@ -93,7 +119,8 @@ grid lines are placed by the coordinate system".
   drawn, `nil` among them places the missing value, and one the data lacks keeps its place. A
   value is matched by `Discrete.key/1`, as the column holds it (design-log §4, the entry beginning
   "A discrete axis names its values"). **Its breaks are the given values among its limits, in the
-  order given, at their limits' places**, or every limit; **its labels** go with given breaks by
+  order given, at their limits' places**, each the limit as the scale holds it, so a break of `4`
+  is a level of `4.0`, or every limit; **its labels** go with given breaks by
   place, a break left out taking its label with it, a list one for each candidate break or the run
   raises (R pads it with `NA`); a map labels the values it holds, the rest written as a level is;
   a function is handed the breaks' values, `nil` among them.

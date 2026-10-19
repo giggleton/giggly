@@ -81,6 +81,15 @@ defmodule Giggly.Plot do
   discrete one. A value outside the limits is missing, so its mark is not drawn. A continuous scale
   given a column of dates places each at its days since 1970-01-01.
 
+  A colour, fill or alpha scale chooses how values become colours or opacities, and sets its
+  legend's title, limits, breaks and labels: `scale_color_manual/2` names each value's colour,
+  `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2` greys,
+  `scale_color_discrete/2` either; `scale_color_gradient/2`, `scale_color_gradient2/2`,
+  `scale_color_gradientn/2` and `scale_color_continuous/2` blend a gradient through two, three or
+  any number of colours; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
+  `scale_alpha_discrete/2` set opacities. `lims/2` sets their limits alone. A value outside a
+  colour scale's limits takes its `na_value:`, as a missing one does.
+
   ## Labels
 
   Each axis and legend is titled by what is mapped to it, as `Giggly.Mapping` describes. `labs/2`
@@ -746,8 +755,256 @@ defmodule Giggly.Plot do
   # A date scale's options that choose what their plain twins choose.
   @date_twins [breaks: :date_breaks, labels: :date_labels, minor_breaks: :date_minor_breaks]
 
-  # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values.
+  # The options of every scale function of an aesthetic other than position, whose guide is a
+  # legend or a colour bar; an option not given keeps the scale's default.
+  @legend_name_spec [
+    type: {:custom, __MODULE__, :validate_label, []},
+    doc:
+      "The legend's or colour bar's title, or `:none` for none; the title its mapping gives " <>
+        "when not given."
+  ]
+
+  @discrete_legend_option_specs [
+    name: @legend_name_spec,
+    limits: [
+      type: {:custom, __MODULE__, :validate_discrete_limits, []},
+      doc:
+        "The values the scale shows, a list in the order shown, whatever the data; each value " <>
+          "as the column holds it, `nil` for the missing value, a number naming the value equal " <>
+          "to it. A value not among them takes `na_value:`. Every value the data holds, in " <>
+          "order, when not given."
+    ],
+    breaks: [
+      type: {:custom, __MODULE__, :validate_discrete_breaks, []},
+      doc:
+        "The values the legend shows a key for, a list in the order given, those not among " <>
+          "the limits left out, or `:none` for no legend; every one of the limits when not given."
+    ],
+    labels: [
+      type: {:custom, __MODULE__, :validate_discrete_labels, []},
+      doc:
+        "The keys' labels: a list of strings, one for each break, or for each limit when no " <>
+          "breaks are given; a map from a value to its label, a value it does not hold keeping " <>
+          "its own; a function handed every break, a list of values, that returns a string for " <>
+          "each; or `:none` for keys with no labels. Each value written as text when not given."
+    ]
+  ]
+
+  @continuous_legend_option_specs [
+    name: @legend_name_spec,
+    limits: [
+      type: @limits_type,
+      doc:
+        "`{low, high}`: the values the scale spans whatever the data, `nil` for an end the " <>
+          "data decides; either order names the same scale. A value outside them takes " <>
+          "`na_value:`."
+    ],
+    breaks: [
+      type: {:custom, __MODULE__, :validate_breaks, []},
+      doc:
+        "The values the legend or colour bar marks, a list of numbers, those outside the " <>
+          "limits left out, or `:none` for no guide; chosen from the limits when not given."
+    ],
+    labels: [
+      type: {:custom, __MODULE__, :validate_scale_labels, []},
+      doc:
+        "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
+          "every break, a list of numbers, that returns a string for each, as `Giggly.Format`'s " <>
+          "do; or `:none` for no labels."
+    ]
+  ]
+
+  # A colour scale's missing value, grey unless a function says otherwise.
+  @color_na_value_doc "The colour of a missing value, or of one outside the limits, or `:none` for none, which draws nothing."
+  @color_na_value_type {:custom, __MODULE__, :validate_color, []}
+  @color_na_value_spec [type: @color_na_value_type, default: "#7F7F7F", doc: @color_na_value_doc]
+
+  # The hue palette's defaults, which a discrete colour scale takes when given no palette: hues from
+  # 15 degrees round the circle, chroma 100 and luminance 65, handed out in order.
+  @hue_defaults [hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1]
+
+  # The default gradient's ends, which a continuous colour scale takes when given no palette.
+  @gradient_defaults [low: "#132B43", high: "#56B1F7"]
+
+  # An alpha scale's default range, which leaves every value visible.
+  @alpha_range_default {0.1, 1.0}
+
+  @opaque_color_type {:custom, __MODULE__, :validate_opaque_color, []}
+
+  @manual_scale_options NimbleOptions.new!(
+                          [
+                            values: [
+                              type: {:custom, __MODULE__, :validate_manual_values, []},
+                              required: true,
+                              doc:
+                                "The colours: a list, given to the values in order, or to " <>
+                                  "`breaks:` in order where they are a list; or a map from a " <>
+                                  "value, as the column holds it, to its colour, whose scale " <>
+                                  "shows only the values the data holds that it names, unless " <>
+                                  "`limits:` gives others. A value with no colour takes " <>
+                                  "`na_value:`."
+                            ],
+                            na_value: @color_na_value_spec
+                          ] ++ @discrete_legend_option_specs
+                        )
+
+  @hue_scale_options NimbleOptions.new!(
+                       [
+                         hue: [
+                           type: {:custom, __MODULE__, :validate_number_pair, []},
+                           default: @hue_defaults[:hue],
+                           doc:
+                             "`{first, last}`: the hues the colours are spaced between, in " <>
+                               "degrees round the colour wheel. A range spanning the whole " <>
+                               "circle leaves its last share off, so the first and last colours " <>
+                               "differ."
+                         ],
+                         chroma: [
+                           type: {:custom, __MODULE__, :validate_number, []},
+                           default: @hue_defaults[:chroma],
+                           doc: "How vivid the colours are, from 0, grey."
+                         ],
+                         luminance: [
+                           type: {:custom, __MODULE__, :validate_number, []},
+                           default: @hue_defaults[:luminance],
+                           doc: "How light the colours are, from 0, black, to 100, white."
+                         ],
+                         direction: [
+                           type: {:in, [1, -1]},
+                           default: @hue_defaults[:direction],
+                           doc: "1 to give the colours to the values in order, -1 in reverse."
+                         ],
+                         na_value: @color_na_value_spec
+                       ] ++ @discrete_legend_option_specs
+                     )
+
+  @gray_scale_options NimbleOptions.new!(
+                        [
+                          start: [
+                            type: {:custom, __MODULE__, :validate_gray_level, []},
+                            default: 0.2,
+                            doc: "The first value's grey, from 0, black, to 1, white."
+                          ],
+                          end: [
+                            type: {:custom, __MODULE__, :validate_gray_level, []},
+                            default: 0.8,
+                            doc: "The last value's grey, from 0, black, to 1, white."
+                          ],
+                          na_value: Keyword.put(@color_na_value_spec, :default, "#FF0000")
+                        ] ++ @discrete_legend_option_specs
+                      )
+
+  @discrete_color_scale_options NimbleOptions.new!(
+                                  [
+                                    palette: [
+                                      type: {:custom, __MODULE__, :validate_palette_colors, []},
+                                      doc:
+                                        "A list of colours, given to the values in order; " <>
+                                          "hues spaced evenly round the colour wheel when not " <>
+                                          "given."
+                                    ],
+                                    na_value: @color_na_value_spec
+                                  ] ++ @discrete_legend_option_specs
+                                )
+
+  @gradient_scale_options NimbleOptions.new!(
+                            [
+                              low: [
+                                type: @opaque_color_type,
+                                default: @gradient_defaults[:low],
+                                doc: "The colour at the low end of the limits."
+                              ],
+                              high: [
+                                type: @opaque_color_type,
+                                default: @gradient_defaults[:high],
+                                doc: "The colour at the high end of the limits."
+                              ],
+                              na_value: @color_na_value_spec
+                            ] ++ @continuous_legend_option_specs
+                          )
+
+  @gradient2_scale_options NimbleOptions.new!(
+                             [
+                               low: [
+                                 type: @opaque_color_type,
+                                 default: "#832424",
+                                 doc:
+                                   "The colour the low side runs to, a dark red when not given."
+                               ],
+                               mid: [
+                                 type: @opaque_color_type,
+                                 default: "#FFFFFF",
+                                 doc: "The colour at the midpoint, white when not given."
+                               ],
+                               high: [
+                                 type: @opaque_color_type,
+                                 default: "#3A3A98",
+                                 doc:
+                                   "The colour the high side runs to, a dark blue when not given."
+                               ],
+                               midpoint: [
+                                 type: {:custom, __MODULE__, :validate_number, []},
+                                 default: 0.0,
+                                 doc: "The value the middle colour stands at."
+                               ],
+                               na_value: @color_na_value_spec
+                             ] ++ @continuous_legend_option_specs
+                           )
+
+  @gradientn_scale_options NimbleOptions.new!(
+                             [
+                               colors: [
+                                 type: {:custom, __MODULE__, :validate_gradient_colors, []},
+                                 required: true,
+                                 doc:
+                                   "The colours, a list, spaced evenly from the low end of the " <>
+                                     "limits to the high."
+                               ],
+                               na_value: @color_na_value_spec
+                             ] ++ @continuous_legend_option_specs
+                           )
+
+  @continuous_color_scale_options NimbleOptions.new!(
+                                    [
+                                      palette: [
+                                        type:
+                                          {:custom, __MODULE__, :validate_gradient_colors, []},
+                                        doc:
+                                          "A list of colours, spaced evenly from the low end " <>
+                                            "of the limits to the high; a gradient from " <>
+                                            "`#132B43` to `#56B1F7` when not given."
+                                      ],
+                                      na_value: @color_na_value_spec
+                                    ] ++ @continuous_legend_option_specs
+                                  )
+
+  @alpha_range_spec [
+    type: {:custom, __MODULE__, :validate_alpha_range, []},
+    default: @alpha_range_default,
+    doc: "`{low, high}`: the opacities the values run between, each from 0 to 1."
+  ]
+
+  @alpha_na_value_spec [
+    type: {:custom, __MODULE__, :validate_alpha, []},
+    doc:
+      "The opacity of a missing value, or of one outside the limits, from 0 to 1; its " <>
+        "colour's own when not given."
+  ]
+
+  @continuous_alpha_scale_options NimbleOptions.new!(
+                                    [range: @alpha_range_spec, na_value: @alpha_na_value_spec] ++
+                                      @continuous_legend_option_specs
+                                  )
+
+  @discrete_alpha_scale_options NimbleOptions.new!(
+                                  [range: @alpha_range_spec, na_value: @alpha_na_value_spec] ++
+                                    @discrete_legend_option_specs
+                                )
+
+  # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values, and the limits
+  # of a colour, fill or alpha scale.
   @axis_limits_type {:custom, __MODULE__, :validate_axis_limits, []}
+  @legend_limits_type {:custom, __MODULE__, :validate_legend_limits, []}
   @lims_options NimbleOptions.new!(
                   x: [
                     type: @axis_limits_type,
@@ -756,6 +1013,25 @@ defmodule Giggly.Plot do
                   y: [
                     type: @axis_limits_type,
                     doc: "The y axis's limits, as `ylim/3` or `ylim/2` takes them."
+                  ],
+                  color: [
+                    type: @legend_limits_type,
+                    doc:
+                      "The colour scale's limits (`colour:` too): `{low, high}`, low first, " <>
+                        "for a continuous scale, as `scale_color_continuous/2` takes them, or " <>
+                        "a list of values for a discrete one, as `scale_color_discrete/2` does."
+                  ],
+                  fill: [
+                    type: @legend_limits_type,
+                    doc:
+                      "The fill scale's limits, as `scale_fill_continuous/2` or " <>
+                        "`scale_fill_discrete/2` takes them."
+                  ],
+                  alpha: [
+                    type: @legend_limits_type,
+                    doc:
+                      "The alpha scale's limits, as `scale_alpha_continuous/2` or " <>
+                        "`scale_alpha_discrete/2` takes them."
                   ]
                 )
 
@@ -1673,6 +1949,561 @@ defmodule Giggly.Plot do
     do: date_scale(plot, :y, options, "Plot.scale_y_date/2")
 
   @doc """
+  Gives the plot a discrete colour scale of the colours given, replacing any colour scale it had.
+
+  `values:` gives the colours, a list handed to the values in order, or a map from a value to its
+  colour. The legend shows a key for each value the scale shows, labelled. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a colour CSS does not define,
+  and `ArgumentError` for a list of labels not one for each break or limit given; a column of
+  numbers, or more values than a list has colours, is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@manual_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_manual(values: %{"4" => "steelblue", "6" => "orange", "8" => "red"})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#FFA500", "#4682B4", "#FF0000"]
+  """
+  @spec scale_color_manual(t(), keyword()) :: t()
+  def scale_color_manual(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @manual_scale_options,
+      "Plot.scale_color_manual/2",
+      &manual_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete fill scale of the colours given, replacing any fill scale it had, as
+  `scale_color_manual/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@manual_scale_options)}
+
+      iex> plot =
+      ...>   %{"drv" => ["f", "r"], "hwy" => [28, 19]}
+      ...>   |> Giggly.Plot.new(%{x: :drv, y: :hwy, fill: :drv})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_manual(values: ["steelblue", "orange"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#4682B4", "#FFA500"]
+  """
+  @spec scale_fill_manual(t(), keyword()) :: t()
+  def scale_fill_manual(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @manual_scale_options,
+      "Plot.scale_fill_manual/2",
+      &manual_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete colour scale of hues spaced evenly round the colour wheel, all of one
+  chroma and luminance, replacing any colour scale it had.
+
+  A discrete column mapped to colour gets these hues by default; the options choose others.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels not one for each break or limit given; a column of
+  numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@hue_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_hue(luminance: 40, chroma: 30)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#3A6845", "#7F5351", "#515E7F"]
+  """
+  @spec scale_color_hue(t(), keyword()) :: t()
+  def scale_color_hue(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :color,
+        options,
+        @hue_scale_options,
+        "Plot.scale_color_hue/2",
+        &hue_scale/1
+      )
+
+  @doc """
+  Gives the plot a discrete fill scale of hues spaced evenly round the colour wheel, replacing any
+  fill scale it had, as `scale_color_hue/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@hue_scale_options)}
+
+      iex> plot =
+      ...>   %{"cyl" => ["6", "4", "8"], "mpg" => [19.7, 26.7, 15.1]}
+      ...>   |> Giggly.Plot.new(%{x: :cyl, y: :mpg, fill: :cyl})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_hue(direction: -1)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#00BA38", "#619CFF", "#F8766D"]
+  """
+  @spec scale_fill_hue(t(), keyword()) :: t()
+  def scale_fill_hue(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :fill,
+        options,
+        @hue_scale_options,
+        "Plot.scale_fill_hue/2",
+        &hue_scale/1
+      )
+
+  @doc """
+  Gives the plot a discrete colour scale of greys, replacing any colour scale it had.
+
+  The greys run from `start:` to `end:`, spaced evenly to the eye; a missing value is red.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a grey's level outside
+  0 to 1, and `ArgumentError` for a list of labels not one for each break or limit given; a column
+  of numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gray_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_gray()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#989898", "#333333", "#CCCCCC"]
+  """
+  @spec scale_color_gray(t(), keyword()) :: t()
+  def scale_color_gray(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :color,
+        options,
+        @gray_scale_options,
+        "Plot.scale_color_gray/2",
+        &gray_scale/1
+      )
+
+  @doc """
+  Gives the plot a discrete fill scale of greys, replacing any fill scale it had, as
+  `scale_color_gray/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gray_scale_options)}
+
+      iex> plot =
+      ...>   %{"drv" => ["f", "r"], "hwy" => [28, 19]}
+      ...>   |> Giggly.Plot.new(%{x: :drv, y: :hwy, fill: :drv})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_gray(start: 0, end: 1)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#000000", "#FFFFFF"]
+  """
+  @spec scale_fill_gray(t(), keyword()) :: t()
+  def scale_fill_gray(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :fill,
+        options,
+        @gray_scale_options,
+        "Plot.scale_fill_gray/2",
+        &gray_scale/1
+      )
+
+  @doc """
+  Gives the plot a discrete colour scale, replacing any colour scale it had: hues spaced evenly
+  round the colour wheel, as a discrete column gets by default, or the colours of `palette:`, in
+  order.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a colour CSS does not
+  define, and `ArgumentError` for a list of labels not one for each break or limit given; a column
+  of numbers, or more values than the palette has colours, is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_color_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_discrete(palette: ["steelblue", "orange", "red"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#FFA500", "#4682B4", "#FF0000"]
+  """
+  @spec scale_color_discrete(t(), keyword()) :: t()
+  def scale_color_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @discrete_color_scale_options,
+      "Plot.scale_color_discrete/2",
+      &discrete_color_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete fill scale, replacing any fill scale it had, as
+  `scale_color_discrete/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_color_scale_options)}
+
+      iex> plot =
+      ...>   %{"drv" => ["f", "r", "4"], "hwy" => [28, 19, 20]}
+      ...>   |> Giggly.Plot.new(%{x: :drv, y: :hwy, fill: :drv})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_discrete(limits: ["f", "r"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#F8766D", "#00BFC4", "#7F7F7F"]
+  """
+  @spec scale_fill_discrete(t(), keyword()) :: t()
+  def scale_fill_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @discrete_color_scale_options,
+      "Plot.scale_fill_discrete/2",
+      &discrete_color_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale, a gradient from `low:` to `high:`, replacing any colour
+  scale it had.
+
+  Each value takes the colour as far along the gradient as the value is through the limits,
+  blended in CIE L*a*b*, which spaces colours evenly to the eye; its guide is a colour bar. Raises
+  `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not define or
+  one with an alpha of its own, and `ArgumentError` for a list of labels without a list of breaks
+  as long; a column that is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradient_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [1, 2, 3]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_gradient(low: "white", high: "black")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#FFFFFF", "#777777", "#000000"]
+  """
+  @spec scale_color_gradient(t(), keyword()) :: t()
+  def scale_color_gradient(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @gradient_scale_options,
+      "Plot.scale_color_gradient/2",
+      &gradient_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale, a gradient from `low:` to `high:`, replacing any fill
+  scale it had, as `scale_color_gradient/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradient_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_gradient(low: "white", high: "steelblue")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#FFFFFF", "#A7BED9", "#4682B4"]
+  """
+  @spec scale_fill_gradient(t(), keyword()) :: t()
+  def scale_fill_gradient(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @gradient_scale_options,
+      "Plot.scale_fill_gradient/2",
+      &gradient_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale diverging from `mid:` at `midpoint:`, toward `low:`
+  below it and `high:` above, replacing any colour scale it had.
+
+  A value's colour is as far toward its side's end as the value is from the midpoint, the end of
+  the limits further from the midpoint taking its colour in full and the nearer only as far as it
+  reaches; its guide is a colour bar. Raises `NimbleOptions.ValidationError` for an option it does
+  not take, a colour CSS does not define or one with an alpha of its own, and `ArgumentError` for a
+  list of labels without a list of breaks as long; a column that is not numbers is refused when the
+  plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradient2_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "change" => [-2, 0, 1]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :change})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_gradient2()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#832424", "#FFFFFF", "#A197CC"]
+  """
+  @spec scale_color_gradient2(t(), keyword()) :: t()
+  def scale_color_gradient2(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @gradient2_scale_options,
+      "Plot.scale_color_gradient2/2",
+      &gradient2_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale diverging from `mid:` at `midpoint:`, replacing any fill
+  scale it had, as `scale_color_gradient2/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradient2_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_gradient2(midpoint: 4)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#B26D65", "#E0DBEE", "#3A3A98"]
+  """
+  @spec scale_fill_gradient2(t(), keyword()) :: t()
+  def scale_fill_gradient2(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @gradient2_scale_options,
+      "Plot.scale_fill_gradient2/2",
+      &gradient2_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale, a gradient through the colours of `colors:`, replacing
+  any colour scale it had.
+
+  The colours are spaced evenly over the limits, the first at the low end and the last at the high,
+  and blended in CIE L*a*b* between neighbours; its guide is a colour bar. Raises
+  `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not define or
+  one with an alpha of its own, and `ArgumentError` for a list of labels without a list of breaks
+  as long; a column that is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradientn_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_gradientn(colors: ["red", "yellow", "blue"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#FF0000", "#FFFF00", "#0000FF"]
+  """
+  @spec scale_color_gradientn(t(), keyword()) :: t()
+  def scale_color_gradientn(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @gradientn_scale_options,
+      "Plot.scale_color_gradientn/2",
+      &gradientn_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale, a gradient through the colours of `colors:`, replacing
+  any fill scale it had, as `scale_color_gradientn/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@gradientn_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_gradientn(colors: ["#FEE0D2", "#FC9272", "#DE2D26"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#FEE0D2", "#FC9272", "#DE2D26"]
+  """
+  @spec scale_fill_gradientn(t(), keyword()) :: t()
+  def scale_fill_gradientn(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @gradientn_scale_options,
+      "Plot.scale_fill_gradientn/2",
+      &gradientn_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale, replacing any colour scale it had: a gradient from
+  `#132B43` to `#56B1F7`, as a column of numbers gets by default, or through the colours of
+  `palette:`, spaced evenly over the limits.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not
+  define or one with an alpha of its own, and `ArgumentError` for a list of labels without a list
+  of breaks as long; a column that is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_color_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [5, 12, 0]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_continuous(limits: {0, 10})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#336A98", "#7F7F7F", "#132B43"]
+  """
+  @spec scale_color_continuous(t(), keyword()) :: t()
+  def scale_color_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @continuous_color_scale_options,
+      "Plot.scale_color_continuous/2",
+      &continuous_color_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale, replacing any fill scale it had, as
+  `scale_color_continuous/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_color_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_continuous(palette: ["#FEE0D2", "#FC9272", "#DE2D26"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#FEE0D2", "#FC9272", "#DE2D26"]
+  """
+  @spec scale_fill_continuous(t(), keyword()) :: t()
+  def scale_fill_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @continuous_color_scale_options,
+      "Plot.scale_fill_continuous/2",
+      &continuous_color_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous alpha scale, replacing any alpha scale it had.
+
+  Each value is drawn as opaque as it is far from the first of `range:` to the second through the
+  limits; its guide is a legend. Raises `NimbleOptions.ValidationError` for an option it does not
+  take or an opacity outside 0 to 1, and `ArgumentError` for a list of labels without a list of
+  breaks as long; a column that is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_alpha_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [1, 2, 3]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, alpha: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_alpha_continuous(range: {0, 1})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:alpha)
+      [0.0, 0.5, 1.0]
+  """
+  @spec scale_alpha_continuous(t(), keyword()) :: t()
+  def scale_alpha_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :alpha,
+      options,
+      @continuous_alpha_scale_options,
+      "Plot.scale_alpha_continuous/2",
+      &continuous_alpha_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete alpha scale, replacing any alpha scale it had.
+
+  The values' opacities are spaced evenly from the first of `range:` to the second, in order; its
+  guide is a legend. Raises `NimbleOptions.ValidationError` for an option it does not take or an
+  opacity outside 0 to 1, and `ArgumentError` for a list of labels not one for each break or limit
+  given; a column of numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_alpha_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, alpha: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_alpha_discrete(range: {0.25, 0.75})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:alpha)
+      [0.5, 0.25, 0.75]
+  """
+  @spec scale_alpha_discrete(t(), keyword()) :: t()
+  def scale_alpha_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :alpha,
+      options,
+      @discrete_alpha_scale_options,
+      "Plot.scale_alpha_discrete/2",
+      &discrete_alpha_scale/1
+    )
+  end
+
+  @doc """
   Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
   for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
   as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
@@ -1777,20 +2608,45 @@ defmodule Giggly.Plot do
   @spec lims(t(), keyword()) :: t()
   def lims(%__MODULE__{} = plot, options) when is_list(options) do
     options
+    |> Aesthetics.canonicalize()
     |> NimbleOptions.validate!(@lims_options)
     |> Enum.reduce(plot, fn {aesthetic, limits}, limited ->
-      put_scale(limited, aesthetic, limits_scale(limits))
+      put_scale(limited, aesthetic, limits_scale(aesthetic, limits))
     end)
   end
 
-  # The scale limits give: a discrete one for a list of values; a date one for dates; else a
-  # continuous one.
-  defp limits_scale(values) when is_list(values), do: %Scale.Discrete{limits: values}
+  # The scale limits give an aesthetic: on an axis, `axis_limits_scale/1`'s; for any other, the
+  # scale its discrete or continuous scale function gives with those limits alone.
+  defp limits_scale(aesthetic, limits) when aesthetic in [:x, :y], do: axis_limits_scale(limits)
 
-  defp limits_scale({low, high} = limits) when is_struct(low, Date) or is_struct(high, Date),
+  defp limits_scale(aesthetic, limits) do
+    {schema, scale_of} = limited_scale(aesthetic, limits)
+
+    [limits: limits]
+    |> NimbleOptions.validate!(schema)
+    |> scale_of.()
+  end
+
+  defp limited_scale(:alpha, values) when is_list(values),
+    do: {@discrete_alpha_scale_options, &discrete_alpha_scale/1}
+
+  defp limited_scale(:alpha, _ends),
+    do: {@continuous_alpha_scale_options, &continuous_alpha_scale/1}
+
+  defp limited_scale(_color, values) when is_list(values),
+    do: {@discrete_color_scale_options, &discrete_color_scale/1}
+
+  defp limited_scale(_color, _ends),
+    do: {@continuous_color_scale_options, &continuous_color_scale/1}
+
+  # The axis's scale limits give: a discrete one for a list of values; a date one for dates; else
+  # a continuous one.
+  defp axis_limits_scale(values) when is_list(values), do: %Scale.Discrete{limits: values}
+
+  defp axis_limits_scale({low, high} = limits) when is_struct(low, Date) or is_struct(high, Date),
     do: %Scale.Continuous{limits: limits, transform: :date}
 
-  defp limits_scale(limits),
+  defp axis_limits_scale(limits),
     do: %Scale.Continuous{limits: limits, transform: limits_transform(limits)}
 
   # Limits given high to low reverse the axis, as ggplot2's `limits()` chooses
@@ -2234,6 +3090,157 @@ defmodule Giggly.Plot do
         {:error,
          "expected {low, high}, two numbers or two dates, each nil for an end the data " <>
            "decides, or a list of a discrete axis's values, got: #{inspect(limits)}"}
+    end
+  end
+
+  # NimbleOptions' check of `lims/2`'s limits for a colour, fill or alpha scale: a list of a
+  # discrete scale's values, or `{low, high}`, two numbers, each kept as a float, or `nil` for an
+  # end the data decides, low first, since such a scale has no transformation to run from high to
+  # low.
+  @doc false
+  @spec validate_legend_limits(term()) ::
+          {:ok, list() | {float() | nil, float() | nil}} | {:error, String.t()}
+  def validate_legend_limits(values) when is_list(values), do: validate_discrete_limits(values)
+
+  def validate_legend_limits({low, high} = limits)
+      when is_number(low) and is_number(high) and low > high do
+    {:error,
+     "expected {low, high}, low first, since a colour, fill or alpha scale cannot run from high " <>
+       "to low, got: #{inspect(limits)}"}
+  end
+
+  def validate_legend_limits(limits) do
+    case validate_limits(limits) do
+      {:ok, _limits} = valid ->
+        valid
+
+      {:error, _message} ->
+        {:error,
+         "expected {low, high}, two numbers, each nil for an end the data decides, or a list of " <>
+           "a discrete scale's values, got: #{inspect(limits)}"}
+    end
+  end
+
+  # NimbleOptions' check of a number, kept as a float, as R keeps one.
+  @doc false
+  @spec validate_number(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_number(number) when is_number(number), do: {:ok, number / 1}
+  def validate_number(other), do: {:error, "expected a number, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of `{first, last}`, two numbers, each kept as a float.
+  @doc false
+  @spec validate_number_pair(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_number_pair({first, last}) when is_number(first) and is_number(last),
+    do: {:ok, {first / 1, last / 1}}
+
+  def validate_number_pair(other),
+    do: {:error, "expected {first, last}, two numbers, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of a grey's level: a number from 0, black, to 1, white, kept as a float.
+  @doc false
+  @spec validate_gray_level(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_gray_level(level) when is_number(level) and level >= 0 and level <= 1,
+    do: {:ok, level / 1}
+
+  def validate_gray_level(other),
+    do: {:error, "expected a grey's level, from 0, black, to 1, white, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of an alpha scale's `range:`: `{low, high}`, each an opacity from 0 to 1,
+  # kept as a float.
+  @doc false
+  @spec validate_alpha_range(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_alpha_range({low, high} = range) do
+    case {validate_alpha(low), validate_alpha(high)} do
+      {{:ok, low}, {:ok, high}} -> {:ok, {low, high}}
+      _not_opacities -> alpha_range_error(range)
+    end
+  end
+
+  def validate_alpha_range(range), do: alpha_range_error(range)
+
+  defp alpha_range_error(range),
+    do: {:error, "expected {low, high}, each an opacity from 0 to 1, got: #{inspect(range)}"}
+
+  # NimbleOptions' check of a gradient's colour: a colour (`validate_color/1`) with no alpha of its
+  # own, since a gradient blends colours alone.
+  @doc false
+  @spec validate_opaque_color(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def validate_opaque_color(color) do
+    case validate_color(color) do
+      {:ok, <<"#", _digits::binary-size(6)>> = opaque} ->
+        {:ok, opaque}
+
+      {:ok, _not_opaque} ->
+        {:error,
+         "expected a colour with no alpha of its own, since a gradient blends colours alone, " <>
+           "got: #{inspect(color)}"}
+
+      {:error, _message} = error ->
+        error
+    end
+  end
+
+  # NimbleOptions' check of a gradient's colours: a list of at least one, each opaque
+  # (`validate_opaque_color/1`).
+  @doc false
+  @spec validate_gradient_colors(term()) :: {:ok, [String.t()]} | {:error, String.t()}
+  def validate_gradient_colors([_first | _rest] = colors),
+    do: colors_each(colors, &validate_opaque_color/1)
+
+  def validate_gradient_colors(other),
+    do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of a discrete palette's colours: a list of at least one, each a colour or
+  # `:none` (`validate_color/1`).
+  @doc false
+  @spec validate_palette_colors(term()) :: {:ok, [ColorOperations.t()]} | {:error, String.t()}
+  def validate_palette_colors([_first | _rest] = colors),
+    do: colors_each(colors, &validate_color/1)
+
+  def validate_palette_colors(other),
+    do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of a manual scale's `values:`: a list of colours
+  # (`validate_palette_colors/1`), or a map from a value (`discrete_values/1`) to its colour.
+  @doc false
+  @spec validate_manual_values(term()) ::
+          {:ok, [ColorOperations.t()] | %{term() => ColorOperations.t()}} | {:error, String.t()}
+  def validate_manual_values(values) when is_list(values), do: validate_palette_colors(values)
+
+  def validate_manual_values(values)
+      when is_map(values) and not is_struct(values) and map_size(values) > 0 do
+    {keys, colors} = Enum.unzip(values)
+
+    with {:ok, _keys} <- discrete_values(keys),
+         {:ok, parsed} <- colors_each(colors, &validate_color/1) do
+      named =
+        keys
+        |> Enum.zip(parsed)
+        |> Map.new()
+
+      {:ok, named}
+    end
+  end
+
+  def validate_manual_values(values) do
+    {:error,
+     "expected a list of at least one colour, or a map from a value to its colour, got: " <>
+       inspect(values)}
+  end
+
+  # Each of `colors` through `check`, all of them, or the first error.
+  defp colors_each(colors, check) do
+    checked =
+      Enum.reduce_while(colors, {:ok, []}, fn color, {:ok, spellings} ->
+        case check.(color) do
+          {:ok, spelling} -> {:cont, {:ok, [spelling | spellings]}}
+          {:error, _message} = error -> {:halt, error}
+        end
+      end)
+
+    case checked do
+      {:ok, spellings} -> {:ok, Enum.reverse(spellings)}
+      {:error, _message} = error -> error
     end
   end
 
@@ -2787,6 +3794,97 @@ defmodule Giggly.Plot do
 
   defp put_scale(%__MODULE__{scales: scales} = plot, aesthetic, scale),
     do: %{plot | scales: Map.put(scales, aesthetic, scale)}
+
+  # The plot with a scale for `aesthetic`, one other than position, from the options `function` was
+  # given, validated against `schema` and built by `scale_of`, replacing any scale it had for it;
+  # its labels are checked as a continuous or a discrete scale's are.
+  defp legend_scale(plot, aesthetic, options, schema, function, scale_of) do
+    validated = NimbleOptions.validate!(options, schema)
+    scale = scale_of.(validated)
+    check_labels(scale, validated, function)
+    put_scale(plot, aesthetic, scale)
+  end
+
+  defp check_labels(%Scale.Continuous{}, validated, function),
+    do: check_scale_labels(validated, function)
+
+  defp check_labels(%Scale.Discrete{}, validated, function),
+    do: check_discrete_labels(validated, function)
+
+  # A discrete scale with a legend, its palette `palette`, the rest of its fields `options`.
+  defp discrete_legend(palette, options),
+    do: struct!(Scale.Discrete, [palette: palette, guide: :legend] ++ options)
+
+  # A continuous scale with `guide`, its palette `palette`, the rest of its fields `options`.
+  defp continuous_legend(palette, guide, options),
+    do: struct!(Scale.Continuous, [palette: palette, guide: guide] ++ options)
+
+  defp manual_scale(validated) do
+    {values, options} = Keyword.pop!(validated, :values)
+    discrete_legend({:manual, named_by_breaks(values, Keyword.get(options, :breaks))}, options)
+  end
+
+  # A manual scale's colours, a list of them named by a list of breaks, the first colour the first
+  # break's, as ggplot2's manual scale names them, those either list has beyond the other left
+  # out; a map, or a list beside no list of breaks, as given.
+  defp named_by_breaks(values, breaks) when is_list(values) and is_list(breaks) do
+    breaks
+    |> Enum.zip(values)
+    |> Map.new()
+  end
+
+  defp named_by_breaks(values, _breaks), do: values
+
+  defp hue_scale(validated) do
+    {hue, options} = Keyword.split(validated, Keyword.keys(@hue_defaults))
+    discrete_legend({:hue, Map.new(hue)}, options)
+  end
+
+  defp gray_scale(validated) do
+    {start, options} = Keyword.pop!(validated, :start)
+    {finish, options} = Keyword.pop!(options, :end)
+    discrete_legend({:gray, {start, finish}}, options)
+  end
+
+  # A discrete colour scale of its palette's colours, or of the default hues.
+  defp discrete_color_scale(validated) do
+    case Keyword.pop(validated, :palette) do
+      {nil, options} -> discrete_legend({:hue, Map.new(@hue_defaults)}, options)
+      {colors, options} -> discrete_legend({:manual, colors}, options)
+    end
+  end
+
+  defp gradient_scale(validated), do: gradient_through(validated, [:low, :high])
+  defp gradient2_scale(validated), do: gradient_through(validated, [:low, :mid, :high])
+
+  # A continuous colour scale with a gradient through the colours of the options `names`, in that
+  # order, and a colour bar.
+  defp gradient_through(validated, names) do
+    {colors, options} = Keyword.split(validated, names)
+    ordered = Enum.map(names, fn name -> Keyword.fetch!(colors, name) end)
+    continuous_legend({:gradient, ordered}, :colorbar, options)
+  end
+
+  defp gradientn_scale(validated) do
+    {colors, options} = Keyword.pop!(validated, :colors)
+    continuous_legend({:gradient, colors}, :colorbar, options)
+  end
+
+  # A continuous colour scale through its palette's colours, or the default gradient.
+  defp continuous_color_scale(validated) do
+    {colors, options} = Keyword.pop(validated, :palette, Keyword.values(@gradient_defaults))
+    continuous_legend({:gradient, colors}, :colorbar, options)
+  end
+
+  defp continuous_alpha_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    continuous_legend({:rescale, range}, :legend, options)
+  end
+
+  defp discrete_alpha_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    discrete_legend({:sequence, range}, options)
+  end
 
   defp check_twins(validated, {plain, dated}, function) do
     if Keyword.has_key?(validated, plain) and Keyword.has_key?(validated, dated) do

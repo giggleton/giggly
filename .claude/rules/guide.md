@@ -103,7 +103,10 @@ panel's grid lines are placed by the coordinate system".
   for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key square on
   the key background with each layer's glyph over it, its label the text margin to its right,
   centred as the title is; the label column as wide as the widest label, or wider when the
-  title is, leaving the room at the labels' right. Drawn in ggplot2's order: background, title,
+  title is, leaving the room at the labels' right. **With no labels (every key's `:none`), the
+  labels' margin and column take no room but what a wider title needs right of the keys**, as
+  ggplot2 leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
+  `label_margin/2`, which the colour bar shares). Drawn in ggplot2's order: background, title,
   each key's background and glyphs, then the labels. Every size is in points.
 - **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them
   on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
@@ -117,4 +120,5 @@ panel's grid lines are placed by the coordinate system".
   `nbin` for the gradient form), from its bottom, the scale's low end, to its top, with no border;
   a white tick `legend.ticks.length` into each side at each break's place, the right side's and
   then the left's, each drawn from inside the bar outward; each label the labels' margin right of
-  the bar, centred on its tick. It draws no layer's glyph.
+  the bar, centred on its tick, and with no labels the ticks alone, the room laid out as a
+  legend's. It draws no layer's glyph.

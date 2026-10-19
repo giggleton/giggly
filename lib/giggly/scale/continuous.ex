@@ -9,13 +9,17 @@ defmodule Giggly.Scale.Continuous do
       range is in transformed space: `:identity` for numbers; `:date` for dates, which it sees as
       days since 1970-01-01; or `:log10`, `:sqrt`, `:reverse` (each value negated) or
       `:reciprocal`, as a plot's scale names one.
-    * `palette`: what turns a value's place in the range into its aesthetic's value: `:identity`
+    * `palette`: what turns a value's place in its limits into its aesthetic's value: `:identity`
       for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
       aesthetic such as alpha, each place, from 0 to 1, rescaled onto `low` to `high`; and
-      `{:gradient, {low, high}}` for colour and fill, the colour as far from `low` toward `high`,
-      blended in L*a*b*.
-    * `na_value`: what a missing value, or one not a finite number, maps to: `nil` for a position
-      and alpha, grey, `"#7F7F7F"`, for colour and fill.
+      `{:gradient, colors}` for colour and fill, the colour that far along a gradient through
+      `colors`, spaced evenly, blended in L*a*b*.
+    * `midpoint`: the value a gradient's middle colour stands at, so each value's place is its
+      distance from the midpoint, the end further from it at 0 or 1; `:none` for none, each value
+      placed between the limits' ends.
+    * `na_value`: what a missing value, one not a finite number, or one outside the limits maps
+      to: `nil` for a position and alpha, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no
+      colour.
     * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha and
       `:colorbar` for colour and fill.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
@@ -35,14 +39,15 @@ defmodule Giggly.Scale.Continuous do
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.
 
-  alias Giggly.Scale.{Palette, Transform}
+  alias Giggly.Scale.Transform
 
   # Every field's default is a position scale's before it has seen any data: the identity
-  # transformation and palette, an axis, and every option the default, ggplot2's 5% of the
-  # limits' width at each end among them.
+  # transformation and palette, no midpoint, an axis, and every option the default, ggplot2's 5%
+  # of the limits' width at each end among them.
   defstruct range: :none,
             transform: :identity,
             palette: :identity,
+            midpoint: :none,
             na_value: nil,
             guide: :axis,
             name: :default,
@@ -58,9 +63,9 @@ defmodule Giggly.Scale.Continuous do
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
           transform: :identity | :date | :log10 | :sqrt | :reverse | :reciprocal,
-          palette:
-            :identity | {:rescale, {number(), number()}} | {:gradient, {String.t(), String.t()}},
-          na_value: nil | String.t(),
+          palette: :identity | {:rescale, {number(), number()}} | {:gradient, [String.t()]},
+          midpoint: :none | number(),
+          na_value: nil | number() | String.t() | :none,
           guide: :axis | :legend | :colorbar,
           name: :default | :none | String.t(),
           limits: {number() | Date.t() | nil, number() | Date.t() | nil},
@@ -92,17 +97,6 @@ defmodule Giggly.Scale.Continuous do
   @doc false
   @spec train_range(:none | {number(), number()}, list()) :: :none | {number(), number()}
   def train_range(range, values), do: Enum.reduce(values, range, &widen/2)
-
-  # Each value as `Giggly.Scale.map/2` describes: a position left where it is, `nil` where it is
-  # outside the limits (`censor/2`); for any other palette, the value's place in the range, as R's
-  # `rescale()` finds it, put through the palette, and the scale's `na_value` for a missing value
-  # or one that is not a finite number, as ggplot2 maps such a value to its `na.value`.
-  @doc false
-  @spec map(t(), list()) :: list()
-  def map(%__MODULE__{palette: :identity} = scale, values), do: censor(scale, values)
-
-  def map(%__MODULE__{} = scale, values),
-    do: Enum.map(values, fn value -> through_palette(value, scale) end)
 
   # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
   # (`oob = censor`, finite values only): an infinite end, `:infinity` or `:neg_infinity`, is kept,
@@ -144,14 +138,6 @@ defmodule Giggly.Scale.Continuous do
     do: nil
 
   defp censored(value, _low, _high), do: value
-
-  defp through_palette(value, %__MODULE__{range: {_low, _high} = range, palette: palette})
-       when is_number(value) do
-    place = Giggly.Scale.rescale(value, range, {0, 1})
-    Palette.continuous(palette, place)
-  end
-
-  defp through_palette(_missing, %__MODULE__{na_value: na_value}), do: na_value
 
   # `nil` and Explorer's non-finite float atoms are not numbers, so only a number widens the range.
   defp widen(value, :none) when is_number(value), do: {value, value}

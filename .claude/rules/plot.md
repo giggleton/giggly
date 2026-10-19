@@ -30,8 +30,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
   the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
   `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `scale_x_discrete/2`,
-  `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, `xlim/3`, `xlim/2`, `ylim/3`,
-  `ylim/2`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
+  `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales `scale_color_manual/2`,
+  `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and `_continuous`, each
+  with its `scale_fill_` twin, `scale_alpha_continuous/2`, `scale_alpha_discrete/2`, `xlim/3`,
+  `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -75,7 +77,19 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   one. **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and
   `xlim/3`, `ylim/3` and `lims/2` two dates a date scale's**, sorted, never reversed, as R's
   `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
-  the entry beginning "Discrete and date position scales"). **Limits, breaks and minor breaks are
+  the entry beginning "Discrete and date position scales"). **A colour, fill or alpha scale
+  function records its palette from its options and every other field from its schema's
+  defaults, R's function defaults** (gray's missing value red, gradient2's ends `muted()`), since
+  `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
+  palette live here as values, and a test pins the discrete and continuous functions' to
+  `Scale.new/2`'s. A colour scale names a colour bar (`guide`) when continuous and a legend when
+  discrete, alpha a legend, until a scale function takes `guide:`. A manual scale's list beside a list of `breaks:` is recorded as a map from each
+  break to the colour at its place, as R's `manual_scale()` names them. **`lims/2` takes `color:`
+  (`colour:`, canonicalized first), `fill:` and `alpha:`**: a list records what the aesthetic's
+  `_discrete` function records with those limits, two numbers its `_continuous` one's; numbers
+  high to low are refused at the call, where R reverses the colours through a transformation
+  these scales lack (design-log §4, the entry beginning "Colour, fill and alpha scales"), and
+  dates are refused. **Limits, breaks and minor breaks are
   recorded in data units, as given**, for the scale to transform; a shortcut records its
   transformation in `transform`, and takes every other option `scale_x_continuous/2` does; limits
   in either order are recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair
@@ -190,7 +204,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `nudge_y:` any number, through custom checks (`validate_alpha/1`, `validate_linewidth/1`,
   `validate_linemitre/1`, `validate_size/1`, `validate_angle/1`, `validate_justification/1`,
   `validate_nudge/1`), which take an integer too and keep a float, as R keeps a number;
-  `validate_color/1` hands a colour to `Giggly.ColorOperations`.
+  `validate_color/1` hands a colour to `Giggly.ColorOperations`. A gradient's colours must be
+  opaque (`validate_opaque_color/1`), since it blends colours alone; a grey's level and an alpha
+  range's ends run from 0 to 1.
 - **An annotation (`annotate/3`, `annotation: true`) is a layer drawn from values given in the
   call** (design-log §4, the entry beginning "`annotate()` draws with every geom"): its positions
   become a table of its own, a row per annotation, its mapping naming each position's column, as

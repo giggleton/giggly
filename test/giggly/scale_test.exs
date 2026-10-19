@@ -811,7 +811,7 @@ defmodule Giggly.ScaleTest do
       expected = %Scale.Discrete{
         levels: [],
         continuous_range: :none,
-        palette: {:hue, %{hue: {15, 375}, chroma: 100, luminance: 65}},
+        palette: {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}},
         na_value: "#7F7F7F",
         guide: :legend
       }
@@ -891,7 +891,7 @@ defmodule Giggly.ScaleTest do
       expected = %Scale.Continuous{
         range: :none,
         transform: :identity,
-        palette: {:gradient, {"#132B43", "#56B1F7"}},
+        palette: {:gradient, ["#132B43", "#56B1F7"]},
         na_value: "#7F7F7F",
         guide: :colorbar
       }
@@ -991,6 +991,282 @@ defmodule Giggly.ScaleTest do
       scale = discrete_alpha(["b", nil, "a"])
 
       assert Scale.legend_breaks(scale) === [{"a", "a"}, {"b", "b"}, {nil, "NA"}]
+    end
+  end
+
+  # A discrete colour scale of `palette`, its missing value grey50, trained once on `values`.
+  defp palette_scale(palette, values, options \\ []) do
+    Scale.Discrete
+    |> struct!([palette: palette, na_value: "#7F7F7F", guide: :legend] ++ options)
+    |> Scale.train(values)
+  end
+
+  # A continuous colour scale of `palette`, its missing value grey50, trained once on `values`.
+  defp gradient_through(colors, values, options \\ []) do
+    Scale.Continuous
+    |> struct!([palette: {:gradient, colors}, na_value: "#7F7F7F", guide: :colorbar] ++ options)
+    |> Scale.train(values)
+  end
+
+  defp hue(low, high, chroma \\ 100.0, luminance \\ 65.0, direction \\ 1),
+    do: {:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}
+
+  # What a discrete colour scale of `palette` trained on `levels` maps them to.
+  defp mapped_levels(palette, levels) do
+    palette
+    |> palette_scale(levels)
+    |> Scale.map(levels)
+  end
+
+  # Golden: scales 1.4.0's `pal_hue(h, c, l, direction = )(n)` in R 4.6.1, through farver 2.1.2;
+  # the palette matched R's on 2,160 ranges, chromas, luminances, directions and counts. A range
+  # less than a degree short of the circle, modulo 360 as R's `%%` takes it, leaves its last
+  # share off: 10 to 370.5 does, 10 to 371 does not, and 375 to 15 does.
+  describe "map/2 through a hue palette of its own" do
+    test "a range is spread end to end unless it is within a degree of the whole circle" do
+      three = ~w(a b c)
+      quarter = hue(0.0, 90.0)
+      half_a_degree_past = hue(10.0, 370.5)
+      a_degree_past = hue(10.0, 371.0)
+      circle_back = hue(375.0, 15.0)
+      backward = hue(200.0, 100.0)
+
+      assert {mapped_levels(quarter, ~w(a b c d)), mapped_levels(half_a_degree_past, three),
+              mapped_levels(a_degree_past, three), mapped_levels(circle_back, three),
+              mapped_levels(backward, three)} ===
+               {["#FF6C91", "#ED813E", "#CD9600", "#9DA700"], ["#FB737A", "#00B820", "#43A0FF"],
+                ["#FB737A", "#00C0BD", "#FA7377"], ["#F8766D", "#00BA38", "#619CFF"],
+                ["#00BECD", "#00BE67", "#88AC00"]}
+    end
+
+    test "a direction of -1 hands the colours out in reverse, and chroma and luminance set them" do
+      levels = ~w(a b c)
+      reversed = hue(15.0, 375.0, 100.0, 65.0, -1)
+      muted = hue(15.0, 375.0, 30.0, 70.0)
+
+      assert {mapped_levels(reversed, levels), mapped_levels(muted, levels)} ===
+               {["#619CFF", "#00BA38", "#F8766D"], ["#CEA09E", "#8BB594", "#9FABCC"]}
+    end
+  end
+
+  # Golden: scales 1.4.0's `pal_grey(start, end)(n)`, grDevices' `grey.colors()`, in R 4.6.1;
+  # the palette matched R's for every count from 1 to 40 on seven ranges.
+  describe "map/2 through the grey palette" do
+    test "the greys run from start to end, spaced evenly once raised to the power 2.2" do
+      colours = fn range, levels -> mapped_levels({:gray, range}, levels) end
+
+      assert {colours.({0.2, 0.8}, ~w(a)), colours.({0.2, 0.8}, ~w(a b)),
+              colours.({0.2, 0.8}, ~w(a b c d e)), colours.({0.2, 0.0}, ~w(a b c d)),
+              colours.({1.0, 0.0}, ~w(a b c))} ===
+               {["#333333"], ["#333333", "#CCCCCC"],
+                ["#333333", "#737373", "#989898", "#B4B4B4", "#CCCCCC"],
+                ["#333333", "#2A2A2A", "#1F1F1F", "#000000"], ["#FFFFFF", "#BABABA", "#000000"]}
+    end
+
+    test "a missing value takes the scale's missing value, and no levels give no greys" do
+      gray = {:gray, {0.2, 0.8}}
+
+      assert {mapped_levels(gray, ["a", nil]), mapped_levels(gray, [nil])} ===
+               {["#333333", "#7F7F7F"], ["#7F7F7F"]}
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `scale_colour_manual()` in R 4.6.1, `layer_data()` and
+  # `get_guide_data()` over mtcars's `factor(cyl)` and small tables: an unnamed list takes the
+  # levels in order, a named one colours by name and shows only the levels it names, `NA` among
+  # them, a value it lacks or one outside the limits grey50, and fewer colours than limits fail,
+  # named or not ("Insufficient values in manual scale. 3 needed but only 2 provided.").
+  describe "map/2 through a manual palette" do
+    test "a list's colours go to the levels in order, the first of them as many as needed" do
+      scale = palette_scale({:manual, ["#FF0000", "#0000FF", "#00FF00", "#FFA500"]}, [6, 4, 8])
+
+      assert Scale.map(scale, [4, 6, 8, nil]) === ["#FF0000", "#0000FF", "#00FF00", "#7F7F7F"]
+    end
+
+    test "a list of too few colours for the levels cannot be drawn" do
+      scale = palette_scale({:manual, ["#FF0000", "#0000FF"]}, [4, 6, 8])
+
+      assert_raise ArgumentError, ~r/needs a value for each of its 3 levels, but has 2/, fn ->
+        Scale.map(scale, [4])
+      end
+    end
+
+    test "a map colours each value by name, a number naming the value equal to it" do
+      colors = %{8 => "#FF0000", 4 => "#0000FF", 6 => "#006400", 10 => "#FFA500"}
+      scale = palette_scale({:manual, colors}, [4.0, 6.0, 8.0])
+
+      assert Scale.map(scale, [4.0, 6.0, 8.0]) === ["#0000FF", "#006400", "#FF0000"]
+    end
+
+    test "a map's scale shows only the levels it names, and the missing value where it is one" do
+      scale = palette_scale({:manual, %{"a" => "#FF0000", "c" => "#0000FF"}}, ["a", "b", nil])
+
+      assert {Scale.legend_breaks(scale), Scale.map(scale, ["a", "b", nil])} ===
+               {[{"a", "a"}, {nil, "NA"}], ["#FF0000", "#7F7F7F", "#7F7F7F"]}
+    end
+
+    test "a limit the map names takes its colour, one it does not the missing value" do
+      colors = %{4 => "#0000FF", 10 => "#FFA500", 12 => "#FF0000"}
+      scale = palette_scale({:manual, colors}, [4, 6], limits: [4, 6, 10])
+
+      assert {Scale.legend_breaks(scale), Scale.map(scale, [4, 6, 10])} ===
+               {[{4, "4"}, {6, "6"}, {10, "10"}], ["#0000FF", "#7F7F7F", "#FFA500"]}
+    end
+
+    test "a map of fewer colours than limits cannot be drawn, whatever their names" do
+      scale =
+        palette_scale({:manual, %{4 => "#0000FF", 10 => "#FFA500"}}, [4], limits: [4, 6, 10])
+
+      assert_raise ArgumentError, ~r/needs a value for each of its 3 levels, but has 2/, fn ->
+        Scale.map(scale, [4])
+      end
+    end
+  end
+
+  # Golden: scales 1.4.0's `colour_ramp()` in R 4.6.1, through farver 2.1.2: Giggly's gradient
+  # matched R's on all 30,054 places sampled through six sets of colours, among them R's
+  # `terrain.colors(10)` and ggplot2's gradient2 default, `muted("red")`, white and
+  # `muted("blue")`. A place at a colour takes that colour exactly.
+  describe "map/2 through a gradient of many colours" do
+    @terrain ~w(#00A600 #2DB600 #63C600 #A0D600 #E6E600 #E8C32E #EBB25E #EDB48E #F0C9C0 #F2F2F2)
+
+    test "the colours are spaced evenly, a place between two blended, one at a colour exactly" do
+      scale = gradient_through(@terrain, [0, 1])
+
+      assert Scale.map(scale, [0, 0.25, 0.5, 1, 0.1111111111111111, 0.44444444444444442]) ===
+               ["#00A600", "#74CA00", "#E7D520", "#F2F2F2", "#2DB600", "#E6E600"]
+    end
+
+    test "three colours blend through the middle one" do
+      scale = gradient_through(["#832424", "#FFFFFF", "#3A3A98"], [0, 1])
+
+      assert Scale.map(scale, [0, 0.25, 0.5, 0.75, 1]) ===
+               ["#832424", "#C89089", "#FFFFFF", "#A197CC", "#3A3A98"]
+    end
+
+    test "one colour is every value's" do
+      scale = gradient_through(["#4682B4"], [0, 10])
+
+      assert Scale.map(scale, [0, 3, 10, nil]) === ["#4682B4", "#4682B4", "#4682B4", "#7F7F7F"]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `scale_colour_continuous(limits = c(0, 10))` and
+  # `scale_colour_gradient2()`'s `layer_data()` in R 4.6.1: a value outside the limits is censored
+  # to grey50, and gradient2 places each value by `rescale_mid()`.
+  describe "map/2 of a continuous colour scale's limits and midpoint" do
+    @default_gradient ["#132B43", "#56B1F7"]
+
+    test "a value's place runs over the limits, and one outside them takes the missing value" do
+      scale = gradient_through(@default_gradient, [0, 12], limits: {0.0, 10.0})
+
+      assert Scale.map(scale, [5, 12, 0, -1]) === ["#336A98", "#7F7F7F", "#132B43", "#7F7F7F"]
+    end
+
+    test "an end of nil takes the trained range's" do
+      scale = gradient_through(@default_gradient, [0, 12], limits: {nil, 24.0})
+
+      assert Scale.map(scale, [12, 24, 30]) === ["#336A98", "#56B1F7", "#7F7F7F"]
+    end
+
+    test "a midpoint places each value by its distance from it, the further end at 0 or 1" do
+      three = ["#832424", "#FFFFFF", "#3A3A98"]
+      centred = gradient_through(three, [-2, 1], midpoint: 0.0)
+      off_centre = gradient_through(three, [0, 10], midpoint: 4.0)
+
+      assert {Scale.map(centred, [-2, 0, 1]), Scale.map(off_centre, [0, 5, 10])} ===
+               {["#832424", "#FFFFFF", "#A197CC"], ["#B26D65", "#E0DBEE", "#3A3A98"]}
+    end
+
+    test "limits of zero width put every value at the middle, about a midpoint too" do
+      three = ["#832424", "#FFFFFF", "#3A3A98"]
+      centred = gradient_through(three, [3, 3], midpoint: 0.0)
+      plain = gradient_through(three, [3, 3])
+
+      assert {Scale.map(centred, [3]), Scale.map(plain, [3])} === {["#FFFFFF"], ["#FFFFFF"]}
+    end
+
+    test "a scale of missing values alone maps them all to the missing value" do
+      scale = gradient_through(@default_gradient, [nil])
+
+      assert Scale.map(scale, [nil, :nan]) === ["#7F7F7F", "#7F7F7F"]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's colour bar in R 4.6.1 over `scale_colour_continuous(limits = c(0,
+  # 40))` on mpg's city mileage, 9 to 35: `extract_decor()` samples the limits, and
+  # `extract_params()` places the breaks over them, a midpoint left out of both.
+  describe "samples/2 and places/2 over a scale's limits" do
+    test "the colour bar samples and places over the limits, whatever the midpoint" do
+      scale =
+        gradient_through(["#832424", "#FFFFFF", "#3A3A98"], [9, 35],
+          limits: {0.0, 40.0},
+          midpoint: 20.0
+        )
+
+      assert {Scale.samples(scale, 5), Scale.places(scale, [10.0, 20.0])} ===
+               {[0.0, 10.0, 20.0, 30.0, 40.0], [0.25, 0.5]}
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `get_guide_data()` in R 4.6.1: a legend's keys are the scale's breaks
+  # among its limits, in the order given, labelled as given; `breaks = NULL` draws no guide.
+  describe "legend_breaks/1 from a scale's options" do
+    test "a continuous scale's breaks are those given inside its limits, labelled as given" do
+      scale =
+        gradient_through(["#132B43", "#56B1F7"], [9, 35],
+          limits: {10.0, 30.0},
+          breaks: [5.0, 10.0, 20.0, 30.0],
+          labels: ["five", "ten", "twenty", "thirty"]
+        )
+
+      assert Scale.legend_breaks(scale) === [{10.0, "ten"}, {20.0, "twenty"}, {30.0, "thirty"}]
+    end
+
+    test "a continuous scale's limits beyond the data reach its legend's breaks" do
+      scale = gradient_through(["#132B43", "#56B1F7"], [9, 35], limits: {0.0, 40.0})
+
+      assert Scale.legend_breaks(scale) ===
+               [{0.0, "0"}, {10.0, "10"}, {20.0, "20"}, {30.0, "30"}, {40.0, "40"}]
+    end
+
+    test "breaks of :none give no legend, and labels of :none keys with no labels" do
+      none = gradient_through(["#132B43", "#56B1F7"], [9, 35], breaks: :none)
+      unlabelled = palette_scale(hue(15.0, 375.0), ["a", "b"], labels: :none)
+
+      assert {Scale.legend_breaks(none), Scale.legend_breaks(unlabelled)} ===
+               {[], [{"a", :none}, {"b", :none}]}
+    end
+
+    test "a discrete scale's are its breaks among its limits, in the order given" do
+      scale = palette_scale(hue(15.0, 375.0), ["4", "6", "8"], breaks: ["8", "5", "4"])
+
+      assert Scale.legend_breaks(scale) === [{"8", "8"}, {"4", "4"}]
+    end
+
+    test "a discrete legend's labels go by place, by value, or from a function" do
+      levels = ["4", "6", "8"]
+
+      by_place =
+        palette_scale(hue(15.0, 375.0), levels, breaks: ["8", "4"], labels: ["eight", "four"])
+
+      by_value = palette_scale(hue(15.0, 375.0), levels, labels: %{"6" => "six"})
+
+      by_function =
+        palette_scale(hue(15.0, 375.0), levels,
+          labels: fn values -> Enum.map(values, fn value -> value <> "!" end) end
+        )
+
+      assert {Scale.legend_breaks(by_place), Scale.legend_breaks(by_value),
+              Scale.legend_breaks(by_function)} ===
+               {[{"8", "eight"}, {"4", "four"}], [{"4", "4"}, {"6", "six"}, {"8", "8"}],
+                [{"4", "4!"}, {"6", "6!"}, {"8", "8!"}]}
+    end
+
+    test "a break names the level equal to it, and the legend shows the level as held" do
+      scale = palette_scale(hue(15.0, 375.0), [4.0, 6.0], breaks: [6])
+
+      assert Scale.legend_breaks(scale) === [{6.0, "6"}]
     end
   end
 end

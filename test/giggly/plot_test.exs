@@ -1817,6 +1817,212 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  # Golden: the defaults of ggplot2 4.0.3's colour, fill and alpha scale functions, read with
+  # `args()` in R 4.6.1: pal_hue()'s hues from 15 to 375, chroma 100, luminance 65; pal_grey()'s
+  # 0.2 to 0.8, its missing value red; the gradient from #132B43 to #56B1F7; gradient2's
+  # muted("red"), #832424, white and muted("blue"), #3A3A98, about 0; alpha's 0.1 to 1; every
+  # other missing colour grey50.
+  describe "the colour, fill and alpha scale functions" do
+    test "each records an untrained scale of its palette, its guide and its missing value" do
+      plot = Plot.new(@rows)
+
+      recorded = fn color_function, fill_function ->
+        {color_function.(plot).scales.color, fill_function.(plot).scales.fill}
+      end
+
+      hue = {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
+      hued = %Scale.Discrete{palette: hue, guide: :legend, na_value: "#7F7F7F"}
+      gray = %Scale.Discrete{palette: {:gray, {0.2, 0.8}}, guide: :legend, na_value: "#FF0000"}
+
+      gradient = %Scale.Continuous{
+        palette: {:gradient, ["#132B43", "#56B1F7"]},
+        guide: :colorbar,
+        na_value: "#7F7F7F"
+      }
+
+      diverging = %{
+        gradient
+        | palette: {:gradient, ["#832424", "#FFFFFF", "#3A3A98"]},
+          midpoint: 0.0
+      }
+
+      assert recorded.(&Plot.scale_color_hue/1, &Plot.scale_fill_hue/1) === {hued, hued}
+      assert recorded.(&Plot.scale_color_gray/1, &Plot.scale_fill_gray/1) === {gray, gray}
+
+      assert recorded.(&Plot.scale_color_gradient/1, &Plot.scale_fill_gradient/1) ===
+               {gradient, gradient}
+
+      assert recorded.(&Plot.scale_color_gradient2/1, &Plot.scale_fill_gradient2/1) ===
+               {diverging, diverging}
+    end
+
+    test "a discrete or continuous scale given no palette records its aesthetic's default scale" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_color_discrete(plot).scales.color,
+              Plot.scale_fill_continuous(plot).scales.fill,
+              Plot.scale_alpha_discrete(plot).scales.alpha,
+              Plot.scale_alpha_continuous(plot).scales.alpha} ===
+               {Scale.new(:discrete, :color), Scale.new(:continuous, :fill),
+                Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha)}
+    end
+
+    test "each records the colours and options it is given" do
+      labeller = fn values -> Enum.map(values, &to_string/1) end
+
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_color_manual(
+          values: %{"6" => "red", "4" => :none},
+          name: "Cylinders",
+          limits: ["4", "6"],
+          breaks: ["6"],
+          labels: labeller,
+          na_value: "black"
+        )
+        |> Plot.scale_fill_gradientn(
+          colors: ["white", "steelblue"],
+          limits: {nil, 30},
+          breaks: [10, 20],
+          labels: ["ten", "twenty"],
+          na_value: :none
+        )
+        |> Plot.scale_alpha_continuous(range: {0, 1}, na_value: 0.5)
+
+      assert plot.scales === %{
+               color: %Scale.Discrete{
+                 palette: {:manual, %{"6" => "#FF0000", "4" => :none}},
+                 guide: :legend,
+                 na_value: "#000000",
+                 name: "Cylinders",
+                 limits: ["4", "6"],
+                 breaks: ["6"],
+                 labels: labeller
+               },
+               fill: %Scale.Continuous{
+                 palette: {:gradient, ["#FFFFFF", "#4682B4"]},
+                 guide: :colorbar,
+                 na_value: :none,
+                 limits: {nil, 30.0},
+                 breaks: [10.0, 20.0],
+                 labels: ["ten", "twenty"]
+               },
+               alpha: %Scale.Continuous{
+                 palette: {:rescale, {0.0, 1.0}},
+                 guide: :legend,
+                 na_value: 0.5
+               }
+             }
+    end
+
+    test "a palette, hues, greys and a midpoint are recorded as given, as floats" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_color_hue(hue: {0, 90}, chroma: 30, luminance: 40, direction: -1)
+        |> Plot.scale_fill_gray(start: 0, end: 1)
+
+      palettes = fn other -> {other.scales.color.palette, other.scales.fill.palette} end
+
+      assert palettes.(plot) ===
+               {{:hue, %{hue: {0.0, 90.0}, chroma: 30.0, luminance: 40.0, direction: -1}},
+                {:gray, {0.0, 1.0}}}
+
+      assert {Plot.scale_color_discrete(plot, palette: ["red", "#0000FF80"]).scales.color.palette,
+              Plot.scale_color_continuous(plot, palette: ["red", "blue"]).scales.color.palette,
+              Plot.scale_fill_gradient2(plot, midpoint: 4).scales.fill.midpoint} ===
+               {{:manual, ["#FF0000", "#0000FF80"]}, {:gradient, ["#FF0000", "#0000FF"]}, 4.0}
+    end
+
+    # ggplot2 4.0.3's `manual_scale()` names an unnamed vector of values by a vector of breaks,
+    # the first value the first break's, those beyond the shorter left out.
+    test "a manual scale's list beside a list of breaks takes its names from them" do
+      plot = Plot.new(@rows)
+      palette = fn options -> Plot.scale_color_manual(plot, options).scales.color.palette end
+
+      assert {palette.(values: ["red", "blue", "green"], breaks: [8, 4]),
+              palette.(values: ["red"], breaks: [8, 4]),
+              palette.(values: ["red", "blue"], breaks: :none)} ===
+               {{:manual, %{8 => "#FF0000", 4 => "#0000FF"}}, {:manual, %{8 => "#FF0000"}},
+                {:manual, ["#FF0000", "#0000FF"]}}
+    end
+
+    test "an option a colour, fill or alpha scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_color_manual/2, [], "required :values option not found"},
+            {&Plot.scale_color_manual/2, [values: []], "at least one colour"},
+            {&Plot.scale_color_manual/2, [values: %{}], "or a map from a value to its colour"},
+            {&Plot.scale_color_manual/2, [values: ["grey50"]], ~s(got: "grey50")},
+            {&Plot.scale_fill_manual/2, [values: %{4 => "red", 4.0 => "blue"}], "more than once"},
+            {&Plot.scale_fill_manual/2, [values: %{4 => "grey50"}], ~s(got: "grey50")},
+            {&Plot.scale_color_hue/2, [hue: 5], "expected {first, last}, two numbers, got: 5"},
+            {&Plot.scale_color_hue/2, [chroma: "a"], ~s(expected a number, got: "a")},
+            {&Plot.scale_fill_hue/2, [direction: 0], "expected one of [1, -1], got: 0"},
+            {&Plot.scale_color_hue/2, [expand: [add: 1]], "unknown options [:expand]"},
+            {&Plot.scale_color_gray/2, [start: 2], "from 0, black, to 1, white, got: 2"},
+            {&Plot.scale_fill_gray/2, [end: -0.1], "got: -0.1"},
+            {&Plot.scale_color_discrete/2, [palette: []], "at least one colour"},
+            {&Plot.scale_color_gradient/2, [low: "#FF000080"], "no alpha of its own"},
+            {&Plot.scale_fill_gradient2/2, [mid: :none], "no alpha of its own"},
+            {&Plot.scale_color_gradient2/2, [midpoint: "a"], ~s(expected a number, got: "a")},
+            {&Plot.scale_color_gradientn/2, [], "required :colors option not found"},
+            {&Plot.scale_fill_gradientn/2, [colors: "red"], ~s(got: "red")},
+            {&Plot.scale_color_continuous/2, [palette: ["red", "#FF000080"]], "no alpha"},
+            {&Plot.scale_color_continuous/2, [limits: [1, 2]], "got: [1, 2]"},
+            {&Plot.scale_color_continuous/2, [na_value: "grey50"], ~s(got: "grey50")},
+            {&Plot.scale_alpha_continuous/2, [range: {0, 2}], "each an opacity from 0 to 1"},
+            {&Plot.scale_alpha_continuous/2, [range: 1], "got: 1"},
+            {&Plot.scale_alpha_discrete/2, [na_value: 2], "got: 2"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+
+    test "labels not one for each break or limit, or without breaks, are refused at the call" do
+      plot = Plot.new(@rows)
+
+      assert_raise ArgumentError,
+                   ~r/scale_fill_hue\/2 is given 1 labels, which must be one for each of its 2 breaks/,
+                   fn -> Plot.scale_fill_hue(plot, breaks: ["4", "6"], labels: ["four"]) end
+
+      assert_raise ArgumentError,
+                   ~r/scale_color_gradient\/2 is given 2 labels, which need breaks/,
+                   fn -> Plot.scale_color_gradient(plot, labels: ["a", "b"]) end
+    end
+
+    test "lims/2 gives a colour, fill or alpha scale its limits, as its scale functions do" do
+      plot = Plot.new(@rows)
+
+      assert Plot.lims(plot, colour: [4, 6, 8], fill: {0, 10}, alpha: {nil, 1}).scales === %{
+               color: Plot.scale_color_discrete(plot, limits: [4, 6, 8]).scales.color,
+               fill: Plot.scale_fill_continuous(plot, limits: {0, 10}).scales.fill,
+               alpha: Plot.scale_alpha_continuous(plot, limits: {nil, 1}).scales.alpha
+             }
+
+      assert Plot.lims(plot, alpha: ["a", "b"]).scales.alpha ===
+               Plot.scale_alpha_discrete(plot, limits: ["a", "b"]).scales.alpha
+    end
+
+    # ggplot2 4.0.3's `lims(colour = c(10, 1))` reverses the colours through a reverse
+    # transformation, which Giggly's colour, fill and alpha scales do not have yet.
+    test "lims/2 refuses a colour, fill or alpha scale's limits high to low, or dates" do
+      plot = Plot.new(@rows)
+
+      for {options, shown} <- [
+            {[color: {10, 1}], "low first, since a colour, fill or alpha scale cannot run"},
+            {[fill: {~D[2026-01-01], nil}], "two numbers, each nil"},
+            {[alpha: "a"], ~s(got: "a")}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+  end
+
   describe "labs/2" do
     test "a plot has no labels until labs/2 sets them" do
       assert Plot.new(@rows).labels === %{}
