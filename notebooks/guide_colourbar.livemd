@@ -21,9 +21,9 @@ colours, with ticks and labels at its breaks. It is chosen in the scale's `guide
 is shaded in, whether the ticks at its ends are drawn, and, through a theme of its own, the bar's
 size and the look and place of its ticks and labels. `guide_colorbar()` is the same function. Giggly
 draws a continuous colour's or fill's colour bar as ggplot2 does at its defaults, in its gradient
-form (`display = "gradient"`, fifteen colours), but has none of the rest yet: no `guides()`, no
-`guide_colourbar()` and its options, and every plot drawn in ggplot2's default theme,
-`theme_gray()`, with no way to change it.
+form (`display = "gradient"`, fifteen colours), and chooses one by name, `:colorbar`, in a scale's
+`guide:` or in `Giggly.Plot.guides/2`, but has none of the rest yet: no `guide_colourbar()` and its
+options, and every plot drawn in ggplot2's default theme, `theme_gray()`, with no way to change it.
 
 ## The basic form
 
@@ -45,8 +45,7 @@ p1 + scale_fill_continuous(guide = guide_colourbar())
 p1 + guides(fill = guide_colourbar())
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`), `scale_fill_continuous()` and its `guide` option,
-`guides()` and `guide_colourbar()`.
+Not in Giggly yet: tiles (`geom_tile()`) and `guide_colourbar()`.
 
 ## Styling the bar
 
@@ -83,8 +82,8 @@ p1 + guides(fill = guide_colourbar(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guides()`, `guide_colourbar()` and its `theme` option, and
-changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and changing the
+theme.
 
 ## The number of bins
 
@@ -98,7 +97,7 @@ p1 + guides(fill = guide_colourbar(nbin = 100))
 
 `nbin` sets how many steps the bar's shading is drawn in.
 
-Not in Giggly yet: `geom_tile()`, `guides()`, and `guide_colourbar()` and its `nbin` option.
+Not in Giggly yet: `geom_tile()`, and `guide_colourbar()` and its `nbin` option.
 
 ## Hiding the end ticks
 
@@ -111,8 +110,8 @@ p1 +
   )
 ```
 
-Not in Giggly yet: `geom_tile()`, `scale_fill_continuous()` and its `limits`, `breaks` and `guide`
-options, and `guide_colourbar()` and its `nbin`, `draw.ulim` and `draw.llim` options.
+Not in Giggly yet: `geom_tile()`, and `guide_colourbar()` and its `nbin`, `draw.ulim` and
+`draw.llim` options.
 
 ## A colour bar beside a legend
 
@@ -135,6 +134,5 @@ p2 +
   )))
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `size`, `scale_fill_continuous()`, `scale_size()`,
-`guides()`, `guide_colourbar()` and `guide_legend()` and their `theme` options, and changing the
-theme.
+Not in Giggly yet: `geom_tile()`, mapping `size`, `scale_size()`, `guide_colourbar()` and its
+`theme` option, `guide_legend()`'s `theme` option, and changing the theme.

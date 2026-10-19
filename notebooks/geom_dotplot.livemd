@@ -83,7 +83,7 @@ ggplot(mtcars, aes(x = mpg)) + geom_dotplot(binwidth = 1.5) +
 The numbers on a dot plot's y axis count nothing, so the example removes the axis's title and
 breaks.
 
-Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, and `scale_y_continuous()`.
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option.
 
 ## Overlapping dots
 

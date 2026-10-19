@@ -16,7 +16,7 @@ cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the 
 of what remains.
 
 `guide_custom()` draws any graphical object, a `grid` grob, alongside a plot's legends, with a title
-if given one. It belongs to no scale. Giggly has none of it yet: it has no guide functions and no
+if given one. It belongs to no scale. Giggly has none of it yet: it has no `guide_custom()` and no
 `grid` grobs, and draws only the legends and colour bars its alpha, colour and fill scales ask for.
 
 ## A grob as a guide
@@ -33,7 +33,7 @@ circle <- grid::circleGrob()
 p + guides(custom = guide_custom(circle, title = "My circle"))
 ```
 
-Not in Giggly yet: `grid` grobs, `guides()` and `guide_custom()`.
+Not in Giggly yet: `grid` grobs and `guide_custom()`.
 
 ## Sizing a grob in relative units
 
@@ -48,8 +48,7 @@ p + guides(custom = guide_custom(
 )
 ```
 
-Not in Giggly yet: `grid` grobs, `guides()`, and `guide_custom()` with its `width` and `height`
-options.
+Not in Giggly yet: `grid` grobs, and `guide_custom()` with its `width` and `height` options.
 
 ## A grob in absolute units
 
@@ -62,4 +61,4 @@ p + guides(custom = guide_custom(
 ))
 ```
 
-Not in Giggly yet: `grid` grobs, `guides()` and `guide_custom()`.
+Not in Giggly yet: `grid` grobs and `guide_custom()`.

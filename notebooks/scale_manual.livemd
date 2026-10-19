@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,8 +32,15 @@ A manual scale maps each value of a discrete column to an aesthetic value given 
 fill, a size, a shape, a line type, a line width or a transparency. Each function works on the
 aesthetic in its name, though `scale_colour_manual()` and `scale_fill_manual()` can serve colour and
 fill at once through their `aesthetics` argument; `scale_discrete_manual()` works on whatever
-aesthetics that argument names. Giggly has none of this yet: it has no scale functions, and every
-column it maps to colour or fill goes through ggplot2's default scales.
+aesthetics that argument names. Giggly has `Giggly.Plot.scale_color_manual/2` and
+`Giggly.Plot.scale_fill_manual/2`, with their `breaks:`, `labels:` and `limits:`, but not their
+`aesthetics` option, so each serves its own aesthetic, nor the other manual scales: it maps no
+`size`, `shape`, `linetype` or `linewidth`, and has no `scale_alpha_manual()`. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
+R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to
+`mtcars`, R's name for it.
 
 ## Colours by hand
 
@@ -32,9 +50,20 @@ p <- ggplot(mtcars, aes(mpg, wt)) +
 p + scale_colour_manual(values = c("red", "blue", "green"))
 ```
 
-Unnamed values go to the column's values in order.
+Unnamed values go to the column's values in order: the cars with 4, 6 and 8 cylinders red, blue
+and green. Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`. CSS's `"green"` is `#008000`,
+darker than R's `#00FF00`, so the eight-cylinder cars are a darker green than ggplot2 draws them.
 
-Not in Giggly yet: `scale_colour_manual()`.
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt})
+  |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+
+p
+|> Plot.scale_color_manual(values: ["red", "blue", "green"])
+|> render.()
+```
 
 ## Colours named by value
 
@@ -45,9 +74,17 @@ p + scale_colour_manual(values = cols)
 ```
 
 Named values go to the column's values with those names, whatever order they are written in; a
-name the data lacks, here `"10"`, is unused.
+name the data lacks, here `"10"`, is unused. Giggly's named vector is a map, and it names each value
+as the column holds it, so `factor(cyl)`'s levels are the numbers `8`, `4`, `6` and `10`, where R
+names them as text.
 
-Not in Giggly yet: `scale_colour_manual()`.
+```elixir
+cols = %{8 => "red", 4 => "blue", 6 => "darkgreen", 10 => "orange"}
+
+p
+|> Plot.scale_color_manual(values: cols)
+|> render.()
+```
 
 ## Colour and fill at once
 
@@ -64,7 +101,7 @@ ggplot(
   )
 ```
 
-Not in Giggly yet: a fixed `shape` and `size`, a point's `fill`, and `scale_colour_manual()` and its
+Not in Giggly yet: a fixed `shape` and `size`, a point's `fill`, and `scale_colour_manual()`'s
 `aesthetics` option.
 
 ## Breaks and labels
@@ -80,7 +117,20 @@ p + scale_colour_manual(
 )
 ```
 
-Not in Giggly yet: `scale_colour_manual()` and its `breaks` and `labels` options.
+The first plot is the one above; the second labels the legend's keys as given, its breaks named
+as the column holds them.
+
+```elixir
+p
+|> Plot.scale_color_manual(values: cols)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_color_manual(values: cols, breaks: [4, 6, 8], labels: ["four", "six", "eight"])
+|> render.()
+```
 
 ## Limits
 
@@ -90,6 +140,18 @@ p + scale_colour_manual(values = cols, limits = c("4", "8"))
 p + scale_colour_manual(values = cols, limits = c("4", "6", "8", "10"))
 ```
 
-A value outside `limits` is treated as missing.
+A value outside `limits` is treated as missing: in the first plot the six-cylinder cars are drawn
+in grey50, the missing value's colour, and the legend has keys for 4 and 8 alone. In the second, 10
+has a key, which no car draws in, so it is empty.
 
-Not in Giggly yet: `scale_colour_manual()` and its `limits` option.
+```elixir
+p
+|> Plot.scale_color_manual(values: cols, limits: [4, 8])
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_color_manual(values: cols, limits: [4, 6, 8, 10])
+|> render.()
+```

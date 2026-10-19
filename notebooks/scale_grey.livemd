@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,8 +29,13 @@ waiting for, so the page is also a list of what remains.
 `scale_colour_grey()` maps a discrete column to evenly spaced shades of grey, the black-and-white
 counterpart of `scale_colour_gradient()`. Its `start` and `end` give the first shade and the last,
 from black at 0 to white at 1, and a missing value is drawn red unless `na.value` says otherwise.
-`scale_fill_grey()` does the same for fill. Giggly has none of this yet: it has no scale functions,
-and colours a discrete column with ggplot2's default hues, `scale_colour_hue()`'s.
+`scale_fill_grey()` does the same for fill. Giggly has `Giggly.Plot.scale_color_gray/2` and
+`Giggly.Plot.scale_fill_gray/2`, spelt as Giggly's theme, `:gray`, is, with `start:`, `end:` and
+`na_value:`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns
+an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in these
+examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
+magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## Shades of grey
 
@@ -29,9 +45,25 @@ p + scale_colour_grey()
 p + scale_colour_grey(end = 0)
 ```
 
-With `end = 0` the shades run from dark grey to black, rather than to light grey.
+With `end = 0` the shades run from dark grey to black, rather than to light grey. Giggly writes
+`factor(cyl)` as `{:factor, [:cyl]}`.
 
-Not in Giggly yet: `scale_colour_grey()` and its `end` option.
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt})
+  |> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+
+p
+|> Plot.scale_color_gray()
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_color_gray(end: 0)
+|> render.()
+```
 
 ## A white background
 
@@ -40,8 +72,8 @@ Not in Giggly yet: `scale_colour_grey()` and its `end` option.
 p + scale_colour_grey() + theme_bw()
 ```
 
-Not in Giggly yet: `scale_colour_grey()` and `theme_bw()`. Every Giggly plot is drawn in ggplot2's
-default theme, `theme_gray()`, with its grey panel.
+Not in Giggly yet: `theme_bw()`. Every Giggly plot is drawn in ggplot2's default theme,
+`theme_gray()`, with its grey panel.
 
 ## Missing values
 
@@ -59,5 +91,4 @@ ggplot(mtcars, aes(mpg, wt)) +
   scale_colour_grey(na.value = "green")
 ```
 
-Not in Giggly yet: a vector outside the data in a mapping, here `miss`, and `scale_colour_grey()`
-and its `na.value` option.
+Not in Giggly yet: a vector outside the data in a mapping, here `miss`.

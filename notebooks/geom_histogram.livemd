@@ -164,8 +164,7 @@ m +
   scale_x_log10()
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, `scale_x_log10()`, and the
-`movies` dataset.
+Not in Giggly yet: `geom_histogram()` and its `binwidth` option, and the `movies` dataset.
 
 ## Bins in a transformed coordinate system
 
@@ -201,8 +200,7 @@ m +
 }
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, `scale_y_sqrt()`, and the
-`movies` dataset.
+Not in Giggly yet: `geom_histogram()` and its `binwidth` option, and the `movies` dataset.
 
 ## A bin width for each panel
 

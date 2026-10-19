@@ -160,9 +160,24 @@ p + geom_text(aes(colour = factor(cyl))) +
 p + geom_label(aes(fill = factor(cyl)), colour = "white", fontface = "bold")
 ```
 
-`scale_colour_hue(l = 40)` darkens the colours by lowering their luminance.
+Giggly draws the first two plots, writing `factor(cyl)` as `{:factor, [:cyl]}`.
+`scale_colour_hue(l = 40)` darkens the colours by lowering their luminance, which Giggly spells
+out, `luminance:`.
 
-Not in Giggly yet: `geom_label()`, `scale_colour_hue()`, and a fixed `fontface`.
+```elixir
+p
+|> Plot.geom_text(%{colour: {:factor, [:cyl]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_text(%{colour: {:factor, [:cyl]}})
+|> Plot.scale_color_hue(luminance: 40)
+|> render.()
+```
+
+Not in Giggly yet: `geom_label()` and a fixed `fontface`.
 
 ## Mapping size
 

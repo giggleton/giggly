@@ -27,7 +27,7 @@ d <- ggplot(diamonds, aes(x, y)) + xlim(4, 10) + ylim(4, 10)
 d + geom_bin_2d()
 ```
 
-Not in Giggly yet: `geom_bin_2d()`, and `xlim()` and `ylim()`.
+Not in Giggly yet: `geom_bin_2d()`.
 
 ## The number of bins
 
@@ -38,7 +38,7 @@ d + geom_bin_2d(bins = 10)
 d + geom_bin_2d(bins = list(x = 30, y = 10))
 ```
 
-Not in Giggly yet: `geom_bin_2d()` and its `bins` option, and `xlim()` and `ylim()`.
+Not in Giggly yet: `geom_bin_2d()` and its `bins` option.
 
 ## The width of the bins
 
@@ -47,4 +47,4 @@ Not in Giggly yet: `geom_bin_2d()` and its `bins` option, and `xlim()` and `ylim
 d + geom_bin_2d(binwidth = c(0.1, 0.1))
 ```
 
-Not in Giggly yet: `geom_bin_2d()` and its `binwidth` option, and `xlim()` and `ylim()`.
+Not in Giggly yet: `geom_bin_2d()` and its `binwidth` option.

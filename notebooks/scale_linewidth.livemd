@@ -19,7 +19,7 @@ what it is waiting for, so the page is also a list of what remains.
 between a thinnest and a thickest width; `scale_linewidth_binned()` cuts the column into bins first.
 The `size` aesthetic can still set a line's width, for historical reasons, but `linewidth` keeps the
 width of a stroke apart from the size of an area. Giggly has none of this yet: it draws paths and
-lines as wide as a layer sets them, but maps no `linewidth`, and it has no scale functions.
+lines as wide as a layer sets them, but maps no `linewidth`.
 
 ## Line width from a column
 

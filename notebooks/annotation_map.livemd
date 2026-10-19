@@ -49,7 +49,7 @@ p <- ggplot(df, aes(x = long, y = lat)) +
 p + xlim(-84, -76) + ylim(34, 37.2)
 ```
 
-Not in Giggly yet: map data from the `maps` package, `annotation_map()`, and `xlim()` and `ylim()`.
+Not in Giggly yet: map data from the `maps` package and `annotation_map()`.
 
 ## A projected map
 

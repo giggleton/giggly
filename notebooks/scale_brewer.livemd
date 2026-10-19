@@ -19,8 +19,8 @@ its ggplot2 code and names what it is waiting for, so the page is also a list of
 The brewer scales colour discrete values with ColorBrewer's sequential, diverging and qualitative
 palettes, which were designed for maps. The distiller scales blend a palette smoothly for continuous
 values, and the fermenter scales cut continuous values into bins, one colour each. Giggly has none
-of them yet: it has no scale functions, and colours a discrete column with ggplot2's default hues
-and a continuous one with its default gradient.
+of them yet: it has no ColorBrewer palettes, and colours a discrete column with hues, greys or
+colours given by hand and a continuous one along a gradient.
 
 ## The default brewer palette
 

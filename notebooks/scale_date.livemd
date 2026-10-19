@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,8 +28,13 @@ waiting for, so the page is also a list of what remains.
 These are the position scales for dates, date-times and times of day, which ggplot2 adds by itself
 for a column of one of them. Setting one by hand chooses its limits, where its breaks fall and how
 its labels are written, in units of time such as `"1 week"` and formats such as `"%b %d"`. Giggly
-has none of these functions yet, but puts a column of dates on an axis with the scale ggplot2 adds
-by itself; date-times and times of day have no scale yet.
+has `Giggly.Plot.scale_x_date/2` and `Giggly.Plot.scale_y_date/2`, with their limits, breaks, labels
+and minor breaks, breaks also as a step of time (`date_breaks: [week: 1]`) and labels as a
+`Calendar.strftime/3` format (`date_labels: "%b %d"`); it has no `scale_x_datetime()` or
+`scale_x_time()`, since date-times and times of day have no scale yet. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`.
 
 ## Breaks and labels
 
@@ -44,8 +58,47 @@ base + scale_x_date(date_breaks = "1 week", date_labels = "%W")
 base + scale_x_date(date_minor_breaks = "1 day")
 ```
 
-Not in Giggly yet: `scale_x_date()` and its `date_labels`, `date_breaks` and `date_minor_breaks`
-options.
+Giggly draws the first and third plots. The cell takes today's date from the clock, as
+`Sys.Date()` does, though `Date.utc_today/0` gives the date in UTC where R gives the local one, and
+writes out the 30 prices R's `runif()` draws after `set.seed(1)`. A step of time is written as
+`Date.shift/2` takes one, `[day: 1]` for `"1 day"`, and a format is `Calendar.strftime/3`'s, which
+writes `"%b %d"` as R does, `Oct 19`.
+
+```elixir
+today = Date.utc_today()
+
+df = %{
+  "date" => Enum.map(0..29, fn days -> Date.add(today, -days) end),
+  "price" => [
+    0.2655086631421, 0.37212389963679016, 0.5728533633518964, 0.9082077899947762,
+    0.2016819310374558, 0.8983896849676967, 0.9446752686053514, 0.6607977924868464,
+    0.6291140438988805, 0.061786270467564464, 0.20597457489930093, 0.17655675252899528,
+    0.6870228466577828, 0.384103718213737, 0.7698414199985564, 0.49769924208521843,
+    0.7176185082644224, 0.9919060948304832, 0.3800351794343442, 0.7774452213197947,
+    0.9347052311059088, 0.21214252128265798, 0.651673766085878, 0.12555509596131742,
+    0.26722066872753203, 0.3861140925437212, 0.013390333158895373, 0.3823879570700228,
+    0.86969084572047, 0.3403489966876805
+  ]
+}
+
+base =
+  df
+  |> Plot.new(%{x: :date, y: :price})
+  |> Plot.geom_line()
+
+base
+|> Plot.scale_x_date(date_labels: "%b %d")
+|> render.()
+```
+
+```elixir
+base
+|> Plot.scale_x_date(date_minor_breaks: [day: 1])
+|> render.()
+```
+
+Not in Giggly yet: `"%W"` in `date_labels`, the week of the year, which `Calendar.strftime/3`
+cannot write.
 
 ## Limits
 
@@ -54,4 +107,11 @@ options.
 base + scale_x_date(limits = c(Sys.Date() - 7, NA))
 ```
 
-Not in Giggly yet: `scale_x_date()` and its `limits` option.
+R's `NA` leaves the upper limit to the data, today; Giggly writes it `nil`. The line through the
+days before the limit is not drawn.
+
+```elixir
+base
+|> Plot.scale_x_date(limits: {Date.add(today, -7), nil})
+|> render.()
+```

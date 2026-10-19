@@ -31,12 +31,14 @@ ggplot2 adds by itself for such a column. Setting one by hand changes its title,
 values, or which values it shows and in what order. A discrete scale places its values at 1, 2, 3
 and so on, so continuous positions can fall between them, which is how jittering works. Giggly
 chooses a discrete position scale from the data, as ggplot2 does, and orders its values
-alphabetically, as ggplot2 orders text; it has no scale functions yet. A plot is described with
-`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
-aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`:
-fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to
-`mpg`, ggplot2's name for it.
+alphabetically, as ggplot2 orders text. It has `Giggly.Plot.scale_x_discrete/2` and
+`Giggly.Plot.scale_y_discrete/2`, with their titles, labels, limits, breaks and expansion, and
+`limits:` shows values in the order given, but it has no ordered factors, which choose the order of
+a column's values. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
+defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
+to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## Bars on a discrete axis
 
@@ -81,8 +83,7 @@ d +
 
 The labels are given by value, so the order they are written in does not matter.
 
-Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and
-`scale_x_discrete()`, whose first argument titles the axis, and its `labels` option.
+Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
 
 ## Which values are shown
 
@@ -92,8 +93,7 @@ Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and
 d + scale_x_discrete(limits = c("Fair","Ideal"))
 ```
 
-Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and
-`scale_x_discrete()` and its `limits` option.
+Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
 
 ## The xlim() and ylim() shortcuts
 
@@ -105,8 +105,7 @@ d + xlim("Fair","Ideal", "Good")
 d + ylim("I1", "IF")
 ```
 
-Not in Giggly yet: choosing the order of a column's values, `geom_jitter()`, and `xlim()` and
-`ylim()`.
+Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
 
 ## Ordering by another column
 
@@ -147,5 +146,4 @@ ggplot(mpg, aes(reorder(manufacturer, displ), cty)) +
 ```
 
 Not in Giggly yet: choosing the order of a column's values, a whole-column function in a mapping,
-such as `reorder(manufacturer, displ)`, and `scale_x_discrete()` and its `labels` option, here given
-R's `abbreviate()` to shorten each name.
+such as `reorder(manufacturer, displ)`, and R's `abbreviate()`, which shortens each name.

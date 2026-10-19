@@ -16,9 +16,9 @@ and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and 
 waiting for, so the page is also a list of what remains.
 
 `scale_x_binned()` and `scale_y_binned()` cut a continuous position into bins, so that a geom
-needing discrete positions can use it: with `geom_bar()`, a binned x scale draws a histogram.
-Giggly has neither yet: it has no scale functions, and a position scale is continuous or discrete
-as it is chosen from the data.
+needing discrete positions can use it: with `geom_bar()`, a binned x scale draws a histogram. Giggly
+has neither yet: it has no binned scales, and a position scale is continuous, discrete or a date
+one.
 
 ## A histogram from bars
 

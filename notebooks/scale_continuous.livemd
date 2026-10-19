@@ -29,15 +29,15 @@ its ggplot2 code and names what it is waiting for, so the page is also a list of
 
 `scale_x_continuous()` and `scale_y_continuous()` are the default scales for a continuous `x` and
 `y`. Setting one by hand changes its title, limits, breaks or labels, or transforms it; the log10,
-square root and reverse scales are shortcuts for common transformations. Giggly chooses a continuous
-position scale from the data, as ggplot2 does, and titles its axis by the column mapped to it, or
-as `Giggly.Plot.labs/2` sets it, but has no scale functions yet, so nothing else about a scale can
-be set. A plot is described with
-`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
-aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`:
-fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to
-`mpg`, ggplot2's name for it.
+square root and reverse scales are shortcuts for common transformations. Giggly has each of these
+functions, `Giggly.Plot.scale_x_continuous/2` and the rest, with their titles, limits, breaks, minor
+breaks, labels, expansion and transformations, and formatters for labels in `Giggly.Format`; it has
+no `sec.axis` option (`sec_axis()`), and no transformation of your own (`scales::new_transform()`).
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
+to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## The default scales
 
@@ -68,8 +68,14 @@ p1 +
   scale_y_continuous("Highway MPG")
 ```
 
-Not in Giggly yet: `scale_x_continuous()` and `scale_y_continuous()`, whose first argument titles
-the axis.
+R's first argument is the scale's name, which titles its axis; Giggly's is `name:`.
+
+```elixir
+p1
+|> Plot.scale_x_continuous(name: "Engine displacement (L)")
+|> Plot.scale_y_continuous(name: "Highway MPG")
+|> render.()
+```
 
 ## Removing axis titles
 
@@ -95,9 +101,20 @@ p1 + scale_x_continuous(limits = c(2, 6))
 p1 + scale_x_continuous(limits = c(0, 10))
 ```
 
-Limits narrower than the data drop the rows outside them; wider ones leave room around the data.
+Limits narrower than the data drop the cars outside them, which ggplot2 warns of and Giggly does
+not; wider ones leave room beyond the data.
 
-Not in Giggly yet: `scale_x_continuous()` and its `limits` option.
+```elixir
+p1
+|> Plot.scale_x_continuous(limits: {2, 6})
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.scale_x_continuous(limits: {0, 10})
+|> render.()
+```
 
 ## The xlim() shortcut
 
@@ -106,7 +123,11 @@ Not in Giggly yet: `scale_x_continuous()` and its `limits` option.
 p1 + xlim(2, 6)
 ```
 
-Not in Giggly yet: `xlim()`.
+```elixir
+p1
+|> Plot.xlim(2, 6)
+|> render.()
+```
 
 ## Where the ticks go
 
@@ -115,7 +136,11 @@ Not in Giggly yet: `xlim()`.
 p1 + scale_x_continuous(breaks = c(2, 4, 6))
 ```
 
-Not in Giggly yet: `scale_x_continuous()` and its `breaks` option.
+```elixir
+p1
+|> Plot.scale_x_continuous(breaks: [2, 4, 6])
+|> render.()
+```
 
 ## Labels of your own
 
@@ -127,7 +152,13 @@ p1 + scale_x_continuous(
 )
 ```
 
-Not in Giggly yet: `scale_x_continuous()` and its `breaks` and `labels` options.
+R matches `label` to the argument it begins, `labels`, which Giggly spells out.
+
+```elixir
+p1
+|> Plot.scale_x_continuous(breaks: [2, 4, 6], labels: ["two", "four", "six"])
+|> render.()
+```
 
 ## Formatting labels
 
@@ -148,8 +179,44 @@ p2 + scale_y_continuous(labels = scales::label_dollar())
 p2 + scale_x_continuous(labels = scales::label_comma())
 ```
 
-Not in Giggly yet: `scale_x_continuous()` and `scale_y_continuous()` and their `labels` option,
-here given label functions from the scales package.
+The cell writes out the `x` R drew, each number to the last digit R holds, and works out `y` as
+R's `seq()` does, each step a ninth. Giggly's formatters are `Giggly.Format`'s, each handed every
+break so that the labels share their decimals, as the scales package's are: `percent/2`,
+`currency/2`, which writes what `label_dollar()` writes at its defaults, and `comma/2`. The first
+two plots' x axis, left to its default labels, reads `0` and `100000` where R writes `0e+00` and
+`1e+05`, since Giggly writes numbers as Elixir does.
+
+```elixir
+df = %{
+  "x" => [
+    -62645.38107423324, 18364.332422208223, -83562.86124100472, 159528.08021377915,
+    32950.777181536054, -82046.83841180152, 48742.90524284853, 73832.47051292173,
+    57578.13516534923, -30538.838715635604
+  ],
+  "y" => Enum.map(0..9, fn step -> step * (1 / 9) end)
+}
+
+p2 =
+  df
+  |> Plot.new(%{x: :x, y: :y})
+  |> Plot.geom_point()
+
+p2
+|> Plot.scale_y_continuous(labels: &Giggly.Format.percent/1)
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.scale_y_continuous(labels: &Giggly.Format.currency/1)
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.scale_x_continuous(labels: &Giggly.Format.comma/1)
+|> render.()
+```
 
 ## Transformations
 
@@ -161,7 +228,23 @@ p1 + scale_y_sqrt()
 p1 + scale_y_reverse()
 ```
 
-Not in Giggly yet: `scale_y_log10()`, `scale_y_sqrt()` and `scale_y_reverse()`.
+```elixir
+p1
+|> Plot.scale_y_log10()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.scale_y_sqrt()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.scale_y_reverse()
+|> render.()
+```
 
 ## Other transformations
 
@@ -172,5 +255,12 @@ p1 + scale_y_continuous(transform = scales::transform_reciprocal())
 # You can also create your own. See ?scales::new_transform
 ```
 
-Not in Giggly yet: `scale_y_continuous()` and its `transform` option, and transformations from the
-scales package, built in or made with `scales::new_transform()`.
+Giggly names a transformation by an atom, `:identity`, `:log10`, `:sqrt`, `:reverse` or
+`:reciprocal`, where R takes the scales package's objects; it has none of the package's others,
+and makes none of your own.
+
+```elixir
+p1
+|> Plot.scale_y_continuous(transform: :reciprocal)
+|> render.()
+```

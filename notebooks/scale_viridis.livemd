@@ -21,7 +21,7 @@ in colour and in black and white, and are designed to be read by people with com
 blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
 continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
 palette, viridis by default, and the `fill` versions do the same for fill. Giggly has none of this
-yet: it has no scale functions, and colours a discrete column with ggplot2's default hues and a
+yet: it has no viridis palettes, and colours a discrete column with ggplot2's default hues and a
 continuous one with its default gradient, whatever its order.
 
 ## The default for ordered values

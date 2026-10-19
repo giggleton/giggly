@@ -95,8 +95,8 @@ R's `expand.grid()` makes a row for each combination of line end and line join, 
 segment is drawn with its own line end and join, and labelled with their names.
 
 Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, a fixed
-`size`, mapping `xend` and `yend`, and `xlim()`. ggplot2 knows no `hjust` called `'outside'` and
-centres these labels, as Giggly does by default.
+`size`, and mapping `xend` and `yend`. ggplot2 knows no `hjust` called `'outside'` and centres these
+labels, as Giggly does by default.
 
 ## Spikes, as base R draws them
 

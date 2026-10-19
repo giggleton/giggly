@@ -22,7 +22,7 @@ area, since area is what readers perceive, while `scale_radius()` maps it to the
 `scale_size_binned_area()` are the binned counterparts of `scale_size()` and `scale_size_area()`,
 cutting the column into bins first. A line's width, once also set by `size`, is now the `linewidth`
 aesthetic. Giggly has none of this yet: every point it draws looks as ggplot2's default point does,
-and it maps no `size` and has no scale functions.
+and it maps no `size`.
 
 ## Size from a column
 

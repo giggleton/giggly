@@ -63,7 +63,7 @@ ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
   xlim(55, 70)
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, and `xlim()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`.
 
 ## Bounded data
 

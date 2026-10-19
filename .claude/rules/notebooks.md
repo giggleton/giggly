@@ -29,7 +29,7 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   notebooks for its name finds every example waiting for it, and those are drawn; a verdict still
   waiting drops the pieces that landed and keeps the rest (design-log §4, the entry beginning "A
   verdict names a missing expression"). **An About sentence says what Giggly has and
-  names what it lacks by that name** ("maps no `shape`", "no scale functions"), never "no X but
+  names what it lacks by that name** ("maps no `shape`", "no binned scales"), never "no X but
   <what exists>", which a search for the next feature cannot find.
 - **An expression is written as a capture wherever one function computes it**
   (`{&:math.log10/1, [:carat]}`), so its guide is titled by the call; a closure only beside

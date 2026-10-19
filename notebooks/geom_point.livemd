@@ -131,7 +131,7 @@ ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
 ```
 
 Not in Giggly yet: mapping `shape` and the legend that reads it back, a point's `fill` and `stroke`,
-a fixed `size`, `scale_shape_manual()`, and `scale_fill_ordinal()` with `guide_legend()` and its
+a fixed `size`, `scale_shape_manual()`, `scale_fill_ordinal()`, and `guide_legend()`'s
 `override.aes` option.
 
 ## Layering points of different sizes

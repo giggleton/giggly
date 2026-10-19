@@ -116,8 +116,8 @@ p + coord_cartesian(ylim = c(15, 30))
 taken, and so changes the means; `coord_cartesian()` zooms in after the stat, leaving them as
 they were.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, `ylim()`, and `coord_cartesian()` and
-its `ylim` option.
+Not in Giggly yet: `stat_summary()` and its `fun` option, and `coord_cartesian()` and its `ylim`
+option.
 
 ## Summary functions from Hmisc
 
@@ -188,5 +188,4 @@ m2 + coord_transform(y="log10")
 }
 ```
 
-Not in Giggly yet: `scale_y_log10()` and `coord_transform()`, and everything the plot above waits
-for.
+Not in Giggly yet: `coord_transform()` and everything the plot above waits for.

@@ -44,7 +44,7 @@ Not in Giggly yet: `geom_smooth()`, the smoothed line drawn over the points.
 p + scale_x_continuous(limits = c(325, 500))
 ```
 
-Not in Giggly yet: `geom_smooth()`, and `scale_x_continuous()`, here setting the scale's limits.
+Not in Giggly yet: `geom_smooth()`.
 
 ## Limits on the coordinate system
 
@@ -106,7 +106,7 @@ Not in Giggly yet: `stat_bin_2d()`.
 d + scale_x_continuous(limits = c(0, 1))
 ```
 
-Not in Giggly yet: `stat_bin_2d()` and `scale_x_continuous()`, here setting the scale's limits.
+Not in Giggly yet: `stat_bin_2d()`.
 
 ## Zooming the histogram's coordinates
 

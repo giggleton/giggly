@@ -224,8 +224,17 @@ p + scale_fill_manual(values = alpha(c("blue", "red"), .3))
 ```
 
 The rectangles span each president's term, from the `presidential` table, coloured by party and
-as tall as the range of unemployment.
+as tall as the range of unemployment. Giggly draws the first plot, the number unemployed each
+month.
+
+```elixir
+p =
+  economics
+  |> Plot.new(%{x: :date, y: :unemploy})
+  |> Plot.geom_line()
+
+render.(p)
+```
 
 Not in Giggly yet: the `presidential` dataset, removing the plot's `x` and `y` from a layer's
-mapping, R's `aes(NULL, NULL)`, and `scale_fill_manual()` with colours made transparent by
-`alpha()`.
+mapping, R's `aes(NULL, NULL)`, and colours made transparent by `alpha()`.

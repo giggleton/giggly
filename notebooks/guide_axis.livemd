@@ -38,8 +38,8 @@ p + scale_x_continuous(guide = guide_axis(n.dodge = 2))
 p + guides(x = guide_axis(angle = 90))
 ```
 
-Not in Giggly yet: `scale_x_continuous()`, `guides()` and `guide_axis()`, here to spread the x
-axis's labels over two rows or turn them through 90 degrees.
+Not in Giggly yet: `guide_axis()`, here to spread the x axis's labels over two rows or turn them
+through 90 degrees.
 
 ## A duplicate axis
 
@@ -48,5 +48,5 @@ axis's labels over two rows or turn them through 90 degrees.
 p + guides(x = guide_axis(n.dodge = 2), y.sec = guide_axis())
 ```
 
-Not in Giggly yet: `guides()`, `guide_axis()`, and secondary axes, here `y.sec`, a copy of the y
-axis on the right.
+Not in Giggly yet: `guide_axis()` and secondary axes, here `y.sec`, a copy of the y axis on the
+right.

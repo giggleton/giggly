@@ -30,10 +30,10 @@ A gradient scale maps a continuous column to colour, or to fill, by blending bet
 diverges from a low colour through a middle one to a high one, around a midpoint, and
 `scale_colour_gradientn()` blends through as many colours as it is given; the `fill` versions do the
 same for fill. A missing value is drawn in grey, or in the colour `na.value` gives. The legend that
-reads a gradient back is a colour bar, `guide_colourbar()`. Giggly colours a continuous column with
-ggplot2's default gradient, `scale_colour_gradient()`'s, from `#132B43` to `#56B1F7`, a missing
-value in grey, and reads it back with a colour bar, but it has no scale functions yet, so none of
-their options.
+reads a gradient back is a colour bar, `guide_colourbar()`. Giggly has all six,
+`Giggly.Plot.scale_color_gradient/2` and the rest, with their colours, gradient2's `midpoint:`, and
+their limits, breaks, labels and `na_value:`, and reads each back with a colour bar; it has no
+`rescaler` option (`scales::rescale_mid()`).
 
 ## The default gradient
 
@@ -61,7 +61,7 @@ ggplot(df, aes(x, y)) +
   geom_point(aes(colour = z2))
 ```
 
-The cell writes out `df`'s `x`, `y` and `z2` as R made them, each number to the last digit R
+The cell writes out `df`'s `x`, `y`, `z1` and `z2` as R made them, each number to the last digit R
 holds. A column of numbers mapped to `colour` takes ggplot2's default gradient, from `#132B43` at
 the smallest `z2` to `#56B1F7` at the largest, blended in L\*a\*b\*, and a colour bar reads it
 back.
@@ -122,6 +122,33 @@ df = %{
     0.10087312618270516, 0.9273020885884762, 0.28323250031098723, 0.5905731588136405,
     0.11036060494370759, 0.840507032116875, 0.3179636844433844, 0.7828513369895518
   ],
+  "z1" => [
+    -0.6203666772241242, 0.04211587314423524, -0.9109216485524455, 0.15802877240407498,
+    -0.6545846439188178, 1.767287269372646, 0.7167074760172057, 0.9101742294952272,
+    0.3841853578263446, 1.6821760805194184, -0.635736453948977, -0.461644730360566,
+    1.432282238541663, -0.6506963533103667, -0.20738074360196543, -0.3928079294419839,
+    -0.31999286854850684, -0.27911330297655895, 0.494188331267827, -0.17733048226960638,
+    -0.5059574621142574, 1.3430388251704115, -0.21457940854686872, -0.17955653004338712,
+    -0.10019074121356196, 0.7126663070514053, -0.07356440412632634, -0.037634171467047915,
+    -0.6816604787556569, -0.32427027224631905, 0.06016044043451516, -0.5888944862596638,
+    0.5314961926325724, -1.5183940817867871, 0.3065578607897656, -1.536449823537586,
+    -0.3009761268366107, -0.5282799044450062, -0.6520947806809988, -0.05689677784739255,
+    -1.9143594256800118, 1.1765833120185625, -1.6649724362120033, -0.4635304014723856,
+    -1.1159201050428453, -0.7508190011934479, 2.087166545628347, 0.017395619693251662,
+    -1.2863005304343256, -1.6406055344185784, 0.45018710127265554, -0.018559832714637983,
+    -0.3180683745438444, -0.9293621474537024, -1.4874603101414847, -1.0751922966156808,
+    1.0000288037139142, -0.6212666947968234, -1.3844268473844914, 1.8692906224235806,
+    0.4251003773724479, -0.23864710091303276, 1.05848304870902, 0.8864226513749359,
+    -0.6192430482311471, 2.2061024645404674, -0.25502703014101524, -1.4244946502128084,
+    -0.14439960195421941, 0.20753833923234477, 2.3079783990593614, 0.10580236789371146,
+    0.45699880542341353, -0.07715293535653098, -0.3340008423665445, -0.03472602831127619,
+    0.7876396056301618, 2.075245008652285, 1.027392438763768, 1.2079083983867038,
+    -1.231323421558044, 0.9838955700533791, 0.21992480366065129, -1.4672500290922426,
+    0.5210227426481387, -0.158754604716016, 1.4645873119697974, -0.7660819996046648,
+    -0.43021175392854655, -0.9261094973774372, -0.17710396143654025, 0.4020117794863379,
+    -0.7317481731196064, 0.8303731679816738, -1.208082786304465, -1.0479844128077416,
+    1.441157706844281, -1.015847465304649, 0.41197471231751487, -0.3810760511089196
+  ],
   "z2" => [
     0.4094018396509341, 1.6888732862040463, 1.5865884334419702, 0.3309078006827663,
     2.285235535292467, 2.497661589834164, 0.667066166765493, 0.5413273359637003,
@@ -166,7 +193,16 @@ ggplot(df, aes(x, y)) +
   scale_colour_gradient2()
 ```
 
-Not in Giggly yet: `scale_colour_gradient2()`.
+The colours diverge from white at the midpoint, 0, toward a muted red below it and a muted blue
+above, each end reached only as far as the data goes from 0.
+
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point(%{colour: :z1})
+|> Plot.scale_color_gradient2()
+|> render.()
+```
 
 ## Colours of your own
 
@@ -177,7 +213,18 @@ ggplot(df, aes(x, y)) +
   scale_colour_gradientn(colours = terrain.colors(10))
 ```
 
-Not in Giggly yet: `scale_colour_gradientn()` and R's `terrain.colors()` palette.
+R's `terrain.colors(10)` is written out as the ten colours it returns.
+
+```elixir
+terrain =
+  ~w(#00A600 #2DB600 #63C600 #A0D600 #E6E600 #E8C32E #EBB25E #EDB48E #F0C9C0 #F2F2F2)
+
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point(%{colour: :z1})
+|> Plot.scale_color_gradientn(colors: terrain)
+|> render.()
+```
 
 ## Centring the gradient
 
@@ -194,8 +241,7 @@ ggplot(df, aes(x, y)) +
 `scales::rescale_mid()` puts 0 at the middle of the colours, here white, however far the data
 reaches on either side.
 
-Not in Giggly yet: `scale_colour_gradientn()` and its `rescaler` option, and
-`scales::rescale_mid()`.
+Not in Giggly yet: `scale_colour_gradientn()`'s `rescaler` option and `scales::rescale_mid()`.
 
 ## Filling with a gradient
 
@@ -206,8 +252,7 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
   scale_fill_gradientn(colours = terrain.colors(10))
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, rasters (`geom_raster()`), `scale_fill_gradientn()`, and
-R's `terrain.colors()` palette.
+Not in Giggly yet: the `faithfuld` dataset and rasters (`geom_raster()`).
 
 ## Choosing the low and high colours
 
@@ -220,7 +265,13 @@ ggplot(df, aes(x, y)) +
 # seeing them
 ```
 
-Not in Giggly yet: `scale_colour_gradient()` and its `low` and `high` options.
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point(%{colour: :z2})
+|> Plot.scale_color_gradient(low: "white", high: "black")
+|> render.()
+```
 
 ## Hiding missing values
 
@@ -239,5 +290,41 @@ ggplot(df_na, aes(x = value, y)) +
    scale_colour_gradient(low = "yellow", high = "red", na.value = NA)
 ```
 
-Not in Giggly yet: `geom_bar()`'s `stat` option, and `scale_fill_gradient()` and
-`scale_colour_gradient()` with their `low`, `high` and `na.value` options.
+Giggly draws the second plot. The cell writes out `df_na` as R made it, each number to the last
+digit R holds, its `z1` missing in the first ten rows; R's `NA` for no colour is `:none`. Ten
+points are drawn, and the axes span all twenty.
+
+```elixir
+df_na = %{
+  "value" => Enum.to_list(1..20),
+  "x" => [
+    0.8142517504747957, 0.9287772257812321, 0.14748104522004724, 0.7498216649983078,
+    0.975657349685207, 0.974792463472113, 0.3506255701649934, 0.3939490569755435,
+    0.9509510090574622, 0.1066483196336776, 0.9347601165063679, 0.3461620998568833,
+    0.5330606058705598, 0.5387942993547767, 0.7147179497405887, 0.4057905001100153,
+    0.15278814127668738, 0.3402327613439411, 0.6266548475250602, 0.057372678304091096
+  ],
+  "y" => [
+    0.8516676397994161, 0.21264534583315253, 0.5394620278384537, 0.13648758619092405,
+    0.3248651404865086, 0.6210762937553227, 0.2559822485782206, 0.6348757988307625,
+    0.4856721069663763, 0.9381769166793674, 0.8575015370734036, 0.3708835376892239,
+    0.3142018299549818, 0.8285343598108739, 0.45184151316061616, 0.31587841222062707,
+    0.09780853753909469, 0.06490053655579686, 0.6894573664758354, 0.668050603941083
+  ],
+  "z1" =>
+    List.duplicate(nil, 10) ++
+      [
+        1.3079015201141457, 1.4970410094027833, 0.8147027308973563, -1.8697887902026127,
+        0.4820295041237599, 0.45613560330120195, -0.3534002858299113, 0.17048947094798195,
+        -0.8640359541269036, 0.6792307740156558
+      ]
+}
+
+df_na
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point(%{colour: :z1})
+|> Plot.scale_color_gradient(low: "yellow", high: "red", na_value: :none)
+|> render.()
+```
+
+Not in Giggly yet: `geom_bar()`'s `stat` option.

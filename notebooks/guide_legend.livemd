@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,9 +28,13 @@ list of what remains.
 it, beside a label. It is chosen in a scale's `guide` argument or in `guides()`, and the legends of
 several scales are merged into one where they can be. Its options set the title, the number of rows
 or columns, the order of the keys and the aesthetics they are drawn with, and, through a theme of
-its own, where the title and labels go and how they look. Giggly has none of this yet, but reads
-`alpha`, and a discrete `colour` or `fill`, back with a legend drawn as `guide_legend()` draws one
-at its defaults, merging those with one title and the same labels.
+its own, where the title and labels go and how they look. Giggly has `Giggly.Plot.guide_legend/1`,
+chosen in a scale's `guide:` or in `Giggly.Plot.guides/2`, with its `reverse:` option alone, and
+reads `alpha`, and a discrete `colour` or `fill`, back with a legend by default, merging those with
+one title and the same labels. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`.
 
 ## The basic form
 
@@ -40,8 +53,7 @@ p2 <- p1 + geom_point(aes(size = value))
 p1 + scale_fill_continuous(guide = guide_legend())
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`), `scale_fill_continuous()` and its `guide` option, and
-`guide_legend()`.
+Not in Giggly yet: tiles (`geom_tile()`).
 
 ## Styling the title and labels
 
@@ -69,8 +81,8 @@ p1 + guides(fill = guide_legend(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guides()`, `guide_legend()` and its `title` and `theme` options,
-and changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `title` and `theme` options, and changing the
+theme.
 
 ## A horizontal legend
 
@@ -92,8 +104,7 @@ p1 +
 The keys run across, with the title above them and each label below its key, turned on its
 side.
 
-Not in Giggly yet: `geom_tile()`, `scale_fill_continuous()` and its `breaks`, `labels` and `guide`
-options, `guide_legend()` and its `theme` option, and changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `theme` option, and changing the theme.
 
 ## Keys drawn opaque
 
@@ -110,8 +121,7 @@ p3 + guides(colour = guide_legend(override.aes = list(alpha = 1)))
 Keys are drawn as the layer draws its points, here almost transparent; `override.aes` draws them
 with an `alpha` of their own.
 
-Not in Giggly yet: jittered points (`geom_jitter()`), `guides()`, and `guide_legend()` and its
-`override.aes` option.
+Not in Giggly yet: jittered points (`geom_jitter()`) and `guide_legend()`'s `override.aes` option.
 
 ## Rows and columns of keys
 
@@ -127,8 +137,7 @@ p + guides(col = guide_legend(nrow = 8, theme = theme(legend.byrow = TRUE)))
 
 `legend.byrow = TRUE` fills the keys in row by row, rather than column by column.
 
-Not in Giggly yet: `guides()`, `guide_legend()` and its `nrow`, `ncol` and `theme` options, and
-changing the theme.
+Not in Giggly yet: `guide_legend()`'s `nrow`, `ncol` and `theme` options, and changing the theme.
 
 ## Keys in reverse order
 
@@ -137,4 +146,23 @@ changing the theme.
 p + guides(col = guide_legend(reverse = TRUE))
 ```
 
-Not in Giggly yet: `guides()`, and `guide_legend()` and its `reverse` option.
+`p` is the example above's plot, twenty points coloured by the first twenty letters, R's
+`letters[1:20]`, which the cell makes too. R's `col` is short for `colour`. The legend's keys run
+from `t` down to `a`.
+
+```elixir
+df = %{
+  "x" => Enum.to_list(1..20),
+  "y" => Enum.to_list(1..20),
+  "color" => ~w(a b c d e f g h i j k l m n o p q r s t)
+}
+
+p =
+  df
+  |> Plot.new(%{x: :x, y: :y})
+  |> Plot.geom_point(%{colour: :color})
+
+p
+|> Plot.guides(colour: Plot.guide_legend(reverse: true))
+|> render.()
+```

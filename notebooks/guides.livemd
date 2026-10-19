@@ -42,7 +42,7 @@ p
 ```
 
 Not in Giggly yet: mapping `size` and `shape`, the scales that map them and the legends that read
-them back, and `guide_colourbar()` and `guide_legend()`.
+them back.
 
 ## Choosing each guide
 
@@ -59,8 +59,8 @@ p +
  scale_shape(guide = "legend")
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, `guides()`, `guide_colourbar()`, `guide_legend()`,
-`scale_colour_continuous()`, `scale_size_discrete()` and `scale_shape()`.
+Not in Giggly yet: mapping `size` and `shape`, `guide_colourbar()`, `scale_size_discrete()` and
+`scale_shape()`.
 
 ## Removing guides
 
@@ -70,8 +70,7 @@ Not in Giggly yet: mapping `size` and `shape`, `guides()`, `guide_colourbar()`, 
  p + guides(colour = "colorbar",size = "none")
 ```
 
-Not in Giggly yet: mapping `size` and `shape` and the legends that read them back, and `guides()`,
-here to leave out the colour bar, or the size legend.
+Not in Giggly yet: mapping `size` and `shape` and the legends that read them back.
 
 ## Merged legends
 
@@ -92,7 +91,7 @@ g <- guide_legend("title")
 p + guides(colour = g, size = g, shape = g)
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, `guides()` and `guide_legend()`.
+Not in Giggly yet: mapping `size` and `shape`, and `guide_legend()`'s `title` option.
 
 ## Legends below the plot
 
@@ -118,5 +117,5 @@ ggplot(mpg, aes(displ, cty)) +
  )
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, `guides()`, and `guide_colourbar()` and
-`guide_legend()` with their `order` option, which sets the order the guides are drawn in.
+Not in Giggly yet: mapping `size` and `shape`, `guide_colourbar()`, and the `order` option of
+`guide_colourbar()` and `guide_legend()`, which sets the order the guides are drawn in.

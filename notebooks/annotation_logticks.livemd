@@ -15,13 +15,12 @@ the order the page gives them. Each example shows ggplot2's code first and then 
 example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
 page is also a list of what remains.
 
-`annotation_logticks()` draws tick marks for a log scale inside the panel, closer together
-towards each power of the base: long ones at the powers, middle ones at the fives and short ones
-between, so they suit base 10 best. It is superseded by `guide_axis_logticks()`. It expects data
-already on a log scale, through `scale_x_log10()` and `scale_y_log10()` or by taking logs before
-plotting; under `coord_transform()`, which takes the logs itself, it needs `scaled = FALSE`.
-Giggly has none of it yet: its position scales are chosen from the data and cannot be set, so
-there are no log scales.
+`annotation_logticks()` draws tick marks for a log scale inside the panel, closer together towards
+each power of the base: long ones at the powers, middle ones at the fives and short ones between, so
+they suit base 10 best. It is superseded by `guide_axis_logticks()`. It expects data already on a
+log scale, through `scale_x_log10()` and `scale_y_log10()` or by taking logs before plotting; under
+`coord_transform()`, which takes the logs itself, it needs `scaled = FALSE`. Giggly has log scales,
+`Giggly.Plot.scale_x_log10/2` and `Giggly.Plot.scale_y_log10/2`, but no `annotation_logticks()`.
 
 ## Log ticks on chosen sides
 
@@ -47,9 +46,8 @@ a + annotation_logticks(sides = "trbl")  # All four sides
 ggplot2's `msleep` describes the sleep of mammals. Some lack a brain weight, and `na.rm = TRUE`
 drops them without a warning, as Giggly drops any row missing a position.
 
-Not in Giggly yet: the `msleep` dataset, `scale_x_log10()` and `scale_y_log10()` with breaks and
-labels from the `scales` package, `theme_bw()`, and `annotation_logticks()` and its `sides`
-option.
+Not in Giggly yet: the `msleep` dataset, `scales::trans_breaks()`, `scales::trans_format()` and
+`scales::math_format()`, `theme_bw()`, and `annotation_logticks()` and its `sides` option.
 
 ## Ticks outside the panel
 
@@ -58,9 +56,9 @@ a + annotation_logticks(sides = "lr", outside = TRUE) +
  coord_cartesian(clip = "off")  # Ticks outside plot
 ```
 
-Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scale_x_log10()`,
-`scale_y_log10()` and `theme_bw()`), `annotation_logticks()` and its `outside` option, and
-`coord_cartesian()` and its `clip` option.
+Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scales::trans_breaks()`,
+`scales::trans_format()`, `scales::math_format()` and `theme_bw()`), `annotation_logticks()` and its
+`outside` option, and `coord_cartesian()` and its `clip` option.
 
 ## Without the minor grid lines
 
@@ -69,9 +67,9 @@ Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scale_x_log10()`
 a + annotation_logticks(sides = "trbl") + theme(panel.grid.minor = element_blank())
 ```
 
-Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scale_x_log10()`,
-`scale_y_log10()` and `theme_bw()`), `annotation_logticks()`, and changing the theme, here to
-hide the minor grid lines.
+Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scales::trans_breaks()`,
+`scales::trans_format()`, `scales::math_format()` and `theme_bw()`), `annotation_logticks()`, and
+changing the theme, here to hide the minor grid lines.
 
 ## Taking logs first
 
@@ -87,9 +85,8 @@ b <- ggplot(msleep, aes(log10(bodywt), log10(brainwt))) +
 b + annotation_logticks()
 ```
 
-Not in Giggly yet: the `msleep` dataset, `scale_x_continuous()` and `scale_y_continuous()` with
-titles and labels from the `scales` package, `theme_bw()`, changing the theme, and
-`annotation_logticks()`.
+Not in Giggly yet: the `msleep` dataset, `scales::label_math()`, `theme_bw()`, changing the theme,
+and `annotation_logticks()`.
 
 ## Log coordinates
 
@@ -116,6 +113,6 @@ a + annotation_logticks(
 )
 ```
 
-Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scale_x_log10()`,
-`scale_y_log10()` and `theme_bw()`), and `annotation_logticks()` and its `short`, `mid` and `long`
-options, lengths given as `grid` units.
+Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scales::trans_breaks()`,
+`scales::trans_format()`, `scales::math_format()` and `theme_bw()`), and `annotation_logticks()` and
+its `short`, `mid` and `long` options, lengths given as `grid` units.

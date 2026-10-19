@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,7 +29,13 @@ waiting for, so the page is also a list of what remains.
 `expansion()` builds the value a position scale's `expand` argument takes: the space left between
 the data and the axes, as a multiple of the scale's range (`mult`), as a fixed amount (`add`), or
 both, either the same at each end or different below and above. `expand_scale()` is its older
-name. Giggly has no scale functions yet, so a scale's expansion cannot be set.
+name. Giggly has no `expansion()`: a position scale's `expand:` takes the same value as a keyword
+list, `[mult: {0, 0.1}]` for `expansion(mult = c(0, .1))`, each of `mult:` and `add:` one amount
+for both ends or a pair, below and above. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, to `mtcars`, R's name for it.
 
 ## No space below the bars
 
@@ -29,7 +46,16 @@ ggplot(mtcars) +
   scale_y_continuous(expand = expansion(mult = c(0, .1)))
 ```
 
-Not in Giggly yet: `scale_y_continuous()` and its `expand` option.
+The bars stand on the x axis, with a tenth of their range left above the tallest. Giggly writes
+`factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+mtcars
+|> Plot.new()
+|> Plot.geom_bar(%{x: {:factor, [:cyl]}})
+|> Plot.scale_y_continuous(expand: [mult: {0, 0.1}])
+|> render.()
+```
 
 ## Space beside discrete values
 
@@ -40,8 +66,8 @@ ggplot(subset(diamonds, carat > 2), aes(cut, clarity)) +
   scale_x_discrete(expand = expansion(add = 2))
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered
-factors), `geom_jitter()`, and `scale_x_discrete()` and its `expand` option.
+Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered factors)
+and `geom_jitter()`.
 
 ## The default expansion
 
@@ -57,5 +83,5 @@ ggplot(subset(diamonds, carat > 2), aes(cut, price)) +
   scale_y_continuous(expand = expansion(mult = .05))
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor),
-`geom_jitter()`, and `scale_x_discrete()` and `scale_y_continuous()` and their `expand` option.
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor) and
+`geom_jitter()`.

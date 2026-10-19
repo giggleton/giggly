@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,10 +30,15 @@ is also a list of what remains.
 `scale_colour_continuous()` and `scale_fill_continuous()` are the scales ggplot2 uses by default
 when a column of numbers is mapped to `colour` or `fill`, blending smoothly through a palette;
 `scale_colour_binned()` and `scale_fill_binned()` cut the numbers into bins and give each bin one
-colour. Their default palette is a setting of the theme. Giggly draws a column of numbers mapped to
-`colour` or `fill` as `scale_colour_continuous()` does by default, along the gradient from `#132B43`
-to `#56B1F7` with a colour bar, but has none of the functions yet, no binned scales, and draws every
-plot in ggplot2's default theme, `theme_gray()`, with no way to change one.
+colour. Their default palette is a setting of the theme. Giggly has
+`Giggly.Plot.scale_color_continuous/2` and `Giggly.Plot.scale_fill_continuous/2`, along the gradient
+from `#132B43` to `#56B1F7` by default or through the colours `palette:` gives, but no binned scales
+(`scale_colour_binned()`), and draws every plot in ggplot2's default theme, `theme_gray()`, with no
+way to change one. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
+defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in
+these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular
+models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## A palette given to the scale
 
@@ -35,7 +51,18 @@ p <- ggplot(mpg, aes(displ, hwy, colour = cty)) +
 p + scale_colour_continuous(palette = c("#FEE0D2", "#FC9272", "#DE2D26"))
 ```
 
-Not in Giggly yet: `scale_colour_continuous()` and its `palette` option.
+Given colours, the palette is a gradient through them, from the lowest `cty` to the highest.
+
+```elixir
+p =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+  |> Plot.geom_point()
+
+p
+|> Plot.scale_color_continuous(palette: ["#FEE0D2", "#FC9272", "#DE2D26"])
+|> render.()
+```
 
 ## A palette from the theme
 

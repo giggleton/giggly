@@ -30,15 +30,18 @@ is waiting for, so the page is also a list of what remains.
 An alpha scale maps a column to transparency, a way to fade the less important observations.
 `scale_alpha()` is short for `scale_alpha_continuous()`, for a column of numbers;
 `scale_alpha_binned()` cuts the numbers into bins first, and `scale_alpha_discrete()` and
-`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has none of these functions yet,
-but maps `alpha` to a column as ggplot2's default scale does, a column of numbers onto 0.1 to 1 and
-one of text spread from 0.1 to 1, and draws the legend that reads it back; a layer can also set it
-for every mark, as `Giggly.Plot.geom_point(alpha: 0.4)` does. A plot is described with
-`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
-aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mpg/0`,
-ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup
-cell binds to `mpg`, ggplot2's name for it.
+`scale_alpha_ordinal()` are for discrete and ordered values. Giggly has
+`Giggly.Plot.scale_alpha_continuous/2` and `Giggly.Plot.scale_alpha_discrete/2`, with their
+`range:`, but not ggplot2's short name, `scale_alpha()`, nor binned or ordered alpha scales
+(`scale_alpha_binned()`, `scale_alpha_ordinal()`), and by default maps `alpha` to a column as
+ggplot2's default scale does, a column of numbers onto 0.1 to 1 and one of text spread from 0.1 to
+1, and draws the legend that reads it back; a layer can also set it for every mark, as
+`Giggly.Plot.geom_point(alpha: 0.4)` does. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy
+for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's
+name for it.
 
 ## Mapping transparency
 
@@ -70,7 +73,14 @@ render.(plot)
 p + scale_alpha(range = c(0, 1))
 ```
 
-Not in Giggly yet: `scale_alpha()` and its `range` option.
+`scale_alpha()` is `Giggly.Plot.scale_alpha_continuous/2`. The cars from 1999 are drawn fully
+transparent, so only those from 2008 show.
+
+```elixir
+plot
+|> Plot.scale_alpha_continuous(range: {0, 1})
+|> render.()
+```
 
 ## Titling the legend
 
@@ -79,4 +89,10 @@ Not in Giggly yet: `scale_alpha()` and its `range` option.
 p + scale_alpha("cylinders")
 ```
 
-Not in Giggly yet: `scale_alpha()`, whose first argument titles the legend.
+R's first argument is the scale's name, which titles its legend; Giggly's is `name:`.
+
+```elixir
+plot
+|> Plot.scale_alpha_continuous(name: "cylinders")
+|> render.()
+```

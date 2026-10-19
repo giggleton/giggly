@@ -116,5 +116,4 @@ p +
   scale_y_continuous(expand = c(0.1, 0.1))
 ```
 
-Not in Giggly yet: `geom_rug()` and its `length` option, and `scale_y_continuous()` and its
-`expand` option.
+Not in Giggly yet: `geom_rug()` and its `length` option.

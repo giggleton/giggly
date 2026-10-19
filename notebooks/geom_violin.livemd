@@ -147,8 +147,8 @@ m +
 each.
 
 Not in Giggly yet: `geom_violin()`, a whole-column function in a mapping, such as `cut_width(rating,
-0.5)`, `cut_width()`, `scale_y_log10()`, `coord_transform()`, and the `movies` dataset from the
-`ggplot2movies` package.
+0.5)`, `cut_width()`, `coord_transform()`, and the `movies` dataset from the `ggplot2movies`
+package.
 
 ## Violins along a continuous x
 

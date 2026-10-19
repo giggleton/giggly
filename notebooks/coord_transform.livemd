@@ -29,13 +29,12 @@ waiting for, so the page is also a list of what remains.
 `coord_transform()` transforms the coordinate system, such as putting an axis on a log scale. Unlike
 transforming a scale, it happens after the statistics are computed, and it changes the shapes geoms
 are drawn in, so a straight line need not stay straight. It transforms continuous positions only.
-`coord_trans()` is its old name, now deprecated. Giggly has neither yet, and no transformed scales:
-its position scales are chosen from the data and cannot be set. It can transform the data, with an
-expression in the mapping. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
-which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
-`Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`. It binds `Giggly.Datasets.diamonds/0`, ggplot2's `diamonds`, to `diamonds`, ggplot2's
-name for it.
+`coord_trans()` is its old name, now deprecated. Giggly has neither yet, but transforms a scale, as
+`Giggly.Plot.scale_x_log10/2` does, and the data, with an expression in the mapping. A plot is
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`. It binds `Giggly.Datasets.diamonds/0`,
+ggplot2's `diamonds`, to `diamonds`, ggplot2's name for it.
 
 ## Transforming the data
 
@@ -69,7 +68,17 @@ ggplot(diamonds, aes(carat, price)) +
   scale_y_log10()
 ```
 
-Not in Giggly yet: `scale_x_log10()` and `scale_y_log10()`.
+Each axis is placed on a log scale and labelled in the data's own units: 0.3, 1 and 3 carats, $300
+to $10,000.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :carat, y: :price})
+|> Plot.geom_point()
+|> Plot.scale_x_log10()
+|> Plot.scale_y_log10()
+|> render.()
+```
 
 ## Transforming the coordinate system
 
@@ -102,8 +111,7 @@ ggplot(d, aes(carat, price)) +
   scale_y_log10()
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()` and `scale_x_log10()` and
-`scale_y_log10()`.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`.
 
 ## A fitted line in transformed coordinates
 
@@ -133,8 +141,8 @@ ggplot(diamonds, aes(carat, price)) +
   coord_transform(x = scales::transform_exp(10), y = scales::transform_exp(10))
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, `scale_x_log10()` and
-`scale_y_log10()`, and `coord_transform()` with transformations from the `scales` package.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and `coord_transform()` with
+transformations from the `scales` package.
 
 ## No transformation
 

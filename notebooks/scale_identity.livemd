@@ -24,8 +24,8 @@ legend unless it is also given breaks, labels and a guide. Each function works o
 its name, though `scale_colour_identity()` and `scale_fill_identity()` can serve colour and fill at
 once through their `aesthetics` argument; `scale_discrete_identity()` and
 `scale_continuous_identity()` work on whatever aesthetics that argument names. Giggly has none of
-this yet: it has no scale functions, and every column it maps to colour or fill goes through
-ggplot2's default scales.
+this yet: it has no identity scales, so every column it maps to colour or fill goes through a scale
+that maps it.
 
 ## Colours named in the data
 
@@ -77,7 +77,7 @@ ggplot(df, aes(x, y)) +
 ```
 
 Not in Giggly yet: `geom_tile()`, `scale_fill_identity()`, whose first argument titles the legend,
-and its `breaks`, `labels` and `guide` options, the legend it asks for, and `guide_legend()`.
+and its `breaks`, `labels` and `guide` options, and the legend it asks for.
 
 ## Sizes from the data
 

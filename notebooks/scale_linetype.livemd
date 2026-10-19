@@ -21,7 +21,7 @@ default set supplied by Richard Pearson of the University of Manchester. A conti
 mapped to line types only through `scale_linetype_binned()`, which cuts it into bins first, and
 since patterns have no order even that is not advised. A line type can be named by number, by name
 or by a string of hex digits, and a missing one is drawn blank. Giggly has none of this yet: it
-draws paths and lines solid, maps no `linetype`, and has no scale functions.
+draws paths and lines solid and maps no `linetype`.
 
 ## A line type for each series
 

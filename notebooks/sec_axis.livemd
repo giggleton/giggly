@@ -17,9 +17,10 @@ waiting for, so the page is also a list of what remains.
 
 A secondary axis is drawn opposite a position scale's primary axis and labels the same positions
 through a one-to-one transformation of the primary axis's values, such as a change of unit.
-`sec_axis()` describes one, given to a position scale's `sec.axis` argument; `dup_axis()` copies
-the primary axis; and `derive()`, given for any of a secondary axis's settings, takes that setting
-from the primary axis. Giggly has none of it yet: it has no scale functions and no secondary axes.
+`sec_axis()` describes one, given to a position scale's `sec.axis` argument; `dup_axis()` copies the
+primary axis; and `derive()`, given for any of a secondary axis's settings, takes that setting from
+the primary axis. Giggly has none of it yet: it has position scales, as
+`Giggly.Plot.scale_y_continuous/2` makes, but no secondary axes.
 
 ## A simple secondary axis
 
@@ -34,7 +35,7 @@ p <- ggplot(mtcars, aes(cyl, mpg)) +
 p + scale_y_continuous(sec.axis = sec_axis(~ . + 10))
 ```
 
-Not in Giggly yet: `scale_y_continuous()` and `sec_axis()`.
+Not in Giggly yet: `sec_axis()`.
 
 ## The primary axis's name
 
@@ -43,8 +44,7 @@ Not in Giggly yet: `scale_y_continuous()` and `sec_axis()`.
 p + scale_y_continuous("Miles/gallon", sec.axis = sec_axis(~ . + 10, name = derive()))
 ```
 
-Not in Giggly yet: `scale_y_continuous()`, here also to title the axis, `sec_axis()`, and
-`derive()`, which gives the secondary axis the same title.
+Not in Giggly yet: `sec_axis()` and `derive()`, which gives the secondary axis the same title.
 
 ## A copy of the primary axis
 
@@ -53,7 +53,7 @@ Not in Giggly yet: `scale_y_continuous()`, here also to title the axis, `sec_axi
 p + scale_y_continuous(sec.axis = dup_axis())
 ```
 
-Not in Giggly yet: `scale_y_continuous()` and `dup_axis()`.
+Not in Giggly yet: `dup_axis()`.
 
 ## A formula alone
 
@@ -62,8 +62,8 @@ Not in Giggly yet: `scale_y_continuous()` and `dup_axis()`.
 p + scale_y_continuous(sec.axis = ~ .^2)
 ```
 
-Not in Giggly yet: `scale_y_continuous()` and its `sec.axis` option, here a formula alone,
-squaring each value, as shorthand for `sec_axis()`.
+Not in Giggly yet: `scale_y_continuous()`'s `sec.axis` option, here a formula alone, squaring each
+value, as shorthand for `sec_axis()`.
 
 ## The time of day
 

@@ -19,8 +19,10 @@ and names what it is waiting for, so the page is also a list of what remains.
 column of discrete values is mapped to `colour` or `fill`, giving each value its own colour from a
 palette. Their default palette is a setting of the theme. Giggly draws a discrete column mapped to
 `colour` or `fill` as `scale_colour_discrete()` does by default, in hues evenly spaced round the
-colour wheel with a legend, but has none of the functions yet, and draws every plot in ggplot2's
-default theme, `theme_gray()`, with no way to change one.
+colour wheel with a legend, and has `Giggly.Plot.scale_color_discrete/2` and
+`Giggly.Plot.scale_fill_discrete/2`, whose `palette:` is a list of colours, but no palette given as
+a function, such as `scales::pal_brewer()`, and draws every plot in ggplot2's default theme,
+`theme_gray()`, with no way to change one.
 
 ## A palette given to the scale
 
@@ -35,7 +37,7 @@ p <- ggplot(mpg, aes(displ, hwy, colour = class)) +
 p + scale_colour_discrete(palette = scales::pal_brewer(palette = "Dark2"))
 ```
 
-Not in Giggly yet: `scale_colour_discrete()` and its `palette` option.
+Not in Giggly yet: `scales::pal_brewer()`.
 
 ## A palette from the theme
 

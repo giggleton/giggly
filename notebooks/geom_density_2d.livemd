@@ -32,7 +32,7 @@ m <- ggplot(faithful, aes(x = eruptions, y = waiting)) +
 m + geom_density_2d()
 ```
 
-Not in Giggly yet: `geom_density_2d()`, `xlim()` and `ylim()`, and the `faithful` dataset.
+Not in Giggly yet: `geom_density_2d()` and the `faithful` dataset.
 
 ## Contour bands
 
@@ -41,7 +41,7 @@ Not in Giggly yet: `geom_density_2d()`, `xlim()` and `ylim()`, and the `faithful
 m + geom_density_2d_filled(alpha = 0.5)
 ```
 
-Not in Giggly yet: `geom_density_2d_filled()`, `xlim()` and `ylim()`, and the `faithful` dataset.
+Not in Giggly yet: `geom_density_2d_filled()` and the `faithful` dataset.
 
 ## Bands and lines
 
@@ -51,8 +51,8 @@ m + geom_density_2d_filled(alpha = 0.5) +
   geom_density_2d(linewidth = 0.25, colour = "black")
 ```
 
-Not in Giggly yet: `geom_density_2d_filled()` and `geom_density_2d()`, a fixed `linewidth`, `xlim()`
-and `ylim()`, and the `faithful` dataset.
+Not in Giggly yet: `geom_density_2d_filled()` and `geom_density_2d()`, a fixed `linewidth`, and the
+`faithful` dataset.
 
 ## Contours for each cut
 

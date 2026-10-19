@@ -305,6 +305,15 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   find landed and waiting examples alike, and the next sweep would read every one to tell them
   apart.
 
+- **A verdict names a date format `Calendar.strftime/3` cannot write by its code in `date_labels`
+  (2026-10-19, Steve: "A").** scale_date's second plot labels weekly breaks `"%W"`, the week of
+  the year, which `date_labels:` refuses at the call, since a format is written by
+  `Calendar.strftime/3` (the entry beginning "`date_breaks:` and `date_minor_breaks:` are a
+  step"). Its verdict reads "`"%W"` in `date_labels`, the week of the year, which
+  `Calendar.strftime/3` cannot write", so a search for the code or the option finds it.
+  *Rejected: "R's `format()` for dates, here `"%W"`"*: it names the port that entry rejected, and
+  a search would find it only if that port were made.
+
 - **An after_stat reads its stat's computed variables as ggplot2 documents them, checked at the
   call (2026-10-18, Steve's choice; checked in R).** `{:after_stat, [value]}` is left out of
   evaluation and grouping, evaluated against the stat's output, and put through its aesthetic's
@@ -1768,6 +1777,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Draw the notebook examples the scale functions made drawable (scale functions,
+  step 7b); §4: "A verdict names a date format `Calendar.strftime/3` cannot write"
 - 2026-10-19 — Draw a colour of :none beside others as R draws NA (scale functions, step 7a);
   §4: "A colour of `:none` beside others in a column is held as `nil`"
 - 2026-10-19 — Let a plot choose its guides (scale functions, step 6); §4: "A guide is chosen by a

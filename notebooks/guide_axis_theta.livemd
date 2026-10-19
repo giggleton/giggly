@@ -18,7 +18,7 @@ a list of what remains.
 `guide_axis_theta()` is the guide `coord_radial()` draws its theta scale with: the position that
 runs as an angle around the circle. Like `guide_axis()`, it can turn its labels, draw minor ticks
 and cap its axis line. Giggly has `Giggly.Plot.coord_radial/1`, ggplot2's `coord_radial()` without
-options, but no guides yet.
+options, but no axis guides yet, `guide_axis_theta()` among them.
 
 ## The labels' angle
 
@@ -32,4 +32,4 @@ p <- ggplot(mtcars, aes(disp, mpg)) +
 p + guides(theta = guide_axis_theta(angle = 0))
 ```
 
-Not in Giggly yet: `guides()`, and `guide_axis_theta()` with its `angle` option.
+Not in Giggly yet: `guide_axis_theta()` with its `angle` option.

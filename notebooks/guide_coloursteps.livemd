@@ -18,8 +18,8 @@ what it is waiting for, so the page is also a list of what remains.
 `guide_coloursteps()`, or `guide_colorsteps()` spelled the American way, is the legend of a binned
 colour or fill scale: a colour bar, as `guide_colourbar()` draws, but with each bin in one constant
 colour rather than a gradient. It is the default guide for binned colour scales. Giggly has none of
-it yet: it has no binned scales and no scale functions, and draws a continuous colour or fill with
-ggplot2's default gradient and its colour bar.
+it yet: it has no binned scales, and draws a continuous colour or fill with ggplot2's default
+gradient and its colour bar.
 
 ## The default for binned colours
 

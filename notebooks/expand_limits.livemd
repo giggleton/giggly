@@ -17,9 +17,9 @@ of what remains.
 
 `expand_limits()` widens a plot's scales to include the values it is given, in every panel, by
 adding a layer that draws nothing at those values (a `geom_blank()`). ggplot2 now prefers giving a
-scale's `limits` a function instead, such as `scale_x_continuous(limits = ~range(.x, 0))` to
-include zero. Giggly has none of this yet: it has no scale functions, and a position scale is
-chosen from the data and cannot be set.
+scale's `limits` a function instead, such as `scale_x_continuous(limits = ~range(.x, 0))` to include
+zero. Giggly has no `expand_limits()`, and a scale's limits are numbers or values, never a function,
+as `Giggly.Plot.lims/2` and the scale functions' `limits:` take them.
 
 ## Including a value on an axis
 
