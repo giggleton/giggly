@@ -921,16 +921,12 @@ defmodule Giggly.Assembly do
   end
 
   # A scale's kind, and a continuous scale's transformation where it has one, which a refusal names
-  # since a continuous scale through the identity takes a date.
+  # since a continuous scale through the identity takes a date; written into the message as it is.
   defp scale_description(%Scale.Continuous{transform: transform})
        when transform not in [:identity, :date],
        do: "continuous through #{transform}"
 
-  defp scale_description(scale) do
-    scale
-    |> Scale.kind_of()
-    |> Atom.to_string()
-  end
+  defp scale_description(scale), do: Scale.kind_of(scale)
 
   # Whether an axis of a scale of `kind` is discrete or continuous, all a geom is told: a date
   # scale is continuous, as ggplot2's geoms see a date axis as not discrete.

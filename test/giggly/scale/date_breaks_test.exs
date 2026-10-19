@@ -125,8 +125,11 @@ defmodule Giggly.Scale.DateBreaksTest do
   # count rounded to a multiple of three and of two, halves rounding to even both ways, before
   # 1970, a Thursday and a Sunday's Monday, the 1st of a month and 1 January from a day well into
   # them, ten-year steps from the extent's own year, not its decade, and 1 January of a leap year,
-  # which `ceiling_date()` rounds up to itself where the day after it rounds up a year. It moves
-  # only if the port stops matching R, which is a bug.
+  # which `ceiling_date()` rounds up to itself where the day after it rounds up a year; and last,
+  # extents ending on a Monday and a Sunday, on 1 January and on 28 February, where the days
+  # rounding up adds, 7 for a week and 31 for a month, decide the last break (a mutation pass found
+  # 6, 8, 30 and 32 matching the rest). It moves only if the port stops matching R, which is a
+  # bug.
   @r_widths [
     {{20_714.55, 20_746.45}, [week: 1],
      [
@@ -244,7 +247,15 @@ defmodule Giggly.Scale.DateBreaksTest do
     {{19_723.0, 19_724.0}, [year: 1], [~D[2024-01-01], ~D[2025-01-01]]},
     {{19_358.0, 19_725.0}, [year: 1], [~D[2023-01-01], ~D[2024-01-01], ~D[2025-01-01]]},
     {{19_020.2, 19_110.8}, [month: 1],
-     [~D[2022-01-01], ~D[2022-02-01], ~D[2022-03-01], ~D[2022-04-01], ~D[2022-05-01]]}
+     [~D[2022-01-01], ~D[2022-02-01], ~D[2022-03-01], ~D[2022-04-01], ~D[2022-05-01]]},
+    {{18_620.0, 18_631.0}, [week: 1],
+     [~D[2020-12-21], ~D[2020-12-28], ~D[2021-01-04], ~D[2021-01-11]]},
+    {{18_620.0, 18_637.0}, [week: 1],
+     [~D[2020-12-21], ~D[2020-12-28], ~D[2021-01-04], ~D[2021-01-11]]},
+    {{19_300.0, 19_358.0}, [month: 1],
+     [~D[2022-11-01], ~D[2022-12-01], ~D[2023-01-01], ~D[2023-02-01]]},
+    {{19_300.0, 19_416.0}, [month: 1],
+     [~D[2022-11-01], ~D[2022-12-01], ~D[2023-01-01], ~D[2023-02-01], ~D[2023-03-01]]}
   ]
 
   describe "width/2" do

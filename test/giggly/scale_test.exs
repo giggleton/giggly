@@ -510,9 +510,11 @@ defmodule Giggly.ScaleTest do
       short = letters(labels: ["P", "Q"])
       counted = letters(labels: fn [first | _rest] -> [to_string(first)] end)
 
-      assert_raise ArgumentError, ~r/2 labels must be one for each of its 4 breaks/, fn ->
-        Scale.breaks(short, Scale.dimension(short))
-      end
+      assert_raise ArgumentError,
+                   ~r/2 labels must be one for each of its 4 breaks, got: \["P", "Q"\]/,
+                   fn ->
+                     Scale.breaks(short, Scale.dimension(short))
+                   end
 
       assert_raise ArgumentError, ~r/labels function must return a string for each/, fn ->
         Scale.breaks(counted, Scale.dimension(counted))

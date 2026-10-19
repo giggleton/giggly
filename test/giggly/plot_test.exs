@@ -1536,15 +1536,23 @@ defmodule Giggly.PlotTest do
         )
         |> Plot.scale_y_discrete(labels: %{4 => "four", nil => "none"})
 
-      assert plot.scales === %{
-               x: %Scale.Discrete{
-                 name: "Cylinders",
-                 limits: ["8", nil, "4"],
-                 breaks: ["4"],
-                 labels: labeller,
-                 expand: [mult: {0.0, 0.0}, add: {2.0, 2.0}]
+      unmarked =
+        @rows
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.scale_x_discrete(breaks: :none, labels: :none)
+
+      assert {plot.scales, unmarked.scales} === {
+               %{
+                 x: %Scale.Discrete{
+                   name: "Cylinders",
+                   limits: ["8", nil, "4"],
+                   breaks: ["4"],
+                   labels: labeller,
+                   expand: [mult: {0.0, 0.0}, add: {2.0, 2.0}]
+                 },
+                 y: %Scale.Discrete{labels: %{4 => "four", nil => "none"}}
                },
-               y: %Scale.Discrete{labels: %{4 => "four", nil => "none"}}
+               %{x: %Scale.Discrete{breaks: :none, labels: :none}}
              }
     end
 
@@ -1575,14 +1583,14 @@ defmodule Giggly.PlotTest do
             {:name, 5, "got: 5"},
             {:limits, [], "got: []"},
             {:limits, {"a", "b"}, ~s(got: {"a", "b"})},
-            {:limits, ["a", ~D[2020-01-01]], "got: ~D[2020-01-01] in"},
-            {:limits, ["a", "b", "a"], ~s(got: "a" more than once)},
+            {:limits, ["a", ~D[2020-01-01]], ~s(got: ~D[2020-01-01] in ["a", ~D[2020-01-01]])},
+            {:limits, ["a", "b", "a"], ~s(got: "a" more than once in ["a", "b", "a"])},
             {:limits, [4, 4.0], "got: 4.0 more than once"},
             {:breaks, "a", ~s(got: "a")},
             {:breaks, [{1, 2}], "got: {1, 2} in"},
             {:breaks, [nil, nil], "got: nil more than once"},
             {:labels, ["a", 1], "got: 1 in it"},
-            {:labels, %{"a" => 1}, "got: 1 in"},
+            {:labels, %{"a" => 1}, ~s(got: 1 in %{"a" => 1})},
             {:labels, %{["a"] => "b"}, ~s(got: ["a"] in)},
             {:labels, "a",
              ~s(a map from a value to its label, a function of one argument or :none, got: "a")},
@@ -1631,6 +1639,13 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  # The reason Calendar.strftime/3 gives for refusing to write a date in `format`.
+  defp strftime_refusal(format) do
+    Calendar.strftime(~D[1970-01-01], format)
+  rescue
+    exception -> Exception.message(exception)
+  end
+
   describe "scale_x_date/2 and scale_y_date/2" do
     test "a date scale function records an untrained date scale with the options given" do
       plot =
@@ -1667,13 +1682,29 @@ defmodule Giggly.PlotTest do
         |> Plot.scale_x_date(date_breaks: [week: 2], date_minor_breaks: [day: 1])
         |> Plot.scale_y_date(date_labels: "%b %d", breaks: :none)
 
-      assert plot.scales === %{
-               x: %Scale.Continuous{
-                 transform: :date,
-                 breaks: {:width, [week: 2]},
-                 minor_breaks: {:width, [day: 1]}
+      yearly =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_date(date_breaks: [year: 10], date_minor_breaks: [month: 3])
+
+      assert {plot.scales, yearly.scales.x} === {
+               %{
+                 x: %Scale.Continuous{
+                   transform: :date,
+                   breaks: {:width, [week: 2]},
+                   minor_breaks: {:width, [day: 1]}
+                 },
+                 y: %Scale.Continuous{
+                   transform: :date,
+                   labels: {:format, "%b %d"},
+                   breaks: :none
+                 }
                },
-               y: %Scale.Continuous{transform: :date, labels: {:format, "%b %d"}, breaks: :none}
+               %Scale.Continuous{
+                 transform: :date,
+                 breaks: {:width, [year: 10]},
+                 minor_breaks: {:width, [month: 3]}
+               }
              }
     end
 
@@ -1698,7 +1729,8 @@ defmodule Giggly.PlotTest do
     end
 
     # Calendar.strftime/3 raises on a directive it lacks, such as R's %W, and on a time's for a
-    # date, such as %H; either is refused at the call, its own message passed on unasserted.
+    # date, such as %H; either is refused at the call, passing on its own reason, which the test
+    # takes from Calendar.strftime/3 rather than pinning its wording.
     test "an option a date scale cannot take is refused, naming it and what was wrong with it" do
       plot = Plot.new(@rows)
 
@@ -1715,8 +1747,8 @@ defmodule Giggly.PlotTest do
             {:date_breaks, [hour: 1], "got: [hour: 1]"},
             {:date_breaks, "1 week", ~s(got: "1 week")},
             {:date_minor_breaks, [quarter: 1], "got: [quarter: 1]"},
-            {:date_labels, "%W", ~s(got: "%W", which it cannot)},
-            {:date_labels, "%H", ~s(got: "%H", which it cannot)},
+            {:date_labels, "%W", ~s(got: "%W", which it cannot: #{strftime_refusal("%W")})},
+            {:date_labels, "%H", ~s(got: "%H", which it cannot: #{strftime_refusal("%H")})},
             {:date_labels, :short, "got: :short"},
             {:labels, %{"a" => "b"}, ~s(got: %{"a" => "b"})}
           ] do
