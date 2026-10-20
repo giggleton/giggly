@@ -454,8 +454,11 @@ defmodule Giggly.PlotTest do
       end
     end
 
-    test "a size or stroke below 0 is refused" do
+    test "a size or stroke below 0 is refused, and 0 taken" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{fixed: %{size: +0.0, stroke: +0.0}}]} =
+               Plot.geom_point(plot, size: 0, stroke: 0)
 
       assert_raise NimbleOptions.ValidationError, ~r/invalid value for :size option/, fn ->
         Plot.geom_point(plot, size: -1)
@@ -1309,6 +1312,20 @@ defmodule Giggly.PlotTest do
                size: [2.0, 4.0, 6.0],
                stroke: [0.5, nil, 2.0]
              }
+    end
+
+    # ggplot2 4.0.3: "Unequal parameter lengths: x (2) and shape (3)", and so for size and stroke.
+    test "a point's shape, size or stroke given another number of values is refused, naming it" do
+      plot = Plot.new(@rows)
+
+      for {aesthetic, values} <- [shape: [21, 22, 23], size: [1, 2, 3], stroke: [1, 2, 3]] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.annotate(plot, :point, [{:x, [1, 2]}, {:y, 1}, {aesthetic, values}])
+          end
+
+        assert error.message =~ ":x 2 values and #{inspect(aesthetic)} 3 values"
+      end
     end
 
     test "a list's values are of one type, as a column of the layer's table holds" do

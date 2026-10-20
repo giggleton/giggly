@@ -215,6 +215,19 @@ defmodule Giggly.GeomTest do
       assert_in_delta radius, 5.33, 0.005
     end
 
+    # Golden: vdiffr 1.0.9 draws ggplot2 4.0.3's `geom_point(size = 0.1, stroke = 0)` as a circle
+    # of radius 0.11.
+    test "a circle however small is drawn" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0], y: [1.0], size: [0.1], stroke: [0.0])
+
+      assert [%Circles{radius: [radius]}] =
+               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+
+      assert_in_delta radius, 0.11, 0.005
+    end
+
     test "a shape of :none, or a missing one, draws no point" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
@@ -753,14 +766,21 @@ defmodule Giggly.GeomTest do
     end
 
     # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `geom_point(shape = 21, size = 3)` filled
-    # by a mapped fill: each key a circle of radius 3.56 filled with its break's colour.
+    # by a mapped fill, its stroke 2 and NA: each key filled with its break's colour, a circle of
+    # radius 4.62 with a 2.83-point outline, and of radius 3.20 with none.
     test "a point's key is drawn in the key's shape, size, stroke and fill" do
-      key = %{alpha: nil, fill: "#F8766D", shape: :circle_filled, size: 3.0, stroke: 0.5}
+      key = %{alpha: nil, fill: "#F8766D", shape: :circle_filled, size: 3.0, stroke: 2.0}
 
-      assert [%Circles{radius: [radius], color: ["#000000"], fill: ["#F8766D"]}] =
+      assert [%Circles{radius: [radius], stroke_width: stroke_width, fill: ["#F8766D"]}] =
                Geom.draw_key(%Geom.Point{}, key, {17.28, 17.28})
 
-      assert_in_delta radius, 3.56, 0.005
+      assert_in_delta radius, 4.62, 0.005
+      assert_in_delta stroke_width, 2.83, 0.005
+
+      assert [%Circles{radius: [no_stroke_radius], color: [:none]}] =
+               Geom.draw_key(%Geom.Point{}, %{key | stroke: :none}, {17.28, 17.28})
+
+      assert_in_delta no_stroke_radius, 3.20, 0.005
       assert Geom.draw_key(%Geom.Point{}, %{shape: :none}, {17.28, 17.28}) === []
     end
 
