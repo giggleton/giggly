@@ -183,6 +183,20 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   never see it. *Rejected: plain doubles* — R's values missed in 30% of groups. *Rejected: one
   summation* — counting's counts would leave `rowsum()`'s.
 
+- **A stat computes only through frame operations and pulls only what it has already summarised
+  (2026-10-20, Steve, scoping Phase 3's ninth increment).** The work that scales with a layer's
+  rows — binning, counting, quantiles, filtering outliers — is written as `mutate`, `filter`,
+  `join` and `summarise` with aggregates, so an engine holding the table does it and nothing of
+  the layer's table crosses into Elixir; what a stat pulls is its own output, small by
+  construction, so `density` from a bin's counts or a box's fences from its hinges may be worked
+  out on lists. Each operation arrives with the stat that first needs it, and the expression form
+  `mutate` takes is the one a mapping's named expressions will reuse (§7, "Engine backends").
+  Counting and counting at each place, which pull lists to choose rows and divide, come under the
+  rule in the same increment. *Rejected: building bin and boxplot on pulled lists and moving them
+  later* — nothing toward the goal, and a rewrite of the first two summarising stats. *Rejected:
+  a vocabulary designed ahead of its callers* — the rules' "an operation arrives with its first
+  caller", and bin and boxplot are the proving ground.
+
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
   `scale_shape_discrete/2` takes `solid:` (`{:shape, :solid}` or `{:shape, :open}`, R's
@@ -2164,6 +2178,49 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   upstream healthy enough at that moment to carry it — checked then, not assumed now. As of
   2026-10-11 Explorer has a new de facto maintainer and a release cadence again after an
   eleven-month gap; Dux has been quiet since May and calls itself not production ready.
+  **The long-term goal (Steve, 2026-10-20): the engine does the work that scales with the rows,
+  so a plot over a very large table is drawn from its small render data without the table
+  crossing into Elixir.** The approach, in the order it is taken: (1) stats compute only through
+  frame operations (§4, the entry beginning "A stat computes only through frame operations"),
+  with a vocabulary every engine has — `mutate` from an expression as data, `filter`, `join`,
+  `summarise` with count, sum, min, max, mean, quantile, and window functions for cumulative
+  sums; (2) a mapping's expressions by name (`{:log10, [:carat]}`), the engine validating each
+  name at the call and refusing what it cannot run, an Elixir function kept as the Lists-only
+  escape; (3) with the first engine, the stages before the stat as columns and aggregates — the
+  facet writing `panel` by a join rather than `split/2`, `group` as a window rank, training as
+  one batched aggregate per layer, discrete mapping as a join against the level table — and
+  `Plot.new/2` taking an engine's handle as itself, `Table.Reader` for Lists alone; a lazy
+  engine then scans the table about twice per layer (train, stat) and materialises only the
+  stat's output, so `layer_data/2` stays a frame of lists. Known limits: the identity stat
+  materialises the rows it draws (Mosaic's M4 — four aggregates per pixel column — is the way
+  past it for lines, outside ggplot2's vocabulary); `stat_density()` is relational in its binning
+  (R's `density()` linear-bins onto 512 points before its FFT convolution; Mosaic's `binLinear1d`
+  does the same binning in SQL and smooths the small result in the client) but not in its
+  convolution, which runs on the 512; loess and gam smooths are not relational, `lm` with one
+  predictor is (sufficient statistics, SQL's `regr_*`); R's doubles to the last digit hold for Lists and become a
+  conformance suite with tolerances for engines whose summation or quantile differs (Polars sums
+  pairwise, DuckDB compensated, Postgres plain; `percentile_cont` exists in Postgres alone).
+  **The precedent is Mosaic** (uwdata/mosaic, read from its source 2026-10-20: `packages/mosaic/
+  sql/src/transforms/`, `packages/mosaic/core/src/`, `packages/vgplot/plot/src/marks/`), a
+  JavaScript grammar whose marks are clients of a coordinator and compute in DuckDB; no Elixir
+  library does this, and VegaLite/Tucan describe transforms for the browser's Vega runtime alone.
+  What carries over: a mark's `prepare()` asks for every channel's statistics (min, max, distinct)
+  in one query, then `query()` builds the main one from those numbers — train once per layer, in
+  one batched aggregate, then one stat scan; bin breaks are chosen in the client from the two
+  extent numbers and the engine runs `floor((col - min) / step)` in transformed space
+  (`binHistogram`), though Mosaic drops empty bins where ggplot2 keeps them; queries are an AST in
+  a package of their own (`mosaic-sql`) walked by visitors (`collectColumns`, `rewrite`), an
+  aggregate becoming a window function when given a partition and order — the shape for
+  `mutate`'s expression form and the engine's validation walk; density's linear binning is two
+  weighted rows per point, `UNION ALL`, group by, sum (`binLinear1d`), smoothed in the client;
+  `regressionY` is one query of SQL's `regr_*`; M4 is four aggregates per pixel column; only
+  decomposable aggregates are cached or merged (`sufficient-statistics.ts`: count, sum, avg,
+  variance, covariance, correlation, `regr_*`, min, max, product; never `DISTINCT`, median or
+  quantile), and the consolidator merges queries on one table, filter and group-by into one
+  `SELECT` split per client, its cache keyed by SQL text. Not to copy: DuckDB-only SQL
+  (`argmin`, `regr_*` are not in SQLite; Polars spells them differently) where the vocabulary
+  wants the portable intersection, and "perceptually faithful" as the correctness bar where
+  Giggly's is R's output.
 - **Rows that `table` reads loosely (found 2026-10-13, unscheduled).** Reviewing
   `DataFrame.from_table/1`: rows whose keys disagree (a later map row missing a key, keyword rows
   in another order, a row that is not a record) raise `table`'s own `RuntimeError`, not an
