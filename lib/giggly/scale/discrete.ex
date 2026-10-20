@@ -13,19 +13,20 @@ defmodule Giggly.Scale.Discrete do
       a colour for each value, their hues spaced evenly from `low` to `high` round the circle,
       handed out in reverse for a `direction` of -1; `{:gray, {start, finish}}`, greys from the
       level `start` to `finish`, 0 black and 1 white; or `{:manual, colors}`, the colours of a
-      list in order, or those of a map from value to colour by value; and for size,
+      list in order, or those of a map from value to colour by value; for size,
       `{:area_sequence, {low, high}}`, sizes from `low` to `high` whose squares, and so areas, are
-      spread evenly.
-    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha and
-      size, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no colour. A missing value takes
-      no share of the palette; a position scale puts it at its last level, and its `na_value` is
-      `nil`.
+      spread evenly; and for shape, `{:shape, :solid}` or `{:shape, :open}`, six shapes by name in
+      order, solid or open, or `{:manual, shapes}`, a list's or a map's, as a colour's.
+    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha,
+      shape and size, grey, `"#7F7F7F"`, for colour and fill, `:none`, no colour or shape, or the
+      shape a plot's scale gives. A missing value takes no share of the palette; a position scale
+      puts it at its last level, and its `na_value` is `nil`.
     * `guide`: the guide that draws it: `:axis` for a position and `:legend` for an aesthetic such
       as alpha or colour, `:none` for none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
     * `limits`: the values it shows, in the order shown, whatever the data, or `:default` for its
-      levels, those a manual palette's map has a colour for where it is one. A value not among
+      levels, those a manual palette's map has a value for where it is one. A value not among
       them is missing, so its mark is not drawn on an axis and takes the `na_value` elsewhere;
       `nil` among them places the missing value. A number names the value equal to it, so `2`
       names a level of `2.0`.
@@ -71,9 +72,10 @@ defmodule Giggly.Scale.Discrete do
                  direction: 1 | -1
                }}
             | {:gray, {number(), number()}}
-            | {:manual, [String.t() | :none] | %{term() => String.t() | :none}}
-            | {:area_sequence, {number(), number()}},
-          na_value: nil | number() | String.t() | :none,
+            | {:manual, [String.t() | atom()] | %{term() => String.t() | atom()}}
+            | {:area_sequence, {number(), number()}}
+            | {:shape, :solid | :open},
+          na_value: nil | number() | String.t() | atom(),
           guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),
           limits: :default | [term()],
@@ -105,7 +107,7 @@ defmodule Giggly.Scale.Discrete do
 
   # The values the scale shows, in order, as ggplot2's `get_limits()` gives them: its limits where
   # given, else its levels, or, for a manual palette's map, those of its levels the map has a
-  # colour for, and the missing value where it is one, as ggplot2's manual scale limits itself to
+  # value for, and the missing value where it is one, as ggplot2's manual scale limits itself to
   # the names of its values.
   @doc false
   @spec limits(t()) :: list()
@@ -121,8 +123,8 @@ defmodule Giggly.Scale.Discrete do
   # Each value as `Giggly.Scale.map/2` describes: a position at its place among the limits counting
   # from 1, `nil` for a value not among them; for any other palette, its value from the palette,
   # which spreads the present limits, `nil` taking none of them, or, for a manual palette's map,
-  # the colour it gives the value; and the scale's `na_value` for `nil`, a value not among the
-  # limits, or one the map has no colour for, as ggplot2's mapping gives each its `na.value`.
+  # the value it gives the value; and the scale's `na_value` for `nil`, a value not among the
+  # limits, or one the map has no value for, as ggplot2's mapping gives each its `na.value`.
   @doc false
   @spec map(t(), list()) :: list()
   def map(%__MODULE__{palette: :identity} = scale, values) do
@@ -152,10 +154,10 @@ defmodule Giggly.Scale.Discrete do
   end
 
   # The palette's value for each of the present limits: a manual palette's map gives each the
-  # colour it holds for it, by value, or `na_value`; any other palette spreads them in order.
-  defp palette_values({:manual, colors}, present, na_value) when is_map(colors) do
-    color_by_key = Map.new(colors, fn {value, color} -> {key(value), color} end)
-    Palette.named(color_by_key, Enum.map(present, &key/1), na_value)
+  # value it holds for it, by value, or `na_value`; any other palette spreads them in order.
+  defp palette_values({:manual, values}, present, na_value) when is_map(values) do
+    value_by_key = Map.new(values, fn {value, mapped} -> {key(value), mapped} end)
+    Palette.named(value_by_key, Enum.map(present, &key/1), na_value)
   end
 
   defp palette_values(palette, present, _na_value),

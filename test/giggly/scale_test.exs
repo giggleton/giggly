@@ -1,7 +1,7 @@
 defmodule Giggly.ScaleTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Scale
+  alias Giggly.{Geom, Scale}
 
   # A new discrete alpha scale trained once on `values`.
   defp discrete_alpha(values) do
@@ -1319,6 +1319,48 @@ defmodule Giggly.ScaleTest do
       assert {Scale.new(:continuous, :size), Scale.new(:discrete, :size)} ===
                {%Scale.Continuous{palette: {:area, {1.0, 6.0}}, guide: :legend},
                 %Scale.Discrete{palette: {:area_sequence, {2.0, 6.0}}, guide: :legend}}
+    end
+  end
+
+  # Golden: scales 1.4.0's `pal_shape()` in R 4.6.1, `c(16, 17, 15, 3, 7, 8)` solid and `c(1, 2, 0,
+  # 3, 7, 8)` open, each number turned into its name by the table points are drawn from; and
+  # ggplot2 4.0.3's `layer_data()` under `scale_shape()` over mpg's seven classes, where the
+  # palette warns and leaves `suv` unshaped.
+  describe "map/2 of a shape scale" do
+    test "a discrete shape gives its levels R's six shapes in order, solid or open, nil none" do
+      levels = ~w(a b c d e f)
+
+      by_number = fn numbers ->
+        Enum.map(numbers, fn number -> Enum.at(Geom.Point.shapes(), number) end)
+      end
+
+      solid =
+        :discrete
+        |> Scale.new(:shape)
+        |> Scale.train(levels)
+
+      open = Scale.train(%Scale.Discrete{palette: {:shape, :open}}, levels)
+
+      assert {Scale.map(solid, [nil | levels]), Scale.map(open, levels)} ===
+               {[nil | by_number.([16, 17, 15, 3, 7, 8])], by_number.([1, 2, 0, 3, 7, 8])}
+    end
+
+    test "a seventh level cannot be drawn, and the scale that takes more is named" do
+      scale =
+        :discrete
+        |> Scale.new(:shape)
+        |> Scale.train(~w(a b c d e f g))
+
+      error = assert_raise ArgumentError, fn -> Scale.map(scale, ["a"]) end
+
+      assert error.message =~ "6 shapes, too few for its 7 values"
+      assert error.message =~ "Giggly.Plot.scale_shape_manual/2"
+    end
+
+    test "a shape scale is discrete alone, records R's solid shapes and a legend, its missing value nil" do
+      assert {Scale.new(:discrete, :shape), Scale.discrete_only?(:shape),
+              Enum.filter(Scale.non_position_aesthetics(), &Scale.discrete_only?/1)} ===
+               {%Scale.Discrete{palette: {:shape, :solid}, guide: :legend}, true, [:shape]}
     end
   end
 

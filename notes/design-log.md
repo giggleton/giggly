@@ -183,6 +183,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   never see it. *Rejected: plain doubles* — R's values missed in 30% of groups. *Rejected: one
   summation* — counting's counts would leave `rowsum()`'s.
 
+- **A shape scale is discrete alone, and its functions take R's options but those their families
+  wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
+  `scale_shape_discrete/2` takes `solid:` (`{:shape, :solid}` or `{:shape, :open}`, R's
+  `pal_shape()`), `scale_shape_manual/2` `values:`, shapes or a map from value to shape, through
+  the colour scale's manual palette, and both `name:`, `limits:`, `breaks:`, `labels:`, `guide:`
+  and `na_value:`, a shape, none when not given, as R's `NA`. Shapes have no order, so a
+  continuous or a date column on shape is refused when run (`Scale.discrete_only?/1`) and
+  `lims(shape: {1, 5})` at the call, where R aborts for each. *Rejected: `Scale.kind/2` giving
+  `:none` for it* — the refusal would say "no scale can place yet", where R never will.
+  *Deferred* (Steve): `aesthetics:`, with the size scales'; `na.translate` and `drop`, with every
+  discrete scale's; `scale_shape_binned()`, with binned scales; `scale_shape_ordinal()`, with
+  ordered factors; `scale_shape_identity()`, with identity scales.
+
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
   alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
@@ -1882,6 +1895,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-20 — Shape points by a mapped column (size, shape and line type, step 5); §4: "A shape
+  scale is discrete alone"
 - 2026-10-20 — Count the rows at each place, sized by their count (size, shape and line type,
   step 4); §4: "A count layer counts over ggplot2's list", "The frame's first group-by aggregate"
 - 2026-10-20 — Size points by a mapped column, and legend keys by their glyphs (size, shape and

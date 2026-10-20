@@ -170,7 +170,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   supplied to a discrete scale"), or else ggplot2's default for that kind (`Scale.new/2`), the
   columns evaluated before the stats first and those computed after them next, each in layer
   order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
-  it checked as an axis's are,
+  it checked as an axis's are, and on an aesthetic whose every scale is discrete
+  (`Scale.discrete_only?/1`: shape) a continuous or a date column refused first, naming the layer,
+  the aesthetic, the value and its type, as ggplot2's `scale_shape_continuous()` aborts for both,
   trained once the positions are final on every layer's column of it (a column a stat dropped
   trains nothing), and each column mapped through it, a value mapped to `:none` put in as `nil`,
   the table's missing value, as R's mapped column holds `NA`, then the set values on top: a

@@ -43,11 +43,16 @@ defmodule Giggly.Scale.Palette do
   #     by steps back from the end, where `seq()` steps on from the start; the bytes are the same
   #     either way, for every one of 20,000 random ranges and counts, so they are spaced as `seq()`
   #     spaces them.
-  #   * `{:manual, colors}`, a discrete colour scale's, `colors` a list: its first colours, one for
-  #     each level in level order, as R's manual palette gives them. A manual palette may instead
-  #     be a map from a value to its colour, each level taking its own by value (`named/3`). Either
-  #     way, more levels than colours cannot be drawn, as R's manual scale fails whatever its
-  #     colours' names.
+  #   * `{:shape, :solid | :open}`, a discrete shape scale's: given the number of levels, that many
+  #     of six shapes, by name, as R's `pal_shape()` gives them: solid, R's 16, 17, 15, 3, 7 and 8,
+  #     or open, its 1, 2, 0, 3, 7 and 8. More than six levels cannot be drawn: R warns and leaves
+  #     the seventh on unshaped, so its points vanish, and Giggly, which cannot warn, raises,
+  #     naming the manual scale that takes more.
+  #   * `{:manual, values}`, a discrete colour or shape scale's, `values` a list: its first values,
+  #     one for each level in level order, as R's manual palette gives them. A manual palette may
+  #     instead be a map from a value to its colour or shape, each level taking its own by value
+  #     (`named/3`). Either way, more levels than values cannot be drawn, as R's manual scale fails
+  #     whatever its values' names.
   #
   # Use it through `Giggly.Scale`.
 
@@ -68,13 +73,21 @@ defmodule Giggly.Scale.Palette do
                direction: 1 | -1
              }}
           | {:gray, {number(), number()}}
-          | {:manual, [ColorOperations.t()] | %{term() => ColorOperations.t()}}
+          | {:shape, :solid | :open}
+          | {:manual, [ColorOperations.t() | atom()] | %{term() => ColorOperations.t() | atom()}}
           | {:area, {number(), number()}}
           | {:abs_area, number()}
           | {:area_sequence, {number(), number()}}
 
   # R's gamma for `grey.colors()`.
   @gray_gamma 2.2
+
+  # `pal_shape()`'s shapes, R's 16, 17, 15, 3, 7 and 8, solid, or 1, 2, 0, 3, 7 and 8, open, by the
+  # names a point is drawn in.
+  @shapes %{
+    solid: [:circle_small, :triangle, :square, :plus, :square_cross, :asterisk],
+    open: [:circle_open, :triangle_open, :square_open, :plus, :square_cross, :asterisk]
+  }
 
   # A continuous palette's value for a place from 0 to 1 in the scale's limits: for a rescale, R's
   # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for an area, the
@@ -160,8 +173,9 @@ defmodule Giggly.Scale.Palette do
   # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
   # every range, chroma, luminance and count its test pins.
   #
-  # A grey palette's are `grey.colors()`'s and a manual one's its first colours, as the opening
-  # comment says; a manual palette of too few colours raises.
+  # A grey palette's are `grey.colors()`'s, a shape palette's its first shapes, and a manual one's
+  # its first values, as the opening comment says; a shape palette for more levels than it has
+  # shapes, or a manual palette of too few values, raises.
   #
   # An area sequence's are the square roots of `spread/2` from `low * low` to `high * high`.
   #
@@ -170,7 +184,9 @@ defmodule Giggly.Scale.Palette do
   @doc false
   @spec discrete({:sequence | :area_sequence, {number(), number()}}, non_neg_integer()) ::
           [number()]
-  @spec discrete({:hue | :gray | :manual, term()}, non_neg_integer()) :: [ColorOperations.t()]
+  @spec discrete({:hue | :gray, term()}, non_neg_integer()) :: [ColorOperations.t()]
+  @spec discrete({:shape, :solid | :open}, non_neg_integer()) :: [atom()]
+  @spec discrete({:manual, list()}, non_neg_integer()) :: [ColorOperations.t() | atom()]
   def discrete({:sequence, range}, count), do: spread(range, count)
 
   def discrete({:area_sequence, {low, high}}, count) do
@@ -199,29 +215,42 @@ defmodule Giggly.Scale.Palette do
     |> Enum.map(fn level -> gray(:math.pow(level, 1 / @gray_gamma)) end)
   end
 
-  def discrete({:manual, colors}, count) when is_list(colors) do
-    check_enough(colors, count)
-    Enum.take(colors, count)
+  def discrete({:shape, fill}, count) do
+    shapes = Map.fetch!(@shapes, fill)
+
+    if count > length(shapes) do
+      raise ArgumentError,
+            "a shape scale's palette has #{length(shapes)} shapes, too few for its #{count} " <>
+              "values, since more are hard to tell apart; Giggly.Plot.scale_shape_manual/2 " <>
+              "gives a shape for each"
+    end
+
+    Enum.take(shapes, count)
   end
 
-  # A manual palette's map's colour for each of `keys`, the present levels' keys as the scale
+  def discrete({:manual, values}, count) when is_list(values) do
+    check_enough(values, count)
+    Enum.take(values, count)
+  end
+
+  # A manual palette's map's value for each of `keys`, the present levels' keys as the scale
   # matches them (`Giggly.Scale.Discrete.key/1`), the map's keys turned so too, or `missing` for
-  # a level the map has no colour for; a map of fewer colours than levels raises, as the opening
+  # a level the map has no value for; a map of fewer values than levels raises, as the opening
   # comment says.
   @doc false
-  @spec named(%{term() => ColorOperations.t()}, [term()], term()) :: [term()]
-  def named(color_by_key, keys, missing) do
-    check_enough(color_by_key, length(keys))
-    Enum.map(keys, fn key -> Map.get(color_by_key, key, missing) end)
+  @spec named(%{term() => term()}, [term()], term()) :: [term()]
+  def named(value_by_key, keys, missing) do
+    check_enough(value_by_key, length(keys))
+    Enum.map(keys, fn key -> Map.get(value_by_key, key, missing) end)
   end
 
-  defp check_enough(colors, count) when is_list(colors) and count <= length(colors), do: :ok
-  defp check_enough(colors, count) when is_map(colors) and count <= map_size(colors), do: :ok
+  defp check_enough(values, count) when is_list(values) and count <= length(values), do: :ok
+  defp check_enough(values, count) when is_map(values) and count <= map_size(values), do: :ok
 
-  defp check_enough(colors, count) do
+  defp check_enough(values, count) do
     raise ArgumentError,
           "a manual scale needs a value for each of its #{count} levels, " <>
-            "but has #{Enum.count(colors)}: #{inspect(colors)}"
+            "but has #{Enum.count(values)}: #{inspect(values)}"
   end
 
   # `count` values from `low` to `high`, evenly spaced, as R's `seq(low, high, length.out =

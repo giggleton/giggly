@@ -4,10 +4,10 @@ defmodule Giggly.Geom.Point do
   # Points, ggplot2's `geom_point()`: one per row, at its `x` and `y`, drawn in its shape. It takes
   # no parameters. Draw it through `Giggly.Geom`.
   #
-  # Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill` and `:size`, and need `:x` and
-  # `:y`; an aesthetic joins the accepted list with the scale that maps it, so a mapping never
-  # silently does nothing. A layer may also set each point's `:shape` and `:stroke`, which no scale
-  # maps yet.
+  # Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:shape` and `:size`, and need
+  # `:x` and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a mapping
+  # never silently does nothing. A layer may also set each point's `:stroke`, which no scale maps,
+  # as ggplot2 scales none.
   #
   # A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
   # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
@@ -44,7 +44,7 @@ defmodule Giggly.Geom.Point do
   # The aesthetics a layer of points can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :size, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :shape, :size, :x, :y]
 
   # The aesthetics a layer of points cannot be drawn without.
   @doc false

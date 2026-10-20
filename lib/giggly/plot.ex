@@ -68,8 +68,8 @@ defmodule Giggly.Plot do
       ["#56B1F7", "#132B43", "#7F7F7F"]
 
   A legend or colour bar is drawn for each mapped aesthetic, stacked down the right of the panels
-  in the order of the aesthetics' names (`alpha`, `color`, `fill`). Two with the same title and
-  labels, such as a colour and a fill mapped to one column, are drawn as one.
+  in the order of the aesthetics' names (`alpha`, `color`, `fill`, `shape`, `size`). Two with the
+  same title and labels, such as a colour and a fill mapped to one column, are drawn as one.
 
   ## Guides
 
@@ -88,16 +88,18 @@ defmodule Giggly.Plot do
   discrete one. A value outside the limits is missing, so its mark is not drawn. A continuous scale
   given a column of dates places each at its days since 1970-01-01.
 
-  A colour, fill, alpha or size scale chooses how values become colours, opacities or sizes, and
-  sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each value's
-  colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2` greys,
-  `scale_color_discrete/2` either; `scale_color_gradient/2`, `scale_color_gradient2/2`,
+  A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
+  sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
+  value's colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2`
+  greys, `scale_color_discrete/2` either; `scale_color_gradient/2`, `scale_color_gradient2/2`,
   `scale_color_gradientn/2` and `scale_color_continuous/2` blend a gradient through two, three or
   any number of colours; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
   `scale_alpha_discrete/2` set opacities. `scale_size_continuous/2` and `scale_size_area/2` size
   points by area, the second from 0, `scale_radius/2` by width, and `scale_size_discrete/2` a
-  discrete column's values in order. `lims/2` sets their limits alone. A value outside a colour
-  scale's limits takes its `na_value:`, as a missing one does.
+  discrete column's values in order. `scale_shape_discrete/2` gives a discrete column's values six
+  shapes, solid or open, and `scale_shape_manual/2` names each value's shape; shapes have no order,
+  so a continuous column cannot be mapped to `:shape`. `lims/2` sets their limits alone. A value
+  outside a colour scale's limits takes its `na_value:`, as a missing one does.
 
   ## Labels
 
@@ -1028,7 +1030,7 @@ defmodule Giggly.Plot do
   @manual_scale_options NimbleOptions.new!(
                           [
                             values: [
-                              type: {:custom, __MODULE__, :validate_manual_values, []},
+                              type: {:custom, __MODULE__, :validate_manual_values, [:color]},
                               required: true,
                               doc:
                                 "The colours: a list, given to the values in order, or to " <>
@@ -1294,6 +1296,58 @@ defmodule Giggly.Plot do
                                    )
                                )
 
+  # A shape scale's guide, a legend unless it says otherwise, and its missing value's shape, none
+  # unless it says otherwise, drawing no point.
+  @shape_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:shape]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  @shape_na_value_spec [
+    type: {:custom, __MODULE__, :validate_shape, []},
+    doc:
+      "The shape of a missing value, or of one not among the limits, by name or by number, or " <>
+        "`:none`; none, which draws no point, when not given."
+  ]
+
+  @shape_legend_option_specs Enum.concat(@discrete_legend_option_specs, guide: @shape_guide_spec)
+
+  @discrete_shape_scale_options NimbleOptions.new!(
+                                  [
+                                    solid: [
+                                      type: :boolean,
+                                      default: true,
+                                      doc:
+                                        "Whether the shapes are solid, `:circle_small`, " <>
+                                          "`:triangle`, `:square`, `:plus`, `:square_cross` " <>
+                                          "and `:asterisk` in order, or, `false`, open, " <>
+                                          "`:circle_open`, `:triangle_open`, `:square_open` and " <>
+                                          "the last three."
+                                    ],
+                                    na_value: @shape_na_value_spec
+                                  ] ++ @shape_legend_option_specs
+                                )
+
+  @manual_shape_scale_options NimbleOptions.new!(
+                                [
+                                  values: [
+                                    type:
+                                      {:custom, __MODULE__, :validate_manual_values, [:shape]},
+                                    required: true,
+                                    doc:
+                                      "The shapes, each by name or by number, or `:none`: a " <>
+                                        "list, given to the values in order, or to `breaks:` " <>
+                                        "in order where they are a list; or a map from a " <>
+                                        "value, as the column holds it, to its shape, whose " <>
+                                        "scale shows only the values the data holds that it " <>
+                                        "names, unless `limits:` gives others. A value with no " <>
+                                        "shape takes `na_value:`."
+                                  ],
+                                  na_value: @shape_na_value_spec
+                                ] ++ @shape_legend_option_specs
+                              )
+
   # `guide_legend/1`'s options.
   @guide_legend_options NimbleOptions.new!(
                           reverse: [
@@ -1326,6 +1380,11 @@ defmodule Giggly.Plot do
                       doc:
                         "The alpha scale's guide, as `scale_alpha_continuous/2`'s `guide:` takes it."
                     ],
+                    shape: [
+                      type: {:custom, __MODULE__, :validate_guide, [:shape]},
+                      doc:
+                        "The shape scale's guide, as `scale_shape_discrete/2`'s `guide:` takes it."
+                    ],
                     size: [
                       type: {:custom, __MODULE__, :validate_guide, [:size]},
                       doc:
@@ -1334,7 +1393,7 @@ defmodule Giggly.Plot do
                   )
 
   # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values, and the limits
-  # of a colour, fill, alpha or size scale.
+  # of a colour, fill, alpha, shape or size scale.
   @axis_limits_type {:custom, __MODULE__, :validate_axis_limits, []}
   @legend_limits_type {:custom, __MODULE__, :validate_legend_limits, []}
   @lims_options NimbleOptions.new!(
@@ -1365,6 +1424,12 @@ defmodule Giggly.Plot do
                       "The alpha scale's limits, as `scale_alpha_continuous/2` or " <>
                         "`scale_alpha_discrete/2` takes them."
                   ],
+                  shape: [
+                    type: {:custom, __MODULE__, :validate_shape_limits, []},
+                    doc:
+                      "The shape scale's limits, a list of values, as `scale_shape_discrete/2` " <>
+                        "takes them."
+                  ],
                   size: [
                     type: @legend_limits_type,
                     doc:
@@ -1383,6 +1448,7 @@ defmodule Giggly.Plot do
                       @label_option,
                   fill: [doc: "The fill legend's or colour bar's title."] ++ @label_option,
                   alpha: [doc: "The alpha legend's title."] ++ @label_option,
+                  shape: [doc: "The shape legend's title."] ++ @label_option,
                   size: [doc: "The size legend's title."] ++ @label_option,
                   title: [doc: "The plot's title, above the panels."] ++ @label_option,
                   subtitle: [doc: "The plot's subtitle, below its title."] ++ @label_option,
@@ -1430,9 +1496,9 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill` and `:size`, and need `:x` and
-  `:y`. A point's alpha applies to its colour and its fill alike; a colour of `:none`, or a missing
-  size, draws no point.
+  Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:shape` and `:size`, and need
+  `:x` and `:y`. A point's alpha applies to its colour and its fill alike; a colour or shape of
+  `:none`, or a missing size or shape, draws no point.
 
   A point is drawn in one of 26 shapes, each named, and numbered 0 to 25:
 
@@ -1519,9 +1585,9 @@ defmodule Giggly.Plot do
   where `:weight` is mapped, by the sum of their weights, and the size legend titled `n`. The
   points are drawn as `geom_point/3` draws them.
 
-  Counting uses `:x`, `:y`, `:weight` and `:group`, and needs `:x` and `:y`. A `:weight` column
-  must hold numbers, and a missing weight leaves its place's count missing, so no point is drawn
-  there. The points also take `:alpha`, `:color`, `:fill` and `:size`; each is counted over, as
+  Counting uses `:x`, `:y`, `:weight` and `:group`, and needs `:x` and `:y`. A `:weight` column must
+  hold numbers, and a missing weight leaves its place's count missing, so no point is drawn there.
+  The points also take `:alpha`, `:color`, `:fill`, `:shape` and `:size`; each is counted over, as
   `:group` is, so a discrete colour gives each of its values at a place a point of its own, and a
   mapped `:size` sizes the points by its column instead of the count. A row missing its `x` or `y`
   is not counted.
@@ -3089,6 +3155,77 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Gives the plot a discrete shape scale, replacing any shape scale it had.
+
+  The values are drawn in six shapes, in order, easy to tell apart: solid, `:circle_small`,
+  `:triangle`, `:square`, `:plus`, `:square_cross` and `:asterisk`, or, with `solid: false`, the
+  first three open, `:circle_open`, `:triangle_open` and `:square_open`. Shapes have no order, so a
+  shape scale is always discrete. Its guide is a legend unless `guide:` says otherwise. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a
+  `guide:` of `:colorbar` among them, and `ArgumentError` for a list of labels not one for each
+  break or limit given; a continuous column, or more than six values, is refused when the plot is
+  run, and `scale_shape_manual/2` gives as many shapes as a scale has values.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_shape_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, shape: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_shape_discrete(solid: false)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:shape)
+      [:triangle_open, :circle_open, :square_open]
+  """
+  @spec scale_shape_discrete(t(), keyword()) :: t()
+  def scale_shape_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :shape,
+      options,
+      @discrete_shape_scale_options,
+      "Plot.scale_shape_discrete/2",
+      &discrete_shape_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete shape scale of the shapes given, replacing any shape scale it had.
+
+  `values:` gives the shapes, each by name or by its number, as `geom_point/3` names them: a list
+  handed to the values in order, or a map from a value to its shape. The legend shows a key for
+  each value the scale shows, labelled. Raises `NimbleOptions.ValidationError` for an option it
+  does not take or a value it cannot use, a shape no point is drawn in or a `guide:` of
+  `:colorbar` among them, and `ArgumentError` for a list of labels not one for each break or limit
+  given; a continuous column, or more values than a list has shapes, is refused when the plot is
+  run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@manual_shape_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, shape: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_shape_manual(values: %{"4" => 21, "6" => :diamond, "8" => 4})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:shape)
+      [:diamond, :circle_filled, :cross]
+  """
+  @spec scale_shape_manual(t(), keyword()) :: t()
+  def scale_shape_manual(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :shape,
+      options,
+      @manual_shape_scale_options,
+      "Plot.scale_shape_manual/2",
+      &manual_scale/1
+    )
+  end
+
+  @doc """
   Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
   for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
   as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
@@ -3218,6 +3355,9 @@ defmodule Giggly.Plot do
   defp limited_scale(:alpha, _ends),
     do: {@continuous_alpha_scale_options, &continuous_alpha_scale/1}
 
+  defp limited_scale(:shape, _values),
+    do: {@discrete_shape_scale_options, &discrete_shape_scale/1}
+
   defp limited_scale(:size, values) when is_list(values),
     do: {@discrete_size_scale_options, &discrete_size_scale/1}
 
@@ -3290,9 +3430,9 @@ defmodule Giggly.Plot do
   `guide_legend/1` makes; or `:none` for none.
 
   A guide set here wins over the one its scale's `guide:` chooses, before or after the scale is
-  given. Each call sets only the guides it is given, keeping the rest. A colour bar for alpha
-  raises here, and one for a colour or fill scale that is discrete raises when the plot is run. A
-  guide for an aesthetic no layer maps reads nothing.
+  given. Each call sets only the guides it is given, keeping the rest. A colour bar for alpha,
+  shape or size raises here, and one for a colour or fill scale that is discrete raises when the
+  plot is run. A guide for an aesthetic no layer maps reads nothing.
 
   ## Options
 
@@ -3818,6 +3958,19 @@ defmodule Giggly.Plot do
     end
   end
 
+  # NimbleOptions' check of `lims/2`'s limits for a shape scale: a list of a discrete scale's
+  # values alone, since a shape scale is always discrete, as ggplot2's `lims(shape = c(1, 5))`
+  # aborts.
+  @doc false
+  @spec validate_shape_limits(term()) :: {:ok, list()} | {:error, String.t()}
+  def validate_shape_limits(values) when is_list(values), do: validate_discrete_limits(values)
+
+  def validate_shape_limits(limits) do
+    {:error,
+     "expected a list of the values the scale shows, since a shape scale is discrete, got: " <>
+       inspect(limits)}
+  end
+
   # NimbleOptions' check of `lims/2`'s limits for a colour, fill or alpha scale: a list of a
   # discrete scale's values, or `{low, high}`, two numbers, each kept as a float, or `nil` for an
   # end the data decides, low first, since such a scale has no transformation to run from high to
@@ -3910,7 +4063,7 @@ defmodule Giggly.Plot do
   @doc false
   @spec validate_gradient_colors(term()) :: {:ok, [String.t()]} | {:error, String.t()}
   def validate_gradient_colors([_first | _rest] = colors),
-    do: colors_each(colors, &validate_opaque_color/1)
+    do: checked_each(colors, &validate_opaque_color/1)
 
   def validate_gradient_colors(other),
     do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
@@ -3920,24 +4073,30 @@ defmodule Giggly.Plot do
   @doc false
   @spec validate_palette_colors(term()) :: {:ok, [ColorOperations.t()]} | {:error, String.t()}
   def validate_palette_colors([_first | _rest] = colors),
-    do: colors_each(colors, &validate_color/1)
+    do: checked_each(colors, &validate_color/1)
 
   def validate_palette_colors(other),
     do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
 
-  # NimbleOptions' check of a manual scale's `values:`: a list of colours
-  # (`validate_palette_colors/1`), or a map from a value (`discrete_values/1`) to its colour.
+  # NimbleOptions' check of a manual scale's `values:` for `aesthetic`: a colour scale's a list of
+  # colours (`validate_palette_colors/1`), a shape scale's a list of at least one shape
+  # (`validate_shape/1`), or either's a map from a value (`discrete_values/1`) to its colour or
+  # shape.
   @doc false
-  @spec validate_manual_values(term()) ::
-          {:ok, [ColorOperations.t()] | %{term() => ColorOperations.t()}} | {:error, String.t()}
-  def validate_manual_values(values) when is_list(values), do: validate_palette_colors(values)
+  @spec validate_manual_values(term(), :color | :shape) ::
+          {:ok, list() | %{term() => ColorOperations.t() | atom()}} | {:error, String.t()}
+  def validate_manual_values(values, :color) when is_list(values),
+    do: validate_palette_colors(values)
 
-  def validate_manual_values(values)
+  def validate_manual_values([_first | _rest] = shapes, :shape),
+    do: checked_each(shapes, &validate_shape/1)
+
+  def validate_manual_values(values, aesthetic)
       when is_map(values) and not is_struct(values) and map_size(values) > 0 do
-    {keys, colors} = Enum.unzip(values)
+    {keys, mapped} = Enum.unzip(values)
 
     with {:ok, _keys} <- discrete_values(keys),
-         {:ok, parsed} <- colors_each(colors, &validate_color/1) do
+         {:ok, parsed} <- checked_each(mapped, manual_check(aesthetic)) do
       named =
         keys
         |> Enum.zip(parsed)
@@ -3947,17 +4106,25 @@ defmodule Giggly.Plot do
     end
   end
 
-  def validate_manual_values(values) do
+  def validate_manual_values(values, aesthetic) do
+    noun = manual_noun(aesthetic)
+
     {:error,
-     "expected a list of at least one colour, or a map from a value to its colour, got: " <>
+     "expected a list of at least one #{noun}, or a map from a value to its #{noun}, got: " <>
        inspect(values)}
   end
 
-  # Each of `colors` through `check`, all of them, or the first error.
-  defp colors_each(colors, check) do
+  defp manual_check(:color), do: &validate_color/1
+  defp manual_check(:shape), do: &validate_shape/1
+
+  defp manual_noun(:color), do: "colour"
+  defp manual_noun(:shape), do: "shape"
+
+  # Each of `values` through `check`, all of them, or the first error.
+  defp checked_each(values, check) do
     checked =
-      Enum.reduce_while(colors, {:ok, []}, fn color, {:ok, spellings} ->
-        case check.(color) do
+      Enum.reduce_while(values, {:ok, []}, fn value, {:ok, spellings} ->
+        case check.(value) do
           {:ok, spelling} -> {:cont, {:ok, [spelling | spellings]}}
           {:error, _message} = error -> {:halt, error}
         end
@@ -3980,9 +4147,9 @@ defmodule Giggly.Plot do
   # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
   # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` for a
   # continuous colour or fill scale alone, as a colour bar shows a continuous scale's colours, so a
-  # discrete scale's is refused, and an alpha or a size scale's whatever its kind.
+  # discrete scale's is refused, and an alpha, a shape or a size scale's whatever its kind.
   @doc false
-  @spec validate_guide(term(), :continuous | :discrete | :alpha | :size) ::
+  @spec validate_guide(term(), :continuous | :discrete | :alpha | :shape | :size) ::
           {:ok, guide()} | {:error, String.t()}
   def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
   def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
@@ -3991,7 +4158,7 @@ defmodule Giggly.Plot do
   def validate_guide(:colorbar, :discrete),
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
 
-  def validate_guide(:colorbar, aesthetic) when aesthetic in [:alpha, :size],
+  def validate_guide(:colorbar, aesthetic) when aesthetic in [:alpha, :shape, :size],
     do: {:error, "a colour bar shows colour or fill, never #{aesthetic}; give :legend"}
 
   def validate_guide(guide, _kind) do
@@ -4695,6 +4862,14 @@ defmodule Giggly.Plot do
     {range, options} = Keyword.pop!(validated, :range)
     discrete_legend({:area_sequence, range}, options)
   end
+
+  defp discrete_shape_scale(validated) do
+    {solid, options} = Keyword.pop!(validated, :solid)
+    discrete_legend({:shape, shape_fill(solid)}, options)
+  end
+
+  defp shape_fill(true), do: :solid
+  defp shape_fill(false), do: :open
 
   defp check_twins(validated, {plain, dated}, function) do
     if Keyword.has_key?(validated, plain) and Keyword.has_key?(validated, dated) do

@@ -1070,7 +1070,9 @@ defmodule Giggly.Assembly do
   # The first column of each aesthetic other than position that a layer maps, which decides the
   # kind of scale it needs: as an axis's, every column of it must be a type some scale can map,
   # and all of one kind, the first deciding, as ggplot2 adds a scale for the first layer's and
-  # refuses a column it cannot map.
+  # refuses a column it cannot map; and on an aesthetic whose every scale is discrete
+  # (`Scale.discrete_only?/1`), none continuous or a date's, as ggplot2's `scale_shape_continuous()`
+  # aborts for both.
   # The columns evaluated before the stats come first, read from `layer_frames`, and those computed
   # after, from `statistic_frames`, each in layer order, as ggplot2 adds the scales of every layer's
   # evaluated aesthetics before any stat runs and an after_stat's as its layer's stat is mapped.
@@ -1082,8 +1084,21 @@ defmodule Giggly.Assembly do
         columns = Enum.concat(evaluated, computed),
         columns != [],
         into: %{} do
+      if Scale.discrete_only?(aesthetic), do: Enum.each(columns, &check_discrete/1)
       checked_kind(columns, "an aesthetic has one scale")
       {aesthetic, hd(columns)}
+    end
+  end
+
+  # A column of an aesthetic whose every scale is discrete, refused unless its type is one a
+  # discrete scale takes, or one no scale can place, which `checked_kind/2` refuses.
+  defp check_discrete({index, aesthetic, value, dtype, _kind}) do
+    if Scale.kind(dtype) in [:continuous, :date] do
+      raise ArgumentError,
+            "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, a " <>
+              "#{inspect(dtype)} column, but a #{aesthetic} scale is discrete, since " <>
+              "#{aesthetic}s have no order; map #{inspect(aesthetic)} to a discrete column or a " <>
+              "factor, or #{inspect(value)} to another aesthetic"
     end
   end
 

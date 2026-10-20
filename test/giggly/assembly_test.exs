@@ -353,7 +353,7 @@ defmodule Giggly.AssemblyTest do
 
       assembly =
         data
-        |> Plot.new(%{x: :x, y: :y, linewidth: :w, shape: :w, xmin: :w})
+        |> Plot.new(%{x: :x, y: :y, linewidth: :w, stroke: :w, xmin: :w})
         |> Plot.geom_point()
         |> Plot.geom_path(linewidth: 2)
         |> Assembly.run()
@@ -361,8 +361,8 @@ defmodule Giggly.AssemblyTest do
       names = fn frames -> Enum.map(frames, &Giggly.DataFrame.names/1) end
 
       assert names.(assembly.layer_data) === [
-               [:x, :y, :linewidth, :shape, :xmin, :panel, :group],
-               [:x, :y, :shape, :xmin, :panel, :group, :linewidth]
+               [:x, :y, :linewidth, :stroke, :xmin, :panel, :group],
+               [:x, :y, :stroke, :xmin, :panel, :group, :linewidth]
              ]
 
       assert names.(assembly.drawn_data) === [

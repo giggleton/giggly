@@ -46,7 +46,7 @@ where its marks sit".
 - **A geom is handed its layer's rows without the aesthetics other than position that the layer
   takes from the plot's mapping and cannot use** (the assembly's `drawn_data`), which ride along in
   `layer_data/2` and are drawn by nothing, so a geom never reads such a column as a value the layer
-  sets: a path's carried `linewidth`, a point's carried `shape`.
+  sets: a path's carried `linewidth`, a point's carried `stroke`.
 - **A row missing a required position is not drawn.** ggplot2 also warns; a pure pipeline cannot,
   so how a dropped row is reported is open until something can report it.
 - **A point looks like ggplot2's default point unless its row says otherwise:** the solid circle

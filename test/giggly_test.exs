@@ -13,6 +13,111 @@ defmodule GigglyTest do
     "class" => ["compact", "compact", "suv"]
   }
 
+  # The scale_shape reference page's `dsmall`: the rows of diamonds R 4.6.1's
+  # `sample(nrow(diamonds), 100)` picks after `set.seed(596)`, counted from 1.
+  @diamond_sample [
+    25_666,
+    38_189,
+    6816,
+    23_077,
+    19_736,
+    25_700,
+    11_808,
+    25_189,
+    26_344,
+    4071,
+    45_742,
+    25_297,
+    52_984,
+    14_612,
+    48_306,
+    19_199,
+    38_194,
+    37_228,
+    48_850,
+    49_734,
+    18_386,
+    14_200,
+    10_993,
+    24_601,
+    7011,
+    34_308,
+    6583,
+    38_595,
+    30_236,
+    1051,
+    8079,
+    31_287,
+    1565,
+    30_482,
+    44_169,
+    50_061,
+    13_023,
+    48_715,
+    16_918,
+    4754,
+    43_963,
+    43_370,
+    2115,
+    11_166,
+    9734,
+    31_412,
+    31_654,
+    45_124,
+    49_949,
+    51_312,
+    41_254,
+    39_717,
+    20_773,
+    13_151,
+    19_964,
+    12_688,
+    6155,
+    31_857,
+    995,
+    32_150,
+    46_525,
+    40_773,
+    52_088,
+    46_509,
+    15_601,
+    45_156,
+    43_334,
+    43_429,
+    37_708,
+    30_408,
+    19_060,
+    32_426,
+    11_867,
+    24_140,
+    8179,
+    51_399,
+    49_507,
+    35_248,
+    49_967,
+    42_223,
+    29_727,
+    33_565,
+    41_530,
+    39_904,
+    49_348,
+    12_696,
+    15_966,
+    18_558,
+    8009,
+    8575,
+    13_142,
+    32_231,
+    6305,
+    39_036,
+    53_530,
+    34_813,
+    36_021,
+    47_384,
+    43_849,
+    23_120
+  ]
+
   # The scale_date reference page's `df`: the 30 days to 2026-10-19, latest first, rather than to
   # the day it runs, and the prices R 4.6.1's runif(30) gives after set.seed(1).
   @last_month %{
@@ -945,6 +1050,138 @@ defmodule GigglyTest do
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
       assert error.message =~ "maps :color to \"d\", a :date column, which no scale can place yet"
+    end
+  end
+
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` and `get_guide_data()` in R 4.6.1 for the
+  # same plot on the same rows, each shape R's number for the name held here.
+  describe "layer_data/2 and the legend, mapping shape" do
+    @drives %{"x" => [1, 2, 3, 4], "y" => [4, 3, 2, 1], "drv" => ["f", "4", "r", "f"]}
+    @missing %{"x" => [1, 2, 3, 4, 5], "y" => [1, 2, 3, 4, 5], "g" => ["a", "b", nil, "c", "a"]}
+
+    test "a discrete shape gives its levels six shapes in order, solid or open, and groups by them" do
+      plot =
+        @drives
+        |> Plot.new(%{x: :x, y: :y, shape: :drv})
+        |> Plot.geom_point()
+
+      groups =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:group)
+
+      assert groups === [2, 1, 3, 2]
+
+      assert {shapes_and_keys(&Function.identity/1),
+              shapes_and_keys(fn plot -> Plot.scale_shape_discrete(plot, solid: false) end)} ===
+               {{[:triangle, :circle_small, :square, :triangle],
+                 [{"4", :circle_small}, {"f", :triangle}, {"r", :square}]},
+                {[:triangle_open, :circle_open, :square_open, :triangle_open],
+                 [{"4", :circle_open}, {"f", :triangle_open}, {"r", :square_open}]}}
+    end
+
+    test "a manual scale's shapes go to the levels in order, by number or name, a map's by value" do
+      manual = fn options ->
+        shapes_and_keys(fn plot -> Plot.scale_shape_manual(plot, options) end)
+      end
+
+      assert {manual.(values: [1, 2, 0]), manual.(values: [:triangle_open, :square, :circle])} ===
+               {{[:triangle_open, :circle_open, :square_open, :triangle_open],
+                 [{"4", :circle_open}, {"f", :triangle_open}, {"r", :square_open}]},
+                {[:square, :triangle_open, :circle, :square],
+                 [{"4", :triangle_open}, {"f", :square}, {"r", :circle}]}}
+
+      assert {manual.(values: %{"r" => 17, "f" => 1}),
+              manual.(values: [1, 2, 0], breaks: ["r", "f"])} ===
+               {{[:circle_open, nil, :triangle, :circle_open],
+                 [{"f", :circle_open}, {"r", :triangle}]},
+                {[:triangle_open, nil, :circle_open, :triangle_open],
+                 [{"r", :circle_open}, {"f", :triangle_open}]}}
+    end
+
+    test "a manual shape of :none leaves its rows unshaped, its key drawn in none, as R's NA" do
+      assert shapes_and_keys(fn plot -> Plot.scale_shape_manual(plot, values: [1, :none, 0]) end) ===
+               {[nil, :circle_open, :square_open, nil],
+                [{"4", :circle_open}, {"f", :none}, {"r", :square_open}]}
+    end
+
+    test "breaks choose the keys, and limits the values shown, one outside them unshaped" do
+      assert {shapes_and_keys(fn plot -> Plot.scale_shape_discrete(plot, breaks: ["r", "4"]) end),
+              shapes_and_keys(fn plot -> Plot.scale_shape_discrete(plot, limits: ["r", "f"]) end),
+              shapes_and_keys(fn plot -> Plot.lims(plot, shape: ["r", "f"]) end)} ===
+               {{[:triangle, :circle_small, :square, :triangle],
+                 [{"r", :square}, {"4", :circle_small}]},
+                {[:triangle, nil, :circle_small, :triangle],
+                 [{"r", :circle_small}, {"f", :triangle}]},
+                {[:triangle, nil, :circle_small, :triangle],
+                 [{"r", :circle_small}, {"f", :triangle}]}}
+    end
+
+    test "a missing value is unshaped, its NA key last, unless na_value: gives it a shape" do
+      missing = fn scaled -> shapes_and_keys(scaled, @missing, :g) end
+
+      assert missing.(&Function.identity/1) ===
+               {[:circle_small, :triangle, nil, :square, :circle_small],
+                [{"a", :circle_small}, {"b", :triangle}, {"c", :square}, {"NA", nil}]}
+
+      assert {missing.(fn plot -> Plot.scale_shape_discrete(plot, na_value: 4) end),
+              missing.(fn plot ->
+                Plot.scale_shape_manual(plot, values: [1, 2, 0], na_value: 8)
+              end)} ===
+               {{[:circle_small, :triangle, :cross, :square, :circle_small],
+                 [{"a", :circle_small}, {"b", :triangle}, {"c", :square}, {"NA", :cross}]},
+                {[:circle_open, :triangle_open, :asterisk, :square_open, :circle_open],
+                 [
+                   {"a", :circle_open},
+                   {"b", :triangle_open},
+                   {"c", :square_open},
+                   {"NA", :asterisk}
+                 ]}}
+    end
+
+    test "a shape and a colour of one column are one legend, each key in both" do
+      plot =
+        @drives
+        |> Plot.new(%{x: :x, y: :y, shape: :drv, colour: :drv})
+        |> Plot.geom_point()
+
+      [legend] = Giggly.Assembly.run(plot).legends
+
+      assert {legend.aesthetics, Enum.map(legend.keys, fn key -> {key.label, key.values} end)} ===
+               {[:color, :shape],
+                [
+                  {"4", %{color: "#F8766D", shape: :circle_small}},
+                  {"f", %{color: "#00BA38", shape: :triangle}},
+                  {"r", %{color: "#619CFF", shape: :square}}
+                ]}
+    end
+
+    # ggplot2 4.0.3 aborts for each: "A continuous variable cannot be mapped to the shape
+    # aesthetic."
+    test "a continuous or a date column mapped to shape is refused when run, for points or counts" do
+      rows = %{"x" => [1, 2], "y" => [1, 2], "day" => [~D[2026-10-12], ~D[2026-10-13]]}
+
+      scaled = fn plot ->
+        plot
+        |> Plot.geom_point()
+        |> Plot.scale_shape_discrete()
+      end
+
+      for {column, add, shown} <- [
+            {:y, &Plot.geom_point/1, ~s("y", a :integer)},
+            {:x, &Plot.geom_count/1, ~s("x", a :integer)},
+            {:day, &Plot.geom_point/1, ~s("day", a :date)},
+            {:y, scaled, ~s("y", a :integer)}
+          ] do
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y, shape: column})
+          |> add.()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ "the layer at index 0 maps :shape to #{shown} column"
+        assert error.message =~ "a shape scale is discrete"
+      end
     end
   end
 
@@ -1885,6 +2122,28 @@ defmodule GigglyTest do
                {[1.0, -1.0, 0.0], [:infinity, :neg_infinity, :nan]}
 
       assert DataFrame.pull(frame, :size) === [6.0, 1.0, 4.5355339059327378]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot: shape 16 at (1, 1) twice
+    # and at (2, 2) once, shape 17 at (1, 1) once.
+    test "a mapped shape is counted over, each of its values at a place a point of its own" do
+      frame =
+        %{"x" => [1, 1, 1, 2], "y" => [1, 1, 1, 2], "s" => ["a", "a", "b", "a"]}
+        |> Plot.new(%{x: :x, y: :y, shape: :s})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :y, :shape, :n, :size, :group], fn name ->
+               DataFrame.pull(frame, name)
+             end) ===
+               [
+                 [1, 1, 2],
+                 [1, 1, 2],
+                 [:circle_small, :triangle, :circle_small],
+                 [2.0, 1.0, 1.0],
+                 [6.0, 1.0, 1.0],
+                 [1, 2, 1]
+               ]
     end
 
     test "a mapped size is counted over in place of the count, and a set one sizes every point" do
@@ -3202,6 +3461,74 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/size_merged_rows.svg")
     end
 
+    # Golden: test/golden/shape_solid.svg and test/golden/shape_open.svg, checked against ggplot2's
+    # drawings of the same plots, made by the R script beside each: every element matches, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. scale_shape()'s first
+    # example and its `solid = FALSE`: a hundred diamonds R picks at random, each cut in one of the
+    # palette's shapes. R's cut is an ordered factor; the limits give the scale its levels' order,
+    # which Giggly's column of strings would sort alphabetically. They move with what moves
+    # test/golden/point_shapes.svg, and with how a legend lays out its keys.
+    test "a discrete shape draws each value in one of six shapes, solid or open, with a legend" do
+      cuts = ["Fair", "Good", "Very Good", "Premium", "Ideal"]
+
+      diamonds =
+        @diamond_sample
+        |> diamond_rows()
+        |> Plot.new(%{x: :carat, y: :price})
+        |> Plot.geom_point(%{shape: :cut})
+
+      assert {to_svg(Plot.scale_shape_discrete(diamonds, limits: cuts)),
+              to_svg(Plot.scale_shape_discrete(diamonds, limits: cuts, solid: false))} ==
+               {File.read!("test/golden/shape_solid.svg"),
+                File.read!("test/golden/shape_open.svg")}
+    end
+
+    # Golden: test/golden/shape_filled.svg, test/golden/shape_missing.svg and
+    # test/golden/shape_colour.svg, checked against ggplot2's drawings of the same plots, made by the
+    # R script beside each: every element matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Drive trains in shapes 21 to 23 a manual scale
+    # gives, filled red and sized 3 by the layer, its keys too; a missing value unshaped, its NA key
+    # drawing no glyph; and shape and colour of one column in one legend. They move with what
+    # moves test/golden/shape_solid.svg, and with how legends merge.
+    test "a manual shape scale's keys take the layer's set look, a missing key none, a merged one colour" do
+      mpg = Plot.new(Giggly.Datasets.mpg(), %{x: :displ, y: :hwy, shape: :drv})
+
+      filled =
+        mpg
+        |> Plot.geom_point(fill: "red", size: 3)
+        |> Plot.scale_shape_manual(values: [21, 22, 23])
+
+      missing =
+        %{"x" => [1, 2, 3, 4, 5], "y" => [1, 2, 3, 4, 5], "g" => ["a", "b", nil, "c", "a"]}
+        |> Plot.new(%{x: :x, y: :y, shape: :g})
+        |> Plot.geom_point()
+
+      colored =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, shape: :drv, colour: :drv})
+        |> Plot.geom_point()
+
+      assert {to_svg(filled), to_svg(missing), to_svg(colored)} ==
+               {File.read!("test/golden/shape_filled.svg"),
+                File.read!("test/golden/shape_missing.svg"),
+                File.read!("test/golden/shape_colour.svg")}
+    end
+
+    # Golden: test/golden/count_shape.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/count_shape.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Counts shaped by drive train, the shape legend
+    # above the size legend. It moves with what moves test/golden/count.svg and
+    # test/golden/shape_solid.svg.
+    test "a count layer's shape counts each value apart, its legend above the size legend" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cty, y: :hwy, shape: :drv})
+        |> Plot.geom_count()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/count_shape.svg")
+    end
+
     # Golden: test/golden/point_key_big.svg, test/golden/bar_key_big.svg,
     # test/golden/line_key_big.svg, test/golden/text_key_big.svg and
     # test/golden/text_key_turned.svg, checked against ggplot2's drawings of the same plots, made by
@@ -3481,15 +3808,15 @@ defmodule GigglyTest do
 
     # An aesthetic a layer takes from the plot's mapping and cannot use is drawn by nothing, as
     # ggplot2's geoms leave it: a layer may set it, but its geom never reads the plot's column of
-    # it as a value set, which raised for a path's width and a point's shape and drew a point's
-    # size unscaled. A number groups nothing, so the drawing is the plot's without the mapping.
+    # it as a value set, which raised for a path's width and drew a point's size unscaled. A
+    # number groups nothing, so the drawing is the plot's without the mapping.
     test "an aesthetic a layer carries unused from the plot's mapping changes nothing it draws" do
       data = %{"x" => [1, 2, 3], "y" => [1.0, 3.0, 2.0], "w" => [1, 2, 3]}
 
       for {add, aesthetic} <- [
             {&Plot.geom_path/1, :linewidth},
             {&Plot.geom_path/1, :linetype},
-            {&Plot.geom_point/1, :shape},
+            {&Plot.geom_point/1, :linewidth},
             {&Plot.geom_point/1, :stroke},
             {&Plot.geom_col/1, :linewidth},
             {&Plot.geom_col/1, :linetype}
@@ -4583,6 +4910,35 @@ defmodule GigglyTest do
 
       assert error.key == [:widht]
     end
+  end
+
+  # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`
+  # with `column` mapped to shape, through `scaled`.
+  defp shapes_and_keys(scaled, rows \\ @drives, column \\ :drv) do
+    plot =
+      rows
+      |> Plot.new(%{x: :x, y: :y, shape: column})
+      |> Plot.geom_point()
+      |> scaled.()
+
+    [legend] = Giggly.Assembly.run(plot).legends
+    keys = Enum.map(legend.keys, fn key -> {key.label, key.values.shape} end)
+
+    shapes =
+      plot
+      |> Giggly.layer_data()
+      |> DataFrame.pull(:shape)
+
+    {shapes, keys}
+  end
+
+  # The rows of `Giggly.Datasets.diamonds/0` at `indices`, counted from 1 as R counts rows, each
+  # column a list.
+  defp diamond_rows(indices) do
+    Map.new(Giggly.Datasets.diamonds(), fn {name, values} ->
+      column = List.to_tuple(values)
+      {name, Enum.map(indices, fn index -> elem(column, index - 1) end)}
+    end)
   end
 
   defp edges(frame) do

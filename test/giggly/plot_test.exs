@@ -221,7 +221,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :size, :x, :y],
+                 accepted: [:alpha, :color, :fill, :group, :shape, :size, :x, :y],
                  annotation: false
                }
              ]
@@ -734,7 +734,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "wt", y: "mpg", weight: "wt"},
                  fixed: %{},
-                 accepted: [:group, :size, :weight, :x, :y, :alpha, :color, :fill],
+                 accepted: [:group, :size, :weight, :x, :y, :alpha, :color, :fill, :shape],
                  annotation: false
                }
              ]
@@ -2288,11 +2288,13 @@ defmodule Giggly.PlotTest do
               Plot.scale_alpha_discrete(plot).scales.alpha,
               Plot.scale_alpha_continuous(plot).scales.alpha,
               Plot.scale_size_discrete(plot).scales.size,
-              Plot.scale_size_continuous(plot).scales.size} ===
+              Plot.scale_size_continuous(plot).scales.size,
+              Plot.scale_shape_discrete(plot).scales.shape} ===
                {Scale.new(:discrete, :color), Scale.new(:discrete, :fill),
                 Scale.new(:continuous, :color), Scale.new(:continuous, :fill),
                 Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha),
-                Scale.new(:discrete, :size), Scale.new(:continuous, :size)}
+                Scale.new(:discrete, :size), Scale.new(:continuous, :size),
+                Scale.new(:discrete, :shape)}
     end
 
     test "a manual or gradientn scale given no colours is refused, naming the option it needs" do
@@ -2614,6 +2616,113 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "the shape scale functions" do
+    test "each records an untrained discrete scale of its palette and a legend, its missing value none" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_shape_discrete(plot).scales.shape,
+              Plot.scale_shape_discrete(plot, solid: false).scales.shape,
+              Plot.scale_shape_manual(plot, values: [1, :triangle, :none]).scales.shape} ===
+               {%Scale.Discrete{palette: {:shape, :solid}, guide: :legend},
+                %Scale.Discrete{palette: {:shape, :open}, guide: :legend},
+                %Scale.Discrete{
+                  palette: {:manual, [:circle_open, :triangle, :none]},
+                  guide: :legend
+                }}
+    end
+
+    test "each records the shapes and options it is given, a shape by name or number held as its name" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_shape_discrete(plot,
+                name: "Cylinders",
+                limits: ["8", "4"],
+                breaks: ["4"],
+                labels: ["four"],
+                na_value: 4
+              ).scales.shape,
+              Plot.scale_shape_manual(plot, values: %{"4" => 21, 6 => :star}, na_value: :none).scales.shape,
+              Plot.scale_shape_manual(plot, values: [0, 25, 2], breaks: ["8", "4"]).scales.shape.palette} ===
+               {%Scale.Discrete{
+                  palette: {:shape, :solid},
+                  guide: :legend,
+                  name: "Cylinders",
+                  limits: ["8", "4"],
+                  breaks: ["4"],
+                  labels: ["four"],
+                  na_value: :cross
+                },
+                %Scale.Discrete{
+                  palette: {:manual, %{"4" => :circle_filled, 6 => :star}},
+                  guide: :legend,
+                  na_value: :none
+                }, {:manual, %{"8" => :square_open, "4" => :triangle_down_filled}}}
+    end
+
+    test "an option a shape scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_shape_discrete/2, [solid: :yes], "expected boolean, got: :yes"},
+            {&Plot.scale_shape_discrete/2, [na_value: 26], "or :none, got: 26"},
+            {&Plot.scale_shape_discrete/2, [values: [1]], "unknown options [:values]"},
+            {&Plot.scale_shape_discrete/2, [range: {1, 6}], "unknown options [:range]"},
+            {&Plot.scale_shape_manual/2, [values: [1, 26]], "or :none, got: 26"},
+            {&Plot.scale_shape_manual/2, [values: %{"4" => "circle"}],
+             ~s(or :none, got: "circle")},
+            {&Plot.scale_shape_manual/2, [values: %{[1] => 1}], "got: [1] in [[1]]"},
+            {&Plot.scale_shape_manual/2, [values: []],
+             "expected a list of at least one shape, or a map from a value to its shape, got: []"},
+            {&Plot.scale_shape_manual/2, [values: :circle], "got: :circle"},
+            {&Plot.scale_shape_manual/2, [], "required :values option not found"},
+            {&Plot.scale_shape_manual/2, [values: [1], solid: false], "unknown options [:solid]"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+
+    test "a list of labels not one for each break or limit given is refused" do
+      plot = Plot.new(@rows)
+
+      for function <- [
+            &Plot.scale_shape_discrete/2,
+            fn shaped, options ->
+              Plot.scale_shape_manual(shaped, [{:values, [1, 2]} | options])
+            end
+          ] do
+        error =
+          assert_raise ArgumentError, fn -> function.(plot, breaks: ["4", "6"], labels: ["a"]) end
+
+        assert error.message =~ "is given 1 labels, which must be one for each of its 2 breaks"
+      end
+    end
+
+    # ggplot2 4.0.3's `lims(shape = c(1, 5))` aborts: "A continuous variable cannot be mapped to
+    # the shape aesthetic."
+    test "lims/2 gives a shape scale its limits, a list alone, as scale_shape_discrete/2 does" do
+      plot = Plot.new(@rows)
+
+      assert Plot.lims(plot, shape: ["8", "4"]).scales.shape ===
+               Plot.scale_shape_discrete(plot, limits: ["8", "4"]).scales.shape
+
+      error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, shape: {1, 5}) end
+
+      assert error.message =~
+               "expected a list of the values the scale shows, since a shape scale is discrete, " <>
+                 "got: {1, 5}"
+    end
+
+    test "labs/2 titles the shape legend" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.labs(shape: "Cylinders")
+
+      assert plot.labels === %{shape: "Cylinders"}
+    end
+  end
+
   describe "a scale's guide:, guide_legend/1 and guides/2" do
     # Each colour, fill and alpha scale function, with the options it needs, and whether its scale
     # is a continuous colour or fill scale, the one kind a colour bar shows.
@@ -2639,7 +2748,9 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_size_continuous/2, [], :size},
       {&Plot.scale_size_area/2, [], :size},
       {&Plot.scale_radius/2, [], :size},
-      {&Plot.scale_size_discrete/2, [], :size}
+      {&Plot.scale_size_discrete/2, [], :size},
+      {&Plot.scale_shape_discrete/2, [], :shape},
+      {&Plot.scale_shape_manual/2, [values: [1]], :shape}
     ]
 
     test "each scale function records the guide it is given" do
@@ -2655,8 +2766,8 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3 warns "`guide_colourbar()` needs continuous scales." for a discrete colour
     # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and for
-    # size, and draws no guide.
-    test "a colour bar is refused for a discrete scale, for alpha and for size, saying why" do
+    # shape and size, and draws no guide.
+    test "a colour bar is refused for a discrete scale, for alpha, shape and size, saying why" do
       plot = Plot.new(@rows)
 
       for {function, options, kind} <- @guided_scale_functions, kind != :continuous do
@@ -2706,10 +2817,10 @@ defmodule Giggly.PlotTest do
                {%{}, %{color: :none, fill: :colorbar, alpha: %Guide.Legend{reverse: true}}}
     end
 
-    test "guides/2 refuses an alpha or size colour bar, and an aesthetic it chooses no guide for" do
+    test "guides/2 refuses an alpha, shape or size colour bar, and an aesthetic it chooses no guide for" do
       plot = Plot.new(@rows)
 
-      for aesthetic <- [:alpha, :size] do
+      for aesthetic <- [:alpha, :shape, :size] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Plot.guides(plot, [{aesthetic, :colorbar}])
@@ -2718,9 +2829,12 @@ defmodule Giggly.PlotTest do
         assert error.message =~ "a colour bar shows colour or fill, never #{aesthetic}"
       end
 
-      assert Plot.guides(plot, size: :none).guides === %{size: :none}
+      assert Plot.guides(plot, size: :none, shape: :legend).guides === %{
+               size: :none,
+               shape: :legend
+             }
 
-      for key <- [:x, :shape] do
+      for key <- [:x, :stroke] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, [{key, :none}]) end
 
@@ -2763,7 +2877,7 @@ defmodule Giggly.PlotTest do
     test "a label for nothing a guide or the plot shows is refused, a misspelling among them" do
       plot = Plot.new(@rows)
 
-      for key <- [:shape, :titel] do
+      for key <- [:stroke, :titel] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> Plot.labs(plot, [{key, "A"}]) end
 
