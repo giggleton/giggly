@@ -654,6 +654,22 @@ defmodule Giggly.GeomTest do
       assert lines === [[{0.25, 0.25}, {0.5, 0.5}], [{1.0, 0.75}, {1.0, 1.0}]]
     end
 
+    # Golden: ggplot2 4.0.3's `layer_grob()` in R 4.6.1 for `geom_path()` through (0, 0) and (2, 4)
+    # in red and a last row missing `y` in blue: one red polyline, as `handle_na()` drops the last
+    # row before the look is tested for constancy.
+    test "a row dropped at a group's end does not make its look vary",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 2.0, 4.0],
+          y: [0.0, 4.0, nil],
+          group: [1, 1, 1],
+          color: ["#FF0000", "#FF0000", "#0000FF"]
+        )
+
+      assert [%Polylines{color: ["#FF0000"]}] = Geom.draw_panel(@path, frame, coord, params)
+    end
+
     test "a piece of one point between missing positions draws nothing",
          %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 2.0, 3.0, 4.0], y: [1.0, nil, 2.0, 3.0], group: [1, 1, 1, 1])

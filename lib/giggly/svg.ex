@@ -835,7 +835,7 @@ defmodule Giggly.SVG do
   defp significant(value) when abs(value) < 1 do
     magnitude = abs(value)
     decimals = ceil(-:math.log10(magnitude)) + 1
-    :erlang.float_to_binary(value / 1, decimals: decimals)
+    :erlang.float_to_binary(value, decimals: decimals)
   end
 
   defp significant(value), do: number(value)

@@ -4397,9 +4397,8 @@ defmodule Giggly.Plot do
   def validate_manual_values(values, :color) when is_list(values),
     do: validate_palette_colors(values)
 
-  def validate_manual_values([_first | _rest] = values, aesthetic)
-      when aesthetic in [:shape, :linetype],
-      do: checked_each(values, manual_check(aesthetic))
+  def validate_manual_values([_first | _rest] = values, aesthetic),
+    do: checked_each(values, manual_check(aesthetic))
 
   def validate_manual_values(values, aesthetic)
       when is_map(values) and not is_struct(values) and map_size(values) > 0 do

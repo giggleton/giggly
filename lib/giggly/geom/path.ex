@@ -87,19 +87,13 @@ defmodule Giggly.Geom.Path do
         |> trimmed()
         |> by_group()
 
-      drawn =
+      rows =
         coord
         |> Coord.munch(kept, panel_params)
         |> without_short_groups()
+        |> rows()
 
-      case DataFrame.row_count(drawn) do
-        0 ->
-          []
-
-        _rows ->
-          rows = rows(drawn)
-          draw_lines(geom, rows, solid?(rows), constant?(rows))
-      end
+      draw_lines(geom, rows, solid?(rows), constant?(rows))
     end
 
     # The panel's lines: refused where a line's look varies along it while any line is not solid,
