@@ -114,7 +114,7 @@ defmodule Giggly.DataFrame.Lists do
   end
 
   @impl DataFrame
-  def summarise(%__MODULE__{row_count: row_count} = frame, by, aggregates) do
+  def summarise(%__MODULE__{} = frame, by, aggregates) do
     keys =
       by
       |> Enum.map(fn name -> pull(frame, name) end)
@@ -122,7 +122,7 @@ defmodule Giggly.DataFrame.Lists do
 
     groups =
       keys
-      |> Enum.zip(Enum.to_list(0..(row_count - 1)//1))
+      |> Enum.with_index()
       |> Enum.group_by(fn {key, _index} -> key end, fn {_key, index} -> index end)
       |> Enum.sort_by(fn {key, _indices} -> Enum.map(key, &missing_last/1) end)
 

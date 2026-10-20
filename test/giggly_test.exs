@@ -1587,6 +1587,32 @@ defmodule GigglyTest do
       assert :weight not in DataFrame.names(varying)
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x, weight = w))` over
+    # x a, a, b, b and w 1, 1, 2, 3 has no weight column: it varies within b's group.
+    test "a column constant within one group but varying within another is dropped" do
+      frame =
+        %{"x" => ["a", "a", "b", "b"], "w" => [1.0, 1.0, 2.0, 3.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), :weight in DataFrame.names(frame)} ===
+               {[2.0, 5.0], false}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x, weight = w))` over
+    # x 1, 2 and w 0, 1 has counts 0 and 1 and props 0 and 1.
+    test "a count of zero beside others has a share of zero" do
+      frame =
+        %{"x" => [1.0, 2.0], "w" => [0.0, 1.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :prop)} ===
+               {[0.0, 1.0], [0.0, 1.0]}
+    end
+
     test "a group whose counts are all zero has no proportions" do
       frame =
         %{"x" => [1.0, 1.0, 2.0], "w" => [0.0, 0.0, 0.0]}
@@ -1909,6 +1935,33 @@ defmodule GigglyTest do
                {[1.0, 1.0, 1.0], ["p", "q", "p"]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_count()` over two rows at one
+    # place, the plot mapping one of these to a column that tells them apart, is two rows, a count
+    # of 1 each, for every name of `.all_aesthetics` but x, y and weight (linetype and shape from a
+    # discrete column, which R requires). It moves with that list.
+    test "every aesthetic ggplot2's list names is counted over, from the plot's mapping too" do
+      table = %{"x" => [1, 1], "y" => [1, 1], "v" => [1, 2], "l" => ["p", "q"]}
+
+      names =
+        ~w(alpha angle color fill group hjust label linetype lower max middle min radius sample
+           shape size upper vjust width xend xintercept xmax xmin yend yintercept ymax ymin z)a
+
+      counts =
+        Map.new(names, fn name ->
+          column = if name in [:linetype, :shape], do: :l, else: :v
+
+          frame =
+            table
+            |> Plot.new(Map.put(%{x: :x, y: :y}, name, column))
+            |> Plot.geom_count()
+            |> Giggly.layer_data()
+
+          {name, DataFrame.pull(frame, :n)}
+        end)
+
+      assert counts == Map.new(names, fn name -> {name, [1.0, 1.0]} end)
+    end
+
     test "places come out in the order of the layer's columns, its own aesthetics first" do
       frame =
         %{"x" => [2, 1, 1], "y" => [1, 2, 1], "g" => ["b", "a", "b"]}
@@ -1931,6 +1984,17 @@ defmodule GigglyTest do
       assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :color),
               DataFrame.pull(frame, :group), DataFrame.pull(frame, :prop)} ===
                {[1, 1, 2], ["#F8766D", "#7F7F7F", "#7F7F7F"], [1, 2, 2], [1.0, 0.5, 0.5]}
+    end
+
+    test "a weight column of only missing values leaves every count and share missing" do
+      frame =
+        %{"x" => [1, 1, 2], "y" => [1, 1, 1], "w" => [nil, nil, nil]}
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :n), DataFrame.pull(frame, :prop),
+              DataFrame.pull(frame, :size)} === {[nil, nil], [nil, nil], [nil, nil]}
     end
 
     test "a weight an expression computes as anything but numbers is refused when run" do

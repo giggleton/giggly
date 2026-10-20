@@ -7,8 +7,8 @@ defmodule Giggly.Stat.Count do
   # share of its group's total; its `width` is 0.9 of the closest spacing of the layer's x
   # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. The frame sums
   # them (`Giggly.DataFrame.summarise/3`): the counts in floats in row order, the doubles R's
-  # `rowsum()` gives, and each group's total, the sum of its counts' sizes, with its compensated
-  # sum, as R's `sum()` adds in extended precision. y takes the count by default
+  # `rowsum()` gives, and each group's total, the sum of its counts' magnitudes, with its
+  # compensated sum, as R's `sum()` adds in extended precision. y takes the count by default
   # (`after_stat(count)`), and a mapping's after_stat reads `count` and `prop`, the variables
   # ggplot2 documents. It takes no parameters yet. Run it through `Giggly.Stat`.
   #
@@ -171,14 +171,13 @@ defmodule Giggly.Stat.Count do
         else: DataFrame.put(frame, :weight, List.duplicate(1.0, DataFrame.row_count(frame)))
     end
 
-    # Each group's total, the sum of its counts' sizes, as ggplot2's `stat_count()` divides by
+    # Each group's total, the sum of its counts' magnitudes, as ggplot2's `stat_count()` divides by
     # `sum(abs(count))`, which R adds in extended precision.
     defp totals_by_group(counted, counts) do
       totals =
         counted
-        |> DataFrame.select([{:panel, :panel}, {:group, :group}])
-        |> DataFrame.put(:size, Enum.map(counts, &abs/1))
-        |> DataFrame.summarise([:panel, :group], total: {:sum, :size})
+        |> DataFrame.put(:magnitude, Enum.map(counts, &abs/1))
+        |> DataFrame.summarise([:panel, :group], total: {:sum, :magnitude})
 
       [:panel, :group, :total]
       |> Enum.map(fn name -> DataFrame.pull(totals, name) end)

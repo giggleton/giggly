@@ -51,12 +51,12 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   after_stat can read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the rows
   there or the sum of their weights, missing weights adding nothing, its `prop` the count's share of
-  its group's total, the sum of its counts' sizes (NaN for a total of zero), and its `width` 0.9 of
-  the layer's x spacing counting from zero (`Giggly.Resolution`). A weight that is not a number is
-  refused when the plot is run, an expression's, whose type the call cannot know. A row missing its
-  x, or at an infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives them. **It
-  counts along whichever of x and y is mapped**, exactly one, as `stat_count()` decides its
-  orientation, and writes that in a `flipped_aes` column for the bar geom and the positions; a
+  its group's total, the sum of its counts' magnitudes (NaN for a total of zero), and its `width`
+  0.9 of the layer's x spacing counting from zero (`Giggly.Resolution`). A weight that is not a
+  number is refused when the plot is run, an expression's, whose type the call cannot know. A row
+  missing its x, or at an infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives
+  them. **It counts along whichever of x and y is mapped**, exactly one, as `stat_count()` decides
+  its orientation, and writes that in a `flipped_aes` column for the bar geom and the positions; a
   horizontal layer is counted as a vertical one, flipped and flipped back, and its count goes into
   x.
 - **Counting at each place is ggplot2's `stat_sum()`** (design-log §4, the entry beginning "A

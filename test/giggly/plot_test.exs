@@ -745,6 +745,9 @@ defmodule Giggly.PlotTest do
 
       assert Plot.stat_sum(plot, %{colour: :cyl}, size: 2).reversed_layers ==
                Plot.geom_count(plot, %{colour: :cyl}, size: 2).reversed_layers
+
+      assert Plot.stat_sum(plot, size: 2).reversed_layers ==
+               Plot.geom_count(plot, size: 2).reversed_layers
     end
 
     test "options alone set every point's look, as a point layer's do" do
