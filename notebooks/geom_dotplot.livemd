@@ -113,7 +113,7 @@ ggplot(mtcars, aes(x = mpg)) +
   geom_dotplot(binwidth = 1.5, fill = "white", stroke = 2)
 ```
 
-Not in Giggly yet: `geom_dotplot()` and its `binwidth` option, and a fixed `stroke`.
+Not in Giggly yet: `geom_dotplot()` and its `binwidth` option.
 
 ## Binning along y
 

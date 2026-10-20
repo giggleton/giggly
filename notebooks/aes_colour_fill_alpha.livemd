@@ -32,14 +32,14 @@ outlines: points, lines, and the borders of rectangles and polygons. `fill` colo
 area: rectangles, polygons, and the point shapes 21 to 25. A colour is one of R's named colours,
 such as `"red"`, an RGB specification, `"#RRGGBB"`, which may add an alpha as `"#RRGGBBAA"`, or
 `NA`, for no colour at all; `alpha` runs from 0, transparent, to 1, opaque. Giggly has all three,
-mapped to a column or set to a value, though no point that takes a fill yet, a set colour written as
-CSS writes one: a name, a hex colour, or `:none` for `NA`. Where R and CSS give a name different
-colours, as `"green"`, it is CSS's, and a name CSS lacks, as R's `"grey50"`, is written as its hex.
-A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
-document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
-`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds
-`Giggly.Datasets.economics/0`, ggplot2's `economics`, and `Giggly.Datasets.mtcars/0`, R's
-`mtcars`, to `economics` and `mtcars`, the names ggplot2 and R give them.
+mapped to a column or set to a value, a set colour written as CSS writes one: a name, a hex colour,
+or `:none` for `NA`. Where R and CSS give a name different colours, as `"green"`, it is CSS's, and a
+name CSS lacks, as R's `"grey50"`, is written as its hex. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
+so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
+cell with `Kino.Image`. It binds `Giggly.Datasets.economics/0`, ggplot2's `economics`, and
+`Giggly.Datasets.mtcars/0`, R's `mtcars`, to `economics` and `mtcars`, the names ggplot2 and R give
+them.
 
 ## The default bars
 

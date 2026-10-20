@@ -215,5 +215,5 @@ ggplot(economics_long, aes(value)) +
 
 The function is the Freedman–Diaconis rule, computed from each panel's own values.
 
-Not in Giggly yet: `geom_histogram()` and a function as its `binwidth`, and the `economics_long`
-dataset. The facets are in Giggly already: `Giggly.Plot.facet_wrap/3` with `scales: :free_x`.
+Not in Giggly yet: `geom_histogram()` and a function as its `binwidth`. The facets are in Giggly
+already: `Giggly.Plot.facet_wrap/3` with `scales: :free_x`.

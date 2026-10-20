@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,9 +28,14 @@ Every scale is read back through a guide: an axis for a position scale, a legend
 the others. Each scale's `guide` argument sets its guide; `guides()` sets them all at once, by
 aesthetic, each as a guide's name, such as `"legend"`, or a call to a guide function. A guide set to
 `"none"` is left out, and legends that show the same values under the same title merge into one.
-Giggly has none of it yet, but reads each scale back as ggplot2 does by default: `x` and `y` with
-axes, `alpha` and a discrete `colour` or `fill` with a legend, and a continuous `colour` or `fill`
-with a colour bar.
+Giggly reads each scale back as ggplot2 does by default: `x` and `y` with axes, a continuous
+`colour` or `fill` with a colour bar, and every other with a legend. It sets the guides of all but
+the axes with `Giggly.Plot.guides/2` or a scale function's `guide:`, each by name, `:colorbar`,
+`:legend` or `:none`, or as the legend `Giggly.Plot.guide_legend/1` builds, and merges legends that
+read alike, as ggplot2 does; it has no `guide_colourbar()`, nor `guide_legend()`'s `title` option.
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`.
 
 ## The guides ggplot2 chooses
 
@@ -41,8 +55,24 @@ p <-
 p
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, the scales that map them and the legends that read
-them back.
+Giggly's table holds `q` and `r` as text, `"1"` to `"5"`, a discrete column as R's factors are.
+
+```elixir
+dat = %{
+  "x" => Enum.to_list(1..5),
+  "y" => Enum.to_list(1..5),
+  "p" => Enum.to_list(1..5),
+  "q" => ["1", "2", "3", "4", "5"],
+  "r" => ["1", "2", "3", "4", "5"]
+}
+
+p =
+  dat
+  |> Plot.new(%{x: :x, y: :y, colour: :p, size: :q, shape: :r})
+  |> Plot.geom_point()
+
+render.(p)
+```
 
 ## Choosing each guide
 
@@ -59,8 +89,25 @@ p +
  scale_shape(guide = "legend")
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, `guide_colourbar()`, `scale_size_discrete()` and
-`scale_shape()`.
+Giggly draws the first and the third, where `scale_colour_continuous()` is
+`Giggly.Plot.scale_color_continuous/2` and `scale_shape()` is `Giggly.Plot.scale_shape_discrete/2`;
+the second calls `guide_colorbar()`, ggplot2's other spelling of `guide_colourbar()`.
+
+```elixir
+p
+|> Plot.guides(colour: :colorbar, size: :legend, shape: :legend)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_color_continuous(guide: :colorbar)
+|> Plot.scale_size_discrete(guide: :legend)
+|> Plot.scale_shape_discrete(guide: :legend)
+|> render.()
+```
+
+Not in Giggly yet: `guide_colourbar()`.
 
 ## Removing guides
 
@@ -70,7 +117,17 @@ Not in Giggly yet: mapping `size` and `shape`, `guide_colourbar()`, `scale_size_
  p + guides(colour = "colorbar",size = "none")
 ```
 
-Not in Giggly yet: mapping `size` and `shape` and the legends that read them back.
+```elixir
+p
+|> Plot.guides(colour: :none)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.guides(colour: :colorbar, size: :none)
+|> render.()
+```
 
 ## Merged legends
 
@@ -91,7 +148,7 @@ g <- guide_legend("title")
 p + guides(colour = g, size = g, shape = g)
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, and `guide_legend()`'s `title` option.
+Not in Giggly yet: `guide_legend()`'s `title` option.
 
 ## Legends below the plot
 
@@ -99,8 +156,7 @@ Not in Giggly yet: mapping `size` and `shape`, and `guide_legend()`'s `title` op
 p + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: mapping `size` and `shape` and the legends that read them back, and changing the
-theme, here to put the legends below the plot.
+Not in Giggly yet: changing the theme, here to put the legends below the plot.
 
 ## The order of the legends
 
@@ -117,5 +173,5 @@ ggplot(mpg, aes(displ, cty)) +
  )
 ```
 
-Not in Giggly yet: mapping `size` and `shape`, `guide_colourbar()`, and the `order` option of
-`guide_colourbar()` and `guide_legend()`, which sets the order the guides are drawn in.
+Not in Giggly yet: `guide_colourbar()`, and the `order` option of `guide_colourbar()` and
+`guide_legend()`, which sets the order the guides are drawn in.

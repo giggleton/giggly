@@ -51,8 +51,7 @@ m + geom_density_2d_filled(alpha = 0.5) +
   geom_density_2d(linewidth = 0.25, colour = "black")
 ```
 
-Not in Giggly yet: `geom_density_2d_filled()` and `geom_density_2d()`, a fixed `linewidth`, and the
-`faithful` dataset.
+Not in Giggly yet: `geom_density_2d_filled()` and `geom_density_2d()`, and the `faithful` dataset.
 
 ## Contours for each cut
 
@@ -114,6 +113,5 @@ Not in Giggly yet: `stat_density_2d()` and its `contour` option, giving a stat a
 d + stat_density_2d(geom = "point", aes(size = after_stat(density)), n = 20, contour = FALSE)
 ```
 
-Not in Giggly yet: `stat_density_2d()` and its `n` and `contour` options, giving a stat a geom by
-name, here `geom = "point"`, mapping `size`, and the scale that maps it and the legend that reads it
-back.
+Not in Giggly yet: `stat_density_2d()` and its `n` and `contour` options, and giving a stat a geom
+by name, here `geom = "point"`.

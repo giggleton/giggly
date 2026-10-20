@@ -38,8 +38,7 @@ ggplot(capitals, aes(long, lat)) +
 `require()` runs each example only when the `maps` package is installed; `capital == 2` picks
 the state capitals from its table of US cities.
 
-Not in Giggly yet: map data from the `maps` package, `annotation_borders()`, mapping `size` and
-the legend that reads it back, `scale_size_area()`, and `coord_quickmap()`.
+Not in Giggly yet: map data from the `maps` package, `annotation_borders()` and `coord_quickmap()`.
 
 ## The world around them
 
@@ -55,5 +54,4 @@ ggplot(capitals, aes(long, lat)) +
 ```
 
 Not in Giggly yet: map data from the `maps` package, `annotation_borders()` and its `xlim` and
-`ylim` options, mapping `size` and the legend that reads it back, `scale_size_area()`, and
-`coord_quickmap()`.
+`ylim` options, and `coord_quickmap()`.

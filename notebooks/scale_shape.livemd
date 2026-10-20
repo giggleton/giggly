@@ -20,8 +20,11 @@ or hollow; a seventh value and any after it are not drawn, with a warning, and
 `scale_shape_manual()` gives shapes by hand. A continuous column can be mapped to shapes only
 through `scale_shape_binned()`, which cuts it into bins first, and since shapes have no order even
 that is not advised. A shape can be named by number or by name, and only shapes 21 to 25 take a
-fill. Giggly has none of this yet: every point it draws looks as ggplot2's default point does, a
-solid circle, and it maps no `shape`.
+fill. Giggly has `Giggly.Plot.scale_shape_discrete/2`, with its `solid:`, and
+`Giggly.Plot.scale_shape_manual/2`, a shape named by number or by name as an atom, but not ggplot2's
+short name, `scale_shape()`, nor binned or identity shape scales (`scale_shape_binned()`,
+`scale_shape_identity()`), and by default maps `shape` to a discrete column as ggplot2's default
+scale does, refusing a seventh value, and draws the legend that reads it back.
 
 ## A shape for each cut
 
@@ -37,10 +40,8 @@ d + scale_shape(solid = FALSE)
 d + scale_shape(name = "Cut of diamond")
 ```
 
-`name` titles the legend.
-
-Not in Giggly yet: mapping `shape`, `scale_shape()` and its `solid` and `name` options, and the
-legend that reads it back.
+`name` titles the legend. `scale_shape()` is `Giggly.Plot.scale_shape_discrete/2`, which takes `solid:` and `name:`. Not in
+Giggly yet: choosing the order of a column's values (`cut` is an ordered factor).
 
 ## The order of the shapes
 
@@ -55,8 +56,7 @@ ggplot(dsmall, aes(price, carat)) + geom_point(aes(shape = cut))
 
 Shapes go to a column's values in the order of its levels.
 
-Not in Giggly yet: choosing the order of a column's values, mapping `shape`, the scale that maps it
-and the legend that reads it back.
+Not in Giggly yet: choosing the order of a column's values.
 
 ## The available shapes
 
@@ -74,5 +74,4 @@ ggplot(df_shapes, aes(0, 0, shape = shape)) +
 gives each a panel of its own. Giggly has `facet_wrap()`: `facet_wrap(~shape)` is
 `Giggly.Plot.facet_wrap(plot, :shape)`.
 
-Not in Giggly yet: mapping `shape`, a fixed `size`, a point's `fill`, `scale_shape_identity()` and
-`theme_void()`.
+Not in Giggly yet: `scale_shape_identity()` and `theme_void()`.

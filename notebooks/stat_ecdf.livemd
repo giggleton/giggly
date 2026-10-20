@@ -80,4 +80,4 @@ ggplot(plain, aes(x)) +
 `plain` repeats each `x` of `weighted` as many times as its weight, so the green weighted curve
 falls on the thick unweighted one.
 
-Not in Giggly yet: `stat_ecdf()`, with or without `weight`, and a fixed `linewidth`.
+Not in Giggly yet: `stat_ecdf()`, with or without `weight`.

@@ -73,8 +73,8 @@ Not in Giggly yet: `geom_boxplot()`.
 p + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options, and a
-fixed `shape`, here 1, a hollow circle.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options, here shape
+1, a hollow circle.
 
 ## Boxes over the data's points
 

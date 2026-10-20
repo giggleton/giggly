@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+economics = Giggly.Datasets.economics()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,8 +29,15 @@ what it is waiting for, so the page is also a list of what remains.
 `scale_linewidth()` maps a continuous column to the width of lines and of polygons' outlines,
 between a thinnest and a thickest width; `scale_linewidth_binned()` cuts the column into bins first.
 The `size` aesthetic can still set a line's width, for historical reasons, but `linewidth` keeps the
-width of a stroke apart from the size of an area. Giggly has none of this yet: it draws paths and
-lines as wide as a layer sets them, but maps no `linewidth`.
+width of a stroke apart from the size of an area. Giggly has
+`Giggly.Plot.scale_linewidth_continuous/2` and `Giggly.Plot.scale_linewidth_discrete/2`, with their
+`range:`, but not ggplot2's short name, `scale_linewidth()`, nor binned line width scales
+(`scale_linewidth_binned()`), and by default maps `linewidth` to a column as ggplot2's default scale
+does, and draws the legend that reads it back. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The data is
+`Giggly.Datasets.economics/0`, ggplot2's `economics`: US economic time series, one row a month from
+1967 to 2015, which the setup cell binds to `economics`, ggplot2's name for it.
 
 ## Line width from a column
 
@@ -31,11 +49,30 @@ p + scale_linewidth("Duration of\nunemployment")
 p + scale_linewidth(range = c(0, 4))
 ```
 
-A scale's first argument titles its legend, and `range` sets the thinnest and the thickest
-widths.
+`uempmed` is the median number of weeks unemployed. A scale's first argument titles its legend, and
+`range` sets the thinnest and the thickest widths. `scale_linewidth()` is
+`Giggly.Plot.scale_linewidth_continuous/2`, its title `name:`.
 
-Not in Giggly yet: mapping `linewidth`, `scale_linewidth()`, whose first argument titles the legend,
-and its `range` option, and the legend that reads it back.
+```elixir
+p =
+  economics
+  |> Plot.new(%{x: :date, y: :unemploy, linewidth: :uempmed})
+  |> Plot.geom_line(lineend: :round)
+
+render.(p)
+```
+
+```elixir
+p
+|> Plot.scale_linewidth_continuous(name: "Duration of\nunemployment")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_linewidth_continuous(range: {0, 4})
+|> render.()
+```
 
 ## Binned widths
 
@@ -44,5 +81,4 @@ and its `range` option, and the legend that reads it back.
 p + scale_linewidth_binned()
 ```
 
-Not in Giggly yet: mapping `linewidth`, `scale_linewidth_binned()` and the legend that reads it
-back.
+Not in Giggly yet: `scale_linewidth_binned()` and the legend that reads it back.

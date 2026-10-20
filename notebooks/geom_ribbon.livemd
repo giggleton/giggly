@@ -74,7 +74,7 @@ a + geom_point(size = 8) + facet_grid(g ~ .)
 
 `facet_grid(g ~ .)` gives each group a row of its own.
 
-Not in Giggly yet: `geom_area()`, a fixed `size`, and `facet_grid()`.
+Not in Giggly yet: `geom_area()` and `facet_grid()`.
 
 ## Aligned points
 
@@ -86,8 +86,8 @@ a + geom_point(stat = "align", position = "stack", size = 8)
 
 Points drawn with the areas' stat and position show the values `stat_align()` computes, stacked.
 
-Not in Giggly yet: `geom_area()`, `stat_align()`, `geom_point()`'s `stat` and `position` options,
-and a fixed `size`.
+Not in Giggly yet: `geom_area()`, `stat_align()`, and `geom_point()`'s `stat` and `position`
+options.
 
 ## Areas without alignment
 

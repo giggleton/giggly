@@ -33,8 +33,7 @@ p <- ggplot(mtcars) +
 p
 ```
 
-Not in Giggly yet: mapping `size`, the binned scale that maps it, `scale_size_binned()`, and the
-legend that reads it back, `guide_bins()`.
+Not in Giggly yet: `scale_size_binned()` and the legend that reads it back, `guide_bins()`.
 
 ## Removing the legend's axis
 
@@ -45,8 +44,8 @@ p + guides(size = guide_bins(
 ))
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_binned()`, `guide_bins()`, and changing the theme,
-here to remove the legend's axis line.
+Not in Giggly yet: `scale_size_binned()`, `guide_bins()`, and changing the theme, here to remove the
+legend's axis line.
 
 ## Showing the limits
 
@@ -54,8 +53,8 @@ here to remove the legend's axis line.
 p + guides(size = guide_bins(show.limits = TRUE))
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_binned()`, and `guide_bins()` with its `show.limits`
-option, which labels the ends of the scale too.
+Not in Giggly yet: `scale_size_binned()`, and `guide_bins()` with its `show.limits` option, which
+labels the ends of the scale too.
 
 ## Arrows on the legend's axis
 
@@ -68,8 +67,8 @@ p + guides(size = guide_bins(
 ))
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_binned()`, `guide_bins()`, and changing the theme,
-here to put arrowheads on the legend's axis line.
+Not in Giggly yet: `scale_size_binned()`, `guide_bins()`, and changing the theme, here to put
+arrowheads on the legend's axis line.
 
 ## Merged legends
 
@@ -84,5 +83,5 @@ ggplot(mtcars) +
   scale_colour_binned(guide = "bins")
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_binned()`, `scale_colour_binned()`, and
-`guide_bins()`, which merges the two into one legend.
+Not in Giggly yet: `scale_size_binned()`, `scale_colour_binned()`, and `guide_bins()`, which merges
+the two into one legend.

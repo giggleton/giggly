@@ -94,9 +94,9 @@ ggplot(df2, aes(x = 1, y = y, xend = 2, yend = y, label = paste(lineend, linejoi
 R's `expand.grid()` makes a row for each combination of line end and line join, and each row's
 segment is drawn with its own line end and join, and labelled with their names.
 
-Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, a fixed
-`size`, and mapping `xend` and `yend`. ggplot2 knows no `hjust` called `'outside'` and centres these
-labels, as Giggly does by default.
+Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, and mapping
+`xend` and `yend`. ggplot2 knows no `hjust` called `'outside'` and centres these labels, as Giggly
+does by default.
 
 ## Spikes, as base R draws them
 
@@ -115,5 +115,4 @@ R's `rpois()` draws 100 random counts from a Poisson distribution with mean 5, a
 counts how often each occurs. Base R's `plot(type = "h")` draws a vertical line from 0 up to each
 frequency, and the `ggplot()` call draws the same with segments.
 
-Not in Giggly yet: `geom_segment()` and its `lineend` option, mapping `xend` and `yend`, and a fixed
-`linewidth`.
+Not in Giggly yet: `geom_segment()` and its `lineend` option, and mapping `xend` and `yend`.

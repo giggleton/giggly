@@ -10,6 +10,7 @@ alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
 economics = Giggly.Datasets.economics()
+economics_long = Giggly.Datasets.economics_long()
 
 render = fn plot ->
   plot
@@ -29,19 +30,21 @@ is also a list of what remains.
 
 The `linetype`, `linewidth`, `size` and `shape` aesthetics change how lines and points look: a
 line's dash pattern and width, the size of a point or of text, and the symbol a point is drawn with.
-Each can be set to one value for every mark, or mapped to a column. Giggly maps none of them yet,
-and sets only a line's `linewidth`: its lines are solid and every point it draws looks as
-ggplot2's default point does. A plot is described with `Giggly.Plot` and drawn with
-`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
-cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell
-with `Kino.Image`. The cells draw `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974
-*Motor Trend* US magazine, and `Giggly.Datasets.economics/0`, ggplot2's `economics`: US economic
-time series, one row a month from 1967 to 2015, which the setup cell binds to `mtcars` and
-`economics`, the names R and ggplot2 give them.
+Each can be set to one value for every mark, or mapped to a column. Giggly sets each and maps each
+but a text's `size`, drawing the legend that reads it back; it takes no character as a shape and has
+no identity scales (`scale_shape_identity()`). A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The cells draw `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, `Giggly.Datasets.economics/0`, ggplot2's `economics`: US economic time series,
+one row a month from 1967 to 2015, and `Giggly.Datasets.economics_long/0`, ggplot2's
+`economics_long`: the same series, a row for each month and series, which the setup cell binds to
+`mtcars`, `economics` and `economics_long`, the names R and ggplot2 give them.
 
 ## Line types
 
-A line type is a number from 0 to 6 or its name: 2 is `"dashed"`, 4 is `"dotdash"`.
+A line type is a number from 0 to 6 or its name: 2 is `"dashed"`, 4 is `"dotdash"`. Giggly takes
+either, the name as an atom.
 
 ```r
 df <- data.frame(x = 1:10 , y = 1:10)
@@ -50,7 +53,19 @@ p + geom_line(linetype = 2)
 p + geom_line(linetype = "dotdash")
 ```
 
-Not in Giggly yet: a fixed `linetype`.
+```elixir
+p = Plot.new(%{"x" => Enum.to_list(1..10), "y" => Enum.to_list(1..10)}, %{x: :x, y: :y})
+
+p
+|> Plot.geom_line(linetype: 2)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_line(linetype: :dotdash)
+|> render.()
+```
 
 ## Dash patterns as hex strings
 
@@ -61,7 +76,14 @@ Not in Giggly yet: a fixed `linetype`.
 p + geom_line(linetype = "3313")
 ```
 
-Not in Giggly yet: a fixed `linetype`.
+Giggly writes a dash pattern as a tuple of the lengths, on and off in turn, `{3, 3, 1, 3}` for
+`"3313"`.
+
+```elixir
+p
+|> Plot.geom_line(linetype: {3, 3, 1, 3})
+|> render.()
+```
 
 ## Mapping line type
 
@@ -71,8 +93,12 @@ ggplot(economics_long, aes(date, value01)) +
   geom_line(aes(linetype = variable))
 ```
 
-Not in Giggly yet: the `economics_long` dataset, and mapping `linetype` and the legend that reads it
-back.
+```elixir
+economics_long
+|> Plot.new(%{x: :date, y: :value01})
+|> Plot.geom_line(%{linetype: :variable})
+|> render.()
+```
 
 ## Line widths
 
@@ -84,8 +110,8 @@ ggplot(economics, aes(date, unemploy)) +
   geom_line(aes(linewidth = uempmed), lineend = "round")
 ```
 
-Giggly draws the first, a line 2 mm wide with its ends rounded; the second maps `linewidth` to a
-column.
+The first draws a line 2 mm wide with its ends rounded; the second maps `linewidth` to a column,
+the median weeks unemployed.
 
 ```elixir
 economics
@@ -94,7 +120,12 @@ economics
 |> render.()
 ```
 
-Not in Giggly yet: mapping `linewidth` and the legend that reads it back.
+```elixir
+economics
+|> Plot.new(%{x: :date, y: :unemploy})
+|> Plot.geom_line(%{linewidth: :uempmed}, lineend: :round)
+|> render.()
+```
 
 ## Point sizes
 
@@ -108,14 +139,28 @@ p + geom_point(size = 2.5) +
 ```
 
 The `size` given to `geom_hline()` is its line's width, which ggplot2 now calls `linewidth`.
+Giggly draws the first two.
 
-Not in Giggly yet: a fixed `size`, mapping `size` and the legend that reads it back,
-`geom_hline()`, and a fixed `linewidth`.
+```elixir
+p = Plot.new(mtcars, %{x: :wt, y: :mpg})
+
+p
+|> Plot.geom_point(size: 4)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(%{size: :qsec})
+|> render.()
+```
+
+Not in Giggly yet: `geom_hline()`.
 
 ## Point shapes
 
 `p` is still the plot of `mtcars` from the size examples. Without a `shape`, a point is ggplot2's
-default one, which is how Giggly draws every point.
+default one, a solid circle.
 
 ```r
 # Shape examples
@@ -123,8 +168,7 @@ p + geom_point()
 ```
 
 ```elixir
-mtcars
-|> Plot.new(%{x: :wt, y: :mpg})
+p
 |> Plot.geom_point()
 |> render.()
 ```
@@ -140,8 +184,29 @@ p + geom_point(shape = NA)
 p + geom_point(aes(shape = factor(cyl)))
 ```
 
-Not in Giggly yet: a fixed `shape` and a fixed `size`, and mapping `shape` and the legend that reads
-it back.
+Giggly takes a shape by its number or its name, `:diamond_open` for 5, and `:none` for `NA`, and
+draws all but the second and third, which draw a character as the shape. Giggly writes
+`factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+p
+|> Plot.geom_point(shape: 5)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(shape: :none)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(%{shape: {:factor, [:cyl]}})
+|> render.()
+```
+
+Not in Giggly yet: a character as a shape.
 
 ## The 25 symbols
 
@@ -162,4 +227,4 @@ p + geom_point(aes(shape = z), size = 4, colour = "Red", fill = "Black") +
   scale_shape_identity()
 ```
 
-Not in Giggly yet: mapping `shape`, `scale_shape_identity()`, a fixed `size`, and a point's `fill`.
+Not in Giggly yet: `scale_shape_identity()`.

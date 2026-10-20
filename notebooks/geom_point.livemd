@@ -43,12 +43,11 @@ p + geom_point()
 ```
 
 ```elixir
-plot =
-  mtcars
-  |> Plot.new(%{x: :wt, y: :mpg})
-  |> Plot.geom_point()
+p = Plot.new(mtcars, %{x: :wt, y: :mpg})
 
-render.(plot)
+p
+|> Plot.geom_point()
+|> render.()
 ```
 
 ## Mapping colour, shape and size
@@ -61,8 +60,25 @@ p + geom_point(aes(shape = factor(cyl)))
 p + geom_point(aes(size = qsec))
 ```
 
-Not in Giggly yet: mapping `shape` or `size` to a column, the scales that map them, and the legends
-that read them back.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+p
+|> Plot.geom_point(%{colour: {:factor, [:cyl]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(%{shape: {:factor, [:cyl]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(%{size: :qsec})
+|> render.()
+```
 
 ## Setting an aesthetic to a fixed value
 
@@ -71,7 +87,12 @@ that read them back.
 ggplot(mtcars, aes(wt, mpg)) + geom_point(colour = "red", size = 3)
 ```
 
-Not in Giggly yet: a fixed `size`.
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point(colour: "red", size: 3)
+|> render.()
+```
 
 ## Transparency for large datasets
 
@@ -116,8 +137,12 @@ ggplot(mtcars, aes(wt, mpg)) +
   geom_point(shape = 21, colour = "black", fill = "white", size = 5, stroke = 5)
 ```
 
-Not in Giggly yet: shapes other than the solid circle, a fixed `size`, and a point's `fill` and
-`stroke`.
+```elixir
+mtcars
+|> Plot.new(%{x: :wt, y: :mpg})
+|> Plot.geom_point(shape: 21, colour: "black", fill: "white", size: 5, stroke: 5)
+|> render.()
+```
 
 ## A legend that shows the fill
 
@@ -130,9 +155,7 @@ ggplot(mtcars, aes(wt, mpg, fill = factor(carb), shape = factor(cyl))) +
   scale_fill_ordinal(guide = guide_legend(override.aes = list(shape = 21)))
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, a point's `fill` and `stroke`,
-a fixed `size`, `scale_shape_manual()`, `scale_fill_ordinal()`, and `guide_legend()`'s
-`override.aes` option.
+Not in Giggly yet: `scale_fill_ordinal()` and `guide_legend()`'s `override.aes` option.
 
 ## Layering points of different sizes
 
@@ -149,7 +172,24 @@ p +
   geom_point(aes(shape = factor(cyl)))
 ```
 
-Not in Giggly yet: mapping `shape` and a fixed `size`. Several layers of points already work.
+R's `"grey90"` is a name CSS lacks, so the cell writes its hex, `"#E5E5E5"`.
+
+```elixir
+p = Plot.new(mtcars, %{x: :mpg, y: :wt, shape: {:factor, [:cyl]}})
+
+p
+|> Plot.geom_point(%{colour: {:factor, [:cyl]}}, size: 4)
+|> Plot.geom_point(colour: "#E5E5E5", size: 1.5)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(colour: "black", size: 4.5)
+|> Plot.geom_point(colour: "pink", size: 4)
+|> Plot.geom_point(%{shape: {:factor, [:cyl]}})
+|> render.()
+```
 
 ## Missing values
 

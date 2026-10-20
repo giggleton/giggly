@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,7 +30,10 @@ a mapping, with the data alone, and with neither, each layer then bringing what 
 counterpart is `Giggly.Plot.new/2`, which takes the data, any table, and a mapping that applies to
 every layer; a layer's own mapping is laid over it. A layer draws the plot's data unless its `data:`
 option gives it a table of its own, as ggplot2's `data =` does. Giggly has no plot with no data, so
-a table is always given to `Giggly.Plot.new/2`.
+a table is always given to `Giggly.Plot.new/2`. A plot is described with `Giggly.Plot` and drawn
+with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`.
 
 ## The data and the mapping for every layer
 
@@ -58,8 +70,36 @@ ggplot(data = sample_df, mapping = aes(x = group, y = value)) +
   )
 ```
 
-Not in Giggly yet: a fixed `size`. Giggly lays a layer's mapping over the plot's as ggplot2 does
-here, the second layer keeping the plot's `x` and replacing its `y`.
+The cell writes out the 30 values R drew after `set.seed(1)`, each to the last digit R holds, and
+works out each group's mean. Giggly lays a layer's mapping over the plot's as ggplot2 does here, the
+second layer keeping the plot's `x` and replacing its `y`.
+
+```elixir
+value = [
+  -0.6264538107423324, 0.18364332422208224, -0.8356286124100472, 1.5952808021377916,
+  0.3295077718153605, -0.8204683841180153, 0.4874290524284853, 0.7383247051292173,
+  0.5757813516534923, -0.305388387156356, 1.511781168450848, 0.3898432364114311,
+  -0.6212405805418038, -2.2146998871775, 1.1249309181431082, -0.04493360901523085,
+  -0.016190263098946087, 0.9438362106852992, 0.8212211950980886, 0.5939013212175088,
+  0.9189773716082182, 0.7821363007310671, 0.0745649833651906, -1.9893516958633728,
+  0.6198257478947102, -0.056128739529000785, -0.1557955067053293, -1.4707523838992744,
+  -0.47815005510862035, 0.4179415601997024
+]
+
+group = Enum.flat_map(["a", "b", "c"], fn letter -> List.duplicate(letter, 10) end)
+sample_df = %{"group" => group, "value" => value}
+
+group_means_df = %{
+  "group" => ["a", "b", "c"],
+  "group_mean" => value |> Enum.chunk_every(10) |> Enum.map(fn ten -> Enum.sum(ten) / 10 end)
+}
+
+sample_df
+|> Plot.new(%{x: :group, y: :value})
+|> Plot.geom_point()
+|> Plot.geom_point(%{y: :group_mean}, data: group_means_df, colour: "red", size: 3)
+|> render.()
+```
 
 ## The data for every layer, a mapping for each
 
@@ -77,7 +117,13 @@ ggplot(data = sample_df) +
   )
 ```
 
-Not in Giggly yet: a fixed `size`.
+```elixir
+sample_df
+|> Plot.new()
+|> Plot.geom_point(%{x: :group, y: :value})
+|> Plot.geom_point(%{x: :group, y: :group_mean}, data: group_means_df, colour: "red", size: 3)
+|> render.()
+```
 
 ## Data and a mapping for each layer
 
@@ -96,5 +142,5 @@ ggplot() +
   )
 ```
 
-Not in Giggly yet: a plot with no data and a fixed `size`. A Giggly plot starts from its data,
-given to `Giggly.Plot.new/2`.
+Not in Giggly yet: a plot with no data. A Giggly plot starts from its data, given to
+`Giggly.Plot.new/2`.

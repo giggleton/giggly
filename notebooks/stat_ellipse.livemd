@@ -54,8 +54,7 @@ ggplot(faithful, aes(waiting, eruptions, color = eruptions > 3)) +
   stat_ellipse(type = "t")
 ```
 
-Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` option, and a fixed
-`linetype`.
+Not in Giggly yet: the `faithful` dataset, and `stat_ellipse()` and its `type` option.
 
 ## A circle
 
@@ -70,8 +69,8 @@ ggplot(faithful, aes(waiting, eruptions, color = eruptions > 3)) +
 `type = "euclid"` draws a circle of radius 3 around each group's centre, which looks round only
 because `coord_fixed()` gives a unit of `x` the same length on the page as a unit of `y`.
 
-Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` and `level` options, a
-fixed `linetype`, and `coord_fixed()`.
+Not in Giggly yet: the `faithful` dataset, `stat_ellipse()` and its `type` and `level` options, and
+`coord_fixed()`.
 
 ## Filled ellipses
 

@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
+economics_long = Giggly.Datasets.economics_long()
 
 render = fn plot ->
   plot
@@ -33,11 +34,14 @@ to a column sets them by hand. Three cases need it: lines through many individua
 discrete axis, and layers grouped differently, such as one fit to all the rows over lines for each
 individual. The later examples show these with `nlme`'s `Oxboys`, the heights of 26 boys, each
 measured on nine occasions. Giggly maps `group` to a column, as a layer of points, bars or lines
-takes it, and stacks bars at the same `x`, one for each group; it maps no `shape` or `linetype`, and
-has no `geom_smooth()` or `geom_boxplot()`. A plot is described with `Giggly.Plot` and drawn with
-`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
-write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
+takes it, stacks bars at the same `x`, one for each group, and groups by a mapped `shape` or
+`linetype` as by a mapped `colour`; it has no `geom_smooth()` or `geom_boxplot()`. A plot is
+described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's
+`mtcars`, and `Giggly.Datasets.economics_long/0`, ggplot2's `economics_long`: five US economic time
+series, a row for each month and series, to `mtcars` and `economics_long`, the names R and ggplot2
+give them.
 
 ## A scatter plot
 
@@ -47,7 +51,13 @@ p <- ggplot(mtcars, aes(wt, mpg))
 p + geom_point(size = 4)
 ```
 
-Not in Giggly yet: a fixed `size`.
+```elixir
+p = Plot.new(mtcars, %{x: :wt, y: :mpg})
+
+p
+|> Plot.geom_point(size: 4)
+|> render.()
+```
 
 ## Groups by colour and shape
 
@@ -58,7 +68,19 @@ p + geom_point(aes(colour = factor(cyl)), size = 4)
 p + geom_point(aes(shape = factor(cyl)), size = 4)
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, and a fixed `size`.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+p
+|> Plot.geom_point(%{colour: {:factor, [:cyl]}}, size: 4)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_point(%{shape: {:factor, [:cyl]}}, size: 4)
+|> render.()
+```
 
 ## Groups by fill
 
@@ -70,8 +92,7 @@ p + geom_bar(aes(fill = factor(cyl)))
 p + geom_bar(aes(fill = factor(vs)))
 ```
 
-Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values. Giggly
-writes `factor(cyl)` as `{:factor, [:cyl]}`.
+Mapping `fill` to `vs` splits each bar into a stack, one part for each of its values.
 
 ```elixir
 p = Plot.new(mtcars, %{x: {:factor, [:cyl]}})
@@ -101,8 +122,15 @@ ggplot(economics_long, aes(date, value01)) +
   geom_line(aes(linetype = variable))
 ```
 
-Not in Giggly yet: the `economics_long` dataset, and mapping `linetype` and the legend that reads it
-back.
+`value01` is each series rescaled to run from 0 to 1, so all five share an axis; mapping `linetype`
+draws a line for each.
+
+```elixir
+economics_long
+|> Plot.new(%{x: :date, y: :value01})
+|> Plot.geom_line(%{linetype: :variable})
+|> render.()
+```
 
 ## One line for each boy
 
@@ -132,8 +160,8 @@ p + geom_smooth(aes(group = Subject), method = "lm", se = FALSE)
 p + geom_smooth(aes(group = 1), size = 2, method = "lm", se = FALSE)
 ```
 
-Not in Giggly yet: the `Oxboys` dataset, `geom_smooth()` and the straight lines it fits with `lm()`,
-and a fixed `size`.
+Not in Giggly yet: the `Oxboys` dataset, and `geom_smooth()` and the straight lines it fits with
+`lm()`.
 
 ## Lines across a discrete axis
 

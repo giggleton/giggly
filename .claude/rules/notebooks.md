@@ -22,14 +22,17 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   computed column standing in for `cut_width(carat, 0.25)`) waits. An argument ggplot2 does not
   recognise, and so draws as its default (`hjust = 'outside'`, centred), is left out of Giggly's
   cell, and the prose says so (design-log §4, the entry beginning "A notebook leaves out an
-  argument").
+  argument"). An example R refuses on purpose (`should_stop()`) that Giggly refuses too is shown
+  by a cell that runs Giggly's line in `try`/`rescue` and returns the message, so every cell still
+  runs and no verdict is written (the entry beginning "An example R refuses on purpose").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
-  words in every notebook** ("mapping `shape`", "a fixed `size`", "`geom_boxplot()`", "a
-  whole-column function in a mapping", "a point's `fill`"), so when a feature lands, searching the
-  notebooks for its name finds every example waiting for it, and those are drawn; a verdict still
-  waiting drops the pieces that landed and keeps the rest (design-log §4, the entry beginning "A
-  verdict names a missing expression"). **An About sentence says what Giggly has and
-  names what it lacks by that name** ("maps no `shape`", "no binned scales"), never "no X but
+  words in every notebook** ("mapping a text's `size`", "a character as a shape",
+  "`geom_boxplot()`", "a whole-column function in a mapping", "choosing the order of a column's
+  values"), so when a feature lands, searching the notebooks for its name finds every example
+  waiting for it, and those are drawn; a verdict still waiting drops the pieces that landed and
+  keeps the rest (design-log §4, the entries beginning "A verdict names a missing expression" and
+  "A verdict names a text's mapped size"). **An About sentence says what Giggly has and
+  names what it lacks by that name** ("maps no `xend`", "no binned scales"), never "no X but
   <what exists>", which a search for the next feature cannot find.
 - **An expression is written as a capture wherever one function computes it**
   (`{&:math.log10/1, [:carat]}`), so its guide is titled by the call; a closure only beside

@@ -33,8 +33,8 @@ d + stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size 
 `mean_cl_boot()`, from the `Hmisc` package, gives the mean with a confidence interval found by
 resampling the data.
 
-Not in Giggly yet: `stat_summary()` and the point ranges it draws, `geom_pointrange()`, the `Hmisc`
-package's summaries, here `mean_cl_boot()`, and a fixed `linewidth` and `size`.
+Not in Giggly yet: `stat_summary()` and the point ranges it draws, `geom_pointrange()`, and the
+`Hmisc` package's summaries, here `mean_cl_boot()`.
 
 ## Horizontal summaries
 
@@ -45,8 +45,7 @@ ggplot(mtcars, aes(mpg, factor(cyl))) +
   stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size = 3)
 ```
 
-Not in Giggly yet: `stat_summary()`, `geom_pointrange()`, `mean_cl_boot()`, and a fixed `linewidth`
-and `size`.
+Not in Giggly yet: `stat_summary()`, `geom_pointrange()` and `mean_cl_boot()`.
 
 ## One summary function
 
@@ -61,8 +60,7 @@ d + aes(colour = factor(vs)) + stat_summary(fun = mean, geom="line")
 The last plot adds a mapping to `d` with `+ aes()`, and joins the means of each group with a
 line.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, a fixed `size`, and adding a mapping with
-`+ aes()`.
+Not in Giggly yet: `stat_summary()` and its `fun` option, and adding a mapping with `+ aes()`.
 
 ## A range from three functions
 

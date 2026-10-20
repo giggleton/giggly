@@ -136,4 +136,4 @@ ggplot(counts, aes(x = x, y = Freq)) +
 
 The `size` given to `geom_segment()` is its line's width, which ggplot2 now calls `linewidth`.
 
-Not in Giggly yet: `geom_segment()`, mapping `xend` and `yend`, and a fixed `linewidth`.
+Not in Giggly yet: `geom_segment()`, and mapping `xend` and `yend`.

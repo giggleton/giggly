@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -23,9 +34,12 @@ drawn in those colours, a column of numbers as those sizes, with no scaling betw
 legend unless it is also given breaks, labels and a guide. Each function works on the aesthetic in
 its name, though `scale_colour_identity()` and `scale_fill_identity()` can serve colour and fill at
 once through their `aesthetics` argument; `scale_discrete_identity()` and
-`scale_continuous_identity()` work on whatever aesthetics that argument names. Giggly has none of
-this yet: it has no identity scales, so every column it maps to colour or fill goes through a scale
-that maps it.
+`scale_continuous_identity()` work on whatever aesthetics that argument names. Giggly has no
+identity scales yet, so every column it maps to an aesthetic goes through a scale that maps it.
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The one example it draws uses `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars
+from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## Colours named in the data
 
@@ -39,8 +53,7 @@ ggplot(luv_colours, aes(u, v)) +
   coord_fixed()
 ```
 
-Not in Giggly yet: the `luv_colours` dataset, `scale_colour_identity()`, a fixed `size` and
-`coord_fixed()`.
+Not in Giggly yet: the `luv_colours` dataset, `scale_colour_identity()` and `coord_fixed()`.
 
 ## Fill colours named in the data
 
@@ -95,5 +108,13 @@ ggplot(mtcars, aes(mpg, wt)) +
   scale_size_identity()
 ```
 
-Not in Giggly yet: mapping `size`, the scale that maps it and the legend that reads it back, and
-`scale_size_identity()`.
+Giggly draws the first.
+
+```elixir
+mtcars
+|> Plot.new(%{x: :mpg, y: :wt})
+|> Plot.geom_point(%{size: :cyl})
+|> render.()
+```
+
+Not in Giggly yet: `scale_size_identity()`.

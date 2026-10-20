@@ -17,5 +17,6 @@ describes and where Giggly stands.
 each of 574 months, personal consumption expenditures, the total population, the personal savings
 rate, the median duration of unemployment and the number of people unemployed. `economics` is in
 wide format, a column per series; `economics_long` holds the same series in long format, a row per
-month and series. `Giggly.Datasets.economics/0` is `economics`, its `date` column dates, which
-Giggly puts on an axis as ggplot2 does. Not in Giggly yet: the `economics_long` dataset.
+month and series, with each series also rescaled to run from 0 to 1, in `value01`, so all five can
+share an axis. `Giggly.Datasets.economics/0` is `economics` and `Giggly.Datasets.economics_long/0`
+is `economics_long`, their `date` columns dates, which Giggly puts on an axis as ggplot2 does.

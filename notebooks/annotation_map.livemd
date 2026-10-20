@@ -85,5 +85,4 @@ p +
 `sf::st_read()` reads North Carolina's counties from a file that comes with the `sf` package.
 
 Not in Giggly yet: everything `p` needs (map data from the `maps` package and `annotation_map()`),
-`sf` objects, `geom_sf()` as a layer that ignores the plot's mapping, a fixed `linewidth`, and
-`coord_sf()`.
+`sf` objects, `geom_sf()` as a layer that ignores the plot's mapping, and `coord_sf()`.

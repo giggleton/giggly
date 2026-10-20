@@ -116,8 +116,8 @@ if (requireNamespace("dplyr", quietly = TRUE)) {
 
 `dplyr::summarise()` reduces each group to one row at its mean, drawn as a large hollow circle.
 
-Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, the `dplyr` package's verbs,
-and a fixed `size` and `shape`, besides what `p` waits for.
+Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, and the `dplyr` package's
+verbs, besides what `p` waits for.
 
 ## Segments with dplyr
 

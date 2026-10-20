@@ -67,8 +67,7 @@ ggplot(nc_3857) +
 
 `sf::st_centroid()` finds the centre of each county, which the second layer draws as a point.
 
-Not in Giggly yet: `sf` objects, `geom_sf()` and its `show.legend` option, mapping `geometry`, and
-mapping `size` and the legend that reads it back.
+Not in Giggly yet: `sf` objects, `geom_sf()` and its `show.legend` option, and mapping `geometry`.
 
 ## Longitude and latitude in other layers
 
@@ -83,8 +82,7 @@ ggplot(nc_3857) +
 
 EPSG code 4326 is longitude and latitude, so the red point is at 80° west, 35° north.
 
-Not in Giggly yet: `sf` objects, `geom_sf()`, a fixed `size`, and `coord_sf()` and its
-`default_crs` option.
+Not in Giggly yet: `sf` objects, `geom_sf()`, and `coord_sf()` and its `default_crs` option.
 
 ## Labels
 

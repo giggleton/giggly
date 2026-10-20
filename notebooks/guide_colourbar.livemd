@@ -134,5 +134,5 @@ p2 +
   )))
 ```
 
-Not in Giggly yet: `geom_tile()`, mapping `size`, `scale_size()`, `guide_colourbar()` and its
-`theme` option, `guide_legend()`'s `theme` option, and changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, `guide_legend()`'s
+`theme` option, and changing the theme.

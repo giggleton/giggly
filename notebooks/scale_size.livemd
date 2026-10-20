@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,8 +32,15 @@ area, since area is what readers perceive, while `scale_radius()` maps it to the
 `scale_size_area()` makes a value of 0 an area of 0. `scale_size_binned()` and
 `scale_size_binned_area()` are the binned counterparts of `scale_size()` and `scale_size_area()`,
 cutting the column into bins first. A line's width, once also set by `size`, is now the `linewidth`
-aesthetic. Giggly has none of this yet: every point it draws looks as ggplot2's default point does,
-and it maps no `size`.
+aesthetic. Giggly has `Giggly.Plot.scale_size_continuous/2`, `Giggly.Plot.scale_size_area/2`,
+`Giggly.Plot.scale_radius/2` and `Giggly.Plot.scale_size_discrete/2`, but not ggplot2's short name,
+`scale_size()`, nor binned size scales (`scale_size_binned()`, `scale_size_binned_area()`), and by
+default maps a point's `size` to a column as ggplot2's default scale does, and draws the legend that
+reads it back, but not a text's `size`. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38
+popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## Size from a column
 
@@ -35,9 +53,28 @@ p + scale_size(range = c(0, 10))
 ```
 
 A scale's first argument titles its legend, and `range` sets the smallest and the largest sizes.
+`scale_size()` is `Giggly.Plot.scale_size_continuous/2`, its title `name:`.
 
-Not in Giggly yet: mapping `size`, `scale_size()`, whose first argument titles the legend, and its
-`range` option, and the legend that reads it back.
+```elixir
+p =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy, size: :hwy})
+  |> Plot.geom_point()
+
+render.(p)
+```
+
+```elixir
+p
+|> Plot.scale_size_continuous(name: "Highway mpg")
+|> render.()
+```
+
+```elixir
+p
+|> Plot.scale_size_continuous(range: {0, 10})
+|> render.()
+```
 
 ## Zero as no size
 
@@ -46,7 +83,11 @@ Not in Giggly yet: mapping `size`, `scale_size()`, whose first argument titles t
 p + scale_size_area()
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_area()` and the legend that reads it back.
+```elixir
+p
+|> Plot.scale_size_area()
+|> render.()
+```
 
 ## Binned sizes
 
@@ -55,7 +96,7 @@ Not in Giggly yet: mapping `size`, `scale_size_area()` and the legend that reads
 p + scale_size_binned()
 ```
 
-Not in Giggly yet: mapping `size`, `scale_size_binned()` and the legend that reads it back.
+Not in Giggly yet: `scale_size_binned()` and the legend that reads it back.
 
 ## Sizes from counts
 
@@ -68,7 +109,13 @@ ggplot(mpg, aes(class, cyl)) +
 
 `geom_count()` draws one point for each place that has rows, sized by how many it has.
 
-Not in Giggly yet: `geom_count()`, `scale_size_area()` and the legend that reads the counts back.
+```elixir
+mpg
+|> Plot.new(%{x: :class, y: :cyl})
+|> Plot.geom_count()
+|> Plot.scale_size_area()
+|> render.()
+```
 
 ## Size as radius
 
@@ -77,4 +124,8 @@ Not in Giggly yet: `geom_count()`, `scale_size_area()` and the legend that reads
 p + scale_radius()
 ```
 
-Not in Giggly yet: mapping `size`, `scale_radius()` and the legend that reads it back.
+```elixir
+p
+|> Plot.scale_radius()
+|> render.()
+```

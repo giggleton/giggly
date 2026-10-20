@@ -27,13 +27,16 @@ then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and name
 waiting for, so the page is also a list of what remains.
 
 `geom_count()` is a variant of `geom_point()` for discrete data whose points overlap: `stat_sum()`
-counts the rows at each position, and the count is mapped to the point's area. Giggly has
-`Giggly.Plot.geom_point/3`, one point per row, but not the counting. A plot is described with
+counts the rows at each position, and the count is mapped to the point's area. Giggly has both,
+`Giggly.Plot.geom_count/3` and `Giggly.Plot.stat_sum/3`, the count `n` and its proportion of the
+group, `prop`, both read with `{:after_stat, [...]}`, and the size scales and legends that read them
+back. A plot is described with
 `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. The first examples use `Giggly.Datasets.mpg/0`, ggplot2's
 `mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds
-to `mpg`, ggplot2's name for it. The rest use ggplot2's `diamonds`, which is not in Giggly yet.
+to `mpg`, ggplot2's name for it. The rest use ggplot2's `diamonds`, `Giggly.Datasets.diamonds/0`,
+whose cut and clarity R keeps as ordered factors and Giggly as labels, sorted alphabetically.
 
 ## Points that overlap
 
@@ -59,8 +62,16 @@ ggplot(mpg, aes(cty, hwy)) +
  geom_count()
 ```
 
-Not in Giggly yet: `geom_count()` and `stat_sum()`, and mapping `size`, the scale that maps it and
-the legend that reads it back.
+Each point's area grows with the number of cars at its place, and the legend reads the counts back.
+
+```elixir
+p =
+  mpg
+  |> Plot.new(%{x: :cty, y: :hwy})
+  |> Plot.geom_count()
+
+render.(p)
+```
 
 ## Sizes by area
 
@@ -73,8 +84,11 @@ ggplot(mpg, aes(cty, hwy)) +
  scale_size_area()
 ```
 
-Not in Giggly yet: `geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it
-back, and `scale_size_area()`.
+```elixir
+p
+|> Plot.scale_size_area()
+|> render.()
+```
 
 ## Proportions of the whole panel
 
@@ -92,9 +106,8 @@ d + geom_count(aes(size = after_stat(prop), group = 1)) +
 ```
 
 With each combination of `cut` and `clarity` a group of its own, every proportion is 1, so every
-point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet:
-`geom_count()` and `stat_sum()`, mapping `size` and the legend that reads it back, and
-`scale_size_area()` and its `max_size` option.
+point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet: choosing
+the order of a column's values (`cut` and `clarity` are ordered factors).
 
 ## Proportions of each row or column
 
@@ -106,6 +119,5 @@ d + geom_count(aes(size = after_stat(prop), group = clarity)) +
   scale_size_area(max_size = 10)
 ```
 
-Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: `geom_count()` and
-`stat_sum()`, mapping `size` and the legend that reads it back, and `scale_size_area()` and its
-`max_size` option.
+Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: choosing the order of a
+column's values (`cut` and `clarity` are ordered factors).

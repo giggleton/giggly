@@ -32,8 +32,7 @@ qplot(mpg, wt, data = mtcars, size = cyl)
 qplot(mpg, wt, data = mtcars, facets = vs ~ am)
 ```
 
-Not in Giggly yet: `qplot()`, mapping `size` and the legend that reads it back, and `facet_grid()`,
-which the two-sided formula `vs ~ am` asks for.
+Not in Giggly yet: `qplot()` and `facet_grid()`, which the two-sided formula `vs ~ am` asks for.
 
 ## Vectors instead of a data frame
 

@@ -63,7 +63,7 @@ ggplot(economics_long, aes(date, value01, colour = variable)) +
   geom_line(key_glyph = "timeseries")
 ```
 
-Not in Giggly yet: `geom_line()`'s `key_glyph` option and the `economics_long` dataset.
+Not in Giggly yet: `geom_line()`'s `key_glyph` option.
 
 ## A vertical time series
 
@@ -263,9 +263,37 @@ p + geom_line(aes(colour = x))
 ```
 
 The table holds two curves, `a` and `b`, told apart by `group`; `qlogis()` is the logistic
-distribution's quantile function.
+distribution's quantile function, `log(x / (1 - x))`, which the cell computes. The third line's
+colour changes along it, so it is drawn solid.
 
-Not in Giggly yet: a fixed `linetype`.
+```elixir
+x = Enum.map(0..99, fn index -> 0.01 + index * (0.99 - 0.01) / 99 end)
+logit = Enum.map(x, fn value -> :math.log(value / (1 - value)) end)
+
+df = %{
+  "x" => x ++ x,
+  "y" => logit ++ Enum.map(logit, fn value -> 2 * value end),
+  "group" => List.duplicate("a", 100) ++ List.duplicate("b", 100)
+}
+
+p = Plot.new(df, %{x: :x, y: :y, group: :group})
+
+p
+|> Plot.geom_line(linetype: 2)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_line(%{colour: :group}, linetype: 2)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_line(%{colour: :x})
+|> render.()
+```
 
 ## A line type that cannot vary
 
@@ -275,6 +303,15 @@ should_stop(p + geom_line(aes(colour = x), linetype=2))
 ```
 
 `should_stop()` checks that the code inside it fails, as it does here: a dashed line cannot change
-colour along its length, so ggplot2 stops with an error.
+colour along its length, so ggplot2 stops with an error. Giggly refuses it too, raising an
+`ArgumentError`; the cell shows its message.
 
-Not in Giggly yet: a fixed `linetype`.
+```elixir
+try do
+  p
+  |> Plot.geom_line(%{colour: :x}, linetype: 2)
+  |> render.()
+rescue
+  error in ArgumentError -> Exception.message(error)
+end
+```

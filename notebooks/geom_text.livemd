@@ -190,8 +190,7 @@ p +
   scale_radius(range = c(3,6))
 ```
 
-Not in Giggly yet: `geom_text()`'s `key_glyph` option, mapping `size`, the scale that maps the size
-and the legend that reads it back, and `scale_radius()`.
+Not in Giggly yet: mapping a text's `size` and `geom_text()`'s `key_glyph` option.
 
 ## Labels as expressions
 

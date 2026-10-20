@@ -34,5 +34,4 @@ ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
 R's `sample()` picks diamonds at random, the same ones every time after `set.seed(596)`;
 `pch = 21` is the point shape with both a border and a fill.
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.size` option, a fixed `shape`, and
-`position_jitterdodge()`.
+Not in Giggly yet: `geom_boxplot()` and its `outlier.size` option, and `position_jitterdodge()`.

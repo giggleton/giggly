@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+economics_long = Giggly.Datasets.economics_long()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,8 +31,16 @@ page is also a list of what remains.
 default set supplied by Richard Pearson of the University of Manchester. A continuous column can be
 mapped to line types only through `scale_linetype_binned()`, which cuts it into bins first, and
 since patterns have no order even that is not advised. A line type can be named by number, by name
-or by a string of hex digits, and a missing one is drawn blank. Giggly has none of this yet: it
-draws paths and lines solid and maps no `linetype`.
+or by a string of hex digits, and a missing one is drawn blank. Giggly has
+`Giggly.Plot.scale_linetype_discrete/2` and `Giggly.Plot.scale_linetype_manual/2`, a line type
+named by number, by name as an atom or as a dash pattern, a tuple of lengths, but not ggplot2's
+short name, `scale_linetype()`, nor binned or identity line type scales (`scale_linetype_binned()`,
+`scale_linetype_identity()`), and by default maps `linetype` to a discrete column as ggplot2's
+default scale does, and draws the legend that reads it back. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The data is
+`Giggly.Datasets.economics_long/0`, ggplot2's `economics_long`: five US economic time series, a row
+for each month and series, which the setup cell binds to `economics_long`, ggplot2's name for it.
 
 ## A line type for each series
 
@@ -31,8 +50,21 @@ base + geom_line(aes(group = variable))
 base + geom_line(aes(linetype = variable))
 ```
 
-Not in Giggly yet: the `economics_long` dataset, mapping `linetype`, the scale that maps it and the
-legend that reads it back.
+`value01` is each series rescaled to run from 0 to 1, so all five share an axis.
+
+```elixir
+base = Plot.new(economics_long, %{x: :date, y: :value01})
+
+base
+|> Plot.geom_line(%{group: :variable})
+|> render.()
+```
+
+```elixir
+base
+|> Plot.geom_line(%{linetype: :variable})
+|> render.()
+```
 
 ## Line types by hand
 
@@ -41,7 +73,7 @@ legend that reads it back.
 ```
 
 The comment points to ggplot2's `scale_manual` page, where `scale_linetype_manual()` gives each
-value a pattern chosen by hand. Not in Giggly yet: `scale_linetype_manual()`.
+value a pattern chosen by hand. Giggly's is `Giggly.Plot.scale_linetype_manual/2`.
 
 ## Common line types
 
@@ -66,5 +98,4 @@ ggplot(df_lines) +
 ```
 
 Not in Giggly yet: choosing the order of a column's values, horizontal lines (`geom_hline()`),
-mapping `linetype`, a fixed `linewidth`, `scale_linetype_identity()`, `facet_grid()` and
-`theme_void()`.
+`scale_linetype_identity()`, `facet_grid()` and `theme_void()`.

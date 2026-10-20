@@ -146,7 +146,22 @@ p2 <- ggplot(mtcars, aes(wt, mpg)) +
 p2
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+p2 =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point(%{colour: {:factor, [:cyl]}, shape: {:factor, [:vs]}})
+  |> Plot.labs(
+    x: "Weight (1000 lbs)",
+    y: "Fuel economy (mpg)",
+    colour: "Cylinders",
+    shape: "Transmission"
+  )
+
+render.(p2)
+```
 
 ## Where the legends go
 
@@ -157,8 +172,7 @@ p2 + theme(legend.justification = "top")
 p2 + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, and changing the theme, here
-where the legends go.
+Not in Giggly yet: changing the theme, here where the legends go.
 
 ## Legends inside the panel
 
@@ -174,8 +188,7 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, and changing the theme, here
-placing the legends inside the panel.
+Not in Giggly yet: changing the theme, here placing the legends inside the panel.
 
 ## A box around the legends
 
@@ -188,8 +201,7 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, and changing the theme, here
-the box around the legends and its margin.
+Not in Giggly yet: changing the theme, here the box around the legends and its margin.
 
 ## Legend keys, text and titles
 
@@ -201,8 +213,7 @@ p2 + theme(legend.text = element_text(size = 8, colour = "red"))
 p2 + theme(legend.title = element_text(face = "bold"))
 ```
 
-Not in Giggly yet: mapping `shape` and the legend that reads it back, and changing the theme, here
-the legends' keys, text and titles.
+Not in Giggly yet: changing the theme, here the legends' keys, text and titles.
 
 ## Strips
 

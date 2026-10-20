@@ -63,7 +63,7 @@ p +
   geom_point(data = df, colour = "red", size = 2)
 ```
 
-Not in Giggly yet: `facet_grid()` and a fixed `size`.
+Not in Giggly yet: `facet_grid()`.
 
 ## Axes on every panel
 

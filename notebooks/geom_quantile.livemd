@@ -65,4 +65,4 @@ regression it fits, and the `quantreg` package's `rqss()`.
 m + geom_quantile(colour = "red", linewidth = 2, alpha = 0.5)
 ```
 
-Not in Giggly yet: `geom_quantile()` and a fixed `linewidth`.
+Not in Giggly yet: `geom_quantile()`.

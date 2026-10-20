@@ -1255,6 +1255,23 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   justifications*, a word ggplot2 lacks, given a meaning only R's fallback gives it; *naming it as
   missing*, which would leave the example waiting on something Giggly will never build.
 
+- **A verdict names a text's mapped size "mapping a text's `size`" (2026-10-20, Steve, in the
+  size, shape and line type sweep).** Once a point maps `size`, "mapping `size`" names something
+  Giggly has, so geom_text's example, which waits for a text to map it, and the About sentences
+  that say what Giggly maps, name it "a text's `size`", as "a point's `fill`" names a point's.
+  Giggly refuses it today: `geom_text/3` accepts no `:size` in its mapping. *Rejected: keeping
+  "mapping `size`"* — after the sweep no point example names it, so a search still finds only
+  text, but the verdict reads as if Giggly mapped no size at all.
+
+- **An example R refuses on purpose, which Giggly refuses too, is shown by a cell returning
+  Giggly's message (2026-10-20, Steve).** geom_path's `should_stop(p + geom_line(aes(colour = x),
+  linetype = 2))` checks that R stops: a dashed line cannot change colour along it. Giggly raises
+  an `ArgumentError` for the same line, so nothing waits and no verdict is written; the cell runs
+  Giggly's line in `try`/`rescue` and returns the message, as `should_stop()` checks the failure,
+  so the refusal is shown running and every cell still runs. *Rejected: prose only* — the refusal
+  is taken on trust. *Rejected: a cell that raises* — closest to R's code, but the notebook keeps a
+  cell that fails on purpose.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -1926,6 +1943,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-20 — Draw the notebook examples sizes, shapes and line types made drawable (size, shape
+  and line type, step 7); §4: "A verdict names a text's mapped size", "An example R refuses on
+  purpose"
 - 2026-10-20 — Dash and widen lines by a mapped column (size, shape and line type, step 6); §4:
   "A line type or width scale takes R's options", "A manual list named by breaks", "A stroke's
   width, a radius, an opacity and a gradient offset"

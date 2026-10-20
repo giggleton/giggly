@@ -94,7 +94,7 @@ p + annotate("pointrange", x = 3.5, y = 20, ymin = 12, ymax = 28,
   colour = "red", size = 2.5, linewidth = 1.5)
 ```
 
-Not in Giggly yet: `geom_pointrange()`, and a fixed `size` and `linewidth`.
+Not in Giggly yet: `geom_pointrange()`.
 
 ## A label at each position
 

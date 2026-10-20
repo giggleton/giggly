@@ -32,10 +32,11 @@ A manual scale maps each value of a discrete column to an aesthetic value given 
 fill, a size, a shape, a line type, a line width or a transparency. Each function works on the
 aesthetic in its name, though `scale_colour_manual()` and `scale_fill_manual()` can serve colour and
 fill at once through their `aesthetics` argument; `scale_discrete_manual()` works on whatever
-aesthetics that argument names. Giggly has `Giggly.Plot.scale_color_manual/2` and
-`Giggly.Plot.scale_fill_manual/2`, with their `breaks:`, `labels:` and `limits:`, but not their
-`aesthetics` option, so each serves its own aesthetic, nor the other manual scales: it maps no
-`size`, `shape`, `linetype` or `linewidth`, and has no `scale_alpha_manual()`. A plot is described
+aesthetics that argument names. Giggly has `Giggly.Plot.scale_color_manual/2`,
+`Giggly.Plot.scale_fill_manual/2`, `Giggly.Plot.scale_shape_manual/2` and
+`Giggly.Plot.scale_linetype_manual/2`, with their `breaks:`, `labels:` and `limits:`, but not the
+`aesthetics` option, so each serves its own aesthetic, nor `scale_size_manual()`,
+`scale_linewidth_manual()`, `scale_alpha_manual()` or `scale_discrete_manual()`. A plot is described
 with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
@@ -101,8 +102,7 @@ ggplot(
   )
 ```
 
-Not in Giggly yet: a fixed `shape` and `size`, a point's `fill`, and `scale_colour_manual()`'s
-`aesthetics` option.
+Not in Giggly yet: `scale_colour_manual()`'s `aesthetics` option.
 
 ## Breaks and labels
 
