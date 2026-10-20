@@ -2674,27 +2674,30 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_shape_manual/2, [values: []],
              "expected a list of at least one shape, or a map from a value to its shape, got: []"},
             {&Plot.scale_shape_manual/2, [values: :circle], "got: :circle"},
-            {&Plot.scale_shape_manual/2, [], "required :values option not found"},
             {&Plot.scale_shape_manual/2, [values: [1], solid: false], "unknown options [:solid]"}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
         assert error.message =~ shown
       end
+
+      error = assert_raise NimbleOptions.ValidationError, fn -> Plot.scale_shape_manual(plot) end
+      assert error.message =~ "required :values option not found"
     end
 
     test "a list of labels not one for each break or limit given is refused" do
       plot = Plot.new(@rows)
 
-      for function <- [
-            &Plot.scale_shape_discrete/2,
-            fn shaped, options ->
-              Plot.scale_shape_manual(shaped, [{:values, [1, 2]} | options])
-            end
+      for {function, name} <- [
+            {&Plot.scale_shape_discrete/2, "Plot.scale_shape_discrete/2"},
+            {fn shaped, options ->
+               Plot.scale_shape_manual(shaped, [{:values, [1, 2]} | options])
+             end, "Plot.scale_shape_manual/2"}
           ] do
         error =
           assert_raise ArgumentError, fn -> function.(plot, breaks: ["4", "6"], labels: ["a"]) end
 
-        assert error.message =~ "is given 1 labels, which must be one for each of its 2 breaks"
+        assert error.message =~
+                 "#{name} is given 1 labels, which must be one for each of its 2 breaks"
       end
     end
 

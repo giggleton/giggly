@@ -4158,7 +4158,7 @@ defmodule Giggly.Plot do
   def validate_guide(:colorbar, :discrete),
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
 
-  def validate_guide(:colorbar, aesthetic) when aesthetic in [:alpha, :shape, :size],
+  def validate_guide(:colorbar, aesthetic),
     do: {:error, "a colour bar shows colour or fill, never #{aesthetic}; give :legend"}
 
   def validate_guide(guide, _kind) do
