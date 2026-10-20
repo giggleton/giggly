@@ -910,8 +910,10 @@ defmodule Giggly.PlotTest do
         assert by_number === [:none, {}, {4, 4}, {1, 3}, {1, 3, 4, 3}, {7, 3}, {2, 2, 6, 2}]
         assert by_name === by_number
 
-        assert [%Plot.Layer{fixed: %{linetype: {3, 3, 1, 15, 2, 2, 1, 1}}}] =
-                 add.(plot, linetype: {3, 3, 1, 15, 2, 2, 1, 1}).reversed_layers
+        for pattern <- [{3, 3, 1, 15, 2, 2, 1, 1}, {1, 2, 3, 4, 5, 6}] do
+          assert [%Plot.Layer{fixed: %{linetype: ^pattern}}] =
+                   add.(plot, linetype: pattern).reversed_layers
+        end
       end
     end
 
@@ -932,6 +934,7 @@ defmodule Giggly.PlotTest do
             {},
             {4},
             {1, 2, 3},
+            {1, 2, 3, 4, 5},
             {0, 4},
             {16, 1},
             {4.0, 4},
@@ -945,6 +948,8 @@ defmodule Giggly.PlotTest do
         assert error.key == :linetype
         assert error.message =~ "got: #{inspect(line_type)}"
         assert error.message =~ ":blank, :solid, :dashed, :dotted, :dotdash, :longdash, :twodash"
+        assert error.message =~ "0 to 6"
+        assert error.message =~ "2, 4, 6 or 8 lengths from 1 to 15"
       end
     end
 
@@ -1423,6 +1428,36 @@ defmodule Giggly.PlotTest do
                  linetype: [{4, 4}, {1, 3}, {3, 1}, nil],
                  linewidth: [1.0, 2.0, 3.0, +0.0]
                }
+      end
+    end
+
+    # ggplot2 4.0.3: `annotate("rect", xmin = 1, xmax = 2, ymin = 0, ymax = 1, linetype =
+    # c("dashed", "dotted"))` draws two rectangles, and given three of each corner "Unequal
+    # parameter lengths: xmin (3), xmax (3), and linetype (2)", and so for linewidth.
+    test "a list of line types or widths counts annotations as a position's list does" do
+      plot = Plot.new(@rows)
+      corners = [xmin: 1, xmax: 2, ymin: 0, ymax: 1]
+
+      for {option, values} <- [linetype: [2, 3], linewidth: [1, 2]] do
+        frame =
+          plot
+          |> Plot.annotate(:rect, [{option, values} | corners])
+          |> Giggly.layer_data()
+
+        assert DataFrame.pull(frame, :xmin) === [1.0, 1.0]
+
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.annotate(plot, :rect, [
+              {:xmin, [1, 3, 5]},
+              {:xmax, [2, 4, 6]},
+              {:ymin, 0},
+              {:ymax, 1},
+              {option, values}
+            ])
+          end
+
+        assert error.message =~ "#{inspect(option)} 2 values"
       end
     end
 

@@ -532,7 +532,9 @@ defmodule Giggly.GeomTest do
       end
     end
 
-    test "a solid line whose colour varies along it is drawn in solid segments",
+    # Golden: ggplot2 4.0.3's `geom_path(aes(colour = z), linewidth = 2)` through vdiffr 1.0.9:
+    # segments 4.27 points wide.
+    test "a solid line whose colour varies along it is drawn in solid segments at its width",
          %{coord: coord, params: params} do
       frame =
         DataFrame.new(
@@ -540,11 +542,14 @@ defmodule Giggly.GeomTest do
           y: [0.0, 4.0, 0.0],
           group: [1, 1, 1],
           color: ["#FF0000", "#0000FF", "#0000FF"],
-          linetype: [{}, {}, {}]
+          linetype: [{}, {}, {}],
+          linewidth: [2.0, 2.0, 2.0]
         )
 
-      assert [%Segments{dashes: :none, color: ["#FF0000", "#0000FF"]}] =
+      assert [%Segments{dashes: :none, color: ["#FF0000", "#0000FF"], stroke_width: width}] =
                Geom.draw_panel(@path, frame, coord, params)
+
+      assert Float.round(width, 2) === 4.27
     end
   end
 
