@@ -61,20 +61,24 @@ defmodule Giggly.Scale do
   #
   # ## Aesthetics other than position
   #
-  # `alpha`, `color` and `fill` so far (`non_position_aesthetics/0`), each scale, unless the plot
-  # gives one, ggplot2's default for its aesthetic. Alpha's maps a continuous column onto 0.1 to
-  # 1, `scale_alpha_continuous()`, and spreads a discrete one from 0.1 to 1,
+  # `alpha`, `color`, `fill` and `size` so far (`non_position_aesthetics/0`), each scale, unless
+  # the plot gives one, ggplot2's default for its aesthetic. Alpha's maps a continuous column onto
+  # 0.1 to 1, `scale_alpha_continuous()`, and spreads a discrete one from 0.1 to 1,
   # `scale_alpha_ordinal()`, which ggplot2's `scale_alpha_discrete()` uses with a warning that
-  # Giggly, building a plot without side effects, does not give. Colour's and fill's give a
-  # discrete column `pal_hue()`'s colours, as `scale_colour_discrete()` falls back to it, and a
-  # continuous one the gradient from `#132B43` to `#56B1F7`, `scale_colour_continuous()`'s,
-  # blended in L*a*b* (`Giggly.Scale.Palette`). A plot's scale may carry another palette: manual,
-  # grey, another hue range or gradient. A continuous value's place runs over the scale's limits,
-  # or about its midpoint (R's `rescale_mid()`), and one outside them is censored, as ggplot2's
-  # `oob = censor`; a missing or censored value maps to the scale's `na_value`, grey50 for a
-  # colour, `nil`, R's `NA`, for alpha. Each names the guide that draws it, as ggplot2's scales
-  # do: a colour bar for a continuous colour or fill, a legend for the rest, whose breaks and
-  # labels are the scale's on its limits.
+  # Giggly, building a plot without side effects, does not give. Size's maps a continuous column
+  # onto sizes from 1 to 6 by area, `scale_size_continuous()`, and spreads a discrete one from 2
+  # to 6 by area, `scale_size_ordinal()`, which `scale_size_discrete()` uses with a warning, which
+  # it leaves out too. Colour's and fill's give a discrete column `pal_hue()`'s colours, as
+  # `scale_colour_discrete()` falls back to it, and a continuous one the gradient from `#132B43`
+  # to `#56B1F7`, `scale_colour_continuous()`'s, blended in L*a*b* (`Giggly.Scale.Palette`). A
+  # plot's scale may carry another palette: manual, grey, another hue range or gradient. A
+  # continuous value's place runs over the scale's limits, or about its midpoint (R's
+  # `rescale_mid()`), or at its share of their high end (R's `rescale_max()`), as the scale's
+  # `rescaler` says, and one outside them is censored, as ggplot2's `oob = censor`; a missing or
+  # censored value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha
+  # and size. Each names the guide that draws it, as ggplot2's scales do: a colour bar for a
+  # continuous colour or fill, a legend for the rest, whose breaks and labels are the scale's on
+  # its limits.
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
   # palette its colours, as R's `scales` depends on farver, and R's `as.character()`, which writes
@@ -96,7 +100,7 @@ defmodule Giggly.Scale do
   @type kind :: :continuous | :discrete | :date | :none
 
   # The aesthetics other than position that a scale maps, and those of them that are colours.
-  @non_position_aesthetics [:alpha, :color, :fill]
+  @non_position_aesthetics [:alpha, :color, :fill, :size]
   @color_aesthetics [:color, :fill]
 
   @continuous_dtypes [:integer, :float, :null]
@@ -123,6 +127,11 @@ defmodule Giggly.Scale do
 
   # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
   @alpha_range {0.1, 1.0}
+
+  # ggplot2's default sizes, in millimetres: 1 to 6 by area for a continuous scale, `pal_area()`'s,
+  # and 2 to 6 by area for a discrete one, its ordinal scale's `sqrt(seq(4, 36))`.
+  @continuous_size_range {1.0, 6.0}
+  @discrete_size_range {2.0, 6.0}
 
   # ggplot2's default discrete colour palette, `pal_hue()`'s: hues from 15 degrees round the
   # circle, chroma 100 and luminance 65, in order.
@@ -154,7 +163,13 @@ defmodule Giggly.Scale do
   def new(:continuous, aesthetic) when aesthetic in @color_aesthetics,
     do: %Continuous{palette: @gradient_palette, na_value: @color_na_value, guide: :colorbar}
 
+  def new(:continuous, :size),
+    do: %Continuous{palette: {:area, @continuous_size_range}, guide: :legend}
+
   def new(:discrete, :alpha), do: %Discrete{palette: {:sequence, @alpha_range}, guide: :legend}
+
+  def new(:discrete, :size),
+    do: %Discrete{palette: {:area_sequence, @discrete_size_range}, guide: :legend}
 
   def new(:discrete, aesthetic) when aesthetic in @color_aesthetics,
     do: %Discrete{palette: @hue_palette, na_value: @color_na_value, guide: :legend}
@@ -221,10 +236,10 @@ defmodule Giggly.Scale do
   # Each value's position on the scale's axis: a continuous value unchanged, or `nil` outside the
   # scale's limits, a discrete one at its level's position counting from 1. For an aesthetic other
   # than position, each value through the scale's palette: a continuous one's place in the scale's
-  # limits (`limits/1`), from 0 to 1, by R's `rescale()`, or, where the scale has a midpoint, by
-  # `rescale_mid()`, put through the palette, and the scale's `na_value` for a missing value, one
-  # that is not a finite number, or one outside the limits, which ggplot2 censors and maps to its
-  # `na.value`; a discrete one as `Giggly.Scale.Discrete` maps it.
+  # limits (`limits/1`), from 0 to 1, by its `rescaler` (`place/3`), put through the palette, and
+  # the scale's `na_value` for a missing value, one that is not a finite number, one outside the
+  # limits, which ggplot2 censors and maps to its `na.value`, or one whose place R makes NaN; a
+  # discrete one as `Giggly.Scale.Discrete` maps it.
   @doc false
   @spec map(t(), list()) :: list()
   def map(%Continuous{palette: :identity} = scale, values), do: Continuous.censor(scale, values)
@@ -235,27 +250,39 @@ defmodule Giggly.Scale do
     bounds = limits(scale)
 
     Enum.map(values, fn value ->
-      if placed_inside?(value, bounds),
-        do: Palette.continuous(palette, place(value, bounds, scale.midpoint)),
-        else: na_value
+      place = if placed_inside?(value, bounds), do: place(value, bounds, scale.rescaler)
+      if is_number(place), do: Palette.continuous(palette, place), else: na_value
     end)
   end
 
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
 
-  # A value's place in `bounds`, from 0 to 1: R's `rescale()`; or, about a midpoint, R's
-  # `rescale_mid()`, `(value - midpoint) / extent + 0.5`, `extent` twice the further end's distance
-  # from it, in that order of operations, so the further end is at 0 or 1 and the midpoint at the
-  # middle; bounds of zero width put every value at the middle.
-  defp place(value, bounds, :none), do: rescale(value, bounds, {0, 1})
+  # A value's place in `bounds` by the scale's rescaler: R's `rescale()`, from 0 to 1; about a
+  # midpoint, R's `rescale_mid()`, `(value - midpoint) / extent + 0.5`, `extent` twice the further
+  # end's distance from it, in that order of operations, so the further end is at 0 or 1 and the
+  # midpoint at the middle; bounds of zero width put every value at the middle either way. Or R's
+  # `rescale_max()`, the value over the high end, so 0 is at 0 and one value at 1, whatever the
+  # low end: over a high end of 0, a value of 0 is R's NaN, `nil`, which maps to the missing value,
+  # and any other an infinity, which R cannot draw, so it raises.
+  defp place(value, bounds, :rescale), do: rescale(value, bounds, {0, 1})
 
-  defp place(value, {low, high}, midpoint) do
+  defp place(value, {low, high}, {:mid, midpoint}) do
     if zero_range?(low, high) do
       0.5
     else
       extent = 2 * max(abs(low - midpoint), abs(high - midpoint))
       (value - midpoint) / extent + 0.5
     end
+  end
+
+  defp place(value, {_low, high}, :max) when high != 0, do: value / high
+  defp place(value, _bounds, :max) when value == 0, do: nil
+
+  defp place(value, _bounds, :max) do
+    raise ArgumentError,
+          "a scale placing each value at its share of its limits' high end cannot place " <>
+            "#{inspect(value)} when that end is 0: its place would be infinite, which R cannot " <>
+            "draw either; give the scale limits whose high end is above 0"
   end
 
   # Each position, `nil` where a continuous scale's limits leave it out, `:infinity` and
@@ -473,7 +500,7 @@ defmodule Giggly.Scale do
 
   # Each of `values`' place in a continuous scale's limits (`limits/1`), from 0 at their low end
   # to 1 at their high (`rescale/3`), as ggplot2's colour bar places its ticks and its colours,
-  # whatever the scale's midpoint.
+  # whatever the scale's rescaler.
   @doc false
   @spec places(Continuous.t(), [number()]) :: [float()]
   def places(%Continuous{} = scale, values) do

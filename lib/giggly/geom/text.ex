@@ -65,6 +65,11 @@ defmodule Giggly.Geom.Text do
     # A legend key's margin round its text, in lines of the text, as `draw_key_text()` sets it.
     @key_margin_lines 0.1
 
+    # The same margin as `draw_key_text()` measures it for the room its key needs: a tenth of a line
+    # of grid's default font, 12 points at a line height of 1.2, not of the text's own, since R
+    # turns the margin into centimetres outside the text's font.
+    @key_measured_margin @key_margin_lines * 12 * @line_height
+
     # Where ggplot2's words put a label's anchor along its baseline or up its height: at its start or
     # bottom, its middle, or its end or top.
     @word_places %{left: 0.0, bottom: 0.0, center: 0.5, middle: 0.5, right: 1.0, top: 1.0}
@@ -137,10 +142,11 @@ defmodule Giggly.Geom.Text do
     # its alpha and the layer's size, angle and family, placed at its justification in the key less
     # a margin of a tenth of a line all round, that justification turned with the text as ggplot2's
     # `rotate_just()` turns it, and justified as the layer's labels are; a colour of `:none` draws
-    # nothing. ggplot2 also widens the key for text too big to fit in it, which Giggly's keys, the
-    # theme's size, do not do.
+    # nothing. The margin is an offset in points, `margin * (1 - 2 * place)` across and up the key
+    # as `titleGrob()` moves its text, turned into the text's own frame, along its baseline and
+    # toward its top.
     @impl Giggly.Geom
-    def draw_key(_geom, key, {width, height}) do
+    def draw_key(_geom, key) do
       case Map.get(key, :color, @color) do
         :none ->
           []
@@ -152,12 +158,16 @@ defmodule Giggly.Geom.Text do
           vjust = justification(Map.get(key, :vjust, 0.5), 0.5, 0.5, angle)
           {across, up} = turned_justification(angle, hjust, vjust)
           margin = @key_margin_lines * font_size * @line_height
+
+          {along, toward_top} =
+            turned_offset({margin * (1 - 2 * across), margin * (1 - 2 * up)}, angle)
+
           label = "a"
 
           [
             %Text{
-              x: [(margin + across * (width - 2 * margin)) / width],
-              y: [(margin + up * (height - 2 * margin)) / height],
+              x: [across],
+              y: [up],
               labels: [label],
               widths: [Font.width(label, font_size)],
               size: font_size,
@@ -166,12 +176,41 @@ defmodule Giggly.Geom.Text do
               opacity: [Mark.opacity(color, Map.get(key, :alpha))],
               angle: angle,
               hjust: [hjust],
-              offset: [{0.0, -vjust * Font.ascent(font_size)}],
+              offset: [{along, toward_top - vjust * Font.ascent(font_size)}],
               check_overlap: false,
               ascent: Font.ascent(font_size)
             }
           ]
       end
+    end
+
+    # The room a key's text needs, as `draw_key_text()` measures it: the box round the letter "a"
+    # turned with the text, as wide as its width along the baseline and as tall as the ascent of
+    # "M", as grid bounds turned text, with the font's descent added across and up by the angle's
+    # sine and cosine, as `titleGrob()` adds it, and the measured margin each side.
+    @impl Giggly.Geom
+    def key_size(_geom, key) do
+      font_size = font_size(Map.get(key, :size, :none))
+      radians = Map.get(key, :angle, 0.0) * :math.pi() / 180
+      cosine = abs(:math.cos(radians))
+      sine = abs(:math.sin(radians))
+      width = Font.width("a", font_size)
+      ascent = Font.ascent(font_size)
+      descent = Font.descent(font_size)
+
+      {
+        width * cosine + ascent * sine + sine * descent + 2 * @key_measured_margin,
+        width * sine + ascent * cosine + cosine * descent + 2 * @key_measured_margin
+      }
+    end
+
+    # An offset across and up a key, in points, as the offset along a text's baseline and toward its
+    # top that moves it there, the text turned `angle` degrees anticlockwise.
+    defp turned_offset({across, up}, angle) do
+      radians = angle * :math.pi() / 180
+      cosine = :math.cos(radians)
+      sine = :math.sin(radians)
+      {across * cosine + up * sine, up * cosine - across * sine}
     end
 
     # The text's size in points: the layer's size in millimetres times `.pt`, or the theme's base

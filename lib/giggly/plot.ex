@@ -88,14 +88,16 @@ defmodule Giggly.Plot do
   discrete one. A value outside the limits is missing, so its mark is not drawn. A continuous scale
   given a column of dates places each at its days since 1970-01-01.
 
-  A colour, fill or alpha scale chooses how values become colours or opacities, and sets its
-  legend's title, limits, breaks and labels: `scale_color_manual/2` names each value's colour,
-  `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2` greys,
+  A colour, fill, alpha or size scale chooses how values become colours, opacities or sizes, and
+  sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each value's
+  colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2` greys,
   `scale_color_discrete/2` either; `scale_color_gradient/2`, `scale_color_gradient2/2`,
   `scale_color_gradientn/2` and `scale_color_continuous/2` blend a gradient through two, three or
   any number of colours; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
-  `scale_alpha_discrete/2` set opacities. `lims/2` sets their limits alone. A value outside a
-  colour scale's limits takes its `na_value:`, as a missing one does.
+  `scale_alpha_discrete/2` set opacities. `scale_size_continuous/2` and `scale_size_area/2` size
+  points by area, the second from 0, `scale_radius/2` by width, and `scale_size_discrete/2` a
+  discrete column's values in order. `lims/2` sets their limits alone. A value outside a colour
+  scale's limits takes its `na_value:`, as a missing one does.
 
   ## Labels
 
@@ -1199,6 +1201,99 @@ defmodule Giggly.Plot do
                                     )
                                 )
 
+  # A size scale's guide, a legend unless it says otherwise, and its missing value's size, none
+  # unless it says otherwise, drawing no point.
+  @size_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:size]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  @size_na_value_spec [
+    type: {:custom, __MODULE__, :validate_size, []},
+    doc:
+      "The size, in millimetres, of a missing value, or of one outside the limits, 0 or more; " <>
+        "none, which draws nothing, when not given."
+  ]
+
+  # The size scales' default ranges, in millimetres, which leave the smallest value visible.
+  @continuous_size_range_default {1.0, 6.0}
+  @discrete_size_range_default {2.0, 6.0}
+
+  @size_range_type {:custom, __MODULE__, :validate_size_range, []}
+
+  # The options of a continuous size scale that takes no missing value's size, as ggplot2's
+  # `scale_size_continuous()` and `scale_radius()` take none: a value outside its limits is not
+  # drawn.
+  @continuous_size_legend_option_specs @continuous_legend_option_specs
+                                       |> Keyword.replace!(:limits,
+                                         type: @limits_type,
+                                         doc:
+                                           "`{low, high}`: the values the scale spans whatever " <>
+                                             "the data, `nil` for an end the data decides; " <>
+                                             "either order names the same scale. A value " <>
+                                             "outside them is not drawn."
+                                       )
+                                       |> Enum.concat(guide: @size_guide_spec)
+
+  @continuous_size_scale_options NimbleOptions.new!(
+                                   [
+                                     range: [
+                                       type: @size_range_type,
+                                       default: @continuous_size_range_default,
+                                       doc:
+                                         "`{low, high}`: the sizes, in millimetres, the values " <>
+                                           "run between by area, each 0 or more."
+                                     ]
+                                   ] ++ @continuous_size_legend_option_specs
+                                 )
+
+  @radius_scale_options NimbleOptions.new!(
+                          [
+                            range: [
+                              type: @size_range_type,
+                              default: @continuous_size_range_default,
+                              doc:
+                                "`{low, high}`: the sizes, in millimetres, the values run " <>
+                                  "between, each 0 or more."
+                            ]
+                          ] ++ @continuous_size_legend_option_specs
+                        )
+
+  @area_size_scale_options NimbleOptions.new!(
+                             [
+                               max_size: [
+                                 type: {:custom, __MODULE__, :validate_size, []},
+                                 default: 6.0,
+                                 doc:
+                                   "The size, in millimetres, of a value at the high end of " <>
+                                     "the limits, 0 or more."
+                               ],
+                               na_value: @size_na_value_spec
+                             ] ++
+                               Enum.concat(
+                                 @continuous_legend_option_specs,
+                                 guide: @size_guide_spec
+                               )
+                           )
+
+  @discrete_size_scale_options NimbleOptions.new!(
+                                 [
+                                   range: [
+                                     type: @size_range_type,
+                                     default: @discrete_size_range_default,
+                                     doc:
+                                       "`{first, last}`: the sizes, in millimetres, of the " <>
+                                         "first and last values, each 0 or more."
+                                   ],
+                                   na_value: @size_na_value_spec
+                                 ] ++
+                                   Enum.concat(
+                                     @discrete_legend_option_specs,
+                                     guide: @size_guide_spec
+                                   )
+                               )
+
   # `guide_legend/1`'s options.
   @guide_legend_options NimbleOptions.new!(
                           reverse: [
@@ -1230,11 +1325,16 @@ defmodule Giggly.Plot do
                       type: {:custom, __MODULE__, :validate_guide, [:alpha]},
                       doc:
                         "The alpha scale's guide, as `scale_alpha_continuous/2`'s `guide:` takes it."
+                    ],
+                    size: [
+                      type: {:custom, __MODULE__, :validate_guide, [:size]},
+                      doc:
+                        "The size scale's guide, as `scale_size_continuous/2`'s `guide:` takes it."
                     ]
                   )
 
   # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values, and the limits
-  # of a colour, fill or alpha scale.
+  # of a colour, fill, alpha or size scale.
   @axis_limits_type {:custom, __MODULE__, :validate_axis_limits, []}
   @legend_limits_type {:custom, __MODULE__, :validate_legend_limits, []}
   @lims_options NimbleOptions.new!(
@@ -1264,6 +1364,12 @@ defmodule Giggly.Plot do
                     doc:
                       "The alpha scale's limits, as `scale_alpha_continuous/2` or " <>
                         "`scale_alpha_discrete/2` takes them."
+                  ],
+                  size: [
+                    type: @legend_limits_type,
+                    doc:
+                      "The size scale's limits, as `scale_size_continuous/2` or " <>
+                        "`scale_size_discrete/2` takes them."
                   ]
                 )
 
@@ -1277,6 +1383,7 @@ defmodule Giggly.Plot do
                       @label_option,
                   fill: [doc: "The fill legend's or colour bar's title."] ++ @label_option,
                   alpha: [doc: "The alpha legend's title."] ++ @label_option,
+                  size: [doc: "The size legend's title."] ++ @label_option,
                   title: [doc: "The plot's title, above the panels."] ++ @label_option,
                   subtitle: [doc: "The plot's subtitle, below its title."] ++ @label_option,
                   caption: [doc: "The plot's caption, below the panels."] ++ @label_option,
@@ -1323,8 +1430,9 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y`, `:group`, `:alpha`, `:color` and `:fill`, and need `:x` and `:y`. A
-  point's alpha applies to its colour and its fill alike; a colour of `:none` draws no point.
+  Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill` and `:size`, and need `:x` and
+  `:y`. A point's alpha applies to its colour and its fill alike; a colour of `:none`, or a missing
+  size, draws no point.
 
   A point is drawn in one of 26 shapes, each named, and numbered 0 to 25:
 
@@ -2779,6 +2887,146 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Gives the plot a continuous size scale, replacing any size scale it had.
+
+  Each value is drawn at a size between the first of `range:` and the second, in millimetres, by
+  area: its size's square is as far between theirs as the value is through the limits, so a
+  point's area grows with the value. Its guide is a legend unless `guide:` says otherwise. A value
+  outside the limits, or missing, is not drawn. Raises `NimbleOptions.ValidationError` for an
+  option it does not take or a value it cannot use, a size below 0 or a `guide:` of `:colorbar`,
+  and `ArgumentError` for a list of labels without a list of breaks as long; a column that is not
+  numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_size_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, size: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_size_continuous(range: {1, 10})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:size)
+      [5.097887617642688, 1.0, 10.0]
+  """
+  @spec scale_size_continuous(t(), keyword()) :: t()
+  def scale_size_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :size,
+      options,
+      @continuous_size_scale_options,
+      "Plot.scale_size_continuous/2",
+      &continuous_size_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous size scale that draws 0 at size 0, replacing any size scale it had.
+
+  Each value is drawn at a size, in millimetres, whose square is as far toward the square of
+  `max_size:` as the value is toward the high end of the limits from 0, so a point's area is in
+  proportion to the value, and the high end is drawn at `max_size:`. A value below 0 is drawn as
+  large as its distance from 0. Its guide is a legend unless `guide:` says otherwise. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a size
+  below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels without a list of
+  breaks as long; a column that is not numbers, and a value below limits whose high end is 0,
+  which would be drawn infinitely large, are refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@area_size_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, size: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_size_area(max_size: 10)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:size)
+      [7.928249671720918, 7.289914755527471, 10.0]
+  """
+  @spec scale_size_area(t(), keyword()) :: t()
+  def scale_size_area(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :size,
+      options,
+      @area_size_scale_options,
+      "Plot.scale_size_area/2",
+      &area_size_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous size scale by width, replacing any size scale it had.
+
+  Each value is drawn at a size between the first of `range:` and the second, in millimetres, as
+  far between them as the value is through the limits, so a point's width, not its area, grows
+  with the value. Its guide is a legend unless `guide:` says otherwise. A value outside the limits,
+  or missing, is not drawn. Raises `NimbleOptions.ValidationError` for an option it does not take
+  or a value it cannot use, a size below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a
+  list of labels without a list of breaks as long; a column that is not numbers is refused when
+  the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@radius_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, size: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_radius(range: {2, 8})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:size)
+      [3.2439024390243905, 2.0, 8.0]
+  """
+  @spec scale_radius(t(), keyword()) :: t()
+  def scale_radius(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :size,
+      options,
+      @radius_scale_options,
+      "Plot.scale_radius/2",
+      &radius_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete size scale, replacing any size scale it had.
+
+  The values are drawn at sizes from the first of `range:` to the second, in millimetres, in
+  order, their squares, and so a point's area, evenly spaced. Its guide is a legend unless `guide:`
+  says otherwise. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
+  it cannot use, a size below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of
+  labels not one for each break or limit given; a column of numbers is refused when the plot is
+  run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_size_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, size: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_size_discrete(range: {1, 3})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:size)
+      [2.23606797749979, 1.0, 3.0]
+  """
+  @spec scale_size_discrete(t(), keyword()) :: t()
+  def scale_size_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :size,
+      options,
+      @discrete_size_scale_options,
+      "Plot.scale_size_discrete/2",
+      &discrete_size_scale/1
+    )
+  end
+
+  @doc """
   Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
   for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
   as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
@@ -2907,6 +3155,12 @@ defmodule Giggly.Plot do
 
   defp limited_scale(:alpha, _ends),
     do: {@continuous_alpha_scale_options, &continuous_alpha_scale/1}
+
+  defp limited_scale(:size, values) when is_list(values),
+    do: {@discrete_size_scale_options, &discrete_size_scale/1}
+
+  defp limited_scale(:size, _ends),
+    do: {@continuous_size_scale_options, &continuous_size_scale/1}
 
   defp limited_scale(_color, values) when is_list(values),
     do: {@discrete_color_scale_options, &discrete_color_scale/1}
@@ -3176,14 +3430,32 @@ defmodule Giggly.Plot do
        "15, such as {4, 4}, got: #{inspect(line_type)}"}
   end
 
-  # NimbleOptions' check of a text's `size:` option: a size in millimetres, 0 or more, kept as a
-  # float.
+  # NimbleOptions' check of a size, a text's or a point's `size:` or a size scale's: a size in
+  # millimetres, 0 or more, kept as a float.
   @doc false
   @spec validate_size(term()) :: {:ok, float()} | {:error, String.t()}
   def validate_size(size) when is_number(size) and size >= 0, do: {:ok, size / 1}
 
   def validate_size(size),
     do: {:error, "expected a size in millimetres, 0 or more, got: #{inspect(size)}"}
+
+  # NimbleOptions' check of a size scale's `range:`: `{low, high}`, each a size in millimetres, 0
+  # or more, kept as a float.
+  @doc false
+  @spec validate_size_range(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_size_range({low, high} = range) do
+    case {validate_size(low), validate_size(high)} do
+      {{:ok, low}, {:ok, high}} -> {:ok, {low, high}}
+      _not_sizes -> size_range_error(range)
+    end
+  end
+
+  def validate_size_range(range), do: size_range_error(range)
+
+  defp size_range_error(range),
+    do:
+      {:error,
+       "expected {low, high}, each a size in millimetres, 0 or more, got: #{inspect(range)}"}
 
   # NimbleOptions' check of a point's `shape:` option: one of the shapes a point is drawn in, by
   # name or by its number, 0 to 25, kept as its name, or `:none` for no point.
@@ -3496,8 +3768,8 @@ defmodule Giggly.Plot do
   def validate_legend_limits({low, high} = limits)
       when is_number(low) and is_number(high) and low > high do
     {:error,
-     "expected {low, high}, low first, since a colour, fill or alpha scale cannot run from high " <>
-       "to low, got: #{inspect(limits)}"}
+     "expected {low, high}, low first, since a colour, fill, alpha or size scale cannot run " <>
+       "from high to low, got: #{inspect(limits)}"}
   end
 
   def validate_legend_limits(limits) do
@@ -3646,9 +3918,9 @@ defmodule Giggly.Plot do
   # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
   # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` for a
   # continuous colour or fill scale alone, as a colour bar shows a continuous scale's colours, so a
-  # discrete scale's is refused, and an alpha scale's whatever its kind.
+  # discrete scale's is refused, and an alpha or a size scale's whatever its kind.
   @doc false
-  @spec validate_guide(term(), :continuous | :discrete | :alpha) ::
+  @spec validate_guide(term(), :continuous | :discrete | :alpha | :size) ::
           {:ok, guide()} | {:error, String.t()}
   def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
   def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
@@ -3657,8 +3929,8 @@ defmodule Giggly.Plot do
   def validate_guide(:colorbar, :discrete),
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
 
-  def validate_guide(:colorbar, :alpha),
-    do: {:error, "a colour bar shows colour or fill, never alpha; give :legend"}
+  def validate_guide(:colorbar, aesthetic) when aesthetic in [:alpha, :size],
+    do: {:error, "a colour bar shows colour or fill, never #{aesthetic}; give :legend"}
 
   def validate_guide(guide, _kind) do
     {:error,
@@ -4277,7 +4549,12 @@ defmodule Giggly.Plot do
   end
 
   defp gradient_scale(validated), do: gradient_through(validated, [:low, :high])
-  defp gradient2_scale(validated), do: gradient_through(validated, [:low, :mid, :high])
+  # A diverging scale, each value placed by its distance from the midpoint, ggplot2's
+  # `rescale_mid()`.
+  defp gradient2_scale(validated) do
+    {midpoint, options} = Keyword.pop!(validated, :midpoint)
+    gradient_through([{:rescaler, {:mid, midpoint}} | options], [:low, :mid, :high])
+  end
 
   # A continuous colour scale with a gradient through the colours of the options `names`, in that
   # order.
@@ -4306,6 +4583,28 @@ defmodule Giggly.Plot do
   defp discrete_alpha_scale(validated) do
     {range, options} = Keyword.pop!(validated, :range)
     discrete_legend({:sequence, range}, options)
+  end
+
+  defp continuous_size_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    continuous_legend({:area, range}, options)
+  end
+
+  # A size scale placing each value at its share of the limits' high end, ggplot2's
+  # `rescale_max()`, through the square root of that share.
+  defp area_size_scale(validated) do
+    {max_size, options} = Keyword.pop!(validated, :max_size)
+    continuous_legend({:abs_area, max_size}, [{:rescaler, :max} | options])
+  end
+
+  defp radius_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    continuous_legend({:rescale, range}, options)
+  end
+
+  defp discrete_size_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    discrete_legend({:area_sequence, range}, options)
   end
 
   defp check_twins(validated, {plain, dated}, function) do

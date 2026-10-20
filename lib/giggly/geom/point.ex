@@ -4,10 +4,10 @@ defmodule Giggly.Geom.Point do
   # Points, ggplot2's `geom_point()`: one per row, at its `x` and `y`, drawn in its shape. It takes
   # no parameters. Draw it through `Giggly.Geom`.
   #
-  # Points use `:x`, `:y`, `:group`, `:alpha`, `:color` and `:fill`, and need `:x` and `:y`; an
-  # aesthetic joins the accepted list with the scale that maps it, so a mapping never silently does
-  # nothing. A layer may also set each point's `:shape`, `:size` and `:stroke`, which no scale maps
-  # yet.
+  # Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill` and `:size`, and need `:x` and
+  # `:y`; an aesthetic joins the accepted list with the scale that maps it, so a mapping never
+  # silently does nothing. A layer may also set each point's `:shape` and `:stroke`, which no scale
+  # maps yet.
   #
   # A row whose `x` or `y` is missing (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops
   # it; ggplot2 also warns, which a pure pipeline cannot. An infinite position is drawn at the
@@ -28,7 +28,8 @@ defmodule Giggly.Geom.Point do
   # carries an alpha, as ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A row
   # whose colour is `:none`, R's `NA`, or missing, as a scale's `na_value: :none` leaves it, draws
   # no point, as ggplot2's `GeomPoint` drops a row whose colour is missing, and so does a row whose
-  # shape is `:none` or missing.
+  # shape is `:none` or missing, or whose size is missing, as a size scale's missing value leaves
+  # it.
   #
   # Points are drawn in row order, each point's elements in the order R draws them, so points that
   # overlap stack as R's do: each run of elements of one kind and one outline width is one
@@ -43,7 +44,7 @@ defmodule Giggly.Geom.Point do
   # The aesthetics a layer of points can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :size, :x, :y]
 
   # The aesthetics a layer of points cannot be drawn without.
   @doc false
@@ -76,6 +77,10 @@ defmodule Giggly.Geom.Point do
     @font_points_per_millimetre 72.27 / 25.4
     @line_width_units_per_millimetre 96 / 25.4
     @points_per_line_width_unit 72 / 96
+
+    # Points in a millimetre, grid's `"mm"` in the scene's points, which a key's room is measured
+    # in.
+    @points_per_millimetre 72 / 25.4
 
     # grid's default line ends, corners and mitre limit, which a point's lines are drawn with.
     @line_end :round
@@ -131,9 +136,9 @@ defmodule Giggly.Geom.Point do
 
     # A legend's key: the point at the middle of the key, as ggplot2's `draw_key_point()` draws
     # it, in the key's shape, size, stroke, colour and fill at its alpha; a colour or shape of
-    # `:none` draws nothing.
+    # `:none`, or a missing size, draws nothing.
     @impl Giggly.Geom
-    def draw_key(_geom, key, _size) do
+    def draw_key(_geom, key) do
       color = Map.get(key, :color, @color)
       fill = Map.get(key, :fill, @fill)
       alpha = Map.get(key, :alpha)
@@ -152,9 +157,28 @@ defmodule Giggly.Geom.Point do
       |> primitives()
     end
 
-    defp drawn?(%{place: {x_position, y_position}, shape: shape, color: {color, _opacity}}) do
+    # The room a key's point needs, its size in millimetres either way, as ggplot2's
+    # `set_key_size()` reads a point's key, which has no `linewidth`, its stroke left out; a
+    # missing size needs none.
+    @impl Giggly.Geom
+    def key_size(_geom, key) do
+      side =
+        case Map.get(key, :size, @size) do
+          nil -> 0.0
+          size -> size * @points_per_millimetre
+        end
+
+      {side, side}
+    end
+
+    defp drawn?(%{
+           place: {x_position, y_position},
+           shape: shape,
+           size: size,
+           color: {color, _opacity}
+         }) do
       is_number(x_position) and is_number(y_position) and color != :none and
-        shape not in [nil, :none]
+        shape not in [nil, :none] and is_number(size)
     end
 
     # The points' elements in order, each run of one kind and one outline width a primitive.

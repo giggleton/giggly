@@ -55,8 +55,9 @@ defmodule Giggly.Geom.Rect do
     @line_width 0.5
     @line_type {}
 
-    # Points in a millimetre: a key's fill is its border's width short of the key each way, as
-    # ggplot2's `draw_key_polygon()` takes `linewidth` millimetres off it, half each side.
+    # Points in a millimetre, grid's `"mm"` in the scene's points: a key's fill is its border's
+    # width short of the key each way, as ggplot2's `draw_key_polygon()` takes `linewidth`
+    # millimetres off it, half each side, and needs that width twice.
     @points_per_millimetre 72 / 25.4
 
     # ggplot2's `GeomRect` draws its rectangles' corners mitred and their ends cut square, grid's
@@ -122,10 +123,11 @@ defmodule Giggly.Geom.Rect do
     defp border(color, _line_type), do: color
 
     # A legend's key: the rectangle's fill short of the key's edges by its border's width, as
-    # ggplot2's `draw_key_polygon()` draws it, in the key's fill at its alpha and its border's
-    # colour, width and line type.
+    # ggplot2's `draw_key_polygon()` draws it, `unit(1, "npc") - unit(linewidth, "mm")` wide and
+    # tall, so its corners are offset half the border's width in from the key's, in the key's fill
+    # at its alpha and its border's colour, width and line type.
     @impl Giggly.Geom
-    def draw_key(_geom, key, {width, height}) do
+    def draw_key(_geom, key) do
       fill = Map.get(key, :fill, @fill)
       line_width = Map.get(key, :linewidth, @line_width)
       line_type = Map.get(key, :linetype, @line_type)
@@ -134,11 +136,11 @@ defmodule Giggly.Geom.Rect do
 
       [
         %Rectangles{
-          xmin: [inset / width],
-          xmax: [1 - inset / width],
-          ymin: [inset / height],
-          ymax: [1 - inset / height],
-          offsets: :none,
+          xmin: [0.0],
+          xmax: [1.0],
+          ymin: [0.0],
+          ymax: [1.0],
+          offsets: [{{inset, inset}, {-inset, -inset}}],
           fill: [Mark.hex(fill)],
           fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
           color: [Mark.hex(border)],
@@ -150,6 +152,14 @@ defmodule Giggly.Geom.Rect do
           mitre_limit: @mitre_limit
         }
       ]
+    end
+
+    # The room a key's rectangle needs, its border's width twice, in millimetres, either way, as
+    # ggplot2's `draw_key_polygon()` sizes its glyph, `linewidth / 5` centimetres.
+    @impl Giggly.Geom
+    def key_size(_geom, key) do
+      side = 2 * Map.get(key, :linewidth, @line_width) * @points_per_millimetre
+      {side, side}
     end
   end
 end

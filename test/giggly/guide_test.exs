@@ -45,7 +45,10 @@ defmodule Giggly.GuideTest do
   # how a legend is laid out.
   describe "draw/3 for a legend" do
     test "a legend is its margin around a title above a key for each label" do
-      keys = Enum.map(~w(2000 2002 2004 2006 2008), fn label -> %{label: label, glyphs: []} end)
+      keys =
+        Enum.map(~w(2000 2002 2004 2006 2008), fn label ->
+          %{label: label, glyphs: [], sizes: []}
+        end)
 
       {width, scene} =
         Guide.draw(%Guide.Legend{}, %{title: "year", keys: keys}, Theme.complete(:gray))
@@ -56,7 +59,7 @@ defmodule Giggly.GuideTest do
     end
 
     test "a title wider than its keys and labels widens the legend to it" do
-      keys = Enum.map(~w(2.5 5.0 7.5), fn label -> %{label: label, glyphs: []} end)
+      keys = Enum.map(~w(2.5 5.0 7.5), fn label -> %{label: label, glyphs: [], sizes: []} end)
 
       {width, scene} =
         Guide.draw(
@@ -68,6 +71,31 @@ defmodule Giggly.GuideTest do
       height = height(scene)
 
       assert {Float.round(width, 2), Float.round(height, 2)} === {119.22, 78.13}
+    end
+
+    # Golden: the merged size and colour legend of test/golden/merged_rows.svg, ggplot2 4.0.3's
+    # through vdiffr 1.0.9: its keys' column 34.02 points wide, as wide as its widest point, and its
+    # rows 17.28, 21.71, 28.53 and 34.02 points tall, each as tall as its own point or the theme's
+    # key, as `measure_legend_keys()` sizes them.
+    test "the keys' column is as wide as the widest glyph, and each row as tall as its tallest" do
+      sizes = [[{11.34, 11.34}], [{21.71, 21.71}], [{28.53, 28.53}, {5.0, 5.0}], [{34.02, 34.02}]]
+
+      keys =
+        Enum.zip_with(~w(4 5 6 8), sizes, fn label, glyph_sizes ->
+          %{label: label, glyphs: [], sizes: glyph_sizes}
+        end)
+
+      {_width, scene} =
+        Guide.draw(%Guide.Legend{}, %{title: "cyl", keys: keys}, Theme.complete(:gray))
+
+      [_margin, {:points, key_column} | _labels] = scene.widths
+
+      key_rows =
+        scene.heights
+        |> Enum.slice(-5, 4)
+        |> Enum.map(fn {:points, height} -> Float.round(height, 2) end)
+
+      assert {key_column, key_rows} === {34.02, [17.28, 21.71, 28.53, 34.02]}
     end
   end
 
@@ -107,7 +135,7 @@ defmodule Giggly.GuideTest do
 
       keys =
         Enum.zip_with(~w(10 15 20 25 30 35), places, fn label, place ->
-          %{label: label, place: place, glyphs: []}
+          %{label: label, place: place, glyphs: [], sizes: []}
         end)
 
       decor = [{0.0, "#132B43"}, {1.0, "#56B1F7"}]
@@ -139,7 +167,7 @@ defmodule Giggly.GuideTest do
 
   # A legend titled `title` with a key for each of `labels`, drawn with no glyphs.
   defp legend(title, labels, theme) do
-    keys = Enum.map(labels, fn label -> %{label: label, glyphs: []} end)
+    keys = Enum.map(labels, fn label -> %{label: label, glyphs: [], sizes: []} end)
     Guide.draw(%Guide.Legend{}, %{title: title, keys: keys}, theme)
   end
 

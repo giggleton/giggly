@@ -35,9 +35,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `scale_x_discrete/2`,
   `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales `scale_color_manual/2`,
   `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and `_continuous`, each
-  with its `scale_fill_` twin, `scale_alpha_continuous/2`, `scale_alpha_discrete/2`, `xlim/3`,
-  `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`), the guide functions (`guides/2`, `guide_legend/1`) and
-  `labs/2`.** `computed_mapping/2`,
+  with its `scale_fill_` twin, `scale_alpha_continuous/2`, `scale_alpha_discrete/2`, the size
+  scales `scale_size_continuous/2`, `scale_size_area/2`, `scale_radius/2` and
+  `scale_size_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`), the guide functions
+  (`guides/2`, `guide_legend/1`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
@@ -81,29 +82,34 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   one. **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and
   `xlim/3`, `ylim/3` and `lims/2` two dates a date scale's**, sorted, never reversed, as R's
   `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
-  the entry beginning "Discrete and date position scales"). **A colour, fill or alpha scale
+  the entry beginning "Discrete and date position scales"). **A colour, fill, alpha or size scale
   function records its palette from its options and every other field from its schema's
   defaults, R's function defaults** (gray's missing value red, gradient2's ends `muted()`), since
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
   palette live here as values, and a test pins the discrete and continuous functions' to
-  `Scale.new/2`'s. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
-  `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
-  its default, the others' `:legend`; a colour bar for a discrete scale or for alpha is refused at
-  the call, where R warns and draws none (design-log §4, the entry beginning "A guide is chosen").
+  `Scale.new/2`'s. gradient2 records its midpoint as the scale's rescaler, `{:mid, midpoint}`, and
+  `scale_size_area/2` its `rescale_max()`, `:max`. **A size scale function takes the options R's
+  does**: `na_value:` only on `scale_size_area/2` and `scale_size_discrete/2`, as R's
+  `scale_size_continuous()` and `scale_radius()` refuse `na.value`, and no `transform:` (design-log
+  §4, the entry beginning "A scale's `rescaler`"); a size, a range's ends and `max_size:` 0 or
+  more (`validate_size/1`, `validate_size_range/1`). **Each records its `guide:`**
+  (`validate_guide/2`): `:legend`, `:none`, or the `%Guide.Legend{}` `guide_legend/1` builds, and
+  on a continuous colour or fill scale `:colorbar`, its default, the others' `:legend`; a colour
+  bar for a discrete scale, for alpha or for size is refused at the call, where R warns and draws
+  none (design-log §4, the entry beginning "A guide is chosen").
   A manual scale's list beside a list of `breaks:` is recorded as a map from each
   break to the colour at its place, as R's `manual_scale()` names them. **`lims/2` takes `color:`
-  (`colour:`, canonicalized first), `fill:` and `alpha:`**: a list records what the aesthetic's
-  `_discrete` function records with those limits, two numbers its `_continuous` one's; numbers
-  high to low are refused at the call, where R reverses the colours through a transformation
-  these scales lack (design-log §4, the entry beginning "Colour, fill and alpha scales"), and
-  dates are refused. **Limits, breaks and minor breaks are
-  recorded in data units, as given**, for the scale to transform; a shortcut records its
-  transformation in `transform`, and takes every other option `scale_x_continuous/2` does; limits
-  in either order are recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair
-  given high to low, as ggplot2's `limits()` does (design-log §4, the entry beginning
-  "Transformations are"). The theme is still a name, `theme: :gray`,
-  until a user can set one; what a misspelt name does arrives with that option, and it must raise
-  at the call.
+  (`colour:`, canonicalized first), `fill:`, `alpha:` and `size:`**: a list records what the
+  aesthetic's `_discrete` function records with those limits, two numbers its `_continuous` one's;
+  numbers high to low are refused at the call, where R reverses the values through a transformation
+  these scales lack (design-log §4, the entry beginning "Colour, fill and alpha scales"), and dates
+  are refused. **Limits, breaks and minor breaks are recorded in data units, as given**, for the
+  scale to transform; a shortcut records its transformation in `transform`, and takes every other
+  option `scale_x_continuous/2` does; limits in either order are recorded so, and `xlim/3`, `ylim/3`
+  and `lims/2` record `:reverse` for a pair given high to low, as ggplot2's `limits()` does
+  (design-log §4, the entry beginning "Transformations are"). The theme is still a name, `theme:
+  :gray`, until a user can set one; what a misspelt name does arrives with that option, and it must
+  raise at the call.
 - **A mistake raises from the call that wrote it, or from the layer that draws it.** Each layer
   function resolves its own mapping against the table it draws, its own or the plot's, and checks
   what the geom can use there, so a misspelt column or an unusable aesthetic is reported by the
@@ -185,18 +191,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and `nil`
   only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
-  aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`) or the plot's `title`, `subtitle`,
-  `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a call replaces only
-  the labels it gives. Any other key raises, and so does a label that is not text or `:none`
-  (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not checked,
-  since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2` takes
-  the titles").
+  aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`, `size`) or the plot's `title`,
+  `subtitle`, `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a call
+  replaces only the labels it gives. Any other key raises, and so does a label that is not text or
+  `:none` (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not
+  checked, since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2`
+  takes the titles").
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
-  `fill` and `alpha` alone, each as a scale's `guide:` takes it, a colour bar for alpha refused at
-  the call; whether a colour or fill scale it gives a colour bar is continuous is known only when
-  the plot is run, so the assembly refuses one that is not. Which aesthetic a layer maps is not
-  checked. The axes take no guide yet: they wait for `guide_axis()`'s options.
+  `fill`, `alpha` and `size` alone, each as a scale's `guide:` takes it, a colour bar for alpha or
+  size refused at the call; whether a colour or fill scale it gives a colour bar is continuous is
+  known only when the plot is run, so the assembly refuses one that is not. Which aesthetic a layer
+  maps is not checked. The axes take no guide yet: they wait for `guide_axis()`'s options.
 - **Each table is read once, by the call that gives it**: the plot's by `new/2`, a layer's own by
   its function's `data:`, any `Table.Reader`, read after the options are validated, as ggplot2's
   `data =`. The plot holds a `Giggly.DataFrame` and each layer its own or `:none`, which draws the

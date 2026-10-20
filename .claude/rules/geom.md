@@ -70,7 +70,8 @@ where its marks sit".
   15 to 18 filled with it and not outlined; 19 and 20 outlined and filled with it; 21 to 25
   outlined with it and filled with the fill. A circle of no radius is not drawn, as `GECircle()`
   draws none; a square, polygon or segment of no size is. A shape of `:none`, or a missing one, as
-  a colour's, draws no point. **Points are drawn in row order, each whole before the next**, so
+  a colour's, draws no point, and so does a missing size, as `GeomPoint` drops a row whose size a
+  size scale left missing. **Points are drawn in row order, each whole before the next**, so
   overlapping points stack as R's do; each run of elements of one kind and one outline width is one
   primitive. Every shape is checked against vdiffr's drawing (`test/golden/point_shapes.svg`).
 - **A row's `alpha` replaces its colour's own alpha: a point's colour and fill alike, a bar's fill
@@ -87,18 +88,23 @@ where its marks sit".
   draws as `:none` does** (`Mark.colors/3`): a frame's column holds one type, so a set `colour:
   :none` fills its whole column, and a value a scale maps to `:none` (`na_value: :none`), or an
   annotation's list's `:none`, is held as `nil`, as R's column holds `NA`.
-- **A geom draws its own legend key (`draw_key/3`)**, as ggplot2's `draw_key` belongs to the geom:
-  handed the key's aesthetic values, the layer's set values among them as ggplot2's key data holds
-  its `aes_params`, and its size in points, it draws in the key's cell. A point's key is the point
-  at the middle in the key's shape, size, stroke, colour and fill, as `draw_key_point()` draws it;
-  ggplot2 widens a key for a point too big for it, which waits for keys that size themselves; a
-  bar's is its fill short of the key by its border's width, the layer's set `linewidth` or 0.5 mm,
-  as `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's alpha
-  and its border in its own, as wide and in the line type the layer sets, a blank one not drawn; a
-  path's is a segment across the middle from a tenth of the key's width to nine tenths, as
+- **A geom draws its own legend key (`draw_key/2`) and says how much room it needs
+  (`key_size/2`)**, as ggplot2's `draw_key` belongs to the geom: handed the key's aesthetic
+  values, the layer's set values among them as ggplot2's key data holds its `aes_params`, it draws
+  in the key's cell **by fractions of the cell and offsets in points**, as grid places a glyph by
+  `npc` and absolute units, so it is right in a key of any size, and reports `{width, height}` in
+  points, which the legend sizes its rows and column by (design-log §4, the entry beginning "A
+  scale's `rescaler`"). A point's key is the point at the middle in the key's shape, size,
+  stroke, colour and fill, as `draw_key_point()` draws it, and needs its size in millimetres
+  either way, its stroke left out, as `set_key_size()` reads it; a bar's is its fill short of the
+  key by its border's width, the layer's set `linewidth` or 0.5 mm, its corners offset half that
+  in, as `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's
+  alpha and its border in its own, as wide and in the line type the layer sets, a blank one not
+  drawn, and needs twice its border's width, `draw_key_polygon()`'s `linewidth / 5` cm; a path's
+  is a segment across the middle from a tenth of the key's width to nine tenths, as
   `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm and in its line
-  type, a blank one drawing nothing, its ends the layer's and its corners round. Neither is widened
-  for a line too wide for its key, which waits for keys that size themselves.
+  type, a blank one drawing nothing, its ends the layer's and its corners round, and needs its
+  width. Each was checked against vdiffr's drawing of a key too big for the theme's.
 - **A path is drawn as ggplot2's `GeomPath` draws one.** Rows missing `x` or `y` at a group's ends
   are dropped (`keep_mid_true()`), and one in the middle breaks the line; the rows are put in
   group order, each group's in its own, and munched; a group of fewer than two rows is not drawn.
@@ -127,8 +133,11 @@ where its marks sit".
   since the scene draws a label at its measured width; **whether labels overlap is the backend's to
   decide** (`Scene.Text`'s `check_overlap`), since it turns on the panel's size in points, which no
   geom sees. Its key is the letter "a" at the layer's justification, turned as `rotate_just()` turns
-  it, a tenth of a line in from the key's edges, as `draw_key_text()` draws it; ggplot2 widens a key
-  for text too big for it, which waits for keys that size themselves.
+  it, a tenth of a line of its own text in from the key's edges, an offset turned into the text's
+  frame, as `draw_key_text()` draws it, and needs the box round the letter turned with it, the
+  font's descent added by the angle's sine and cosine and a margin each side of a tenth of a line
+  of grid's default 12-point font, not its own, as `draw_key_text()` measures it, outside the
+  text's font.
 - **A line (`Geom.Line`) is a path whose rows `setup_data/3` puts in order** of panel, group and
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws

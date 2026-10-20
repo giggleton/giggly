@@ -140,6 +140,21 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   R's, each run of one kind and outline width one primitive. *Rejected: a symbol primitive the
   backend draws* — every backend would hold R's geometry, and the scene would know R.
 
+- **A scale's `rescaler` says how it places a value, and a legend key is as big as its glyphs
+  (2026-10-20, Steve, the size step).** `scale_size_area()` places a value at its share of the
+  limits' high end, R's `rescale_max()`, which no palette can work out from a place alone, so
+  `Scale.Continuous`'s `midpoint` became `rescaler` (`:rescale`, `{:mid, midpoint}`, `:max`), the
+  field ggplot2's scale holds: one field for one question (Steve). Keys size themselves as
+  `measure_legend_keys()` sizes them: each geom reports its glyph's room (`Geom.key_size/2`) and
+  draws by fractions of the key and offsets in points (`draw_key/2`), as grid mixes `npc` and
+  absolute units, so the legend lays out its rows and column before any glyph is placed; text keys
+  too (Steve), measured as `draw_key_text()` measures them. A size scale takes R's options,
+  `na_value:` on `_area` and `_discrete` alone. *Rejected: `rescaler` beside `midpoint`*, two
+  fields a scale uses one of. *Rejected: drawing each key at its final size*, rendering asking the
+  guide for its layout between measuring and drawing. *Deferred:* `transform:` on size scales (so
+  `lims(size: {20, 0})` is refused, where R reverses), `aesthetics:`, and `scale_size_ordinal()`,
+  with ordered factors.
+
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
   alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
@@ -219,10 +234,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   generalised from two colours, Giggly's blend matches R on all 30,054 colours sampled from six
   colour sets, through the `color` library with farver's constants, no new library. gradient2
   centres its colours on the midpoint by R's `rescale_mid()`, which R keeps on the scale as its
-  rescaler, so `Scale.Continuous` gains `midpoint`, `:none` otherwise; its colour bar's ticks are
-  placed over the limits, as R places them, ignoring it. *Rejected: a palette per function*,
-  three copies of one blend. *Rejected: the midpoint in the palette*: a palette takes a place
-  from 0 to 1, and the ticks never go through the midpoint.
+  rescaler, so `Scale.Continuous` holds it as its `rescaler`, `{:mid, midpoint}`; its colour bar's
+  ticks are placed over the limits, as R places them, ignoring it. *Rejected: a palette per
+  function*, three copies of one blend. *Rejected: the midpoint in the palette*: a palette takes a
+  place from 0 to 1, and the ticks never go through the midpoint.
 
 - **`date_breaks:` and `date_minor_breaks:` are a step as `Date.shift/2` takes one, `[week: 1]`,
   and `date_labels:` is a `Calendar.strftime/3` format (2026-10-19, Steve).** A step is one of
@@ -685,7 +700,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   functions, its kind fixed (`legends/3` in the assembly, `draw_legend/2` in rendering). Then each
   kind becomes one module holding its struct (its options), key and drawing, behind a protocol at
   `Giggly.Guide`: a build function the assembly calls, a drawing one rendering calls; glyphs stay
-  on `Geom.draw_key/3`. Merging groups guides by order, kind, title and labels, each kind merging
+  on `Geom.draw_key/2`. Merging groups guides by order, kind, title and labels, each kind merging
   its own way. Axes join when a user can choose one. `Plot` building guide structs widens its
   boundary, raised then. *Rejected: ggity's legend protocol on the scale*, every scale redoing the
   layout and its own glyphs. *Rejected: building it now*, a protocol with one implementation.
@@ -697,7 +712,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   centred when its sizes are all points, as grid centres a fixed gtable in its viewport; the
   legend's cell spans the panel rows right of the panels. Its geometry is read from ggplot2's
   `GuideLegend` (`setup_elements()`'s margins and justifications) and checked against R, not
-  fitted. Each geom draws its own key (`Geom.draw_key/3`), as ggplot2's `draw_key` does.
+  fitted. Each geom draws its own key (`Geom.draw_key/2`), as ggplot2's `draw_key` does.
   *Rejected: the legend's rows and columns in the plot's table*, which centring on faceted panels
   breaks. *Rejected: one cell placed by point offsets*, which rectangles and circles lack and which
   would write the key backgrounds unlike svglite.
@@ -1839,6 +1854,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-20 — Size points by a mapped column, and legend keys by their glyphs (size, shape and
+  line type, step 3); §4: "A scale's `rescaler` says how it places a value"
 - 2026-10-19 — Dash a line and a bar's border in its line type (size, shape and line type, step
   2); §4: "A line type is a name", "An aesthetic a layer takes from the plot"
 - 2026-10-19 — Give a point its shape, size, stroke and fill (size, shape and line type, step 1);

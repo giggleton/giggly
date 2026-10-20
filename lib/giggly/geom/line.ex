@@ -66,10 +66,17 @@ defmodule Giggly.Geom.Line do
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key, size) do
+    def draw_key(geom, key) do
       geom
       |> path()
-      |> Geom.draw_key(key, size)
+      |> Geom.draw_key(key)
+    end
+
+    @impl Giggly.Geom
+    def key_size(geom, key) do
+      geom
+      |> path()
+      |> Geom.key_size(key)
     end
 
     # The path a line is drawn as.

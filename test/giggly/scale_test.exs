@@ -49,9 +49,9 @@ defmodule Giggly.ScaleTest do
              ]
     end
 
-    test "a date has a scale on a position aesthetic and none yet on alpha" do
-      assert {Scale.kind(:date, :x), Scale.kind(:date, :ymax), Scale.kind(:date, :alpha)} ===
-               {:date, :date, :none}
+    test "a date has a scale on a position aesthetic and none yet on alpha or size" do
+      assert {Scale.kind(:date, :x), Scale.kind(:date, :ymax), Scale.kind(:date, :alpha),
+              Scale.kind(:date, :size)} === {:date, :date, :none, :none}
 
       assert {Scale.kind(:float, :alpha), Scale.kind(:string, :alpha)} ===
                {:continuous, :discrete}
@@ -1001,6 +1001,17 @@ defmodule Giggly.ScaleTest do
     |> Scale.train(values)
   end
 
+  # mtcars' horsepower range trains the scale, as R's does.
+  defp size_scale(untrained), do: Scale.train(untrained, [52, 335])
+
+  # A scale of sizes by area from 0, as `Giggly.Plot.scale_size_area/2` records it with
+  # `options`, trained on `values`.
+  defp area_scale(values, options \\ []) do
+    Scale.Continuous
+    |> struct!([palette: {:abs_area, 6.0}, rescaler: :max, guide: :legend] ++ options)
+    |> Scale.train(values)
+  end
+
   # A continuous colour scale of `palette`, its missing value grey50, trained once on `values`.
   defp gradient_through(colors, values, options \\ []) do
     Scale.Continuous
@@ -1171,8 +1182,8 @@ defmodule Giggly.ScaleTest do
 
     test "a midpoint places each value by its distance from it, the further end at 0 or 1" do
       three = ["#832424", "#FFFFFF", "#3A3A98"]
-      centred = gradient_through(three, [-2, 1], midpoint: 0.0)
-      off_centre = gradient_through(three, [0, 10], midpoint: 4.0)
+      centred = gradient_through(three, [-2, 1], rescaler: {:mid, 0.0})
+      off_centre = gradient_through(three, [0, 10], rescaler: {:mid, 4.0})
 
       assert {Scale.map(centred, [-2, 0, 1]), Scale.map(off_centre, [0, 5, 10])} ===
                {["#832424", "#FFFFFF", "#A197CC"], ["#B26D65", "#E0DBEE", "#3A3A98"]}
@@ -1180,7 +1191,7 @@ defmodule Giggly.ScaleTest do
 
     test "limits of zero width put every value at the middle, about a midpoint too" do
       three = ["#832424", "#FFFFFF", "#3A3A98"]
-      centred = gradient_through(three, [3, 3], midpoint: 0.0)
+      centred = gradient_through(three, [3, 3], rescaler: {:mid, 0.0})
       plain = gradient_through(three, [3, 3])
 
       assert {Scale.map(centred, [3]), Scale.map(plain, [3])} === {["#FFFFFF"], ["#FFFFFF"]}
@@ -1193,6 +1204,124 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `size = hp` on mtcars, whose
+  # horsepower runs from 52 to 335, through `scale_size_continuous()`, `scale_size_area()`,
+  # `scale_radius()` and `scale_size(range = c(0, 10))`, and for a discrete size of seven levels
+  # through `scale_size_discrete()`, R's own figures to the last digit.
+  describe "map/2 of a size scale" do
+    @horsepower [110, 93, 175, 105]
+
+    test "a continuous size is its place's square root rescaled onto 1 to 6, so its area grows" do
+      default =
+        :continuous
+        |> Scale.new(:size)
+        |> size_scale()
+
+      wide = size_scale(%Scale.Continuous{palette: {:area, {0.0, 10.0}}, guide: :legend})
+
+      assert {Scale.map(default, @horsepower), Scale.map(wide, @horsepower)} ===
+               {[3.2635536025596519, 2.9031311376803437, 4.2963198239287159, 3.1637880669295164],
+                [4.5271072051193038, 3.8062622753606878, 6.5926396478574318, 4.3275761338590328]}
+    end
+
+    test "a size by radius is its place rescaled onto 1 to 6" do
+      scale = size_scale(%Scale.Continuous{palette: {:rescale, {1.0, 6.0}}, guide: :legend})
+
+      assert Scale.map(scale, @horsepower) ===
+               [2.0247349823321557, 1.7243816254416962, 3.1731448763250882, 1.9363957597173145]
+    end
+
+    test "a size by area from 0 is the square root of its share of the high end, times 6" do
+      scale = area_scale([52, 335])
+
+      assert Scale.map(scale, @horsepower) ===
+               [3.438152923066113, 3.1613335557555877, 4.3365850792131049, 3.3591043582407853]
+    end
+
+    test "a size by area from 0 takes a value below 0 by its distance, and one value at the top" do
+      signed = area_scale([-2, -1, 1, 4])
+      negative = area_scale([-4, -2, -1])
+      single = area_scale([3, 3])
+
+      assert {Scale.map(signed, [-2, -1, 1, 4]), Scale.map(negative, [-4, -2, -1]),
+              Scale.map(single, [3])} ===
+               {[4.2426406871192857, 3.0, 3.0, 6.0], [12.0, 8.4852813742385713, 6.0], [6.0]}
+    end
+
+    test "a size by area from 0 censors outside its limits, and takes its missing value's size" do
+      values = [1, 2, nil, 10]
+      wide = area_scale(values, limits: {0.0, 20.0})
+      narrow = area_scale(values, limits: {2.0, 5.0})
+      missing = area_scale(values, na_value: 2.0)
+
+      assert {Scale.map(wide, values), Scale.map(narrow, values), Scale.map(missing, values)} ===
+               {[1.3416407864998738, 1.8973665961010275, nil, 4.2426406871192857],
+                [nil, 3.7947331922020551, nil, nil],
+                [1.8973665961010275, 2.6832815729997477, 2.0, 6.0]}
+    end
+
+    # R gives 0 / 0, NaN, which maps to NA, and -1 / 0, minus infinity, a size R's legend cannot
+    # draw ("non-finite location and/or size for viewport").
+    test "a size by area from 0 whose high end is 0 drops 0 and refuses a value below it" do
+      zeros = area_scale([0, 0])
+      below = area_scale([-1, 0])
+
+      assert Scale.map(zeros, [0, 0.0]) === [nil, nil]
+
+      error = assert_raise ArgumentError, fn -> Scale.map(below, [-1]) end
+      assert error.message =~ "cannot place -1 when that end is 0"
+    end
+
+    test "one value is at the middle of a size's range, as any continuous aesthetic's" do
+      continuous =
+        :continuous
+        |> Scale.new(:size)
+        |> Scale.train([3, 3])
+
+      radius = Scale.train(%Scale.Continuous{palette: {:rescale, {1.0, 6.0}}}, [3, 3])
+
+      assert {Scale.map(continuous, [3]), Scale.map(radius, [3])} ===
+               {[4.5355339059327378], [3.5]}
+    end
+
+    test "a discrete size spreads its levels' areas evenly from 2 to 6, or over its range" do
+      levels = ~w(a b c d e f g)
+
+      default =
+        :discrete
+        |> Scale.new(:size)
+        |> Scale.train(levels)
+
+      narrow = Scale.train(%Scale.Discrete{palette: {:area_sequence, {1.0, 3.0}}}, levels)
+
+      assert {Scale.map(default, levels), Scale.map(narrow, levels)} ===
+               {[
+                  2.0,
+                  3.0550504633038931,
+                  3.8297084310253524,
+                  4.4721359549995796,
+                  5.0332229568471663,
+                  5.5377492419453826,
+                  6.0
+                ],
+                [
+                  1.0,
+                  1.5275252316519465,
+                  1.9148542155126762,
+                  2.2360679774997898,
+                  2.5166114784235831,
+                  2.7688746209726913,
+                  3.0
+                ]}
+    end
+
+    test "a size scale records ggplot2's default sizes and a legend, untrained, its missing value nil" do
+      assert {Scale.new(:continuous, :size), Scale.new(:discrete, :size)} ===
+               {%Scale.Continuous{palette: {:area, {1.0, 6.0}}, guide: :legend},
+                %Scale.Discrete{palette: {:area_sequence, {2.0, 6.0}}, guide: :legend}}
+    end
+  end
+
   # Golden: ggplot2 4.0.3's colour bar in R 4.6.1 over `scale_colour_continuous(limits = c(0,
   # 40))` on mpg's city mileage, 9 to 35: `extract_decor()` samples the limits, and
   # `extract_params()` places the breaks over them, a midpoint left out of both.
@@ -1201,7 +1330,7 @@ defmodule Giggly.ScaleTest do
       scale =
         gradient_through(["#832424", "#FFFFFF", "#3A3A98"], [9, 35],
           limits: {0.0, 40.0},
-          midpoint: 20.0
+          rescaler: {:mid, 20.0}
         )
 
       assert {Scale.samples(scale, 5), Scale.places(scale, [10.0, 20.0])} ===

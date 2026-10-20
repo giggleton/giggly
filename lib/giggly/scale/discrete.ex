@@ -13,10 +13,13 @@ defmodule Giggly.Scale.Discrete do
       a colour for each value, their hues spaced evenly from `low` to `high` round the circle,
       handed out in reverse for a `direction` of -1; `{:gray, {start, finish}}`, greys from the
       level `start` to `finish`, 0 black and 1 white; or `{:manual, colors}`, the colours of a
-      list in order, or those of a map from value to colour by value.
-    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha,
-      grey, `"#7F7F7F"`, for colour and fill, or `:none`, no colour. A missing value takes no share
-      of the palette; a position scale puts it at its last level, and its `na_value` is `nil`.
+      list in order, or those of a map from value to colour by value; and for size,
+      `{:area_sequence, {low, high}}`, sizes from `low` to `high` whose squares, and so areas, are
+      spread evenly.
+    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha and
+      size, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no colour. A missing value takes
+      no share of the palette; a position scale puts it at its last level, and its `na_value` is
+      `nil`.
     * `guide`: the guide that draws it: `:axis` for a position and `:legend` for an aesthetic such
       as alpha or colour, `:none` for none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
@@ -68,7 +71,8 @@ defmodule Giggly.Scale.Discrete do
                  direction: 1 | -1
                }}
             | {:gray, {number(), number()}}
-            | {:manual, [String.t() | :none] | %{term() => String.t() | :none}},
+            | {:manual, [String.t() | :none] | %{term() => String.t() | :none}}
+            | {:area_sequence, {number(), number()}},
           na_value: nil | number() | String.t() | :none,
           guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),

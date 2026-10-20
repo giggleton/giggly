@@ -13,14 +13,17 @@ defmodule Giggly.Scale.Continuous do
       for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
       aesthetic such as alpha, each place, from 0 to 1, rescaled onto `low` to `high`; and
       `{:gradient, colors}` for colour and fill, the colour that far along a gradient through
-      `colors`, spaced evenly, blended in L*a*b*.
-    * `midpoint`: the value a gradient's middle colour stands at, so each value's place is its
-      distance from the midpoint, the end further from it at 0 or 1; `:none` for none, each value
-      placed between the limits' ends.
+      `colors`, spaced evenly, blended in L*a*b*; and for size, `{:area, {low, high}}`, each
+      place's square root rescaled onto `low` to `high`, so a value's area grows with it, or
+      `{:abs_area, max}`, the square root of the place's size rescaled onto 0 to `max`.
+    * `rescaler`: how a value's place in the limits is found: `:rescale`, its distance from the
+      low end over the limits' width; `{:mid, midpoint}`, its distance from the midpoint over twice
+      the further end's, so the midpoint is at the middle and the further end at 0 or 1; or `:max`,
+      the value over the high end, so 0 is at 0.
     * `na_value`: what a missing value, one not a finite number, or one outside the limits maps
-      to: `nil` for a position and alpha, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no
-      colour.
-    * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha and
+      to: `nil` for a position, alpha and size, grey, `"#7F7F7F"`, for colour and fill, or
+      `:none`, no colour.
+    * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha, size and
       `:colorbar` for colour and fill unless a scale function chooses `:legend`, `:none` for
       none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
@@ -43,12 +46,12 @@ defmodule Giggly.Scale.Continuous do
   alias Giggly.Scale.Transform
 
   # Every field's default is a position scale's before it has seen any data: the identity
-  # transformation and palette, no midpoint, an axis, and every option the default, ggplot2's 5%
-  # of the limits' width at each end among them.
+  # transformation and palette, places between the limits' ends, an axis, and every option the
+  # default, ggplot2's 5% of the limits' width at each end among them.
   defstruct range: :none,
             transform: :identity,
             palette: :identity,
-            midpoint: :none,
+            rescaler: :rescale,
             na_value: nil,
             guide: :axis,
             name: :default,
@@ -64,8 +67,13 @@ defmodule Giggly.Scale.Continuous do
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
           transform: :identity | :date | :log10 | :sqrt | :reverse | :reciprocal,
-          palette: :identity | {:rescale, {number(), number()}} | {:gradient, [String.t()]},
-          midpoint: :none | number(),
+          palette:
+            :identity
+            | {:rescale, {number(), number()}}
+            | {:gradient, [String.t()]}
+            | {:area, {number(), number()}}
+            | {:abs_area, number()},
+          rescaler: :rescale | {:mid, number()} | :max,
           na_value: nil | number() | String.t() | :none,
           guide: :axis | :legend | :colorbar | :none | struct(),
           name: :default | :none | String.t(),

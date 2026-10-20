@@ -12,9 +12,11 @@ defmodule Giggly.Guide.Legend do
   #   * the title, as deep as its lines (`Giggly.Guide.Parts`), left-aligned and centred down its
   #     row as grid centres text, then the title's margin below it; a title of `:none` takes
   #     neither;
-  #   * a row for each key, as tall as a key, the key square and on the key background, the glyph
-  #     of each layer drawn over it, and its label right of it, the labels' margin from the key,
-  #     centred on it as the title is;
+  #   * a row for each key, the key on the key background, the glyph of each layer drawn over it,
+  #     and its label right of it, the labels' margin from the key, centred on it as the title is;
+  #     each row as tall as the theme's key or the tallest glyph drawn in it, and the keys' column
+  #     as wide as the theme's key or the widest glyph drawn in any, as ggplot2's
+  #     `measure_legend_keys()` sizes them from the room each glyph needs;
   #   * the label column as wide as the widest label, or wider when the title is wider than the
   #     keys and their labels, which leaves the room at the labels' right; with no labels, neither
   #     the column nor its margin, but the room a wider title needs right of the keys, as ggplot2
@@ -49,12 +51,18 @@ defmodule Giggly.Guide.Legend do
       label_widths = Parts.label_widths(labels, text_look)
       label_margin = Parts.label_margin(labels, text_look)
       title_width = Parts.legend_title_width(title, title_look)
-      label_column = max(Enum.max(label_widths), title_width - key_size - label_margin)
+      key_column = key_extent(keys, key_size, fn {width, _height} -> width end)
+      label_column = max(Enum.max(label_widths), title_width - key_column - label_margin)
       {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
       first_key_row = 2 + length(title_rows)
 
-      widths = [margin, key_size, label_margin, label_column, margin]
-      key_rows = List.duplicate(key_size, length(keys))
+      widths = [margin, key_column, label_margin, label_column, margin]
+
+      key_rows =
+        Enum.map(keys, fn key ->
+          key_extent([key], key_size, fn {_width, height} -> height end)
+        end)
+
       heights = Enum.concat([[margin], title_rows, key_rows, [margin]])
 
       scene = %Scene{
@@ -71,6 +79,15 @@ defmodule Giggly.Guide.Legend do
       }
 
       {Enum.sum(widths), scene}
+    end
+
+    # How far `keys` reach one way, `extent` of each glyph's room: the theme's key size, or the
+    # largest glyph's where one needs more.
+    defp key_extent(keys, key_size, extent) do
+      keys
+      |> Enum.flat_map(fn key -> Enum.map(key.sizes, extent) end)
+      |> Enum.max(fn -> key_size end)
+      |> max(key_size)
     end
 
     # Each key's cell, its background under its glyphs, in the key rows, which start at

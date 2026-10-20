@@ -2675,6 +2675,105 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/point_fill_legend.svg")
     end
 
+    # Golden: test/golden/size_continuous.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/size_continuous.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. scale_size()'s first example: mpg's points
+    # sized by highway mileage, by area from 1 to 6 mm, a legend of three points in keys of the
+    # theme's size. It moves with what moves test/golden/point_colour_legend.svg.
+    test "points are sized by a mapped column, by area, with a legend of sized keys" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, size: :hwy})
+        |> Plot.geom_point()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/size_continuous.svg")
+    end
+
+    # Golden: test/golden/size_range.svg and test/golden/size_area.svg, checked against ggplot2's
+    # drawings of the same plots, made by test/golden/size_range.R and test/golden/size_area.R:
+    # every element matches, the x axis drawn before the y as in test/golden/point.svg, and every
+    # clip path. The same points sized by area from 0 to 10 mm, the legend's keys widened to the
+    # largest point and each row as tall as its own; and by area in proportion to the mileage, 0 at
+    # size 0. They move with what moves test/golden/size_continuous.svg.
+    test "a size scale's range sizes the points and its keys, and size_area draws 0 at size 0" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, size: :hwy})
+        |> Plot.geom_point()
+
+      drawn = fn scaled ->
+        scaled
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+      end
+
+      ranged = Plot.scale_size_continuous(plot, range: {0, 10})
+      by_area = Plot.scale_size_area(plot)
+
+      assert drawn.(ranged) == File.read!("test/golden/size_range.svg")
+      assert drawn.(by_area) == File.read!("test/golden/size_area.svg")
+    end
+
+    # Golden: test/golden/size_merged_rows.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/size_merged_rows.R: every element matches it, the x axis drawn before the
+    # y as in test/golden/point.svg, and every clip path. Cylinders as a factor mapped to size and
+    # colour, sized by area from 4 to 12 mm: one merged legend, its keys' column as wide as the
+    # largest point and each row as tall as its own point or the theme's key. It moves with what
+    # moves test/golden/size_continuous.svg, and with how legends merge.
+    test "a discrete size merges with a colour of the same column, each key row its point's height" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, size: {:factor, [:cyl]}, colour: {:factor, [:cyl]}})
+        |> Plot.geom_point()
+        |> Plot.scale_size_discrete(range: {4, 12})
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/size_merged_rows.svg")
+    end
+
+    # Golden: test/golden/point_key_big.svg, test/golden/bar_key_big.svg,
+    # test/golden/line_key_big.svg, test/golden/text_key_big.svg and
+    # test/golden/text_key_turned.svg, checked against ggplot2's drawings of the same plots, made by
+    # the R script beside each: every element matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. A point set to 8 mm, a bar bordered 4 mm wide, a
+    # line 8 mm wide, and text at 12 mm and at 8 mm turned 30 degrees, each in a colour or fill
+    # legend whose keys widen to fit it, as ggplot2's `set_key_size()` and `draw_key_text()` size
+    # them. They move with what moves test/golden/point_colour_legend.svg.
+    test "a legend's keys widen to fit what the layers set too big for the theme's key" do
+      mpg = Giggly.Datasets.mpg()
+      lines = %{"x" => [1, 2, 1, 2], "y" => [1, 2, 2, 1], "g" => ["a", "a", "b", "b"]}
+      labelled = Plot.new(mpg, %{x: :displ, y: :hwy, colour: :drv, label: :drv})
+
+      plots = [
+        {"point_key_big",
+         mpg
+         |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+         |> Plot.geom_point(size: 8)},
+        {"bar_key_big",
+         mpg
+         |> Plot.new(%{x: :class, fill: :drv})
+         |> Plot.geom_bar(colour: "black", linewidth: 4)},
+        {"line_key_big",
+         lines
+         |> Plot.new(%{x: :x, y: :y, colour: :g})
+         |> Plot.geom_line(linewidth: 8)},
+        {"text_key_big", Plot.geom_text(labelled, size: 12)},
+        {"text_key_turned", Plot.geom_text(labelled, size: 8, angle: 30, hjust: 0, vjust: 1)}
+      ]
+
+      for {name, plot} <- plots do
+        svg =
+          plot
+          |> Giggly.to_svg(width: 960, height: 768)
+          |> IO.iodata_to_binary()
+
+        assert svg == File.read!("test/golden/#{name}.svg"), name
+      end
+    end
+
     # Golden: test/golden/bar_fill.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/bar_fill.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_bar()'s example from ggplot2's reference page:
@@ -2923,7 +3022,6 @@ defmodule GigglyTest do
             {&Plot.geom_path/1, :linewidth},
             {&Plot.geom_path/1, :linetype},
             {&Plot.geom_point/1, :shape},
-            {&Plot.geom_point/1, :size},
             {&Plot.geom_point/1, :stroke},
             {&Plot.geom_col/1, :linewidth},
             {&Plot.geom_col/1, :linetype}

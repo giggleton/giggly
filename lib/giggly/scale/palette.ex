@@ -16,9 +16,19 @@ defmodule Giggly.Scale.Palette do
   #     channels interpolated between the two colours either side as R's `approxfun()` does, a
   #     place at a colour taking that colour's exactly, and the blend turned back into a colour. One
   #     colour is every place's. ggplot2's default runs from `#132B43` to `#56B1F7`.
+  #   * `{:area, {low, high}}`, a continuous size scale's: a value's place in the limits, from 0 to
+  #     1, its square root rescaled onto `low` to `high`, as R's `pal_area()` does, so a point's
+  #     area, not its width, grows with the value. ggplot2's default runs from 1 to 6.
+  #   * `{:abs_area, max}`, the size scale's that puts 0 at size 0: the square root of a place's
+  #     size rescaled onto 0 to `max`, as R's `abs_area()` does. Its scale places a value at its
+  #     share of the limits' high end, which may be below 0, hence the size.
   #   * `{:sequence, {low, high}}`, a discrete scale's: given the number of levels, that many
   #     values from `low` to `high`, evenly spaced, as ggplot2's ordinal alpha scale takes R's
   #     `seq(low, high, length.out = n)`.
+  #   * `{:area_sequence, {low, high}}`, a discrete size scale's: given the number of levels, that
+  #     many sizes from `low` to `high` whose squares are evenly spaced, so their areas are, as
+  #     ggplot2's ordinal size scale takes R's `sqrt(seq(low^2, high^2, length.out = n))`, `low^2`
+  #     as R's `^` computes a square, `low * low`. ggplot2's default runs from 2 to 6.
   #   * `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}`,
   #     a discrete colour scale's: given the number of levels, that many colours of one chroma and
   #     luminance, their hues spaced evenly from `low` to `high`, as R's `pal_hue()` gives them,
@@ -59,17 +69,37 @@ defmodule Giggly.Scale.Palette do
              }}
           | {:gray, {number(), number()}}
           | {:manual, [ColorOperations.t()] | %{term() => ColorOperations.t()}}
+          | {:area, {number(), number()}}
+          | {:abs_area, number()}
+          | {:area_sequence, {number(), number()}}
 
   # R's gamma for `grey.colors()`.
   @gray_gamma 2.2
 
   # A continuous palette's value for a place from 0 to 1 in the scale's limits: for a rescale, R's
-  # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for a gradient, the
-  # colour that far along it, as the opening comment says.
+  # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for an area, the
+  # place's square root rescaled so, as `pal_area()` computes it; for an absolute area, the square
+  # root of the place's size rescaled onto 0 to the maximum, as `abs_area()` computes it, a place
+  # being any number its scale's rescaler gives; for a gradient, the colour that far along it, as
+  # the opening comment says.
   @doc false
-  @spec continuous({:rescale, {number(), number()}}, number()) :: float()
+  @spec continuous({:rescale | :area, {number(), number()}}, number()) :: float()
+  @spec continuous({:abs_area, number()}, number()) :: float()
   @spec continuous({:gradient, [String.t()]}, number()) :: String.t()
   def continuous({:rescale, to}, place), do: Giggly.Scale.rescale(place, {0, 1}, to)
+
+  def continuous({:area, to}, place) do
+    place
+    |> :math.sqrt()
+    |> Giggly.Scale.rescale({0, 1}, to)
+  end
+
+  def continuous({:abs_area, max}, place) do
+    place
+    |> abs()
+    |> :math.sqrt()
+    |> Giggly.Scale.rescale({0, 1}, {0, max})
+  end
 
   def continuous({:gradient, [color]}, _place), do: color
 
@@ -133,12 +163,21 @@ defmodule Giggly.Scale.Palette do
   # A grey palette's are `grey.colors()`'s and a manual one's its first colours, as the opening
   # comment says; a manual palette of too few colours raises.
   #
+  # An area sequence's are the square roots of `spread/2` from `low * low` to `high * high`.
+  #
   # A scale whose every value is missing has no levels to ask for, and ggplot2 then maps every
   # value to its NA value without asking its palette, so no levels give none.
   @doc false
-  @spec discrete({:sequence, {number(), number()}}, non_neg_integer()) :: [number()]
+  @spec discrete({:sequence | :area_sequence, {number(), number()}}, non_neg_integer()) ::
+          [number()]
   @spec discrete({:hue | :gray | :manual, term()}, non_neg_integer()) :: [ColorOperations.t()]
   def discrete({:sequence, range}, count), do: spread(range, count)
+
+  def discrete({:area_sequence, {low, high}}, count) do
+    {low * low, high * high}
+    |> spread(count)
+    |> Enum.map(&:math.sqrt/1)
+  end
 
   def discrete({:hue, _parameters}, 0), do: []
 

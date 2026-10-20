@@ -67,6 +67,10 @@ defmodule Giggly.Geom.Path do
     @key_start {0.1, 0.5}
     @key_end {0.9, 0.5}
 
+    # Points in a millimetre, grid's `"mm"` in the scene's points, which a key's room is measured
+    # in.
+    @points_per_millimetre 72 / 25.4
+
     # A path is drawn at its x and y alone, in the data's order.
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
@@ -107,7 +111,7 @@ defmodule Giggly.Geom.Path do
     # A legend's key, in the key's colour at its alpha, width and line type; a colour of `:none`, or
     # a blank line type, draws nothing.
     @impl Giggly.Geom
-    def draw_key(geom, key, _size) do
+    def draw_key(geom, key) do
       line_width = Map.get(key, :linewidth, @line_width)
 
       case {Map.get(key, :color, @color), Map.get(key, :linetype, @line_type)} do
@@ -130,6 +134,14 @@ defmodule Giggly.Geom.Path do
             }
           ]
       end
+    end
+
+    # The room a key's line needs, its width in millimetres either way, as ggplot2's
+    # `set_key_size()` reads a path's key, which has no `size`.
+    @impl Giggly.Geom
+    def key_size(_geom, key) do
+      side = Map.get(key, :linewidth, @line_width) * @points_per_millimetre
+      {side, side}
     end
 
     # Each group a line, in its first row's colour and alpha and the layer's line type, broken where

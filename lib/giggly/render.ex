@@ -176,30 +176,33 @@ defmodule Giggly.Render do
   # and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs
   # drawn by the geom of every layer that maps one of the legend's aesthetics and draws in that
   # key, in the order the layers were added, at the key's values of the aesthetics it maps and with
-  # what the layer sets, as ggplot2 draws each such layer's `draw_key` in the keys it keeps.
+  # what the layer sets, as ggplot2 draws each such layer's `draw_key` in the keys it keeps, and the
+  # room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by.
   defp draw_legend([], _theme), do: :none
 
   defp draw_legend(legends, theme) do
-    size = {theme.legend_key_size, theme.legend_key_size}
-
     legends
     |> Enum.map(fn %{guide: guide, keys: keys, layers: layers} = legend ->
-      drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers, size) end)
+      drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers) end)
       Guide.draw(guide, %{legend | keys: drawn_keys}, theme)
     end)
     |> Guide.Box.draw(theme)
   end
 
   # A key with the glyphs each layer drawing in it draws, with the key's values of the aesthetics
-  # the layer maps and what the layer sets.
-  defp draw_key(%{values: values} = key, index, layers, size) do
-    glyphs =
+  # the layer maps and what the layer sets, and the room each layer's glyph needs.
+  defp draw_key(%{values: values} = key, index, layers) do
+    {glyphs, sizes} =
       for %{geom: geom, aesthetics: aesthetics, fixed: fixed, draws: draws} <- layers,
-          Enum.at(draws, index),
-          glyph <- Geom.draw_key(geom, Map.merge(fixed, Map.take(values, aesthetics)), size),
-          do: glyph
+          Enum.at(draws, index) do
+        key_values = Map.merge(fixed, Map.take(values, aesthetics))
+        {Geom.draw_key(geom, key_values), Geom.key_size(geom, key_values)}
+      end
+      |> Enum.unzip()
 
-    Map.put(key, :glyphs, glyphs)
+    key
+    |> Map.put(:glyphs, Enum.concat(glyphs))
+    |> Map.put(:sizes, sizes)
   end
 
   # The columns, left to right, each named and sized: the margin, the tag, the y title, then for

@@ -240,6 +240,17 @@ defmodule Giggly.GeomTest do
       assert [%Polygons{outlines: [[{0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}]]}] =
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
+
+    # ggplot2 4.0.3's `GeomPoint` drops a row whose size is missing, as a size scale's missing
+    # value leaves it, and so does its key.
+    test "a missing size draws no point" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 3.0], y: [1.0, 1.0], size: [nil, 2.0])
+
+      assert [%Circles{x: [0.75]}] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+      assert Geom.draw_key(%Geom.Point{}, %{size: nil}) === []
+    end
   end
 
   describe "draw_panel/4 for bars" do
@@ -871,23 +882,23 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_key/3" do
+  describe "draw_key/2" do
     test "a point's key is the point at the middle of the key, at the key's alpha" do
       assert [%Circles{x: [0.5], y: [0.5], color_opacity: [0.2]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2})
 
       assert [%Circles{color_opacity: [1.0]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: nil}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, %{alpha: nil})
     end
 
     test "a point's key is in the colour its layer sets, the key's alpha replacing the colour's own" do
       assert [%Circles{color: ["#4682B4"], color_opacity: [0.2]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"})
 
       assert [%Circles{color: ["#4682B4"], color_opacity: [@half_alpha]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"})
 
-      assert Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}, {17.28, 17.28}) === []
+      assert Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}) === []
     end
 
     # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `geom_point(shape = 21, size = 3)` filled
@@ -897,27 +908,27 @@ defmodule Giggly.GeomTest do
       key = %{alpha: nil, fill: "#F8766D", shape: :circle_filled, size: 3.0, stroke: 2.0}
 
       assert [%Circles{radius: [radius], stroke_width: stroke_width, fill: ["#F8766D"]}] =
-               Geom.draw_key(%Geom.Point{}, key, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, key)
 
       assert_in_delta radius, 4.62, 0.005
       assert_in_delta stroke_width, 2.83, 0.005
 
       assert [%Circles{radius: [no_stroke_radius], color: [:none]}] =
-               Geom.draw_key(%Geom.Point{}, %{key | stroke: :none}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Point{}, %{key | stroke: :none})
 
       assert_in_delta no_stroke_radius, 3.20, 0.005
-      assert Geom.draw_key(%Geom.Point{}, %{shape: :none}, {17.28, 17.28}) === []
+      assert Geom.draw_key(%Geom.Point{}, %{shape: :none}) === []
     end
 
     test "a bar's key is its fill short of the key's edges by its border's width" do
-      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{}, %{alpha: 0.55}, {17.28, 17.28})
+      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{}, %{alpha: 0.55})
+      [{{left, bottom}, {right, top}}] = key.offsets
 
-      [xmin] = key.xmin
-      [xmax] = key.xmax
-      [ymin] = key.ymin
+      assert {key.xmin, key.xmax, key.ymin, key.ymax} === {[0.0], [1.0], [0.0], [1.0]}
 
-      assert {Float.round((xmax - xmin) * 17.28, 2), Float.round(ymin * 17.28, 2),
-              key.fill_opacity, key.color} === {15.86, 0.71, [0.55], [:none]}
+      assert {Float.round(left, 2), Float.round(bottom, 2), Float.round(right, 2),
+              Float.round(top, 2), key.fill_opacity, key.color} ===
+               {0.71, 0.71, -0.71, -0.71, [0.55], [:none]}
     end
 
     # Golden: ggplot2 4.0.3's `geom_col(colour = "black", linewidth = 1.5, linetype = "dotted")`
@@ -926,22 +937,20 @@ defmodule Giggly.GeomTest do
     test "a bar's key is short of the key by its border's width, which it is drawn at and dashed" do
       key = %{color: "#000000", linewidth: 1.5, linetype: {1, 3}}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key, {17.28, 17.28})
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key)
+      [{{left, _bottom}, {right, _top}}] = drawn.offsets
 
-      [xmin] = drawn.xmin
-      [xmax] = drawn.xmax
-
-      assert {Float.round((xmax - xmin) * 17.28, 2), Float.round(drawn.stroke_width, 2),
+      assert {Float.round(17.28 + right - left, 2), Float.round(drawn.stroke_width, 2),
               rounded(drawn.dashes), drawn.color} === {13.03, 3.2, [4.27, 12.8], ["#000000"]}
 
       assert [%Rectangles{color: [:none], dashes: :none}] =
-               Geom.draw_key(%Geom.Bar{}, %{key | linetype: :none}, {17.28, 17.28})
+               Geom.draw_key(%Geom.Bar{}, %{key | linetype: :none})
     end
 
     test "a bar's key is filled and bordered as its layer sets, the key's alpha its fill's alone" do
       key = %{alpha: 0.3, fill: "#0000FF80", color: "#FF000080"}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key, {17.28, 17.28})
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key)
 
       assert {drawn.fill, drawn.fill_opacity, drawn.color, drawn.color_opacity} ===
                {["#0000FF"], [0.3], ["#FF0000"], [@half_alpha]}
@@ -953,7 +962,7 @@ defmodule Giggly.GeomTest do
       geom = %Geom.Path{line_end: :square, line_join: :mitre, mitre_limit: 4.0}
 
       assert [%Segments{} = key] =
-               Geom.draw_key(geom, %{alpha: 0.4, linewidth: 2.0}, {17.28, 17.28})
+               Geom.draw_key(geom, %{alpha: 0.4, linewidth: 2.0})
 
       assert {key.starts, key.ends, key.opacity, key.stroke_width} ===
                {[{0.1, 0.5}], [{0.9, 0.5}], [0.4], @two_millimetres}
@@ -966,18 +975,18 @@ defmodule Giggly.GeomTest do
     # key of a blank line.
     test "a path's key is dashed as its line type, and a blank one draws none" do
       assert [%Segments{dashes: dashes}] =
-               Geom.draw_key(@path, %{linewidth: 1.0, linetype: {7, 3}}, {17.28, 17.28})
+               Geom.draw_key(@path, %{linewidth: 1.0, linetype: {7, 3}})
 
       assert rounded(dashes) === [19.92, 8.54]
-      assert Geom.draw_key(@path, %{linetype: :none}, {17.28, 17.28}) === []
+      assert Geom.draw_key(@path, %{linetype: :none}) === []
     end
 
     test "a line's key is a path's, ggplot2's default width where the layer sets none" do
-      assert Geom.draw_key(@line, %{alpha: nil}, {17.28, 17.28}) ===
-               Geom.draw_key(@path, %{alpha: nil}, {17.28, 17.28})
+      assert Geom.draw_key(@line, %{alpha: nil}) ===
+               Geom.draw_key(@path, %{alpha: nil})
 
       assert [%Segments{opacity: [1.0], stroke_width: @default_width}] =
-               Geom.draw_key(@path, %{alpha: nil}, {17.28, 17.28})
+               Geom.draw_key(@path, %{alpha: nil})
     end
 
     test "a text's key is the letter a at the middle of the key, in its colour at its alpha" do
@@ -986,32 +995,30 @@ defmodule Giggly.GeomTest do
       assert [%Text{} = key] =
                Geom.draw_key(
                  %Geom.Text{check_overlap: false},
-                 %{color: "#F8766D", alpha: 0.5},
-                 {17.28, 17.28}
+                 %{color: "#F8766D", alpha: 0.5}
                )
 
       assert {key.labels, key.x, key.y, key.hjust, key.offset, key.color, key.opacity, key.size} ===
                {["a"], [0.5], [0.5], [0.5], [{0.0, -0.5 * ascent}], ["#F8766D"], [0.5], 11.0}
 
-      assert Geom.draw_key(%Geom.Text{check_overlap: false}, %{color: :none}, {17.28, 17.28}) ===
+      assert Geom.draw_key(%Geom.Text{check_overlap: false}, %{color: :none}) ===
                []
     end
 
     # Golden: ggplot2 4.0.3's key for text set `hjust = 0, vjust = 1`, through vdiffr 1.0.9: the
     # letter's start 1.32 points, a tenth of a line of 11-point text 1.2 lines apart, inside the
-    # key's left edge, and its top as far below the key's top.
+    # key's left edge, and its top as far below the key's top, whatever the key's size.
     test "a text's key is placed at the layer's justification, a tenth of a line in from its edges" do
       margin = 0.1 * 11.0 * 1.2
 
       assert [%Text{} = key] =
                Geom.draw_key(
                  %Geom.Text{check_overlap: false},
-                 %{hjust: 0.0, vjust: 1.0},
-                 {17.28, 17.28}
+                 %{hjust: 0.0, vjust: 1.0}
                )
 
       assert {key.x, key.y, key.hjust, key.offset} ===
-               {[margin / 17.28], [(17.28 - margin) / 17.28], [0.0], [{0.0, -Font.ascent(11.0)}]}
+               {[0.0], [1.0], [0.0], [{margin, -margin - Font.ascent(11.0)}]}
     end
 
     # Golden: ggplot2 4.0.3's keys for text set `hjust = 0, vjust = 1` and turned 100, 200 and 300
@@ -1019,32 +1026,71 @@ defmodule Giggly.GeomTest do
     # element: `rotate_just()` puts the anchor at (1 - vjust, hjust) of the key, then at
     # (1 - hjust, 1 - vjust), then at (vjust, 1 - hjust).
     test "a turned text's key is placed at its justification turned with it" do
+      ascent = Font.ascent(11.0)
+
       places =
         Enum.map([100.0, 200.0, 300.0], fn angle ->
-          [%Text{x: [x_place], y: [y_place]}] =
+          [%Text{x: [x_place], y: [y_place], offset: [{along, up}]}] =
             Geom.draw_key(
               %Geom.Text{check_overlap: false},
-              %{hjust: 0.0, vjust: 1.0, angle: angle},
-              {100.0, 100.0}
+              %{hjust: 0.0, vjust: 1.0, angle: angle}
             )
 
-          {Float.round(x_place, 4), Float.round(y_place, 4)}
+          # The anchor in a key 100 points square: its place, moved by its offset less the
+          # ascent `vjust` takes off, turned back from the text's frame.
+          radians = angle * :math.pi() / 180
+          margin_up = up + ascent
+          across = along * :math.cos(radians) - margin_up * :math.sin(radians)
+          upward = along * :math.sin(radians) + margin_up * :math.cos(radians)
+          {Float.round(x_place * 100 + across, 4), Float.round(y_place * 100 + upward, 4)}
         end)
 
-      margin = 0.1 * 11.0 * 1.2 / 100
+      margin = 0.1 * 11.0 * 1.2
 
       assert places === [
                {Float.round(margin, 4), Float.round(margin, 4)},
-               {Float.round(1 - margin, 4), Float.round(margin, 4)},
-               {Float.round(1 - margin, 4), Float.round(1 - margin, 4)}
+               {Float.round(100 - margin, 4), Float.round(margin, 4)},
+               {Float.round(100 - margin, 4), Float.round(100 - margin, 4)}
              ]
     end
 
     test "a path's key is in the colour its layer sets, and a colour of :none draws none" do
       assert [%Segments{color: ["#FF0000"], opacity: [@half_alpha]}] =
-               Geom.draw_key(@path, %{alpha: nil, color: "#FF000080"}, {17.28, 17.28})
+               Geom.draw_key(@path, %{alpha: nil, color: "#FF000080"})
 
-      assert Geom.draw_key(@path, %{alpha: 0.4, color: :none}, {17.28, 17.28}) === []
+      assert Geom.draw_key(@path, %{alpha: 0.4, color: :none}) === []
     end
   end
+
+  # The room each geom's key glyph needs, in points, checked against vdiffr 1.0.9's drawings of
+  # ggplot2 4.0.3's legends (the keys of test/golden/point_key_big.svg, bar_key_big.svg,
+  # line_key_big.svg and text_key_big.svg) and against `draw_key_text()`'s own `width` and
+  # `height` on vdiffr's device.
+  describe "key_size/2" do
+    test "a point's key needs its size, in millimetres, either way; a missing size none" do
+      assert rounded_size(Geom.key_size(%Geom.Point{}, %{size: 8.0})) === {22.68, 22.68}
+      assert rounded_size(Geom.key_size(%Geom.Point{}, %{})) === {4.25, 4.25}
+      assert Geom.key_size(%Geom.Point{}, %{size: nil}) === {0.0, 0.0}
+    end
+
+    test "a path's or line's key needs its line's width; a bar's twice its border's" do
+      assert rounded_size(Geom.key_size(@path, %{linewidth: 8.0})) === {22.68, 22.68}
+      assert rounded_size(Geom.key_size(@line, %{})) === {1.42, 1.42}
+      assert rounded_size(Geom.key_size(%Geom.Bar{}, %{linewidth: 4.0})) === {22.68, 22.68}
+      assert rounded_size(Geom.key_size(%Geom.Rect{}, %{})) === {2.83, 2.83}
+    end
+
+    # R's own figures, `attr(draw_key_text(...), "width")` and `"height"` in big points.
+    test "a text's key needs its letter's box, turned with it, its descent and a margin each side" do
+      text = %Geom.Text{check_overlap: false}
+
+      assert Enum.map([0.0, 30.0, 90.0, 135.0], fn angle ->
+               rounded_size(Geom.key_size(text, %{size: 12.0, angle: angle}))
+             end) === [{21.87, 33.47}, {34.62, 38.86}, {33.47, 21.87}, {37.94, 37.94}]
+
+      assert rounded_size(Geom.key_size(text, %{size: 3.88})) === {9.02, 12.77}
+    end
+  end
+
+  defp rounded_size({width, height}), do: {Float.round(width, 2), Float.round(height, 2)}
 end

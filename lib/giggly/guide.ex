@@ -49,12 +49,18 @@ defprotocol Giggly.Guide do
 
   @typedoc """
   A guide of an aesthetic other than position, as rendering hands it over: its title and its keys,
-  each its label and the glyphs the layers drawing in it draw, among what the assembly gave each
-  key and the guide.
+  each its label, the glyphs the layers drawing in it draw, and the room each layer's glyph needs,
+  `{width, height}` in points, among what the assembly gave each key and the guide.
   """
   @type legend :: %{
           required(:title) => String.t(),
-          required(:keys) => [%{required(:label) => String.t(), required(:glyphs) => list()}],
+          required(:keys) => [
+            %{
+              required(:label) => String.t(),
+              required(:glyphs) => list(),
+              required(:sizes) => [{float(), float()}]
+            }
+          ],
           optional(atom()) => term()
         }
 

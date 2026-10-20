@@ -104,10 +104,14 @@ panel's grid lines are placed by the coordinate system".
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
   defaults**: the legend margin inside the edge; the title above, as deep as its lines,
   left-aligned and centred down its row, as grid centres text, the title's margin below, or neither
-  for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key square on
-  the key background with each layer's glyph over it, its label the text margin to its right,
-  centred as the title is; the label column as wide as the widest label, or wider when the
-  title is, leaving the room at the labels' right. **With no labels (every key's `:none`), the
+  for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key on the key
+  background with each layer's glyph over it, its label the text margin to its right,
+  centred as the title is; **each row as tall as the theme's key or its tallest glyph, and the
+  keys' column as wide as the theme's key or the widest glyph in any key**, from the room each
+  glyph needs, which rendering hands over with it (`Geom.key_size/2`), as ggplot2's
+  `measure_legend_keys()` sizes them, each key's background filling its whole cell and its glyphs
+  placed in it as drawn; the label column as wide as the widest label, or wider when the title
+  is, leaving the room at the labels' right. **With no labels (every key's `:none`), the
   labels' margin and column take no room but what a wider title needs right of the keys**, as
   ggplot2 leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
   `label_margin/2`, which the colour bar shares). Drawn in ggplot2's order: background, title,

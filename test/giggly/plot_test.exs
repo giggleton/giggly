@@ -221,7 +221,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :x, :y],
+                 accepted: [:alpha, :color, :fill, :group, :size, :x, :y],
                  annotation: false
                }
              ]
@@ -2157,7 +2157,7 @@ defmodule Giggly.PlotTest do
       diverging = %{
         gradient
         | palette: {:gradient, ["#832424", "#FFFFFF", "#3A3A98"]},
-          midpoint: 0.0
+          rescaler: {:mid, 0.0}
       }
 
       assert recorded.(&Plot.scale_color_hue/1, &Plot.scale_fill_hue/1) === {hued, hued}
@@ -2178,10 +2178,13 @@ defmodule Giggly.PlotTest do
               Plot.scale_color_continuous(plot).scales.color,
               Plot.scale_fill_continuous(plot).scales.fill,
               Plot.scale_alpha_discrete(plot).scales.alpha,
-              Plot.scale_alpha_continuous(plot).scales.alpha} ===
+              Plot.scale_alpha_continuous(plot).scales.alpha,
+              Plot.scale_size_discrete(plot).scales.size,
+              Plot.scale_size_continuous(plot).scales.size} ===
                {Scale.new(:discrete, :color), Scale.new(:discrete, :fill),
                 Scale.new(:continuous, :color), Scale.new(:continuous, :fill),
-                Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha)}
+                Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha),
+                Scale.new(:discrete, :size), Scale.new(:continuous, :size)}
     end
 
     test "a manual or gradientn scale given no colours is refused, naming the option it needs" do
@@ -2262,8 +2265,9 @@ defmodule Giggly.PlotTest do
 
       assert {Plot.scale_color_discrete(plot, palette: ["red", "#0000FF80"]).scales.color.palette,
               Plot.scale_color_continuous(plot, palette: ["red", "blue"]).scales.color.palette,
-              Plot.scale_fill_gradient2(plot, midpoint: 4).scales.fill.midpoint} ===
-               {{:manual, ["#FF0000", "#0000FF80"]}, {:gradient, ["#FF0000", "#0000FF"]}, 4.0}
+              Plot.scale_fill_gradient2(plot, midpoint: 4).scales.fill.rescaler} ===
+               {{:manual, ["#FF0000", "#0000FF80"]}, {:gradient, ["#FF0000", "#0000FF"]},
+                {:mid, 4.0}}
     end
 
     # ggplot2 4.0.3's `manual_scale()` names an unnamed vector of values by a vector of breaks,
@@ -2376,7 +2380,11 @@ defmodule Giggly.PlotTest do
              [colors: ["red"]] ++ continuous},
             {&Plot.scale_color_continuous/2, "scale_color_continuous", continuous},
             {&Plot.scale_fill_continuous/2, "scale_fill_continuous", continuous},
-            {&Plot.scale_alpha_continuous/2, "scale_alpha_continuous", continuous}
+            {&Plot.scale_alpha_continuous/2, "scale_alpha_continuous", continuous},
+            {&Plot.scale_size_continuous/2, "scale_size_continuous", continuous},
+            {&Plot.scale_size_area/2, "scale_size_area", continuous},
+            {&Plot.scale_radius/2, "scale_radius", continuous},
+            {&Plot.scale_size_discrete/2, "scale_size_discrete", discrete}
           ] do
         error = assert_raise ArgumentError, fn -> function.(plot, options) end
         assert error.message =~ "Plot.#{name}/2 is given 1 labels"
@@ -2390,14 +2398,111 @@ defmodule Giggly.PlotTest do
 
       for {options, shown} <- [
             {[color: {10, 1}],
-             "low first, since a colour, fill or alpha scale cannot run from high to low, " <>
-               "got: {10, 1}"},
+             "low first, since a colour, fill, alpha or size scale cannot run from high to " <>
+               "low, got: {10, 1}"},
             {[fill: {~D[2026-01-01], nil}], "two numbers, each nil"},
             {[alpha: "a"], ~s(got: "a")}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, options) end
         assert error.message =~ shown
       end
+    end
+  end
+
+  # Golden: the defaults of ggplot2 4.0.3's size scale functions, read with `args()` and run in R
+  # 4.6.1: `scale_size_continuous()`'s `pal_area()` from 1 to 6, `scale_size_area()`'s 6 through
+  # `rescale_max()`, `scale_radius()`'s 1 to 6, and the discrete scale's `sqrt(seq(4, 36))`, each a
+  # legend; `scale_size_continuous(na.value = 1)` and `scale_radius(na.value = 1)` fail, "unused
+  # argument".
+  describe "the size scale functions" do
+    test "each records an untrained scale of its palette and a legend, its missing value none" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_size_continuous(plot).scales.size,
+              Plot.scale_size_area(plot).scales.size, Plot.scale_radius(plot).scales.size,
+              Plot.scale_size_discrete(plot).scales.size} ===
+               {%Scale.Continuous{palette: {:area, {1.0, 6.0}}, guide: :legend},
+                %Scale.Continuous{palette: {:abs_area, 6.0}, rescaler: :max, guide: :legend},
+                %Scale.Continuous{palette: {:rescale, {1.0, 6.0}}, guide: :legend},
+                %Scale.Discrete{palette: {:area_sequence, {2.0, 6.0}}, guide: :legend}}
+    end
+
+    test "each records the sizes and options it is given, as floats" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_size_continuous(plot,
+                range: {0, 10},
+                name: "Power",
+                limits: {nil, 400},
+                breaks: [100, 200],
+                labels: ["a", "b"]
+              ).scales.size, Plot.scale_size_area(plot, max_size: 10, na_value: 1).scales.size,
+              Plot.scale_radius(plot, range: {2, 8}).scales.size.palette,
+              Plot.scale_size_discrete(plot, range: {1, 3}, na_value: 0, limits: ["4", "6"]).scales.size} ===
+               {%Scale.Continuous{
+                  palette: {:area, {0.0, 10.0}},
+                  guide: :legend,
+                  name: "Power",
+                  limits: {nil, 400.0},
+                  breaks: [100.0, 200.0],
+                  labels: ["a", "b"]
+                },
+                %Scale.Continuous{
+                  palette: {:abs_area, 10.0},
+                  rescaler: :max,
+                  guide: :legend,
+                  na_value: 1.0
+                }, {:rescale, {2.0, 8.0}},
+                %Scale.Discrete{
+                  palette: {:area_sequence, {1.0, 3.0}},
+                  guide: :legend,
+                  na_value: 0.0,
+                  limits: ["4", "6"]
+                }}
+    end
+
+    test "an option a size scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_size_continuous/2, [range: {-1, 6}],
+             "each a size in millimetres, 0 or more, got: {-1, 6}"},
+            {&Plot.scale_radius/2, [range: 6], "got: 6"},
+            {&Plot.scale_size_discrete/2, [range: {1, "a"}], ~s(got: {1, "a"})},
+            {&Plot.scale_size_area/2, [max_size: -1], "0 or more, got: -1"},
+            {&Plot.scale_size_area/2, [na_value: "a"], ~s(got: "a")},
+            {&Plot.scale_size_discrete/2, [na_value: -1], "got: -1"},
+            {&Plot.scale_size_continuous/2, [na_value: 1], "unknown options [:na_value]"},
+            {&Plot.scale_radius/2, [na_value: 1], "unknown options [:na_value]"},
+            {&Plot.scale_size_area/2, [range: {1, 6}], "unknown options [:range]"},
+            {&Plot.scale_size_continuous/2, [transform: :log10], "unknown options [:transform]"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+
+    # ggplot2 4.0.3's `lims(size = c(20, 0))` reverses the sizes through a reverse transformation,
+    # which Giggly's size scales do not have.
+    test "lims/2 gives a size scale its limits, low first, as its scale functions do" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.lims(plot, size: {0, 400}).scales.size,
+              Plot.lims(plot, size: ["8", "4"]).scales.size} ===
+               {Plot.scale_size_continuous(plot, limits: {0, 400}).scales.size,
+                Plot.scale_size_discrete(plot, limits: ["8", "4"]).scales.size}
+
+      error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, size: {20, 0}) end
+      assert error.message =~ "since a colour, fill, alpha or size scale cannot run from high"
+    end
+
+    test "labs/2 titles the size legend" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.labs(size: "Power")
+
+      assert plot.labels === %{size: "Power"}
     end
   end
 
@@ -2422,7 +2527,11 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_fill_gradientn/2, [colors: ["red"]], :continuous},
       {&Plot.scale_color_continuous/2, [], :continuous},
       {&Plot.scale_fill_continuous/2, [], :continuous},
-      {&Plot.scale_alpha_continuous/2, [], :alpha}
+      {&Plot.scale_alpha_continuous/2, [], :alpha},
+      {&Plot.scale_size_continuous/2, [], :size},
+      {&Plot.scale_size_area/2, [], :size},
+      {&Plot.scale_radius/2, [], :size},
+      {&Plot.scale_size_discrete/2, [], :size}
     ]
 
     test "each scale function records the guide it is given" do
@@ -2437,9 +2546,9 @@ defmodule Giggly.PlotTest do
     end
 
     # ggplot2 4.0.3 warns "`guide_colourbar()` needs continuous scales." for a discrete colour
-    # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and draws
-    # no guide.
-    test "a colour bar is refused for a discrete scale and for alpha, saying why" do
+    # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and for
+    # size, and draws no guide.
+    test "a colour bar is refused for a discrete scale, for alpha and for size, saying why" do
       plot = Plot.new(@rows)
 
       for {function, options, kind} <- @guided_scale_functions, kind != :continuous do
@@ -2449,9 +2558,9 @@ defmodule Giggly.PlotTest do
           end
 
         assert error.message =~
-                 if(kind == :alpha,
-                   do: "a colour bar shows colour or fill, never alpha; give :legend",
-                   else: "a colour bar shows a continuous scale, and this one is discrete"
+                 if(kind == :discrete,
+                   do: "a colour bar shows a continuous scale, and this one is discrete",
+                   else: "a colour bar shows colour or fill, never #{kind}; give :legend"
                  )
       end
     end
@@ -2489,15 +2598,21 @@ defmodule Giggly.PlotTest do
                {%{}, %{color: :none, fill: :colorbar, alpha: %Guide.Legend{reverse: true}}}
     end
 
-    test "guides/2 refuses an alpha colour bar, and an aesthetic it chooses no guide for" do
+    test "guides/2 refuses an alpha or size colour bar, and an aesthetic it chooses no guide for" do
       plot = Plot.new(@rows)
 
-      alpha =
-        assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, alpha: :colorbar) end
+      for aesthetic <- [:alpha, :size] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.guides(plot, [{aesthetic, :colorbar}])
+          end
 
-      assert alpha.message =~ "a colour bar shows colour or fill, never alpha"
+        assert error.message =~ "a colour bar shows colour or fill, never #{aesthetic}"
+      end
 
-      for key <- [:x, :size] do
+      assert Plot.guides(plot, size: :none).guides === %{size: :none}
+
+      for key <- [:x, :shape] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, [{key, :none}]) end
 
