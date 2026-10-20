@@ -110,14 +110,18 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   spelling, the Elixir form) — every ggplot2 user writes `shape = 21`. *Rejected: numbers only*
   — `21` says nothing of what it draws.
 
-- **A line type is a name, R's number 0 to 6, or a dash pattern as a list of lengths
-  (2026-10-19, Steve).** The names are R's as atoms (`:blank`, `:solid`, `:dashed`, `:dotted`,
-  `:dotdash`, `:longdash`, `:twodash`), a number turned into its name at the call as a shape's
-  is. A pattern is 2, 4, 6 or 8 lengths from 1 to 15, on and off in turn, in line widths:
-  `[3, 3, 1, 3]` for R's `"3313"`, and each name is one (`:dashed` is `[4, 4]`). *Rejected: R's
-  hex string* — a little language (`"F"` for 15) that can be checked only whole, and custom
-  patterns are rare in ggplot2 code, so its familiarity buys little. *Rejected: both* — two
-  spellings of a rare thing.
+- **A line type is a name, R's number 0 to 6, or a dash pattern as a tuple of lengths
+  (2026-10-19, Steve; the tuple and annotations' lists building step 2).** The names are R's as
+  atoms (`:blank`, `:solid`, `:dashed`, `:dotted`, `:dotdash`, `:longdash`, `:twodash`). A
+  pattern is 2, 4, 6 or 8 lengths from 1 to 15, on and off in turn: `{3, 3, 1, 3}` for R's
+  `"3313"`. Each is held as its pattern from the call (`:dashed` as `{4, 4}`, `:solid` as `{}`,
+  `:blank` as `:none`), as a colour as its hex: a column holds one type, and R's palette mixes
+  `solid` with patterns. A bar's or a rectangle's annotation takes a list of line types and of
+  widths, as R draws them row by row; a path's takes one, as R refuses a type varying along a
+  line. *Rejected: a list* (agreed first) — `annotate/3` and a layer's set values read a list as
+  one value per row, so `linetype: [2, 3]`, R's `c(2, 3)`, dashed then dotted, would be a pattern.
+  *Rejected: R's hex string* — a little language (`"F"` for 15) checked only whole, its
+  familiarity buying little for something rare. *Rejected: both* — two spellings of a rare thing.
 
 - **A discrete palette with fewer shapes or line types than the scale has values raises when the
   plot is run (2026-10-19, Steve).** R gives the seventh shape on, or the fourteenth line type,
@@ -495,7 +499,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   The carried aesthetic is evaluated into the layer's table and drawn by nothing; a discrete one
   still splits the layer's groups (never `label`, which grouping leaves out), and the layer draws in
   a legend only for aesthetics it accepts, a legend no layer can draw dropped, as ggplot2's
-  `matched_aes()` and its guides do. *Rejected: dropping it for that layer*, the same drawing for
+  `matched_aes()` and its guides do. Its geom is handed the rows without it, so none reads it as a
+  value the layer sets (2026-10-19, Steve: a carried `linewidth` broke a path). *Rejected:
+  dropping it for that layer*, the same drawing for
   `label` but not for a plot-level `fill`, which splits a line's groups in ggplot2; *refusing it*,
   the first geom's rule, which cannot write that example.
 
@@ -1833,6 +1839,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Dash a line and a bar's border in its line type (size, shape and line type, step
+  2); §4: "A line type is a name", "An aesthetic a layer takes from the plot"
 - 2026-10-19 — Give a point its shape, size, stroke and fill (size, shape and line type, step 1);
   §4: "Size, shape and line type are Phase 3's eighth increment", "A shape is ggplot2's name for
   it", "A line type is a name", "A discrete palette with fewer shapes or line types", "A point's

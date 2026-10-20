@@ -267,6 +267,35 @@ defmodule Giggly.Plot do
     doc: "How wide every line is, in millimetres; 0.5 when not given."
   ]
 
+  # The line types, by name in the order of their numbers, 0 to 6, each held as its dash pattern:
+  # the lengths of its dashes and gaps in turn, `{}` for a solid line, and `:none` for a blank one,
+  # which draws no line, as R's graphics engine reads `lty`.
+  @line_types [
+    blank: :none,
+    solid: {},
+    dashed: {4, 4},
+    dotted: {1, 3},
+    dotdash: {1, 3, 4, 3},
+    longdash: {7, 3},
+    twodash: {2, 2, 6, 2}
+  ]
+  @line_type_names Keyword.keys(@line_types)
+
+  # A line type set for every line of a layer, as ggplot2's `linetype = "dashed"` sets it, held as
+  # its dash pattern.
+  @linetype_type {:custom, __MODULE__, :validate_linetype, []}
+
+  # The line types an option that sets one takes.
+  @linetype_forms "`:blank`, which draws no line, `:solid`, `:dashed`, `:dotted`, `:dotdash`, " <>
+                    "`:longdash` or `:twodash`, or its number in that order, 0 to 6; or a dash " <>
+                    "pattern, a tuple of 2, 4, 6 or 8 lengths from 1 to 15, a dash and a gap in " <>
+                    "turn, which grow with the line's width, `{4, 4}` being `:dashed`"
+
+  @linetype_option [
+    type: @linetype_type,
+    doc: "The line type of every line: " <> @linetype_forms <> "; `:solid` when not given."
+  ]
+
   # A colour set for every mark of a layer, as ggplot2's `colour = "steelblue"` sets it, kept in the
   # one spelling `Giggly.ColorOperations` gives it: uppercase hex, or `:none`.
   @color_type {:custom, __MODULE__, :validate_color, []}
@@ -328,6 +357,17 @@ defmodule Giggly.Plot do
     doc: "The colour every bar is filled with: " <> @color_forms <> "; `#595959` when not given."
   ]
 
+  @bar_linewidth_option [
+    type: {:custom, __MODULE__, :validate_linewidth, []},
+    doc: "How wide every bar's border is, in millimetres; 0.5 when not given."
+  ]
+
+  @bar_linetype_option [
+    type: @linetype_type,
+    doc:
+      "The line type of every bar's border: " <> @linetype_forms <> "; `:solid` when not given."
+  ]
+
   @line_color_option [
     type: @color_type,
     doc:
@@ -380,6 +420,7 @@ defmodule Giggly.Plot do
     :color,
     :fill,
     :linewidth,
+    :linetype,
     :shape,
     :size,
     :stroke,
@@ -419,7 +460,9 @@ defmodule Giggly.Plot do
                  ],
                  alpha: @alpha_option,
                  color: @bar_color_option,
-                 fill: @bar_fill_option
+                 fill: @bar_fill_option,
+                 linewidth: @bar_linewidth_option,
+                 linetype: @bar_linetype_option
                )
 
   # `geom_path/3`'s options, validated at the call.
@@ -428,7 +471,8 @@ defmodule Giggly.Plot do
                     data: @data_option,
                     alpha: @alpha_option,
                     color: @line_color_option,
-                    linewidth: @linewidth_option
+                    linewidth: @linewidth_option,
+                    linetype: @linetype_option
                   ] ++ @line_style_options
                 )
 
@@ -448,7 +492,8 @@ defmodule Giggly.Plot do
                     orientation: @orientation_option,
                     alpha: @alpha_option,
                     color: @line_color_option,
-                    linewidth: @linewidth_option
+                    linewidth: @linewidth_option,
+                    linetype: @linetype_option
                   ] ++ @line_style_options
                 )
 
@@ -534,6 +579,18 @@ defmodule Giggly.Plot do
         @color_forms <> "; `#595959` when not given."
   ]
 
+  @rect_linewidth_option [
+    type: {:custom, __MODULE__, :validate_linewidth, []},
+    doc: "How wide every rectangle's border is, in millimetres; 0.5 when not given."
+  ]
+
+  @rect_linetype_option [
+    type: @linetype_type,
+    doc:
+      "The line type of every rectangle's border: " <>
+        @linetype_forms <> "; `:solid` when not given."
+  ]
+
   # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
   @corner_type {:custom, __MODULE__, :validate_corner, []}
 
@@ -543,6 +600,8 @@ defmodule Giggly.Plot do
                   alpha: @alpha_option,
                   color: @rect_color_option,
                   fill: @rect_fill_option,
+                  linewidth: @rect_linewidth_option,
+                  linetype: @rect_linetype_option,
                   xmin: [
                     type: @corner_type,
                     doc:
@@ -583,7 +642,23 @@ defmodule Giggly.Plot do
   @annotation_stroke [
     type: {:custom, __MODULE__, :validate_per_annotation, [:validate_stroke]}
   ]
-  @per_annotation_aesthetics [:alpha, :color, :fill, :label, :shape, :size, :stroke]
+  @annotation_linewidth [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_linewidth]}
+  ]
+  @annotation_linetype [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_linetype]}
+  ]
+  @per_annotation_aesthetics [
+    :alpha,
+    :color,
+    :fill,
+    :label,
+    :linetype,
+    :linewidth,
+    :shape,
+    :size,
+    :stroke
+  ]
 
   # `annotate/3`'s options for each geom it draws with, validated at the call: the positions the
   # geom draws at and the options its function takes but `data:` and `position:`, and nudging, which
@@ -603,14 +678,17 @@ defmodule Giggly.Plot do
     y: @annotation_position,
     alpha: @annotation_alpha,
     color: @annotation_color,
-    fill: @annotation_color
+    fill: @annotation_color,
+    linewidth: @annotation_linewidth,
+    linetype: @annotation_linetype
   ]
   @path_annotation [
                      x: @annotation_position,
                      y: @annotation_position,
                      alpha: @annotation_alpha,
                      color: @annotation_color,
-                     linewidth: @linewidth_option
+                     linewidth: @linewidth_option,
+                     linetype: @linetype_option
                    ] ++ @line_style_options
   @annotation_geoms [:point, :col, :bar, :path, :line, :text, :rect]
   @annotation_options %{
@@ -638,7 +716,9 @@ defmodule Giggly.Plot do
         ymax: @annotation_position,
         alpha: @annotation_alpha,
         color: @annotation_color,
-        fill: @annotation_color
+        fill: @annotation_color,
+        linewidth: @annotation_linewidth,
+        linetype: @annotation_linetype
       )
   }
 
@@ -1396,7 +1476,8 @@ defmodule Giggly.Plot do
 
   Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill` and `:color`, and need `:x` and `:y`. `:fill`
   fills a bar and takes its alpha; `:color` borders it, and bars have no border unless it is
-  mapped or set. With a discrete `y` and a continuous `x`, the bars are horizontal.
+  mapped or set; `linewidth:` and `linetype:` set how wide the border is and how it is dashed. With
+  a discrete `y` and a continuous `x`, the bars are horizontal.
 
   ## Options
 
@@ -1454,7 +1535,9 @@ defmodule Giggly.Plot do
   Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`. Each group is a
   line of its own, and a discrete colour groups the rows. A row missing `x` or `y` breaks its line;
   a group of one row draws nothing. Where colour or alpha changes along a line, each segment takes
-  the colour and alpha of the row it starts from. A colour of `:none` draws no line.
+  the colour and alpha of the row it starts from; a line dashed, dotted or blank keeps one colour
+  and one alpha all along it, and drawing one whose colour or alpha changes raises
+  `ArgumentError`. A colour of `:none` draws no line, and so does the line type `:blank`.
 
   ## Options
 
@@ -1469,6 +1552,16 @@ defmodule Giggly.Plot do
       [2.9, 4.1, 3.4]
       iex> Giggly.DataFrame.pull(frame, :linewidth)
       [2.0, 2.0, 2.0]
+
+  A line type is held as its dash pattern, whichever way it is written:
+
+      iex> frame =
+      ...>   %{"unemploy" => [2.9, 4.1], "psavert" => [12.6, 9.4]}
+      ...>   |> Giggly.Plot.new(%{x: :unemploy, y: :psavert})
+      ...>   |> Giggly.Plot.geom_path(linetype: 2)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :linetype)
+      [{4, 4}, {4, 4}]
   """
   @spec geom_path(t(), mapping_argument() | keyword(), keyword()) :: t()
   def geom_path(plot, mapping_or_options \\ %{}, options \\ [])
@@ -1621,7 +1714,8 @@ defmodule Giggly.Plot do
   corner draws nothing.
 
   Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill` and `:color`, and
-  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do.
+  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do, their borders as
+  wide and dashed as `linewidth:` and `linetype:` set.
 
   ## Options
 
@@ -1687,8 +1781,9 @@ defmodule Giggly.Plot do
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
-  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`; the rest take
-  one value. Under a facet that makes more than one
+  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:` and a bar's
+  or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash pattern among
+  them a tuple; the rest take one value. Under a facet that makes more than one
   panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
@@ -1696,12 +1791,13 @@ defmodule Giggly.Plot do
 
     * `:point`: `x:`, `y:`, `alpha:`, `colour:`, `fill:`, `shape:`, `size:` and `stroke:`;
     * `:col` and `:bar`, each a bar from 0 to its `y` as `geom_col/3` draws one: `x:`, `y:`,
-      `alpha:`, `colour:` and `fill:`;
-    * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `lineend:`, `linejoin:` and
-      `linemitre:`, and `:line` those and `orientation:`;
+      `alpha:`, `colour:`, `fill:`, `linewidth:` and `linetype:`;
+    * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `lineend:`, `linejoin:`
+      and `linemitre:`, and `:line` those and `orientation:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
-    * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:` and `fill:`.
+    * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
+      `linetype:`.
 
   Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, for a
   list whose values are not of one type, and for an aesthetic the geom needs and is not given;
@@ -3048,6 +3144,37 @@ defmodule Giggly.Plot do
 
   def validate_linewidth(width),
     do: {:error, "expected a width in millimetres, 0 or more, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a `linetype:` option: one of R's line types by name or by its number, 0
+  # to 6, or a dash pattern, a tuple of 2, 4, 6 or 8 lengths from 1 to 15, as R's graphics engine
+  # takes a string of hex digits; each held as its dash pattern, a blank line as `:none`.
+  @doc false
+  @spec validate_linetype(term()) :: {:ok, tuple() | :none} | {:error, String.t()}
+  def validate_linetype(number) when number in 0..6 do
+    {_name, pattern} = Enum.at(@line_types, number)
+    {:ok, pattern}
+  end
+
+  def validate_linetype(name) when name in @line_type_names,
+    do: {:ok, Keyword.fetch!(@line_types, name)}
+
+  def validate_linetype(pattern) when tuple_size(pattern) in [2, 4, 6, 8] do
+    lengths = Tuple.to_list(pattern)
+
+    if Enum.all?(lengths, fn length -> length in 1..15 end),
+      do: {:ok, pattern},
+      else: linetype_error(pattern)
+  end
+
+  def validate_linetype(line_type), do: linetype_error(line_type)
+
+  defp linetype_error(line_type) do
+    {:error,
+     "expected a line type: one of " <>
+       Enum.map_join(@line_type_names, ", ", &inspect/1) <>
+       ", its number, 0 to 6, or a dash pattern, a tuple of 2, 4, 6 or 8 lengths from 1 to " <>
+       "15, such as {4, 4}, got: #{inspect(line_type)}"}
+  end
 
   # NimbleOptions' check of a text's `size:` option: a size in millimetres, 0 or more, kept as a
   # float.

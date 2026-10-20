@@ -345,6 +345,32 @@ defmodule Giggly.AssemblyTest do
                {["Mazda RX4", "Datsun 710"], [-1, -1], [-1, -1]}
     end
 
+    # ggplot2 4.0.3's layer_data() keeps an aesthetic the layer cannot use, and its geom never reads
+    # it. A position stays in the rows drawn, as a geom reads only the positions it uses or works
+    # out, and a value the layer sets replaces the plot's mapping of it.
+    test "an aesthetic a layer carries unused is in its table but not in the rows its geom draws" do
+      data = %{"x" => [1, 2], "y" => [1, 3], "w" => [1, 2]}
+
+      assembly =
+        data
+        |> Plot.new(%{x: :x, y: :y, linewidth: :w, shape: :w, xmin: :w})
+        |> Plot.geom_point()
+        |> Plot.geom_path(linewidth: 2)
+        |> Assembly.run()
+
+      names = fn frames -> Enum.map(frames, &Giggly.DataFrame.names/1) end
+
+      assert names.(assembly.layer_data) === [
+               [:x, :y, :linewidth, :shape, :xmin, :panel, :group],
+               [:x, :y, :shape, :xmin, :panel, :group, :linewidth]
+             ]
+
+      assert names.(assembly.drawn_data) === [
+               [:x, :y, :xmin, :panel, :group],
+               [:x, :y, :xmin, :panel, :group, :linewidth]
+             ]
+    end
+
     # ggplot2 4.0.3: bars coloured and filled by one column have one guide; `labs(fill = "F")` gives
     # them two, `labs(fill = "F", colour = "F")` one again, and `labs(colour = NULL)` two, one with
     # no title.

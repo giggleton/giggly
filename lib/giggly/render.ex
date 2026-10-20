@@ -122,7 +122,7 @@ defmodule Giggly.Render do
   # Each panel of the layout drawn: where it sits, its primitives, its axes and its strips.
   defp draw_panels(
          %Assembly{
-           layer_data: layer_data,
+           drawn_data: drawn_data,
            layer_geoms: layer_geoms,
            layout: layout,
            coord: coord,
@@ -130,7 +130,7 @@ defmodule Giggly.Render do
          },
          theme
        ) do
-    layers_by_panel = Enum.map(layer_data, fn frame -> DataFrame.split(frame, :panel) end)
+    layers_by_panel = Enum.map(drawn_data, fn frame -> DataFrame.split(frame, :panel) end)
 
     [:panel, :row, :column, :axis_bottom, :axis_left, :strip]
     |> Enum.map(fn name -> DataFrame.pull(layout, name) end)

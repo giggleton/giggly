@@ -62,8 +62,9 @@ defmodule Giggly.Assembly do
   # calls only the families' build functions, never their drawing ones, which are rendering's.
   #
   # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
-  # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom; the layout
-  # table; the trained scales, by scale id; the trained scale of each aesthetic other than position
+  # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom and the rows
+  # it draws, the frame without the aesthetics other than position the layer carries unused; the
+  # layout table; the trained scales, by scale id; the trained scale of each aesthetic other than position
   # that a layer maps, by aesthetic, and the legend each gives; the plot's coordinate system, which rendering hands each
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
@@ -111,6 +112,7 @@ defmodule Giggly.Assembly do
 
   @enforce_keys [
     :layer_data,
+    :drawn_data,
     :layer_geoms,
     :layout,
     :x_scales,
@@ -128,9 +130,10 @@ defmodule Giggly.Assembly do
   defstruct @enforce_keys
 
   @typedoc """
-  An assembled plot: each layer's table and the geom that draws it, in the order the layers were
-  added; the layout table; the trained x and y scales keyed by the scale ids the layout gives each
-  panel; the trained scale of each aesthetic other than position that a layer maps, by aesthetic;
+  An assembled plot: each layer's table, the rows its geom draws, the table without the aesthetics
+  the layer carries unused, and the geom that draws them, in the order the layers were added; the
+  layout table; the trained x and y scales keyed by the scale ids the layout gives each panel; the
+  trained scale of each aesthetic other than position that a layer maps, by aesthetic;
   each legend those scales give, its title, its keys and the geoms that draw them; the plot's
   coordinate system, each panel's params keyed by panel id, whether panels
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
@@ -140,6 +143,7 @@ defmodule Giggly.Assembly do
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
+          drawn_data: [DataFrame.t()],
           layer_geoms: [struct()],
           layout: DataFrame.t(),
           x_scales: %{optional(pos_integer()) => Scale.t()},
@@ -331,6 +335,8 @@ defmodule Giggly.Assembly do
 
     %__MODULE__{
       layer_data: fixed_data,
+      drawn_data:
+        Enum.zip_with(layers, fixed_data, fn layer, frame -> drawn(frame, plot, layer) end),
       layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
       x_scales: final_x_scales,
@@ -350,6 +356,26 @@ defmodule Giggly.Assembly do
         end),
       theme: theme
     }
+  end
+
+  # The rows a layer's geom draws: its table without the aesthetics other than position it takes
+  # from the plot's mapping and cannot use, which ride along in its table, and split its groups,
+  # but are drawn by nothing, so a geom never reads one as a value the layer sets. A carried
+  # position stays, as a geom reads only the positions it uses or works out itself, as a bar its
+  # edges.
+  defp drawn(frame, plot, layer) do
+    accepted = Plot.layer_accepted(layer)
+
+    carried =
+      plot
+      |> Plot.computed_mapping(layer)
+      |> Map.keys()
+      |> Enum.reject(fn aesthetic ->
+        aesthetic in accepted or Aesthetics.family(aesthetic) != :none
+      end)
+
+    kept = for name <- DataFrame.names(frame), name not in carried, do: {name, name}
+    DataFrame.select(frame, kept)
   end
 
   # The title of an aesthetic's guide, an axis's or a legend's: the name of the plot's scale for it,

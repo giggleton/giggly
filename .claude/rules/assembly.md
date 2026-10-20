@@ -69,7 +69,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   ggplot2 maps them, which leaves out what a scale's limits cut: a bar reaching past the y axis's
   limit is missing its end, so it is not drawn; the non-position scales train on what remains.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
-  the layer frames with each layer's geom, the layout table, the trained x and y scales keyed by
+  the layer frames, the rows each layer's geom draws (`drawn_data`: its frame without the
+  aesthetics other than position it carries unused), each layer's geom, the layout table, the
+  trained x and y scales keyed by
   scale id, the trained scale of each aesthetic other than position that a layer maps, by
   aesthetic (`non_position_scales`), the legends those scales give, merged and ordered
   (`legends`), the plot's coordinate system (carried for rendering to hand each geom and guide),
@@ -133,7 +135,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A text's `label` never groups**: `Group.add/2` leaves it out of the key whatever its type, as
   ggplot2's `add_group()` leaves `label` out, so labels that differ in every row do not make every
   row a group. An aesthetic a layer takes from the plot and cannot use is evaluated like any other,
-  and a discrete one splits its groups, as in ggplot2.
+  and a discrete one splits its groups, as in ggplot2; it stays in the layer's frame, which
+  `layer_data/2` shows, but not in the rows its geom draws, which no geom reads as set.
 - **`group` is written once, by `Group.add/2`, straight after evaluation** — before any scale maps
   a discrete position to numbers, after which it no longer looks discrete.
 - **The assembly gives grouping its order.** `Group.add/2` numbers values by the key it is handed;

@@ -14,7 +14,8 @@ defmodule Giggly.Scene.Rectangles do
   # rectangle's corners a number of points across and up from their places, one
   # `{{across, up}, {across, up}}` for each rectangle, the first moving its `xmin` and `ymin` and
   # the second its `xmax` and `ymax`, as `Giggly.Scene.Polylines` moves a line's points: a point's
-  # square is drawn round its place at a size in points. `:none` moves none.
+  # square is drawn round its place at a size in points. `:none` moves none. `dashes` dashes every
+  # border as `Giggly.Scene.Polylines` dashes a line.
 
   @enforce_keys [
     :xmin,
@@ -27,6 +28,7 @@ defmodule Giggly.Scene.Rectangles do
     :color,
     :color_opacity,
     :stroke_width,
+    :dashes,
     :line_end,
     :line_join,
     :mitre_limit
@@ -44,6 +46,7 @@ defmodule Giggly.Scene.Rectangles do
           color: [String.t() | :none],
           color_opacity: [float()],
           stroke_width: float(),
+          dashes: Giggly.Scene.Polylines.dashes(),
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),
           mitre_limit: float()

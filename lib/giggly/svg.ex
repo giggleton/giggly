@@ -325,9 +325,10 @@ defmodule Giggly.SVG do
   end
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
-  # it, its border its colour at its opacity, its ends and corners as a line's, and its fill its
-  # colour at its opacity.
+  # it, its border its colour at its opacity, its dashes, ends and corners as a line's, and its fill
+  # its colour at its opacity.
   defp primitive(%Rectangles{} = rectangles, box) do
+    dashes = dash_style(rectangles.dashes)
     style = line_style(rectangles.line_end, rectangles.line_join, rectangles.mitre_limit)
 
     columns = [
@@ -358,6 +359,7 @@ defmodule Giggly.SVG do
         number(rectangles.stroke_width),
         ";",
         stroke_style(color, color_opacity),
+        dashes,
         style,
         fill_style(fill, fill_opacity),
         "' />\n"
@@ -365,9 +367,11 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # Each line as svglite writes a polyline, its stroke its colour at its opacity.
+  # Each line as svglite writes a polyline, its stroke its colour at its opacity, then its dashes.
   defp primitive(%Polylines{} = polylines, box) do
     lines = placed_lines(polylines.lines, polylines.offsets, box)
+    dashes = dash_style(polylines.dashes)
+    style = line_style(polylines.line_end, polylines.line_join, polylines.mitre_limit)
 
     Enum.zip_with([lines, polylines.color, polylines.opacity], fn [line, color, opacity] ->
       [
@@ -377,15 +381,17 @@ defmodule Giggly.SVG do
         number(polylines.stroke_width),
         ";",
         stroke_style(color, opacity),
-        line_style(polylines.line_end, polylines.line_join, polylines.mitre_limit),
+        dashes,
+        style,
         " fill: none;' />\n"
       ]
     end)
   end
 
   # Each segment as svglite writes a line, from its start to its end, each moved by its offset,
-  # its stroke its colour at its opacity.
+  # its stroke its colour at its opacity, then its dashes.
   defp primitive(%Segments{} = segments, box) do
+    dashes = dash_style(segments.dashes)
     style = line_style(segments.line_end, segments.line_join, segments.mitre_limit)
     columns = [placed_segments(segments, box), segments.color, segments.opacity]
 
@@ -403,6 +409,7 @@ defmodule Giggly.SVG do
         number(segments.stroke_width),
         ";",
         stroke_style(color, opacity),
+        dashes,
         style,
         "' />\n"
       ]
@@ -713,6 +720,13 @@ defmodule Giggly.SVG do
       [number(x_position), ",", number(y_position), " "]
     end)
   end
+
+  # A line's dashes as svglite writes them, after its stroke: each length in points, joined by
+  # commas, or nothing for a solid line, SVG's default.
+  defp dash_style(:none), do: ""
+
+  defp dash_style(dashes),
+    do: [" stroke-dasharray: ", Enum.map_intersperse(dashes, ",", &number/1), ";"]
 
   # A line's ends and corners as svglite writes them, leaving out what its stylesheet declares,
   # round ends, round corners and a mitre limit of 10, which the document's root declares here: a

@@ -2845,6 +2845,101 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/line_alpha.svg")
     end
 
+    # Golden: test/golden/line_types.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/line_types.R: every element matches it, in order, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Each of the seven named line types and a
+    # pattern of its own, a path annotation each: dashed as svglite writes R's line types, each
+    # length times the line's width in line-width units, alone for a line narrower than one, and
+    # the blank line not drawn; and a legend's keys dashed as their lines. It moves with what moves
+    # test/golden/line_alpha.svg, and with how a line is dashed.
+    test "each line type is dashed as svglite writes it, on a line and on its legend's keys" do
+      line_types = [:blank, :solid, :dashed, :dotted, :dotdash, :longdash, :twodash, {3, 3, 1, 3}]
+
+      base =
+        %{"x" => [0, 10, 0, 10], "y" => [10, 10, 11, 11], "g" => ["p", "p", "q", "q"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_line(linetype: :longdash, linewidth: 1)
+
+      plot =
+        line_types
+        |> Enum.with_index(1)
+        |> Enum.reduce(base, fn {line_type, index}, annotated ->
+          Plot.annotate(annotated, :path, x: [0, 10], y: index, linetype: line_type)
+        end)
+        |> Plot.annotate(:path, x: [0, 10], y: 9, linetype: :dashed, linewidth: 0.2)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/line_types.svg")
+    end
+
+    # Golden: test/golden/bar_line_types.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/bar_line_types.R: every element matches it, in order, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. Bars bordered 1.5 mm wide and
+    # dotted, their keys short of the key by 1.5 mm and bordered alike; a column annotation and a
+    # rectangle annotation each given a list of the eight line types, the rectangles a list of
+    # widths too, each border dashed at its own width and the blank one not drawn; and a dashed
+    # rectangle with no border colour, its dashes written all the same. It moves with what moves
+    # test/golden/bar_fill.svg, and with how a border is dashed.
+    test "each line type is dashed as svglite writes it on a bar's border and on its key" do
+      line_types = [:blank, :solid, :dashed, :dotted, :dotdash, :longdash, :twodash, {3, 3, 1, 3}]
+      positions = Enum.to_list(3..10)
+
+      plot =
+        %{"x" => [1, 2], "y" => [3, 2], "g" => ["p", "q"]}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_col(colour: "black", linewidth: 1.5, linetype: :dotted)
+        |> Plot.annotate(:col, x: positions, y: 1, colour: "black", linetype: line_types)
+        |> Plot.annotate(:rect,
+          xmin: Enum.map(positions, fn position -> position - 0.45 end),
+          xmax: Enum.map(positions, fn position -> position + 0.45 end),
+          ymin: 2,
+          ymax: 3,
+          colour: "black",
+          linetype: line_types,
+          linewidth: [0.2, 0.2, 1, 1, 2, 2, 0.5, 0.5]
+        )
+        |> Plot.annotate(:rect, xmin: 0.55, xmax: 2.45, ymin: 3.5, ymax: 4, linetype: :dashed)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/bar_line_types.svg")
+    end
+
+    # An aesthetic a layer takes from the plot's mapping and cannot use is drawn by nothing, as
+    # ggplot2's geoms leave it: a layer may set it, but its geom never reads the plot's column of
+    # it as a value set, which raised for a path's width and a point's shape and drew a point's
+    # size unscaled. A number groups nothing, so the drawing is the plot's without the mapping.
+    test "an aesthetic a layer carries unused from the plot's mapping changes nothing it draws" do
+      data = %{"x" => [1, 2, 3], "y" => [1.0, 3.0, 2.0], "w" => [1, 2, 3]}
+
+      for {add, aesthetic} <- [
+            {&Plot.geom_path/1, :linewidth},
+            {&Plot.geom_path/1, :linetype},
+            {&Plot.geom_point/1, :shape},
+            {&Plot.geom_point/1, :size},
+            {&Plot.geom_point/1, :stroke},
+            {&Plot.geom_col/1, :linewidth},
+            {&Plot.geom_col/1, :linetype}
+          ] do
+        drawn = fn mapping ->
+          data
+          |> Plot.new(mapping)
+          |> add.()
+          |> Giggly.to_svg(width: 300, height: 200)
+          |> IO.iodata_to_binary()
+        end
+
+        assert drawn.(%{:x => :x, :y => :y, aesthetic => :w}) == drawn.(%{x: :x, y: :y})
+      end
+    end
+
     # Golden: test/golden/date_line.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/date_line.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_path's first example: economics's

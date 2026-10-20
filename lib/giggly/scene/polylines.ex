@@ -13,12 +13,15 @@ defmodule Giggly.Scene.Polylines do
   # number of points across and up from its place, one `{across, up}` for each point, line by line,
   # as grid adds a unit in points to one in the viewport's own (`unit(x, "npc") + unit(d, "pt")`): a
   # tick reaching out from a circle whose size in points is known only when the scene is laid out.
-  # `:none` moves no point.
+  # `:none` moves no point. `dashes` is how every line is dashed: the lengths of its dashes and of
+  # the gaps between them, in turn, in points, as grid's `lty` draws a line type, or `:none` for a
+  # solid line.
 
   @enforce_keys [
     :lines,
     :offsets,
     :stroke_width,
+    :dashes,
     :color,
     :opacity,
     :line_end,
@@ -33,10 +36,14 @@ defmodule Giggly.Scene.Polylines do
   @typedoc "How a line turns a corner, grid's `linejoin`."
   @type line_join :: :round | :mitre | :bevel
 
+  @typedoc "How a line is dashed: its dashes' and gaps' lengths in turn, in points, or `:none`."
+  @type dashes :: :none | [float()]
+
   @type t :: %__MODULE__{
           lines: [[{float(), float()}]],
           offsets: :none | [[{float(), float()}]],
           stroke_width: float(),
+          dashes: dashes(),
           color: [String.t()],
           opacity: [float()],
           line_end: line_end(),

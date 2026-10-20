@@ -12,8 +12,21 @@ defmodule Giggly.Geom.Mark do
   # scene as its `#RRGGBB` and an opacity, which the backend writes as svglite writes an R colour's
   # alpha. A missing colour, which a scale's `na_value: :none` leaves in the table as R's mapped
   # column holds `NA`, is read as `:none` (`colors/3`).
+  #
+  # A line is as wide as its `linewidth` in millimetres, which ggplot2 hands grid as `linewidth *
+  # .pt` line-width units of 1/96 inch and svglite writes in points (`stroke_width/1`), and dashed
+  # as its line type says: a dash pattern held as a tuple of lengths, dash and gap in turn, `{}` for
+  # a solid line and `:none` for a blank one, which draws no line, as `Giggly.Plot` holds every
+  # line type, a missing one read as blank (`line_types/1`), as ggplot2 draws a missing line type.
+  # svglite writes each length times the line's width in line-width units, or 1 where the line is
+  # narrower, as a length in points (`dashes/2`).
 
   alias Giggly.DataFrame
+
+  # ggplot2's `.pt` (font points per millimetre), and the line-width units and points in an inch.
+  @font_points_per_millimetre 72.27 / 25.4
+  @line_width_units_per_inch 96
+  @points_per_inch 72
 
   # The value the layer sets for `aesthetic`, the same in every row of `frame`, or `default` where
   # it sets none.
@@ -50,6 +63,37 @@ defmodule Giggly.Geom.Mark do
     frame
     |> values(aesthetic, default)
     |> Enum.map(fn color -> color || :none end)
+  end
+
+  # Each row's line type in `frame`, as `values/3` reads it, solid where the table has none, a
+  # missing one read as `:none`, blank.
+  @doc false
+  @spec line_types(DataFrame.t()) :: [tuple() | :none]
+  def line_types(frame) do
+    frame
+    |> values(:linetype, {})
+    |> Enum.map(fn line_type -> line_type || :none end)
+  end
+
+  # A line `millimetres` wide, in points, worked out in ggplot2's and svglite's order.
+  @doc false
+  @spec stroke_width(number()) :: float()
+  def stroke_width(millimetres),
+    do: millimetres * @font_points_per_millimetre / @line_width_units_per_inch * @points_per_inch
+
+  # How a line of `line_type`, `millimetres` wide, is dashed, in points, as svglite's `scale_lty()`
+  # writes it: each length of its pattern times the line's width in line-width units, or 1 where it
+  # is narrower; `:none` for a solid line, and for a blank one, which has no dashes.
+  @doc false
+  @spec dashes(tuple() | :none, number()) :: :none | [float()]
+  def dashes(line_type, _millimetres) when line_type in [{}, :none], do: :none
+
+  def dashes(pattern, millimetres) when is_tuple(pattern) do
+    unit = max(millimetres * @font_points_per_millimetre, 1.0)
+
+    pattern
+    |> Tuple.to_list()
+    |> Enum.map(fn length -> length * unit end)
   end
 
   # Each row's opacity in its colour, one of `colors` for each row: its alpha, or the colour's own

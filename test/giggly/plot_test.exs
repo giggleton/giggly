@@ -485,6 +485,31 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "a bar's and a rectangle's border" do
+    test "a border's width and line type are set for every bar or rectangle, as a line's are" do
+      for {add, mapping} <- [
+            {&Plot.geom_col/2, %{x: :cyl, y: :mpg}},
+            {&Plot.geom_bar/2, %{x: :cyl}},
+            {&Plot.geom_rect/2, %{xmin: :wt, xmax: :mpg, ymin: :wt, ymax: :mpg}}
+          ] do
+        plot = Plot.new(@rows, mapping)
+
+        assert [%Plot.Layer{fixed: %{linewidth: 1.0, linetype: {1, 3}}}] =
+                 add.(plot, linewidth: 1, linetype: 3).reversed_layers
+
+        assert [%Plot.Layer{fixed: %{linewidth: +0.0, linetype: :none}}] =
+                 add.(plot, linewidth: 0, linetype: :blank).reversed_layers
+
+        for {option, value} <- [linewidth: -0.5, linetype: 7] do
+          error =
+            assert_raise NimbleOptions.ValidationError, fn -> add.(plot, [{option, value}]) end
+
+          assert error.key == option
+        end
+      end
+    end
+  end
+
   describe "geom_col/3" do
     test "a column layer records the bar geom, the identity stat and stacking" do
       plot =
@@ -860,6 +885,66 @@ defmodule Giggly.PlotTest do
         error = assert_raise ArgumentError, fn -> add.(plot) end
         assert error.message =~ function
         assert error.message =~ ":y"
+      end
+    end
+
+    # R 4.6.1 reads `lty = 0` to `6` as "blank" to "twodash", and a string of hex digits as its own
+    # lengths: vdiffr 1.0.9 dashes each 0.5 mm line `5.69,5.69`, `1.42,4.27`, `1.42,4.27,5.69,4.27`,
+    # `9.96,4.27` and `2.85,2.85,8.54,2.85`, each length 1.42 times these (test/golden/line_types.R).
+    test "a line type is set for every line, held as its dash pattern, by name, number or pattern" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for add <- [&Plot.geom_path/2, &Plot.geom_line/2] do
+        by_number =
+          for number <- 0..6 do
+            [layer] = add.(plot, linetype: number).reversed_layers
+            layer.fixed.linetype
+          end
+
+        by_name =
+          for name <- [:blank, :solid, :dashed, :dotted, :dotdash, :longdash, :twodash] do
+            [layer] = add.(plot, linetype: name).reversed_layers
+            layer.fixed.linetype
+          end
+
+        assert by_number === [:none, {}, {4, 4}, {1, 3}, {1, 3, 4, 3}, {7, 3}, {2, 2, 6, 2}]
+        assert by_name === by_number
+
+        assert [%Plot.Layer{fixed: %{linetype: {3, 3, 1, 15, 2, 2, 1, 1}}}] =
+                 add.(plot, linetype: {3, 3, 1, 15, 2, 2, 1, 1}).reversed_layers
+      end
+    end
+
+    # R refuses a pattern of an odd number of digits or more than 8 ("invalid line type: must be
+    # length 2, 4, 6 or 8"), a 0 ("zeroes are not allowed"), and a number below 0; it takes 7 and
+    # up round again from solid, which Giggly refuses rather than draw a line type not asked for.
+    test "a line type that is not a name, a number from 0 to 6 or a pattern of 2 to 8 is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for line_type <- [
+            7,
+            -1,
+            2.0,
+            :dashdot,
+            "dashed",
+            "44",
+            [4, 4],
+            {},
+            {4},
+            {1, 2, 3},
+            {0, 4},
+            {16, 1},
+            {4.0, 4},
+            {1, 1, 1, 1, 1, 1, 1, 1, 1, 1}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_path(plot, linetype: line_type)
+          end
+
+        assert error.key == :linetype
+        assert error.message =~ "got: #{inspect(line_type)}"
+        assert error.message =~ ":blank, :solid, :dashed, :dotted, :dotdash, :longdash, :twodash"
       end
     end
 
@@ -1312,6 +1397,69 @@ defmodule Giggly.PlotTest do
                size: [2.0, 4.0, 6.0],
                stroke: [0.5, nil, 2.0]
              }
+    end
+
+    # ggplot2 4.0.3's `annotate("rect", xmin = c(1, 3), xmax = c(2, 4), ymin = 0, ymax = 1,
+    # linetype = c(2, 3), linewidth = c(1, 2))` borders the first rectangle dashed and 1 mm wide,
+    # the second dotted and 2 mm wide.
+    test "a bar's or a rectangle's line type and width each take a list, a blank held as missing" do
+      plot = Plot.new(@rows)
+
+      for {geom, positions} <- [
+            {:rect, [xmin: [1, 3, 5, 7], xmax: [2, 4, 6, 8], ymin: 0, ymax: 1]},
+            {:col, [x: [1, 2, 3, 4], y: 1]},
+            {:bar, [x: [1, 2, 3, 4], y: 1]}
+          ] do
+        annotated =
+          Plot.annotate(
+            plot,
+            geom,
+            positions ++ [linetype: [2, :dotted, {3, 1}, :blank], linewidth: [1, 2, 3, 0]]
+          )
+
+        assert [%Plot.Layer{fixed: fixed}] = annotated.reversed_layers
+
+        assert fixed === %{
+                 linetype: [{4, 4}, {1, 3}, {3, 1}, nil],
+                 linewidth: [1.0, 2.0, 3.0, +0.0]
+               }
+      end
+    end
+
+    test "a dash pattern given to an annotation is one line type, and a list of one too" do
+      plot = Plot.new(@rows)
+
+      for line_type <- [{4, 2}, [{4, 2}]] do
+        annotated =
+          Plot.annotate(plot, :rect,
+            xmin: [1, 3],
+            xmax: [2, 4],
+            ymin: 0,
+            ymax: 1,
+            linetype: line_type
+          )
+
+        assert [%Plot.Layer{fixed: %{linetype: {4, 2}}}] = annotated.reversed_layers
+      end
+    end
+
+    # ggplot2 4.0.3 aborts drawing a path whose line type changes along it ("can't have varying
+    # colour, linewidth, and/or alpha along the line when linetype isn't solid"), and a path
+    # annotation is one line.
+    test "a path's or a line's annotation takes one line type and one width, not a list" do
+      plot = Plot.new(@rows)
+
+      for geom <- [:path, :line], {option, values} <- [linetype: [2, 3], linewidth: [1, 2]] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.annotate(plot, geom, [{:x, [1, 2]}, {:y, 1}, {option, values}])
+          end
+
+        assert error.key == option
+      end
+
+      assert [%Plot.Layer{fixed: %{linetype: {7, 3}, linewidth: 2.0}}] =
+               Plot.annotate(plot, :path, x: [1, 2], y: 1, linetype: :longdash, linewidth: 2).reversed_layers
     end
 
     # ggplot2 4.0.3: "Unequal parameter lengths: x (2) and shape (3)", and so for size and stroke.

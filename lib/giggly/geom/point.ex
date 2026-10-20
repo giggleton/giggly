@@ -241,6 +241,7 @@ defmodule Giggly.Geom.Point do
         color: colors(marks, :outline),
         color_opacity: opacities(marks, :outline),
         stroke_width: stroke_width,
+        dashes: :none,
         line_end: @line_end,
         line_join: @line_join,
         mitre_limit: @mitre_limit
@@ -272,6 +273,7 @@ defmodule Giggly.Geom.Point do
         ends: places,
         offsets: geometries(marks),
         stroke_width: stroke_width,
+        dashes: :none,
         color: colors(marks, :outline),
         opacity: opacities(marks, :outline),
         line_end: @line_end,

@@ -17,7 +17,8 @@ ggplot2's facets' order".
 ## Rules
 
 - **Rendering reads the assembled plot and builds the scene; it computes no positions.** Each
-  layer's geom draws in each panel, and the guide's modules draw the panel's background and grid
+  layer's geom draws the rows the assembly hands it (`drawn_data`) in each panel, and the guide's
+  modules draw the panel's background and grid
   lines (`Guide.Grid`), axes (`Guide.Axis`) and strips (`Guide.Strip`), handed the plot's coordinate system and that panel's params, which
   rendering passes on unread; rendering arranges what they draw into cells, the panel's background
   and grid under its layers and any axis inside the panel over them, as ggplot2's coordinate

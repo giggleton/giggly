@@ -21,11 +21,15 @@ defmodule Giggly.Geom.Path do
   # segment from each row to the next, each in the colour and alpha of the row it starts from, and
   # a segment touching a missing position is not drawn.
   #
-  # Every line looks as ggplot2's default line does, until aesthetics such as linetype can be
-  # mapped: solid, 0.5 mm wide, which grid draws 1.07 points wide, or as wide as the `linewidth` a
-  # layer sets, in millimetres, and black, or its row's colour, mapped or set. A row's `alpha`,
-  # where its table has one, makes its line that opaque, replacing its colour's own; a row without
-  # one keeps its colour's (`Giggly.Geom.Mark`).
+  # Every line looks as ggplot2's default line does, until line types and widths can be mapped:
+  # solid, or in the line type a layer sets, 0.5 mm wide, which grid draws 1.07 points wide, or as
+  # wide as the `linewidth` a layer sets, in millimetres, and black, or its row's colour, mapped or
+  # set. A row's `alpha`, where its table has one, makes its line that opaque, replacing its
+  # colour's own; a row without one keeps its colour's (`Giggly.Geom.Mark`). A dashed line is drawn
+  # with its dashes as svglite writes them (`Mark.dashes/2`), and a blank one is not drawn, as R's
+  # graphics engine draws no line of R's `"blank"`. A line in any line type but solid, blank
+  # included, keeps one colour and one alpha all along it: where a group's vary, the panel is
+  # refused, as ggplot2's `GeomPath` aborts, since segments would dash each piece afresh.
 
   @enforce_keys [:line_end, :line_join, :mitre_limit]
   defstruct @enforce_keys
@@ -53,16 +57,10 @@ defmodule Giggly.Geom.Path do
     alias Giggly.Geom.Mark
     alias Giggly.Scene.{Polylines, Segments}
 
-    # ggplot2's default line: its width in millimetres and its ink.
+    # ggplot2's default line: its width in millimetres, its line type, solid, and its ink.
     @line_width 0.5
+    @line_type {}
     @color "#000000"
-
-    # ggplot2's `.pt` (font points per millimetre), and the line-width units and points in an inch:
-    # a line `linewidth` millimetres wide is drawn `linewidth * .pt` units of 1/96 inch wide, which
-    # svglite writes in points.
-    @font_points_per_millimetre 72.27 / 25.4
-    @line_width_units_per_inch 96
-    @points_per_inch 72
 
     # A legend's key, `draw_key_path()`: a line across the middle of the key, from a tenth of its
     # width to nine tenths, its corners grid's default, round.
@@ -88,24 +86,42 @@ defmodule Giggly.Geom.Path do
 
       case DataFrame.row_count(drawn) do
         0 -> []
-        _rows -> [draw(geom, drawn, constant?(drawn))]
+        _rows -> draw_lines(geom, drawn, Mark.set(drawn, :linetype, @line_type), constant?(drawn))
       end
     end
 
-    # A legend's key, in the key's colour at its alpha; a colour of `:none` draws nothing.
+    # The panel's lines in their line type: refused where one not solid varies along a line, as
+    # ggplot2's `GeomPath` aborts, and none where it is blank, which R's engine does not draw.
+    defp draw_lines(_geom, _frame, line_type, false) when line_type != {} do
+      raise ArgumentError,
+            "a path or line whose line type is not :solid cannot vary its colour or alpha " <>
+              "along a line, as ggplot2 refuses; give each group one colour and one alpha, or " <>
+              "draw the lines :solid"
+    end
+
+    defp draw_lines(_geom, _frame, :none, true), do: []
+
+    defp draw_lines(geom, frame, line_type, constant),
+      do: [draw(geom, frame, line_type, constant)]
+
+    # A legend's key, in the key's colour at its alpha, width and line type; a colour of `:none`, or
+    # a blank line type, draws nothing.
     @impl Giggly.Geom
     def draw_key(geom, key, _size) do
-      case Map.get(key, :color, @color) do
-        :none ->
+      line_width = Map.get(key, :linewidth, @line_width)
+
+      case {Map.get(key, :color, @color), Map.get(key, :linetype, @line_type)} do
+        {color, line_type} when :none in [color, line_type] ->
           []
 
-        color ->
+        {color, line_type} ->
           [
             %Segments{
               starts: [@key_start],
               ends: [@key_end],
               offsets: :none,
-              stroke_width: points(Map.get(key, :linewidth, @line_width)),
+              stroke_width: Mark.stroke_width(line_width),
+              dashes: Mark.dashes(line_type, line_width),
               color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.get(key, :alpha))],
               line_end: geom.line_end,
@@ -116,9 +132,9 @@ defmodule Giggly.Geom.Path do
       end
     end
 
-    # Each group a line, in its first row's colour and alpha, broken where a position is missing, as
-    # grid breaks a polyline; a piece of one point draws nothing.
-    defp draw(geom, frame, true) do
+    # Each group a line, in its first row's colour and alpha and the layer's line type, broken where
+    # a position is missing, as grid breaks a polyline; a piece of one point draws nothing.
+    defp draw(geom, frame, line_type, true) do
       {lines, looks} =
         frame
         |> rows()
@@ -134,10 +150,13 @@ defmodule Giggly.Geom.Path do
         end)
         |> Enum.unzip()
 
+      line_width = Mark.set(frame, :linewidth, @line_width)
+
       %Polylines{
         lines: lines,
         offsets: :none,
-        stroke_width: stroke_width(frame),
+        stroke_width: Mark.stroke_width(line_width),
+        dashes: Mark.dashes(line_type, line_width),
         color: Enum.map(looks, fn row -> Mark.hex(row.color) end),
         opacity: Enum.map(looks, fn row -> Mark.opacity(row.color, row.alpha) end),
         line_end: geom.line_end,
@@ -147,8 +166,9 @@ defmodule Giggly.Geom.Path do
     end
 
     # A segment from each row to the next of its group, in the colour and alpha of the row it starts
-    # from; a segment touching a missing position is not drawn.
-    defp draw(geom, frame, false) do
+    # from, solid, the one line type a line whose look varies along it is drawn in; a segment
+    # touching a missing position is not drawn.
+    defp draw(geom, frame, {}, false) do
       segments =
         frame
         |> rows()
@@ -157,11 +177,14 @@ defmodule Giggly.Geom.Path do
           from.group == to.group and placed?(from) and placed?(to)
         end)
 
+      line_width = Mark.set(frame, :linewidth, @line_width)
+
       %Segments{
         starts: Enum.map(segments, fn [from, _to] -> position(from) end),
         ends: Enum.map(segments, fn [_from, to] -> position(to) end),
         offsets: :none,
-        stroke_width: stroke_width(frame),
+        stroke_width: Mark.stroke_width(line_width),
+        dashes: :none,
         color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
         opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),
         line_end: geom.line_end,
@@ -258,18 +281,5 @@ defmodule Giggly.Geom.Path do
     defp placed?(row), do: is_number(row.x) and is_number(row.y)
 
     defp position(row), do: {row.x, row.y}
-
-    # The layer's line width in points, from the width it sets in millimetres, the same in every
-    # row, or ggplot2's default.
-    defp stroke_width(frame) do
-      frame
-      |> Mark.set(:linewidth, @line_width)
-      |> points()
-    end
-
-    # A line `millimetres` wide, in points, worked out in ggplot2's and svglite's order.
-    defp points(millimetres),
-      do:
-        millimetres * @font_points_per_millimetre / @line_width_units_per_inch * @points_per_inch
   end
 end

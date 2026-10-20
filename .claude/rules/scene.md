@@ -66,7 +66,9 @@ weight".
   path's legend key and a point's plus or cross) and placed `Rectangles` say how their ends
   (`:butt`, `:round`, `:square`) and corners (`:round`, `:mitre`, `:bevel`) are drawn and their
   mitre limit; the guides' lines are theme_gray()'s, butt and round, a bar's border `GeomRect`'s,
-  butt and mitred, and a point's lines grid's own, round.
+  butt and mitred, and a point's lines grid's own, round. **Each also carries its `dashes`**, the
+  lengths of its dashes and gaps in turn, in points, or `:none` for a solid line, one for the
+  primitive as its `stroke_width` is: worked out by the geom, so the backend measures nothing.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.

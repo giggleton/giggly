@@ -43,6 +43,10 @@ where its marks sit".
   layer's mapping against (`accepted_aesthetics/0`, `required_aesthetics/0`), which `Plot` reads;
   and its drawing, in a `defimpl Giggly.Geom` that opens by classifying itself into this boundary.
   The boundary exports the kinds; their drawing stays in their implementations.
+- **A geom is handed its layer's rows without the aesthetics other than position that the layer
+  takes from the plot's mapping and cannot use** (the assembly's `drawn_data`), which ride along in
+  `layer_data/2` and are drawn by nothing, so a geom never reads such a column as a value the layer
+  sets: a path's carried `linewidth`, a point's carried `shape`.
 - **A row missing a required position is not drawn.** ggplot2 also warns; a pure pipeline cannot,
   so how a dropped row is reported is open until something can report it.
 - **A point looks like ggplot2's default point unless its row says otherwise:** the solid circle
@@ -88,11 +92,13 @@ where its marks sit".
   its `aes_params`, and its size in points, it draws in the key's cell. A point's key is the point
   at the middle in the key's shape, size, stroke, colour and fill, as `draw_key_point()` draws it;
   ggplot2 widens a key for a point too big for it, which waits for keys that size themselves; a
-  bar's is its fill short of the key by its border's width, 0.5 mm, as `draw_key_polygon()` takes
-  `linewidth` millimetres off the key, its fill at the key's alpha and its border in its own; a
+  bar's is its fill short of the key by its border's width, the layer's set `linewidth` or 0.5 mm,
+  as `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's alpha
+  and its border in its own, as wide and in the line type the layer sets, a blank one not drawn; a
   path's is a segment across the middle from a tenth of the key's width to nine tenths, as
-  `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm, its ends the layer's
-  and its corners round.
+  `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm and in its line
+  type, a blank one drawing nothing, its ends the layer's and its corners round. Neither is widened
+  for a line too wide for its key, which waits for keys that size themselves.
 - **A path is drawn as ggplot2's `GeomPath` draws one.** Rows missing `x` or `y` at a group's ends
   are dropped (`keep_mid_true()`), and one in the middle breaks the line; the rows are put in
   group order, each group's in its own, and munched; a group of fewer than two rows is not drawn.
@@ -101,10 +107,14 @@ where its marks sit".
   each row to the next of its group, in its start's colour and alpha, a segment touching a missing
   position left out, as `GeomPath` tests its groups' `colour` and `alpha` for constancy. A discrete
   colour groups the rows, so it varies along a group only where `group` is mapped apart from it. A
-  line is black, or its row's colour, and solid, as wide as the layer's set `linewidth` in
+  line is black, or its row's colour, as wide as the layer's set `linewidth` in
   millimetres or 0.5 (1.07 points, worked out as ggplot2's `linewidth * .pt` line-width units and
   svglite's points), with the geom's ends, corners and mitre limit (ggplot2's defaults: butt,
-  round, 10).
+  round, 10). **It is solid, or in the layer's line type, dashed as svglite writes R's**
+  (`Mark.dashes/2`): each length of its pattern times the line's width in line-width units, or 1
+  where the line is narrower, in points; a blank line is not drawn, as R's engine draws none.
+  **A line type other than solid, blank included, refuses a group whose colour or alpha varies
+  along it, when the plot is drawn**, as `GeomPath` aborts, so segments are always solid.
 - **Text (`Geom.Text`) is drawn as ggplot2's `GeomText` draws it**: a label per row at its `x` and
   `y`, its row's value as R's `as.character()` writes it (`Giggly.AsCharacter`, which the scales'
   discrete levels share: a whole number with no point, a float in up to 15 significant digits,
@@ -126,7 +136,12 @@ where its marks sit".
   orientation is the layer's; one a stat names arrives with the first such stat.
 - **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
   rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
-  rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). A
+  rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). **Each
+  rectangle's border is as wide as its row's `linewidth`, 0.5 mm by default, and in its row's line
+  type**, dashed as a line is, a blank one leaving it unbordered, as R's engine draws a blank
+  border transparent, and the dashes written whether or not the border has a colour; the
+  rectangles are drawn in row order, each run of borders alike in width and line type one
+  primitive, as a point's elements run by outline width. A
   rectangle's corners are left as they are by the build and drawn between, an `xmin` past its
   `xmax` included, as grid draws one; a row missing a corner is not drawn, and an infinite one is
   at the panel's edge, where the coordinate system puts it. Its corners are `xmin`, `xmax`,

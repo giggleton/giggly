@@ -10,13 +10,15 @@ defmodule Giggly.Scene.Segments do
   # of a point's plus, cross and asterisk. `offsets` moves each segment's ends a number of points
   # across and up from their places, one `{{across, up}, {across, up}}` for each segment, its
   # start's and its end's, as `Giggly.Scene.Polylines` moves a line's points: a point's strokes are
-  # drawn round its place at a size in points. `:none` moves none.
+  # drawn round its place at a size in points. `:none` moves none. `dashes` dashes every segment as
+  # `Giggly.Scene.Polylines` dashes a line.
 
   @enforce_keys [
     :starts,
     :ends,
     :offsets,
     :stroke_width,
+    :dashes,
     :color,
     :opacity,
     :line_end,
@@ -30,6 +32,7 @@ defmodule Giggly.Scene.Segments do
           ends: [{float(), float()}],
           offsets: :none | [{{float(), float()}, {float(), float()}}],
           stroke_width: float(),
+          dashes: Giggly.Scene.Polylines.dashes(),
           color: [String.t()],
           opacity: [float()],
           line_end: Giggly.Scene.Polylines.line_end(),

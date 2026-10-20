@@ -108,6 +108,7 @@ defmodule Giggly.Guide.Colorbar do
             lines: lines,
             offsets: :none,
             stroke_width: ticks_look.line_width,
+            dashes: :none,
             color: List.duplicate(ticks_look.color, length(lines)),
             opacity: List.duplicate(1.0, length(lines)),
             line_end: :butt,

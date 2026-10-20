@@ -246,6 +246,7 @@ defmodule Giggly.SVGTest do
         lines: [[{0.5, 0.25}, {0.5, 0.25}]],
         offsets: [[{0.0, 0.0}, {3.0, -4.0}]],
         stroke_width: 0.75,
+        dashes: :none,
         color: ["#000000"],
         opacity: [1.0],
         line_end: :butt,
@@ -269,6 +270,7 @@ defmodule Giggly.SVGTest do
         color_opacity: [0.0],
         # A 0.5 mm line, as grid draws it in points.
         stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -299,6 +301,7 @@ defmodule Giggly.SVGTest do
           color: [:none],
           color_opacity: [0.0],
           stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96,
+          dashes: :none,
           line_end: :butt,
           line_join: :mitre,
           mitre_limit: 10.0
@@ -355,6 +358,7 @@ defmodule Giggly.SVGTest do
         color: [:none, "#7F7F7F"],
         color_opacity: [1.0, 1.0],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -364,6 +368,7 @@ defmodule Giggly.SVGTest do
         lines: [[{0.1, 0.1}, {0.2, 0.2}], [{0.3, 0.3}, {0.4, 0.4}]],
         offsets: :none,
         stroke_width: 1.07,
+        dashes: :none,
         color: ["#F8766D", "#00BFC4"],
         opacity: [1.0, 1.0],
         line_end: :butt,
@@ -376,6 +381,7 @@ defmodule Giggly.SVGTest do
         ends: [{0.3, 0.75}, {0.5, 0.75}],
         offsets: :none,
         stroke_width: 1.07,
+        dashes: :none,
         color: ["#00BFC4", "#F8766D"],
         opacity: [1.0, 1.0],
         line_end: :butt,
@@ -464,6 +470,7 @@ defmodule Giggly.SVGTest do
         color: [:none],
         color_opacity: [0.0],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -534,6 +541,7 @@ defmodule Giggly.SVGTest do
         color: [:none],
         color_opacity: [0.0],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -560,6 +568,7 @@ defmodule Giggly.SVGTest do
         color: ["#FF0000"],
         color_opacity: [128 / 255],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -585,6 +594,7 @@ defmodule Giggly.SVGTest do
         color: [:none],
         color_opacity: [1.0],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -609,6 +619,7 @@ defmodule Giggly.SVGTest do
         color: ["#FF0000"],
         color_opacity: [1.0],
         stroke_width: 1.07,
+        dashes: :none,
         line_end: :butt,
         line_join: :mitre,
         mitre_limit: 10.0
@@ -632,6 +643,7 @@ defmodule Giggly.SVGTest do
           lines: [[{0.1, 0.1}, {0.2, 0.2}]],
           offsets: :none,
           stroke_width: 21.34,
+          dashes: :none,
           color: ["#000000"],
           opacity: [1.0],
           line_end: line_end,
@@ -673,6 +685,7 @@ defmodule Giggly.SVGTest do
         lines: [[{0.1, 0.1}, {0.2, 0.2}], [{0.3, 0.3}, {0.4, 0.4}]],
         offsets: :none,
         stroke_width: 1.07,
+        dashes: :none,
         color: List.duplicate("#000000", 2),
         opacity: [0.1, 1.0],
         line_end: :butt,
@@ -690,12 +703,92 @@ defmodule Giggly.SVGTest do
              ]
     end
 
+    # As vdiffr 1.0.9's `write_style_linetype()` writes a line's style, test/golden/line_types.svg
+    # and test/golden/bar_line_types.svg among its drawings: `stroke-dasharray` after the stroke
+    # and its opacity, before the ends and corners, each length to two decimals, written for a
+    # border of no colour too, and none for a solid line.
+    test "a line's dashes follow its stroke, each length in points, and a solid line has none" do
+      line = [line_end: :butt, line_join: :round, mitre_limit: 10.0]
+
+      polylines =
+        struct!(
+          Polylines,
+          [
+            lines: [[{0.1, 0.1}, {0.2, 0.2}]],
+            offsets: :none,
+            stroke_width: 1.07,
+            dashes: [5.6906, 17.0718],
+            color: ["#FF0000"],
+            opacity: [0.5]
+          ] ++ line
+        )
+
+      segments =
+        struct!(
+          Segments,
+          [
+            starts: [{0.1, 0.5}],
+            ends: [{0.3, 0.75}],
+            offsets: :none,
+            stroke_width: 1.07,
+            dashes: [1.4226, 4.2679, 5.6906, 4.2679],
+            color: ["#000000"],
+            opacity: [1.0]
+          ] ++ line
+        )
+
+      rectangles = %Rectangles{
+        xmin: [0.1, 0.5],
+        xmax: [0.2, 0.6],
+        ymin: [0.1, 0.1],
+        ymax: [0.2, 0.2],
+        offsets: :none,
+        fill: ["#595959", "#595959"],
+        fill_opacity: [1.0, 1.0],
+        color: [:none, "#000000"],
+        color_opacity: [0.0, 1.0],
+        stroke_width: 1.07,
+        dashes: [4.0, 4.0],
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
+      }
+
+      assert Regex.scan(
+               ~r/<(?:polyline|line|rect x)[^>]*?style='([^']*)'/,
+               draw(whole([polylines, segments, rectangles, %{polylines | dashes: :none}])),
+               capture: :all_but_first
+             ) === [
+               [
+                 "stroke-width: 1.07; stroke: #FF0000; stroke-opacity: 0.50; " <>
+                   "stroke-dasharray: 5.69,17.07; stroke-linecap: butt; fill: none;"
+               ],
+               [
+                 "stroke-width: 1.07; stroke: #000000; " <>
+                   "stroke-dasharray: 1.42,4.27,5.69,4.27; stroke-linecap: butt;"
+               ],
+               [
+                 "stroke-width: 1.07; stroke: none; stroke-dasharray: 4.00,4.00; " <>
+                   "stroke-linecap: butt; stroke-linejoin: miter; fill: #595959;"
+               ],
+               [
+                 "stroke-width: 1.07; stroke: #000000; stroke-dasharray: 4.00,4.00; " <>
+                   "stroke-linecap: butt; stroke-linejoin: miter; fill: #595959;"
+               ],
+               [
+                 "stroke-width: 1.07; stroke: #FF0000; stroke-opacity: 0.50; " <>
+                   "stroke-linecap: butt; fill: none;"
+               ]
+             ]
+    end
+
     test "a segment is a line from its start to its end, its stroke carrying its opacity" do
       segments = %Segments{
         starts: [{0.1, 0.5}],
         ends: [{0.3, 0.75}],
         offsets: :none,
         stroke_width: 1.07,
+        dashes: :none,
         color: ["#000000"],
         opacity: [0.1],
         line_end: :butt,
@@ -776,6 +869,7 @@ defmodule Giggly.SVGTest do
         color: ["#0000FF"],
         color_opacity: [0.5],
         stroke_width: 1.42,
+        dashes: :none,
         line_end: :round,
         line_join: :round,
         mitre_limit: 10.0
@@ -826,6 +920,7 @@ defmodule Giggly.SVGTest do
         ends: [{0.5, 0.5}],
         offsets: [{{-8.5, -3.0}, {8.5, 3.0}}],
         stroke_width: 1.42,
+        dashes: :none,
         color: ["#0000FF"],
         opacity: [1.0],
         line_end: :round,

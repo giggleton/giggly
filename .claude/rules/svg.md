@@ -47,6 +47,10 @@ size has a weight".
   `pat-0`, so two drawings on one page share an id only when they share the gradient.
 - **Each mark is written in its own colour and opacity**, as svglite writes each element's own
   `gp`, so a mapped colour needs no element of its own per value.
+- **A dashed line is written as svglite writes R's line type**: `stroke-dasharray` right after
+  its stroke and the stroke's opacity, before its ends and corners, each length in points with two
+  decimals, joined by commas, written on a border of no colour too, as svglite writes it whatever
+  the colour; a solid line writes none, SVG's default.
 - **An opacity is written as svglite writes the alpha of an R colour**: R holds it as a byte, the
   opacity times 255 rounded half to even, and svglite writes the byte over 255 as it writes any
   number below 1 (`write_double()`), with as many decimals as reach its first significant digit

@@ -15,6 +15,10 @@ defmodule Giggly.GeomTest do
   # A colour's own alpha of 80, half-opaque: R holds it as the byte 128, so its opacity is 128/255.
   @half_alpha 128 / 255
 
+  # Dashes in points to two decimals, as svglite writes them.
+  defp rounded(:none), do: :none
+  defp rounded(dashes), do: Enum.map(dashes, fn length -> Float.round(length, 2) end)
+
   describe "draw_panel/4 for points" do
     test "a row missing its x or its y is not drawn" do
       coord = %Coord.Cartesian{}
@@ -376,6 +380,39 @@ defmodule Giggly.GeomTest do
       assert {rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax} ===
                {[0.25, 0.0], [0.0, 0.5], [1.0, 0.25], [0.5, 1.0]}
     end
+
+    # Golden: ggplot2 4.0.3's `annotate("rect", ..., colour = "black", linetype = c("dashed",
+    # "dashed", "dashed", "blank"), linewidth = c(0.5, 0.5, 2, 0.5))` through vdiffr 1.0.9: borders
+    # 1.07 points wide dashed `5.69,5.69`, then 4.27 wide dashed `22.76,22.76`, then a blank one
+    # `stroke: none` with no dashes.
+    test "each border is as wide and dashed as its row, each run of one look a primitive" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          xmin: [0.0, 1.0, 2.0, 3.0],
+          xmax: [1.0, 2.0, 3.0, 4.0],
+          ymin: [0.0, 0.0, 0.0, 0.0],
+          ymax: [1.0, 1.0, 1.0, 1.0],
+          color: ["#000000", "#000000", "#000000", "#000000"],
+          linewidth: [0.5, 0.5, 2.0, 0.5],
+          linetype: [{4, 4}, {4, 4}, {4, 4}, nil]
+        )
+
+      assert [thin, thick, blank] = Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+
+      assert {thin.xmin, thick.xmin, blank.xmin} === {[0.0, 0.25], [0.5], [0.75]}
+
+      assert Enum.map([thin, thick, blank], fn rectangles ->
+               {Float.round(rectangles.stroke_width, 2), rounded(rectangles.dashes),
+                rectangles.color}
+             end) === [
+               {1.07, [5.69, 5.69], ["#000000", "#000000"]},
+               {4.27, [22.76, 22.76], ["#000000"]},
+               {1.07, :none, [:none]}
+             ]
+    end
   end
 
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
@@ -425,6 +462,89 @@ defmodule Giggly.GeomTest do
         DataFrame.new(x: [3.0, 1.0, 2.0], y: [1.0, 2.0, 3.0], panel: [1, 1, 1], group: [1, 1, 1])
 
       assert Geom.setup_data(@path, frame, %{x: :continuous, y: :continuous}) === frame
+    end
+  end
+
+  describe "draw_panel/4 for paths, in a line type" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    # Golden: ggplot2 4.0.3's `geom_line(linetype = ...)` through vdiffr 1.0.9: "dashed" 0.5 mm wide
+    # `5.69,5.69`, 0.2 mm wide `4.00,4.00`, and "longdash" 2 mm wide `39.83,17.07`.
+    test "a line is dashed, each length times its width in line-width units, or alone under one",
+         %{coord: coord, params: params} do
+      for {line_type, width, dashes} <- [
+            {{4, 4}, 0.5, [5.69, 5.69]},
+            {{4, 4}, 0.2, [4.0, 4.0]},
+            {{7, 3}, 2.0, [39.83, 17.07]},
+            {{}, 2.0, :none}
+          ] do
+        frame =
+          DataFrame.new(
+            x: [0.0, 4.0],
+            y: [0.0, 4.0],
+            group: [1, 1],
+            linetype: [line_type, line_type],
+            linewidth: [width, width]
+          )
+
+        assert [%Polylines{dashes: drawn}] = Geom.draw_panel(@path, frame, coord, params)
+        assert rounded(drawn) === dashes
+      end
+    end
+
+    # R's graphics engine draws no line whose line type is "blank".
+    test "a blank line draws nothing", %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [0.0, 4.0], y: [0.0, 4.0], group: [1, 1], linetype: [:none, :none])
+
+      assert Geom.draw_panel(@path, frame, coord, params) === []
+    end
+
+    # ggplot2 4.0.3's `geom_path(aes(colour = y), linetype = "dashed")`, and "blank" alike: "can't
+    # have varying colour, linewidth, and/or alpha along the line when linetype isn't solid".
+    test "a line not solid whose colour or alpha varies along it is refused, a blank one too",
+         %{coord: coord, params: params} do
+      for {line_type, look} <- [
+            {{4, 4}, [color: ["#FF0000", "#0000FF", "#0000FF"]]},
+            {:none, [color: ["#FF0000", "#0000FF", "#0000FF"]]},
+            {{1, 3}, [alpha: [0.5, 1.0, 1.0]]}
+          ] do
+        frame =
+          DataFrame.new(
+            [
+              x: [0.0, 2.0, 4.0],
+              y: [0.0, 4.0, 0.0],
+              group: [1, 1, 1],
+              linetype: [line_type, line_type, line_type]
+            ] ++ look
+          )
+
+        error =
+          assert_raise ArgumentError, fn -> Geom.draw_panel(@path, frame, coord, params) end
+
+        assert error.message =~ ":solid"
+      end
+    end
+
+    test "a solid line whose colour varies along it is drawn in solid segments",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 2.0, 4.0],
+          y: [0.0, 4.0, 0.0],
+          group: [1, 1, 1],
+          color: ["#FF0000", "#0000FF", "#0000FF"],
+          linetype: [{}, {}, {}]
+        )
+
+      assert [%Segments{dashes: :none, color: ["#FF0000", "#0000FF"]}] =
+               Geom.draw_panel(@path, frame, coord, params)
     end
   end
 
@@ -795,6 +915,24 @@ defmodule Giggly.GeomTest do
               key.fill_opacity, key.color} === {15.86, 0.71, [0.55], [:none]}
     end
 
+    # Golden: ggplot2 4.0.3's `geom_col(colour = "black", linewidth = 1.5, linetype = "dotted")`
+    # through vdiffr 1.0.9: each key 13.03 points square, bordered 3.20 points wide, dotted
+    # `4.27,12.80`; a blank border not drawn.
+    test "a bar's key is short of the key by its border's width, which it is drawn at and dashed" do
+      key = %{color: "#000000", linewidth: 1.5, linetype: {1, 3}}
+
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key, {17.28, 17.28})
+
+      [xmin] = drawn.xmin
+      [xmax] = drawn.xmax
+
+      assert {Float.round((xmax - xmin) * 17.28, 2), Float.round(drawn.stroke_width, 2),
+              rounded(drawn.dashes), drawn.color} === {13.03, 3.2, [4.27, 12.8], ["#000000"]}
+
+      assert [%Rectangles{color: [:none], dashes: :none}] =
+               Geom.draw_key(%Geom.Bar{}, %{key | linetype: :none}, {17.28, 17.28})
+    end
+
     test "a bar's key is filled and bordered as its layer sets, the key's alpha its fill's alone" do
       key = %{alpha: 0.3, fill: "#0000FF80", color: "#FF000080"}
 
@@ -816,6 +954,17 @@ defmodule Giggly.GeomTest do
                {[{0.1, 0.5}], [{0.9, 0.5}], [0.4], @two_millimetres}
 
       assert {key.line_end, key.line_join, key.mitre_limit} === {:square, :round, 10.0}
+    end
+
+    # Golden: ggplot2 4.0.3's `geom_line(aes(colour = g), linetype = "longdash", linewidth = 1)`
+    # through vdiffr 1.0.9: each key dashed `19.92,8.54`, as its line; R's graphics engine draws no
+    # key of a blank line.
+    test "a path's key is dashed as its line type, and a blank one draws none" do
+      assert [%Segments{dashes: dashes}] =
+               Geom.draw_key(@path, %{linewidth: 1.0, linetype: {7, 3}}, {17.28, 17.28})
+
+      assert rounded(dashes) === [19.92, 8.54]
+      assert Geom.draw_key(@path, %{linetype: :none}, {17.28, 17.28}) === []
     end
 
     test "a line's key is a path's, ggplot2's default width where the layer sets none" do
