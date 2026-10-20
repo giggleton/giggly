@@ -15,8 +15,9 @@ defmodule Giggly.SVG do
   # nested in a cell, such as a legend, is laid out in the cell's box the same way, centred in it
   # when all its sizes are in points. The document's user unit is the point, as svglite writes it:
   # the `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
-  # 1.95 points at the size the plot is shown. Numbers are written with two decimals, an opacity as
-  # svglite writes a number below 1, and each primitive as svglite writes it, so output can be set
+  # 1.95 points at the size the plot is shown. A position is written with two decimals, a size, an
+  # opacity or an offset as svglite writes a number, more decimals the nearer it is to 0, and each
+  # primitive as svglite writes it, so output can be set
   # beside the SVG ggplot2's own tests snapshot; a polyline also says it is not filled, and so does a
   # shape of no fill or a wholly transparent one, which svglite leaves to its stylesheet and SVG
   # would otherwise fill black. svglite's stylesheet also
@@ -55,6 +56,9 @@ defmodule Giggly.SVG do
   }
 
   @font_family ~S("Liberation Sans", Arial, Helvetica, sans-serif)
+
+  # A double's machine epsilon, below which svglite's `dbl_format()` writes a number as 0.
+  @epsilon 2.220446049250313e-16
 
   # The SVG document that draws `scene` at `width` by `height` points, as grid's `grid.draw()` puts
   # a finished table on a device.
@@ -240,9 +244,9 @@ defmodule Giggly.SVG do
         "' cy='",
         number(y_position),
         "' r='",
-        number(radius),
+        significant(radius),
         "' style='stroke-width: ",
-        number(circles.stroke_width),
+        significant(circles.stroke_width),
         ";",
         stroke_style(color, color_opacity),
         fill_style(fill, fill_opacity),
@@ -263,7 +267,7 @@ defmodule Giggly.SVG do
       "' height='",
       number(height),
       "' style='stroke-width: ",
-      number(rect.stroke_width),
+      significant(rect.stroke_width),
       "; stroke: ",
       stroke(rect.color),
       "; fill: ",
@@ -292,7 +296,13 @@ defmodule Giggly.SVG do
       number(top),
       "'>\n",
       Enum.map(gradient.stops, fn {offset, color} ->
-        ["  <stop offset='", offset(offset), "' stop-color='", color, "' stop-opacity='1.00'/>\n"]
+        [
+          "  <stop offset='",
+          significant(offset),
+          "' stop-color='",
+          color,
+          "' stop-opacity='1.00'/>\n"
+        ]
       end)
     ]
 
@@ -317,7 +327,7 @@ defmodule Giggly.SVG do
       "' height='",
       number(height),
       "' style='stroke-width: ",
-      number(gradient.stroke_width),
+      significant(gradient.stroke_width),
       "; stroke: none; fill: url(#",
       id,
       ");' />\n"
@@ -356,7 +366,7 @@ defmodule Giggly.SVG do
         "' height='",
         number(down),
         "' style='stroke-width: ",
-        number(rectangles.stroke_width),
+        significant(rectangles.stroke_width),
         ";",
         stroke_style(color, color_opacity),
         dashes,
@@ -378,7 +388,7 @@ defmodule Giggly.SVG do
         "<polyline points='",
         points(line),
         "' style='stroke-width: ",
-        number(polylines.stroke_width),
+        significant(polylines.stroke_width),
         ";",
         stroke_style(color, opacity),
         dashes,
@@ -406,7 +416,7 @@ defmodule Giggly.SVG do
         "' y2='",
         number(y_finish),
         "' style='stroke-width: ",
-        number(segments.stroke_width),
+        significant(segments.stroke_width),
         ";",
         stroke_style(color, opacity),
         dashes,
@@ -432,7 +442,7 @@ defmodule Giggly.SVG do
         "<polygon points='",
         points(outline),
         "' style='stroke-width: ",
-        number(polygons.stroke_width),
+        significant(polygons.stroke_width),
         ";",
         stroke_style(color, color_opacity),
         fill_style(fill, fill_opacity),
@@ -808,19 +818,25 @@ defmodule Giggly.SVG do
   defp half_to_even(whole, _half) when rem(whole, 2) == 0, do: whole
   defp half_to_even(whole, _half), do: whole + 1
 
+  # A position or an extent, with two decimals, as svglite writes one from 0.1 up and a clip path's
+  # edges into its name. svglite writes a smaller one as `significant/1` does, but a position that
+  # near 0 is layout's rounding error, which grid's arithmetic and this backend's leave apart, as
+  # 5.7e-14 for grid's 0 at the top of a radial panel's background.
   defp number(value), do: :erlang.float_to_binary(value / 1, decimals: 2)
 
-  # A gradient stop's offset, as svglite writes one: as a number below 1 between the ends, and with
-  # two decimals at them.
-  defp offset(value) when value > 0 and value < 1, do: significant(value)
-  defp offset(value), do: number(value)
+  # A size, a stroke's width or a circle's radius, an opacity or a gradient stop's offset, as
+  # svglite's `write_double()` writes every number: from 1 up, and 0, with two decimals; nearer 0
+  # than 1 with as many decimals as reach its first significant digit and one more, so 0.0235 is
+  # 0.024, 0.0078 keeps its 78 and 0.04 is 0.040, and from 0.1 up two; and one nearer 0 than a
+  # double's epsilon as 0, as svglite's `dbl_format()` takes it. Each is worked out in R's own
+  # order, so no rounding error sets it apart from R's.
+  defp significant(value) when abs(value) < @epsilon, do: number(0.0)
 
-  # A number between 0 and 1 as svglite's `write_double()` writes one: with as many decimals as
-  # reach its first significant digit and one more, so 0.0235 is 0.024 and 0.0078 keeps its 78; from
-  # 0.1 up, two. Only an opacity and a gradient stop's offset are written so, and only between 0
-  # and 1; every other number keeps two decimals (`number/1`).
-  defp significant(value) when value > 0 and value < 1 do
-    decimals = ceil(-:math.log10(value)) + 1
-    :erlang.float_to_binary(value, decimals: decimals)
+  defp significant(value) when abs(value) < 1 do
+    magnitude = abs(value)
+    decimals = ceil(-:math.log10(magnitude)) + 1
+    :erlang.float_to_binary(value / 1, decimals: decimals)
   end
+
+  defp significant(value), do: number(value)
 end

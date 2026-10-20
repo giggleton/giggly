@@ -17,6 +17,8 @@ atoms with ggplot2's names".
   table — never a substring rule, which in Elixir would mean creating atoms from caller input.
 - **Two keys naming one aesthetic raise.** Either value winning silently is a plot the caller did
   not write.
+- **A message names an aesthetic in words through `in_words/1`** (`"line type"`, `"line
+  width"`, any other its name), so a refusal from the plot or the assembly spells it alike.
 - **Spelling only, not membership.** An unknown name passes through `canonical/1` unchanged; which
   aesthetics a layer accepts is declared by its geom, stat and position, and checked there.
 - **The vocabulary depends on nothing.** Its boundary lists no `deps:`, so nothing it could call

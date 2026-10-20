@@ -1094,6 +1094,22 @@ defmodule Giggly.ScaleTest do
       assert Scale.map(scale, [4, 6, 8, nil]) === ["#FF0000", "#0000FF", "#00FF00", "#7F7F7F"]
     end
 
+    # As ggplot2 4.0.3's `scale_colour_manual(values = c("red", "blue", "green"), breaks = c("c",
+    # "a"))` colours three levels in R 4.6.1 (`giggly_test.exs` has it): each break's level the
+    # colour at its place, the level no break names grey50, the green named by no break, the limits
+    # every level; and, as two values for three levels fail there, two values fail here, however
+    # many breaks name them.
+    test "a list named by breaks gives each break's level the colour at its place, the rest none" do
+      scale = palette_scale({:manual, ["#FF0000", "#0000FF", "#00FF00"], [8, 4]}, [6, 4, 8])
+
+      assert {Scale.map(scale, [4, 6, 8, nil]), Scale.Discrete.limits(scale)} ===
+               {["#0000FF", "#7F7F7F", "#FF0000", "#7F7F7F"], [4, 6, 8]}
+
+      short = palette_scale({:manual, ["#FF0000", "#0000FF"], [8, 4, 6, 10]}, [6, 4, 8])
+      error = assert_raise ArgumentError, fn -> Scale.map(short, [4]) end
+      assert error.message =~ "a value for each of its 3 levels, but has 2"
+    end
+
     test "a list of too few colours for the levels cannot be drawn" do
       scale = palette_scale({:manual, ["#FF0000", "#0000FF"]}, [4, 6, 8])
       error = assert_raise ArgumentError, fn -> Scale.map(scale, [4]) end
@@ -1358,9 +1374,75 @@ defmodule Giggly.ScaleTest do
     end
 
     test "a shape scale is discrete alone, records R's solid shapes and a legend, its missing value nil" do
-      assert {Scale.new(:discrete, :shape), Scale.discrete_only?(:shape),
-              Enum.filter(Scale.non_position_aesthetics(), &Scale.discrete_only?/1)} ===
-               {%Scale.Discrete{palette: {:shape, :solid}, guide: :legend}, true, [:shape]}
+      assert {Scale.new(:discrete, :shape), Scale.discrete_only?(:shape)} ===
+               {%Scale.Discrete{palette: {:shape, :solid}, guide: :legend}, true}
+    end
+
+    test "only shape and line type scales are discrete alone" do
+      assert Enum.filter(Scale.non_position_aesthetics(), &Scale.discrete_only?/1) === [
+               :linetype,
+               :shape
+             ]
+    end
+  end
+
+  # Golden: scales 1.4.0's `pal_linetype()(13)` in R 4.6.1, `"solid"`, `"22"`, `"42"`, `"44"`,
+  # `"13"`, `"1343"`, `"73"`, `"2262"`, `"12223242"`, `"F282"`, `"F4448444"`, `"224282F2"` and
+  # `"F1"`, each held as its dash pattern, a hex digit its length; and ggplot2 4.0.3's
+  # `layer_data()` for a line width mapped from 2, 4.5, 3 and 7, and from three levels.
+  describe "map/2 of a line type or line width scale" do
+    test "a discrete line type gives its levels R's 13 line types in order, nil none" do
+      levels = ~w(a b c d e f g h i j k l m)
+
+      scale =
+        :discrete
+        |> Scale.new(:linetype)
+        |> Scale.train(levels)
+
+      assert Scale.map(scale, [nil | levels]) === [
+               nil,
+               {},
+               {2, 2},
+               {4, 2},
+               {4, 4},
+               {1, 3},
+               {1, 3, 4, 3},
+               {7, 3},
+               {2, 2, 6, 2},
+               {1, 2, 2, 2, 3, 2, 4, 2},
+               {15, 2, 8, 2},
+               {15, 4, 4, 4, 8, 4, 4, 4},
+               {2, 2, 4, 2, 8, 2, 15, 2},
+               {15, 1}
+             ]
+    end
+
+    test "a fourteenth level cannot be drawn, and the scale that takes more is named" do
+      scale =
+        :discrete
+        |> Scale.new(:linetype)
+        |> Scale.train(~w(a b c d e f g h i j k l m n))
+
+      error = assert_raise ArgumentError, fn -> Scale.map(scale, ["a"]) end
+
+      assert error.message =~ "13 line types, too few for its 14 values"
+      assert error.message =~ "Giggly.Plot.scale_linetype_manual/2"
+    end
+
+    test "a line width is its place rescaled onto 1 to 6, or a level's spread from 2 to 6, nil none" do
+      continuous =
+        :continuous
+        |> Scale.new(:linewidth)
+        |> Scale.train([2, 4.5, 3, 7])
+
+      discrete =
+        :discrete
+        |> Scale.new(:linewidth)
+        |> Scale.train(["b", "a", nil, "c"])
+
+      assert {Scale.map(continuous, [2, 4.5, 3, 7, nil]),
+              Scale.map(discrete, ["b", "a", nil, "c"])} ===
+               {[1.0, 3.5, 2.0, 6.0, nil], [4.0, 2.0, nil, 6.0]}
     end
   end
 

@@ -25,6 +25,9 @@ defmodule Giggly.Datasets do
   @economics_path Application.app_dir(:giggly, "priv/datasets/economics.csv")
   @external_resource @economics_path
 
+  @economics_long_path Application.app_dir(:giggly, "priv/datasets/economics_long.csv")
+  @external_resource @economics_long_path
+
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
     model: :string,
@@ -82,6 +85,14 @@ defmodule Giggly.Datasets do
     unemploy: :float
   ]
 
+  # How each of economics_long's columns is read; the file's header gives their order.
+  @economics_long_types [
+    date: :date,
+    variable: :string,
+    value: :float,
+    value01: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -106,6 +117,12 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @economics_text File.read!(@economics_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @economics_long_text File.read!(@economics_long_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
   # its table of types already holds, and read by its type.
   @parsed Map.new(
@@ -113,7 +130,8 @@ defmodule Giggly.Datasets do
               mtcars: {@mtcars_text, @mtcars_types},
               mpg: {@mpg_text, @mpg_types},
               diamonds: {@diamonds_text, @diamonds_types},
-              economics: {@economics_text, @economics_types}
+              economics: {@economics_text, @economics_types},
+              economics_long: {@economics_long_text, @economics_long_types}
             ],
             fn {dataset, {text, types}} ->
               columns =
@@ -153,7 +171,7 @@ defmodule Giggly.Datasets do
   # Erlang's external term format, and decoded each time it is asked for: as columns it would be
   # some 18 MB held wherever this module is loaded, a release loading every module at boot, where
   # compressed it is half a megabyte, decoded in a few tens of milliseconds, with no IO either way.
-  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics])
+  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long])
   @diamonds @parsed
             |> Map.fetch!(:diamonds)
             |> :erlang.term_to_binary(compressed: 9)
@@ -288,4 +306,30 @@ defmodule Giggly.Datasets do
   """
   @spec economics() :: [{atom(), [Date.t() | number()]}]
   def economics, do: Map.fetch!(@datasets, :economics)
+
+  @doc """
+  ggplot2's `economics_long`: `economics/0` in long form, a row for each month and series, 2,870
+  in all, so the five series can be drawn as lines of one plot.
+
+  The columns: `date`, the month, as a `Date` on its first day; `variable`, the series, `"pce"`,
+  `"pop"`, `"psavert"`, `"uempmed"` or `"unemploy"`, as `economics/0` names its columns; `value`,
+  the series' value that month, in its own units; and `value01`, the value rescaled within its
+  series, from 0, its lowest, to 1, its highest, so series of different units share an axis.
+  Every number is a float.
+
+      iex> economics_long = Giggly.Datasets.economics_long()
+      iex> Keyword.keys(economics_long)
+      [:date, :variable, :value, :value01]
+      iex> economics_long |> Keyword.fetch!(:date) |> length()
+      2870
+      iex> Enum.map(economics_long, fn {name, values} -> {name, Enum.at(values, 1)} end)
+      [
+        date: ~D[1967-08-01],
+        variable: "pce",
+        value: 509.8,
+        value01: 0.0002652497197765077
+      ]
+  """
+  @spec economics_long() :: [{atom(), [Date.t() | String.t() | number()]}]
+  def economics_long, do: Map.fetch!(@datasets, :economics_long)
 end

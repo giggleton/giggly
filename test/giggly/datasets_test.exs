@@ -36,4 +36,24 @@ defmodule Giggly.DatasetsTest do
     assert {Enum.sum_by(dates, fn date -> Date.diff(date, ~D[1970-01-01]) end), hd(dates),
             List.last(dates)} === {4_480_873, ~D[1967-07-01], ~D[2015-04-01]}
   end
+
+  # Golden: R 4.6.1 with ggplot2 4.0.3, `table(economics_long$variable)`, and
+  # `sprintf("%.17g", economics_long$value01[4])`, the first of the 993 values that 16 significant
+  # digits cannot write, so a copy written as `write.csv()` writes, to 15, would miss it.
+  test "economics_long reads R's every row, and a value only 17 digits write as R's double" do
+    economics_long = Giggly.Datasets.economics_long()
+
+    variables = Keyword.fetch!(economics_long, :variable)
+    value01s = Keyword.fetch!(economics_long, :value01)
+
+    assert Enum.frequencies(variables) == %{
+             "pce" => 574,
+             "pop" => 574,
+             "psavert" => 574,
+             "uempmed" => 574,
+             "unemploy" => 574
+           }
+
+    assert Enum.at(value01s, 3) === 0.00047060434153896666
+  end
 end

@@ -1185,6 +1185,226 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` and `get_guide_data()` in R 4.6.1 for the
+  # same plot on the same rows, printed to 17 significant digits, each line type R writes as the
+  # dash pattern held here (`"solid"` `{}`, `"22"` `{2, 2}`, `"dotted"`, `"13"` and 3 `{1, 3}`,
+  # `"dashed"` and 2 `{4, 4}`, `"3313"` `{3, 3, 1, 3}`, `NA` `nil`), a line's rows in the order
+  # ggplot2's lines put them in.
+  describe "layer_data/2 and the legend, mapping line type and width" do
+    @series %{
+      "x" => [1, 2, 1, 2, 1, 2],
+      "y" => [1, 2, 2, 3, 3, 4],
+      "g" => ["b", "b", "a", "a", "c", "c"]
+    }
+    @series_missing %{
+      "x" => [1, 2, 1, 2, 1, 2],
+      "y" => [1, 2, 2, 3, 3, 4],
+      "g" => ["a", "a", nil, nil, "b", "b"]
+    }
+    @widths %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4], "w" => [2, 4.5, 3, 7]}
+    @bars %{"x" => ["p", "q", "r"], "y" => [1, 2, 3], "w" => [1, 2, 4]}
+
+    test "a discrete line type gives its levels R's line types in order, and groups by them" do
+      plot =
+        @series
+        |> Plot.new(%{x: :x, y: :y, linetype: :g})
+        |> Plot.geom_line()
+
+      groups =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:group)
+
+      assert {groups, values_and_keys(plot, :linetype)} ===
+               {[1, 1, 2, 2, 3, 3],
+                {[{}, {}, {2, 2}, {2, 2}, {4, 2}, {4, 2}],
+                 [{"a", {}}, {"b", {2, 2}}, {"c", {4, 2}}]}}
+    end
+
+    test "limits choose the values shown, one outside them missing, and breaks the keys" do
+      assert {line_types(fn plot ->
+                Plot.scale_linetype_discrete(plot, limits: ["c", "a"], breaks: ["a", "c"])
+              end), line_types(fn plot -> Plot.lims(plot, linetype: ["c", "b"]) end)} ===
+               {{[{2, 2}, {2, 2}, nil, nil, {}, {}], [{"a", {2, 2}}, {"c", {}}]},
+                {[nil, nil, {2, 2}, {2, 2}, {}, {}], [{"c", {}}, {"b", {2, 2}}]}}
+    end
+
+    test "a manual scale's line types go to the levels in order, by name, number or pattern, a map's by value" do
+      manual = fn options ->
+        line_types(fn plot -> Plot.scale_linetype_manual(plot, options) end)
+      end
+
+      assert {manual.(values: [:dotted, :dashed, {3, 3, 1, 3}]), manual.(values: [2, 3, 6]),
+              manual.(values: %{"c" => :longdash, "a" => {1, 3}})} ===
+               {{[{1, 3}, {1, 3}, {4, 4}, {4, 4}, {3, 3, 1, 3}, {3, 3, 1, 3}],
+                 [{"a", {1, 3}}, {"b", {4, 4}}, {"c", {3, 3, 1, 3}}]},
+                {[{4, 4}, {4, 4}, {1, 3}, {1, 3}, {2, 2, 6, 2}, {2, 2, 6, 2}],
+                 [{"a", {4, 4}}, {"b", {1, 3}}, {"c", {2, 2, 6, 2}}]},
+                {[{1, 3}, {1, 3}, nil, nil, {7, 3}, {7, 3}], [{"a", {1, 3}}, {"c", {7, 3}}]}}
+    end
+
+    # ggplot2 4.0.3's `manual_scale()` names a list by its breaks after choosing its limits, so the
+    # limits stay every level: `scale_colour_manual(values = c("red", "blue", "green"), breaks =
+    # c("c", "a"))` leaves `b` grey50 and its keys `c` and `a`, and two values for the three levels,
+    # colour, shape or line type alike, fail, "Insufficient values in manual scale. 3 needed but
+    # only 2 provided."
+    test "a manual list named by breaks leaves the scale its levels, so too few values raise" do
+      colored = fn options ->
+        @series
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_line()
+        |> Plot.scale_color_manual(options)
+      end
+
+      plot = colored.(values: ["red", "blue", "green"], breaks: ["c", "a"])
+
+      assert values_and_keys(plot, :color) ===
+               {["#0000FF", "#0000FF", "#7F7F7F", "#7F7F7F", "#FF0000", "#FF0000"],
+                [{"c", "#FF0000"}, {"a", "#0000FF"}]}
+
+      shaped =
+        %{"x" => [1, 2, 3, 4], "y" => [4, 3, 2, 1], "drv" => ["f", "4", "r", "f"]}
+        |> Plot.new(%{x: :x, y: :y, shape: :drv})
+        |> Plot.geom_point()
+        |> Plot.scale_shape_manual(values: [1, 2], breaks: ["r", "f"])
+
+      typed =
+        @series
+        |> Plot.new(%{x: :x, y: :y, linetype: :g})
+        |> Plot.geom_line()
+        |> Plot.scale_linetype_manual(values: [:dotted, {1, 3}], breaks: ["c", "a"])
+
+      for plot <- [colored.(values: ["red", "blue"], breaks: ["c", "a"]), shaped, typed] do
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ "a manual scale needs a value for each of its 3 levels, but has 2"
+      end
+    end
+
+    test "a missing value has no line type, its NA key last, unless na_value: gives it one" do
+      missing = fn scaled ->
+        @series_missing
+        |> Plot.new(%{x: :x, y: :y, linetype: :g})
+        |> Plot.geom_line()
+        |> scaled.()
+        |> values_and_keys(:linetype)
+      end
+
+      assert {missing.(&Function.identity/1),
+              missing.(fn plot -> Plot.scale_linetype_discrete(plot, na_value: :dotted) end)} ===
+               {{[{}, {}, {2, 2}, {2, 2}, nil, nil], [{"a", {}}, {"b", {2, 2}}, {"NA", nil}]},
+                {[{}, {}, {2, 2}, {2, 2}, {1, 3}, {1, 3}],
+                 [{"a", {}}, {"b", {2, 2}}, {"NA", {1, 3}}]}}
+    end
+
+    test "a line type and a colour of one column are one legend, each key in both" do
+      [legend] =
+        @series
+        |> Plot.new(%{x: :x, y: :y, linetype: :g, colour: :g})
+        |> Plot.geom_line()
+        |> Giggly.Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert {legend.aesthetics, Enum.map(legend.keys, fn key -> {key.label, key.values} end)} ===
+               {[:color, :linetype],
+                [
+                  {"a", %{color: "#F8766D", linetype: {}}},
+                  {"b", %{color: "#00BA38", linetype: {2, 2}}},
+                  {"c", %{color: "#619CFF", linetype: {4, 2}}}
+                ]}
+    end
+
+    test "a continuous width runs from 1 to 6 mm over the limits, a key for each break, none outside them" do
+      widths = fn scaled ->
+        @widths
+        |> Plot.new(%{x: :x, y: :y, linewidth: :w})
+        |> Plot.geom_line()
+        |> scaled.()
+        |> values_and_keys(:linewidth)
+      end
+
+      assert {widths.(&Function.identity/1),
+              widths.(fn plot ->
+                Plot.scale_linewidth_continuous(plot,
+                  range: {0, 4},
+                  limits: {0, 5},
+                  breaks: [0, 2.5, 5]
+                )
+              end), widths.(fn plot -> Plot.lims(plot, linewidth: {0, 10}) end)} ===
+               {{[1.0, 3.5, 2.0, 6.0],
+                 [{"2", 1.0}, {"3", 2.0}, {"4", 3.0}, {"5", 4.0}, {"6", 5.0}, {"7", 6.0}]},
+                {[1.6, 3.6, 2.4, nil], [{"0.0", 0.0}, {"2.5", 2.0}, {"5.0", 4.0}]},
+                {[2.0, 3.25, 2.5, 4.5],
+                 [
+                   {"0.0", 1.0},
+                   {"2.5", 2.25},
+                   {"5.0", 3.5},
+                   {"7.5", 4.75},
+                   {"10.0", 6.0}
+                 ]}}
+    end
+
+    test "a discrete width spreads its levels from 2 to 6 mm, a missing one none unless na_value: gives one" do
+      assert {@series
+              |> Plot.new(%{x: :x, y: :y, linewidth: :g})
+              |> Plot.geom_line()
+              |> values_and_keys(:linewidth),
+              @series_missing
+              |> Plot.new(%{x: :x, y: :y, linewidth: :g})
+              |> Plot.geom_line()
+              |> Plot.scale_linewidth_discrete(range: {1, 3}, na_value: 0.25)
+              |> values_and_keys(:linewidth)} ===
+               {{[2.0, 2.0, 4.0, 4.0, 6.0, 6.0], [{"a", 2.0}, {"b", 4.0}, {"c", 6.0}]},
+                {[1.0, 1.0, 3.0, 3.0, 0.25, 0.25], [{"a", 1.0}, {"b", 3.0}, {"NA", 0.25}]}}
+    end
+
+    test "a bar's border takes a mapped width, and a width and line type of one column are one legend" do
+      bordered = fn mapping ->
+        @bars
+        |> Plot.new(mapping)
+        |> Plot.geom_col(colour: "black")
+      end
+
+      [legend] =
+        %{x: :x, y: :y, linewidth: :x, linetype: :x}
+        |> bordered.()
+        |> Giggly.Assembly.run()
+        |> Map.fetch!(:legends)
+
+      widths =
+        %{x: :x, y: :y, linewidth: :w}
+        |> bordered.()
+        |> values_and_keys(:linewidth)
+
+      assert {widths, legend.aesthetics,
+              Enum.map(legend.keys, fn key -> {key.label, key.values} end)} ===
+               {{[1.0, 2.6666666666666665, 6.0],
+                 [{"1", 1.0}, {"2", 2.6666666666666665}, {"3", 4.333333333333333}, {"4", 6.0}]},
+                [:linetype, :linewidth],
+                [
+                  {"p", %{linetype: {}, linewidth: 2.0}},
+                  {"q", %{linetype: {2, 2}, linewidth: 4.0}},
+                  {"r", %{linetype: {4, 2}, linewidth: 6.0}}
+                ]}
+    end
+
+    # ggplot2 4.0.3 aborts for each: "A continuous variable cannot be mapped to the linetype
+    # aesthetic."
+    test "a continuous or a date column mapped to line type is refused when run" do
+      rows = %{"x" => [1, 2], "y" => [1, 2], "day" => [~D[2026-10-12], ~D[2026-10-13]]}
+
+      for {column, shown} <- [{:y, ~s("y", a :integer)}, {:day, ~s("day", a :date)}] do
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y, linetype: column})
+          |> Plot.geom_line()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ "the layer at index 0 maps :linetype to #{shown} column"
+        assert error.message =~ "a line type scale is discrete, since line types have no order"
+      end
+    end
+  end
+
   describe "layer_data/2 and the legends under a plot's colour, fill or alpha scale" do
     @cylinders %{"mpg" => [22.8, 24.4, 32.4], "wt" => [2.32, 3.19, 2.2], "cyl" => [4.0, 4.0, 4.0]}
 
@@ -3529,6 +3749,90 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/count_shape.svg")
     end
 
+    # Golden: test/golden/linetype_economics.svg, test/golden/linetype_colour.svg and
+    # test/golden/linetype_manual.svg, checked against ggplot2's drawings of the same plots, made by
+    # the R script beside each: every element matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. scale_linetype()'s own example, economics_long's
+    # five series in the palette's first five line types; the same mapped to colour too, one
+    # legend; and line types given by name and by pattern, a missing series drawing no line and its
+    # key none. They move with what moves test/golden/date_line.svg and test/golden/line_types.svg.
+    test "a mapped line type draws each line dashed as its value's, a key for each in the legend" do
+      economics_long = Plot.new(Giggly.Datasets.economics_long(), %{x: :date, y: :value01})
+
+      manual =
+        %{
+          "x" => [1, 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3],
+          "y" => [1, 2, 1.5, 2, 3, 2.5, 3, 4, 3.5, 4, 5, 4.5],
+          "g" => ["a", "a", "a", "b", "b", "b", "c", "c", "c", nil, nil, nil]
+        }
+        |> Plot.new(%{x: :x, y: :y, linetype: :g})
+        |> Plot.geom_line()
+        |> Plot.scale_linetype_manual(values: [:dotted, :dotdash, {3, 3, 1, 3}])
+
+      typed = Plot.geom_line(economics_long, %{linetype: :variable})
+      colored = Plot.geom_line(economics_long, %{linetype: :variable, colour: :variable})
+
+      assert {to_svg(typed), to_svg(colored), to_svg(manual)} ==
+               {File.read!("test/golden/linetype_economics.svg"),
+                File.read!("test/golden/linetype_colour.svg"),
+                File.read!("test/golden/linetype_manual.svg")}
+    end
+
+    # Golden: test/golden/linewidth_economics.svg, test/golden/linewidth_name.svg and
+    # test/golden/linewidth_range.svg, checked against ggplot2's drawings of the same plots, made by
+    # the R script beside each: every element matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. scale_linewidth()'s first three examples:
+    # economics's unemployment as wide as the median duration of unemployment, a segment from each
+    # month to the next with round ends; the legend titled over two lines; and widths from 0 to 4
+    # mm, the narrowest written 0.040 points wide as svglite writes a number below 0.1. They move
+    # with what moves test/golden/date_line.svg and test/golden/line_key_big.svg.
+    test "a mapped width draws a line a segment at a time, each as wide as the month it starts from" do
+      widths =
+        Giggly.Datasets.economics()
+        |> Plot.new(%{x: :date, y: :unemploy, linewidth: :uempmed})
+        |> Plot.geom_line(lineend: :round)
+
+      named = Plot.scale_linewidth_continuous(widths, name: "Duration of\nunemployment")
+      ranged = Plot.scale_linewidth_continuous(widths, range: {0, 4})
+
+      assert {to_svg(widths), to_svg(named), to_svg(ranged)} ==
+               {File.read!("test/golden/linewidth_economics.svg"),
+                File.read!("test/golden/linewidth_name.svg"),
+                File.read!("test/golden/linewidth_range.svg")}
+    end
+
+    # Golden: test/golden/linewidth_bar.svg, test/golden/linewidth_missing.svg and
+    # test/golden/annotate_widths.svg, checked against ggplot2's drawings of the same plots, made by
+    # the R script beside each: every element matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's classes stacked by drive train, each bar's
+    # border in its drive train's line type and width, one legend for both, its keys widened to
+    # hold their borders; a line whose width is missing at both ends and once between, the ends
+    # dropped and the segment from the missing one not drawn; and a path annotation whose width
+    # grows along it. They move with what moves test/golden/bar_key_big.svg and
+    # test/golden/line_key_big.svg.
+    test "a bar's border takes a mapped type and width, and a missing width draws no segment" do
+      bars =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar(%{linetype: :drv, linewidth: :drv}, colour: "black")
+
+      missing =
+        %{"x" => [1, 2, 3, 4, 5, 6], "y" => [1, 3, 2, 4, 3, 5], "w" => [nil, 1, 2, nil, 3, nil]}
+        |> Plot.new(%{x: :x, y: :y, linewidth: :w})
+        |> Plot.geom_line()
+
+      annotated =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.annotate(:path, x: [1, 2, 3, 4], y: [2, 4, 3, 1], linewidth: [0.5, 2, 4, 6])
+
+      assert {to_svg(bars), to_svg(missing), to_svg(annotated)} ==
+               {File.read!("test/golden/linewidth_bar.svg"),
+                File.read!("test/golden/linewidth_missing.svg"),
+                File.read!("test/golden/annotate_widths.svg")}
+    end
+
     # Golden: test/golden/point_key_big.svg, test/golden/bar_key_big.svg,
     # test/golden/line_key_big.svg, test/golden/text_key_big.svg and
     # test/golden/text_key_turned.svg, checked against ggplot2's drawings of the same plots, made by
@@ -3808,18 +4112,16 @@ defmodule GigglyTest do
 
     # An aesthetic a layer takes from the plot's mapping and cannot use is drawn by nothing, as
     # ggplot2's geoms leave it: a layer may set it, but its geom never reads the plot's column of
-    # it as a value set, which raised for a path's width and drew a point's size unscaled. A
+    # it as a value set, which once raised for a path's width and drew a point's size unscaled. A
     # number groups nothing, so the drawing is the plot's without the mapping.
     test "an aesthetic a layer carries unused from the plot's mapping changes nothing it draws" do
       data = %{"x" => [1, 2, 3], "y" => [1.0, 3.0, 2.0], "w" => [1, 2, 3]}
 
       for {add, aesthetic} <- [
-            {&Plot.geom_path/1, :linewidth},
-            {&Plot.geom_path/1, :linetype},
+            {&Plot.geom_path/1, :stroke},
             {&Plot.geom_point/1, :linewidth},
             {&Plot.geom_point/1, :stroke},
-            {&Plot.geom_col/1, :linewidth},
-            {&Plot.geom_col/1, :linetype}
+            {&Plot.geom_col/1, :stroke}
           ] do
         drawn = fn mapping ->
           data
@@ -4930,6 +5232,29 @@ defmodule GigglyTest do
       |> DataFrame.pull(:shape)
 
     {shapes, keys}
+  end
+
+  # Each row's `aesthetic` in the plot's layer's table, and each key of its one legend, its label
+  # and its value of `aesthetic`.
+  defp values_and_keys(plot, aesthetic) do
+    [legend] = Giggly.Assembly.run(plot).legends
+    keys = Enum.map(legend.keys, fn key -> {key.label, Map.fetch!(key.values, aesthetic)} end)
+
+    values =
+      plot
+      |> Giggly.layer_data()
+      |> DataFrame.pull(aesthetic)
+
+    {values, keys}
+  end
+
+  # `values_and_keys/2` of lines whose line type `@series`'s `g` maps, put through `scaled`.
+  defp line_types(scaled) do
+    @series
+    |> Plot.new(%{x: :x, y: :y, linetype: :g})
+    |> Plot.geom_line()
+    |> scaled.()
+    |> values_and_keys(:linetype)
   end
 
   # The rows of `Giggly.Datasets.diamonds/0` at `indices`, counted from 1 as R counts rows, each

@@ -38,7 +38,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `_continuous`, each with its `scale_fill_` twin, `scale_alpha_continuous/2`,
   `scale_alpha_discrete/2`, the size scales `scale_size_continuous/2`, `scale_size_area/2`,
   `scale_radius/2` and `scale_size_discrete/2`, the shape scales `scale_shape_discrete/2` and
-  `scale_shape_manual/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
+  `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
+  `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
+  `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
   the guide functions (`guides/2`, `guide_legend/1`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
   `layer_annotation?/1` whether it is an annotation) exist for the assembly and are `@doc false`,
@@ -84,9 +86,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   one. **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and
   `xlim/3`, `ylim/3` and `lims/2` two dates a date scale's**, sorted, never reversed, as R's
   `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
-  the entry beginning "Discrete and date position scales"). **A colour, fill, alpha, shape or size
-  scale function records its palette from its options and every other field from its schema's
-  defaults, R's function defaults** (gray's missing value red, gradient2's ends `muted()`), since
+  the entry beginning "Discrete and date position scales"). **A colour, fill, alpha, shape, size,
+  line type or line width scale function records its palette from its options and every other
+  field from its schema's defaults, R's function defaults** (gray's missing value red, gradient2's
+  ends `muted()`), since
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
   palette live here as values, and a test pins the discrete and continuous functions' to
   `Scale.new/2`'s. gradient2 records its midpoint as the scale's rescaler, `{:mid, midpoint}`, and
@@ -98,17 +101,26 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   R's does** but those its family waits for (`aesthetics:`, `na.translate`, `drop`): `solid:`,
   recorded `true` unless given, `na_value:`, a shape (`validate_shape/1`), none, drawing no point,
   when not given, as R's `NA`, and `scale_shape_manual/2`'s `values:`, shapes or a map from value to
-  shape (`validate_manual_values/2`, which a colour's takes too). **Each records its `guide:`**
-  (`validate_guide/2`): `:legend`, `:none`, or the `%Guide.Legend{}` `guide_legend/1` builds, and
-  on a continuous colour or fill scale `:colorbar`, its default, the others' `:legend`; a colour
-  bar for a discrete scale, for alpha, for shape or for size is refused at the call, where R warns
-  and draws none (design-log §4, the entry beginning "A guide is chosen").
-  A manual scale's list beside a list of `breaks:` is recorded as a map from each
-  break to the colour or shape at its place, as R's `manual_scale()` names them. **`lims/2` takes
-  `color:` (`colour:`, canonicalized first), `fill:`, `alpha:`, `shape:` and `size:`**: a list
-  records what the aesthetic's `_discrete` function records with those limits, two numbers its
-  `_continuous` one's, but a shape's, refused at the call (`validate_shape_limits/1`), as R's
-  `lims(shape = c(1, 5))` aborts; numbers high to low are refused at the call, where R reverses the
+  shape (`validate_manual_values/2`, which a colour's takes too). **A line type scale function
+  takes the options R's does** but those its family waits for: `na_value:`, a line type
+  (`validate_linetype/1`), none, drawing no line, when not given, as R's `NA`, which R's
+  `scale_linetype()` takes though its docs leave it out, and `scale_linetype_manual/2`'s `values:`,
+  line types or a map from value to line type. **A line width scale function takes R's**:
+  `range:`, widths 0 or more (`validate_linewidth_range/1`), and `na_value:` only on
+  `scale_linewidth_discrete/2`, as R's `scale_linewidth_continuous()` refuses `na.value`, and no
+  `transform:`. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
+  `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
+  its default, the others' `:legend`; a colour bar for a discrete scale, or for any aesthetic but
+  colour and fill, is refused at the call, where R warns and draws none (design-log §4, the entry
+  beginning "A guide is chosen").
+  A manual scale's list beside a list of `breaks:` is recorded with them, `{:manual, values,
+  breaks}`, each value the break's at its place, as R's `manual_scale()` names them, which leaves
+  the scale's limits its levels, so too few values raise. **`lims/2` takes `color:` (`colour:`,
+  canonicalized first), `fill:`, `alpha:`, `shape:`, `size:`, `linetype:` and `linewidth:`**: a
+  list records what the aesthetic's `_discrete` function records with those limits, two numbers
+  its `_continuous` one's, but a shape's or a line type's, refused at the call
+  (`validate_unordered_limits/2`), as R's `lims(shape = c(1, 5))` aborts; numbers high to low are
+  refused at the call, where R reverses the
   values through a transformation these scales lack (design-log §4, the entry beginning "Colour,
   fill and alpha scales"), and dates are refused. **Limits, breaks and minor breaks are recorded in
   data units, as given**, for the scale to transform; a shortcut records its transformation in
@@ -199,19 +211,20 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   there. A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and
   `nil` only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
-  aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`, `shape`, `size`) or the plot's
-  `title`, `subtitle`, `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a
+  aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`, `shape`, `size`, `linetype`,
+  `linewidth`) or the plot's `title`, `subtitle`, `caption` and `tag`, each a string or `:none`,
+  `%{}` until a call sets one; a
   call replaces only the labels it gives. Any other key raises, and so does a label that is not text
   or `:none` (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not
   checked, since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2`
   takes the titles").
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
-  `fill`, `alpha`, `shape` and `size` alone, each as a scale's `guide:` takes it, a colour bar for
-  alpha, shape or size refused at the call; whether a colour or fill scale it gives a colour bar is
-  continuous is known only when the plot is run, so the assembly refuses one that is not. Which
-  aesthetic a layer maps is not checked. The axes take no guide yet: they wait for `guide_axis()`'s
-  options.
+  `fill`, `alpha`, `shape`, `size`, `linetype` and `linewidth` alone, each as a scale's `guide:`
+  takes it, a colour bar for any but colour and fill refused at the call; whether a colour or fill
+  scale it gives a colour bar is continuous is known only when the plot is run, so the assembly
+  refuses one that is not. Which aesthetic a layer maps is not checked. The axes take no guide yet:
+  they wait for `guide_axis()`'s options.
 - **Each table is read once, by the call that gives it**: the plot's by `new/2`, a layer's own by
   its function's `data:`, any `Table.Reader`, read after the options are validated, as ggplot2's
   `data =`. The plot holds a `Giggly.DataFrame` and each layer its own or `:none`, which draws the
@@ -258,12 +271,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
-  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, and a bar's or a rectangle's
-  `linewidth` and `linetype`) take a list, which `fixed` holds as one value per annotation; a
-  path's or a line's line type and width are one, as ggplot2 refuses a line type varying along a
-  line. A list's values are of one type, checked by building its column
-  (`Giggly.DataFrame`) at the call, a colour's, a shape's or a stroke's `:none`, or a line type's
-  `:blank`, in a list held as `nil`, the column's missing value, as R's `c(NA, "red")` holds `NA`.
-  A position is kept as a float where it is a number, as an option's number is. The options are
-  each geom's function's but `data:`, `position:` and nudging, so one its geom cannot use raises,
-  where ggplot2 warns and ignores it.
+  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's or a rectangle's
+  `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn a segment at a time) take
+  a list, which `fixed` holds as one value per annotation; a path's or a line's line type is one,
+  as ggplot2 refuses a line type varying along a line. A list's values are of one type, checked by
+  building its column (`Giggly.DataFrame`) at the call, a colour's, a shape's or a stroke's `:none`,
+  or a line type's `:blank`, in a list held as `nil`, the column's missing value, as R's `c(NA,
+  "red")` holds `NA`. A position is kept as a float where it is a number, as an option's number is.
+  The options are each geom's function's but `data:`, `position:` and nudging, so one its geom
+  cannot use raises, where ggplot2 warns and ignores it.

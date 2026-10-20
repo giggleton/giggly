@@ -4,9 +4,9 @@ defmodule Giggly.Geom.Bar do
   # Bars, ggplot2's `GeomBar`, which `geom_col()` draws with: one rectangle per row, from 0 to its
   # y and centred on its x. It takes no parameters yet. Use it through `Giggly.Geom`.
   #
-  # Bars use `:x`, `:y`, `:group`, `:alpha`, `:color` and `:fill`, and need `:x` and `:y`; an
-  # aesthetic joins the accepted list with the scale that maps it, so a mapping never silently does
-  # nothing.
+  # Bars use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`, and
+  # need `:x` and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a
+  # mapping never silently does nothing.
   #
   # A bar is horizontal when its stat says so in a `flipped_aes` column, as counting along y does,
   # or else when y is the one discrete axis, as ggplot2's `GeomBar` decides (`has_flipped_aes()`);
@@ -31,7 +31,7 @@ defmodule Giggly.Geom.Bar do
   # The aesthetics a layer of bars can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y]
 
   # The aesthetics a layer of bars cannot be drawn without.
   @doc false

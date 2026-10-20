@@ -7,29 +7,33 @@ defmodule Giggly.Geom.Path do
   # corner may reach (`mitre_limit`, `linemitre`). Lines (`Giggly.Geom.Line`) draw as a path once
   # their rows are in order. Use it through `Giggly.Geom`.
   #
-  # Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`; an aesthetic
-  # joins the accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # Paths use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need `:x`
+  # and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a mapping never
+  # silently does nothing.
   #
   # A path is drawn as ggplot2's `GeomPath` draws one. Rows missing `x` or `y` (`nil`, or the float
-  # `:nan`), or whose colour is `:none`, R's `NA`, or missing, at the start or end of a group are
-  # dropped, as `handle_na()` drops them, and one missing a position in the middle breaks the line
-  # there, as grid breaks a polyline; ggplot2 also warns of the rows it drops, which a pure
-  # pipeline cannot. The rows are put in group order, keeping each group's own order, and cut into
-  # steps that follow the panel's curves (`Giggly.Coord.munch/3`); a group of fewer than two rows
-  # is not drawn. Where every group keeps one colour and one alpha all along it, each group is one
-  # line, drawn in its first row's colour and alpha; where any group's vary, every group is drawn a
-  # segment from each row to the next, each in the colour and alpha of the row it starts from, and
-  # a segment touching a missing position is not drawn.
+  # `:nan`), a width or a line type, or whose colour is `:none`, R's `NA`, or missing, at the start
+  # or end of a group are dropped, as `handle_na()` drops them, and one missing a position in the
+  # middle breaks the line there, as grid breaks a polyline; ggplot2 also warns of the rows it
+  # drops, which a pure pipeline cannot. The rows are put in group order, keeping each group's own
+  # order, and cut into steps that follow the panel's curves (`Giggly.Coord.munch/3`); a group of
+  # fewer than two rows is not drawn. Where every group keeps one colour, alpha, width and line
+  # type all along it, each group is one line, drawn in its first row's look; where any group's
+  # vary, every group is drawn a segment from each row to the next, each in the colour, alpha and
+  # width of the row it starts from, and a segment touching a missing position, or starting from a
+  # row missing its width, is not drawn, as R's graphics engine draws no line of no width.
   #
-  # Every line looks as ggplot2's default line does, until line types and widths can be mapped:
-  # solid, or in the line type a layer sets, 0.5 mm wide, which grid draws 1.07 points wide, or as
-  # wide as the `linewidth` a layer sets, in millimetres, and black, or its row's colour, mapped or
-  # set. A row's `alpha`, where its table has one, makes its line that opaque, replacing its
-  # colour's own; a row without one keeps its colour's (`Giggly.Geom.Mark`). A dashed line is drawn
-  # with its dashes as svglite writes them (`Mark.dashes/2`), and a blank one is not drawn, as R's
-  # graphics engine draws no line of R's `"blank"`. A line in any line type but solid, blank
-  # included, keeps one colour and one alpha all along it: where a group's vary, the panel is
-  # refused, as ggplot2's `GeomPath` aborts, since segments would dash each piece afresh.
+  # Every line looks as ggplot2's default line does unless its row says otherwise: solid, 0.5 mm
+  # wide, which grid draws 1.07 points wide, and black; or in its row's line type, as wide as its
+  # row's `linewidth`, in millimetres, and in its row's colour, each mapped or set. A row's
+  # `alpha`, where its table has one, makes its line that opaque, replacing its colour's own; a row
+  # without one keeps its colour's (`Giggly.Geom.Mark`). A dashed line is drawn with its dashes as
+  # svglite writes them (`Mark.dashes/2`), and a blank one is not drawn, as R's graphics engine
+  # draws no line of R's `"blank"`. While any line is in a line type but solid, blank included, no
+  # line's colour, alpha, width or line type may change along it: where one does, the panel is
+  # refused, as ggplot2's `GeomPath` aborts, since segments would dash each piece afresh. The lines
+  # are drawn in group order, each run of lines alike in width and line type one primitive, and the
+  # segments in row order, each run alike in width one.
 
   @enforce_keys [:line_end, :line_join, :mitre_limit]
   defstruct @enforce_keys
@@ -43,7 +47,7 @@ defmodule Giggly.Geom.Path do
   # The aesthetics a layer of paths can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :group, :linetype, :linewidth, :x, :y]
 
   # The aesthetics a layer of paths cannot be drawn without.
   @doc false
@@ -89,36 +93,44 @@ defmodule Giggly.Geom.Path do
         |> without_short_groups()
 
       case DataFrame.row_count(drawn) do
-        0 -> []
-        _rows -> draw_lines(geom, drawn, Mark.set(drawn, :linetype, @line_type), constant?(drawn))
+        0 ->
+          []
+
+        _rows ->
+          rows = rows(drawn)
+          draw_lines(geom, rows, solid?(rows), constant?(rows))
       end
     end
 
-    # The panel's lines in their line type: refused where one not solid varies along a line, as
-    # ggplot2's `GeomPath` aborts, and none where it is blank, which R's engine does not draw.
-    defp draw_lines(_geom, _frame, line_type, false) when line_type != {} do
+    # The panel's lines: refused where a line's look varies along it while any line is not solid,
+    # as ggplot2's `GeomPath` aborts; else each group a line where every group's look is constant,
+    # or a segment from each row to the next where any varies.
+    defp draw_lines(_geom, _rows, false, false) do
       raise ArgumentError,
-            "a path or line whose line type is not :solid cannot vary its colour or alpha " <>
-              "along a line, as ggplot2 refuses; give each group one colour and one alpha, or " <>
-              "draw the lines :solid"
+            "a path or line cannot vary its colour, alpha, width or line type along it while " <>
+              "any line of its layer is not :solid, as ggplot2 refuses; give each group one " <>
+              "colour, alpha, width and line type, or draw every line :solid"
     end
 
-    defp draw_lines(_geom, _frame, :none, true), do: []
+    defp draw_lines(geom, rows, _solid, true), do: draw_polylines(geom, rows)
+    defp draw_lines(geom, rows, true, false), do: draw_segments(geom, rows)
 
-    defp draw_lines(geom, frame, line_type, constant),
-      do: [draw(geom, frame, line_type, constant)]
-
-    # A legend's key, in the key's colour at its alpha, width and line type; a colour of `:none`, or
-    # a blank line type, draws nothing.
+    # A legend's key, in the key's colour at its alpha, width and line type; a colour of `:none`, a
+    # blank line type, or a missing width or line type, R's `NA`, draws nothing, as
+    # `draw_key_path()` draws a missing line type blank and R's graphics engine draws no line of a
+    # missing width.
     @impl Giggly.Geom
     def draw_key(geom, key) do
-      line_width = Map.get(key, :linewidth, @line_width)
+      look =
+        {Map.get(key, :color, @color), Map.get(key, :linewidth, @line_width),
+         Map.get(key, :linetype, @line_type)}
 
-      case {Map.get(key, :color, @color), Map.get(key, :linetype, @line_type)} do
-        {color, line_type} when :none in [color, line_type] ->
+      case look do
+        {color, line_width, line_type}
+        when :none in [color, line_type] or is_nil(line_width) or is_nil(line_type) ->
           []
 
-        {color, line_type} ->
+        {color, line_width, line_type} ->
           [
             %Segments{
               starts: [@key_start],
@@ -137,72 +149,75 @@ defmodule Giggly.Geom.Path do
     end
 
     # The room a key's line needs, its width in millimetres either way, as ggplot2's
-    # `set_key_size()` reads a path's key, which has no `size`.
+    # `set_key_size()` reads a path's key, which has no `size`; a missing width needs none.
     @impl Giggly.Geom
     def key_size(_geom, key) do
-      side = Map.get(key, :linewidth, @line_width) * @points_per_millimetre
+      side =
+        case Map.get(key, :linewidth, @line_width) do
+          nil -> 0.0
+          line_width -> line_width * @points_per_millimetre
+        end
+
       {side, side}
     end
 
-    # Each group a line, in its first row's colour and alpha and the layer's line type, broken where
-    # a position is missing, as grid breaks a polyline; a piece of one point draws nothing.
-    defp draw(geom, frame, line_type, true) do
-      {lines, looks} =
-        frame
-        |> rows()
-        |> Enum.chunk_by(fn row -> row.group end)
-        |> Enum.flat_map(fn [first | _rest] = group_rows ->
-          group_rows
-          |> Enum.chunk_by(fn row -> placed?(row) end)
-          |> Enum.filter(fn
-            [first_row, _second_row | _rest] -> placed?(first_row)
-            [_lone_row] -> false
-          end)
-          |> Enum.map(fn piece -> {Enum.map(piece, &position/1), first} end)
+    # Each group a line, in its first row's colour, alpha, width and line type, broken where a
+    # position is missing, as grid breaks a polyline; a piece of one point draws nothing. Each run
+    # of lines alike in width and line type is one primitive, and a blank run draws nothing.
+    defp draw_polylines(geom, rows) do
+      rows
+      |> Enum.chunk_by(fn row -> row.group end)
+      |> Enum.flat_map(fn [first | _rest] = group_rows ->
+        group_rows
+        |> Enum.chunk_by(fn row -> placed?(row) end)
+        |> Enum.filter(fn
+          [first_row, _second_row | _rest] -> placed?(first_row)
+          [_lone_row] -> false
         end)
-        |> Enum.unzip()
-
-      line_width = Mark.set(frame, :linewidth, @line_width)
-
-      %Polylines{
-        lines: lines,
-        offsets: :none,
-        stroke_width: Mark.stroke_width(line_width),
-        dashes: Mark.dashes(line_type, line_width),
-        color: Enum.map(looks, fn row -> Mark.hex(row.color) end),
-        opacity: Enum.map(looks, fn row -> Mark.opacity(row.color, row.alpha) end),
-        line_end: geom.line_end,
-        line_join: geom.line_join,
-        mitre_limit: geom.mitre_limit
-      }
+        |> Enum.map(fn piece -> {Enum.map(piece, &position/1), first} end)
+      end)
+      |> Enum.chunk_by(fn {_line, look} -> {look.linewidth, look.linetype} end)
+      |> Enum.reject(fn [{_line, look} | _rest] -> look.linetype == :none end)
+      |> Enum.map(fn [{_line, look} | _rest] = lines ->
+        %Polylines{
+          lines: Enum.map(lines, fn {line, _look} -> line end),
+          offsets: :none,
+          stroke_width: Mark.stroke_width(look.linewidth),
+          dashes: Mark.dashes(look.linetype, look.linewidth),
+          color: Enum.map(lines, fn {_line, row} -> Mark.hex(row.color) end),
+          opacity: Enum.map(lines, fn {_line, row} -> Mark.opacity(row.color, row.alpha) end),
+          line_end: geom.line_end,
+          line_join: geom.line_join,
+          mitre_limit: geom.mitre_limit
+        }
+      end)
     end
 
-    # A segment from each row to the next of its group, in the colour and alpha of the row it starts
-    # from, solid, the one line type a line whose look varies along it is drawn in; a segment
-    # touching a missing position is not drawn.
-    defp draw(geom, frame, {}, false) do
-      segments =
-        frame
-        |> rows()
-        |> Enum.chunk_every(2, 1, :discard)
-        |> Enum.filter(fn [from, to] ->
-          from.group == to.group and placed?(from) and placed?(to)
-        end)
-
-      line_width = Mark.set(frame, :linewidth, @line_width)
-
-      %Segments{
-        starts: Enum.map(segments, fn [from, _to] -> position(from) end),
-        ends: Enum.map(segments, fn [_from, to] -> position(to) end),
-        offsets: :none,
-        stroke_width: Mark.stroke_width(line_width),
-        dashes: :none,
-        color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
-        opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),
-        line_end: geom.line_end,
-        line_join: geom.line_join,
-        mitre_limit: geom.mitre_limit
-      }
+    # A segment from each row to the next of its group, in the colour, alpha and width of the row it
+    # starts from, solid, the one line type a line whose look varies along it is drawn in; a segment
+    # touching a missing position, or starting from a row missing its width, is not drawn. Each run
+    # of segments alike in width is one primitive.
+    defp draw_segments(geom, rows) do
+      rows
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.filter(fn [from, to] ->
+        from.group == to.group and placed?(from) and placed?(to) and is_number(from.linewidth)
+      end)
+      |> Enum.chunk_by(fn [from, _to] -> from.linewidth end)
+      |> Enum.map(fn [[first, _to] | _rest] = segments ->
+        %Segments{
+          starts: Enum.map(segments, fn [from, _to] -> position(from) end),
+          ends: Enum.map(segments, fn [_from, to] -> position(to) end),
+          offsets: :none,
+          stroke_width: Mark.stroke_width(first.linewidth),
+          dashes: :none,
+          color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
+          opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),
+          line_end: geom.line_end,
+          line_join: geom.line_join,
+          mitre_limit: geom.mitre_limit
+        }
+      end)
     end
 
     # The rows of each group from its first with both positions to its last, as ggplot2's
@@ -255,17 +270,28 @@ defmodule Giggly.Geom.Path do
       DataFrame.slice(frame, kept)
     end
 
-    # Whether every group keeps one colour and one alpha all along it, ggplot2's test for drawing a
-    # group as one line rather than segments; a table without alpha is opaque throughout.
-    defp constant?(frame) do
-      frame
-      |> rows()
-      |> Enum.group_by(fn row -> row.group end, fn row -> {row.color, row.alpha} end)
+    # Whether every group keeps one colour, alpha, width and line type all along it, ggplot2's test
+    # for drawing a group as one line rather than segments; a table without alpha is opaque
+    # throughout.
+    defp constant?(rows) do
+      rows
+      |> Enum.group_by(fn row -> row.group end, fn row ->
+        {row.color, row.alpha, row.linewidth, row.linetype}
+      end)
       |> Enum.all?(fn {_group, looks} -> match?([_one], Enum.uniq(looks)) end)
     end
 
-    # Each row's positions, group, colour, black for a table without one, and alpha, `nil` for a
-    # table without one.
+    # Whether every group is solid all along it, ggplot2's test for whether a line may be drawn as
+    # segments.
+    defp solid?(rows) do
+      rows
+      |> Enum.group_by(fn row -> row.group end, fn row -> row.linetype end)
+      |> Enum.all?(fn {_group, line_types} -> Enum.uniq(line_types) == [@line_type] end)
+    end
+
+    # Each row's positions, group, colour, black for a table without one, alpha, `nil` for a table
+    # without one, width, 0.5 for a table without one, and line type, solid for a table without
+    # one, a missing width or line type `nil`.
     defp rows(frame) do
       Enum.zip_with(
         [
@@ -273,19 +299,32 @@ defmodule Giggly.Geom.Path do
           DataFrame.pull(frame, :y),
           DataFrame.pull(frame, :group),
           Mark.colors(frame, :color, @color),
-          Mark.values(frame, :alpha, nil)
+          Mark.values(frame, :alpha, nil),
+          Mark.values(frame, :linewidth, @line_width),
+          Mark.values(frame, :linetype, @line_type)
         ],
-        fn [x_position, y_position, group, color, alpha] ->
-          %{x: x_position, y: y_position, group: group, color: color, alpha: alpha}
+        fn [x_position, y_position, group, color, alpha, line_width, line_type] ->
+          %{
+            x: x_position,
+            y: y_position,
+            group: group,
+            color: color,
+            alpha: alpha,
+            linewidth: line_width,
+            linetype: line_type
+          }
         end
       )
     end
 
-    # A row with both positions and a colour, before it is placed, as R's `complete.cases()` finds
-    # one, an infinite position counting as present and a colour of `:none` as missing, a colour
-    # read by `Mark.colors/3` so a missing one is `:none` too.
-    defp complete?(row),
-      do: not missing?(row.x) and not missing?(row.y) and row.color != :none
+    # A row with both positions, a colour, a width and a line type, before it is placed, as R's
+    # `complete.cases()` finds one, an infinite position counting as present and a colour of
+    # `:none` as missing, a colour read by `Mark.colors/3` so a missing one is `:none` too, and a
+    # blank line type, held as `:none` where a layer sets it, as present.
+    defp complete?(row) do
+      not missing?(row.x) and not missing?(row.y) and row.color != :none and
+        not is_nil(row.linewidth) and not is_nil(row.linetype)
+    end
 
     defp missing?(position), do: position in [nil, :nan]
 

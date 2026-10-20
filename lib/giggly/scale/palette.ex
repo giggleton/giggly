@@ -48,11 +48,19 @@ defmodule Giggly.Scale.Palette do
   #     or open, its 1, 2, 0, 3, 7 and 8. More than six levels cannot be drawn: R warns and leaves
   #     the seventh on unshaped, so its points vanish, and Giggly, which cannot warn, raises,
   #     naming the manual scale that takes more.
-  #   * `{:manual, values}`, a discrete colour or shape scale's, `values` a list: its first values,
-  #     one for each level in level order, as R's manual palette gives them. A manual palette may
-  #     instead be a map from a value to its colour or shape, each level taking its own by value
-  #     (`named/3`). Either way, more levels than values cannot be drawn, as R's manual scale fails
-  #     whatever its values' names.
+  #   * `:linetype`, a discrete line type scale's: given the number of levels, that many of 13 line
+  #     types, each as its dash pattern, as R's `pal_linetype()` gives them: `"solid"`, held as
+  #     `{}`, then the patterns R writes in hex digits, `"22"` to `"F1"`, as tuples of their lengths.
+  #     More than 13 levels cannot be drawn: R warns and leaves the fourteenth on with no line type,
+  #     so its lines vanish, and Giggly, which cannot warn, raises, naming the manual scale that
+  #     takes more.
+  #   * `{:manual, values}`, a discrete colour, shape or line type scale's, `values` a list: its
+  #     first values, one for each level in level order, as R's manual palette gives them. A manual
+  #     palette may instead be a map from a value to its colour, shape or line type, each level
+  #     taking its own by value (`named/3`), or `{:manual, values, breaks}`, a list each of whose
+  #     values is the break's at its place, as R's manual scale names a list by its breaks, a level
+  #     no break names taking none (`named_by_breaks/4`). Either way, more levels than values cannot
+  #     be drawn, as R's manual scale fails whatever its values' names.
   #
   # Use it through `Giggly.Scale`.
 
@@ -74,10 +82,15 @@ defmodule Giggly.Scale.Palette do
              }}
           | {:gray, {number(), number()}}
           | {:shape, :solid | :open}
-          | {:manual, [ColorOperations.t() | atom()] | %{term() => ColorOperations.t() | atom()}}
+          | :linetype
+          | {:manual, [manual_value()] | %{term() => manual_value()}}
+          | {:manual, [manual_value()], [term()]}
           | {:area, {number(), number()}}
           | {:abs_area, number()}
           | {:area_sequence, {number(), number()}}
+
+  @typedoc "A manual palette's value: a colour, a shape's name, or a line type's dash pattern."
+  @type manual_value :: ColorOperations.t() | atom() | tuple()
 
   # R's gamma for `grey.colors()`.
   @gray_gamma 2.2
@@ -88,6 +101,25 @@ defmodule Giggly.Scale.Palette do
     solid: [:circle_small, :triangle, :square, :plus, :square_cross, :asterisk],
     open: [:circle_open, :triangle_open, :square_open, :plus, :square_cross, :asterisk]
   }
+
+  # `pal_linetype()`'s line types, R's `"solid"`, `"22"`, `"42"`, `"44"`, `"13"`, `"1343"`, `"73"`,
+  # `"2262"`, `"12223242"`, `"F282"`, `"F4448444"`, `"224282F2"` and `"F1"`, each as its dash
+  # pattern, a hex digit as its length.
+  @line_types [
+    {},
+    {2, 2},
+    {4, 2},
+    {4, 4},
+    {1, 3},
+    {1, 3, 4, 3},
+    {7, 3},
+    {2, 2, 6, 2},
+    {1, 2, 2, 2, 3, 2, 4, 2},
+    {15, 2, 8, 2},
+    {15, 4, 4, 4, 8, 4, 4, 4},
+    {2, 2, 4, 2, 8, 2, 15, 2},
+    {15, 1}
+  ]
 
   # A continuous palette's value for a place from 0 to 1 in the scale's limits: for a rescale, R's
   # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for an area, the
@@ -173,9 +205,9 @@ defmodule Giggly.Scale.Palette do
   # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
   # every range, chroma, luminance and count its test pins.
   #
-  # A grey palette's are `grey.colors()`'s, a shape palette's its first shapes, and a manual one's
-  # its first values, as the opening comment says; a shape palette for more levels than it has
-  # shapes, or a manual palette of too few values, raises.
+  # A grey palette's are `grey.colors()`'s, a shape or line type palette's its first shapes or line
+  # types, and a manual one's its first values, as the opening comment says; a shape or line type
+  # palette for more levels than it holds, or a manual palette of too few values, raises.
   #
   # An area sequence's are the square roots of `spread/2` from `low * low` to `high * high`.
   #
@@ -186,7 +218,8 @@ defmodule Giggly.Scale.Palette do
           [number()]
   @spec discrete({:hue | :gray, term()}, non_neg_integer()) :: [ColorOperations.t()]
   @spec discrete({:shape, :solid | :open}, non_neg_integer()) :: [atom()]
-  @spec discrete({:manual, list()}, non_neg_integer()) :: [ColorOperations.t() | atom()]
+  @spec discrete(:linetype, non_neg_integer()) :: [tuple()]
+  @spec discrete({:manual, list()}, non_neg_integer()) :: [manual_value()]
   def discrete({:sequence, range}, count), do: spread(range, count)
 
   def discrete({:area_sequence, {low, high}}, count) do
@@ -228,6 +261,17 @@ defmodule Giggly.Scale.Palette do
     Enum.take(shapes, count)
   end
 
+  def discrete(:linetype, count) do
+    if count > length(@line_types) do
+      raise ArgumentError,
+            "a line type scale's palette has #{length(@line_types)} line types, too few for its " <>
+              "#{count} values, since more are hard to tell apart; " <>
+              "Giggly.Plot.scale_linetype_manual/2 gives a line type for each"
+    end
+
+    Enum.take(@line_types, count)
+  end
+
   def discrete({:manual, values}, count) when is_list(values) do
     check_enough(values, count)
     Enum.take(values, count)
@@ -241,6 +285,23 @@ defmodule Giggly.Scale.Palette do
   @spec named(%{term() => term()}, [term()], term()) :: [term()]
   def named(value_by_key, keys, missing) do
     check_enough(value_by_key, length(keys))
+    Enum.map(keys, fn key -> Map.get(value_by_key, key, missing) end)
+  end
+
+  # A manual palette's list named by breaks: for each of `keys`, the present levels' keys as the
+  # scale matches them, the value at the place of the break whose key, in `break_keys`, it is, or
+  # `missing` for a level no break names, a value beyond the last break naming none; a list of
+  # fewer values than levels raises, as R counts every value of a manual scale, named or not.
+  @doc false
+  @spec named_by_breaks(list(), [term()], [term()], term()) :: [term()]
+  def named_by_breaks(values, break_keys, keys, missing) do
+    check_enough(values, length(keys))
+
+    value_by_key =
+      break_keys
+      |> Enum.zip(values)
+      |> Map.new()
+
     Enum.map(keys, fn key -> Map.get(value_by_key, key, missing) end)
   end
 

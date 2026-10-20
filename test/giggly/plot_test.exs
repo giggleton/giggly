@@ -525,7 +525,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :x, :y],
+                 accepted: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y],
                  annotation: false
                }
              ]
@@ -592,7 +592,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "cyl", weight: "wt"},
                  fixed: %{},
-                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill],
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
                  annotation: false
                }
              ]
@@ -855,7 +855,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :x, :y],
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :y],
                  annotation: false
                }
              ]
@@ -968,9 +968,9 @@ defmodule Giggly.PlotTest do
       assert error.message =~ "Plot.geom_line/3"
       assert error.message =~ ":weight"
 
-      error = assert_raise ArgumentError, fn -> Plot.geom_path(plot, %{linewidth: :cyl}) end
+      error = assert_raise ArgumentError, fn -> Plot.geom_path(plot, %{shape: :cyl}) end
       assert error.message =~ "Plot.geom_path/3"
-      assert error.message =~ ":linewidth"
+      assert error.message =~ ":shape"
     end
 
     test "a column the data does not have is refused, naming the call" do
@@ -1321,7 +1321,18 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{xmax: "mpg"},
                  fixed: %{ymin: 0.0, ymax: :infinity},
-                 accepted: [:alpha, :color, :fill, :group, :xmax, :xmin, :ymax, :ymin],
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :fill,
+                   :group,
+                   :linetype,
+                   :linewidth,
+                   :xmax,
+                   :xmin,
+                   :ymax,
+                   :ymin
+                 ],
                  annotation: false
                }
              ]
@@ -1588,17 +1599,20 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3 aborts drawing a path whose line type changes along it ("can't have varying
     # colour, linewidth, and/or alpha along the line when linetype isn't solid"), and a path
-    # annotation is one line.
-    test "a path's or a line's annotation takes one line type and one width, not a list" do
+    # annotation is one line; its width may change along it, drawn a segment at a time.
+    test "a path's or a line's annotation takes one line type, not a list, and a list of widths" do
       plot = Plot.new(@rows)
 
-      for geom <- [:path, :line], {option, values} <- [linetype: [2, 3], linewidth: [1, 2]] do
+      for geom <- [:path, :line] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            Plot.annotate(plot, geom, [{:x, [1, 2]}, {:y, 1}, {option, values}])
+            Plot.annotate(plot, geom, x: [1, 2], y: 1, linetype: [2, 3])
           end
 
-        assert error.key == option
+        assert error.key == :linetype
+
+        assert [%Plot.Layer{fixed: %{linewidth: [1.0, 2.0]}}] =
+                 Plot.annotate(plot, geom, x: [1, 2], y: 1, linewidth: [1, 2]).reversed_layers
       end
 
       assert [%Plot.Layer{fixed: %{linetype: {7, 3}, linewidth: 2.0}}] =
@@ -2289,12 +2303,16 @@ defmodule Giggly.PlotTest do
               Plot.scale_alpha_continuous(plot).scales.alpha,
               Plot.scale_size_discrete(plot).scales.size,
               Plot.scale_size_continuous(plot).scales.size,
-              Plot.scale_shape_discrete(plot).scales.shape} ===
+              Plot.scale_shape_discrete(plot).scales.shape,
+              Plot.scale_linetype_discrete(plot).scales.linetype,
+              Plot.scale_linewidth_discrete(plot).scales.linewidth,
+              Plot.scale_linewidth_continuous(plot).scales.linewidth} ===
                {Scale.new(:discrete, :color), Scale.new(:discrete, :fill),
                 Scale.new(:continuous, :color), Scale.new(:continuous, :fill),
                 Scale.new(:discrete, :alpha), Scale.new(:continuous, :alpha),
                 Scale.new(:discrete, :size), Scale.new(:continuous, :size),
-                Scale.new(:discrete, :shape)}
+                Scale.new(:discrete, :shape), Scale.new(:discrete, :linetype),
+                Scale.new(:discrete, :linewidth), Scale.new(:continuous, :linewidth)}
     end
 
     test "a manual or gradientn scale given no colours is refused, naming the option it needs" do
@@ -2381,16 +2399,17 @@ defmodule Giggly.PlotTest do
     end
 
     # ggplot2 4.0.3's `manual_scale()` names an unnamed vector of values by a vector of breaks,
-    # the first value the first break's, those beyond the shorter left out.
-    test "a manual scale's list beside a list of breaks takes its names from them" do
+    # the first value the first break's, after it has chosen the scale's limits, so they stay its
+    # levels; a map's names, the user's, limit it.
+    test "a manual scale's list beside a list of breaks is recorded with them, to be named by them" do
       plot = Plot.new(@rows)
       palette = fn options -> Plot.scale_color_manual(plot, options).scales.color.palette end
 
       assert {palette.(values: ["red", "blue", "green"], breaks: [8, 4]),
-              palette.(values: ["red"], breaks: [8, 4]),
+              palette.(values: %{8 => "red"}, breaks: [8, 4]),
               palette.(values: ["red", "blue"], breaks: :none)} ===
-               {{:manual, %{8 => "#FF0000", 4 => "#0000FF"}}, {:manual, %{8 => "#FF0000"}},
-                {:manual, ["#FF0000", "#0000FF"]}}
+               {{:manual, ["#FF0000", "#0000FF", "#008000"], [8, 4]},
+                {:manual, %{8 => "#FF0000"}}, {:manual, ["#FF0000", "#0000FF"]}}
     end
 
     test "an option a colour, fill or alpha scale cannot take is refused, naming what was wrong" do
@@ -2508,8 +2527,8 @@ defmodule Giggly.PlotTest do
 
       for {options, shown} <- [
             {[color: {10, 1}],
-             "low first, since a colour, fill, alpha or size scale cannot run from high to " <>
-               "low, got: {10, 1}"},
+             "low first, since a colour, fill, alpha, size or line width scale cannot run " <>
+               "from high to low, got: {10, 1}"},
             {[fill: {~D[2026-01-01], nil}], "two numbers, each nil"},
             {[alpha: "a"], ~s(got: "a")}
           ] do
@@ -2603,7 +2622,7 @@ defmodule Giggly.PlotTest do
                 Plot.scale_size_discrete(plot, limits: ["8", "4"]).scales.size}
 
       error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, size: {20, 0}) end
-      assert error.message =~ "since a colour, fill, alpha or size scale cannot run from high"
+      assert error.message =~ "since a colour, fill, alpha, size or line width scale cannot run"
     end
 
     test "labs/2 titles the size legend" do
@@ -2656,7 +2675,7 @@ defmodule Giggly.PlotTest do
                   palette: {:manual, %{"4" => :circle_filled, 6 => :star}},
                   guide: :legend,
                   na_value: :none
-                }, {:manual, %{"8" => :square_open, "4" => :triangle_down_filled}}}
+                }, {:manual, [:square_open, :triangle_down_filled, :triangle_open], ["8", "4"]}}
     end
 
     test "an option a shape scale cannot take is refused, naming what was wrong" do
@@ -2726,6 +2745,162 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "the line type and line width scale functions" do
+    test "each records an untrained scale of its palette and a legend, its missing value none" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_linetype_discrete(plot).scales.linetype,
+              Plot.scale_linetype_manual(plot, values: [2, :blank, {3, 1}]).scales.linetype,
+              Plot.scale_linewidth_continuous(plot).scales.linewidth,
+              Plot.scale_linewidth_discrete(plot).scales.linewidth} ===
+               {%Scale.Discrete{palette: :linetype, guide: :legend},
+                %Scale.Discrete{palette: {:manual, [{4, 4}, :none, {3, 1}]}, guide: :legend},
+                %Scale.Continuous{palette: {:rescale, {1.0, 6.0}}, guide: :legend},
+                %Scale.Discrete{palette: {:sequence, {2.0, 6.0}}, guide: :legend}}
+    end
+
+    test "each records the line types, widths and options it is given, a line type as its pattern" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_linetype_discrete(plot,
+                name: "Cylinders",
+                limits: ["8", "4"],
+                breaks: ["4"],
+                labels: ["four"],
+                na_value: :dotted
+              ).scales.linetype,
+              Plot.scale_linetype_manual(plot, values: %{"4" => 5, 6 => :solid}, na_value: :blank).scales.linetype,
+              Plot.scale_linetype_manual(plot, values: [:twodash, {2, 1}], breaks: ["8", "4"]).scales.linetype.palette,
+              Plot.scale_linewidth_continuous(plot,
+                range: {0, 4},
+                name: "Duration",
+                limits: {nil, 20},
+                breaks: [5, 10],
+                labels: ["a", "b"]
+              ).scales.linewidth,
+              Plot.scale_linewidth_discrete(plot, range: {1, 3}, na_value: 0, limits: ["4", "6"]).scales.linewidth} ===
+               {%Scale.Discrete{
+                  palette: :linetype,
+                  guide: :legend,
+                  name: "Cylinders",
+                  limits: ["8", "4"],
+                  breaks: ["4"],
+                  labels: ["four"],
+                  na_value: {1, 3}
+                },
+                %Scale.Discrete{
+                  palette: {:manual, %{"4" => {7, 3}, 6 => {}}},
+                  guide: :legend,
+                  na_value: :none
+                }, {:manual, [{2, 2, 6, 2}, {2, 1}], ["8", "4"]},
+                %Scale.Continuous{
+                  palette: {:rescale, {0.0, 4.0}},
+                  guide: :legend,
+                  name: "Duration",
+                  limits: {nil, 20.0},
+                  breaks: [5.0, 10.0],
+                  labels: ["a", "b"]
+                },
+                %Scale.Discrete{
+                  palette: {:sequence, {1.0, 3.0}},
+                  guide: :legend,
+                  na_value: 0.0,
+                  limits: ["4", "6"]
+                }}
+    end
+
+    # ggplot2 4.0.3's `scale_linewidth_continuous(na.value = 3)` fails, "unused argument", and
+    # its line type and line width scales take no transformation here, as size's take none.
+    test "an option a line type or line width scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_linetype_discrete/2, [na_value: 7], "or a dash pattern"},
+            {&Plot.scale_linetype_discrete/2, [na_value: {1, 16}], "got: {1, 16}"},
+            {&Plot.scale_linetype_discrete/2, [values: [1]], "unknown options [:values]"},
+            {&Plot.scale_linetype_manual/2, [values: [1, "22"]], ~s(got: "22")},
+            {&Plot.scale_linetype_manual/2, [values: %{"4" => {1, 2, 3}}], "got: {1, 2, 3}"},
+            {&Plot.scale_linetype_manual/2, [values: []],
+             "expected a list of at least one line type, or a map from a value to its line " <>
+               "type, got: []"},
+            {&Plot.scale_linewidth_continuous/2, [range: {-1, 6}],
+             "each a width in millimetres, 0 or more, got: {-1, 6}"},
+            {&Plot.scale_linewidth_discrete/2, [range: 6], "got: 6"},
+            {&Plot.scale_linewidth_discrete/2, [na_value: -1], "got: -1"},
+            {&Plot.scale_linewidth_continuous/2, [na_value: 1], "unknown options [:na_value]"},
+            {&Plot.scale_linewidth_continuous/2, [transform: :log10],
+             "unknown options [:transform]"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.scale_linetype_manual(plot) end
+
+      assert error.message =~ "required :values option not found"
+    end
+
+    test "a list of labels not one for each break or limit given is refused" do
+      plot = Plot.new(@rows)
+
+      for {function, name} <- [
+            {&Plot.scale_linetype_discrete/2, "Plot.scale_linetype_discrete/2"},
+            {fn typed, options ->
+               Plot.scale_linetype_manual(typed, [{:values, [1, 2]} | options])
+             end, "Plot.scale_linetype_manual/2"},
+            {&Plot.scale_linewidth_discrete/2, "Plot.scale_linewidth_discrete/2"}
+          ] do
+        error =
+          assert_raise ArgumentError, fn -> function.(plot, breaks: ["4", "6"], labels: ["a"]) end
+
+        assert error.message =~
+                 "#{name} is given 1 labels, which must be one for each of its 2 breaks"
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.scale_linewidth_continuous(plot, labels: ["a"])
+        end
+
+      assert error.message =~ "Plot.scale_linewidth_continuous/2 is given 1 labels"
+    end
+
+    # ggplot2 4.0.3's `lims(linetype = c(1, 5))` aborts: "A continuous variable cannot be mapped
+    # to the linetype aesthetic", and its `lims(linewidth = c(10, 0))` reverses the widths through
+    # a reverse transformation, which Giggly's line width scales do not have.
+    test "lims/2 gives a line type scale a list of limits, and a line width scale either, low first" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.lims(plot, linetype: ["8", "4"]).scales.linetype,
+              Plot.lims(plot, linewidth: {0, 10}).scales.linewidth,
+              Plot.lims(plot, linewidth: ["8", "4"]).scales.linewidth} ===
+               {Plot.scale_linetype_discrete(plot, limits: ["8", "4"]).scales.linetype,
+                Plot.scale_linewidth_continuous(plot, limits: {0, 10}).scales.linewidth,
+                Plot.scale_linewidth_discrete(plot, limits: ["8", "4"]).scales.linewidth}
+
+      for {options, shown} <- [
+            {[linetype: {1, 5}],
+             "expected a list of the values the scale shows, since a line type scale is " <>
+               "discrete, got: {1, 5}"},
+            {[linewidth: {10, 0}],
+             "since a colour, fill, alpha, size or line width scale cannot run"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+
+    test "labs/2 titles the line type and line width legends" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.labs(linetype: "Series", linewidth: "Duration of\nunemployment")
+
+      assert plot.labels === %{linetype: "Series", linewidth: "Duration of\nunemployment"}
+    end
+  end
+
   describe "a scale's guide:, guide_legend/1 and guides/2" do
     # Each colour, fill and alpha scale function, with the options it needs, and whether its scale
     # is a continuous colour or fill scale, the one kind a colour bar shows.
@@ -2753,8 +2928,21 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_radius/2, [], :size},
       {&Plot.scale_size_discrete/2, [], :size},
       {&Plot.scale_shape_discrete/2, [], :shape},
-      {&Plot.scale_shape_manual/2, [values: [1]], :shape}
+      {&Plot.scale_shape_manual/2, [values: [1]], :shape},
+      {&Plot.scale_linetype_discrete/2, [], :linetype},
+      {&Plot.scale_linetype_manual/2, [values: [1]], :linetype},
+      {&Plot.scale_linewidth_continuous/2, [], :linewidth},
+      {&Plot.scale_linewidth_discrete/2, [], :linewidth}
     ]
+
+    # Each aesthetic other than colour and fill as a colour bar's refusal names it.
+    @guided_nouns %{
+      alpha: "alpha",
+      shape: "shape",
+      size: "size",
+      linetype: "line type",
+      linewidth: "line width"
+    }
 
     test "each scale function records the guide it is given" do
       plot = Plot.new(@rows)
@@ -2769,8 +2957,8 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3 warns "`guide_colourbar()` needs continuous scales." for a discrete colour
     # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and for
-    # shape and size, and draws no guide.
-    test "a colour bar is refused for a discrete scale, for alpha, shape and size, saying why" do
+    # shape, size, linetype and linewidth, and draws no guide.
+    test "a colour bar is refused for a discrete scale, and for any aesthetic but colour, saying why" do
       plot = Plot.new(@rows)
 
       for {function, options, kind} <- @guided_scale_functions, kind != :continuous do
@@ -2782,7 +2970,9 @@ defmodule Giggly.PlotTest do
         assert error.message =~
                  if(kind == :discrete,
                    do: "a colour bar shows a continuous scale, and this one is discrete",
-                   else: "a colour bar shows colour or fill, never #{kind}; give :legend"
+                   else:
+                     "a colour bar shows colour or fill, never #{Map.fetch!(@guided_nouns, kind)}; " <>
+                       "give :legend"
                  )
       end
     end
@@ -2820,22 +3010,20 @@ defmodule Giggly.PlotTest do
                {%{}, %{color: :none, fill: :colorbar, alpha: %Guide.Legend{reverse: true}}}
     end
 
-    test "guides/2 refuses an alpha, shape or size colour bar, and an aesthetic it chooses no guide for" do
+    test "guides/2 refuses a colour bar but for colour or fill, and an aesthetic it chooses no guide for" do
       plot = Plot.new(@rows)
 
-      for aesthetic <- [:alpha, :shape, :size] do
+      for {aesthetic, noun} <- @guided_nouns do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Plot.guides(plot, [{aesthetic, :colorbar}])
           end
 
-        assert error.message =~ "a colour bar shows colour or fill, never #{aesthetic}"
+        assert error.message =~ "a colour bar shows colour or fill, never #{noun}"
       end
 
-      assert Plot.guides(plot, size: :none, shape: :legend).guides === %{
-               size: :none,
-               shape: :legend
-             }
+      assert Plot.guides(plot, size: :none, shape: :legend, linetype: :none, linewidth: :legend).guides ===
+               %{size: :none, shape: :legend, linetype: :none, linewidth: :legend}
 
       for key <- [:x, :stroke] do
         error =

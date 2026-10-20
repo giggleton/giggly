@@ -424,6 +424,29 @@ defmodule Giggly.GeomTest do
                {1.07, :none, [:none]}
              ]
     end
+
+    # Golden: ggplot2 4.0.3's `geom_col(aes(linewidth = w), colour = "black")` through vdiffr
+    # 1.0.9, `w` missing for one bar: R's graphics engine draws a border of no width transparent,
+    # `stroke: none`, which svglite writes `nan` wide and Giggly 0.
+    test "a missing border width draws no border, a run of its own 0 wide" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          xmin: [0.0, 1.0, 2.0],
+          xmax: [1.0, 2.0, 3.0],
+          ymin: [0.0, 0.0, 0.0],
+          ymax: [1.0, 1.0, 1.0],
+          color: ["#000000", "#000000", "#000000"],
+          linewidth: [0.5, nil, 0.5]
+        )
+
+      assert [first, missing, last] = Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+
+      assert {first.color, missing.color, missing.stroke_width, last.color} ===
+               {["#000000"], [:none], 0.0, ["#000000"]}
+    end
   end
 
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
@@ -543,6 +566,50 @@ defmodule Giggly.GeomTest do
       end
     end
 
+    # Golden: ggplot2 4.0.3's `layer_grob()` in R 4.6.1 for `geom_path()` of three groups, their
+    # line types and widths set by `I()`: one polyline, each group in its own `lty` and `lwd`, in
+    # group order. A group whose line type is missing, as a column holds a mapped blank one, is
+    # dropped, as `handle_na()` drops rows missing a line type.
+    test "lines alike in width and line type are one primitive, in group order, a missing type none",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 4.0, 0.0, 4.0, 0.0, 4.0, 0.0, 4.0],
+          y: [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0],
+          group: [1, 1, 2, 2, 3, 3, 4, 4],
+          linetype: [{}, {}, {}, {}, nil, nil, {4, 4}, {4, 4}],
+          linewidth: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 2.0, 2.0]
+        )
+
+      assert [solid, dashed] = Geom.draw_panel(@path, frame, coord, params)
+
+      assert {length(solid.lines), solid.dashes, solid.stroke_width, length(dashed.lines),
+              rounded(dashed.dashes), dashed.stroke_width} ===
+               {2, :none, @default_width, 1, [22.76, 22.76], @two_millimetres}
+    end
+
+    # ggplot2 4.0.3's `GeomPath` aborts in R 4.6.1 where any group is not solid and any group's look
+    # varies, each group apart: a dashed line beside one whose width varies, or a line type changing
+    # along one line, "can't have varying colour, linewidth, and/or alpha along the line when
+    # linetype isn't solid".
+    test "while any line is not solid, a look varying along any line is refused",
+         %{coord: coord, params: params} do
+      for look <- [
+            [linetype: [{4, 4}, {4, 4}, {}, {}], linewidth: [0.5, 0.5, 1.0, 2.0]],
+            [linetype: [{}, {}, {}, {4, 4}], linewidth: [0.5, 0.5, 0.5, 0.5]]
+          ] do
+        frame =
+          DataFrame.new(
+            [x: [0.0, 4.0, 0.0, 4.0], y: [1.0, 1.0, 2.0, 2.0], group: [1, 1, 2, 2]] ++ look
+          )
+
+        error =
+          assert_raise ArgumentError, fn -> Geom.draw_panel(@path, frame, coord, params) end
+
+        assert error.message =~ "cannot vary its colour, alpha, width or line type along it"
+      end
+    end
+
     # Golden: ggplot2 4.0.3's `geom_path(aes(colour = z), linewidth = 2)` through vdiffr 1.0.9:
     # segments 4.27 points wide.
     test "a solid line whose colour varies along it is drawn in solid segments at its width",
@@ -635,6 +702,30 @@ defmodule Giggly.GeomTest do
       assert segments.starts === [{0.0, 0.0}, {0.75, 0.75}, {0.0, 1.0}]
       assert segments.ends === [{0.25, 0.25}, {1.0, 1.0}, {1.0, 1.0}]
       assert segments.opacity === [0.1, 0.4, 1.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_grob()` in R 4.6.1 for `geom_path(aes(linewidth = w))`, and its
+    # drawing through vdiffr 1.0.9: a segment from each row to the next, each as wide as the row it
+    # starts from, a missing width's `lwd` `NA` and not drawn, as R's graphics engine draws no line
+    # of no width, and rows missing a width or a line type at a group's ends dropped, as
+    # `handle_na()` drops them.
+    test "where a width varies along a line, each segment is its start's width, a missing one none",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0, 2.0, 3.0, 4.0, 0.0, 4.0, 4.0],
+          y: [0.0, 1.0, 2.0, 3.0, 4.0, 4.0, 4.0, 0.0],
+          group: [1, 1, 1, 1, 1, 2, 2, 2],
+          linewidth: [nil, 0.5, 0.5, nil, 2.0, 2.0, 2.0, 2.0],
+          linetype: [{}, {}, {}, {}, {}, {}, {}, nil]
+        )
+
+      assert [thin, thick] = Geom.draw_panel(@path, frame, coord, params)
+
+      assert {thin.starts, thin.ends, thin.stroke_width, thick.starts, thick.ends,
+              thick.stroke_width} ===
+               {[{0.25, 0.25}, {0.5, 0.5}], [{0.5, 0.5}, {0.75, 0.75}], @default_width,
+                [{0.0, 1.0}], [{1.0, 1.0}], @two_millimetres}
     end
 
     test "every line is as wide as the layer sets, and ended, joined and mitred as the geom says",
@@ -981,6 +1072,18 @@ defmodule Giggly.GeomTest do
       assert Geom.draw_key(@path, %{linetype: :none}) === []
     end
 
+    # Golden: ggplot2 4.0.3's legends through vdiffr 1.0.9 for a missing line type or width: a
+    # path's key draws no line for either, and a bar's key of a missing width nothing at all, as
+    # `draw_key_polygon()`'s rectangle of a missing width has no size; a missing line type leaves a
+    # bar's border blank, as `gg_par()` reads `NA` as `"blank"`.
+    test "a key of a missing width draws nothing, and of a missing line type no line or border" do
+      assert {Geom.draw_key(@path, %{linewidth: nil}), Geom.draw_key(@path, %{linetype: nil}),
+              Geom.draw_key(%Geom.Bar{}, %{color: "#000000", linewidth: nil})} === {[], [], []}
+
+      assert [%Rectangles{color: [:none], dashes: :none}] =
+               Geom.draw_key(%Geom.Bar{}, %{color: "#000000", linetype: nil})
+    end
+
     test "a line's key is a path's, ggplot2's default width where the layer sets none" do
       assert Geom.draw_key(@line, %{alpha: nil}) ===
                Geom.draw_key(@path, %{alpha: nil})
@@ -1078,6 +1181,10 @@ defmodule Giggly.GeomTest do
       assert rounded_size(Geom.key_size(@line, %{})) === {1.42, 1.42}
       assert rounded_size(Geom.key_size(%Geom.Bar{}, %{linewidth: 4.0})) === {22.68, 22.68}
       assert rounded_size(Geom.key_size(%Geom.Rect{}, %{})) === {2.83, 2.83}
+
+      assert {Geom.key_size(@path, %{linewidth: nil}),
+              Geom.key_size(%Geom.Bar{}, %{linewidth: nil})} ===
+               {{0.0, 0.0}, {0.0, 0.0}}
     end
 
     # R's own figures, `attr(draw_key_text(...), "width")` and `"height"` in big points.

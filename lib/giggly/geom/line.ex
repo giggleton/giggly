@@ -7,8 +7,9 @@ defmodule Giggly.Geom.Line do
   # (`Giggly.Geom.Path`), with the same ends, corners and mitre limit. Use it through
   # `Giggly.Geom`.
   #
-  # Lines use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`; an aesthetic
-  # joins the accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # Lines use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need `:x`
+  # and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a mapping never
+  # silently does nothing.
   #
   # While the plot is assembled, after the stat and before the position, the rows are put in order
   # of panel, group and then the position along the line (`setup_data/3`), as ggplot2's
@@ -30,7 +31,7 @@ defmodule Giggly.Geom.Line do
   # The aesthetics a layer of lines can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :group, :x, :y]
+  def accepted_aesthetics, do: [:alpha, :color, :group, :linetype, :linewidth, :x, :y]
 
   # The aesthetics a layer of lines cannot be drawn without.
   @doc false

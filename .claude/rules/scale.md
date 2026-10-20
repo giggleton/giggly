@@ -30,27 +30,33 @@ grid lines are placed by the coordinate system".
   `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high, length.out = n)` as
   ggplot2's ordinal alpha takes it, and for a discrete colour or fill `{:hue, %{hue:, chroma:,
   luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`, or
-  `{:manual, values}`, a list or a map from value to colour or shape, R's manual palette; for size,
+  `{:manual, values}`, a list or a map from value to colour, shape or line type, R's manual
+  palette, or `{:manual, values, breaks}`, a list named by breaks; for size,
   `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled, `{:abs_area, max}`,
   R's `abs_area()`, the square root of the place's size rescaled onto 0 to `max`, and, discrete,
   `{:area_sequence, {low, high}}`, ggplot2's ordinal `sqrt(seq(low^2, high^2))`, `low^2` as
   `low * low`, as R's `^` squares; for shape, `{:shape, :solid}` or `{:shape, :open}`, R's
-  `pal_shape()`, six shapes by name. Each matched R to the last digit; its tests pin R's figures.
+  `pal_shape()`, six shapes by name; for line type, `:linetype`, R's `pal_linetype()`, 13 line
+  types as dash patterns. Each matched R to the last digit; its tests pin R's figures.
   `new/1` makes a position scale; `new/2` makes an aesthetic's with ggplot2's default palette for
   it (`alpha`: 0.1 to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
-  to 6 discrete; `shape`: the solid shapes, discrete alone; as floats, as `Plot`'s scale functions
-  record them), one of `non_position_aesthetics/0`.
-- **A shape scale is discrete alone** (`discrete_only?/1`), as R's `scale_shape_continuous()`
-  aborts, shapes having no order: `new/2` makes none continuous, and the assembly refuses a
-  continuous or a date column of the aesthetic. **The shape palette gives the present levels R's
+  to 6 discrete; `shape`: the solid shapes, discrete alone; `linetype`: R's 13, discrete alone;
+  `linewidth`: 1 to 6 rescaled, or 2 to 6 discrete by `seq()`; as floats, as `Plot`'s scale
+  functions record them), one of `non_position_aesthetics/0`.
+- **A shape or line type scale is discrete alone** (`discrete_only?/1`), as R's
+  `scale_shape_continuous()` and `scale_linetype_continuous()` abort, neither having an order:
+  `new/2` makes none continuous, and the assembly refuses a continuous or a date column of the
+  aesthetic. **The shape palette gives the present levels R's
   16, 17, 15, 3, 7 and 8, or open, 1, 2, 0, 3, 7 and 8, as their names** (`:circle_small`,
   `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, the first three open
   `:circle_open`, `:triangle_open`, `:square_open`), its test pinning each name to R's number
   through the table points are drawn from; **a seventh level raises when the plot is run**,
   naming the palette's six, the count and `Giggly.Plot.scale_shape_manual/2`, where R warns and
   leaves the seventh on unshaped (design-log §4, the entry beginning "A discrete palette with
-  fewer shapes").
+  fewer shapes"). **The line type palette gives R's 13 in order, `"solid"` as `{}` and each hex
+  pattern as a tuple of its lengths, and a fourteenth level raises**, naming
+  `Giggly.Plot.scale_linetype_manual/2`, its test pinning `pal_linetype()`'s output.
 - **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient
   is one palette"), which R's two- and three-colour gradients are too: its colours spaced evenly
   from 0 to 1 by R's `seq()`, a place between two neighbours blended in CIE L*a*b*
@@ -70,8 +76,8 @@ grid lines are placed by the coordinate system".
   cannot draw. The rescaler is the scale's, not the palette's, since a palette takes a place and
   the colour bar's ticks never go through a midpoint. A missing value, one that is not a finite
   number, or one outside the limits, which ggplot2 censors (`oob = censor`), maps to the scale's
-  `na_value`, ggplot2's `na.value`: `nil` for a position, alpha and size, grey50 for a colour or
-  fill, or what a plot's scale gives, `:none` among them.
+  `na_value`, ggplot2's `na.value`: `nil` for a position, alpha, line width and size, grey50 for a
+  colour or fill, or what a plot's scale gives, `:none` among them.
 - **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`),
   from its options as an axis's are: a continuous scale's are its breaks, given or its
   transformation's, inside its limits, taken as floats as R's limits are doubles, one at the low
@@ -81,11 +87,11 @@ grid lines are placed by the coordinate system".
   legend, as R's `breaks = NULL` draws no guide.
 - **A discrete palette spreads the present levels; `nil` takes no share and maps to the scale's
   `na_value`**, ggplot2's `na.value`, as ggplot2's mapping leaves `NA` out of the levels it counts:
-  `nil` for alpha and shape (R's `NA`) and grey50, `#7F7F7F`, for colour and fill. `na_value` is a
-  field of both scale kinds, as ggplot2's scale carries it (design-log §4, the entry beginning "A
-  discrete scale carries its missing value"); a position scale places `nil` as its last level and
-  reads none. The spread is R's `seq()`: its ends exact, each value between found by steps from the
-  first (the fourth of seven is 0.54999999999999993).
+  `nil` for alpha, line type, line width and shape (R's `NA`) and grey50, `#7F7F7F`, for colour and
+  fill. `na_value` is a field of both scale kinds, as ggplot2's scale carries it (design-log §4, the
+  entry beginning "A discrete scale carries its missing value"); a position scale places `nil` as
+  its last level and reads none. The spread is R's `seq()`: its ends exact, each value between found
+  by steps from the first (the fourth of seven is 0.54999999999999993).
 - **The hue palette is exactly R's `pal_hue()`**: a range less than a degree short of the whole
   circle, taken modulo 360 as R's `%%` takes it, leaves its last `360 / n` degrees off, any other
   is spread end to end, the hues by the same `seq()`, each colour
@@ -98,21 +104,24 @@ grid lines are placed by the coordinate system".
   byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, whose second half steps back
   from the end; spacing them with `seq()` changes no byte on any range and count sampled
   (`Scale.Palette`'s comment), so `seq()` it is.
-- **A manual palette gives a list's colours or shapes to the levels in order, and a map's by value**
-  (`Discrete.key/1`), a level the map lacks taking the `na_value`; a map with no given limits
-  narrows the scale's limits to the levels it names, the missing value kept, as ggplot2's manual
-  scale limits itself to its values' names. Either kind with fewer values than limits raises when
-  the plot is run, named or not, as R fails ("Insufficient values in manual scale").
+- **A manual palette gives a list's colours, shapes or line types to the levels in order, and a
+  map's by value** (`Discrete.key/1`), a level the map lacks taking the `na_value`; a map with no
+  given limits narrows the scale's limits to the levels it names, the missing value kept, as
+  ggplot2's manual scale limits itself to its values' names. **A list named by breaks (`{:manual,
+  values, breaks}`) gives each break's level the value at its place and leaves the limits the
+  levels**, as `manual_scale()` names values by breaks after choosing its limits. Any kind with
+  fewer values than limits raises when the plot is run, named or not, as R fails ("Insufficient
+  values in manual scale").
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
-  protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha, shape, size and a
-  discrete colour or fill, by default; a plot's scale may name `:none`, a legend for a continuous
-  colour or fill, or carry the legend's struct `Plot.guide_legend/1` builds, typed `struct()`. The
-  assembly turns a name into the kind; a scale never reads its guide, so the boundary lists no
-  guide. **`samples/2` and `places/2` give what a colour bar draws from a continuous scale**: values
-  spread evenly over its limits by R's `seq()`, as `extract_decor()` takes them, and each value's
-  place in the limits, 0 to 1, whatever the rescaler, as the gradient form places its ticks and
-  colours.
+  protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha, line type, line
+  width, shape, size and a discrete colour or fill, by default; a plot's scale may name `:none`, a
+  legend for a continuous colour or fill, or carry the legend's struct `Plot.guide_legend/1` builds,
+  typed `struct()`. The assembly turns a name into the kind; a scale never reads its guide, so the
+  boundary lists no guide. **`samples/2` and `places/2` give what a colour bar draws from a
+  continuous scale**: values spread evenly over its limits by R's `seq()`, as `extract_decor()`
+  takes them, and each value's place in the limits, 0 to 1, whatever the rescaler, as the gradient
+  form places its ticks and colours.
 - **`Scale.Continuous` and `Scale.Discrete` are API, and the boundary exports both; the rest of
   the namespace is not.** `Giggly.panel_scales/2` returns them and `Giggly.Plot` writes them, so
   their fields are documented and changing one changes the API; their functions are `@doc false`,
@@ -176,10 +185,11 @@ grid lines are placed by the coordinate system".
   whatever its values: a date's is a continuous scale through the date transformation, so
   dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
   date has no scale yet (`kind/2` gives `:none`), ggplot2's `scale_colour_date()`,
-  `scale_alpha_date()` and `scale_size_date()`. **`takes?/2` is the one rule for which kind of
-  column a plot's scale takes**: its own kind, and a continuous scale through the identity a date's,
-  which the identity places at its days since 1970-01-01, as R's untransformed continuous scale
-  draws a date; under any other transformation a date is refused, where R fails.
+  `scale_alpha_date()`, `scale_size_date()` and `scale_linewidth_date()`. **`takes?/2` is the one
+  rule for which kind of column a plot's scale takes**: its own kind, and a continuous scale through
+  the identity a date's, which the identity places at its days since 1970-01-01, as R's
+  untransformed continuous scale draws a date; under any other transformation a date is refused,
+  where R fails.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped); discrete levels are the distinct values, `nil` last, numbers
   among them, as a factor's are. **Which a discrete scale is handed, levels or positions, the

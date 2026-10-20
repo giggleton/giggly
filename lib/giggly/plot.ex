@@ -691,7 +691,7 @@ defmodule Giggly.Plot do
                      y: @annotation_position,
                      alpha: @annotation_alpha,
                      color: @annotation_color,
-                     linewidth: @linewidth_option,
+                     linewidth: @annotation_linewidth,
                      linetype: @linetype_option
                    ] ++ @line_style_options
   @annotation_geoms [:point, :col, :bar, :path, :line, :text, :rect]
@@ -1348,6 +1348,113 @@ defmodule Giggly.Plot do
                                 ] ++ @shape_legend_option_specs
                               )
 
+  # A line type scale's guide, a legend unless it says otherwise, and its missing value's line type,
+  # none unless it says otherwise, drawing no line.
+  @linetype_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:linetype]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  @linetype_na_value_spec [
+    type: @linetype_type,
+    doc:
+      "The line type of a missing value, or of one not among the limits: " <>
+        @linetype_forms <> "; none, which draws no line, when not given."
+  ]
+
+  @linetype_legend_option_specs Enum.concat(
+                                  @discrete_legend_option_specs,
+                                  guide: @linetype_guide_spec
+                                )
+
+  @discrete_linetype_scale_options NimbleOptions.new!(
+                                     [na_value: @linetype_na_value_spec] ++
+                                       @linetype_legend_option_specs
+                                   )
+
+  @manual_linetype_scale_options NimbleOptions.new!(
+                                   [
+                                     values: [
+                                       type:
+                                         {:custom, __MODULE__, :validate_manual_values,
+                                          [:linetype]},
+                                       required: true,
+                                       doc:
+                                         "The line types, each " <>
+                                           @linetype_forms <>
+                                           ": a list, given to the values in order, or to " <>
+                                           "`breaks:` in order where they are a list; or a " <>
+                                           "map from a value, as the column holds it, to its " <>
+                                           "line type, whose scale shows only the values the " <>
+                                           "data holds that it names, unless `limits:` gives " <>
+                                           "others. A value with no line type takes `na_value:`."
+                                     ],
+                                     na_value: @linetype_na_value_spec
+                                   ] ++ @linetype_legend_option_specs
+                                 )
+
+  # A line width scale's guide, a legend unless it says otherwise, and its missing value's width,
+  # none unless it says otherwise, drawing no line.
+  @linewidth_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:linewidth]},
+    default: :legend,
+    doc: "What reads the scale back: `:legend`, a key for each break, " <> @guide_doc_tail
+  ]
+
+  # The line width scales' default ranges, in millimetres, which leave the narrowest line visible.
+  @continuous_linewidth_range_default {1.0, 6.0}
+  @discrete_linewidth_range_default {2.0, 6.0}
+
+  @linewidth_range_type {:custom, __MODULE__, :validate_linewidth_range, []}
+
+  # The options of a continuous line width scale, which takes no missing value's width, as
+  # ggplot2's `scale_linewidth_continuous()` takes none: a value outside its limits draws no line.
+  @continuous_linewidth_scale_options NimbleOptions.new!(
+                                        [
+                                          range: [
+                                            type: @linewidth_range_type,
+                                            default: @continuous_linewidth_range_default,
+                                            doc:
+                                              "`{low, high}`: the widths, in millimetres, the " <>
+                                                "values run between, each 0 or more."
+                                          ]
+                                        ] ++
+                                          (@continuous_legend_option_specs
+                                           |> Keyword.replace!(:limits,
+                                             type: @limits_type,
+                                             doc:
+                                               "`{low, high}`: the values the scale spans " <>
+                                                 "whatever the data, `nil` for an end the " <>
+                                                 "data decides; either order names the same " <>
+                                                 "scale. A value outside them draws no line."
+                                           )
+                                           |> Enum.concat(guide: @linewidth_guide_spec))
+                                      )
+
+  @discrete_linewidth_scale_options NimbleOptions.new!(
+                                      [
+                                        range: [
+                                          type: @linewidth_range_type,
+                                          default: @discrete_linewidth_range_default,
+                                          doc:
+                                            "`{first, last}`: the widths, in millimetres, of " <>
+                                              "the first and last values, each 0 or more."
+                                        ],
+                                        na_value: [
+                                          type: {:custom, __MODULE__, :validate_linewidth, []},
+                                          doc:
+                                            "The width, in millimetres, of a missing value, or " <>
+                                              "of one not among the limits, 0 or more; none, " <>
+                                              "which draws no line, when not given."
+                                        ]
+                                      ] ++
+                                        Enum.concat(
+                                          @discrete_legend_option_specs,
+                                          guide: @linewidth_guide_spec
+                                        )
+                                    )
+
   # `guide_legend/1`'s options.
   @guide_legend_options NimbleOptions.new!(
                           reverse: [
@@ -1389,11 +1496,23 @@ defmodule Giggly.Plot do
                       type: {:custom, __MODULE__, :validate_guide, [:size]},
                       doc:
                         "The size scale's guide, as `scale_size_continuous/2`'s `guide:` takes it."
+                    ],
+                    linetype: [
+                      type: {:custom, __MODULE__, :validate_guide, [:linetype]},
+                      doc:
+                        "The line type scale's guide, as `scale_linetype_discrete/2`'s `guide:` " <>
+                          "takes it."
+                    ],
+                    linewidth: [
+                      type: {:custom, __MODULE__, :validate_guide, [:linewidth]},
+                      doc:
+                        "The line width scale's guide, as `scale_linewidth_continuous/2`'s " <>
+                          "`guide:` takes it."
                     ]
                   )
 
   # `lims/2`'s options: each axis's limits, its ends or a discrete axis's values, and the limits
-  # of a colour, fill, alpha, shape or size scale.
+  # of a colour, fill, alpha, shape, size, line type or line width scale.
   @axis_limits_type {:custom, __MODULE__, :validate_axis_limits, []}
   @legend_limits_type {:custom, __MODULE__, :validate_legend_limits, []}
   @lims_options NimbleOptions.new!(
@@ -1425,7 +1544,7 @@ defmodule Giggly.Plot do
                         "`scale_alpha_discrete/2` takes them."
                   ],
                   shape: [
-                    type: {:custom, __MODULE__, :validate_shape_limits, []},
+                    type: {:custom, __MODULE__, :validate_unordered_limits, [:shape]},
                     doc:
                       "The shape scale's limits, a list of values, as `scale_shape_discrete/2` " <>
                         "takes them."
@@ -1435,6 +1554,18 @@ defmodule Giggly.Plot do
                     doc:
                       "The size scale's limits, as `scale_size_continuous/2` or " <>
                         "`scale_size_discrete/2` takes them."
+                  ],
+                  linetype: [
+                    type: {:custom, __MODULE__, :validate_unordered_limits, [:linetype]},
+                    doc:
+                      "The line type scale's limits, a list of values, as " <>
+                        "`scale_linetype_discrete/2` takes them."
+                  ],
+                  linewidth: [
+                    type: @legend_limits_type,
+                    doc:
+                      "The line width scale's limits, as `scale_linewidth_continuous/2` or " <>
+                        "`scale_linewidth_discrete/2` takes them."
                   ]
                 )
 
@@ -1450,6 +1581,8 @@ defmodule Giggly.Plot do
                   alpha: [doc: "The alpha legend's title."] ++ @label_option,
                   shape: [doc: "The shape legend's title."] ++ @label_option,
                   size: [doc: "The size legend's title."] ++ @label_option,
+                  linetype: [doc: "The line type legend's title."] ++ @label_option,
+                  linewidth: [doc: "The line width legend's title."] ++ @label_option,
                   title: [doc: "The plot's title, above the panels."] ++ @label_option,
                   subtitle: [doc: "The plot's subtitle, below its title."] ++ @label_option,
                   caption: [doc: "The plot's caption, below the panels."] ++ @label_option,
@@ -1648,9 +1781,9 @@ defmodule Giggly.Plot do
 
   Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   counts along the one mapped, so mapping `:y` alone draws horizontal bars. A `:weight` column must
-  hold numbers. The bars also take `:alpha`, `:fill` and `:color`; one reaches a bar only where it
-  is the same in every row the bar counts, so a discrete one groups the rows and gives each group
-  its own bar.
+  hold numbers. The bars also take `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`; one
+  reaches a bar only where it is the same in every row the bar counts, so a discrete one groups the
+  rows and gives each group its own bar.
 
   Counting computes `count` and `prop`, the count's share of its group's total, which a mapping
   reads with an after_stat (`Giggly.Mapping`): `%{x: :class, y: {:after_stat, [:prop]}, group: 1}`
@@ -1710,10 +1843,10 @@ defmodule Giggly.Plot do
   on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart. The `y`
   axis reaches 0.
 
-  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill` and `:color`, and need `:x` and `:y`. `:fill`
-  fills a bar and takes its alpha; `:color` borders it, and bars have no border unless it is
-  mapped or set; `linewidth:` and `linetype:` set how wide the border is and how it is dashed. With
-  a discrete `y` and a continuous `x`, the bars are horizontal.
+  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`, and
+  need `:x` and `:y`. `:fill` fills a bar and takes its alpha; `:color` borders it, and bars have no
+  border unless it is mapped or set; `:linewidth` and `:linetype` say how wide the border is and
+  how it is dashed. With a discrete `y` and a continuous `x`, the bars are horizontal.
 
   ## Options
 
@@ -1768,12 +1901,14 @@ defmodule Giggly.Plot do
   Adds a layer of paths: a line through each group's rows in the order the data gives them, for a
   line that may double back. `geom_line/3` puts the rows in order first.
 
-  Paths use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`. Each group is a
-  line of its own, and a discrete colour groups the rows. A row missing `x` or `y` breaks its line;
-  a group of one row draws nothing. Where colour or alpha changes along a line, each segment takes
-  the colour and alpha of the row it starts from; a line dashed, dotted or blank keeps one colour
-  and one alpha all along it, and drawing one whose colour or alpha changes raises
-  `ArgumentError`. A colour of `:none` draws no line, and so does the line type `:blank`.
+  Paths use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need `:x`
+  and `:y`. Each group is a line of its own, and a discrete colour, line type or width groups the
+  rows. A row missing `x` or `y` breaks its line; a group of one row draws nothing. Where colour,
+  alpha or width changes along a line, each segment takes the colour, alpha and width of the row
+  it starts from, and a missing width leaves its segment out; a line type cannot change along a
+  line, and while any line is dashed, dotted or blank, drawing one whose colour, alpha or width
+  changes raises `ArgumentError`. A colour of `:none` draws no line, and so does the line type
+  `:blank`.
 
   ## Options
 
@@ -1949,9 +2084,9 @@ defmodule Giggly.Plot do
   `:neg_infinity` reach the panel's edge, so a band can shade the whole panel. A row missing a
   corner draws nothing.
 
-  Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill` and `:color`, and
-  need all four corners, each mapped or set. They look as `geom_col/3`'s bars do, their borders as
-  wide and dashed as `linewidth:` and `linetype:` set.
+  Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill`, `:color`,
+  `:linetype` and `:linewidth`, and need all four corners, each mapped or set. They look as
+  `geom_col/3`'s bars do, their borders as wide and dashed as `:linewidth` and `:linetype` say.
 
   ## Options
 
@@ -2017,9 +2152,10 @@ defmodule Giggly.Plot do
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
-  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:` and a bar's
-  or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash pattern among
-  them a tuple; the rest take one value. Under a facet that makes more than one
+  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's or
+  a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash pattern among
+  them a tuple, and a path's or a line's `linewidth:`, a line whose width changes along it drawn a
+  segment from each annotation to the next; the rest take one value. Under a facet that makes more than one
   panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
@@ -3226,6 +3362,148 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Gives the plot a discrete line type scale, replacing any line type scale it had.
+
+  The values are drawn in 13 line types, in order, easy to tell apart: solid, then the dash
+  patterns `{2, 2}`, `{4, 2}`, `{4, 4}`, `{1, 3}`, `{1, 3, 4, 3}`, `{7, 3}`, `{2, 2, 6, 2}`,
+  `{1, 2, 2, 2, 3, 2, 4, 2}`, `{15, 2, 8, 2}`, `{15, 4, 4, 4, 8, 4, 4, 4}`,
+  `{2, 2, 4, 2, 8, 2, 15, 2}` and `{15, 1}`. Line types have no order, so a line type scale is
+  always discrete. Its guide is a legend unless `guide:` says otherwise. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a
+  `guide:` of `:colorbar` among them, and `ArgumentError` for a list of labels not one for each
+  break or limit given; a continuous column, or more than 13 values, is refused when the plot is
+  run, and `scale_linetype_manual/2` gives as many line types as a scale has values.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_linetype_scale_options)}
+
+      iex> plot =
+      ...>   %{"month" => [1, 2, 1, 2], "value" => [0.2, 0.4, 0.9, 0.7], "series" => ["pce", "pce", "pop", "pop"]}
+      ...>   |> Giggly.Plot.new(%{x: :month, y: :value, linetype: :series})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_linetype_discrete(limits: ["pop", "pce"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:linetype)
+      [{2, 2}, {2, 2}, {}, {}]
+  """
+  @spec scale_linetype_discrete(t(), keyword()) :: t()
+  def scale_linetype_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :linetype,
+      options,
+      @discrete_linetype_scale_options,
+      "Plot.scale_linetype_discrete/2",
+      &discrete_linetype_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete line type scale of the line types given, replacing any line type scale
+  it had.
+
+  `values:` gives the line types, each by name, by its number or as a dash pattern, as
+  `geom_line/3`'s `linetype:` takes one: a list handed to the values in order, or a map from a
+  value to its line type. The legend shows a key for each value the scale shows, labelled. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a line
+  type no line is drawn in or a `guide:` of `:colorbar` among them, and `ArgumentError` for a list
+  of labels not one for each break or limit given; a continuous column, or more values than a list
+  has line types, is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@manual_linetype_scale_options)}
+
+      iex> plot =
+      ...>   %{"month" => [1, 2, 1, 2], "value" => [0.2, 0.4, 0.9, 0.7], "series" => ["pce", "pce", "pop", "pop"]}
+      ...>   |> Giggly.Plot.new(%{x: :month, y: :value, linetype: :series})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_linetype_manual(values: %{"pce" => :dotted, "pop" => {3, 1}})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:linetype)
+      [{1, 3}, {1, 3}, {3, 1}, {3, 1}]
+  """
+  @spec scale_linetype_manual(t(), keyword()) :: t()
+  def scale_linetype_manual(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :linetype,
+      options,
+      @manual_linetype_scale_options,
+      "Plot.scale_linetype_manual/2",
+      &manual_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous line width scale, replacing any line width scale it had.
+
+  Each value's line is drawn at a width between the first of `range:` and the second, in
+  millimetres, as far between them as the value is through the limits. A line whose width changes
+  along it is drawn a segment from each row to the next, each as wide as the row it starts from.
+  Its guide is a legend unless `guide:` says otherwise. A value outside the limits, or missing,
+  draws no line. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
+  it cannot use, a width below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of
+  labels without a list of breaks as long; a column that is not numbers is refused when the plot
+  is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_linewidth_scale_options)}
+
+      iex> plot =
+      ...>   %{"month" => [1, 2, 3], "unemploy" => [2944, 2945, 2958], "uempmed" => [4.5, 4.7, 4.6]}
+      ...>   |> Giggly.Plot.new(%{x: :month, y: :unemploy, linewidth: :uempmed})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_linewidth_continuous(range: {0, 4})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:linewidth)
+      [0.0, 4.0, 1.9999999999999911]
+  """
+  @spec scale_linewidth_continuous(t(), keyword()) :: t()
+  def scale_linewidth_continuous(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :linewidth,
+      options,
+      @continuous_linewidth_scale_options,
+      "Plot.scale_linewidth_continuous/2",
+      &continuous_linewidth_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a discrete line width scale, replacing any line width scale it had.
+
+  The values' lines are drawn at widths spaced evenly from the first of `range:` to the second, in
+  millimetres, in order. Its guide is a legend unless `guide:` says otherwise. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a width
+  below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels not one for each
+  break or limit given; a column of numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_linewidth_scale_options)}
+
+      iex> plot =
+      ...>   %{"class" => ["suv", "compact", "pickup"], "hwy" => [18, 28, 16]}
+      ...>   |> Giggly.Plot.new(%{x: :class, y: :hwy, linewidth: :class})
+      ...>   |> Giggly.Plot.geom_col(colour: "black")
+      ...>   |> Giggly.Plot.scale_linewidth_discrete(range: {1, 3})
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:linewidth)
+      [3.0, 1.0, 2.0]
+  """
+  @spec scale_linewidth_discrete(t(), keyword()) :: t()
+  def scale_linewidth_discrete(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :linewidth,
+      options,
+      @discrete_linewidth_scale_options,
+      "Plot.scale_linewidth_discrete/2",
+      &discrete_linewidth_scale/1
+    )
+  end
+
+  @doc """
   Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
   for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
   as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
@@ -3363,6 +3641,15 @@ defmodule Giggly.Plot do
 
   defp limited_scale(:size, _ends),
     do: {@continuous_size_scale_options, &continuous_size_scale/1}
+
+  defp limited_scale(:linetype, _values),
+    do: {@discrete_linetype_scale_options, &discrete_linetype_scale/1}
+
+  defp limited_scale(:linewidth, values) when is_list(values),
+    do: {@discrete_linewidth_scale_options, &discrete_linewidth_scale/1}
+
+  defp limited_scale(:linewidth, _ends),
+    do: {@continuous_linewidth_scale_options, &continuous_linewidth_scale/1}
 
   defp limited_scale(_color, values) when is_list(values),
     do: {@discrete_color_scale_options, &discrete_color_scale/1}
@@ -3658,6 +3945,24 @@ defmodule Giggly.Plot do
     do:
       {:error,
        "expected {low, high}, each a size in millimetres, 0 or more, got: #{inspect(range)}"}
+
+  # NimbleOptions' check of a line width scale's `range:`: `{low, high}`, each a width in
+  # millimetres, 0 or more, kept as a float.
+  @doc false
+  @spec validate_linewidth_range(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_linewidth_range({low, high} = range) do
+    case {validate_linewidth(low), validate_linewidth(high)} do
+      {{:ok, low}, {:ok, high}} -> {:ok, {low, high}}
+      _not_widths -> linewidth_range_error(range)
+    end
+  end
+
+  def validate_linewidth_range(range), do: linewidth_range_error(range)
+
+  defp linewidth_range_error(range),
+    do:
+      {:error,
+       "expected {low, high}, each a width in millimetres, 0 or more, got: #{inspect(range)}"}
 
   # NimbleOptions' check of a point's `shape:` option: one of the shapes a point is drawn in, by
   # name or by its number, 0 to 25, kept as its name, or `:none` for no point.
@@ -3958,17 +4263,19 @@ defmodule Giggly.Plot do
     end
   end
 
-  # NimbleOptions' check of `lims/2`'s limits for a shape scale: a list of a discrete scale's
-  # values alone, since a shape scale is always discrete, as ggplot2's `lims(shape = c(1, 5))`
-  # aborts.
+  # NimbleOptions' check of `lims/2`'s limits for a shape or line type scale (`aesthetic`): a list
+  # of a discrete scale's values alone, since such a scale is always discrete, as ggplot2's
+  # `lims(shape = c(1, 5))` and `lims(linetype = c(1, 5))` abort.
   @doc false
-  @spec validate_shape_limits(term()) :: {:ok, list()} | {:error, String.t()}
-  def validate_shape_limits(values) when is_list(values), do: validate_discrete_limits(values)
+  @spec validate_unordered_limits(term(), :shape | :linetype) ::
+          {:ok, list()} | {:error, String.t()}
+  def validate_unordered_limits(values, _aesthetic) when is_list(values),
+    do: validate_discrete_limits(values)
 
-  def validate_shape_limits(limits) do
+  def validate_unordered_limits(limits, aesthetic) do
     {:error,
-     "expected a list of the values the scale shows, since a shape scale is discrete, got: " <>
-       inspect(limits)}
+     "expected a list of the values the scale shows, since a #{Aesthetics.in_words(aesthetic)} " <>
+       "scale is discrete, got: #{inspect(limits)}"}
   end
 
   # NimbleOptions' check of `lims/2`'s limits for a colour, fill or alpha scale: a list of a
@@ -3983,8 +4290,8 @@ defmodule Giggly.Plot do
   def validate_legend_limits({low, high} = limits)
       when is_number(low) and is_number(high) and low > high do
     {:error,
-     "expected {low, high}, low first, since a colour, fill, alpha or size scale cannot run " <>
-       "from high to low, got: #{inspect(limits)}"}
+     "expected {low, high}, low first, since a colour, fill, alpha, size or line width scale " <>
+       "cannot run from high to low, got: #{inspect(limits)}"}
   end
 
   def validate_legend_limits(limits) do
@@ -4080,16 +4387,19 @@ defmodule Giggly.Plot do
 
   # NimbleOptions' check of a manual scale's `values:` for `aesthetic`: a colour scale's a list of
   # colours (`validate_palette_colors/1`), a shape scale's a list of at least one shape
-  # (`validate_shape/1`), or either's a map from a value (`discrete_values/1`) to its colour or
-  # shape.
+  # (`validate_shape/1`), a line type scale's a list of at least one line type
+  # (`validate_linetype/1`), or any one's a map from a value (`discrete_values/1`) to its colour,
+  # shape or line type.
   @doc false
-  @spec validate_manual_values(term(), :color | :shape) ::
-          {:ok, list() | %{term() => ColorOperations.t() | atom()}} | {:error, String.t()}
+  @spec validate_manual_values(term(), :color | :shape | :linetype) ::
+          {:ok, list() | %{term() => ColorOperations.t() | atom() | tuple()}}
+          | {:error, String.t()}
   def validate_manual_values(values, :color) when is_list(values),
     do: validate_palette_colors(values)
 
-  def validate_manual_values([_first | _rest] = shapes, :shape),
-    do: checked_each(shapes, &validate_shape/1)
+  def validate_manual_values([_first | _rest] = values, aesthetic)
+      when aesthetic in [:shape, :linetype],
+      do: checked_each(values, manual_check(aesthetic))
 
   def validate_manual_values(values, aesthetic)
       when is_map(values) and not is_struct(values) and map_size(values) > 0 do
@@ -4116,9 +4426,11 @@ defmodule Giggly.Plot do
 
   defp manual_check(:color), do: &validate_color/1
   defp manual_check(:shape), do: &validate_shape/1
+  defp manual_check(:linetype), do: &validate_linetype/1
 
   defp manual_noun(:color), do: "colour"
   defp manual_noun(:shape), do: "shape"
+  defp manual_noun(:linetype), do: "line type"
 
   # Each of `values` through `check`, all of them, or the first error.
   defp checked_each(values, check) do
@@ -4147,9 +4459,13 @@ defmodule Giggly.Plot do
   # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
   # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` for a
   # continuous colour or fill scale alone, as a colour bar shows a continuous scale's colours, so a
-  # discrete scale's is refused, and an alpha, a shape or a size scale's whatever its kind.
+  # discrete scale's is refused, and an alpha, a shape, a size, a line type or a line width
+  # scale's whatever its kind.
   @doc false
-  @spec validate_guide(term(), :continuous | :discrete | :alpha | :shape | :size) ::
+  @spec validate_guide(
+          term(),
+          :continuous | :discrete | :alpha | :shape | :size | :linetype | :linewidth
+        ) ::
           {:ok, guide()} | {:error, String.t()}
   def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
   def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
@@ -4159,7 +4475,9 @@ defmodule Giggly.Plot do
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
 
   def validate_guide(:colorbar, aesthetic),
-    do: {:error, "a colour bar shows colour or fill, never #{aesthetic}; give :legend"}
+    do:
+      {:error,
+       "a colour bar shows colour or fill, never #{Aesthetics.in_words(aesthetic)}; give :legend"}
 
   def validate_guide(guide, _kind) do
     {:error,
@@ -4771,19 +5089,16 @@ defmodule Giggly.Plot do
 
   defp manual_scale(validated) do
     {values, options} = Keyword.pop!(validated, :values)
-    discrete_legend({:manual, named_by_breaks(values, Keyword.get(options, :breaks))}, options)
+    discrete_legend(manual_palette(values, Keyword.get(options, :breaks)), options)
   end
 
-  # A manual scale's colours, a list of them named by a list of breaks, the first colour the first
-  # break's, as ggplot2's manual scale names them, those either list has beyond the other left
-  # out; a map, or a list beside no list of breaks, as given.
-  defp named_by_breaks(values, breaks) when is_list(values) and is_list(breaks) do
-    breaks
-    |> Enum.zip(values)
-    |> Map.new()
-  end
+  # A manual scale's palette: a list of values beside a list of breaks, the values named by the
+  # breaks, as ggplot2's `manual_scale()` names them, which leaves the scale's limits its levels;
+  # a map, or a list beside no list of breaks, as given.
+  defp manual_palette(values, breaks) when is_list(values) and is_list(breaks),
+    do: {:manual, values, breaks}
 
-  defp named_by_breaks(values, _breaks), do: values
+  defp manual_palette(values, _breaks), do: {:manual, values}
 
   defp hue_scale(validated) do
     {hue, options} = Keyword.split(validated, Keyword.keys(@hue_defaults))
@@ -4870,6 +5185,18 @@ defmodule Giggly.Plot do
 
   defp shape_fill(true), do: :solid
   defp shape_fill(false), do: :open
+
+  defp discrete_linetype_scale(validated), do: discrete_legend(:linetype, validated)
+
+  defp continuous_linewidth_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    continuous_legend({:rescale, range}, options)
+  end
+
+  defp discrete_linewidth_scale(validated) do
+    {range, options} = Keyword.pop!(validated, :range)
+    discrete_legend({:sequence, range}, options)
+  end
 
   defp check_twins(validated, {plain, dated}, function) do
     if Keyword.has_key?(validated, plain) and Keyword.has_key?(validated, dated) do

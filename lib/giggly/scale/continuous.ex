@@ -11,7 +11,8 @@ defmodule Giggly.Scale.Continuous do
       `:reciprocal`, as a plot's scale names one.
     * `palette`: what turns a value's place in its limits into its aesthetic's value: `:identity`
       for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
-      aesthetic such as alpha, each place, from 0 to 1, rescaled onto `low` to `high`; and
+      aesthetic such as alpha or line width, each place, from 0 to 1, rescaled onto `low` to
+      `high`; and
       `{:gradient, colors}` for colour and fill, the colour that far along a gradient through
       `colors`, spaced evenly, blended in L*a*b*; and for size, `{:area, {low, high}}`, each
       place's square root rescaled onto `low` to `high`, so a value's area grows with it, or
@@ -21,9 +22,10 @@ defmodule Giggly.Scale.Continuous do
       the further end's, so the midpoint is at the middle and the further end at 0 or 1; or `:max`,
       the value over the high end, so 0 is at 0.
     * `na_value`: what a missing value, one not a finite number, or one outside the limits maps
-      to: `nil` for a position, alpha and size, grey, `"#7F7F7F"`, for colour and fill, or
-      `:none`, no colour.
-    * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha, size and
+      to: `nil` for a position, alpha, line width and size, grey, `"#7F7F7F"`, for colour and
+      fill, or `:none`, no colour.
+    * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha, line width,
+      size and
       `:colorbar` for colour and fill unless a scale function chooses `:legend`, `:none` for
       none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping

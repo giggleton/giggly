@@ -76,4 +76,11 @@ defmodule Giggly.AestheticsTest do
       assert Aesthetics.counterpart(:fill) == :fill
     end
   end
+
+  describe "in_words/1" do
+    test "a name running words together is spelled apart, and any other is its own" do
+      assert Enum.map([:linetype, :linewidth, :shape, :color], &Aesthetics.in_words/1) ===
+               ["line type", "line width", "shape", "color"]
+    end
+  end
 end

@@ -61,8 +61,9 @@ defmodule Giggly.Scale do
   #
   # ## Aesthetics other than position
   #
-  # `alpha`, `color`, `fill`, `shape` and `size` so far (`non_position_aesthetics/0`), each scale,
-  # unless the plot gives one, ggplot2's default for its aesthetic. Alpha's maps a continuous
+  # `alpha`, `color`, `fill`, `linetype`, `linewidth`, `shape` and `size` so far
+  # (`non_position_aesthetics/0`), each scale, unless the plot gives one, ggplot2's default for its
+  # aesthetic. Alpha's maps a continuous
   # column onto 0.1 to 1, `scale_alpha_continuous()`, and spreads a discrete one from 0.1 to 1,
   # `scale_alpha_ordinal()`, which ggplot2's `scale_alpha_discrete()` uses with a warning that
   # Giggly, building a plot without side effects, does not give. Size's maps a continuous column
@@ -72,16 +73,20 @@ defmodule Giggly.Scale do
   # `scale_colour_discrete()` falls back to it, and a continuous one the gradient from `#132B43`
   # to `#56B1F7`, `scale_colour_continuous()`'s, blended in L*a*b* (`Giggly.Scale.Palette`).
   # Shape's gives a discrete column `pal_shape()`'s six solid shapes, as `scale_shape()` does, and
-  # a shape scale is always discrete (`discrete_only?/1`): shapes have no order, so R has no
-  # continuous shape scale and aborts for a continuous column. A plot's scale may carry another
-  # palette: manual, grey, another hue range or gradient, open shapes. A
-  # continuous value's place runs over the scale's limits, or about its midpoint (R's
+  # line type's `pal_linetype()`'s 13 line types, as `scale_linetype()` does; a shape or line type
+  # scale is always discrete (`discrete_only?/1`): neither has an order, so R has no continuous
+  # scale of either and aborts for a continuous column. Line width's maps a continuous column onto
+  # widths from 1 to 6, `scale_linewidth_continuous()`, and spreads a discrete one from 2 to 6,
+  # `scale_linewidth_ordinal()`, which `scale_linewidth_discrete()` uses with a warning Giggly
+  # leaves out. A plot's scale may carry another palette: manual, grey, another hue range or
+  # gradient, open shapes. A continuous value's place runs over the scale's limits, or about its
+  # midpoint (R's
   # `rescale_mid()`), or at its share of their high end (R's `rescale_max()`), as the scale's
   # `rescaler` says, and one outside them is censored, as ggplot2's `oob = censor`; a missing or
   # censored value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha,
-  # shape and size. Each names the guide that draws it, as ggplot2's scales do: a colour bar for a
-  # continuous colour or fill, a legend for the rest, whose breaks and labels are the scale's on
-  # its limits.
+  # line type, line width, shape and size. Each names the guide that draws it, as ggplot2's scales
+  # do: a colour bar for a continuous colour or fill, a legend for the rest, whose breaks and labels
+  # are the scale's on its limits.
 
   # Values in, values out: a scale depends on nothing but the colour operations, which give the hue
   # palette its colours, as R's `scales` depends on farver, and R's `as.character()`, which writes
@@ -104,9 +109,9 @@ defmodule Giggly.Scale do
 
   # The aesthetics other than position that a scale maps, those of them that are colours, and those
   # whose every scale is discrete.
-  @non_position_aesthetics [:alpha, :color, :fill, :shape, :size]
+  @non_position_aesthetics [:alpha, :color, :fill, :linetype, :linewidth, :shape, :size]
   @color_aesthetics [:color, :fill]
-  @discrete_aesthetics [:shape]
+  @discrete_aesthetics [:linetype, :shape]
 
   @continuous_dtypes [:integer, :float, :null]
   @discrete_dtypes [:string, :boolean, :atom, :category]
@@ -138,6 +143,11 @@ defmodule Giggly.Scale do
   @continuous_size_range {1.0, 6.0}
   @discrete_size_range {2.0, 6.0}
 
+  # ggplot2's default line widths, in millimetres: 1 to 6 for a continuous scale, `pal_rescale()`'s,
+  # and 2 to 6 for a discrete one, its ordinal scale's `seq(2, 6)`.
+  @continuous_linewidth_range {1.0, 6.0}
+  @discrete_linewidth_range {2.0, 6.0}
+
   # ggplot2's default discrete colour palette, `pal_hue()`'s: hues from 15 degrees round the
   # circle, chroma 100 and luminance 65, in order.
   @hue_palette {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
@@ -162,8 +172,8 @@ defmodule Giggly.Scale do
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
   # ggplot2's default palette, value for a missing value and guide for it: a colour bar for a
-  # continuous colour or fill, and a legend for the rest. A shape's is discrete alone
-  # (`discrete_only?/1`).
+  # continuous colour or fill, and a legend for the rest. A shape's and a line type's are discrete
+  # alone (`discrete_only?/1`).
   @doc false
   @spec new(:continuous | :discrete, atom()) :: t()
   def new(:continuous, :alpha),
@@ -175,15 +185,22 @@ defmodule Giggly.Scale do
   def new(:continuous, :size),
     do: %Continuous{palette: {:area, @continuous_size_range}, guide: :legend}
 
+  def new(:continuous, :linewidth),
+    do: %Continuous{palette: {:rescale, @continuous_linewidth_range}, guide: :legend}
+
   def new(:discrete, :alpha), do: %Discrete{palette: {:sequence, @alpha_range}, guide: :legend}
 
   def new(:discrete, :size),
     do: %Discrete{palette: {:area_sequence, @discrete_size_range}, guide: :legend}
 
+  def new(:discrete, :linewidth),
+    do: %Discrete{palette: {:sequence, @discrete_linewidth_range}, guide: :legend}
+
   def new(:discrete, aesthetic) when aesthetic in @color_aesthetics,
     do: %Discrete{palette: @hue_palette, na_value: @color_na_value, guide: :legend}
 
   def new(:discrete, :shape), do: %Discrete{palette: @shape_palette, guide: :legend}
+  def new(:discrete, :linetype), do: %Discrete{palette: :linetype, guide: :legend}
 
   # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a date scale,
   # or another continuous scale.
@@ -208,9 +225,9 @@ defmodule Giggly.Scale do
   @spec non_position_aesthetics() :: [atom()]
   def non_position_aesthetics, do: @non_position_aesthetics
 
-  # Whether every scale of `aesthetic` is discrete, as a shape's is: shapes have no order, so
-  # ggplot2's `scale_shape_continuous()` aborts, and a continuous column, or a date's, cannot be
-  # mapped to one.
+  # Whether every scale of `aesthetic` is discrete, as a shape's and a line type's are: neither
+  # has an order, so ggplot2's `scale_shape_continuous()` and `scale_linetype_continuous()` abort,
+  # and a continuous column, or a date's, cannot be mapped to one.
   @doc false
   @spec discrete_only?(atom()) :: boolean()
   def discrete_only?(aesthetic), do: aesthetic in @discrete_aesthetics

@@ -806,6 +806,44 @@ defmodule Giggly.SVGTest do
              )
     end
 
+    # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `scale_linewidth(range = c(0, 4))` example,
+    # its narrowest segments 0.040 and 0.081 points wide, as svglite's `write_double()` writes every
+    # number nearer 0 than 0.1 (vdiffr's `SvgStream.h`), a circle's radius among them; a position,
+    # however near 0, keeps two decimals here (`Giggly.SVG`'s comment says why).
+    test "a stroke's width or a circle's radius below 0.1 is written as svglite writes it" do
+      segments = %Segments{
+        starts: [{0.1, 0.5}, {0.3, 0.5}, {0.5, 0.5}],
+        ends: [{0.2, 0.5}, {0.4, 0.5}, {0.6, 0.5}],
+        offsets: :none,
+        stroke_width: 0.04,
+        dashes: :none,
+        color: ["#000000", "#000000", "#000000"],
+        opacity: [1.0, 1.0, 1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      circles = %Circles{
+        x: [0.5],
+        y: [0.5],
+        radius: [0.05],
+        stroke_width: 0.0809,
+        color: ["#000000"],
+        color_opacity: [1.0],
+        fill: [:none],
+        fill_opacity: [0.0]
+      }
+
+      drawn = draw(whole([segments, %{segments | stroke_width: 0.0}, circles]))
+
+      widths = Regex.scan(~r/stroke-width: [0-9.]+;/, drawn)
+
+      assert {Enum.uniq(widths), Regex.scan(~r/ r='[^']*'/, drawn)} ===
+               {[["stroke-width: 0.040;"], ["stroke-width: 0.00;"], ["stroke-width: 0.081;"]],
+                [[" r='0.050'"]]}
+    end
+
     test "a polygon is filled round its outline, its border as svglite writes it" do
       polygon = %Polygons{
         outlines: [[{0.1, 0.1}, {0.2, 0.1}, {0.2, 0.3}]],

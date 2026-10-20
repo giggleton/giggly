@@ -21,7 +21,7 @@ size has a weight".
   number's format that changes changes the golden; a surviving mutant in a literal here is a
   finding, never message wording.
 - **The document's unit is the point, written as svglite writes it:** `width` and `height` in `pt`,
-  a `viewBox` of the size in points, numbers with two decimals, circles with `cx`/`cy`/`r` and a
+  a `viewBox` of the size in points, positions with two decimals, circles with `cx`/`cy`/`r` and a
   `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`, rectangles with
   `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border)
   and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
@@ -55,7 +55,11 @@ size has a weight".
   opacity times 255 rounded half to even, and svglite writes the byte over 255 as it writes any
   number below 1 (`write_double()`), with as many decimals as reach its first significant digit
   and one more (`0.024`, `0.0078`, from 0.1 up two), or nothing for 255, opaque. So 0.998 is
-  written `1.00`, and 0.999 not at all. Every other number keeps two decimals. **No colour,
+  written `1.00`, and 0.999 not at all. **A stroke's width, a circle's radius and a gradient stop's
+  offset are written as svglite writes any number** (`0.040` for a line 0.04 points wide), as are
+  opacities; **a position or an extent keeps two decimals**, though svglite writes one below 0.1
+  with more, since a position that near 0 is layout's rounding error, which grid's arithmetic and
+  Giggly's leave apart (5.7e-14 for grid's 0 at a radial panel's top). **No colour,
   `:none`, or a wholly transparent one, byte 0, is a stroke of `none` and a fill of `none`**; the
   element is still written. svglite skips such a fill and its stylesheet makes it `none`; without
   that stylesheet SVG fills a shape black, so Giggly writes `fill: none`.

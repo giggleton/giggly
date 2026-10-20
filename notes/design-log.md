@@ -117,8 +117,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `"3313"`. Each is held as its pattern from the call (`:dashed` as `{4, 4}`, `:solid` as `{}`,
   `:blank` as `:none`), as a colour as its hex: a column holds one type, and R's palette mixes
   `solid` with patterns. A bar's or a rectangle's annotation takes a list of line types and of
-  widths, as R draws them row by row; a path's takes one, as R refuses a type varying along a
-  line. *Rejected: a list* (agreed first) — `annotate/3` and a layer's set values read a list as
+  widths, as R draws them row by row; a path's one line type, as R refuses a type varying along a
+  line, and a list of widths, drawn a segment at a time. *Rejected: a list* (agreed first) — `annotate/3` and a layer's set values read a list as
   one value per row, so `linetype: [2, 3]`, R's `c(2, 3)`, dashed then dotted, would be a pattern.
   *Rejected: R's hex string* — a little language (`"F"` for 15) checked only whole, its
   familiarity buying little for something rare. *Rejected: both* — two spellings of a rare thing.
@@ -195,6 +195,37 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Deferred* (Steve): `aesthetics:`, with the size scales'; `na.translate` and `drop`, with every
   discrete scale's; `scale_shape_binned()`, with binned scales; `scale_shape_ordinal()`, with
   ordered factors; `scale_shape_identity()`, with identity scales.
+
+- **A line type or width scale takes R's options but those its family waits for, and
+  `economics_long` comes with it (2026-10-20, Steve, the line type and width step; checked against
+  ggplot2 4.0.3 in R).** Line type is discrete alone, as R's `scale_linetype_continuous()` aborts
+  for a number, a date and `lims(linetype = c(1, 5))`; its palette is `pal_linetype()`'s 13
+  patterns as tuples, a fourteenth level raising. `na_value:` goes on `scale_linetype_discrete/2`,
+  which R takes though its docs hide it, and on `scale_linewidth_discrete/2`, never
+  `_continuous`, which R refuses. `economics_long` came forward from the notebook step, its
+  waiver asked, so the golden is `scale_linetype()`'s own example, written to 17 digits where
+  `write.csv()`'s 15 lose `value01`. *Deferred* (Steve), each with its family:
+  `scale_linetype_binned()`, `scale_linewidth_binned()`, `scale_linetype_identity()`,
+  `scale_linewidth_manual()`, `scale_linewidth_ordinal()`, `scale_linewidth_date()` and
+  `_datetime()` (R draws dates 1 to 6 mm; every aesthetic but position refuses a date),
+  `transform:` (`lims(linewidth: {10, 0})` refused where R reverses), `aesthetics:`,
+  `na.translate`, `drop`.
+
+- **A manual list named by breaks leaves the scale its levels, as R's does (2026-10-20, Steve,
+  found checking the line type step against R).** `manual_scale()` names a list by its breaks after
+  choosing its limits, so two values with `breaks = c("c", "a")` over three levels fail
+  ("Insufficient values"), where Giggly had made the list a map, which narrowed the scale to `c`
+  and `a` and drew `b` missing. The palette is `{:manual, values, breaks}`, for every manual scale;
+  a map the user writes still narrows. *Rejected: leaving it*, a recorded departure — a plot R
+  refuses for a missing value would draw without a word.
+
+- **A stroke's width, a radius, an opacity and a gradient offset are written as svglite writes
+  any number, a position with two decimals (2026-10-20, the line type and width step).** svglite
+  writes every number below 1 with as many decimals as reach its first significant digit and one
+  more, so `scale_linewidth(range = c(0, 4))` draws 0.040-point segments that two decimals wrote
+  `0.04`. Sizes are worked out in R's order, so they match R's to the digit. *Rejected: every
+  number so* — positions near 0 are layout's rounding error, which grid and Giggly leave apart
+  (5.7e-14 where grid has 0 at a radial panel's top), and two decimals hide it.
 
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
@@ -1895,6 +1926,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-20 — Dash and widen lines by a mapped column (size, shape and line type, step 6); §4:
+  "A line type or width scale takes R's options", "A manual list named by breaks", "A stroke's
+  width, a radius, an opacity and a gradient offset"
 - 2026-10-20 — Shape points by a mapped column (size, shape and line type, step 5); §4: "A shape
   scale is discrete alone"
 - 2026-10-20 — Count the rows at each place, sized by their count (size, shape and line type,

@@ -1094,11 +1094,13 @@ defmodule Giggly.Assembly do
   # discrete scale takes, or one no scale can place, which `checked_kind/2` refuses.
   defp check_discrete({index, aesthetic, value, dtype, _kind}) do
     if Scale.kind(dtype) in [:continuous, :date] do
+      noun = Aesthetics.in_words(aesthetic)
+
       raise ArgumentError,
             "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, a " <>
-              "#{inspect(dtype)} column, but a #{aesthetic} scale is discrete, since " <>
-              "#{aesthetic}s have no order; map #{inspect(aesthetic)} to a discrete column or a " <>
-              "factor, or #{inspect(value)} to another aesthetic"
+              "#{inspect(dtype)} column, but a #{noun} scale is discrete, since #{noun}s have " <>
+              "no order; map #{inspect(aesthetic)} to a discrete column or a factor, or " <>
+              "#{inspect(value)} to another aesthetic"
     end
   end
 

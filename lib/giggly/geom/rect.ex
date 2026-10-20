@@ -5,10 +5,11 @@ defmodule Giggly.Geom.Rect do
   # its `ymax`. It takes no parameters yet. Use it through `Giggly.Geom`. Bars (`Giggly.Geom.Bar`)
   # are drawn as rectangles once their edges are worked out, as ggplot2's `GeomBar` is a `GeomRect`.
   #
-  # Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:color` and `:fill`, and
-  # need all four corners, each mapped or set; an aesthetic joins the accepted list with the scale
-  # that maps it, so a mapping never silently does nothing. ggplot2 4.0 also places a rectangle by
-  # its centre and size (`x` and `width`, `y` and `height`), which waits.
+  # Rectangles use `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:color`, `:fill`,
+  # `:linetype` and `:linewidth`, and need all four corners, each mapped or set; an aesthetic joins
+  # the accepted list with the scale that maps it, so a mapping never silently does nothing.
+  # ggplot2 4.0 also places a rectangle by its centre and size (`x` and `width`, `y` and
+  # `height`), which waits.
   #
   # A rectangle is drawn where its corners are, which the build leaves as they are, so a row whose
   # `xmin` is past its `xmax` is drawn between them all the same, as grid draws one. A row missing a
@@ -35,7 +36,8 @@ defmodule Giggly.Geom.Rect do
   # The aesthetics a layer of rectangles can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :xmax, :xmin, :ymax, :ymin]
+  def accepted_aesthetics,
+    do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :xmax, :xmin, :ymax, :ymin]
 
   # The aesthetics a layer of rectangles cannot be drawn without, each mapped or set.
   @doc false
@@ -89,8 +91,8 @@ defmodule Giggly.Geom.Rect do
           extent: [xmin, xmax, ymin, ymax],
           fill: fill,
           fill_opacity: fill_opacity,
-          border: border(color, line_type),
-          line: {width, line_type}
+          border: border(color, width, line_type),
+          line: {width || 0.0, line_type}
         }
       end)
       |> Enum.filter(fn rectangle -> Enum.all?(rectangle.extent, &is_number/1) end)
@@ -118,20 +120,43 @@ defmodule Giggly.Geom.Rect do
       }
     end
 
-    # A border's colour in its line type: none where it is blank.
-    defp border(_color, :none), do: :none
-    defp border(color, _line_type), do: color
+    # A border's colour at its width and in its line type: none where it is blank, or where its
+    # width is missing, R's `NA`, as R's graphics engine draws a border of no width transparent.
+    defp border(_color, _width, :none), do: :none
+    defp border(_color, nil, _line_type), do: :none
+    defp border(color, _width, _line_type), do: color
 
     # A legend's key: the rectangle's fill short of the key's edges by its border's width, as
     # ggplot2's `draw_key_polygon()` draws it, `unit(1, "npc") - unit(linewidth, "mm")` wide and
     # tall, so its corners are offset half the border's width in from the key's, in the key's fill
-    # at its alpha and its border's colour, width and line type.
+    # at its alpha and its border's colour, width and line type, a missing line type blank; a
+    # missing width, R's `NA`, leaves the rectangle no size, so it draws nothing.
     @impl Giggly.Geom
     def draw_key(_geom, key) do
+      case Map.get(key, :linewidth, @line_width) do
+        nil -> []
+        line_width -> key_rectangle(key, line_width)
+      end
+    end
+
+    # The room a key's rectangle needs, its border's width twice, in millimetres, either way, as
+    # ggplot2's `draw_key_polygon()` sizes its glyph, `linewidth / 5` centimetres; a missing width
+    # needs none.
+    @impl Giggly.Geom
+    def key_size(_geom, key) do
+      side =
+        case Map.get(key, :linewidth, @line_width) do
+          nil -> 0.0
+          line_width -> 2 * line_width * @points_per_millimetre
+        end
+
+      {side, side}
+    end
+
+    defp key_rectangle(key, line_width) do
       fill = Map.get(key, :fill, @fill)
-      line_width = Map.get(key, :linewidth, @line_width)
-      line_type = Map.get(key, :linetype, @line_type)
-      border = border(Map.get(key, :color, :none), line_type)
+      line_type = Map.get(key, :linetype, @line_type) || :none
+      border = border(Map.get(key, :color, :none), line_width, line_type)
       inset = line_width * @points_per_millimetre / 2
 
       [
@@ -152,14 +177,6 @@ defmodule Giggly.Geom.Rect do
           mitre_limit: @mitre_limit
         }
       ]
-    end
-
-    # The room a key's rectangle needs, its border's width twice, in millimetres, either way, as
-    # ggplot2's `draw_key_polygon()` sizes its glyph, `linewidth / 5` centimetres.
-    @impl Giggly.Geom
-    def key_size(_geom, key) do
-      side = 2 * Map.get(key, :linewidth, @line_width) * @points_per_millimetre
-      {side, side}
     end
   end
 end

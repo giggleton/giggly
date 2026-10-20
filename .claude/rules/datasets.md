@@ -15,7 +15,9 @@ pages".
 
 - **A dataset is R's own data, copied, never recomputed.** Its file in `priv/datasets/` is what R
   writes (`write.csv()`), with a header saying where it came from, which R wrote it and how to
-  regenerate it; a value that differs from R's is a bug in the copy.
+  regenerate it; a value that differs from R's is a bug in the copy. `write.csv()` writes 15
+  significant digits, so a double that needs more is written in the fewest, to 17, that read back
+  as R's (`economics_long`'s `value01`), its test pinning one that needs 17.
 - **A dataset is a keyword list of columns, in the dataset's order**, which `Plot.new/2`, Explorer
   and Kino all read as a table. A column takes R's type: integers where R stores integers, floats
   where it stores doubles, names strings and dates `Date`s (`diamonds`' `table`, `economics`'
@@ -38,4 +40,5 @@ pages".
   entry beginning "Each dataset's file is read behind a waiver of its own"). Only the parsing is
   shared.
 - **A dataset is public API with no caller in Giggly**, and its boundary lists nothing. Each
-  arrives with the first notebook example that draws it.
+  arrives with the first example that draws it, a notebook's or a golden's (`economics_long` with
+  `scale_linetype()`'s own, ahead of its notebook).

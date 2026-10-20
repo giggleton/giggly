@@ -8,19 +8,24 @@ defmodule Giggly.Scale.Discrete do
       placed, such as a bar's edges, which can widen the axis past its levels; `:none` before any.
     * `palette`: what turns a value into its aesthetic's value: `:identity` for a position, each
       value at its place counting from 1; `{:sequence, {low, high}}` for an aesthetic such as
-      alpha, the values spread evenly from `low` to `high` in order; and, for colour and fill,
-      `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}`,
+      alpha or line width, the values spread evenly from `low` to `high` in order; and, for colour
+      and fill, `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction:
+      direction}}`,
       a colour for each value, their hues spaced evenly from `low` to `high` round the circle,
       handed out in reverse for a `direction` of -1; `{:gray, {start, finish}}`, greys from the
       level `start` to `finish`, 0 black and 1 white; or `{:manual, colors}`, the colours of a
-      list in order, or those of a map from value to colour by value; for size,
+      list in order, or those of a map from value to colour by value, or `{:manual, colors,
+      breaks}`, the colours of a list each given to the break at its place; for size,
       `{:area_sequence, {low, high}}`, sizes from `low` to `high` whose squares, and so areas, are
-      spread evenly; and for shape, `{:shape, :solid}` or `{:shape, :open}`, six shapes by name in
-      order, solid or open, or `{:manual, shapes}`, a list's or a map's, as a colour's.
-    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha,
-      shape and size, grey, `"#7F7F7F"`, for colour and fill, `:none`, no colour or shape, or the
-      shape a plot's scale gives. A missing value takes no share of the palette; a position scale
-      puts it at its last level, and its `na_value` is `nil`.
+      spread evenly; for shape, `{:shape, :solid}` or `{:shape, :open}`, six shapes by name in
+      order, solid or open, or `{:manual, shapes}`, a list's or a map's, as a colour's; and for
+      line type, `:linetype`, 13 line types in order, each as its dash pattern, `{}` for a solid
+      line, or `{:manual, line_types}`, as a colour's.
+    * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha, line
+      type, line width, shape and size, grey, `"#7F7F7F"`, for colour and fill, `:none`, no colour,
+      shape or line, or the shape, line type or width a plot's scale gives. A missing value takes
+      no share of the palette; a position scale puts it at its last level, and its `na_value` is
+      `nil`.
     * `guide`: the guide that draws it: `:axis` for a position and `:legend` for an aesthetic such
       as alpha or colour, `:none` for none, or a legend `Giggly.Plot.guide_legend/1` makes.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
@@ -72,10 +77,13 @@ defmodule Giggly.Scale.Discrete do
                  direction: 1 | -1
                }}
             | {:gray, {number(), number()}}
-            | {:manual, [String.t() | atom()] | %{term() => String.t() | atom()}}
+            | {:manual,
+               [String.t() | atom() | tuple()] | %{term() => String.t() | atom() | tuple()}}
+            | {:manual, [String.t() | atom() | tuple()], [term()]}
             | {:area_sequence, {number(), number()}}
-            | {:shape, :solid | :open},
-          na_value: nil | number() | String.t() | atom(),
+            | {:shape, :solid | :open}
+            | :linetype,
+          na_value: nil | number() | String.t() | atom() | tuple(),
           guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),
           limits: :default | [term()],
@@ -154,10 +162,15 @@ defmodule Giggly.Scale.Discrete do
   end
 
   # The palette's value for each of the present limits: a manual palette's map gives each the
-  # value it holds for it, by value, or `na_value`; any other palette spreads them in order.
+  # value it holds for it, by value, or `na_value`, and so does a list named by breaks, each value
+  # its break's; any other palette spreads them in order.
   defp palette_values({:manual, values}, present, na_value) when is_map(values) do
     value_by_key = Map.new(values, fn {value, mapped} -> {key(value), mapped} end)
     Palette.named(value_by_key, Enum.map(present, &key/1), na_value)
+  end
+
+  defp palette_values({:manual, values, breaks}, present, na_value) do
+    Palette.named_by_breaks(values, Enum.map(breaks, &key/1), Enum.map(present, &key/1), na_value)
   end
 
   defp palette_values(palette, present, _na_value),

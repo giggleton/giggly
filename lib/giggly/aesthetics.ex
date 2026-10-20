@@ -103,6 +103,14 @@ defmodule Giggly.Aesthetics do
       "(as #{inspect(earlier_name)} and #{inspect(name)}); give it once"
   end
 
+  # An aesthetic as a message names it in words: `"line type"` and `"line width"` for the two whose
+  # names run words together, any other its name.
+  @doc false
+  @spec in_words(name()) :: String.t()
+  def in_words(:linetype), do: "line type"
+  def in_words(:linewidth), do: "line width"
+  def in_words(name) when is_atom(name), do: Atom.to_string(name)
+
   # The position family `name` belongs to.
   @doc false
   @spec family(name()) :: family()
