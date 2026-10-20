@@ -48,9 +48,12 @@ defmodule Giggly.Guide.Grid do
   defp background(outline, look) do
     %Polygons{
       outlines: [outline],
-      fill: look.fill,
-      color: look.color,
-      stroke_width: look.line_width
+      offsets: :none,
+      stroke_width: look.line_width,
+      color: [look.color],
+      color_opacity: [1.0],
+      fill: [look.fill],
+      fill_opacity: [1.0]
     }
   end
 

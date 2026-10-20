@@ -37,12 +37,13 @@ weight".
   left, as `legend.box.just` justifies it. Every bottom
   axis hangs from its panel's edge at its own height, and every left axis at its own width, which
   are the row's and the column's when it is the one that measures them.
-- **Primitives are placed in their cell's units, 0 to 1 across and up, offset from there in
-  points, and sized in points**, as grid adds a unit in points to one in the viewport's own. A
-  primitive never knows the cell's size; the backend places it in the cell's box and moves it by
-  its offset: a polyline's points by their `offsets`, `{across, up}` (`:none` for none), and a
-  text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor is at its
-  `hjust` of the label's width, any fraction from its start (0) to its end (1).
+- **Primitives are placed in their cell's units, 0 to 1 across and up, offset from there in points,
+  and sized in points**, as grid adds a unit in points to one in the viewport's own. A primitive
+  never knows the cell's size; the backend places it in the cell's box and moves it by its offset: a
+  polyline's or a polygon's points by their `offsets`, `{across, up}` (`:none` for none), a placed
+  rectangle's two corners and a segment's two ends likewise, as a point's shape is drawn round its
+  place, and a text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor
+  is at its `hjust` of the label's width, any fraction from its start (0) to its end (1).
 - **A text carries each label's measured width**, which the backend draws it at, **and each label's
   colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label; its size, its
   `family` (`""` the default sans-serif) and its angle, any number of degrees, are the text's. **A
@@ -50,21 +51,22 @@ weight".
   label drawn before it**, the box its width along the baseline by the text's `ascent` up from
   it, as grid's `check.overlap` measures a string; which labels cross turns on where they land, so
   the backend decides it once the table is laid out, as grid does when it draws.
-- **Circles, placed rectangles, polylines and segments carry a colour and an opacity for each
-  mark**, the opacity from 0 to 1: a circle's `color` and `opacity` its outline and fill alike, a
-  rectangle's `fill` and `fill_opacity` its fill and its `color` and `color_opacity` its border, a
-  polyline's or segment's `color` and `opacity` its stroke, as grid's colours carry the alpha
-  ggplot2 gives them. One per mark, as grid's graphical parameters are, so a mapped aesthetic needs
-  no primitive per value; size will take the same route. **A colour is `#RRGGBB` beside its
-  opacity**, never with an alpha of its own: a placed rectangle's border's `color_opacity` is its
-  colour's own alpha, since ggplot2 never gives a border the row's; its `fill` and `color` may be
-  `:none`, R's `NA`, which draws none.
+- **Circles, polygons, placed rectangles, polylines and segments carry a colour and an opacity
+  for each mark**, the opacity from 0 to 1: a circle's, a polygon's or a rectangle's `color` and
+  `color_opacity` its outline and its `fill` and `fill_opacity` its fill, a polyline's or
+  segment's `color` and `opacity` its stroke, as grid's colours carry the alpha ggplot2 gives
+  them; a circle carries its `radius` for each mark too. One per mark, as grid's graphical
+  parameters are, so a mapped aesthetic needs no primitive per value. **A colour is `#RRGGBB`
+  beside its opacity**, never with an alpha of its own: a placed rectangle's border's
+  `color_opacity` is its colour's own alpha, since ggplot2 never gives a border the row's; a
+  shape's `fill` and `color` may be `:none`, R's `NA`, which draws none.
 - **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
-  `polylineGrob()`, a line through points, one per tick, grid line or group) and `Segments`
-  (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it and a
-  path's legend key) say how their ends (`:butt`, `:round`, `:square`) and corners (`:round`,
-  `:mitre`, `:bevel`) are drawn and their mitre limit; the guides' lines are theme_gray()'s, butt
-  and round.
+  `polylineGrob()`, a line through points, one per tick, grid line or group), `Segments`
+  (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it, a
+  path's legend key and a point's plus or cross) and placed `Rectangles` say how their ends
+  (`:butt`, `:round`, `:square`) and corners (`:round`, `:mitre`, `:bevel`) are drawn and their
+  mitre limit; the guides' lines are theme_gray()'s, butt and round, a bar's border `GeomRect`'s,
+  butt and mitred, and a point's lines grid's own, round.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.
@@ -74,11 +76,12 @@ weight".
 - **A rectangle (`Rect`) fills its cell**, as grid's `rectGrob()` does at its default place and
   size, which is how ggplot2 draws a background; **rectangles placed and sized within their cell
   (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, either way
-  round, as ggplot2's `GeomRect` draws a bar or a rectangle. A background that is not rectangular is
-  a polygon (`Polygons`), closed round its outline. **A gradient (`Gradient`) is a rectangle filling
-  its cell with a linear gradient running up it**, from the cell's bottom to its top through its
-  stops, each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled
-  with a `linearGradient()`, as ggplot2's colour bar draws its bar.
+  round, as ggplot2's `GeomRect` draws a bar or a rectangle and R's graphics engine a point's
+  square. A background that is not rectangular is a polygon (`Polygons`), closed round its outline,
+  as are a point's triangles, diamonds and filled square. **A gradient (`Gradient`) is a rectangle
+  filling its cell with a linear gradient running up it**, from the cell's bottom to its top through
+  its stops, each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()`
+  filled with a `linearGradient()`, as ggplot2's colour bar draws its bar.
 - **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
   as gtable nests one table in another: its sizes in points take their length and its shares split
   what is left of the box, and a table of sizes in points alone is centred in the box both ways,

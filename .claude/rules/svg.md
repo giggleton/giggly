@@ -26,9 +26,10 @@ size has a weight".
   `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border)
   and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
   bars, whichever way round their corners are given, as svglite writes one, a `stroke-opacity` after
-  the `stroke` and `stroke-linecap: butt; stroke-linejoin: miter` before the `fill`, as `GeomRect`
-  sets them, and a `fill-opacity` after it, polygons with `points` and the same `style` as
-  rectangles, polylines with `points` and a `style` of `stroke-width`, `stroke` and
+  the `stroke`, the line style below before the `fill` (`stroke-linecap: butt;
+  stroke-linejoin: miter` for `GeomRect`'s, none for a point's square), and a `fill-opacity` after
+  it, polygons with `points` and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill`
+  and `fill-opacity`, polylines with `points` and a `style` of `stroke-width`, `stroke` and
   `stroke-opacity`, the line style below, and `fill: none`, segments as `<line>` with `x1`, `y1`,
   `x2` and `y2` and the same `style` but `fill`, and text with `x` and `y` (or, turned,
   `transform='translate(x,y) rotate(-angle)'`, the angle in whole degrees as vdiffr writes it with

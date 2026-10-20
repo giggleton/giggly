@@ -262,12 +262,16 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: ["#595959"],
         fill_opacity: [1.0],
         color: [:none],
         color_opacity: [0.0],
         # A 0.5 mm line, as grid draws it in points.
-        stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
+        stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       drawn = draw(whole([rectangles]))
@@ -289,11 +293,15 @@ defmodule Giggly.SVGTest do
           xmax: [xmax],
           ymin: [ymin],
           ymax: [ymax],
+          offsets: :none,
           fill: ["#595959"],
           fill_opacity: [1.0],
           color: [:none],
           color_opacity: [0.0],
-          stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96
+          stroke_width: 0.5 * 72.27 / 25.4 * 72 / 96,
+          line_end: :butt,
+          line_join: :mitre,
+          mitre_limit: 10.0
         }
       end
 
@@ -307,10 +315,12 @@ defmodule Giggly.SVGTest do
       circles = %Circles{
         x: [0.25, 0.75],
         y: [0.5, 0.5],
-        radius: 1.95,
+        radius: [1.95, 1.95],
         stroke_width: 0.71,
         color: List.duplicate("#000000", 2),
-        opacity: [1 / 3, 1.0]
+        color_opacity: [1 / 3, 1.0],
+        fill: List.duplicate("#000000", 2),
+        fill_opacity: [1 / 3, 1.0]
       }
 
       assert circles(draw(whole([circles]))) === [
@@ -326,10 +336,12 @@ defmodule Giggly.SVGTest do
       circles = %Circles{
         x: [0.25, 0.75],
         y: [0.5, 0.5],
-        radius: 1.95,
+        radius: [1.95, 1.95],
         stroke_width: 0.71,
         color: ["#F8766D", "#00BFC4"],
-        opacity: [1.0, 1.0]
+        color_opacity: [1.0, 1.0],
+        fill: ["#F8766D", "#00BFC4"],
+        fill_opacity: [1.0, 1.0]
       }
 
       rectangles = %Rectangles{
@@ -337,11 +349,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3, 0.7],
         ymin: [0.5, 0.5],
         ymax: [0.8, 0.8],
+        offsets: :none,
         fill: ["#F8766D", "#00BFC4"],
         fill_opacity: [1.0, 1.0],
         color: [:none, "#7F7F7F"],
         color_opacity: [1.0, 1.0],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       polylines = %Polylines{
@@ -358,6 +374,7 @@ defmodule Giggly.SVGTest do
       segments = %Segments{
         starts: [{0.1, 0.5}, {0.3, 0.5}],
         ends: [{0.3, 0.75}, {0.5, 0.75}],
+        offsets: :none,
         stroke_width: 1.07,
         color: ["#00BFC4", "#F8766D"],
         opacity: [1.0, 1.0],
@@ -441,11 +458,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: ["#595959"],
         fill_opacity: [0.5],
         color: [:none],
         color_opacity: [0.0],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       assert draw(whole([rectangles])) =~
@@ -464,10 +485,12 @@ defmodule Giggly.SVGTest do
       circles = %Circles{
         x: Enum.map(1..6, fn index -> index / 7 end),
         y: List.duplicate(0.5, 6),
-        radius: 1.95,
+        radius: List.duplicate(1.95, 6),
         stroke_width: 0.71,
         color: List.duplicate("#000000", 6),
-        opacity: opacities
+        color_opacity: opacities,
+        fill: List.duplicate("#000000", 6),
+        fill_opacity: opacities
       }
 
       assert circles(draw(whole([circles]))) === [
@@ -492,10 +515,12 @@ defmodule Giggly.SVGTest do
       circles = %Circles{
         x: [0.5],
         y: [0.5],
-        radius: 1.95,
+        radius: [1.95],
         stroke_width: 0.71,
         color: ["#000000"],
-        opacity: [0.0]
+        color_opacity: [0.0],
+        fill: ["#000000"],
+        fill_opacity: [0.0]
       }
 
       rectangles = %Rectangles{
@@ -503,11 +528,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: ["#595959"],
         fill_opacity: [0.0],
         color: [:none],
         color_opacity: [0.0],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       drawn = draw(whole([circles, rectangles]))
@@ -525,11 +554,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: ["#0000FF"],
         fill_opacity: [0.3],
         color: ["#FF0000"],
         color_opacity: [128 / 255],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       assert draw(whole([rectangles])) =~
@@ -546,11 +579,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: ["#595959"],
         fill_opacity: [1.0],
         color: [:none],
         color_opacity: [1.0],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       assert draw(whole([rectangles])) =~
@@ -566,11 +603,15 @@ defmodule Giggly.SVGTest do
         xmax: [0.3],
         ymin: [0.5],
         ymax: [0.8],
+        offsets: :none,
         fill: [:none],
         fill_opacity: [1.0],
         color: ["#FF0000"],
         color_opacity: [1.0],
-        stroke_width: 1.07
+        stroke_width: 1.07,
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
       }
 
       assert draw(whole([rectangles])) =~
@@ -653,6 +694,7 @@ defmodule Giggly.SVGTest do
       segments = %Segments{
         starts: [{0.1, 0.5}],
         ends: [{0.3, 0.75}],
+        offsets: :none,
         stroke_width: 1.07,
         color: ["#000000"],
         opacity: [0.1],
@@ -674,9 +716,12 @@ defmodule Giggly.SVGTest do
     test "a polygon is filled round its outline, its border as svglite writes it" do
       polygon = %Polygons{
         outlines: [[{0.1, 0.1}, {0.2, 0.1}, {0.2, 0.3}]],
-        fill: "#EBEBEB",
-        color: :none,
-        stroke_width: 0.75
+        offsets: :none,
+        stroke_width: 0.75,
+        color: [:none],
+        color_opacity: [1.0],
+        fill: ["#EBEBEB"],
+        fill_opacity: [1.0]
       }
 
       drawn = draw(whole([polygon]))
@@ -685,6 +730,115 @@ defmodule Giggly.SVGTest do
                drawn,
                "<polygon points='72.00,518.40 144.00,518.40 144.00,403.20 ' " <>
                  "style='stroke-width: 0.75; stroke: none; fill: #EBEBEB;' />\n</svg>\n"
+             )
+    end
+
+    # Golden: the styles vdiffr 1.0.9 writes for ggplot2 4.0.3's shapes 1 and 16 at alpha 0.5, each
+    # circle placed here: an outline alone, `stroke-opacity: 0.50` and no fill, which svglite leaves
+    # to its stylesheet; a fill alone, `stroke: none; fill: #0000FF; fill-opacity: 0.50`.
+    test "each circle is written at its own radius, its outline and fill each in its own colour" do
+      circles = %Circles{
+        x: [0.25, 0.75],
+        y: [0.5, 0.5],
+        radius: [6.04, 1.95],
+        stroke_width: 1.42,
+        color: ["#0000FF", :none],
+        color_opacity: [0.5, 0.0],
+        fill: [:none, "#0000FF"],
+        fill_opacity: [0.0, 0.5]
+      }
+
+      drawn = draw(whole([circles]))
+
+      assert Regex.scan(~r/<circle [^>]*/, drawn) === [
+               [
+                 "<circle cx='180.00' cy='288.00' r='6.04' style='stroke-width: 1.42; " <>
+                   "stroke: #0000FF; stroke-opacity: 0.50; fill: none;' /"
+               ],
+               [
+                 "<circle cx='540.00' cy='288.00' r='1.95' style='stroke-width: 1.42; " <>
+                   "stroke: none; fill: #0000FF; fill-opacity: 0.50;' /"
+               ]
+             ]
+    end
+
+    # vdiffr 1.0.9 writes ggplot2 4.0.3's shape 0, a square round its place, with grid's round
+    # corners and ends, which svglite does not write; the corners here are placed by hand.
+    test "a rectangle's corners are moved by their offsets, its ends and corners as a line's" do
+      rectangles = %Rectangles{
+        xmin: [0.5],
+        xmax: [0.5],
+        ymin: [0.5],
+        ymax: [0.5],
+        offsets: [{{-6.0, -4.0}, {6.0, 4.0}}],
+        fill: [:none],
+        fill_opacity: [0.0],
+        color: ["#0000FF"],
+        color_opacity: [0.5],
+        stroke_width: 1.42,
+        line_end: :round,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      drawn = draw(whole([rectangles]))
+
+      assert String.ends_with?(
+               drawn,
+               "<rect x='354.00' y='284.00' width='12.00' height='8.00' style='stroke-width: " <>
+                 "1.42; stroke: #0000FF; stroke-opacity: 0.50; fill: none;' />\n</svg>\n"
+             )
+    end
+
+    # Golden: the styles vdiffr 1.0.9 writes for ggplot2 4.0.3's shapes 2 and 15 at alpha 0.5, each
+    # polygon placed here: an outline alone, and a fill alone.
+    test "a polygon's points are moved by their offsets, each polygon in its own colours" do
+      polygons = %Polygons{
+        outlines: [List.duplicate({0.5, 0.5}, 3), List.duplicate({0.25, 0.5}, 3)],
+        offsets: [
+          [{0.0, 9.0}, {8.0, -5.0}, {-8.0, -5.0}],
+          [{-6.0, -6.0}, {6.0, -6.0}, {0.0, 6.0}]
+        ],
+        stroke_width: 1.42,
+        color: ["#0000FF", :none],
+        color_opacity: [0.5, 0.0],
+        fill: [:none, "#0000FF"],
+        fill_opacity: [0.0, 0.5]
+      }
+
+      drawn = draw(whole([polygons]))
+
+      assert Regex.scan(~r/<polygon [^>]*/, drawn) === [
+               [
+                 "<polygon points='360.00,279.00 368.00,293.00 352.00,293.00 ' style='" <>
+                   "stroke-width: 1.42; stroke: #0000FF; stroke-opacity: 0.50; fill: none;' /"
+               ],
+               [
+                 "<polygon points='174.00,294.00 186.00,294.00 180.00,282.00 ' style='" <>
+                   "stroke-width: 1.42; stroke: none; fill: #0000FF; fill-opacity: 0.50;' /"
+               ]
+             ]
+    end
+
+    test "a segment's ends are moved by their offsets" do
+      segments = %Segments{
+        starts: [{0.5, 0.5}],
+        ends: [{0.5, 0.5}],
+        offsets: [{{-8.5, -3.0}, {8.5, 3.0}}],
+        stroke_width: 1.42,
+        color: ["#0000FF"],
+        opacity: [1.0],
+        line_end: :round,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+
+      drawn = draw(whole([segments]))
+
+      assert String.ends_with?(
+               drawn,
+               "<line x1='351.50' y1='291.00' x2='368.50' y2='285.00' " <>
+                 "style='stroke-width: 1.42; stroke: #0000FF;' />\n</svg>\n"
              )
     end
   end

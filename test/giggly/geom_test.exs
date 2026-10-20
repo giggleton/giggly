@@ -2,7 +2,7 @@ defmodule Giggly.GeomTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Coord, DataFrame, Font, Geom}
-  alias Giggly.Scene.{Circles, Polylines, Rectangles, Segments, Text}
+  alias Giggly.Scene.{Circles, Polygons, Polylines, Rectangles, Segments, Text}
 
   @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
   @line %Geom.Line{orientation: :x, line_end: :butt, line_join: :round, mitre_limit: 10.0}
@@ -36,8 +36,13 @@ defmodule Giggly.GeomTest do
           alpha: [0.25, 0.5, nil, 1]
         )
 
-      assert [%Circles{x: [0.25, 0.5, 0.75], opacity: [0.25, 1.0, 1.0]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+      assert [
+               %Circles{
+                 x: [0.25, 0.5, 0.75],
+                 color_opacity: [0.25, 1.0, 1.0],
+                 fill_opacity: [0.25, 1.0, 1.0]
+               }
+             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "a table without alpha draws every point opaque" do
@@ -45,7 +50,7 @@ defmodule Giggly.GeomTest do
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0])
 
-      assert [%Circles{opacity: [1.0, 1.0], color: ["#000000", "#000000"]}] =
+      assert [%Circles{color_opacity: [1.0, 1.0], color: ["#000000", "#000000"]}] =
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
@@ -63,7 +68,7 @@ defmodule Giggly.GeomTest do
           color: ["#FF000080", "#FF000080"]
         )
 
-      assert [%Circles{color: ["#FF0000", "#FF0000"], opacity: [0.2, @half_alpha]}] =
+      assert [%Circles{color: ["#FF0000", "#FF0000"], color_opacity: [0.2, @half_alpha]}] =
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
@@ -81,7 +86,7 @@ defmodule Giggly.GeomTest do
       assert [
                %Circles{
                  color: ["#F8766D", "#00BA38", "#7F7F7F"],
-                 opacity: [1.0, @half_alpha, 1.0]
+                 color_opacity: [1.0, @half_alpha, 1.0]
                }
              ] =
                Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
@@ -95,6 +100,128 @@ defmodule Giggly.GeomTest do
       drawn = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
       assert Enum.flat_map(drawn, fn %Circles{x: x_places} -> x_places end) === []
+    end
+
+    # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `geom_point(shape = 21, size = 5, stroke =
+    # 5)`, its font size `size * .pt + stroke * .stroke / 2`: a radius of 8.88 points and an
+    # outline 7.09 points wide.
+    test "a point's radius and outline are worked out from its size and stroke, as grid's are" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(x: [1.0], y: [1.0], shape: [:circle_filled], size: [5.0], stroke: [5.0])
+
+      assert [%Circles{radius: [radius], stroke_width: stroke_width}] =
+               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+
+      assert_in_delta radius, 8.88, 0.005
+      assert_in_delta stroke_width, 7.09, 0.005
+    end
+
+    # R's graphics engine leaves an open shape unfilled, fills 15 to 18 in the point's colour with
+    # no outline, outlines and fills 19 and 20 in it, and fills 21 to 25 with the point's fill.
+    test "a shape's outline and fill are drawn in the point's colour or fill, as R draws each" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 4.0],
+          y: [1.0, 1.0, 1.0, 1.0],
+          shape: [:circle_open, :circle_small, :circle, :circle_filled],
+          color: List.duplicate("#FF0000", 4),
+          fill: List.duplicate("#0000FF80", 4),
+          alpha: [nil, nil, nil, 0.2]
+        )
+
+      assert [
+               %Circles{
+                 color: ["#FF0000", :none, "#FF0000", "#FF0000"],
+                 color_opacity: [1.0, _none, 1.0, 0.2],
+                 fill: [:none, "#FF0000", "#FF0000", "#0000FF"],
+                 fill_opacity: [_no_fill, 1.0, 1.0, 0.2]
+               }
+             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    # R's graphics engine draws each point whole before the next, so a point drawn later covers an
+    # earlier one: shape 7 is a square and then its two diagonals.
+    test "points are drawn in row order, each point's elements in the order R draws them" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], shape: [:square_cross, :square_cross])
+
+      assert [
+               %Rectangles{xmin: [0.25]},
+               %Segments{starts: [{0.25, 0.25}, {0.25, 0.25}]},
+               %Rectangles{xmin: [0.5]},
+               %Segments{starts: [{0.5, 0.5}, {0.5, 0.5}]}
+             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    test "a run of elements of one kind and one outline width is one primitive" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 4.0],
+          y: [1.0, 1.0, 1.0, 1.0],
+          shape: [:circle, :circle_open, :circle, :square_open],
+          stroke: [0.5, 0.5, 1.0, 1.0]
+        )
+
+      assert [
+               %Circles{x: [0.25, 0.5]},
+               %Circles{x: [0.75]},
+               %Rectangles{xmin: [1.0]}
+             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's shapes 0 to 25 at size 0 and stroke 0:
+    # no circle, and every square, polygon and line at no size.
+    test "a circle of no radius is not drawn, as R's graphics engine draws none" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0], y: [1.0], shape: [:circle_plus], size: [0.0], stroke: [0.0])
+
+      assert [%Segments{starts: [{0.25, 0.25}, {0.25, 0.25}]}] =
+               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+    end
+
+    # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's shapes 7 and 21 at size 5 and stroke NA:
+    # shape 7's square with no outline and no diagonals, and a circle of radius 5.33, as at
+    # stroke 0, with no outline and its fill.
+    test "a stroke of :none, or a missing one, draws no outline and no lines, and adds no size" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [1.0, 1.0],
+          shape: [:square_cross, :circle_filled],
+          size: [5.0, 5.0],
+          stroke: [:none, nil],
+          fill: ["#FF0000", "#FF0000"]
+        )
+
+      assert [
+               %Rectangles{color: [:none], stroke_width: +0.0},
+               %Circles{radius: [radius], color: [:none], fill: ["#FF0000"]}
+             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+
+      assert_in_delta radius, 5.33, 0.005
+    end
+
+    test "a shape of :none, or a missing one, draws no point" do
+      coord = %Coord.Cartesian{}
+      panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 2.0, 3.0], y: [1.0, 1.0, 1.0], shape: [:none, nil, :square])
+
+      assert [%Polygons{outlines: [[{0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}]]}] =
+               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
   end
 
@@ -608,21 +735,33 @@ defmodule Giggly.GeomTest do
 
   describe "draw_key/3" do
     test "a point's key is the point at the middle of the key, at the key's alpha" do
-      assert [%Circles{x: [0.5], y: [0.5], opacity: [0.2]}] =
+      assert [%Circles{x: [0.5], y: [0.5], color_opacity: [0.2]}] =
                Geom.draw_key(%Geom.Point{}, %{alpha: 0.2}, {17.28, 17.28})
 
-      assert [%Circles{opacity: [1.0]}] =
+      assert [%Circles{color_opacity: [1.0]}] =
                Geom.draw_key(%Geom.Point{}, %{alpha: nil}, {17.28, 17.28})
     end
 
     test "a point's key is in the colour its layer sets, the key's alpha replacing the colour's own" do
-      assert [%Circles{color: ["#4682B4"], opacity: [0.2]}] =
+      assert [%Circles{color: ["#4682B4"], color_opacity: [0.2]}] =
                Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"}, {17.28, 17.28})
 
-      assert [%Circles{color: ["#4682B4"], opacity: [@half_alpha]}] =
+      assert [%Circles{color: ["#4682B4"], color_opacity: [@half_alpha]}] =
                Geom.draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"}, {17.28, 17.28})
 
       assert Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}, {17.28, 17.28}) === []
+    end
+
+    # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `geom_point(shape = 21, size = 3)` filled
+    # by a mapped fill: each key a circle of radius 3.56 filled with its break's colour.
+    test "a point's key is drawn in the key's shape, size, stroke and fill" do
+      key = %{alpha: nil, fill: "#F8766D", shape: :circle_filled, size: 3.0, stroke: 0.5}
+
+      assert [%Circles{radius: [radius], color: ["#000000"], fill: ["#F8766D"]}] =
+               Geom.draw_key(%Geom.Point{}, key, {17.28, 17.28})
+
+      assert_in_delta radius, 3.56, 0.005
+      assert Geom.draw_key(%Geom.Point{}, %{shape: :none}, {17.28, 17.28}) === []
     end
 
     test "a bar's key is its fill short of the key's edges by its border's width" do

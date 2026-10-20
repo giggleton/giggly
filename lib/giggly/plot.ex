@@ -279,8 +279,40 @@ defmodule Giggly.Plot do
   @point_color_option [
     type: @color_type,
     doc:
-      "The colour of every point, its outline and fill alike, written `colour:` or `color:`: " <>
-        @color_forms <> "; black when not given."
+      "The colour of every point, written `colour:` or `color:`, which outlines its shape and " <>
+        "fills the shapes filled in it: " <> @color_forms <> "; black when not given."
+  ]
+
+  # The shapes a point is drawn in, by name, in the order of their numbers, 0 to 25.
+  @shapes Geom.Point.shapes()
+
+  # A point's look set for every point of a layer, as ggplot2's `geom_point(shape = 21, size = 3)`
+  # sets it: a shape a number names kept as its name, and a size or stroke as a float.
+  @point_fill_option [
+    type: @color_type,
+    doc:
+      "The colour every point of a shape with a fill of its own is filled with: " <>
+        @color_forms <> "; none when not given."
+  ]
+
+  @point_shape_option [
+    type: {:custom, __MODULE__, :validate_shape, []},
+    doc:
+      "The shape every point is drawn in, by its name or its number, as listed above, or " <>
+        "`:none` for no point; `:circle` when not given."
+  ]
+
+  @point_size_option [
+    type: {:custom, __MODULE__, :validate_size, []},
+    doc: "How big every point is, in millimetres; 1.5 when not given."
+  ]
+
+  @point_stroke_option [
+    type: {:custom, __MODULE__, :validate_stroke, []},
+    doc:
+      "How heavy every point's outline is, in millimetres, or `:none` for no outline and no " <>
+        "lines; 0.5 when not given. The outline is drawn half that wide, and a heavier stroke " <>
+        "makes the shape bigger too."
   ]
 
   @bar_color_option [
@@ -348,7 +380,9 @@ defmodule Giggly.Plot do
     :color,
     :fill,
     :linewidth,
+    :shape,
     :size,
+    :stroke,
     :angle,
     :hjust,
     :vjust,
@@ -366,7 +400,11 @@ defmodule Giggly.Plot do
   @point_options NimbleOptions.new!(
                    data: @data_option,
                    alpha: @alpha_option,
-                   color: @point_color_option
+                   color: @point_color_option,
+                   fill: @point_fill_option,
+                   shape: @point_shape_option,
+                   size: @point_size_option,
+                   stroke: @point_stroke_option
                  )
 
   # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
@@ -540,7 +578,12 @@ defmodule Giggly.Plot do
   @annotation_label [
     type: {:custom, __MODULE__, :validate_per_annotation, [:validate_annotation_label]}
   ]
-  @per_annotation_aesthetics [:alpha, :color, :fill, :label]
+  @annotation_shape [type: {:custom, __MODULE__, :validate_per_annotation, [:validate_shape]}]
+  @annotation_size [type: {:custom, __MODULE__, :validate_per_annotation, [:validate_size]}]
+  @annotation_stroke [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_stroke]}
+  ]
+  @per_annotation_aesthetics [:alpha, :color, :fill, :label, :shape, :size, :stroke]
 
   # `annotate/3`'s options for each geom it draws with, validated at the call: the positions the
   # geom draws at and the options its function takes but `data:` and `position:`, and nudging, which
@@ -549,7 +592,11 @@ defmodule Giggly.Plot do
     x: @annotation_position,
     y: @annotation_position,
     alpha: @annotation_alpha,
-    color: @annotation_color
+    color: @annotation_color,
+    fill: @annotation_color,
+    shape: @annotation_shape,
+    size: @annotation_size,
+    stroke: @annotation_stroke
   ]
   @bar_annotation [
     x: @annotation_position,
@@ -1196,8 +1243,20 @@ defmodule Giggly.Plot do
   @doc """
   Adds a layer of points, one per row, at `x` and `y`.
 
-  Points use `:x`, `:y`, `:group`, `:alpha` and `:color`, and need `:x` and `:y`. A point's colour
-  and alpha apply to its outline and fill alike; a colour of `:none` draws no point.
+  Points use `:x`, `:y`, `:group`, `:alpha`, `:color` and `:fill`, and need `:x` and `:y`. A
+  point's alpha applies to its colour and its fill alike; a colour of `:none` draws no point.
+
+  A point is drawn in one of 26 shapes, each named, and numbered 0 to 25:
+
+    * outlined in the point's colour: `:square_open` (0), `:circle_open` (1), `:triangle_open`
+      (2), `:plus` (3), `:cross` (4), `:diamond_open` (5), `:triangle_down_open` (6),
+      `:square_cross` (7), `:asterisk` (8), `:diamond_plus` (9), `:circle_plus` (10), `:star`
+      (11), `:square_plus` (12), `:circle_cross` (13) and `:square_triangle` (14);
+    * filled with its colour: `:square` (15), `:circle_small` (16), `:triangle` (17) and
+      `:diamond` (18), with no outline, and `:circle` (19) and the smaller `:bullet` (20),
+      outlined in it too;
+    * outlined in its colour and filled with its fill: `:circle_filled` (21), `:square_filled`
+      (22), `:diamond_filled` (23), `:triangle_filled` (24) and `:triangle_down_filled` (25).
 
   ## Options
 
@@ -1230,6 +1289,16 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.geom_point(colour: "steelblue")
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
       ["#4682B4", "#4682B4"]
+
+  A shape given by its number is kept as its name:
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point(shape: 21, fill: "white", size: 5, stroke: 2)
+      iex> frame = Giggly.layer_data(plot)
+      iex> {Giggly.DataFrame.pull(frame, :shape), Giggly.DataFrame.pull(frame, :fill)}
+      {[:circle_filled, :circle_filled], ["#FFFFFF", "#FFFFFF"]}
   """
   @spec geom_point(t(), mapping_argument() | keyword(), keyword()) :: t()
   def geom_point(plot, mapping_or_options \\ %{}, options \\ [])
@@ -1618,13 +1687,14 @@ defmodule Giggly.Plot do
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
-  a list, its values of one type; the rest take one value. Under a facet that makes more than one
+  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`; the rest take
+  one value. Under a facet that makes more than one
   panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
   and `position:`, and `geom_text/3`'s nudging:
 
-    * `:point`: `x:`, `y:`, `alpha:` and `colour:`;
+    * `:point`: `x:`, `y:`, `alpha:`, `colour:`, `fill:`, `shape:`, `size:` and `stroke:`;
     * `:col` and `:bar`, each a bar from 0 to its `y` as `geom_col/3` draws one: `x:`, `y:`,
       `alpha:`, `colour:` and `fill:`;
     * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `lineend:`, `linejoin:` and
@@ -2987,6 +3057,31 @@ defmodule Giggly.Plot do
 
   def validate_size(size),
     do: {:error, "expected a size in millimetres, 0 or more, got: #{inspect(size)}"}
+
+  # NimbleOptions' check of a point's `shape:` option: one of the shapes a point is drawn in, by
+  # name or by its number, 0 to 25, kept as its name, or `:none` for no point.
+  @doc false
+  @spec validate_shape(term()) :: {:ok, atom()} | {:error, String.t()}
+  def validate_shape(number) when number in 0..25,
+    do: {:ok, Enum.at(@shapes, number)}
+
+  def validate_shape(shape) when shape in @shapes or shape == :none, do: {:ok, shape}
+
+  def validate_shape(shape) do
+    {:error,
+     "expected one of a point's shapes, by name or by its number, 0 to 25, or :none, got: " <>
+       "#{inspect(shape)}; the names are #{Enum.map_join(@shapes, ", ", &inspect/1)}"}
+  end
+
+  # NimbleOptions' check of a point's `stroke:` option: a width in millimetres, 0 or more, kept
+  # as a float, or `:none` for no outline.
+  @doc false
+  @spec validate_stroke(term()) :: {:ok, float() | :none} | {:error, String.t()}
+  def validate_stroke(stroke) when is_number(stroke) and stroke >= 0, do: {:ok, stroke / 1}
+  def validate_stroke(:none), do: {:ok, :none}
+
+  def validate_stroke(stroke),
+    do: {:error, "expected a width in millimetres, 0 or more, or :none, got: #{inspect(stroke)}"}
 
   # NimbleOptions' check of an `angle:` option: any number of degrees, kept as a float.
   @doc false

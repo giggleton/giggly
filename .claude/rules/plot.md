@@ -142,8 +142,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   become the geom's options (the entry beginning "A layer chooses its position by an atom").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar and rectangle functions `fill:`, the line functions
-  `linewidth:`, in millimetres, and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
+  function takes `alpha:` and `colour:`, the bar, rectangle and point functions `fill:`,
+  `geom_point/3` `shape:`, `size:` and `stroke:`, in millimetres, the line functions `linewidth:`,
+  in millimetres, and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
@@ -152,14 +153,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   aesthetic, before the geom's setup, so it widens the axes as ggplot2 4.0's `GeomRect` fills its
   corners in. **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
   holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
-  raises naming the value. A point neither takes a `fill:` nor maps `:fill`, which only the filled
-  shapes not yet drawn use. A map maps and a keyword list sets: the two never trade places. **An
+  raises naming the value. **A shape is resolved at the call too** (`validate_shape/1`): one of
+  the names `Geom.Point.shapes/0` lists, or its number, 0 to 25, held as the name, or `:none`, so
+  nothing past the call sees two spellings (design-log §4, the entry beginning "A shape is
+  ggplot2's name"); anything else raises listing the names. A map maps and a keyword list sets:
+  the two never trade places. **An
   option that chooses how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s
   `orientation:`, `geom_text/3`'s `check_overlap:`) **is a field of the geom's struct**, its
   default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
-  function's `data:`, `alpha:` and `colour:`; the line functions' `lineend:`, `linejoin:`,
+  function's `data:`, `alpha:` and `colour:`; `geom_point/3`'s `fill:`, `shape:`, `size:` and
+  `stroke:`; the line functions' `lineend:`, `linejoin:`,
   `linemitre:` and `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`,
   `geom_rect/3`, `annotate/3`, the scale functions, the guide functions and `labs/2`),
   so a misspelt option raises naming it, and a repeated one is refused by
@@ -212,11 +217,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
   repeat. NimbleOptions has no number type either: an option taking any number is
   `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
-  more, `linemitre:` 1 or more, as grid refuses less, a text's `size:` 0 or more and `angle:` any
+  more, `linemitre:` 1 or more, as grid refuses less, a text's or a point's `size:` and a point's
+  `stroke:` 0 or more, the stroke `:none` too, `angle:` any
   number, `hjust:` and `vjust:` any number or one of ggplot2's words, and `nudge_x:` and
   `nudge_y:` any number, through custom checks (`validate_alpha/1`, `validate_linewidth/1`,
   `validate_linemitre/1`, `validate_size/1`, `validate_angle/1`, `validate_justification/1`,
-  `validate_nudge/1`), which take an integer too and keep a float, as R keeps a number;
+  `validate_nudge/1`, `validate_stroke/1`), which take an integer too and keep a float, as R
+  keeps a number, and a shape's (`validate_shape/1`), which takes a name or a whole number;
   `validate_color/1` hands a colour to `Giggly.ColorOperations`. A gradient's colours must be
   opaque (`validate_opaque_color/1`), since it blends colours alone; a grey's level and an alpha
   range's ends run from 0 to 1.
@@ -228,9 +235,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
-  `alpha`, `fill`) take a list, which `fixed` holds as one value per annotation. A list's values
-  are of one type, checked by building its column (`Giggly.DataFrame`) at the call, a colour's
-  `:none` in a list held as `nil`, the column's missing value, as R's `c(NA, "red")` holds `NA`.
+  `alpha`, `fill`, and a point's `shape`, `size` and `stroke`) take a list, which `fixed` holds as
+  one value per annotation. A list's values are of one type, checked by building its column
+  (`Giggly.DataFrame`) at the call, a colour's, a shape's or a stroke's `:none` in a list held as
+  `nil`, the column's missing value, as R's `c(NA, "red")` holds `NA`.
   A position is kept as a float where it is a number, as an option's number is. The options are
   each geom's function's but `data:`, `position:` and nudging, so one its geom cannot use raises,
   where ggplot2 warns and ignores it.

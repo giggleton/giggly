@@ -79,6 +79,63 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Size, shape and line type are Phase 3's eighth increment, in seven steps: a point's look
+  (its fixed look and a mapped fill), a line's fixed look, mapped size, `geom_count()`, mapped
+  shape, mapped line type and width, the notebooks (2026-10-19, Steve, agreeing the proposal;
+  checked against ggplot2 4.0.3's source and vdiffr).** A point took only colour and alpha, so
+  `geom_point(size = 3)` could not be written, and the scales and legends built for colour, fill
+  and alpha reached no other aesthetic; 86 waiting examples name a piece of it, more than any other
+  candidate. The scale functions are kind-named as step 5's (`scale_size_continuous/2`, not R's
+  alias `scale_size`), beside R's own `scale_radius/2` and `scale_size_area/2`. `geom_count()`
+  comes in (Steve), the size scale's natural subject, so `Giggly.Stat` exports `Sum`. A mapped
+  point fill moved from the fifth step to the first (Steve, building it): once points draw a fill,
+  a plot's `fill` reaches them and fills shapes 21 to 25, so waiting would draw R's points without
+  R's legend. `stroke: :none` is R's `stroke = NA`, as `:none` removes (Steve), rather than
+  leaving it to `stroke: 0`, which looks alike in SVG but writes the lines R leaves out.
+  *Rejected, as the
+  next increment:* the theme (14 examples alone, and its legend-placement examples map shape),
+  histograms and box plots (18; their outliers want shapes), `facet_grid()` (13), ordering and
+  jitter (21). *Deferred:* identity scales, as one family of seven, likely with tiles (Steve); a
+  character as a shape; binned size and line width; a mapped `stroke`, which ggplot2 does not
+  scale; a mapped text size; `scale_size_manual()` and `scale_linewidth_manual()`, with alpha's;
+  `override.aes`.
+
+- **A shape is ggplot2's name for it as an atom, or R's number, turned into the name at the call
+  (2026-10-19, Steve).** `shape: 21` and `shape: :circle_filled` draw the same point. The 26
+  names are ggplot2's `translate_shape_string()` table with underscores for spaces, shape 14
+  keeping only `:square_triangle`; a number becomes its name where `colour:` becomes `color:`,
+  so nothing past the call sees two spellings. `:none` draws no point. The default palette hands
+  out `:circle_small`, `:triangle`, `:square`, `:plus`, `:square_cross` and `:asterisk` (R's 16,
+  17, 15, 3, 7, 8), or with `solid: false` the open ones. *Rejected: names only* (proposed: one
+  spelling, the Elixir form) — every ggplot2 user writes `shape = 21`. *Rejected: numbers only*
+  — `21` says nothing of what it draws.
+
+- **A line type is a name, R's number 0 to 6, or a dash pattern as a list of lengths
+  (2026-10-19, Steve).** The names are R's as atoms (`:blank`, `:solid`, `:dashed`, `:dotted`,
+  `:dotdash`, `:longdash`, `:twodash`), a number turned into its name at the call as a shape's
+  is. A pattern is 2, 4, 6 or 8 lengths from 1 to 15, on and off in turn, in line widths:
+  `[3, 3, 1, 3]` for R's `"3313"`, and each name is one (`:dashed` is `[4, 4]`). *Rejected: R's
+  hex string* — a little language (`"F"` for 15) that can be checked only whole, and custom
+  patterns are rare in ggplot2 code, so its familiarity buys little. *Rejected: both* — two
+  spellings of a rare thing.
+
+- **A discrete palette with fewer shapes or line types than the scale has values raises when the
+  plot is run (2026-10-19, Steve).** R gives the seventh shape on, or the fourteenth line type,
+  no value, warns, and leaves those points or lines out. Giggly cannot warn, so it raises,
+  naming the aesthetic, the number of values and the palette's, and the manual scale that takes
+  more: as a colour bar for a discrete scale raises where R warns, and as R's own manual scale
+  fails on the same shortage. *Rejected: drawing as R draws* — whole categories would vanish
+  without a word.
+
+- **A point's shape is worked out in the geom from R's graphics engine and drawn with the scene's
+  primitives (2026-10-19, in the scope Steve agreed).** R's `GESymbol()` turns each of the 26 shapes
+  into the rectangles, circles, polygons and lines svglite writes (0 a `<rect>`, 15 a `<polygon>`, 3
+  two `<line>`s, 21 a circle with a fill of its own); the port works them out in points round each
+  point's place, so circles carry a radius and fill per mark and rectangles, polygons and segments
+  offsets in points, as polylines do. Points are drawn in row order, so overlapping ones stack as
+  R's, each run of one kind and outline width one primitive. *Rejected: a symbol primitive the
+  backend draws* — every backend would hold R's geometry, and the scene would know R.
+
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
   alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
@@ -436,10 +493,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   A layer's own mapping is checked against what it accepts; the plot's reaches every layer, so a
   plot can map `label` for its text and still draw points, as ggplot2's `geom_text` example does.
   The carried aesthetic is evaluated into the layer's table and drawn by nothing; a discrete one
-  still splits the layer's groups (never `label`, which grouping leaves out), and the layer draws
-  in a legend only for aesthetics it accepts, a legend no layer can draw dropped, as ggplot2's
-  `matched_aes()` and its guides do. ggplot2's point knows `fill` and draws in a fill legend;
-  Giggly's waits for filled shapes. *Rejected: dropping it for that layer*, the same drawing for
+  still splits the layer's groups (never `label`, which grouping leaves out), and the layer draws in
+  a legend only for aesthetics it accepts, a legend no layer can draw dropped, as ggplot2's
+  `matched_aes()` and its guides do. *Rejected: dropping it for that layer*, the same drawing for
   `label` but not for a plot-level `fill`, which splits a line's groups in ggplot2; *refusing it*,
   the first geom's rule, which cannot write that example.
 
@@ -947,7 +1003,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   once a theme takes arguments.
 
 - **The scene's circle primitive is `Circles`, not `Points` (2026-10-14, Steve).** The scene names
-  its primitives after grid's, and this one holds positions and one radius, grid's
+  its primitives after grid's, and this one holds positions and their radii, grid's
   `circleGrob(x, y, r)`; grid's `pointsGrob()` takes a shape and a size, which it never held. A
   primitive is named for what it draws, a shape, while a geom is named for the grammar's mark:
   `geom_point` and `Geom.Point` keep their names, and which primitives a point is drawn with is the
@@ -1777,6 +1833,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-19 — Give a point its shape, size, stroke and fill (size, shape and line type, step 1);
+  §4: "Size, shape and line type are Phase 3's eighth increment", "A shape is ggplot2's name for
+  it", "A line type is a name", "A discrete palette with fewer shapes or line types", "A point's
+  shape is worked out in the geom"
 - 2026-10-19 — Draw the notebook examples the scale functions made drawable (scale functions,
   step 7b); §4: "A verdict names a date format `Calendar.strftime/3` cannot write"
 - 2026-10-19 — Draw a colour of :none beside others as R draws NA (scale functions, step 7a);

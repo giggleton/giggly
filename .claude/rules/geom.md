@@ -45,22 +45,37 @@ where its marks sit".
   The boundary exports the kinds; their drawing stays in their implementations.
 - **A row missing a required position is not drawn.** ggplot2 also warns; a pure pipeline cannot,
   so how a dropped row is reported is open until something can report it.
-- **A point looks like ggplot2's default point until aesthetics can change it:** black, size 1.5
-  mm, border 0.5 mm, which grid draws as a circle of radius 1.95 points with a 0.71-point outline.
-  **A bar looks like ggplot2's default bar, and a rectangle like its default rectangle:** filled
-  `#595959`, ink mixed 35% toward paper, with no border, its border's width 0.5 mm all the same.
-  The defaults move to the theme with the default-aesthetics stage. **A row's colour, mapped or
-  set, replaces the default**: a point's colour, a bar's fill and border, a line's colour, read
-  from each row (`Giggly.Geom.Mark.colors/3`), where the assembly put it, so the scene carries one
-  per mark. A point takes `color` and no `fill`, which colours only the filled shapes not yet
-  drawn; a bar takes both; a line takes `color`.
-- **A row's `alpha` replaces its colour's own alpha: a point's outline and fill alike, a bar's fill
-  alone, a line's stroke**, as ggplot2's `GeomPoint` applies `alpha()` to both colours, `GeomRect`
-  `fill_alpha()` to the fill and `GeomPath` `alpha()` to the line; a row without one, or a table
-  without the column, keeps the colour's own, opaque for a colour with none, as ggplot2's default
-  alpha, `NA`, leaves a colour. **A bar's border is never given the row's alpha**, only its own.
-  `Giggly.Geom.Mark` is the one home of the rule, and a colour reaches the scene as its `#RRGGBB`
-  and an opacity.
+- **A point looks like ggplot2's default point unless its row says otherwise:** the solid circle
+  (`:circle`, R's 19), black, no fill, size 1.5 mm, border 0.5 mm, which grid draws as a circle of
+  radius 1.95 points with a 0.71-point outline. **A bar looks like ggplot2's default bar, and a
+  rectangle like its default rectangle:** filled `#595959`, ink mixed 35% toward paper, with no
+  border, its border's width 0.5 mm all the same. The defaults move to the theme with the
+  default-aesthetics stage. **A row's colour, mapped or set, replaces the default**: a point's
+  colour and fill, a bar's fill and border, a line's colour, read from each row
+  (`Giggly.Geom.Mark.colors/3`), where the assembly put it, so the scene carries one per mark. A
+  point takes `color` and `fill`, which fills only shapes 21 to 25; a bar takes both; a line takes
+  `color`.
+- **A point is drawn in its row's shape as R's graphics engine draws it** (`Giggly.Geom.Shape`,
+  ported from `GESymbol()` in R's `engine.c`): each of the 26 shapes the circles, squares,
+  polygons and line segments R draws it with, in R's order, worked out in points round the point
+  from its font size, `size * .pt + stroke * .stroke / 2` (ggplot2's `gg_par()`), its outline
+  `stroke * .stroke / 2` line-width units wide; a stroke of `:none`, R's `NA`, or a missing one,
+  adds nothing to the size, outlines nothing and draws no segment, as R's engine draws a border of
+  no width transparent and a line of no width not at all (`test/golden/point_no_stroke.svg`,
+  written `0.00` wide where svglite writes `nan`). The open shapes are outlined in the colour alone;
+  15 to 18 filled with it and not outlined; 19 and 20 outlined and filled with it; 21 to 25
+  outlined with it and filled with the fill. A circle of no radius is not drawn, as `GECircle()`
+  draws none; a square, polygon or segment of no size is. A shape of `:none`, or a missing one, as
+  a colour's, draws no point. **Points are drawn in row order, each whole before the next**, so
+  overlapping points stack as R's do; each run of elements of one kind and one outline width is one
+  primitive. Every shape is checked against vdiffr's drawing (`test/golden/point_shapes.svg`).
+- **A row's `alpha` replaces its colour's own alpha: a point's colour and fill alike, a bar's fill
+  alone, a line's stroke**, as ggplot2's `GeomPoint` applies `alpha()` to the colour and
+  `fill_alpha()` to the fill, `GeomRect` `fill_alpha()` to the fill and `GeomPath` `alpha()` to the
+  line; a row without one, or a table without the column, keeps the colour's own, opaque for a
+  colour with none, as ggplot2's default alpha, `NA`, leaves a colour. **A bar's border is never
+  given the row's alpha**, only its own. `Giggly.Geom.Mark` is the one home of the rule, and a
+  colour reaches the scene as its `#RRGGBB` and an opacity.
 - **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
   and `GeomPath` drop the rows whose colour is missing (`handle_na()`, a path's at a group's ends),
   and a bar left unfilled or unbordered, whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's
@@ -71,11 +86,13 @@ where its marks sit".
 - **A geom draws its own legend key (`draw_key/3`)**, as ggplot2's `draw_key` belongs to the geom:
   handed the key's aesthetic values, the layer's set values among them as ggplot2's key data holds
   its `aes_params`, and its size in points, it draws in the key's cell. A point's key is the point
-  at the middle; a bar's is its fill short of the key by its border's width, 0.5 mm, as
-  `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's alpha and
-  its border in its own; a path's is a segment across the middle from a tenth of the key's width
-  to nine tenths, as `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm,
-  its ends the layer's and its corners round.
+  at the middle in the key's shape, size, stroke, colour and fill, as `draw_key_point()` draws it;
+  ggplot2 widens a key for a point too big for it, which waits for keys that size themselves; a
+  bar's is its fill short of the key by its border's width, 0.5 mm, as `draw_key_polygon()` takes
+  `linewidth` millimetres off the key, its fill at the key's alpha and its border in its own; a
+  path's is a segment across the middle from a tenth of the key's width to nine tenths, as
+  `draw_key_path()` draws it, as wide as the layer's set `linewidth` or 0.5 mm, its ends the layer's
+  and its corners round.
 - **A path is drawn as ggplot2's `GeomPath` draws one.** Rows missing `x` or `y` at a group's ends
   are dropped (`keep_mid_true()`), and one in the middle breaks the line; the rows are put in
   group order, each group's in its own, and munched; a group of fewer than two rows is not drawn.

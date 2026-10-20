@@ -378,19 +378,19 @@ defmodule Giggly.AssemblyTest do
                {[1.0, 2.0], [+0.0, +0.0]}
     end
 
-    # ggplot2 also draws the points in the fill legend, its point knowing `fill`; Giggly's points
-    # take no fill until they draw the shapes it fills.
+    # ggplot2's text knows no `fill`, so it draws no key in a fill legend; its point knows one.
     test "a layer draws in a legend only for the aesthetics it can use" do
       [legend] =
         %{"x" => [1, 2], "y" => [1, 2], "g" => ["a", "b"]}
         |> Plot.new(%{x: :x, y: :y, fill: :g})
         |> Plot.geom_col()
+        |> Plot.geom_text(%{label: :g})
         |> Plot.geom_point()
         |> Assembly.run()
         |> Map.fetch!(:legends)
 
       assert Enum.map(legend.layers, fn layer -> {layer.geom, layer.aesthetics} end) ===
-               [{%Geom.Bar{}, [:fill]}]
+               [{%Geom.Bar{}, [:fill]}, {%Geom.Point{}, [:fill]}]
     end
 
     test "legends with different titles stay apart, in the order of their aesthetics' names" do

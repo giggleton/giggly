@@ -54,6 +54,12 @@ defmodule Giggly.Geom.Rect do
     # `draw_key_polygon()` takes `linewidth` millimetres off it: half each side, in points.
     @key_inset 0.5 * 72 / 25.4 / 2
 
+    # ggplot2's `GeomRect` draws its rectangles' corners mitred and their ends cut square, grid's
+    # `linejoin = "mitre"` and `lineend = "butt"`, at grid's mitre limit.
+    @line_end :butt
+    @line_join :mitre
+    @mitre_limit 10.0
+
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
@@ -87,11 +93,15 @@ defmodule Giggly.Geom.Rect do
           xmax: Enum.map(drawn, fn %{extent: [_xmin, xmax, _ymin, _ymax]} -> xmax end),
           ymin: Enum.map(drawn, fn %{extent: [_xmin, _xmax, ymin, _ymax]} -> ymin end),
           ymax: Enum.map(drawn, fn %{extent: [_xmin, _xmax, _ymin, ymax]} -> ymax end),
+          offsets: :none,
           fill: Enum.map(drawn, fn rectangle -> Mark.hex(rectangle.fill) end),
           fill_opacity: Enum.map(drawn, fn rectangle -> rectangle.fill_opacity end),
           color: Enum.map(drawn, fn rectangle -> Mark.hex(rectangle.border) end),
           color_opacity: Enum.map(drawn, fn rectangle -> Mark.own_opacity(rectangle.border) end),
-          stroke_width: @stroke_width
+          stroke_width: @stroke_width,
+          line_end: @line_end,
+          line_join: @line_join,
+          mitre_limit: @mitre_limit
         }
       ]
     end
@@ -110,11 +120,15 @@ defmodule Giggly.Geom.Rect do
           xmax: [1 - @key_inset / width],
           ymin: [@key_inset / height],
           ymax: [1 - @key_inset / height],
+          offsets: :none,
           fill: [Mark.hex(fill)],
           fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
           color: [Mark.hex(border)],
           color_opacity: [Mark.own_opacity(border)],
-          stroke_width: @stroke_width
+          stroke_width: @stroke_width,
+          line_end: @line_end,
+          line_join: @line_join,
+          mitre_limit: @mitre_limit
         }
       ]
     end

@@ -196,9 +196,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   maps and its geom knows and its key data holds a layer's `aes_params`; a layer that sets the
   legend's own aesthetic draws none. **A legend no layer draws in is dropped**, either kind, as
   ggplot2 drops a guide no layer matches: an aesthetic every layer takes from the plot's mapping
-  and none can use has no legend. ggplot2's point knows `fill`, so its points draw in a fill
-  legend; Giggly's points accept no `fill` until they draw the shapes it fills. **Each such layer says whether it draws in each
-  key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
+  and none can use has no legend, as text, which knows no `fill`, draws in no fill legend. **Each
+  such layer says whether it draws in each key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
   final and before the other aesthetics are mapped: a discrete key only where one of the layer's
   columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as
   ggplot2's `.value`), matched as the scale matches values (`Scale.Discrete.key/1`, a limit of `4`

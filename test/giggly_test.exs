@@ -2570,6 +2570,111 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/point_colour_alpha.svg")
     end
 
+    # Golden: test/golden/point_shapes.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/point_shapes.R: every element matches it, in the same order, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. Each of the 26 shapes, given as
+    # a list to one annotation, outlined and filled at half their opacity: every shape's
+    # rectangles, polygons, circles and lines where R's graphics engine puts them, in its order. It
+    # moves with what moves test/golden/point.svg, and with a shape's geometry or how its elements
+    # are written.
+    test "each of a point's 26 shapes is drawn as R's graphics engine draws it" do
+      shapes = Enum.to_list(0..25)
+
+      plot =
+        %{"x" => [0, 5], "y" => [0, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.annotate(:point,
+          x: Enum.map(shapes, fn shape -> rem(shape, 6) end),
+          y: Enum.map(shapes, fn shape -> div(shape, 6) end),
+          shape: shapes,
+          size: 5,
+          stroke: 1,
+          colour: "blue",
+          fill: "red",
+          alpha: 0.5
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_shapes.svg")
+    end
+
+    # Golden: test/golden/point_no_stroke.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/point_no_stroke.R: every element matches it, in the same order, R's
+    # `stroke-width: nan` written `0.00`, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The 26 shapes with no stroke but the last: no
+    # outlines, no lines. It moves with what moves test/golden/point_shapes.svg.
+    test "a point of no stroke is drawn with no outline and none of its lines" do
+      shapes = Enum.to_list(0..25)
+
+      strokes =
+        :none
+        |> List.duplicate(25)
+        |> Enum.concat([1])
+
+      plot =
+        %{"x" => [0, 5], "y" => [0, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.annotate(:point,
+          x: Enum.map(shapes, fn shape -> rem(shape, 6) end),
+          y: Enum.map(shapes, fn shape -> div(shape, 6) end),
+          shape: shapes,
+          size: 5,
+          stroke: strokes,
+          colour: "blue",
+          fill: "red",
+          alpha: 0.5
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_no_stroke.svg")
+    end
+
+    # Golden: test/golden/point_fill_stroke.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/point_fill_stroke.R: every element matches it, in the same order,
+    # the x axis drawn before the y as in test/golden/point.svg, and every clip path. geom_point()'s
+    # example of a point's fill and border: a heavy stroke widens the outline and the circle. It
+    # moves with what moves test/golden/point.svg.
+    test "points are drawn in the shape, size, stroke and fill the layer sets" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(shape: 21, colour: "black", fill: "white", size: 5, stroke: 5)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_fill_stroke.svg")
+    end
+
+    # Golden: test/golden/point_fill_legend.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/point_fill_legend.R: every element matches it, in the same order,
+    # the x axis drawn before the y as in test/golden/point.svg, and every clip path. mpg's points
+    # filled by drive train from the plot's mapping, the fill legend's keys in the layer's shape
+    # and size. It moves with what moves test/golden/point_colour_legend.svg.
+    test "points draw in a fill legend, its keys in the shape and size the layer sets" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, fill: :drv})
+        |> Plot.geom_point(shape: 21, size: 3)
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/point_fill_legend.svg")
+    end
+
     # Golden: test/golden/bar_fill.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/bar_fill.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_bar()'s example from ggplot2's reference page:

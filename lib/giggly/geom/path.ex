@@ -104,6 +104,7 @@ defmodule Giggly.Geom.Path do
             %Segments{
               starts: [@key_start],
               ends: [@key_end],
+              offsets: :none,
               stroke_width: points(Map.get(key, :linewidth, @line_width)),
               color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.get(key, :alpha))],
@@ -159,6 +160,7 @@ defmodule Giggly.Geom.Path do
       %Segments{
         starts: Enum.map(segments, fn [from, _to] -> position(from) end),
         ends: Enum.map(segments, fn [_from, to] -> position(to) end),
+        offsets: :none,
         stroke_width: stroke_width(frame),
         color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
         opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),

@@ -221,7 +221,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :x, :y],
+                 accepted: [:alpha, :color, :fill, :group, :x, :y],
                  annotation: false
                }
              ]
@@ -234,13 +234,13 @@ defmodule Giggly.PlotTest do
       assert error.message =~ "Plot.geom_point/3"
     end
 
-    # A point's fill colours only the filled shapes, which Giggly does not draw yet.
+    # ggplot2's points draw no label; its text does.
     test "an aesthetic points cannot use is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{fill: :cyl}) end
+      error = assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{label: :cyl}) end
       assert error.message =~ "Plot.geom_point/3"
-      assert error.message =~ ":fill"
+      assert error.message =~ ":label"
       assert error.message =~ ":group"
     end
 
@@ -378,13 +378,107 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":color"
     end
 
-    test "points take no fill, which only the filled shapes not yet drawn use" do
+    test "a point's shape, size, stroke and fill are set for every point, a shape by name or number" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      error =
-        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_point(plot, fill: "red") end
+      by_number = Plot.geom_point(plot, shape: 21, size: 5, stroke: 2, fill: "white")
+      by_name = Plot.geom_point(plot, shape: :circle_filled, size: 5, stroke: 2, fill: "white")
 
-      assert error.message =~ "fill"
+      assert [%Plot.Layer{fixed: fixed}] = by_number.reversed_layers
+      assert fixed === %{shape: :circle_filled, size: 5.0, stroke: 2.0, fill: "#FFFFFF"}
+      assert by_name.reversed_layers === by_number.reversed_layers
+    end
+
+    # ggplot2 4.0.3's `translate_shape_string()` table, its spaces written as underscores, and
+    # "triangle square" left out for 14, which "square triangle" names.
+    test "every shape's number is its place in the list of names, 0 to 25" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      shapes =
+        for number <- 0..25 do
+          [layer] = Plot.geom_point(plot, shape: number).reversed_layers
+          layer.fixed.shape
+        end
+
+      assert shapes === [
+               :square_open,
+               :circle_open,
+               :triangle_open,
+               :plus,
+               :cross,
+               :diamond_open,
+               :triangle_down_open,
+               :square_cross,
+               :asterisk,
+               :diamond_plus,
+               :circle_plus,
+               :star,
+               :square_plus,
+               :circle_cross,
+               :square_triangle,
+               :square,
+               :circle_small,
+               :triangle,
+               :diamond,
+               :circle,
+               :bullet,
+               :circle_filled,
+               :square_filled,
+               :diamond_filled,
+               :triangle_filled,
+               :triangle_down_filled
+             ]
+    end
+
+    test "a shape of :none is kept, to draw no point, and a stroke of :none, to draw no outline" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert %Plot{reversed_layers: [%Plot.Layer{fixed: %{shape: :none, stroke: :none}}]} =
+               Plot.geom_point(plot, shape: :none, stroke: :none)
+    end
+
+    # ggplot2 4.0.3 aborts on a name it does not know ("Shape aesthetic contains invalid value"),
+    # and R's graphics engine draws no shape past 25, nor a character, which Giggly takes no
+    # shape for.
+    test "a shape that is neither a name nor a number from 0 to 25 is refused, naming the names" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for shape <- [26, -1, 21.0, :triangle_up, "circle", "a"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_point(plot, shape: shape)
+          end
+
+        assert error.message =~ "got: #{inspect(shape)}"
+        assert error.message =~ ":square_open, :circle_open, :triangle_open,"
+      end
+    end
+
+    test "a size or stroke below 0 is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :size option/, fn ->
+        Plot.geom_point(plot, size: -1)
+      end
+
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/invalid value for :stroke option.*-0.5/,
+                   fn ->
+                     Plot.geom_point(plot, stroke: -0.5)
+                   end
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :stroke option.*nil/, fn ->
+        Plot.geom_point(plot, stroke: nil)
+      end
+    end
+
+    test "points map a fill" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point(%{fill: :cyl})
+
+      assert [%Plot.Layer{mapping: %{fill: "cyl"}}] = plot.reversed_layers
     end
   end
 
@@ -1191,6 +1285,30 @@ defmodule Giggly.PlotTest do
       assert_raise NimbleOptions.ValidationError, ~r/invalid value for :size option/, fn ->
         Plot.annotate(plot, :text, x: [1, 2], y: 1, label: "a", size: [3, 5])
       end
+    end
+
+    # ggplot2 4.0.3's `annotate("point", x = 1:3, y = 1, shape = c(21, 15, NA), size = c(2, 4,
+    # 6), stroke = c(0.5, NA, 2))` draws each point in its own shape, size and stroke, none for the
+    # missing shape and no outline for the missing stroke.
+    test "a point's shape, size and stroke each take a list, a :none held as missing" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.annotate(:point,
+          x: [1, 2, 3],
+          y: 1,
+          shape: [21, :square, :none],
+          size: [2, 4, 6],
+          stroke: [0.5, :none, 2]
+        )
+
+      assert [%Plot.Layer{fixed: fixed}] = plot.reversed_layers
+
+      assert fixed === %{
+               shape: [:circle_filled, :square, nil],
+               size: [2.0, 4.0, 6.0],
+               stroke: [0.5, nil, 2.0]
+             }
     end
 
     test "a list's values are of one type, as a column of the layer's table holds" do

@@ -218,12 +218,20 @@ defmodule Giggly.SVG do
     Enum.map(scene.cells, fn cell -> cell(cell, column_spans, row_spans) end)
   end
 
-  # Each circle's outline and fill are its colour at its opacity, as svglite writes a colour's
-  # alpha.
+  # Each circle at its own radius, its outline its colour at its opacity and its fill likewise, as
+  # svglite writes a colour's alpha.
   defp primitive(%Circles{} = circles, box) do
-    columns = [circles.x, circles.y, circles.color, circles.opacity]
+    columns = [
+      circles.x,
+      circles.y,
+      circles.radius,
+      circles.color,
+      circles.color_opacity,
+      circles.fill,
+      circles.fill_opacity
+    ]
 
-    Enum.zip_with(columns, fn [x_place, y_place, color, opacity] ->
+    Enum.zip_with(columns, fn [x_place, y_place, radius, color, color_opacity, fill, fill_opacity] ->
       {x_position, y_position} = place({x_place, y_place}, box)
 
       [
@@ -232,12 +240,12 @@ defmodule Giggly.SVG do
         "' cy='",
         number(y_position),
         "' r='",
-        number(circles.radius),
+        number(radius),
         "' style='stroke-width: ",
         number(circles.stroke_width),
         ";",
-        stroke_style(color, opacity),
-        fill_style(color, opacity),
+        stroke_style(color, color_opacity),
+        fill_style(fill, fill_opacity),
         "' />\n"
       ]
     end)
@@ -317,39 +325,40 @@ defmodule Giggly.SVG do
   end
 
   # Each rectangle as grid places one hung from its top left corner, as ggplot2's `GeomRect` hangs
-  # it, its width and height the cell's share of its extent, its border its colour at its opacity
-  # and its fill likewise. A rectangle whose `xmin` is past its `xmax`, or `ymin` past its `ymax`,
-  # is written from its left and top all the same, as svglite writes one, its width and height
-  # never negative.
-  defp primitive(%Rectangles{} = rectangles, {{_left, width}, {_top, height}} = box) do
+  # it, its border its colour at its opacity, its ends and corners as a line's, and its fill its
+  # colour at its opacity.
+  defp primitive(%Rectangles{} = rectangles, box) do
+    style = line_style(rectangles.line_end, rectangles.line_join, rectangles.mitre_limit)
+
     columns = [
-      rectangles.xmin,
-      rectangles.xmax,
-      rectangles.ymin,
-      rectangles.ymax,
+      placed_rectangles(rectangles, box),
       rectangles.fill,
       rectangles.fill_opacity,
       rectangles.color,
       rectangles.color_opacity
     ]
 
-    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, fill, fill_opacity, color, color_opacity] ->
-      {x_position, y_position} = place({min(xmin, xmax), max(ymin, ymax)}, box)
-
+    Enum.zip_with(columns, fn [
+                                {x_position, y_position, across, down},
+                                fill,
+                                fill_opacity,
+                                color,
+                                color_opacity
+                              ] ->
       [
         "<rect x='",
         number(x_position),
         "' y='",
         number(y_position),
         "' width='",
-        number(abs(xmax - xmin) * width),
+        number(across),
         "' height='",
-        number(abs(ymax - ymin) * height),
+        number(down),
         "' style='stroke-width: ",
         number(rectangles.stroke_width),
         ";",
         stroke_style(color, color_opacity),
-        " stroke-linecap: butt; stroke-linejoin: miter;",
+        style,
         fill_style(fill, fill_opacity),
         "' />\n"
       ]
@@ -358,7 +367,7 @@ defmodule Giggly.SVG do
 
   # Each line as svglite writes a polyline, its stroke its colour at its opacity.
   defp primitive(%Polylines{} = polylines, box) do
-    lines = placed_lines(polylines, box)
+    lines = placed_lines(polylines.lines, polylines.offsets, box)
 
     Enum.zip_with([lines, polylines.color, polylines.opacity], fn [line, color, opacity] ->
       [
@@ -374,16 +383,13 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # Each segment as svglite writes a line, from its start to its end, its stroke its colour at its
-  # opacity.
+  # Each segment as svglite writes a line, from its start to its end, each moved by its offset,
+  # its stroke its colour at its opacity.
   defp primitive(%Segments{} = segments, box) do
     style = line_style(segments.line_end, segments.line_join, segments.mitre_limit)
-    columns = [segments.starts, segments.ends, segments.color, segments.opacity]
+    columns = [placed_segments(segments, box), segments.color, segments.opacity]
 
-    Enum.zip_with(columns, fn [start, finish, color, opacity] ->
-      {x_start, y_start} = place(start, box)
-      {x_finish, y_finish} = place(finish, box)
-
+    Enum.zip_with(columns, fn [{{x_start, y_start}, {x_finish, y_finish}}, color, opacity] ->
       [
         "<line x1='",
         number(x_start),
@@ -403,20 +409,28 @@ defmodule Giggly.SVG do
     end)
   end
 
+  # Each polygon round its outline, each point moved by its offset, its border its colour at its
+  # opacity and its fill likewise, as svglite writes a polygon.
   defp primitive(%Polygons{} = polygons, box) do
-    style = [
-      "style='stroke-width: ",
-      number(polygons.stroke_width),
-      "; stroke: ",
-      stroke(polygons.color),
-      "; fill: ",
+    columns = [
+      placed_lines(polygons.outlines, polygons.offsets, box),
+      polygons.color,
+      polygons.color_opacity,
       polygons.fill,
-      ";'"
+      polygons.fill_opacity
     ]
 
-    Enum.map(polygons.outlines, fn outline ->
-      placed = Enum.map(outline, fn position -> place(position, box) end)
-      ["<polygon points='", points(placed), "' ", style, " />\n"]
+    Enum.zip_with(columns, fn [outline, color, color_opacity, fill, fill_opacity] ->
+      [
+        "<polygon points='",
+        points(outline),
+        "' style='stroke-width: ",
+        number(polygons.stroke_width),
+        ";",
+        stroke_style(color, color_opacity),
+        fill_style(fill, fill_opacity),
+        "' />\n"
+      ]
     end)
   end
 
@@ -627,17 +641,70 @@ defmodule Giggly.SVG do
   defp text_anchor(anchor) when anchor == 0.5, do: " text-anchor='middle'"
   defp text_anchor(anchor) when anchor == 1.0, do: " text-anchor='end'"
 
-  # Placed lines, each point moved by its offset, if the lines carry any.
-  defp placed_lines(%Polylines{lines: lines, offsets: :none}, box),
+  # Placed lines, or a polygon's outlines, each point moved by its offset, if they carry any.
+  defp placed_lines(lines, :none, box),
     do: Enum.map(lines, fn line -> Enum.map(line, fn position -> place(position, box) end) end)
 
-  defp placed_lines(%Polylines{lines: lines, offsets: offsets}, box) do
+  defp placed_lines(lines, offsets, box) do
     Enum.zip_with(lines, offsets, fn line, line_offsets ->
-      Enum.zip_with(line, line_offsets, fn position, offset ->
-        position
-        |> place(box)
-        |> moved(offset)
-      end)
+      Enum.zip_with(line, line_offsets, fn position, offset -> placed(position, offset, box) end)
+    end)
+  end
+
+  # A position placed in its box and moved by its offset in points.
+  defp placed(position, offset, box) do
+    position
+    |> place(box)
+    |> moved(offset)
+  end
+
+  # Each segment's start and end in the drawing, each moved by its offset, if the segments carry
+  # any.
+  defp placed_segments(%Segments{offsets: :none} = segments, box) do
+    Enum.zip_with(segments.starts, segments.ends, fn start, finish ->
+      {place(start, box), place(finish, box)}
+    end)
+  end
+
+  defp placed_segments(%Segments{} = segments, box) do
+    Enum.zip_with(
+      [segments.starts, segments.ends, segments.offsets],
+      fn [start, finish, {start_offset, finish_offset}] ->
+        {placed(start, start_offset, box), placed(finish, finish_offset, box)}
+      end
+    )
+  end
+
+  # Each rectangle's top left corner in the drawing, its width and its height: its width and
+  # height the cell's share of its extent, or the distance between its corners once each is moved
+  # by its offset. A rectangle whose `xmin` is past its `xmax`, or `ymin` past its `ymax`, is
+  # written from its left and top all the same, as svglite writes one, its width and height never
+  # negative.
+  defp placed_rectangles(
+         %Rectangles{offsets: :none} = rectangles,
+         {{_left, width}, {_top, height}} = box
+       ) do
+    columns = [rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax]
+
+    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax] ->
+      {x_position, y_position} = place({min(xmin, xmax), max(ymin, ymax)}, box)
+      {x_position, y_position, abs(xmax - xmin) * width, abs(ymax - ymin) * height}
+    end)
+  end
+
+  defp placed_rectangles(%Rectangles{} = rectangles, box) do
+    columns = [
+      rectangles.xmin,
+      rectangles.xmax,
+      rectangles.ymin,
+      rectangles.ymax,
+      rectangles.offsets
+    ]
+
+    Enum.zip_with(columns, fn [xmin, xmax, ymin, ymax, {low_offset, high_offset}] ->
+      {low_x, low_y} = placed({xmin, ymin}, low_offset, box)
+      {high_x, high_y} = placed({xmax, ymax}, high_offset, box)
+      {min(low_x, high_x), min(low_y, high_y), abs(high_x - low_x), abs(high_y - low_y)}
     end)
   end
 
