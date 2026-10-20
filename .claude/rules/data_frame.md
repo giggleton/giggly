@@ -20,8 +20,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `put/4`, `split/2`, `slice/2` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
-  `@moduledoc false`; offering a user another operation is a decision (CLAUDE.md, Conventions).
+  `put/4`, `split/2`, `slice/2`, `summarise/3` and the callbacks are the pipeline's, `@doc false`,
+  and `Lists` is `@moduledoc false`; offering a user another operation is a decision (CLAUDE.md,
+  Conventions).
 - **The frame owns the `table` library.** Its `deps:` is `Table` alone, which the root lists too,
   as boundary lets a sub-boundary list only what its parent does, and no other domain lists it
   (`.claude/rules/dependencies.md`). A domain that uses the frame lists `Giggly.DataFrame`, its
@@ -35,7 +36,14 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
   any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
-  them, and the facet repeats a table across the panels. Not designed ahead.
+  them, and the facet repeats a table across the panels; `summarise/3`, the first group-by
+  aggregate, with the stats that count. Not designed ahead.
+- **`summarise/3`'s one aggregate is a sum, and its spec says how it adds** (design-log §4, the
+  entry beginning "The frame's first group-by aggregate"): `summation: :compensated`, the
+  default, as R's `sum()` adds in extended precision, or `:plain`, in row order, as `rowsum()`;
+  `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or a non-finite
+  float. Its rows are sorted by the `by` columns, a missing value last, each keeping its type. An
+  engine implementing the frame implements both summations, or refuses the one it cannot.
 - **The frame knows nothing about plots.** The `panel` and `group` columns belong to the code that
   writes them (the facet, `add_group`), not to the frame.
 - **A frame that exists is well formed**: no name twice, every column `row_count` long, every
@@ -50,8 +58,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **`:category` is the one type never worked out from values: `new/1` and `put/4` are told it**,
   a column given as `{name, values, :category}` or put with `:category`, its values typed and cast
   as any column's first, a `:term`'s refused. It is Explorer's name for a categorical column; what
-  it means (discrete) is the plot's. `select/2`, `split/2` and `slice/2` carry it; `put/3` works a
-  type out afresh.
+  it means (discrete) is the plot's. `select/2`, `split/2`, `slice/2` and `summarise/3`'s `by`
+  columns carry it; `put/3` works a type out afresh.
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
   has no type of its own (maps, lists, `Decimal`…), so a column the plot never uses cannot refuse
   the table. When something needs one of those checked or plotted, it gets a named type of its own.

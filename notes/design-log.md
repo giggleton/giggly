@@ -155,6 +155,34 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `lims(size: {20, 0})` is refused, where R reverses), `aesthetics:`, and `scale_size_ordinal()`,
   with ordered factors.
 
+- **A count layer counts over ggplot2's list of aesthetics, and `stat_sum/3` comes with
+  `geom_count/3` (2026-10-20, Steve, the size step's fourth; checked against ggplot2 4.0.3 in R).**
+  `Stat.Sum` is R's `StatSum`: per panel, a row for each combination of the columns
+  `.all_aesthetics` names but `weight`, `group` included, its `n` the rows or their weights' sum,
+  its `prop` that share of its group's total, size taking `n` by default. A column the plot's
+  mapping carries in under a name the list lacks (`linewidth`, `stroke`, a nudge) is dropped, as R
+  drops it. A missing weight makes its count missing, as R's `sum()` does, where counting skips
+  one, as `rowsum()` does. A stat's default for an aesthetic other than position gets a scale and
+  draws in the legend, as ggplot2 reads `defaults(computed_mapping, stat$default_aes)`; a set size
+  draws none. A weight given after the stat is refused, as counting refuses it, where R ignores it.
+  *Rejected: every column but `weight`* — simpler, but a plot-mapped `linewidth` splits counts R
+  keeps whole. *Rejected: `stat_sum()` left out until a layer chooses its geom* (proposed) —
+  Steve: the same layer under R's name, now.
+
+- **The frame's first group-by aggregate is `DataFrame.summarise/3`, and stats sum through it,
+  compensated as R's `sum()` adds or plain as `rowsum()` does (2026-10-20, Steve).** R's `sum()`
+  adds in extended precision, so plain doubles missed R's `layer_data()` in 901 of 3,000 random
+  weight groups (mpg's `displ`: 55.500000000000014 for R's 55.5), and Neumaier's compensated sum
+  matched all 3,000. Steve asked that stats compute through the frame rather than on pulled lists:
+  `summarise(frame, by, name: {:sum, column, options})` groups and sums, rows sorted by `by`, a
+  missing value last, each `by` column keeping its type, with `summation: :compensated` (the
+  default) or `:plain` and `missing: :propagate` (the default) or `:skip`. Counting moved onto it,
+  its counts plain and its proportions' totals compensated, which fixed a departure: 6 of mpg's 7
+  class shares weighted by `displ` were a bit off. Choosing rows and dividing stay on lists.
+  *Rejected: a compensated sum private to the stat* (proposed) — an engine running the frame would
+  never see it. *Rejected: plain doubles* — R's values missed in 30% of groups. *Rejected: one
+  summation* — counting's counts would leave `rowsum()`'s.
+
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
   alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
@@ -1854,6 +1882,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-20 — Count the rows at each place, sized by their count (size, shape and line type,
+  step 4); §4: "A count layer counts over ggplot2's list", "The frame's first group-by aggregate"
 - 2026-10-20 — Size points by a mapped column, and legend keys by their glyphs (size, shape and
   line type, step 3); §4: "A scale's `rescaler` says how it places a value"
 - 2026-10-19 — Dash a line and a bar's border in its line type (size, shape and line type, step

@@ -30,27 +30,28 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   which boundary cannot, since a boundary always exports its root and every export to all its
   dependents (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a
   scale and never runs one.
-- **The API is `new/2`, the geom functions, `annotate/3`, the facet functions (`facet_wrap/3`),
-  the coordinate functions (`coord_radial/1`), the scale functions (`scale_x_continuous/2`,
-  `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts, `scale_x_discrete/2`,
-  `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales `scale_color_manual/2`,
-  `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and `_continuous`, each
-  with its `scale_fill_` twin, `scale_alpha_continuous/2`, `scale_alpha_discrete/2`, the size
-  scales `scale_size_continuous/2`, `scale_size_area/2`, `scale_radius/2` and
-  `scale_size_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`), the guide functions
-  (`guides/2`, `guide_legend/1`) and `labs/2`.** `computed_mapping/2`,
+- **The API is `new/2`, the geom functions, `stat_sum/3`, `annotate/3`, the facet functions
+  (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
+  (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
+  `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
+  `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and
+  `_continuous`, each with its `scale_fill_` twin, `scale_alpha_continuous/2`,
+  `scale_alpha_discrete/2`, the size scales `scale_size_continuous/2`, `scale_size_area/2`,
+  `scale_radius/2` and `scale_size_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
+  the guide functions (`guides/2`, `guide_legend/1`) and `labs/2`.** `computed_mapping/2`,
   `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
-  `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
-  `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`,
-  not `Aesthetics.name/0`). An example in the docs shows what a user
-  sees, through `Giggly.layer_data/2` or the drawing `Giggly.to_svg/2` makes, never a layer's or a
-  kind's struct.
+  `layer_annotation?/1` whether it is an annotation) exist for the assembly and are `@doc false`,
+  and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`, not
+  `Aesthetics.name/0`). An example in the docs shows what a user sees, through `Giggly.layer_data/2`
+  or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
 - **No function ggplot2 has superseded or deprecated becomes API**; Giggly offers its replacement
   alone, `labs()` and never `xlab()` (design-log §4, the entry beginning "Giggly exposes no
   function").
 - **A kind is named after ggplot2's ggproto class without its family prefix, and a class ggplot2
   keeps only as an alias is not a kind:** `geom_col/3` records `%Geom.Bar{}` with
-  `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`. A
+  `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`, and
+  `geom_count/3` and `stat_sum/3` both `%Geom.Point{}` with `%Stat.Sum{}` and
+  `%Position.Identity{}`. A
   function takes ggplot2's function name, several may share a kind, and a refusal names the
   function that wrote the mapping (design-log §4, the entry beginning "A kind is named after").
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
@@ -130,17 +131,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
   column layer against its geom's (`Geom.Point`, `Geom.Bar`), a counting layer against its stat's
   (`Stat.Count`: one of `:x` and `:y` needed and not both, ggplot2's `"x|y"`, `:weight` taken),
-  accepting too what its geom draws (`:alpha`), which counting carries. **An after_stat, the
-  layer's own or the plot's, is checked at the call against the variables the layer's stat
+  accepting too what its geom draws (`:alpha`), which counting carries, and a count layer against
+  `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's. **An after_stat,
+  the layer's own or the plot's, is checked at the call against the variables the layer's stat
   documents** (`Stat.Count.computed_variables/0`; none for a layer that computes nothing, which
   refuses every one), never against the table, and refused for an aesthetic its stat consumes
-  (`dropped_aesthetics/0`, counting's `:weight`). What a stat requires is met, and what it takes
-  only one of is counted, by the aesthetics mapped before it runs: `x` beside an after_stat `y`
-  counts along x, and an after_stat alone meets nothing, as ggplot2's stat sees only those. A
+  (`dropped_aesthetics/0`, both counting stats' `:weight`). What a stat requires is met, and what it
+  takes only one of is counted, by the aesthetics mapped before it runs: `x` beside an after_stat
+  `y` counts along x, and an after_stat alone meets nothing, as ggplot2's stat sees only those. A
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
   allows at most one. A weight must hold numbers: a column's type, read from the layer's table, and
   a constant's are refused at the call, where R would fail inside the stat and draw nothing; an
-  expression's type is known only once it has run, so counting refuses it then.
+  expression's type is known only once it has run, so its stat refuses it then.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
@@ -149,7 +151,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle and point functions `fill:`,
-  `geom_point/3` `shape:`, `size:` and `stroke:`, in millimetres, the line, bar and rectangle
+  `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
+  the line, bar and rectangle
   functions `linewidth:`, in millimetres, and `linetype:`, a line's or a border's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
@@ -174,22 +177,21 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `orientation:`, `geom_text/3`'s `check_overlap:`) **is a field of the geom's struct**, its
   default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom
-  function's `data:`, `alpha:` and `colour:`; `geom_point/3`'s `fill:`, `shape:`, `size:` and
-  `stroke:`; the line functions' `lineend:`, `linejoin:`,
-  `linemitre:` and `linewidth:`; the line, bar and rectangle functions' `linetype:`, and the bar
-  functions' `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`,
-  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions and `labs/2`),
-  so a misspelt option raises naming it, and a repeated one is refused by
-  `Aesthetics.canonicalize/1`, run first. A deliberate default is recorded as a value (`scales:
-  :fixed`). An option not given is recorded as `:none` in the kind's
-  struct, but a scale's, whose `:none` removes, is `:default`. A continuous or date scale's list
-  of labels needs a list of breaks as long, checked at the call, since its default breaks are
-  known only when run; a discrete scale's is one for each break given, or else each limit given,
-  checked at the call, and otherwise when run. `date_labels:` is checked at the call by writing a
-  date in it with `Calendar.strftime/3`, so a format it cannot write (`"%W"`) raises there.
-  A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and `nil`
-  only for a limit the data supplies (design-log §4, the entry beginning "Absent").
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom function's
+  `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_count/3`'s and `stat_sum/3`'s `fill:`,
+  `shape:`, `size:` and `stroke:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
+  `linewidth:`; the line, bar and rectangle functions' `linetype:`, and the bar functions'
+  `linewidth:`; `geom_line/3`'s `orientation:`; every option of `geom_text/3`, `geom_rect/3`,
+  `annotate/3`, the scale functions, the guide functions and `labs/2`), so a misspelt option raises
+  naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first. A deliberate
+  default is recorded as a value (`scales: :fixed`). An option not given is recorded as `:none` in
+  the kind's struct, but a scale's, whose `:none` removes, is `:default`. A continuous or date
+  scale's list of labels needs a list of breaks as long, checked at the call, since its default
+  breaks are known only when run; a discrete scale's is one for each break given, or else each limit
+  given, checked at the call, and otherwise when run. `date_labels:` is checked at the call by
+  writing a date in it with `Calendar.strftime/3`, so a format it cannot write (`"%W"`) raises
+  there. A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and
+  `nil` only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
   aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`, `size`) or the plot's `title`,
   `subtitle`, `caption` and `tag`, each a string or `:none`, `%{}` until a call sets one; a call

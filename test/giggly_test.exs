@@ -1597,6 +1597,353 @@ defmodule GigglyTest do
       assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :prop)} ===
                {[0.0, 0.0], [:nan, :nan]}
     end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(class, weight = displ,
+    # group = 1))` over mpg, printed to 17 significant digits: `rowsum()` adds the counts in doubles
+    # and `sum()` their total in extended precision.
+    test "a proportion divides by its group's total as R sums it, the counts as R's rowsum()" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, weight: :displ, group: 1})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) === [
+               30.800000000000001,
+               109.29999999999998,
+               119.79999999999998,
+               37.300000000000004,
+               145.80000000000004,
+               93.100000000000023,
+               276.2999999999999
+             ]
+
+      assert DataFrame.pull(frame, :prop) === [
+               0.037912358444116202,
+               0.1345396356474643,
+               0.14746430329886753,
+               0.045913343180699166,
+               0.17946824224519947,
+               0.11459871984244217,
+               0.34010339734121109
+             ]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same `geom_count()` layers, printed to
+  # 17 significant digits. The default size scale places each count by area from 1 to 6 mm. It moves
+  # with `stat_sum()`, how R's `sum()` adds, and the default size scale.
+  describe "layer_data/2, for geom_count" do
+    test "each place counts the rows there, its share of all of them, and is sized by its count" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cty, y: :hwy})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      first = fn name ->
+        frame
+        |> DataFrame.pull(name)
+        |> Enum.take(12)
+      end
+
+      assert DataFrame.row_count(frame) == 78
+      assert first.(:x) === [9, 11, 11, 11, 11, 12, 12, 12, 13, 13, 13, 13]
+      assert first.(:y) === [12, 14, 15, 16, 17, 16, 17, 18, 16, 17, 18, 19]
+      assert first.(:n) === [5.0, 2.0, 10.0, 3.0, 5.0, 2.0, 1.0, 5.0, 2.0, 12.0, 3.0, 4.0]
+
+      assert first.(:prop) === [
+               0.021367521367521368,
+               0.0085470085470085479,
+               0.042735042735042736,
+               0.01282051282051282,
+               0.021367521367521368,
+               0.0085470085470085479,
+               0.0042735042735042739,
+               0.021367521367521368,
+               0.0085470085470085479,
+               0.05128205128205128,
+               0.01282051282051282,
+               0.017094017094017096
+             ]
+
+      assert first.(:size) === [
+               3.773500981126146,
+               2.386750490563073,
+               5.1602514716892189,
+               2.9611613513818407,
+               3.773500981126146,
+               2.386750490563073,
+               1.0,
+               3.773500981126146,
+               2.386750490563073,
+               5.5993310550389994,
+               2.9611613513818407,
+               3.4019223070763069
+             ]
+    end
+
+    test "weights are summed as R's sum() adds them, each place's share of its group's total" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :drv, y: :cyl, weight: :displ})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1, 1, 1, 2, 2, 2, 2, 3, 3], [4, 6, 8, 4, 5, 6, 8, 6, 8]}
+
+      assert DataFrame.pull(frame, :n) === [
+               55.5,
+               116.09999999999999,
+               240.20000000000002,
+               118.3,
+               10.0,
+               137.59999999999999,
+               5.2999999999999998,
+               15.6,
+               113.8
+             ]
+
+      assert DataFrame.pull(frame, :prop) === [
+               0.13477416221466731,
+               0.28193297717338511,
+               0.58329286061194763,
+               0.4362094395280236,
+               0.03687315634218289,
+               0.50737463126843663,
+               0.019542772861356934,
+               0.12055641421947449,
+               0.87944358578052539
+             ]
+    end
+
+    test "a missing weight leaves its count and its group's shares missing, so it is not sized" do
+      frame =
+        %{
+          "x" => [1, 1, 2, 2, 2, 3, nil, 3, :infinity],
+          "y" => [1, 1, 1, 2, 2, 3, 1, nil, 1],
+          "g" => ["a", "b", "a", "a", "b", "b", "a", "a", "b"],
+          "w" => [1, 2, 3, nil, 5, 6, 7, 8, 9]
+        }
+        |> Plot.new(%{x: :x, y: :y, weight: :w, colour: :g})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y), DataFrame.pull(frame, :group)} ===
+               {[1.0, 1.0, 2.0, 2.0, 2.0, 3.0], [1, 1, 1, 2, 2, 3], [1, 2, 1, 1, 2, 2]}
+
+      assert DataFrame.pull(frame, :color) ===
+               ["#F8766D", "#00BFC4", "#F8766D", "#F8766D", "#00BFC4", "#00BFC4"]
+
+      assert DataFrame.pull(frame, :n) === [1.0, 2.0, 3.0, nil, 5.0, 6.0]
+
+      assert DataFrame.pull(frame, :prop) ===
+               [nil, 0.15384615384615385, nil, nil, 0.38461538461538464, 0.46153846153846156]
+
+      assert DataFrame.pull(frame, :size) ===
+               [1.0, 3.2360679774997898, 4.16227766016838, nil, 5.4721359549995796, 6.0]
+    end
+
+    test "a group of every row, or of each x, sets what each share is of" do
+      plot = Plot.new(Giggly.Datasets.mpg(), %{x: :class, y: :drv})
+
+      of_all =
+        plot
+        |> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: 1})
+        |> Giggly.layer_data()
+
+      of_each_class =
+        plot
+        |> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: :class})
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(of_all, :x), DataFrame.pull(of_all, :y)} ===
+               {[1, 2, 2, 3, 3, 4, 5, 6, 6, 6, 7, 7], [3, 1, 2, 1, 2, 2, 1, 1, 2, 3, 1, 3]}
+
+      assert DataFrame.pull(of_all, :n) ===
+               [5.0, 12.0, 35.0, 3.0, 38.0, 11.0, 33.0, 4.0, 22.0, 9.0, 51.0, 11.0]
+
+      assert DataFrame.pull(of_all, :prop) === [
+               0.021367521367521368,
+               0.05128205128205128,
+               0.14957264957264957,
+               0.01282051282051282,
+               0.1623931623931624,
+               0.047008547008547008,
+               0.14102564102564102,
+               0.017094017094017096,
+               0.094017094017094016,
+               0.038461538461538464,
+               0.21794871794871795,
+               0.047008547008547008
+             ]
+
+      assert DataFrame.pull(of_all, :size) === [
+               2.0206207261596578,
+               3.1650635094610968,
+               5.0824829046386304,
+               1.0,
+               5.2695628191498329,
+               3.0412414523193152,
+               4.9528470752104745,
+               1.7216878364870325,
+               4.1457643480294797,
+               2.7677669529663689,
+               6.0,
+               3.0412414523193152
+             ]
+
+      assert DataFrame.pull(of_each_class, :prop) === [
+               1.0,
+               0.25531914893617019,
+               0.74468085106382975,
+               0.073170731707317069,
+               0.92682926829268297,
+               1.0,
+               1.0,
+               0.11428571428571428,
+               0.62857142857142856,
+               0.25714285714285712,
+               0.82258064516129037,
+               0.17741935483870969
+             ]
+    end
+
+    test "on discrete axes each combination of levels is a group, and counts at its positions" do
+      frame =
+        %{
+          "g" => ["a", "b", "a", "a", "b", "b", "a", "a", "b"],
+          "y" => [1, 1, 1, 2, 2, 3, 1, nil, 1]
+        }
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y), DataFrame.pull(frame, :group)} ===
+               {[1, 1, 2, 2, 2], [1, 2, 1, 2, 3], [1, 1, 2, 2, 2]}
+
+      assert {DataFrame.pull(frame, :n), DataFrame.pull(frame, :prop)} ===
+               {[3.0, 1.0, 2.0, 1.0, 1.0], [0.75, 0.25, 0.5, 0.25, 0.25]}
+
+      assert DataFrame.pull(frame, :size) === [6.0, 1.0, 4.5355339059327378, 1.0, 1.0]
+    end
+
+    test "each panel counts its own rows, and each share is of its own panel's" do
+      frame =
+        %{
+          "x" => [1, 1, 2, 2, 2, 3],
+          "y" => [1, 1, 1, 2, 2, 3],
+          "g" => ["a", "b", "a", "a", "b", "b"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_count()
+        |> Plot.facet_wrap([:g])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :panel), DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1, 1, 1, 2, 2, 2], [1, 2, 2, 1, 2, 3], [1, 1, 2, 1, 2, 3]}
+
+      assert DataFrame.pull(frame, :prop) === List.duplicate(0.33333333333333331, 6)
+      assert DataFrame.pull(frame, :size) === List.duplicate(4.5355339059327378, 6)
+    end
+
+    test "weights that cancel give a share of an infinity, or NaN where the count is zero" do
+      frame =
+        %{"x" => [1, 2, 3], "y" => [1, 1, 1], "w" => [1, -1, 0]}
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :n), DataFrame.pull(frame, :prop)} ===
+               {[1.0, -1.0, 0.0], [:infinity, :neg_infinity, :nan]}
+
+      assert DataFrame.pull(frame, :size) === [6.0, 1.0, 4.5355339059327378]
+    end
+
+    test "a mapped size is counted over in place of the count, and a set one sizes every point" do
+      table = %{
+        "x" => [1, 1, 2, 2, 2, 3],
+        "y" => [1, 1, 1, 2, 2, 3],
+        "v" => [10, 10, 20, 20, 20, 30]
+      }
+
+      plot = Plot.new(table, %{x: :x, y: :y})
+
+      mapped =
+        plot
+        |> Plot.geom_count(%{size: :v})
+        |> Giggly.layer_data()
+
+      set =
+        plot
+        |> Plot.geom_count(size: 3)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(mapped, :n), DataFrame.pull(mapped, :size)} ===
+               {[2.0, 1.0, 2.0, 1.0], [1.0, 4.5355339059327378, 4.5355339059327378, 6.0]}
+
+      assert {DataFrame.pull(set, :n), DataFrame.pull(set, :size)} ===
+               {[2.0, 1.0, 2.0, 1.0], [3.0, 3.0, 3.0, 3.0]}
+    end
+
+    test "a column the plot's mapping carries in splits the counts only if R's list names it" do
+      table = %{"x" => [1, 1, 2], "y" => [1, 1, 1], "v" => [1, 2, 3], "l" => ["p", "q", "p"]}
+
+      line_width =
+        table
+        |> Plot.new(%{x: :x, y: :y, linewidth: :v})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      labelled =
+        table
+        |> Plot.new(%{x: :x, y: :y, label: :l})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(line_width, :n), :linewidth in DataFrame.names(line_width)} ===
+               {[2.0, 1.0], false}
+
+      assert {DataFrame.pull(labelled, :n), DataFrame.pull(labelled, :label)} ===
+               {[1.0, 1.0, 1.0], ["p", "q", "p"]}
+    end
+
+    test "places come out in the order of the layer's columns, its own aesthetics first" do
+      frame =
+        %{"x" => [2, 1, 1], "y" => [1, 2, 1], "g" => ["b", "a", "b"]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_count(%{colour: :g})
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :color), DataFrame.pull(frame, :x), DataFrame.pull(frame, :y),
+              DataFrame.pull(frame, :prop)} ===
+               {["#F8766D", "#00BFC4", "#00BFC4"], [1, 1, 2], [2, 1, 1], [1.0, 0.5, 0.5]}
+    end
+
+    test "a missing colour is a place's value of its own, sorted last" do
+      frame =
+        %{"x" => [1, 1, 2], "y" => [1, 1, 1], "g" => ["a", nil, nil]}
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :color),
+              DataFrame.pull(frame, :group), DataFrame.pull(frame, :prop)} ===
+               {[1, 1, 2], ["#F8766D", "#7F7F7F", "#7F7F7F"], [1, 2, 2], [1.0, 0.5, 0.5]}
+    end
+
+    test "a weight an expression computes as anything but numbers is refused when run" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cty, y: :hwy})
+        |> Plot.geom_count(%{weight: {&Atom.to_string/1, [{:constant, :heavy}]}})
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~ "weight must be a number"
+      assert error.message =~ ":string"
+    end
   end
 
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, `geom_bar(position = "dodge")` on the same
@@ -2714,6 +3061,63 @@ defmodule GigglyTest do
 
       assert drawn.(ranged) == File.read!("test/golden/size_range.svg")
       assert drawn.(by_area) == File.read!("test/golden/size_area.svg")
+    end
+
+    # Golden: test/golden/count.svg and test/golden/count_size_area.svg, checked against ggplot2's
+    # drawings of the same plots, made by test/golden/count.R and test/golden/count_size_area.R:
+    # every element matches, the x axis drawn before the y as in test/golden/point.svg, and every
+    # clip path. geom_count()'s reference examples: mpg's mileages, a point at each pair sized by
+    # how many rows hold it, by area from 1 to 6 mm, then in proportion to its count. They move with
+    # what moves test/golden/size_continuous.svg.
+    test "a count layer sizes a point at each place by its count, with a size legend titled n" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cty, y: :hwy})
+        |> Plot.geom_count()
+
+      drawn = fn scaled ->
+        scaled
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+      end
+
+      by_area = Plot.scale_size_area(plot)
+
+      assert drawn.(plot) == File.read!("test/golden/count.svg")
+      assert drawn.(by_area) == File.read!("test/golden/count_size_area.svg")
+    end
+
+    # Golden: test/golden/count_prop.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/count_prop.R: every element matches it but the background's edge, which
+    # svglite writes as R's rounding error, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mpg's classes and drive trains, each point sized
+    # by its share of every row. It moves with what moves test/golden/count.svg.
+    test "a count layer sizes its points by their shares on discrete axes, titled prop" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :drv})
+        |> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: 1})
+        |> Plot.scale_size_area(max_size: 10)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/count_prop.svg")
+    end
+
+    # Golden: test/golden/count_colour.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/count_colour.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Counts coloured by drive train, the colour
+    # legend above the size legend. It moves with what moves test/golden/count.svg and
+    # test/golden/point_colour_legend.svg.
+    test "a count layer's colour counts each value apart, its legend beside the size legend" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cty, y: :hwy, colour: :drv})
+        |> Plot.geom_count()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/count_colour.svg")
     end
 
     # Golden: test/golden/size_merged_rows.svg, checked against ggplot2's drawing of the same plot,

@@ -479,6 +479,38 @@ defmodule Giggly.AssemblyTest do
       assert [%{fixed: %{linewidth: 2.0}}] = legend.layers
     end
 
+    # Golden: `get_guide_data(plot, "size")` for `geom_count()` over mpg's cty and hwy is two keys,
+    # 5 and 10, at sizes 3.773500981126146 and 5.1602514716892189, titled `n`; with `size = 3` set
+    # it is `NULL`. It moves with the default size scale and `stat_sum()`'s default size.
+    test "a size a stat maps by default is scaled and draws its legend, unless the layer sets it" do
+      plot = Plot.new(Giggly.Datasets.mpg(), %{x: :cty, y: :hwy})
+      counted = Plot.geom_count(plot)
+      set = Plot.geom_count(plot, size: 3)
+
+      legends = fn layered ->
+        layered
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+      end
+
+      assert legends.(counted) === [
+               %{
+                 guide: %Guide.Legend{},
+                 aesthetics: [:size],
+                 title: "n",
+                 keys: [
+                   %{label: "5", value: 5.0, values: %{size: 3.773500981126146}},
+                   %{label: "10", value: 10.0, values: %{size: 5.1602514716892189}}
+                 ],
+                 layers: [
+                   %{geom: %Geom.Point{}, aesthetics: [:size], fixed: %{}, draws: [true, true]}
+                 ]
+               }
+             ]
+
+      assert legends.(set) === []
+    end
+
     test "an aesthetic whose every column a stat dropped has no legend" do
       assembly =
         Giggly.Datasets.mpg()

@@ -719,6 +719,111 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_count/3 and stat_sum/3" do
+    test "a count layer records the point geom, counting at each place and no position" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_count(%{x: :wt, y: :mpg, weight: :wt})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Point{},
+                 stat: %Stat.Sum{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{x: "wt", y: "mpg", weight: "wt"},
+                 fixed: %{},
+                 accepted: [:group, :size, :weight, :x, :y, :alpha, :color, :fill],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "stat_sum/3 adds the layer geom_count/3 adds" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert Plot.stat_sum(plot, %{colour: :cyl}, size: 2).reversed_layers ==
+               Plot.geom_count(plot, %{colour: :cyl}, size: 2).reversed_layers
+    end
+
+    test "options alone set every point's look, as a point layer's do" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_count(shape: 21, fill: "white", stroke: 1)
+
+      assert [%Plot.Layer{fixed: %{shape: :circle_filled, fill: "#FFFFFF", stroke: 1.0}}] =
+               plot.reversed_layers
+    end
+
+    test "an option points do not take is refused by the option's validation" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_count(plot, position: :jitter)
+        end
+
+      assert error.message =~ "unknown options [:position]"
+    end
+
+    # ggplot2 4.0.3's `stat_sum()` requires x and y.
+    test "a missing y is refused, naming the function that wrote the layer" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for {add, function} <- [
+            {&Plot.geom_count/1, "Plot.geom_count/3"},
+            {&Plot.stat_sum/1, "Plot.stat_sum/3"}
+          ] do
+        error = assert_raise ArgumentError, fn -> add.(plot) end
+        assert error.message =~ "#{function} needs :y"
+      end
+    end
+
+    test "an aesthetic points cannot draw is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_count(plot, %{linewidth: :wt}) end
+      assert error.message =~ "Plot.geom_count/3"
+      assert error.message =~ ":linewidth"
+    end
+
+    test "a weight from a column that is not a number is refused, naming the column and its type" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_count(plot, %{weight: :cyl}) end
+      assert error.message =~ "Plot.geom_count/3 maps :weight to \"cyl\", a :string column"
+    end
+
+    # ggplot2 4.0.3 documents `stat_sum()`'s computed variables as `n` and `prop`.
+    test "an after_stat reads n and prop, and naming another is refused, listing those" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{mapping: %{size: {:after_stat, ["prop"]}}}] =
+               Plot.geom_count(plot, %{size: {:after_stat, [:prop]}}).reversed_layers
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_count(plot, %{size: {:after_stat, [:count]}})
+        end
+
+      assert error.message =~ ~s(no variable "count")
+      assert error.message =~ ~s("n", "prop")
+    end
+
+    test "an after_stat for the weight it consumes is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_count(plot, %{weight: {:after_stat, [:n]}})
+        end
+
+      assert error.message =~ "its stat consumes :weight as it computes"
+    end
+  end
+
   describe "geom_path/3 and geom_line/3" do
     test "paths and lines map their colour, and refuse a fill, which a line has none of" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})

@@ -438,6 +438,30 @@ defmodule Giggly.Assembly do
     |> Stat.default_mapping()
   end
 
+  # What `layer` maps (`Plot.computed_mapping/2`) with, in each aesthetic it neither maps nor sets,
+  # the after_stat its stat puts there by default, written as a layer would map it, as
+  # `size: {:after_stat, [:n]}`: ggplot2 reads `defaults(computed_mapping, stat$default_aes)` to add
+  # the scales a stat's output needs and to match a layer with a legend (`matched_aes()`, which
+  # leaves out what the layer sets), so a size its stat gives it by default is scaled and drawn in
+  # the size legend.
+  defp mapping_with_defaults(plot, layer) do
+    mapping = Plot.computed_mapping(plot, layer)
+
+    set =
+      layer
+      |> Plot.layer_fixed()
+      |> Map.keys()
+
+    layer
+    |> default_mapping()
+    |> Map.drop(set)
+    |> Map.new(fn {aesthetic, column} ->
+      {:ok, value} = Mapping.resolve({:after_stat, [column]})
+      {aesthetic, value}
+    end)
+    |> Map.merge(mapping)
+  end
+
   # The legends the scales of aesthetics other than position give, as ggplot2's guides build them
   # from the trained scales: each scale's, drawn by its guide (`guide/3`), none for `:none`, in the
   # order of the aesthetics' names, a key for each break the scale shows, labelled, with the value
@@ -494,10 +518,10 @@ defmodule Giggly.Assembly do
   # plot's mapping and none can use it.
   defp draws_in?(legend, plot, layer), do: drawn_aesthetics(legend, plot, layer) != []
 
-  # The legend's aesthetics that `layer` maps, from its own mapping or the plot's, and can use, as
-  # ggplot2's `matched_aes()` keeps those the layer's geom knows.
+  # The legend's aesthetics that `layer` maps, from its own mapping or the plot's, or its stat by
+  # default, and can use, as ggplot2's `matched_aes()` keeps those the layer's geom knows.
   defp drawn_aesthetics(legend, plot, layer) do
-    mapping = Plot.computed_mapping(plot, layer)
+    mapping = mapping_with_defaults(plot, layer)
     accepted = Plot.layer_accepted(layer)
 
     Enum.filter(legend.aesthetics, fn aesthetic ->
@@ -1069,7 +1093,8 @@ defmodule Giggly.Assembly do
   # it, its type and the kind of scale that type needs. The type is read from the layer's frame,
   # `layer_frames` in layer order, evaluated or, for an after_stat, the stat's output with it put
   # in, since an expression's is known only once its function has run; the value from the plot's
-  # mapping, so a refusal names what the caller mapped rather than the aesthetic's column.
+  # mapping, so a refusal names what the caller mapped rather than the aesthetic's column, or the
+  # after_stat its stat maps by default (`mapping_with_defaults/2`).
   defp mapped_columns(plot, layer_frames, selected?, stage) do
     layers_and_frames =
       plot.reversed_layers
@@ -1078,7 +1103,7 @@ defmodule Giggly.Assembly do
 
     for {{layer, frame}, index} <- Enum.with_index(layers_and_frames),
         dtypes = DataFrame.dtypes(frame),
-        mapping = Plot.computed_mapping(plot, layer),
+        mapping = mapping_with_defaults(plot, layer),
         {aesthetic, value} <- Enum.sort(mapping),
         selected?.(aesthetic),
         Mapping.stage(value) == stage,

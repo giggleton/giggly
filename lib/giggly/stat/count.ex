@@ -5,10 +5,12 @@ defmodule Giggly.Stat.Count do
   # x of each group in each panel, in that order, x ascending. Its `count` is the number of rows at
   # that x, or the sum of their weights where the layer maps `weight`, and its `prop` the count's
   # share of its group's total; its `width` is 0.9 of the closest spacing of the layer's x
-  # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. Counts are
-  # doubles, as R's `rowsum()` gives them. y takes the count by default (`after_stat(count)`), and
-  # a mapping's after_stat reads `count` and `prop`, the variables ggplot2 documents. It takes no
-  # parameters yet. Run it through `Giggly.Stat`.
+  # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. The frame sums
+  # them (`Giggly.DataFrame.summarise/3`): the counts in floats in row order, the doubles R's
+  # `rowsum()` gives, and each group's total, the sum of its counts' sizes, with its compensated
+  # sum, as R's `sum()` adds in extended precision. y takes the count by default
+  # (`after_stat(count)`), and a mapping's after_stat reads `count` and `prop`, the variables
+  # ggplot2 documents. It takes no parameters yet. Run it through `Giggly.Stat`.
   #
   # Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   # counts along the one mapped, so a layer mapping `:y` alone is counted along y and drawn
@@ -111,8 +113,10 @@ defmodule Giggly.Stat.Count do
     end
 
     defp count(frame, flipped) do
-      names = DataFrame.names(frame)
-      carried = Enum.reject(names, fn name -> name in @computed end)
+      carried =
+        frame
+        |> DataFrame.names()
+        |> Enum.reject(fn name -> name in @computed end)
 
       width =
         frame
@@ -120,71 +124,105 @@ defmodule Giggly.Stat.Count do
         |> Resolution.of(zero: true)
         |> Kernel.*(@width_share)
 
-      groups =
-        names
-        |> Enum.map(fn name -> DataFrame.pull(frame, name) end)
-        |> Enum.zip_with(fn values -> row(names, values) end)
-        |> Enum.filter(fn row -> is_number(row.x) end)
-        |> Enum.group_by(fn row -> {row.panel, row.group} end)
-        |> Enum.sort_by(fn {panel_and_group, _rows} -> panel_and_group end)
-        |> Enum.map(fn {_panel_and_group, rows} -> rows end)
+      positioned = positioned(frame)
 
-      counted = Enum.flat_map(groups, fn rows -> count_group(rows, width, flipped) end)
-      constant = Enum.filter(carried, fn name -> constant_in_every_group?(groups, name) end)
+      counted =
+        positioned
+        |> weighted()
+        |> DataFrame.summarise([:panel, :group, :x],
+          count: {:sum, :weight, summation: :plain, missing: :skip}
+        )
 
-      columns =
-        Enum.map(@computed ++ constant, fn name ->
-          {name, Enum.map(counted, fn row -> Map.fetch!(row, name) end)}
-        end)
+      groups = panels_and_groups(counted)
+      counts = DataFrame.pull(counted, :count)
+      totals = totals_by_group(counted, counts)
+      rows = DataFrame.row_count(counted)
 
-      DataFrame.new(columns)
+      computed = [
+        {:count, counts},
+        {:prop,
+         Enum.zip_with(counts, groups, fn count, group ->
+           share(count, Map.fetch!(totals, group))
+         end)},
+        {:x, DataFrame.pull(counted, :x)},
+        {:width, List.duplicate(width, rows)},
+        {:flipped_aes, List.duplicate(flipped, rows)}
+      ]
+
+      DataFrame.new(computed ++ constant_columns(positioned, carried, groups))
     end
 
-    defp row(names, values) do
-      names
-      |> Enum.zip(values)
+    # The rows at a finite x, the only ones counted.
+    defp positioned(frame) do
+      kept =
+        frame
+        |> DataFrame.pull(:x)
+        |> Enum.with_index()
+        |> Enum.flat_map(fn {x, index} -> if is_number(x), do: [index], else: [] end)
+
+      DataFrame.slice(frame, kept)
+    end
+
+    # The table with each row's weight, 1 where the layer maps none, as ggplot2's `stat_count()`
+    # weighs each row 1.
+    defp weighted(frame) do
+      if :weight in DataFrame.names(frame),
+        do: frame,
+        else: DataFrame.put(frame, :weight, List.duplicate(1.0, DataFrame.row_count(frame)))
+    end
+
+    # Each group's total, the sum of its counts' sizes, as ggplot2's `stat_count()` divides by
+    # `sum(abs(count))`, which R adds in extended precision.
+    defp totals_by_group(counted, counts) do
+      totals =
+        counted
+        |> DataFrame.select([{:panel, :panel}, {:group, :group}])
+        |> DataFrame.put(:size, Enum.map(counts, &abs/1))
+        |> DataFrame.summarise([:panel, :group], total: {:sum, :size})
+
+      [:panel, :group, :total]
+      |> Enum.map(fn name -> DataFrame.pull(totals, name) end)
+      |> Enum.zip_with(fn [panel, group, total] -> {{panel, group}, total} end)
       |> Map.new()
     end
-
-    # One row per distinct x of the group, x ascending, carrying the group's first row's columns.
-    defp count_group([first | _rest] = rows, width, flipped) do
-      counts =
-        rows
-        |> Enum.group_by(fn row -> row.x end, fn row -> weight(row) end)
-        |> Enum.map(fn {x, weights} -> {x, Enum.reduce(weights, 0.0, &+/2)} end)
-        |> Enum.sort_by(fn {x, _count} -> x end)
-
-      total =
-        counts
-        |> Enum.map(fn {_x, count} -> abs(count) end)
-        |> Enum.sum()
-
-      Enum.map(counts, fn {x, count} ->
-        Map.merge(first, %{
-          count: count,
-          prop: share(count, total),
-          x: x,
-          width: width,
-          flipped_aes: flipped
-        })
-      end)
-    end
-
-    # A row's weight, 1 where the layer maps none, nothing where its weight is missing.
-    defp weight(%{weight: weight}) when is_number(weight), do: weight
-    defp weight(%{weight: _missing}), do: 0.0
-    defp weight(_row), do: 1.0
 
     defp share(_count, total) when total == 0, do: :nan
     defp share(count, total), do: count / total
 
-    defp constant_in_every_group?(groups, name) do
-      Enum.all?(groups, fn rows ->
-        rows
-        |> Enum.uniq_by(fn row -> Map.fetch!(row, name) end)
-        |> length()
-        |> Kernel.==(1)
-      end)
+    # Each row's panel and group, in row order.
+    defp panels_and_groups(frame) do
+      panels = DataFrame.pull(frame, :panel)
+      groups = DataFrame.pull(frame, :group)
+      Enum.zip(panels, groups)
+    end
+
+    # Each carried column that holds one value within every group, as its group's value in each of
+    # the groups `groups` names, one per counted row.
+    defp constant_columns(positioned, carried, groups) do
+      row_groups = panels_and_groups(positioned)
+
+      for name <- carried,
+          values = DataFrame.pull(positioned, name),
+          by_group = values_by_group(row_groups, values),
+          Enum.all?(by_group, fn {_group, group_values} -> one_value?(group_values) end) do
+        {name, Enum.map(groups, fn group -> first_value(by_group, group) end)}
+      end
+    end
+
+    defp values_by_group(row_groups, values) do
+      row_groups
+      |> Enum.zip(values)
+      |> Enum.group_by(fn {group, _value} -> group end, fn {_group, value} -> value end)
+    end
+
+    defp one_value?(values) do
+      distinct = Enum.uniq(values)
+      match?([_one], distinct)
+    end
+
+    defp first_value(by_group, group) do
+      [value | _rest] = Map.fetch!(by_group, group)
+      value
     end
   end
 end

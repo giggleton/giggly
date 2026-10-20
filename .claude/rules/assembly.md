@@ -48,8 +48,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **After the stat, each aesthetic the layer maps to an after_stat takes its value evaluated
   against the stat's output, in `Plot.mapping_order/2`'s order, then each it leaves unmapped the
   computed column its stat names for it** (`Stat.default_mapping/1`), in name order, as ggplot2's
-  `map_statistic()`: counting's count goes into y. Each replaces its column in place or follows
-  the last, a factor's declared `:category`. The output is read as it stands; ggplot2 reads it
+  `map_statistic()`: counting's count goes into y, counting at each place's `n` into size. Each
+  replaces its column in place or follows the last, a factor's declared `:category`. The output is
+  read as it stands; ggplot2 reads it
   back in data units first, which waits for a stat whose documented variables are positions.
   **Each on an axis is checked against the axis's scale, chosen before the stat, and put through
   it** (`Scale.transform/2`, each row on its panel's scale): numbers on a continuous or a discrete
@@ -160,9 +161,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.
-- **Each aesthetic other than position that a layer maps gets one scale for the whole plot**:
-  the plot's own scale for it, refused when run unless it takes the kind of column the first
-  column needs (`Scale.takes?/2`, naming that column, where ggplot2 fails with "Continuous value
+- **Each aesthetic other than position that a layer maps gets one scale for the whole plot**, one
+  its stat fills by default counting as mapped where the layer neither maps nor sets it
+  (`mapping_with_defaults/2`: size from `n`), as ggplot2 adds scales from
+  `defaults(computed_mapping, stat$default_aes)`: the plot's own scale for it, refused when run
+  unless it takes the kind of column the first column needs (`Scale.takes?/2`, naming that
+  column, where ggplot2 fails with "Continuous value
   supplied to a discrete scale"), or else ggplot2's default for that kind (`Scale.new/2`), the
   columns evaluated before the stats first and those computed after them next, each in layer
   order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
@@ -193,9 +197,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets
-  `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics and accepts
-  it (`Plot.layer_accepted/1`), with those it maps and accepts, each carrying what it sets (its
-  `fixed`) for its keys, as ggplot2's `matched_aes()` gives a layer only the key's aesthetics it
+  `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, its stat's
+  default for one it neither maps nor sets included, and accepts it (`Plot.layer_accepted/1`),
+  with those it maps and accepts, each carrying what it sets (its `fixed`) for its keys, as
+  ggplot2's `matched_aes()` gives a layer only the key's aesthetics it
   maps and its geom knows and its key data holds a layer's `aes_params`; a layer that sets the
   legend's own aesthetic draws none. **A legend no layer draws in is dropped**, either kind, as
   ggplot2 drops a guide no layer matches: an aesthetic every layer takes from the plot's mapping

@@ -272,4 +272,118 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.row_count(sliced) == 0
     end
   end
+
+  describe "summarise/3" do
+    test "one row per combination the rows hold, sorted by the columns in order, missing last" do
+      frame =
+        DataFrame.new([
+          {:panel, [2, 1, 1, 1, 1]},
+          {:color, ["b", nil, "b", "a", "b"]},
+          {:weight, [1.0, 2.0, 3.0, 4.0, 5.0]}
+        ])
+
+      summarised = DataFrame.summarise(frame, [:panel, :color], n: {:sum, :weight})
+
+      assert DataFrame.names(summarised) == [:panel, :color, :n]
+      assert DataFrame.pull(summarised, :panel) === [1, 1, 1, 2]
+      assert DataFrame.pull(summarised, :color) === ["a", "b", nil, "b"]
+      assert DataFrame.pull(summarised, :n) === [4.0, 8.0, 2.0, 1.0]
+    end
+
+    test "each column grouped by keeps its type, a category's included, and a sum is a float" do
+      frame =
+        DataFrame.new([
+          {:x, [4, 6, 4], :category},
+          {:y, [1, 2, 1]},
+          {:weight, [1, 2, 3]}
+        ])
+
+      summarised = DataFrame.summarise(frame, [:x, :y], n: {:sum, :weight})
+
+      assert DataFrame.dtypes(summarised) == %{x: :category, y: :integer, n: :float}
+      assert DataFrame.pull(summarised, :n) === [4.0, 2.0]
+    end
+
+    # Golden: R 4.6.1's sum(c(0.1, 0.2, 0.3)) is 0.59999999999999998, added in extended
+    # precision, and rowsum(c(0.1, 0.2, 0.3), rep(1, 3)) is 0.60000000000000009, added in doubles in
+    # row order, printed to 17 significant digits. It moves with nothing but how R adds.
+    test "a sum is compensated as R's sum() adds, or plain as R's rowsum() does" do
+      frame = DataFrame.new(group: [1, 1, 1], weight: [0.1, 0.2, 0.3])
+
+      compensated = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+
+      plain =
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight, summation: :plain})
+
+      assert DataFrame.pull(compensated, :n) === [0.59999999999999998]
+      assert DataFrame.pull(plain, :n) === [0.60000000000000009]
+    end
+
+    test "a missing or non-finite value makes its group's sum missing, or is skipped" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 2, 2, 3, 4],
+          weight: [1.0, nil, 2.0, :nan, :infinity, 5.0]
+        )
+
+      propagated = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+
+      skipped =
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight, missing: :skip})
+
+      assert DataFrame.pull(propagated, :n) === [nil, nil, nil, 5.0]
+      assert DataFrame.pull(skipped, :n) === [1.0, 2.0, 0.0, 5.0]
+    end
+
+    test "a frame of no rows summarises into no rows, its columns named" do
+      frame = DataFrame.new(group: [], weight: [])
+
+      summarised = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+
+      assert DataFrame.row_count(summarised) == 0
+      assert DataFrame.names(summarised) == [:group, :n]
+    end
+
+    test "a sum of a column that is not numbers is refused, naming the column and its type" do
+      frame = DataFrame.new(group: [1], weight: ["heavy"])
+
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+        end
+
+      assert error.message =~ ":weight"
+      assert error.message =~ ":string"
+    end
+
+    test "an option not listed, or a value it does not take, is refused" do
+      frame = DataFrame.new(group: [1], weight: [1.0])
+
+      assert_raise ArgumentError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight, rounding: :plain})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight, summation: :kahan})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight, missing: :zero})
+      end
+    end
+
+    test "no column to group by, or a sum named as one, is refused" do
+      frame = DataFrame.new(group: [1], weight: [1.0])
+      # Built as the test runs, since the type checker warns of a literal `[]` it knows fails.
+      no_columns = Enum.drop([:group], 1)
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, no_columns, n: {:sum, :weight})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], group: {:sum, :weight})
+      end
+    end
+  end
 end

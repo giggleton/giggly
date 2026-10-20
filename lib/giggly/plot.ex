@@ -1514,6 +1514,68 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of points counting the rows at each place: one point for each combination of `x`,
+  `y` and the layer's other aesthetics that its rows hold, sized by how many rows hold it, or,
+  where `:weight` is mapped, by the sum of their weights, and the size legend titled `n`. The
+  points are drawn as `geom_point/3` draws them.
+
+  Counting uses `:x`, `:y`, `:weight` and `:group`, and needs `:x` and `:y`. A `:weight` column
+  must hold numbers, and a missing weight leaves its place's count missing, so no point is drawn
+  there. The points also take `:alpha`, `:color`, `:fill` and `:size`; each is counted over, as
+  `:group` is, so a discrete colour gives each of its values at a place a point of its own, and a
+  mapped `:size` sizes the points by its column instead of the count. A row missing its `x` or `y`
+  is not counted.
+
+  Counting computes `n` and `prop`, the count's share of its group's total in its panel, which a
+  mapping reads with an after_stat (`Giggly.Mapping`): `%{size: {:after_stat, [:prop]}, group: 1}`
+  sizes each point by its share of all the rows.
+
+  ## Options
+
+  #{NimbleOptions.docs(@point_options)}
+
+      iex> plot =
+      ...>   %{"cty" => [18, 18, 21], "hwy" => [29, 29, 29]}
+      ...>   |> Giggly.Plot.new(%{x: :cty, y: :hwy})
+      ...>   |> Giggly.Plot.geom_count()
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :n)
+      [2.0, 1.0]
+      iex> Giggly.DataFrame.pull(frame, :size)
+      [6.0, 1.0]
+  """
+  @spec geom_count(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_count(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_count(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_count(plot, %{}, options)
+
+  def geom_count(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: count_layer(plot, mapping, options, "Plot.geom_count/3")
+
+  @doc """
+  Adds the layer `geom_count/3` adds, points counting the rows at each place, from the same
+  mapping and options.
+
+      iex> plot =
+      ...>   %{"cty" => [18, 18, 21], "hwy" => [29, 29, 29]}
+      ...>   |> Giggly.Plot.new(%{x: :cty, y: :hwy})
+      ...>   |> Giggly.Plot.stat_sum()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:prop)
+      [0.6666666666666666, 0.3333333333333333]
+  """
+  @spec stat_sum(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_sum(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_sum(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_sum(plot, %{}, options)
+
+  def stat_sum(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: count_layer(plot, mapping, options, "Plot.stat_sum/3")
+
+  @doc """
   Adds a layer of bars counting the rows at each `x`. Each bar runs from 0 to the number of rows at
   its `x`, or, where `:weight` is mapped, to the sum of their weights, and the y axis is titled
   `count`. A row missing its `x` is not counted. The bars are drawn as `geom_col/3` draws them.
@@ -1569,7 +1631,7 @@ defmodule Giggly.Plot do
       computed: Stat.Count.computed_variables(),
       dropped: Stat.Count.dropped_aesthetics()
     )
-    |> check_weight(layer)
+    |> check_weight(layer, "Plot.geom_bar/3")
   end
 
   @doc """
@@ -4140,6 +4202,32 @@ defmodule Giggly.Plot do
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
 
+  # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its
+  # mistakes named as `function`'s.
+  defp count_layer(plot, mapping, options, function) do
+    validated = layer_options(options, @point_options)
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Point{},
+      stat: %Stat.Sum{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Sum.accepted_aesthetics() ++ Geom.Point.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.Sum.required_aesthetics(),
+      computed: Stat.Sum.computed_variables(),
+      dropped: Stat.Sum.dropped_aesthetics()
+    )
+    |> check_weight(layer, function)
+  end
+
   # A layer function's options, validated against `schema`, their names put in their canonical
   # spelling first, so a repeated option is refused rather than one silently winning.
   defp layer_options(options, schema) do
@@ -4259,8 +4347,9 @@ defmodule Giggly.Plot do
 
   # A weight is summed, so the column a layer's weight comes from must hold numbers, missing ones
   # included, where the call can tell its type: a column's or a constant's. An expression's is its
-  # function's to decide, and counting refuses one that is not a number when the plot is run.
-  defp check_weight(plot, layer) do
+  # function's to decide, and the layer's stat refuses one that is not a number when the plot is
+  # run.
+  defp check_weight(plot, layer, function) do
     mapping = computed_mapping(plot, layer)
     table = drawn_table(plot, layer.data)
 
@@ -4268,7 +4357,7 @@ defmodule Giggly.Plot do
          dtype when dtype not in [:integer, :float, :null, :computed] <-
            Mapping.dtype(value, table) do
       raise ArgumentError,
-            "Plot.geom_bar/3 maps :weight to #{inspect(value)}, a #{inspect(dtype)} column, " <>
+            "#{function} maps :weight to #{inspect(value)}, a #{inspect(dtype)} column, " <>
               "but a weight is summed, so it must be a number"
     end
 

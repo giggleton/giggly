@@ -86,6 +86,11 @@ defmodule Giggly.DataFrame do
   @typedoc "A column as built: its name and values, and `:category` where it is declared one."
   @type column :: {name(), list()} | {name(), list(), :category}
 
+  @typedoc "What `summarise/3` computes for each group: the sum of a column, with its options."
+  @type aggregate ::
+          {:sum, name()}
+          | {:sum, name(), [summation: :compensated | :plain, missing: :propagate | :skip]}
+
   # Builds a frame from columns, as `new/1` describes.
   @doc false
   @callback new([column()]) :: t()
@@ -125,6 +130,10 @@ defmodule Giggly.DataFrame do
   # The rows at the given indices, as `slice/2` describes.
   @doc false
   @callback slice(t(), [non_neg_integer()]) :: t()
+
+  # One row per group of rows, as `summarise/3` describes.
+  @doc false
+  @callback summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
 
   # Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
   # result) into a frame.
@@ -280,4 +289,28 @@ defmodule Giggly.DataFrame do
   @spec slice(t(), [non_neg_integer()]) :: t()
   def slice(%implementation{} = frame, indices) when is_list(indices),
     do: implementation.slice(frame, indices)
+
+  # One row for each combination of the values of the columns `by` that the frame's rows hold, as
+  # dplyr's `summarise(.by = )` and SQL's `GROUP BY` give one, with each of `aggregates`, a
+  # `{name, aggregate}` in order, computed over that group's rows. The `by` columns come first, in
+  # the order given, each keeping its type, a category's included; each aggregate follows as a
+  # column of its own. The rows are sorted by the `by` columns, the first deciding first, each by
+  # its values in Erlang's term order with a missing one last, as R's `id()` orders the
+  # combinations it finds and SQL's `NULLS LAST` does.
+  #
+  # The one aggregate is `{:sum, column}`: the sum of a column of numbers, a float, which takes two
+  # options. `summation:` says how it adds: `:compensated`, the default, carries the rounding error
+  # each addition makes and adds it back at the end, as R's `sum()` adds in extended precision, so
+  # the sum is the one R's gives; `:plain` adds the values in row order in floats, as R's
+  # `rowsum()` does. `missing:` says what a missing value does, one that is `nil` or a non-finite
+  # float: `:propagate`, the default, makes the group's sum missing (`nil`), as R's `sum()` gives
+  # `NA`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a group of only missing values
+  # summing to 0. A column of another type and an option not listed are refused with an
+  # `ArgumentError`; an empty `by`, an option's value not listed and an aggregate's name shared
+  # with a `by` column raise `FunctionClauseError`.
+  @doc false
+  @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
+  def summarise(%implementation{} = frame, [_first | _rest] = by, aggregates)
+      when is_list(aggregates),
+      do: implementation.summarise(frame, by, aggregates)
 end
