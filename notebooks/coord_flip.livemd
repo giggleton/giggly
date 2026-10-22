@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -15,13 +26,17 @@ gives them. Each example shows ggplot2's code first and then Giggly's. An exampl
 draw yet keeps its ggplot2 code and names what it is waiting for, so the page is also a list of
 what remains.
 
-`coord_flip()` swaps the axes, so that what is mapped to `x` runs up the panel and what is mapped
-to `y` runs across it. It is superseded: swapping the `x` and `y` mappings, or setting a layer's
-`orientation`, draws the same plots, and `coord_flip()` remains for the geoms and stats that
-cannot be turned that way. Under it, the x scale and the `xlim` option act on the vertical axis,
-while the theme's settings for the x axis still act on the horizontal one, and facets keep their
-order. Giggly has no `coord_flip()` yet; its `Giggly.Plot.geom_bar/3` draws horizontal bars when
-`y` is mapped rather than `x`, the swap the page prefers.
+`coord_flip()` swaps the axes, so that what is mapped to `x` runs up the panel and what is mapped to
+`y` runs across it. It is superseded: swapping the `x` and `y` mappings, or setting a layer's
+`orientation`, draws the same plots, and `coord_flip()` remains for the geoms and stats that cannot
+be turned that way. Under it, the x scale and the `xlim` option act on the vertical axis, while the
+theme's settings for the x axis still act on the horizontal one, and facets keep their order. Giggly
+has no `coord_flip()` yet; its `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_histogram/3` and
+`Giggly.Plot.geom_boxplot/3` turn on their side when `y` is mapped rather than `x`, the swap the
+page prefers. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns
+an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds ggplot2's
+`diamonds`, `Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
 
 ## Horizontal boxplots
 
@@ -31,8 +46,10 @@ ggplot(diamonds, aes(price, cut)) +
   geom_boxplot()
 ```
 
-Not in Giggly yet: `geom_boxplot()`, and choosing the order of a column's values (`cut` is an
-ordered factor).
+Giggly draws these boxes, but puts the cuts in alphabetical order, where R keeps the order of
+`cut`'s levels.
+
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor).
 
 ## Flipping boxplots
 
@@ -43,7 +60,8 @@ ggplot(diamonds, aes(cut, price)) +
   coord_flip()
 ```
 
-Not in Giggly yet: `geom_boxplot()` and `coord_flip()`.
+Not in Giggly yet: `coord_flip()`, and choosing the order of a column's values (`cut` is an
+ordered factor).
 
 ## Reversing a horizontal histogram
 
@@ -54,7 +72,15 @@ ggplot(diamonds, aes(y = carat)) +
   scale_y_reverse()
 ```
 
-Not in Giggly yet: `geom_histogram()`.
+With `y` mapped, the bins run up the panel, and `Giggly.Plot.scale_y_reverse/2` turns the left
+axis upside down.
+
+```elixir
+Plot.new(diamonds, %{y: :carat})
+|> Plot.geom_histogram()
+|> Plot.scale_y_reverse()
+|> render.()
+```
 
 ## Reversing a flipped histogram
 
@@ -66,7 +92,7 @@ ggplot(diamonds, aes(carat)) +
   scale_x_reverse()
 ```
 
-Not in Giggly yet: `geom_histogram()` and `coord_flip()`.
+Not in Giggly yet: `coord_flip()`.
 
 ## A horizontal area
 

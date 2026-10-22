@@ -34,7 +34,7 @@ ggplot(mpg, aes(class, hwy)) +
 
 `geom_jitter()` is a shortcut for `geom_point(position = "jitter")`.
 
-Not in Giggly yet: `geom_boxplot()` and `geom_jitter()`, points placed by `position_jitter()`.
+Not in Giggly yet: `geom_jitter()`, points placed by `position_jitter()`.
 
 ## Too much jitter
 

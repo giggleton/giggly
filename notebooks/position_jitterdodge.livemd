@@ -15,11 +15,11 @@ the order the page gives them. Each example shows ggplot2's code first and then 
 example Giggly cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the
 page is also a list of what remains.
 
-`position_jitterdodge()` dodges and jitters at once. It is mostly for lining points up with
-boxplots dodged side by side, as they are when a boxplot maps `fill`: each point moves to its
-group's place in the dodge, then by a little random noise, sideways only unless `jitter.height`
-says otherwise. Giggly dodges bars, with `position: :dodge` on `Giggly.Plot.geom_bar/3`, but has
-none of this yet: no jitter, no boxplots, and no dodging of points.
+`position_jitterdodge()` dodges and jitters at once. It is mostly for lining points up with boxplots
+dodged side by side, as they are when a boxplot maps `fill`: each point moves to its group's place
+in the dodge, then by a little random noise, sideways only unless `jitter.height` says otherwise.
+Giggly dodges bars, and box plots by default with `Giggly.Plot.geom_boxplot/3`, but has none of
+this yet: no jitter, and no dodging of points.
 
 ## Points over dodged boxplots
 
@@ -34,4 +34,6 @@ ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
 R's `sample()` picks diamonds at random, the same ones every time after `set.seed(596)`;
 `pch = 21` is the point shape with both a border and a fill.
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.size` option, and `position_jitterdodge()`.
+Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered
+factors), `scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor, and
+`position_jitterdodge()` with `geom_point()`'s `position` option.

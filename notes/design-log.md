@@ -1493,6 +1493,16 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   is taken on trust. *Rejected: a cell that raises* — closest to R's code, but the notebook keeps a
   cell that fails on purpose.
 
+- **A value an example computes in base R before plotting is written out as R gives it
+  (2026-10-22, Steve, in the distributions sweep).** geom_histogram's equal-count bins take their
+  edges from `quantile(diamonds$price, probs = seq(0, 1, length = 11))`, base R's default
+  quantiles; Giggly offers no quantile a user can call (the frame's is internal), so the cell
+  writes R's eleven edges as a list and the prose says they are what `quantile()` gives, as a
+  notebook takes the rows R's random numbers produced. The plot is still Giggly's own: `breaks:`
+  takes the list, and both drawings match R's. *Rejected: computing them in the cell* — R's
+  interpolation ported by hand, statistics in a page about plotting. *Rejected: leaving the
+  example waiting on `quantile()`* — base R, not ggplot2, and nothing Giggly's plotting lacks.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -2164,6 +2174,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Sweep the notebooks for histograms, box plots and dodging (distributions, step 7);
+  §4: "A value an example computes in base R"
 - 2026-10-22 — Draw box plots: Geom.Boxplot and geom_boxplot/3 (distributions, step 6); §4: "A
   weight in the plot's mapping is refused by a box layer", "A box layer dodges by clusters", "A
   box plot's orientation is R's", "A box plot takes R's options" (amended)

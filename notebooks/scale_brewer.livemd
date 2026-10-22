@@ -69,8 +69,8 @@ p <- ggplot(diamonds, aes(x = price, fill = cut)) +
 p + scale_fill_brewer()
 ```
 
-Not in Giggly yet: `geom_histogram()`, choosing the order of a column's values (`cut` is an ordered
-factor), and `scale_fill_brewer()`.
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_fill_brewer()`.
 
 ## Reversing the palette
 
@@ -79,8 +79,8 @@ factor), and `scale_fill_brewer()`.
 p + scale_fill_brewer(direction = -1)
 ```
 
-Not in Giggly yet: `geom_histogram()`, choosing the order of a column's values, and
-`scale_fill_brewer()` and its `direction` option.
+Not in Giggly yet: choosing the order of a column's values, and `scale_fill_brewer()` and its
+`direction` option.
 
 ## A dark background
 
@@ -91,8 +91,8 @@ p +
   theme_dark()
 ```
 
-Not in Giggly yet: `geom_histogram()`, choosing the order of a column's values,
-`scale_fill_brewer()` and its `direction` option, and `theme_dark()`. Giggly draws every plot in
+Not in Giggly yet: choosing the order of a column's values, `scale_fill_brewer()` and its
+`direction` option, and `theme_dark()`. Giggly draws every plot in
 ggplot2's default theme, `theme_gray()`.
 
 ## Continuous colours

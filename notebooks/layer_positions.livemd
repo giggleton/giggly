@@ -17,11 +17,12 @@ A layer's position adjusts where its marks sit, mostly to keep them from overlap
 them side by side, stacking piles them up, filling scales each pile to a proportion, jittering adds
 random noise and nudging offsets them by a fixed distance. ggplot2 takes a layer's position from a
 geom's default, as a string (`position = "jitter"`), as a `position_*()` function, which also
-carries its options, or through `layer()`; for many layers it is `position_identity()`, which
-leaves them where they are. Giggly has stacking and dodging, for bars:
-`Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3` stack by default, or dodge with
-`position: :dodge`, as `position = "dodge"` does; and nudging, for text: `Giggly.Plot.geom_text/3`
-nudges every label by its `nudge_x:` and `nudge_y:` options, as ggplot2's `geom_text()` does. Not
-in Giggly yet: `position_dodge2()`,
-`position_fill()`, `position_jitter()`, `position_jitterdodge()` and `position_nudge()`, the
-options of `position_stack()` and `position_dodge()`, and `layer()`.
+carries its options, or through `layer()`; for many layers it is `position_identity()`, which leaves
+them where they are. Giggly has stacking and dodging, for bars and histograms:
+`Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3` and `Giggly.Plot.geom_histogram/3` stack by
+default, or dodge with `position: :dodge`, as `position = "dodge"` does, or with `position: :dodge2`
+or `Giggly.Plot.position_dodge2/1`, as `position_dodge2()` does, which `Giggly.Plot.geom_boxplot/3`
+dodges its boxes with by default; and nudging, for text: `Giggly.Plot.geom_text/3` nudges every
+label by its `nudge_x:` and `nudge_y:` options, as ggplot2's `geom_text()` does. Not in Giggly yet:
+`position_fill()`, `position_jitter()`, `position_jitterdodge()` and `position_nudge()`, the options
+of `position_stack()` and `position_dodge()`, `position_dodge2()`'s `width` option, and `layer()`.

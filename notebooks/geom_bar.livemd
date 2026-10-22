@@ -185,8 +185,15 @@ values = List.duplicate(2.9, 5) ++ List.duplicate(3.1, 10) ++ List.duplicate(4.5
 ggplot(df, aes(x)) + geom_histogram(binwidth = 0.5)
 ```
 
-Not in Giggly yet: histograms, `geom_histogram()`, and the binning they count with,
-`stat_bin()`.
+The cell takes `values` from the example before, as R reuses its `df`. Bins half a unit wide put
+2.9 and 3.1 in one bin.
+
+```elixir
+[x: values]
+|> Plot.new(%{x: :x})
+|> Plot.geom_histogram(binwidth: 0.5)
+|> render.()
+```
 
 ## Aligning columns with dates
 
@@ -199,5 +206,21 @@ ggplot(df, aes(x, y)) + geom_col(just = 0.5)
 ggplot(df, aes(x, y)) + geom_col(just = 1)
 ```
 
-Not in Giggly yet: `geom_col()`'s `just` option. Giggly centres every bar
-on its `x`, as `just = 0.5` does.
+Each column is 0.9 as wide as the two dates are apart. With `just = 1` the columns end on the
+first day of each month rather than begin there, as the comment says: ggplot2 sets a column from
+`x - width * just` to `x + width * (1 - just)`, so `just = 0` would begin them there. Giggly draws
+what R draws.
+
+```elixir
+df = %{"x" => [~D[2020-01-01], ~D[2020-02-01]], "y" => [1, 2]}
+
+Plot.new(df, %{x: :x, y: :y})
+|> Plot.geom_col(just: 0.5)
+|> render.()
+```
+
+```elixir
+Plot.new(df, %{x: :x, y: :y})
+|> Plot.geom_col(just: 1)
+|> render.()
+```

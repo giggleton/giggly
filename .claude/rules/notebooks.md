@@ -27,7 +27,7 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   runs and no verdict is written (the entry beginning "An example R refuses on purpose").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
   words in every notebook** ("mapping a text's `size`", "a character as a shape",
-  "`geom_boxplot()`", "a whole-column function in a mapping", "choosing the order of a column's
+  "`geom_jitter()`", "a whole-column function in a mapping", "choosing the order of a column's
   values"), so when a feature lands, searching the notebooks for its name finds every example
   waiting for it, and those are drawn; a verdict still waiting drops the pieces that landed and
   keeps the rest (design-log §4, the entries beginning "A verdict names a missing expression" and
@@ -49,7 +49,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   ggplot2 is review's job (`test/golden/point.R`), not the notebook's.
 - **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses; a small table
   the example writes out in R, the cell writes out too. Where an example draws random numbers in
-  R, the notebook takes the rows R actually produced and says so.
+  R, the notebook takes the rows R actually produced and says so, and where it computes values
+  with base R before plotting (`quantile()`), it writes out R's values and says so (design-log §4,
+  the entry beginning "A value an example computes in base R").
 - **A notebook installs Giggly by path** (`Path.join(__DIR__, "..")`) and Kino, and shows a plot
   with `Kino.Image.new(svg, :svg)`, through the setup cell's `render`, until a plot can show
   itself. A `livebook` escript built with an older Elixir than `mix.exs` requires cannot run

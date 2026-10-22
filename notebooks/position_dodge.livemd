@@ -8,6 +8,9 @@ Mix.install([
 
 alias Giggly.Plot
 
+mtcars = Giggly.Datasets.mtcars()
+mpg = Giggly.Datasets.mpg()
+
 render = fn plot ->
   plot
   |> Giggly.to_svg()
@@ -25,12 +28,16 @@ and then Giggly's. An example Giggly cannot draw yet keeps its ggplot2 code and 
 waiting for, so the page is also a list of what remains.
 
 Dodging keeps each mark's vertical position and sets the marks that share an `x` side by side.
-`position_dodge()` dodges by group, so it needs the groups; `position_dodge2()` needs none,
-dodging each mark by its own extent and leaving a little padding between them, which suits box
-plots of different widths. `width` gives the width to dodge within, for marks narrower than the
-bars they sit beside, and `preserve` keeps either the total width at each position or the width
-of each mark. Giggly dodges bars as `position = "dodge"` does: `Giggly.Plot.geom_bar/3` and
-`Giggly.Plot.geom_col/3` take `position: :dodge`, which has no options.
+`position_dodge()` dodges by group, so it needs the groups; `position_dodge2()` needs none, dodging
+each mark by its own extent and leaving a little padding between them, which suits box plots of
+different widths. `width` gives the width to dodge within, for marks narrower than the bars they sit
+beside, and `preserve` keeps either the total width at each position or the width of each mark.
+Giggly dodges bars and histograms as `position = "dodge"` does, with `position: :dodge`, which has
+no options, and bars, histograms and box plots as `position_dodge2()` does, with `position: :dodge2`
+or `Giggly.Plot.position_dodge2/1` and its `preserve:`, `padding:` and `reverse:`. Not in Giggly
+yet: `position_dodge()`'s options and `position_dodge2()`'s `width` option. The setup cell binds R's
+`mtcars` and ggplot2's `mpg`, `Giggly.Datasets.mtcars/0` and `Giggly.Datasets.mpg/0`, to their names
+in R.
 
 ## Dodging without groups
 
@@ -39,7 +46,14 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = "dodge2")
 ```
 
-Not in Giggly yet: `position_dodge2()`.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}` and `position = "dodge2"` as
+`position: :dodge2`.
+
+```elixir
+Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar(position: :dodge2)
+|> render.()
+```
 
 ## The width of each bar
 
@@ -50,7 +64,13 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = position_dodge2(preserve = "single"))
 ```
 
-Not in Giggly yet: `position_dodge2()` and its `preserve` option.
+`Giggly.Plot.position_dodge2/1` takes ggplot2's options, a word as an atom.
+
+```elixir
+Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :single))
+|> render.()
+```
 
 ## Dodged histograms
 
@@ -60,7 +80,12 @@ ggplot(diamonds, aes(price, fill = cut)) +
 # see ?geom_bar for more examples
 ```
 
-Not in Giggly yet: histograms, `geom_histogram()`, and `position_dodge2()`.
+Giggly bins and dodges the diamonds with `Giggly.Plot.geom_histogram/3` and `position: :dodge2`,
+but fills `cut` with hues in alphabetical order, where R fills an ordered factor with viridis in
+the order of its levels.
+
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor.
 
 ## Frequency polygons instead
 
@@ -70,8 +95,8 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly()
 ```
 
-Not in Giggly yet: frequency polygons and `geom_freqpoly()`, choosing the order of a column's values
-(`cut` is an ordered factor), and `scale_colour_viridis_d()`, ggplot2's default colour scale for an
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_colour_viridis_d()`, ggplot2's default colour scale for an
 ordered factor.
 
 ## Columns dodged by group
@@ -161,7 +186,14 @@ ggplot(mpg, aes(factor(year), displ)) +
   geom_boxplot(aes(colour = hwy < 30))
 ```
 
-Not in Giggly yet: box plots, `geom_boxplot()`, and `position_dodge2()`.
+Giggly writes `hwy < 30` as `{&Kernel.</2, [:hwy, 30]}`, which titles the legend `hwy < 30`, as R
+does.
+
+```elixir
+Plot.new(mpg, %{x: {:factor, [:year]}, y: :displ})
+|> Plot.geom_boxplot(%{colour: {&Kernel.</2, [:hwy, 30]}})
+|> render.()
+```
 
 ## Box plots of different widths
 
@@ -173,7 +205,11 @@ ggplot(mpg, aes(factor(year), displ)) +
 `varwidth = TRUE` makes each box's width grow with the square root of its number of rows, and
 `position_dodge2()` dodges the boxes by their own widths.
 
-Not in Giggly yet: `geom_boxplot()` and its `varwidth` option, and `position_dodge2()`.
+```elixir
+Plot.new(mpg, %{x: {:factor, [:year]}, y: :displ})
+|> Plot.geom_boxplot(%{colour: {&Kernel.</2, [:hwy, 30]}}, varwidth: true)
+|> render.()
+```
 
 ## Bars dodged the same way
 
@@ -188,4 +224,14 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
 Every 8-cylinder car has `vs` 0, so that `x` has one bar: as wide as one bar of a pair with
 `preserve = "single"`, and as wide as the whole pair with `preserve = "total"`.
 
-Not in Giggly yet: `position_dodge2()` and its `preserve` option.
+```elixir
+Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :single))
+|> render.()
+```
+
+```elixir
+Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :total))
+|> render.()
+```

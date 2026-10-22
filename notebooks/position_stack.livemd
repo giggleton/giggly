@@ -48,8 +48,11 @@ ggplot(diamonds, aes(price, fill = cut)) +
   geom_histogram(binwidth = 500, position = "fill")
 ```
 
-Not in Giggly yet: `geom_histogram()` with the binning it counts by, `stat_bin()`, and
-`position_fill()`.
+`Giggly.Plot.geom_histogram/3` stacks its bars, as the first plot does, but fills `cut` with hues in
+alphabetical order, where R fills an ordered factor with viridis in the order of its levels.
+
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor),
+`scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor, and `position_fill()`.
 
 ## Stacked areas
 

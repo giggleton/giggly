@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,7 +31,17 @@ A box plot shows the distribution of a continuous column in five numbers: the me
 at the first and third quartiles, and two whiskers, each reaching to the furthest value within 1.5
 times the inter-quartile range of its hinge. Every value beyond a whisker is drawn as a point of
 its own, an outlier. `stat_boxplot()` computes the five numbers for each group, and
-`geom_boxplot()` draws them, or draws numbers computed beforehand. Giggly has none of this yet.
+`geom_boxplot()` draws them, or draws numbers computed beforehand. Giggly has
+`Giggly.Plot.geom_boxplot/3`, which computes the five numbers for each group itself, takes ggplot2's
+options as keyword options (`notch:`, `varwidth:`, `outlier_colour:` and the look of each part),
+and sets boxes that share a position side by side as `position_dodge2()` does. It has no
+`stat_boxplot()` of its own, no `geom_jitter()` and no `cut_width()`, maps no `lower`, `middle` or
+`upper`, and cannot choose a layer's stat. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. Most examples use `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234
+cars of 38 popular models from 1999 to 2008; the rest use ggplot2's `diamonds`,
+`Giggly.Datasets.diamonds/0`. The setup cell binds each to ggplot2's name for it.
 
 ## A box for each class
 
@@ -28,7 +50,13 @@ p <- ggplot(mpg, aes(class, hwy))
 p + geom_boxplot()
 ```
 
-Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
+```elixir
+p = Plot.new(mpg, %{x: :class, y: :hwy})
+
+p
+|> Plot.geom_boxplot()
+|> render.()
+```
 
 ## Horizontal boxes
 
@@ -37,7 +65,13 @@ Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
 ggplot(mpg, aes(hwy, class)) + geom_boxplot()
 ```
 
-Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
+Giggly's boxes stand along the discrete axis too, here `y`.
+
+```elixir
+Plot.new(mpg, %{x: :hwy, y: :class})
+|> Plot.geom_boxplot()
+|> render.()
+```
 
 ## Notches
 
@@ -45,8 +79,15 @@ Not in Giggly yet: `geom_boxplot()` and `stat_boxplot()`.
 p + geom_boxplot(notch = TRUE)
 ```
 
-A notch around each median shows a rough 95% confidence interval for comparing medians. Not in
-Giggly yet: `geom_boxplot()` and its `notch` option.
+A notch around each median shows a rough 95% confidence interval for comparing medians. Where a
+notch reaches past its box's hinges, as two do here, R warns that the notch went outside the
+hinges; Giggly draws the same notches without a warning.
+
+```elixir
+p
+|> Plot.geom_boxplot(notch: true)
+|> render.()
+```
 
 ## Widths that follow the group's size
 
@@ -54,8 +95,13 @@ Giggly yet: `geom_boxplot()` and its `notch` option.
 p + geom_boxplot(varwidth = TRUE)
 ```
 
-Each box's width is in proportion to the square root of its group's number of rows. Not in
-Giggly yet: `geom_boxplot()` and its `varwidth` option.
+Each box's width is in proportion to the square root of its group's number of rows.
+
+```elixir
+p
+|> Plot.geom_boxplot(varwidth: true)
+|> render.()
+```
 
 ## A fixed fill and colour
 
@@ -63,7 +109,11 @@ Giggly yet: `geom_boxplot()` and its `varwidth` option.
 p + geom_boxplot(fill = "white", colour = "#3366FF")
 ```
 
-Not in Giggly yet: `geom_boxplot()`.
+```elixir
+p
+|> Plot.geom_boxplot(fill: "white", colour: "#3366FF")
+|> render.()
+```
 
 ## Outliers of their own colour
 
@@ -73,8 +123,13 @@ Not in Giggly yet: `geom_boxplot()`.
 p + geom_boxplot(outlier.colour = "red", outlier.shape = 1)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape` options, here shape
-1, a hollow circle.
+Shape 1 is a hollow circle. Giggly writes ggplot2's dotted option names with underscores.
+
+```elixir
+p
+|> Plot.geom_boxplot(outlier_colour: "red", outlier_shape: 1)
+|> render.()
+```
 
 ## Boxes over the data's points
 
@@ -83,7 +138,8 @@ Not in Giggly yet: `geom_boxplot()` and its `outlier.colour` and `outlier.shape`
 p + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, and `geom_jitter()`.
+Not in Giggly yet: `geom_jitter()`. Giggly hides the outliers with `outlier_shape: :none`, as
+`outlier.shape = NA` does.
 
 ## Dodged boxes
 
@@ -92,7 +148,14 @@ Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, and `geom_ji
 p + geom_boxplot(aes(colour = drv))
 ```
 
-Not in Giggly yet: `geom_boxplot()` and `position_dodge2()`, which sets the boxes side by side.
+Mapping `colour` to `drv` splits each class into a box for each drive train, which Giggly sets side
+by side as `position_dodge2()` does, its default for boxes too.
+
+```elixir
+p
+|> Plot.geom_boxplot(%{colour: :drv})
+|> render.()
+```
 
 ## A continuous x
 
@@ -101,12 +164,24 @@ Not in Giggly yet: `geom_boxplot()` and `position_dodge2()`, which sets the boxe
 # a grouping variable. cut_width is particularly useful
 ggplot(diamonds, aes(carat, price)) +
   geom_boxplot()
+```
+
+Without a group, the whole of `carat` makes one box, nine tenths as wide as its range. R warns that
+a continuous `x` wants a `group`; Giggly draws the same box without a warning.
+
+```elixir
+Plot.new(diamonds, %{x: :carat, y: :price})
+|> Plot.geom_boxplot()
+|> render.()
+```
+
+```r
 ggplot(diamonds, aes(carat, price)) +
   geom_boxplot(aes(group = cut_width(carat, 0.25)))
 ```
 
-Without a group, the whole of `carat` makes one box. Not in Giggly yet: `geom_boxplot()`,
-`cut_width()`, and a whole-column function in a mapping, such as `cut_width(carat, 0.25)`.
+Not in Giggly yet: `cut_width()`, and a whole-column function in a mapping, such as
+`cut_width(carat, 0.25)`.
 
 ## Transparent outliers
 
@@ -116,8 +191,8 @@ ggplot(diamonds, aes(carat, price)) +
   geom_boxplot(aes(group = cut_width(carat, 0.25)), outlier.alpha = 0.1)
 ```
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.alpha` option, `cut_width()`, and a
-whole-column function in a mapping, such as `cut_width(carat, 0.25)`.
+Not in Giggly yet: `cut_width()`, and a whole-column function in a mapping, such as
+`cut_width(carat, 0.25)`. Giggly's `outlier_alpha:` sets the outliers' transparency.
 
 ## Numbers computed beforehand
 
@@ -142,5 +217,5 @@ ggplot(df, aes(x)) +
 ```
 
 R draws 100 random numbers and puts their five numbers in a table of one row, which `stat =
-"identity"` draws as they are. Not in Giggly yet: `geom_boxplot()`, mapping `lower`, `middle` and
-`upper`, and choosing a layer's stat, here `stat = "identity"`.
+"identity"` draws as they are. Not in Giggly yet: mapping `lower`, `middle` and `upper`, and
+choosing a layer's stat, here `stat = "identity"`.

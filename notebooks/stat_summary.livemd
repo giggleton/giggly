@@ -21,7 +21,7 @@ summary. The summary is one function that returns a middle and the ends of a ran
 or a function for each (`fun`, `fun.min` and `fun.max`); given neither, it is the mean and its
 standard error, `mean_se()`. Each summary is drawn as a point with a line through its range,
 `geom_pointrange()`, unless another geom is given. Giggly has none of it yet; the nearest it has
-is `Giggly.Plot.geom_bar/3`, which counts the rows at each `x` or sums their `weight`.
+is `Giggly.Plot.geom_boxplot/3`, which summarises the `y` values at each `x` in five numbers.
 
 ## Means with bootstrapped intervals
 
@@ -85,7 +85,8 @@ d + stat_summary(aes(y = price), fun = "mean", geom = "bar")
 The first plot counts the diamonds of each cut; the second draws the mean price of each cut as a
 bar.
 
-Not in Giggly yet: `stat_summary()` drawn as bars.
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`stat_summary()` drawn as bars.
 
 ## Summaries in bins
 

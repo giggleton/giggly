@@ -87,8 +87,8 @@ p + scale_fill_viridis_d()
 p + scale_fill_viridis_d(direction = -1)
 ```
 
-Not in Giggly yet: the `txhousing` dataset, histograms (`geom_histogram()`) and the binning they
-count with (`stat_bin()`), and `scale_fill_viridis_d()` and its `direction` option.
+Not in Giggly yet: the `txhousing` dataset, and `scale_fill_viridis_d()` and its `direction`
+option.
 
 ## Continuous values
 

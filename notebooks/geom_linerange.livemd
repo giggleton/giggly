@@ -111,4 +111,6 @@ geom_errorbar(
 )
 ```
 
-Not in Giggly yet: `position_dodge2()` and its options, and `geom_errorbar()`.
+Not in Giggly yet: `geom_errorbar()`. `Giggly.Plot.position_dodge2/1` takes `padding:` but no
+`width:`, and R ignores `width = 0.5` here: the error bars have widths of their own, which
+`position_dodge2()` dodges by.

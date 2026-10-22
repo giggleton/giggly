@@ -15,4 +15,4 @@ examples, so this notebook says only what the page describes and where Giggly st
 `seals` is a vector field of seal movements, a table of 1,155 rows and 4 columns, produced from
 the data of Brillinger, Preisler, Ager and Kie, "An exploratory data analysis (EDA) of the paths
 of moving animals" (2004), with the methods of Brillinger's "Learning a potential function from a
-trajectory" (2007). Not in Giggly yet: the `seals` dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics` and `mpg`, and R's `mtcars`.
+trajectory" (2007). Not in Giggly yet: the `seals` dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics`, `economics_long` and `mpg`, and R's `mtcars`.

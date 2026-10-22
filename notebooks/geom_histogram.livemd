@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,8 +31,16 @@ into bins and counts the rows in each; `geom_histogram()` draws the counts as ba
 `geom_freqpoly()`, a frequency polygon, as a line through them, which is easier to compare across
 the values of a categorical column. The bins are set by their number, their width or their
 boundaries, and a bar's height can be a density or a sum of weights instead of a count. Giggly has
-none of these yet. Its `Giggly.Plot.geom_bar/3` counts the rows at each distinct `x`, or sums
-their `weight`, without binning, as `stat_count()` does.
+all three, `Giggly.Plot.geom_histogram/3`, `Giggly.Plot.geom_freqpoly/3` and
+`Giggly.Plot.stat_bin/3`, which take ggplot2's binning options as keyword options (`bins:`,
+`binwidth:`, `breaks:`, `boundary:` and the rest), sum a mapped `weight`, and map what the binning
+computes, such as the density, with `{:after_stat, [:density]}`. It has no `scale_x_binned()`, no
+function as a `binwidth`, no `coord_transform()` and not the `movies` dataset, and cannot yet choose
+the order of a column's values, which ggplot2's ordered `cut` needs. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The examples use ggplot2's `diamonds`,
+`Giggly.Datasets.diamonds/0`, which the setup cell binds to `diamonds`, ggplot2's name for it.
 
 ## A histogram
 
@@ -31,8 +50,13 @@ ggplot(diamonds, aes(carat)) +
 ```
 
 With neither `bins` nor `binwidth`, ggplot2 makes 30 bins and suggests choosing a better value.
+Giggly makes 30 bins too, without the suggestion.
 
-Not in Giggly yet: `geom_histogram()` and `stat_bin()`.
+```elixir
+Plot.new(diamonds, %{x: :carat})
+|> Plot.geom_histogram()
+|> render.()
+```
 
 ## The width and number of bins
 
@@ -43,7 +67,17 @@ ggplot(diamonds, aes(carat)) +
   geom_histogram(bins = 200)
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` and `bins` options.
+```elixir
+Plot.new(diamonds, %{x: :carat})
+|> Plot.geom_histogram(binwidth: 0.01)
+|> render.()
+```
+
+```elixir
+Plot.new(diamonds, %{x: :carat})
+|> Plot.geom_histogram(bins: 200)
+|> render.()
+```
 
 ## A horizontal histogram
 
@@ -53,7 +87,13 @@ ggplot(diamonds, aes(y = carat)) +
   geom_histogram()
 ```
 
-Not in Giggly yet: `geom_histogram()`.
+With `y` mapped rather than `x`, the bins run up the panel and the bars across it.
+
+```elixir
+Plot.new(diamonds, %{y: :carat})
+|> Plot.geom_histogram()
+|> render.()
+```
 
 ## Binning the axis instead
 
@@ -82,9 +122,9 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_histogram()` and `geom_freqpoly()`, choosing the order of a column's values
-(`cut` is an ordered factor), and `scale_fill_viridis_d()` and `scale_colour_viridis_d()`, ggplot2's
-default fill and colour scales for an ordered factor.
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_fill_viridis_d()` and `scale_colour_viridis_d()`, ggplot2's default fill and colour scales
+for an ordered factor.
 
 ## Density instead of count
 
@@ -95,7 +135,11 @@ ggplot(diamonds, aes(price, after_stat(density), colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: `geom_freqpoly()`.
+Giggly maps the density as `{:after_stat, [:density]}`, but colours `cut` with hues in alphabetical
+order, where R colours an ordered factor with viridis in the order of its levels.
+
+Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
+`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
 
 ## Bins of unequal width
 
@@ -116,7 +160,23 @@ ggplot(diamonds, aes(price, after_stat(count / width))) +
 With the count as its height, every bar is about as tall as the next and the widest look the
 biggest; dividing each count by its bin's width makes each bar's area its count instead.
 
-Not in Giggly yet: `geom_histogram()` and its `breaks` option.
+Giggly has no quantile a user can call, so the cell writes out the eleven prices R's `quantile()`
+gives. `{:after_stat, [{&Kernel.//2, [:count, :width]}]}` divides each bin's count by its width,
+and titles the y axis `count / width`, where R writes `count/width`.
+
+```elixir
+price_bins = [326, 646, 837, 1087, 1698, 2401, 3465, 4662, 6301.2, 9821, 18823]
+
+Plot.new(diamonds, %{x: :price})
+|> Plot.geom_histogram(breaks: price_bins, color: "black")
+|> render.()
+```
+
+```elixir
+Plot.new(diamonds, %{x: :price, y: {:after_stat, [{&Kernel.//2, [:count, :width]}]}})
+|> Plot.geom_histogram(breaks: price_bins, color: "black")
+|> render.()
+```
 
 ## Movies by rating
 
@@ -133,7 +193,7 @@ m <- ggplot(movies, aes(rating))
 m + geom_histogram(binwidth = 0.1)
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, and the `movies` dataset.
+Not in Giggly yet: the `movies` dataset.
 
 ## Summing a weight
 
@@ -146,10 +206,9 @@ m +
 ```
 
 Mapping `weight` makes each bar the sum of its rows' votes rather than their number, as it does
-for `Giggly.Plot.geom_bar/3`.
+for `Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_bar/3`.
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, `ylab()`, and the `movies`
-dataset.
+Not in Giggly yet: `ylab()` and the `movies` dataset.
 
 ## Bins on a transformed scale
 
@@ -164,7 +223,7 @@ m +
   scale_x_log10()
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, and the `movies` dataset.
+Not in Giggly yet: the `movies` dataset.
 
 ## Bins in a transformed coordinate system
 
@@ -185,8 +244,7 @@ m +
   coord_transform(x = "sqrt")
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `boundary` option, `coord_transform()`, and the
-`movies` dataset.
+Not in Giggly yet: `coord_transform()` and the `movies` dataset.
 
 ## Transforming the y axis
 
@@ -200,7 +258,7 @@ m +
 }
 ```
 
-Not in Giggly yet: `geom_histogram()` and its `binwidth` option, and the `movies` dataset.
+Not in Giggly yet: the `movies` dataset.
 
 ## A bin width for each panel
 
@@ -215,5 +273,6 @@ ggplot(economics_long, aes(value)) +
 
 The function is the Freedman–Diaconis rule, computed from each panel's own values.
 
-Not in Giggly yet: `geom_histogram()` and a function as its `binwidth`. The facets are in Giggly
-already: `Giggly.Plot.facet_wrap/3` with `scales: :free_x`.
+Not in Giggly yet: a function as `geom_histogram()`'s `binwidth`. The facets are in Giggly already,
+`Giggly.Plot.facet_wrap/3` with `scales: :free_x`, and `Giggly.Plot.geom_histogram/3` takes a
+number as its `binwidth:`.

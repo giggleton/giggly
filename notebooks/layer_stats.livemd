@@ -19,8 +19,12 @@ string given to a geom (`geom_line(stat = "density")`), as a ggproto object, or 
 Some geoms are paired with a stat of their own, as `geom_histogram()` is with `stat_bin()` and
 `geom_boxplot()` with `stat_boxplot()`, and most use `stat_identity()`, which leaves the data as it
 is. The variables a stat computes can be mapped with `after_stat()`. Of ggplot2's stats, Giggly
-computes one: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums their `weight`, as
-`geom_bar()` and `stat_count()` do; its points, columns, paths and lines draw the data as it is, as
-`geom_point()`, `geom_col()`, `geom_path()` and `geom_line()` do with `stat_identity()`. A mapping
-reads what counting computes, `count` and `prop`, with `{:after_stat, [:prop]}`. Not in Giggly yet:
-every other stat, giving a layer its stat by name, and `layer()`.
+computes four: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums their `weight`, as
+`geom_bar()` and `stat_count()` do; `Giggly.Plot.geom_count/3` and `Giggly.Plot.stat_sum/3` count
+the rows at each position, as `stat_sum()` does; `Giggly.Plot.geom_histogram/3`,
+`Giggly.Plot.geom_freqpoly/3` and `Giggly.Plot.stat_bin/3` count them in bins, as `stat_bin()` does;
+and `Giggly.Plot.geom_boxplot/3` summarises each group in five numbers, as `stat_boxplot()` does.
+Its points, columns, paths, lines, rectangles and text draw the data as it is, as ggplot2's do with
+`stat_identity()`. A mapping reads what a stat computes, such as counting's `prop` or binning's
+`density`, with `{:after_stat, [:prop]}`. Not in Giggly yet: every other stat, `stat_boxplot()` as a
+function of its own, giving a layer its stat by name, and `layer()`.

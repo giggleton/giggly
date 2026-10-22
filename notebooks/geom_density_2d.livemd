@@ -66,7 +66,9 @@ d <- ggplot(dsmall, aes(x, y))
 d + geom_density_2d(aes(colour = cut))
 ```
 
-Not in Giggly yet: `geom_density_2d()`.
+Not in Giggly yet: `geom_density_2d()`, choosing the order of a column's values (`cut` is an
+ordered factor), and `scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered
+factor.
 
 ## Filled contours in facets
 

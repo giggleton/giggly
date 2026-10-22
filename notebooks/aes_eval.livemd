@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,9 +31,14 @@ stat, from the variables the stat computes, with `after_stat()`; or after the sc
 aesthetics already mapped, with `after_scale()`. `stage()` maps one aesthetic at more than one of
 them, and `from_theme()` takes a colour from the theme's settings for geoms. Giggly maps at the
 start and after the stat: a mapping value is a column, an expression or a constant evaluated from
-the layer's data, or `{:after_stat, [value]}`, a value evaluated from what its stat computes, which
-`Giggly.Plot.geom_bar/3`'s counting is so far. It has no `after_scale()`, `stage()` or
-`from_theme()`, and no whole-column function in a mapping, such as `max(count)`.
+the layer's data, or `{:after_stat, [value]}`, a value evaluated from what its stat computes:
+counting (`Giggly.Plot.geom_bar/3`), summing (`Giggly.Plot.geom_count/3`), binning
+(`Giggly.Plot.geom_histogram/3`) or a box plot's summary (`Giggly.Plot.geom_boxplot/3`). It has no
+`after_scale()`, `stage()` or `from_theme()`, and no whole-column function in a mapping, such as
+`max(count)`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
+and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`, to `mpg`, ggplot2's name for it.
 
 ## The default histogram
 
@@ -32,9 +48,14 @@ ggplot(mpg, aes(displ)) +
   geom_histogram(aes(y = after_stat(count)))
 ```
 
-`after_stat(count)` is what `geom_histogram()` maps `y` to anyway.
+`after_stat(count)` is what `geom_histogram()` maps `y` to anyway. Giggly writes it
+`{:after_stat, [:count]}`.
 
-Not in Giggly yet: histograms and `geom_histogram()`.
+```elixir
+Plot.new(mpg, %{x: :displ})
+|> Plot.geom_histogram(%{y: {:after_stat, [:count]}})
+|> render.()
+```
 
 ## The tallest bin scaled to 1
 
@@ -44,8 +65,7 @@ ggplot(mpg, aes(displ)) +
   geom_histogram(aes(y = after_stat(count / max(count))))
 ```
 
-Not in Giggly yet: `geom_histogram()` and a whole-column function in a mapping, here `max(count)`
-inside `after_stat()`.
+Not in Giggly yet: a whole-column function in a mapping, here `max(count)` inside `after_stat()`.
 
 ## A fill made from the colour
 
@@ -58,7 +78,7 @@ ggplot(mpg, aes(class, hwy)) +
 `after_scale()` takes each box's colour once the scale has mapped `class` to it, and `alpha()`
 makes it translucent.
 
-Not in Giggly yet: box plots, `geom_boxplot()`, and `after_scale()`.
+Not in Giggly yet: `after_scale()`.
 
 ## Changing a scaled fill
 
@@ -71,7 +91,7 @@ ggplot(mpg, aes(class, hwy)) +
 `stage()` maps `fill` from `class` at the start, and then makes the colour the scale gives it
 translucent.
 
-Not in Giggly yet: `geom_boxplot()` and `stage()`.
+Not in Giggly yet: `stage()`.
 
 ## A proportional stacked density
 
@@ -156,5 +176,5 @@ ggplot(mpg, aes(displ, class)) +
 The text layer computes the box plot's statistics too, with `stat = "boxplot"`: `stage()` gives
 it `displ` to compute them from, and then places each label at the computed `xmax`.
 
-Not in Giggly yet: `geom_boxplot()` and its `outlier.shape` option, `stat_boxplot()` given to a geom
-as `stat = "boxplot"`, and `stage()`.
+Not in Giggly yet: `stat_boxplot()` given to a geom as `stat = "boxplot"`, and `stage()`. Giggly's
+box plot hides its outliers with `outlier_shape: :none`, as `outlier.shape = NA` does.

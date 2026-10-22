@@ -18,8 +18,8 @@ waiting for, so the page is also a list of what remains.
 `geom_density()` draws a kernel density estimate, a smoothed version of the histogram, which suits
 continuous data drawn from a smooth distribution; `stat_density()` computes it. Besides the
 density, the stat computes counts, the density times the number of rows, for stacking densities.
-Giggly has none of this yet. Every example uses ggplot2's `diamonds`, which is not in Giggly yet
-either.
+Giggly has none of this yet. Every example uses ggplot2's `diamonds`, which Giggly has, as
+`Giggly.Datasets.diamonds/0`.
 
 ## A density curve
 
@@ -63,7 +63,9 @@ ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
   xlim(55, 70)
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
+(`cut` is an ordered factor), and `scale_colour_viridis_d()` and `scale_fill_viridis_d()`, ggplot2's
+default colour and fill scales for an ordered factor.
 
 ## Bounded data
 
@@ -92,7 +94,9 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "stack")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
+(`cut` is an ordered factor), and `scale_fill_viridis_d()`, ggplot2's default fill scale for an
+ordered factor.
 
 ## Conditional densities
 
@@ -102,4 +106,6 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, and `position_fill()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
+(`cut` is an ordered factor), and `scale_fill_viridis_d()`, ggplot2's default fill scale for an
+ordered factor, and `position_fill()`.
