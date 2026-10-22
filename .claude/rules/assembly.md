@@ -122,8 +122,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   continuous scale censoring those outside its limits. Which columns belong to an axis is
   `Aesthetics.family/1`'s answer, never a name compared with `:x`.
 - **A layer's stat and position run by the structs the layer records**, read with
-  `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/2` and
-  `Position.compute_layer/2`; the assembly names no stat or position kind.
+  `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/3` and
+  `Position.compute_layer/2`; the assembly names no stat or position kind. **A stat is handed
+  each panel's axes** (design-log §4, the entry beginning "A stat is handed each panel's axes"),
+  built once from the scales trained before the stat: each axis's extent unwidened
+  (`Scale.dimension/2` with no expansion, as ggplot2's stats call `dimension()`), whether it is
+  discrete, and a function putting values through its transformation, built round the panel's
+  scale, so a stat never sees one.
 - **Each row is routed to the scale its panel uses.** The layout's `scale_x` and `scale_y` say
   which scale each panel uses, one for a fixed axis and one per panel for a free one; the assembly
   adds an untrained scale per id, all of the axis's one kind, trains each on the rows of the

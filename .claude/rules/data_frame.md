@@ -15,8 +15,16 @@ column names become strings", "Column types belong to the frame" and "Every boun
 ## Rules
 
 - **Callers use `Giggly.DataFrame`, never an implementation.** It is its own boundary exporting
-  only its root, so a call to `Giggly.DataFrame.Lists` or a `%Lists{}` outside it fails the build.
-  A new operation is a `@callback` plus a function here that dispatches on the frame's struct.
+  its root and `Arithmetic` alone, so a call to `Giggly.DataFrame.Lists` or a `%Lists{}` outside
+  it fails the build. A new operation is a `@callback` plus a function here that dispatches on the
+  frame's struct.
+- **R's arithmetic on the frame's doubles is `Giggly.DataFrame.Arithmetic`** (design-log §4, the
+  entry beginning "A missing value in a sum is R's"): the frame owns `nil` (R's `NA`), `:nan`,
+  `:infinity` and `:neg_infinity`, so it owns how they add, multiply, divide, compare and take a
+  magnitude or a maximum, as IEEE arithmetic and R's `pmin()`, `pmax()`, `max()` and `<` do, a
+  missing value and NaN where both meet resolved as R resolves them. A stat's shares and
+  densities and stacking's heights go through it, never Elixir's arithmetic, which has no
+  infinity.
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
@@ -36,10 +44,12 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **What `filter/2` and `mutate/2` compute, and what an aggregate reads, is an expression: plain
   data in the mapping's grammar with an operation named by an atom** (design-log §4, the entry
   beginning "The frame's operations share one expression grammar"): a column by its name, a
-  constant alone or as `{:constant, term}`, an operation `{name, [expression]}`. Values follow
-  Explorer's semantics, as types do: a missing value passes through an operation, a filter keeps
-  only the rows whose value is true, `and` is SQL's three-valued and. A column named alone keeps
-  its type, a constant's is worked out from its value, an operation's is what it computes. An
+  constant alone or as `{:constant, term}`, an operation `{name, [expression]}`, or `{name,
+  [expression], options}` for parameters that are not row values (`cut`'s `breaks:` and
+  `closed:`, R's `cut(include.lowest = TRUE)`, numbering each value's interval from 1). Values
+  follow Explorer's semantics, as types do: a missing value passes through an operation, a filter
+  keeps only the rows whose value is true, `and` is SQL's three-valued and. A column named alone
+  keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
   none, raises `FunctionClauseError`; the mapping's expressions by name will reuse the grammar.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
@@ -48,15 +58,17 @@ column names become strings", "Column types belong to the frame" and "Every boun
   them, and the facet repeats a table across the panels; `summarise/3`, the first group-by
   aggregate, with the stats that count; `filter/2`, `mutate/2`, the `is_finite` and `and`
   operations and the `n_distinct` and `first` aggregates, with counting's rows, weights and carried
-  columns. Not designed ahead.
+  columns; `cut`, with binning's bins. Not designed ahead.
 - **`summarise/3`'s aggregates are operations over one column, `{name, [column]}`**:
   `n_distinct`, a missing value counting as one, as R's `vec_unique_count()` counts; `first`, in
   row order, of the column's type; and a sum. **A sum's spec says how it adds** (design-log §4, the
   entry beginning "The frame's first group-by aggregate"): `summation: :compensated`, the
   default, as R's `sum()` adds in extended precision, or `:plain`, in row order, as `rowsum()`;
-  `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or a non-finite
-  float. Its rows are sorted by the `by` columns, a missing value last, each keeping its type. An
-  engine implementing the frame implements both summations, or refuses the one it cannot.
+  `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or NaN, as R's
+  `is.na()` reads one, the first met kept where it propagates, and an infinity no missing value but
+  added as IEEE adds one, so a sum meeting both infinities is NaN. Its rows are sorted by the
+  `by` columns, a missing value last, each keeping its type. An engine implementing the frame
+  implements both summations, or refuses the one it cannot.
 - **The frame knows nothing about plots.** The `panel` and `group` columns belong to the code that
   writes them (the facet, `add_group`), not to the frame.
 - **A frame that exists is well formed**: no name twice, every column `row_count` long, every

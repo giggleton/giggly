@@ -111,7 +111,8 @@ defmodule Giggly.Scale.Continuous do
 
   # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
   # (`oob = censor`, finite values only): an infinite end, `:infinity` or `:neg_infinity`, is kept,
-  # so a rectangle reaching the panel's edge still does.
+  # so a rectangle reaching the panel's edge still does, and NaN becomes `nil`, as ggplot2's
+  # position map gives `NA` for it.
   @doc false
   @spec censor(t(), list()) :: list()
   def censor(%__MODULE__{} = scale, values) do
@@ -148,6 +149,7 @@ defmodule Giggly.Scale.Continuous do
   defp censored(value, _low, high) when is_number(value) and is_number(high) and value > high,
     do: nil
 
+  defp censored(:nan, _low, _high), do: nil
   defp censored(value, _low, _high), do: value
 
   # `nil` and Explorer's non-finite float atoms are not numbers, so only a number widens the range.

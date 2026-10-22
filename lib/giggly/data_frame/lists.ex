@@ -164,6 +164,19 @@ defmodule Giggly.DataFrame.Lists do
     {:boolean, Enum.zip_with(left_values, right_values, &both/2)}
   end
 
+  defp evaluated(frame, {:cut, [argument], options}) do
+    {dtype, values} = evaluated(frame, argument)
+    numbers(dtype)
+
+    breaks =
+      options
+      |> Keyword.fetch!(:breaks)
+      |> List.to_tuple()
+
+    closed = Keyword.fetch!(options, :closed)
+    {:integer, Enum.map(values, fn value -> interval(value, breaks, closed) end)}
+  end
+
   defp constant(%__MODULE__{row_count: row_count}, value),
     do: typed({:constant, value}, List.duplicate(value, row_count))
 
@@ -176,6 +189,40 @@ defmodule Giggly.DataFrame.Lists do
   defp finite(nil), do: nil
   defp finite(value) when is_number(value), do: true
   defp finite(value) when value in @non_finite_floats, do: false
+
+  # The interval of `breaks` a number falls in, numbered from 1, as R's `.bincode()` finds it with
+  # `include.lowest = TRUE`: missing for a missing value, NaN or a number outside the breaks; else
+  # a halving search, a number on a break inside them going to the interval it closes.
+  defp interval(nil, _breaks, _closed), do: nil
+  defp interval(:nan, _breaks, _closed), do: nil
+
+  defp interval(value, breaks, closed) when closed in [:right, :left] do
+    last = tuple_size(breaks) - 1
+
+    if below?(value, elem(breaks, 0)) or below?(elem(breaks, last), value) do
+      nil
+    else
+      search(value, breaks, closed, 0, last)
+    end
+  end
+
+  defp search(_value, _breaks, _closed, low, high) when high - low < 2, do: low + 1
+
+  defp search(value, breaks, closed, low, high) do
+    middle = div(low + high, 2)
+    break = elem(breaks, middle)
+
+    if below?(break, value) or (closed == :left and value == break),
+      do: search(value, breaks, closed, middle, high),
+      else: search(value, breaks, closed, low, middle)
+  end
+
+  # Whether `low` is below `high`, an infinity below or above every number.
+  defp below?(:neg_infinity, high), do: high != :neg_infinity
+  defp below?(_low, :neg_infinity), do: false
+  defp below?(:infinity, _high), do: false
+  defp below?(_low, :infinity), do: true
+  defp below?(low, high), do: low < high
 
   # Whether both are true, by SQL's three-valued logic: false beats missing, and missing beats
   # true.
@@ -279,23 +326,36 @@ defmodule Giggly.DataFrame.Lists do
     end
   end
 
-  # The sum of `values`, each missing one, `nil` or a non-finite float, making it missing or left
-  # out as `missing` says.
+  # The sum of `values` as R adds doubles: a missing one, `nil` (R's `NA`) or NaN, makes it missing,
+  # the first in row order, as R's running sum keeps the first, or is left out, as `missing` says;
+  # and an infinity adds as IEEE adds one, so the sum is that infinity, or NaN where the two meet.
   defp sum(values, summation, :propagate) do
-    if Enum.all?(values, &is_number/1), do: added(values, summation), else: nil
+    case Enum.find(values, :none, fn value -> value in [nil, :nan] end) do
+      :none -> added(values, summation)
+      missing -> missing
+    end
   end
 
   defp sum(values, summation, :skip) do
     values
-    |> Enum.filter(&is_number/1)
+    |> Enum.reject(fn value -> value in [nil, :nan] end)
     |> added(summation)
   end
 
-  defp added(values, :plain), do: Enum.reduce(values, 0.0, &+/2)
+  defp added(values, summation) do
+    cond do
+      :infinity in values and :neg_infinity in values -> :nan
+      :infinity in values -> :infinity
+      :neg_infinity in values -> :neg_infinity
+      true -> finite_sum(values, summation)
+    end
+  end
+
+  defp finite_sum(values, :plain), do: Enum.reduce(values, 0.0, &+/2)
 
   # Neumaier's compensated sum: each addition's rounding error, found exactly from the two values
   # and their rounded sum, is kept apart and added back once at the end.
-  defp added(values, :compensated) do
+  defp finite_sum(values, :compensated) do
     {total, compensation} =
       Enum.reduce(values, {0.0, 0.0}, fn value, {total, compensation} ->
         sum = total + value

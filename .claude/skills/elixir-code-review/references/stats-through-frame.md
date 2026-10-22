@@ -19,7 +19,7 @@ Follow each frame a pull reads back to where it came from. A row-keeping operati
 `mutate/2`, `select/2`, `slice/2`, `split/2`, `put/3`) keeps a table the input's size, so its
 result is still the input:
 
-- `DataFrame.pull/2` of the frame `compute_layer/2` was handed, or of one made from it by
+- `DataFrame.pull/2` of the frame `compute_layer/3` was handed, or of one made from it by
   row-keeping operations, including through a helper that takes the frame as an argument;
 - a list as long as the input built in Elixir and put back (`List.duplicate(1.0,
   DataFrame.row_count(frame))`), where `mutate/2` with a constant does it;

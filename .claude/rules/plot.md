@@ -30,8 +30,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   which boundary cannot, since a boundary always exports its root and every export to all its
   dependents (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a
   scale and never runs one.
-- **The API is `new/2`, the geom functions, `stat_sum/3`, `annotate/3`, the facet functions
-  (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
+- **The API is `new/2`, the geom functions, `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet
+  functions (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
   `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and
@@ -54,7 +54,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   keeps only as an alias is not a kind:** `geom_col/3` records `%Geom.Bar{}` with
   `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`, and
   `geom_count/3` and `stat_sum/3` both `%Geom.Point{}` with `%Stat.Sum{}` and
-  `%Position.Identity{}`. A
+  `%Position.Identity{}`, and `stat_bin/3` `%Geom.Bar{}` with `%Stat.Bin{}` and its position,
+  `:stack` unless `position:` says `:dodge`. **`stat_bin/3`'s binning options are fields of
+  `%Stat.Bin{}`**, ggplot2's: `bins:` (30), `binwidth:`, above 0, `center:`, `boundary:`,
+  `breaks:`, two or more distinct numbers, `closed:` (`:right` or `:left`), `pad:` and `drop:`
+  (`:none`, `:all` or `:extremes`), numbers kept as floats as R keeps doubles, an option not given
+  `:none`; a centre and a boundary together are refused at the call, as `stat_bin()` refuses
+  them. A
   function takes ggplot2's function name, several may share a kind, and a refusal names the
   function that wrote the mapping (design-log §4, the entry beginning "A kind is named after").
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every

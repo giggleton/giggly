@@ -29,6 +29,7 @@ defmodule Giggly.Position.Stack do
     use Boundary, classify_to: Giggly.Position
 
     alias Giggly.{Aesthetics, DataFrame}
+    alias Giggly.DataFrame.Arithmetic
 
     # ggplot2's default: each bar's y at the top of its stretch.
     @vjust 1
@@ -116,8 +117,7 @@ defmodule Giggly.Position.Stack do
     defp stacked_end(ymax, ymin) when ymax == 0, do: ymin
     defp stacked_end(ymax, _ymin), do: ymax
 
-    defp below_zero?(%{ymax: ymax}) when is_number(ymax), do: ymax < 0
-    defp below_zero?(_row), do: false
+    defp below_zero?(%{ymax: ymax}), do: Arithmetic.less?(ymax, 0) == true
 
     # ggplot2's `collide()`: the pile's rows by their `xmin`, a missing one last, then by group,
     # highest first, each run of one `xmin` stacked on its own.
@@ -132,15 +132,22 @@ defmodule Giggly.Position.Stack do
     defp xmin_key(_missing), do: {1, nil}
 
     # ggplot2's `pos_stack()`: each bar takes the stretch from the pile's height so far to that
-    # height plus its y, a missing y adding nothing, in order. A bar whose `ymax` was below its
-    # `ymin` keeps them that way round, and one missing either has neither.
+    # height plus its y, a missing y adding nothing, in order, in R's arithmetic
+    # (`Giggly.DataFrame.Arithmetic`), so an infinite bar takes the pile to its infinity, and a
+    # bar above it stretches from infinity to infinity, its y NaN, as `0 * Inf` is. A bar whose
+    # `ymax` was below its `ymin` keeps them that way round, and one missing either has neither.
     defp pile(rows) do
       {stacked, _height} =
         Enum.map_reduce(rows, 0.0, fn row, height ->
-          next = height + y_value(row.y)
-          low = min(height, next)
-          high = max(height, next)
-          y = (1 - @vjust) * low + @vjust * high
+          next = Arithmetic.add(height, y_value(row.y))
+          low = Arithmetic.lesser(height, next)
+          high = Arithmetic.greater(height, next)
+
+          y =
+            Arithmetic.add(
+              Arithmetic.multiply(1 - @vjust, low),
+              Arithmetic.multiply(@vjust, high)
+            )
 
           {edges(row, y, low, high), next}
         end)
@@ -148,18 +155,16 @@ defmodule Giggly.Position.Stack do
       stacked
     end
 
-    defp y_value(y) when is_number(y), do: y
-    defp y_value(_missing), do: 0.0
+    defp y_value(missing) when missing in [nil, :nan], do: 0.0
+    defp y_value(y), do: y
 
-    defp edges(%{ymin: ymin, ymax: ymax} = row, y, low, high)
-         when is_number(ymin) and is_number(ymax) and ymax < ymin,
-         do: %{row | y: y, ymin: high, ymax: low}
-
-    defp edges(%{ymin: ymin, ymax: ymax} = row, y, low, high)
-         when is_number(ymin) and is_number(ymax),
-         do: %{row | y: y, ymin: low, ymax: high}
-
-    defp edges(row, y, _low, _high), do: %{row | y: y, ymin: nil, ymax: nil}
+    defp edges(%{ymin: ymin, ymax: ymax} = row, y, low, high) do
+      case Arithmetic.less?(ymax, ymin) do
+        true -> %{row | y: y, ymin: high, ymax: low}
+        false -> %{row | y: y, ymin: low, ymax: high}
+        nil -> %{row | y: y, ymin: nil, ymax: nil}
+      end
+    end
 
     defp missing?(value), do: value in [nil, :nan]
   end

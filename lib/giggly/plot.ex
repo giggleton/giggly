@@ -469,6 +469,77 @@ defmodule Giggly.Plot do
                  linetype: @bar_linetype_option
                )
 
+  # `stat_bin/3`'s options, validated at the call: how the axis is cut into bins, and a bar's.
+  @bin_options NimbleOptions.new!(
+                 data: @data_option,
+                 position: [
+                   type: {:in, [:stack, :dodge]},
+                   default: :stack,
+                   doc:
+                     "How bars that share a bin are placed: piled on one another (`:stack`), " <>
+                       "or set side by side within the bin's width (`:dodge`)."
+                 ],
+                 bins: [
+                   type: :pos_integer,
+                   default: 30,
+                   doc:
+                     "How many bins span the axis, when neither `binwidth:` nor `breaks:` is " <>
+                       "given."
+                 ],
+                 binwidth: [
+                   type: {:custom, __MODULE__, :validate_binwidth, []},
+                   doc:
+                     "How wide each bin is, a number above 0 in the axis's transformed units, " <>
+                       "which takes the place of `bins:`."
+                 ],
+                 center: [
+                   type: {:or, [:integer, :float]},
+                   doc:
+                     "Where one bin's middle falls, which places them all; not with " <>
+                       "`boundary:`."
+                 ],
+                 boundary: [
+                   type: {:or, [:integer, :float]},
+                   doc:
+                     "Where two bins meet, which places them all; not with `center:`. Without " <>
+                       "either, the outermost bins are centred on the axis's limits, or bins " <>
+                       "`binwidth:` wide meet half a width from 0."
+                 ],
+                 breaks: [
+                   type: {:custom, __MODULE__, :validate_bin_breaks, []},
+                   doc:
+                     "Where the bins meet, a list of two or more distinct numbers in the data's " <>
+                       "units, put through the axis's transformation, which takes the place of " <>
+                       "`bins:`, `binwidth:`, `center:` and `boundary:`; a row outside them is " <>
+                       "not counted."
+                 ],
+                 closed: [
+                   type: {:in, [:right, :left]},
+                   default: :right,
+                   doc:
+                     "Which end of a bin a value on its edge belongs to: the right end " <>
+                       "(`:right`), or the left (`:left`); the outermost bins hold their outer " <>
+                       "ends too."
+                 ],
+                 pad: [
+                   type: :boolean,
+                   default: false,
+                   doc: "Whether to add a bin of no rows at each end."
+                 ],
+                 drop: [
+                   type: {:in, [:none, :all, :extremes]},
+                   default: :none,
+                   doc:
+                     "Which bins of no rows to leave out: none (`:none`), every one (`:all`), " <>
+                       "or those before the first bin with rows and after the last (`:extremes`)."
+                 ],
+                 alpha: @alpha_option,
+                 color: @bar_color_option,
+                 fill: @bar_fill_option,
+                 linewidth: @bar_linewidth_option,
+                 linetype: @bar_linetype_option
+               )
+
   # `geom_path/3`'s options, validated at the call.
   @path_options NimbleOptions.new!(
                   [
@@ -1831,6 +1902,72 @@ defmodule Giggly.Plot do
       dropped: Stat.Count.dropped_aesthetics()
     )
     |> check_weight(layer, "Plot.geom_bar/3")
+  end
+
+  @doc """
+  Adds a layer of bars counting the rows in each bin: the `x` axis cut into bins, and for each
+  group one bar per bin, from 0 to the number of rows in it, or, where `:weight` is mapped, to the
+  sum of their weights, a bin with no rows counting 0. The y axis is titled `count`. The bins are
+  30 spanning each panel's x axis unless `bins:`, `binwidth:` or `breaks:` says otherwise; bars of
+  different groups in one bin are stacked. A row missing its `x`, or outside the breaks given, is
+  not counted. The bars are drawn as `geom_col/3` draws them.
+
+  Binning uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`, on a
+  continuous axis: it bins along the one mapped, so mapping `:y` alone draws horizontal bars. A
+  `:weight` column must hold numbers, and a missing weight adds nothing. The bars also take
+  `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`; one reaches a bar only where it is the
+  same in every row of its group, so a discrete one groups the rows and gives each group its bars.
+
+  Binning computes, for each bin, `count`; `density`, the count over the bin's width over the
+  group's total, so a group's bars cover an area of 1; `ncount` and `ndensity`, the count and the
+  density over the group's largest; and `width`. A mapping reads them with an after_stat
+  (`Giggly.Mapping`): `%{x: :hwy, y: {:after_stat, [:density]}}` draws the density.
+
+  ## Options
+
+  #{NimbleOptions.docs(@bin_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1.0, 1.5, 2.5, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x})
+      ...>   |> Giggly.Plot.stat_bin(binwidth: 1, boundary: 0)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :count)
+      [2.0, 1.0, 1.0]
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [1.5, 2.5, 3.5]
+  """
+  @spec stat_bin(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_bin(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_bin(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_bin(plot, %{}, options)
+
+  def stat_bin(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @bin_options)
+    check_bin_placement(validated, "Plot.stat_bin/3")
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Bar{},
+      stat: bin_stat(validated),
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.stat_bin/3"),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, "Plot.stat_bin/3",
+      required: Stat.Bin.required_aesthetics(),
+      exclusive: Stat.Bin.exclusive_aesthetics(),
+      computed: Stat.Bin.computed_variables(),
+      dropped: Stat.Bin.dropped_aesthetics()
+    )
+    |> check_weight(layer, "Plot.stat_bin/3")
   end
 
   @doc """
@@ -4574,6 +4711,32 @@ defmodule Giggly.Plot do
   def validate_linemitre(limit),
     do: {:error, "expected a number of line widths, 1 or more, got: #{inspect(limit)}"}
 
+  # NimbleOptions' check of a `binwidth:` option: a number above 0, kept as a float, as R keeps a
+  # double.
+  @doc false
+  @spec validate_binwidth(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_binwidth(width) when is_number(width) and width > 0, do: {:ok, width / 1}
+
+  def validate_binwidth(width),
+    do: {:error, "expected a bin width, a number above 0, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a `breaks:` option for bins: two or more numbers, no two the same, each
+  # kept as a float, as R keeps doubles; a list of one break or a repeated one has no bins between.
+  @doc false
+  @spec validate_bin_breaks(term()) :: {:ok, [float()]} | {:error, String.t()}
+  def validate_bin_breaks([_first, _second | _rest] = breaks) do
+    floats = for break <- breaks, is_number(break), do: break / 1
+
+    if length(floats) == length(breaks) and length(Enum.uniq(floats)) == length(floats),
+      do: {:ok, floats},
+      else: {:error, bin_breaks_error(breaks)}
+  end
+
+  def validate_bin_breaks(breaks), do: {:error, bin_breaks_error(breaks)}
+
+  defp bin_breaks_error(breaks),
+    do: "expected two or more distinct numbers where the bins meet, got: #{inspect(breaks)}"
+
   # A mapping as the plot holds it: its keys canonical and each value resolved
   # (`Giggly.Mapping`), a value the grammar refuses raising. The plot's mapping is held so, and
   # checked against a table by each layer that takes it.
@@ -4725,6 +4888,35 @@ defmodule Giggly.Plot do
     validated
     |> Keyword.take(@fixed_aesthetics)
     |> Map.new()
+  end
+
+  # Binning's struct from a layer function's validated options, each not given recorded as `:none`.
+  defp bin_stat(validated) do
+    center = Keyword.get(validated, :center, :none)
+    boundary = Keyword.get(validated, :boundary, :none)
+
+    %Stat.Bin{
+      bins: Keyword.fetch!(validated, :bins),
+      binwidth: Keyword.get(validated, :binwidth, :none),
+      center: as_float(center),
+      boundary: as_float(boundary),
+      breaks: Keyword.get(validated, :breaks, :none),
+      closed: Keyword.fetch!(validated, :closed),
+      pad: Keyword.fetch!(validated, :pad),
+      drop: Keyword.fetch!(validated, :drop)
+    }
+  end
+
+  defp as_float(:none), do: :none
+  defp as_float(number), do: number / 1
+
+  # A bin's middle and its edge each place every bin, so a layer takes one of `center:` and
+  # `boundary:`, as ggplot2's `stat_bin()` refuses both.
+  defp check_bin_placement(validated, function) do
+    if Keyword.has_key?(validated, :center) and Keyword.has_key?(validated, :boundary) do
+      raise ArgumentError,
+            "#{function} takes center: or boundary:, not both, since each places every bin"
+    end
   end
 
   defp position(:stack), do: %Position.Stack{}

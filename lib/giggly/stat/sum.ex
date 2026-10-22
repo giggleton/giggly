@@ -20,11 +20,12 @@ defmodule Giggly.Stat.Sum do
   # orders the combinations it finds (`id()`).
   #
   # A row missing its x or y, or at an infinite one, is not counted, as ggplot2's
-  # `remove_missing(finite = TRUE)` drops it. A weight that is missing, or not a finite number,
-  # makes its place's count missing, as R's `sum()` gives `NA` where it meets one, and its group's
-  # proportions with it; so a point sized by its count is not drawn there. A group whose counts
-  # total zero has a proportion of NaN for a count of zero and an infinite one for any other, as R
-  # divides by zero.
+  # `remove_missing(finite = TRUE)` drops it. A weight that is missing, `nil` or NaN, makes its
+  # place's count missing, the first met kept, as R's `sum()` gives `NA` or `NaN` where it meets
+  # one, and its group's proportions with it; so a point sized by its count is not drawn there. An
+  # infinite weight makes the count infinite, as R adds it. The proportions divide as R divides
+  # (`Giggly.DataFrame.Arithmetic`): a group whose counts total zero has a proportion of NaN for a
+  # count of zero and an infinite one for any other.
 
   defstruct []
 
@@ -58,6 +59,7 @@ defmodule Giggly.Stat.Sum do
     use Boundary, classify_to: Giggly.Stat
 
     alias Giggly.DataFrame
+    alias Giggly.DataFrame.Arithmetic
 
     # ggplot2's `.all_aesthetics` in Giggly's spelling, less `weight`, which is summed, and the
     # base graphics names (`col`, `pch`, `lwd` and the rest) ggplot2 renames before any table holds
@@ -99,7 +101,7 @@ defmodule Giggly.Stat.Sum do
     def default_mapping(_stat), do: %{size: :n}
 
     @impl Giggly.Stat
-    def compute_layer(_stat, frame) do
+    def compute_layer(_stat, frame, _axes) do
       check_weight(frame)
 
       counted_over =
@@ -156,7 +158,7 @@ defmodule Giggly.Stat.Sum do
         |> totals_by_group()
 
       Enum.zip_with([counts, panels, groups], fn [count, panel, group] ->
-        share(count, Map.fetch!(totals, {panel, group}))
+        Arithmetic.divide(count, Map.fetch!(totals, {panel, group}))
       end)
     end
 
@@ -166,13 +168,5 @@ defmodule Giggly.Stat.Sum do
       |> Enum.zip_with(fn [panel, group, total] -> {{panel, group}, total} end)
       |> Map.new()
     end
-
-    # A count's share of its group's total: missing where the total is, and for a total of zero NaN
-    # for a count of zero and otherwise an infinity of the count's sign, as R divides by zero.
-    defp share(_count, nil), do: nil
-    defp share(count, total) when total != 0, do: count / total
-    defp share(count, _zero) when count > 0, do: :infinity
-    defp share(count, _zero) when count < 0, do: :neg_infinity
-    defp share(_zero, _also_zero), do: :nan
   end
 end

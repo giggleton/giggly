@@ -23,11 +23,13 @@ defmodule Giggly.Stat.Count do
   # swapped and swapped back, as ggplot2's `flip_data()` does; y then takes no count, and x does.
   #
   # A row missing its x, or at an infinite one, is not counted, as ggplot2's `remove_missing()`
-  # drops it; a missing weight adds nothing, as `rowsum(na.rm = TRUE)` skips it, and a group whose
-  # counts are all zero has no proportions (NaN). Each other column of the table that holds one
-  # value within every group is carried to that group's rows, as ggplot2 carries a group's constant
-  # columns through a summary, `weight` included; one that varies within a group is dropped, where
-  # ggplot2 also warns unless it is `weight`, which counting consumes.
+  # drops it; a missing weight, `nil` or NaN, adds nothing, as `rowsum(na.rm = TRUE)` skips it, and
+  # an infinite one makes its count infinite, as R adds it; the proportions divide as R divides
+  # (`Giggly.DataFrame.Arithmetic`), so a group whose counts are all zero has none (NaN), and one
+  # with an infinite count has NaN for it and 0 for the rest. Each other column of the table that
+  # holds one value within every group is carried to that group's rows, as ggplot2 carries a
+  # group's constant columns through a summary, `weight` included; one that varies within a group
+  # is dropped, where ggplot2 also warns unless it is `weight`, which counting consumes.
 
   defstruct []
 
@@ -67,6 +69,8 @@ defmodule Giggly.Stat.Count do
     use Boundary, classify_to: Giggly.Stat
 
     alias Giggly.{Aesthetics, DataFrame, Resolution}
+    alias Giggly.DataFrame.Arithmetic
+    alias Giggly.Stat.Carry
 
     # ggplot2's default bar width, as a share of the spacing of the x positions.
     @width_share 0.9
@@ -78,7 +82,7 @@ defmodule Giggly.Stat.Count do
     def default_mapping(_stat), do: %{x: :count, y: :count}
 
     @impl Giggly.Stat
-    def compute_layer(_stat, frame) do
+    def compute_layer(_stat, frame, _axes) do
       check_weight(frame)
       flipped = :x not in DataFrame.names(frame)
 
@@ -122,7 +126,7 @@ defmodule Giggly.Stat.Count do
         |> Enum.reject(fn name -> name in @computed end)
 
       positioned = DataFrame.filter(frame, {:is_finite, [:x]})
-      constant = constant_columns(positioned, carried)
+      constant = Carry.constant_columns(positioned, carried)
 
       firsts =
         for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
@@ -148,7 +152,7 @@ defmodule Giggly.Stat.Count do
 
       prop =
         Enum.zip_with(counts, groups, fn count, group ->
-          share(count, Map.fetch!(totals, group))
+          Arithmetic.divide(count, Map.fetch!(totals, group))
         end)
 
       counted
@@ -171,7 +175,7 @@ defmodule Giggly.Stat.Count do
     defp totals_by_group(counted, counts) do
       totals =
         counted
-        |> DataFrame.put(:magnitude, Enum.map(counts, &abs/1))
+        |> DataFrame.put(:magnitude, Enum.map(counts, &Arithmetic.magnitude/1))
         |> DataFrame.summarise([:panel, :group], total: {:sum, [:magnitude]})
 
       [:panel, :group, :total]
@@ -180,34 +184,11 @@ defmodule Giggly.Stat.Count do
       |> Map.new()
     end
 
-    defp share(_count, total) when total == 0, do: :nan
-    defp share(count, total), do: count / total
-
     # Each row's panel and group, in row order.
     defp panels_and_groups(frame) do
       panels = DataFrame.pull(frame, :panel)
       groups = DataFrame.pull(frame, :group)
       Enum.zip(panels, groups)
-    end
-
-    # The carried columns that hold one value within every group, in their order: `panel` and
-    # `group`, which the groups are, and each other whose distinct values the frame counts as one
-    # in each group, a missing value counting as one.
-    defp constant_columns(positioned, carried) do
-      counted_distinct =
-        for name <- carried, name not in [:panel, :group], do: {name, {:n_distinct, [name]}}
-
-      distinct = DataFrame.summarise(positioned, [:panel, :group], counted_distinct)
-
-      Enum.filter(carried, fn name ->
-        name in [:panel, :group] or one_value_in_each_group?(distinct, name)
-      end)
-    end
-
-    defp one_value_in_each_group?(distinct, name) do
-      distinct
-      |> DataFrame.pull(name)
-      |> Enum.all?(fn count -> count == 1 end)
     end
   end
 end

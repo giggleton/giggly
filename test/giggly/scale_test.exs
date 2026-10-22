@@ -166,6 +166,18 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  describe "dimension/2" do
+    test "an extent is widened by the expansion handed it, none leaving the limits as they are" do
+      continuous = trained(:continuous, [1, 3])
+      discrete = trained(:discrete, ["a", "b", "c"])
+      none = [mult: {0.0, 0.0}, add: {0.0, 0.0}]
+
+      assert Scale.dimension(continuous, none) === {1.0, 3.0}
+      assert Scale.dimension(continuous, mult: {0.5, 0.0}, add: {0.0, 1.0}) === {0.0, 4.0}
+      assert Scale.dimension(discrete, none) === {1.0, 3.0}
+    end
+  end
+
   describe "dimension/1" do
     test "a continuous range is widened by 5% of its width at each end" do
       scale = trained(:continuous, [1, 3])

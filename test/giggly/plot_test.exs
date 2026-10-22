@@ -827,6 +827,115 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "stat_bin/3" do
+    test "a binning layer records the bar geom, binning with its defaults and stacking" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.stat_bin(%{x: :wt, weight: :mpg})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Bar{},
+                 stat: %Stat.Bin{
+                   bins: 30,
+                   binwidth: :none,
+                   center: :none,
+                   boundary: :none,
+                   breaks: :none,
+                   closed: :right,
+                   pad: false,
+                   drop: :none
+                 },
+                 position: %Position.Stack{},
+                 data: :none,
+                 mapping: %{x: "wt", weight: "mpg"},
+                 fixed: %{},
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "its options are recorded in binning's struct, numbers as floats" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.stat_bin(
+          bins: 5,
+          binwidth: 2,
+          center: 1,
+          breaks: [0, 2.5, 5],
+          closed: :left,
+          pad: true,
+          drop: :extremes,
+          position: :dodge,
+          fill: "white"
+        )
+
+      [layer] = plot.reversed_layers
+
+      assert layer.stat == %Stat.Bin{
+               bins: 5,
+               binwidth: 2.0,
+               center: 1.0,
+               boundary: :none,
+               breaks: [0.0, 2.5, 5.0],
+               closed: :left,
+               pad: true,
+               drop: :extremes
+             }
+
+      assert {layer.position, layer.fixed} == {%Position.Dodge{}, %{fill: "#FFFFFF"}}
+    end
+
+    test "a boundary is recorded as a float" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.stat_bin(boundary: 1)
+
+      assert [%Plot.Layer{stat: %Stat.Bin{boundary: 1.0, center: :none}}] = plot.reversed_layers
+    end
+
+    test "a centre and a boundary together are refused, each placing every bin" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.stat_bin(plot, center: 0, boundary: 0) end
+
+      assert error.message =~ "Plot.stat_bin/3"
+    end
+
+    test "a bin width not above 0 is refused" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.stat_bin(plot, binwidth: 0) end
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.stat_bin(plot, binwidth: "1") end
+    end
+
+    test "breaks are refused unless two or more distinct numbers" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for breaks <- [[1], [1, 1.0], [1, "2"], 3] do
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.stat_bin(plot, breaks: breaks) end
+      end
+    end
+
+    test "x and y together are refused, binning along one" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert_raise ArgumentError, fn -> Plot.stat_bin(plot) end
+    end
+
+    test "a weight that is not numbers is refused at the call" do
+      plot = Plot.new(@rows, %{x: :wt, weight: :cyl})
+
+      error = assert_raise ArgumentError, fn -> Plot.stat_bin(plot) end
+      assert error.message =~ "Plot.stat_bin/3"
+    end
+  end
+
   describe "geom_path/3 and geom_line/3" do
     test "paths and lines map their colour, and refuse a fill, which a line has none of" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})

@@ -777,6 +777,47 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
   # significant digits. It moves with ggplot2's bar geometry or stacking.
   describe "layer_data/2, for geom_col" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(aes(x, y))` over x 1, 2 and
+    # y -Inf, Inf: ymin -Inf and 0, ymax 0 and Inf, each bar from 0 to its infinity.
+    test "a bar of infinite height runs from 0 to its infinity" do
+      frame =
+        %{"x" => [1, 2], "y" => [:neg_infinity, :infinity]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[:neg_infinity, 0.0], [0.0, :infinity]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(aes(x, y, fill = g))`: over x
+    # 1, 1, 2, y 1, Inf, 2, g a, b, a, y NA, Inf, 2, ymin Inf, 0, 0, ymax Inf, Inf, 2; over x 1, 1,
+    # y Inf, 1, g a, b, y Inf, 1, ymin 1, 0, ymax Inf, 1; over y -1, -Inf, y NA, NA, ymin -Inf,
+    # -Inf, ymax -Inf, 0. A bar above an infinity runs from infinity to infinity, its y R's
+    # `0 * Inf`, NaN, which the scale maps to NA.
+    test "an infinite bar takes the pile to its infinity, a bar above it from infinity to infinity" do
+      stacked = fn xs, ys, groups ->
+        %{"x" => xs, "y" => ys, "g" => groups}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+      end
+
+      on = stacked.([1, 1, 2], [1.0, :infinity, 2.0], ["a", "b", "a"])
+      under = stacked.([1, 1], [:infinity, 1.0], ["a", "b"])
+      below = stacked.([1, 1], [-1.0, :neg_infinity], ["a", "b"])
+
+      assert {DataFrame.pull(on, :y), DataFrame.pull(on, :ymin), DataFrame.pull(on, :ymax)} ===
+               {[nil, :infinity, 2.0], [:infinity, 0.0, 0.0], [:infinity, :infinity, 2.0]}
+
+      assert {DataFrame.pull(under, :y), DataFrame.pull(under, :ymin),
+              DataFrame.pull(under, :ymax)} === {[:infinity, 1.0], [1.0, 0.0], [:infinity, 1.0]}
+
+      assert {DataFrame.pull(below, :y), DataFrame.pull(below, :ymin),
+              DataFrame.pull(below, :ymax)} ===
+               {[nil, nil], [:neg_infinity, :neg_infinity], [:neg_infinity, 0.0]}
+    end
+
     test "each bar runs from 0 to its y, 0.9 wide and centred on its level" do
       frame =
         %{"trt" => ["a", "b", "c"], "outcome" => [2.3, 1.9, 3.2]}
@@ -2008,6 +2049,35 @@ defmodule GigglyTest do
                 [3.1000000000000001, 5.0999999999999996, 7.0999999999999996]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x, weight = w))`: over
+    # x 1, 2, 3 weighted 1, Inf, 1, counts 1, Inf, 1 and props 0, NaN, 0; over x 1, 2 weighted -1,
+    # Inf, props -0 and NaN (1 / prop is -Inf); over x 1, 1, 2 weighted Inf, -Inf, 1, counts NaN
+    # and 1 and props NaN; over x 1, 1, 2 weighted 1, NaN, 2, counts 1 and 2, NaN skipped.
+    test "an infinite weight adds, and a share divides by it, as R adds and divides" do
+      counted = fn weights, xs ->
+        %{"x" => xs, "w" => weights}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+      end
+
+      infinite = counted.([1.0, :infinity, 1.0], [1, 2, 3])
+      negative = counted.([-1.0, :infinity], [1, 2])
+      opposite = counted.([:infinity, :neg_infinity, 1.0], [1, 1, 2])
+      nan = counted.([1.0, :nan, 2.0], [1, 1, 2])
+
+      assert {DataFrame.pull(infinite, :count), DataFrame.pull(infinite, :prop)} ===
+               {[1.0, :infinity, 1.0], [0.0, :nan, 0.0]}
+
+      assert DataFrame.pull(negative, :prop) === [-0.0, :nan]
+
+      assert {DataFrame.pull(opposite, :count), DataFrame.pull(opposite, :prop)} ===
+               {[:nan, 1.0], [:nan, :nan]}
+
+      assert {DataFrame.pull(nan, :count), DataFrame.pull(nan, :prop)} ===
+               {[1.0, 2.0], [0.33333333333333331, 0.66666666666666663]}
+    end
+
     test "a row missing its x is not counted, and a missing weight adds nothing" do
       missing_x =
         %{"x" => [1.0, nil, 1.0, 2.0]}
@@ -2240,6 +2310,28 @@ defmodule GigglyTest do
                0.12055641421947449,
                0.87944358578052539
              ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_count(aes(x, y, weight = w))`
+    # over x 1, 1, 2 and y 1: weighted 1, Inf, 1, n Inf and 1, props NaN and 0; weighted 1, NaN,
+    # 1, n NaN and 1, props NaN; and over x 1, 2 weighted -1, Inf, props -0 and NaN.
+    test "an infinite or NaN weight adds as R adds, and a share divides by it" do
+      counted = fn xs, weights ->
+        %{"x" => xs, "y" => List.duplicate(1, length(xs)), "w" => weights}
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_count()
+        |> Giggly.layer_data()
+      end
+
+      infinite = counted.([1, 1, 2], [1.0, :infinity, 1.0])
+      nan = counted.([1, 1, 2], [1.0, :nan, 1.0])
+      negative = counted.([1, 2], [-1.0, :infinity])
+
+      assert {DataFrame.pull(infinite, :n), DataFrame.pull(infinite, :prop)} ===
+               {[:infinity, 1.0], [:nan, 0.0]}
+
+      assert {DataFrame.pull(nan, :n), DataFrame.pull(nan, :prop)} === {[:nan, 1.0], [:nan, :nan]}
+      assert DataFrame.pull(negative, :prop) === [-0.0, :nan]
     end
 
     test "a missing weight leaves its count and its group's shares missing, so it is not sized" do
@@ -2532,6 +2624,383 @@ defmodule GigglyTest do
 
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, `geom_bar(position = "dodge")` on the same
   # `mpg`, printed to 17 significant digits. It moves with `position_dodge()`.
+  describe "layer_data/2, for stat_bin" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(hwy))` over mpg:
+    # 30 bins, their middles from 12 to 44, 32/29 apart. Moves with mpg and with R's `seq()`.
+    test "30 bins span the axis, the outermost centred on its limits" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.stat_bin()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) === [
+               5.0,
+               0.0,
+               2.0,
+               10.0,
+               7.0,
+               41.0,
+               13.0,
+               11.0,
+               2.0,
+               7.0,
+               7.0,
+               13.0,
+               15.0,
+               32.0,
+               21.0,
+               22.0,
+               4.0,
+               7.0,
+               4.0,
+               2.0,
+               1.0,
+               2.0,
+               2.0,
+               1.0,
+               0.0,
+               0.0,
+               1.0,
+               0.0,
+               0.0,
+               2.0
+             ]
+
+      middles = DataFrame.pull(frame, :x)
+
+      assert Enum.take(middles, 5) === [
+               12.0,
+               13.103448275862069,
+               14.206896551724139,
+               15.310344827586206,
+               16.413793103448278
+             ]
+
+      assert List.last(middles) === 44.0
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 1.5, 2.5 and 4 with binwidth 1:
+    # middles 1, 2, 3, 4 by default, 1.5, 2.5, 3.5 with boundary 0, and 1.25 to 4.25 with center
+    # 0.25, counts 2, 1, 0, 1 or 2, 1, 1.
+    test "bins a width apart meet half a width from 0, or where a boundary or a centre places them" do
+      plot = Plot.new(%{"x" => [1.0, 1.5, 2.5, 4.0]}, %{x: :x})
+
+      binned = fn options ->
+        plot
+        |> Plot.stat_bin(options)
+        |> Giggly.layer_data()
+      end
+
+      by_default = binned.(binwidth: 1)
+      on_boundary = binned.(binwidth: 1, boundary: 0)
+      on_center = binned.(binwidth: 1, center: 0.25)
+
+      assert {DataFrame.pull(by_default, :x), DataFrame.pull(by_default, :count)} ===
+               {[1.0, 2.0, 3.0, 4.0], [2.0, 1.0, 0.0, 1.0]}
+
+      assert {DataFrame.pull(on_boundary, :x), DataFrame.pull(on_boundary, :count)} ===
+               {[1.5, 2.5, 3.5], [2.0, 1.0, 1.0]}
+
+      assert {DataFrame.pull(on_center, :x), DataFrame.pull(on_center, :count)} ===
+               {[1.25, 2.25, 3.25, 4.25], [2.0, 1.0, 0.0, 1.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(bins = 10, boundary =
+    # 0)` over x 0, 2.5, 5 and 10: the limit 0 falls on the boundary, so the bins are 10 / 10 wide,
+    # not 10 / 9, middles 0.5 to 9.5.
+    test "bins span the limits a bin each apart where a limit falls on the boundary" do
+      frame =
+        %{"x" => [0.0, 2.5, 5.0, 10.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(bins: 10, boundary: 0)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) ===
+               [0.5, 1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]
+
+      assert DataFrame.pull(frame, :count) ===
+               [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 0, 1, 2 and 3 with binwidth 1 and
+    # boundary 0: counts 2, 1, 1 closed on the right and 1, 1, 2 closed on the left.
+    test "a value on an edge falls in the bin it closes, the outermost bins at both ends" do
+      plot = Plot.new(%{"x" => [0, 1, 2, 3]}, %{x: :x})
+
+      right =
+        plot
+        |> Plot.stat_bin(binwidth: 1, boundary: 0)
+        |> Giggly.layer_data()
+
+      left =
+        plot
+        |> Plot.stat_bin(binwidth: 1, boundary: 0, closed: :left)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(right, :count) === [2.0, 1.0, 1.0]
+      assert DataFrame.pull(left, :count) === [1.0, 1.0, 2.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 1 and 4 with binwidth 1,
+    # boundary 0.5 and pad: middles 0 to 5, counts 0, 2, 0, 0, 1, 0; drop "all" leaves 1 and 4,
+    # drop "extremes" 1 to 4.
+    test "pad adds a bin of no rows at each end, and drop leaves out every one or the outer ones" do
+      plot = Plot.new(%{"x" => [1, 1, 4]}, %{x: :x})
+
+      binned = fn options ->
+        plot
+        |> Plot.stat_bin(options)
+        |> Giggly.layer_data()
+      end
+
+      padded = binned.(binwidth: 1, boundary: 0.5, pad: true)
+      all = binned.(binwidth: 1, boundary: 0.5, pad: true, drop: :all)
+      extremes = binned.(binwidth: 1, boundary: 0.5, pad: true, drop: :extremes)
+
+      assert {DataFrame.pull(padded, :x), DataFrame.pull(padded, :count)} ===
+               {[0.0, 1.0, 2.0, 3.0, 4.0, 5.0], [0.0, 2.0, 0.0, 0.0, 1.0, 0.0]}
+
+      assert {DataFrame.pull(all, :x), DataFrame.pull(all, :count)} === {[1.0, 4.0], [2.0, 1.0]}
+
+      assert {DataFrame.pull(extremes, :x), DataFrame.pull(extremes, :count)} ===
+               {[1.0, 2.0, 3.0, 4.0], [2.0, 0.0, 0.0, 1.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(breaks = c(0, 2, 5,
+    # 10))` over x 1, 2, 3, 7, 9 and 12: 12 is outside them, so counts 2, 1, 2 over a total of 5,
+    # densities 0.2, 1/15, 0.08.
+    test "breaks given cut the bins, a row outside them not counted, and each bin has its density" do
+      frame =
+        %{"x" => [1, 2, 3, 7, 9, 12]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(breaks: [0, 2, 5, 10])
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[0.0, 2.0, 5.0], [2.0, 5.0, 10.0]}
+
+      assert DataFrame.pull(frame, :count) === [2.0, 1.0, 2.0]
+      assert DataFrame.pull(frame, :density) === [0.2, 0.066666666666666666, 0.08]
+      assert DataFrame.pull(frame, :ncount) === [1.0, 0.5, 1.0]
+
+      assert DataFrame.pull(frame, :ndensity) ===
+               [1.0, 0.33333333333333331, 0.39999999999999997]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 1 and 2 weighted 0.5, NA and 2,
+    # binwidth 1, boundary 0.5: counts 0.5 and 2.
+    test "a bin counts the weights of its rows, a missing one adding nothing" do
+      frame =
+        %{"x" => [1, 1, 2], "w" => [0.5, nil, 2.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) === [0.5, 2.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(hwy, fill = drv),
+    # binwidth = 5, boundary = 0)` over mpg: each drive train's seven bins, its density over its own
+    # total, its ncount and ndensity over its own largest (0.18333333333333332 and
+    # 0.18333333333333335 apart in the last digit).
+    test "each group is binned on its own, its densities and largest its own" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, fill: :drv})
+        |> Plot.stat_bin(binwidth: 5, boundary: 0)
+        |> Giggly.layer_data()
+
+      first_group = fn name ->
+        frame
+        |> DataFrame.pull(name)
+        |> Enum.take(7)
+      end
+
+      assert first_group.(:count) === [16.0, 60.0, 16.0, 11.0, 0.0, 0.0, 0.0]
+
+      assert first_group.(:density) ===
+               [0.031067961165048546, 0.11650485436893204, 0.031067961165048546] ++
+                 [0.021359223300970877, 0.0, 0.0, 0.0]
+
+      assert first_group.(:ncount) ===
+               [0.26666666666666666, 1.0, 0.26666666666666666, 0.18333333333333332, 0.0, 0.0, 0.0]
+
+      assert first_group.(:ndensity) ===
+               [0.26666666666666666, 1.0, 0.26666666666666666, 0.18333333333333335, 0.0, 0.0, 0.0]
+
+      assert DataFrame.pull(frame, :group) ===
+               List.duplicate(1, 7) ++ List.duplicate(2, 7) ++ List.duplicate(3, 7)
+
+      last_group =
+        frame
+        |> DataFrame.pull(:count)
+        |> Enum.drop(14)
+
+      assert last_group === [1.0, 11.0, 9.0, 4.0, 0.0, 0.0, 0.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(y = y), binwidth =
+    # 1, boundary = 0.5)` over y 1, 2, 2, 4: bins along y, middles 1 to 4, bars from x 0 to the
+    # counts 1, 2, 0, 1.
+    test "a layer mapping y alone is binned along y" do
+      frame =
+        %{"y" => [1, 2, 2, 4]}
+        |> Plot.new(%{y: :y})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[0.5, 1.5, 2.5, 3.5], [1.5, 2.5, 3.5, 4.5]}
+
+      assert DataFrame.pull(frame, :xmax) === [1.0, 2.0, 0.0, 1.0]
+      assert DataFrame.pull(frame, :flipped_aes) === [true, true, true, true]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(hwy), bins = 3) +
+    # facet_wrap(~drv, scales = "free_x")` over mpg: each panel's three bins span its own limits,
+    # middles 12, 20, 28; 17, 30.5, 44; 15, 20.5, 26.
+    test "each panel is binned over its own axis" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.stat_bin(bins: 3)
+        |> Plot.facet_wrap(:drv, scales: :free_x)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) ===
+               [12.0, 20.0, 28.0, 17.0, 30.5, 44.0, 15.0, 20.5, 26.0]
+
+      assert DataFrame.pull(frame, :count) ===
+               [22.0, 60.0, 21.0, 8.0, 95.0, 3.0, 7.0, 10.0, 8.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(breaks = c(1, 50, 500,
+    # 5000)) + scale_x_log10()` over x 10, 100 and 1000: the breaks are cut at their logs.
+    test "breaks given are put through the axis's transformation" do
+      frame =
+        %{"x" => [10, 100, 1000]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(breaks: [1, 50, 500, 5000])
+        |> Plot.scale_x_log10()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[0.0, 1.6989700043360187, 2.6989700043360187],
+                [1.6989700043360187, 2.6989700043360187, 3.6989700043360187]}
+
+      assert DataFrame.pull(frame, :count) === [1.0, 1.0, 1.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 3, 3, 3 by default (one bin from
+    # 2.95 to 3.05), over x 1, 2, 4 with bins 1 (1 to 4), and over x 1e6 with binwidth 1e-9 (one
+    # bin from 999999.99999999953 to 1000000.0000000005, R's `seq()` giving its start alone).
+    test "an axis of zero width takes bins 0.1 wide, one bin spans the limits, and a span within rounding is one bin" do
+      binned = fn values, options ->
+        %{"x" => values}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(options)
+        |> Giggly.layer_data()
+      end
+
+      zero_width = binned.([3, 3, 3], [])
+      one_bin = binned.([1, 2, 4], bins: 1)
+      within_rounding = binned.([1.0e6], binwidth: 1.0e-9)
+
+      assert {DataFrame.pull(zero_width, :xmin), DataFrame.pull(zero_width, :xmax)} ===
+               {[2.9500000000000002], [3.0499999999999998]}
+
+      assert {DataFrame.pull(one_bin, :xmin), DataFrame.pull(one_bin, :xmax)} === {[1.0], [4.0]}
+
+      assert {DataFrame.pull(within_rounding, :xmin), DataFrame.pull(within_rounding, :xmax)} ===
+               {[999_999.99999999953], [1_000_000.0000000005]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2, 3 all weighted 0: density,
+    # ncount and ndensity NaN, as R divides 0 by 0.
+    test "a group whose counts are all 0 has no densities" do
+      frame =
+        %{"x" => [1, 2, 3], "w" => [0, 0, 0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :density), DataFrame.pull(frame, :ncount),
+              DataFrame.pull(frame, :ndensity)} ===
+               {[:nan, :nan, :nan], [:nan, :nan, :nan], [:nan, :nan, :nan]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(x, weight = w),
+    # bins = 2)`: over x 1, 2, 3 weighted 1, Inf, 1, counts Inf and 1, densities NaN and 0, ncounts
+    # NaN and 0, ndensities NaN; weighted 1, NaN, 1, counts 1 and 1, NaN adding nothing; over x 1,
+    # 3 weighted -1, Inf, densities and ncounts -0 and NaN (1 / x is -Inf).
+    test "an infinite weight adds to its bin, and the densities divide by it, as R adds and divides" do
+      binned = fn xs, weights ->
+        %{"x" => xs, "w" => weights}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.stat_bin(bins: 2)
+        |> Giggly.layer_data()
+      end
+
+      infinite = binned.([1, 2, 3], [1.0, :infinity, 1.0])
+      nan = binned.([1, 2, 3], [1.0, :nan, 1.0])
+      negative = binned.([1, 3], [-1.0, :infinity])
+
+      assert {DataFrame.pull(infinite, :count), DataFrame.pull(infinite, :density),
+              DataFrame.pull(infinite, :ncount), DataFrame.pull(infinite, :ndensity)} ===
+               {[:infinity, 1.0], [:nan, 0.0], [:nan, 0.0], [:nan, :nan]}
+
+      assert DataFrame.pull(nan, :count) === [1.0, 1.0]
+
+      assert {DataFrame.pull(negative, :density), DataFrame.pull(negative, :ncount)} ===
+               {[-0.0, :nan], [-0.0, :nan]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(x, y =
+    # after_stat(density)), binwidth = 1, boundary = 0.5)` over x 1, 2, 3: y 1/3 each.
+    test "an after_stat reads a bin's density" do
+      frame =
+        %{"x" => [1, 2, 3]}
+        |> Plot.new(%{x: :x, y: {:after_stat, [:density]}})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :ymax) ===
+               [0.33333333333333331, 0.33333333333333331, 0.33333333333333331]
+    end
+
+    test "an x on a discrete axis is refused when the plot is run" do
+      plot =
+        %{"class" => ["suv", "compact"]}
+        |> Plot.new(%{x: :class})
+        |> Plot.stat_bin()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "discrete"
+      assert error.message =~ "geom_bar"
+    end
+
+    test "a weight an expression computes as text is refused when the plot is run" do
+      plot =
+        %{"x" => [1, 2]}
+        |> Plot.new(%{x: :x, weight: {&Integer.to_string/1, [:x]}})
+        |> Plot.stat_bin()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ ":string"
+    end
+
+    test "bins too narrow for the axis are refused when the plot is run, naming the width" do
+      plot =
+        %{"x" => [0, 1]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(binwidth: 1.0e-7)
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "1.0e-7"
+    end
+  end
+
   describe "layer_data/2, dodged" do
     test "the groups at one x share a bar's width, lowest group leftmost; a lone group keeps it" do
       frame =
@@ -2725,6 +3194,19 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots of mpg. They
   # move with how a continuous scale's limits censor a position.
   describe "layer_data/2, under a scale's limits" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(aes(x, y))` over x 1, NaN,
+    # 3 and y NaN, 2, 3: x 1, NA, 3 and y NA, 2, 3, as a position scale maps NaN to NA.
+    test "a NaN position is mapped to a missing one" do
+      frame =
+        %{"x" => [1.0, :nan, 3.0], "y" => [:nan, 2.0, 3.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1.0, nil, 3.0], [nil, 2.0, 3.0]}
+    end
+
     test "a row outside the limits is missing before counting, so it is not counted" do
       frame =
         Giggly.Datasets.mpg()

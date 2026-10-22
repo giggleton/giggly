@@ -12,7 +12,7 @@ defmodule Giggly.Stat.Identity do
     use Boundary, classify_to: Giggly.Stat
 
     @impl Giggly.Stat
-    def compute_layer(_stat, frame), do: frame
+    def compute_layer(_stat, frame, _axes), do: frame
 
     @impl Giggly.Stat
     def default_mapping(_stat), do: %{}

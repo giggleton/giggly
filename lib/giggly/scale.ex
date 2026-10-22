@@ -350,7 +350,16 @@ defmodule Giggly.Scale do
   # middle of the panel; ends that are equal are how the coordinate system is told to.
   @doc false
   @spec dimension(t()) :: {number(), number()}
-  def dimension(%Continuous{expand: expansion} = scale) do
+  def dimension(%Continuous{expand: expansion} = scale), do: dimension(scale, expansion)
+  def dimension(%Discrete{expand: expansion} = scale), do: dimension(scale, expansion)
+
+  # The extent `dimension/1` gives, widened by `expansion` in place of the scale's `expand`, as
+  # ggplot2's `dimension(expand)` takes one: a stat reads an axis unwidened, `[mult: {0, 0}, add:
+  # {0, 0}]`, as ggplot2's stats call `dimension()` with its default.
+  @doc false
+  @spec dimension(t(), mult: {number(), number()}, add: {number(), number()}) ::
+          {number(), number()}
+  def dimension(%Continuous{} = scale, expansion) do
     case limits(scale) do
       :none ->
         expand({0, 1}, expansion)
@@ -362,7 +371,7 @@ defmodule Giggly.Scale do
     end
   end
 
-  def dimension(%Discrete{expand: expansion, continuous_range: range} = scale) do
+  def dimension(%Discrete{continuous_range: range} = scale, expansion) do
     case {Discrete.limits(scale), range} do
       {[], :none} ->
         expand({0, 1}, expansion)

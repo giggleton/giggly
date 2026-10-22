@@ -150,9 +150,12 @@ defmodule Giggly.Geom.Bar do
     defp edge(missing, _offset) when missing in [nil, :nan], do: missing
 
     # The lower or higher of a y position and 0, as R's `pmin(y, 0)` and `pmax(y, 0)` give it, a
-    # double; a missing one stays missing.
+    # double: an infinite bar runs from 0 to its infinity, at the panel's edge; a missing one stays
+    # missing.
     defp toward_zero(y, :lower) when is_number(y), do: min(y / 1, 0.0)
     defp toward_zero(y, :higher) when is_number(y), do: max(y / 1, 0.0)
-    defp toward_zero(missing, _end) when missing in [nil, :nan], do: missing
+    defp toward_zero(:infinity, :lower), do: 0.0
+    defp toward_zero(:neg_infinity, :higher), do: 0.0
+    defp toward_zero(other, _end) when other in [nil, :nan, :infinity, :neg_infinity], do: other
   end
 end

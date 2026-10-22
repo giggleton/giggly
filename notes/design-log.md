@@ -206,6 +206,28 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   a vocabulary designed ahead of its callers* — the rules' "an operation arrives with its first
   caller", and bin and boxplot are the proving ground.
 
+- **A stat is handed each panel's axes: their limits, whether each is discrete, and a function
+  through its transformation (2026-10-21, Steve, scoping distributions' step 2).** ggplot2's stats
+  read four things from a scale: `dimension()`, `is_discrete()`, and the transformation forward
+  (binning's user breaks, `stat_function()`'s y) and back (`stat_function()`'s x). The assembly,
+  which holds the scales, hands `compute_layer` a map from panel to its x and y, each its
+  unexpanded limits, a discrete flag and a function that transforms values, built around the
+  panel's scale; the inverse joins with its first reader. Stat keeps its boundary and can do only
+  what it is handed. *Rejected: the transformation's name, Stat listing Scale* — plain data and
+  closer to R, but one widening opens every function Scale exports to every stat. *Rejected:
+  refusing user breaks on a transformed axis* — it leaves out what R does.
+
+- **A missing value in a sum is R's, `NA` or NaN, and an infinity adds (2026-10-21, Steve).** R's
+  `sum()` and `rowsum(na.rm = TRUE)` treat only `NA` and `NaN` as missing, so an infinite weight
+  made R's counts infinite and their shares NaN or 0 where Giggly's sum skipped it or went
+  missing. The frame's sum now keeps the first missing value met and adds an infinity as IEEE
+  does, and R's arithmetic on the frame's values has one home, `Giggly.DataFrame.Arithmetic`
+  (exported), through which counting, counting at each place and binning divide and stacking
+  adds; the bar geom takes an infinite y to the panel's edge, which `geom_col()` crashed on, and
+  the position scale maps NaN to missing, as R's does. *Rejected: an infinity as a missing
+  value* — it departed from R in every stat that sums. *Rejected: the arithmetic in each family*
+  — three homes for one rule, Stat, Geom and Position.
+
 - **The frame's operations share one expression grammar, and a row finds its bin by `cut` per
   panel (2026-10-21, Steve).** `mutate/2`, `filter/2` and `summarise/3`'s aggregates take the
   mapping's grammar with an operation named by an atom: a column by its frame name (never `true`,
@@ -1059,8 +1081,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   across the pipeline: `Plot` held `geom_point`'s accepted and required aesthetics while
   `Geom.Point` drew, and default aesthetics (the assembly) and legend keys (the guides) would
   each add another place, the scattering the ggity research found. **The shape:** a family's root
-  is a protocol (`Giggly.Geom` with `draw_panel/4`; `Giggly.Stat` and `Giggly.Position` with
-  `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
+  is a protocol (`Giggly.Geom` with `draw_panel/4`; `Giggly.Stat` with `compute_layer/3` and
+  `Giggly.Position` with `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
   `panel_params/3`, `transform/3`, `axes/2`, `grid/2` and `clip/1`), each function taking the
   kind first, and each kind is one module holding everything about it, as ggplot2's `GeomPoint`
   does: `Giggly.Geom.Point` has `defstruct` with the kind's parameters, functions giving its facts
@@ -2006,6 +2028,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-21 — Bin a continuous axis into counts, and add infinite weights as R does
+  (distributions, step 2); §4: "A stat is handed each panel's axes", "A missing value in a sum is
+  R's"
 - 2026-10-21 — Choose, weigh and carry counted rows through the frame (distributions, step 1);
   §4: "A stat computes only through frame operations", "The frame's operations share one
   expression grammar"

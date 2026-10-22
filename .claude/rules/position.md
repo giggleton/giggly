@@ -32,6 +32,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   the layer share an x, in any panel; then each panel's bars pile by their `xmin`, those below
   zero downward and apart from the rest, ordered by group, highest first, each bar's y moving to
   the top of its stretch. A row missing its x, edges or y loses them all and stacks as nothing.
+  The heights add and compare in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an infinite
+  bar takes its pile to its infinity and a bar above it runs from infinity to infinity, its y R's
+  `0 * Inf`, NaN, which the scale's second mapping makes missing.
 - **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: each panel's bars at one
   `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
   bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged

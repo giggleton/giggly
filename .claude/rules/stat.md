@@ -23,13 +23,15 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary exports the kinds.
 - **A stat runs after the position scales have mapped the layer's x and y columns**, so it
   computes on positions: a discrete value is its level's position.
-- **A stat's arguments arrive with their first reader.** Every stat is handed the table alone:
-  counting groups it by the `panel` and `group` columns through the frame and reads no scale. The
-  panel's scales (ggplot2 hands `compute_layer` the layout, and binning reads the scale's range)
-  arrive with the first stat that reads one, and a stat's own parameters with the option that sets
-  them.
+- **A stat's arguments arrive with their first reader.** Every stat is handed the table and each
+  panel's axes (`Stat.axes/0`; design-log §4, the entry beginning "A stat is handed each panel's
+  axes"), ggplot2's panel scales as plain values: each axis's extent unwidened, whether it is
+  discrete, and a function through its transformation, so a stat never sees a scale and its
+  boundary lists none; binning first read them. The inverse of the transformation arrives with its
+  first reader (`stat_function()`), and a stat's own parameters with the option that sets them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
-  `compute_panel()` does. **Counting carries a group's constant columns**: a column holding one
+  `compute_panel()` does. **Counting and binning carry a group's constant columns**
+  (`Giggly.Stat.Carry`): a column holding one
   value within every group goes to that group's rows with its type, a factor's category included,
   as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot); counting at each place keeps only
@@ -56,8 +58,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   the call. A stat with neither, the identity, computes nothing an
   after_stat can read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the rows
-  there or the sum of their weights, missing weights adding nothing, its `prop` the count's share of
-  its group's total, the sum of its counts' magnitudes (NaN for a total of zero), and its `width`
+  there or the sum of their weights, a missing weight (`nil` or NaN) adding nothing and an
+  infinite one making the count infinite, its `prop` the count's share of its group's total, the
+  sum of its counts' magnitudes, divided as R divides (`Giggly.DataFrame.Arithmetic`: NaN for a
+  total of zero or an infinite count over an infinite total, 0 for a finite one), and its `width`
   0.9 of the layer's x spacing counting from zero (`Giggly.Resolution`). A weight that is not a
   number is refused when the plot is run, an expression's, whose type the call cannot know. A row
   missing its x, or at an infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives
@@ -65,12 +69,30 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   its orientation, and writes that in a `flipped_aes` column for the bar geom and the positions; a
   horizontal layer is counted as a vertical one, flipped and flipped back, and its count goes into
   x.
+- **Binning is ggplot2's `stat_bin()`**: per panel and per group, one row per bin, its `count` the
+  rows in it or the sum of their weights, a missing weight adding nothing and an infinite one
+  making it infinite, 0 for a bin no row falls
+  in, and its middle `x`, its ends `xmin` and `xmax`, its `width`, its `density` (the count over
+  the width over the group's total of the counts' magnitudes, summed by the frame), and `ncount`
+  and `ndensity` (over the group's largest magnitude), NaN where the group's counts are all 0, as R
+  divides. **The bins are R's to the last digit** (`bin.R`), from each panel's axis: the breaks
+  given, through the axis's transformation and sorted; or `binwidth` apart in transformed units,
+  on a `boundary`, a `center`, or else half a width from 0, by R's `seq()`; or else `bins` spanning
+  the limits, the outermost centred on them unless either limit falls on the boundary (R's `%%`,
+  in doubles where R works in extended precision); 0.1 wide on an axis of zero width. Each break
+  is moved outward a hundred-millionth of the median gap, R's fuzz, and a row's bin is the frame's
+  `cut` against them, closed as `closed` says, the outermost at both ends; a row missing its x or at
+  an infinite one is not counted. `pad` and `drop` add and leave out bins as `stat_bin()`'s do. It
+  bins along whichever of x and y is mapped, as counting counts, refuses an axis that is
+  discrete, and refuses bins that would number more than a million, as R does; y takes `count`
+  by default, and an after_stat reads `count`, `density`, `ncount`, `ndensity` and `width`.
 - **Counting at each place is ggplot2's `stat_sum()`** (design-log §4, the entry beginning "A
   count layer counts over ggplot2's list"): per panel, a row for each combination of the columns
   ggplot2's `.all_aesthetics` names but `weight`, `group` included, in column order, so a column
   the plot's mapping carries in under another name (`linewidth`, `stroke`) is dropped and splits
   nothing; rows sorted by those columns, a missing value last. Its `n` is the rows or the sum of
-  their weights, a missing or non-finite weight making it missing, as R's `sum()` does; its `prop`
-  is `n` over its group's total in the panel, with no `abs()`, an infinity or NaN where the total
-  is zero. A row missing its x or y, or at an infinite one, is not counted. size takes `n` by
-  default; it computes `n` and `prop` and consumes `weight`.
+  their weights, a missing weight (`nil` or NaN) making it missing, the first met kept, and an
+  infinite one infinite, as R's `sum()` adds; its `prop` is `n` over its group's total in the
+  panel, with no `abs()`, divided as R divides, an infinity or NaN where the total is zero. A
+  row missing its x or y, or at an infinite one, is not counted. size takes `n` by default; it
+  computes `n` and `prop` and consumes `weight`.

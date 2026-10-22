@@ -459,6 +459,53 @@ defmodule Giggly.DataFrameTest do
       assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, columns) end
     end
 
+    test "cut numbers each value's interval from 1, closed on the right, the lowest at both ends" do
+      frame = DataFrame.new(x: [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, -1.0, 5.0, nil, :nan])
+
+      mutated =
+        DataFrame.mutate(frame, bin: {:cut, [:x], breaks: [0.0, 1.0, 2.0, 4.0], closed: :right})
+
+      assert DataFrame.pull(mutated, :bin) === [1, 1, 1, 2, 3, 3, nil, nil, nil, nil]
+      assert DataFrame.dtypes(mutated).bin == :integer
+    end
+
+    test "cut closed on the left puts a value on a break in the interval it opens, the highest at both ends" do
+      frame = DataFrame.new(x: [0.0, 1.0, 2.0, 3.0, 4.0])
+
+      mutated =
+        DataFrame.mutate(frame, bin: {:cut, [:x], breaks: [0.0, 1.0, 2.0, 4.0], closed: :left})
+
+      assert DataFrame.pull(mutated, :bin) === [1, 2, 3, 3, 3]
+    end
+
+    test "cut finds the interval among many breaks, an infinity outside them all" do
+      breaks = Enum.map(0..16, fn step -> step / 1 end)
+      frame = DataFrame.new(x: [0.25, 7.5, 12.0, 15.75, :infinity, :neg_infinity])
+
+      mutated = DataFrame.mutate(frame, bin: {:cut, [:x], breaks: breaks, closed: :right})
+
+      assert DataFrame.pull(mutated, :bin) === [1, 8, 12, 16, nil, nil]
+    end
+
+    test "cut places an infinity among infinite breaks, below or above every number" do
+      frame = DataFrame.new(x: [:neg_infinity, 0.0, :infinity])
+
+      mutated =
+        DataFrame.mutate(frame,
+          bin: {:cut, [:x], breaks: [:neg_infinity, 0.0, :infinity], closed: :right}
+        )
+
+      assert DataFrame.pull(mutated, :bin) === [1, 1, 2]
+    end
+
+    test "cut of a column that is not numbers is refused" do
+      frame = DataFrame.new(label: ["a"])
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, bin: {:cut, [:label], breaks: [0.0, 1.0], closed: :right})
+      end
+    end
+
     test "true, false and nil name no column" do
       frame = DataFrame.new([{true, [1]}, {nil, [2]}])
 
@@ -515,11 +562,17 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.pull(plain, :n) === [0.60000000000000009]
     end
 
-    test "a missing or non-finite value makes its group's sum missing, or is skipped" do
+    # Golden: R 4.6.1's sum(c(1, NA)), sum(c(2, NaN)), sum(Inf), sum(c(Inf, -Inf)), sum(c(NA,
+    # NaN)), sum(c(5, -Inf)) and sum(c(NaN, NA, Inf)) are NA, NaN, Inf, NaN, NA, -Inf and NaN, and
+    # with na.rm = TRUE 1, 2, Inf, NaN, 0, -Inf and Inf: a missing value is NA or NaN, the first
+    # met kept, and an infinity adds as IEEE adds one.
+    test "a missing value makes its group's sum missing, or is skipped, and an infinity adds" do
       frame =
         DataFrame.new(
-          group: [1, 1, 2, 2, 3, 4],
-          weight: [1.0, nil, 2.0, :nan, :infinity, 5.0]
+          group: [1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 6, 7, 7, 7],
+          weight:
+            [1.0, nil, 2.0, :nan, :infinity, :infinity, :neg_infinity, nil, :nan] ++
+              [5.0, :neg_infinity, :nan, nil, :infinity]
         )
 
       propagated = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
@@ -527,8 +580,11 @@ defmodule Giggly.DataFrameTest do
       skipped =
         DataFrame.summarise(frame, [:group], n: {:sum, [:weight], missing: :skip})
 
-      assert DataFrame.pull(propagated, :n) === [nil, nil, nil, 5.0]
-      assert DataFrame.pull(skipped, :n) === [1.0, 2.0, 0.0, 5.0]
+      assert DataFrame.pull(propagated, :n) ===
+               [nil, :nan, :infinity, :nan, nil, :neg_infinity, :nan]
+
+      assert DataFrame.pull(skipped, :n) ===
+               [1.0, 2.0, :infinity, :nan, 0.0, :neg_infinity, :infinity]
     end
 
     test "n_distinct counts each group's distinct values, a missing value counting as one" do

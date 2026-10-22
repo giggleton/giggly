@@ -63,8 +63,13 @@ defmodule Giggly.DataFrame do
   #     none;
   #   * a constant, the value in every row: a number, a boolean, a date or a time written alone, or
   #     any value as `{:constant, term}`, typed as a column holding it would be;
-  #   * an operation, `{name, [expression, ...]}`: `{:is_finite, [x]}`, whether each number is
-  #     finite, and `{:and, [left, right]}`, whether both are true, each a boolean.
+  #   * an operation, `{name, [expression, ...]}`, or `{name, [expression, ...], options}` for
+  #     parameters that are not row values: `{:is_finite, [x]}`, whether each number is finite,
+  #     and `{:and, [left, right]}`, whether both are true, each a boolean; `{:cut, [x], breaks:
+  #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
+  #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
+  #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
+  #     too, a number outside them all missing.
   #
   # Values follow Explorer's semantics, as types do: a missing value passes through an operation
   # as missing, so `is_finite` is missing where its number is, and `and` is false where either side
@@ -72,12 +77,13 @@ defmodule Giggly.DataFrame do
   # expression outside this vocabulary, or an operation given a column of the wrong type, whether
   # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
 
-  # Its own boundary, exporting only this module: callers reach a frame through the functions
-  # below, so an implementation's struct and functions are private to it and a second
-  # implementation changes no caller. It owns the `table` library, which `Giggly` lists too, as
+  # Its own boundary, exporting this module and `Giggly.DataFrame.Arithmetic`, R's arithmetic on
+  # the doubles a frame holds: callers reach a frame through the functions below, so an
+  # implementation's struct and functions are private to it and a second implementation changes
+  # no caller. It owns the `table` library, which `Giggly` lists too, as
   # boundary lets a sub-boundary list only what its parent does; no other domain lists it, and
   # here `from_table/1` is the one caller.
-  use Boundary, deps: [Table], exports: []
+  use Boundary, deps: [Table], exports: [Arithmetic]
 
   alias Giggly.DataFrame.Lists
 
@@ -120,6 +126,7 @@ defmodule Giggly.DataFrame do
           | {:constant, term()}
           | {:is_finite, [expression()]}
           | {:and, [expression()]}
+          | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."
   @type aggregate ::
@@ -372,12 +379,14 @@ defmodule Giggly.DataFrame do
   # A sum's `summation:` says how it adds: `:compensated`, the default, carries the rounding error
   # each addition makes and adds it back at the end, as R's `sum()` adds in extended precision, so
   # the sum is the one R's gives; `:plain` adds the values in row order in floats, as R's
-  # `rowsum()` does. `missing:` says what a missing value does, one that is `nil` or a non-finite
-  # float: `:propagate`, the default, makes the group's sum missing (`nil`), as R's `sum()` gives
-  # `NA`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a group of only missing values
-  # summing to 0. A sum of a column of another type and an option not listed are refused with an
-  # `ArgumentError`; an empty `by`, an option's value not listed, an aggregate not listed and an
-  # aggregate's name shared with a `by` column raise `FunctionClauseError`.
+  # `rowsum()` does. `missing:` says what a missing value does, one that is `nil` (R's `NA`) or
+  # NaN: `:propagate`, the default, makes the group's sum missing, `nil` where one is, else NaN,
+  # as R's `sum()` gives `NA` or `NaN`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a
+  # group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
+  # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum of a column of
+  # another type and an option not listed are refused with an `ArgumentError`; an empty `by`, an
+  # option's value not listed, an aggregate not listed and an aggregate's name shared with a `by`
+  # column raise `FunctionClauseError`.
   @doc false
   @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
   def summarise(%implementation{} = frame, [_first | _rest] = by, aggregates)

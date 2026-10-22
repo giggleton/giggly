@@ -162,7 +162,8 @@ grid lines are placed by the coordinate system".
   takes the range's (R's `get_limits()`), and with both ends an axis exists before any data.
   `map/2` turns a position outside the limits into `nil` before the stat, and `censor/2` does once
   the positions are final, as ggplot2 maps them twice with `oob = censor` (finite values only):
-  `:infinity` and `:neg_infinity` are kept, and a discrete scale's positions are never censored.
+  `:infinity` and `:neg_infinity` are kept, NaN becomes `nil`, as ggplot2's position map gives
+  `NA` for it, and a discrete scale's positions are never censored.
 - **Given breaks are kept in the order given wherever they fall inside the widened extent**, in
   data units and transformed, one outside the transformation's domain dropped, even beyond the
   limits, as R keeps 1.4 on mtcars' weights from 1.513; given labels go with their
@@ -288,7 +289,9 @@ grid lines are placed by the coordinate system".
   positioned marks.
 - **An untrained continuous scale's range is `:none`.** The empty axis's 0 to 1 is
   `dimension/1`'s, as it is ggplot2's `get_limits()`'s.
-- **`dimension/1` is an axis's extent widened by the scale's expansion**, in transformed
+- **`dimension/1` is an axis's extent widened by the scale's expansion, and `dimension/2` the
+  same widened by the expansion it is handed**, as ggplot2's `dimension(expand)` takes one, which a
+  stat reads unwidened, in transformed
   positions: a continuous scale's limits by its `expand`, at each end `width * mult + add` (R's
   `expand_range4()`; a negative amount narrows it, as R's `expansion()` allows), 5% of the width
   by default, a discrete scale's limits (1 to n) by its `expand`, 0.6 by default,

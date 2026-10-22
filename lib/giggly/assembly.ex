@@ -228,6 +228,9 @@ defmodule Giggly.Assembly do
   # by its index, counting from 0, the aesthetic, the column as the data names it, and its type.
   # Raises it too for an annotation given a list of values for an aesthetic under a facet that
   # repeats its rows across several panels, naming the layer and the aesthetic.
+  # No expansion, as ggplot2's stats read an axis's `dimension()`.
+  @unexpanded [mult: {0.0, 0.0}, add: {0.0, 0.0}]
+
   @doc false
   @spec run(Plot.t()) :: t()
   def run(
@@ -275,6 +278,7 @@ defmodule Giggly.Assembly do
     y_scales = train(untrained_y_scales, y_routes, :y, transformed_data, &Scale.train/2)
 
     axes = %{x: {x_scales, x_routes}, y: {y_scales, y_routes}}
+    panel_axes = stat_axes(axes)
 
     statistic_data =
       layers
@@ -282,7 +286,7 @@ defmodule Giggly.Assembly do
       |> Enum.zip_with(transformed_data, fn {layer, index}, frame ->
         stat = Plot.layer_stat(layer)
         mapped = through_scales(frame, axes.x, axes.y, &Scale.map/2)
-        computed = Stat.compute_layer(stat, mapped)
+        computed = Stat.compute_layer(stat, mapped, panel_axes)
         map_statistic(computed, {plot, layer, index}, scale_kinds, axes)
       end)
 
@@ -929,6 +933,29 @@ defmodule Giggly.Assembly do
   # Which of the axis's scales each panel uses, by panel: the layout's `:scale_x` or `:scale_y`,
   # ggplot2's `SCALE_X` and `SCALE_Y`. A fixed axis routes every panel to one scale, a free one each
   # panel to its own.
+  # Each panel's x and y as a stat reads them (`Giggly.Stat.axes/0`), ggplot2's panel scales
+  # handed to `compute_layer()`: each axis's extent unwidened, whether it is discrete, and a
+  # function through its transformation, built round the panel's scale, so a stat never sees one.
+  defp stat_axes(%{x: {x_scales, x_routes}, y: {y_scales, y_routes}}) do
+    Map.new(x_routes, fn {panel, x_scale_id} ->
+      y_scale_id = Map.fetch!(y_routes, panel)
+
+      {panel,
+       %{
+         x: stat_axis(Map.fetch!(x_scales, x_scale_id)),
+         y: stat_axis(Map.fetch!(y_scales, y_scale_id))
+       }}
+    end)
+  end
+
+  defp stat_axis(scale) do
+    %{
+      limits: Scale.dimension(scale, @unexpanded),
+      discrete: Scale.discrete?(scale),
+      transform: fn values -> Scale.transform(scale, values) end
+    }
+  end
+
   defp routes(layout, family) do
     panels = DataFrame.pull(layout, :panel)
     scale_ids = DataFrame.pull(layout, scale_column(family))
