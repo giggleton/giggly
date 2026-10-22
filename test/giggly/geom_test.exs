@@ -582,7 +582,7 @@ defmodule Giggly.GeomTest do
 
     # As grid splits a polygon at a missing point: `geom_boxplot() + xlim(0.7, 3.5)`, then with
     # `notch = TRUE` and `xlim(0.5, 3.2)`, draw a box whose side the limit cuts as the pieces
-    # left, and leave out the median, which has lost an end.
+    # left, and leave out the median, which has lost an end; a box cut both sides leaves none.
     test "a box whose side a limit cuts is drawn in the pieces left, its median left out" do
       {coord, params} = box_params()
       cut_left = box_rows(xmin: [nil])
@@ -601,6 +601,10 @@ defmodule Giggly.GeomTest do
                [{0.3125, 0.2375}, {0.3125, 0.25562903736661297}],
                [{0.3125, 0.09437096263338704}, {0.3125, 0.1125}]
              ]
+
+      cut_both = box_rows(xmin: [nil], xmax: [nil])
+
+      assert [%Circles{}, %Segments{}] = Geom.draw_panel(@box, cut_both, coord, params)
     end
 
     test "a box keeping no outliers draws none" do
