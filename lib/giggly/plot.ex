@@ -438,7 +438,8 @@ defmodule Giggly.Plot do
     :xmin,
     :xmax,
     :ymin,
-    :ymax
+    :ymax,
+    :width
   ]
 
   # `geom_point/3`'s options, validated at the call.
@@ -470,6 +471,24 @@ defmodule Giggly.Plot do
         "mapped; it runs along that one when this is not given."
   ]
 
+  # How wide every bar is, an option of `geom_bar/3` and `geom_col/3` that sets the aesthetic.
+  @bar_width_option [
+    type: {:custom, __MODULE__, :validate_width, []},
+    doc:
+      "How wide every bar is, in the units of the axis it stands on, any number; it replaces " <>
+        "the width the bars would take otherwise, and a mapped `:width`."
+  ]
+
+  # Where every bar sits against its position, an option of `geom_bar/3` and `geom_col/3` that
+  # chooses how the bar geom draws.
+  @bar_just_option [
+    type: {:custom, __MODULE__, :validate_just, []},
+    default: 0.5,
+    doc:
+      "Where each bar sits against its position, a number from 0 to 1: 0 puts its lower edge " <>
+        "there, 1 its upper edge, and 0.5 centres it."
+  ]
+
   # How bars that share an `x` are placed, an option of `geom_bar/3` and `geom_col/3`.
   @bar_position_option [
     type: {:in, [:stack, :dodge]},
@@ -481,7 +500,12 @@ defmodule Giggly.Plot do
 
   # `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
-                 [data: @data_option, position: @bar_position_option] ++ @bar_look_options
+                 [
+                   data: @data_option,
+                   position: @bar_position_option,
+                   width: @bar_width_option,
+                   just: @bar_just_option
+                 ] ++ @bar_look_options
                )
 
   # `geom_bar/3`'s options, validated at the call: a bar's, and the axis its counting runs along.
@@ -489,7 +513,9 @@ defmodule Giggly.Plot do
                    [
                      data: @data_option,
                      position: @bar_position_option,
-                     orientation: @runs_along_option
+                     orientation: @runs_along_option,
+                     width: @bar_width_option,
+                     just: @bar_just_option
                    ] ++ @bar_look_options
                  )
 
@@ -760,6 +786,7 @@ defmodule Giggly.Plot do
   @annotation_linetype [
     type: {:custom, __MODULE__, :validate_per_annotation, [:validate_linetype]}
   ]
+  @annotation_width [type: {:custom, __MODULE__, :validate_per_annotation, [:validate_width]}]
   @per_annotation_aesthetics [
     :alpha,
     :color,
@@ -769,7 +796,8 @@ defmodule Giggly.Plot do
     :linewidth,
     :shape,
     :size,
-    :stroke
+    :stroke,
+    :width
   ]
 
   # `annotate/3`'s options for each geom it draws with, validated at the call: the positions the
@@ -792,7 +820,9 @@ defmodule Giggly.Plot do
     color: @annotation_color,
     fill: @annotation_color,
     linewidth: @annotation_linewidth,
-    linetype: @annotation_linetype
+    linetype: @annotation_linetype,
+    width: @annotation_width,
+    just: @bar_just_option
   ]
   @path_annotation [
                      x: @annotation_position,
@@ -1891,7 +1921,9 @@ defmodule Giggly.Plot do
   counts along the one mapped, so mapping `:y` alone draws horizontal bars. A `:weight` column must
   hold numbers. The bars also take `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`; one
   reaches a bar only where it is the same in every row the bar counts, so a discrete one groups the
-  rows and gives each group its own bar.
+  rows and gives each group its own bar. Each bar is 0.9 times the closest spacing of the `x`
+  positions wide, counting from zero, unless `width:` says otherwise; counting gives every bar its
+  width, so `:width` is not mapped. `just:` places each bar against its `x`.
 
   Counting computes `count` and `prop`, the count's share of its group's total, which a mapping
   reads with an after_stat (`Giggly.Mapping`): `%{x: :class, y: {:after_stat, [:prop]}, group: 1}`
@@ -1921,13 +1953,13 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Bar{},
+      geom: %Geom.Bar{just: Keyword.fetch!(validated, :just)},
       stat: %Stat.Count{},
       position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_bar/3"),
       fixed: fixed(validated),
-      accepted: Enum.uniq(Stat.Count.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      accepted: counted_bar_aesthetics(Stat.Count.accepted_aesthetics()),
       annotation: false
     }
 
@@ -2066,19 +2098,22 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x`, for bars whose
-  heights are in the data. Bars at the same `x` are stacked, those below zero downward, the
-  highest group at the bottom; with `position: :dodge` they are set side by side within one bar's
-  width, an `x` with one group keeping its whole width.
+  Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x` unless `just:`
+  says otherwise, for bars whose heights are in the data. Bars at the same `x` are stacked, those
+  below zero downward, the highest group at the bottom; with `position: :dodge` they are set side
+  by side within one bar's width, an `x` with one group keeping its whole width.
 
   Each bar is 0.9 times the closest spacing of the `x` positions wide: 0.9 on a discrete axis, and
-  on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart. The `y`
-  axis reaches 0.
+  on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart; or as
+  wide as its mapped `:width`, a number, or as `width:` makes every bar, which wins over a mapped
+  one. `just:` places each bar against its `x`, its lower edge there at 0 and its upper at 1. Bars
+  of different widths at one `x` are neither stacked nor dodged together. The `y` axis reaches 0.
 
-  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`, and
-  need `:x` and `:y`. `:fill` fills a bar and takes its alpha; `:color` borders it, and bars have no
-  border unless it is mapped or set; `:linewidth` and `:linetype` say how wide the border is and
-  how it is dashed. With a discrete `y` and a continuous `x`, the bars are horizontal.
+  Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype`, `:linewidth` and
+  `:width`, and need `:x` and `:y`. `:fill` fills a bar and takes its alpha; `:color` borders it,
+  and bars have no border unless it is mapped or set; `:linewidth` and `:linetype` say how wide
+  the border is and how it is dashed. With a discrete `y` and a continuous `x`, the bars are
+  horizontal.
 
   ## Options
 
@@ -2116,7 +2151,7 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Bar{},
+      geom: %Geom.Bar{just: Keyword.fetch!(validated, :just)},
       stat: %Stat.Identity{},
       position: position(Keyword.fetch!(validated, :position)),
       data: data,
@@ -2126,7 +2161,9 @@ defmodule Giggly.Plot do
       annotation: false
     }
 
-    add_layer(plot, layer, "Plot.geom_col/3", required: Geom.Bar.required_aesthetics())
+    plot
+    |> add_layer(layer, "Plot.geom_col/3", required: Geom.Bar.required_aesthetics())
+    |> check_width(layer, "Plot.geom_col/3")
   end
 
   @doc """
@@ -2395,7 +2432,7 @@ defmodule Giggly.Plot do
 
     * `:point`: `x:`, `y:`, `alpha:`, `colour:`, `fill:`, `shape:`, `size:` and `stroke:`;
     * `:col` and `:bar`, each a bar from 0 to its `y` as `geom_col/3` draws one: `x:`, `y:`,
-      `alpha:`, `colour:`, `fill:`, `linewidth:` and `linetype:`;
+      `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`, `width:` and `just:`;
     * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `lineend:`, `linejoin:`
       and `linemitre:`, and `:line` those and `orientation:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
@@ -4227,6 +4264,22 @@ defmodule Giggly.Plot do
   def validate_angle(angle) when is_number(angle), do: {:ok, angle / 1}
   def validate_angle(angle), do: {:error, "expected a number of degrees, got: #{inspect(angle)}"}
 
+  # NimbleOptions' check of a bar's `width:`: any number, kept as a float, as R keeps one; a
+  # negative width puts a bar's edges the other way round, which draws it as wide.
+  @doc false
+  @spec validate_width(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_width(width) when is_number(width), do: {:ok, width / 1}
+  def validate_width(width), do: {:error, "expected a width, a number, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a bar's `just:`: where it sits against its position, from 0 to 1, kept
+  # as a float.
+  @doc false
+  @spec validate_just(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_just(just) when is_number(just) and just >= 0 and just <= 1, do: {:ok, just / 1}
+
+  def validate_just(just),
+    do: {:error, "expected a number from 0 to 1, got: #{inspect(just)}"}
+
   # NimbleOptions' check of a `nudge_x:` or `nudge_y:` option: any distance along its axis, kept as
   # a float, as R keeps one.
   @doc false
@@ -4978,13 +5031,13 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Bar{},
+      geom: %Geom.Bar{just: 0.5},
       stat: bin_stat(validated, Keyword.fetch!(validated, :pad)),
       position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
-      accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      accepted: counted_bar_aesthetics(Stat.Bin.accepted_aesthetics()),
       annotation: false
     }
 
@@ -5078,8 +5131,10 @@ defmodule Giggly.Plot do
   defp annotation_geom(:point, _validated),
     do: {%Geom.Point{}, Geom.Point.accepted_aesthetics(), Geom.Point.required_aesthetics()}
 
-  defp annotation_geom(bar, _validated) when bar in [:col, :bar],
-    do: {%Geom.Bar{}, Geom.Bar.accepted_aesthetics(), Geom.Bar.required_aesthetics()}
+  defp annotation_geom(bar, validated) when bar in [:col, :bar] do
+    geom = %Geom.Bar{just: Keyword.fetch!(validated, :just)}
+    {geom, Geom.Bar.accepted_aesthetics(), Geom.Bar.required_aesthetics()}
+  end
 
   defp annotation_geom(:path, validated),
     do: {path_geom(validated), Geom.Path.accepted_aesthetics(), Geom.Path.required_aesthetics()}
@@ -5156,19 +5211,38 @@ defmodule Giggly.Plot do
   # included, where the call can tell its type: a column's or a constant's. An expression's is its
   # function's to decide, and the layer's stat refuses one that is not a number when the plot is
   # run.
-  defp check_weight(plot, layer, function) do
+  defp check_weight(plot, layer, function),
+    do: check_numbers(plot, layer, function, :weight, "a weight is summed")
+
+  # A mapped width is how wide a bar is drawn, so it must hold numbers, as a weight must; an
+  # expression's the bar geom refuses when the plot is run.
+  defp check_width(plot, layer, function),
+    do: check_numbers(plot, layer, function, :width, "a bar is drawn as wide as its width")
+
+  # The plot, once the column the layer maps `aesthetic` to, where the call can tell its type, is
+  # found to hold numbers, as `reason` says it must.
+  defp check_numbers(plot, layer, function, aesthetic, reason) do
     mapping = computed_mapping(plot, layer)
     table = drawn_table(plot, layer.data)
 
-    with {:ok, value} <- Map.fetch(mapping, :weight),
+    with {:ok, value} <- Map.fetch(mapping, aesthetic),
          dtype when dtype not in [:integer, :float, :null, :computed] <-
            Mapping.dtype(value, table) do
       raise ArgumentError,
-            "#{function} maps :weight to #{inspect(value)}, a #{inspect(dtype)} column, " <>
-              "but a weight is summed, so it must be a number"
+            "#{function} maps #{inspect(aesthetic)} to #{inspect(value)}, a #{inspect(dtype)} " <>
+              "column, but #{reason}, so it must be a number"
     end
 
     plot
+  end
+
+  # What a layer of bars a stat counts can use: its stat's aesthetics and the bar geom's, but a
+  # mapped `:width`, since counting and binning write each bar's width, as ggplot2's do, so a
+  # mapped one would do nothing.
+  defp counted_bar_aesthetics(statistic_aesthetics) do
+    (statistic_aesthetics ++ Geom.Bar.accepted_aesthetics())
+    |> Enum.uniq()
+    |> Enum.reject(fn aesthetic -> aesthetic == :width end)
   end
 
   # A counting or binning layer runs along the one of x and y it maps before its stat, so an

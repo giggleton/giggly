@@ -519,13 +519,13 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Bar{},
+                 geom: %Geom.Bar{just: 0.5},
                  stat: %Stat.Identity{},
                  position: %Position.Stack{},
                  data: :none,
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y],
+                 accepted: [:alpha, :color, :fill, :group, :linetype, :linewidth, :width, :x, :y],
                  annotation: false
                }
              ]
@@ -588,9 +588,71 @@ defmodule Giggly.PlotTest do
 
       assert error.message =~ "unknown options [:orientation]"
     end
+
+    test "width: is set for every bar, as a float, and just: is the geom's, 0.5 unless given" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      assert [%Plot.Layer{geom: %Geom.Bar{just: 0.5}, fixed: %{width: 1.0}}] =
+               Plot.geom_col(plot, width: 1).reversed_layers
+
+      assert [%Plot.Layer{geom: %Geom.Bar{just: +0.0}, fixed: fixed}] =
+               Plot.geom_col(plot, just: 0).reversed_layers
+
+      assert fixed == %{}
+    end
+
+    test "a width that is not a number, and a just: outside 0 to 1, are refused" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {option, value} <- [width: "wide", just: 1.5, just: -0.1] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_col(plot, [{option, value}])
+          end
+
+        assert error.key == option
+      end
+    end
+
+    test "a mapped width must hold numbers, its column refused at the call naming its type" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      assert [%Plot.Layer{mapping: %{width: "wt"}}] =
+               Plot.geom_col(plot, %{width: :wt}).reversed_layers
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_col(plot, %{width: :cyl}) end
+      assert error.message =~ "Plot.geom_col/3 maps :width to \"cyl\", a :string column"
+    end
   end
 
   describe "geom_bar/3" do
+    # ggplot2 4.0.3's `geom_bar(aes(width = w))` and `geom_histogram(aes(width = w))` draw bars of
+    # their stat's width whatever `w` holds, and `geom_histogram(width = 0.5)` bins of their own
+    # width, so neither takes what would change nothing.
+    test "counted bars take width: but no mapped width, and histograms neither" do
+      plot = Plot.new(@rows, %{x: :cyl})
+      binned = Plot.new(@rows, %{x: :wt})
+
+      assert [%Plot.Layer{fixed: %{width: 0.5}, geom: %Geom.Bar{just: 1.0}}] =
+               Plot.geom_bar(plot, width: 0.5, just: 1).reversed_layers
+
+      for call <- [
+            fn -> Plot.geom_bar(plot, %{width: :wt}) end,
+            fn -> Plot.geom_histogram(binned, %{width: :mpg}) end,
+            fn -> Plot.stat_bin(binned, %{width: :mpg}) end
+          ] do
+        error = assert_raise ArgumentError, call
+        assert error.message =~ "cannot use :width"
+      end
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_histogram(binned, width: 0.5)
+        end
+
+      assert error.message =~ "unknown options [:width]"
+    end
+
     test "a bar layer records the bar geom, counting and stacking" do
       plot =
         @rows
@@ -599,7 +661,7 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Bar{},
+                 geom: %Geom.Bar{just: 0.5},
                  stat: %Stat.Count{},
                  position: %Position.Stack{},
                  data: :none,
@@ -861,7 +923,7 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Bar{},
+                 geom: %Geom.Bar{just: 0.5},
                  stat: %Stat.Bin{
                    bins: 30,
                    binwidth: :none,
@@ -1717,6 +1779,19 @@ defmodule Giggly.PlotTest do
   end
 
   describe "annotate/3" do
+    test "a bar annotation's width is checked as each bar's, and its just: as geom_col/3's" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {option, value} <- [width: [0.5, "wide"], just: 2] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.annotate(plot, :col, [{:x, [1, 2]}, {:y, [3, 4]}, {option, value}])
+          end
+
+        assert error.key == option
+      end
+    end
+
     test "an annotation records its geom, the identity stat and position, and a table of its values" do
       plot =
         @rows
@@ -1761,8 +1836,8 @@ defmodule Giggly.PlotTest do
 
       assert kinds == [
                %Geom.Point{},
-               %Geom.Bar{},
-               %Geom.Bar{},
+               %Geom.Bar{just: 0.5},
+               %Geom.Bar{just: 0.5},
                %Geom.Path{line_end: :round, line_join: :round, mitre_limit: 10.0},
                %Geom.Line{orientation: :y, line_end: :butt, line_join: :round, mitre_limit: 10.0},
                %Geom.Rect{}

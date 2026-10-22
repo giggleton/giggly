@@ -939,6 +939,159 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
   # `mpg` where it is used, printed to 17 significant digits. It moves with ggplot2's default alpha
   # scales: a continuous column onto 0.1 to 1, a discrete one spread from 0.1 to 1.
+  describe "layer_data/2, a bar's width and placement" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mpg, aes(drv)) +
+    # geom_bar(width = 0.5)`, then with `fill = factor(year)` and `position = "dodge"`, then
+    # `aes(cyl)`, `aes(y = drv)` and `width = -0.5`; they move only with ggplot2's bars.
+    test "a counted bar is as wide as width: says, dodged and turned with it" do
+      counted = fn mapping, options ->
+        Giggly.Datasets.mpg()
+        |> Plot.new(mapping)
+        |> Plot.geom_bar(options)
+        |> Giggly.layer_data()
+      end
+
+      set = counted.(%{x: :drv}, width: 0.5)
+      dodged = counted.(%{x: :drv, fill: {:factor, [:year]}}, width: 0.5, position: :dodge)
+      continuous = counted.(%{x: :cyl}, width: 0.5)
+      lying = counted.(%{y: :drv}, width: 0.5)
+      reversed = counted.(%{x: :drv}, width: -0.5)
+
+      assert {DataFrame.pull(set, :xmin), DataFrame.pull(set, :xmax)} ===
+               {[0.75, 1.75, 2.75], [1.25, 2.25, 3.25]}
+
+      assert {DataFrame.pull(dodged, :xmin), DataFrame.pull(dodged, :xmax)} ===
+               {[0.75, 1.0, 1.75, 2.0, 2.75, 3.0], [1.0, 1.25, 2.0, 2.25, 3.0, 3.25]}
+
+      assert DataFrame.pull(continuous, :xmin) === [3.75, 4.75, 5.75, 7.75]
+
+      assert {DataFrame.pull(lying, :ymin), DataFrame.pull(lying, :ymax)} ===
+               {[0.75, 1.75, 2.75], [1.25, 2.25, 3.25]}
+
+      assert {DataFrame.pull(reversed, :xmin), DataFrame.pull(reversed, :xmax)} ===
+               {[1.25, 2.25, 3.25], [0.75, 1.75, 2.75]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col()` over x a, a, b and y 1, 2,
+    # 3 with `width = 0.5`, then `aes(group = g)` of p, q, p dodged, then `aes(width = w)` of 0.3,
+    # 0.6, 0.8, stacked and dodged alike, R warning that the x intervals overlap, then that mapping
+    # with `width = 0.5`; over x 4, 6, 8 with `width = 2`; and over x a, b with `aes(width = w)` of
+    # 0.5, NA. They move only with ggplot2's bars.
+    test "a column is as wide as its width: or its mapped width, the one set winning" do
+      columns = fn rows, mapping, options ->
+        rows
+        |> Plot.new(mapping)
+        |> Plot.geom_col(options)
+        |> Giggly.layer_data()
+      end
+
+      rows = %{"x" => ["a", "a", "b"], "y" => [1.0, 2.0, 3.0], "g" => ["p", "q", "p"]}
+      widths = Map.put(rows, "w", [0.3, 0.6, 0.8])
+      mapped = %{x: :x, y: :y, group: :g, width: :w}
+
+      set = columns.(rows, %{x: :x, y: :y}, width: 0.5)
+      dodged = columns.(rows, %{x: :x, y: :y, group: :g}, width: 0.5, position: :dodge)
+      own = columns.(widths, mapped, [])
+      own_dodged = columns.(widths, mapped, position: :dodge)
+      both = columns.(widths, mapped, width: 0.5)
+      continuous = columns.(%{"x" => [4, 6, 8], "y" => [1, 2, 3]}, %{x: :x, y: :y}, width: 2)
+
+      missing =
+        columns.(
+          %{"x" => ["a", "b"], "y" => [1, 2], "w" => [0.5, nil]},
+          %{x: :x, y: :y, width: :w},
+          []
+        )
+
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      assert edges.(set) === {[0.75, 0.75, 1.75], [1.25, 1.25, 2.25]}
+      assert edges.(dodged) === {[0.75, 1.0, 1.75], [1.0, 1.25, 2.25]}
+      assert edges.(own) === {[0.85, 0.7, 1.6], [1.15, 1.3, 2.4]}
+
+      assert {DataFrame.pull(own, :ymin), DataFrame.pull(own, :ymax)} ===
+               {[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]}
+
+      assert edges.(own_dodged) === edges.(own)
+      assert edges.(both) === {[0.75, 0.75, 1.75], [1.25, 1.25, 2.25]}
+      assert edges.(continuous) === {[3.0, 5.0, 7.0], [5.0, 7.0, 9.0]}
+      assert edges.(missing) === {[0.75, nil], [1.25, nil]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(just = 0)` and `just = 1`
+    # over x a, b and y 1, 2, `geom_bar(just = 0)` of mpg's `drv`, and `geom_col(just = 1,
+    # position = "dodge")` over x a, a, y 1, 2 and group p, q, which dodges round the x itself;
+    # they move only with ggplot2's bars.
+    test "just: puts a bar's lower or upper edge on its position, and dodging centres on the x" do
+      rows = %{"x" => ["a", "b"], "y" => [1.0, 2.0]}
+
+      placed = fn options ->
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col(options)
+        |> Giggly.layer_data()
+      end
+
+      counted =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :drv})
+        |> Plot.geom_bar(just: 0)
+        |> Giggly.layer_data()
+
+      dodged =
+        %{"x" => ["a", "a"], "y" => [1.0, 2.0], "g" => ["p", "q"]}
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col(just: 1, position: :dodge)
+        |> Giggly.layer_data()
+
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      lower = placed.(just: 0)
+      upper = placed.(just: 1)
+
+      assert edges.(lower) === {[1.0, 2.0], [1.8999999999999999, 2.8999999999999999]}
+      assert edges.(upper) === {[0.099999999999999978, 1.1000000000000001], [1.0, 2.0]}
+
+      assert DataFrame.pull(counted, :xmin) === [1.0, 2.0, 3.0]
+      assert edges.(dodged) === {[0.55000000000000004, 1.0], [1.0, 1.4500000000000002]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `annotate("col", x = c(1, 2), y = c(3,
+    # 4), width = c(0.3, 0.6))`, `annotate("bar", ..., width = 0.5)` and `annotate("col", ..., just
+    # = 0)` over points at x 1, 2; they move only with ggplot2's bars.
+    test "an annotation's bars take a width each, or one for all, and just:" do
+      annotated = fn geom, options ->
+        %{"x" => [1.0, 2.0], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.annotate(geom, [x: [1, 2], y: [3, 4]] ++ options)
+        |> Giggly.layer_data(1)
+      end
+
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      each = annotated.(:col, width: [0.3, 0.6])
+      all = annotated.(:bar, width: 0.5)
+      placed = annotated.(:col, just: 0)
+
+      assert edges.(each) === {[0.85, 1.7], [1.15, 2.3]}
+      assert edges.(all) === {[0.75, 1.75], [1.25, 2.25]}
+      assert edges.(placed) === {[1.0, 2.0], [1.8999999999999999, 2.8999999999999999]}
+    end
+
+    test "an expression's width that is not a number is refused when the plot is run" do
+      plot =
+        %{"x" => ["a"], "y" => [1.0]}
+        |> Plot.new(%{x: :x, y: :y, width: {&to_string/1, [:y]}})
+        |> Plot.geom_col()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message =~ "width must be a number"
+      assert error.message =~ ":string"
+    end
+  end
+
   describe "layer_data/2, mapping alpha" do
     @alpha_rows %{
       "x" => [1, 2, 3, 4, 5],

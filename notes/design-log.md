@@ -308,6 +308,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: a field of `%Stat.Bin{}`* — nothing would read it. *Rejected: `geom_bar/3`'s waiting
   for `geom_col/3`'s* — one bar feature, but the check is binning's, ready now.
 
+- **Bars take R's `width:` and `just:`, and `geom_col/3` a mapped `:width` (2026-10-22, Steve:
+  "follow ggplot2's lead in terms of what is supported").** `geom_bar/3` and `geom_col/3` take
+  `width:`, any number, as R does, a set aesthetic like `alpha:`, so it beats a mapped `:width` as
+  R's `aes_params` do, put into every row before the bar's setup, as a set corner is, so stacking,
+  dodging and the axes see the edges; on `geom_bar/3` it replaces counting's width, as
+  `stat_count()` takes it. `geom_col/3` and `annotate/3`'s bars take `:width` row by row. `just:`,
+  0 to 1 (R takes any number), is a field of `%Geom.Bar{}`, as R's is a parameter. A mapped
+  `:width` on `geom_bar/3` and `width:` on the histogram functions stay refused: R ignores both.
+  *Rejected: the bars' refusal* — never decided, and R's own pages use both. *Rejected: `width:` as
+  a field of the geom* — a mapped width would beat the set one, the reverse of R.
+
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
   `scale_shape_discrete/2` takes `solid:` (`{:shape, :solid}` or `{:shape, :open}`, R's
@@ -2068,6 +2079,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Give bars R's width and placement: width:, just: and a mapped width; §4: "Bars
+  take R's `width:` and `just:`"
 - 2026-10-22 — Summarise each group into a box through the frame (distributions, step 4); §4: "A
   box's outliers are a list column", "A box plot takes R's options", "The frame's operations share
   one expression grammar"

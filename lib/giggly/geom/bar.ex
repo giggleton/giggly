@@ -2,11 +2,13 @@ defmodule Giggly.Geom.Bar do
   @moduledoc false
 
   # Bars, ggplot2's `GeomBar`, which `geom_col()` draws with: one rectangle per row, from 0 to its
-  # y and centred on its x. It takes no parameters yet. Use it through `Giggly.Geom`.
+  # y and placed against its x as `just` says, ggplot2's parameter: 0.5 centres it, 0 puts its
+  # lower edge on the x and 1 its upper edge. Use it through `Giggly.Geom`.
   #
-  # Bars use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`, and
-  # need `:x` and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a
-  # mapping never silently does nothing.
+  # Bars use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype`, `:linewidth` and
+  # `:width`, and need `:x` and `:y`; an aesthetic joins the accepted list with the scale that maps
+  # it, or, as `:width`, which no scale maps, with the setup that reads it, so a mapping never
+  # silently does nothing.
   #
   # A bar is horizontal when its stat says so in a `flipped_aes` column, as counting along y does,
   # or else when y is the one discrete axis, as ggplot2's `GeomBar` decides (`has_flipped_aes()`);
@@ -15,23 +17,28 @@ defmodule Giggly.Geom.Bar do
   #
   # While the plot is assembled, each row becomes a rectangle in data space (`setup_data/2`), as
   # ggplot2's `GeomBar$setup_data()` makes one: from the lower of its y and 0 to the higher, and as
-  # wide as the `width` its stat gave it, as counting does, or else 0.9 of the closest spacing of
-  # the x positions (`Giggly.Resolution`, not counting from zero), the smallest found in any panel,
-  # centred on its x; the `width` column is then dropped. A row missing its x has no width, and
+  # wide as its `width`, the one its stat gave it, as counting does, or a layer maps or sets, or
+  # else 0.9 of the closest spacing of the x positions (`Giggly.Resolution`, not counting from
+  # zero), the smallest found in any panel, placed by `just`; the `width` column is then dropped. A
+  # width that is not a number is refused, an expression's, whose type is known only once it has
+  # run, as ggplot2 fails at `width * just`. A row missing its x or its width has no width, and
   # one missing its y no height, so neither is drawn; an infinite y is not taken yet. The position
   # then stacks or moves those rectangles, and the scales are trained again to cover them.
   #
   # A bar is then drawn, and its legend key too, as a rectangle (`Giggly.Geom.Rect`), as ggplot2's
   # `GeomBar` draws with its parent `GeomRect`, so a bar looks as ggplot2's default bar does.
 
-  defstruct []
+  # Every field is given by the function that adds the layer, its defaults there.
+  @enforce_keys [:just]
+  defstruct @enforce_keys
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{just: float()}
 
   # The aesthetics a layer of bars can use, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y]
+  def accepted_aesthetics,
+    do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :width, :x, :y]
 
   # The aesthetics a layer of bars cannot be drawn without.
   @doc false
@@ -45,21 +52,36 @@ defmodule Giggly.Geom.Bar do
     alias Giggly.DataFrame.Arithmetic
     alias Giggly.Geom.Rect
 
-    # ggplot2's default bar: its share of the spacing of the x positions, centred on its x
-    # (`just = 0.5`).
+    # ggplot2's default bar: its share of the spacing of the x positions.
     @width_share 0.9
-    @just 0.5
 
     @impl Giggly.Geom
-    def setup_data(_geom, frame, axis_kinds) do
+    def setup_data(geom, frame, axis_kinds) do
+      check_width(frame)
       flipped = flipped?(frame, axis_kinds)
       orientation = List.duplicate(flipped, DataFrame.row_count(frame))
 
       frame
       |> DataFrame.put(:flipped_aes, orientation)
       |> flip(flipped)
-      |> edges()
+      |> edges(geom.just)
       |> flip(flipped)
+    end
+
+    # A bar is drawn as wide as its width, so a width must be a number. `Giggly.Plot` refuses a
+    # column or a constant that is not at the call; an expression's type is known only once it has
+    # run, so one that computes anything else is refused here, where ggplot2 fails at
+    # `width * just`.
+    defp check_width(frame) do
+      case DataFrame.dtypes(frame) do
+        %{width: dtype} when dtype not in [:integer, :float, :null] ->
+          raise ArgumentError,
+                "a bar is drawn as wide as its width, so a width must be a number, but the " <>
+                  "layer's width is a #{inspect(dtype)} column"
+
+        _numbers_or_no_width ->
+          :ok
+      end
     end
 
     # The stat's orientation where it gave one, else horizontal when y alone is discrete.
@@ -84,7 +106,7 @@ defmodule Giggly.Geom.Bar do
       DataFrame.select(frame, renames)
     end
 
-    defp edges(frame) do
+    defp edges(frame, just) do
       widths = widths(frame)
       x_positions = DataFrame.pull(frame, :x)
       y_positions = DataFrame.pull(frame, :y)
@@ -95,8 +117,8 @@ defmodule Giggly.Geom.Bar do
         |> Enum.reject(fn name -> name == :width end)
         |> Enum.map(fn name -> {name, name} end)
 
-      xmins = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, -@just) end)
-      xmaxes = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, 1 - @just) end)
+      xmins = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, -just) end)
+      xmaxes = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, 1 - just) end)
 
       frame
       |> DataFrame.select(kept)

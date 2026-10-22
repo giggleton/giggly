@@ -28,7 +28,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   left for after the stat (`Mapping.stage/1`) → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
   stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
-  ggplot2's `GeomRect$setup_data()` fills them in) → geom reparameterize (a bar to
+  ggplot2's `GeomRect$setup_data()` fills them in), and the width it sets (a bar's, replacing its
+  stat's, as `GeomBar$setup_data()` reads its parameter) → geom reparameterize (a bar to
   `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position → reset and
   retrain position scales → map positions again, censoring what limits cut → freeze view scales →
   train non-position scales → build guides → map non-position scales → `after_scale` → fixed

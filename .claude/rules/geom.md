@@ -35,9 +35,12 @@ where its marks sit".
   discrete**, as ggplot2's `GeomBar` decides; it writes `flipped_aes` for the position and makes a
   horizontal bar as a vertical one, flipped and flipped back (`Aesthetics.flipped/1`).
 - **A mark with a width and none given takes it from the spacing of its positions**
-  (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar takes the `width` its stat
-  gave it, as counting does, or else 0.9 of the closest spacing of its x positions, not counting
-  from zero, the smallest found in any panel; the `width` column is then dropped.
+  (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar takes its `width`, the
+  one its stat gave it, as counting does, or the layer maps or sets (design-log §4, the entry
+  beginning "Bars take R's `width:`"), or else 0.9 of the closest spacing of its x positions, not
+  counting from zero, the smallest found in any panel; the `width` column is then dropped. A
+  width that is not a number is refused when the plot is run. **A bar sits against its x as its
+  struct's `just` says**, R's parameter, `x - width * just` to `x + width * (1 - just)`.
 - **A geom calls the coordinate system itself**, as ggplot2's `draw_panel()` calls
   `coord$transform()`: a geom drawing lines (`Geom.Path`) places its rows with `Coord.munch/3`,
   which cuts them to follow the panel's curves, and every other with `transform/3`, which only

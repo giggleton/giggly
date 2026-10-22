@@ -713,13 +713,17 @@ defmodule Giggly.Assembly do
     set_fixed(frame, Map.merge(defaults, Map.take(fixed, Map.keys(defaults))))
   end
 
-  # The layer's table with each position the layer sets, an x- or y-family aesthetic, given its
-  # value in every row just before its geom's setup, as ggplot2's `GeomRect$setup_data()` fills a
-  # rectangle's missing corners from the layer's parameters: so the position moves it and the
-  # scales, trained again after the position, cover it, as a rectangle's set corners need.
+  # The layer's table with each position the layer sets, an x- or y-family aesthetic, and the width
+  # it sets, given its value in every row just before its geom's setup, as ggplot2's
+  # `GeomRect$setup_data()` fills a rectangle's missing corners and `GeomBar$setup_data()` reads a
+  # bar's width from the layer's parameters: so the position moves the mark and the scales, trained
+  # again after the position, cover it, as a rectangle's set corners and a set bar's edges need. A
+  # set width replaces the one a stat gave each bar, as `stat_count()` takes it as its own.
   defp set_positions(frame, fixed) do
     positions =
-      Map.filter(fixed, fn {aesthetic, _value} -> Aesthetics.family(aesthetic) != :none end)
+      Map.filter(fixed, fn {aesthetic, _value} ->
+        Aesthetics.family(aesthetic) != :none or aesthetic == :width
+      end)
 
     set_fixed(frame, positions)
   end

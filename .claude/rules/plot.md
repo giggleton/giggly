@@ -176,7 +176,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   required aesthetic is a name or a list of alternatives, one of which is enough; an exclusive list
   allows at most one. A weight must hold numbers: a column's type, read from the layer's table, and
   a constant's are refused at the call, where R would fail inside the stat and draw nothing; an
-  expression's type is known only once it has run, so its stat refuses it then.
+  expression's type is known only once it has run, so its stat refuses it then; a column layer's
+  mapped `:width` alike, an expression's refused by the bar geom.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
@@ -192,10 +193,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
-  `:neg_infinity`, in the units of each axis. The assembly puts it into every row last, a
+  `:neg_infinity`, in the units of each axis, and `geom_bar/3` and `geom_col/3` `width:`, any
+  number, as R takes it. The assembly puts it into every row last, a
   position's aesthetic also just before the position runs, and a set corner, an x- or y-family
-  aesthetic, before the geom's setup, so it widens the axes as ggplot2 4.0's `GeomRect` fills its
-  corners in. **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
+  aesthetic, and a set width before the geom's setup, so it widens the axes as ggplot2 4.0's
+  `GeomRect` fills its corners in, and a bar's edges are where R's are.
+  **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
   holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
   raises naming the value. **A shape is resolved at the call too** (`validate_shape/1`): one of
   the names `Geom.Point.shapes/0` lists, or its number, 0 to 25, held as the name, or `:none`, so
@@ -208,10 +211,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   names. A map maps and a keyword list sets:
   the two never trade places. **An
   option that chooses how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s
-  `orientation:`, `geom_text/3`'s `check_overlap:`) **is a field of the geom's struct**, its
-  default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`).
+  `orientation:`, `geom_text/3`'s `check_overlap:`, the bar functions' `just:`) **is a field of the
+  geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`,
+  `0.5`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:` and `fill:`; every geom function's
+  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`, `fill:`, `width:` and `just:`,
+  0 to 1; every geom function's
   `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_count/3`'s and `stat_sum/3`'s `fill:`,
   `shape:`, `size:` and `stroke:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,

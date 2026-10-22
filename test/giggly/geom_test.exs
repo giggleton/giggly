@@ -267,7 +267,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax} ===
                {[0.0, 0.5], [0.25, 0.75], [0.0, 0.0], [0.5, 1.0]}
@@ -287,12 +287,12 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{fill_opacity: [0.5, 1.0, 1.0], color: [:none, :none, :none]}] =
-               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       without_alpha = DataFrame.new(xmin: [0.0], xmax: [1.0], ymin: [0.0], ymax: [2.0])
 
       assert [%Rectangles{fill_opacity: [1.0], fill: ["#595959"], color_opacity: [+0.0]}] =
-               Geom.draw_panel(%Geom.Bar{}, without_alpha, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, without_alpha, coord, panel_params)
     end
 
     # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = "#0000FF80", colour =
@@ -314,7 +314,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.fill, rectangles.fill_opacity, rectangles.color,
               rectangles.color_opacity} ===
@@ -337,7 +337,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.fill, rectangles.fill_opacity, rectangles.color,
               rectangles.color_opacity} ===
@@ -368,7 +368,7 @@ defmodule Giggly.GeomTest do
                  color_opacity: [1.0, +0.0]
                }
              ] =
-               Geom.draw_panel(%Geom.Bar{}, frame, coord, panel_params)
+               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
     end
   end
 
@@ -1028,7 +1028,7 @@ defmodule Giggly.GeomTest do
     end
 
     test "a bar's key is its fill short of the key's edges by its border's width" do
-      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{}, %{alpha: 0.55})
+      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{just: 0.5}, %{alpha: 0.55})
       [{{left, bottom}, {right, top}}] = key.offsets
 
       assert {key.xmin, key.xmax, key.ymin, key.ymax} === {[0.0], [1.0], [0.0], [1.0]}
@@ -1044,20 +1044,20 @@ defmodule Giggly.GeomTest do
     test "a bar's key is short of the key by its border's width, which it is drawn at and dashed" do
       key = %{color: "#000000", linewidth: 1.5, linetype: {1, 3}}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key)
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{just: 0.5}, key)
       [{{left, _bottom}, {right, _top}}] = drawn.offsets
 
       assert {Float.round(17.28 + right - left, 2), Float.round(drawn.stroke_width, 2),
               rounded(drawn.dashes), drawn.color} === {13.03, 3.2, [4.27, 12.8], ["#000000"]}
 
       assert [%Rectangles{color: [:none], dashes: :none}] =
-               Geom.draw_key(%Geom.Bar{}, %{key | linetype: :none})
+               Geom.draw_key(%Geom.Bar{just: 0.5}, %{key | linetype: :none})
     end
 
     test "a bar's key is filled and bordered as its layer sets, the key's alpha its fill's alone" do
       key = %{alpha: 0.3, fill: "#0000FF80", color: "#FF000080"}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{}, key)
+      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{just: 0.5}, key)
 
       assert {drawn.fill, drawn.fill_opacity, drawn.color, drawn.color_opacity} ===
                {["#0000FF"], [0.3], ["#FF0000"], [@half_alpha]}
@@ -1094,10 +1094,11 @@ defmodule Giggly.GeomTest do
     # bar's border blank, as `gg_par()` reads `NA` as `"blank"`.
     test "a key of a missing width draws nothing, and of a missing line type no line or border" do
       assert {Geom.draw_key(@path, %{linewidth: nil}), Geom.draw_key(@path, %{linetype: nil}),
-              Geom.draw_key(%Geom.Bar{}, %{color: "#000000", linewidth: nil})} === {[], [], []}
+              Geom.draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linewidth: nil})} ===
+               {[], [], []}
 
       assert [%Rectangles{color: [:none], dashes: :none}] =
-               Geom.draw_key(%Geom.Bar{}, %{color: "#000000", linetype: nil})
+               Geom.draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linetype: nil})
     end
 
     test "a line's key is a path's, ggplot2's default width where the layer sets none" do
@@ -1195,11 +1196,14 @@ defmodule Giggly.GeomTest do
     test "a path's or line's key needs its line's width; a bar's twice its border's" do
       assert rounded_size(Geom.key_size(@path, %{linewidth: 8.0})) === {22.68, 22.68}
       assert rounded_size(Geom.key_size(@line, %{})) === {1.42, 1.42}
-      assert rounded_size(Geom.key_size(%Geom.Bar{}, %{linewidth: 4.0})) === {22.68, 22.68}
+
+      assert rounded_size(Geom.key_size(%Geom.Bar{just: 0.5}, %{linewidth: 4.0})) ===
+               {22.68, 22.68}
+
       assert rounded_size(Geom.key_size(%Geom.Rect{}, %{})) === {2.83, 2.83}
 
       assert {Geom.key_size(@path, %{linewidth: nil}),
-              Geom.key_size(%Geom.Bar{}, %{linewidth: nil})} ===
+              Geom.key_size(%Geom.Bar{just: 0.5}, %{linewidth: nil})} ===
                {{0.0, 0.0}, {0.0, 0.0}}
     end
 

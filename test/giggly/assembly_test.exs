@@ -85,7 +85,7 @@ defmodule Giggly.AssemblyTest do
                 ],
                 [
                   %{
-                    geom: %Geom.Bar{},
+                    geom: %Geom.Bar{just: 0.5},
                     aesthetics: [:alpha],
                     fixed: %{},
                     draws: [true, true, true]
@@ -186,7 +186,7 @@ defmodule Giggly.AssemblyTest do
                ],
                layers: [
                  %{
-                   geom: %Geom.Bar{},
+                   geom: %Geom.Bar{just: 0.5},
                    aesthetics: [:color, :fill],
                    fixed: %{},
                    draws: [true, true, true]
@@ -302,7 +302,7 @@ defmodule Giggly.AssemblyTest do
                {[:color, :fill],
                 [
                   %{
-                    geom: %Geom.Bar{},
+                    geom: %Geom.Bar{just: 0.5},
                     aesthetics: [:fill],
                     fixed: %{},
                     draws: [true, true, true]
@@ -416,7 +416,7 @@ defmodule Giggly.AssemblyTest do
         |> Map.fetch!(:legends)
 
       assert Enum.map(legend.layers, fn layer -> {layer.geom, layer.aesthetics} end) ===
-               [{%Geom.Bar{}, [:fill]}, {%Geom.Point{}, [:fill]}]
+               [{%Geom.Bar{just: 0.5}, [:fill]}, {%Geom.Point{}, [:fill]}]
     end
 
     test "legends with different titles stay apart, in the order of their aesthetics' names" do
@@ -458,7 +458,7 @@ defmodule Giggly.AssemblyTest do
 
       assert legend.layers === [
                %{
-                 geom: %Geom.Bar{},
+                 geom: %Geom.Bar{just: 0.5},
                  aesthetics: [:alpha],
                  fixed: %{},
                  draws: [true, true, true, true, true]
