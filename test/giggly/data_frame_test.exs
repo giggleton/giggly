@@ -487,8 +487,8 @@ defmodule Giggly.DataFrameTest do
     test "a comparison is missing where either number is, and puts NaN above every number" do
       frame =
         DataFrame.new(
-          left: [1.0, :nan, nil, :infinity, :neg_infinity, :nan, 2.0],
-          right: [2.0, 1.0, 1.0, :nan, -1.0e308, :nan, 2]
+          left: [1.0, :nan, nil, :infinity, :neg_infinity, :nan, 2.0, 1.0],
+          right: [2.0, 1.0, 1.0, :nan, -1.0e308, :nan, 2, nil]
         )
 
       mutated =
@@ -497,8 +497,19 @@ defmodule Giggly.DataFrameTest do
           above: {:>, [:left, :right]}
         )
 
-      assert DataFrame.pull(mutated, :below) === [true, false, nil, true, true, false, false]
-      assert DataFrame.pull(mutated, :above) === [false, true, nil, false, false, false, false]
+      assert DataFrame.pull(mutated, :below) === [true, false, nil, true, true, false, false, nil]
+
+      assert DataFrame.pull(mutated, :above) === [
+               false,
+               true,
+               nil,
+               false,
+               false,
+               false,
+               false,
+               nil
+             ]
+
       assert DataFrame.dtypes(mutated).below == :boolean
     end
 
@@ -796,6 +807,16 @@ defmodule Giggly.DataFrameTest do
                [:infinity, :infinity],
                [:infinity, :infinity]
              ]
+    end
+
+    # Golden: R 4.6.1's quantile(c(54.6, 54.6, 60), 0.1) is 54.6, the tied value kept, where
+    # 0.8 * 54.6 + 0.2 * 54.6 is 54.600000000000009; it moves only with R's `quantile()`.
+    test "a quantile at a place between two equal values is that value" do
+      frame = DataFrame.new(group: [1, 1, 1], y: [54.6, 54.6, 60.0])
+
+      summarised = DataFrame.summarise(frame, [:group], q: {:quantile, [:y], probability: 0.1})
+
+      assert DataFrame.pull(summarised, :q) === [54.6]
     end
 
     test "a quantile of integers is a float" do

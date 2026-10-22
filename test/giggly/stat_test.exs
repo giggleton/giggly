@@ -156,6 +156,22 @@ defmodule Giggly.StatTest do
              ]
     end
 
+    # Golden: `ggplot(df, aes(x, y, group = g))` of x `c(0.2, 0.2, 10, 11)`, y `c(1, 2, 3, 4)` and
+    # g `c("a", "a", "b", "b")`: the layer's spacing counting from zero is 0.2.
+    test "a group of two x values is 0.9 of their range wide, and the spacing counts from zero" do
+      frame =
+        DataFrame.new(
+          x: [0.2, 0.2, 10.0, 11.0],
+          y: [1.0, 2.0, 3.0, 4.0],
+          panel: [1, 1, 1, 1],
+          group: [1, 1, 2, 2]
+        )
+
+      boxes = Stat.compute_layer(box(), frame, axes([1], false, false))
+
+      assert columns(boxes, [:x, :width]) === [[0.2, 10.5], [0.15000000000000002, 0.9]]
+    end
+
     # Golden: `ggplot(mpg, aes(y = hwy))` and `ggplot(mpg, aes(x = hwy))`.
     test "a layer mapping y alone is summarised at x 0, and one mapping x alone along x" do
       vertical = mpg_frame(y: column(:hwy), group: List.duplicate(-1, 234))
@@ -209,6 +225,18 @@ defmodule Giggly.StatTest do
       assert DataFrame.pull(given, :width) === [0.3, 0.8, 0.8]
     end
 
+    # Golden: `ggplot(df, aes(x, y, width = w))` of x `c("a", "a", "b", "b")`, y `c(1, 2, 3, 4)` and
+    # w `c(1L, 1L, NA, NA)`, then w `NA_real_`: R's widths are 1 and NA, then NA and NA.
+    test "a mapped width of whole numbers or of missing values is each group's first" do
+      whole = Stat.compute_layer(box(), width_frame([1, 1, nil, nil]), axes([1], true, false))
+
+      missing =
+        Stat.compute_layer(box(), width_frame([nil, nil, nil, nil]), axes([1], true, false))
+
+      assert {DataFrame.pull(whole, :width), DataFrame.pull(missing, :width)} ===
+               {[1, nil], [nil, nil]}
+    end
+
     # Golden: `ggplot(mpg, aes(drv, hwy)) + facet_wrap(~year)`.
     test "each panel's boxes are summarised apart, panels first" do
       years = column(:year)
@@ -236,11 +264,21 @@ defmodule Giggly.StatTest do
              ]
     end
 
-    # Golden: `ggplot(mpg, aes(hwy, class))`, whose boxes are `aes(class, hwy)`'s lying down.
+    # Golden: `ggplot(mpg, aes(hwy, class))`, whose boxes are `aes(class, hwy)`'s lying down, and
+    # `ggplot(mpg, aes(hwy, class, group = drv))`, whose groups each hold many of both.
     test "a box runs along the continuous axis where the other is discrete" do
       frame = mpg_frame(x: column(:hwy), y: places(:class), group: places(:class))
+      by_drive = mpg_frame(x: column(:hwy), y: places(:class), group: places(:drv))
 
       boxes = Stat.compute_layer(box(), frame, axes([1], false, true))
+      drive_boxes = Stat.compute_layer(box(), by_drive, axes([1], false, true))
+
+      assert columns(drive_boxes, [:xmiddle, :y, :width, :flipped_aes]) === [
+               [18.0, 28.0, 21.0],
+               [4.5, 4.0, 4.0],
+               [4.5, 3.6000000000000001, 5.4000000000000004],
+               [true, true, true]
+             ]
 
       assert columns(boxes, [:xlower, :xmiddle, :xupper, :y, :flipped_aes]) === [
                [24.0, 26.0, 26.0, 22.0, 16.0, 24.5, 17.0],
@@ -252,7 +290,9 @@ defmodule Giggly.StatTest do
     end
 
     # Golden: `ggplot(mpg, aes(cyl, hwy, group = cyl))`, `ggplot(mpg, aes(hwy, cyl, group = cyl))`
-    # and `ggplot(mpg, aes(displ, hwy))`, which R summarises along y and warns of.
+    # and `ggplot(mpg, aes(displ, hwy))`, which R summarises along y and warns of; and `ggplot(df,
+    # aes(x, y, group = g))` of x `c(1, 2, 3)`, y `c(5, 5, 6)` and g `c("a", "a", "b")`, whose
+    # groups each hold one y, though the second holds one x too.
     test "on two continuous axes a box runs along the axis each group holds many values of" do
       upright = mpg_frame(x: column(:cyl), y: column(:hwy), group: places(:cyl))
       lying = mpg_frame(x: column(:hwy), y: column(:cyl), group: places(:cyl))
@@ -274,6 +314,12 @@ defmodule Giggly.StatTest do
                [4.0, 5.0, 6.0, 8.0],
                List.duplicate(true, 4)
              ]
+
+      one_y =
+        DataFrame.new(x: [1.0, 2.0, 3.0], y: [5.0, 5.0, 6.0], panel: [1, 1, 1], group: [1, 1, 2])
+
+      assert columns(Stat.compute_layer(box(), one_y, continuous), [:xmiddle, :y, :flipped_aes]) ===
+               [[1.5, 3.0], [5.0, 6.0], [true, true]]
 
       assert columns(undecided_boxes, [:middle, :x, :width, :flipped_aes]) === [
                [24.0],
@@ -323,6 +369,16 @@ defmodule Giggly.StatTest do
   end
 
   defp box, do: %Stat.Boxplot{coef: 1.5, width: :none, orientation: :none}
+
+  defp width_frame(widths) do
+    DataFrame.new(
+      x: [1, 1, 2, 2],
+      y: [1.0, 2.0, 3.0, 4.0],
+      width: widths,
+      panel: [1, 1, 1, 1],
+      group: [1, 1, 2, 2]
+    )
+  end
 
   # Each panel's axes as the stat reads them: only whether each is discrete matters to a box plot.
   defp axes(panels, x_discrete, y_discrete) do

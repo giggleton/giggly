@@ -33,7 +33,19 @@ defmodule Giggly.ScaleTest do
 
   describe "kind/1 and kind/2" do
     test "a column's type decides its scale's kind, and a type with no scale yet gets none" do
-      dtypes = [:integer, :float, :null, :string, :boolean, :atom, :category, :date, :time, :term]
+      dtypes = [
+        :integer,
+        :float,
+        :null,
+        :string,
+        :boolean,
+        :atom,
+        :category,
+        :date,
+        :time,
+        :term,
+        {:list, :float}
+      ]
 
       assert Enum.map(dtypes, &Scale.kind/1) == [
                :continuous,
@@ -44,6 +56,7 @@ defmodule Giggly.ScaleTest do
                :discrete,
                :discrete,
                :date,
+               :none,
                :none,
                :none
              ]
