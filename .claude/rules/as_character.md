@@ -17,7 +17,8 @@ entry beginning "R's `as.character()` is a boundary of its own".
   with no point; `TRUE`, `FALSE`, `Inf`, `-Inf`, `NaN`; a date as R prints one. Its tests pin R's
   own output.
 - **It depends on nothing, and its callers list it**: `Giggly.Geom` for a text's labels,
-  `Giggly.Scale` for discrete levels and `Giggly.Facet` for strips, none of which lists another. A
-  rule for writing a given value as text lives here, never copied into a caller.
+  `Giggly.Scale` for discrete levels, `Giggly.Facet` for strips and `Giggly.Mapping` for a
+  factor's levels in its title, none of which lists another. A rule for writing a given value as
+  text lives here, never copied into a caller.
 - **A missing value has no text here.** Each caller says what one means: text leaves its row out,
   a scale and a strip label it `NA`.

@@ -358,6 +358,89 @@ defmodule GigglyTest do
                {[1, 1, 2, 2], [2.0, 2.0], %{x: "factor(w)", y: "count"}}
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1's `layer_data()` of `ggplot(mtcars, aes(factor(cyl, levels =
+    # c(8, 4, 6)), fill = factor(gear, levels = c(5, 4, 3)))) + geom_bar()`: each cylinder's bars
+    # in the levels' order, numbered so, the first level on top of its stack.
+    test "a factor's levels order its axis, its groups and its stacks" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{
+          x: {:factor, [:cyl], levels: [8, 4, 6]},
+          fill: {:factor, [:gear], levels: [5, 4, 3]}
+        })
+        |> Plot.geom_bar()
+
+      frame = Giggly.layer_data(plot)
+
+      bars =
+        [:x, :group, :fill, :ymin, :ymax]
+        |> Enum.map(fn name -> DataFrame.pull(frame, name) end)
+        |> Enum.zip()
+        |> Enum.sort_by(fn {_x, group, _fill, _ymin, _ymax} -> group end)
+
+      assert bars == [
+               {1, 1, "#F8766D", 12, 14},
+               {1, 2, "#619CFF", 0, 12},
+               {2, 3, "#F8766D", 9, 11},
+               {2, 4, "#00BA38", 1, 9},
+               {2, 5, "#619CFF", 0, 1},
+               {3, 6, "#F8766D", 6, 7},
+               {3, 7, "#00BA38", 2, 6},
+               {3, 8, "#619CFF", 0, 2}
+             ]
+
+      assert Giggly.panel_scales(plot, 1).x.levels === [8.0, 4.0, 6.0]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 colours `colour = factor(cyl, levels = c(8, 4, 6))` over
+    # `mtcars` #F8766D for an 8, #00BA38 for a 4 and #619CFF for a 6, its legend keys 8, 4, 6, and
+    # titles it `factor(cyl, levels = c(8, 4, 6))`.
+    test "a factor's levels order its legend and its colours" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      plot =
+        mtcars
+        |> Plot.new(%{x: :mpg, y: :wt, colour: {:factor, [:cyl], levels: [8, 4, 6]}})
+        |> Plot.geom_point()
+
+      [legend] = Giggly.Assembly.run(plot).legends
+      frame = Giggly.layer_data(plot)
+
+      colours =
+        mtcars
+        |> Keyword.fetch!(:cyl)
+        |> Enum.zip(DataFrame.pull(frame, :color))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      assert {colours, Enum.map(legend.keys, fn key -> key.label end), legend.title} ===
+               {[{4.0, "#00BA38"}, {6.0, "#619CFF"}, {8.0, "#F8766D"}], ["8", "4", "6"],
+                "factor(cyl, levels = c(8, 4, 6))"}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 places `factor(cyl, levels = c(8, 4))` over `mtcars` at 1 for
+    # an 8, 2 for a 4, and 3 for a 6, which is `NA`, placed last.
+    test "a value not among a factor's levels is missing, placed after them" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      plot =
+        mtcars
+        |> Plot.new(%{x: {:factor, [:cyl], levels: [8, 4]}, y: :mpg})
+        |> Plot.geom_point()
+
+      frame = Giggly.layer_data(plot)
+
+      places =
+        mtcars
+        |> Keyword.fetch!(:cyl)
+        |> Enum.zip(DataFrame.pull(frame, :x))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      assert {places, Giggly.panel_scales(plot, 1).x.levels} ===
+               {[{4.0, 2}, {6.0, 3}, {8.0, 1}], [8.0, 4.0, nil]}
+    end
+
     # Golden: ggplot2 4.0.3 in R 4.6.1 labels a colour legend of `TRUE` and `FALSE` `FALSE`, `TRUE`.
     test "a column of true and false is labelled as R writes it" do
       [legend] =
@@ -3354,6 +3437,28 @@ defmodule GigglyTest do
                {[4, 4, 4], :category}
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fills `geom_histogram(bins = 5)` of mtcars' `mpg` by
+    # `factor(cyl, levels = c(8, 4, 6))` with its legend's keys 8, 4, 6, its groups 1, 2, 3 filled
+    # #F8766D, #00BA38 and #619CFF: the bins carry the factor's levels.
+    test "a carried factor keeps its levels, so the legend and colours follow them" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, fill: {:factor, [:cyl], levels: [8, 4, 6]}})
+        |> Plot.geom_histogram(bins: 5)
+
+      frame = Giggly.layer_data(plot)
+      [legend] = Giggly.Assembly.run(plot).legends
+
+      fills =
+        frame
+        |> DataFrame.pull(:group)
+        |> Enum.zip(DataFrame.pull(frame, :fill))
+        |> Enum.uniq()
+
+      assert {Enum.map(legend.keys, fn key -> key.label end), fills} ===
+               {["8", "4", "6"], [{1, "#F8766D"}, {2, "#00BA38"}, {3, "#619CFF"}]}
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2, 2 with binwidth 1, boundary
     # 0.5 and y after_stat(count), (ncount), (ndensity) and (width): ymax 1, 2; 0.5, 1; 0.5, 1; 1, 1.
     test "an after_stat reads each variable binning computes" do
@@ -4694,6 +4799,7 @@ defmodule GigglyTest do
       assert scales === %{
                x: %Giggly.Scale.Discrete{
                  levels: ["a", "b", "c"],
+                 factor: false,
                  continuous_range: {0.55000000000000004, 3.4500000000000002},
                  palette: :identity,
                  na_value: nil,
@@ -4825,6 +4931,7 @@ defmodule GigglyTest do
       assert {Giggly.panel_scales(plot, 1).x, Giggly.panel_scales(plot, 2).x} ==
                {%Giggly.Scale.Discrete{
                   levels: ["6", "8"],
+                  factor: false,
                   continuous_range: {1, 2},
                   palette: :identity,
                   na_value: nil,
@@ -4832,6 +4939,7 @@ defmodule GigglyTest do
                 },
                 %Giggly.Scale.Discrete{
                   levels: ["4", "6"],
+                  factor: false,
                   continuous_range: {1, 2},
                   palette: :identity,
                   na_value: nil,

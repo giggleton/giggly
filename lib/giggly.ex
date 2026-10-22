@@ -91,6 +91,7 @@ defmodule Giggly do
       %{
         x: %Giggly.Scale.Discrete{
           levels: ["4", "6"],
+          factor: false,
           continuous_range: {1, 2},
           palette: :identity,
           na_value: nil,

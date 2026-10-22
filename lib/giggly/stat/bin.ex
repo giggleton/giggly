@@ -315,7 +315,7 @@ defmodule Giggly.Stat.Bin do
     end
 
     # The output table: the computed columns in ggplot2's order, then each column carried from its
-    # group's rows, a category kept one.
+    # group's rows, a category kept one, with its levels.
     defp output(bins, groups, constant, flipped) do
       computed =
         for name <- [:count, :x, :xmin, :xmax, :width, :density, :ncount, :ndensity],
@@ -330,7 +330,7 @@ defmodule Giggly.Stat.Bin do
           values = Enum.map(bins, fn bin -> Map.fetch!(by_group, bin.key) end)
 
           if Map.fetch!(dtypes, name) == :category,
-            do: {name, values, :category},
+            do: {name, values, DataFrame.category(groups, name)},
             else: {name, values}
         end)
 

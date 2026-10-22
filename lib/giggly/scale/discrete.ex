@@ -3,7 +3,13 @@ defmodule Giggly.Scale.Discrete do
   A discrete scale. `Giggly.Plot.scale_x_discrete/2` records one with the options it is given and
   no levels, and `Giggly.panel_scales/2` returns an axis's trained. Its fields:
 
-    * `levels`: the distinct values it has seen, in level order.
+    * `levels`: the distinct values it has seen, in level order: a factor's in its levels' order,
+      those it lacks after them, and values with no levels of their own sorted, a missing value
+      last, but where `factor` keeps them in the order they came.
+    * `factor`: whether the first values it was trained on were a factor's, whose levels have an
+      order of their own: `true` keeps its levels in the order they came, each new value after
+      them; `false` sorts them again whenever values with no levels of their own come, a factor's
+      levels first until then; `:none` before it has seen any.
     * `continuous_range`: the range of the positions it has been handed since its levels were
       placed, such as a bar's edges, which can widen the axis past its levels; `:none` before any.
     * `palette`: what turns a value into its aesthetic's value: `:identity` for a position, each
@@ -53,6 +59,7 @@ defmodule Giggly.Scale.Discrete do
   # identity palette, an axis, and every option the default, ggplot2's 0.6 of a level's room at
   # each end among them.
   defstruct levels: [],
+            factor: :none,
             continuous_range: :none,
             palette: :identity,
             na_value: nil,
@@ -65,6 +72,7 @@ defmodule Giggly.Scale.Discrete do
 
   @type t :: %__MODULE__{
           levels: list(),
+          factor: :none | boolean(),
           continuous_range: :none | {number(), number()},
           palette:
             :identity
@@ -92,18 +100,55 @@ defmodule Giggly.Scale.Discrete do
           expand: [mult: {number(), number()}, add: {number(), number()}]
         }
 
-  # The scale with the distinct `values` merged into its levels, as `Giggly.Scale.train/2`
-  # describes.
+  # The scale with `values` merged into its levels, as R's `scales::discrete_range()` merges a
+  # range, `levels` the factor's levels they are values of, or `:none`; as `Giggly.Scale.train/3`
+  # describes. Values that are none merge nothing, as ggplot2 trains nothing on no rows.
   @doc false
-  @spec train(t(), list()) :: t()
-  def train(%__MODULE__{levels: levels} = scale, values) do
+  @spec train(t(), list(), list() | :none) :: t()
+  def train(%__MODULE__{} = scale, [], _levels), do: scale
+
+  def train(%__MODULE__{factor: :none} = scale, values, levels),
+    do: %{scale | levels: present_levels(values, levels), factor: levels != :none}
+
+  def train(%__MODULE__{levels: old, factor: factor} = scale, values, levels) do
     merged =
-      levels
-      |> Enum.concat(values)
-      |> Enum.uniq()
-      |> Enum.sort_by(&Giggly.Scale.level_key/1)
+      merged(ordered_old(old, factor), factor, present_levels(values, levels), levels != :none)
 
     %{scale | levels: merged}
+  end
+
+  # The levels `values` bring, as R's `clevels()` with `drop = TRUE` gives them: a factor's levels
+  # its values hold, in its levels' order, then the missing value if one is among them; or the
+  # distinct values sorted, the missing value last.
+  defp present_levels(values, :none) do
+    values
+    |> Enum.uniq_by(&key/1)
+    |> Enum.sort_by(&Giggly.Scale.level_key/1)
+  end
+
+  defp present_levels(values, levels) do
+    present = MapSet.new(values, &key/1)
+    held = Enum.filter(levels, fn level -> MapSet.member?(present, key(level)) end)
+    if MapSet.member?(present, nil), do: Enum.concat(held, [nil]), else: held
+  end
+
+  # The levels already held as `discrete_range()` reads them before merging: kept in order, the
+  # missing value moved last, where the first values were a factor's; else sorted.
+  defp ordered_old(old, true), do: Enum.reject(old, &is_nil/1) ++ Enum.filter(old, &is_nil/1)
+  defp ordered_old(old, false), do: Enum.sort_by(old, &Giggly.Scale.level_key/1)
+
+  # A factor's levels lead where the held levels' order is not a factor's, so the two swap; the
+  # levels not yet held follow, and the whole is sorted unless the leading levels are a factor's.
+  defp merged(old, false, new, true), do: merged(new, true, old, false)
+
+  defp merged(old, old_factor, new, _new_factor) do
+    held = MapSet.new(old, &key/1)
+
+    case Enum.reject(new, fn level -> MapSet.member?(held, key(level)) end) do
+      [] -> old
+      added when old_factor -> old ++ added
+      added -> Enum.sort_by(old ++ added, &Giggly.Scale.level_key/1)
+    end
   end
 
   # The scale with its continuous range widened to cover the positions `values`, its levels left

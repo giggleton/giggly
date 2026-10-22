@@ -192,15 +192,23 @@ grid lines are placed by the coordinate system".
   untransformed continuous scale draws a date; under any other transformation a date is refused,
   where R fails.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
-  the non-finite floats skipped); discrete levels are the distinct values, `nil` last, numbers
-  among them, as a factor's are. **Which a discrete scale is handed, levels or positions, the
-  caller says** by the function it calls, never by the values' type: `train/2` for a layer's own
-  values, its levels, and `train_positions/2` for positions once the levels are mapped, which
-  widen its continuous range alone. `discrete?/1` tells the two kinds apart for a caller that
-  must, as a legend's key drawing does.
-- **Discrete values are ordered by `level_key/1` alone**, and the assembly hands the same key to
-  grouping, which orders its combinations by it, so group ids and axis positions agree. The rule
-  exists once, and grouping does not depend on scales to use it.
+  the non-finite floats skipped). **A discrete scale merges each training as R's
+  `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and
+  plain values"), handed a column at a time, with the levels of the factor its values are of or
+  `:none`: a factor brings the levels its values hold, in their order, the missing value after
+  them, as `drop = TRUE`; other values their distinct values sorted, `nil` last; values matched by
+  `Discrete.key/1`, so `4` and `4.0` are one; a factor's levels lead the rest, and the scale's
+  `factor` field, set by its first training, says whether new values follow the levels held or
+  everything is sorted again; no values train nothing. **Which a discrete scale is handed, levels
+  or positions, the caller says** by the function it calls, never by the values' type: `train/3`
+  for a layer's own values, its levels, and `train_positions/2` for positions once the levels are
+  mapped, which widen its continuous range alone. `discrete?/1` tells the two kinds apart for a
+  caller that must, as a legend's key drawing does.
+- **Values with no levels of their own are ordered by `level_key/1` alone**, and the assembly
+  hands the same key to grouping, which orders their combinations by it, so group ids and axis
+  positions agree; a factor's values are ordered by its levels, which grouping reads from the
+  frame as the scale is handed them. The rule exists once, and grouping does not depend on scales
+  to use it.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
   `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`; a

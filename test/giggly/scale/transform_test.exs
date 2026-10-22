@@ -14,7 +14,7 @@ defmodule Giggly.Scale.TransformTest do
   # minor breaks, as the assembly finds them.
   defp axis(transform, values, options \\ []) do
     scale = struct!(Continuous, [{:transform, transform} | options])
-    trained = Scale.train(scale, Scale.transform(scale, values))
+    trained = Scale.train(scale, Scale.transform(scale, values), :none)
     extent = Scale.dimension(trained)
     breaks = Scale.breaks(trained, extent)
     {extent, breaks, Scale.minor_breaks(trained, breaks, extent)}
@@ -244,7 +244,7 @@ defmodule Giggly.Scale.TransformTest do
                 ], [-15.5, -16.5, -17.5, -18.5, -19.5]}
 
       scale = %Continuous{transform: :reverse, limits: {50, nil}}
-      trained = Scale.train(scale, Scale.transform(scale, [1, 10, 100]))
+      trained = Scale.train(scale, Scale.transform(scale, [1, 10, 100]), :none)
       extent = Scale.dimension(trained)
 
       assert extent == {-52.45, 1.4500000000000002}
@@ -302,7 +302,7 @@ defmodule Giggly.Scale.TransformTest do
         end
       }
 
-      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)))
+      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
       extent = Scale.dimension(trained)
 
       assert labels(trained, extent) == ["20.0", "30.0", "40.0"]
@@ -315,7 +315,9 @@ defmodule Giggly.Scale.TransformTest do
         labels: fn dates -> Enum.map(dates, &Date.to_iso8601/1) end
       }
 
-      trained = Scale.train(scale, Scale.transform(scale, [~D[2020-01-01], ~D[2020-01-03]]))
+      trained =
+        Scale.train(scale, Scale.transform(scale, [~D[2020-01-01], ~D[2020-01-03]]), :none)
+
       extent = Scale.dimension(trained)
 
       assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
@@ -344,7 +346,7 @@ defmodule Giggly.Scale.TransformTest do
 
     test "a labels function's refusal shows the breaks in data units" do
       scale = %Continuous{transform: :log10, labels: fn _breaks -> ["one"] end}
-      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)))
+      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
 
       error =
         assert_raise ArgumentError, fn -> Scale.breaks(trained, Scale.dimension(trained)) end

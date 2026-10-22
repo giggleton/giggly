@@ -7,28 +7,39 @@ defmodule Giggly.ScaleTest do
   defp discrete_alpha(values) do
     :discrete
     |> Scale.new(:alpha)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   # A new continuous colour scale trained once on `values`.
   defp gradient_scale(values) do
     :continuous
     |> Scale.new(:color)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   # A new discrete colour scale trained once on `values`.
   defp hue_scale(values) do
     :discrete
     |> Scale.new(:color)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   # A new scale of `kind` trained once on `values`.
   defp trained(kind, values) do
     kind
     |> Scale.new()
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
+  end
+
+  # The levels of `scale` once trained on each `{values, levels}` in turn, `levels` the factor's
+  # the values are of, or `:none`.
+  defp levels_after(steps, scale \\ Scale.new(:discrete)) do
+    trained =
+      Enum.reduce(steps, scale, fn {values, levels}, training ->
+        Scale.train(training, values, levels)
+      end)
+
+    trained.levels
   end
 
   describe "kind/1 and kind/2" do
@@ -80,13 +91,13 @@ defmodule Giggly.ScaleTest do
     end
   end
 
-  describe "train/2" do
+  describe "train/3" do
     test "a continuous range spans the finite numbers only, across trainings" do
       scale =
         :continuous
         |> Scale.new()
-        |> Scale.train([nil, 3, :infinity, 1.5])
-        |> Scale.train([2])
+        |> Scale.train([nil, 3, :infinity, 1.5], :none)
+        |> Scale.train([2], :none)
 
       assert scale === %Scale.Continuous{
                range: {1.5, 3},
@@ -101,11 +112,12 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new()
-        |> Scale.train(["b", nil, "a"])
-        |> Scale.train(["c", "a"])
+        |> Scale.train(["b", nil, "a"], :none)
+        |> Scale.train(["c", "a"], :none)
 
       assert scale === %Scale.Discrete{
                levels: ["a", "b", "c", nil],
+               factor: false,
                continuous_range: :none,
                palette: :identity,
                na_value: nil,
@@ -117,6 +129,69 @@ defmodule Giggly.ScaleTest do
     # ggplot2's legend.
     test "a discrete scale takes numbers as levels, in order of value, nil last" do
       assert trained(:discrete, [10, 9, nil, 100, 9]).levels === [9, 10, 100, nil]
+    end
+
+    # Golden, each a layer's `x` in turn, `layer_scales()` in R 4.6.1 with ggplot2 4.0.3 and scales
+    # 1.4.0: a factor's levels lead, whichever layer brings them, as `discrete_range()` swaps them.
+    test "a factor's levels lead the values without levels, in either order" do
+      factor = {["b", "a"], ["b", "a"]}
+      text = {["c", "a"], :none}
+
+      assert {levels_after([factor, text]), levels_after([text, factor])} ===
+               {["b", "a", "c"], ["b", "a", "c"]}
+    end
+
+    # Golden: as above; the scale remembers whether its first values were a factor's.
+    test "past two trainings, a scale whose first values were a factor's keeps their order" do
+      factor = {["b", "a"], ["b", "a"]}
+      text = {["c", "a"], :none}
+      more_text = {["d", "0"], :none}
+
+      assert {levels_after([factor, text, more_text]), levels_after([text, factor, more_text])} ===
+               {["b", "a", "c", "0", "d"], ["0", "a", "b", "c", "d"]}
+    end
+
+    # Golden: as above, for factors with levels `c("b", "a")` and `c("z", "a")`, and for levels
+    # `c("c", "b", "a")` over the values `b` and `a`, which drop `c`, as `drop = TRUE` does.
+    test "two factors' levels follow each other, and a level no value holds is dropped" do
+      assert {levels_after([{["b", "a"], ["b", "a"]}, {["z", "a"], ["z", "a"]}]),
+              levels_after([{["b", "a"], ["c", "b", "a"]}])} === {["b", "a", "z"], ["b", "a"]}
+    end
+
+    # Golden: as above, the factor's values `b`, `NA` and `a` beside the text `c` and `a`, and its
+    # values `b` and `a` beside the text `c` and `NA`.
+    test "a missing value follows a factor's levels, and the values after it follow it" do
+      factor_missing = {["b", nil, "a"], ["b", "a"]}
+      text = {["c", "a"], :none}
+      factor = {["b", "a"], ["b", "a"]}
+      text_missing = {["c", nil], :none}
+
+      assert {levels_after([factor_missing, text]), levels_after([text, factor_missing]),
+              levels_after([factor, text_missing]), levels_after([text_missing, factor])} ===
+               {["b", "a", nil, "c"], ["b", "a", nil, "c"], ["b", "a", "c", nil],
+                ["b", "a", "c", nil]}
+    end
+
+    # Golden: as above, the factor's values `b`, `NA` and `a`, then the text `c` and `a`, then `d`:
+    # each training reads the levels held as a factor's, which moves the missing value last.
+    test "where the first values were a factor's, the missing value moves last before each merge" do
+      steps = [{["b", nil, "a"], ["b", "a"]}, {["c", "a"], :none}, {["d"], :none}]
+
+      assert levels_after(steps) === ["b", "a", "c", nil, "d"]
+    end
+
+    # Golden: as above, a first layer with no rows, a factor's, then the text `c` and `a`, then
+    # `d` and `0`, sorts them, on an axis and a colour scale alike: no rows train nothing.
+    test "values that are none train nothing, so a factor with no rows sets nothing" do
+      steps = [{[], ["z"]}, {["c", "a"], :none}, {["d", "0"], :none}]
+
+      assert {levels_after(steps), levels_after(steps, Scale.new(:discrete, :color))} ===
+               {["0", "a", "c", "d"], ["0", "a", "c", "d"]}
+    end
+
+    # R writes a factor's levels as text, so its `4` and `4.0` are one level, "4".
+    test "two factors' levels equal as numbers are one level" do
+      assert levels_after([{[4], [4]}, {[4.0, 6.0], [4.0, 6.0]}]) === [4, 6.0]
     end
   end
 
@@ -130,6 +205,7 @@ defmodule Giggly.ScaleTest do
 
       assert scale === %Scale.Discrete{
                levels: ["a", "b"],
+               factor: false,
                continuous_range: {0.55, 2.45},
                palette: :identity,
                na_value: nil,
@@ -157,6 +233,7 @@ defmodule Giggly.ScaleTest do
                 },
                 %Scale.Discrete{
                   levels: ["a", "b"],
+                  factor: false,
                   continuous_range: :none,
                   palette: :identity,
                   na_value: nil,
@@ -346,7 +423,7 @@ defmodule Giggly.ScaleTest do
     defp weights(options) do
       Scale.Continuous
       |> struct!(options)
-      |> Scale.train([1.513, 5.424])
+      |> Scale.train([1.513, 5.424], :none)
     end
 
     test "limits replace the range before it is widened, and a nil end is the range's" do
@@ -365,7 +442,11 @@ defmodule Giggly.ScaleTest do
 
     test "expansion is set at each end, a multiple of the width plus a constant" do
       counts =
-        Scale.train(%Scale.Continuous{expand: [mult: {0.0, 0.05}, add: {0.0, 0.0}]}, [0, 62])
+        Scale.train(
+          %Scale.Continuous{expand: [mult: {0.0, 0.05}, add: {0.0, 0.0}]},
+          [0, 62],
+          :none
+        )
 
       none = weights(expand: [mult: {0.0, 0.0}, add: {0.0, 0.0}])
       added = weights(expand: [mult: {0.0, 0.0}, add: {2.0, 1.0}])
@@ -469,7 +550,7 @@ defmodule Giggly.ScaleTest do
     defp letters(options) do
       Scale.Discrete
       |> struct!(options)
-      |> Scale.train(["p", "q", "r", nil])
+      |> Scale.train(["p", "q", "r", nil], :none)
     end
 
     # Each scale's map of p, q, r and the missing value, its breaks and its extent.
@@ -586,7 +667,7 @@ defmodule Giggly.ScaleTest do
         :discrete
         |> Scale.new(:color)
         |> struct!(limits: ["r", "p"])
-        |> Scale.train(["p", "q", "r"])
+        |> Scale.train(["p", "q", "r"], :none)
 
       assert Scale.legend_breaks(scale) === [{"r", "r"}, {"p", "p"}]
     end
@@ -599,7 +680,7 @@ defmodule Giggly.ScaleTest do
       scale =
         Scale.Continuous
         |> struct!([{:transform, :date} | options])
-        |> Scale.train([20_716.0, 20_745.0])
+        |> Scale.train([20_716.0, 20_745.0], :none)
 
       {scale, Scale.dimension(scale)}
     end
@@ -695,7 +776,7 @@ defmodule Giggly.ScaleTest do
     test "an untransformed continuous scale places a date at its days and labels them as numbers" do
       scale = Scale.new(:continuous)
       days = Scale.transform(scale, [~D[2024-01-01], ~D[2024-01-11], ~D[2024-02-15], nil])
-      trained = Scale.train(scale, days)
+      trained = Scale.train(scale, days, :none)
       extent = Scale.dimension(trained)
 
       assert {days, extent, Scale.breaks(trained, extent)} ===
@@ -729,7 +810,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :continuous
         |> Scale.new(:alpha)
-        |> Scale.train([2, 4, nil, 10, 6])
+        |> Scale.train([2, 4, nil, 10, 6], :none)
 
       assert Scale.map(scale, [2, 4, nil, 10, 6, 3.3, :nan]) ===
                [0.1, 0.325, nil, 1.0, 0.55, 0.24625, nil]
@@ -739,7 +820,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :continuous
         |> Scale.new(:alpha)
-        |> Scale.train([7, 7])
+        |> Scale.train([7, 7], :none)
 
       assert Scale.map(scale, [7, 7]) === [0.55, 0.55]
     end
@@ -748,7 +829,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new(:alpha)
-        |> Scale.train(["b", "a", nil, "c", "a"])
+        |> Scale.train(["b", "a", nil, "c", "a"], :none)
 
       assert Scale.map(scale, ["b", "a", nil, "c", "a"]) === [0.55, 0.1, nil, 1.0, 0.1]
     end
@@ -759,7 +840,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new(:alpha)
-        |> Scale.train(levels)
+        |> Scale.train(levels, :none)
 
       assert Scale.map(scale, levels) ===
                [
@@ -990,7 +1071,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :continuous
         |> Scale.new(:alpha)
-        |> Scale.train([1999, 2008])
+        |> Scale.train([1999, 2008], :none)
 
       assert Scale.legend_breaks(scale) === [
                {2000.0, "2000"},
@@ -1005,7 +1086,7 @@ defmodule Giggly.ScaleTest do
       one =
         :continuous
         |> Scale.new(:alpha)
-        |> Scale.train([7, 7])
+        |> Scale.train([7, 7], :none)
 
       untrained = Scale.new(:continuous, :alpha)
 
@@ -1023,25 +1104,25 @@ defmodule Giggly.ScaleTest do
   defp palette_scale(palette, values, options \\ []) do
     Scale.Discrete
     |> struct!([palette: palette, na_value: "#7F7F7F", guide: :legend] ++ options)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   # mtcars' horsepower range trains the scale, as R's does.
-  defp size_scale(untrained), do: Scale.train(untrained, [52, 335])
+  defp size_scale(untrained), do: Scale.train(untrained, [52, 335], :none)
 
   # A scale of sizes by area from 0, as `Giggly.Plot.scale_size_area/2` records it with
   # `options`, trained on `values`.
   defp area_scale(values, options \\ []) do
     Scale.Continuous
     |> struct!([palette: {:abs_area, 6.0}, rescaler: :max, guide: :legend] ++ options)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   # A continuous colour scale of `palette`, its missing value grey50, trained once on `values`.
   defp gradient_through(colors, values, options \\ []) do
     Scale.Continuous
     |> struct!([palette: {:gradient, colors}, na_value: "#7F7F7F", guide: :colorbar] ++ options)
-    |> Scale.train(values)
+    |> Scale.train(values, :none)
   end
 
   defp hue(low, high, chroma \\ 100.0, luminance \\ 65.0, direction \\ 1),
@@ -1317,9 +1398,9 @@ defmodule Giggly.ScaleTest do
       continuous =
         :continuous
         |> Scale.new(:size)
-        |> Scale.train([3, 3])
+        |> Scale.train([3, 3], :none)
 
-      radius = Scale.train(%Scale.Continuous{palette: {:rescale, {1.0, 6.0}}}, [3, 3])
+      radius = Scale.train(%Scale.Continuous{palette: {:rescale, {1.0, 6.0}}}, [3, 3], :none)
 
       assert {Scale.map(continuous, [3]), Scale.map(radius, [3])} ===
                {[4.5355339059327378], [3.5]}
@@ -1331,9 +1412,9 @@ defmodule Giggly.ScaleTest do
       default =
         :discrete
         |> Scale.new(:size)
-        |> Scale.train(levels)
+        |> Scale.train(levels, :none)
 
-      narrow = Scale.train(%Scale.Discrete{palette: {:area_sequence, {1.0, 3.0}}}, levels)
+      narrow = Scale.train(%Scale.Discrete{palette: {:area_sequence, {1.0, 3.0}}}, levels, :none)
 
       assert {Scale.map(default, levels), Scale.map(narrow, levels)} ===
                {[
@@ -1378,9 +1459,9 @@ defmodule Giggly.ScaleTest do
       solid =
         :discrete
         |> Scale.new(:shape)
-        |> Scale.train(levels)
+        |> Scale.train(levels, :none)
 
-      open = Scale.train(%Scale.Discrete{palette: {:shape, :open}}, levels)
+      open = Scale.train(%Scale.Discrete{palette: {:shape, :open}}, levels, :none)
 
       assert {Scale.map(solid, [nil | levels]), Scale.map(open, levels)} ===
                {[nil | by_number.([16, 17, 15, 3, 7, 8])], by_number.([1, 2, 0, 3, 7, 8])}
@@ -1390,7 +1471,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new(:shape)
-        |> Scale.train(~w(a b c d e f g))
+        |> Scale.train(~w(a b c d e f g), :none)
 
       error = assert_raise ArgumentError, fn -> Scale.map(scale, ["a"]) end
 
@@ -1422,7 +1503,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new(:linetype)
-        |> Scale.train(levels)
+        |> Scale.train(levels, :none)
 
       assert Scale.map(scale, [nil | levels]) === [
                nil,
@@ -1446,7 +1527,7 @@ defmodule Giggly.ScaleTest do
       scale =
         :discrete
         |> Scale.new(:linetype)
-        |> Scale.train(~w(a b c d e f g h i j k l m n))
+        |> Scale.train(~w(a b c d e f g h i j k l m n), :none)
 
       error = assert_raise ArgumentError, fn -> Scale.map(scale, ["a"]) end
 
@@ -1458,12 +1539,12 @@ defmodule Giggly.ScaleTest do
       continuous =
         :continuous
         |> Scale.new(:linewidth)
-        |> Scale.train([2, 4.5, 3, 7])
+        |> Scale.train([2, 4.5, 3, 7], :none)
 
       discrete =
         :discrete
         |> Scale.new(:linewidth)
-        |> Scale.train(["b", "a", nil, "c"])
+        |> Scale.train(["b", "a", nil, "c"], :none)
 
       assert {Scale.map(continuous, [2, 4.5, 3, 7, nil]),
               Scale.map(discrete, ["b", "a", nil, "c"])} ===

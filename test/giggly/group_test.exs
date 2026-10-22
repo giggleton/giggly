@@ -25,6 +25,28 @@ defmodule Giggly.GroupTest do
       assert group_ids(frame) === [2, 1, 3, 4]
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 groups `colour = factor(cyl, levels =
+    # c(8, 4, 6))` over `mtcars` 3 for a 6, 2 for a 4 and 1 for an 8: the levels' order, not the
+    # values'.
+    test "a category with levels is numbered in its levels' order, nil after them" do
+      levelled = {:category, levels: [8, 4, 6]}
+
+      frame =
+        DataFrame.new([{:color, [6.0, 4.0, 8.0, nil, 4.0], levelled}, {:y, [1, 2, 3, 4, 5]}])
+
+      assert group_ids(frame) === [3, 2, 1, 4, 2]
+    end
+
+    test "a category's levels order it beside a column without levels" do
+      frame =
+        DataFrame.new([
+          {:fill, ["a", "b", "a", "b"], {:category, levels: ["b", "a"]}},
+          {:shape, ["q", "q", "p", "p"]}
+        ])
+
+      assert group_ids(frame) === [4, 2, 3, 1]
+    end
+
     test "two discrete columns are compared one at a time in column order" do
       frame =
         DataFrame.new(

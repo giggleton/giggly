@@ -15,6 +15,9 @@ defmodule Giggly.DataFrame.Lists do
   # type and the values are stored together, so a column cannot exist without its type. An
   # expression is evaluated into such a pair, its type and its values, so `mutate/2` puts it as it
   # is, `filter/2` reads its booleans, and an aggregate's column keeps its type or takes its own.
+  # A category's type holds its levels and whether it is ordered, `{:category, levels, ordered}`,
+  # so every operation that carries a type carries them, and `dtypes/1` reports it as `:category`;
+  # its values are its levels' own terms, or `nil`, so a value is one of its levels by equality.
 
   @behaviour Giggly.DataFrame
 
@@ -26,9 +29,13 @@ defmodule Giggly.DataFrame.Lists do
 
   @type t :: %__MODULE__{
           reversed_names: [DataFrame.name()],
-          columns: %{optional(DataFrame.name()) => {DataFrame.dtype(), list()}},
+          columns: %{optional(DataFrame.name()) => {dtype(), list()}},
           row_count: non_neg_integer()
         }
+
+  # A column's type as the frame holds it: `t:Giggly.DataFrame.dtype/0`, but a category's, which
+  # holds its levels and whether it is ordered.
+  @typep dtype :: DataFrame.dtype() | {:category, list(), boolean()} | {:list, dtype()}
 
   # Explorer's representations of the non-finite floats.
   @non_finite_floats [:nan, :infinity, :neg_infinity]
@@ -51,8 +58,19 @@ defmodule Giggly.DataFrame.Lists do
 
   @impl DataFrame
   def dtypes(%__MODULE__{columns: columns}) do
-    Map.new(columns, fn {name, {dtype, _values}} -> {name, dtype} end)
+    Map.new(columns, fn {name, {dtype, _values}} -> {name, reported(dtype)} end)
   end
+
+  # A type as `dtypes/1` reports it: a category's as `:category`, a list's by its values'.
+  defp reported({:category, _levels, _ordered}), do: :category
+  defp reported({:list, dtype}), do: {:list, reported(dtype)}
+  defp reported(dtype), do: dtype
+
+  @impl DataFrame
+  def category(%__MODULE__{} = frame, name), do: declaration(column(frame, name))
+
+  defp declaration({{:category, levels, ordered}, _values}),
+    do: {:category, levels: levels, ordered: ordered}
 
   @impl DataFrame
   def select(%__MODULE__{row_count: row_count} = frame, renames) do
@@ -71,8 +89,8 @@ defmodule Giggly.DataFrame.Lists do
   def put(%__MODULE__{} = frame, name, values), do: put_entered(frame, entered({name, values}))
 
   @impl DataFrame
-  def put(%__MODULE__{} = frame, name, values, :category),
-    do: put_entered(frame, entered({name, values, :category}))
+  def put(%__MODULE__{} = frame, name, values, category),
+    do: put_entered(frame, entered({name, values, category}))
 
   # A column replaced where it is, or else added.
   defp put_entered(
@@ -553,25 +571,119 @@ defmodule Giggly.DataFrame.Lists do
   end
 
   # A column as `new/1` or `put/3` and `put/4` are given it, typed: a category is typed as any
-  # column, then declared one.
+  # column, then declared one, with its levels.
   defp entered({name, values}), do: {name, typed(name, values)}
+  defp entered({name, values, :category}), do: entered({name, values, {:category, []}})
 
-  defp entered({name, values, :category}) do
-    case typed(name, values) do
-      {:term, typed_values} ->
+  defp entered({name, values, {:category, options}}) do
+    validated = Keyword.validate!(options, levels: :none, ordered: false)
+    ordered = ordered(Keyword.fetch!(validated, :ordered))
+    {dtype, typed_values} = categorised(name, "values", typed(name, values))
+    {levels, category_values} = levelled(name, dtype, typed_values, validated[:levels])
+    {name, {{:category, levels, ordered}, category_values}}
+  end
+
+  defp ordered(ordered) when is_boolean(ordered), do: ordered
+
+  # The values of a category, or its levels, as typed, unless they have no type of their own or
+  # are lists, which a category cannot hold.
+  defp categorised(name, what, {:term, typed_values}) do
+    raise ArgumentError,
+          "the column #{inspect(name)} is declared a category, but its #{what} have no type of " <>
+            "their own (#{inspect(witness(typed_values))})"
+  end
+
+  defp categorised(name, what, {{:list, _values_dtype}, typed_values}) do
+    raise ArgumentError,
+          "the column #{inspect(name)} is declared a category, but its #{what} are lists " <>
+            "(#{inspect(witness(typed_values))}), which a category cannot hold"
+  end
+
+  defp categorised(_name, _what, typed), do: typed
+
+  # A category's levels and its values, each value the level equal to it or `nil`: the levels
+  # given, typed with the values, or else the distinct values in order.
+  defp levelled(_name, dtype, values, :none) do
+    levels =
+      values
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&as_level/1)
+      |> Enum.uniq()
+      |> sorted_levels(dtype)
+
+    {levels, Enum.map(values, &level_of/1)}
+  end
+
+  defp levelled(name, dtype, values, levels) when is_list(levels) do
+    if nil in levels do
+      raise ArgumentError,
+            "the column #{inspect(name)} is declared a category with nil among its levels, " <>
+              "which is the missing value and never a level"
+    end
+
+    {levels_dtype, typed_levels} = categorised(name, "levels", typed(name, levels))
+
+    case wider(dtype, levels_dtype) do
+      {:ok, widened} ->
+        category_levels =
+          widened
+          |> cast(typed_levels)
+          |> Enum.map(&as_level/1)
+
+        refuse_repeated_level(name, category_levels)
+        level_set = MapSet.new(category_levels)
+
+        category_values =
+          widened
+          |> cast(values)
+          |> Enum.map(fn value -> among(level_of(value), level_set) end)
+
+        {category_levels, category_values}
+
+      :error ->
         raise ArgumentError,
-              "the column #{inspect(name)} is declared a category, but its values have no type " <>
-                "of their own (#{inspect(witness(typed_values))})"
-
-      {{:list, _values_dtype}, typed_values} ->
-        raise ArgumentError,
-              "the column #{inspect(name)} is declared a category, but its values are lists " <>
-                "(#{inspect(witness(typed_values))}), which a category cannot hold"
-
-      {_dtype, typed_values} ->
-        {name, {:category, typed_values}}
+              "the column #{inspect(name)} is declared a category whose levels " <>
+                "(#{inspect(witness(typed_levels))}) are of another type than its values " <>
+                "(#{inspect(witness(values))})"
     end
   end
+
+  defp refuse_repeated_level(name, levels) do
+    case levels -- Enum.uniq(levels) do
+      [] ->
+        :ok
+
+      [repeated | _others] ->
+        raise ArgumentError,
+              "the column #{inspect(name)} is declared a category with the level " <>
+                "#{inspect(repeated)} twice"
+    end
+  end
+
+  # A value as a level holds it: a float with a zero's sign dropped, so `-0.0` and `0.0` are one
+  # level, as R writes both `0`; any other value as it is, a missing one missing.
+  defp as_level(value) when is_float(value), do: value + 0.0
+  defp as_level(value), do: value
+
+  defp level_of(nil), do: nil
+  defp level_of(value), do: as_level(value)
+
+  # The level, if it is among the levels; else missing.
+  defp among(level, level_set) do
+    if MapSet.member?(level_set, level), do: level
+  end
+
+  # A category's levels in order when none are given, as R's `factor()` orders its values: numbers
+  # by value, minus infinity first and NaN last; dates and times by time; anything else in term
+  # order, so strings by their bytes and `false` before `true`.
+  defp sorted_levels(levels, dtype) when dtype in [:integer, :float],
+    do: Enum.sort_by(levels, &rank/1)
+
+  defp sorted_levels(levels, :date), do: Enum.sort(levels, Date)
+  defp sorted_levels(levels, :time), do: Enum.sort(levels, Time)
+  defp sorted_levels(levels, :naive_datetime), do: Enum.sort(levels, NaiveDateTime)
+  defp sorted_levels(levels, :datetime), do: Enum.sort(levels, DateTime)
+  defp sorted_levels(levels, _dtype), do: Enum.sort(levels)
 
   # The values typed as a column holding them, and cast to that type.
   defp typed(name, values) do

@@ -32,8 +32,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
   `compute_panel()` does. **Counting, binning and the box plot's summary carry a group's constant
   columns** (`Giggly.Stat.Carry`): a column holding one
-  value within every group goes to that group's rows with its type, a factor's category included,
-  as R carries a factor, and one that varies within any group is
+  value within every group goes to that group's rows with its type, a factor's category included
+  with its levels and ordered flag, as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot); counting at each place keeps only
   the columns it counts over.
 - **A stat sums through the frame (`DataFrame.summarise/3`), as R sums**: counting's counts plain,

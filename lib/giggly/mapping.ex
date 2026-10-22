@@ -17,10 +17,14 @@ defmodule Giggly.Mapping do
       a time is a constant written alone; a string or an atom would name a column, so a constant
       one is written `{:constant, "smooth"}`.
     * **A factor**, `{:factor, [value]}`, is the value read as discrete, so a column of numbers
-      maps as levels: a discrete scale whatever the values, its levels in order of value with a
-      missing one last, each written as text (a whole number without a decimal point, `4`; a
-      boolean as `TRUE` or `FALSE`), and the rows grouped by them. A factor reads a whole column, so it is the whole of a mapping
-      value, a factor's own or an after_stat's, never an expression's argument.
+      maps as levels: a discrete scale whatever the values, its levels in order of value (dates by
+      date) with a missing one last, each written as text (a whole number without a decimal
+      point, `4`; a boolean as `TRUE` or `FALSE`), and the rows grouped by them.
+      `{:factor, [value], levels: [level, ...]}` gives the levels and their order, each named as
+      the value holds it (`[8, 4, 6]` for numbers), a value not among them missing, so the axis,
+      the legend, the groups and stacking follow that order; `ordered: true` marks the factor's
+      levels as ordered. A factor reads a whole column, so it is the whole of a mapping value, a
+      factor's own or an after_stat's, never an expression's argument.
     * **An after_stat**, `{:after_stat, [value]}`, is the value computed from what the layer's stat
       computes: its names are the stat's computed variables (counting's are `count` and `prop`),
       and it is evaluated once the stat has run, so it takes no part in grouping or in what the
@@ -31,8 +35,10 @@ defmodule Giggly.Mapping do
   A constant is a value a column can hold: `nil`, a list, and a value with no column type of its
   own (a map, a tuple, a struct other than a date or a time) are refused, and so are a function
   alone, a tuple that is neither an expression nor a constant, and a function given a number of
-  arguments it does not take. A layer whose stat computes nothing, and so documents no variables,
-  refuses every after_stat.
+  arguments it does not take. A factor's levels are refused unless they are a list of one or more
+  values a column can hold, of one type, none of them `nil` and none given twice (`4` and `4.0`
+  are one); levels of another type than the value's are refused when the plot is run. A layer
+  whose stat computes nothing, and so documents no variables, refuses every after_stat.
 
       iex> plot =
       ...>   %{"hwy" => [29, 24], "cty" => [18, 16]}
@@ -54,6 +60,15 @@ defmodule Giggly.Mapping do
       iex> Giggly.DataFrame.pull(frame, :y)
       [0.25, 0.25, 0.5]
 
+  The cylinders in the order given, so the axis reads 8, 4, 6:
+
+      iex> plot =
+      ...>   %{"cyl" => [4, 6, 8, 4], "mpg" => [26.0, 19.7, 15.0, 30.4]}
+      ...>   |> Giggly.Plot.new(%{x: {:factor, [:cyl], levels: [8, 4, 6]}, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      iex> Giggly.panel_scales(plot, 1).x.levels
+      [8, 4, 6]
+
   ## Titles
 
   A guide is titled by what its aesthetic is mapped to:
@@ -64,7 +79,8 @@ defmodule Giggly.Mapping do
       names, `:math.log10(carat)`, as `inspect/1` names it;
     * an expression whose function is a closure, such as `fn hwy -> hwy * 2 end`, has no text, so
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
-    * a factor by its value's text inside `factor()`, `factor(cyl)`;
+    * a factor by its value's text inside `factor()`, `factor(cyl)`, and its options as R writes
+      them, `factor(cyl, levels = c(8, 4, 6), ordered = TRUE)`;
     * an after_stat by its value's text, `prop`;
     * a constant by its aesthetic's name, `color`, unless another layer maps the aesthetic to a
       column or an expression, whose title wins.
@@ -92,10 +108,11 @@ defmodule Giggly.Mapping do
   # after_stat's against its stat's output, every other against the layer's data. A value's
   # kinds differ in what they are, not in how they run, so they are function clauses rather than a
   # protocol. `Plot` calls only the checks; that holds by review, as the assembly's calls into
-  # `Coord` and `Geom` do.
-  use Boundary, deps: [Giggly.DataFrame], exports: []
+  # `Coord` and `Geom` do. It lists `Giggly.AsCharacter`, which writes a factor's levels in its
+  # title as R writes them.
+  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: []
 
-  alias Giggly.DataFrame
+  alias Giggly.{AsCharacter, DataFrame}
 
   # Kernel's operators, each with a capture of it, which the compiler turns into a capture of the
   # function the operator is inlined as (`&Kernel.!=/2` is `&:erlang."/="/2`), so a capture of
@@ -147,8 +164,9 @@ defmodule Giggly.Mapping do
           | NaiveDateTime.t()
           | DateTime.t()
 
-  @typedoc "A factor: a value read as discrete."
-  @type factor :: {:factor, [value()]}
+  @typedoc "A factor: a value read as discrete, with the levels it holds and their order."
+  @type factor ::
+          {:factor, [value()]} | {:factor, [value()], [levels: [term()], ordered: boolean()]}
 
   @typedoc "An after_stat: a value computed from the stat's computed variables."
   @type after_stat :: {:after_stat, [value()]}
@@ -164,6 +182,7 @@ defmodule Giggly.Mapping do
           String.t()
           | {:constant, term()}
           | {:factor, [resolved()]}
+          | {:factor, [resolved()], [levels: [term()], ordered: boolean()]}
           | {:after_stat, [resolved()]}
           | {function(), [resolved()]}
 
@@ -179,9 +198,23 @@ defmodule Giggly.Mapping do
   def resolve(value) when is_atom(value), do: {:ok, Atom.to_string(value)}
   def resolve({:constant, term}), do: constant(term)
   def resolve({:factor, [value]}), do: factor(value)
+  def resolve({:factor, [value], []}), do: factor(value)
+
+  def resolve({:factor, [value], options}) when is_list(options) do
+    with {:ok, {:factor, [resolved]}} <- factor(value),
+         :ok <- factor_options(options) do
+      {:ok, {:factor, [resolved], options}}
+    end
+  end
 
   def resolve({:factor, _arguments}),
     do: {:error, "a factor reads one value, written {:factor, [value]}"}
+
+  def resolve({:factor, _arguments, _options}),
+    do:
+      {:error,
+       "a factor reads one value, with a keyword list of options, written " <>
+         "{:factor, [value], levels: [level, ...]}"}
 
   def resolve({:after_stat, [value]}), do: wrapped(:after_stat, value)
 
@@ -220,12 +253,117 @@ defmodule Giggly.Mapping do
   # An expression's argument: any value inside another but a factor, which reads a whole column as
   # discrete, as R hands a function its level codes, where a function applied in each row sees one
   # value.
-  defp argument({:factor, _arguments}),
+  defp argument(factor) when elem(factor, 0) == :factor,
     do: {:error, "a factor reads a whole column, so it is not an expression's argument"}
 
   defp argument(value), do: inner(value)
 
   defp factor(value), do: wrapped(:factor, value)
+
+  # A factor's options, `levels:` and `ordered:`, each at most once, as R's `factor()` takes them.
+  defp factor_options(options) do
+    with :ok <- factor_option_names(options),
+         :ok <- each_once(options) do
+      first_refusal(options, &factor_option/1)
+    end
+  end
+
+  defp factor_option_names(options) do
+    if Keyword.keyword?(options) and
+         Enum.all?(options, fn {name, _value} -> name in [:levels, :ordered] end),
+       do: :ok,
+       else: {:error, "a factor's options are levels: and ordered:"}
+  end
+
+  defp each_once(options) do
+    names = Keyword.keys(options)
+
+    if names == Enum.uniq(names),
+      do: :ok,
+      else: {:error, "a factor's options are each given once"}
+  end
+
+  # `:ok` when `check` passes every item, or else its first refusal.
+  defp first_refusal(items, check) do
+    Enum.find_value(items, :ok, fn item ->
+      case check.(item) do
+        :ok -> nil
+        refusal -> refusal
+      end
+    end)
+  end
+
+  defp factor_option({:ordered, ordered}) when is_boolean(ordered), do: :ok
+  defp factor_option({:ordered, _ordered}), do: {:error, "a factor's ordered: is true or false"}
+
+  defp factor_option({:levels, [_first | _rest] = levels}) do
+    case first_refusal(levels, &level/1) do
+      :ok -> levels_of_one_type(levels)
+      refusal -> refusal
+    end
+  end
+
+  defp factor_option({:levels, _levels}),
+    do: {:error, "a factor's levels are a list of one or more values, in order"}
+
+  defp level(nil), do: {:error, "nil is a missing value, never a level"}
+
+  defp level(level) do
+    case resolve({:constant, level}) do
+      {:ok, _constant} ->
+        :ok
+
+      {:error, _reason} ->
+        {:error,
+         "a level is a value a column can hold: a number, a string, an atom, a boolean, " <>
+           "a date or a time"}
+    end
+  end
+
+  # Levels of one type, as one column holds them, integers and floats being one, and none given
+  # twice, `4` and `4.0` being one.
+  defp levels_of_one_type(levels) do
+    kinds =
+      levels
+      |> Enum.map(&level_kind/1)
+      |> Enum.uniq()
+
+    case {kinds, repeated(levels)} do
+      {[_one_kind], :none} ->
+        :ok
+
+      {[_one_kind], {:repeated, level}} ->
+        {:error, "a factor's level #{inspect(level)} is given twice"}
+
+      {_kinds, _repeated} ->
+        {:error, "a factor's levels are all of one type"}
+    end
+  end
+
+  defp level_kind(level) when is_number(level), do: :number
+
+  defp level_kind(level) do
+    case dtype_of(level) do
+      :float -> :number
+      dtype -> dtype
+    end
+  end
+
+  # The first level equal to one before it, by `==`, so `4` and `4.0` are one.
+  defp repeated(levels) do
+    levels
+    |> Enum.reduce_while([], &repeated_or_earlier/2)
+    |> repetition()
+  end
+
+  defp repeated_or_earlier(level, earlier) do
+    if Enum.any?(earlier, fn seen -> seen == level end),
+      do: {:halt, {:repeated, level}},
+      else: {:cont, [level | earlier]}
+  end
+
+  defp repetition({:repeated, _level} = repeated), do: repeated
+  defp repetition(_earlier), do: :none
 
   defp wrapped(head, value) do
     case inner(value) do
@@ -282,6 +420,8 @@ defmodule Giggly.Mapping do
   defp column_names({_function_or_head, arguments}),
     do: Enum.flat_map(arguments, &column_names/1)
 
+  defp column_names({:factor, [value], _options}), do: column_names(value)
+
   # The type of the column `value` makes from `table`, the table it is evaluated against (the stat's
   # output for an after_stat, which is known only when the plot is run), where it can be told: a
   # column's own and a constant's, as the frame types them; `:category` for a factor, which the
@@ -296,6 +436,7 @@ defmodule Giggly.Mapping do
 
   def dtype({:constant, term}, _table), do: dtype_of(term)
   def dtype({:factor, [_value]}, _table), do: :category
+  def dtype({:factor, [_value], _options}, _table), do: :category
   def dtype({:after_stat, [value]}, statistic), do: dtype(value, by_name(statistic))
   def dtype({_function, _arguments}, _table), do: :computed
 
@@ -318,6 +459,7 @@ defmodule Giggly.Mapping do
     do: List.duplicate(term, DataFrame.row_count(frame))
 
   def evaluate({:factor, [value]}, frame), do: evaluate(value, frame)
+  def evaluate({:factor, [value], _options}, frame), do: evaluate(value, frame)
   def evaluate({:after_stat, [value]}, statistic), do: evaluate(value, by_name(statistic))
 
   def evaluate({function, []}, frame) do
@@ -345,6 +487,17 @@ defmodule Giggly.Mapping do
     DataFrame.select(statistic, renames)
   end
 
+  # How the column `value` makes is declared a category when it enters a frame
+  # (`t:Giggly.DataFrame.category/0`): a factor's, with the levels it gives and whether it is
+  # ordered, an after_stat's as its value's; `:none` for any other value, whose type the frame
+  # reads from its values.
+  @doc false
+  @spec category(resolved()) :: DataFrame.category() | :none
+  def category({:factor, [_value]}), do: :category
+  def category({:factor, [_value], options}), do: {:category, options}
+  def category({:after_stat, [value]}), do: category(value)
+  def category(_value), do: :none
+
   # When `value` is evaluated, its stage, as ggplot2's `stage()` names them: `:after_stat` against
   # its stat's output, once the stat has run; `:start`, every other, against the layer's data.
   @doc false
@@ -367,10 +520,12 @@ defmodule Giggly.Mapping do
 
   defp text({:after_stat, [value]}), do: text(value)
 
-  defp text({:factor, [value]}) do
+  defp text({:factor, [value]}), do: text({:factor, [value], []})
+
+  defp text({:factor, [value], options}) do
     case text(value) do
       :none -> :none
-      written -> "factor(#{written})"
+      written -> "factor(#{Enum.join([written | Enum.map(options, &option_text/1)], ", ")})"
     end
   end
 
@@ -398,6 +553,18 @@ defmodule Giggly.Mapping do
         "#{inspect(module)}.#{Macro.inspect_atom(:remote_call, name)}(#{Enum.join(texts, ", ")})"
     end
   end
+
+  # A factor's option as R writes the argument, `levels = c(8, 4, 6)`, `ordered = TRUE`.
+  defp option_text({:levels, levels}),
+    do: "levels = c(#{Enum.map_join(levels, ", ", &level_text/1)})"
+
+  defp option_text({:ordered, true}), do: "ordered = TRUE"
+  defp option_text({:ordered, false}), do: "ordered = FALSE"
+
+  # A level as R writes it in a call: a string in quotes, as `deparse()` writes one, any other value
+  # as R's `as.character()` writes it (`8`, `1e+05`, `TRUE`).
+  defp level_text(level) when is_binary(level), do: inspect(level)
+  defp level_text(level), do: AsCharacter.text(level)
 
   defp operand_text(argument, text) do
     if operator?(argument), do: "(#{text})", else: text

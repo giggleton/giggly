@@ -30,9 +30,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `put/4`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3`, `join/3` and the callbacks
-  are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a user another
-  operation is a decision (CLAUDE.md, Conventions).
+  `put/4`, `category/2`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3`, `join/3`
+  and the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
+  user another operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library.** Its `deps:` is `Table` alone, which the root lists too,
   as boundary lets a sub-boundary list only what its parent does, and no other domain lists it
   (`.claude/rules/dependencies.md`). A domain that uses the frame lists `Giggly.DataFrame`, its
@@ -94,11 +94,19 @@ column names become strings", "Column types belong to the frame" and "Every boun
   expression. What a type *means* to a plot (discrete
   or not, which scale) is the caller's, never the frame's.
 - **`:category` is the one type never worked out from values: `new/1` and `put/4` are told it**,
-  a column given as `{name, values, :category}` or put with `:category`, its values typed and cast
-  as any column's first, a `:term`'s refused. It is Explorer's name for a categorical column; what
-  it means (discrete) is the plot's. `select/2`, `split/2`, `slice/2`, `filter/2`, a column
-  `mutate/2` names alone, `summarise/3`'s `by` columns and its `first` carry it; `put/3` works a
-  type out afresh.
+  a column given as `{name, values, :category}` or `{name, values, {:category, levels: levels,
+  ordered: ordered}}`, or put with either, its values typed and cast as any column's first, a
+  `:term`'s refused. It is Explorer's name for a categorical column; what it means (discrete) is
+  the plot's. **A category has levels and may be ordered** (design-log §4, the entries beginning
+  "A table's column carries its levels" and "A factor carries R's `ordered` flag"): levels given
+  are typed and cast with the values, refused if they hold `nil`, repeat a value (`4` and `4.0`)
+  or are of another type; else they are its distinct values in order, as R's `factor()` orders
+  them (numbers by value, minus infinity first and NaN last, dates and times by time, the rest in
+  term order); a value not among them is `nil`, and each value is its level's own term, `-0.0`
+  held as `0.0`. The type holds them, so `select/2`, `split/2`, `slice/2`, `filter/2`, a column
+  `mutate/2` names alone, `join/3`, `summarise/3`'s `by` columns and its `first` carry them;
+  `dtypes/1` reports `:category`, `category/2` the declaration `put/4` would make again, and
+  `put/3` works a type out afresh.
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
   has no type of its own (maps, tuples, `Decimal`…), so a column the plot never uses cannot refuse
   the table. When something needs one of those checked or plotted, it gets a named type of its own,

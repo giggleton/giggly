@@ -202,6 +202,122 @@ defmodule Giggly.DataFrameTest do
       assert error.message =~ ":payload"
       assert error.message =~ "%{id: 1}"
     end
+
+    # Golden: R 4.6.1's `levels(factor(c(1, Inf, -Inf, NaN, NA)))` is `-Inf 1 Inf NaN`, its
+    # `levels(factor(c(-0, 0)))` is `0`, and `levels(factor(c(TRUE, FALSE)))` `FALSE TRUE`.
+    test "a category's levels are its distinct values in order of value, NaN last, nil none" do
+      frame =
+        DataFrame.new([
+          {:x, [1, :infinity, :neg_infinity, :nan, nil, 1.0], :category},
+          {:zero, [-0.0, 0.0, 0.0, -0.0, nil, nil], :category},
+          {:manual, [true, false, true, nil, nil, nil], :category}
+        ])
+
+      assert Enum.map([:x, :zero, :manual], fn name -> DataFrame.category(frame, name) end) ===
+               [
+                 {:category, levels: [:neg_infinity, 1.0, :infinity, :nan], ordered: false},
+                 {:category, levels: [0.0], ordered: false},
+                 {:category, levels: [false, true], ordered: false}
+               ]
+
+      assert DataFrame.pull(frame, :zero) === [0.0, 0.0, 0.0, 0.0, nil, nil]
+    end
+
+    # Golden: R 4.6.1's `levels(factor(as.Date(c("2020-02-01", "2019-12-31", "2020-01-15"))))` is
+    # `2019-12-31 2020-01-15 2020-02-01`.
+    test "a category of dates is in order of date" do
+      frame = DataFrame.new([{:day, [~D[2020-02-01], ~D[2019-12-31], ~D[2020-01-15]], :category}])
+
+      assert DataFrame.category(frame, :day) ===
+               {:category,
+                levels: [~D[2019-12-31], ~D[2020-01-15], ~D[2020-02-01]], ordered: false}
+    end
+
+    # Golden: R 4.6.1's `factor(cyl, levels = c(8, 4))` over `mtcars` makes each 6 `NA`.
+    test "given levels are its levels in their order, typed with its values, others missing" do
+      frame =
+        DataFrame.new([{:cyl, [6.0, 4.0, 8.0, nil], {:category, levels: [8, 4], ordered: true}}])
+
+      assert {DataFrame.dtypes(frame), DataFrame.category(frame, :cyl),
+              DataFrame.pull(frame, :cyl)} ===
+               {%{cyl: :category}, {:category, levels: [8.0, 4.0], ordered: true},
+                [nil, 4.0, 8.0, nil]}
+    end
+
+    test "a category's levels may name values it does not hold, and false is a value" do
+      frame = DataFrame.new([{:manual, [false, true], {:category, levels: [true, false]}}])
+      empty = DataFrame.new([{:cut, [nil, nil], {:category, levels: ["Fair", "Good"]}}])
+
+      assert {DataFrame.pull(frame, :manual), DataFrame.category(empty, :cut)} ===
+               {[false, true], {:category, levels: ["Fair", "Good"], ordered: false}}
+    end
+
+    # R's `factor(1:3, levels = c(1, 1, 2))` fails: "factor level [2] is duplicated".
+    test "levels that repeat a value, hold nil or are of another type are refused" do
+      repeated =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:cyl, [4, 6], {:category, levels: [4, 6, 4.0]}}])
+        end
+
+      missing =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:cyl, [4, 6], {:category, levels: [4, nil]}}])
+        end
+
+      other =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:cyl, [4, 6], {:category, levels: ["4", "6"]}}])
+        end
+
+      assert repeated.message =~ ":cyl is declared a category with the level 4.0 twice"
+      assert missing.message =~ "nil among its levels"
+      assert other.message =~ ~s{levels ("4") are of another type than its values (4)}
+    end
+
+    test "a category's levels and ordered flag travel with it through every operation" do
+      declaration = {:category, levels: ["b", "a"], ordered: true}
+
+      frame =
+        DataFrame.new([
+          {:fill, ["a", "b", "a"], declaration},
+          {:panel, [1, 1, 2]},
+          {:keep, [true, false, true]}
+        ])
+
+      summarised = DataFrame.summarise(frame, [:fill], first: {:first, [:fill]})
+
+      joined =
+        [panel: [2]]
+        |> DataFrame.new()
+        |> DataFrame.join(frame, [:panel])
+
+      carried = [
+        DataFrame.select(frame, [{:x, :fill}]),
+        DataFrame.slice(frame, [2, 0]),
+        DataFrame.filter(frame, :keep),
+        DataFrame.mutate(frame, x: :fill),
+        frame
+        |> DataFrame.split(:panel)
+        |> Map.fetch!(2),
+        joined
+      ]
+
+      assert Enum.map(carried, fn carrying ->
+               name = Enum.find([:x, :fill], fn name -> name in DataFrame.names(carrying) end)
+               DataFrame.category(carrying, name)
+             end) == List.duplicate(declaration, 6)
+
+      assert {DataFrame.category(summarised, :fill), DataFrame.category(summarised, :first)} ==
+               {declaration, declaration}
+    end
+
+    test "category/2 refuses a column that is not a category" do
+      assert_raise FunctionClauseError, fn ->
+        [x: ["a"]]
+        |> DataFrame.new()
+        |> DataFrame.category(:x)
+      end
+    end
   end
 
   describe "select/2" do
@@ -274,6 +390,20 @@ defmodule Giggly.DataFrameTest do
       assert_raise ArgumentError, ~r/declared a category/, fn ->
         DataFrame.put(frame, :fill, [%{}], :category)
       end
+    end
+
+    test "a column put with its levels is declared with them" do
+      frame =
+        [x: [1, 2]]
+        |> DataFrame.new()
+        |> DataFrame.put(
+          :fill,
+          ["c", "a"],
+          {:category, levels: ["c", "b", "a"]}
+        )
+
+      assert {DataFrame.category(frame, :fill), DataFrame.pull(frame, :fill)} ===
+               {{:category, levels: ["c", "b", "a"], ordered: false}, ["c", "a"]}
     end
   end
 

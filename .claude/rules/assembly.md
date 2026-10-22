@@ -147,11 +147,12 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   `layer_data/2` shows, but not in the rows its geom draws, which no geom reads as set.
 - **`group` is written once, by `Group.add/2`, straight after evaluation** — before any scale maps
   a discrete position to numbers, after which it no longer looks discrete.
-- **The assembly gives grouping its order.** `Group.add/2` numbers values by the key it is handed;
-  the assembly hands it `Scale.level_key/1`, the order a discrete scale gives its levels, so group
-  ids follow axis and legend order while grouping names nothing about scales. It hands the facet
-  the same key, so panels made from a column's values follow the same order. When level order can
-  be configured, the assembly hands over the configured order.
+- **The assembly gives grouping its order for values with no levels of their own.** `Group.add/2`
+  numbers a category by its levels, read from the frame, as R's `id()` numbers a factor, and other
+  values by the key it is handed; the assembly hands it `Scale.level_key/1`, the order a discrete
+  scale gives such values, so group ids follow axis and legend order while grouping names nothing
+  about scales. It hands the facet the same key, so panels made from a column's values follow the
+  same order.
 - **Whether a column suits an axis is checked here, when the plot is run.** Before training, every
   column on an axis must be a type `Scale.kind/1` can place and all of one kind, each layer's
   types read from its evaluated frame, since an expression's type is known only once it has run;
@@ -160,11 +161,14 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   aesthetics a geom takes).
 - **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`,
   `:category`), never by scanning values. **A factor's column enters the evaluated frame declared
-  `:category`** (`Mapping.dtype/2` says which), so grouping and the scales' kinds read it as
-  discrete, numbers and all. **A scale is told levels from positions by the stage**: the first
-  training hands it the layers' own values (`Scale.train/2`), the retraining after the position
-  their positions (`Scale.train_positions/2`), so a factor's numbers train levels and a bar's
-  edges a discrete axis's continuous range.
+  a category, with its levels** (`Mapping.category/1` gives the declaration), so grouping and the
+  scales' kinds read it as discrete, numbers and all; the transformation leaves a category as it
+  is, a discrete scale's being the identity, so it reaches training with its levels. **A scale is
+  told levels from positions by the stage**: the first training hands it the layers' own values,
+  a column at a time, each with its factor's levels or `:none` (`Scale.train/3`), the retraining
+  after the position their positions (`Scale.train_positions/2`), so a factor's numbers train
+  levels and a bar's edges a discrete axis's continuous range. A non-position scale is trained on
+  each column with its levels too.
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
   no exclusion from the key.

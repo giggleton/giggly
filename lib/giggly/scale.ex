@@ -240,12 +240,14 @@ defmodule Giggly.Scale do
   def transform(%Continuous{} = scale, values), do: Continuous.transform(scale, values)
   def transform(%Discrete{}, values), do: values
 
-  # The scale widened to cover `values` as a layer's table gives them: a continuous scale's range,
-  # and a discrete scale's levels, numbers among them, as ggplot2 trains a factor's levels.
+  # The scale widened to cover `values` as a layer's table gives them, `levels` the levels of the
+  # factor they are values of, or `:none`: a continuous scale's range, and a discrete scale's
+  # levels, numbers among them, as R's `scales::discrete_range()` merges a factor's levels and
+  # other values into a range (`Giggly.Scale.Discrete`'s `levels` and `factor` say how).
   @doc false
-  @spec train(t(), list()) :: t()
-  def train(%Continuous{} = scale, values), do: Continuous.train(scale, values)
-  def train(%Discrete{} = scale, values), do: Discrete.train(scale, values)
+  @spec train(t(), list(), list() | :none) :: t()
+  def train(%Continuous{} = scale, values, :none), do: Continuous.train(scale, values)
+  def train(%Discrete{} = scale, values, levels), do: Discrete.train(scale, values, levels)
 
   # Whether `scale` is discrete, its legend's keys its levels, rather than continuous.
   @doc false
@@ -254,7 +256,7 @@ defmodule Giggly.Scale do
   def discrete?(%Continuous{}), do: false
 
   # The scale widened to cover positions, such as a bar's edges once its levels are mapped: a
-  # continuous scale's range, as `train/2` widens it, and a discrete scale's continuous range, its
+  # continuous scale's range, as `train/3` widens it, and a discrete scale's continuous range, its
   # levels left alone, as ggplot2's discrete position scale trains `range_c`.
   @doc false
   @spec train_positions(t(), list()) :: t()
@@ -726,10 +728,10 @@ defmodule Giggly.Scale do
     smaller != 0 and abs((low - high) / smaller) < @zero_range_tolerance
   end
 
-  # The key that orders discrete values: `nil` after every present value, which compare in Erlang
-  # term order, so strings sort by their bytes and structs such as dates by their fields, not
-  # chronologically. Grouping orders its combinations by the same key, so group ids and axis
-  # positions agree.
+  # The key that orders discrete values with no levels of their own: `nil` after every present
+  # value, which compare in Erlang term order, so strings sort by their bytes and `false` before
+  # `true`; a factor's values, dates among them, are ordered by its levels instead. Grouping orders
+  # its combinations by the same key, so group ids and axis positions agree.
   @doc false
   @spec level_key(term()) :: {0, term()} | {1, nil}
   def level_key(nil), do: {1, nil}

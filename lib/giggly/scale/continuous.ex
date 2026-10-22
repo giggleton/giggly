@@ -96,7 +96,7 @@ defmodule Giggly.Scale.Continuous do
   @spec transform(t(), list()) :: list()
   def transform(%__MODULE__{transform: name}, values), do: Transform.transform(name, values)
 
-  # The scale widened to cover the finite numbers in `values`, as `Giggly.Scale.train/2` describes.
+  # The scale widened to cover the finite numbers in `values`, as `Giggly.Scale.train/3` describes.
   @doc false
   @spec train(t(), list()) :: t()
   def train(%__MODULE__{range: range} = scale, values) do

@@ -47,7 +47,10 @@ defmodule Giggly.DataFrame do
   One more is never worked out from values, only declared when a column is built: `:category`,
   Explorer's name for a categorical column, which a plot reads as discrete whatever its values
   are. Its values are typed, and an integer among floats becomes a float, as any column's; it may
-  hold anything but a `:term`'s values or lists.
+  hold anything but a `:term`'s values or lists. A category has levels, the values it may hold in
+  their order, given when it is declared or else its distinct values in order (numbers by value,
+  minus infinity first and NaN last, dates and times by time), and it may be declared ordered; a
+  value not among its levels is missing.
   """
 
   # ## Implementations
@@ -120,8 +123,15 @@ defmodule Giggly.DataFrame do
           | :category
           | {:list, dtype()}
 
-  @typedoc "A column as built: its name and values, and `:category` where it is declared one."
-  @type column :: {name(), list()} | {name(), list(), :category}
+  @typedoc """
+  How a column is declared a category: `:category`, its levels its distinct values in order, or
+  `{:category, levels: levels, ordered: ordered}`, either option left out to take that default
+  (`ordered: false`).
+  """
+  @type category :: :category | {:category, [levels: list(), ordered: boolean()]}
+
+  @typedoc "A column as built: its name and values, and how it is declared a category if it is one."
+  @type column :: {name(), list()} | {name(), list(), category()}
 
   @typedoc """
   What a frame computes in each row: a column by its name, a constant, or an operation on
@@ -186,7 +196,11 @@ defmodule Giggly.DataFrame do
 
   # Adds or replaces a column declared a category, as `put/4` describes.
   @doc false
-  @callback put(t(), name(), list(), :category) :: t()
+  @callback put(t(), name(), list(), category()) :: t()
+
+  # A category's declaration, as `category/2` describes.
+  @doc false
+  @callback category(t(), name()) :: {:category, [levels: list(), ordered: boolean()]}
 
   # The rows split by the values of one column, as `split/2` describes.
   @doc false
@@ -287,12 +301,13 @@ defmodule Giggly.DataFrame do
   end
 
   # Builds a frame from `{name, values}` pairs, keeping their order, a column declared a category
-  # given as `{name, values, :category}`.
+  # given as `{name, values, category}` (`t:category/0`).
   #
   # This is how the pipeline builds a frame; data from outside it enters through `from_table/1`.
   # Every `values` is a list of the same length and no name appears twice; a call that breaks either
   # raises `FunctionClauseError`. A column mixing two types raises `ArgumentError`, and so does a
-  # category of values with no type of their own.
+  # category of values with no type of their own, or one whose levels repeat a value (`4` and `4.0`
+  # are one), hold `nil`, or are of another type than its values.
   @doc false
   @spec new([column()]) :: t()
   def new(columns) when is_list(columns), do: Lists.new(columns)
@@ -344,12 +359,19 @@ defmodule Giggly.DataFrame do
   def put(%implementation{} = frame, name, values), do: implementation.put(frame, name, values)
 
   # The frame with the column `name` holding `values`, declared a category, as `new/1` declares a
-  # column given as `{name, values, :category}`: replaced where it is, or added after the last
-  # column. Raises as `put/3` does, and `ArgumentError` for values with no type of their own.
+  # column given as `{name, values, category}`: replaced where it is, or added after the last
+  # column. Raises as `put/3` does, and `ArgumentError` as `new/1` does for a category.
   @doc false
-  @spec put(t(), name(), list(), :category) :: t()
-  def put(%implementation{} = frame, name, values, :category),
-    do: implementation.put(frame, name, values, :category)
+  @spec put(t(), name(), list(), category()) :: t()
+  def put(%implementation{} = frame, name, values, category),
+    do: implementation.put(frame, name, values, category)
+
+  # How the category `name` is declared, its levels and whether it is ordered, as `put/4` would
+  # declare it again: `{:category, levels: levels, ordered: ordered}`. Raises
+  # `FunctionClauseError` for a column that is not a category.
+  @doc false
+  @spec category(t(), name()) :: {:category, [levels: list(), ordered: boolean()]}
+  def category(%implementation{} = frame, name), do: implementation.category(frame, name)
 
   # The frame's rows split by the values of the column `name`, as R's `split()` splits ggplot2's
   # layer data by panel: for each value the column holds, a frame of the rows holding it, in their

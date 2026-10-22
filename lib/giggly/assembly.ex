@@ -272,12 +272,13 @@ defmodule Giggly.Assembly do
           frame,
           {untrained_x_scales, x_routes},
           {untrained_y_scales, y_routes},
-          &Scale.transform/2
+          &Scale.transform/2,
+          categories(frame)
         )
       end)
 
-    x_scales = train(untrained_x_scales, x_routes, :x, transformed_data, &Scale.train/2)
-    y_scales = train(untrained_y_scales, y_routes, :y, transformed_data, &Scale.train/2)
+    x_scales = train(untrained_x_scales, x_routes, :x, transformed_data, :levels)
+    y_scales = train(untrained_y_scales, y_routes, :y, transformed_data, :levels)
 
     axes = %{x: {x_scales, x_routes}, y: {y_scales, y_routes}}
     panel_axes = stat_axes(axes)
@@ -686,7 +687,7 @@ defmodule Giggly.Assembly do
   defp train_non_position(untrained, aesthetic, layer_data) do
     Enum.reduce(layer_data, untrained, fn frame, scale ->
       if aesthetic in DataFrame.names(frame),
-        do: Scale.train(scale, DataFrame.pull(frame, aesthetic)),
+        do: Scale.train(scale, DataFrame.pull(frame, aesthetic), levels(frame, aesthetic)),
         else: scale
     end)
   end
@@ -831,8 +832,8 @@ defmodule Giggly.Assembly do
 
   defp put_column(frame, {name, values}), do: DataFrame.put(frame, name, values)
 
-  defp put_column(frame, {name, values, :category}),
-    do: DataFrame.put(frame, name, values, :category)
+  defp put_column(frame, {name, values, category}),
+    do: DataFrame.put(frame, name, values, category)
 
   # The column of `aesthetic`, computed from the stat's output, put through its axis's scale where
   # it is an x- or y-family aesthetic, each row on the scale its panel uses, once it is checked: an
@@ -942,14 +943,14 @@ defmodule Giggly.Assembly do
   end
 
   # The column `value` makes from the table it is evaluated against, the layer's or, for an
-  # after_stat, the stat's output, under `aesthetic`'s name, declared a category where it is a
-  # factor, whose type the frame cannot read from its values.
+  # after_stat, the stat's output, under `aesthetic`'s name, declared a category, with its levels,
+  # where it is a factor, whose type the frame cannot read from its values.
   defp evaluated_column(aesthetic, value, paneled_data) do
     values = Mapping.evaluate(value, paneled_data)
 
-    case Mapping.dtype(value, paneled_data) do
-      :category -> {aesthetic, values, :category}
-      _read_from_values -> {aesthetic, values}
+    case Mapping.category(value) do
+      :none -> {aesthetic, values}
+      category -> {aesthetic, values, category}
     end
   end
 
@@ -996,21 +997,47 @@ defmodule Giggly.Assembly do
     |> Map.new(fn scale_id -> {scale_id, untrained} end)
   end
 
-  # Each scale folds in, from every layer's columns on its axis, the values in the rows of the
-  # panels that use it, as ggplot2's `train_position()` trains each panel scale on its panels.
-  # `training` is `Scale.train/2` for the layers' own values, a discrete axis's levels, and
-  # `Scale.train_positions/2` once they are positions.
+  # Each scale folds in, from every layer's columns on its axis, a column at a time, the values in
+  # the rows of the panels that use it, as ggplot2's `train_position()` trains each panel scale on
+  # its panels. `training` is `:levels` for the layers' own values, a discrete axis's levels, each
+  # with its factor's levels where it is a category (`Scale.train/3`), and `:positions` once they
+  # are positions (`Scale.train_positions/2`).
   defp train(scales, routes, family, layer_data, training) do
     Map.new(scales, fn {scale_id, untrained} ->
       trained =
         layer_data
         |> family_columns(family)
         |> Enum.reduce(untrained, fn {frame, name}, scale ->
-          training.(scale, values_on(frame, name, routes, scale_id))
+          values = values_on(frame, name, routes, scale_id)
+          trained(scale, values, frame, name, training)
         end)
 
       {scale_id, trained}
     end)
+  end
+
+  defp trained(scale, values, frame, name, :levels),
+    do: Scale.train(scale, values, levels(frame, name))
+
+  defp trained(scale, positions, _frame, _name, :positions),
+    do: Scale.train_positions(scale, positions)
+
+  # The levels of the factor the column `name` holds, or `:none` where it is not a category.
+  defp levels(frame, name) do
+    case DataFrame.dtypes(frame) do
+      %{^name => :category} ->
+        {:category, declaration} = DataFrame.category(frame, name)
+        Keyword.fetch!(declaration, :levels)
+
+      %{} ->
+        :none
+    end
+  end
+
+  # The frame's categories, which only a discrete scale places, whose transformation leaves every
+  # value as it is, so they keep their levels for training.
+  defp categories(frame) do
+    for {name, :category} <- DataFrame.dtypes(frame), do: name
   end
 
   # Each scale reset and trained again on every layer's columns on its axis: ggplot2's
@@ -1018,7 +1045,7 @@ defmodule Giggly.Assembly do
   defp retrain(scales, routes, family, layer_data) do
     scales
     |> Map.new(fn {scale_id, scale} -> {scale_id, Scale.reset(scale)} end)
-    |> train(routes, family, layer_data, &Scale.train_positions/2)
+    |> train(routes, family, layer_data, :positions)
   end
 
   # The column's values in the rows whose panel uses the scale `scale_id`.
@@ -1214,9 +1241,11 @@ defmodule Giggly.Assembly do
 
   # Replaces each x-family and y-family column with what `scale_function` (a transformation or a
   # mapping) makes of its values, each row's on the scale its panel uses: ggplot2's `scale_apply()`.
-  defp through_scales(frame, x_axis, y_axis, scale_function) do
+  # The columns named in `kept` are left as they are.
+  defp through_scales(frame, x_axis, y_axis, scale_function, kept \\ []) do
     frame
     |> DataFrame.names()
+    |> Enum.reject(fn name -> name in kept end)
     |> Enum.reduce(frame, fn name, scaled ->
       case Aesthetics.family(name) do
         :x -> through_scale(scaled, name, x_axis, scale_function)

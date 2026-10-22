@@ -99,6 +99,51 @@ defmodule Giggly.MappingTest do
       assert reason =~ "nil is a missing value"
     end
 
+    test "a factor with levels and ordered is held with its options as given" do
+      assert {Mapping.resolve({:factor, [:cyl], levels: [8, 4, 6], ordered: true}),
+              Mapping.resolve({:factor, [:cut], ordered: true, levels: ["Fair", "Good"]}),
+              Mapping.resolve({:factor, [:cyl], []})} ===
+               {{:ok, {:factor, ["cyl"], [levels: [8, 4, 6], ordered: true]}},
+                {:ok, {:factor, ["cut"], [ordered: true, levels: ["Fair", "Good"]]}},
+                {:ok, {:factor, ["cyl"]}}}
+    end
+
+    # R's `factor(1:3, levels = c(1, 1, 2))` fails: "factor level [2] is duplicated".
+    test "a factor's options are refused unless levels of one type, none twice, and a flag" do
+      refused = [
+        {[level: [4]], "a factor's options are levels: and ordered:"},
+        {[{"levels", [4]}], "a factor's options are levels: and ordered:"},
+        {[levels: [4], levels: [6]], "a factor's options are each given once"},
+        {[levels: []], "a factor's levels are a list of one or more values"},
+        {[levels: 4], "a factor's levels are a list of one or more values"},
+        {[levels: [4, nil]], "nil is a missing value, never a level"},
+        {[levels: [4, %{}]], "a level is a value a column can hold"},
+        {[levels: [4, [6]]], "a level is a value a column can hold"},
+        {[levels: [4, "6"]], "a factor's levels are all of one type"},
+        {[levels: [4, 6, 4.0]], "a factor's level 4.0 is given twice"},
+        {[ordered: "yes"], "a factor's ordered: is true or false"}
+      ]
+
+      for {options, reason} <- refused do
+        assert {:error, refusal} = Mapping.resolve({:factor, [:cyl], options})
+        assert refusal =~ reason
+      end
+
+      assert {:error, refusal} = Mapping.resolve({:factor, [:cyl], :levels})
+      assert refusal =~ "with a keyword list of options"
+    end
+
+    test "a factor's levels may mix integers and floats, NaN among them, as a column does" do
+      assert {:ok, _factor} = Mapping.resolve({:factor, [:x], levels: [1, 2.5, :nan]})
+    end
+
+    test "a factor with levels as an expression's argument is refused too" do
+      assert {:error, reason} =
+               Mapping.resolve({&Kernel.+/2, [{:factor, [:cyl], levels: [4]}, 1]})
+
+      assert reason =~ "a factor reads a whole column"
+    end
+
     test "a refused argument refuses the expression, with the argument's reason" do
       assert {:error, reason} = Mapping.resolve({&Kernel.//2, [:hwy, nil]})
       assert reason =~ "nil is a missing value"
@@ -160,6 +205,10 @@ defmodule Giggly.MappingTest do
               Mapping.columns({:factor, ["cyl"]})} === {["hwy", "cty"], ["cty"], [], ["cyl"]}
     end
 
+    test "a factor with levels reads its value's columns" do
+      assert Mapping.columns({:factor, ["cyl"], levels: [8, 4]}) === ["cyl"]
+    end
+
     test "an after_stat's columns are the stat's variables its value reads" do
       {:ok, value} = Mapping.resolve({:after_stat, [{&Kernel.//2, [:count, :prop]}]})
 
@@ -177,6 +226,10 @@ defmodule Giggly.MappingTest do
 
     test "a factor's type is a category, whatever its value's" do
       assert Mapping.dtype({:factor, ["hwy"]}, @frame) === :category
+    end
+
+    test "a factor with levels is a category too" do
+      assert Mapping.dtype({:factor, ["hwy"], levels: [31, 29]}, @frame) === :category
     end
 
     test "an after_stat's type is its value's in the stat's output, whose columns are atoms" do
@@ -202,6 +255,10 @@ defmodule Giggly.MappingTest do
       assert Mapping.evaluate({:factor, ["hwy"]}, @frame) === [29, 24, 31]
     end
 
+    test "a factor with levels is its value's values, the frame told its levels" do
+      assert Mapping.evaluate({:factor, ["hwy"], levels: [31, 29]}, @frame) === [29, 24, 31]
+    end
+
     test "a function of no arguments gives a value in every row" do
       assert Mapping.evaluate({fn -> 1 end, []}, @frame) === [1, 1, 1]
     end
@@ -212,6 +269,29 @@ defmodule Giggly.MappingTest do
       assert {Mapping.evaluate(value, @statistic),
               Mapping.evaluate({:after_stat, ["count"]}, @statistic)} ===
                {[25.0, 75.0], [1.0, 3.0]}
+    end
+  end
+
+  describe "category/1" do
+    test "a factor is declared a category with its options, an after_stat as its value" do
+      assert Enum.map(
+               [
+                 {:factor, ["cyl"]},
+                 {:factor, ["cyl"], levels: [8, 4], ordered: true},
+                 {:after_stat, [{:factor, ["count"], levels: [2, 1]}]},
+                 {:after_stat, ["count"]},
+                 "cyl",
+                 {:constant, 4}
+               ],
+               &Mapping.category/1
+             ) === [
+               :category,
+               {:category, levels: [8, 4], ordered: true},
+               {:category, levels: [2, 1]},
+               :none,
+               :none,
+               :none
+             ]
     end
   end
 
@@ -284,6 +364,28 @@ defmodule Giggly.MappingTest do
               Mapping.title({:factor, [{:constant, 4}]}, :color),
               Mapping.title({:factor, [{fn hwy -> hwy end, ["hwy"]}]}, :color)} ===
                {{:title, "factor(cyl)"}, {:title, "factor(4)"}, {:title, :none}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(colour = factor(cyl, levels = c(8, 4, 6)))`
+    # `factor(cyl, levels = c(8, 4, 6))`, and with `ordered = TRUE` that and `, ordered = TRUE`.
+    test "a factor's options are titled as R writes the arguments, in the order given" do
+      assert {Mapping.title({:factor, ["cyl"], levels: [8, 4, 6]}, :color),
+              Mapping.title({:factor, ["cyl"], levels: [8, 4, 6], ordered: true}, :color),
+              Mapping.title({:factor, ["cut"], ordered: false, levels: ["Fair", "Good"]}, :color)} ===
+               {{:title, "factor(cyl, levels = c(8, 4, 6))"},
+                {:title, "factor(cyl, levels = c(8, 4, 6), ordered = TRUE)"},
+                {:title, ~s{factor(cut, ordered = FALSE, levels = c("Fair", "Good"))}}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `factor(cyl, levels = c(8, 4))`, `factor(am, levels =
+    # c(TRUE, FALSE))` and `factor(x, levels = c(1e5, 0.5))` with `1e+05`.
+    test "a factor's levels are written as R writes them" do
+      assert {Mapping.title({:factor, ["cyl"], levels: [8.0, 4.0]}, :color),
+              Mapping.title({:factor, ["am"], levels: [true, false]}, :color),
+              Mapping.title({:factor, ["x"], levels: [100_000.0, 0.5]}, :color)} ===
+               {{:title, "factor(cyl, levels = c(8, 4))"},
+                {:title, "factor(am, levels = c(TRUE, FALSE))"},
+                {:title, "factor(x, levels = c(1e+05, 0.5))"}}
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 titles `after_stat(prop)` `prop`, `after_stat(factor(count))`

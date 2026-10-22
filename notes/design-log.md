@@ -79,6 +79,98 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Ordering, viridis and `log10` by name are Phase 3's tenth increment, in seven steps: levels
+  from the mapping, levels from the table, `diamonds`' levels, viridis, `log10`, `reorder()`, the
+  notebooks (2026-10-22, Steve, agreeing the proposal; checked against R, ggplot2 4.0.3, scales
+  1.4.0 and Explorer 0.13).** 44 waiting verdicts name the order of a column's values, most of
+  them `diamonds`' ordered factors, and 22 examples draw once it lands. A factor's levels order
+  its scale, legend, groups (so stacking and dodging) and facet panels, as R's do, and the frame's
+  category carries them and `ordered`. `{:reorder, [x, y]}` is R's `reorder()`, the whole of a
+  mapping value as a factor is: the frame's mean of `y` for each value of `x` (a `mean`
+  aggregate, as R's `mean()` adds), ties in `x`'s own order, a missing mean last, titled
+  `reorder(manufacturer, cty)`. *Deferred:* `drop:` (no caller; unused levels are dropped, as
+  R's default), `factor()`'s `labels`, `reorder()`'s `FUN` and `decreasing` (r4ds writes
+  `fct_reorder(class, hwy, median)`), forcats, `cut_*()` and `interaction()`, faceting by an
+  expression, binned viridis. *Found:* Explorer 0.13 has no level order to bring; its categories
+  are its string cache's first-seen order, sorted and grouped by text.
+
+- **`{:factor, [value], levels: [...]}` gives a factor its levels, in the frame grammar's
+  options form (2026-10-22, Steve, agreeing the proposal; checked in R).** As R's `factor(x,
+  levels = ...)`: the levels name values as the column holds them, as `limits:` does (`[8, 4, 6]`
+  for numbers), a value not among them is missing and placed last, one the data lacks is dropped
+  by the scale, and `ordered: true` marks the factor ordered; a level named twice (`4` and `4.0`
+  are one), `nil` or no levels is refused at the call, as R refuses a repeated level. Without
+  `levels:` the levels are the sorted values, as R's. The title is R's, `factor(cyl, levels =
+  c(8, 4, 6))`, each level as `Giggly.AsCharacter` writes it (`TRUE`, `1e+05`), a string quoted,
+  `Giggly.Mapping` listing it (Steve; *rejected:* Elixir's `inspect` text, no widening, but
+  `c(true, false)` inside R's call). *Rejected: `{:factor, [:cyl, [8, 4, 6]]}`* — an argument list
+  holds what is evaluated, and a bare list is refused, kept for an inline column. *Rejected:
+  `{:factor, [:cyl], [8, 4, 6]}`* — a positional third element nothing else in the grammar has.
+
+- **A mapping names a function only as a shortcut for a common one Elixir lacks, `log10` first;
+  an operator stays a capture (2026-10-22, Steve, scoping Phase 3's tenth increment: "If there is
+  an elixir function already I don't think we need to rename it").** `{:log10, [:carat]}` is
+  titled `log10(carat)`, as R titles it, and computed by the frame's `mutate/2` as R computes it
+  (0 gives minus infinity, a negative number NaN, a missing value passes through); each frame
+  implementation says which names it runs, Lists all of them, which a test pins, and the call
+  refuses a name the table's engine cannot run. `{&Kernel.//2, [:hwy, :cty]}` and Kernel's other
+  operators stay captures, titled as Elixir writes them and computed on lists, as any function
+  is; an engine could later run them by recognising the capture, as titles already do. `sqrt`,
+  `log`, `exp` and the rest arrive with their callers. *Rejected: the operators by name*
+  (`{:/, [:hwy, :cty]}`, proposed, all their families or only those the notebooks write) — a
+  second spelling of a function Elixir already has.
+
+- **Viridis joins the tenth increment: `scale_color_viridis_d/2`, `scale_fill_viridis_d/2`, their
+  `_c` forms, an ordered factor's default colour and fill scale, and `Giggly.Datasets.txhousing/0`
+  (2026-10-22, Steve; checked against viridisLite 0.4.3 and grDevices).** R's `viridis(n)` takes a
+  palette's 256 colours into CIE Lab through grDevices' `convertColor()` (D65 at (0.3137,
+  0.3291) and the sRGB matrix made from it, not farver's), fits an fmm spline per channel, samples
+  `n` places from `begin` to `end` and converts back, rounded to 5 decimals and clipped. The
+  `color` library's Lindbloom conversions take grDevices' constants; the splines are R's
+  coefficients from `splinefun()`, copied into `priv/` and read at compile time behind a waiver of
+  their own, so Giggly only evaluates the cubic; R's `viridis(n)` for every palette and `n` to 256
+  pins it. The options are R's: `option:` (the eight palettes by name), `begin:`, `end:`,
+  `direction:`, `alpha:`; `_c` is the gradient over six. *Left out:* `_b` (no binned scales),
+  `scale_*_ordinal()`'s `type`. *Rejected: viridis as its own increment* (the plan) — Steve.
+
+- **A factor carries R's `ordered` flag from the increment that brings levels (2026-10-22, Steve,
+  scoping Phase 3's tenth increment; checked in R).** `ordered: true` on `Giggly.Factor.new/2` and
+  on `{:factor, ...}` marks a factor ordered, the frame's category carries it beside its levels,
+  `reorder()` keeps it, as R's does, and `diamonds`' `cut`, `color` and `clarity` are ordered, as
+  R's are, so the dataset is R's whole once. In a plot it changes only the default colour and
+  fill scale, to viridis (`scale_colour_ordinal()`); alpha's and size's ordinal palettes are their
+  discrete ones, and shape only warns. *Rejected: the flag with viridis, its only reader*
+  (proposed, as an option that changes nothing can be tested only as carried) — Steve's call,
+  asking for viridis in this increment too.
+
+- **A discrete scale fed levelled and plain values trains as R's `discrete_range()`, remembering
+  whether its first values had levels (2026-10-22, Steve, scoping Phase 3's tenth increment;
+  checked in R).** Each training (one layer's column, on the panels the scale serves) brings the
+  levels its rows hold, as R's `drop = TRUE`, or its plain values sorted, and adds those the scale
+  lacks, matched by `Discrete.key/1`: a factor's levels lead whichever layer brings them, so
+  factor (b, a) and text (c, a) train to b, a, c in either order. A scale whose first values had
+  levels then adds each new value after the rest; one whose first were plain sorts everything at
+  each plain training, so text, factor, text (d, 0) gives 0, a, b, c, d where factor first gives
+  b, a, c, 0, d. `Scale.Discrete` gains a documented field saying which, `factor`, R's name for
+  it; Giggly already trains in ggplot2's order, a layer and a column at a time. *Rejected: levels
+  first, plain values sorted after, whatever the order* — no field, but a departure from R from
+  the third training on.
+
+- **A table's column carries its levels as a `Giggly.Factor`, its values and levels in one
+  struct, read with the table (2026-10-22, Steve, scoping Phase 3's tenth increment; checked
+  against R, Explorer 0.13 and `table`).** R orders a scale, its groups and a facet's panels by a
+  factor column's levels, as `diamonds`' `cut`, `color` and `clarity` carry them, and a facet
+  splits the raw table, so only the table can order its panels. `Table.Reader` hands over values
+  alone and Explorer 0.13's categories are its string cache's first-seen order, so no source
+  brings levels. `Giggly.Factor.new(values, levels: [...])` enumerates as its values, so Explorer,
+  Kino and `table` read it as a list (`Table.to_columns/1` passes it through), and `from_table/1`
+  stores a `:category` column with its levels, a value not among them `nil`, as R's NA. Its
+  boundary lists NimbleOptions; the frame and `Giggly.Datasets` list it. *Rejected: levels only
+  in a mapping* — every `diamonds` example would write a factor where R names a column, and
+  panels could not be ordered. *Rejected: `Table.Reader` metadata under a namespaced key* — a user
+  wraps a whole table to order one column. *Rejected: `Giggly.Category`* — `Factor` is the
+  mapping's `{:factor, ...}` word.
+
 - **Size, shape and line type are Phase 3's eighth increment, in seven steps: a point's look
   (its fixed look and a mapped fill), a line's fixed look, mapped size, `geom_count()`, mapped
   shape, mapped line type and width, the notebooks (2026-10-19, Steve, agreeing the proposal;
@@ -2174,6 +2266,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Give a factor its levels, and train a discrete scale as R's discrete_range()
+  (ordering, step 1); §4: "A discrete scale fed levelled and plain values", "A factor carries R's
+  `ordered` flag", "`{:factor, [value], levels: [...]}` gives a factor its levels"
 - 2026-10-22 — Sweep the notebooks for histograms, box plots and dodging (distributions, step 7);
   §4: "A value an example computes in base R"
 - 2026-10-22 — Draw box plots: Geom.Boxplot and geom_boxplot/3 (distributions, step 6); §4: "A
