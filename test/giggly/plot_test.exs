@@ -849,6 +849,8 @@ defmodule Giggly.PlotTest do
 
       assert Plot.stat_bin(plot, bins: 5).reversed_layers ==
                Plot.geom_histogram(plot, bins: 5).reversed_layers
+
+      assert Plot.stat_bin(plot).reversed_layers == Plot.geom_histogram(plot).reversed_layers
     end
 
     test "a binning layer records the bar geom, binning with its defaults and stacking" do
@@ -1013,6 +1015,18 @@ defmodule Giggly.PlotTest do
              ]
     end
 
+    test "with neither a mapping nor options, it bins the plot's mapping, padded" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_freqpoly()
+
+      assert [%Plot.Layer{geom: %Geom.Path{}, stat: %Stat.Bin{pad: true}, mapping: mapping}] =
+               plot.reversed_layers
+
+      assert mapping == %{}
+    end
+
     test "its binning options go to binning's struct, a line's to the path and its look" do
       plot =
         @rows
@@ -1081,6 +1095,7 @@ defmodule Giggly.PlotTest do
 
       for add <- [
             fn -> Plot.geom_freqpoly(plot, center: 0, boundary: 0) end,
+            fn -> Plot.geom_freqpoly(plot, %{x: :disp}) end,
             fn -> Plot.geom_freqpoly(plot, %{y: :mpg}) end,
             fn -> Plot.geom_freqpoly(plot, %{weight: :cyl}) end,
             fn -> Plot.geom_freqpoly(plot, %{weight: {:after_stat, [:count]}}) end
