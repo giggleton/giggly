@@ -69,8 +69,8 @@ defmodule Giggly.DataFrame do
   # Values follow Explorer's semantics, as types do: a missing value passes through an operation
   # as missing, so `is_finite` is missing where its number is, and `and` is false where either side
   # is false, true where both are true and missing otherwise (SQL's three-valued logic). An
-  # expression outside this vocabulary, or an operation given a column of the wrong type, raises
-  # `FunctionClauseError`. Operations arrive with their first caller.
+  # expression outside this vocabulary, or an operation given a column of the wrong type, whether
+  # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
 
   # Its own boundary, exporting only this module: callers reach a frame through the functions
   # below, so an implementation's struct and functions are private to it and a second

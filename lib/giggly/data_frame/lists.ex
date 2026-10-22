@@ -118,7 +118,7 @@ defmodule Giggly.DataFrame.Lists do
   @impl DataFrame
   def filter(%__MODULE__{} = frame, expression) do
     {dtype, kept} = evaluated(frame, expression)
-    booleans(dtype, :filter)
+    booleans(dtype)
 
     indices =
       kept
@@ -152,24 +152,25 @@ defmodule Giggly.DataFrame.Lists do
 
   defp evaluated(frame, {:is_finite, [argument]}) do
     {dtype, values} = evaluated(frame, argument)
-    numbers(dtype, :is_finite)
+    numbers(dtype)
     {:boolean, Enum.map(values, &finite/1)}
   end
 
   defp evaluated(frame, {:and, [left, right]}) do
     {left_dtype, left_values} = evaluated(frame, left)
     {right_dtype, right_values} = evaluated(frame, right)
-    booleans(left_dtype, :and)
-    booleans(right_dtype, :and)
+    booleans(left_dtype)
+    booleans(right_dtype)
     {:boolean, Enum.zip_with(left_values, right_values, &both/2)}
   end
 
   defp constant(%__MODULE__{row_count: row_count}, value),
     do: typed({:constant, value}, List.duplicate(value, row_count))
 
-  # An operation's argument of the type it takes, or a `FunctionClauseError`.
-  defp numbers(dtype, _operation) when dtype in [:integer, :float, :null], do: :ok
-  defp booleans(dtype, _operation) when dtype in [:boolean, :null], do: :ok
+  # An operation's argument of the type it takes, or a `FunctionClauseError`, whether or not the
+  # column has rows, as an engine checks an expression's types before it runs.
+  defp numbers(dtype) when dtype in [:integer, :float, :null], do: :ok
+  defp booleans(dtype) when dtype in [:boolean, :null], do: :ok
 
   # Whether a number is finite, missing where it is.
   defp finite(nil), do: nil

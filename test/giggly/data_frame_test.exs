@@ -296,6 +296,14 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.pull(filtered, :y) === [2, 4]
     end
 
+    test "a missing constant keeps no row" do
+      frame = DataFrame.new(y: [1, 2])
+
+      filtered = DataFrame.filter(frame, {:constant, nil})
+
+      assert DataFrame.row_count(filtered) == 0
+    end
+
     test "an expression that is not a boolean one is refused" do
       frame = DataFrame.new(x: [1.0])
 
@@ -414,6 +422,41 @@ defmodule Giggly.DataFrameTest do
       end
 
       assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, y: :missing) end
+    end
+
+    test "an operation's types are checked when the column has no rows" do
+      frame =
+        [label: ["a"]]
+        |> DataFrame.new()
+        |> DataFrame.filter({:constant, false})
+
+      assert DataFrame.dtypes(frame) == %{label: :string}
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, finite: {:is_finite, [:label]})
+      end
+    end
+
+    test "is_finite of a column of only missing values is missing in every row" do
+      frame = DataFrame.new(x: [nil, nil])
+
+      mutated = DataFrame.mutate(frame, finite: {:is_finite, [:x]})
+
+      assert DataFrame.pull(mutated, :finite) === [nil, nil]
+    end
+
+    test "a struct other than a date or a time is no constant written alone" do
+      frame = DataFrame.new(x: [1.0])
+
+      assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, set: MapSet.new([1])) end
+    end
+
+    test "columns are given as a list of pairs, never a map" do
+      frame = DataFrame.new(x: [1.0])
+      # Built as the test runs, since the type checker warns of a literal map it knows fails.
+      columns = Map.new([{:weight, 1.0}])
+
+      assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, columns) end
     end
 
     test "true, false and nil name no column" do

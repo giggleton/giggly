@@ -2057,6 +2057,34 @@ defmodule GigglyTest do
                {[4, 6], :category}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x))` over x 0.5 and 3
+    # has xmin 0.275 and 2.775, xmax 0.725 and 3.225: the bars are 0.9 of 0.5 wide, the gap from 0
+    # to 0.5 counted, where the gap between the positions alone is 2.5.
+    test "a bar's width counts its spacing from zero" do
+      frame =
+        %{"x" => [0.5, 3.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[0.275, 2.775], [0.725, 3.225]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x)) + facet_wrap(~f)` over
+    # x a, b, a and f p, p, q has PANEL 1, 1, 2, x 1, 2, 1 and each count 1.
+    test "each panel is counted apart and keeps its panel" do
+      frame =
+        %{"x" => ["a", "b", "a"], "f" => ["p", "p", "q"]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Plot.facet_wrap(:f)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :panel), DataFrame.pull(frame, :x),
+              DataFrame.pull(frame, :count)} === {[1, 1, 2], [1, 2, 1], [1.0, 1.0, 1.0]}
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x, weight = w))` over
     # x a, a, b, b and w 1, 1, 2, 3 has no weight column: it varies within b's group.
     test "a column constant within one group but varying within another is dropped" do

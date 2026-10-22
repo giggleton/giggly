@@ -40,8 +40,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   Explorer's semantics, as types do: a missing value passes through an operation, a filter keeps
   only the rows whose value is true, `and` is SQL's three-valued and. A column named alone keeps
   its type, a constant's is worked out from its value, an operation's is what it computes. An
-  expression outside the vocabulary, or an operation given a column of the wrong type, raises
-  `FunctionClauseError`; the mapping's expressions by name will reuse the grammar.
+  expression outside the vocabulary, or an operation given a column of the wrong type, rows or
+  none, raises `FunctionClauseError`; the mapping's expressions by name will reuse the grammar.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
   any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
