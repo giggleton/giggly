@@ -8,9 +8,12 @@ defmodule Giggly.Stat.Count do
   # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. The frame sums
   # them (`Giggly.DataFrame.summarise/3`): the counts in floats in row order, the doubles R's
   # `rowsum()` gives, and each group's total, the sum of its counts' magnitudes, with its
-  # compensated sum, as R's `sum()` adds in extended precision. y takes the count by default
-  # (`after_stat(count)`), and a mapping's after_stat reads `count` and `prop`, the variables
-  # ggplot2 documents. It takes no parameters yet. Run it through `Giggly.Stat`.
+  # compensated sum, as R's `sum()` adds in extended precision. The frame also chooses the rows,
+  # weighs them and finds the columns constant within each group (`filter/2`, `mutate/2`,
+  # `n_distinct` and `first`), and the width is read from the counted table's x, which holds the
+  # layer's distinct x positions, so counting never pulls a column of its input. y takes the count
+  # by default (`after_stat(count)`), and a mapping's after_stat reads `count` and `prop`, the
+  # variables ggplot2 documents. It takes no parameters yet. Run it through `Giggly.Stat`.
   #
   # Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   # counts along the one mapped, so a layer mapping `:y` alone is counted along y and drawn
@@ -118,19 +121,18 @@ defmodule Giggly.Stat.Count do
         |> DataFrame.names()
         |> Enum.reject(fn name -> name in @computed end)
 
-      width =
-        frame
-        |> DataFrame.pull(:x)
-        |> Resolution.of(zero: true)
-        |> Kernel.*(@width_share)
+      positioned = DataFrame.filter(frame, {:is_finite, [:x]})
+      constant = constant_columns(positioned, carried)
 
-      positioned = positioned(frame)
+      firsts =
+        for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
 
       counted =
         positioned
         |> weighted()
-        |> DataFrame.summarise([:panel, :group, :x],
-          count: {:sum, :weight, summation: :plain, missing: :skip}
+        |> DataFrame.summarise(
+          [:panel, :group, :x],
+          [{:count, {:sum, [:weight], summation: :plain, missing: :skip}} | firsts]
         )
 
       groups = panels_and_groups(counted)
@@ -138,29 +140,22 @@ defmodule Giggly.Stat.Count do
       totals = totals_by_group(counted, counts)
       rows = DataFrame.row_count(counted)
 
-      computed = [
-        {:count, counts},
-        {:prop,
-         Enum.zip_with(counts, groups, fn count, group ->
-           share(count, Map.fetch!(totals, group))
-         end)},
-        {:x, DataFrame.pull(counted, :x)},
-        {:width, List.duplicate(width, rows)},
-        {:flipped_aes, List.duplicate(flipped, rows)}
-      ]
-
-      DataFrame.new(computed ++ constant_columns(positioned, carried, groups))
-    end
-
-    # The rows at a finite x, the only ones counted.
-    defp positioned(frame) do
-      kept =
-        frame
+      width =
+        counted
         |> DataFrame.pull(:x)
-        |> Enum.with_index()
-        |> Enum.flat_map(fn {x, index} -> if is_number(x), do: [index], else: [] end)
+        |> Resolution.of(zero: true)
+        |> Kernel.*(@width_share)
 
-      DataFrame.slice(frame, kept)
+      prop =
+        Enum.zip_with(counts, groups, fn count, group ->
+          share(count, Map.fetch!(totals, group))
+        end)
+
+      counted
+      |> DataFrame.put(:prop, prop)
+      |> DataFrame.put(:width, List.duplicate(width, rows))
+      |> DataFrame.put(:flipped_aes, List.duplicate(flipped, rows))
+      |> DataFrame.select(Enum.map(@computed ++ constant, fn name -> {name, name} end))
     end
 
     # The table with each row's weight, 1 where the layer maps none, as ggplot2's `stat_count()`
@@ -168,7 +163,7 @@ defmodule Giggly.Stat.Count do
     defp weighted(frame) do
       if :weight in DataFrame.names(frame),
         do: frame,
-        else: DataFrame.put(frame, :weight, List.duplicate(1.0, DataFrame.row_count(frame)))
+        else: DataFrame.mutate(frame, weight: 1.0)
     end
 
     # Each group's total, the sum of its counts' magnitudes, as ggplot2's `stat_count()` divides by
@@ -177,7 +172,7 @@ defmodule Giggly.Stat.Count do
       totals =
         counted
         |> DataFrame.put(:magnitude, Enum.map(counts, &abs/1))
-        |> DataFrame.summarise([:panel, :group], total: {:sum, :magnitude})
+        |> DataFrame.summarise([:panel, :group], total: {:sum, [:magnitude]})
 
       [:panel, :group, :total]
       |> Enum.map(fn name -> DataFrame.pull(totals, name) end)
@@ -195,33 +190,24 @@ defmodule Giggly.Stat.Count do
       Enum.zip(panels, groups)
     end
 
-    # Each carried column that holds one value within every group, as its group's value in each of
-    # the groups `groups` names, one per counted row.
-    defp constant_columns(positioned, carried, groups) do
-      row_groups = panels_and_groups(positioned)
+    # The carried columns that hold one value within every group, in their order: `panel` and
+    # `group`, which the groups are, and each other whose distinct values the frame counts as one
+    # in each group, a missing value counting as one.
+    defp constant_columns(positioned, carried) do
+      counted_distinct =
+        for name <- carried, name not in [:panel, :group], do: {name, {:n_distinct, [name]}}
 
-      for name <- carried,
-          values = DataFrame.pull(positioned, name),
-          by_group = values_by_group(row_groups, values),
-          Enum.all?(by_group, fn {_group, group_values} -> one_value?(group_values) end) do
-        {name, Enum.map(groups, fn group -> first_value(by_group, group) end)}
-      end
+      distinct = DataFrame.summarise(positioned, [:panel, :group], counted_distinct)
+
+      Enum.filter(carried, fn name ->
+        name in [:panel, :group] or one_value_in_each_group?(distinct, name)
+      end)
     end
 
-    defp values_by_group(row_groups, values) do
-      row_groups
-      |> Enum.zip(values)
-      |> Enum.group_by(fn {group, _value} -> group end, fn {_group, value} -> value end)
-    end
-
-    defp one_value?(values) do
-      distinct = Enum.uniq(values)
-      match?([_one], distinct)
-    end
-
-    defp first_value(by_group, group) do
-      [value | _rest] = Map.fetch!(by_group, group)
-      value
+    defp one_value_in_each_group?(distinct, name) do
+      distinct
+      |> DataFrame.pull(name)
+      |> Enum.all?(fn count -> count == 1 end)
     end
   end
 end

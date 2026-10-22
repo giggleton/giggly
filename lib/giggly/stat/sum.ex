@@ -6,7 +6,9 @@ defmodule Giggly.Stat.Sum do
   # `group` among them, its `n` the number of rows holding it, or the sum of their weights where
   # the layer maps `weight`, and its `prop` that count's share of its group's total in the panel.
   # The counts and the totals are summed by the frame (`Giggly.DataFrame.summarise/3`), with its
-  # compensated sum, so they are the doubles R's `sum()` gives, which adds in extended precision.
+  # compensated sum, so they are the doubles R's `sum()` gives, which adds in extended precision,
+  # and it chooses and weighs the rows through the frame too (`filter/2`, `mutate/2`), so it never
+  # pulls a column of its input.
   # size takes the count by default (`after_stat(n)`), and a mapping's after_stat reads `n` and
   # `prop`, the variables ggplot2 documents. It takes no parameters. Run it through `Giggly.Stat`.
   #
@@ -109,7 +111,7 @@ defmodule Giggly.Stat.Sum do
         frame
         |> weighted()
         |> positioned()
-        |> DataFrame.summarise([:panel | counted_over], n: {:sum, :weight})
+        |> DataFrame.summarise([:panel | counted_over], n: {:sum, [:weight]})
 
       DataFrame.put(counted, :prop, shares(counted))
     end
@@ -135,19 +137,12 @@ defmodule Giggly.Stat.Sum do
     defp weighted(frame) do
       if :weight in DataFrame.names(frame),
         do: frame,
-        else: DataFrame.put(frame, :weight, List.duplicate(1.0, DataFrame.row_count(frame)))
+        else: DataFrame.mutate(frame, weight: 1.0)
     end
 
     # The rows at a finite x and y, the only ones counted.
-    defp positioned(frame) do
-      kept =
-        [DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)]
-        |> Enum.zip_with(fn [x, y] -> is_number(x) and is_number(y) end)
-        |> Enum.with_index()
-        |> Enum.flat_map(fn {finite, index} -> if finite, do: [index], else: [] end)
-
-      DataFrame.slice(frame, kept)
-    end
+    defp positioned(frame),
+      do: DataFrame.filter(frame, {:and, [{:is_finite, [:x]}, {:is_finite, [:y]}]})
 
     # Each place's share of its group's total in its panel, the totals summed as the counts are.
     defp shares(counted) do
@@ -157,7 +152,7 @@ defmodule Giggly.Stat.Sum do
 
       totals =
         counted
-        |> DataFrame.summarise([:panel, :group], total: {:sum, :n})
+        |> DataFrame.summarise([:panel, :group], total: {:sum, [:n]})
         |> totals_by_group()
 
       Enum.zip_with([counts, panels, groups], fn [count, panel, group] ->

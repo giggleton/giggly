@@ -273,6 +273,159 @@ defmodule Giggly.DataFrameTest do
     end
   end
 
+  describe "filter/2" do
+    test "the rows where the expression is true are kept in order, each column keeping its type" do
+      frame =
+        DataFrame.new([
+          {:x, [1.0, nil, :infinity, 2.0, :nan, :neg_infinity]},
+          {:label, [4, 6, 8, 4, 6, 8], :category}
+        ])
+
+      filtered = DataFrame.filter(frame, {:is_finite, [:x]})
+
+      assert DataFrame.pull(filtered, :x) === [1.0, 2.0]
+      assert DataFrame.pull(filtered, :label) === [4, 4]
+      assert DataFrame.dtypes(filtered) == %{x: :float, label: :category}
+    end
+
+    test "a column of booleans filters as itself, a row where it is false or missing left out" do
+      frame = DataFrame.new(keep: [false, true, nil, true], y: [1, 2, 3, 4])
+
+      filtered = DataFrame.filter(frame, :keep)
+
+      assert DataFrame.pull(filtered, :y) === [2, 4]
+    end
+
+    test "an expression that is not a boolean one is refused" do
+      frame = DataFrame.new(x: [1.0])
+
+      assert_raise FunctionClauseError, fn -> DataFrame.filter(frame, :x) end
+    end
+  end
+
+  describe "mutate/2" do
+    test "a constant fills every row, typed as a column of it, each added after the last" do
+      frame = DataFrame.new(x: [1.0, 2.0])
+
+      mutated =
+        DataFrame.mutate(frame,
+          weight: 1,
+          share: 0.5,
+          kept: true,
+          day: ~D[2026-10-21],
+          time: ~T[12:00:00],
+          naive: ~N[2026-10-21 12:00:00],
+          instant: ~U[2026-10-21 12:00:00Z],
+          kind: {:constant, "smooth"},
+          gap: {:constant, nil}
+        )
+
+      assert DataFrame.names(mutated) ==
+               [:x, :weight, :share, :kept, :day, :time, :naive, :instant, :kind, :gap]
+
+      assert DataFrame.dtypes(mutated) == %{
+               x: :float,
+               weight: :integer,
+               share: :float,
+               kept: :boolean,
+               day: :date,
+               time: :time,
+               naive: :naive_datetime,
+               instant: :datetime,
+               kind: :string,
+               gap: :null
+             }
+
+      assert DataFrame.pull(mutated, :kind) === ["smooth", "smooth"]
+      assert DataFrame.pull(mutated, :day) === [~D[2026-10-21], ~D[2026-10-21]]
+    end
+
+    test "a column named alone is copied with its type, a replaced column keeping its place" do
+      frame = DataFrame.new([{:x, [1.0, 2.0]}, {"cyl", [4, 6], :category}, {:y, [3, 4]}])
+
+      mutated = DataFrame.mutate(frame, x: "cyl", copy: :y)
+
+      assert DataFrame.names(mutated) == [:x, "cyl", :y, :copy]
+      assert DataFrame.pull(mutated, :x) === [4, 6]
+
+      assert DataFrame.dtypes(mutated) == %{
+               :x => :category,
+               "cyl" => :category,
+               :y => :integer,
+               :copy => :integer
+             }
+    end
+
+    test "every expression reads the frame as given, never a column the same call computes" do
+      frame = DataFrame.new(y: [5.0])
+
+      mutated = DataFrame.mutate(frame, y: 2.0, z: :y)
+
+      assert {DataFrame.pull(mutated, :y), DataFrame.pull(mutated, :z)} === {[2.0], [5.0]}
+    end
+
+    test "is_finite is whether each number is finite, missing where the number is" do
+      frame =
+        DataFrame.new(
+          x: [1.0, nil, :nan, :infinity, :neg_infinity],
+          n: [3, nil, 4, 5, 6]
+        )
+
+      mutated =
+        DataFrame.mutate(frame, finite: {:is_finite, [:x]}, whole: {:is_finite, [:n]})
+
+      assert DataFrame.pull(mutated, :finite) === [true, nil, false, false, false]
+      assert DataFrame.pull(mutated, :whole) === [true, nil, true, true, true]
+      assert DataFrame.dtypes(mutated).finite == :boolean
+    end
+
+    test "and is false where either side is, true where both are, and otherwise missing" do
+      frame =
+        DataFrame.new(
+          left: [true, true, false, false, nil, true, nil, nil, false],
+          right: [true, false, true, nil, false, nil, true, nil, false]
+        )
+
+      mutated = DataFrame.mutate(frame, both: {:and, [:left, :right]})
+
+      assert DataFrame.pull(mutated, :both) ===
+               [true, false, false, false, false, nil, nil, nil, false]
+
+      assert DataFrame.dtypes(mutated).both == :boolean
+    end
+
+    test "an operation given a column of the wrong type, or one not in the vocabulary, is refused" do
+      frame = DataFrame.new(x: [1.0], label: ["a"], kept: [true])
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, finite: {:is_finite, [:label]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, both: {:and, [:kept, :x]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, both: {:and, [:x, :kept]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, either: {:or, [:kept, :kept]})
+      end
+
+      assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, y: :missing) end
+    end
+
+    test "true, false and nil name no column" do
+      frame = DataFrame.new([{true, [1]}, {nil, [2]}])
+
+      mutated = DataFrame.mutate(frame, kept: true)
+
+      assert DataFrame.pull(mutated, :kept) === [true]
+      assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, gap: nil) end
+    end
+  end
+
   describe "summarise/3" do
     test "one row per combination the rows hold, sorted by the columns in order, missing last" do
       frame =
@@ -282,7 +435,7 @@ defmodule Giggly.DataFrameTest do
           {:weight, [1.0, 2.0, 3.0, 4.0, 5.0]}
         ])
 
-      summarised = DataFrame.summarise(frame, [:panel, :color], n: {:sum, :weight})
+      summarised = DataFrame.summarise(frame, [:panel, :color], n: {:sum, [:weight]})
 
       assert DataFrame.names(summarised) == [:panel, :color, :n]
       assert DataFrame.pull(summarised, :panel) === [1, 1, 1, 2]
@@ -298,7 +451,7 @@ defmodule Giggly.DataFrameTest do
           {:weight, [1, 2, 3]}
         ])
 
-      summarised = DataFrame.summarise(frame, [:x, :y], n: {:sum, :weight})
+      summarised = DataFrame.summarise(frame, [:x, :y], n: {:sum, [:weight]})
 
       assert DataFrame.dtypes(summarised) == %{x: :category, y: :integer, n: :float}
       assert DataFrame.pull(summarised, :n) === [4.0, 2.0]
@@ -310,10 +463,10 @@ defmodule Giggly.DataFrameTest do
     test "a sum is compensated as R's sum() adds, or plain as R's rowsum() does" do
       frame = DataFrame.new(group: [1, 1, 1], weight: [0.1, 0.2, 0.3])
 
-      compensated = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+      compensated = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
 
       plain =
-        DataFrame.summarise(frame, [:group], n: {:sum, :weight, summation: :plain})
+        DataFrame.summarise(frame, [:group], n: {:sum, [:weight], summation: :plain})
 
       assert DataFrame.pull(compensated, :n) === [0.59999999999999998]
       assert DataFrame.pull(plain, :n) === [0.60000000000000009]
@@ -326,19 +479,45 @@ defmodule Giggly.DataFrameTest do
           weight: [1.0, nil, 2.0, :nan, :infinity, 5.0]
         )
 
-      propagated = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+      propagated = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
 
       skipped =
-        DataFrame.summarise(frame, [:group], n: {:sum, :weight, missing: :skip})
+        DataFrame.summarise(frame, [:group], n: {:sum, [:weight], missing: :skip})
 
       assert DataFrame.pull(propagated, :n) === [nil, nil, nil, 5.0]
       assert DataFrame.pull(skipped, :n) === [1.0, 2.0, 0.0, 5.0]
     end
 
+    test "n_distinct counts each group's distinct values, a missing value counting as one" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 1, 1, 2, 2],
+          label: ["a", "a", nil, nil, "b", "c"]
+        )
+
+      summarised = DataFrame.summarise(frame, [:group], label: {:n_distinct, [:label]})
+
+      assert DataFrame.pull(summarised, :label) === [2, 2]
+      assert DataFrame.dtypes(summarised).label == :integer
+    end
+
+    test "first is each group's first value in row order, of its column's type" do
+      frame =
+        DataFrame.new([
+          {:group, [2, 1, 1, 2]},
+          {:label, [nil, 6, 4, 8], :category}
+        ])
+
+      summarised = DataFrame.summarise(frame, [:group], label: {:first, [:label]})
+
+      assert DataFrame.pull(summarised, :label) === [6, nil]
+      assert DataFrame.dtypes(summarised).label == :category
+    end
+
     test "a frame of no rows summarises into no rows, its columns named" do
       frame = DataFrame.new(group: [], weight: [])
 
-      summarised = DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+      summarised = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
 
       assert DataFrame.row_count(summarised) == 0
       assert DataFrame.names(summarised) == [:group, :n]
@@ -349,7 +528,7 @@ defmodule Giggly.DataFrameTest do
 
       error =
         assert_raise ArgumentError, fn ->
-          DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+          DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
         end
 
       assert error.message =~ ":weight"
@@ -360,15 +539,15 @@ defmodule Giggly.DataFrameTest do
       frame = DataFrame.new(group: [1], weight: [1.0])
 
       assert_raise ArgumentError, fn ->
-        DataFrame.summarise(frame, [:group], n: {:sum, :weight, rounding: :plain})
+        DataFrame.summarise(frame, [:group], n: {:sum, [:weight], rounding: :plain})
       end
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.summarise(frame, [:group], n: {:sum, :weight, summation: :kahan})
+        DataFrame.summarise(frame, [:group], n: {:sum, [:weight], summation: :kahan})
       end
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.summarise(frame, [:group], n: {:sum, :weight, missing: :zero})
+        DataFrame.summarise(frame, [:group], n: {:sum, [:weight], missing: :zero})
       end
     end
 
@@ -378,11 +557,27 @@ defmodule Giggly.DataFrameTest do
       no_columns = Enum.drop([:group], 1)
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.summarise(frame, no_columns, n: {:sum, :weight})
+        DataFrame.summarise(frame, no_columns, n: {:sum, [:weight]})
       end
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.summarise(frame, [:group], group: {:sum, :weight})
+        DataFrame.summarise(frame, [:group], group: {:sum, [:weight]})
+      end
+    end
+
+    test "an aggregate not listed, or given other than one column, is refused" do
+      frame = DataFrame.new(group: [1], weight: [1.0])
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:mean, [:weight]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:sum, :weight})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.summarise(frame, [:group], n: {:first, [:weight, :weight]})
       end
     end
   end

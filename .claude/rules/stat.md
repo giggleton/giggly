@@ -30,14 +30,20 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
   `compute_panel()` does. **Counting carries a group's constant columns**: a column holding one
-  value within every group goes to that group's rows, and one that varies within any group is
+  value within every group goes to that group's rows with its type, a factor's category included,
+  as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot); counting at each place keeps only
   the columns it counts over.
 - **A stat sums through the frame (`DataFrame.summarise/3`), as R sums**: counting's counts plain,
   as `rowsum()` adds, every other sum, a proportion's total among them, compensated, as `sum()`
   adds in extended precision, so `layer_data/2` holds R's doubles (design-log §4, the entry
-  beginning "The frame's first group-by aggregate"). Choosing the rows to count and dividing stay
-  on the lists a stat pulls.
+  beginning "The frame's first group-by aggregate").
+- **A stat never pulls a column of its input, only of a table it has already summarised**
+  (design-log §4, the entry beginning "A stat computes only through frame operations"): the work
+  that scales with the layer's rows (choosing the rows, weighing them, counting, finding a group's
+  constant columns) runs through the frame's operations, so an engine holding the table could run
+  it, and what a stat works out on lists is its own small output, a share from its counts, a
+  width from its counted positions. Nothing checks this but review.
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
   into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a

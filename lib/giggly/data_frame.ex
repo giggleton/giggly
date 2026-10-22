@@ -53,6 +53,25 @@ defmodule Giggly.DataFrame do
   # function, since an engine cannot run one. Code that needs one pulls a column into a list and
   # puts the result back.
 
+  # ## Expressions
+  #
+  # What `filter/2` and `mutate/2` compute in each row is an expression, plain data in the grammar
+  # a mapping writes, with an operation named by an atom where a mapping takes a function, so an
+  # engine can run it and a stat never pulls a table to choose its rows:
+  #
+  #   * a column, by its name, an atom or a string: `:x`, `"cyl"`; `true`, `false` and `nil` name
+  #     none;
+  #   * a constant, the value in every row: a number, a boolean, a date or a time written alone, or
+  #     any value as `{:constant, term}`, typed as a column holding it would be;
+  #   * an operation, `{name, [expression, ...]}`: `{:is_finite, [x]}`, whether each number is
+  #     finite, and `{:and, [left, right]}`, whether both are true, each a boolean.
+  #
+  # Values follow Explorer's semantics, as types do: a missing value passes through an operation
+  # as missing, so `is_finite` is missing where its number is, and `and` is false where either side
+  # is false, true where both are true and missing otherwise (SQL's three-valued logic). An
+  # expression outside this vocabulary, or an operation given a column of the wrong type, raises
+  # `FunctionClauseError`. Operations arrive with their first caller.
+
   # Its own boundary, exporting only this module: callers reach a frame through the functions
   # below, so an implementation's struct and functions are private to it and a second
   # implementation changes no caller. It owns the `table` library, which `Giggly` lists too, as
@@ -86,10 +105,28 @@ defmodule Giggly.DataFrame do
   @typedoc "A column as built: its name and values, and `:category` where it is declared one."
   @type column :: {name(), list()} | {name(), list(), :category}
 
-  @typedoc "What `summarise/3` computes for each group: the sum of a column, with its options."
+  @typedoc """
+  What a frame computes in each row: a column by its name, a constant, or an operation on
+  expressions by its name.
+  """
+  @type expression ::
+          name()
+          | number()
+          | boolean()
+          | Date.t()
+          | Time.t()
+          | NaiveDateTime.t()
+          | DateTime.t()
+          | {:constant, term()}
+          | {:is_finite, [expression()]}
+          | {:and, [expression()]}
+
+  @typedoc "What `summarise/3` computes over each group's values of a column."
   @type aggregate ::
-          {:sum, name()}
-          | {:sum, name(), [summation: :compensated | :plain, missing: :propagate | :skip]}
+          {:sum, [name()]}
+          | {:sum, [name()], [summation: :compensated | :plain, missing: :propagate | :skip]}
+          | {:n_distinct, [name()]}
+          | {:first, [name()]}
 
   # Builds a frame from columns, as `new/1` describes.
   @doc false
@@ -130,6 +167,14 @@ defmodule Giggly.DataFrame do
   # The rows at the given indices, as `slice/2` describes.
   @doc false
   @callback slice(t(), [non_neg_integer()]) :: t()
+
+  # The rows an expression is true in, as `filter/2` describes.
+  @doc false
+  @callback filter(t(), expression()) :: t()
+
+  # Adds or replaces columns computed from expressions, as `mutate/2` describes.
+  @doc false
+  @callback mutate(t(), [{name(), expression()}]) :: t()
 
   # One row per group of rows, as `summarise/3` describes.
   @doc false
@@ -290,6 +335,24 @@ defmodule Giggly.DataFrame do
   def slice(%implementation{} = frame, indices) when is_list(indices),
     do: implementation.slice(frame, indices)
 
+  # The frame's rows in which `expression` is true, in their order, every column keeping its type,
+  # as dplyr's `filter()` and SQL's `WHERE` keep them: a row where it is false or missing is left
+  # out. The expression is a boolean one, as the Expressions comment above describes.
+  @doc false
+  @spec filter(t(), expression()) :: t()
+  def filter(%implementation{} = frame, expression),
+    do: implementation.filter(frame, expression)
+
+  # The frame with each of `columns`, a `{name, expression}`, computed in every row: replaced where
+  # it is, or added after the last column, in the order given, as dplyr's `mutate()` adds them.
+  # Every expression reads the frame as given, never a column the same call computes, as Polars'
+  # `with_columns()` reads. A column named alone keeps its type, a category's included; a
+  # constant's type is worked out from its value, and an operation's is what it computes.
+  @doc false
+  @spec mutate(t(), [{name(), expression()}]) :: t()
+  def mutate(%implementation{} = frame, columns) when is_list(columns),
+    do: implementation.mutate(frame, columns)
+
   # One row for each combination of the values of the columns `by` that the frame's rows hold, as
   # dplyr's `summarise(.by = )` and SQL's `GROUP BY` give one, with each of `aggregates`, a
   # `{name, aggregate}` in order, computed over that group's rows. The `by` columns come first, in
@@ -298,16 +361,23 @@ defmodule Giggly.DataFrame do
   # its values in Erlang's term order with a missing one last, as R's `id()` orders the
   # combinations it finds and SQL's `NULLS LAST` does.
   #
-  # The one aggregate is `{:sum, column}`: the sum of a column of numbers, a float, which takes two
-  # options. `summation:` says how it adds: `:compensated`, the default, carries the rounding error
+  # An aggregate is an operation, `{name, [column]}` or `{name, [column], options}`, over each
+  # group's values of one column, in row order:
+  #
+  #   * `{:n_distinct, [column]}`, how many distinct values the group holds, an integer, a missing
+  #     value counting as one, as R's `vec_unique_count()` and Polars' `n_unique()` count it;
+  #   * `{:first, [column]}`, the group's first value, of the column's type, a category's included;
+  #   * `{:sum, [column]}`, the sum of a column of numbers, a float, which takes two options.
+  #
+  # A sum's `summation:` says how it adds: `:compensated`, the default, carries the rounding error
   # each addition makes and adds it back at the end, as R's `sum()` adds in extended precision, so
   # the sum is the one R's gives; `:plain` adds the values in row order in floats, as R's
   # `rowsum()` does. `missing:` says what a missing value does, one that is `nil` or a non-finite
   # float: `:propagate`, the default, makes the group's sum missing (`nil`), as R's `sum()` gives
   # `NA`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a group of only missing values
-  # summing to 0. A column of another type and an option not listed are refused with an
-  # `ArgumentError`; an empty `by`, an option's value not listed and an aggregate's name shared
-  # with a `by` column raise `FunctionClauseError`.
+  # summing to 0. A sum of a column of another type and an option not listed are refused with an
+  # `ArgumentError`; an empty `by`, an option's value not listed, an aggregate not listed and an
+  # aggregate's name shared with a `by` column raise `FunctionClauseError`.
   @doc false
   @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
   def summarise(%implementation{} = frame, [_first | _rest] = by, aggregates)

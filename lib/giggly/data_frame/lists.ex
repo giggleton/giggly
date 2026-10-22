@@ -12,7 +12,9 @@ defmodule Giggly.DataFrame.Lists do
   #
   # A column's type is worked out once, when its values enter through `new/1` or `put/3`, by one
   # pass that widens the type as each value arrives; `select/2` carries a column's type with it. The
-  # type and the values are stored together, so a column cannot exist without its type.
+  # type and the values are stored together, so a column cannot exist without its type. An
+  # expression is evaluated into such a pair, its type and its values, so `mutate/2` puts it as it
+  # is, `filter/2` reads its booleans, and an aggregate's column keeps its type or takes its own.
 
   @behaviour Giggly.DataFrame
 
@@ -114,6 +116,74 @@ defmodule Giggly.DataFrame.Lists do
   end
 
   @impl DataFrame
+  def filter(%__MODULE__{} = frame, expression) do
+    {dtype, kept} = evaluated(frame, expression)
+    booleans(dtype, :filter)
+
+    indices =
+      kept
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {keep, index} -> if keep == true, do: [index], else: [] end)
+
+    slice(frame, indices)
+  end
+
+  @impl DataFrame
+  def mutate(%__MODULE__{} = frame, columns) do
+    columns
+    |> Enum.map(fn {name, expression} -> {name, evaluated(frame, expression)} end)
+    |> Enum.reduce(frame, fn computed, mutated -> put_entered(mutated, computed) end)
+  end
+
+  # An expression's column over the frame's rows: its type and its values, as the frame's
+  # Expressions comment describes.
+  defp evaluated(frame, name) when is_binary(name), do: column(frame, name)
+
+  defp evaluated(frame, name) when is_atom(name) and not is_boolean(name) and not is_nil(name),
+    do: column(frame, name)
+
+  defp evaluated(frame, {:constant, value}), do: constant(frame, value)
+
+  defp evaluated(frame, value) when is_number(value) or is_boolean(value),
+    do: constant(frame, value)
+
+  defp evaluated(frame, %struct{} = value) when struct in [Date, Time, NaiveDateTime, DateTime],
+    do: constant(frame, value)
+
+  defp evaluated(frame, {:is_finite, [argument]}) do
+    {dtype, values} = evaluated(frame, argument)
+    numbers(dtype, :is_finite)
+    {:boolean, Enum.map(values, &finite/1)}
+  end
+
+  defp evaluated(frame, {:and, [left, right]}) do
+    {left_dtype, left_values} = evaluated(frame, left)
+    {right_dtype, right_values} = evaluated(frame, right)
+    booleans(left_dtype, :and)
+    booleans(right_dtype, :and)
+    {:boolean, Enum.zip_with(left_values, right_values, &both/2)}
+  end
+
+  defp constant(%__MODULE__{row_count: row_count}, value),
+    do: typed({:constant, value}, List.duplicate(value, row_count))
+
+  # An operation's argument of the type it takes, or a `FunctionClauseError`.
+  defp numbers(dtype, _operation) when dtype in [:integer, :float, :null], do: :ok
+  defp booleans(dtype, _operation) when dtype in [:boolean, :null], do: :ok
+
+  # Whether a number is finite, missing where it is.
+  defp finite(nil), do: nil
+  defp finite(value) when is_number(value), do: true
+  defp finite(value) when value in @non_finite_floats, do: false
+
+  # Whether both are true, by SQL's three-valued logic: false beats missing, and missing beats
+  # true.
+  defp both(false, _right), do: false
+  defp both(_left, false), do: false
+  defp both(true, true), do: true
+  defp both(_left, _right), do: nil
+
+  @impl DataFrame
   def summarise(%__MODULE__{} = frame, by, aggregates) do
     keys =
       by
@@ -136,7 +206,7 @@ defmodule Giggly.DataFrame.Lists do
 
     aggregated =
       Enum.map(aggregates, fn {name, aggregate} ->
-        {name, typed(name, aggregated(frame, aggregate, groups))}
+        {name, aggregated(frame, aggregate, groups)}
       end)
 
     Enum.reduce(by_columns ++ aggregated, empty(length(groups)), fn {name, column}, summarised ->
@@ -150,23 +220,50 @@ defmodule Giggly.DataFrame.Lists do
   defp missing_last(nil), do: {1, nil}
   defp missing_last(value), do: {0, value}
 
-  # The aggregate's value for each group, in the groups' order.
-  defp aggregated(frame, {:sum, name}, groups), do: aggregated(frame, {:sum, name, []}, groups)
+  # The aggregate's column, its value for each group in the groups' order, typed.
+  defp aggregated(frame, {:sum, [name]}, groups),
+    do: aggregated(frame, {:sum, [name], []}, groups)
 
-  defp aggregated(frame, {:sum, name, options}, groups) when is_list(options) do
+  defp aggregated(frame, {:sum, [name], options}, groups) when is_list(options) do
     validated = Keyword.validate!(options, summation: :compensated, missing: :propagate)
     summation = Keyword.fetch!(validated, :summation)
     missing = Keyword.fetch!(validated, :missing)
 
-    values =
+    sums =
       frame
       |> summed_column(name)
-      |> List.to_tuple()
+      |> by_group(groups, fn values -> sum(values, summation, missing) end)
+
+    typed(name, sums)
+  end
+
+  defp aggregated(frame, {:n_distinct, [name]}, groups) do
+    counts =
+      frame
+      |> pull(name)
+      |> by_group(groups, &distinct_count/1)
+
+    {:integer, counts}
+  end
+
+  defp aggregated(frame, {:first, [name]}, groups) do
+    {dtype, values} = column(frame, name)
+    {dtype, by_group(values, groups, fn [first | _rest] -> first end)}
+  end
+
+  defp distinct_count(values) do
+    values
+    |> Enum.uniq()
+    |> length()
+  end
+
+  # Each group's values of a column, in row order, as `reduce` reduces them, in the groups' order.
+  defp by_group(values, groups, reduce) do
+    by_index = List.to_tuple(values)
 
     Enum.map(groups, fn {_key, indices} ->
-      indices
-      |> Enum.map(fn index -> elem(values, index) end)
-      |> sum(summation, missing)
+      group_values = Enum.map(indices, fn index -> elem(by_index, index) end)
+      reduce.(group_values)
     end)
   end
 

@@ -1,6 +1,6 @@
 ---
 name: elixir-code-review
-description: Reviews Elixir code for known architectural problems this codebase cares about — logic in the wrong module, a namespace's internals reached past its public API, a `use Boundary` declaration widened instead of a caller fixed, OTP process hygiene, test quality (brittle, duplicative, or valueless tests), and suppressed lint/security findings (credo disables, hex.audit ignores). Use this whenever the user asks for a code review, asks you to look over a diff/PR/branch, asks where some logic should live, asks whether tests are worth keeping or are brittle/duplicative, or is about to commit changes touching test files or GenServers. Also use it proactively after you yourself write or modify OTP code or tests, widen a boundary declaration, or add any lint/security suppression, before reporting the work as done.
+description: Reviews Elixir code for known architectural problems this codebase cares about — logic in the wrong module, a namespace's internals reached past its public API, a `use Boundary` declaration widened instead of a caller fixed, OTP process hygiene, test quality (brittle, duplicative, or valueless tests), suppressed lint/security findings (credo disables, hex.audit ignores), and a stat pulling its input instead of computing through the frame. Use this whenever the user asks for a code review, asks you to look over a diff/PR/branch, asks where some logic should live, asks whether tests are worth keeping or are brittle/duplicative, or is about to commit changes touching test files or GenServers. Also use it proactively after you yourself write or modify OTP code or tests, widen a boundary declaration, or add any lint/security suppression, before reporting the work as done.
 ---
 
 # Elixir Code Review
@@ -17,6 +17,7 @@ rule set can grow without bloating this file.
 | OTP process hygiene | `references/otp-processes.md` | `lib/giggly/**/*.ex` |
 | Test quality | `references/test-quality.md` | `test/**/*_test.exs`, `test/support/**` |
 | Suppressions & waivers | `references/suppressions.md` | `lib/**/*.ex`, `.credo.exs`, `mix.exs` |
+| Stats compute through the frame | `references/stats-through-frame.md` | `lib/giggly/stat/**/*.ex` |
 
 Read only the reference files whose "Applies to" pattern matches files in scope. Reading
 rules that can't apply wastes context and tends to produce stretched findings.

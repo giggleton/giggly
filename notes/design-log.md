@@ -174,11 +174,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   adds in extended precision, so plain doubles missed R's `layer_data()` in 901 of 3,000 random
   weight groups (mpg's `displ`: 55.500000000000014 for R's 55.5), and Neumaier's compensated sum
   matched all 3,000. Steve asked that stats compute through the frame rather than on pulled lists:
-  `summarise(frame, by, name: {:sum, column, options})` groups and sums, rows sorted by `by`, a
+  `summarise(frame, by, name: {:sum, [column], options})` groups and sums, rows sorted by `by`, a
   missing value last, each `by` column keeping its type, with `summation: :compensated` (the
   default) or `:plain` and `missing: :propagate` (the default) or `:skip`. Counting moved onto it,
   its counts plain and its proportions' totals compensated, which fixed a departure: 6 of mpg's 7
-  class shares weighted by `displ` were a bit off. Choosing rows and dividing stay on lists.
+  class shares weighted by `displ` were a bit off.
   *Rejected: a compensated sum private to the stat* (proposed) — an engine running the frame would
   never see it. *Rejected: plain doubles* — R's values missed in 30% of groups. *Rejected: one
   summation* — counting's counts would leave `rowsum()`'s.
@@ -191,11 +191,60 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   construction, so `density` from a bin's counts or a box's fences from its hinges may be worked
   out on lists. Each operation arrives with the stat that first needs it, and the expression form
   `mutate` takes is the one a mapping's named expressions will reuse (§7, "Engine backends").
-  Counting and counting at each place, which pull lists to choose rows and divide, come under the
-  rule in the same increment. *Rejected: building bin and boxplot on pulled lists and moving them
+  Counting and counting at each place, which pull their input to choose rows, weigh them and
+  carry a group's constant columns, come under the rule in the same increment, first, the panel's
+  limits arriving with binning, their first reader (Steve, 2026-10-21): R's bin and boxplot drop rows and carry constant
+  columns as counting does, so counting is those operations' first caller, proven by its tests
+  pinned to R before binning relies on them. *Rejected: counting last, or in a follow-up* —
+  binning would prove the operations alone, and a follow-up leaves two carries, one on lists.
+  Nothing checks the rule but review (Steve, 2026-10-21). *Rejected: a credo check* — it sees
+  a pull of the input and of a summarised table alike, so it could only pin a code shape (pull
+  beside its summarise). *Rejected: a strict frame for tests* (proposed), refusing a pull of
+  anything not yet summarised.
+  *Rejected: building bin and boxplot on pulled lists and moving them
   later* — nothing toward the goal, and a rewrite of the first two summarising stats. *Rejected:
   a vocabulary designed ahead of its callers* — the rules' "an operation arrives with its first
   caller", and bin and boxplot are the proving ground.
+
+- **The frame's operations share one expression grammar, and a row finds its bin by `cut` per
+  panel (2026-10-21, Steve).** `mutate/2`, `filter/2` and `summarise/3`'s aggregates take the
+  mapping's grammar with an operation named by an atom: a column by its frame name (never `true`,
+  `false`, `nil`), a constant alone or `{:constant, term}`, `{name, [argument]}`, or `{name,
+  [argument], options}` for parameters that are not row values, so `{:sum, :weight, options}`
+  becomes `{:sum, [:weight], options}`. Values follow Explorer's semantics: a missing value passes
+  through, a filter keeps the rows whose value is true, floats divide as IEEE does. Counting brings
+  `filter`, `mutate`, `is_finite`, `and`, `n_distinct` (a missing value counting as one) and
+  `first`; binning `cut`, R's `.bincode` against its fuzzy breaks, per panel by `split/2`; box
+  plots a left `join/3` on equal keys, `is_nil`, `is_nan`, `or`, `not`, `<`, `>`, `count`, `min`,
+  `max`, `quantile` (type 7) and `list`. Densities, shares and fences are worked out on summarised
+  tables, so arithmetic waits for the mapping's names; no boundary changes. *Rejected: floor
+  arithmetic* (Mosaic's) — equal widths only, a value within rounding error of a break can land in
+  another bin than R's, and binning would need a join and arithmetic.
+
+- **A box's outliers are a list column on its row, a type of its own (2026-10-21, Steve, scoping
+  Phase 3's ninth increment).** As R's `stat_boxplot()` returns them: each box's row holds its
+  outliers, found by a frame filter against its fences and collected into a list by a `summarise`
+  aggregate, so the geom reads their extent into `ymin_final` and `ymax_final` and draws them at
+  the box's x in its look, after dodging moves the box. The column is typed a list of floats, as
+  the frame gives a `:term` that gets plotted a named type. Engines build such a column (Explorer
+  0.13's grouped `summarise` of a plain column gives a `list[…]`), and diamonds' price by cut
+  brings 3,588 outliers out of 53,940 rows in either shape, since each is drawn. *Rejected:
+  outliers as rows of a second frame* — every stage after the stat would carry two tables, the
+  extents and the drawing each a join, and `layer_data/2` would lose them or differ from R; its
+  premise, that an engine cannot build a list column, was wrong.
+
+- **A box plot takes R's options but `quantile.type` and a `stat:` (2026-10-21, Steve, scoping
+  Phase 3's ninth increment).** `geom_boxplot/3` takes `outliers:`, the outliers' look
+  (`outlier_color:`, `_fill:`, `_shape:`, `_size:`, `_stroke:`, `_alpha:`), `varwidth:` (which
+  dodges each box at its own width, as R switches `position_dodge2()` to `preserve = "single"`),
+  `notch:` and `notchwidth:`, `width:` and `staplewidth:`, and ggplot2 4.0's look of each part
+  (`whisker_`, `staple_`, `median_` and `box_` `color:`, `linetype:`, `linewidth:`), R's dotted
+  names underscored as `na.value` is `na_value:`, `outlier_colour:` beside `outlier_color:` as
+  `colour:` is. Usage was thin (reference examples: the outlier look 5, `varwidth` 2, `notch` 1;
+  r4ds and the ggplot2 book's 42 box plots: `varwidth` and `width` once each), but Steve kept the
+  part looks, cheap to draw. *Left out: `quantile.type`* — no use, and each of R's other eight
+  types would be an aggregate every engine must carry. *Left out: the identity-stat box* — it
+  needs a `stat:` option, which no geom has; that is a decision for every geom.
 
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
@@ -1957,6 +2006,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-21 — Choose, weigh and carry counted rows through the frame (distributions, step 1);
+  §4: "A stat computes only through frame operations", "The frame's operations share one
+  expression grammar"
 - 2026-10-20 — Draw the notebook examples sizes, shapes and line types made drawable (size, shape
   and line type, step 7); §4: "A verdict names a text's mapped size", "An example R refuses on
   purpose"
@@ -2199,7 +2251,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   convolution, which runs on the 512; loess and gam smooths are not relational, `lm` with one
   predictor is (sufficient statistics, SQL's `regr_*`); R's doubles to the last digit hold for Lists and become a
   conformance suite with tolerances for engines whose summation or quantile differs (Polars sums
-  pairwise, DuckDB compensated, Postgres plain; `percentile_cont` exists in Postgres alone).
+  pairwise, DuckDB compensated, Postgres plain; `percentile_cont` exists in Postgres alone;
+  Explorer 0.13's `quantile` in a query is hard-coded to nearest-rank interpolation, not R's
+  type 7, so an Explorer engine refuses a box's hinges or computes them otherwise, checked
+  2026-10-21 in its `expressions.rs`).
   **The precedent is Mosaic** (uwdata/mosaic, read from its source 2026-10-20: `packages/mosaic/
   sql/src/transforms/`, `packages/mosaic/core/src/`, `packages/vgplot/plot/src/marks/`), a
   JavaScript grammar whose marks are clients of a coordinator and compute in DuckDB; no Elixir

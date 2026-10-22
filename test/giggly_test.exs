@@ -2044,6 +2044,19 @@ defmodule GigglyTest do
       assert :weight not in DataFrame.names(varying)
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(class, label =
+    # factor(cyl)))` over class a, a, b and cyl 4, 4, 6 has a label column of class factor, 4 and 6.
+    test "a carried column keeps its type, a factor's category included" do
+      frame =
+        %{"class" => ["a", "a", "b"], "cyl" => [4, 4, 6]}
+        |> Plot.new(%{x: :class, label: {:factor, [:cyl]}})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :label), DataFrame.dtypes(frame).label} ===
+               {[4, 6], :category}
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_bar(aes(x, weight = w))` over
     # x a, a, b, b and w 1, 1, 2, 3 has no weight column: it varies within b's group.
     test "a column constant within one group but varying within another is dropped" do
