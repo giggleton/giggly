@@ -30,8 +30,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary lists none; binning first read them. The inverse of the transformation arrives with its
   first reader (`stat_function()`), and a stat's own parameters with the option that sets them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
-  `compute_panel()` does. **Counting and binning carry a group's constant columns**
-  (`Giggly.Stat.Carry`): a column holding one
+  `compute_panel()` does. **Counting, binning and the box plot's summary carry a group's constant
+  columns** (`Giggly.Stat.Carry`): a column holding one
   value within every group goes to that group's rows with its type, a factor's category included,
   as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot); counting at each place keeps only
@@ -97,3 +97,18 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   panel, with no `abs()`, divided as R divides, an infinity or NaN where the total is zero. A
   row missing its x or y, or at an infinite one, is not counted. size takes `n` by default; it
   computes `n` and `prop` and consumes `weight`.
+- **The box plot's summary is ggplot2's `stat_boxplot()`** (design-log §4, the entries beginning
+  "A box's outliers are a list column" and "A box plot takes R's options"): per panel and per
+  group, one row per box, its quartiles the frame's `quantile` (R's type 7), its outliers the rows
+  more than `coef` times the box's height past a hinge, by a join of the fences and a filter,
+  collected by `list` in row order, an empty list for none; its whiskers the least and greatest y
+  of the rest, or, where it has outliers, the range of those and its quartiles, so a box of only
+  outliers reaches its hinges; its notches `middle` ∓ 1.58 × height / √rows, `relvarwidth` √rows,
+  `x` the middle of its x range, and `width` its group's first mapped width, else 0.9 of its x
+  range where it holds several, else the stat's `width`, else 0.75 of the layer's x spacing from
+  zero. The orientation and the spacing are read from every row, as R reads them; then a row
+  missing its x or y, or at an infinite one, is left out, and a group left with none has no box.
+  **It runs along the axis R's `has_flipped_aes()` picks for a box plot**: `orientation`, else the
+  one axis mapped (y at x 0, or x), else the continuous axis beside a discrete one, else y where
+  every group holds one x and x where every group holds one y, else y, where R also warns. A width
+  that is not a number is refused when the plot is run.

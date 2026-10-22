@@ -32,26 +32,32 @@ defmodule Giggly.DataFrame do
     * `Date`, `Time`, `NaiveDateTime` and `DateTime` are `:date`, `:time`, `:naive_datetime` and
       `:datetime`.
 
+  A column of lists is `{:list, type}`, the type its lists' values have, worked out as a column's
+  is from all of them together, so `[[1, 2.0], []]` is `{:list, :float}`, its integers stored as
+  floats, a column holding only empty lists is `{:list, :null}`, a list of lists is a list of a
+  list type, and lists whose values mix two types are refused. A missing list, or a missing value
+  in one, is `nil`.
+
   Two types exist here and not in Explorer, since a list holds Elixir values an engine cannot:
-  `:atom`, for any other atom, and `:term`, for anything else (maps, lists, tuples, `Decimal` and
-  other structs). A `:term` column's values are not checked against each other; it is the frame's
+  `:atom`, for any other atom, and `:term`, for anything else (maps, tuples, `Decimal` and other
+  structs). A `:term` column's values are not checked against each other; it is the frame's
   equivalent of pandas' and Polars' `object` type, so a column the plot never uses cannot refuse the
   table.
 
   One more is never worked out from values, only declared when a column is built: `:category`,
   Explorer's name for a categorical column, which a plot reads as discrete whatever its values
   are. Its values are typed, and an integer among floats becomes a float, as any column's; it may
-  hold anything but a `:term`'s values.
+  hold anything but a `:term`'s values or lists.
   """
 
   # ## Implementations
   #
   # This module is both the behaviour an implementation follows and the only module callers use:
   # each operation dispatches on the frame's struct. `Giggly.DataFrame.Lists` is the one
-  # implementation. The operations are relational (choosing, renaming and adding columns, splitting
-  # and taking rows), so an engine such as a database could run them, and none takes an Elixir
-  # function, since an engine cannot run one. Code that needs one pulls a column into a list and
-  # puts the result back.
+  # implementation. The operations are relational (choosing, renaming and adding columns, splitting,
+  # taking and joining rows), so an engine such as a database could run them, and none takes an
+  # Elixir function, since an engine cannot run one. Code that needs one pulls a column into a list
+  # and puts the result back.
 
   # ## Expressions
   #
@@ -65,15 +71,20 @@ defmodule Giggly.DataFrame do
   #     any value as `{:constant, term}`, typed as a column holding it would be;
   #   * an operation, `{name, [expression, ...]}`, or `{name, [expression, ...], options}` for
   #     parameters that are not row values: `{:is_finite, [x]}`, whether each number is finite,
-  #     and `{:and, [left, right]}`, whether both are true, each a boolean; `{:cut, [x], breaks:
+  #     `{:and, [left, right]}` and `{:or, [left, right]}`, whether both or either are true, and
+  #     `{:not, [x]}`, whether it is false, each a boolean; `{:<, [left, right]}` and `{:>, [left,
+  #     right]}`, whether one number is below or above another, a boolean; `{:cut, [x], breaks:
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
   #     too, a number outside them all missing.
   #
   # Values follow Explorer's semantics, as types do: a missing value passes through an operation
-  # as missing, so `is_finite` is missing where its number is, and `and` is false where either side
-  # is false, true where both are true and missing otherwise (SQL's three-valued logic). An
+  # as missing, so `is_finite` is missing where its number is, `and` is false where either side
+  # is false, true where both are true and missing otherwise, and `or` true where either side is
+  # true, false where both are false and missing otherwise (SQL's three-valued logic); a
+  # comparison is missing where either number is, and puts NaN above every number, both
+  # infinities included, as Explorer orders a float. An
   # expression outside this vocabulary, or an operation given a column of the wrong type, whether
   # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
 
@@ -107,6 +118,7 @@ defmodule Giggly.DataFrame do
           | :null
           | :term
           | :category
+          | {:list, dtype()}
 
   @typedoc "A column as built: its name and values, and `:category` where it is declared one."
   @type column :: {name(), list()} | {name(), list(), :category}
@@ -126,6 +138,10 @@ defmodule Giggly.DataFrame do
           | {:constant, term()}
           | {:is_finite, [expression()]}
           | {:and, [expression()]}
+          | {:or, [expression()]}
+          | {:not, [expression()]}
+          | {:<, [expression()]}
+          | {:>, [expression()]}
           | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."
@@ -134,6 +150,11 @@ defmodule Giggly.DataFrame do
           | {:sum, [name()], [summation: :compensated | :plain, missing: :propagate | :skip]}
           | {:n_distinct, [name()]}
           | {:first, [name()]}
+          | {:quantile, [name()], [probability: number()]}
+          | {:count, [name()]}
+          | {:min, [name()]}
+          | {:max, [name()]}
+          | {:list, [name()]}
 
   # Builds a frame from columns, as `new/1` describes.
   @doc false
@@ -186,6 +207,10 @@ defmodule Giggly.DataFrame do
   # One row per group of rows, as `summarise/3` describes.
   @doc false
   @callback summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
+
+  # The rows of one frame joined with those of another, as `join/3` describes.
+  @doc false
+  @callback join(t(), t(), [name(), ...]) :: t()
 
   # Reads any `Table.Reader` (a list of maps, a map of columns, an Explorer data frame, a database
   # result) into a frame.
@@ -374,7 +399,21 @@ defmodule Giggly.DataFrame do
   #   * `{:n_distinct, [column]}`, how many distinct values the group holds, an integer, a missing
   #     value counting as one, as R's `vec_unique_count()` and Polars' `n_unique()` count it;
   #   * `{:first, [column]}`, the group's first value, of the column's type, a category's included;
+  #   * `{:list, [column]}`, the group's values in a list, missing ones included, of the type
+  #     `{:list, type}`, the column's type;
+  #   * `{:count, [column]}`, how many of the group's values are not missing, an integer;
+  #   * `{:min, [column]}` and `{:max, [column]}`, the least and the greatest of a column of
+  #     numbers, of its type, an infinity below or above every number;
+  #   * `{:quantile, [column], probability: probability}`, of a column of numbers at a
+  #     `probability` from 0 to 1, a float, as R's `quantile()` takes it by default (type 7, SQL's
+  #     `percentile_cont`): the numbers sorted and the one at the place `1 + (n - 1) * probability`,
+  #     counting from 1, or where the place falls between two that differ, `(1 - h) * lower + h *
+  #     higher` for the fraction `h` of the way, in that order, as R works it;
   #   * `{:sum, [column]}`, the sum of a column of numbers, a float, which takes two options.
+  #
+  # `count`, `min`, `max` and `quantile` leave a missing value out, one that is `nil` (R's `NA`) or
+  # NaN, as R's `is.na()` reads one and as R's statistics call them, with `na.rm = TRUE`; a group
+  # with none is missing, or counts 0.
   #
   # A sum's `summation:` says how it adds: `:compensated`, the default, carries the rounding error
   # each addition makes and adds it back at the end, as R's `sum()` adds in extended precision, so
@@ -383,13 +422,26 @@ defmodule Giggly.DataFrame do
   # NaN: `:propagate`, the default, makes the group's sum missing, `nil` where one is, else NaN,
   # as R's `sum()` gives `NA` or `NaN`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a
   # group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
-  # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum of a column of
-  # another type and an option not listed are refused with an `ArgumentError`; an empty `by`, an
-  # option's value not listed, an aggregate not listed and an aggregate's name shared with a `by`
-  # column raise `FunctionClauseError`.
+  # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum, a minimum, a
+  # maximum or a quantile of a column of another type and an option not listed are refused with an
+  # `ArgumentError`; an empty `by`, an option's value not listed, a quantile with no probability,
+  # an aggregate not listed and an aggregate's name shared with a `by` column raise
+  # `FunctionClauseError`.
   @doc false
   @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
   def summarise(%implementation{} = frame, [_first | _rest] = by, aggregates)
       when is_list(aggregates),
       do: implementation.summarise(frame, by, aggregates)
+
+  # The rows of `left` joined with the rows of `right` whose columns `on` hold the same values, as
+  # dplyr's `left_join(by = )` and SQL's `LEFT JOIN` join them: each left row, in order, once for
+  # each matching right row, in right's order, with right's other columns after left's, or once
+  # with those columns missing where no right row matches. A missing value in a column `on` matches
+  # nothing, as Explorer joins. Each column keeps its type, a category's included. A column `on`
+  # that either frame lacks, two of them of different types, and a column besides those `on` in
+  # both frames raise `FunctionClauseError`.
+  @doc false
+  @spec join(t(), t(), [name(), ...]) :: t()
+  def join(%implementation{} = left, %implementation{} = right, [_first | _rest] = on),
+    do: implementation.join(left, right, on)
 end

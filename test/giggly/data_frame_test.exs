@@ -75,7 +75,7 @@ defmodule Giggly.DataFrameTest do
           logged: [~N[2026-10-12 09:30:00], ~N[2026-10-12 17:00:00]],
           stamped: [~U[2026-10-12 09:30:00Z], ~U[2026-10-12 17:00:00Z]],
           missing: [nil, nil],
-          payload: [%{id: 1}, [2]]
+          payload: [%{id: 1}, {2}]
         )
 
       assert DataFrame.dtypes(frame) == %{
@@ -114,6 +114,60 @@ defmodule Giggly.DataFrameTest do
       assert_raise FunctionClauseError, fn ->
         DataFrame.new(x: [1, 2], y: [3])
       end
+    end
+  end
+
+  describe "new/1, lists" do
+    # Explorer 0.13.0's `Series.from_list/1` types `[[1, 2.0], [3]]` `{:list, {:f, 64}}` holding
+    # `[[1.0, 2.0], [3.0]]`, `[[], []]` `{:list, :null}`, `[[1.0, nil], nil]` keeping both nils, and
+    # `[[[1.0]], [[]]]` `{:list, {:list, {:f, 64}}}`.
+    test "a column of lists is a list of the type its lists' values have together" do
+      frame =
+        DataFrame.new(
+          mixed: [[1, 2.0], [3]],
+          empty: [[], []],
+          missing: [[1.0, nil], nil],
+          nested: [[[1]], [[]]],
+          labels: [["a"], []]
+        )
+
+      assert DataFrame.dtypes(frame) == %{
+               mixed: {:list, :float},
+               empty: {:list, :null},
+               missing: {:list, :float},
+               nested: {:list, {:list, :integer}},
+               labels: {:list, :string}
+             }
+
+      assert {DataFrame.pull(frame, :mixed), DataFrame.pull(frame, :missing)} ===
+               {[[1.0, 2.0], [3.0]], [[1.0, nil], nil]}
+    end
+
+    # Explorer 0.13.0 refuses `[[1.0, "a"]]` and `[[1.0], ["a"]]`: "the value "a" does not match the
+    # inferred dtype {:f, 64}".
+    test "lists whose values mix two types are refused, within a list or across them" do
+      within =
+        assert_raise ArgumentError, fn -> DataFrame.new(tags: [[1.0, "a"]]) end
+
+      across =
+        assert_raise ArgumentError, fn -> DataFrame.new(tags: [[1.0], ["a"]]) end
+
+      assert within.message =~ ~s{:tags holds values of more than one type (1.0 and "a")}
+      assert across.message =~ ~s{:tags holds values of more than one type ([1.0] and ["a"])}
+    end
+
+    test "a list among values that are not lists is refused" do
+      assert_raise ArgumentError, fn -> DataFrame.new(tags: [[1.0], 2.0]) end
+    end
+
+    test "a category holds no lists" do
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:tags, [nil, [1]], :category}])
+        end
+
+      assert error.message =~ ":tags"
+      assert error.message =~ "[1]"
     end
   end
 
@@ -402,6 +456,60 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(mutated).both == :boolean
     end
 
+    # Explorer 0.13.0's `Series.or/2` of these two columns gives these booleans.
+    test "or is true where either side is, false where both are, and otherwise missing" do
+      frame =
+        DataFrame.new(
+          left: [true, true, false, false, nil, true, nil, nil, false],
+          right: [true, false, true, nil, false, nil, true, nil, false]
+        )
+
+      mutated = DataFrame.mutate(frame, either: {:or, [:left, :right]})
+
+      assert DataFrame.pull(mutated, :either) ===
+               [true, true, true, nil, nil, true, true, nil, false]
+
+      assert DataFrame.dtypes(mutated).either == :boolean
+    end
+
+    test "not is the opposite of a boolean, missing where it is" do
+      frame = DataFrame.new(kept: [true, false, nil])
+
+      mutated = DataFrame.mutate(frame, dropped: {:not, [:kept]})
+
+      assert DataFrame.pull(mutated, :dropped) === [false, true, nil]
+      assert DataFrame.dtypes(mutated).dropped == :boolean
+    end
+
+    # Explorer 0.13.0's `Series.less/2` and `Series.greater/2` of these two columns give these
+    # booleans: NaN sorts above every number, infinity included, and is neither below nor above
+    # NaN.
+    test "a comparison is missing where either number is, and puts NaN above every number" do
+      frame =
+        DataFrame.new(
+          left: [1.0, :nan, nil, :infinity, :neg_infinity, :nan, 2.0],
+          right: [2.0, 1.0, 1.0, :nan, -1.0e308, :nan, 2]
+        )
+
+      mutated =
+        DataFrame.mutate(frame,
+          below: {:<, [:left, :right]},
+          above: {:>, [:left, :right]}
+        )
+
+      assert DataFrame.pull(mutated, :below) === [true, false, nil, true, true, false, false]
+      assert DataFrame.pull(mutated, :above) === [false, true, nil, false, false, false, false]
+      assert DataFrame.dtypes(mutated).below == :boolean
+    end
+
+    test "a comparison reads a constant and an integer column alike" do
+      frame = DataFrame.new(x: [1, 3, 5])
+
+      kept = DataFrame.filter(frame, {:and, [{:>, [:x, 1.5]}, {:<, [:x, 5]}]})
+
+      assert DataFrame.pull(kept, :x) === [3]
+    end
+
     test "an operation given a column of the wrong type, or one not in the vocabulary, is refused" do
       frame = DataFrame.new(x: [1.0], label: ["a"], kept: [true])
 
@@ -418,7 +526,27 @@ defmodule Giggly.DataFrameTest do
       end
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.mutate(frame, either: {:or, [:kept, :kept]})
+        DataFrame.mutate(frame, either: {:xor, [:kept, :kept]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, below: {:<, [:label, :x]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, above: {:>, [:x, :kept]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, either: {:or, [:kept, :x]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, either: {:or, [:x, :kept]})
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.mutate(frame, opposite: {:not, [:x]})
       end
 
       assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, y: :missing) end
@@ -613,6 +741,148 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(summarised).label == :category
     end
 
+    # Golden: R 4.6.1's quantile(group, probability, na.rm = TRUE), type 7, of the groups c(54.6,
+    # 60.4), c(81.6, 7.1), c(1, 2, 3, 4, 10), c(3, 1, 2), c(5, NA, NaN, 1) and NA, printed to 17
+    # significant digits; they move only with R's `quantile()`. `lower + h * (higher - lower)`
+    # gives 56.05, 58.95 and 44.35 where R's order gives 56.050000000000004, 58.949999999999996 and
+    # 44.349999999999994.
+    test "a quantile is R's type 7, worked in R's order, a missing value left out" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 5, 5, 5, 5, 6],
+          y:
+            [54.6, 60.4, 81.6, 7.1, 1, 2, 3, 4, 10, 3.0, 1.0, 2.0] ++
+              [5.0, nil, :nan, 1.0, nil]
+        )
+
+      quantiles =
+        for probability <- [0.25, 0.75, 0.5, 0.3, 0, 1] do
+          frame
+          |> DataFrame.summarise([:group], q: {:quantile, [:y], probability: probability})
+          |> DataFrame.pull(:q)
+        end
+
+      assert quantiles === [
+               [56.050000000000004, 25.724999999999998, 2.0, 1.5, 2.0, nil],
+               [58.949999999999996, 62.974999999999994, 4.0, 2.5, 4.0, nil],
+               [57.5, 44.349999999999994, 3.0, 2.0, 3.0, nil],
+               [56.340000000000003, 29.449999999999999, 2.2000000000000002] ++
+                 [1.6000000000000001, 2.2000000000000002, nil],
+               [54.600000000000001, 7.0999999999999996, 1.0, 1.0, 1.0, nil],
+               [60.399999999999999, 81.599999999999994, 10.0, 3.0, 5.0, nil]
+             ]
+    end
+
+    # Golden: R 4.6.1's quantile(c(1, Inf, 2, 3), c(0.25, 0.5, 0.75)) is 1.75, 2.5 and Inf, and
+    # quantile(c(-Inf, Inf, 2, 3), c(0, 0.25, 0.5, 0.75, 1)) is -Inf, -Inf, 2.5, Inf and Inf.
+    test "a quantile puts an infinity at either end and interpolates as R's arithmetic does" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 1, 1, 2, 2, 2, 2],
+          y: [1, :infinity, 2, 3, :neg_infinity, :infinity, 2, 3]
+        )
+
+      quantiles =
+        for probability <- [0, 0.25, 0.5, 0.75, 1] do
+          frame
+          |> DataFrame.summarise([:group], q: {:quantile, [:y], probability: probability})
+          |> DataFrame.pull(:q)
+        end
+
+      assert quantiles === [
+               [1.0, :neg_infinity],
+               [1.75, :neg_infinity],
+               [2.5, 2.5],
+               [:infinity, :infinity],
+               [:infinity, :infinity]
+             ]
+    end
+
+    test "a quantile of integers is a float" do
+      frame = DataFrame.new(group: [1, 1, 1], y: [3, 1, 2])
+
+      summarised = DataFrame.summarise(frame, [:group], q: {:quantile, [:y], probability: 0.5})
+
+      assert DataFrame.pull(summarised, :q) === [2.0]
+      assert DataFrame.dtypes(summarised).q == :float
+    end
+
+    # Golden: R 4.6.1's min(c(3, NA, NaN, -Inf), na.rm = TRUE) is -Inf and max(c(3, NA, NaN, 2),
+    # na.rm = TRUE) is 3.
+    test "min and max leave a missing value out, keep their column's type, and order infinities" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 1, 1, 2, 2, 2, 2, 3],
+          y: [3.0, nil, :nan, :neg_infinity, 3.0, nil, :nan, 2.0, nil],
+          n: [4, 1, 2, 9, 5, 5, 6, 3, nil]
+        )
+
+      summarised =
+        DataFrame.summarise(frame, [:group],
+          low: {:min, [:y]},
+          high: {:max, [:y]},
+          fewest: {:min, [:n]},
+          most: {:max, [:n]}
+        )
+
+      assert Enum.map([:low, :high, :fewest, :most], fn name ->
+               DataFrame.pull(summarised, name)
+             end) === [
+               [:neg_infinity, 2.0, nil],
+               [3.0, 3.0, nil],
+               [1, 3, nil],
+               [9, 6, nil]
+             ]
+
+      dtypes = DataFrame.dtypes(summarised)
+
+      assert Map.take(dtypes, [:low, :fewest]) == %{
+               low: :float,
+               fewest: :integer
+             }
+    end
+
+    test "count is how many of a group's values are not missing, nil or NaN" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 1, 1, 2],
+          y: [1.0, nil, :nan, :infinity, nil],
+          label: ["a", nil, "b", "c", nil]
+        )
+
+      summarised =
+        DataFrame.summarise(frame, [:group], y: {:count, [:y]}, label: {:count, [:label]})
+
+      assert {DataFrame.pull(summarised, :y), DataFrame.pull(summarised, :label)} ===
+               {[2, 0], [3, 0]}
+
+      assert DataFrame.dtypes(summarised).y == :integer
+    end
+
+    # Explorer 0.13.0's grouped `summarise` of a plain float column gives each group's values,
+    # `nil` and NaN among them, as a `{:list, {:f, 64}}` column.
+    test "list is each group's values in row order, missing ones kept, a list of their type" do
+      frame =
+        DataFrame.new(
+          group: [2, 1, 2, 1, 2],
+          y: [3.0, 1.0, nil, :nan, 5],
+          cyl: [4, 6, 4, 8, 6]
+        )
+
+      summarised =
+        DataFrame.summarise(frame, [:group], y: {:list, [:y]}, cyl: {:list, [:cyl]})
+
+      assert {DataFrame.pull(summarised, :y), DataFrame.pull(summarised, :cyl)} ===
+               {[[1.0, :nan], [3.0, nil, 5.0]], [[6, 8], [4, 4, 6]]}
+
+      dtypes = DataFrame.dtypes(summarised)
+
+      assert Map.take(dtypes, [:y, :cyl]) == %{
+               y: {:list, :float},
+               cyl: {:list, :integer}
+             }
+    end
+
     test "a frame of no rows summarises into no rows, its columns named" do
       frame = DataFrame.new(group: [], weight: [])
 
@@ -632,6 +902,38 @@ defmodule Giggly.DataFrameTest do
 
       assert error.message =~ ":weight"
       assert error.message =~ ":string"
+    end
+
+    test "a quantile, a minimum or a maximum of a column that is not numbers is refused" do
+      frame = DataFrame.new(group: [1], label: ["a"])
+
+      for {aggregate, purpose} <- [
+            {{:quantile, [:label], probability: 0.5}, "a quantile orders numbers"},
+            {{:min, [:label]}, "a minimum compares numbers"},
+            {{:max, [:label]}, "a maximum compares numbers"}
+          ] do
+        error =
+          assert_raise ArgumentError, fn ->
+            DataFrame.summarise(frame, [:group], q: aggregate)
+          end
+
+        assert error.message ==
+                 "#{purpose}, but the column :label is a :string column"
+      end
+    end
+
+    test "a quantile takes a probability from 0 to 1 and no other option" do
+      frame = DataFrame.new(group: [1], y: [1.0])
+
+      for options <- [[], [probability: -0.1], [probability: 1.5], [probability: "half"]] do
+        assert_raise FunctionClauseError, fn ->
+          DataFrame.summarise(frame, [:group], q: {:quantile, [:y], options})
+        end
+      end
+
+      assert_raise ArgumentError, fn ->
+        DataFrame.summarise(frame, [:group], q: {:quantile, [:y], probability: 0.5, type: 8})
+      end
     end
 
     test "an option not listed, or a value it does not take, is refused" do
@@ -677,6 +979,93 @@ defmodule Giggly.DataFrameTest do
 
       assert_raise FunctionClauseError, fn ->
         DataFrame.summarise(frame, [:group], n: {:first, [:weight, :weight]})
+      end
+    end
+  end
+
+  describe "join/3" do
+    # Explorer 0.13.0's `DataFrame.join(left, right, how: :left, on: :k)` of these gives k `[1, 1,
+    # 2, nil, 3]`, a `[10, 10, 20, 30, 40]` and b `["x", "z", nil, nil, nil]`.
+    test "each left row in order, once per matching right row, a missing key matching none" do
+      left = DataFrame.new(k: [1, 2, nil, 3], a: [10, 20, 30, 40])
+      right = DataFrame.new(k: [1, nil, 1, 4], b: ["x", "y", "z", "w"])
+
+      joined = DataFrame.join(left, right, [:k])
+
+      assert DataFrame.names(joined) == [:k, :a, :b]
+
+      assert Enum.map([:k, :a, :b], fn name -> DataFrame.pull(joined, name) end) === [
+               [1, 1, 2, nil, 3],
+               [10, 10, 20, 30, 40],
+               ["x", "z", nil, nil, nil]
+             ]
+    end
+
+    test "rows join on every key column together, each column keeping its type" do
+      left =
+        DataFrame.new([
+          {:panel, [1, 1, 2]},
+          {:group, [1, 2, 1]},
+          {:x, [4, 6, 4], :category}
+        ])
+
+      right =
+        DataFrame.new([
+          {:group, [1, 2]},
+          {:panel, [2, 1]},
+          {:outliers, [[1.0], []]},
+          {:fill, ["a", "b"], :category}
+        ])
+
+      joined = DataFrame.join(left, right, [:panel, :group])
+
+      assert Enum.map([:outliers, :fill], fn name -> DataFrame.pull(joined, name) end) === [
+               [nil, [], [1.0]],
+               [nil, "b", "a"]
+             ]
+
+      assert DataFrame.dtypes(joined) == %{
+               panel: :integer,
+               group: :integer,
+               x: :category,
+               outliers: {:list, :float},
+               fill: :category
+             }
+    end
+
+    test "a frame of no rows on either side joins" do
+      left = DataFrame.new(k: [1, 2], a: [10, 20])
+
+      none =
+        [k: [1], b: [1.0]]
+        |> DataFrame.new()
+        |> DataFrame.filter({:constant, false})
+
+      onto_none = DataFrame.join(none, left, [:k])
+      none_onto = DataFrame.join(left, none, [:k])
+
+      assert DataFrame.pull(none_onto, :b) === [nil, nil]
+      assert DataFrame.row_count(onto_none) == 0
+    end
+
+    test "keys of two types, a key a frame lacks, a column in both or no key at all is refused" do
+      left = DataFrame.new(k: [1], a: [10])
+      no_keys = Enum.drop([:k], 1)
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.join(left, DataFrame.new(k: [1.0], b: [1]), [:k])
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.join(left, DataFrame.new(j: [1], b: [1]), [:k])
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.join(left, DataFrame.new(k: [1], a: [1]), [:k])
+      end
+
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.join(left, DataFrame.new(k: [1], b: [1]), no_keys)
       end
     end
   end

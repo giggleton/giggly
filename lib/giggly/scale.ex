@@ -21,7 +21,7 @@ defmodule Giggly.Scale do
   #     date transformation, as ggplot2's `scale_type()` gives a `Date` `"date"`; on an aesthetic
   #     other than position it gets none yet. A plot's continuous scale through the identity takes
   #     one too, placing each date at its days, as R stores a date (`takes?/2`);
-  #   * times, datetimes and `:term` get none yet.
+  #   * times, datetimes, lists and `:term` get none yet.
   #
   # ## Transformation
   #
@@ -121,17 +121,18 @@ defmodule Giggly.Scale do
 
   # The kind of scale a column of type `dtype` (a `Giggly.DataFrame` type) needs.
   @doc false
-  @spec kind(atom()) :: kind()
+  @spec kind(atom() | {:list, term()}) :: kind()
   def kind(dtype) when dtype in @continuous_dtypes, do: :continuous
   def kind(dtype) when dtype in @discrete_dtypes, do: :discrete
   def kind(:date), do: :date
   def kind(dtype) when is_atom(dtype), do: :none
+  def kind({:list, _values_dtype}), do: :none
 
   # The kind of scale a column of type `dtype` needs on `aesthetic`: on a position aesthetic, its
   # `kind/1`; on another, the same but for a date, whose scale on any aesthetic but position
   # (ggplot2's `scale_alpha_date()` and `scale_colour_date()`) has not arrived.
   @doc false
-  @spec kind(atom(), atom()) :: kind()
+  @spec kind(atom() | {:list, term()}, atom()) :: kind()
   def kind(:date, aesthetic) when aesthetic in @non_position_aesthetics, do: :none
   def kind(dtype, _aesthetic), do: kind(dtype)
 

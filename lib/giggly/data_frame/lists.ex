@@ -19,6 +19,7 @@ defmodule Giggly.DataFrame.Lists do
   @behaviour Giggly.DataFrame
 
   alias Giggly.DataFrame
+  alias Giggly.DataFrame.Arithmetic
 
   @enforce_keys [:reversed_names, :columns, :row_count]
   defstruct @enforce_keys
@@ -135,6 +136,61 @@ defmodule Giggly.DataFrame.Lists do
     |> Enum.reduce(frame, fn computed, mutated -> put_entered(mutated, computed) end)
   end
 
+  @impl DataFrame
+  def join(%__MODULE__{} = left, %__MODULE__{} = right, on) do
+    Enum.each(on, fn name -> same_type(column(left, name), column(right, name)) end)
+    matches = matches(left, right, on)
+    joined = slice(left, Enum.map(matches, fn {left_index, _right_index} -> left_index end))
+    right_indices = Enum.map(matches, fn {_left_index, right_index} -> right_index end)
+
+    right
+    |> names()
+    |> Enum.reject(fn name -> name in on end)
+    |> Enum.reduce(joined, fn name, joined_so_far ->
+      {dtype, values} = column(right, name)
+      add_column(joined_so_far, name, {dtype, taken(values, right_indices)})
+    end)
+  end
+
+  # Two key columns are joined only when they are of one type, as Explorer refuses two.
+  defp same_type({dtype, _left_values}, {dtype, _right_values}), do: :ok
+
+  # Each left row's index, in order, paired with the index of each right row whose keys equal its
+  # own, in right's order, or with `nil` where none does; a missing key equals nothing.
+  defp matches(left, right, on) do
+    right_indices_by_key =
+      right
+      |> keys(on)
+      |> Enum.with_index()
+      |> Enum.reject(fn {key, _index} -> nil in key end)
+      |> Enum.group_by(fn {key, _index} -> key end, fn {_key, index} -> index end)
+
+    left
+    |> keys(on)
+    |> Enum.with_index()
+    |> Enum.flat_map(fn {key, left_index} ->
+      paired(left_index, Map.get(right_indices_by_key, key, []))
+    end)
+  end
+
+  defp paired(left_index, []), do: [{left_index, nil}]
+
+  defp paired(left_index, right_indices),
+    do: Enum.map(right_indices, fn right_index -> {left_index, right_index} end)
+
+  # Each row's values of the columns `on`, in row order.
+  defp keys(frame, on) do
+    on
+    |> Enum.map(fn name -> pull(frame, name) end)
+    |> Enum.zip_with(fn values -> values end)
+  end
+
+  # The values at `indices`, missing where an index is.
+  defp taken(values, indices) do
+    by_index = List.to_tuple(values)
+    Enum.map(indices, fn index -> if index, do: elem(by_index, index) end)
+  end
+
   # An expression's column over the frame's rows: its type and its values, as the frame's
   # Expressions comment describes.
   defp evaluated(frame, name) when is_binary(name), do: column(frame, name)
@@ -162,6 +218,34 @@ defmodule Giggly.DataFrame.Lists do
     booleans(left_dtype)
     booleans(right_dtype)
     {:boolean, Enum.zip_with(left_values, right_values, &both/2)}
+  end
+
+  defp evaluated(frame, {comparison, [left, right]}) when comparison in [:<, :>] do
+    {left_dtype, left_values} = evaluated(frame, left)
+    {right_dtype, right_values} = evaluated(frame, right)
+    numbers(left_dtype)
+    numbers(right_dtype)
+
+    compared =
+      Enum.zip_with(left_values, right_values, fn left_value, right_value ->
+        compared(comparison, left_value, right_value)
+      end)
+
+    {:boolean, compared}
+  end
+
+  defp evaluated(frame, {:or, [left, right]}) do
+    {left_dtype, left_values} = evaluated(frame, left)
+    {right_dtype, right_values} = evaluated(frame, right)
+    booleans(left_dtype)
+    booleans(right_dtype)
+    {:boolean, Enum.zip_with(left_values, right_values, &either/2)}
+  end
+
+  defp evaluated(frame, {:not, [argument]}) do
+    {dtype, values} = evaluated(frame, argument)
+    booleans(dtype)
+    {:boolean, Enum.map(values, &negated/1)}
   end
 
   defp evaluated(frame, {:cut, [argument], options}) do
@@ -224,6 +308,31 @@ defmodule Giggly.DataFrame.Lists do
   defp below?(_low, :infinity), do: true
   defp below?(low, high), do: low < high
 
+  # Whether `left` is below (`:<`) or above (`:>`) `right`, missing where either is, NaN above
+  # every number and both infinities, as Explorer orders it.
+  defp compared(_comparison, nil, _right), do: nil
+  defp compared(_comparison, _left, nil), do: nil
+  defp compared(:<, left, right), do: rank(left) < rank(right)
+  defp compared(:>, left, right), do: rank(left) > rank(right)
+
+  # Where a number that is not missing sorts, as Explorer sorts a float: minus infinity below every
+  # number, infinity above, and NaN above that.
+  defp rank(:neg_infinity), do: {0, 0}
+  defp rank(:infinity), do: {2, 0}
+  defp rank(:nan), do: {3, 0}
+  defp rank(number), do: {1, number}
+
+  # Whether either is true, by SQL's three-valued logic: true beats missing, and missing beats
+  # false.
+  defp either(true, _right), do: true
+  defp either(_left, true), do: true
+  defp either(false, false), do: false
+  defp either(_left, _right), do: nil
+
+  # The opposite of a boolean, missing where it is.
+  defp negated(nil), do: nil
+  defp negated(boolean), do: not boolean
+
   # Whether both are true, by SQL's three-valued logic: false beats missing, and missing beats
   # true.
   defp both(false, _right), do: false
@@ -276,13 +385,50 @@ defmodule Giggly.DataFrame.Lists do
     validated = Keyword.validate!(options, summation: :compensated, missing: :propagate)
     summation = Keyword.fetch!(validated, :summation)
     missing = Keyword.fetch!(validated, :missing)
+    {_dtype, values} = numbers_column(frame, name, "a sum adds numbers")
 
-    sums =
+    typed(
+      name,
+      by_group(values, groups, fn group_values -> sum(group_values, summation, missing) end)
+    )
+  end
+
+  defp aggregated(frame, {:quantile, [name], options}, groups) when is_list(options) do
+    probability =
+      options
+      |> Keyword.validate!([:probability])
+      |> probability()
+
+    {_dtype, values} = numbers_column(frame, name, "a quantile orders numbers")
+
+    quantiles =
+      by_group(values, groups, fn group_values -> quantile(present(group_values), probability) end)
+
+    {:float, quantiles}
+  end
+
+  defp aggregated(frame, {:min, [name]}, groups) do
+    {dtype, values} = numbers_column(frame, name, "a minimum compares numbers")
+    {dtype, by_group(values, groups, fn group_values -> least(present(group_values)) end)}
+  end
+
+  defp aggregated(frame, {:max, [name]}, groups) do
+    {dtype, values} = numbers_column(frame, name, "a maximum compares numbers")
+    {dtype, by_group(values, groups, fn group_values -> greatest(present(group_values)) end)}
+  end
+
+  defp aggregated(frame, {:count, [name]}, groups) do
+    counts =
       frame
-      |> summed_column(name)
-      |> by_group(groups, fn values -> sum(values, summation, missing) end)
+      |> pull(name)
+      |> by_group(groups, fn group_values -> length(present(group_values)) end)
 
-    typed(name, sums)
+    {:integer, counts}
+  end
+
+  defp aggregated(frame, {:list, [name]}, groups) do
+    {dtype, values} = column(frame, name)
+    {{:list, dtype}, by_group(values, groups, fn group_values -> group_values end)}
   end
 
   defp aggregated(frame, {:n_distinct, [name]}, groups) do
@@ -315,16 +461,63 @@ defmodule Giggly.DataFrame.Lists do
     end)
   end
 
-  defp summed_column(frame, name) do
+  # A column of numbers, or an `ArgumentError` saying what `purpose` needs, naming the column and
+  # its type.
+  defp numbers_column(frame, name, purpose) do
     case column(frame, name) do
-      {dtype, values} when dtype in [:integer, :float, :null] ->
-        values
+      {dtype, _values} = numbers when dtype in [:integer, :float, :null] ->
+        numbers
 
       {dtype, _values} ->
         raise ArgumentError,
-              "a sum adds numbers, but the column #{inspect(name)} is a #{inspect(dtype)} column"
+              "#{purpose}, but the column #{inspect(name)} is a #{inspect(dtype)} column"
     end
   end
+
+  # The values that are not missing, neither `nil` (R's `NA`) nor NaN, as R's `is.na()` reads one.
+  defp present(values), do: Enum.reject(values, fn value -> value in [nil, :nan] end)
+
+  # The probability a quantile is taken at, from 0 to 1.
+  defp probability(probability: probability)
+       when is_number(probability) and probability >= 0 and probability <= 1,
+       do: probability
+
+  # The quantile at `probability` of numbers none of which is missing, as R's `quantile()` takes it
+  # by its default, type 7: the numbers sorted, an infinity at either end, and the one at the
+  # place `1 + (n - 1) * probability` counting from 1, or, where the place falls between two that
+  # differ, `(1 - h) * lower + h * higher` for the fraction `h` of the way, in R's arithmetic and in
+  # that order, which differs from `lower + h * (higher - lower)` in the last digit about one time
+  # in ten. Missing where there are none.
+  defp quantile([], _probability), do: nil
+
+  defp quantile(values, probability) do
+    sorted =
+      values
+      |> Enum.sort_by(&rank/1)
+      |> List.to_tuple()
+
+    place = 1 + (tuple_size(sorted) - 1) * probability
+    low = floor(place)
+    lower = elem(sorted, low - 1)
+    higher = elem(sorted, ceil(place) - 1)
+    fraction = place - low
+
+    if place > low and higher != lower do
+      from_lower = Arithmetic.multiply(1 - fraction, lower)
+      from_higher = Arithmetic.multiply(fraction, higher)
+      Arithmetic.add(from_lower, from_higher)
+    else
+      as_float(lower)
+    end
+  end
+
+  # The least and the greatest of numbers none of which is missing, an infinity below or above
+  # every number; missing where there are none.
+  defp least([]), do: nil
+  defp least(values), do: Enum.min_by(values, &rank/1)
+
+  defp greatest([]), do: nil
+  defp greatest(values), do: Enum.max_by(values, &rank/1)
 
   # The sum of `values` as R adds doubles: a missing one, `nil` (R's `NA`) or NaN, makes it missing,
   # the first in row order, as R's running sum keeps the first, or is left out, as `missing` says;
@@ -398,47 +591,85 @@ defmodule Giggly.DataFrame.Lists do
   defp entered({name, values, :category}) do
     case typed(name, values) do
       {:term, typed_values} ->
-        witness = Enum.find(typed_values, fn value -> value != nil end)
-
         raise ArgumentError,
               "the column #{inspect(name)} is declared a category, but its values have no type " <>
-                "of their own (#{inspect(witness)})"
+                "of their own (#{inspect(witness(typed_values))})"
+
+      {{:list, _values_dtype}, typed_values} ->
+        raise ArgumentError,
+              "the column #{inspect(name)} is declared a category, but its values are lists " <>
+                "(#{inspect(witness(typed_values))}), which a category cannot hold"
 
       {_dtype, typed_values} ->
         {name, {:category, typed_values}}
     end
   end
 
-  # Folds the values into the column's type, keeping the first value of that type so a value that
-  # disagrees can be reported beside it.
+  # The values typed as a column holding them, and cast to that type.
   defp typed(name, values) do
+    dtype = values_type(name, values)
+    {dtype, cast(dtype, values)}
+  end
+
+  defp witness(values), do: Enum.find(values, fn value -> value != nil end)
+
+  # Folds the values into their type, a column's or a list's, keeping the first value of that type
+  # so a value that disagrees can be reported beside it.
+  defp values_type(name, values) do
     {dtype, _witness} =
       Enum.reduce(values, {:null, nil}, fn value, typed_so_far ->
         widen(name, typed_so_far, value)
       end)
 
-    {dtype, cast(dtype, values)}
+    dtype
   end
 
   # A column of floats holds only floats: an integer among them becomes one, as Explorer casts a
-  # mix of integers and floats, so `4` and `4.0` are one value wherever values are compared.
+  # mix of integers and floats, so `4` and `4.0` are one value wherever values are compared. A
+  # list's values are cast as a column's, a missing list left missing.
   defp cast(:float, values), do: Enum.map(values, &as_float/1)
+
+  defp cast({:list, values_dtype}, lists),
+    do: Enum.map(lists, fn list -> cast_list(values_dtype, list) end)
+
   defp cast(_dtype, values), do: values
+
+  defp cast_list(_values_dtype, nil), do: nil
+  defp cast_list(values_dtype, list), do: cast(values_dtype, list)
 
   defp as_float(value) when is_integer(value), do: value / 1
   defp as_float(value), do: value
 
   defp widen(_name, typed_so_far, nil), do: typed_so_far
-  defp widen(_name, {:null, _witness}, value), do: {kind(value), value}
 
   defp widen(name, {dtype, witness} = typed_so_far, value) do
-    case {dtype, kind(value)} do
-      {same, same} -> typed_so_far
-      {:float, :integer} -> typed_so_far
-      {:integer, :float} -> {:float, value}
-      {_dtype, _kind} -> raise ArgumentError, mixed_message(name, witness, value)
+    case wider(dtype, kind(name, value)) do
+      {:ok, ^dtype} -> typed_so_far
+      {:ok, widened} -> {widened, value}
+      :error -> raise ArgumentError, mixed_message(name, witness, value)
     end
   end
+
+  # The type that holds values of both types, as Explorer widens a series: the type of no values
+  # widens to any, integers and floats to floats, two lists by their values, and nothing else.
+  defp wider(dtype, dtype), do: {:ok, dtype}
+  defp wider(:null, dtype), do: {:ok, dtype}
+  defp wider(dtype, :null), do: {:ok, dtype}
+  defp wider(:integer, :float), do: {:ok, :float}
+  defp wider(:float, :integer), do: {:ok, :float}
+
+  defp wider({:list, left}, {:list, right}) do
+    case wider(left, right) do
+      {:ok, widened} -> {:ok, {:list, widened}}
+      :error -> :error
+    end
+  end
+
+  defp wider(_left, _right), do: :error
+
+  # A list's kind is a list of its values' type, worked out as a column's.
+  defp kind(name, values) when is_list(values), do: {:list, values_type(name, values)}
+  defp kind(_name, value), do: kind(value)
 
   defp kind(value) when is_integer(value), do: :integer
   defp kind(value) when is_float(value) or value in @non_finite_floats, do: :float

@@ -28,9 +28,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `put/4`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3` and the callbacks are the
-  pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a user another operation
-  is a decision (CLAUDE.md, Conventions).
+  `put/4`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3`, `join/3` and the callbacks
+  are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a user another
+  operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library.** Its `deps:` is `Table` alone, which the root lists too,
   as boundary lets a sub-boundary list only what its parent does, and no other domain lists it
   (`.claude/rules/dependencies.md`). A domain that uses the frame lists `Giggly.DataFrame`, its
@@ -48,7 +48,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   [expression], options}` for parameters that are not row values (`cut`'s `breaks:` and
   `closed:`, R's `cut(include.lowest = TRUE)`, numbering each value's interval from 1). Values
   follow Explorer's semantics, as types do: a missing value passes through an operation, a filter
-  keeps only the rows whose value is true, `and` is SQL's three-valued and. A column named alone
+  keeps only the rows whose value is true, `and` and `or` are SQL's three-valued and and or, and
+  `<` and `>` put NaN above every number, both infinities included. A column named alone
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
   none, raises `FunctionClauseError`; the mapping's expressions by name will reuse the grammar.
@@ -58,11 +59,20 @@ column names become strings", "Column types belong to the frame" and "Every boun
   them, and the facet repeats a table across the panels; `summarise/3`, the first group-by
   aggregate, with the stats that count; `filter/2`, `mutate/2`, the `is_finite` and `and`
   operations and the `n_distinct` and `first` aggregates, with counting's rows, weights and carried
-  columns; `cut`, with binning's bins. Not designed ahead.
+  columns; `cut`, with binning's bins; `join/3`, the `or`, `not`, `<` and `>` operations and the
+  `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
+  and whiskers. Not designed ahead.
+- **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,
+  the key columns must be of one type in both frames, and a column besides them in both is
+  refused, never suffixed.
 - **`summarise/3`'s aggregates are operations over one column, `{name, [column]}`**:
   `n_distinct`, a missing value counting as one, as R's `vec_unique_count()` counts; `first`, in
-  row order, of the column's type; and a sum. **A sum's spec says how it adds** (design-log §4, the
-  entry beginning "The frame's first group-by aggregate"): `summation: :compensated`, the
+  row order, of the column's type; `list`, the group's values in row order, missing ones kept, of
+  the type `{:list, type}`; `count`, `min`, `max` and `quantile` (`probability:`, R's type 7,
+  worked in R's order, `(1 - h) * lower + h * higher`, which a test pins where the textbook order
+  differs), each leaving a missing value (`nil` or NaN) out, as R's statistics call them, and
+  missing, or 0, for a group of none; and a sum. **A sum's spec says how it adds** (design-log §4,
+  the entry beginning "The frame's first group-by aggregate"): `summation: :compensated`, the
   default, as R's `sum()` adds in extended precision, or `:plain`, in row order, as `rowsum()`;
   `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or NaN, as R's
   `is.na()` reads one, the first met kept where it propagates, and an infinity no missing value but
@@ -88,8 +98,11 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `mutate/2` names alone, `summarise/3`'s `by` columns and its `first` carry it; `put/3` works a
   type out afresh.
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
-  has no type of its own (maps, lists, `Decimal`…), so a column the plot never uses cannot refuse
-  the table. When something needs one of those checked or plotted, it gets a named type of its own.
+  has no type of its own (maps, tuples, `Decimal`…), so a column the plot never uses cannot refuse
+  the table. When something needs one of those checked or plotted, it gets a named type of its own,
+  as lists got `{:list, type}` (design-log §4, the entry beginning "A box's outliers are a list
+  column"): typed by Explorer's rule, the values of all of a column's lists together, so lists
+  whose values mix two types are refused, and a category holds none.
 - **`nil` in a column is a missing value.** Values are stored as given, but for an integer in a
   `:float` column, which becomes a float, as Explorer casts a mix of the two: `4` and `4.0` are then
   one value to every reader that compares them (a facet's panels, the groups, a scale's levels), as

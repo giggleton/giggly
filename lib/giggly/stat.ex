@@ -19,7 +19,8 @@ defprotocol Giggly.Stat do
   # `geom_bar()` defaults `stat = "count"`, counting at each place (`Giggly.Stat.Sum`) the rows
   # at each combination of their aesthetics, as `geom_count()` defaults `stat = "sum"`, and
   # binning (`Giggly.Stat.Bin`) the rows in each bin of the axis, as `geom_histogram()` defaults
-  # `stat = "bin"`.
+  # `stat = "bin"`, and the box plot's summary (`Giggly.Stat.Boxplot`) each group's quartiles,
+  # whiskers and outliers, as `geom_boxplot()` defaults `stat = "boxplot"`.
   #
   # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
   # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
