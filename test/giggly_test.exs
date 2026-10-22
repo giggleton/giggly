@@ -977,6 +977,27 @@ defmodule GigglyTest do
     # 0.6, 0.8, stacked and dodged alike, R warning that the x intervals overlap, then that mapping
     # with `width = 0.5`; over x 4, 6, 8 with `width = 2`; and over x a, b with `aes(width = w)` of
     # 0.5, NA. They move only with ggplot2's bars.
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(aes(x, y, width = w))` over x
+    # a, b and y 1, 2, with w `c(1L, 1L)` and then `NA_real_`: edges 0.5 to 1.5 and 1.5 to 2.5, then
+    # none; they move only with ggplot2's bars.
+    test "a mapped width of whole numbers is taken, and one of only missing values draws nothing" do
+      columns = fn widths ->
+        %{"x" => ["a", "b"], "y" => [1.0, 2.0], "w" => widths}
+        |> Plot.new(%{x: :x, y: :y, width: :w})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+      end
+
+      whole = columns.([1, 1])
+      missing = columns.([nil, nil])
+
+      assert {DataFrame.pull(whole, :xmin), DataFrame.pull(whole, :xmax)} ===
+               {[0.5, 1.5], [1.5, 2.5]}
+
+      assert {DataFrame.pull(missing, :xmin), DataFrame.pull(missing, :xmax)} ===
+               {[nil, nil], [nil, nil]}
+    end
+
     test "a column is as wide as its width: or its mapped width, the one set winning" do
       columns = fn rows, mapping, options ->
         rows

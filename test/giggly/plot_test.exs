@@ -611,6 +611,7 @@ defmodule Giggly.PlotTest do
           end
 
         assert error.key == option
+        assert error.message =~ inspect(value)
       end
     end
 
