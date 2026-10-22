@@ -27,7 +27,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A position's arguments arrive with their first reader.** Every position is handed the table
   alone: stacking splits it by the `panel` column itself and reads no scale. A position's own
   parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
-  them, and the panel's scales with the first position that reads one.
+  them, as dodging by clusters' `preserve`, `padding` and `reverse` arrived with
+  `Plot.position_dodge2/1`, its `width` waiting for a geom without edges, and the panel's scales
+  with the first position that reads one.
 - **Stacking is ggplot2's `position_stack()`, `vjust = 1`**: nothing moves unless two rows of
   the layer share an x, in any panel; then each panel's bars pile by their `xmin`, those below
   zero downward and apart from the rest, ordered by group, highest first, each bar's y moving to
@@ -39,6 +41,15 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
   bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged
   positions come out doubles, as R's are, so a discrete axis's column stays one type.
+- **Dodging by clusters is ggplot2's `position_dodge2()`, on lists, in R's order and R's
+  arithmetic** (design-log §4, the entries beginning "Dodging by clusters"): its widths' sum and
+  its edges are R's `sum()` and `cumsum()` in extended precision (`Arithmetic.sum/2`,
+  `cumulative_sum/1`), so its doubles are R's; each panel's rows come out sorted by x, then
+  group, as R's do; a bar with no group is dodged; padding applies to every bar of a panel where a
+  cluster holds two, and nowhere else; `:single` divides by the most bars at one present x in any
+  panel. **It departs from R in one place**: each cluster is placed from its own middle and
+  widths, where R misplaces those after a bar missing an edge, which is placed nowhere and loses
+  its x. It writes none of R's scratch columns (`xid`, `newx`, `new_width`), nor `order`.
 - **A position declares the aesthetics it reads, each with its default
   (`default_aesthetics/1`)**, as ggplot2's position declares its `default_aes`, and reads them
   from columns the assembly has put into every row before it runs (design-log §4, the entry
@@ -50,4 +61,6 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   do, and a missing one stays missing.
 - **A position reads a layer's orientation from its `flipped_aes` column**, written by the stat or
   the geom, and moves horizontal bars along y, flipped and flipped back, as ggplot2's positions
-  read `flipped_aes`; without the column, bars are vertical.
+  read `flipped_aes`; without the column, bars are vertical. The positions that move bars share
+  this through `Giggly.Position.Orientation`, a module of the boundary that is no kind and no
+  export.

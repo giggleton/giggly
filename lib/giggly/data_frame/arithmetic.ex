@@ -111,6 +111,72 @@ defmodule Giggly.DataFrame.Arithmetic do
     if nil in values, do: nil, else: Enum.reduce(rest, first, &greater/2)
   end
 
+  # The sum of `values`, R's `sum()`: missing where one is, `nil` (R's `NA`) or NaN, the first in
+  # order, as R's running sum keeps the first; an infinity as IEEE adds one, so the sum is that
+  # infinity, or NaN where the two meet; and otherwise the numbers added in extended precision, as
+  # R's `sum()` adds them in a long double (`:compensated`, the default), or in order in doubles, as
+  # R's `rowsum()` adds them (`:plain`).
+  @doc false
+  @spec sum([double()], :compensated | :plain) :: double()
+  def sum(values, summation \\ :compensated) when summation in [:compensated, :plain] do
+    case Enum.find(values, :none, fn value -> value in [nil, :nan] end) do
+      :none -> added(values, summation)
+      missing -> missing
+    end
+  end
+
+  defp added(values, summation) do
+    cond do
+      :infinity in values and :neg_infinity in values -> :nan
+      :infinity in values -> :infinity
+      :neg_infinity in values -> :neg_infinity
+      true -> finite_sum(values, summation)
+    end
+  end
+
+  defp finite_sum(values, :plain), do: Enum.reduce(values, 0.0, &+/2)
+
+  # Neumaier's compensated sum: each addition's rounding error, found exactly from the two values
+  # and their rounded sum, is kept apart and added back once at the end, which gives the sum a long
+  # double gives.
+  defp finite_sum(values, :compensated) do
+    {total, compensation} = Enum.reduce(values, {0.0, 0.0}, &compensated/2)
+    total + compensation
+  end
+
+  # The running sums of `values`, R's `cumsum()`: each the sum of the values up to it, in extended
+  # precision, as R's `cumsum()` adds in a long double and rounds each sum to a double, which a
+  # running compensated sum gives; from a missing value or an infinity on, each is what `add/2`
+  # makes of the sum before it and the value.
+  @doc false
+  @spec cumulative_sum([double()]) :: [double()]
+  def cumulative_sum(values) do
+    {sums, _running} = Enum.map_reduce(values, {0.0, 0.0}, &running/2)
+    sums
+  end
+
+  # The next running sum and what the one after it adds to: a compensated sum while every value
+  # has been a number, and the non-finite sum once one has not.
+  defp running(value, {_total, _compensation} = sum) when is_number(value) do
+    {total, compensation} = compensated(value, sum)
+    {total + compensation, {total, compensation}}
+  end
+
+  defp running(value, {total, compensation}), do: running(value, total + compensation)
+
+  defp running(value, sum) do
+    next = add(sum, value)
+    {next, next}
+  end
+
+  defp compensated(value, {total, compensation}) do
+    sum = total + value
+    {sum, compensation + rounding_error(total, value, sum)}
+  end
+
+  defp rounding_error(total, value, sum) when abs(total) >= abs(value), do: total - sum + value
+  defp rounding_error(total, value, sum), do: value - sum + total
+
   # Where a double that is neither missing nor NaN falls among the others.
   defp rank(:neg_infinity), do: {0, 0}
   defp rank(:infinity), do: {2, 0}

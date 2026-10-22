@@ -691,6 +691,21 @@ defmodule Giggly.PlotTest do
                plot.reversed_layers
     end
 
+    test "every bar function dodges by clusters by name, with the defaults, or as told" do
+      plot = Plot.new(@rows, %{x: :wt})
+      told = Plot.position_dodge2(preserve: :single, padding: 0, reverse: true)
+
+      for add <- [&Plot.geom_bar/2, &Plot.geom_histogram/2, &Plot.stat_bin/2] do
+        assert [%Plot.Layer{position: by_name}] = add.(plot, position: :dodge2).reversed_layers
+        assert by_name == %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}
+      end
+
+      assert [%Plot.Layer{position: ^told}] =
+               Plot.geom_col(plot, %{y: :mpg}, position: told).reversed_layers
+
+      assert told == %Position.Dodge2{preserve: :single, padding: 0.0, reverse: true}
+    end
+
     test "counted bars accept a mapped alpha, which the bar geom draws though counting ignores it" do
       plot =
         @rows
@@ -732,15 +747,17 @@ defmodule Giggly.PlotTest do
       assert error.key == :fill
     end
 
-    test "a position bars do not take is refused by the option's validation" do
+    test "a position bars do not take is refused by the option's validation, naming those they do" do
       plot = Plot.new(@rows, %{x: :cyl})
 
-      error =
-        assert_raise NimbleOptions.ValidationError, fn ->
-          Plot.geom_bar(plot, position: :jitter)
-        end
+      for add <- [&Plot.geom_bar/2, &Plot.geom_col/2, &Plot.geom_histogram/2, &Plot.stat_bin/2],
+          position <- [:jitter, %Position.Dodge{}] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: position) end
 
-      assert error.key == :position
+        assert error.key == :position
+        assert error.message =~ ":stack, :dodge, :dodge2 or a position Plot.position_dodge2/1"
+      end
     end
 
     test "an option given twice is refused rather than one silently winning" do
@@ -2077,6 +2094,29 @@ defmodule Giggly.PlotTest do
       assert_raise NimbleOptions.ValidationError, ~r/expected a label.*got: %\{\}/, fn ->
         Plot.annotate(plot, :text, x: 1, y: 1, label: %{})
       end
+    end
+  end
+
+  describe "position_dodge2/1" do
+    test "a padding outside 0 to 1, a preserve it does not know and a width are refused" do
+      for {options, key, message} <- [
+            {[padding: 1.5], :padding, "expected a fraction from 0 to 1, got: 1.5"},
+            {[padding: -0.1], :padding, "expected a fraction from 0 to 1, got: -0.1"},
+            {[padding: "0.1"], :padding, ~s(expected a fraction from 0 to 1, got: "0.1")},
+            {[preserve: :both], :preserve, "expected one of [:total, :single], got: :both"},
+            {[width: 0.5], [:width], "unknown options [:width]"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge2(options) end
+
+        assert error.key == key
+        assert error.message =~ message
+      end
+    end
+
+    test "a padding is kept as a float, 0 and 1 included" do
+      assert Enum.map([0, 1], fn padding -> Plot.position_dodge2(padding: padding).padding end) ===
+               [0.0, 1.0]
     end
   end
 

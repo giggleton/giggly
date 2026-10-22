@@ -3649,6 +3649,350 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for each plot below with
+  # `position_dodge2()`, its R spelled beside each test, printed to 17 significant digits, but for
+  # the one test that says where Giggly departs from R. They move with `position_dodge2()`.
+  describe "layer_data/2, dodged by clusters" do
+    # `ggplot(mtcars, aes(factor(cyl), fill = factor(vs)))` with `geom_bar(position = "dodge2")`,
+    # then `position_dodge2(preserve = "single")`.
+    test "the bars at an x share its width with a gap; with :single each takes its share alone" do
+      total = counted_cylinders(:dodge2)
+      single = counted_cylinders(Plot.position_dodge2(preserve: :single))
+
+      assert DataFrame.pull(total, :x) === [
+               0.77500000000000002,
+               1.22500000000000009,
+               1.77499999999999991,
+               2.22500000000000009,
+               3.0
+             ]
+
+      assert {DataFrame.pull(total, :xmin), DataFrame.pull(total, :xmax)} ===
+               {[
+                  0.57250000000000001,
+                  1.02250000000000019,
+                  1.57249999999999979,
+                  2.02249999999999996,
+                  2.59499999999999975
+                ],
+                [
+                  0.97750000000000004,
+                  1.42749999999999999,
+                  1.97750000000000004,
+                  2.42750000000000021,
+                  3.40500000000000025
+                ]}
+
+      assert last_edges(single) === {2.79749999999999988, 3.20250000000000012}
+    end
+
+    # The same with `position_dodge2(reverse = TRUE)`, `padding = 0` and `padding = 0.5`.
+    test "reverse: puts the highest group first, and padding: is the gap each bar leaves" do
+      reversed = counted_cylinders(Plot.position_dodge2(reverse: true))
+      unpadded = counted_cylinders(Plot.position_dodge2(padding: 0))
+      half = counted_cylinders(Plot.position_dodge2(padding: 0.5))
+
+      assert {DataFrame.pull(reversed, :group), DataFrame.pull(reversed, :xmin)} ===
+               {[2, 1, 4, 3, 5],
+                [
+                  0.57250000000000001,
+                  1.02250000000000019,
+                  1.57249999999999979,
+                  2.02249999999999996,
+                  2.59499999999999975
+                ]}
+
+      assert DataFrame.pull(unpadded, :xmin) === [
+               0.55000000000000004,
+               1.0,
+               1.54999999999999982,
+               2.0,
+               2.54999999999999982
+             ]
+
+      assert DataFrame.pull(half, :xmin) === [
+               0.66250000000000009,
+               1.11250000000000004,
+               1.66249999999999987,
+               2.11250000000000027,
+               2.77499999999999991
+             ]
+    end
+
+    # `geom_col(position = "dodge2")` over x b, a, b, a, y 4, 3, 2, 1 and fill q, q, p, p; then
+    # `geom_bar(position = "dodge2")` of `factor(cyl)` alone.
+    test "rows come out by x, then group, and no bar is padded where no x holds two" do
+      columns =
+        dodged_columns(
+          %{"x" => ["b", "a", "b", "a"], "y" => [4, 3, 2, 1], "g" => ["q", "q", "p", "p"]},
+          %{x: :x, y: :y, fill: :g},
+          position: :dodge2
+        )
+
+      alone =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}})
+        |> Plot.geom_bar(position: :dodge2)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(columns, :y), DataFrame.pull(columns, :group)} ===
+               {[1, 3, 2, 4], [1, 2, 3, 4]}
+
+      assert {DataFrame.pull(alone, :xmin), DataFrame.pull(alone, :xmax)} ===
+               {[0.55000000000000004, 1.54999999999999982, 2.54999999999999982],
+                [1.45, 2.4500000000000002, 3.4500000000000002]}
+    end
+
+    # `geom_col(aes(width = w), position = "dodge2")` over x a, a, a, b, y 1 to 4, fill p, q, r, p
+    # and w 0.3, 0.6, 0.8, 0.5, then with `preserve = "single"`, then `geom_col(width = 0.5,
+    # position = "dodge2")`; and over x a, a, a with w 0.1, 0.5, 0.6, whose widths add apart in
+    # doubles from R's extended precision.
+    test "bars of different widths at an x are dodged together, each its width over their number" do
+      rows = %{
+        "x" => ["a", "a", "a", "b"],
+        "y" => [1, 2, 3, 4],
+        "g" => ["p", "q", "r", "p"],
+        "w" => [0.3, 0.6, 0.8, 0.5]
+      }
+
+      mapped = %{x: :x, y: :y, fill: :g, width: :w}
+      total = dodged_columns(rows, mapped, position: :dodge2)
+      single = dodged_columns(rows, mapped, position: Plot.position_dodge2(preserve: :single))
+      set = dodged_columns(rows, %{x: :x, y: :y, fill: :g}, width: 0.5, position: :dodge2)
+
+      precise =
+        dodged_columns(
+          %{
+            "x" => ["a", "a", "a"],
+            "y" => [1, 2, 3],
+            "g" => ["p", "q", "r"],
+            "w" => [0.1, 0.5, 0.6]
+          },
+          mapped,
+          position: :dodge2
+        )
+
+      assert {DataFrame.pull(total, :xmin), DataFrame.pull(total, :xmax)} ===
+               {[
+                  0.72166666666666657,
+                  0.82666666666666666,
+                  1.02999999999999980,
+                  1.77499999999999991
+                ],
+                [
+                  0.81166666666666665,
+                  1.00666666666666660,
+                  1.27000000000000002,
+                  2.22500000000000009
+                ]}
+
+      assert last_edges(single) === {1.92500000000000004, 2.07500000000000018}
+
+      assert DataFrame.pull(set, :xmin) === [
+               0.75833333333333330,
+               0.92500000000000004,
+               1.09166666666666656,
+               1.77499999999999991
+             ]
+
+      assert {DataFrame.pull(precise, :xmin), DataFrame.pull(precise, :xmax)} ===
+               {[0.80166666666666664, 0.84166666666666667, 1.01000000000000001],
+                [0.83166666666666667, 0.99166666666666659, 1.19000000000000017]}
+    end
+
+    # `geom_col(aes(x, y, width = w), position = "dodge2")` over x 1, 1.5, 3, y 1 to 3 and w 1, with
+    # no group; and `geom_col(position = "dodge2")` over x a, a, b, y 1 to 3.
+    test "bars need no group: overlapping bars are dodged, and two of one group at an x" do
+      overlapping =
+        dodged_columns(
+          %{"x" => [1, 1.5, 3], "y" => [1, 2, 3], "w" => [1, 1, 1]},
+          %{x: :x, y: :y, width: :w},
+          position: :dodge2
+        )
+
+      one_group =
+        dodged_columns(
+          %{"x" => ["a", "a", "b"], "y" => [1, 2, 3]},
+          %{x: :x, y: :y},
+          position: :dodge2
+        )
+
+      assert {DataFrame.pull(overlapping, :xmin), DataFrame.pull(overlapping, :xmax)} ===
+               {[0.77500000000000002, 1.27499999999999991, 2.54999999999999982],
+                [1.2250000000000001, 1.7250000000000001, 3.4500000000000002]}
+
+      assert {DataFrame.pull(one_group, :group), DataFrame.pull(one_group, :xmin)} ===
+               {[1, 1, 2], [0.57250000000000001, 1.02250000000000019, 1.59499999999999997]}
+    end
+
+    # `geom_col(position = "dodge2")` over x 1, NA, 2, 2, y 1 to 4 and fill p, p, p, q; then
+    # `position_dodge2(preserve = "single")` over x 1, 2, 2, NA, NA, NA, y 1 to 6 and fill p, p,
+    # q, p, q, r, whose missing x count at none.
+    test "a bar missing its x comes last, placed nowhere, and :single counts it at no x" do
+      missing =
+        dodged_columns(
+          %{"x" => [1, nil, 2, 2], "y" => [1, 2, 3, 4], "g" => ["p", "p", "p", "q"]},
+          %{x: :x, y: :y, fill: :g},
+          position: :dodge2
+        )
+
+      single =
+        dodged_columns(
+          %{
+            "x" => [1, 2, 2, nil, nil, nil],
+            "y" => [1, 2, 3, 4, 5, 6],
+            "g" => ["p", "p", "q", "p", "q", "r"]
+          },
+          %{x: :x, y: :y, fill: :g},
+          position: Plot.position_dodge2(preserve: :single)
+        )
+
+      assert {DataFrame.pull(missing, :y), DataFrame.pull(missing, :x)} ===
+               {[1, 3, 4, 2], [1.0, 1.7749999999999999, 2.2250000000000001, nil]}
+
+      assert DataFrame.pull(missing, :xmin) === [
+               0.59499999999999997,
+               1.57249999999999979,
+               2.02249999999999996,
+               nil
+             ]
+
+      assert DataFrame.pull(single, :xmin) === [
+               0.79749999999999999,
+               1.57249999999999979,
+               2.02249999999999996,
+               nil,
+               nil,
+               nil
+             ]
+    end
+
+    # `geom_col(aes(width = w), position = "dodge2")` over x a, a, b, c, c, y 1 to 5, fill p, q,
+    # p, p, q and w 0.5, 0.5, NA, 0.5, 0.5: R gives b's bar no x, as here, but sets c's two bars one
+    # on the other at 2.8875 to 3.1125, b's cluster taking c's start (design-log §4, the entry
+    # beginning "Dodging by clusters places each cluster").
+    test "a bar with no width loses its x, and the clusters after it are placed from their own" do
+      frame =
+        dodged_columns(
+          %{
+            "x" => ["a", "a", "b", "c", "c"],
+            "y" => [1, 2, 3, 4, 5],
+            "g" => ["p", "q", "p", "p", "q"],
+            "w" => [0.5, 0.5, nil, 0.5, 0.5]
+          },
+          %{x: :x, y: :y, fill: :g, width: :w},
+          position: :dodge2
+        )
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :xmin),
+              DataFrame.pull(frame, :xmax)} ===
+               {[0.875, 1.125, nil, 2.875, 3.125], [0.7625, 1.0125, nil, 2.7625, 3.0125],
+                [0.9875, 1.2375, nil, 2.9875, 3.2375]}
+    end
+
+    # `ggplot(mtcars, aes(y = factor(cyl), fill = factor(vs))) + geom_bar(position = "dodge2")`.
+    test "horizontal bars dodge along y" do
+      frame =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{y: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+        |> Plot.geom_bar(position: :dodge2)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :x)} ===
+               {[
+                  0.57250000000000001,
+                  1.02250000000000019,
+                  1.57249999999999979,
+                  2.02249999999999996,
+                  2.59499999999999975
+                ], [1.0, 10.0, 3.0, 4.0, 14.0]}
+    end
+
+    # `geom_col(position = position_dodge2(preserve = "single"))` of `aes("x", y, fill = g2)` over
+    # g1 x, x, y, y, y, g2 a, b, a, b, c and y 1, 2, 3, 4, 3, faceted by g1; then
+    # `geom_col(position = "dodge2")` over f u, u, u, v, v, x a, a, b, a, b, y 1 to 5 and fill p,
+    # q, p, p, p, faceted by f.
+    test "under a facet, :single's share is the layer's, and a panel is padded on its own" do
+      single =
+        %{
+          "g1" => ["x", "x", "y", "y", "y"],
+          "g2" => ["a", "b", "a", "b", "c"],
+          "y" => [1, 2, 3, 4, 3]
+        }
+        |> Plot.new(%{x: {:constant, "x"}, y: :y, fill: :g2})
+        |> Plot.geom_col(position: Plot.position_dodge2(preserve: :single))
+        |> Plot.facet_wrap(:g1)
+        |> Giggly.layer_data()
+
+      padded =
+        %{
+          "f" => ["u", "u", "u", "v", "v"],
+          "x" => ["a", "a", "b", "a", "b"],
+          "y" => [1, 2, 3, 4, 5],
+          "g" => ["p", "q", "p", "p", "p"]
+        }
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_col(position: :dodge2)
+        |> Plot.facet_wrap(:f)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(single, :xmin) === [
+               0.71499999999999997,
+               1.01499999999999990,
+               0.56500000000000006,
+               0.86499999999999999,
+               1.16499999999999981
+             ]
+
+      assert DataFrame.pull(padded, :xmin) === [
+               0.57250000000000001,
+               1.02250000000000019,
+               1.59499999999999997,
+               0.55000000000000004,
+               1.54999999999999982
+             ]
+    end
+
+    # `ggplot(mpg, aes(hwy, fill = drv)) + geom_histogram(bins = 5, position = "dodge2")`, its first
+    # bin's three bars and the groups of all fifteen.
+    test "a histogram's bars in one bin are dodged within it" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, fill: :drv})
+        |> Plot.geom_histogram(bins: 5, position: :dodge2)
+        |> Giggly.layer_data()
+
+      first_bin =
+        frame
+        |> DataFrame.pull(:xmin)
+        |> Enum.take(3)
+
+      groups =
+        [1, 2, 3]
+        |> List.duplicate(5)
+        |> List.flatten()
+
+      assert first_bin === [8.1333333333333329, 10.8000000000000007, 13.4666666666666668]
+      assert DataFrame.pull(frame, :group) === groups
+    end
+
+    # `geom_col(just = 0, position = "dodge2")` over x a, a, b, y 1 to 3 and fill p, q, p: each
+    # cluster centred on the middle of its bars' span, b's bar moving off its x.
+    test "bars set beside their x are dodged about the middle of their span" do
+      frame =
+        dodged_columns(
+          %{"x" => ["a", "a", "b"], "y" => [1, 2, 3], "g" => ["p", "q", "p"]},
+          %{x: :x, y: :y, fill: :g},
+          just: 0,
+          position: :dodge2
+        )
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :xmin)} ===
+               {[1.2250000000000001, 1.6749999999999998, 2.4500000000000002],
+                [1.0225000000000002, 1.4724999999999999, 2.0450000000000004]}
+    end
+  end
+
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same `mpg` where it
   # is used, printed to 17 significant digits. It moves with ggplot2's bar orientation.
   describe "layer_data/2, horizontal bars" do
@@ -5385,6 +5729,22 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/dodge.svg")
     end
 
+    # Golden: test/golden/dodge2.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/dodge2.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. mtcars' cylinders counted by engine shape and
+    # dodged by clusters: the bars at each count of cylinders side by side with a gap between them,
+    # the eight-cylinder count's one bar narrowed alike. It moves with what moves
+    # test/golden/bar_fill.svg, and with dodging by clusters.
+    test "bars dodged by clusters stand side by side with a gap between them" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+        |> Plot.geom_bar(position: :dodge2)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/dodge2.svg")
+    end
+
     # Golden: test/golden/horizontal_bar.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/horizontal_bar.R: every element matches it, the x axis drawn before the y
     # as in test/golden/point.svg, and every clip path. geom_bar()'s third example from ggplot2's
@@ -6434,5 +6794,34 @@ defmodule GigglyTest do
     |> String.split("\n")
     |> Enum.filter(fn line -> String.starts_with?(line, ["<polyline", "<line "]) end)
     |> Enum.reject(fn line -> String.contains?(line, ["#FFFFFF", "#333333"]) end)
+  end
+
+  # The layer's table of mtcars' cylinders counted by engine shape, `vs`, its bars placed by
+  # `position`.
+  defp counted_cylinders(position) do
+    Giggly.Datasets.mtcars()
+    |> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+    |> Plot.geom_bar(position: position)
+    |> Giggly.layer_data()
+  end
+
+  # The last row's `xmin` and `xmax` in the layer's table `frame`.
+  defp last_edges(frame) do
+    [xmin, xmax] =
+      Enum.map([:xmin, :xmax], fn name ->
+        frame
+        |> DataFrame.pull(name)
+        |> List.last()
+      end)
+
+    {xmin, xmax}
+  end
+
+  # The layer's table of columns drawn from `rows` with `mapping` and `options`.
+  defp dodged_columns(rows, mapping, options) do
+    rows
+    |> Plot.new(mapping)
+    |> Plot.geom_col(options)
+    |> Giggly.layer_data()
   end
 end

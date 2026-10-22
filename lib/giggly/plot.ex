@@ -491,11 +491,12 @@ defmodule Giggly.Plot do
 
   # How bars that share an `x` are placed, an option of `geom_bar/3` and `geom_col/3`.
   @bar_position_option [
-    type: {:in, [:stack, :dodge]},
+    type: {:custom, __MODULE__, :validate_bar_position, []},
     default: :stack,
     doc:
-      "How bars that share an `x` are placed: piled on one another (`:stack`), or set side by " <>
-        "side within the width one bar takes (`:dodge`)."
+      "How bars that share an `x` are placed: piled on one another (`:stack`), set side by " <>
+        "side within the width one bar takes (`:dodge`), or set side by side, each its share " <>
+        "of their widths, with a gap between them (`:dodge2`, or as `position_dodge2/1` says)."
   ]
 
   # `geom_col/3`'s options, validated at the call.
@@ -578,11 +579,13 @@ defmodule Giggly.Plot do
                  [
                    data: @data_option,
                    position: [
-                     type: {:in, [:stack, :dodge]},
+                     type: {:custom, __MODULE__, :validate_bar_position, []},
                      default: :stack,
                      doc:
                        "How bars that share a bin are placed: piled on one another " <>
-                         "(`:stack`), or set side by side within the bin's width (`:dodge`)."
+                         "(`:stack`), set side by side within the bin's width (`:dodge`), or " <>
+                         "set side by side, each its share of the bin's width, with a gap " <>
+                         "between them (`:dodge2`, or as `position_dodge2/1` says)."
                    ]
                  ] ++ @binning_options ++ @bar_look_options
                )
@@ -1593,6 +1596,34 @@ defmodule Giggly.Plot do
                                         )
                                     )
 
+  # `position_dodge2/1`'s options.
+  @position_dodge2_options NimbleOptions.new!(
+                             preserve: [
+                               type: {:in, [:total, :single]},
+                               default: :total,
+                               doc:
+                                 "Whether the bars at a position share their whole width " <>
+                                   "(`:total`), or each takes its width over the most bars any " <>
+                                   "one position holds, so a position with fewer leaves room " <>
+                                   "(`:single`)."
+                             ],
+                             padding: [
+                               type: {:custom, __MODULE__, :validate_padding, []},
+                               default: 0.1,
+                               doc:
+                                 "How much of its share each bar leaves as a gap, a fraction " <>
+                                   "from 0 to 1, in every panel where some position holds two " <>
+                                   "bars or more."
+                             ],
+                             reverse: [
+                               type: :boolean,
+                               default: false,
+                               doc:
+                                 "Whether the bars at a position run from the highest group to " <>
+                                   "the lowest."
+                             ]
+                           )
+
   # `guide_legend/1`'s options.
   @guide_legend_options NimbleOptions.new!(
                           reverse: [
@@ -2101,13 +2132,15 @@ defmodule Giggly.Plot do
   Adds a layer of bars, one per row, each from 0 to its `y` and centred on its `x` unless `just:`
   says otherwise, for bars whose heights are in the data. Bars at the same `x` are stacked, those
   below zero downward, the highest group at the bottom; with `position: :dodge` they are set side
-  by side within one bar's width, an `x` with one group keeping its whole width.
+  by side within one bar's width, an `x` with one group keeping its whole width; with `position:
+  :dodge2`, or as `position_dodge2/1` says, bars whose spans overlap are set side by side, each its
+  share of their widths, with a gap between them.
 
   Each bar is 0.9 times the closest spacing of the `x` positions wide: 0.9 on a discrete axis, and
   on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart; or as
   wide as its mapped `:width`, a number, or as `width:` makes every bar, which wins over a mapped
   one. `just:` places each bar against its `x`, its lower edge there at 0 and its upper at 1. Bars
-  of different widths at one `x` are neither stacked nor dodged together. The `y` axis reaches 0.
+  of different widths at one `x` are dodged together only by `:dodge2`. The `y` axis reaches 0.
 
   Bars use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype`, `:linewidth` and
   `:width`, and need `:x` and `:y`. `:fill` fills a bar and takes its alpha; `:color` borders it,
@@ -2503,6 +2536,38 @@ defmodule Giggly.Plot do
     raise ArgumentError,
           "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :text or :rect, " <>
             "got: #{inspect(geom)}"
+  end
+
+  @doc """
+  A position for the `position:` of `geom_bar/3`, `geom_col/3`, `geom_histogram/3` and
+  `stat_bin/3`, with options: the bars at a position set side by side, as `position: :dodge2`
+  sets them.
+
+  Bars whose spans overlap or meet are dodged together, whatever their groups and widths: each
+  takes its share of their widths, its own width over their number, and they are laid side by
+  side in order of group, centred on the middle of the span they covered, each bar's `x` moving
+  to its middle. In a panel where some position holds two bars or more, every bar is then
+  narrowed by `padding:`, so neighbours stand apart. The layer's rows come out in that order: by
+  panel, then by `x`, then by group.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use.
+
+  ## Options
+
+  #{NimbleOptions.docs(@position_dodge2_options)}
+
+      iex> plot =
+      ...>   %{"x" => ["a", "a", "b"], "y" => [1.0, 2.0, 3.0], "g" => ["p", "q", "p"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, fill: :g})
+      ...>   |> Giggly.Plot.geom_col(position: Giggly.Plot.position_dodge2(preserve: :single))
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :xmin)
+      [0.5725, 1.0225000000000002, 1.7974999999999999]
+  """
+  @spec position_dodge2(keyword()) :: struct()
+  def position_dodge2(options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, @position_dodge2_options)
+    struct!(Position.Dodge2, validated)
   end
 
   @doc """
@@ -4280,6 +4345,31 @@ defmodule Giggly.Plot do
   def validate_just(just),
     do: {:error, "expected a number from 0 to 1, got: #{inspect(just)}"}
 
+  # NimbleOptions' check of a bar's `position:`: one of the positions it takes by name, or a
+  # position `position_dodge2/1` makes.
+  @doc false
+  @spec validate_bar_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
+  def validate_bar_position(position) when position in [:stack, :dodge, :dodge2],
+    do: {:ok, position}
+
+  def validate_bar_position(%Position.Dodge2{} = position), do: {:ok, position}
+
+  def validate_bar_position(position) do
+    {:error,
+     "expected :stack, :dodge, :dodge2 or a position Plot.position_dodge2/1 makes, got: " <>
+       inspect(position)}
+  end
+
+  # NimbleOptions' check of `position_dodge2/1`'s `padding:`: the fraction of its share each bar
+  # leaves as a gap, from 0 to 1, kept as a float.
+  @doc false
+  @spec validate_padding(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_padding(padding) when is_number(padding) and padding >= 0 and padding <= 1,
+    do: {:ok, padding / 1}
+
+  def validate_padding(padding),
+    do: {:error, "expected a fraction from 0 to 1, got: #{inspect(padding)}"}
+
   # NimbleOptions' check of a `nudge_x:` or `nudge_y:` option: any distance along its axis, kept as
   # a float, as R keeps one.
   @doc false
@@ -5105,6 +5195,8 @@ defmodule Giggly.Plot do
 
   defp position(:stack), do: %Position.Stack{}
   defp position(:dodge), do: %Position.Dodge{}
+  defp position(:dodge2), do: position_dodge2()
+  defp position(%Position.Dodge2{} = position), do: position
 
   defp path_geom(validated) do
     %Geom.Path{

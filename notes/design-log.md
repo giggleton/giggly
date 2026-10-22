@@ -319,6 +319,44 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: the bars' refusal* — never decided, and R's own pages use both. *Rejected: `width:` as
   a field of the geom* — a mapped width would beat the set one, the reverse of R.
 
+- **Dodging by clusters computes on lists, as every position does, since a position's rows are
+  its marks (2026-10-22, Steve, scoping distributions' step 5).** `Position.Dodge2`, R's
+  `position_dodge2()`, pulls the columns it moves, works out R's clusters, widths, running sums and
+  padding on lists, in R's order through `Giggly.DataFrame.Arithmetic` so its doubles are R's, and
+  puts them back, as dodging and stacking do. The stat rule (the entry beginning "A stat computes
+  only through frame operations") covers the work that scales with a layer's input; a position
+  runs on the stat's output, one row per mark, which the geom reads straight after to draw, and
+  §7's engine plan materialises that output, so `layer_data/2` stays a frame of lists. *Rejected:
+  frame operations* — dodge2's per-bar steps need arithmetic in expressions, a sort and an ordered
+  running sum within groups, three new kinds of operation whose first caller would be a table
+  drawn at once; the running sum arrives with a stat that needs it (`stat_ecdf()`), arithmetic
+  with expressions by name.
+
+- **`Plot.position_dodge2/1` arrives with dodging by clusters, taking `preserve:`, `padding:` and
+  `reverse:` (2026-10-22, Steve, scoping distributions' step 5).** It returns `%Position.Dodge2{}`,
+  which `position:` takes beside the `:dodge2` atom on `geom_bar/3`, `geom_col/3`,
+  `geom_histogram/3` and `stat_bin/3`, as the entry beginning "A layer chooses its position by an
+  atom now" foresaw: `preserve:` `:total` or `:single`, R's strings as atoms; `padding:` 0 to 1, as
+  `just:` is, where R takes any number and its code widens bars into their neighbours below 0 and
+  turns them inside out above 1; `reverse:` a boolean. Step 6's `varwidth` sets the same
+  `preserve`. `width:` is left out: R reads it only for a geom without edges, none of which takes a
+  position, and on bars it changes nothing, so it raises as an unknown option, as a frequency
+  polygon's `pad:` does. *Rejected: the atom alone, `preserve` set only by `varwidth`* — R's
+  `position_dodge` page draws bars with `preserve` twice. *Rejected: `preserve:` alone* —
+  `padding:` and `reverse:` are R's, a line each, already checked against R.
+
+- **Dodging by clusters places each cluster from its own centre and widths, where R misplaces
+  those after a bar with no edges (2026-10-22, Steve, scoping distributions' step 5).** R's
+  `pos_dodge2()` totals each cluster's new widths by its centre, sorts the centres, and gives the
+  k-th one's start to the k-th cluster found; a bar with no edges, from a missing mapped width, is
+  a cluster with no centre, so each cluster after it takes the next one's start and the last keeps
+  its own edges. Over x a, a, b, c, c with widths 0.5, 0.5, NA, 0.5, 0.5, R draws c's two bars one
+  on the other at 2.8875–3.1125; Giggly sets them at 2.7625–2.9875 and 3.0125–3.2375, as a's are,
+  and the bar with no edges loses its x, as R's does. The two agree wherever every bar has edges
+  and a positive width and none reaches back past an earlier cluster; negative widths, each its
+  own cluster by R's rule, stay where they are. *Rejected: R's placement* — a slip in its
+  indexing, which stacks the bars dodging exists to separate.
+
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
   `scale_shape_discrete/2` takes `solid:` (`{:shape, :solid}` or `{:shape, :open}`, R's
@@ -2079,6 +2117,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Dodge bars by clusters: position_dodge2 (distributions, step 5); §4: "Dodging by
+  clusters computes on lists", "`Plot.position_dodge2/1` arrives", "Dodging by clusters places
+  each cluster"
 - 2026-10-22 — Give bars R's width and placement: width:, just: and a mapped width; §4: "Bars
   take R's `width:` and `just:`"
 - 2026-10-22 — Summarise each group into a box through the frame (distributions, step 4); §4: "A

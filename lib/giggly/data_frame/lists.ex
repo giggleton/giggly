@@ -519,47 +519,15 @@ defmodule Giggly.DataFrame.Lists do
   defp greatest([]), do: nil
   defp greatest(values), do: Enum.max_by(values, &rank/1)
 
-  # The sum of `values` as R adds doubles: a missing one, `nil` (R's `NA`) or NaN, makes it missing,
-  # the first in row order, as R's running sum keeps the first, or is left out, as `missing` says;
-  # and an infinity adds as IEEE adds one, so the sum is that infinity, or NaN where the two meet.
-  defp sum(values, summation, :propagate) do
-    case Enum.find(values, :none, fn value -> value in [nil, :nan] end) do
-      :none -> added(values, summation)
-      missing -> missing
-    end
-  end
+  # The sum of `values` as R adds doubles (`Arithmetic.sum/2`), a missing one, `nil` (R's `NA`) or
+  # NaN, making it missing or left out, as `missing` says.
+  defp sum(values, summation, :propagate), do: Arithmetic.sum(values, summation)
 
   defp sum(values, summation, :skip) do
     values
     |> Enum.reject(fn value -> value in [nil, :nan] end)
-    |> added(summation)
+    |> Arithmetic.sum(summation)
   end
-
-  defp added(values, summation) do
-    cond do
-      :infinity in values and :neg_infinity in values -> :nan
-      :infinity in values -> :infinity
-      :neg_infinity in values -> :neg_infinity
-      true -> finite_sum(values, summation)
-    end
-  end
-
-  defp finite_sum(values, :plain), do: Enum.reduce(values, 0.0, &+/2)
-
-  # Neumaier's compensated sum: each addition's rounding error, found exactly from the two values
-  # and their rounded sum, is kept apart and added back once at the end.
-  defp finite_sum(values, :compensated) do
-    {total, compensation} =
-      Enum.reduce(values, {0.0, 0.0}, fn value, {total, compensation} ->
-        sum = total + value
-        {sum, compensation + rounding_error(total, value, sum)}
-      end)
-
-    total + compensation
-  end
-
-  defp rounding_error(total, value, sum) when abs(total) >= abs(value), do: total - sum + value
-  defp rounding_error(total, value, sum), do: value - sum + total
 
   # The frame of the `row_count` rows whose key is `key`, from the columns grouped by key.
   defp part(%__MODULE__{reversed_names: reversed_names}, grouped, key, row_count) do

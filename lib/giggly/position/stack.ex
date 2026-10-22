@@ -19,7 +19,7 @@ defmodule Giggly.Position.Stack do
   # missing, so it is not drawn.
   #
   # Horizontal bars, those whose `flipped_aes` column says so, are stacked along x, x and y
-  # swapped and swapped back, as ggplot2's `flip_data()` does.
+  # swapped and swapped back (`Giggly.Position.Orientation`).
 
   defstruct []
 
@@ -28,8 +28,9 @@ defmodule Giggly.Position.Stack do
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
 
-    alias Giggly.{Aesthetics, DataFrame}
+    alias Giggly.DataFrame
     alias Giggly.DataFrame.Arithmetic
+    alias Giggly.Position.Orientation
 
     # ggplot2's default: each bar's y at the top of its stretch.
     @vjust 1
@@ -43,34 +44,12 @@ defmodule Giggly.Position.Stack do
 
     @impl Giggly.Position
     def compute_layer(_position, frame) do
-      flipped = flipped?(frame)
+      flipped = Orientation.flipped?(frame)
 
       frame
-      |> flip(flipped)
+      |> Orientation.flip(flipped)
       |> moved()
-      |> flip(flipped)
-    end
-
-    # Horizontal where the stat or geom wrote so in `flipped_aes`, as ggplot2's positions read it.
-    defp flipped?(frame) do
-      if :flipped_aes in DataFrame.names(frame) do
-        frame
-        |> DataFrame.pull(:flipped_aes)
-        |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
-      else
-        false
-      end
-    end
-
-    defp flip(frame, false), do: frame
-
-    defp flip(frame, true) do
-      renames =
-        frame
-        |> DataFrame.names()
-        |> Aesthetics.flipped()
-
-      DataFrame.select(frame, renames)
+      |> Orientation.flip(flipped)
     end
 
     defp moved(frame) do

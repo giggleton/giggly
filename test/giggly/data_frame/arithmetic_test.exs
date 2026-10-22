@@ -192,4 +192,38 @@ defmodule Giggly.DataFrame.ArithmeticTest do
              2
            ]
   end
+
+  # Golden: R 4.6.1's sum(c(1e16, 1, 1)) is 10000000000000002, where adding in doubles gives 1e16,
+  # and sum(c(1, NA, NaN)), sum(c(NaN, NA)) and sum(c(1, Inf, -Inf)) are NA, NaN and NaN.
+  test "sum is R's sum(): in extended precision, the first missing value kept, infinities met NaN" do
+    assert Arithmetic.sum([1.0e16, 1.0, 1.0]) === 10_000_000_000_000_002.0
+    assert Arithmetic.sum([1.0e16, 1.0, 1.0], :plain) === 1.0e16
+
+    assert Enum.map([[1.0, nil, :nan], [:nan, nil], [1.0, :infinity, :neg_infinity]], fn values ->
+             Arithmetic.sum(values)
+           end) === [nil, :nan, :nan]
+  end
+
+  # Golden: R 4.6.1's cumsum() of c(1e16, 1, 1), c(0.1, 0.2), c(1, Inf, 2, -Inf, 3) and c(1, NA, 2),
+  # printed to 17 significant digits: 1e16, 1e16, 10000000000000002 (adding in doubles keeps 1e16);
+  # 0.10000000000000001, 0.30000000000000004; 1, Inf, Inf, NaN, NaN; and 1, NA, NA.
+  test "cumulative_sum is R's cumsum(): each sum in extended precision, a missing one carried on" do
+    sums =
+      Enum.map(
+        [
+          [1.0e16, 1.0, 1.0],
+          [0.1, 0.2],
+          [1.0, :infinity, 2.0, :neg_infinity, 3.0],
+          [1.0, nil, 2.0]
+        ],
+        &Arithmetic.cumulative_sum/1
+      )
+
+    assert sums === [
+             [1.0e16, 1.0e16, 10_000_000_000_000_002.0],
+             [0.1, 0.30000000000000004],
+             [1.0, :infinity, :infinity, :nan, :nan],
+             [1.0, nil, nil]
+           ]
+  end
 end

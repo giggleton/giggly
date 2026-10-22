@@ -42,10 +42,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
   `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
   `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
-  the guide functions (`guides/2`, `guide_legend/1`) and `labs/2`.** `computed_mapping/2`,
-  `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a layer draws,
-  `layer_annotation?/1` whether it is an annotation) exist for the assembly and are `@doc false`,
-  and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`, not
+  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1` and `labs/2`.**
+  `computed_mapping/2`, `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a
+  layer draws, `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
+  `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`, not
   `Aesthetics.name/0`). An example in the docs shows what a user sees, through `Giggly.layer_data/2`
   or the drawing `Giggly.to_svg/2` makes, never a layer's or a kind's struct.
 - **No function ggplot2 has superseded or deprecated becomes API**; Giggly offers its replacement
@@ -56,7 +56,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`, and
   `geom_count/3` and `stat_sum/3` both `%Geom.Point{}` with `%Stat.Sum{}` and
   `%Position.Identity{}`, and `geom_histogram/3` and `stat_bin/3` both `%Geom.Bar{}` with
-  `%Stat.Bin{}` and their position, `:stack` unless `position:` says `:dodge`, and
+  `%Stat.Bin{}` and their position, `:stack` unless `position:` says otherwise, and
   `geom_freqpoly/3` `%Geom.Path{}` with `%Stat.Bin{pad: true}` and `%Position.Identity{}`, as
   ggplot2's `geom_freqpoly()` pads whatever it is given, so it takes no `pad:` (design-log §4, the
   entry beginning "A frequency polygon takes no"). **The binning options are fields of
@@ -180,9 +180,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   mapped `:width` alike, an expression's refused by the bar geom.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
-  position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A position is chosen by
-  an atom (`position: :stack | :dodge`) and recorded as its kind's struct; its parameters never
-  become the geom's options (the entry beginning "A layer chooses its position by an atom").
+  position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A bar function's
+  position is chosen by an atom (`position: :stack | :dodge | :dodge2`, `:dodge2` recorded with
+  `position_dodge2/1`'s defaults) or by the struct `position_dodge2/1` builds from its options
+  (`preserve:`, `padding:` 0 to 1, `reverse:`, and no `width:`, which no geom taking a position
+  reads), and recorded as its kind's struct; its parameters never become the geom's options
+  (design-log §4, the entries beginning "A layer chooses its position by an atom" and
+  "`Plot.position_dodge2/1` arrives").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle and point functions `fill:`,
