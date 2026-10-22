@@ -272,8 +272,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `colour:` is. Usage was thin (reference examples: the outlier look 5, `varwidth` 2, `notch` 1;
   r4ds and the ggplot2 book's 42 box plots: `varwidth` and `width` once each), but Steve kept the
   part looks, cheap to draw. A mapped `width` is taken too (2026-10-22, Steve: "follow ggplot2's
-  lead in terms of what is supported"): a box is as wide as its group's first `width`, ahead of
-  `width:` and of 0.9 of the group's x range, as R's stat reads it. *Rejected: refusing it as
+  lead in terms of what is supported"): a box is as wide as its group's first `width`, else 0.9 of
+  the group's x range where it spans several, else `width:`, as R's stat reads them; a set `width:`
+  drops a mapped one, as R's set aesthetics drop a mapping (R draws mapped widths 0.2 and 0.6 beside
+  `width = 0.3` at 0.3), and still yields to a group's range (checked 2026-10-22, scoping step 6).
+  The set aesthetics are R's, `shape:` and `size:` setting the outliers' look as R's do (Steve,
+  2026-10-22, step 6). *Left out: `stat_boxplot/3`* (step 6) — without `geom:` it draws what
+  `geom_boxplot()` draws but ignores the outlier and part looks; its use, `geom = "errorbar"`,
+  waits on `geom:`, and neither r4ds nor the ggplot2 book calls it. *Rejected: refusing it as
   `geom_bar/3` and `geom_col/3` do* (proposed) — R documents and draws it; the bars' refusal was
   never decided. *Left out: `quantile.type`* — no use, and each of R's other eight types would be an
   aggregate every engine must carry. *Left out: weighted boxes* (2026-10-22, Steve) — R weighs them
@@ -281,6 +287,43 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   called 'quantreg'") and draws no layer, and matching `rq()`'s linear-programming answer would be
   research. *Left out: the identity-stat box* — it needs a `stat:` option, which no geom has; that
   is a decision for every geom.
+
+- **A weight in the plot's mapping is refused by a box layer at the call (2026-10-22, Steve,
+  scoping distributions' step 6).** `Plot.new(mpg, %{x: :class, y: :hwy, weight: :displ}) |>
+  Plot.geom_boxplot()` raises from `geom_boxplot/3`, saying the plot maps `:weight`, that a box's
+  quartiles are of its rows unweighted, and to map the weight on the layers that count with it.
+  R weighs the boxes with `quantreg::rq()`, or, on a plain install, warns "Computation failed in
+  `stat_boxplot()`" and draws none; Giggly leaves weighted boxes out (the entry beginning "A box
+  plot takes R's options"), so riding along, the rule for a plot aesthetic a layer cannot use (the
+  entry beginning "An aesthetic a layer takes from the plot"), would draw unweighted boxes, a
+  third result R never draws, silently. The first exception to that rule: an aesthetic R's layer
+  uses and Giggly's cannot. *Rejected: riding along unused* — a mapping silently doing nothing.
+  The cost, accepted: a plot weighting a bar layer through its own mapping holds no boxes until
+  the weight moves to that layer, where R would have weighed the boxes too.
+
+- **A box layer dodges by clusters unless told otherwise, and `varwidth:` switches its dodging to
+  `preserve: :single` silently (2026-10-22, Steve, scoping distributions' step 6).**
+  `geom_boxplot/3` takes `position:` `:dodge2`, its default, `:dodge`, or `position_dodge2/1`'s
+  struct; `:stack` is refused, as R fails stacking boxes ("replacement has 0 rows"), and
+  `:identity` waits, as it does for bars. With `varwidth: true`, either atom records
+  `position_dodge2(preserve: :single)`, as R replaces any position string, `"identity"` included,
+  and a struct records `preserve: :single` with its `padding` and `reverse` kept, where R warns
+  "Can't preserve total widths when `varwidth = TRUE`" and switches, so every call draws what R
+  draws. *Rejected: raising for a struct* — `position_dodge2/1` records `:total` unless told
+  otherwise, as R's does, so it would refuse the default struct, a setting nobody wrote, where R
+  only warns.
+
+- **A box plot's orientation is R's, an ambiguous one chosen silently, and a contrary
+  `orientation:` raises where one axis is mapped (2026-10-22, Steve, scoping distributions' step
+  6).** Where both axes are continuous and no group holds one value, R warns "Orientation is not
+  uniquely specified" and runs along y, even on its own reference example, `geom_boxplot(aes(group
+  = cut_width(carat, 0.25)))`, and its no-group example draws one wide box after "did you forget
+  `aes(group = ...)`?"; both draw, so Giggly draws them, unwarned, as a pure pipeline must. Where
+  one of x and y is mapped, the box summarises it and stands along the other (R's
+  `main_is_orthogonal`), so `orientation:` names the axis not mapped, `:x` for y alone, the
+  reverse of binning's sense, and a contrary one raises at the call, where R draws a box of `NA`s;
+  where both are mapped, it chooses. *Rejected: refusing the ambiguous case* — it refuses R's
+  reference examples, whose drawing is well defined.
 
 - **A frequency polygon takes no `pad:`, since R pads one whatever it is given (2026-10-22, Steve,
   scoping distributions' step 3).** ggplot2's `geom_freqpoly()` sets `params$pad <- TRUE` after
@@ -311,10 +354,12 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **Bars take R's `width:` and `just:`, and `geom_col/3` a mapped `:width` (2026-10-22, Steve:
   "follow ggplot2's lead in terms of what is supported").** `geom_bar/3` and `geom_col/3` take
   `width:`, any number, as R does, a set aesthetic like `alpha:`, so it beats a mapped `:width` as
-  R's `aes_params` do, put into every row before the bar's setup, as a set corner is, so stacking,
-  dodging and the axes see the edges; on `geom_bar/3` it replaces counting's width, as
-  `stat_count()` takes it. `geom_col/3` and `annotate/3`'s bars take `:width` row by row. `just:`,
-  0 to 1 (R takes any number), is a field of `%Geom.Bar{}`, as R's is a parameter. A mapped
+  R's `aes_params` do, put into every row before the bar's setup where the table has no width, as
+  a set corner is, so stacking, dodging and the axes see the edges; on `geom_bar/3` counting takes
+  it as its width, as `stat_count()` takes it (2026-10-22, step 6: so a box plot's summary keeps
+  0.9 of a group's range over a set width, as R's `compute_data_size()` reads a row's width
+  first). `geom_col/3` and `annotate/3`'s bars take `:width` row by row. `just:`, 0 to 1 (R takes
+  any number), is a field of `%Geom.Bar{}`, as R's is a parameter. A mapped
   `:width` on `geom_bar/3` and `width:` on the histogram functions stay refused: R ignores both.
   *Rejected: the bars' refusal* — never decided, and R's own pages use both. *Rejected: `width:` as
   a field of the geom* — a mapped width would beat the set one, the reverse of R.
@@ -2119,6 +2164,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Draw box plots: Geom.Boxplot and geom_boxplot/3 (distributions, step 6); §4: "A
+  weight in the plot's mapping is refused by a box layer", "A box layer dodges by clusters", "A
+  box plot's orientation is R's", "A box plot takes R's options" (amended)
 - 2026-10-22 — Dodge bars by clusters: position_dodge2 (distributions, step 5); §4: "Dodging by
   clusters computes on lists", "`Plot.position_dodge2/1` arrives", "Dodging by clusters places
   each cluster"

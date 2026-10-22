@@ -43,6 +43,46 @@ defmodule Giggly.Stat.Boxplot do
           orientation: :none | :x | :y
         }
 
+  # The aesthetics a box plot's layer can use for its summary, from its own mapping or the plot's:
+  # ggplot2's `stat_boxplot()`'s but `weight`, since weighted boxes are left out.
+  @doc false
+  @spec accepted_aesthetics() :: [atom()]
+  def accepted_aesthetics, do: [:group, :width, :x, :y]
+
+  # The aesthetics a box plot's summary cannot be computed without: x or y, ggplot2's
+  # `required_aes = "y|x"`; both may be mapped, the summary running along one of them.
+  @doc false
+  @spec required_aesthetics() :: [[atom()]]
+  def required_aesthetics, do: [[:x, :y]]
+
+  # The variables the summary computes that a mapping's after_stat can read, as ggplot2 documents
+  # `stat_boxplot()`'s, each of the whiskers and hinges in either orientation (`ymin` or `xmin`):
+  # not the `outliers`, `relvarwidth` and `flipped_aes` its table also holds.
+  @doc false
+  @spec computed_variables() :: [atom()]
+  def computed_variables,
+    do: [
+      :lower,
+      :middle,
+      :notchlower,
+      :notchupper,
+      :upper,
+      :width,
+      :xlower,
+      :xmax,
+      :xmiddle,
+      :xmin,
+      :xupper,
+      :ymax,
+      :ymin
+    ]
+
+  # The aesthetics the summary consumes, ggplot2's `dropped_aes`: the axis it summarises and the
+  # one it places each box along, whose position it writes afresh, and a weight.
+  @doc false
+  @spec dropped_aesthetics() :: [atom()]
+  def dropped_aesthetics, do: [:weight, :x, :y]
+
   defimpl Giggly.Stat, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Stat
 

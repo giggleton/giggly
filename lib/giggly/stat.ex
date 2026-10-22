@@ -37,7 +37,7 @@ defprotocol Giggly.Stat do
   # implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
-    exports: [Bin, Count, Identity, Sum]
+    exports: [Bin, Boxplot, Count, Identity, Sum]
 
   alias Giggly.DataFrame
 

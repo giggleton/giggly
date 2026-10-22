@@ -170,3 +170,23 @@ where its marks sit".
   at the panel's edge, where the coordinate system puts it. Its corners are `xmin`, `xmax`,
   `ymin` and `ymax`; ggplot2 4.0 also places one by `x` and `width`, `y` and `height`, which
   waits, and so does a rectangle in radial coordinates, drawn square as a bar is.
+- **A box plot (`Geom.Boxplot`) is set up and drawn as ggplot2's `GeomBoxplot` does it**
+  (design-log §4, the entry beginning "A box plot takes R's options"). Its setup works along the
+  stat's `flipped_aes`, flipped and flipped back; drops `outliers` where the layer keeps none, so
+  the axes fit the whiskers; writes `ymin_final` and `ymax_final`, R's `pmin()` and `pmax()` of the
+  outliers and the whiskers' ends; and puts its sides at x ∓ width/2, or with `varwidth` times its
+  `relvarwidth` over the greatest in the layer, in R's arithmetic, dropping `width` and
+  `relvarwidth`. **Each panel's boxes are drawn in the order of their groups, each whole before
+  the next**, as ggplot2 splits a panel by group: outliers as points (`Geom.Point`), staples where
+  `staplewidth` is not 0, whiskers, the box as a polygon, pinched in at its notches with `notch`,
+  and the median. Each part takes its look from the struct's map for it, which holds only what the
+  layer gave (a look absent is the box's own, `:none` R's `NA`), else the box's row; lines never
+  take the box's alpha and its fill does; the median is twice the box's width unless its look
+  gives one; the box is `#333333`, white, 0.5 mm, solid; staples and whiskers are cut square, the
+  box and median cut square and mitred; a line of colour `:none` or missing, blank, or of missing
+  width is not drawn, a box's border so left off. **Its key is `draw_key_boxplot()`'s**, turned
+  for a horizontal layer, which the legend says in the key's `flipped_aes`, its staples drawn
+  though they have no length at a `staplewidth` of 0 and its median not doubled, and needs its
+  `size` and `linewidth` added, in millimetres. A box in radial coordinates is drawn between its
+  placed corners, not curved. Every part and key is checked against vdiffr's drawing
+  (`test/golden/boxplot*.svg`).

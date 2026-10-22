@@ -28,9 +28,11 @@ size has a weight".
   bars, whichever way round their corners are given, as svglite writes one, a `stroke-opacity` after
   the `stroke`, the line style below before the `fill` (`stroke-linecap: butt;
   stroke-linejoin: miter` for `GeomRect`'s, none for a point's square), and a `fill-opacity` after
-  it, polygons with `points` and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill`
-  and `fill-opacity`, polylines with `points` and a `style` of `stroke-width`, `stroke` and
-  `stroke-opacity`, the line style below, and `fill: none`, segments as `<line>` with `x1`, `y1`,
+  it, polygons with `points` and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, the
+  dashes and line style below (`stroke-linecap: butt; stroke-linejoin: miter` for a box plot's
+  box, none for a point's polygon or a radial background), `fill` and `fill-opacity`, polylines
+  with `points` and a `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line style
+  below, and `fill: none`, segments as `<line>` with `x1`, `y1`,
   `x2` and `y2` and the same `style` but `fill`, and text with `x` and `y` (or, turned,
   `transform='translate(x,y) rotate(-angle)'`, the angle in whole degrees as vdiffr writes it with
   `%0.0f`, a tie to the even one), `text-anchor` (left out for text anchored at its start, as

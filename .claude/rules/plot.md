@@ -30,9 +30,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   which boundary cannot, since a boundary always exports its root and every export to all its
   dependents (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a
   scale and never runs one.
-- **The API is `new/2`, the geom functions (`geom_histogram/3` and `geom_freqpoly/3` among them),
-  `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet
-  functions (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
+- **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3` and
+  `geom_boxplot/3` among them), `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet functions
+  (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
   `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and
@@ -72,6 +72,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   runs along that one; a contrary one raises saying what the layer runs along, why, and how to run
   along the other (design-log §4, the entry beginning "Binning takes `orientation:`").
   `geom_col/3`, whose orientation would choose its bars' direction, takes none.
+  **`geom_boxplot/3` records `%Geom.Boxplot{}` with `%Stat.Boxplot{}` and dodging by clusters**
+  (design-log §4, the entries beginning "A box plot takes R's options", "A weight in the plot's
+  mapping", "A box layer dodges by clusters" and "A box plot's orientation"): `coef:`, `width:`
+  and `orientation:` are the stat's fields, `width:` set in `fixed` too, so it drops a mapped
+  width; `outliers:`, `notch:`, `notchwidth:`, `staplewidth:` and `varwidth:` the geom's, and each
+  part's look (`outlier_`, `whisker_`, `staple_`, `median_` and `box_` options, `outlier_stroke:`
+  0.5 unless given) a map in the geom of only the looks given. `position:` takes `:dodge2`, its
+  default, `:dodge` or `position_dodge2/1`'s struct; with `varwidth: true` an atom records
+  `position_dodge2(preserve: :single)` and a struct `preserve: :single`, its padding and order
+  kept. A `:weight` the plot's mapping gives is refused, naming it, since boxes are not weighted;
+  where one of x and y is mapped, `orientation:` must name the other, the axis the boxes stand
+  along, the reverse of binning's sense, and where both are it chooses.
 - **A layer's mapping laid over the plot's is `computed_mapping/2`, and nowhere else.** Every
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence exists once: the layer's column wins over the plot's, and an aesthetic the layer
@@ -166,7 +178,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   its stat's (`Stat.Count`, `Stat.Bin`: one of `:x` and `:y` needed and not both, ggplot2's
   `"x|y"`, `:weight` taken),
   accepting too what its geom draws (`:alpha`), which counting carries, and a count layer against
-  `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's. **An after_stat,
+  `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's, and a box plot
+  layer against `Stat.Boxplot`'s (`:x` or `:y` needed, both allowed, `:width` taken) and
+  `Geom.Boxplot`'s. **An after_stat,
   the layer's own or the plot's, is checked at the call against the variables the layer's stat
   documents** (`Stat.Count.computed_variables/0`; none for a layer that computes nothing, which
   refuses every one), never against the table, and refused for an aesthetic its stat consumes
@@ -198,10 +212,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
   `:neg_infinity`, in the units of each axis, and `geom_bar/3` and `geom_col/3` `width:`, any
-  number, as R takes it. The assembly puts it into every row last, a
+  number, as R takes it, and `geom_boxplot/3` `fill:`, `linewidth:`, `linetype:`, `shape:` and
+  `size:`, the last two the outliers', and `width:`. The assembly puts it into every row last, a
   position's aesthetic also just before the position runs, and a set corner, an x- or y-family
-  aesthetic, and a set width before the geom's setup, so it widens the axes as ggplot2 4.0's
-  `GeomRect` fills its corners in, and a bar's edges are where R's are.
+  aesthetic, and a set width where the table has none, before the geom's setup, so it widens the
+  axes as ggplot2 4.0's `GeomRect` fills its corners in, and a bar's edges are where R's are; a
+  stat writing a width takes the set one as its own (counting's `%Stat.Count{width:}`).
   **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
   holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
   raises naming the value. **A shape is resolved at the call too** (`validate_shape/1`): one of
@@ -225,7 +241,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `shape:`, `size:` and `stroke:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
-  binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_text/3`,
+  binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
+  `geom_text/3`,
   `geom_rect/3`, `annotate/3`, the scale functions, the guide functions and `labs/2`), so a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as
@@ -276,7 +293,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **When keyword options arrive, `Aesthetics.canonicalize/1` runs before NimbleOptions validates
   them.** NimbleOptions keeps only the first of a repeated key and checks only that one, so
   validating first would let `alpha: 0.4, alpha: "x"` through; `canonicalize/1` refuses the
-  repeat. NimbleOptions has no number type either: an option taking any number is
+  repeat, and spells a box part's colour `_color`, `outlier_colour:` beside `outlier_color:`. NimbleOptions has no number type either: an option taking any number is
   `{:or, [:integer, :float]}`, or an integer is refused. `alpha:` takes 0 to 1, `linewidth:` 0 or
   more, `linemitre:` 1 or more, as grid refuses less, a text's or a point's `size:` and a point's
   `stroke:` 0 or more, the stroke `:none` too, `angle:` any

@@ -190,12 +190,18 @@ defmodule Giggly.Render do
   end
 
   # A key with the glyphs each layer drawing in it draws, with the key's values of the aesthetics
-  # the layer maps and what the layer sets, and the room each layer's glyph needs.
+  # the layer maps, what the layer sets, and whether its marks are horizontal, in `flipped_aes`, as
+  # ggplot2 hands `draw_key` the layer's, and the room each layer's glyph needs.
   defp draw_key(%{values: values} = key, index, layers) do
     {glyphs, sizes} =
-      for %{geom: geom, aesthetics: aesthetics, fixed: fixed, draws: draws} <- layers,
+      for %{geom: geom, aesthetics: aesthetics, fixed: fixed, flipped: flipped, draws: draws} <-
+            layers,
           Enum.at(draws, index) do
-        key_values = Map.merge(fixed, Map.take(values, aesthetics))
+        key_values =
+          fixed
+          |> Map.merge(Map.take(values, aesthetics))
+          |> Map.put(:flipped_aes, flipped)
+
         {Geom.draw_key(geom, key_values), Geom.key_size(geom, key_values)}
       end
       |> Enum.unzip()

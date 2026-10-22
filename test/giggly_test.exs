@@ -3652,6 +3652,148 @@ defmodule GigglyTest do
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for each plot below with
   # `position_dodge2()`, its R spelled beside each test, printed to 17 significant digits, but for
   # the one test that says where Giggly departs from R. They move with `position_dodge2()`.
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
+  # significant digits. It moves with the box plot's summary, the box geom's setup and the
+  # positions.
+  describe "layer_data/2, for geom_boxplot" do
+    # Two groups of rows, one box each, each with an outlier: `data.frame(g = c(rep("a", 6),
+    # rep("b", 5)), y = c(1, 2, 3, 4, 5, 20, 2, 3, 3, 4, 9))`.
+    @box_rows %{
+      "g" => ["a", "a", "a", "a", "a", "a", "b", "b", "b", "b", "b"],
+      "y" => [1.0, 2.0, 3.0, 4.0, 5.0, 20.0, 2.0, 3.0, 3.0, 4.0, 9.0],
+      "w" => [0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.6, 0.6, 0.6, 0.6, 0.6]
+    }
+
+    # Two boxes at each of two positions, by `h`: `data.frame(g = rep(c("a", "b"), each = 8), h =
+    # rep(c("p", "q"), 8), y = c(1:8, c(2, 3, 4, 5, 6, 7, 8, 30)))`.
+    @paired_box_rows %{
+      "g" => List.duplicate("a", 8) ++ List.duplicate("b", 8),
+      "h" => Enum.flat_map(1..8, fn _pair -> ["p", "q"] end),
+      "y" => [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 30.0]
+    }
+
+    # `ggplot(data, aes(g, y)) + geom_boxplot()`, then with `outliers = FALSE`.
+    test "a box reaches its outliers in ymin_final and ymax_final, its sides half its width out" do
+      frame = box_layer(%{x: :g, y: :y})
+
+      assert DataFrame.names(frame) === [
+               :ymin,
+               :lower,
+               :middle,
+               :upper,
+               :ymax,
+               :outliers,
+               :notchupper,
+               :notchlower,
+               :x,
+               :flipped_aes,
+               :panel,
+               :group,
+               :ymin_final,
+               :ymax_final,
+               :xmin,
+               :xmax
+             ]
+
+      assert {DataFrame.pull(frame, :ymin_final), DataFrame.pull(frame, :ymax_final)} ===
+               {[1.0, 2.0], [20.0, 9.0]}
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[0.625, 1.625], [1.375, 2.375]}
+
+      kept =
+        %{x: :g, y: :y}
+        |> box_layer(outliers: false)
+        |> DataFrame.names()
+
+      assert Enum.filter([:outliers, :ymin_final, :ymax_final], fn name -> name in kept end) == []
+    end
+
+    # `geom_boxplot(varwidth = TRUE)`: six rows against five.
+    test "with varwidth: a box is as wide as the square root of its rows makes it beside the widest" do
+      frame = box_layer(%{x: :g, y: :y}, varwidth: true)
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[0.625, 1.6576734015592711], [1.375, 2.3423265984407289]}
+    end
+
+    # `ggplot(data, aes(y, g)) + geom_boxplot()`.
+    test "a horizontal box reaches its outliers along x and stands along y" do
+      frame = box_layer(%{x: :y, y: :g})
+
+      assert {DataFrame.pull(frame, :xmin_final), DataFrame.pull(frame, :xmax_final)} ===
+               {[1.0, 2.0], [20.0, 9.0]}
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[0.625, 1.625], [1.375, 2.375]}
+    end
+
+    # `ggplot(data, aes(g, y, fill = h))` with `geom_boxplot()`, `position = "dodge"`, and
+    # `varwidth = TRUE, position = position_dodge2(padding = 0.3)`.
+    test "boxes sharing a position are dodged by clusters, within one box's width, or as told" do
+      clusters = paired_boxes([])
+      dodged = paired_boxes(position: :dodge)
+
+      padded =
+        paired_boxes(varwidth: true, position: Plot.position_dodge2(padding: 0.3))
+
+      assert DataFrame.pull(clusters, :x) === [0.8125, 1.1875, 1.8125, 2.1875]
+
+      assert {DataFrame.pull(clusters, :xmin), DataFrame.pull(clusters, :xmax)} ===
+               {[0.64375000000000004, 1.01875, 1.64375, 2.0187499999999998],
+                [0.98124999999999996, 1.35625, 1.98125, 2.3562500000000002]}
+
+      assert DataFrame.pull(clusters, :ymax_final) === [7.0, 8.0, 8.0, 30.0]
+
+      assert {DataFrame.pull(dodged, :xmin), DataFrame.pull(dodged, :xmax)} ===
+               {[0.625, 1.0, 1.625, 2.0], [1.0, 1.375, 2.0, 2.375]}
+
+      assert {DataFrame.pull(padded, :xmin), DataFrame.pull(padded, :xmax)} ===
+               {[0.68125000000000002, 1.0562499999999999, 1.6812499999999999, 2.0562499999999999],
+                [0.94374999999999998, 1.3187500000000001, 1.9437500000000001, 2.3187500000000001]}
+    end
+
+    # `ggplot(data, aes(g, y, width = w)) + geom_boxplot(width = 0.3)`, and `ggplot(mpg,
+    # aes(displ, hwy, group = cyl)) + geom_boxplot(width = 0.3)`.
+    test "width: replaces a mapped width and gives way to the range of a group spanning several x" do
+      set = box_layer(%{x: :g, y: :y, width: :w}, width: 0.3)
+
+      spanning =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, group: :cyl})
+        |> Plot.geom_boxplot(width: 0.3)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(set, :xmin), DataFrame.pull(set, :xmax)} ===
+               {[0.85000000000000009, 1.8500000000000001],
+                [1.1499999999999999, 2.1499999999999999]}
+
+      assert {DataFrame.pull(spanning, :xmin), DataFrame.pull(spanning, :xmax)} ===
+               {[2.4315000000000002, 2.75, 2.8704999999999998, 4.2850000000000001],
+                [2.7284999999999999, 2.8399999999999999, 3.3295000000000003, 6.7149999999999999]}
+    end
+
+    # `ggplot(mpg, aes(displ, hwy, group = cyl)) + geom_boxplot(orientation = "y")`.
+    test "orientation: :y stands boxes along y where both axes are continuous" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, group: :cyl})
+        |> Plot.geom_boxplot(orientation: :y)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :xmiddle) === [
+               5.2000000000000002,
+               3.3999999999999999,
+               2.5,
+               2.0
+             ]
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[22.170000000000002, 25.297500000000003, 27.873750000000001, 28.357500000000002],
+                [25.005000000000003, 27.727500000000003, 28.076250000000002, 33.217500000000001]}
+    end
+  end
+
   describe "layer_data/2, dodged by clusters" do
     # `ggplot(mtcars, aes(factor(cyl), fill = factor(vs)))` with `geom_bar(position = "dodge2")`,
     # then `position_dodge2(preserve = "single")`.
@@ -5745,6 +5887,93 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/dodge2.svg")
     end
 
+    # Golden: test/golden/boxplot.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/boxplot.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_boxplot()'s first example from ggplot2's
+    # reference page: mpg's highway mileage by class, each box whole before the next, its outliers,
+    # whiskers, box and doubled median. It moves with the box geom and the box plot's summary.
+    test "a box for each class, its whiskers, median and outliers" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/boxplot.svg")
+    end
+
+    # Golden: test/golden/boxplot_dodged.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/boxplot_dodged.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. The reference page's dodged boxes: each
+    # class's boxes by drive dodged by clusters, each in its colour, and a legend of box keys. It
+    # moves with what moves test/golden/boxplot.svg, and with dodging by clusters and the legend.
+    test "boxes coloured by drive are dodged by clusters, and key a legend" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy, colour: :drv})
+        |> Plot.geom_boxplot()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/boxplot_dodged.svg")
+    end
+
+    # Golden: test/golden/boxplot_notch.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/boxplot_notch.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. The reference page's notched boxes and its
+    # boxes of varying width together: each box as wide as the square root of its rows makes it,
+    # notched at its median. It moves with what moves test/golden/boxplot.svg.
+    test "notched boxes of varying width" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot(notch: true, varwidth: true)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/boxplot_notch.svg")
+    end
+
+    # Golden: test/golden/boxplot_parts.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/boxplot_parts.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Each part of a box in a look of its own:
+    # blue staples, red whiskers, a median 2 mm wide, a dashed border and open dark green outliers,
+    # and keys drawing every part's look. It moves with what moves test/golden/boxplot.svg.
+    test "each part of a box in its own look, in the boxes and their keys" do
+      svg =
+        %{
+          "g" => ["a", "a", "a", "a", "a", "a", "b", "b", "b", "b", "b"],
+          "y" => [1, 2, 3, 4, 5, 20, 2, 3, 3, 4, 9]
+        }
+        |> Plot.new(%{x: :g, y: :y, fill: :g})
+        |> Plot.geom_boxplot(
+          staplewidth: 0.5,
+          whisker_colour: "red",
+          median_linewidth: 2,
+          box_linetype: :dashed,
+          staple_colour: "blue",
+          outlier_shape: 1,
+          outlier_colour: "darkgreen"
+        )
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/boxplot_parts.svg")
+    end
+
+    # Golden: test/golden/boxplot_horizontal.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/boxplot_horizontal.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. The reference page's
+    # horizontal boxes, filled by drive: mpg's highway mileage summarised along x by class, the
+    # boxes dodged up the axis, and keys drawing a box turned on its side. It moves with what moves
+    # test/golden/boxplot.svg, and with orientation.
+    test "horizontal boxes summarise x, dodge along y and key a turned box" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, y: :class, fill: :drv})
+        |> Plot.geom_boxplot()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/boxplot_horizontal.svg")
+    end
+
     # Golden: test/golden/horizontal_bar.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/horizontal_bar.R: every element matches it, the x axis drawn before the y
     # as in test/golden/point.svg, and every clip path. geom_bar()'s third example from ggplot2's
@@ -6779,6 +7008,23 @@ defmodule GigglyTest do
   end
 
   # The plot drawn at vdiffr's size, 720 by 576 points, as its goldens are.
+  # The layer `geom_boxplot/3` adds to a plot of `@box_rows` with `mapping` and `options`, after
+  # its stat, setup and position.
+  defp box_layer(mapping, options \\ []) do
+    @box_rows
+    |> Plot.new(mapping)
+    |> Plot.geom_boxplot(options)
+    |> Giggly.layer_data()
+  end
+
+  # The boxes of `@paired_box_rows`, two at each position by `h`, under `options`.
+  defp paired_boxes(options) do
+    @paired_box_rows
+    |> Plot.new(%{x: :g, y: :y, fill: :h})
+    |> Plot.geom_boxplot(options)
+    |> Giggly.layer_data()
+  end
+
   defp to_svg(plot) do
     plot
     |> Giggly.to_svg(width: 960, height: 768)

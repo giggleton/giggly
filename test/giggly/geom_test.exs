@@ -449,6 +449,110 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for box plots" do
+    @box %Geom.Boxplot{
+      outliers: true,
+      outlier: %{stroke: 0.5},
+      whisker: %{},
+      staple: %{},
+      median: %{},
+      box: %{},
+      notch: false,
+      notchwidth: 0.5,
+      staplewidth: 0.0,
+      varwidth: false
+    }
+
+    # A set-up box, as `layer_data()` shows `geom_boxplot()`'s of 1, 2, 3, 4, 5 and 20 at x 1.
+    defp box_rows(columns) do
+      DataFrame.new(
+        [
+          ymin: [1.0],
+          lower: [2.25],
+          middle: [3.5],
+          upper: [4.75],
+          ymax: [5.0],
+          outliers: [[20.0]],
+          notchupper: [5.1125807473322595],
+          notchlower: [1.887419252667741],
+          x: [1.0],
+          flipped_aes: [false],
+          panel: [1],
+          group: [1],
+          xmin: [0.625],
+          xmax: [1.375]
+        ] ++ columns
+      )
+    end
+
+    defp box_params do
+      coord = %Coord.Cartesian{}
+      {coord, Coord.panel_params(coord, {{0.0, 2.0}, [], []}, {{0.0, 20.0}, [], []})}
+    end
+
+    test "a box's fill and outliers take its alpha, and its lines never do" do
+      {coord, params} = box_params()
+      frame = box_rows(alpha: [0.5], fill: ["#FF0000"])
+
+      assert [
+               %Circles{color_opacity: [0.5], fill_opacity: [0.5]},
+               %Segments{opacity: [1.0, 1.0]},
+               %Polygons{color: ["#333333"], color_opacity: [1.0], fill_opacity: [0.5]},
+               %Segments{opacity: [1.0]}
+             ] = Geom.draw_panel(@box, frame, coord, params)
+    end
+
+    test "a part whose colour is :none, or a blank border, is not drawn, the box still filled" do
+      {coord, params} = box_params()
+      geom = %{@box | whisker: %{color: :none}, box: %{linetype: :none}}
+
+      assert [%Circles{}, %Polygons{color: [:none], fill: ["#FFFFFF"]}, %Segments{}] =
+               Geom.draw_panel(geom, box_rows([]), coord, params)
+    end
+
+    test "the median is twice the box's width unless its look gives one" do
+      {coord, params} = box_params()
+      frame = box_rows(linewidth: [1.0])
+      [_outliers, _whiskers, _box, median] = Geom.draw_panel(@box, frame, coord, params)
+      given = %{@box | median: %{linewidth: 0.5}}
+      [_outliers, _whiskers, _box, given_median] = Geom.draw_panel(given, frame, coord, params)
+
+      assert {median.stroke_width, given_median.stroke_width} ===
+               {@two_millimetres, @default_width}
+    end
+
+    test "boxes are drawn in the order of their groups, each whole before the next" do
+      {coord, params} = box_params()
+
+      frame =
+        DataFrame.new(
+          ymin: [1.0, 1.0],
+          lower: [2.0, 2.0],
+          middle: [3.0, 3.0],
+          upper: [4.0, 4.0],
+          ymax: [5.0, 5.0],
+          outliers: [[], []],
+          notchupper: [4.0, 4.0],
+          notchlower: [2.0, 2.0],
+          x: [1.5, 0.5],
+          flipped_aes: [false, false],
+          panel: [1, 1],
+          group: [2, 1],
+          xmin: [1.25, 0.25],
+          xmax: [1.75, 0.75]
+        )
+
+      assert [
+               %Segments{starts: [{0.25, _first}, _second]},
+               %Polygons{},
+               %Segments{},
+               %Segments{starts: [{0.75, _third}, _fourth]},
+               %Polygons{},
+               %Segments{}
+             ] = Geom.draw_panel(@box, frame, coord, params)
+    end
+  end
+
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
   # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
   describe "setup_data/3 for lines" do
@@ -1216,6 +1320,12 @@ defmodule Giggly.GeomTest do
              end) === [{21.87, 33.47}, {34.62, 38.86}, {33.47, 21.87}, {37.94, 37.94}]
 
       assert rounded_size(Geom.key_size(text, %{size: 3.88})) === {9.02, 12.77}
+    end
+
+    test "a box's key needs its size and line width added, a missing one counting 0" do
+      assert rounded_size(Geom.key_size(@box, %{})) === {5.67, 5.67}
+      assert rounded_size(Geom.key_size(@box, %{size: 4.0, linewidth: nil})) === {11.34, 11.34}
+      assert Geom.key_size(@box, %{size: nil, linewidth: nil}) === {0.0, 0.0}
     end
   end
 

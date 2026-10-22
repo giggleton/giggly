@@ -77,6 +77,8 @@ ggplot2's facets' order".
   out, and its table is centred down it; the cell is drawn after the axes' titles and before the
   plot's labels. Each key's glyphs are drawn by the geom of every layer that maps one of the
   legend's aesthetics and draws in that key (`Geom.draw_key/2`), in layer order, at the key's
-  values of the aesthetics that layer maps and with what it sets, and handed to the guide with the
+  values of the aesthetics that layer maps, with what it sets and with whether its marks are
+  horizontal (`flipped_aes`, the assembly's `flipped`), as ggplot2 hands `draw_key` the layer's
+  `flipped_aes`, so a box's key is turned, and handed to the guide with the
   room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by, so rendering
   measures nothing itself; a key no layer draws in keeps its background and label.

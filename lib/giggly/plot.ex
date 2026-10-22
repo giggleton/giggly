@@ -638,6 +638,224 @@ defmodule Giggly.Plot do
                         ] ++ @line_style_options
                     )
 
+  # A box plot's parts drawn as lines, each with a look of its own, and how its options' docs name
+  # each.
+  @boxplot_line_parts [
+    whisker: "whiskers",
+    staple: "staples",
+    median: "median",
+    box: "box's border"
+  ]
+
+  # The look of each line part, ggplot2's `whisker.colour` and the rest, R's dotted names
+  # underscored.
+  @boxplot_line_look_options Enum.flat_map(@boxplot_line_parts, fn {part, named} ->
+                               [
+                                 {:"#{part}_color",
+                                  [
+                                    type: @color_type,
+                                    doc:
+                                      "The colour of the #{named}, written `#{part}_colour:` " <>
+                                        "or `#{part}_color:`: " <>
+                                        @color_forms <> "; the box's colour when not given."
+                                  ]},
+                                 {:"#{part}_linetype",
+                                  [
+                                    type: @linetype_type,
+                                    doc:
+                                      "The line type of the #{named}: " <>
+                                        @linetype_forms <> "; the box's when not given."
+                                  ]},
+                                 {:"#{part}_linewidth",
+                                  [
+                                    type: {:custom, __MODULE__, :validate_linewidth, []},
+                                    doc:
+                                      "How wide the #{named} is drawn, in millimetres; the " <>
+                                        "box's line width when not given" <>
+                                        if(part == :median, do: ", doubled.", else: ".")
+                                  ]}
+                               ]
+                             end)
+
+  # Each option giving a part of a box its look, by the part and the look it gives, which the box
+  # geom holds by part.
+  @boxplot_part_looks [
+                        outlier_color: {:outlier, :color},
+                        outlier_fill: {:outlier, :fill},
+                        outlier_shape: {:outlier, :shape},
+                        outlier_size: {:outlier, :size},
+                        outlier_stroke: {:outlier, :stroke},
+                        outlier_alpha: {:outlier, :alpha}
+                      ] ++
+                        for(
+                          {part, _named} <- @boxplot_line_parts,
+                          look <- [:color, :linetype, :linewidth],
+                          do: {:"#{part}_#{look}", {part, look}}
+                        )
+
+  # `geom_boxplot/3`'s options, validated at the call: the box plot's summary's, how its boxes are
+  # placed and drawn, and the look of every box and of each of its parts.
+  @boxplot_options NimbleOptions.new!(
+                     [
+                       data: @data_option,
+                       position: [
+                         type: {:custom, __MODULE__, :validate_boxplot_position, []},
+                         default: :dodge2,
+                         doc:
+                           "How boxes that share a position are placed: set side by side, " <>
+                             "each its share of their widths, with a gap between them " <>
+                             "(`:dodge2`, or as `position_dodge2/1` says), or within the width " <>
+                             "one box takes (`:dodge`). With `varwidth: true`, every box keeps " <>
+                             "its own width, as `position_dodge2(preserve: :single)` sets them, " <>
+                             "whatever this says."
+                       ],
+                       coef: [
+                         type: {:custom, __MODULE__, :validate_number, []},
+                         default: 1.5,
+                         doc:
+                           "How far the whiskers may reach past the box, in heights of the " <>
+                             "box; a value further out is an outlier."
+                       ],
+                       width: [
+                         type: {:custom, __MODULE__, :validate_width, []},
+                         doc:
+                           "How wide a box is, in the units of the axis it stands on, any " <>
+                             "number; it replaces a mapped `:width`, and gives way to 0.9 of " <>
+                             "the range of a group spanning several positions. 0.75 times the " <>
+                             "closest spacing of the positions, counting from zero, when not " <>
+                             "given."
+                       ],
+                       orientation: [
+                         type: {:in, [:x, :y]},
+                         doc:
+                           "The axis the boxes stand along, `:x` or `:y`, summarising the " <>
+                             "other. Where one of `:x` and `:y` is mapped, the boxes summarise " <>
+                             "it, so this must name the other; where both are, it chooses, and " <>
+                             "when not given the boxes stand along the discrete one, or else " <>
+                             "along the axis on which every group holds one value, or else " <>
+                             "along x."
+                       ],
+                       outliers: [
+                         type: :boolean,
+                         default: true,
+                         doc:
+                           "Whether to keep the outliers, drawing them and fitting the axes " <>
+                             "to them; `false` leaves them out, the axes fitting the whiskers. " <>
+                             "`outlier_shape: :none` hides them and keeps the axes."
+                       ],
+                       outlier_color: [
+                         type: @color_type,
+                         doc:
+                           "The outliers' colour, written `outlier_colour:` or " <>
+                             "`outlier_color:`: " <> @color_forms <> "; the box's when not given."
+                       ],
+                       outlier_fill: [
+                         type: @color_type,
+                         doc:
+                           "The colour outliers of a shape with a fill of their own are filled " <>
+                             "with: " <> @color_forms <> "; the box's fill when not given."
+                       ],
+                       outlier_shape: [
+                         type: {:custom, __MODULE__, :validate_shape, []},
+                         doc:
+                           "The shape the outliers are drawn in, by name or number, as " <>
+                             "`geom_point/3` takes one, or `:none` for none; the box's `:shape`, " <>
+                             "or `:circle`, when not given."
+                       ],
+                       outlier_size: [
+                         type: {:custom, __MODULE__, :validate_size, []},
+                         doc:
+                           "How big the outliers are, in millimetres; the box's `:size`, or " <>
+                             "1.5, when not given."
+                       ],
+                       outlier_stroke: [
+                         type: {:custom, __MODULE__, :validate_stroke, []},
+                         default: 0.5,
+                         doc:
+                           "How heavy the outliers' outlines are, in millimetres, or `:none` " <>
+                             "for none."
+                       ],
+                       outlier_alpha: [
+                         type: {:custom, __MODULE__, :validate_alpha, []},
+                         doc:
+                           "How opaque the outliers are, from 0 to 1; the box's alpha when not " <>
+                             "given."
+                       ]
+                     ] ++
+                       @boxplot_line_look_options ++
+                       [
+                         notch: [
+                           type: :boolean,
+                           default: false,
+                           doc:
+                             "Whether to notch each box at its median, the notches reaching " <>
+                               "1.58 heights of the box over the square root of its rows either " <>
+                               "side, so boxes whose notches do not overlap have medians that " <>
+                               "differ."
+                         ],
+                         notchwidth: [
+                           type: {:custom, __MODULE__, :validate_number, []},
+                           default: 0.5,
+                           doc: "How wide a notched box is at its median, a share of its width."
+                         ],
+                         staplewidth: [
+                           type: {:custom, __MODULE__, :validate_number, []},
+                           default: 0.0,
+                           doc:
+                             "How wide the staples across the whiskers' ends are, a share of " <>
+                               "the box's width; 0 draws none."
+                         ],
+                         varwidth: [
+                           type: :boolean,
+                           default: false,
+                           doc:
+                             "Whether to draw each box as wide as the square root of its rows " <>
+                               "makes it beside the widest."
+                         ],
+                         alpha: [
+                           type: {:custom, __MODULE__, :validate_alpha, []},
+                           doc:
+                             "How opaque every box's fill and outliers are, from 0 to 1; its " <>
+                               "lines take none."
+                         ],
+                         color: [
+                           type: @color_type,
+                           doc:
+                             "The colour of every box's lines and outliers, written `colour:` " <>
+                               "or `color:`: " <> @color_forms <> "; `#333333` when not given."
+                         ],
+                         fill: [
+                           type: @color_type,
+                           doc:
+                             "The colour every box is filled with: " <>
+                               @color_forms <> "; white when not given."
+                         ],
+                         linewidth: [
+                           type: {:custom, __MODULE__, :validate_linewidth, []},
+                           doc:
+                             "How wide every box's lines are, in millimetres; 0.5 when not given."
+                         ],
+                         linetype: [
+                           type: @linetype_type,
+                           doc:
+                             "The line type of every box's lines: " <>
+                               @linetype_forms <> "; `:solid` when not given."
+                         ],
+                         shape: [
+                           type: {:custom, __MODULE__, :validate_shape, []},
+                           doc:
+                             "The shape every box's outliers are drawn in, as `outlier_shape:` " <>
+                               "takes one, which wins over it."
+                         ],
+                         size: [
+                           type: {:custom, __MODULE__, :validate_size, []},
+                           doc:
+                             "How big every box's outliers are, in millimetres, as " <>
+                               "`outlier_size:` takes it, which wins over it."
+                         ]
+                       ]
+                   )
+
   # Whether text leaves out the labels that would cross one drawn before it.
   @check_overlap_option [
     type: :boolean,
@@ -1985,7 +2203,7 @@ defmodule Giggly.Plot do
 
     layer = %Layer{
       geom: %Geom.Bar{just: Keyword.fetch!(validated, :just)},
-      stat: %Stat.Count{},
+      stat: %Stat.Count{width: Keyword.get(validated, :width, :none)},
       position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_bar/3"),
@@ -2126,6 +2344,84 @@ defmodule Giggly.Plot do
     }
 
     add_binning_layer(plot, layer, validated, "Plot.geom_freqpoly/3")
+  end
+
+  @doc """
+  Adds a layer of box plots, a box for each group summarising its `y`: from its lower quartile to
+  its upper, a line across it at its median, and whiskers out to the least and greatest `y` within
+  `coef:` heights of the box beyond it, every value further out drawn as a point, an outlier. The
+  quartiles are R's default (type 7). Each box stands at the middle of its group's `x` values,
+  0.75 times the closest spacing of the `x` positions wide, counting from zero, or 0.9 of the
+  range of its group's `x` values where they are several, or as wide as its group's first mapped
+  `:width`, a number, or as `width:` says. A row missing its `x` or `y`, or at an infinite one, is
+  left out.
+
+  Boxes stand along the discrete one of `x` and `y`, so mapping a discrete `y` beside a numeric `x`
+  draws horizontal boxes summarising `x`; mapping one of them alone summarises it, a single box at
+  0; where both are continuous, they stand along the axis on which every group holds one value,
+  or else along `x`, each group a box, so a numeric `x` takes a `:group` to draw more than one.
+  `orientation:` says which. Boxes sharing a position are set side by side, as `position:` says.
+
+  Box plots use `:x`, `:y`, `:group`, `:width`, `:alpha`, `:color`, `:fill`, `:linetype` and
+  `:linewidth`, and `:shape` and `:size`, which the outliers take, and need `:x` or `:y`. A look
+  reaches a box only where it is the same in every row of its group, so a discrete one groups the
+  rows and gives each group its own box. A box plot is not weighted, so a `:weight` the plot's
+  mapping gives is refused. The whiskers, staples, median and box's border each take a look of
+  their own (`whisker_color:` and the like), and the outliers theirs (`outlier_color:` and the
+  like), else the box's.
+
+  ## Options
+
+  #{NimbleOptions.docs(@boxplot_options)}
+
+      iex> plot =
+      ...>   %{"g" => ["a", "a", "a", "a", "a"], "y" => [1.0, 2.0, 3.0, 4.0, 20.0]}
+      ...>   |> Giggly.Plot.new(%{x: :g, y: :y})
+      ...>   |> Giggly.Plot.geom_boxplot()
+      iex> frame = Giggly.layer_data(plot)
+      iex> {Giggly.DataFrame.pull(frame, :middle), Giggly.DataFrame.pull(frame, :outliers)}
+      {[3.0], [[20.0]]}
+  """
+  @spec geom_boxplot(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_boxplot(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_boxplot(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_boxplot(plot, %{}, options)
+
+  def geom_boxplot(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, @boxplot_options)
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: boxplot_geom(validated),
+      stat: %Stat.Boxplot{
+        coef: Keyword.fetch!(validated, :coef),
+        width: Keyword.get(validated, :width, :none),
+        orientation: Keyword.get(validated, :orientation, :none)
+      },
+      position:
+        boxplot_position(
+          Keyword.fetch!(validated, :position),
+          Keyword.fetch!(validated, :varwidth)
+        ),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_boxplot/3"),
+      fixed: fixed(validated),
+      accepted:
+        Enum.uniq(Stat.Boxplot.accepted_aesthetics() ++ Geom.Boxplot.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_boxplot/3",
+      required: Stat.Boxplot.required_aesthetics(),
+      computed: Stat.Boxplot.computed_variables(),
+      dropped: Stat.Boxplot.dropped_aesthetics()
+    )
+    |> check_unweighted(layer, "Plot.geom_boxplot/3")
+    |> check_numbers(layer, "Plot.geom_boxplot/3", :width, "a box is drawn as wide as its width")
+    |> check_stands_along(layer, validated, "Plot.geom_boxplot/3")
   end
 
   @doc """
@@ -4360,6 +4656,21 @@ defmodule Giggly.Plot do
        inspect(position)}
   end
 
+  # NimbleOptions' check of a box plot's `position:`: one of the positions it takes by name, or a
+  # position `position_dodge2/1` makes. Boxes do not stack.
+  @doc false
+  @spec validate_boxplot_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
+  def validate_boxplot_position(position) when position in [:dodge, :dodge2],
+    do: {:ok, position}
+
+  def validate_boxplot_position(%Position.Dodge2{} = position), do: {:ok, position}
+
+  def validate_boxplot_position(position) do
+    {:error,
+     "expected :dodge2, :dodge or a position Plot.position_dodge2/1 makes, got: " <>
+       inspect(position)}
+  end
+
   # NimbleOptions' check of `position_dodge2/1`'s `padding:`: the fraction of its share each bar
   # leaves as a gap, from 0 to 1, kept as a float.
   @doc false
@@ -5198,6 +5509,40 @@ defmodule Giggly.Plot do
   defp position(:dodge2), do: position_dodge2()
   defp position(%Position.Dodge2{} = position), do: position
 
+  # A box plot's position: the one given, or, where each box keeps a width of its own, dodging by
+  # clusters at each box's own width, as ggplot2's `geom_boxplot()` makes any position named by a
+  # string `position_dodge2(preserve = "single")` and switches a `position_dodge2()` that
+  # preserves the total, keeping its padding and order (design-log §4, the entry beginning "A box
+  # layer dodges by clusters").
+  defp boxplot_position(position, false), do: position(position)
+  defp boxplot_position(%Position.Dodge2{} = position, true), do: %{position | preserve: :single}
+  defp boxplot_position(_named, true), do: position_dodge2(preserve: :single)
+
+  # The box geom's struct from `geom_boxplot/3`'s validated options, each part's look holding only
+  # those given.
+  defp boxplot_geom(validated) do
+    parts = Map.new([:outlier, :whisker, :staple, :median, :box], fn part -> {part, %{}} end)
+
+    looks =
+      Enum.reduce(@boxplot_part_looks, parts, fn {option, {part, look}}, given ->
+        case Keyword.fetch(validated, option) do
+          {:ok, value} -> put_in(given, [part, look], value)
+          :error -> given
+        end
+      end)
+
+    struct!(
+      Geom.Boxplot,
+      Map.merge(looks, %{
+        outliers: Keyword.fetch!(validated, :outliers),
+        notch: Keyword.fetch!(validated, :notch),
+        notchwidth: Keyword.fetch!(validated, :notchwidth),
+        staplewidth: Keyword.fetch!(validated, :staplewidth),
+        varwidth: Keyword.fetch!(validated, :varwidth)
+      })
+    )
+  end
+
   defp path_geom(validated) do
     %Geom.Path{
       line_end: Keyword.fetch!(validated, :lineend),
@@ -5357,6 +5702,52 @@ defmodule Giggly.Plot do
                 "#{inspect(given)} can then stay or be left out."
 
       _agreeing_or_not_given ->
+        plot
+    end
+  end
+
+  # A box plot is not weighted, so a weight the plot's mapping gives it, which would ride along
+  # unused, is refused, where a weighted box would differ (design-log §4, the entry beginning "A
+  # weight in the plot's mapping"); one the layer maps itself it cannot use, refused as any such.
+  defp check_unweighted(plot, layer, function) do
+    mapping = computed_mapping(plot, layer)
+
+    case Map.fetch(mapping, :weight) do
+      {:ok, value} ->
+        raise ArgumentError,
+              "#{function} takes :weight from the plot's mapping, which maps it to " <>
+                "#{inspect(value)}, but a box plot is not weighted: each box summarises its " <>
+                "rows as they are. Map :weight on the layers that count with it rather than on " <>
+                "the plot."
+
+      :error ->
+        plot
+    end
+  end
+
+  # A box plot summarises the one of x and y it maps before its stat, where it maps one, its boxes
+  # standing along the other, so an orientation it is given must name that other; where it maps
+  # both, the orientation chooses (design-log §4, the entry beginning "A box plot's orientation").
+  defp check_stands_along(plot, layer, validated, function) do
+    mapped =
+      plot
+      |> computed_mapping(layer)
+      |> Map.take([:x, :y])
+      |> Enum.reject(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
+      |> Enum.map(fn {aesthetic, _value} -> aesthetic end)
+
+    case {mapped, Keyword.fetch(validated, :orientation)} do
+      {[summarised], {:ok, summarised}} ->
+        other = if summarised == :x, do: :y, else: :x
+
+        raise ArgumentError,
+              "#{function} summarises #{summarised} here, because #{inspect(summarised)} alone " <>
+                "is mapped, so its boxes stand along #{other} and orientation: " <>
+                "#{inspect(summarised)} cannot apply. To stand the boxes along #{summarised}, " <>
+                "map #{inspect(other)} instead of #{inspect(summarised)}; orientation: " <>
+                "#{inspect(summarised)} can then stay or be left out."
+
+      _agreeing_chosen_or_not_given ->
         plot
     end
   end

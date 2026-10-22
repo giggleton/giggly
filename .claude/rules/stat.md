@@ -52,17 +52,19 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   fallback, which any layer's column or expression replaces.
 - **A stat names what a mapping's after_stat can read: its computed variables as ggplot2
   documents them** (`computed_variables/0`: counting's `count` and `prop`, not the `width` and
-  `flipped_aes` its table also holds), **and the aesthetics it consumes** (`dropped_aesthetics/0`,
-  ggplot2's `dropped_aes`: counting's `weight`, and counting at each place's, which `StatSum`
-  sums without declaring), module functions beside its accepted aesthetics, which `Plot` reads at
-  the call. A stat with neither, the identity, computes nothing an
-  after_stat can read.
+  `flipped_aes` its table also holds; the box plot's summary's whiskers, hinges, notches and
+  `width`, each in either orientation, not its `outliers` or `relvarwidth`), **and the aesthetics
+  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's `weight`, the box
+  plot's summary's `x`, `y` and `weight`, and counting at each place's, which `StatSum` sums
+  without declaring), module functions beside its accepted aesthetics, which `Plot` reads at the
+  call. A stat with neither, the identity, computes nothing an after_stat can read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the rows
   there or the sum of their weights, a missing weight (`nil` or NaN) adding nothing and an
   infinite one making the count infinite, its `prop` the count's share of its group's total, the
   sum of its counts' magnitudes, divided as R divides (`Giggly.DataFrame.Arithmetic`: NaN for a
   total of zero or an infinite count over an infinite total, 0 for a finite one), and its `width`
-  0.9 of the layer's x spacing counting from zero (`Giggly.Resolution`). A weight that is not a
+  the one the layer sets, the stat's `width`, as `stat_count()` takes it, else 0.9 of the layer's
+  x spacing counting from zero (`Giggly.Resolution`). A weight that is not a
   number is refused when the plot is run, an expression's, whose type the call cannot know. A row
   missing its x, or at an infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives
   them. **It counts along whichever of x and y is mapped**, exactly one, as `stat_count()` decides
@@ -105,8 +107,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   of the rest, or, where it has outliers, the range of those and its quartiles, so a box of only
   outliers reaches its hinges; its notches `middle` ∓ 1.58 × height / √rows, `relvarwidth` √rows,
   `x` the middle of its x range, and `width` its group's first mapped width, else 0.9 of its x
-  range where it holds several, else the stat's `width`, else 0.75 of the layer's x spacing from
-  zero. The orientation and the spacing are read from every row, as R reads them; then a row
+  range where it holds several, else the stat's `width`, the layer's `width:`, which drops a mapped
+  one as any set aesthetic does, else 0.75 of the layer's x spacing from zero. The orientation and the spacing are read from every row, as R reads them; then a row
   missing its x or y, or at an infinite one, is left out, and a group left with none has no box.
   **It runs along the axis R's `has_flipped_aes()` picks for a box plot**: `orientation`, else the
   one axis mapped (y at x 0, or x), else the continuous axis beside a discrete one, else y where

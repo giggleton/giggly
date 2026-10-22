@@ -42,6 +42,7 @@ defmodule Giggly.AssemblyTest do
                    geom: %Geom.Point{},
                    aesthetics: [:alpha],
                    fixed: %{},
+                   flipped: false,
                    draws: [true, true, true, true, true]
                  }
                ]
@@ -88,6 +89,7 @@ defmodule Giggly.AssemblyTest do
                     geom: %Geom.Bar{just: 0.5},
                     aesthetics: [:alpha],
                     fixed: %{},
+                    flipped: false,
                     draws: [true, true, true]
                   }
                 ]}
@@ -189,6 +191,7 @@ defmodule Giggly.AssemblyTest do
                    geom: %Geom.Bar{just: 0.5},
                    aesthetics: [:color, :fill],
                    fixed: %{},
+                   flipped: false,
                    draws: [true, true, true]
                  }
                ]
@@ -305,12 +308,14 @@ defmodule Giggly.AssemblyTest do
                     geom: %Geom.Bar{just: 0.5},
                     aesthetics: [:fill],
                     fixed: %{},
+                    flipped: false,
                     draws: [true, true, true]
                   },
                   %{
                     geom: %Geom.Point{},
                     aesthetics: [:color],
                     fixed: %{},
+                    flipped: false,
                     draws: [true, true, true]
                   }
                 ]}
@@ -461,6 +466,7 @@ defmodule Giggly.AssemblyTest do
                  geom: %Geom.Bar{just: 0.5},
                  aesthetics: [:alpha],
                  fixed: %{},
+                 flipped: false,
                  draws: [true, true, true, true, true]
                }
              ]
@@ -503,7 +509,13 @@ defmodule Giggly.AssemblyTest do
                    %{label: "10", value: 10.0, values: %{size: 5.1602514716892189}}
                  ],
                  layers: [
-                   %{geom: %Geom.Point{}, aesthetics: [:size], fixed: %{}, draws: [true, true]}
+                   %{
+                     geom: %Geom.Point{},
+                     aesthetics: [:size],
+                     fixed: %{},
+                     flipped: false,
+                     draws: [true, true]
+                   }
                  ]
                }
              ]

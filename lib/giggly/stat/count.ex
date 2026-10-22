@@ -4,8 +4,9 @@ defmodule Giggly.Stat.Count do
   # Counting, ggplot2's `stat_count()`, which `geom_bar()` computes with: one row for each distinct
   # x of each group in each panel, in that order, x ascending. Its `count` is the number of rows at
   # that x, or the sum of their weights where the layer maps `weight`, and its `prop` the count's
-  # share of its group's total; its `width` is 0.9 of the closest spacing of the layer's x
-  # positions, counting from zero (`Giggly.Resolution`), which the bar geom draws at. The frame sums
+  # share of its group's total; its `width` is the stat's `width`, the one a layer sets, or else 0.9
+  # of the closest spacing of the layer's x positions, counting from zero (`Giggly.Resolution`),
+  # which the bar geom draws at, as `stat_count()` takes its `width` parameter. The frame sums
   # them (`Giggly.DataFrame.summarise/3`): the counts in floats in row order, the doubles R's
   # `rowsum()` gives, and each group's total, the sum of its counts' magnitudes, with its
   # compensated sum, as R's `sum()` adds in extended precision. The frame also chooses the rows,
@@ -13,7 +14,7 @@ defmodule Giggly.Stat.Count do
   # `n_distinct` and `first`), and the width is read from the counted table's x, which holds the
   # layer's distinct x positions, so counting never pulls a column of its input. y takes the count
   # by default (`after_stat(count)`), and a mapping's after_stat reads `count` and `prop`, the
-  # variables ggplot2 documents. It takes no parameters yet. Run it through `Giggly.Stat`.
+  # variables ggplot2 documents. Run it through `Giggly.Stat`.
   #
   # Counting uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`: it
   # counts along the one mapped, so a layer mapping `:y` alone is counted along y and drawn
@@ -31,9 +32,11 @@ defmodule Giggly.Stat.Count do
   # group's constant columns through a summary, `weight` included; one that varies within a group
   # is dropped, where ggplot2 also warns unless it is `weight`, which counting consumes.
 
-  defstruct []
+  # Every field is given by the function that adds the layer, its defaults there.
+  @enforce_keys [:width]
+  defstruct @enforce_keys
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{width: :none | number()}
 
   # The aesthetics a layer that counts can use, from its own mapping or the plot's.
   @doc false
@@ -82,13 +85,13 @@ defmodule Giggly.Stat.Count do
     def default_mapping(_stat), do: %{x: :count, y: :count}
 
     @impl Giggly.Stat
-    def compute_layer(_stat, frame, _axes) do
+    def compute_layer(stat, frame, _axes) do
       check_weight(frame)
       flipped = :x not in DataFrame.names(frame)
 
       frame
       |> flip(flipped)
-      |> count(flipped)
+      |> count(stat.width, flipped)
       |> flip(flipped)
     end
 
@@ -119,7 +122,7 @@ defmodule Giggly.Stat.Count do
       DataFrame.select(frame, renames)
     end
 
-    defp count(frame, flipped) do
+    defp count(frame, set_width, flipped) do
       carried =
         frame
         |> DataFrame.names()
@@ -144,11 +147,7 @@ defmodule Giggly.Stat.Count do
       totals = totals_by_group(counted, counts)
       rows = DataFrame.row_count(counted)
 
-      width =
-        counted
-        |> DataFrame.pull(:x)
-        |> Resolution.of(zero: true)
-        |> Kernel.*(@width_share)
+      width = width(set_width, counted)
 
       prop =
         Enum.zip_with(counts, groups, fn count, group ->
@@ -160,6 +159,17 @@ defmodule Giggly.Stat.Count do
       |> DataFrame.put(:width, List.duplicate(width, rows))
       |> DataFrame.put(:flipped_aes, List.duplicate(flipped, rows))
       |> DataFrame.select(Enum.map(@computed ++ constant, fn name -> {name, name} end))
+    end
+
+    # Each bar's width: the one the layer sets, or else 0.9 of the spacing of the counted table's
+    # x positions, the layer's distinct ones, counting from zero.
+    defp width(set_width, _counted) when is_number(set_width), do: set_width
+
+    defp width(:none, counted) do
+      counted
+      |> DataFrame.pull(:x)
+      |> Resolution.of(zero: true)
+      |> Kernel.*(@width_share)
     end
 
     # The table with each row's weight, 1 where the layer maps none, as ggplot2's `stat_count()`

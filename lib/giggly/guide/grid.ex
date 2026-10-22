@@ -53,7 +53,11 @@ defmodule Giggly.Guide.Grid do
       color: [look.color],
       color_opacity: [1.0],
       fill: [look.fill],
-      fill_opacity: [1.0]
+      fill_opacity: [1.0],
+      dashes: :none,
+      line_end: :round,
+      line_join: :round,
+      mitre_limit: 10.0
     }
   end
 

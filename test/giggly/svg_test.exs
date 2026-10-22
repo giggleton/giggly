@@ -852,7 +852,11 @@ defmodule Giggly.SVGTest do
         color: [:none],
         color_opacity: [1.0],
         fill: ["#EBEBEB"],
-        fill_opacity: [1.0]
+        fill_opacity: [1.0],
+        dashes: :none,
+        line_end: :round,
+        line_join: :round,
+        mitre_limit: 10.0
       }
 
       drawn = draw(whole([polygon]))
@@ -861,6 +865,32 @@ defmodule Giggly.SVGTest do
                drawn,
                "<polygon points='72.00,518.40 144.00,518.40 144.00,403.20 ' " <>
                  "style='stroke-width: 0.75; stroke: none; fill: #EBEBEB;' />\n</svg>\n"
+             )
+    end
+
+    # Golden: the style vdiffr 1.0.9 writes for ggplot2 4.0.3's box of `geom_boxplot(box.linetype =
+    # "dashed")`, a polygon whose border is dashed, its ends cut square and its corners mitred.
+    test "a polygon's border is dashed, its ends and corners written, as svglite writes them" do
+      polygon = %Polygons{
+        outlines: [[{0.1, 0.1}, {0.2, 0.1}, {0.2, 0.3}]],
+        offsets: :none,
+        stroke_width: 1.07,
+        color: ["#333333"],
+        color_opacity: [1.0],
+        fill: ["#F8766D"],
+        fill_opacity: [1.0],
+        dashes: [5.69, 5.69],
+        line_end: :butt,
+        line_join: :mitre,
+        mitre_limit: 10.0
+      }
+
+      drawn = draw(whole([polygon]))
+
+      assert String.ends_with?(
+               drawn,
+               "style='stroke-width: 1.07; stroke: #333333; stroke-dasharray: 5.69,5.69; " <>
+                 "stroke-linecap: butt; stroke-linejoin: miter; fill: #F8766D;' />\n</svg>\n"
              )
     end
 
@@ -935,7 +965,11 @@ defmodule Giggly.SVGTest do
         color: ["#0000FF", :none],
         color_opacity: [0.5, 0.0],
         fill: [:none, "#0000FF"],
-        fill_opacity: [0.0, 0.5]
+        fill_opacity: [0.0, 0.5],
+        dashes: :none,
+        line_end: :round,
+        line_join: :round,
+        mitre_limit: 10.0
       }
 
       drawn = draw(whole([polygons]))

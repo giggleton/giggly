@@ -28,12 +28,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   left for after the stat (`Mapping.stage/1`) → `Group.add/2` writes `group` →
   transform scales → train position scales → map positions to numeric (not to the unit panel) →
   stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
-  ggplot2's `GeomRect$setup_data()` fills them in), and the width it sets (a bar's, replacing its
-  stat's, as `GeomBar$setup_data()` reads its parameter) → geom reparameterize (a bar to
-  `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position → reset and
-  retrain position scales → map positions again, censoring what limits cut → freeze view scales →
-  train non-position scales → build guides → map non-position scales → `after_scale` → fixed
-  values last. A stage arrives with its increment and goes where this order puts it.
+  ggplot2's `GeomRect$setup_data()` fills them in), and the width it sets where its table has
+  none, as `compute_data_size()` reads a row's width before its parameter (a stat writing a width
+  takes the set one as its own, as `stat_count()` and `stat_boxplot()` do) → geom reparameterize
+  (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position →
+  reset and retrain position scales → map positions again, censoring what limits cut → freeze
+  view scales → train non-position scales → build guides → map non-position scales →
+  `after_scale` → fixed values last. A stage arrives with its increment and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly calls the families' build functions, never their drawing ones**: the facet's,

@@ -663,7 +663,7 @@ defmodule Giggly.PlotTest do
       assert plot.reversed_layers == [
                %Plot.Layer{
                  geom: %Geom.Bar{just: 0.5},
-                 stat: %Stat.Count{},
+                 stat: %Stat.Count{width: :none},
                  position: %Position.Stack{},
                  data: :none,
                  mapping: %{x: "cyl", weight: "wt"},
@@ -1183,6 +1183,234 @@ defmodule Giggly.PlotTest do
         error = assert_raise ArgumentError, add
         assert error.message =~ "Plot.geom_freqpoly/3"
       end
+    end
+  end
+
+  describe "geom_boxplot/3" do
+    test "a box plot layer records the box geom, the box plot's summary and dodging by clusters" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_boxplot(%{x: :cyl, y: :mpg})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Boxplot{
+                   outliers: true,
+                   outlier: %{stroke: 0.5},
+                   whisker: %{},
+                   staple: %{},
+                   median: %{},
+                   box: %{},
+                   notch: false,
+                   notchwidth: 0.5,
+                   staplewidth: 0.0,
+                   varwidth: false
+                 },
+                 stat: %Stat.Boxplot{coef: 1.5, width: :none, orientation: :none},
+                 position: %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
+                 data: :none,
+                 mapping: %{x: "cyl", y: "mpg"},
+                 fixed: %{},
+                 accepted: [
+                   :group,
+                   :width,
+                   :x,
+                   :y,
+                   :alpha,
+                   :color,
+                   :fill,
+                   :linetype,
+                   :linewidth,
+                   :shape,
+                   :size
+                 ],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "each part's look holds what is given, either spelling of a colour taken once" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.geom_boxplot(
+          outlier_colour: "red",
+          outlier_shape: 21,
+          outlier_stroke: :none,
+          whisker_color: "blue",
+          staple_linewidth: 2,
+          median_linetype: :dotted,
+          box_colour: :none,
+          staplewidth: 1,
+          notch: true,
+          notchwidth: 0.25,
+          varwidth: true,
+          outliers: false
+        )
+
+      assert [%Plot.Layer{geom: geom}] = plot.reversed_layers
+
+      assert geom == %Geom.Boxplot{
+               outliers: false,
+               outlier: %{color: "#FF0000", shape: :circle_filled, stroke: :none},
+               whisker: %{color: "#0000FF"},
+               staple: %{linewidth: 2.0},
+               median: %{linetype: {1, 3}},
+               box: %{color: :none},
+               notch: true,
+               notchwidth: 0.25,
+               staplewidth: 1.0,
+               varwidth: true
+             }
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_boxplot(plot, whisker_colour: "red", whisker_color: "blue")
+        end
+
+      assert error.message =~ ":whisker_color is given twice"
+    end
+
+    test "the summary's options are its struct's, and what a box sets is fixed, width included" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.geom_boxplot(coef: 3, width: 0.3, orientation: :x, fill: "white", size: 3)
+
+      assert [%Plot.Layer{stat: stat, fixed: fixed}] = plot.reversed_layers
+      assert stat == %Stat.Boxplot{coef: 3.0, width: 0.3, orientation: :x}
+      assert fixed == %{fill: "#FFFFFF", size: 3.0, width: 0.3}
+    end
+
+    test "varwidth: dodges each box at its own width, whatever position is given" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+      single = %Position.Dodge2{preserve: :single, padding: 0.1, reverse: false}
+
+      for position <- [:dodge2, :dodge] do
+        assert [%Plot.Layer{position: ^single}] =
+                 Plot.geom_boxplot(plot, position: position, varwidth: true).reversed_layers
+      end
+
+      told = Plot.position_dodge2(padding: 0.3, reverse: true)
+
+      assert [%Plot.Layer{position: kept}] =
+               Plot.geom_boxplot(plot, position: told, varwidth: true).reversed_layers
+
+      assert kept == %Position.Dodge2{preserve: :single, padding: 0.3, reverse: true}
+
+      assert [%Plot.Layer{position: %Position.Dodge{}}] =
+               Plot.geom_boxplot(plot, position: :dodge).reversed_layers
+    end
+
+    test "boxes are not stacked" do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          @rows
+          |> Plot.new(%{x: :cyl, y: :mpg})
+          |> Plot.geom_boxplot(position: :stack)
+        end
+
+      assert error.message =~
+               "expected :dodge2, :dodge or a position Plot.position_dodge2/1 makes, got: :stack"
+    end
+
+    test "a weight the plot maps is refused, and one the layer maps cannot be used" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg, weight: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_boxplot(plot) end
+
+      assert error.message ==
+               "Plot.geom_boxplot/3 takes :weight from the plot's mapping, which maps it to " <>
+                 "\"wt\", but a box plot is not weighted: each box summarises its rows as they " <>
+                 "are. Map :weight on the layers that count with it rather than on the plot."
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new(%{x: :cyl, y: :mpg})
+          |> Plot.geom_boxplot(%{weight: :wt})
+        end
+
+      assert error.message =~ "cannot use :weight"
+    end
+
+    test "with one of x and y mapped, orientation: must name the other; with both, it chooses" do
+      alone = Plot.new(@rows, %{y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_boxplot(alone, orientation: :y) end
+
+      assert error.message ==
+               "Plot.geom_boxplot/3 summarises y here, because :y alone is mapped, so its " <>
+                 "boxes stand along x and orientation: :y cannot apply. To stand the boxes " <>
+                 "along y, map :x instead of :y; orientation: :y can then stay or be left out."
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new(%{x: :mpg})
+          |> Plot.geom_boxplot(orientation: :x)
+        end
+
+      assert error.message =~ "summarises x here, because :x alone is mapped"
+
+      for {plot, orientation} <- [
+            {alone, :x},
+            {Plot.new(@rows, %{x: :mpg}), :y},
+            {Plot.new(@rows, %{x: :wt, y: :mpg}), :y}
+          ] do
+        assert [%Plot.Layer{stat: %Stat.Boxplot{orientation: ^orientation}}] =
+                 Plot.geom_boxplot(plot, orientation: orientation).reversed_layers
+      end
+    end
+
+    test "a box plot needs x or y, and a mapped width must hold numbers" do
+      error =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new()
+          |> Plot.geom_boxplot()
+        end
+
+      assert error.message =~ "Plot.geom_boxplot/3 needs"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new(%{x: :cyl, y: :mpg})
+          |> Plot.geom_boxplot(%{width: :cyl})
+        end
+
+      assert error.message ==
+               "Plot.geom_boxplot/3 maps :width to \"cyl\", a :string column, but a box is " <>
+                 "drawn as wide as its width, so it must be a number"
+
+      assert [%Plot.Layer{}] =
+               @rows
+               |> Plot.new(%{x: :cyl, y: :mpg, width: :cyl})
+               |> Plot.geom_boxplot(width: 0.5)
+               |> Map.fetch!(:reversed_layers)
+    end
+
+    test "an after_stat reads the summary's documented variables, and none it consumes" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      assert [%Plot.Layer{}] =
+               Plot.geom_boxplot(plot, %{fill: {:after_stat, [:middle]}}).reversed_layers
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_boxplot(plot, %{fill: {:after_stat, [:outliers]}})
+        end
+
+      assert error.message =~ "Plot.geom_boxplot/3 maps :fill"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_boxplot(plot, %{x: {:after_stat, [:middle]}, y: :mpg})
+        end
+
+      assert error.message =~ "its stat consumes :x"
     end
   end
 

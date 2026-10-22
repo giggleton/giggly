@@ -427,8 +427,11 @@ defmodule Giggly.SVG do
   end
 
   # Each polygon round its outline, each point moved by its offset, its border its colour at its
-  # opacity and its fill likewise, as svglite writes a polygon.
+  # opacity, then its dashes and line style, and its fill likewise, as svglite writes a polygon.
   defp primitive(%Polygons{} = polygons, box) do
+    dashes = dash_style(polygons.dashes)
+    style = line_style(polygons.line_end, polygons.line_join, polygons.mitre_limit)
+
     columns = [
       placed_lines(polygons.outlines, polygons.offsets, box),
       polygons.color,
@@ -445,6 +448,8 @@ defmodule Giggly.SVG do
         significant(polygons.stroke_width),
         ";",
         stroke_style(color, color_opacity),
+        dashes,
+        style,
         fill_style(fill, fill_opacity),
         "' />\n"
       ]

@@ -176,7 +176,8 @@ defmodule Giggly.Assembly do
   its place up the bar and its colour (`decor`); and each layer that maps one of its aesthetics,
   in the order the layers were added, with those it maps, its geom drawing its glyph with the
   key's values of those aesthetics and the aesthetics the layer sets, as ggplot2's legend draws a
-  key for each such layer, its `aes_params` among the key's data, and whether it draws in each
+  key for each such layer, its `aes_params` among the key's data, whether its marks are horizontal
+  (`flipped`), as ggplot2 hands `draw_key` the layer's `flipped_aes`, and whether it draws in each
   key, in key order; a colour bar has none.
   """
   @type legend :: %{
@@ -196,6 +197,7 @@ defmodule Giggly.Assembly do
               geom: struct(),
               aesthetics: [Plot.aesthetic()],
               fixed: %{optional(Plot.aesthetic()) => term()},
+              flipped: boolean(),
               draws: [boolean()]
             }
           ],
@@ -608,8 +610,9 @@ defmodule Giggly.Assembly do
   end
 
   # Each layer that maps one of the legend's aesthetics and can use it, in the order the layers were
-  # added, with those it maps, its geom, what it sets, and whether it draws in each key; none for a
-  # colour bar, which draws no layer's glyph, as ggplot2's colour bar keeps none.
+  # added, with those it maps, its geom, what it sets, whether its marks are horizontal, and whether
+  # it draws in each key; none for a colour bar, which draws no layer's glyph, as ggplot2's colour
+  # bar keeps none.
   defp key_layers(%{guide: %Guide.Colorbar{}}, _scales, _plot, _layers_and_data), do: []
 
   defp key_layers(legend, scales, plot, layers_and_data) do
@@ -625,8 +628,21 @@ defmodule Giggly.Assembly do
         geom: Plot.layer_geom(layer),
         aesthetics: mapped,
         fixed: Plot.layer_fixed(layer),
+        flipped: flipped?(frame),
         draws: draws(legend.keys, frame, mapped, discrete)
       }
+    end
+  end
+
+  # Whether a layer's marks are horizontal, as the first orientation its stat or geom wrote in
+  # `flipped_aes` says, as ggplot2's `has_flipped_aes()` reads it; vertical where none wrote one.
+  defp flipped?(frame) do
+    if :flipped_aes in DataFrame.names(frame) do
+      frame
+      |> DataFrame.pull(:flipped_aes)
+      |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
+    else
+      false
     end
   end
 
@@ -713,16 +729,19 @@ defmodule Giggly.Assembly do
     set_fixed(frame, Map.merge(defaults, Map.take(fixed, Map.keys(defaults))))
   end
 
-  # The layer's table with each position the layer sets, an x- or y-family aesthetic, and the width
-  # it sets, given its value in every row just before its geom's setup, as ggplot2's
-  # `GeomRect$setup_data()` fills a rectangle's missing corners and `GeomBar$setup_data()` reads a
-  # bar's width from the layer's parameters: so the position moves the mark and the scales, trained
-  # again after the position, cover it, as a rectangle's set corners and a set bar's edges need. A
-  # set width replaces the one a stat gave each bar, as `stat_count()` takes it as its own.
+  # The layer's table with each position the layer sets, an x- or y-family aesthetic, given its
+  # value in every row just before its geom's setup, as ggplot2's `GeomRect$setup_data()` fills a
+  # rectangle's missing corners, and the width it sets where the table has none, as ggplot2's
+  # `compute_data_size()` reads a mark's width from its row before the layer's parameters: so the
+  # position moves the mark and the scales, trained again after the position, cover it, as a
+  # rectangle's set corners and a set bar's edges need. A stat that writes a width takes the set
+  # one as its own, as `stat_count()` and `stat_boxplot()` do, so the width it wrote stands.
   defp set_positions(frame, fixed) do
+    names = DataFrame.names(frame)
+
     positions =
       Map.filter(fixed, fn {aesthetic, _value} ->
-        Aesthetics.family(aesthetic) != :none or aesthetic == :width
+        Aesthetics.family(aesthetic) != :none or (aesthetic == :width and :width not in names)
       end)
 
     set_fixed(frame, positions)
