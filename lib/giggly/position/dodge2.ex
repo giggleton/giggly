@@ -22,8 +22,9 @@ defmodule Giggly.Position.Dodge2 do
   # width. A cluster is placed from its own middle and widths, where R gives each cluster after a
   # bar with no edges the next one's start (design-log §4, the entry beginning "Dodging by clusters
   # places each cluster"); a bar missing an edge is in no cluster, is placed nowhere, and loses its
-  # x. Heights are left alone. Horizontal bars, those whose `flipped_aes` column says so, are dodged
-  # along y, x and y swapped and swapped back (`Giggly.Position.Orientation`).
+  # x, even where no bar of its panel has edges, which R fails at. Heights are left alone.
+  # Horizontal bars, those whose `flipped_aes` column says so, are dodged along y, x and y swapped
+  # and swapped back (`Giggly.Position.Orientation`).
 
   @enforce_keys [:preserve, :padding, :reverse]
   defstruct @enforce_keys
@@ -64,9 +65,9 @@ defmodule Giggly.Position.Dodge2 do
 
       placed =
         rows
-        |> Enum.group_by(fn row -> row.panel end)
-        |> Enum.sort_by(fn {panel, _rows} -> panel end)
-        |> Enum.flat_map(fn {_panel, panel_rows} -> dodge_panel(panel_rows, share, position) end)
+        |> Enum.sort_by(fn row -> {row.panel, x_key(row.x), group_key(row.group, position)} end)
+        |> Enum.chunk_by(fn row -> row.panel end)
+        |> Enum.flat_map(fn panel_rows -> dodge_panel(panel_rows, share, position) end)
 
       sorted = DataFrame.slice(frame, Enum.map(placed, fn row -> row.index end))
 
@@ -94,11 +95,8 @@ defmodule Giggly.Position.Dodge2 do
       |> Enum.max(fn -> 1 end)
     end
 
-    # ggplot2's `collide2()` and `pos_dodge2()` for one panel's rows.
-    defp dodge_panel(rows, share, position) do
-      sorted =
-        Enum.sort_by(rows, fn row -> {x_key(row.x), group_key(row.group, position.reverse)} end)
-
+    # ggplot2's `collide2()` and `pos_dodge2()` for one panel's rows, sorted.
+    defp dodge_panel(sorted, share, position) do
       clusters = clusters(sorted)
 
       laid =
@@ -118,13 +116,14 @@ defmodule Giggly.Position.Dodge2 do
       end)
     end
 
-    # R's order: by value, minus infinity first and infinity after every number, a missing x last.
+    # R's order: by value, minus infinity first and infinity after every number, a missing x last,
+    # those missing in the order they came, as R's `order()` keeps them.
     defp x_key(x) when x in [nil, :nan], do: {2, 0}
     defp x_key(:neg_infinity), do: {0, 0}
     defp x_key(x), do: {1, x}
 
-    defp group_key(group, false), do: group
-    defp group_key(group, true), do: -group
+    defp group_key(group, %{reverse: false}), do: group
+    defp group_key(group, %{reverse: true}), do: -group
 
     # ggplot2's `find_x_overlaps()`: walking the bars with both edges, in order, one starts a new
     # cluster where its `xmin` is beyond the furthest `xmax` before it, or on it for a bar with
@@ -184,13 +183,10 @@ defmodule Giggly.Position.Dodge2 do
       end)
     end
 
-    # A bar as its cluster laid it, or, missing an edge, as it was, its width missing too; either
-    # way its x moves to its middle.
+    # A bar as its cluster laid it, or, missing an edge, as it was, with no width; either way its x
+    # moves to its middle, which a bar missing an edge does not have, so padding leaves it missing.
     defp laid_out(row, laid) do
-      bar =
-        Map.get_lazy(laid, row.index, fn ->
-          Map.put(row, :width, Arithmetic.subtract(row.xmax, row.xmin))
-        end)
+      bar = Map.get_lazy(laid, row.index, fn -> Map.put(row, :width, nil) end)
 
       %{bar | x: midpoint(bar.xmin, bar.xmax)}
     end

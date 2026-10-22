@@ -47,9 +47,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `cumulative_sum/1`), so its doubles are R's; each panel's rows come out sorted by x, then
   group, as R's do; a bar with no group is dodged; padding applies to every bar of a panel where a
   cluster holds two, and nowhere else; `:single` divides by the most bars at one present x in any
-  panel. **It departs from R in one place**: each cluster is placed from its own middle and
+  panel. **It departs from R where R slips**: each cluster is placed from its own middle and
   widths, where R misplaces those after a bar missing an edge, which is placed nowhere and loses
-  its x. It writes none of R's scratch columns (`xid`, `newx`, `new_width`), nor `order`.
+  its x; and a panel where no bar has edges, where R fails, keeps them missing. It writes none of
+  R's scratch columns (`xid`, `newx`, `new_width`), nor `order`.
 - **A position declares the aesthetics it reads, each with its default
   (`default_aesthetics/1`)**, as ggplot2's position declares its `default_aes`, and reads them
   from columns the assembly has put into every row before it runs (design-log §4, the entry

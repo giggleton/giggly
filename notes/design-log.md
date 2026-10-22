@@ -354,8 +354,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   on the other at 2.8875–3.1125; Giggly sets them at 2.7625–2.9875 and 3.0125–3.2375, as a's are,
   and the bar with no edges loses its x, as R's does. The two agree wherever every bar has edges
   and a positive width and none reaches back past an earlier cluster; negative widths, each its
-  own cluster by R's rule, stay where they are. *Rejected: R's placement* — a slip in its
-  indexing, which stacks the bars dodging exists to separate.
+  own cluster by R's rule, stay where they are. A panel where no bar has edges, where R fails
+  summing no clusters ("non-numeric argument to binary operator"), keeps its bars without them
+  (found in the step's mutation pass). *Rejected: R's placement* — a slip in its indexing, which
+  stacks the bars dodging exists to separate.
 
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**

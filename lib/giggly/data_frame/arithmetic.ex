@@ -146,8 +146,9 @@ defmodule Giggly.DataFrame.Arithmetic do
 
   # The running sums of `values`, R's `cumsum()`: each the sum of the values up to it, in extended
   # precision, as R's `cumsum()` adds in a long double and rounds each sum to a double, which a
-  # running compensated sum gives; from a missing value or an infinity on, each is what `add/2`
-  # makes of the sum before it and the value.
+  # running compensated sum gives. From a missing value or an infinity on, each is what `add/2`
+  # makes of the sum before it and the value, but that once a value is `nil` (R's `NA`) every sum
+  # after it is, NaN met before or after, as R's long double keeps `NA` over NaN.
   @doc false
   @spec cumulative_sum([double()]) :: [double()]
   def cumulative_sum(values) do
@@ -156,13 +157,15 @@ defmodule Giggly.DataFrame.Arithmetic do
   end
 
   # The next running sum and what the one after it adds to: a compensated sum while every value
-  # has been a number, and the non-finite sum once one has not.
+  # has been a number, and the non-finite sum once one has not, which is the first value not a
+  # number itself, as `add/2` makes a number's sum with it.
   defp running(value, {_total, _compensation} = sum) when is_number(value) do
     {total, compensation} = compensated(value, sum)
     {total + compensation, {total, compensation}}
   end
 
-  defp running(value, {total, compensation}), do: running(value, total + compensation)
+  defp running(value, {_total, _compensation}), do: {value, value}
+  defp running(nil, _sum), do: {nil, nil}
 
   defp running(value, sum) do
     next = add(sum, value)

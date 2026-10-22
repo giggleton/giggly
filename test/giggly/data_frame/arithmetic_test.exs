@@ -226,4 +226,17 @@ defmodule Giggly.DataFrame.ArithmeticTest do
              [1.0, nil, nil]
            ]
   end
+
+  # Golden: R 4.6.1's cumsum() of c(NaN, NA), c(NA, NaN), c(Inf, -Inf, NA) and c(NA, Inf): NaN, NA;
+  # NA, NA; Inf, NaN, NA; and NA, NA. Its long double keeps NA over NaN whichever comes first,
+  # where R's `+` keeps its first operand.
+  test "cumulative_sum keeps NA from where it is met, NaN before it or after" do
+    sums =
+      Enum.map(
+        [[:nan, nil], [nil, :nan], [:infinity, :neg_infinity, nil], [nil, :infinity]],
+        &Arithmetic.cumulative_sum/1
+      )
+
+    assert sums === [[:nan, nil], [nil, nil], [:infinity, :nan, nil], [nil, nil]]
+  end
 end
