@@ -28,7 +28,9 @@ where its marks sit".
   discrete** (`axis_kinds`), which ggplot2's geoms read from a position's `mapped_discrete` class;
   a geom sees an axis's kind, never its range.
 - **A bar runs from 0 to its y, as R's `pmin(y, 0)` and `pmax(y, 0)` give its ends, an infinite
-  one to the panel's edge**, its ends doubles, a missing y's missing.
+  one to the panel's edge**, its ends doubles, a missing y's missing; its sides are its x less and
+  plus half its width, in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an infinite bin's are
+  an infinity or NaN.
 - **A bar is horizontal when its stat says so in `flipped_aes`, or else when y alone is
   discrete**, as ggplot2's `GeomBar` decides; it writes `flipped_aes` for the position and makes a
   horizontal bar as a vertical one, flipped and flipped back (`Aesthetics.flipped/1`).

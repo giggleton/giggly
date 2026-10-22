@@ -126,6 +126,49 @@ defmodule Giggly.DataFrame.ArithmeticTest do
              [true, false, true, false, nil, nil, nil]
   end
 
+  # Golden: R 4.6.1's 1 + NA, Inf + NaN, 1 * NA, Inf * NaN, -0.5 * Inf, Inf / -0.5, -Inf / 0,
+  # -Inf / 0.5 and -Inf / -0.5 are NA, NaN, NA, NaN, -Inf, -Inf, -Inf, -Inf and Inf: a missing
+  # second operand, and a fraction's sign beside an infinity.
+  test "a missing second operand and a fraction beside an infinity follow R" do
+    assert {Arithmetic.add(1, nil), Arithmetic.add(:infinity, :nan)} === {nil, :nan}
+
+    assert {Arithmetic.multiply(1, nil), Arithmetic.multiply(:infinity, :nan),
+            Arithmetic.multiply(-0.5, :infinity)} === {nil, :nan, :neg_infinity}
+
+    quotients =
+      Enum.map(
+        [{:infinity, -0.5}, {:neg_infinity, 0}, {:neg_infinity, 0.5}, {:neg_infinity, -0.5}],
+        fn {numerator, denominator} -> Arithmetic.divide(numerator, denominator) end
+      )
+
+    assert quotients === [:neg_infinity, :neg_infinity, :neg_infinity, :infinity]
+  end
+
+  # Golden: R 4.6.1's 3 - 1.5, 1 - -Inf, Inf - Inf, NA - NaN, NaN - NA and -Inf - 2 are 1.5, Inf,
+  # NaN, NA, NaN and -Inf.
+  test "subtract subtracts as R subtracts doubles" do
+    pairs = [
+      {3, 1.5},
+      {1, :neg_infinity},
+      {:infinity, :infinity},
+      {nil, :nan},
+      {:nan, nil},
+      {:neg_infinity, 2}
+    ]
+
+    assert Enum.map(pairs, fn {left, right} -> Arithmetic.subtract(left, right) end) ===
+             [1.5, :infinity, :nan, nil, :nan, :neg_infinity]
+  end
+
+  # Golden: R 4.6.1's 1 / pmin(0, -0) is Inf and 1 / pmax(-0, 0) is -Inf, a tie keeping the first;
+  # pmax(NA, Inf), pmax(NaN, Inf) and pmin(NA, -Inf) are NA, NaN and NA.
+  test "lesser and greater keep the first of a tie, and a missing value beats an infinity" do
+    assert {Arithmetic.lesser(0.0, -0.0), Arithmetic.greater(-0.0, 0.0)} === {0.0, -0.0}
+
+    assert {Arithmetic.greater(nil, :infinity), Arithmetic.greater(:nan, :infinity),
+            Arithmetic.lesser(nil, :neg_infinity)} === {nil, :nan, nil}
+  end
+
   # Golden: R 4.6.1's abs() of -2.5, -Inf, Inf, NaN and NA is 2.5, Inf, Inf, NaN and NA.
   test "magnitude is R's abs(), an infinity's plus infinity" do
     magnitudes = Enum.map([-2.5, :neg_infinity, :infinity, :nan, nil], &Arithmetic.magnitude/1)

@@ -777,6 +777,30 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17
   # significant digits. It moves with ggplot2's bar geometry or stacking.
   describe "layer_data/2, for geom_col" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(aes(x, y, fill = g))` over x
+    # 1, 1, 1, 1, y -1, 2, -3, 0.5 and g a, b, c, d: a's bar from -4 to -3, b's from 0.5 to 2.5, c's
+    # from -3 to 0, d's from 0 to 0.5, those below zero piled apart, the highest group nearest it;
+    # and over x 1, 1, 1, y 2, NaN, NaN, g a, b, c: a from 0 to 2, and b and c, their heights
+    # missing, have no ends and a y of 0, each adding nothing to the other.
+    test "bars below zero pile apart, and a missing height adds nothing to its pile" do
+      stacked = fn xs, ys, groups ->
+        %{"x" => xs, "y" => ys, "g" => groups}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+      end
+
+      below = stacked.([1, 1, 1, 1], [-1.0, 2.0, -3.0, 0.5], ["a", "b", "c", "d"])
+      missing = stacked.([1, 1, 1], [2.0, :nan, :nan], ["a", "b", "c"])
+
+      assert {DataFrame.pull(below, :ymin), DataFrame.pull(below, :ymax)} ===
+               {[-4.0, 0.5, -3.0, 0.0], [-3.0, 2.5, 0.0, 0.5]}
+
+      assert {DataFrame.pull(missing, :y), DataFrame.pull(missing, :ymin),
+              DataFrame.pull(missing, :ymax)} ===
+               {[2.0, 0.0, 0.0], [0.0, nil, nil], [2.0, nil, nil]}
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_col(aes(x, y))` over x 1, 2 and
     # y -Inf, Inf: ymin -Inf and 0, ymax 0 and Inf, each bar from 0 to its infinity.
     test "a bar of infinite height runs from 0 to its infinity" do
@@ -2987,7 +3011,203 @@ defmodule GigglyTest do
         |> Plot.stat_bin()
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "weight must be a number"
       assert error.message =~ ":string"
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(binwidth = 1)` over x
+    # 0 and 999999 has no rows: from -0.5 to 999999.99999999 is more than a million bins, which R
+    # refuses and drops the layer for, where Giggly raises.
+    test "a million bins and a half are refused" do
+      plot =
+        %{"x" => [0, 999_999]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(binwidth: 1)
+
+      assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(breaks = ...)`: over
+    # breaks 0, 1, 3, 10, gaps 1, 2, 7 and fuzz 2e-8, x 1 + 1.8e-8 and -1e-8 both count in the
+    # first bin (2, 0, 0); over breaks 0, 1, 3, 10, 20, the median gap 4.5, x 1 + 5e-8 counts in the
+    # second (0, 1, 0, 0), and x 1 + 4.2e-8, inside it, in the first (1, 0, 0, 0); closed on the
+    # left, x 1 - 1.8e-8 and 10 + 1e-8 count in the second and the third (0, 1, 1). Beyond the
+    # fuzz, x -3e-8 is left out and 1 + 3e-8 counts in the second (0, 1, 0), and closed on the
+    # left, 1 - 3e-8 counts in the first and 10 + 3e-8 is left out (1, 0, 0).
+    test "a value within the fuzz of a break falls as R puts it, the fuzz from the median gap" do
+      counts = fn values, options ->
+        %{"x" => values}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(options)
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:count)
+      end
+
+      assert counts.([1 + 1.8e-8, -1.0e-8], breaks: [0, 1, 3, 10]) === [2.0, 0.0, 0.0]
+      assert counts.([1 + 5.0e-8], breaks: [0, 1, 3, 10, 20]) === [0.0, 1.0, 0.0, 0.0]
+      assert counts.([1 + 4.2e-8], breaks: [0, 1, 3, 10, 20]) === [1.0, 0.0, 0.0, 0.0]
+
+      assert counts.([1 - 1.8e-8, 10 + 1.0e-8], breaks: [0, 1, 3, 10], closed: :left) ===
+               [0.0, 1.0, 1.0]
+
+      assert counts.([-3.0e-8, 1 + 3.0e-8], breaks: [0, 1, 3, 10]) === [0.0, 1.0, 0.0]
+
+      assert counts.([1 - 3.0e-8, 10 + 3.0e-8], breaks: [0, 1, 3, 10], closed: :left) ===
+               [1.0, 0.0, 0.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(breaks = c(0, 10)) +
+    # scale_x_log10()` over x 0.5 and 10.000000000001: the breaks' logs, -Inf and 1, leave no two
+    # finite, so the fuzz is 1000 epsilons and the second value, 4e-14 past 1, counts; one bin,
+    # its middle -Inf, from -Inf to NA, count 2. With breaks c(10, 1, 0, -1), -1 has no log and the
+    # rest sort to -Inf, 0, 1: middles -Inf and 0.5, counts 2 and 1.
+    test "breaks are sorted, one with no log dropped, and an infinite one makes an infinite bin" do
+      binned = fn values, breaks ->
+        %{"x" => values}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(breaks: breaks)
+        |> Plot.scale_x_log10()
+        |> Giggly.layer_data()
+      end
+
+      one_finite = binned.([0.5, 10.000000000001], [0, 10])
+      unsorted = binned.([0.5, 1, 5], [10, 1, 0, -1])
+
+      assert {DataFrame.pull(one_finite, :x), DataFrame.pull(one_finite, :xmin),
+              DataFrame.pull(one_finite, :xmax), DataFrame.pull(one_finite, :count)} ===
+               {[:neg_infinity], [:neg_infinity], [nil], [2.0]}
+
+      assert {DataFrame.pull(unsorted, :x), DataFrame.pull(unsorted, :xmin),
+              DataFrame.pull(unsorted, :xmax), DataFrame.pull(unsorted, :count)} ===
+               {[:neg_infinity, 0.5], [:neg_infinity, 0.0], [nil, 1.0], [2.0, 1.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(breaks = c(0, 1, 2)) +
+    # scale_x_continuous(transform = "reciprocal")` over x 1.5 and 4: the breaks' reciprocals sort
+    # to 0.5, 1, Inf, so the bins' middles are 0.75 and Inf, from 0.5 and NA to 1 and Inf, and 4's
+    # 0.25 falls below them (counts 1, 0).
+    test "a break the transformation takes to infinity sorts last" do
+      frame =
+        %{"x" => [1.5, 4]}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(breaks: [0, 1, 2])
+        |> Plot.scale_x_continuous(transform: :reciprocal)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :xmin),
+              DataFrame.pull(frame, :xmax), DataFrame.pull(frame, :count)} ===
+               {[0.75, :infinity], [0.5, nil], [1.0, :infinity], [1.0, 0.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2 weighted NA, NA, binwidth 1,
+    # boundary 0.5: counts 0 and densities NaN, a column of only missing weights adding nothing.
+    test "a weight column of only missing values adds nothing" do
+      frame =
+        %{"x" => [1, 2], "w" => [nil, nil]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :count), DataFrame.pull(frame, :density)} ===
+               {[0.0, 0.0], [:nan, :nan]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1: over x 2.5, 3.5 with binwidth 1, boundary 0
+    # and pad, middles 1.5 to 4.5, counts 0, 1, 1, 0; over x 1, 4 with bins 4 and center 0, middles
+    # 1 to 4, from 0.5 to 4.5, counts 1, 0, 0, 1.
+    test "a pad bin sits a width beyond the outermost, and a centre places bins counted by number" do
+      binned = fn values, options ->
+        %{"x" => values}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(options)
+        |> Giggly.layer_data()
+      end
+
+      padded = binned.([2.5, 3.5], binwidth: 1, boundary: 0, pad: true)
+      centred = binned.([1, 4], bins: 4, center: 0)
+
+      assert {DataFrame.pull(padded, :x), DataFrame.pull(padded, :count)} ===
+               {[1.5, 2.5, 3.5, 4.5], [0.0, 1.0, 1.0, 0.0]}
+
+      assert {DataFrame.pull(centred, :x), DataFrame.pull(centred, :xmin),
+              DataFrame.pull(centred, :count)} ===
+               {[1.0, 2.0, 3.0, 4.0], [0.5, 1.5, 2.5, 3.5], [1.0, 0.0, 0.0, 1.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(bins = 5)`: over x 5, 25
+    # with boundary 0, 5 %% 5 is 0 %% 5, so the bins are 20 / 5 wide, middles 6 to 26; over x -7,
+    # 13 with boundary 3, -7 %% 5 is 3 as R takes the sign of the divisor, so 20 / 5 again, middles
+    # -7 to 13.
+    test "a limit on the boundary, by R's %%, sets bins counted by number their number apart" do
+      middles = fn values, boundary ->
+        %{"x" => values}
+        |> Plot.new(%{x: :x})
+        |> Plot.stat_bin(bins: 5, boundary: boundary)
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:x)
+      end
+
+      assert middles.([5, 25], 0) === [6.0, 10.0, 14.0, 18.0, 22.0, 26.0]
+      assert middles.([-7, 13], 3) === [-7.0, -3.0, 1.0, 5.0, 9.0, 13.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2 weighted -2, 1, binwidth 1,
+    # boundary 0.5: densities -2/3 and 1/3, ncount and ndensity -1 and 0.5, over the largest
+    # magnitude.
+    test "a group's largest is its largest magnitude" do
+      frame =
+        %{"x" => [1, 2], "w" => [-2.0, 1.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :density), DataFrame.pull(frame, :ncount),
+              DataFrame.pull(frame, :ndensity)} ===
+               {[-0.66666666666666663, 0.33333333333333331], [-1.0, 0.5], [-1.0, 0.5]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(x, label =
+    # factor(cyl)), binwidth = 1, boundary = 0.5)` over x 1, 2, 3 and cyl 4: a label column of class
+    # factor, 4 in each bin.
+    test "a carried column keeps its type, a factor's category included" do
+      frame =
+        %{"x" => [1, 2, 3], "cyl" => [4, 4, 4]}
+        |> Plot.new(%{x: :x, label: {:factor, [:cyl]}})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :label), DataFrame.dtypes(frame).label} ===
+               {[4, 4, 4], :category}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2, 2 with binwidth 1, boundary
+    # 0.5 and y after_stat(count), (ncount), (ndensity) and (width): ymax 1, 2; 0.5, 1; 0.5, 1; 1, 1.
+    test "an after_stat reads each variable binning computes" do
+      ymax = fn variable ->
+        %{"x" => [1, 2, 2]}
+        |> Plot.new(%{x: :x, y: {:after_stat, [variable]}})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:ymax)
+      end
+
+      assert Enum.map([:count, :ncount, :ndensity, :width], ymax) ===
+               [[1.0, 2.0], [0.5, 1.0], [0.5, 1.0], [1.0, 1.0]]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(aes(x, xmin = a, xmax =
+    # a, width = a), binwidth = 1, boundary = 0.5)` over x 1, 2 and a 0: the bins' own ends and
+    # width win over the columns the plot's mapping carries in, middles 0 to 2 from -0.5 to 2.5.
+    test "the columns binning computes win over those the plot's mapping carries in" do
+      frame =
+        %{"x" => [1, 2], "a" => [0, 0]}
+        |> Plot.new(%{x: :x, xmin: :a, xmax: :a, width: :a})
+        |> Plot.stat_bin(binwidth: 1, boundary: 0.5)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax),
+              DataFrame.pull(frame, :count)} ===
+               {[-0.5, 0.5, 1.5], [0.5, 1.5, 2.5], [0.0, 1.0, 1.0]}
     end
 
     test "bins too narrow for the axis are refused when the plot is run, naming the width" do

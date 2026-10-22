@@ -28,6 +28,11 @@ defmodule Giggly.DataFrame.Arithmetic do
   def add(left, _right) when left in @infinities, do: left
   def add(_left, right), do: right
 
+  # `left - right`, as `left + -right`.
+  @doc false
+  @spec subtract(double(), double()) :: double()
+  def subtract(left, right), do: add(left, multiply(right, -1))
+
   # `left * right`: an infinity times 0 is NaN, and otherwise an infinity of the two signs' product.
   @doc false
   @spec multiply(double(), double()) :: double()

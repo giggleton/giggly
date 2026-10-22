@@ -875,7 +875,7 @@ defmodule Giggly.PlotTest do
 
       [layer] = plot.reversed_layers
 
-      assert layer.stat == %Stat.Bin{
+      assert layer.stat === %Stat.Bin{
                bins: 5,
                binwidth: 2.0,
                center: 1.0,
@@ -922,10 +922,31 @@ defmodule Giggly.PlotTest do
       end
     end
 
-    test "x and y together are refused, binning along one" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+    test "x and y together, or neither, are refused, binning along one, naming the function" do
+      both = Plot.new(@rows, %{x: :wt, y: :mpg})
+      neither = Plot.new(@rows)
 
-      assert_raise ArgumentError, fn -> Plot.stat_bin(plot) end
+      error = assert_raise ArgumentError, fn -> Plot.stat_bin(both) end
+      assert error.message =~ "Plot.stat_bin/3"
+      assert_raise ArgumentError, fn -> Plot.stat_bin(neither) end
+    end
+
+    test "a mapping the grammar refuses is refused, naming the function" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.stat_bin(plot, %{x: {1, 2, 3}}) end
+      assert error.message =~ "Plot.stat_bin/3"
+    end
+
+    test "an after_stat for the weight it consumes is refused" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.stat_bin(plot, %{weight: {:after_stat, [:count]}})
+        end
+
+      assert error.message =~ "its stat consumes :weight as it computes"
     end
 
     test "a weight that is not numbers is refused at the call" do

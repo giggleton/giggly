@@ -20,11 +20,11 @@ column names become strings", "Column types belong to the frame" and "Every boun
   frame's struct.
 - **R's arithmetic on the frame's doubles is `Giggly.DataFrame.Arithmetic`** (design-log §4, the
   entry beginning "A missing value in a sum is R's"): the frame owns `nil` (R's `NA`), `:nan`,
-  `:infinity` and `:neg_infinity`, so it owns how they add, multiply, divide, compare and take a
-  magnitude or a maximum, as IEEE arithmetic and R's `pmin()`, `pmax()`, `max()` and `<` do, a
-  missing value and NaN where both meet resolved as R resolves them. A stat's shares and
-  densities and stacking's heights go through it, never Elixir's arithmetic, which has no
-  infinity.
+  `:infinity` and `:neg_infinity`, so it owns how they add, subtract, multiply, divide, compare
+  and take a magnitude or a maximum, as IEEE arithmetic and R's `pmin()`, `pmax()`, `max()` and
+  `<` do, a missing value and NaN where both meet resolved as R resolves them. A stat's shares,
+  densities and bins, stacking's heights and a bar's sides go through it, never Elixir's
+  arithmetic, which has no infinity.
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,

@@ -42,6 +42,7 @@ defmodule Giggly.Geom.Bar do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Aesthetics, DataFrame, Geom, Resolution}
+    alias Giggly.DataFrame.Arithmetic
     alias Giggly.Geom.Rect
 
     # ggplot2's default bar: its share of the spacing of the x positions, centred on its x
@@ -94,8 +95,8 @@ defmodule Giggly.Geom.Bar do
         |> Enum.reject(fn name -> name == :width end)
         |> Enum.map(fn name -> {name, name} end)
 
-      xmins = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, -width * @just) end)
-      xmaxes = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width * (1 - @just)) end)
+      xmins = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, -@just) end)
+      xmaxes = Enum.zip_with(x_positions, widths, fn x, width -> edge(x, width, 1 - @just) end)
 
       frame
       |> DataFrame.select(kept)
@@ -145,9 +146,9 @@ defmodule Giggly.Geom.Bar do
       resolution * @width_share
     end
 
-    # An x position moved by `offset` to a bar's edge; a missing one stays missing.
-    defp edge(x, offset) when is_number(x), do: x + offset
-    defp edge(missing, _offset) when missing in [nil, :nan], do: missing
+    # An x position moved by a share of its bar's width to an edge, in R's arithmetic, so an
+    # infinite bar's edge is at an infinity or NaN; a missing one stays missing.
+    defp edge(x, width, share), do: Arithmetic.add(x, Arithmetic.multiply(width, share))
 
     # The lower or higher of a y position and 0, as R's `pmin(y, 0)` and `pmax(y, 0)` give it, a
     # double: an infinite bar runs from 0 to its infinity, at the panel's edge; a missing one stays

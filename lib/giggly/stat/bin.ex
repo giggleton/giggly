@@ -33,14 +33,9 @@ defmodule Giggly.Stat.Bin do
   # ggplot2's `flip_data()` does; an axis that is discrete is refused, as `stat_bin()` refuses
   # one.
 
-  defstruct binwidth: :none,
-            bins: 30,
-            center: :none,
-            boundary: :none,
-            breaks: :none,
-            closed: :right,
-            pad: false,
-            drop: :none
+  # Every field is given by the function that adds the layer, its defaults there.
+  @enforce_keys [:binwidth, :bins, :center, :boundary, :breaks, :closed, :pad, :drop]
+  defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           binwidth: :none | number(),
@@ -230,11 +225,17 @@ defmodule Giggly.Stat.Bin do
       |> Enum.map(fn {[low, high], index} ->
         %{
           count: Map.get(counts, {panel, group, index}, 0.0),
-          x: (low + high) / 2,
-          width: high - low
+          x: middle(low, high),
+          width: Arithmetic.subtract(high, low)
         }
       end)
       |> padded(pad)
+    end
+
+    defp middle(low, high) do
+      low
+      |> Arithmetic.add(high)
+      |> Arithmetic.divide(2)
     end
 
     defp padded(bins, false), do: bins
@@ -242,8 +243,8 @@ defmodule Giggly.Stat.Bin do
     defp padded(bins, true) do
       %{x: first_x, width: first_width} = List.first(bins)
       %{x: last_x, width: last_width} = List.last(bins)
-      before = %{count: 0.0, x: first_x - first_width, width: first_width}
-      beyond = %{count: 0.0, x: last_x + last_width, width: last_width}
+      before = %{count: 0.0, x: Arithmetic.subtract(first_x, first_width), width: first_width}
+      beyond = %{count: 0.0, x: Arithmetic.add(last_x, last_width), width: last_width}
       Enum.concat([[before], bins, [beyond]])
     end
 
@@ -285,8 +286,8 @@ defmodule Giggly.Stat.Bin do
 
       Enum.zip_with(bins, densities, fn bin, density ->
         Map.merge(bin, %{
-          xmin: bin.x - bin.width / 2,
-          xmax: bin.x + bin.width / 2,
+          xmin: Arithmetic.subtract(bin.x, Arithmetic.divide(bin.width, 2)),
+          xmax: Arithmetic.add(bin.x, Arithmetic.divide(bin.width, 2)),
           density: density,
           ncount: Arithmetic.divide(bin.count, largest_count),
           ndensity: Arithmetic.divide(density, largest_density)

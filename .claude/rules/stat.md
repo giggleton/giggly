@@ -72,7 +72,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **Binning is ggplot2's `stat_bin()`**: per panel and per group, one row per bin, its `count` the
   rows in it or the sum of their weights, a missing weight adding nothing and an infinite one
   making it infinite, 0 for a bin no row falls
-  in, and its middle `x`, its ends `xmin` and `xmax`, its `width`, its `density` (the count over
+  in, and its middle `x`, its ends `xmin` and `xmax`, its `width`, in R's arithmetic, so a break a
+  transformation takes to an infinity makes a bin of infinite width, its `density` (the count over
   the width over the group's total of the counts' magnitudes, summed by the frame), and `ncount`
   and `ndensity` (over the group's largest magnitude), NaN where the group's counts are all 0, as R
   divides. **The bins are R's to the last digit** (`bin.R`), from each panel's axis: the breaks
