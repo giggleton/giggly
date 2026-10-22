@@ -452,92 +452,113 @@ defmodule Giggly.Plot do
                    stroke: @point_stroke_option
                  )
 
-  # `geom_bar/3`'s and `geom_col/3`'s options, validated at the call.
+  # How every bar of a layer looks, set by its options.
+  @bar_look_options [
+    alpha: @alpha_option,
+    color: @bar_color_option,
+    fill: @bar_fill_option,
+    linewidth: @bar_linewidth_option,
+    linetype: @bar_linetype_option
+  ]
+
+  # Which of x and y a counting or binning layer runs along, ggplot2's `orientation`: a claim the
+  # call checks against the one of them mapped, which decides it, so it is recorded nowhere.
+  @runs_along_option [
+    type: {:in, [:x, :y]},
+    doc:
+      "The axis the layer runs along, `:x` or `:y`, which must be the one of `:x` and `:y` " <>
+        "mapped; it runs along that one when this is not given."
+  ]
+
+  # How bars that share an `x` are placed, an option of `geom_bar/3` and `geom_col/3`.
+  @bar_position_option [
+    type: {:in, [:stack, :dodge]},
+    default: :stack,
+    doc:
+      "How bars that share an `x` are placed: piled on one another (`:stack`), or set side by " <>
+        "side within the width one bar takes (`:dodge`)."
+  ]
+
+  # `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
-                 data: @data_option,
-                 position: [
-                   type: {:in, [:stack, :dodge]},
-                   default: :stack,
-                   doc:
-                     "How bars that share an `x` are placed: piled on one another (`:stack`), " <>
-                       "or set side by side within the width one bar takes (`:dodge`)."
-                 ],
-                 alpha: @alpha_option,
-                 color: @bar_color_option,
-                 fill: @bar_fill_option,
-                 linewidth: @bar_linewidth_option,
-                 linetype: @bar_linetype_option
+                 [data: @data_option, position: @bar_position_option] ++ @bar_look_options
                )
 
-  # `stat_bin/3`'s options, validated at the call: how the axis is cut into bins, and a bar's.
+  # `geom_bar/3`'s options, validated at the call: a bar's, and the axis its counting runs along.
+  @count_options NimbleOptions.new!(
+                   [
+                     data: @data_option,
+                     position: @bar_position_option,
+                     orientation: @runs_along_option
+                   ] ++ @bar_look_options
+                 )
+
+  # How a binning layer cuts its axis into bins, options of every function that adds one.
+  @binning_options [
+    bins: [
+      type: :pos_integer,
+      default: 30,
+      doc: "How many bins span the axis, when neither `binwidth:` nor `breaks:` is given."
+    ],
+    binwidth: [
+      type: {:custom, __MODULE__, :validate_binwidth, []},
+      doc:
+        "How wide each bin is, a number above 0 in the axis's transformed units, which takes " <>
+          "the place of `bins:`."
+    ],
+    center: [
+      type: {:or, [:integer, :float]},
+      doc: "Where one bin's middle falls, which places them all; not with `boundary:`."
+    ],
+    boundary: [
+      type: {:or, [:integer, :float]},
+      doc:
+        "Where two bins meet, which places them all; not with `center:`. Without either, the " <>
+          "outermost bins are centred on the axis's limits, or bins `binwidth:` wide meet half " <>
+          "a width from 0."
+    ],
+    breaks: [
+      type: {:custom, __MODULE__, :validate_bin_breaks, []},
+      doc:
+        "Where the bins meet, a list of two or more distinct numbers in the data's units, put " <>
+          "through the axis's transformation, which takes the place of `bins:`, `binwidth:`, " <>
+          "`center:` and `boundary:`; a row outside them is not counted."
+    ],
+    closed: [
+      type: {:in, [:right, :left]},
+      default: :right,
+      doc:
+        "Which end of a bin a value on its edge belongs to: the right end (`:right`), or the " <>
+          "left (`:left`); the outermost bins hold their outer ends too."
+    ],
+    pad: [
+      type: :boolean,
+      default: false,
+      doc: "Whether to add a bin of no rows at each end."
+    ],
+    drop: [
+      type: {:in, [:none, :all, :extremes]},
+      default: :none,
+      doc:
+        "Which bins of no rows to leave out: none (`:none`), every one (`:all`), or those " <>
+          "before the first bin with rows and after the last (`:extremes`)."
+    ],
+    orientation: @runs_along_option
+  ]
+
+  # `geom_histogram/3`'s and `stat_bin/3`'s options, validated at the call: how the axis is cut
+  # into bins, and a bar's.
   @bin_options NimbleOptions.new!(
-                 data: @data_option,
-                 position: [
-                   type: {:in, [:stack, :dodge]},
-                   default: :stack,
-                   doc:
-                     "How bars that share a bin are placed: piled on one another (`:stack`), " <>
-                       "or set side by side within the bin's width (`:dodge`)."
-                 ],
-                 bins: [
-                   type: :pos_integer,
-                   default: 30,
-                   doc:
-                     "How many bins span the axis, when neither `binwidth:` nor `breaks:` is " <>
-                       "given."
-                 ],
-                 binwidth: [
-                   type: {:custom, __MODULE__, :validate_binwidth, []},
-                   doc:
-                     "How wide each bin is, a number above 0 in the axis's transformed units, " <>
-                       "which takes the place of `bins:`."
-                 ],
-                 center: [
-                   type: {:or, [:integer, :float]},
-                   doc:
-                     "Where one bin's middle falls, which places them all; not with " <>
-                       "`boundary:`."
-                 ],
-                 boundary: [
-                   type: {:or, [:integer, :float]},
-                   doc:
-                     "Where two bins meet, which places them all; not with `center:`. Without " <>
-                       "either, the outermost bins are centred on the axis's limits, or bins " <>
-                       "`binwidth:` wide meet half a width from 0."
-                 ],
-                 breaks: [
-                   type: {:custom, __MODULE__, :validate_bin_breaks, []},
-                   doc:
-                     "Where the bins meet, a list of two or more distinct numbers in the data's " <>
-                       "units, put through the axis's transformation, which takes the place of " <>
-                       "`bins:`, `binwidth:`, `center:` and `boundary:`; a row outside them is " <>
-                       "not counted."
-                 ],
-                 closed: [
-                   type: {:in, [:right, :left]},
-                   default: :right,
-                   doc:
-                     "Which end of a bin a value on its edge belongs to: the right end " <>
-                       "(`:right`), or the left (`:left`); the outermost bins hold their outer " <>
-                       "ends too."
-                 ],
-                 pad: [
-                   type: :boolean,
-                   default: false,
-                   doc: "Whether to add a bin of no rows at each end."
-                 ],
-                 drop: [
-                   type: {:in, [:none, :all, :extremes]},
-                   default: :none,
-                   doc:
-                     "Which bins of no rows to leave out: none (`:none`), every one (`:all`), " <>
-                       "or those before the first bin with rows and after the last (`:extremes`)."
-                 ],
-                 alpha: @alpha_option,
-                 color: @bar_color_option,
-                 fill: @bar_fill_option,
-                 linewidth: @bar_linewidth_option,
-                 linetype: @bar_linetype_option
+                 [
+                   data: @data_option,
+                   position: [
+                     type: {:in, [:stack, :dodge]},
+                     default: :stack,
+                     doc:
+                       "How bars that share a bin are placed: piled on one another " <>
+                         "(`:stack`), or set side by side within the bin's width (`:dodge`)."
+                   ]
+                 ] ++ @binning_options ++ @bar_look_options
                )
 
   # `geom_path/3`'s options, validated at the call.
@@ -571,6 +592,22 @@ defmodule Giggly.Plot do
                     linetype: @linetype_option
                   ] ++ @line_style_options
                 )
+
+  # How a frequency polygon cuts its axis into bins: binning's options but `pad`, which a frequency
+  # polygon always takes.
+  @freqpoly_binning_options Keyword.delete(@binning_options, :pad)
+
+  # `geom_freqpoly/3`'s options, validated at the call: how the axis is cut into bins, and a path's.
+  @freqpoly_options NimbleOptions.new!(
+                      [data: @data_option] ++
+                        @freqpoly_binning_options ++
+                        [
+                          alpha: @alpha_option,
+                          color: @line_color_option,
+                          linewidth: @linewidth_option,
+                          linetype: @linetype_option
+                        ] ++ @line_style_options
+                    )
 
   # Whether text leaves out the labels that would cross one drawn before it.
   @check_overlap_option [
@@ -1862,7 +1899,7 @@ defmodule Giggly.Plot do
 
   ## Options
 
-  #{NimbleOptions.docs(@bar_options)}
+  #{NimbleOptions.docs(@count_options)}
 
       iex> plot =
       ...>   %{"class" => ["suv", "compact", "suv"]}
@@ -1880,7 +1917,7 @@ defmodule Giggly.Plot do
 
   def geom_bar(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
-    validated = layer_options(options, @bar_options)
+    validated = layer_options(options, @count_options)
     data = own_data(validated)
 
     layer = %Layer{
@@ -1902,15 +1939,16 @@ defmodule Giggly.Plot do
       dropped: Stat.Count.dropped_aesthetics()
     )
     |> check_weight(layer, "Plot.geom_bar/3")
+    |> check_runs_along(layer, validated, "Plot.geom_bar/3", "count")
   end
 
   @doc """
-  Adds a layer of bars counting the rows in each bin: the `x` axis cut into bins, and for each
-  group one bar per bin, from 0 to the number of rows in it, or, where `:weight` is mapped, to the
-  sum of their weights, a bin with no rows counting 0. The y axis is titled `count`. The bins are
-  30 spanning each panel's x axis unless `bins:`, `binwidth:` or `breaks:` says otherwise; bars of
-  different groups in one bin are stacked. A row missing its `x`, or outside the breaks given, is
-  not counted. The bars are drawn as `geom_col/3` draws them.
+  Adds a layer of bars counting the rows in each bin, a histogram: the `x` axis cut into bins, and
+  for each group one bar per bin, from 0 to the number of rows in it, or, where `:weight` is
+  mapped, to the sum of their weights, a bin with no rows counting 0. The y axis is titled `count`.
+  The bins are 30 spanning each panel's x axis unless `bins:`, `binwidth:` or `breaks:` says
+  otherwise; bars of different groups in one bin are stacked. A row missing its `x`, or outside the
+  breaks given, is not counted. The bars are drawn as `geom_col/3` draws them.
 
   Binning uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`, on a
   continuous axis: it bins along the one mapped, so mapping `:y` alone draws horizontal bars. A
@@ -1930,12 +1968,33 @@ defmodule Giggly.Plot do
       iex> plot =
       ...>   %{"x" => [1.0, 1.5, 2.5, 4.0]}
       ...>   |> Giggly.Plot.new(%{x: :x})
-      ...>   |> Giggly.Plot.stat_bin(binwidth: 1, boundary: 0)
+      ...>   |> Giggly.Plot.geom_histogram(binwidth: 1, boundary: 0)
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.pull(frame, :count)
       [2.0, 1.0, 1.0]
       iex> Giggly.DataFrame.pull(frame, :x)
       [1.5, 2.5, 3.5]
+  """
+  @spec geom_histogram(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_histogram(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_histogram(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_histogram(plot, %{}, options)
+
+  def geom_histogram(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: bin_layer(plot, mapping, options, "Plot.geom_histogram/3")
+
+  @doc """
+  Adds the layer `geom_histogram/3` adds, bars counting the rows in each bin, from the same mapping
+  and options.
+
+      iex> plot =
+      ...>   %{"x" => [1.0, 1.5, 2.5, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x})
+      ...>   |> Giggly.Plot.stat_bin(binwidth: 1, boundary: 0)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:density)
+      [0.5, 0.25, 0.25]
   """
   @spec stat_bin(t(), mapping_argument() | keyword(), keyword()) :: t()
   def stat_bin(plot, mapping_or_options \\ %{}, options \\ [])
@@ -1944,30 +2003,66 @@ defmodule Giggly.Plot do
     do: stat_bin(plot, %{}, options)
 
   def stat_bin(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: bin_layer(plot, mapping, options, "Plot.stat_bin/3")
+
+  @doc """
+  Adds a layer of frequency polygons: the `x` axis cut into bins, as `geom_histogram/3` cuts it,
+  and for each group a line through the middle of each bin at the number of rows in it, or, where
+  `:weight` is mapped, the sum of their weights. A bin of no rows is added at each end, so every
+  line starts and ends at 0. The y axis is titled `count`. The lines of different groups are drawn
+  over one another, not stacked, so a discrete colour compares the groups' distributions. A row
+  missing its `x`, or outside the breaks given, is not counted. The lines are drawn as
+  `geom_path/3` draws paths.
+
+  Binning uses `:x` or `:y`, `:weight` and `:group`, and needs exactly one of `:x` and `:y`, on a
+  continuous axis: it bins along the one mapped, so mapping `:y` alone draws lines that run up the
+  panel. A `:weight` column must hold numbers, and a missing weight adds nothing. The lines also
+  take `:alpha`, `:color`, `:linetype` and `:linewidth`; one reaches a line only where it is the
+  same in every row of its group, so a discrete one groups the rows and gives each group its line.
+
+  Binning computes what `geom_histogram/3` lists, which a mapping reads with an after_stat
+  (`Giggly.Mapping`): `%{x: :price, y: {:after_stat, [:density]}, color: :cut}` draws each cut's
+  density, comparable however many rows each cut has.
+
+  ## Options
+
+  #{NimbleOptions.docs(@freqpoly_options)}
+
+      iex> plot =
+      ...>   %{"x" => [1.0, 1.5, 2.5, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x})
+      ...>   |> Giggly.Plot.geom_freqpoly(binwidth: 1, boundary: 0)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [0.5, 1.5, 2.5, 3.5, 4.5]
+      iex> Giggly.DataFrame.pull(frame, :count)
+      [0.0, 2.0, 1.0, 1.0, 0.0]
+  """
+  @spec geom_freqpoly(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_freqpoly(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_freqpoly(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_freqpoly(plot, %{}, options)
+
+  def geom_freqpoly(%__MODULE__{} = plot, mapping, options)
       when is_map(mapping) and is_list(options) do
-    validated = layer_options(options, @bin_options)
-    check_bin_placement(validated, "Plot.stat_bin/3")
+    validated = layer_options(options, @freqpoly_options)
+    check_bin_placement(validated, "Plot.geom_freqpoly/3")
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Bar{},
-      stat: bin_stat(validated),
-      position: position(Keyword.fetch!(validated, :position)),
+      geom: path_geom(validated),
+      stat: bin_stat(validated, true),
+      position: %Position.Identity{},
       data: data,
-      mapping: resolve(mapping, plot, data, "Plot.stat_bin/3"),
+      mapping: resolve(mapping, plot, data, "Plot.geom_freqpoly/3"),
       fixed: fixed(validated),
-      accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Path.accepted_aesthetics()),
       annotation: false
     }
 
-    plot
-    |> add_layer(layer, "Plot.stat_bin/3",
-      required: Stat.Bin.required_aesthetics(),
-      exclusive: Stat.Bin.exclusive_aesthetics(),
-      computed: Stat.Bin.computed_variables(),
-      dropped: Stat.Bin.dropped_aesthetics()
-    )
-    |> check_weight(layer, "Plot.stat_bin/3")
+    add_binning_layer(plot, layer, validated, "Plot.geom_freqpoly/3")
   end
 
   @doc """
@@ -4875,6 +4970,41 @@ defmodule Giggly.Plot do
     |> check_weight(layer, function)
   end
 
+  # The layer `geom_histogram/3` and `stat_bin/3` add, bars counting the rows in each bin, its
+  # mistakes named as `function`'s.
+  defp bin_layer(plot, mapping, options, function) do
+    validated = layer_options(options, @bin_options)
+    check_bin_placement(validated, function)
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Bar{},
+      stat: bin_stat(validated, Keyword.fetch!(validated, :pad)),
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Bar.accepted_aesthetics()),
+      annotation: false
+    }
+
+    add_binning_layer(plot, layer, validated, function)
+  end
+
+  # The plot with a binning layer added, once its mappings are checked against binning's, its
+  # weight's type and its orientation.
+  defp add_binning_layer(plot, layer, validated, function) do
+    plot
+    |> add_layer(layer, function,
+      required: Stat.Bin.required_aesthetics(),
+      exclusive: Stat.Bin.exclusive_aesthetics(),
+      computed: Stat.Bin.computed_variables(),
+      dropped: Stat.Bin.dropped_aesthetics()
+    )
+    |> check_weight(layer, function)
+    |> check_runs_along(layer, validated, function, "bin")
+  end
+
   # A layer function's options, validated against `schema`, their names put in their canonical
   # spelling first, so a repeated option is refused rather than one silently winning.
   defp layer_options(options, schema) do
@@ -4890,8 +5020,9 @@ defmodule Giggly.Plot do
     |> Map.new()
   end
 
-  # Binning's struct from a layer function's validated options, each not given recorded as `:none`.
-  defp bin_stat(validated) do
+  # Binning's struct from a layer function's validated options, each not given recorded as `:none`,
+  # padded as `pad` says.
+  defp bin_stat(validated, pad) do
     center = Keyword.get(validated, :center, :none)
     boundary = Keyword.get(validated, :boundary, :none)
 
@@ -4902,7 +5033,7 @@ defmodule Giggly.Plot do
       boundary: as_float(boundary),
       breaks: Keyword.get(validated, :breaks, :none),
       closed: Keyword.fetch!(validated, :closed),
-      pad: Keyword.fetch!(validated, :pad),
+      pad: pad,
       drop: Keyword.fetch!(validated, :drop)
     }
   end
@@ -5038,6 +5169,30 @@ defmodule Giggly.Plot do
     end
 
     plot
+  end
+
+  # A counting or binning layer runs along the one of x and y it maps before its stat, so an
+  # orientation it is given must name that one; one that does says nothing more, so it is recorded
+  # nowhere. `verb` is what the layer does along it, `"count"` or `"bin"`.
+  defp check_runs_along(plot, layer, validated, function, verb) do
+    [mapped] =
+      plot
+      |> computed_mapping(layer)
+      |> Map.take([:x, :y])
+      |> Enum.reject(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
+      |> Enum.map(fn {aesthetic, _value} -> aesthetic end)
+
+    case Keyword.fetch(validated, :orientation) do
+      {:ok, given} when given != mapped ->
+        raise ArgumentError,
+              "#{function} #{verb}s along #{mapped} here, because #{inspect(mapped)} is mapped, " <>
+                "so orientation: #{inspect(given)} cannot apply. To #{verb} along #{given}, map " <>
+                "#{inspect(given)} instead of #{inspect(mapped)}; orientation: " <>
+                "#{inspect(given)} can then stay or be left out."
+
+      _agreeing_or_not_given ->
+        plot
+    end
   end
 
   # Each column the layer takes from the plot's mapping, for an aesthetic it neither maps nor sets,

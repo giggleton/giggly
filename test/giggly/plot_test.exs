@@ -575,6 +575,19 @@ defmodule Giggly.PlotTest do
       assert error.message =~ "Plot.geom_col/3"
       assert error.message =~ ":y"
     end
+
+    # ggplot2 4.0.3's `geom_col(orientation = "y")` over two numeric columns draws horizontal
+    # bars, which the bar geom cannot yet be told to, so the option is not taken.
+    test "orientation: is refused, the bars' direction being the geom's alone" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_col(plot, orientation: :y)
+        end
+
+      assert error.message =~ "unknown options [:orientation]"
+    end
   end
 
   describe "geom_bar/3" do
@@ -827,7 +840,17 @@ defmodule Giggly.PlotTest do
     end
   end
 
-  describe "stat_bin/3" do
+  describe "geom_histogram/3 and stat_bin/3" do
+    test "stat_bin/3 adds the layer geom_histogram/3 adds" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      assert Plot.stat_bin(plot, %{fill: :cyl}, binwidth: 1, position: :dodge).reversed_layers ==
+               Plot.geom_histogram(plot, %{fill: :cyl}, binwidth: 1, position: :dodge).reversed_layers
+
+      assert Plot.stat_bin(plot, bins: 5).reversed_layers ==
+               Plot.geom_histogram(plot, bins: 5).reversed_layers
+    end
+
     test "a binning layer records the bar geom, binning with its defaults and stacking" do
       plot =
         @rows
@@ -901,10 +924,13 @@ defmodule Giggly.PlotTest do
     test "a centre and a boundary together are refused, each placing every bin" do
       plot = Plot.new(@rows, %{x: :wt})
 
-      error =
-        assert_raise ArgumentError, fn -> Plot.stat_bin(plot, center: 0, boundary: 0) end
-
-      assert error.message =~ "Plot.stat_bin/3"
+      for {add, function} <- [
+            {&Plot.geom_histogram/2, "Plot.geom_histogram/3"},
+            {&Plot.stat_bin/2, "Plot.stat_bin/3"}
+          ] do
+        error = assert_raise ArgumentError, fn -> add.(plot, center: 0, boundary: 0) end
+        assert error.message =~ function
+      end
     end
 
     test "a bin width not above 0 is refused" do
@@ -954,6 +980,173 @@ defmodule Giggly.PlotTest do
 
       error = assert_raise ArgumentError, fn -> Plot.stat_bin(plot) end
       assert error.message =~ "Plot.stat_bin/3"
+    end
+  end
+
+  describe "geom_freqpoly/3" do
+    test "a frequency polygon records the path geom, binning padded at each end and no position" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_freqpoly(%{x: :wt, colour: :cyl, weight: :mpg})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0},
+                 stat: %Stat.Bin{
+                   bins: 30,
+                   binwidth: :none,
+                   center: :none,
+                   boundary: :none,
+                   breaks: :none,
+                   closed: :right,
+                   pad: true,
+                   drop: :none
+                 },
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{x: "wt", color: "cyl", weight: "mpg"},
+                 fixed: %{},
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :linetype, :linewidth],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "its binning options go to binning's struct, a line's to the path and its look" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_freqpoly(
+          bins: 5,
+          binwidth: 2,
+          boundary: 1,
+          breaks: [0, 2.5, 5],
+          closed: :left,
+          drop: :all,
+          lineend: :round,
+          linejoin: :mitre,
+          linemitre: 2,
+          colour: "red",
+          linewidth: 2,
+          linetype: :dashed,
+          alpha: 0.5
+        )
+
+      [layer] = plot.reversed_layers
+
+      assert layer.stat === %Stat.Bin{
+               bins: 5,
+               binwidth: 2.0,
+               center: :none,
+               boundary: 1.0,
+               breaks: [0.0, 2.5, 5.0],
+               closed: :left,
+               pad: true,
+               drop: :all
+             }
+
+      assert layer.geom === %Geom.Path{line_end: :round, line_join: :mitre, mitre_limit: 2.0}
+
+      assert layer.fixed === %{
+               color: "#FF0000",
+               linewidth: 2.0,
+               linetype: {4, 4},
+               alpha: 0.5
+             }
+    end
+
+    # ggplot2 4.0.3's `geom_freqpoly()` sets `pad = TRUE` after reading its arguments, so a
+    # polygon is padded whatever `pad` says.
+    test "pad:, position: and fill: are refused, a polygon being padded, unplaced and unfilled" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for option <- [pad: false, position: :stack, fill: "red"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_freqpoly(plot, [option]) end
+
+        assert error.message =~ "unknown options [#{inspect(elem(option, 0))}]"
+      end
+    end
+
+    test "a mapped fill is refused, which a line has none of" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_freqpoly(plot, %{fill: :cyl}) end
+      assert error.message =~ "Plot.geom_freqpoly/3 cannot use :fill"
+    end
+
+    test "binning's refusals name the function" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      for add <- [
+            fn -> Plot.geom_freqpoly(plot, center: 0, boundary: 0) end,
+            fn -> Plot.geom_freqpoly(plot, %{y: :mpg}) end,
+            fn -> Plot.geom_freqpoly(plot, %{weight: :cyl}) end,
+            fn -> Plot.geom_freqpoly(plot, %{weight: {:after_stat, [:count]}}) end
+          ] do
+        error = assert_raise ArgumentError, add
+        assert error.message =~ "Plot.geom_freqpoly/3"
+      end
+    end
+  end
+
+  describe "orientation: of a counting or binning layer" do
+    test "one naming the axis mapped is taken and recorded nowhere, saying what the mapping says" do
+      along_x = Plot.new(@rows, %{x: :wt})
+      along_y = Plot.new(@rows, %{y: :wt})
+
+      for add <- [
+            &Plot.geom_bar/2,
+            &Plot.geom_histogram/2,
+            &Plot.stat_bin/2,
+            &Plot.geom_freqpoly/2
+          ] do
+        assert add.(along_x, orientation: :x) == add.(along_x, [])
+        assert add.(along_y, orientation: :y) == add.(along_y, [])
+      end
+    end
+
+    # ggplot2 4.0.3 warns "Computation failed in `stat_bin()`" for `geom_histogram(aes(x),
+    # orientation = "y")`, and draws the plot without the layer.
+    test "one naming the other axis is refused, saying how to run along it" do
+      along_x = Plot.new(@rows, %{x: :wt})
+
+      for {add, function, verb} <- [
+            {&Plot.geom_histogram/2, "Plot.geom_histogram/3", "bin"},
+            {&Plot.stat_bin/2, "Plot.stat_bin/3", "bin"},
+            {&Plot.geom_freqpoly/2, "Plot.geom_freqpoly/3", "bin"},
+            {&Plot.geom_bar/2, "Plot.geom_bar/3", "count"}
+          ] do
+        error = assert_raise ArgumentError, fn -> add.(along_x, orientation: :y) end
+        assert error.message =~ "#{function} #{verb}s along x here, because :x is mapped"
+        assert error.message =~ "To #{verb} along y, map :y instead of :x"
+      end
+    end
+
+    test "the axis is the one mapped before the stat, the layer's own or the plot's" do
+      plot = Plot.new(@rows, %{y: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_histogram(plot, orientation: :x) end
+      assert error.message =~ "Plot.geom_histogram/3 bins along y here"
+
+      after_stat = Plot.new(@rows, %{y: {:after_stat, [:density]}})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_freqpoly(after_stat, %{x: :wt}, orientation: :y)
+        end
+
+      assert error.message =~ "Plot.geom_freqpoly/3 bins along x here"
+    end
+
+    # ggplot2 4.0.3 reads any orientation but "y" as "x".
+    test "an axis other than :x and :y is refused" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.geom_histogram(plot, orientation: :z)
+      end
     end
   end
 

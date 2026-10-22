@@ -268,6 +268,32 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   types would be an aggregate every engine must carry. *Left out: the identity-stat box* — it
   needs a `stat:` option, which no geom has; that is a decision for every geom.
 
+- **A frequency polygon takes no `pad:`, since R pads one whatever it is given (2026-10-22, Steve,
+  scoping distributions' step 3).** ggplot2's `geom_freqpoly()` sets `params$pad <- TRUE` after
+  reading its arguments, so `geom_freqpoly(pad = FALSE)` still draws a bin of no rows at each end,
+  and says nothing. `geom_freqpoly/3` records `%Stat.Bin{pad: true}` and leaves `pad:` out of its
+  options, so `pad: false` raises naming it, as an option that would do nothing raises elsewhere
+  (`fill:` on `geom_path/3`), and every call it takes draws what R draws. *Rejected: honouring
+  `pad: false`* — the unpadded polygon a reader might expect, but R draws one only through
+  `stat_bin(geom = "line")`, so the same call would draw differently. *Rejected: taking `pad:` and
+  ignoring it, as R does* — an option that changes nothing.
+
+- **Binning takes `orientation:`, which must name the aesthetic it bins, and a contrary one raises
+  a friendly error at the call (2026-10-22, Steve, scoping distributions' step 3).** R's
+  `geom_histogram()`, `geom_freqpoly()` and `stat_bin()` take `orientation`: one agreeing with the
+  mapped `x` or `y` changes nothing, and a contrary one only warns "Computation failed in
+  `stat_bin()`", with a cause that never says why, and draws the plot without the layer; any
+  string but `"y"` reads as `"x"`. Giggly's three take `:x` or `:y`, checked at the call against
+  the one of `x` and `y` mapped and recorded nowhere, since one accepted says what the mapping
+  says; a contrary one raises in plain words: what the layer bins along, why, and how to bin the
+  other way. Unlike a polygon's `pad:`, which R ignores, it is a claim the call checks, so R code
+  with a correct orientation runs unchanged. `geom_bar/3`'s counting, as unambiguous, takes it
+  alike, with options of its own (Steve); `geom_col/3`'s, the ambiguous case `orientation` exists
+  for (horizontal bars from two numeric columns), is a feature waiting for the bar geom to read
+  it. *Rejected: leaving it out* (proposed) — code ported from R meets "unknown options".
+  *Rejected: a field of `%Stat.Bin{}`* — nothing would read it. *Rejected: `geom_bar/3`'s waiting
+  for `geom_col/3`'s* — one bar feature, but the check is binning's, ready now.
+
 - **A shape scale is discrete alone, and its functions take R's options but those their families
   wait for (2026-10-20, Steve, the shape step; checked against ggplot2 4.0.3 in R).**
   `scale_shape_discrete/2` takes `solid:` (`{:shape, :solid}` or `{:shape, :open}`, R's
@@ -2028,6 +2054,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Draw histograms and frequency polygons, and check a layer's orientation
+  (distributions, step 3); §4: "A frequency polygon takes no `pad:`", "Binning takes
+  `orientation:`"
 - 2026-10-21 — Bin a continuous axis into counts, and add infinite weights as R does
   (distributions, step 2); §4: "A stat is handed each panel's axes", "A missing value in a sum is
   R's"

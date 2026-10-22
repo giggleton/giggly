@@ -3221,6 +3221,205 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_freqpoly" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_freqpoly(binwidth = 1, boundary =
+    # 0)` over x 1, 1.5, 2.5 and 4: the three bins with rows and one of none at each end, the
+    # stat's every column kept, y its count.
+    test "a bin of no rows is added at each end, and the stat's columns are kept" do
+      frame =
+        %{"x" => [1.0, 1.5, 2.5, 4.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_freqpoly(binwidth: 1, boundary: 0)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) == [
+               :count,
+               :x,
+               :xmin,
+               :xmax,
+               :width,
+               :density,
+               :ncount,
+               :ndensity,
+               :flipped_aes,
+               :panel,
+               :group,
+               :y
+             ]
+
+      assert Enum.map([:count, :x, :xmin, :xmax, :width], fn name ->
+               DataFrame.pull(frame, name)
+             end) ===
+               [
+                 [0.0, 2.0, 1.0, 1.0, 0.0],
+                 [0.5, 1.5, 2.5, 3.5, 4.5],
+                 [0.0, 1.0, 2.0, 3.0, 4.0],
+                 [1.0, 2.0, 3.0, 4.0, 5.0],
+                 [1.0, 1.0, 1.0, 1.0, 1.0]
+               ]
+
+      assert Enum.map([:density, :ncount, :ndensity, :y], fn name ->
+               DataFrame.pull(frame, name)
+             end) ===
+               [
+                 [0.0, 0.5, 0.25, 0.25, 0.0],
+                 [0.0, 1.0, 0.5, 0.5, 0.0],
+                 [0.0, 1.0, 0.5, 0.5, 0.0],
+                 [0.0, 2.0, 1.0, 1.0, 0.0]
+               ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_freqpoly(bins = 3)` over x 0.3,
+    # 1.1, 2.9, 3.0 and 7.7: bins 3.7 wide, each end its middle less and plus half the width, to
+    # the last digit.
+    test "a bin's ends are its middle less and plus half its width" do
+      frame =
+        %{"x" => [0.3, 1.1, 2.9, 3.0, 7.7]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_freqpoly(bins: 3)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) ===
+               [-3.4, 0.30000000000000016, 4.0, 7.700000000000001, 11.400000000000002]
+
+      assert DataFrame.pull(frame, :xmin) ===
+               [-5.25, -1.5499999999999998, 2.15, 5.850000000000001, 9.550000000000002]
+
+      assert DataFrame.pull(frame, :xmax) ===
+               [-1.5499999999999998, 2.1500000000000004, 5.85, 9.55, 13.250000000000002]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_freqpoly(breaks = c(0, 1, 4,
+    # 8))` over the same x: bins 1, 3 and 4 wide, each padding bin as wide as its neighbour.
+    test "bins of unequal width are padded by bins as wide as the outermost" do
+      frame =
+        %{"x" => [0.3, 1.1, 2.9, 3.0, 7.7]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_freqpoly(breaks: [0, 1, 4, 8])
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :xmin, :xmax, :width], fn name -> DataFrame.pull(frame, name) end) ===
+               [
+                 [-0.5, 0.5, 2.5, 6.0, 10.0],
+                 [-1.0, 0.0, 1.0, 4.0, 8.0],
+                 [0.0, 1.0, 4.0, 8.0, 12.0],
+                 [1.0, 1.0, 3.0, 4.0, 4.0]
+               ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_freqpoly(breaks = c(0, 1, 10,
+    # 100)) + scale_x_log10()` over x 0.5, 2, 20 and 50: the break 0's log makes the first bin,
+    # and the one padding it, infinitely wide, their middles and low ends -Inf and their high ends
+    # NA, -Inf plus Inf.
+    test "a bin a transformation makes infinitely wide has infinite ends, or none" do
+      frame =
+        %{"x" => [0.5, 2.0, 20.0, 50.0]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_freqpoly(breaks: [0, 1, 10, 100])
+        |> Plot.scale_x_log10()
+        |> Giggly.layer_data()
+
+      assert Enum.map([:count, :x, :xmin, :xmax, :width], fn name ->
+               DataFrame.pull(frame, name)
+             end) ===
+               [
+                 [0.0, 1.0, 1.0, 2.0, 0.0],
+                 [:neg_infinity, :neg_infinity, 0.5, 1.5, 2.5],
+                 [:neg_infinity, :neg_infinity, 0.0, 1.0, 2.0],
+                 [nil, nil, 1.0, 2.0, 3.0],
+                 [:infinity, :infinity, 1.0, 1.0, 1.0]
+               ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_freqpoly(binwidth = 1, boundary =
+    # 0)` over x 1 and 3.5: `drop = "extremes"` leaves out the padding bins and keeps the empty
+    # one between, `drop = "all"` every empty bin.
+    test "dropping bins of no rows takes the padding bins too" do
+      binned = fn drop ->
+        %{"x" => [1.0, 3.5]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_freqpoly(binwidth: 1, boundary: 0, drop: drop)
+        |> Giggly.layer_data()
+      end
+
+      extremes = binned.(:extremes)
+      all = binned.(:all)
+
+      assert {DataFrame.pull(extremes, :x), DataFrame.pull(extremes, :count)} ===
+               {[1.5, 2.5, 3.5], [1.0, 0.0, 1.0]}
+
+      assert {DataFrame.pull(all, :x), DataFrame.pull(all, :count)} === {[1.5, 3.5], [1.0, 1.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(aes(y = x)) +
+    # geom_freqpoly(binwidth = 1, boundary = 0)`: the bins along y, their ends ymin and ymax, the
+    # count in x.
+    test "a polygon binning y runs up the panel, the count across it" do
+      frame =
+        %{"x" => [1.0, 1.5, 2.5, 4.0]}
+        |> Plot.new(%{y: :x})
+        |> Plot.geom_freqpoly(binwidth: 1, boundary: 0)
+        |> Giggly.layer_data()
+
+      assert Enum.map([:y, :ymin, :ymax, :x, :flipped_aes], fn name ->
+               DataFrame.pull(frame, name)
+             end) ===
+               [
+                 [0.5, 1.5, 2.5, 3.5, 4.5],
+                 [0.0, 1.0, 2.0, 3.0, 4.0],
+                 [1.0, 2.0, 3.0, 4.0, 5.0],
+                 [0.0, 2.0, 1.0, 1.0, 0.0],
+                 [true, true, true, true, true]
+               ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(aes(x, after_stat(density),
+    # colour = g)) + geom_freqpoly(binwidth = 1, boundary = 0)` over x 1, 1.5, 2.5, 4 and g a, b,
+    # a, b: a line per colour, each padded, each group's density its own.
+    test "each group is binned and padded apart, an after_stat reading its own density" do
+      frame =
+        %{"x" => [1.0, 1.5, 2.5, 4.0], "g" => ["a", "b", "a", "b"]}
+        |> Plot.new(%{x: :x, y: {:after_stat, [:density]}, colour: :g})
+        |> Plot.geom_freqpoly(binwidth: 1, boundary: 0)
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :y, :group], fn name -> DataFrame.pull(frame, name) end) ===
+               [
+                 [0.5, 1.5, 2.5, 3.5, 4.5, 0.5, 1.5, 2.5, 3.5, 4.5],
+                 [0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5, 0.0],
+                 [1, 1, 1, 1, 1, 2, 2, 2, 2, 2]
+               ]
+
+      assert DataFrame.pull(frame, :color) ==
+               List.duplicate("#F8766D", 5) ++ List.duplicate("#00BFC4", 5)
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `aes(x, weight = w)` over weights 2,
+    # 0.5, NA and 3: each bin's count its weights' sum, the missing one adding nothing.
+    test "a weight is summed in each bin" do
+      frame =
+        %{"x" => [1.0, 1.5, 2.5, 4.0], "w" => [2.0, 0.5, nil, 3.0]}
+        |> Plot.new(%{x: :x, weight: :w})
+        |> Plot.geom_freqpoly(binwidth: 1, boundary: 0)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :y) === [0.0, 2.5, 0.0, 3.0, 0.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `ggplot_build()` in R 4.6.1 for `ggplot(mpg, aes(hwy, colour = drv))
+    # + geom_freqpoly(binwidth = 2)`: middles 10 to 46, ends 9 to 47, and the x axis spans 9 to 47
+    # before its expansion, its range 7.1 to 48.9. Moves with mpg.
+    test "the x axis spans the bins' ends, beyond their middles" do
+      scales =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, colour: :drv})
+        |> Plot.geom_freqpoly(binwidth: 2)
+        |> Giggly.panel_scales()
+
+      assert scales.x.range === {9.0, 47.0}
+    end
+  end
+
   describe "layer_data/2, dodged" do
     test "the groups at one x share a bar's width, lowest group leftmost; a lone group keeps it" do
       frame =
@@ -4404,6 +4603,38 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/count_colour.svg")
+    end
+
+    # Golden: test/golden/histogram_fill.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/histogram_fill.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. mpg's highway mileages in bins 2 wide, each
+    # drive train's bars stacked in each bin and filled by it. It moves with what moves
+    # test/golden/bar.svg, and with binning.
+    test "a histogram stacks each group's bars in each bin" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, fill: :drv})
+        |> Plot.geom_histogram(binwidth: 2)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/histogram_fill.svg")
+    end
+
+    # Golden: test/golden/freqpoly_colour.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/freqpoly_colour.R: every element matches it, the x axis drawn before the
+    # y as in test/golden/point.svg, and every clip path. mpg's highway mileages in bins 2 wide, a
+    # line for each drive train in its colour, each starting and ending at 0, the x axis spanning
+    # the bins' ends. It moves with what moves test/golden/linetype_colour.svg, and with binning.
+    test "a frequency polygon draws each group's padded bins as a line, the axis to their ends" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, colour: :drv})
+        |> Plot.geom_freqpoly(binwidth: 2)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/freqpoly_colour.svg")
     end
 
     # Golden: test/golden/size_merged_rows.svg, checked against ggplot2's drawing of the same plot,
