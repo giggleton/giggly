@@ -44,8 +44,9 @@ defmodule Giggly.Geom.Boxplot do
   # `GeomSegment` draws them; the box and its median are cut square and mitred at their corners, as
   # `GeomCrossbar` draws them. A line whose colour is `:none` or missing, whose line type is blank or
   # whose width is missing is not drawn, as R's graphics engine draws none, and a box's border so is
-  # left off, its fill drawn. A box in radial coordinates is drawn between its placed corners, not
-  # curved.
+  # left off, its fill drawn; a line missing an end, one a scale's limits cut, is left out, and a box
+  # missing a corner is drawn in the runs of two corners or more left, as grid splits a polygon at a
+  # missing point. A box in radial coordinates is drawn between its placed corners, not curved.
   #
   # Its legend key is ggplot2's `draw_key_boxplot()`, by fractions of the key: whiskers from a tenth
   # to a quarter of the way up and from three quarters to nine tenths, a box three quarters wide and
@@ -53,8 +54,8 @@ defmodule Giggly.Geom.Boxplot do
   # across the whiskers' ends, `0.75 * staplewidth` of the key wide, drawn though they have no length
   # at a `staplewidth` of 0, as ggplot2 draws them; each line in its part's look, else the key's
   # colour, line type and width, the median not doubled, the box filled in the key's fill at its
-  # alpha, every line cut square and mitred; turned for a horizontal layer, which the legend says in
-  # the key's `flipped_aes`, as ggplot2 hands `draw_key` the layer's `flipped_aes`. It needs its
+  # alpha, every line cut square and mitred; turned for a horizontal layer, which the legend always
+  # says in the key's `flipped_aes`, as ggplot2 hands `draw_key` the layer's `flipped_aes`. It needs its
   # `size` and `linewidth` added, in millimetres, as ggplot2's `set_key_size()` reads a key with no
   # size of its own, a missing one counting 0.
 
@@ -112,7 +113,6 @@ defmodule Giggly.Geom.Boxplot do
     @line_type {}
     @shape :circle
     @size 1.5
-    @stroke 0.5
 
     # ggplot2's median, `fatten` times the box's line width.
     @median_fatten 2
@@ -137,15 +137,11 @@ defmodule Giggly.Geom.Boxplot do
       |> flip(flipped)
     end
 
-    # The orientation the box plot's summary wrote, vertical where it wrote none.
+    # The orientation the box plot's summary wrote in every row, vertical for a table of no boxes.
     defp flipped?(frame) do
-      if :flipped_aes in DataFrame.names(frame) do
-        frame
-        |> DataFrame.pull(:flipped_aes)
-        |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
-      else
-        false
-      end
+      frame
+      |> DataFrame.pull(:flipped_aes)
+      |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
     end
 
     defp flip(frame, false), do: frame
@@ -265,10 +261,7 @@ defmodule Giggly.Geom.Boxplot do
         linewidth: Mark.values(frame, :linewidth, @line_width),
         shape: Mark.values(frame, :shape, @shape),
         size: Mark.values(frame, :size, @size),
-        outliers:
-          frame
-          |> Mark.values(:outliers, [])
-          |> Enum.map(fn listed -> listed || [] end),
+        outliers: Mark.values(frame, :outliers, []),
         group: DataFrame.pull(frame, :group)
       ]
 
@@ -284,9 +277,8 @@ defmodule Giggly.Geom.Boxplot do
       end)
     end
 
-    # A box's outliers as points at its x, in the outliers' look, else the box's.
-    defp outliers(_geom, %{outliers: []}, _placing), do: []
-
+    # A box's outliers as points at its x, in the outliers' look, else the box's, their stroke the
+    # look's, which the layer always gives.
     defp outliers(geom, box, {flipped, coord, panel_params}) do
       look = geom.outlier
       count = length(box.outliers)
@@ -299,20 +291,16 @@ defmodule Giggly.Geom.Boxplot do
         DataFrame.new(
           x: x_positions,
           y: y_positions,
-          color: List.duplicate(missing_for_none(Map.get(look, :color, box.color)), count),
-          fill: List.duplicate(missing_for_none(Map.get(look, :fill, box.fill)), count),
+          color: List.duplicate(Map.get(look, :color, box.color), count),
+          fill: List.duplicate(Map.get(look, :fill, box.fill), count),
           shape: List.duplicate(Map.get(look, :shape, box.shape), count),
           size: List.duplicate(Map.get(look, :size, box.size), count),
-          stroke: List.duplicate(Map.get(look, :stroke, @stroke), count),
+          stroke: List.duplicate(Map.fetch!(look, :stroke), count),
           alpha: List.duplicate(Map.get(look, :alpha, box.alpha), count)
         )
 
       Geom.draw_panel(%Point{}, points, coord, panel_params)
     end
-
-    # A colour the box reads as `:none` held as a missing one, as a column holds R's `NA`.
-    defp missing_for_none(:none), do: nil
-    defp missing_for_none(color), do: color
 
     # A box's staples across its whiskers' ends, the upper first, where they have a width.
     defp staples(%{staplewidth: staplewidth}, _box, _placing) when staplewidth == 0, do: []
@@ -417,8 +405,6 @@ defmodule Giggly.Geom.Boxplot do
     # Straight lines in one look, each `{start, end}` in a vertical box's terms, placed in the
     # panel; none where the look draws no line, and a line with an end missing left out.
     defp segments(lines, {color, width, line_type}, {line_end, line_join}, placing) do
-      color = color || :none
-
       placed =
         lines
         |> Enum.flat_map(fn {start, finish} -> [start, finish] end)
@@ -451,33 +437,48 @@ defmodule Giggly.Geom.Boxplot do
     end
 
     # The box round its outline, in a vertical box's terms, placed in the panel, filled at its
-    # alpha and bordered in its look, left off where the look draws no line; none where a corner is
-    # missing.
+    # alpha and bordered in its look, left off where the look draws no line. A missing corner, one
+    # a scale's limits cut, splits the outline, as grid splits a polygon at a missing point, and
+    # each run of two corners or more is drawn as a piece of its own.
     defp polygon(outline, {color, width, line_type}, box, placing) do
-      placed = place(outline, placing)
-      border = if drawn_line?(color || :none, width, line_type), do: color, else: :none
-      border_width = width || 0.0
+      pieces =
+        outline
+        |> place(placing)
+        |> Enum.chunk_by(&placed?/1)
+        |> Enum.filter(&drawn_piece?/1)
 
-      if Enum.all?(placed, &placed?/1) do
+      border = if drawn_line?(color, width, line_type), do: color, else: :none
+      border_width = width || 0.0
+      count = length(pieces)
+      border_color = Mark.hex(border)
+      border_opacity = Mark.own_opacity(border)
+      fill = Mark.hex(box.fill)
+      fill_opacity = Mark.opacity(box.fill, box.alpha)
+
+      if count == 0 do
+        []
+      else
         [
           %Polygons{
-            outlines: [placed],
+            outlines: pieces,
             offsets: :none,
             stroke_width: Mark.stroke_width(border_width),
-            color: [Mark.hex(border)],
-            color_opacity: [Mark.own_opacity(border)],
-            fill: [Mark.hex(box.fill)],
-            fill_opacity: [Mark.opacity(box.fill, box.alpha)],
+            color: List.duplicate(border_color, count),
+            color_opacity: List.duplicate(border_opacity, count),
+            fill: List.duplicate(fill, count),
+            fill_opacity: List.duplicate(fill_opacity, count),
             dashes: Mark.dashes(line_type, border_width),
             line_end: :butt,
             line_join: :mitre,
             mitre_limit: @mitre_limit
           }
         ]
-      else
-        []
       end
     end
+
+    # A run of placed corners long enough to draw, two or more, as grid draws a piece of a polygon.
+    defp drawn_piece?([first, _second | _rest]), do: placed?(first)
+    defp drawn_piece?([_alone]), do: false
 
     defp drawn_line?(color, width, line_type),
       do: color != :none and is_number(width) and line_type != :none
@@ -508,7 +509,7 @@ defmodule Giggly.Geom.Boxplot do
       }
 
       fill = Map.get(key, :fill, @fill)
-      turn = if Map.get(key, :flipped_aes, false), do: &turned/1, else: &Function.identity/1
+      turn = if Map.fetch!(key, :flipped_aes), do: &turned/1, else: &Function.identity/1
       reach = 0.375 * geom.staplewidth
 
       Enum.concat([
@@ -533,7 +534,6 @@ defmodule Giggly.Geom.Boxplot do
 
     defp key_lines(lines, part, base, turn) do
       {color, width, line_type} = line_look(part, base)
-      color = color || :none
       count = length(lines)
       hex = Mark.hex(color)
       opacity = Mark.own_opacity(color)
@@ -559,7 +559,7 @@ defmodule Giggly.Geom.Boxplot do
 
     # The key's box, three quarters of the key wide and half as tall, in its middle.
     defp key_box({color, width, line_type}, fill, alpha, turn) do
-      border = if drawn_line?(color || :none, width, line_type), do: color, else: :none
+      border = if drawn_line?(color, width, line_type), do: color, else: :none
       border_width = width || 0.0
       {xmin, ymin} = turn.({0.125, 0.25})
       {xmax, ymax} = turn.({0.875, 0.75})

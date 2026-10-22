@@ -64,10 +64,12 @@ defprotocol Giggly.Geom do
   def draw_panel(geom, frame, coord, panel_params)
 
   # The primitives `geom` draws a legend's key with, in the key's cell, its aesthetics' values in
-  # `key`, such as `%{alpha: 0.2}`, `nil` for none: ggplot2's `draw_key`, each geom's glyph for what
-  # it draws. The glyph is placed by fractions of the cell and offsets in points, as grid places one
-  # by `npc` and absolute units, so it is drawn right in a cell of any size: a legend sizes its
-  # keys to their glyphs (`key_size/2`) before any is drawn.
+  # `key`, such as `%{alpha: 0.2}`, `nil` for none, and whether its layer's marks are horizontal,
+  # `flipped_aes`, which the legend always gives: ggplot2's `draw_key`, each geom's glyph for what
+  # it draws, handed the layer's `flipped_aes` as ggplot2 hands it the layer's params. The glyph is
+  # placed by fractions of the cell and offsets in points, as grid places one by `npc` and absolute
+  # units, so it is drawn right in a cell of any size: a legend sizes its keys to their glyphs
+  # (`key_size/2`) before any is drawn.
   @doc false
   @spec draw_key(t(), %{optional(atom()) => term()}) :: [Scene.primitive()]
   def draw_key(geom, key)

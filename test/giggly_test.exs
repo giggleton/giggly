@@ -3709,6 +3709,31 @@ defmodule GigglyTest do
       assert Enum.filter([:outliers, :ymin_final, :ymax_final], fn name -> name in kept end) == []
     end
 
+    # Whole numbers, every box with an outlier either side, so every reach is one: `y = c(-10L, 2L,
+    # 3L, 4L, 5L, 20L, -10L, 3L, 3L, 4L, 9L)`, whose reach R gives as doubles.
+    test "a box's reach is a double where its y holds whole numbers" do
+      frame =
+        @box_rows
+        |> Map.put("y", [-10, 2, 3, 4, 5, 20, -10, 3, 3, 4, 9])
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_boxplot()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :ymin_final), DataFrame.pull(frame, :ymax_final)} ===
+               {[-10.0, -10.0], [20.0, 9.0]}
+    end
+
+    # `geom_boxplot()` over rows whose every y is `NA`, whose `layer_data()` has no rows.
+    test "a layer whose every row lacks its y has no box" do
+      frame =
+        %{"g" => ["a", "b"], "y" => [nil, nil]}
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_boxplot()
+        |> Giggly.layer_data()
+
+      assert DataFrame.row_count(frame) == 0
+    end
+
     # `geom_boxplot(varwidth = TRUE)`: six rows against five.
     test "with varwidth: a box is as wide as the square root of its rows makes it beside the widest" do
       frame = box_layer(%{x: :g, y: :y}, varwidth: true)

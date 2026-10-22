@@ -5725,16 +5725,16 @@ defmodule Giggly.Plot do
     end
   end
 
-  # A box plot summarises the one of x and y it maps before its stat, where it maps one, its boxes
-  # standing along the other, so an orientation it is given must name that other; where it maps
-  # both, the orientation chooses (design-log §4, the entry beginning "A box plot's orientation").
+  # A box plot summarises the one of x and y it maps, where it maps one, its boxes standing along
+  # the other, so an orientation it is given must name that other; where it maps both, the
+  # orientation chooses (design-log §4, the entry beginning "A box plot's orientation"). Neither
+  # is an after_stat here: the summary consumes both, so the layer has refused one already.
   defp check_stands_along(plot, layer, validated, function) do
     mapped =
       plot
       |> computed_mapping(layer)
       |> Map.take([:x, :y])
-      |> Enum.reject(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
-      |> Enum.map(fn {aesthetic, _value} -> aesthetic end)
+      |> Map.keys()
 
     case {mapped, Keyword.fetch(validated, :orientation)} do
       {[summarised], {:ok, summarised}} ->

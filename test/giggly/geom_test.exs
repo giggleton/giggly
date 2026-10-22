@@ -463,26 +463,28 @@ defmodule Giggly.GeomTest do
       varwidth: false
     }
 
-    # A set-up box, as `layer_data()` shows `geom_boxplot()`'s of 1, 2, 3, 4, 5 and 20 at x 1.
-    defp box_rows(columns) do
-      DataFrame.new(
-        [
-          ymin: [1.0],
-          lower: [2.25],
-          middle: [3.5],
-          upper: [4.75],
-          ymax: [5.0],
-          outliers: [[20.0]],
-          notchupper: [5.1125807473322595],
-          notchlower: [1.887419252667741],
-          x: [1.0],
-          flipped_aes: [false],
-          panel: [1],
-          group: [1],
-          xmin: [0.625],
-          xmax: [1.375]
-        ] ++ columns
-      )
+    # A set-up box, as `layer_data()` shows `geom_boxplot()`'s of 1, 2, 3, 4, 5 and 20 at x 1, with
+    # `columns` in place of its own or beside them, and without those `dropped`.
+    defp box_rows(columns, dropped \\ []) do
+      [
+        ymin: [1.0],
+        lower: [2.25],
+        middle: [3.5],
+        upper: [4.75],
+        ymax: [5.0],
+        outliers: [[20.0]],
+        notchupper: [5.1125807473322595],
+        notchlower: [1.887419252667741],
+        x: [1.0],
+        flipped_aes: [false],
+        panel: [1],
+        group: [1],
+        xmin: [0.625],
+        xmax: [1.375]
+      ]
+      |> Keyword.merge(columns)
+      |> Keyword.drop(dropped)
+      |> DataFrame.new()
     end
 
     defp box_params do
@@ -519,6 +521,94 @@ defmodule Giggly.GeomTest do
 
       assert {median.stroke_width, given_median.stroke_width} ===
                {@two_millimetres, @default_width}
+    end
+
+    test "outliers are drawn as points in the outliers' look, else in the box's" do
+      {coord, params} = box_params()
+      frame = box_rows(fill: ["#FF0000"], shape: [:circle_filled], size: [3.0], alpha: [0.5])
+
+      look = %{
+        color: "#0000FF",
+        fill: "#00FF00",
+        shape: :triangle_filled,
+        size: 2.0,
+        stroke: 1.0,
+        alpha: 0.25
+      }
+
+      [boxs | _rest] = Geom.draw_panel(@box, frame, coord, params)
+      looked = Geom.draw_panel(%{@box | outlier: look}, frame, coord, params)
+
+      points = fn values ->
+        [x: [1.0], y: [20.0]]
+        |> Enum.concat(Enum.map(values, fn {aesthetic, value} -> {aesthetic, [value]} end))
+        |> DataFrame.new()
+        |> then(fn points -> Geom.draw_panel(%Geom.Point{}, points, coord, params) end)
+      end
+
+      assert [boxs] ===
+               points.(
+                 color: "#333333",
+                 fill: "#FF0000",
+                 shape: :circle_filled,
+                 size: 3.0,
+                 stroke: 0.5,
+                 alpha: 0.5
+               )
+
+      assert Enum.take(looked, length(looked) - 3) === points.(look)
+    end
+
+    # R's `(xmin - x) * staplewidth + x` and `(xmax - x) * staplewidth + x`, at a staplewidth
+    # whose staples a swapped side would move.
+    test "staples cross the whiskers' ends, a share of the box's width, the upper first" do
+      {coord, params} = box_params()
+      geom = %{@box | staplewidth: 0.25}
+
+      assert [_outliers, %Segments{starts: starts, ends: ends} | _rest] =
+               Geom.draw_panel(geom, box_rows([]), coord, params)
+
+      assert {starts, ends} ===
+               {[{0.453125, 0.25}, {0.453125, 0.05}], [{0.546875, 0.25}, {0.546875, 0.05}]}
+    end
+
+    test "the median takes its own colour and line type, else the box's" do
+      {coord, params} = box_params()
+      geom = %{@box | median: %{color: "#FF0000", linetype: {4, 4}}}
+      [_outliers, _whiskers, _box, median] = Geom.draw_panel(geom, box_rows([]), coord, params)
+
+      assert {median.color, rounded(median.dashes)} === {["#FF0000"], [11.38, 11.38]}
+    end
+
+    # As grid splits a polygon at a missing point: `geom_boxplot() + xlim(0.7, 3.5)`, then with
+    # `notch = TRUE` and `xlim(0.5, 3.2)`, draw a box whose side the limit cuts as the pieces
+    # left, and leave out the median, which has lost an end.
+    test "a box whose side a limit cuts is drawn in the pieces left, its median left out" do
+      {coord, params} = box_params()
+      cut_left = box_rows(xmin: [nil])
+
+      assert [%Circles{}, %Segments{}, %Polygons{outlines: [left]}] =
+               Geom.draw_panel(@box, cut_left, coord, params)
+
+      assert left === [{0.6875, 0.1125}, {0.6875, 0.2375}]
+
+      cut_right = box_rows(xmax: [nil])
+
+      assert [%Circles{}, %Segments{}, %Polygons{outlines: pieces}] =
+               Geom.draw_panel(%{@box | notch: true}, cut_right, coord, params)
+
+      assert pieces === [
+               [{0.3125, 0.2375}, {0.3125, 0.25562903736661297}],
+               [{0.3125, 0.09437096263338704}, {0.3125, 0.1125}]
+             ]
+    end
+
+    test "a box keeping no outliers draws none" do
+      {coord, params} = box_params()
+      frame = box_rows([], [:outliers])
+
+      assert [%Segments{}, %Polygons{}, %Segments{}] =
+               Geom.draw_panel(@box, frame, coord, params)
     end
 
     test "boxes are drawn in the order of their groups, each whole before the next" do
@@ -1094,6 +1184,33 @@ defmodule Giggly.GeomTest do
   end
 
   describe "draw_key/2" do
+    test "a box's key takes the key's line width, line type and alpha, its lines never the alpha" do
+      key = %{flipped_aes: false, linewidth: 1.0, linetype: {4, 4}, alpha: 0.5, fill: "#FF0000"}
+      millimetre = 2 * @default_width
+
+      assert [whiskers, box, median, staples] = Geom.draw_key(@box, key)
+
+      assert {box.fill, box.fill_opacity, box.color_opacity, box.stroke_width} ===
+               {["#FF0000"], [0.5], [1.0], millimetre}
+
+      assert Enum.map([whiskers, median, staples], fn line ->
+               {line.stroke_width, rounded(line.dashes), Enum.uniq(line.opacity)}
+             end) === List.duplicate({millimetre, [11.38, 11.38], [1.0]}, 3)
+    end
+
+    test "a box's key leaves out a part whose colour is :none, and every line of no type or width" do
+      geom = %{@box | whisker: %{color: :none}}
+
+      assert [%Rectangles{color: ["#333333"]}, %Polylines{}, %Polylines{}] =
+               Geom.draw_key(geom, %{flipped_aes: false})
+
+      assert [%Rectangles{color: [:none]}] =
+               Geom.draw_key(@box, %{flipped_aes: false, linetype: nil})
+
+      assert [%Rectangles{color: [:none], stroke_width: +0.0}] =
+               Geom.draw_key(@box, %{flipped_aes: false, linewidth: nil})
+    end
+
     test "a point's key is the point at the middle of the key, at the key's alpha" do
       assert [%Circles{x: [0.5], y: [0.5], color_opacity: [0.2]}] =
                Geom.draw_key(%Geom.Point{}, %{alpha: 0.2})

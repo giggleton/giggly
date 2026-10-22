@@ -1348,11 +1348,14 @@ defmodule Giggly.PlotTest do
       error =
         assert_raise ArgumentError, fn ->
           @rows
-          |> Plot.new(%{x: :mpg})
+          |> Plot.new(%{x: :mpg, colour: :cyl})
           |> Plot.geom_boxplot(orientation: :x)
         end
 
-      assert error.message =~ "summarises x here, because :x alone is mapped"
+      assert error.message ==
+               "Plot.geom_boxplot/3 summarises x here, because :x alone is mapped, so its " <>
+                 "boxes stand along y and orientation: :x cannot apply. To stand the boxes " <>
+                 "along x, map :y instead of :x; orientation: :x can then stay or be left out."
 
       for {plot, orientation} <- [
             {alone, :x},
@@ -1392,25 +1395,89 @@ defmodule Giggly.PlotTest do
                |> Map.fetch!(:reversed_layers)
     end
 
+    # ggplot2 4.0.3's `stat_boxplot()` documents its whiskers, hinges, notches and width, each of
+    # the first in either orientation, and drops x, y and weight.
     test "an after_stat reads the summary's documented variables, and none it consumes" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
-      assert [%Plot.Layer{}] =
-               Plot.geom_boxplot(plot, %{fill: {:after_stat, [:middle]}}).reversed_layers
+      for variable <- [
+            :ymin,
+            :xmin,
+            :lower,
+            :xlower,
+            :middle,
+            :xmiddle,
+            :upper,
+            :xupper,
+            :ymax,
+            :xmax,
+            :notchlower,
+            :notchupper,
+            :width
+          ] do
+        assert [%Plot.Layer{}] =
+                 Plot.geom_boxplot(plot, %{fill: {:after_stat, [variable]}}).reversed_layers
+      end
 
+      for variable <- [:outliers, :relvarwidth] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.geom_boxplot(plot, %{fill: {:after_stat, [variable]}})
+          end
+
+        assert error.message =~ "Plot.geom_boxplot/3 maps :fill"
+      end
+
+      for aesthetic <- [:x, :y, :weight] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.geom_boxplot(plot, %{aesthetic => {:after_stat, [:middle]}})
+          end
+
+        assert error.message =~ "its stat consumes #{inspect(aesthetic)}"
+      end
+    end
+
+    test "a column the mapping misspells is refused, naming the function" do
       error =
         assert_raise ArgumentError, fn ->
-          Plot.geom_boxplot(plot, %{fill: {:after_stat, [:outliers]}})
+          @rows
+          |> Plot.new(%{x: :cyl})
+          |> Plot.geom_boxplot(%{y: :mgp})
         end
 
-      assert error.message =~ "Plot.geom_boxplot/3 maps :fill"
+      assert error.message =~ "Plot.geom_boxplot/3 maps :y to :mgp"
+    end
 
-      error =
-        assert_raise ArgumentError, fn ->
-          Plot.geom_boxplot(plot, %{x: {:after_stat, [:middle]}, y: :mpg})
-        end
+    test "every box's look and its outliers' are checked and held as resolved" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :cyl, y: :mpg})
+        |> Plot.geom_boxplot(
+          colour: "red",
+          linetype: :dashed,
+          shape: 21,
+          outlier_fill: "blue",
+          outlier_size: 2,
+          outlier_alpha: 0.5,
+          median_colour: "green"
+        )
 
-      assert error.message =~ "its stat consumes :x"
+      assert [%Plot.Layer{geom: geom, fixed: fixed}] = plot.reversed_layers
+      assert fixed === %{color: "#FF0000", linetype: {4, 4}, shape: :circle_filled}
+
+      assert {geom.outlier, geom.median} ===
+               {%{fill: "#0000FF", size: 2.0, alpha: 0.5, stroke: 0.5}, %{color: "#008000"}}
+
+      for refused <- [
+            [alpha: 2],
+            [linewidth: -1],
+            [size: -1],
+            [outlier_size: -1],
+            [outlier_alpha: 2]
+          ] do
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_boxplot(plot, refused) end
+      end
     end
   end
 

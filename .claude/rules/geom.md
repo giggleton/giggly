@@ -184,7 +184,10 @@ where its marks sit".
   take the box's alpha and its fill does; the median is twice the box's width unless its look
   gives one; the box is `#333333`, white, 0.5 mm, solid; staples and whiskers are cut square, the
   box and median cut square and mitred; a line of colour `:none` or missing, blank, or of missing
-  width is not drawn, a box's border so left off. **Its key is `draw_key_boxplot()`'s**, turned
+  width is not drawn, a box's border so left off, and a line missing an end is left out. **A box
+  whose corners a scale's limits cut is drawn in the pieces left**, each run of two placed corners
+  or more, as grid splits a polygon at a missing point (checked against vdiffr's drawing of
+  `xlim()` cutting a plain and a notched box). **Its key is `draw_key_boxplot()`'s**, turned
   for a horizontal layer, which the legend says in the key's `flipped_aes`, its staples drawn
   though they have no length at a `staplewidth` of 0 and its median not doubled, and needs its
   `size` and `linewidth` added, in millimetres. A box in radial coordinates is drawn between its
