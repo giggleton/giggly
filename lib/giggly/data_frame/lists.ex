@@ -440,7 +440,7 @@ defmodule Giggly.DataFrame.Lists do
     do: aggregated(frame, {:sum, [name], []}, groups)
 
   defp aggregated(frame, {:sum, [name], options}, groups) when is_list(options) do
-    validated = Keyword.validate!(options, summation: :compensated, missing: :propagate)
+    validated = Keyword.validate!(options, summation: :extended, missing: :propagate)
     summation = Keyword.fetch!(validated, :summation)
     missing = Keyword.fetch!(validated, :missing)
     {_dtype, values} = numbers_column(frame, name, "a sum adds numbers")

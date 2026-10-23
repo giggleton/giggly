@@ -25,13 +25,16 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `:infinity` and `:neg_infinity`, so it owns how they add, subtract, multiply, divide, compare
   and take a magnitude, a maximum, a sum, running sums or a mean, as IEEE arithmetic and R's
   `pmin()`, `pmax()`, `max()`, `sum()`, `cumsum()`, `mean()` and `<` do, a missing value and NaN
-  where both meet resolved as R resolves them, and a sum and running sums added in extended
-  precision, as R's add in a long double (`sum/2`, which `summarise/3`'s sum calls, and
-  `cumulative_sum/1`). **A mean is R's `mean()` digit for digit** (`mean/1`, design-log §4, the
-  entry beginning "The frame's mean is R's"): every step R takes in its long double, the
-  correction pass and the division of each value where the sum is past the largest double
-  included, taken in `Giggly.DataFrame.LongDouble`, which holds a value exactly and rounds each
-  result to 64 bits, as the x87 does, and only `Arithmetic` calls. A stat's shares, densities
+  where both meet resolved as R resolves them, and **a result past the largest double an
+  infinity of its sign**, as IEEE rounds it, where Erlang raises. **A sum, running sums and a mean
+  are R's digit for digit** (`sum/2`, which `summarise/3`'s sum calls, `cumulative_sum/1` and
+  `mean/1`; design-log §4, the entries beginning "The frame's sums are R's" and "The frame's mean
+  is R's"): every step R takes in its long double, a mean's correction pass and its division of
+  each value where the sum is past the largest double included, taken in
+  `Giggly.DataFrame.LongDouble`, which holds a value exactly and rounds each result to 64 bits, as
+  the x87 does, and only `Arithmetic` calls; so a running sum may pass the largest double and come
+  back, and a sum left past it is an infinity, as R's `sum()` reads it, a running sum one where
+  it rounds to one, as `cumsum()` rounds it. A stat's shares, densities
   and bins, stacking's heights, dodging's widths and a bar's sides go through it, never Elixir's
   arithmetic, which has no infinity.
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
@@ -90,8 +93,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   missing, or 0, for a group of none; `mean`, R's `mean()`, a float, missing wherever a `nil`
   is, else NaN where a NaN is or both infinities meet; and a sum. **A sum's spec says how it
   adds** (design-log §4, the entry beginning "The frame's first group-by aggregate"):
-  `summation: :compensated`, the default, as R's `sum()` adds in extended precision, or
-  `:plain`, in row order, as `rowsum()`;
+  `summation: :extended`, the default, as R's `sum()` adds in extended precision, or `:plain`,
+  in row order, as `rowsum()`;
   `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or NaN, as R's
   `is.na()` reads one, the first met kept where it propagates, and an infinity no missing value but
   added as IEEE adds one, so a sum meeting both infinities is NaN. Its rows are sorted by the

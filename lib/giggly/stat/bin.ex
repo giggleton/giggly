@@ -25,8 +25,8 @@ defmodule Giggly.Stat.Bin do
   # (`:all`) or those before the first and after the last bin with rows (`:extremes`).
   #
   # The frame does what scales with the rows (`Giggly.DataFrame`): it chooses the rows at a finite
-  # x, puts each row in its bin (`cut`), sums the weights in each bin of each group, with R's
-  # compensated sum, a missing weight adding nothing, and carries the columns constant within each
+  # x, puts each row in its bin (`cut`), sums the weights in each bin of each group, as R's
+  # `sum()` adds them, a missing weight adding nothing, and carries the columns constant within each
   # group (`Giggly.Stat.Carry`); the breaks come from two numbers, and the rest is worked out on
   # the summarised counts, so binning never pulls a column of its input. Binning along y, where
   # the layer maps `:y` alone, is binning along x with the two swapped and swapped back, as

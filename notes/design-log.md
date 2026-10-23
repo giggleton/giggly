@@ -135,6 +135,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   it can arrive later without breaking anything. A reordering's values follow the same rule, so
   `reorder(class, -hwy)` is refused.
 
+- **The frame's sums are R's, added in the emulated long double, and its arithmetic gives an
+  infinity past the largest double (2026-10-23, Steve: "A").** Elixir raises where IEEE rounds a
+  result past the largest double to an infinity, so the frame's add, subtract, multiply, divide
+  and sums raised where R gives `Inf`; each now gives the infinity, the plain sum (`rowsum()`)
+  too. R's `sum()` and `cumsum()` add in its long double, which passes the largest double and
+  comes back (`sum(c(xmax, xmax, -xmax))` is `xmax`), `sum()` reading anything past it as `Inf`
+  and `cumsum()` rounding each running sum; both now add in `LongDouble`, matching R on 2,000
+  random groups and every edge, and the summation is named `:extended` for what it now is.
+  *Rejected: Neumaier's compensated sum with its overflow caught* — an infinity where R's sum
+  comes back, and an approximation of the long double where the emulation is R's by construction.
+
 - **The frame's mean is R's `mean()`, worked out in an emulated long double (2026-10-23, Steve:
   "A", building step 6 of the tenth increment; checked against R 4.6.1 and Explorer 0.13).** R
   adds a mean's doubles in the x87's long double (64 significant bits), divides by the count,
@@ -307,15 +318,15 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   Steve: the same layer under R's name, now.
 
 - **The frame's first group-by aggregate is `DataFrame.summarise/3`, and stats sum through it,
-  compensated as R's `sum()` adds or plain as `rowsum()` does (2026-10-20, Steve).** R's `sum()`
+  extended as R's `sum()` adds or plain as `rowsum()` does (2026-10-20, Steve).** R's `sum()`
   adds in extended precision, so plain doubles missed R's `layer_data()` in 901 of 3,000 random
-  weight groups (mpg's `displ`: 55.500000000000014 for R's 55.5), and Neumaier's compensated sum
-  matched all 3,000. Steve asked that stats compute through the frame rather than on pulled lists:
-  `summarise(frame, by, name: {:sum, [column], options})` groups and sums, rows sorted by `by`, a
-  missing value last, each `by` column keeping its type, with `summation: :compensated` (the
-  default) or `:plain` and `missing: :propagate` (the default) or `:skip`. Counting moved onto it,
-  its counts plain and its proportions' totals compensated, which fixed a departure: 6 of mpg's 7
-  class shares weighted by `displ` were a bit off.
+  weight groups (mpg's `displ`: 55.500000000000014 for R's 55.5). Steve asked that stats compute
+  through the frame rather than on pulled lists: `summarise(frame, by, name: {:sum, [column],
+  options})` groups and sums, rows sorted by `by`, a missing value last, each `by` column keeping
+  its type, with `summation: :extended` (the default; how it adds is the entry beginning "The
+  frame's sums are R's") or `:plain` and `missing: :propagate` (the default) or `:skip`. Counting
+  moved onto it, its counts plain and its proportions' totals extended, which fixed a departure:
+  6 of mpg's 7 class shares weighted by `displ` were a bit off.
   *Rejected: a compensated sum private to the stat* (proposed) — an engine running the frame would
   never see it. *Rejected: plain doubles* — R's values missed in 30% of groups. *Rejected: one
   summation* — counting's counts would leave `rowsum()`'s.
@@ -2312,6 +2323,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Give the frame's arithmetic R's infinities, and add its sums in the long double;
+  §4: "The frame's sums are R's", "The frame's first group-by aggregate" (amended)
 - 2026-10-23 — Reorder by name, by R's mean() in an emulated long double (ordering, step 6); §4:
   "The frame's mean is R's `mean()`", "Ordering, viridis and `log10` by name" (amended), "A
   function by name's value" (amended)

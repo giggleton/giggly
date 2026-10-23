@@ -1002,15 +1002,15 @@ defmodule Giggly.DataFrameTest do
     # Golden: R 4.6.1's sum(c(0.1, 0.2, 0.3)) is 0.59999999999999998, added in extended
     # precision, and rowsum(c(0.1, 0.2, 0.3), rep(1, 3)) is 0.60000000000000009, added in doubles in
     # row order, printed to 17 significant digits. It moves with nothing but how R adds.
-    test "a sum is compensated as R's sum() adds, or plain as R's rowsum() does" do
+    test "a sum is extended as R's sum() adds, or plain as R's rowsum() does" do
       frame = DataFrame.new(group: [1, 1, 1], weight: [0.1, 0.2, 0.3])
 
-      compensated = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
+      extended = DataFrame.summarise(frame, [:group], n: {:sum, [:weight]})
 
       plain =
         DataFrame.summarise(frame, [:group], n: {:sum, [:weight], summation: :plain})
 
-      assert DataFrame.pull(compensated, :n) === [0.59999999999999998]
+      assert DataFrame.pull(extended, :n) === [0.59999999999999998]
       assert DataFrame.pull(plain, :n) === [0.60000000000000009]
     end
 

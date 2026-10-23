@@ -240,6 +240,91 @@ defmodule Giggly.DataFrame.ArithmeticTest do
     assert sums === [[:nan, nil], [nil, nil], [:infinity, :nan, nil], [nil, nil]]
   end
 
+  # Golden: R 4.6.1's 1e308 + 1e308, -1e308 - 1e308, 1e308 * 10, 1e308 * -10, 1e308 / 1e-10,
+  # 1e308 / -1e-10, xmax + 1e292 and xmax + 9.9e291, for the largest double xmax, are Inf, -Inf,
+  # Inf, -Inf, Inf, -Inf, Inf and xmax: past the largest double by half its last place or more is
+  # an infinity of the result's sign.
+  test "add, subtract, multiply and divide give an infinity past the largest double" do
+    largest = 1.797_693_134_862_315_7e308
+
+    assert [
+             Arithmetic.add(1.0e308, 1.0e308),
+             Arithmetic.subtract(-1.0e308, 1.0e308),
+             Arithmetic.multiply(1.0e308, 10),
+             Arithmetic.multiply(1.0e308, -10),
+             Arithmetic.divide(1.0e308, 1.0e-10),
+             Arithmetic.divide(1.0e308, -1.0e-10),
+             Arithmetic.add(largest, 1.0e292),
+             Arithmetic.add(largest, 9.9e291)
+           ] === [
+             :infinity,
+             :neg_infinity,
+             :infinity,
+             :neg_infinity,
+             :infinity,
+             :neg_infinity,
+             :infinity,
+             largest
+           ]
+  end
+
+  # Golden: R 4.6.1's sum() of c(xmax, xmax, -xmax), c(-xmax, -xmax, xmax), c(1e308, 1e308),
+  # c(-1e308, -1e308), c(xmax, 1e291) and c(-xmax, -1e291), for the largest double xmax, is xmax,
+  # -xmax, Inf, -Inf, Inf and -Inf: its long double passes the largest double and comes back, and
+  # a sum past it by any amount is an infinity, though 1e291 is less than half xmax's last place;
+  # rowsum() of c(xmax, xmax, -xmax) and c(-1e308, -1e308) is Inf and -Inf, adding in doubles.
+  test "sum adds past the largest double and back, as R's long double does" do
+    largest = 1.797_693_134_862_315_7e308
+
+    extended =
+      Enum.map(
+        [
+          [largest, largest, -largest],
+          [-largest, -largest, largest],
+          [1.0e308, 1.0e308],
+          [-1.0e308, -1.0e308],
+          [largest, 1.0e291],
+          [-largest, -1.0e291]
+        ],
+        &Arithmetic.sum/1
+      )
+
+    plain =
+      Enum.map([[largest, largest, -largest], [-1.0e308, -1.0e308]], fn values ->
+        Arithmetic.sum(values, :plain)
+      end)
+
+    assert {extended, plain} ===
+             {[largest, -largest, :infinity, :neg_infinity, :infinity, :neg_infinity],
+              [:infinity, :neg_infinity]}
+  end
+
+  # Golden: R 4.6.1's cumsum() of c(1e308, 1e308, -1e308), c(-1e308, -1e308, 1e308), c(xmax,
+  # 1e292) and c(xmax, 1e291), for the largest double xmax, is 1e308, Inf, 1e308; -1e308, -Inf,
+  # -1e308; xmax, Inf; and xmax, xmax: each running sum rounded to a double, its long double
+  # carried on.
+  test "cumulative_sum rounds each running sum to a double, an infinity past the largest" do
+    largest = 1.797_693_134_862_315_7e308
+
+    sums =
+      Enum.map(
+        [
+          [1.0e308, 1.0e308, -1.0e308],
+          [-1.0e308, -1.0e308, 1.0e308],
+          [largest, 1.0e292],
+          [largest, 1.0e291]
+        ],
+        &Arithmetic.cumulative_sum/1
+      )
+
+    assert sums === [
+             [1.0e308, :infinity, 1.0e308],
+             [-1.0e308, :neg_infinity, -1.0e308],
+             [largest, :infinity],
+             [largest, largest]
+           ]
+  end
+
   # Golden: R 4.6.1's mean() of c(NA, NaN), c(NaN, NA), c(1, NaN, NA), c(Inf, NA), c(NA_integer_,
   # 1L), c(1, NaN), c(Inf, NaN), c(Inf, 1), c(-Inf, 1) and c(Inf, -Inf) is NA, NA, NA, NA, NA,
   # NaN, NaN, Inf, -Inf and NaN: NA wherever it is, where R's sum() keeps the first missing value.

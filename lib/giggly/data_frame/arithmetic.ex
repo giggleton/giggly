@@ -6,9 +6,10 @@ defmodule Giggly.DataFrame.Arithmetic do
   # these values, so it owns their arithmetic: what a stat works out from its summarised table (a
   # share, a density, a count over the largest) and what stacking adds up, once a weight or a
   # height is infinite, and a mean, follow IEEE arithmetic and R's `pmin()`, `pmax()`, `max()`,
-  # `mean()` and `<` here, rather than Elixir's, which has no infinity and raises dividing by zero.
-  # Where a missing value (`nil`) and NaN meet, the one R keeps wins: an operator's first operand,
-  # `pmin()`'s and `pmax()`'s later one, and `max()`'s and `mean()`'s missing value.
+  # `mean()` and `<` here, rather than Elixir's, which has no infinity and raises dividing by zero
+  # or past the largest double. Where a missing value (`nil`) and NaN meet, the one R keeps wins:
+  # an operator's first operand, `pmin()`'s and `pmax()`'s later one, and `max()`'s and `mean()`'s
+  # missing value.
 
   alias Giggly.DataFrame.LongDouble
 
@@ -17,10 +18,19 @@ defmodule Giggly.DataFrame.Arithmetic do
 
   @infinities [:infinity, :neg_infinity]
 
-  # `left + right`: an infinity wins over any number, and two of opposite signs make NaN.
+  # The largest double, past which R's `sum()` reads its long double as an infinity.
+  @largest 1.797_693_134_862_315_7e308
+
+  # `left + right`: an infinity wins over any number, and two of opposite signs make NaN; two
+  # numbers whose sum is past the largest double make an infinity of their sign.
   @doc false
   @spec add(double(), double()) :: double()
-  def add(left, right) when is_number(left) and is_number(right), do: left + right
+  def add(left, right) when is_number(left) and is_number(right) do
+    left + right
+  rescue
+    ArithmeticError -> infinity(sign(left))
+  end
+
   def add(left, _right) when left in [nil, :nan], do: left
   def add(_left, right) when right in [nil, :nan], do: right
 
@@ -35,10 +45,16 @@ defmodule Giggly.DataFrame.Arithmetic do
   @spec subtract(double(), double()) :: double()
   def subtract(left, right), do: add(left, multiply(right, -1))
 
-  # `left * right`: an infinity times 0 is NaN, and otherwise an infinity of the two signs' product.
+  # `left * right`: an infinity times 0 is NaN, and otherwise an infinity of the two signs' product,
+  # as is a product of numbers past the largest double.
   @doc false
   @spec multiply(double(), double()) :: double()
-  def multiply(left, right) when is_number(left) and is_number(right), do: left * right
+  def multiply(left, right) when is_number(left) and is_number(right) do
+    left * right
+  rescue
+    ArithmeticError -> infinity(sign(left) * sign(right))
+  end
+
   def multiply(left, _right) when left in [nil, :nan], do: left
   def multiply(_left, right) when right in [nil, :nan], do: right
 
@@ -56,9 +72,16 @@ defmodule Giggly.DataFrame.Arithmetic do
   defp sign(number) when number < 0, do: -1
   defp sign(_zero), do: 0
 
+  # The infinity of a sign: IEEE rounds a result past the largest double to it, where Erlang
+  # raises `ArithmeticError`, which a finite operand's sum, product or quotient raises for nothing
+  # else.
+  defp infinity(1), do: :infinity
+  defp infinity(-1), do: :neg_infinity
+
   # `numerator / denominator`: missing where either is, NaN where either is NaN, or for 0 over 0
   # and an infinity over an infinity; an infinity of the right sign for a number other than 0
-  # over 0, or an infinity over a number; and 0 of the right sign for a number over an infinity.
+  # over 0, an infinity over a number, or a quotient past the largest double; and 0 of the right
+  # sign for a number over an infinity.
   @doc false
   @spec divide(double(), double()) :: double()
   def divide(numerator, _denominator) when numerator in [nil, :nan], do: numerator
@@ -73,7 +96,13 @@ defmodule Giggly.DataFrame.Arithmetic do
   def divide(:neg_infinity, _denominator), do: :neg_infinity
   def divide(numerator, :infinity), do: numerator * 0.0
   def divide(numerator, :neg_infinity), do: numerator * -0.0
-  def divide(numerator, denominator) when denominator != 0, do: numerator / denominator
+
+  def divide(numerator, denominator) when denominator != 0 do
+    numerator / denominator
+  rescue
+    ArithmeticError -> infinity(sign(numerator) * sign(denominator))
+  end
+
   def divide(numerator, _zero) when numerator > 0, do: :infinity
   def divide(numerator, _zero) when numerator < 0, do: :neg_infinity
   def divide(_zero, _also_zero), do: :nan
@@ -115,12 +144,14 @@ defmodule Giggly.DataFrame.Arithmetic do
 
   # The sum of `values`, R's `sum()`: missing where one is, `nil` (R's `NA`) or NaN, the first in
   # order, as R's running sum keeps the first; an infinity as IEEE adds one, so the sum is that
-  # infinity, or NaN where the two meet; and otherwise the numbers added in extended precision, as
-  # R's `sum()` adds them in a long double (`:compensated`, the default), or in order in doubles, as
-  # R's `rowsum()` adds them (`:plain`).
+  # infinity, or NaN where the two meet; and otherwise the numbers added in extended precision, in
+  # R's long double (`Giggly.DataFrame.LongDouble`), which no sum of doubles overflows, a sum past
+  # the largest double either way an infinity, as R's `sum()` reads it, and the rest rounded to a
+  # double (`:extended`, the default); or in order in doubles, as R's `rowsum()` adds them, a sum
+  # past the largest double an infinity from there on (`:plain`).
   @doc false
-  @spec sum([double()], :compensated | :plain) :: double()
-  def sum(values, summation \\ :compensated) when summation in [:compensated, :plain] do
+  @spec sum([double()], :extended | :plain) :: double()
+  def sum(values, summation \\ :extended) when summation in [:extended, :plain] do
     case Enum.find(values, :none, fn value -> value in [nil, :nan] end) do
       :none -> added(values, summation)
       missing -> missing
@@ -145,15 +176,27 @@ defmodule Giggly.DataFrame.Arithmetic do
     end
   end
 
-  defp finite_sum(values, :plain), do: Enum.reduce(values, 0.0, &+/2)
+  defp finite_sum(values, :plain), do: Enum.reduce(values, 0.0, &add/2)
 
-  # Neumaier's compensated sum: each addition's rounding error, found exactly from the two values
-  # and their rounded sum, is kept apart and added back once at the end, which gives the sum a long
-  # double gives.
-  defp finite_sum(values, :compensated) do
-    {total, compensation} = Enum.reduce(values, {0.0, 0.0}, &compensated/2)
-    total + compensation
+  defp finite_sum(values, :extended) do
+    sum = long_double_sum(values)
+
+    cond do
+      LongDouble.compare(sum, LongDouble.from_double(@largest)) == :gt -> :infinity
+      LongDouble.compare(sum, LongDouble.from_double(-@largest)) == :lt -> :neg_infinity
+      true -> LongDouble.to_double(sum)
+    end
   end
+
+  # Numbers added in R's long double, each an integer or a double.
+  defp long_double_sum(values) do
+    Enum.reduce(values, LongDouble.zero(), fn value, sum ->
+      LongDouble.add(sum, long_double(value))
+    end)
+  end
+
+  defp long_double(integer) when is_integer(integer), do: LongDouble.from_integer(integer)
+  defp long_double(double), do: LongDouble.from_double(double)
 
   # The mean of `values`, R's `mean()`: missing where one is `nil` (R's `NA`), wherever it is, as
   # R's long double keeps `NA` over NaN; else NaN where one is NaN; else an infinity, or NaN, as
@@ -183,9 +226,7 @@ defmodule Giggly.DataFrame.Arithmetic do
 
   defp finite_mean([first | _rest] = integers) when is_integer(first) do
     integers
-    |> Enum.reduce(LongDouble.zero(), fn integer, sum ->
-      LongDouble.add(sum, LongDouble.from_integer(integer))
-    end)
+    |> long_double_sum()
     |> LongDouble.divide(length(integers))
     |> LongDouble.to_double()
   end
@@ -223,41 +264,34 @@ defmodule Giggly.DataFrame.Arithmetic do
     LongDouble.to_double(mean)
   end
 
-  # The running sums of `values`, R's `cumsum()`: each the sum of the values up to it, in extended
-  # precision, as R's `cumsum()` adds in a long double and rounds each sum to a double, which a
-  # running compensated sum gives. From a missing value or an infinity on, each is what `add/2`
-  # makes of the sum before it and the value, but that once a value is `nil` (R's `NA`) every sum
-  # after it is, NaN met before or after, as R's long double keeps `NA` over NaN.
+  # The running sums of `values`, R's `cumsum()`: each the sum of the values up to it, added in
+  # R's long double and rounded to a double, as R's `cumsum()` rounds each, so a running sum past
+  # the largest double is an infinity there and a number again once later values bring it back.
+  # From a missing value or an infinity on, each is what `add/2` makes of the sum before it and the
+  # value, but that once a value is `nil` (R's `NA`) every sum after it is, NaN met before or
+  # after, as R's long double keeps `NA` over NaN.
   @doc false
   @spec cumulative_sum([double()]) :: [double()]
   def cumulative_sum(values) do
-    {sums, _running} = Enum.map_reduce(values, {0.0, 0.0}, &running/2)
+    {sums, _running} = Enum.map_reduce(values, LongDouble.zero(), &running/2)
     sums
   end
 
-  # The next running sum and what the one after it adds to: a compensated sum while every value
-  # has been a number, and the non-finite sum once one has not, which is the first value not a
-  # number itself, as `add/2` makes a number's sum with it.
-  defp running(value, {_total, _compensation} = sum) when is_number(value) do
-    {total, compensation} = compensated(value, sum)
-    {total + compensation, {total, compensation}}
+  # The next running sum and what the one after it adds to: a long double while every value has
+  # been a number, and the non-finite sum once one has not, which is the first value not a number
+  # itself, as `add/2` makes a number's sum with it.
+  defp running(value, sum) when is_number(value) and is_tuple(sum) do
+    next = LongDouble.add(sum, long_double(value))
+    {LongDouble.to_double(next), next}
   end
 
-  defp running(value, {_total, _compensation}), do: {value, value}
+  defp running(value, sum) when is_tuple(sum), do: {value, value}
   defp running(nil, _sum), do: {nil, nil}
 
   defp running(value, sum) do
     next = add(sum, value)
     {next, next}
   end
-
-  defp compensated(value, {total, compensation}) do
-    sum = total + value
-    {sum, compensation + rounding_error(total, value, sum)}
-  end
-
-  defp rounding_error(total, value, sum) when abs(total) >= abs(value), do: total - sum + value
-  defp rounding_error(total, value, sum), do: value - sum + total
 
   # Where a double that is neither missing nor NaN falls among the others.
   defp rank(:neg_infinity), do: {0, 0}

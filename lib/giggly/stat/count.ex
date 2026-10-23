@@ -8,8 +8,8 @@ defmodule Giggly.Stat.Count do
   # of the closest spacing of the layer's x positions, counting from zero (`Giggly.Resolution`),
   # which the bar geom draws at, as `stat_count()` takes its `width` parameter. The frame sums
   # them (`Giggly.DataFrame.summarise/3`): the counts in floats in row order, the doubles R's
-  # `rowsum()` gives, and each group's total, the sum of its counts' magnitudes, with its
-  # compensated sum, as R's `sum()` adds in extended precision. The frame also chooses the rows,
+  # `rowsum()` gives, and each group's total, the sum of its counts' magnitudes, in extended
+  # precision, as R's `sum()` adds. The frame also chooses the rows,
   # weighs them and finds the columns constant within each group (`filter/2`, `mutate/2`,
   # `n_distinct` and `first`), and the width is read from the counted table's x, which holds the
   # layer's distinct x positions, so counting never pulls a column of its input. y takes the count

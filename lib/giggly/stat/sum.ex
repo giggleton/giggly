@@ -5,8 +5,8 @@ defmodule Giggly.Stat.Sum do
   # panel, one row for each distinct combination of the layer's aesthetic columns, x and y and
   # `group` among them, its `n` the number of rows holding it, or the sum of their weights where
   # the layer maps `weight`, and its `prop` that count's share of its group's total in the panel.
-  # The counts and the totals are summed by the frame (`Giggly.DataFrame.summarise/3`), with its
-  # compensated sum, so they are the doubles R's `sum()` gives, which adds in extended precision,
+  # The counts and the totals are summed by the frame (`Giggly.DataFrame.summarise/3`) in extended
+  # precision, so they are the doubles R's `sum()` gives, which adds in its long double,
   # and it chooses and weighs the rows through the frame too (`filter/2`, `mutate/2`), so it never
   # pulls a column of its input.
   # size takes the count by default (`after_stat(n)`), and a mapping's after_stat reads `n` and

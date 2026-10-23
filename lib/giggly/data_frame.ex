@@ -165,7 +165,7 @@ defmodule Giggly.DataFrame do
   @typedoc "What `summarise/3` computes over each group's values of a column."
   @type aggregate ::
           {:sum, [name()]}
-          | {:sum, [name()], [summation: :compensated | :plain, missing: :propagate | :skip]}
+          | {:sum, [name()], [summation: :extended | :plain, missing: :propagate | :skip]}
           | {:mean, [name()]}
           | {:n_distinct, [name()]}
           | {:first, [name()]}
@@ -473,13 +473,13 @@ defmodule Giggly.DataFrame do
   # NaN, as R's `is.na()` reads one and as R's statistics call them, with `na.rm = TRUE`; a group
   # with none is missing, or counts 0.
   #
-  # A sum's `summation:` says how it adds: `:compensated`, the default, carries the rounding error
-  # each addition makes and adds it back at the end, as R's `sum()` adds in extended precision, so
-  # the sum is the one R's gives; `:plain` adds the values in row order in floats, as R's
-  # `rowsum()` does. `missing:` says what a missing value does, one that is `nil` (R's `NA`) or
-  # NaN: `:propagate`, the default, makes the group's sum missing, `nil` where one is, else NaN,
-  # as R's `sum()` gives `NA` or `NaN`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a
-  # group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
+  # A sum's `summation:` says how it adds: `:extended`, the default, in R's long double, as R's
+  # `sum()` adds in extended precision, so the sum is the one R's gives, a sum past the largest
+  # double an infinity; `:plain` adds the values in row order in floats, as R's `rowsum()` does,
+  # an infinity from wherever the running sum passes the largest double. `missing:` says what a
+  # missing value does, one that is `nil` (R's `NA`) or NaN: `:propagate`, the default, makes the
+  # group's sum missing, `nil` where one is, else NaN, as R's `sum()` gives `NA` or `NaN`; `:skip`
+  # leaves it out, as `rowsum(na.rm = TRUE)` does, a group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
   # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum, a minimum, a
   # maximum, a mean or a quantile of a column of another type and an option not listed are refused
   # with an `ArgumentError`; an empty `by`, an option's value not listed, a quantile with no
