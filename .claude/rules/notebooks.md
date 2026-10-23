@@ -27,17 +27,17 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   runs and no verdict is written (the entry beginning "An example R refuses on purpose").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
   words in every notebook** ("mapping a text's `size`", "a character as a shape",
-  "`geom_jitter()`", "a whole-column function in a mapping", "choosing the order of a column's
-  values"), so when a feature lands, searching the notebooks for its name finds every example
-  waiting for it, and those are drawn; a verdict still waiting drops the pieces that landed and
-  keeps the rest (design-log §4, the entries beginning "A verdict names a missing expression" and
-  "A verdict names a text's mapped size"). **An About sentence says what Giggly has and
-  names what it lacks by that name** ("maps no `xend`", "no binned scales"), never "no X but
-  <what exists>", which a search for the next feature cannot find.
-- **An expression is written as a capture wherever one function computes it**
-  (`{&:math.log10/1, [:carat]}`), so its guide is titled by the call; a closure only beside
-  `labs/2`, which titles it. The prose says where the title differs from R's (`:math.log10(carat)`
-  for `log10(carat)`, `unemploy / pop` for `unemploy/pop`), as the drawing otherwise matches.
+  "`geom_jitter()`", "a whole-column function in a mapping"), so when a feature lands, searching the
+  notebooks for its name finds every example waiting for it, and those are drawn; a verdict still
+  waiting drops the pieces that landed and keeps the rest (design-log §4, the entries beginning "A
+  verdict names a missing expression" and "A verdict names a text's mapped size"). **An About
+  sentence says what Giggly has and names what it lacks by that name** ("maps no `xend`", "no binned
+  scales"), never "no X but <what exists>", which a search for the next feature cannot find.
+- **An expression is written as a function by name where Giggly names R's** (`{:log10,
+  [:carat]}`, titled `log10(carat)` as R titles it), **and otherwise as a capture wherever one
+  function computes it** (`{&Kernel.//2, [:unemploy, :pop]}`), so its guide is titled by the call;
+  a closure only beside `labs/2`, which titles it. The prose says where the title differs from R's
+  (`unemploy / pop` for `unemploy/pop`), as the drawing otherwise matches.
 - **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
   CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
   `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`
@@ -47,11 +47,12 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   A notebook for a new page arrives with its line there.
 - **Documentation first: no ggplot2 drawings beside Giggly's.** Checking a drawing against
   ggplot2 is review's job (`test/golden/point.R`), not the notebook's.
-- **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses; a small table
-  the example writes out in R, the cell writes out too. Where an example draws random numbers in
-  R, the notebook takes the rows R actually produced and says so, and where it computes values
-  with base R before plotting (`quantile()`), it writes out R's values and says so (design-log §4,
-  the entry beginning "A value an example computes in base R").
+- **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses; a small table the
+  example writes out in R, the cell writes out too. Where an example draws random numbers in R, the
+  notebook takes the rows R actually produced and says so, a sample of a table's rows as the row
+  numbers R picks, each factor rebuilt with its levels, and where it computes values with base R
+  before plotting (`quantile()`), it writes out R's values and says so (design-log §4, the entries
+  beginning "A random sample of a table's rows" and "A value an example computes in base R").
 - **A notebook installs Giggly by path** (`Path.join(__DIR__, "..")`) and Kino, and shows a plot
   with `Kino.Image.new(svg, :svg)`, through the setup cell's `render`, until a plot can show
   itself. A `livebook` escript built with an older Elixir than `mix.exs` requires cannot run

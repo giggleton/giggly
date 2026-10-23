@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 mpg = Giggly.Datasets.mpg()
+diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
   plot
@@ -36,7 +37,8 @@ aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, wh
 shows it below the cell with `Kino.Image`. The first examples use `Giggly.Datasets.mpg/0`, ggplot2's
 `mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds
 to `mpg`, ggplot2's name for it. The rest use ggplot2's `diamonds`, `Giggly.Datasets.diamonds/0`,
-whose cut and clarity R keeps as ordered factors and Giggly as labels, sorted alphabetically.
+which the setup cell binds to `diamonds`, and whose cut and clarity are ordered factors, as R's
+are, so each axis follows its levels.
 
 ## Points that overlap
 
@@ -106,8 +108,22 @@ d + geom_count(aes(size = after_stat(prop), group = 1)) +
 ```
 
 With each combination of `cut` and `clarity` a group of its own, every proportion is 1, so every
-point is the same size; `group = 1` makes the whole panel one group. Not in Giggly yet: choosing
-the order of a column's values (`cut` and `clarity` are ordered factors).
+point is the same size; `group = 1` makes the whole panel one group, a constant in the mapping.
+
+```elixir
+plot = Plot.new(diamonds, %{x: :cut, y: :clarity})
+
+plot
+|> Plot.geom_count(%{size: {:after_stat, [:prop]}})
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: 1})
+|> Plot.scale_size_area(max_size: 10)
+|> render.()
+```
 
 ## Proportions of each row or column
 
@@ -119,5 +135,18 @@ d + geom_count(aes(size = after_stat(prop), group = clarity)) +
   scale_size_area(max_size = 10)
 ```
 
-Grouping by a column is in Giggly, a mapping of `group`. Not in Giggly yet: choosing the order of a
-column's values (`cut` and `clarity` are ordered factors).
+Grouping by a column is a mapping of `group`.
+
+```elixir
+plot
+|> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: :cut})
+|> Plot.scale_size_area(max_size: 10)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.geom_count(%{size: {:after_stat, [:prop]}, group: :clarity})
+|> Plot.scale_size_area(max_size: 10)
+|> render.()
+```

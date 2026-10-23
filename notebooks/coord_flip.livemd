@@ -46,10 +46,15 @@ ggplot(diamonds, aes(price, cut)) +
   geom_boxplot()
 ```
 
-Giggly draws these boxes, but puts the cuts in alphabetical order, where R keeps the order of
-`cut`'s levels.
+Mapping the cut to `y` stands the boxes along the vertical axis, the cuts in the order of their
+levels, from Fair to Ideal.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor).
+```elixir
+diamonds
+|> Plot.new(%{x: :price, y: :cut})
+|> Plot.geom_boxplot()
+|> render.()
+```
 
 ## Flipping boxplots
 
@@ -60,8 +65,7 @@ ggplot(diamonds, aes(cut, price)) +
   coord_flip()
 ```
 
-Not in Giggly yet: `coord_flip()`, and choosing the order of a column's values (`cut` is an
-ordered factor).
+Not in Giggly yet: `coord_flip()`.
 
 ## Reversing a horizontal histogram
 

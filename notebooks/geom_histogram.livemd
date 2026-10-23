@@ -35,9 +35,8 @@ all three, `Giggly.Plot.geom_histogram/3`, `Giggly.Plot.geom_freqpoly/3` and
 `Giggly.Plot.stat_bin/3`, which take ggplot2's binning options as keyword options (`bins:`,
 `binwidth:`, `breaks:`, `boundary:` and the rest), sum a mapped `weight`, and map what the binning
 computes, such as the density, with `{:after_stat, [:density]}`. It has no `scale_x_binned()`, no
-function as a `binwidth`, no `coord_transform()` and not the `movies` dataset, and cannot yet choose
-the order of a column's values, which ggplot2's ordered `cut` needs. A plot is described with
-`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+function as a `binwidth`, no `coord_transform()` and not the `movies` dataset. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. The examples use ggplot2's `diamonds`,
 `Giggly.Datasets.diamonds/0`, which the setup cell binds to `diamonds`, ggplot2's name for it.
@@ -122,9 +121,22 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
-`scale_fill_viridis_d()` and `scale_colour_viridis_d()`, ggplot2's default fill and colour scales
-for an ordered factor.
+`cut` is an ordered factor, so the bars stack and the lines are coloured in the order of its
+levels, from Fair to Ideal, with viridis, ggplot2's default fill and colour scales for one.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :price, fill: :cut})
+|> Plot.geom_histogram(binwidth: 500)
+|> render.()
+```
+
+```elixir
+diamonds
+|> Plot.new(%{x: :price, colour: :cut})
+|> Plot.geom_freqpoly(binwidth: 500)
+|> render.()
+```
 
 ## Density instead of count
 
@@ -135,11 +147,15 @@ ggplot(diamonds, aes(price, after_stat(density), colour = cut)) +
   geom_freqpoly(binwidth = 500)
 ```
 
-Giggly maps the density as `{:after_stat, [:density]}`, but colours `cut` with hues in alphabetical
-order, where R colours an ordered factor with viridis in the order of its levels.
+Giggly maps the density as `{:after_stat, [:density]}`. The y axis reads `0.0000` to `0.0005`
+where R writes `0e+00` to `5e-04`, since Giggly writes numbers as Elixir does.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
-`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
+```elixir
+diamonds
+|> Plot.new(%{x: :price, y: {:after_stat, [:density]}, colour: :cut})
+|> Plot.geom_freqpoly(binwidth: 500)
+|> render.()
+```
 
 ## Bins of unequal width
 

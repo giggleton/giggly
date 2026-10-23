@@ -63,9 +63,7 @@ ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
   xlim(55, 70)
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
-(`cut` is an ordered factor), and `scale_colour_viridis_d()` and `scale_fill_viridis_d()`, ggplot2's
-default colour and fill scales for an ordered factor.
+Not in Giggly yet: `geom_density()` and `stat_density()`.
 
 ## Bounded data
 
@@ -94,9 +92,7 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "stack")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
-(`cut` is an ordered factor), and `scale_fill_viridis_d()`, ggplot2's default fill scale for an
-ordered factor.
+Not in Giggly yet: `geom_density()` and `stat_density()`.
 
 ## Conditional densities
 
@@ -106,6 +102,4 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, choosing the order of a column's values
-(`cut` is an ordered factor), and `scale_fill_viridis_d()`, ggplot2's default fill scale for an
-ordered factor, and `position_fill()`.
+Not in Giggly yet: `geom_density()` and `stat_density()`, and `position_fill()`.

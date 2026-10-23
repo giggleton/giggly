@@ -97,5 +97,5 @@ ggplot(df_lines) +
   theme_void(20)
 ```
 
-Not in Giggly yet: choosing the order of a column's values, horizontal lines (`geom_hline()`),
-`scale_linetype_identity()`, `facet_grid()` and `theme_void()`.
+Not in Giggly yet: horizontal lines (`geom_hline()`), `scale_linetype_identity()`, `facet_grid()`
+and `theme_void()`.

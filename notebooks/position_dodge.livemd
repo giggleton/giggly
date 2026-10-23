@@ -10,6 +10,7 @@ alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
 mpg = Giggly.Datasets.mpg()
+diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
   plot
@@ -36,8 +37,8 @@ Giggly dodges bars and histograms as `position = "dodge"` does, with `position: 
 no options, and bars, histograms and box plots as `position_dodge2()` does, with `position: :dodge2`
 or `Giggly.Plot.position_dodge2/1` and its `preserve:`, `padding:` and `reverse:`. Not in Giggly
 yet: `position_dodge()`'s options and `position_dodge2()`'s `width` option. The setup cell binds R's
-`mtcars` and ggplot2's `mpg`, `Giggly.Datasets.mtcars/0` and `Giggly.Datasets.mpg/0`, to their names
-in R.
+`mtcars` and ggplot2's `mpg` and `diamonds`, `Giggly.Datasets.mtcars/0`, `Giggly.Datasets.mpg/0` and
+`Giggly.Datasets.diamonds/0`, to their names in R.
 
 ## Dodging without groups
 
@@ -81,11 +82,14 @@ ggplot(diamonds, aes(price, fill = cut)) +
 ```
 
 Giggly bins and dodges the diamonds with `Giggly.Plot.geom_histogram/3` and `position: :dodge2`,
-but fills `cut` with hues in alphabetical order, where R fills an ordered factor with viridis in
-the order of its levels.
+and fills `cut`, an ordered factor, with viridis in the order of its levels, as R does.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
-`scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor.
+```elixir
+diamonds
+|> Plot.new(%{x: :price, fill: :cut})
+|> Plot.geom_histogram(position: :dodge2)
+|> render.()
+```
 
 ## Frequency polygons instead
 
@@ -95,9 +99,12 @@ ggplot(diamonds, aes(price, colour = cut)) +
   geom_freqpoly()
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
-`scale_colour_viridis_d()`, ggplot2's default colour scale for an
-ordered factor.
+```elixir
+diamonds
+|> Plot.new(%{x: :price, colour: :cut})
+|> Plot.geom_freqpoly()
+|> render.()
+```
 
 ## Columns dodged by group
 

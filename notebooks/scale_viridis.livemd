@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+txhousing = Giggly.Datasets.txhousing()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,9 +32,16 @@ The viridis scales colour with palettes from the viridisLite package, which chan
 in colour and in black and white, and are designed to be read by people with common forms of colour
 blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viridis_c()` a
 continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
-palette, viridis by default, and the `fill` versions do the same for fill. Giggly has none of this
-yet: it has no viridis palettes, and colours a discrete column with ggplot2's default hues and a
-continuous one with its default gradient, whatever its order.
+palette, viridis by default, and the `fill` versions do the same for fill. Giggly has
+`Giggly.Plot.scale_color_viridis_d/2`, `Giggly.Plot.scale_fill_viridis_d/2`,
+`Giggly.Plot.scale_color_viridis_c/2` and `Giggly.Plot.scale_fill_viridis_c/2`, with ggplot2's
+options, `option:` naming a palette by an atom (`:plasma`), `begin:`, `end:` and `direction:`, and
+`alpha:` on the discrete ones, and colours an ordered factor with viridis by default, as ggplot2
+does; it has no binned scales. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds ggplot2's `diamonds` and `txhousing`, `Giggly.Datasets.diamonds/0` and
+`Giggly.Datasets.txhousing/0`, to their names in R.
 
 ## The default for ordered values
 
@@ -37,12 +56,109 @@ ggplot(dsamp, aes(carat, price)) +
   geom_point(aes(colour = clarity))
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`clarity` is an ordered factor) and
-`scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered factor.
+R's `sample()` picks the rows at random, the same ones every time after `set.seed(596)`. The cell
+writes out the 1,000 row numbers it picks, counted from 1 as R counts rows, and takes those rows of
+every column, as `diamonds[rows, ]` does. A `Giggly.Factor` enumerates as its values alone, so
+`cut`, `color` and `clarity` are rebuilt with `Giggly.Factor.new/2`, keeping their levels and
+their order, and `clarity` is coloured with viridis because it is ordered.
+
+```elixir
+rows =
+  ~w(25666 38189 6816 23077 19736 25700 11808 25189 26344 4071 45742 25297 52984 14612 48306
+     19199 38194 37228 48850 49734 18386 14200 10993 24601 7011 34308 6583 38595 30236 1051 8079
+     31287 1565 30482 44169 50061 13023 48715 16918 4754 43963 43370 2115 11166 9734 31412 31654
+     45124 49949 51312 41254 39717 20773 13151 19964 12688 6155 31857 995 32150 46525 40773
+     52088 46509 15601 45156 43334 43429 37708 30408 19060 32426 11867 24140 8179 51399 49507
+     35248 49967 42223 29727 33565 41530 39904 49348 12696 15966 18558 8009 8575 13142 32231
+     6305 39036 53530 34813 36021 47384 43849 23120 4595 20897 9939 7663 35256 19106 5397 673
+     31803 33843 7779 37953 25945 48618 11984 9944 9117 12876 13527 40608 15964 13500 24172
+     11546 29343 30185 17021 51011 26254 45776 6304 48092 14579 41612 38147 26621 10880 34779
+     49702 21763 53234 45667 35061 28866 35353 45202 47347 39769 20956 49295 38811 29480 49290
+     16747 17666 52090 43670 45367 7341 27773 21392 4138 21711 7207 46231 28399 4092 8610 21666
+     32965 29827 9072 50470 32087 35796 14965 34040 38472 51536 20807 27796 27826 50443 16099
+     52267 22365 6637 37629 7186 30703 37706 30788 15894 7248 28258 40058 45250 46061 36382 3943
+     25999 35205 8060 22771 2743 43405 31607 17086 52186 17044 41192 3471 10589 19443 27233
+     16430 10473 34812 38387 41538 24798 39569 4852 52245 10986 22249 21134 17354 43705 32033
+     18848 48445 50802 41889 6166 53686 34675 19893 5251 35698 28781 4265 25865 42038 25993
+     30880 25309 20466 17649 52470 30273 32225 50254 49406 40921 49143 36341 40276 16666 36407
+     26243 15143 22347 13811 6817 34002 5446 50759 22869 25849 12153 39689 38849 21688 48147
+     11030 30946 27445 21548 18779 28502 10350 22784 36643 34601 1211 41957 9168 11746 39914
+     39119 48668 28456 17557 43784 11019 25274 34677 6796 23285 47998 45331 27348 35928 51659
+     36462 45275 13678 16939 24586 38339 4023 50109 15230 41250 43505 20421 11366 7110 3731
+     23582 6516 13533 45770 52523 19482 6898 24987 16603 29916 50268 37347 13710 26150 12498
+     22298 18818 53797 48887 36377 14264 1941 23964 8523 14517 20488 1889 8554 31970 7298 14585
+     4107 25529 12486 36502 48881 18512 53422 19447 53137 51836 47204 24103 51957 18335 25881
+     7313 42513 12590 6727 25010 27434 12573 35528 40797 51947 9106 8283 12405 14312 37546 43759
+     52963 5696 16460 16029 25542 10714 53416 29602 35565 25004 8643 7406 16349 18029 51937
+     35890 4203 35560 42785 26557 22797 44112 53069 39901 47520 22856 23243 31213 46222 23407
+     41376 21459 41579 3169 39126 6588 17060 10782 9459 7509 41467 8192 42851 38404 16038 18937
+     4127 34554 41056 46633 41012 50310 48745 43998 37691 12493 14989 2077 15258 52514 25414
+     31991 10595 44905 45155 10690 9951 46138 28334 14121 33070 17404 35267 21060 24102 6998
+     24466 11489 9094 41717 48590 32800 37531 9372 1600 19248 20235 50356 37987 38576 13935
+     46166 28587 30914 1603 35913 20054 36630 39997 5484 25662 39402 22250 40609 44148 51599
+     33780 29927 18392 36444 41188 52886 20153 11562 51747 18245 17226 23673 27962 48783 3692
+     16889 34147 24599 25748 43712 17346 20279 38719 1961 1096 52821 51209 44413 5168 3662 5220
+     41091 7062 22291 8776 12776 53652 21891 23262 18623 12528 49871 19758 40843 18528 30318
+     23750 41033 9677 50667 35934 15215 6592 11757 20240 33562 33738 33551 18822 21289 102 39803
+     43875 6062 30041 4784 21935 31802 44708 12592 32794 38775 13280 1606 7581 48202 51869 35700
+     19670 4858 9214 1184 43419 32942 767 8234 12358 38641 42562 6142 39447 43984 50349 6371
+     18719 876 2348 47382 1 12081 40566 35629 32130 39743 13585 19449 33029 33896 19582 52189
+     37290 34048 43750 21036 20939 25773 45016 45071 23571 36551 30590 42992 15521 46969 3321
+     53129 32748 31110 41817 16199 29729 42613 36831 30282 43146 49100 18172 26711 50188 5964
+     45537 40391 36470 51607 11251 27209 12780 17137 43044 2098 35041 17194 18652 22923 5353
+     44373 2124 34894 5749 7645 39375 23519 45531 10793 29561 31437 16954 479 34001 634 51372
+     14407 6285 3538 31181 41623 31875 4904 1099 14358 2058 22175 8262 14657 32396 17699 15936
+     36232 48225 53509 3164 4020 45310 14523 29285 19035 573 12709 50537 35364 27740 42841 22462
+     17026 51199 28633 25614 25615 19288 29950 40424 2679 15967 48145 52567 36304 41699 24438
+     1412 27200 4899 32984 48939 38446 33805 1338 9352 35457 2915 34625 48376 40508 22385 26848
+     20969 3963 18316 40081 35987 42439 8548 46415 37583 53188 45499 21450 47094 42929 24873
+     22377 38111 8341 44679 6008 46404 25574 7097 2553 40487 31826 1059 43836 7014 49972 41707
+     47405 21470 35085 5515 44014 25791 12737 27013 39664 42890 12684 35690 800 37963 44182
+     52055 10159 33250 29783 41093 50220 32376 47109 22088 48288 28424 36697 25688 24810 3777
+     29416 40286 6551 27831 24530 17139 37671 15737 6443 50947 7675 47016 856 48873 32825 28751
+     19329 19073 38083 46787 16855 2137 20500 30659 11121 18125 28287 37439 34024 22664 9804
+     24012 36216 41868 20711 47584 19646 19315 8153 10140 23933 29402 13474 13778 19958 52086
+     3159 2026 41798 7632 44411 3678 11123 48218 19524 24600 26842 25690 26277 37323 17552 5091
+     15958 5931 31306 14012 35557 17550 22253 10802 44259 39593 51619 12972 39328 286 23690
+     52517 14431 39931 46346 43995 53119 41732 34338 33621 49401 9466 17674 19830 34660 26806
+     47484 51301 2257 22849 35500 40561 28722 43959 2341 28193 41939 16164 3884 29906 48149
+     46878 37388 6790 13149 592 31502 22413 6329 31957 38914 9542 39542 41291 9227 48297 14268
+     14072 4285 44420 41771 2 17355 4047 27455 21510 4140 41839 13980 35703 23772 14109 50213
+     15799 46209 32939 32061 53350 16141 22275 34593 3102 15314 11440 20041 47926 23186 6278
+     45634 37918 33118 31686 14626 3908 51082 24188 5900 19880 36162 174 31499 37270 16819 18199
+     36517 42638 21809 40303 30396 17356 40913 46399 48148 50403 2231 25098 28663 31630 22188
+     42244 42403 29784 32390 44676 40956 39010 50049 20768 31050 35985 49704 30620 2661 30720
+     18353 15544 49336 6915 22990 29512 40223 27884 13092 1126 43308 9219 12959 8473 36266 17141
+     2979)
+  |> Enum.map(&String.to_integer/1)
+
+dsamp =
+  Enum.map(diamonds, fn {name, column} ->
+    values = column |> Enum.to_list() |> List.to_tuple()
+    taken = Enum.map(rows, fn row -> elem(values, row - 1) end)
+
+    case column do
+      %Giggly.Factor{levels: levels, ordered: ordered} ->
+        {name, Giggly.Factor.new(taken, levels: levels, ordered: ordered)}
+
+      _values ->
+        {name, taken}
+    end
+  end)
+```
+
+```elixir
+dsamp
+|> Plot.new(%{x: :carat, y: :price})
+|> Plot.geom_point(%{colour: :clarity})
+|> render.()
+```
 
 ## Discrete values
 
-`txsamp` keeps the rows of the `txhousing` dataset for the cities named.
+`txsamp` keeps the rows of the `txhousing` dataset for the cities named. `city` is text, not an
+ordered factor, so the first plot colours it with ggplot2's default hues, and the second asks for
+viridis.
 
 ```r
 # Use viridis_d with discrete data
@@ -53,19 +169,55 @@ txsamp <- subset(txhousing, city %in%
 d + scale_colour_viridis_d()
 ```
 
-Not in Giggly yet: the `txhousing` dataset and `scale_colour_viridis_d()`.
+The cell keeps the rows R's `subset()` keeps, each column's values where `city` is one of the five.
+
+```elixir
+cities = ["Houston", "Fort Worth", "San Antonio", "Dallas", "Austin"]
+kept = Enum.map(Keyword.fetch!(txhousing, :city), fn city -> city in cities end)
+
+txsamp =
+  Enum.map(txhousing, fn {name, values} ->
+    rows =
+      values
+      |> Enum.zip(kept)
+      |> Enum.filter(fn {_value, keep} -> keep end)
+      |> Enum.map(fn {value, _keep} -> value end)
+
+    {name, rows}
+  end)
+
+plot =
+  txsamp
+  |> Plot.new(%{x: :sales, y: :median})
+  |> Plot.geom_point(%{colour: :city})
+
+render.(plot)
+```
+
+```elixir
+plot
+|> Plot.scale_color_viridis_d()
+|> render.()
+```
 
 ## The legend's title
+
+`name:` titles the legend, and `\n` breaks the title over two lines.
 
 ```r
 # Change scale label
 d + scale_colour_viridis_d("City\nCenter")
 ```
 
-Not in Giggly yet: the `txhousing` dataset and `scale_colour_viridis_d()`, whose first argument
-titles the legend, here over two lines.
+```elixir
+plot
+|> Plot.scale_color_viridis_d(name: "City\nCenter")
+|> render.()
+```
 
 ## Other palettes
+
+Giggly names a palette by an atom.
 
 ```r
 # Select palette to use, see ?scales::pal_viridis for more details
@@ -73,7 +225,17 @@ d + scale_colour_viridis_d(option = "plasma")
 d + scale_colour_viridis_d(option = "inferno")
 ```
 
-Not in Giggly yet: the `txhousing` dataset, and `scale_colour_viridis_d()` and its `option`.
+```elixir
+plot
+|> Plot.scale_color_viridis_d(option: :plasma)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.scale_color_viridis_d(option: :inferno)
+|> render.()
+```
 
 ## Fill colours
 
@@ -87,8 +249,24 @@ p + scale_fill_viridis_d()
 p + scale_fill_viridis_d(direction = -1)
 ```
 
-Not in Giggly yet: the `txhousing` dataset, and `scale_fill_viridis_d()` and its `direction`
-option.
+Giggly writes `position = "dodge"` as `position: :dodge`.
+
+```elixir
+histogram =
+  txsamp
+  |> Plot.new(%{x: :median, fill: :city})
+  |> Plot.geom_histogram(position: :dodge, binwidth: 15000)
+
+histogram
+|> Plot.scale_fill_viridis_d()
+|> render.()
+```
+
+```elixir
+histogram
+|> Plot.scale_fill_viridis_d(direction: -1)
+|> render.()
+```
 
 ## Continuous values
 
@@ -100,8 +278,7 @@ v + scale_fill_viridis_c()
 v + scale_fill_viridis_c(option = "plasma")
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, tiles (`geom_tile()`), and `scale_fill_viridis_c()` and
-its `option`.
+Not in Giggly yet: the `faithfuld` dataset and tiles (`geom_tile()`).
 
 ## Binned values
 

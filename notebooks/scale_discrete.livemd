@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 mpg = Giggly.Datasets.mpg()
+diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
   plot
@@ -30,15 +31,17 @@ is waiting for, so the page is also a list of what remains.
 ggplot2 adds by itself for such a column. Setting one by hand changes its title, the labels of its
 values, or which values it shows and in what order. A discrete scale places its values at 1, 2, 3
 and so on, so continuous positions can fall between them, which is how jittering works. Giggly
-chooses a discrete position scale from the data, as ggplot2 does, and orders its values
-alphabetically, as ggplot2 orders text. It has `Giggly.Plot.scale_x_discrete/2` and
-`Giggly.Plot.scale_y_discrete/2`, with their titles, labels, limits, breaks and expansion, and
-`limits:` shows values in the order given, but it has no ordered factors, which choose the order of
-a column's values. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
-returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
-defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
-`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
-to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
+chooses a discrete position scale from the data, as ggplot2 does, and orders its values as ggplot2
+does: text alphabetically, and a factor by its levels, a `Giggly.Factor`'s in the table or those a
+mapping's `{:factor, [...], levels: [...]}` or `{:reorder, [...]}` gives. It has
+`Giggly.Plot.scale_x_discrete/2` and `Giggly.Plot.scale_y_discrete/2`, with their titles, labels,
+limits, breaks and expansion, and `limits:` shows values in the order given. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot
+and shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's
+`mpg`: fuel economy for 234 cars of 38 popular models from 1999 to 2008, and ggplot2's `diamonds`,
+`Giggly.Datasets.diamonds/0`, which the setup cell binds to `mpg` and `diamonds`, ggplot2's names
+for them.
 
 ## Bars on a discrete axis
 
@@ -46,8 +49,14 @@ to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 ggplot(diamonds, aes(cut)) + geom_bar()
 ```
 
-Not in Giggly yet: choosing the order of a column's values: `cut` is an ordered factor, which
-ggplot2 shows from Fair to Ideal.
+`cut` is an ordered factor, so the bars run from Fair to Ideal, the order of its levels.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :cut})
+|> Plot.geom_bar()
+|> render.()
+```
 
 ## Jittered points on two discrete axes
 
@@ -61,8 +70,7 @@ Parentheses around an assignment print its value, so this draws `d` as well as n
       geom_jitter())
 ```
 
-Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered factors)
-and `geom_jitter()`.
+Not in Giggly yet: `geom_jitter()`.
 
 ## The axis title and labels
 
@@ -83,7 +91,7 @@ d +
 
 The labels are given by value, so the order they are written in does not matter.
 
-Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
+Not in Giggly yet: `geom_jitter()`.
 
 ## Which values are shown
 
@@ -93,7 +101,7 @@ Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
 d + scale_x_discrete(limits = c("Fair","Ideal"))
 ```
 
-Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
+Not in Giggly yet: `geom_jitter()`.
 
 ## The xlim() and ylim() shortcuts
 
@@ -105,7 +113,7 @@ d + xlim("Fair","Ideal", "Good")
 d + ylim("I1", "IF")
 ```
 
-Not in Giggly yet: choosing the order of a column's values and `geom_jitter()`.
+Not in Giggly yet: `geom_jitter()`.
 
 ## Ordering by another column
 
@@ -133,8 +141,22 @@ ggplot(mpg, aes(reorder(manufacturer, displ), cty)) +
   geom_point()
 ```
 
-Not in Giggly yet: choosing the order of a column's values, and a whole-column function in a
-mapping, such as `reorder(manufacturer, cty)`.
+Giggly writes `reorder(manufacturer, cty)` as `{:reorder, [:manufacturer, :cty]}`, and titles the
+axis as R does.
+
+```elixir
+mpg
+|> Plot.new(%{x: {:reorder, [:manufacturer, :cty]}, y: :cty})
+|> Plot.geom_point()
+|> render.()
+```
+
+```elixir
+mpg
+|> Plot.new(%{x: {:reorder, [:manufacturer, :displ]}, y: :cty})
+|> Plot.geom_point()
+|> render.()
+```
 
 ## Abbreviated labels
 
@@ -145,5 +167,4 @@ ggplot(mpg, aes(reorder(manufacturer, displ), cty)) +
   scale_x_discrete(labels = abbreviate)
 ```
 
-Not in Giggly yet: choosing the order of a column's values, a whole-column function in a mapping,
-such as `reorder(manufacturer, displ)`, and R's `abbreviate()`, which shortens each name.
+Not in Giggly yet: R's `abbreviate()`, which shortens each name.

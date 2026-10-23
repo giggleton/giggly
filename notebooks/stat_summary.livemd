@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -22,6 +33,10 @@ or a function for each (`fun`, `fun.min` and `fun.max`); given neither, it is th
 standard error, `mean_se()`. Each summary is drawn as a point with a line through its range,
 `geom_pointrange()`, unless another geom is given. Giggly has none of it yet; the nearest it has
 is `Giggly.Plot.geom_boxplot/3`, which summarises the `y` values at each `x` in five numbers.
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds ggplot2's
+`diamonds`, `Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
 
 ## Means with bootstrapped intervals
 
@@ -83,10 +98,16 @@ d + stat_summary(aes(y = price), fun = "mean", geom = "bar")
 ```
 
 The first plot counts the diamonds of each cut; the second draws the mean price of each cut as a
-bar.
+bar. Giggly draws the first, the cuts from Fair to Ideal, the order of their levels.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor), and
-`stat_summary()` drawn as bars.
+```elixir
+diamonds
+|> Plot.new(%{x: :cut})
+|> Plot.geom_bar()
+|> render.()
+```
+
+Not in Giggly yet: `stat_summary()` drawn as bars.
 
 ## Summaries in bins
 

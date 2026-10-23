@@ -34,6 +34,4 @@ ggplot(dsub, aes(x = cut, y = carat, fill = clarity)) +
 R's `sample()` picks diamonds at random, the same ones every time after `set.seed(596)`;
 `pch = 21` is the point shape with both a border and a fill.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` and `clarity` are ordered
-factors), `scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor, and
-`position_jitterdodge()` with `geom_point()`'s `position` option.
+Not in Giggly yet: `position_jitterdodge()` with `geom_point()`'s `position` option.

@@ -47,13 +47,12 @@ ggplot(diamonds, aes(log10(carat), log10(price))) +
   geom_point()
 ```
 
-`&:math.log10/1` is Erlang's base-10 logarithm, applied in each row. An expression is titled as
-Elixir writes the call, so the axes read `:math.log10(carat)` and `:math.log10(price)` where
-ggplot2's read `log10(carat)` and `log10(price)`; the points are where ggplot2 puts them.
+Giggly names the base-10 logarithm as R does, `{:log10, [:carat]}`, and titles the axes as R
+does, `log10(carat)` and `log10(price)`.
 
 ```elixir
 diamonds
-|> Plot.new(%{x: {&:math.log10/1, [:carat]}, y: {&:math.log10/1, [:price]}})
+|> Plot.new(%{x: {:log10, [:carat]}, y: {:log10, [:price]}})
 |> Plot.geom_point()
 |> render.()
 ```

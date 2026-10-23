@@ -110,8 +110,26 @@ ggplot(mpg, aes(displ, hwy)) +
   facet_wrap(vars(class2))
 ```
 
-Not in Giggly yet: choosing the order of a column's values. Giggly orders panels as it orders an
-axis's levels, alphabetically, with a missing value last.
+`reorder()` gives `class2` the values of `class`, its levels ordered by each class's mean `displ`,
+smallest first, and the panels follow the levels. Giggly reorders a mapping's values with
+`{:reorder, [:class, :displ]}`, but faceting by an expression waits, so the cell writes out the
+levels R's `reorder()` gives and adds the column to the table, as R does, with
+`Giggly.Factor.new/2`.
+
+```elixir
+class2 =
+  Giggly.Factor.new(Keyword.fetch!(mpg, :class),
+    levels: ["compact", "subcompact", "midsize", "minivan", "pickup", "suv", "2seater"]
+  )
+
+mpg = mpg ++ [class2: class2]
+
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.facet_wrap(:class2)
+|> render.()
+```
 
 ## Free scales
 

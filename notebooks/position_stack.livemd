@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,8 +33,13 @@ show proportions. A stack runs in the reverse order of the `group` aesthetic, so
 up with the default legend, and positive values stack upward from zero while negative ones stack
 downward. `vjust` places an object that has a position rather than a size, such as a label,
 within its part of the stack, and `reverse` turns the order over. Giggly stacks bars: it is the
-default `position: :stack` of `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3`. It has none
-of the rest yet: no `position_fill()`, no options, and no stacking of other layers.
+default `position: :stack` of `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3` and
+`Giggly.Plot.geom_histogram/3`. It has none of the rest yet: no `position_fill()`, no options, and
+no stacking of other layers. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds R's `mtcars` and ggplot2's `diamonds`, `Giggly.Datasets.mtcars/0` and
+`Giggly.Datasets.diamonds/0`, to their names in R.
 
 ## Stacking and filling bars
 
@@ -37,6 +54,15 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = "fill")
 ```
 
+Giggly draws the first plot, writing `factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+mtcars
+|> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+|> Plot.geom_bar()
+|> render.()
+```
+
 Not in Giggly yet: `position_fill()`.
 
 ## Stacking and filling histograms
@@ -48,11 +74,17 @@ ggplot(diamonds, aes(price, fill = cut)) +
   geom_histogram(binwidth = 500, position = "fill")
 ```
 
-`Giggly.Plot.geom_histogram/3` stacks its bars, as the first plot does, but fills `cut` with hues in
-alphabetical order, where R fills an ordered factor with viridis in the order of its levels.
+Giggly draws the first plot: `Giggly.Plot.geom_histogram/3` stacks its bars, and fills `cut`, an
+ordered factor, with viridis in the order of its levels, as R does.
 
-Not in Giggly yet: choosing the order of a column's values (`cut` is an ordered factor),
-`scale_fill_viridis_d()`, ggplot2's default fill scale for an ordered factor, and `position_fill()`.
+```elixir
+diamonds
+|> Plot.new(%{x: :price, fill: :cut})
+|> Plot.geom_histogram(binwidth: 500)
+|> render.()
+```
+
+Not in Giggly yet: `position_fill()`.
 
 ## Stacked areas
 
@@ -86,7 +118,8 @@ ggplot(series, aes(time, value)) +
   geom_area(aes(fill = type2))
 ```
 
-Not in Giggly yet: `geom_area()` and choosing the order of a column's values.
+`factor()`'s `levels` give `type2` its order, which `Giggly.Factor.new/2` gives a column in the
+table. Not in Giggly yet: `geom_area()`.
 
 ## Ordering the legend
 
@@ -110,8 +143,8 @@ ggplot(series, aes(time, value)) +
   theme(legend.position = "top")
 ```
 
-Not in Giggly yet: `geom_area()`, choosing the order of a column's values, `position_stack()`'s
-`reverse` option, `coord_flip()`, and changing the theme, here to put the legend above the plot.
+Not in Giggly yet: `geom_area()`, `position_stack()`'s `reverse` option, `coord_flip()`, and
+changing the theme, here to put the legend above the plot.
 
 ## Stacking lines and points
 

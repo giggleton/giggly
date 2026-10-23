@@ -1652,6 +1652,18 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   interpolation ported by hand, statistics in a page about plotting. *Rejected: leaving the
   example waiting on `quantile()`* — base R, not ggplot2, and nothing Giggly's plotting lacks.
 
+- **A random sample of a table's rows is written out as R's row numbers, however many
+  (2026-10-23, Steve: "A", in the ordering sweep).** scale_hue, scale_viridis and scale_brewer
+  draw `diamonds[sample(nrow(diamonds), 1000), ]` after `set.seed(596)`, scale_shape 100 rows of
+  the same draw. Each cell writes the numbers R's `sample()` picks as a `~w()` word list and takes
+  those rows of every column; a `Giggly.Factor` enumerates as its values alone, so the cell
+  rebuilds each factor with `Giggly.Factor.new/2` and its levels, or the cuts would sort
+  alphabetically. Every such drawing matches R's. facet_wrap's `reorder(mpg$class, mpg$displ)`, a
+  base-R step before plotting, is written out too, as the levels R gives, since faceting by an
+  expression waits. *Rejected: leaving the 1,000-row examples waiting on R's `sample()`* —
+  shorter notebooks, but base R, not plotting, as the entry above found. *Rejected: a list
+  literal* — Elixir's formatter puts each of 1,000 numbers on a line of its own.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -2323,6 +2335,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Draw the notebook examples ordering, viridis and log10 by name made drawable
+  (ordering, step 7); §4: "A random sample of a table's rows"
 - 2026-10-23 — Give the frame's doubles one sort order, Arithmetic.sort_key/1 (seven private
   copies replaced)
 - 2026-10-23 — Give the frame's arithmetic R's infinities, and add its sums in the long double;
@@ -2561,6 +2575,14 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 
 ## 7. Deferred / open questions
 
+- **Rows taken from a table by hand lose its factors' levels (found 2026-10-23, the ordering
+  sweep).** A `Giggly.Factor` enumerates as its values, so a user who filters or samples
+  `diamonds` with `Enum`, or reads it into Explorer, gets plain text, and `cut` sorts
+  alphabetically, where R's `subset()` and `diamonds[rows, ]` keep the factor. The notebooks
+  rebuild each factor by hand (§4, the entry beginning "A random sample of a table's rows").
+  Options: a public function that takes rows of a table and keeps its factors, or leaving the
+  rebuilding to the user, as the notebooks do. Settled when `geom_jitter()` arrives, whose
+  examples draw `subset(diamonds, carat > 1)`.
 - **How a notebook treats an example of a function Giggly will not offer (found 2026-10-17).**
   Giggly exposes no superseded or deprecated function (§4, the entry beginning "Giggly exposes no
   function"), yet 33 waiting examples call one, most of them `coord_map()`,

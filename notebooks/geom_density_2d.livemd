@@ -66,9 +66,7 @@ d <- ggplot(dsmall, aes(x, y))
 d + geom_density_2d(aes(colour = cut))
 ```
 
-Not in Giggly yet: `geom_density_2d()`, choosing the order of a column's values (`cut` is an
-ordered factor), and `scale_colour_viridis_d()`, ggplot2's default colour scale for an ordered
-factor.
+Not in Giggly yet: `geom_density_2d()`.
 
 ## Filled contours in facets
 
@@ -106,7 +104,7 @@ d + stat_density_2d(
 ```
 
 Not in Giggly yet: `stat_density_2d()` and its `contour` option, giving a stat a geom by name, here
-`geom = "raster"`, `geom_raster()`, and `scale_fill_viridis_c()`.
+`geom = "raster"`, and `geom_raster()`.
 
 ## The density as points
 

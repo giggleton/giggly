@@ -43,10 +43,11 @@ Not in Giggly yet: `facet_grid()`.
 # change the order of variable levels with factor()
 ```
 
-This is advice rather than an example: the panels follow the order of a column's values, which R
-sets with `factor()`.
+This is advice rather than an example: the panels follow the order of a column's levels, which R
+sets with `factor()`. `Giggly.Plot.facet_wrap/3`'s panels follow a column's levels too, which
+`Giggly.Factor.new/2` sets in the table.
 
-Not in Giggly yet: choosing the order of a column's values.
+Not in Giggly yet: `facet_grid()`.
 
 ## Data repeated across panels
 

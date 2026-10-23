@@ -15,5 +15,6 @@ has no examples, so this notebook says only what the page describes and where Gi
 `txhousing` holds information about the housing market in Texas from the TAMU real estate center:
 8,602 rows, each naming a multiple listing service (MLS) area and a month, with the number of
 sales, their total value, the median sale price, the number of active listings, and the months it
-would take to sell them all at the current pace of sales. Not in Giggly yet: the `txhousing`
-dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics` and `mpg`, and R's `mtcars`.
+would take to sell them all at the current pace of sales. Giggly has it as
+`Giggly.Datasets.txhousing/0`, a keyword list of columns `Giggly.Plot.new/2` takes as it is, a
+value the data lacks `nil`, as R's is `NA`.

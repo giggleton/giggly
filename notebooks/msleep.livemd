@@ -16,4 +16,4 @@ no examples, so this notebook says only what the page describes and where Giggly
 its common name, genus, order, diet, conservation status, hours of total and REM sleep, length of
 sleep cycle, hours awake, and brain and body weight in kilograms. The updated sleep times and
 weights come from Savage and West (2007); the order, conservation status and diet were added from
-Wikipedia. Not in Giggly yet: the `msleep` dataset; `Giggly.Datasets` has ggplot2's `diamonds`, `economics`, `economics_long` and `mpg`, and R's `mtcars`.
+Wikipedia. Not in Giggly yet: the `msleep` dataset.

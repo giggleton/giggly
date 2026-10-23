@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -24,7 +35,11 @@ fill. Giggly has `Giggly.Plot.scale_shape_discrete/2`, with its `solid:`, and
 `Giggly.Plot.scale_shape_manual/2`, a shape named by number or by name as an atom, but not ggplot2's
 short name, `scale_shape()`, nor binned or identity shape scales (`scale_shape_binned()`,
 `scale_shape_identity()`), and by default maps `shape` to a discrete column as ggplot2's default
-scale does, refusing a seventh value, and draws the legend that reads it back.
+scale does, refusing a seventh value, and draws the legend that reads it back. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot
+and shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds`,
+`Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
 
 ## A shape for each cut
 
@@ -40,8 +55,63 @@ d + scale_shape(solid = FALSE)
 d + scale_shape(name = "Cut of diamond")
 ```
 
-`name` titles the legend. `scale_shape()` is `Giggly.Plot.scale_shape_discrete/2`, which takes `solid:` and `name:`. Not in
-Giggly yet: choosing the order of a column's values (`cut` is an ordered factor).
+`name` titles the legend. `scale_shape()` is `Giggly.Plot.scale_shape_discrete/2`, which takes
+`solid:` and `name:`. R's `sample()` picks the rows at random, the same ones every time after
+`set.seed(596)`. The cell writes out the 100 row numbers it picks, counted from 1 as R counts rows,
+and takes those rows of every column, as `diamonds[rows, ]` does. A `Giggly.Factor` enumerates as
+its values alone, so `cut`, `color` and `clarity` are rebuilt with `Giggly.Factor.new/2`, keeping
+their levels and their order, which give the cuts their shapes from Fair to Ideal.
+
+```elixir
+rows =
+  ~w(25666 38189 6816 23077 19736 25700 11808 25189 26344 4071 45742 25297 52984 14612 48306
+     19199 38194 37228 48850 49734 18386 14200 10993 24601 7011 34308 6583 38595 30236 1051 8079
+     31287 1565 30482 44169 50061 13023 48715 16918 4754 43963 43370 2115 11166 9734 31412 31654
+     45124 49949 51312 41254 39717 20773 13151 19964 12688 6155 31857 995 32150 46525 40773
+     52088 46509 15601 45156 43334 43429 37708 30408 19060 32426 11867 24140 8179 51399 49507
+     35248 49967 42223 29727 33565 41530 39904 49348 12696 15966 18558 8009 8575 13142 32231
+     6305 39036 53530 34813 36021 47384 43849 23120)
+  |> Enum.map(&String.to_integer/1)
+
+dsmall =
+  Enum.map(diamonds, fn {name, column} ->
+    values = column |> Enum.to_list() |> List.to_tuple()
+    taken = Enum.map(rows, fn row -> elem(values, row - 1) end)
+
+    case column do
+      %Giggly.Factor{levels: levels, ordered: ordered} ->
+        {name, Giggly.Factor.new(taken, levels: levels, ordered: ordered)}
+
+      _values ->
+        {name, taken}
+    end
+  end)
+
+plot =
+  dsmall
+  |> Plot.new(%{x: :carat, y: :price})
+  |> Plot.geom_point(%{shape: :cut})
+
+render.(plot)
+```
+
+```elixir
+plot
+|> Plot.scale_shape_discrete(solid: true)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.scale_shape_discrete(solid: false)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.scale_shape_discrete(name: "Cut of diamond")
+|> render.()
+```
 
 ## The order of the shapes
 
@@ -54,9 +124,26 @@ levels(dsmall$cut) <- c("Fair", "Good", "Very Good", "Premium", "Ideal")
 ggplot(dsmall, aes(price, carat)) + geom_point(aes(shape = cut))
 ```
 
-Shapes go to a column's values in the order of its levels.
+Shapes go to a column's values in the order of its levels. R's `levels<-` renames a factor's
+levels in place, the first level to the first name and so on, and these are the names the levels
+already have, so despite the comment the factor and its shapes are as before. Giggly gives a column
+its levels with `Giggly.Factor.new/2`, whose `levels:` name the values each level holds, so the
+same five levels leave it as it was too.
 
-Not in Giggly yet: choosing the order of a column's values.
+```elixir
+cut =
+  dsmall
+  |> Keyword.fetch!(:cut)
+  |> Enum.to_list()
+  |> Giggly.Factor.new(levels: ["Fair", "Good", "Very Good", "Premium", "Ideal"], ordered: true)
+
+dsmall = Keyword.replace!(dsmall, :cut, cut)
+
+dsmall
+|> Plot.new(%{x: :price, y: :carat})
+|> Plot.geom_point(%{shape: :cut})
+|> render.()
+```
 
 ## The available shapes
 
