@@ -90,8 +90,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   aggregate, as R's `mean()` adds), ties in `x`'s own order, a missing mean last, titled
   `reorder(manufacturer, cty)`. *Deferred:* `drop:` (no caller; unused levels are dropped, as
   R's default), `factor()`'s `labels`, `reorder()`'s `FUN` and `decreasing` (r4ds writes
-  `fct_reorder(class, hwy, median)`), forcats, `cut_*()` and `interaction()`, faceting by an
-  expression, binned viridis. *Found:* Explorer 0.13 has no level order to bring; its categories
+  `fct_reorder(class, hwy, median)`), a factor as `reorder()`'s value, forcats, `cut_*()` and
+  `interaction()`, faceting by an expression, binned viridis. *Found:* Explorer 0.13 has no level order to bring; its categories
   are its string cache's first-seen order, sorted and grouped by text.
 
 - **`{:factor, [value], levels: [...]}` gives a factor its levels, in the frame grammar's
@@ -132,7 +132,22 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   name inside a capture (`log10(price) * 2`) is computed by the frame and handed to the capture.
   *Rejected: accepting a capture inside* (the capture computed on lists and handed to the frame
   as a column, titled as R's) — a temporary column, a type known only when run, and no caller;
-  it can arrive later without breaking anything.
+  it can arrive later without breaking anything. A reordering's values follow the same rule, so
+  `reorder(class, -hwy)` is refused.
+
+- **The frame's mean is R's `mean()`, worked out in an emulated long double (2026-10-23, Steve:
+  "A", building step 6 of the tenth increment; checked against R 4.6.1 and Explorer 0.13).** R
+  adds a mean's doubles in the x87's long double (64 significant bits), divides by the count,
+  adds the values' summed distances from that mean over the count, and rounds to a double last;
+  integers it sums and divides once. `Giggly.DataFrame.LongDouble` holds each value exactly and
+  rounds every step to 64 bits, so `summarise/3`'s `mean` matched R on 2,000 random groups of
+  doubles and 2,000 of integers, overflow (1e308 twice gives 1e308) and 1e16, 1, -1e16
+  (0.33365885416666669, not a third) included; `NA` wins wherever it is, where R's `sum()` keeps
+  the first met. `operations/1` now names the aggregates, so a reordering is refused where the
+  engine has no `mean`. *Rejected: the compensated sum over the count* — missed R's last digit in
+  441 groups of 2,000, and overflows. *Rejected: the exact mean rounded once* — missed in 83,
+  wherever R's correction pass loses bits. *Rejected: Explorer's mean* — missed in 523, and skips
+  `nil`.
 
 - **Viridis joins the tenth increment: `scale_color_viridis_d/2`, `scale_fill_viridis_d/2`, their
   `_c` forms, an ordered factor's default colour and fill scale, and `Giggly.Datasets.txhousing/0`
@@ -2297,6 +2312,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Reorder by name, by R's mean() in an emulated long double (ordering, step 6); §4:
+  "The frame's mean is R's `mean()`", "Ordering, viridis and `log10` by name" (amended), "A
+  function by name's value" (amended)
 - 2026-10-22 — Map log10 by name, computed by the table's frame (ordering, step 5); §4: "A
   mapping names a function only as a shortcut" (amended), "A function by name's value is a
   column, a constant or another function by name"

@@ -941,12 +941,30 @@ defmodule Giggly.DataFrameTest do
   end
 
   describe "operations/1" do
-    test "the frame runs every operation its expressions name" do
+    test "the frame runs every operation its expressions and its aggregates name" do
       frame = DataFrame.new(x: [1.0])
 
       operations = DataFrame.operations(frame)
 
-      assert Enum.sort(operations) == [:<, :>, :and, :cut, :is_finite, :log10, :not, :or]
+      assert Enum.sort(operations) == [
+               :<,
+               :>,
+               :and,
+               :count,
+               :cut,
+               :first,
+               :is_finite,
+               :list,
+               :log10,
+               :max,
+               :mean,
+               :min,
+               :n_distinct,
+               :not,
+               :or,
+               :quantile,
+               :sum
+             ]
     end
   end
 
@@ -1199,6 +1217,27 @@ defmodule Giggly.DataFrameTest do
              }
     end
 
+    # Golden: R 4.6.1's tapply(c(63.9, 61, 62, NA, 2, NaN), c(1, 1, 1, 2, 2, 3), mean) is
+    # 62.299999999999997, NA and NaN, and tapply(c(3L, 1L, 4L, 5L), c(1, 1, 1, 2), mean) is
+    # 2.6666666666666665 and 5, each a double.
+    test "mean is each group's mean as R's mean() works it out, missing where a value is" do
+      frame =
+        DataFrame.new(
+          group: [1, 1, 1, 2, 2, 3],
+          y: [63.9, 61.0, 62.0, nil, 2.0, :nan],
+          n: [3, 1, 4, 5, 5, 5]
+        )
+
+      summarised = DataFrame.summarise(frame, [:group], y: {:mean, [:y]}, n: {:mean, [:n]})
+
+      assert {DataFrame.pull(summarised, :y), DataFrame.pull(summarised, :n)} ===
+               {[62.3, nil, :nan], [2.6666666666666665, 5.0, 5.0]}
+
+      dtypes = DataFrame.dtypes(summarised)
+
+      assert Map.take(dtypes, [:y, :n]) == %{y: :float, n: :float}
+    end
+
     test "a frame of no rows summarises into no rows, its columns named" do
       frame = DataFrame.new(group: [], weight: [])
 
@@ -1220,13 +1259,14 @@ defmodule Giggly.DataFrameTest do
       assert error.message =~ ":string"
     end
 
-    test "a quantile, a minimum or a maximum of a column that is not numbers is refused" do
+    test "a quantile, a minimum, a maximum or a mean of a column that is not numbers is refused" do
       frame = DataFrame.new(group: [1], label: ["a"])
 
       for {aggregate, purpose} <- [
             {{:quantile, [:label], probability: 0.5}, "a quantile orders numbers"},
             {{:min, [:label]}, "a minimum compares numbers"},
-            {{:max, [:label]}, "a maximum compares numbers"}
+            {{:max, [:label]}, "a maximum compares numbers"},
+            {{:mean, [:label]}, "a mean averages numbers"}
           ] do
         error =
           assert_raise ArgumentError, fn ->
@@ -1286,7 +1326,7 @@ defmodule Giggly.DataFrameTest do
       frame = DataFrame.new(group: [1], weight: [1.0])
 
       assert_raise FunctionClauseError, fn ->
-        DataFrame.summarise(frame, [:group], n: {:mean, [:weight]})
+        DataFrame.summarise(frame, [:group], n: {:median, [:weight]})
       end
 
       assert_raise FunctionClauseError, fn ->

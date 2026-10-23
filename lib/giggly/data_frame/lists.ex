@@ -66,9 +66,30 @@ defmodule Giggly.DataFrame.Lists do
   defp reported({:list, dtype}), do: {:list, reported(dtype)}
   defp reported(dtype), do: dtype
 
-  # Every operation an expression names, each run below (`evaluated/2`).
+  # Every operation an expression or an aggregate names, each run below (`evaluated/2`,
+  # `aggregated/3`).
   @impl DataFrame
-  def operations(%__MODULE__{}), do: [:<, :>, :and, :cut, :is_finite, :log10, :not, :or]
+  def operations(%__MODULE__{}) do
+    [
+      :<,
+      :>,
+      :and,
+      :count,
+      :cut,
+      :first,
+      :is_finite,
+      :list,
+      :log10,
+      :max,
+      :mean,
+      :min,
+      :n_distinct,
+      :not,
+      :or,
+      :quantile,
+      :sum
+    ]
+  end
 
   @impl DataFrame
   def category(%__MODULE__{} = frame, name), do: declaration(column(frame, name))
@@ -442,6 +463,11 @@ defmodule Giggly.DataFrame.Lists do
       by_group(values, groups, fn group_values -> quantile(present(group_values), probability) end)
 
     {:float, quantiles}
+  end
+
+  defp aggregated(frame, {:mean, [name]}, groups) do
+    {_dtype, values} = numbers_column(frame, name, "a mean averages numbers")
+    {:float, by_group(values, groups, &Arithmetic.mean/1)}
   end
 
   defp aggregated(frame, {:min, [name]}, groups) do

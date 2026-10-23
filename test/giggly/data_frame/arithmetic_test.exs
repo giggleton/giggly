@@ -239,4 +239,78 @@ defmodule Giggly.DataFrame.ArithmeticTest do
 
     assert sums === [[:nan, nil], [nil, nil], [:infinity, :nan, nil], [nil, nil]]
   end
+
+  # Golden: R 4.6.1's mean() of c(NA, NaN), c(NaN, NA), c(1, NaN, NA), c(Inf, NA), c(NA_integer_,
+  # 1L), c(1, NaN), c(Inf, NaN), c(Inf, 1), c(-Inf, 1) and c(Inf, -Inf) is NA, NA, NA, NA, NA,
+  # NaN, NaN, Inf, -Inf and NaN: NA wherever it is, where R's sum() keeps the first missing value.
+  test "mean is R's mean(): missing wherever a value is, else NaN, infinities as they add" do
+    means =
+      Enum.map(
+        [
+          [nil, :nan],
+          [:nan, nil],
+          [1.0, :nan, nil],
+          [:infinity, nil],
+          [nil, 1],
+          [1.0, :nan],
+          [:infinity, :nan],
+          [:infinity, 1.0],
+          [:neg_infinity, 1.0],
+          [:infinity, :neg_infinity]
+        ],
+        &Arithmetic.mean/1
+      )
+
+    assert means === [nil, nil, nil, nil, nil, :nan, :nan, :infinity, :neg_infinity, :nan]
+  end
+
+  # Golden: R 4.6.1's mean() of c(63.9, 61, 62), c(0.2, 0.1, 0.3), c(0.1, 0.2) and c(1e16, 1,
+  # -1e16), printed to 17 significant digits: 62.299999999999997, 0.20000000000000001,
+  # 0.15000000000000002 and 0.33365885416666669. Their sums in extended precision divided by the
+  # count are 62.300000000000004, 0.19999999999999998, 0.15000000000000002 and
+  # 0.33333333333333331: R's correction pass, run in a long double, moves the first two to the
+  # nearest double and the last away from a third.
+  test "mean works a double's mean out in R's long double, its correction pass included" do
+    means =
+      Enum.map(
+        [[63.9, 61.0, 62.0], [0.2, 0.1, 0.3], [0.1, 0.2], [1.0e16, 1.0, -1.0e16]],
+        &Arithmetic.mean/1
+      )
+
+    assert means === [62.3, 0.2, 0.15000000000000002, 0.33365885416666669]
+  end
+
+  # Golden: R 4.6.1's mean() of c(1e308, 1e308), c(xmax, xmax, -xmax) for the largest double xmax,
+  # and c(-1e308, -1e308, -1e308) is 1e308, 5.9923104495410527e307 and -1e308, where a sum in
+  # doubles is past the largest.
+  test "mean of doubles whose sum is past the largest double divides each by the count first" do
+    largest = 1.797_693_134_862_315_7e308
+
+    means =
+      Enum.map(
+        [[1.0e308, 1.0e308], [largest, largest, -largest], [-1.0e308, -1.0e308, -1.0e308]],
+        &Arithmetic.mean/1
+      )
+
+    assert means === [1.0e308, 5.992_310_449_541_052_7e307, -1.0e308]
+  end
+
+  # Golden: R 4.6.1's mean() of c(5e-324, 5e-324) and c(5e-324, 0) is 4.9406564584124654e-324
+  # and 0, half the least double a tie rounded to even, and 1 / mean(-0) is Inf, its sum begun
+  # from plus zero.
+  test "mean rounds to a double last, below the least normal one too, and has no minus zero" do
+    means =
+      Enum.map([[5.0e-324, 5.0e-324], [5.0e-324, 0.0], [-0.0], [-0.0, -0.0]], &Arithmetic.mean/1)
+
+    assert means === [5.0e-324, 0.0, 0.0, 0.0]
+  end
+
+  # Golden: R 4.6.1's mean(c(1L, 2L)) is 1.5 and mean(c(640883879L, integer(4094))) is
+  # 156503.99975579977, the exact sum divided once in a long double and rounded to a double, where
+  # dividing in doubles gives 156503.99975579974.
+  test "mean of integers divides their exact sum once in R's long double" do
+    many = [640_883_879 | List.duplicate(0, 4094)]
+
+    assert {Arithmetic.mean([1, 2]), Arithmetic.mean(many)} === {1.5, 156_503.99975579977}
+  end
 end

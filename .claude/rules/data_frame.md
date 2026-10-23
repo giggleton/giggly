@@ -23,12 +23,17 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **R's arithmetic on the frame's doubles is `Giggly.DataFrame.Arithmetic`** (design-log §4, the
   entry beginning "A missing value in a sum is R's"): the frame owns `nil` (R's `NA`), `:nan`,
   `:infinity` and `:neg_infinity`, so it owns how they add, subtract, multiply, divide, compare
-  and take a magnitude, a maximum, a sum or running sums, as IEEE arithmetic and R's `pmin()`,
-  `pmax()`, `max()`, `sum()`, `cumsum()` and `<` do, a missing value and NaN where both meet
-  resolved as R resolves them, and a sum and running sums added in extended precision, as R's
-  add in a long double (`sum/2`, which `summarise/3`'s sum calls, and `cumulative_sum/1`). A
-  stat's shares, densities and bins, stacking's heights, dodging's widths and a bar's sides go
-  through it, never Elixir's arithmetic, which has no infinity.
+  and take a magnitude, a maximum, a sum, running sums or a mean, as IEEE arithmetic and R's
+  `pmin()`, `pmax()`, `max()`, `sum()`, `cumsum()`, `mean()` and `<` do, a missing value and NaN
+  where both meet resolved as R resolves them, and a sum and running sums added in extended
+  precision, as R's add in a long double (`sum/2`, which `summarise/3`'s sum calls, and
+  `cumulative_sum/1`). **A mean is R's `mean()` digit for digit** (`mean/1`, design-log §4, the
+  entry beginning "The frame's mean is R's"): every step R takes in its long double, the
+  correction pass and the division of each value where the sum is past the largest double
+  included, taken in `Giggly.DataFrame.LongDouble`, which holds a value exactly and rounds each
+  result to 64 bits, as the x87 does, and only `Arithmetic` calls. A stat's shares, densities
+  and bins, stacking's heights, dodging's widths and a bar's sides go through it, never Elixir's
+  arithmetic, which has no infinity.
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
@@ -60,9 +65,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
   none, raises `FunctionClauseError`. **An implementation names the operations it runs**
-  (`operations/1`), the list frame every one, a test pinning the list, so a caller can refuse
-  what an engine cannot run before running it; a mapping's function by name is an expression in
-  this grammar.
+  (`operations/1`), `summarise/3`'s aggregates among them, the list frame every one, a test
+  pinning the list, so a caller can refuse what an engine cannot run before running it; a
+  mapping's function by name is an expression in this grammar, and its reordering needs `mean`.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
   any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
@@ -72,7 +77,7 @@ column names become strings", "Column types belong to the frame" and "Every boun
   columns; `cut`, with binning's bins; `log10` and `operations/1`, with a mapping's functions by
   name; `join/3`, the `or`, `not`, `<` and `>` operations and the
   `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
-  and whiskers. Not designed ahead.
+  and whiskers; the `mean` aggregate, with a mapping's reordering. Not designed ahead.
 - **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,
   the key columns must be of one type in both frames, and a column besides them in both is
   refused, never suffixed.
@@ -82,9 +87,11 @@ column names become strings", "Column types belong to the frame" and "Every boun
   the type `{:list, type}`; `count`, `min`, `max` and `quantile` (`probability:`, R's type 7,
   worked in R's order, `(1 - h) * lower + h * higher`, which a test pins where the textbook order
   differs), each leaving a missing value (`nil` or NaN) out, as R's statistics call them, and
-  missing, or 0, for a group of none; and a sum. **A sum's spec says how it adds** (design-log §4,
-  the entry beginning "The frame's first group-by aggregate"): `summation: :compensated`, the
-  default, as R's `sum()` adds in extended precision, or `:plain`, in row order, as `rowsum()`;
+  missing, or 0, for a group of none; `mean`, R's `mean()`, a float, missing wherever a `nil`
+  is, else NaN where a NaN is or both infinities meet; and a sum. **A sum's spec says how it
+  adds** (design-log §4, the entry beginning "The frame's first group-by aggregate"):
+  `summation: :compensated`, the default, as R's `sum()` adds in extended precision, or
+  `:plain`, in row order, as `rowsum()`;
   `missing: :propagate`, the default, or `:skip`, a missing value being `nil` or NaN, as R's
   `is.na()` reads one, the first met kept where it propagates, and an infinity no missing value but
   added as IEEE adds one, so a sum meeting both infinities is NaN. Its rows are sorted by the

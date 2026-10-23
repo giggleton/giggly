@@ -502,6 +502,67 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, reorder()" do
+    # Golden: ggplot2 4.0.3 in R 4.6.1 places `aes(reorder(class, hwy), hwy)` over mpg's classes
+    # pickup 1, suv 2, minivan 3, 2seater 4, midsize 5, subcompact 6 and compact 7, groups them so,
+    # and titles the axis `reorder(class, hwy)`.
+    test "a reordering is a discrete axis in order of the means, grouped and titled as R does" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: {:reorder, [:class, :hwy]}, y: :hwy})
+        |> Plot.geom_point()
+
+      frame = Giggly.layer_data(plot)
+      positions = ~w(pickup suv minivan 2seater midsize subcompact compact)
+
+      by_class =
+        frame
+        |> DataFrame.pull(:x)
+        |> Enum.zip_with(Keyword.fetch!(Giggly.Datasets.mpg(), :class), fn x, class ->
+          {class, x}
+        end)
+        |> Enum.uniq()
+        |> Enum.sort_by(fn {_class, x} -> x end)
+
+      assert {by_class, DataFrame.pull(frame, :group) === DataFrame.pull(frame, :x),
+              Giggly.Assembly.run(plot).guide_titles.x} ===
+               {Enum.with_index(positions, 1), true, "reorder(class, hwy)"}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 colours `colour = reorder(q, v)`, q the ordered factor Fair,
+    # Good, Ideal, Fair of those levels and v 5, 9, 1, 3, by `scale_colour_ordinal()`: #21908C,
+    # #FDE725, #440154 and #21908C, its legend titled `reorder(q, v)`; the same strings, not a
+    # factor, by `scale_colour_discrete()`: #00BA38, #619CFF, #F8766D and #00BA38.
+    test "an ordered factor's reordering is coloured by viridis, a plain column's by hues" do
+      rows = [
+        x: [1, 2, 3, 4],
+        y: [1, 2, 3, 4],
+        q:
+          Giggly.Factor.new(["Fair", "Good", "Ideal", "Fair"],
+            levels: ["Fair", "Good", "Ideal"],
+            ordered: true
+          ),
+        p: ["Fair", "Good", "Ideal", "Fair"],
+        v: [5, 9, 1, 3]
+      ]
+
+      colours = fn value ->
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y, colour: value})
+          |> Plot.geom_point()
+
+        [legend] = Giggly.Assembly.run(plot).legends
+        frame = Giggly.layer_data(plot)
+        {DataFrame.pull(frame, :color), legend.title}
+      end
+
+      assert {colours.({:reorder, [:q, :v]}), colours.({:reorder, [:p, :v]})} ===
+               {{["#21908C", "#FDE725", "#440154", "#21908C"], "reorder(q, v)"},
+                {["#00BA38", "#619CFF", "#F8766D", "#00BA38"], "reorder(p, v)"}}
+    end
+  end
+
   describe "layer_data/2, a layer's own table" do
     test "the layer draws its own table with the plot's mapping" do
       plot =

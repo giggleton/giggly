@@ -5,10 +5,12 @@ defmodule Giggly.DataFrame.Arithmetic do
   # `:infinity` and `:neg_infinity`; and every finite float, minus zero among them. The frame owns
   # these values, so it owns their arithmetic: what a stat works out from its summarised table (a
   # share, a density, a count over the largest) and what stacking adds up, once a weight or a
-  # height is infinite, follows IEEE arithmetic and R's `pmin()`, `pmax()`, `max()` and `<` here,
-  # rather than Elixir's, which has no infinity and raises dividing by zero. Where a missing value
-  # (`nil`) and NaN meet, the one R keeps wins: an operator's first operand, `pmin()`'s and
-  # `pmax()`'s later one, and `max()`'s missing value.
+  # height is infinite, and a mean, follow IEEE arithmetic and R's `pmin()`, `pmax()`, `max()`,
+  # `mean()` and `<` here, rather than Elixir's, which has no infinity and raises dividing by zero.
+  # Where a missing value (`nil`) and NaN meet, the one R keeps wins: an operator's first operand,
+  # `pmin()`'s and `pmax()`'s later one, and `max()`'s and `mean()`'s missing value.
+
+  alias Giggly.DataFrame.LongDouble
 
   @typedoc "A double as the frame holds it."
   @type double :: number() | :nan | :infinity | :neg_infinity | nil
@@ -126,11 +128,20 @@ defmodule Giggly.DataFrame.Arithmetic do
   end
 
   defp added(values, summation) do
+    case infinite(values) do
+      :none -> finite_sum(values, summation)
+      infinite -> infinite
+    end
+  end
+
+  # What numbers with an infinity among them add up to, as IEEE adds them: NaN where the two
+  # infinities meet, else the infinity; `:none` where there is none.
+  defp infinite(values) do
     cond do
       :infinity in values and :neg_infinity in values -> :nan
       :infinity in values -> :infinity
       :neg_infinity in values -> :neg_infinity
-      true -> finite_sum(values, summation)
+      true -> :none
     end
   end
 
@@ -142,6 +153,74 @@ defmodule Giggly.DataFrame.Arithmetic do
   defp finite_sum(values, :compensated) do
     {total, compensation} = Enum.reduce(values, {0.0, 0.0}, &compensated/2)
     total + compensation
+  end
+
+  # The mean of `values`, R's `mean()`: missing where one is `nil` (R's `NA`), wherever it is, as
+  # R's long double keeps `NA` over NaN; else NaN where one is NaN; else an infinity, or NaN, as
+  # they add; and otherwise worked out as R works it out in a long double
+  # (`Giggly.DataFrame.LongDouble`), each step rounded to 64 bits and the mean to a double last.
+  # Integers are summed and divided once by their count. Doubles are summed and divided, and the
+  # sum of their distances from that mean, divided by the count, is added to it, R's correction,
+  # which can leave it further from the exact mean: 1e16, 1 and -1e16 have the mean
+  # 0.33365885416666669, as R's has. Where their sum is past the largest double, each is divided
+  # by the count first, in doubles, and so is each distance, as R does.
+  @doc false
+  @spec mean([double(), ...]) :: double()
+  def mean([_first | _rest] = values) do
+    cond do
+      nil in values -> nil
+      :nan in values -> :nan
+      true -> averaged(values)
+    end
+  end
+
+  defp averaged(values) do
+    case infinite(values) do
+      :none -> finite_mean(values)
+      infinite -> infinite
+    end
+  end
+
+  defp finite_mean([first | _rest] = integers) when is_integer(first) do
+    integers
+    |> Enum.reduce(LongDouble.zero(), fn integer, sum ->
+      LongDouble.add(sum, LongDouble.from_integer(integer))
+    end)
+    |> LongDouble.divide(length(integers))
+    |> LongDouble.to_double()
+  end
+
+  defp finite_mean(doubles) do
+    count = length(doubles)
+    long_doubles = Enum.map(doubles, &LongDouble.from_double/1)
+    sum = Enum.reduce(long_doubles, LongDouble.zero(), &LongDouble.add/2)
+
+    mean =
+      if is_float(LongDouble.to_double(sum)) do
+        mean = LongDouble.divide(sum, count)
+
+        correction =
+          Enum.reduce(long_doubles, LongDouble.zero(), fn long_double, total ->
+            LongDouble.add(total, LongDouble.subtract(long_double, mean))
+          end)
+
+        LongDouble.add(mean, LongDouble.divide(correction, count))
+      else
+        mean =
+          Enum.reduce(doubles, LongDouble.zero(), fn double, sum ->
+            LongDouble.add(sum, LongDouble.from_double(double / count))
+          end)
+
+        correction =
+          Enum.reduce(long_doubles, LongDouble.zero(), fn long_double, total ->
+            distance = LongDouble.subtract(long_double, mean)
+            LongDouble.add(total, LongDouble.divide(distance, count))
+          end)
+
+        LongDouble.add(mean, correction)
+      end
+
+    LongDouble.to_double(mean)
   end
 
   # The running sums of `values`, R's `cumsum()`: each the sum of the values up to it, in extended

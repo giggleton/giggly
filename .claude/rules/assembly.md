@@ -162,7 +162,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`,
   `:category`), never by scanning values. **A factor's column enters the evaluated frame declared
   a category, with its levels** (`Mapping.category/2` gives the declaration, a table's factor
-  column's included), so grouping and the
+  column's and a reordering's included), so grouping and the
   scales' kinds read it as discrete, numbers and all; the transformation leaves a category as it
   is, a discrete scale's being the identity, so it reaches training with its levels. **A scale is
   told levels from positions by the stage**: the first training hands it the layers' own values,

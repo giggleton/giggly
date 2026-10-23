@@ -31,6 +31,16 @@ defmodule Giggly.Mapping do
       the legend, the groups and stacking follow that order; `ordered: true` marks the factor's
       levels as ordered. A factor reads a whole column, so it is the whole of a mapping value, a
       factor's own or an after_stat's, never an expression's argument.
+    * **A reordering**, `{:reorder, [value, by]}`, is `value` read as discrete, as a factor reads
+      it, its levels ordered by the mean of `by` over each one's rows, the lowest first: levels
+      whose means tie keep the order the factor of `value` gives them (its own levels where the
+      table's column is a factor), and a level whose mean is missing, since its rows hold a
+      missing or NaN `by` or there are none, goes last. The mean is R's `mean()`, worked out as
+      R works it out, digit for digit. Each of `value` and `by` is a column or a function by
+      name, which the engine holding the table computes, as it computes the means, and `by` is
+      numbers; the levels are ordered, as `ordered: true` marks a factor's, where `value` is an
+      ordered factor. A reordering reads whole columns, as a factor does, so it goes where a
+      factor goes.
     * **An after_stat**, `{:after_stat, [value]}`, is the value computed from what the layer's stat
       computes: its names are the stat's computed variables (counting's are `count` and `prop`),
       and it is evaluated once the stat has run, so it takes no part in grouping or in what the
@@ -45,7 +55,9 @@ defmodule Giggly.Mapping do
   it, and `log10` where its value is a column or a constant that is not numbers, a factor's
   column among them. A factor's levels are refused unless they are a list of one or more
   values a column can hold, of one type, none of them `nil` and none given twice (`4` and `4.0`
-  are one); levels of another type than the value's are refused when the plot is run. A layer
+  are one); levels of another type than the value's are refused when the plot is run. A
+  reordering is refused where either of its values is a constant, a capture or a closure, a factor
+  or another reordering, or where `by` is a column that is not numbers. A layer
   whose stat computes nothing, and so documents no variables, refuses every after_stat.
 
       iex> plot =
@@ -77,6 +89,15 @@ defmodule Giggly.Mapping do
       iex> Giggly.panel_scales(plot, 1).x.levels
       [8, 4, 6]
 
+  The classes in order of their mean highway mileage, 19 for the SUVs, 27 and 28:
+
+      iex> plot =
+      ...>   %{"class" => ["suv", "compact", "suv", "midsize"], "hwy" => [18, 28, 20, 27]}
+      ...>   |> Giggly.Plot.new(%{x: {:reorder, [:class, :hwy]}, y: :hwy})
+      ...>   |> Giggly.Plot.geom_point()
+      iex> Giggly.panel_scales(plot, 1).x.levels
+      ["suv", "midsize", "compact"]
+
   ## Titles
 
   A guide is titled by what its aesthetic is mapped to:
@@ -90,6 +111,7 @@ defmodule Giggly.Mapping do
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
     * a factor by its value's text inside `factor()`, `factor(cyl)`, and its options as R writes
       them, `factor(cyl, levels = c(8, 4, 6), ordered = TRUE)`;
+    * a reordering as a call to R's `reorder()`, `reorder(class, hwy)`;
     * an after_stat by its value's text, `prop`;
     * a constant by its aesthetic's name, `color`, unless another layer maps the aesthetic to a
       column or an expression, whose title wins.
@@ -122,7 +144,8 @@ defmodule Giggly.Mapping do
   # compute it (`check/2`); the assembly evaluates it against a
   # layer's table (`evaluate/2`) and titles its guide (`title/2`). A value is held resolved: a
   # column by its name as a string, a constant as `{:constant, term}`, a factor as
-  # `{:factor, [resolved]}`, an after_stat as `{:after_stat, [resolved]}`, an expression as its
+  # `{:factor, [resolved]}`, a reordering as `{:reorder, [resolved, resolved]}`, an after_stat as
+  # `{:after_stat, [resolved]}`, an expression as its
   # function or its name and its resolved arguments, a function by name so being an expression
   # the frame computes as it is. When a value is evaluated is its stage (`stage/1`): an
   # after_stat's against its stat's output, every other against the layer's data. A value's
@@ -196,11 +219,17 @@ defmodule Giggly.Mapping do
   @type factor ::
           {:factor, [value()]} | {:factor, [value()], [levels: [term()], ordered: boolean()]}
 
+  @typedoc "A reordering: a value read as discrete, its levels ordered by another's means."
+  @type reordering :: {:reorder, [column() | expression()]}
+
   @typedoc "An after_stat: a value computed from the stat's computed variables."
   @type after_stat :: {:after_stat, [value()]}
 
-  @typedoc "A value as written: a column, an expression, a constant, a factor or an after_stat."
-  @type value :: column() | expression() | constant() | factor() | after_stat()
+  @typedoc """
+  A value as written: a column, an expression, a constant, a factor, a reordering or an
+  after_stat.
+  """
+  @type value :: column() | expression() | constant() | factor() | reordering() | after_stat()
 
   @typedoc """
   A value as a plot holds it: a column by its name as a string, a constant as `{:constant, term}`,
@@ -211,6 +240,7 @@ defmodule Giggly.Mapping do
           | {:constant, term()}
           | {:factor, [resolved()]}
           | {:factor, [resolved()], [levels: [term()], ordered: boolean()]}
+          | {:reorder, [resolved()]}
           | {:after_stat, [resolved()]}
           | {function(), [resolved()]}
           | {:log10, [resolved()]}
@@ -245,6 +275,15 @@ defmodule Giggly.Mapping do
        "a factor reads one value, with a keyword list of options, written " <>
          "{:factor, [value], levels: [level, ...]}"}
 
+  def resolve({:reorder, [value, by]}) do
+    with {:ok, resolved_value} <- reordered(value),
+         {:ok, resolved_by} <- reordered(by),
+         do: {:ok, {:reorder, [resolved_value, resolved_by]}}
+  end
+
+  def resolve({:reorder, _arguments}),
+    do: {:error, "a reordering reads two values, written {:reorder, [value, by]}"}
+
   def resolve({:after_stat, [value]}), do: wrapped(:after_stat, value)
 
   def resolve({:after_stat, _arguments}),
@@ -261,7 +300,7 @@ defmodule Giggly.Mapping do
       do: {:error, "an expression's arguments are a list of values"}
 
   def resolve({name, arguments}) when is_atom(name) and is_list(arguments) do
-    known = Enum.sort([:after_stat, :constant, :factor | functions()])
+    known = Enum.sort([:after_stat, :constant, :factor, :reorder | functions()])
 
     {:error,
      "#{inspect(name)} is none of the names a mapping knows " <>
@@ -329,9 +368,41 @@ defmodule Giggly.Mapping do
   defp argument(factor) when elem(factor, 0) == :factor,
     do: {:error, "a factor reads a whole column, so it is not an expression's argument"}
 
+  defp argument(reordering) when elem(reordering, 0) == :reorder,
+    do: {:error, "a reordering reads whole columns, so it is not an expression's argument"}
+
   defp argument(value), do: inner(value)
 
   defp factor(value), do: wrapped(:factor, value)
+
+  # A reordering's value: a column or a function by name, which the table's engine computes, as it
+  # computes the means the levels are ordered by; never a constant, since R pairs each row's value
+  # with the one beside it ("arguments must have same length"), a capture or a closure, which the
+  # engine cannot run, or what reads a whole column itself.
+  defp reordered(value) do
+    with {:ok, resolved} <- inner(value), do: reorderable(resolved)
+  end
+
+  defp reorderable(name) when is_binary(name), do: {:ok, name}
+  defp reorderable({name, _arguments} = call) when is_map_key(@functions, name), do: {:ok, call}
+
+  defp reorderable({:constant, _term}),
+    do:
+      {:error,
+       "a reordering orders a column's values by another's in the same rows, so neither of its " <>
+         "values is a constant"}
+
+  defp reorderable({function, _arguments}) when is_function(function),
+    do:
+      {:error,
+       "a reordering is computed by the table's engine, which runs no Elixir function, so its " <>
+         "values are columns and functions by name"}
+
+  defp reorderable(_factor_or_reordering),
+    do:
+      {:error,
+       "a reordering's values are columns and functions by name, never a factor or another " <>
+         "reordering"}
 
   # A factor's options, `levels:` and `ordered:`, each at most once, as R's `factor()` takes them.
   defp factor_options(options) do
@@ -503,8 +574,9 @@ defmodule Giggly.Mapping do
   # Whether `value` can be computed from `table`, the table it is evaluated against, as far as the
   # call can tell, or why not, worded to follow "maps :x to …, but": each function it names by an
   # atom one the engine holding the table runs (`DataFrame.operations/1`), and each of their
-  # values whose type the call can tell, a column of the table or a constant, numbers. An
-  # after_stat's columns are its stat's output, whose types are known only when the plot is run.
+  # values whose type the call can tell, a column of the table or a constant, numbers; and for a
+  # reordering, the engine's `mean`, and numbers to order by. An after_stat's columns are its
+  # stat's output, whose types are known only when the plot is run.
   @doc false
   @spec check(resolved(), DataFrame.t()) :: :ok | {:error, String.t()}
   def check(value, table) do
@@ -521,27 +593,42 @@ defmodule Giggly.Mapping do
   defp calls({:constant, _term}), do: []
   defp calls({:factor, [value], _options}), do: calls(value)
 
+  defp calls({:reorder, [value, by]} = reordering),
+    do: [reordering | calls(value) ++ calls(by)]
+
   defp calls({name, arguments} = call) when is_map_key(@functions, name),
     do: [call | Enum.flat_map(arguments, &calls/1)]
 
   # An expression's arguments, or a factor's or an after_stat's one value.
   defp calls({_function_or_head, arguments}), do: Enum.flat_map(arguments, &calls/1)
 
+  # A reordering orders its levels by means the engine computes, of numbers.
+  defp call_refusal({:reorder, [_value, by]}, operations, table, stage) do
+    if :mean in operations,
+      do: numbers_refusal("reorder orders by the mean of numbers", by, table, stage),
+      else:
+        {:error,
+         "the engine holding the table cannot compute mean, by which a reordering orders its " <>
+           "levels"}
+  end
+
   defp call_refusal({name, arguments}, operations, table, stage) do
     if name in operations,
       do:
-        first_refusal(arguments, fn argument -> numbers_refusal(name, argument, table, stage) end),
+        first_refusal(arguments, fn argument ->
+          numbers_refusal("#{name} takes numbers", argument, table, stage)
+        end),
       else: {:error, "the engine holding the table cannot compute #{name}"}
   end
 
-  # A value of a function that takes numbers is refused where the call can tell it holds none.
-  defp numbers_refusal(name, argument, table, stage) do
+  # A value that must be numbers, as `needs` says, refused where the call can tell it holds none.
+  defp numbers_refusal(needs, argument, table, stage) do
     case known_dtype(argument, table, stage) do
       dtype when dtype in [:integer, :float, :null, :computed] ->
         :ok
 
       dtype ->
-        {:error, "#{name} takes numbers, and #{typed_text(argument, dtype)}"}
+        {:error, "#{needs}, and #{typed_text(argument, dtype)}"}
     end
   end
 
@@ -569,6 +656,7 @@ defmodule Giggly.Mapping do
   def dtype({:constant, term}, _table), do: dtype_of(term)
   def dtype({:factor, [_value]}, _table), do: :category
   def dtype({:factor, [_value], _options}, _table), do: :category
+  def dtype({:reorder, [_value, _by]}, _table), do: :category
   def dtype({:after_stat, [value]}, statistic), do: dtype(value, by_name(statistic))
   def dtype({_function, _arguments}, _table), do: :computed
 
@@ -593,6 +681,7 @@ defmodule Giggly.Mapping do
 
   def evaluate({:factor, [value]}, frame), do: evaluate(value, frame)
   def evaluate({:factor, [value], _options}, frame), do: evaluate(value, frame)
+  def evaluate({:reorder, [value, _by]}, frame), do: evaluate(value, frame)
   def evaluate({:after_stat, [value]}, statistic), do: evaluate(value, by_name(statistic))
 
   # A function by name is computed by the frame, whose expression it already is: its columns by
@@ -649,8 +738,50 @@ defmodule Giggly.Mapping do
   def category({:factor, [value], options}, table),
     do: factor_category(category(value, table), options)
 
+  def category({:reorder, [value, by]}, table), do: reordered_category(value, by, table)
   def category({:after_stat, [value]}, statistic), do: category(value, by_name(statistic))
   def category(_value, _table), do: :none
+
+  # A reordering's declaration: the levels the factor of `value` holds, a category's own, ordered
+  # by the mean of `by` over each one's rows (`DataFrame.summarise/3`'s, R's `mean()`), the lowest
+  # first, minus infinity before every number and infinity after, those that tie in the order they
+  # held, and those whose mean is missing, `nil` or NaN, or that no row holds, last, as R's
+  # `reorder()` sorts its scores; ordered where `value` is an ordered category. The frame computes
+  # the means, and only their summary, a row for each value, is read here.
+  defp reordered_category(value, by, table) do
+    declared =
+      case category(value, table) do
+        :none -> :category
+        category -> category
+      end
+
+    summary =
+      table
+      |> DataFrame.mutate(ordering: by)
+      |> DataFrame.put(:reordered, evaluate(value, table), declared)
+      |> DataFrame.summarise([:reordered], mean: {:mean, [:ordering]})
+
+    {:category, levels: levels, ordered: ordered} = DataFrame.category(summary, :reordered)
+
+    means =
+      summary
+      |> DataFrame.pull(:reordered)
+      |> Enum.zip_with(DataFrame.pull(summary, :mean), fn level, mean -> {level, mean} end)
+      |> Map.new()
+
+    ordered_levels =
+      levels
+      |> Enum.with_index()
+      |> Enum.sort_by(fn {level, index} -> {mean_order(Map.get(means, level)), index} end)
+      |> Enum.map(fn {level, _index} -> level end)
+
+    {:category, levels: ordered_levels, ordered: ordered}
+  end
+
+  defp mean_order(:neg_infinity), do: {0, 0}
+  defp mean_order(mean) when is_float(mean), do: {1, mean}
+  defp mean_order(:infinity), do: {2, 0}
+  defp mean_order(_missing), do: {3, 0}
 
   defp factor_category({:category, inherited}, options),
     do: {:category, Keyword.merge(inherited, options)}
@@ -688,6 +819,8 @@ defmodule Giggly.Mapping do
       written -> "factor(#{Enum.join([written | Enum.map(options, &option_text/1)], ", ")})"
     end
   end
+
+  defp text({:reorder, [value, by]}), do: "reorder(#{text(value)}, #{text(by)})"
 
   # A function by name takes one value, as every one so far does.
   defp text({name, [value]}) when is_map_key(@functions, name), do: "#{name}(#{text(value)})"

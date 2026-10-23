@@ -73,7 +73,7 @@ defmodule Giggly.MappingTest do
       for name <- [:fctor, :sqrt] do
         assert {:error, reason} = Mapping.resolve({name, [:cyl]})
         assert reason =~ "#{inspect(name)} is none of the names a mapping knows"
-        assert reason =~ ":after_stat, :constant, :factor, :log10"
+        assert reason =~ ":after_stat, :constant, :factor, :log10, :reorder"
         assert reason =~ "a capture, {&Module.function/arity, [values]}"
       end
     end
@@ -255,6 +255,77 @@ defmodule Giggly.MappingTest do
       assert {:error, reason} = Mapping.resolve({:after_stat, [nil]})
       assert reason =~ "nil is a missing value"
     end
+
+    test "a reordering is held with its values resolved, where a factor goes" do
+      assert Enum.map(
+               [
+                 {:reorder, [:class, :hwy]},
+                 {:reorder, ["class", {:log10, [:hwy]}]},
+                 {:factor, [{:reorder, [:class, :hwy]}]},
+                 {:after_stat, [{:reorder, [:x, :count]}]}
+               ],
+               &Mapping.resolve/1
+             ) === [
+               {:ok, {:reorder, ["class", "hwy"]}},
+               {:ok, {:reorder, ["class", {:log10, ["hwy"]}]}},
+               {:ok, {:factor, [{:reorder, ["class", "hwy"]}]}},
+               {:ok, {:after_stat, [{:reorder, ["x", "count"]}]}}
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails to build `aes(reorder(class, 1), hwy)` and
+    # `aes(reorder("a", hwy), hwy)`: "arguments must have same length".
+    test "a reordering of a constant, or by one, is refused" do
+      for value <- [{:reorder, [:class, 1]}, {:reorder, [{:constant, "a"}, :hwy]}] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "so neither of its values is a constant"
+      end
+    end
+
+    test "a reordering of a capture or a closure is refused, the engine computing it" do
+      for value <- [
+            {:reorder, [:class, {&Kernel.-/1, [:hwy]}]},
+            {:reorder, [{fn class -> class end, [:class]}, :hwy]}
+          ] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "computed by the table's engine, which runs no Elixir function"
+      end
+    end
+
+    test "a reordering of a factor, another reordering or an after_stat is refused" do
+      reasons =
+        Enum.map(
+          [
+            {:reorder, [{:factor, [:cyl]}, :hwy]},
+            {:reorder, [:class, {:reorder, [:class, :hwy]}]},
+            {:reorder, [:class, {:after_stat, [:count]}]}
+          ],
+          fn value ->
+            {:error, reason} = Mapping.resolve(value)
+            reason
+          end
+        )
+
+      assert [factor, reordering, after_stat] = reasons
+      assert factor =~ "never a factor or another reordering"
+      assert reordering =~ "never a factor or another reordering"
+      assert after_stat =~ "an after_stat is the whole of a mapping value"
+    end
+
+    test "a reordering of other than two values, or inside an expression, is refused" do
+      for value <- [{:reorder, [:class]}, {:reorder, [:class, :hwy, :cty]}, {:reorder, :class}] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "a reordering reads two values, written {:reorder, [value, by]}"
+      end
+
+      for value <- [
+            {&Kernel.<>/2, [{:reorder, [:class, :hwy]}, "!"]},
+            {:log10, [{:reorder, [:cyl, :hwy]}]}
+          ] do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "a reordering reads whole columns, so it is not an expression's argument"
+      end
+    end
   end
 
   describe "stage/1" do
@@ -276,6 +347,10 @@ defmodule Giggly.MappingTest do
 
     test "a factor with levels reads its value's columns" do
       assert Mapping.columns({:factor, ["cyl"], levels: [8, 4]}) === ["cyl"]
+    end
+
+    test "a reordering reads its values' columns" do
+      assert Mapping.columns({:reorder, ["class", {:log10, ["hwy"]}]}) === ["class", "hwy"]
     end
 
     test "a function by name reads its value's columns" do
@@ -303,6 +378,10 @@ defmodule Giggly.MappingTest do
 
     test "a factor's type is a category, whatever its value's" do
       assert Mapping.dtype({:factor, ["hwy"]}, @frame) === :category
+    end
+
+    test "a reordering's type is a category, whatever its values'" do
+      assert Mapping.dtype({:reorder, ["hwy", "cty"]}, @frame) === :category
     end
 
     test "a factor with levels is a category too" do
@@ -380,6 +459,65 @@ defmodule Giggly.MappingTest do
       assert reason =~ ~s{"a" is a :string constant}
     end
 
+    test "a reordering by numbers, a column, a function by name or an empty column, can be computed" do
+      table =
+        DataFrame.new([
+          {"class", ["suv", "compact"]},
+          {"hwy", [29, 24]},
+          {"weight", [2.5, nil]},
+          {"gap", [nil, nil]}
+        ])
+
+      values = [
+        {:reorder, ["class", "hwy"]},
+        {:reorder, ["class", "weight"]},
+        {:reorder, ["class", "gap"]},
+        {:reorder, ["class", {:log10, ["hwy"]}]},
+        {:reorder, [{:log10, ["hwy"]}, "weight"]},
+        {:factor, [{:reorder, ["class", "hwy"]}]},
+        {:after_stat, [{:reorder, ["class", "count"]}]}
+      ]
+
+      assert Enum.map(values, fn value -> Mapping.check(value, table) end) ===
+               List.duplicate(:ok, 7)
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 builds `aes(reorder(class, manufacturer), hwy)`, warning
+    # "argument is not numeric or logical: returning NA" for each class and ordering none, and
+    # averages TRUE as 1 and a date by its days; Giggly's frame, as Explorer's, averages neither.
+    test "a reordering by a column that is not numbers is refused, its own value's checked too" do
+      table =
+        DataFrame.new([
+          {"class", ["suv", "compact"]},
+          {"cut", ["Fair", "Good"], :category},
+          {"day", [~D[2026-10-22], ~D[2026-10-23]]},
+          {"am", [true, false]}
+        ])
+
+      refusals = [
+        {{:reorder, ["cut", "class"]},
+         ~s{reorder orders by the mean of numbers, and "class" is a :string column}},
+        {{:reorder, ["class", "cut"]}, ~s{"cut" is a :category column}},
+        {{:reorder, ["class", "day"]}, ~s{"day" is a :date column}},
+        {{:reorder, ["class", "am"]}, ~s{"am" is a :boolean column}},
+        {{:reorder, ["class", {:log10, ["class"]}]},
+         ~s{log10 takes numbers, and "class" is a :string column}},
+        {{:reorder, [{:log10, ["day"]}, "am"]}, ~s{"am" is a :boolean column}}
+      ]
+
+      for {value, cause} <- refusals do
+        assert {:error, reason} = Mapping.check(value, table)
+        assert reason =~ cause
+      end
+    end
+
+    test "a reordering the table's engine has no mean for is refused, naming it" do
+      assert Mapping.check({:after_stat, [{:reorder, ["x", "count"]}]}, %Engine{}) ===
+               {:error,
+                "the engine holding the table cannot compute mean, by which a reordering " <>
+                  "orders its levels"}
+    end
+
     test "a function by name the table's engine cannot compute is refused, naming it" do
       assert Mapping.check({:factor, ["hwy"]}, %Engine{}) === :ok
 
@@ -406,6 +544,10 @@ defmodule Giggly.MappingTest do
 
     test "a factor with levels is its value's values, the frame told its levels" do
       assert Mapping.evaluate({:factor, ["hwy"], levels: [31, 29]}, @frame) === [29, 24, 31]
+    end
+
+    test "a reordering is its value's values, which the frame is told are a category" do
+      assert Mapping.evaluate({:reorder, ["class", "hwy"]}, @frame) === ["a", "b", "a"]
     end
 
     test "a function by name is what the frame computes, R's log10 at zero, below it and missing" do
@@ -460,6 +602,144 @@ defmodule Giggly.MappingTest do
                {declared, declared,
                 {:category, levels: ["Fair", "Good", "Ideal"], ordered: false},
                 {:category, ordered: true, levels: ["Ideal", "Fair"]}}
+    end
+  end
+
+  describe "category/2, a reordering" do
+    # Golden: R 4.6.1's reorder(mpg$class, mpg$hwy) has the levels pickup, suv, minivan, 2seater,
+    # midsize, subcompact, compact; reorder(mpg$cyl, mpg$hwy) 8, 6, 5, 4.
+    test "a reordering's levels are its values in order of the mean of what orders them" do
+      table = DataFrame.from_table(Giggly.Datasets.mpg())
+
+      assert {Mapping.category({:reorder, ["class", "hwy"]}, table),
+              Mapping.category({:reorder, ["cyl", "hwy"]}, table)} ===
+               {{:category,
+                 levels: [
+                   "pickup",
+                   "suv",
+                   "minivan",
+                   "2seater",
+                   "midsize",
+                   "subcompact",
+                   "compact"
+                 ],
+                 ordered: false}, {:category, levels: [8, 6, 5, 4], ordered: false}}
+    end
+
+    # Golden: R 4.6.1's reorder() of c("b", "a", "c", "d") by c(1, 1, 0, 1) has the levels c, a,
+    # b, d, and of the factor with levels d, b, a, c the levels c, d, b, a; of c(3, 1, 2) by
+    # c(5, 5, 5) 1, 2, 3; and of c(0, -0, 1) by c(5, 1, 4) 0 and 1, its two zeros one level.
+    test "levels whose means tie keep the order the factor of the value gives them" do
+      table =
+        DataFrame.new([
+          {"letter", ["b", "a", "c", "d"]},
+          {"factor", ["b", "a", "c", "d"], {:category, levels: ["d", "b", "a", "c"]}},
+          {"by", [1, 1, 0, 1]}
+        ])
+
+      numbers = DataFrame.new([{"number", [3, 1, 2]}, {"by", [5, 5, 5]}])
+      zeros = DataFrame.new([{"zero", [0.0, -0.0, 1.0]}, {"by", [5, 1, 4]}])
+
+      assert Enum.map(
+               [
+                 {{:reorder, ["letter", "by"]}, table},
+                 {{:reorder, ["factor", "by"]}, table},
+                 {{:reorder, ["number", "by"]}, numbers},
+                 {{:reorder, ["zero", "by"]}, zeros}
+               ],
+               fn {value, frame} -> Mapping.category(value, frame) end
+             ) === [
+               {:category, levels: ["c", "a", "b", "d"], ordered: false},
+               {:category, levels: ["c", "d", "b", "a"], ordered: false},
+               {:category, levels: [1, 2, 3], ordered: false},
+               {:category, levels: [0.0, 1.0], ordered: false}
+             ]
+    end
+
+    # Golden: R 4.6.1's reorder() of a, a, b, b, c, c, d, d, e, e, f, f, g, g, h by 1, NaN, NA, 2,
+    # NA, NA, NaN, NaN, Inf, 1, -Inf, 1, Inf, -Inf, 5 has the levels f, h, e, a, b, c, d, g, its
+    # means NaN, NA, NA, NaN, Inf, -Inf, NaN and 5; of a, NA, b, a by 3, 1, 2, 3 the levels b, a;
+    # of the factor a, b with levels z, a, b by 2, 1 the levels b, a, z, z's mean NA.
+    test "a missing mean goes last, NA or NaN alike, and a missing value is no level" do
+      letters = ~w(a a b b c c d d e e f f g g h)
+
+      by = [
+        1.0,
+        :nan,
+        nil,
+        2.0,
+        nil,
+        nil,
+        :nan,
+        :nan,
+        :infinity,
+        1.0,
+        :neg_infinity,
+        1.0,
+        :infinity,
+        :neg_infinity,
+        5.0
+      ]
+
+      missing = DataFrame.new([{"letter", letters}, {"by", by}])
+      gaps = DataFrame.new([{"letter", ["a", nil, "b", "a"]}, {"by", [3, 1, 2, 3]}])
+
+      unused =
+        DataFrame.new([
+          {"letter", ["a", "b"], {:category, levels: ["z", "a", "b"]}},
+          {"by", [2, 1]}
+        ])
+
+      assert Enum.map([missing, gaps, unused], fn frame ->
+               Mapping.category({:reorder, ["letter", "by"]}, frame)
+             end) === [
+               {:category, levels: ~w(f h e a b c d g), ordered: false},
+               {:category, levels: ["b", "a"], ordered: false},
+               {:category, levels: ["b", "a", "z"], ordered: false}
+             ]
+    end
+
+    # Golden: R 4.6.1's reorder() of 1, NaN, NA, 2, Inf, -Inf by 1 to 6 has the levels 1, NaN, 2,
+    # Inf, -Inf, NaN among them and NA not.
+    test "NaN and the infinities in the value are levels, as a factor's" do
+      table =
+        DataFrame.new([
+          {"number", [1.0, :nan, nil, 2.0, :infinity, :neg_infinity]},
+          {"by", [1, 2, 3, 4, 5, 6]}
+        ])
+
+      assert Mapping.category({:reorder, ["number", "by"]}, table) ===
+               {:category, levels: [1.0, :nan, 2.0, :infinity, :neg_infinity], ordered: false}
+    end
+
+    # Golden: R 4.6.1's reorder() of factor(c("Ideal", "Fair", "Good", "Fair"), levels = c("Fair",
+    # "Good", "Ideal"), ordered = TRUE) by c(10, 1000, 1, 1000) is ordered, its levels Good, Ideal,
+    # Fair; of c("b", "a", "c", "c") by log10() of the same numbers b, c, a.
+    test "an ordered factor's reordering is ordered, and a function by name orders as computed" do
+      table =
+        DataFrame.new([
+          {"cut", ["Ideal", "Fair", "Good", "Fair"],
+           {:category, levels: ["Fair", "Good", "Ideal"], ordered: true}},
+          {"letter", ["b", "a", "c", "c"]},
+          {"price", [10, 1000, 1, 1000]}
+        ])
+
+      assert {Mapping.category({:reorder, ["cut", "price"]}, table),
+              Mapping.category({:reorder, ["letter", {:log10, ["price"]}]}, table)} ===
+               {{:category, levels: ["Good", "Ideal", "Fair"], ordered: true},
+                {:category, levels: ["b", "c", "a"], ordered: false}}
+    end
+
+    # Golden: R 4.6.1's factor(reorder(c("a", "b", "a"), c(3, 1, 5))) has the levels b, a, and
+    # reorder(c(1, 2), c(3, 1)) 2, 1.
+    test "a factor of a reordering keeps its levels, and an after_stat's reorders the output" do
+      table = DataFrame.new([{"letter", ["a", "b", "a"]}, {"by", [3, 1, 5]}])
+      statistic = DataFrame.new(count: [3.0, 1.0], x: [1, 2])
+
+      assert {Mapping.category({:factor, [{:reorder, ["letter", "by"]}]}, table),
+              Mapping.category({:after_stat, [{:reorder, ["x", "count"]}]}, statistic)} ===
+               {{:category, levels: ["b", "a"], ordered: false},
+                {:category, levels: [2, 1], ordered: false}}
     end
   end
 
@@ -548,6 +828,17 @@ defmodule Giggly.MappingTest do
                {:title, "factor(log10(cyl))"},
                {:title, "log10(count)"}
              ]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(reorder(class, hwy))` `reorder(class, hwy)`,
+    # `aes(colour = reorder(manufacturer, cty))` `reorder(manufacturer, cty)` and
+    # `aes(reorder(class, log10(hwy)))` `reorder(class, log10(hwy))`.
+    test "a reordering is titled as a call to reorder(), its values' text inside" do
+      assert {Mapping.title({:reorder, ["class", "hwy"]}, :x),
+              Mapping.title({:reorder, ["manufacturer", "cty"]}, :color),
+              Mapping.title({:reorder, ["class", {:log10, ["hwy"]}]}, :x)} ===
+               {{:title, "reorder(class, hwy)"}, {:title, "reorder(manufacturer, cty)"},
+                {:title, "reorder(class, log10(hwy))"}}
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(colour = factor(cyl))` `factor(cyl)`.

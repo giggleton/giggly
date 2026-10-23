@@ -93,8 +93,9 @@ defmodule Giggly.DataFrame do
   # infinities included, as Explorer orders a float. An
   # expression outside this vocabulary, or an operation given a column of the wrong type, whether
   # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
-  # An implementation names the operations it runs (`operations/1`), so a caller can refuse an
-  # expression the frame's engine cannot run before running it.
+  # An implementation names the operations it runs (`operations/1`), the aggregates
+  # `summarise/3` computes among them, so a caller can refuse an expression or an aggregate the
+  # frame's engine cannot run before running it.
 
   # Its own boundary, exporting this module and `Giggly.DataFrame.Arithmetic`, R's arithmetic on
   # the doubles a frame holds: callers reach a frame through the functions below, so an
@@ -165,6 +166,7 @@ defmodule Giggly.DataFrame do
   @type aggregate ::
           {:sum, [name()]}
           | {:sum, [name()], [summation: :compensated | :plain, missing: :propagate | :skip]}
+          | {:mean, [name()]}
           | {:n_distinct, [name()]}
           | {:first, [name()]}
           | {:quantile, [name()], [probability: number()]}
@@ -205,7 +207,7 @@ defmodule Giggly.DataFrame do
   @doc false
   @callback put(t(), name(), list(), category()) :: t()
 
-  # The operations its expressions may name, as `operations/1` describes.
+  # The operations its expressions and aggregates may name, as `operations/1` describes.
   @doc false
   @callback operations(t()) :: [atom()]
 
@@ -389,8 +391,9 @@ defmodule Giggly.DataFrame do
   def put(%implementation{} = frame, name, values, category),
     do: implementation.put(frame, name, values, category)
 
-  # The operations an expression may name that the frame's implementation runs as the Expressions
-  # comment above describes them: the list frame runs every one, and an engine those it can.
+  # The operations an expression may name that the frame's implementation runs, as the Expressions
+  # comment above describes them, and the aggregates `summarise/3` may compute: the list frame runs
+  # every one, and an engine those it can.
   @doc false
   @spec operations(t()) :: [atom()]
   def operations(%implementation{} = frame), do: implementation.operations(frame)
@@ -460,7 +463,11 @@ defmodule Giggly.DataFrame do
   #     `percentile_cont`): the numbers sorted and the one at the place `1 + (n - 1) * probability`,
   #     counting from 1, or where the place falls between two that differ, `(1 - h) * lower + h *
   #     higher` for the fraction `h` of the way, in that order, as R works it;
-  #   * `{:sum, [column]}`, the sum of a column of numbers, a float, which takes two options.
+  #   * `{:sum, [column]}`, the sum of a column of numbers, a float, which takes two options;
+  #   * `{:mean, [column]}`, the mean of a column of numbers, a float, as R's `mean()` works it
+  #     out in a long double (`Giggly.DataFrame.Arithmetic.mean/1`), digit for digit, missing where
+  #     the group holds a `nil` (R's `NA`), else NaN where it holds NaN or both infinities, else an
+  #     infinity where it holds one.
   #
   # `count`, `min`, `max` and `quantile` leave a missing value out, one that is `nil` (R's `NA`) or
   # NaN, as R's `is.na()` reads one and as R's statistics call them, with `na.rm = TRUE`; a group
@@ -474,9 +481,9 @@ defmodule Giggly.DataFrame do
   # as R's `sum()` gives `NA` or `NaN`; `:skip` leaves it out, as `rowsum(na.rm = TRUE)` does, a
   # group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
   # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum, a minimum, a
-  # maximum or a quantile of a column of another type and an option not listed are refused with an
-  # `ArgumentError`; an empty `by`, an option's value not listed, a quantile with no probability,
-  # an aggregate not listed and an aggregate's name shared with a `by` column raise
+  # maximum, a mean or a quantile of a column of another type and an option not listed are refused
+  # with an `ArgumentError`; an empty `by`, an option's value not listed, a quantile with no
+  # probability, an aggregate not listed and an aggregate's name shared with a `by` column raise
   # `FunctionClauseError`.
   @doc false
   @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()

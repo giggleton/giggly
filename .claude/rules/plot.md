@@ -181,7 +181,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   run. **Each value a layer draws with, its own or the plot's, is checked against the table it
   draws by `Mapping.check/2`** once its columns are found: a function by name the table's engine
   runs, given numbers where the call can tell its value's type, where R fails when the plot is
-  built ("non-numeric argument to mathematical function"). A facet's columns are named at the
+  built ("non-numeric argument to mathematical function"), and a reordering by numbers, its mean
+  one the engine runs, where R warns and orders nothing. A facet's columns are named at the
   call, and none, one named twice, or a value that is not a
   column reference is refused there; whether some table holds them all, and whether `nrow:` and
   `ncol:` hold the panels, are the facet's questions, answered when the plot is run, since a layer

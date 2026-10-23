@@ -24,8 +24,8 @@ entry beginning "An after_stat reads its stat's computed variables".
   into `Coord` and `Geom` do.
 - **A plot holds each value resolved, and the mapping stays a map** (`Mapping.t()`, no struct): a
   column by its name as a string, a constant as `{:constant, term}`, an expression as its function
-  and its resolved arguments, a function by name as its name and its resolved value. A string in
-  a held mapping is always a column.
+  and its resolved arguments, a function by name as its name and its resolved value, a reordering
+  as `{:reorder, [value, by]}`, each resolved. A string in a held mapping is always a column.
 - **An atom or a string is a column; nothing else is read as a name.** `true`, `false` and `nil`
   are atoms and name none, and `2.5` is a constant, never the column `"2.5"`.
 - **A wrapper only where the type is ambiguous.** A number, a boolean, a date or a time is a
@@ -39,9 +39,11 @@ entry beginning "An after_stat reads its stat's computed variables".
   of `levels:` and `ordered:`, each once (levels a list of one or more values a column can hold,
   of one type, integers and floats being one, none `nil` and none twice by `==`; `ordered:` a
   boolean), an after_stat inside another value, an atom naming none of `:after_stat`,
-  `:constant`, `:factor` and the functions by name, the refusal listing them, and a function by
-  name given other than as many values as it takes, or a capture or a closure among them. A
-  refused argument refuses its expression.
+  `:constant`, `:factor`, `:reorder` and the functions by name, the refusal listing them, a
+  function by name given other than as many values as it takes, or a capture or a closure among
+  them, and a reordering of other than two values, of a constant (R: "arguments must have same
+  length"), a capture or a closure, a factor, an after_stat or another reordering, or as an
+  expression's argument. A refused argument refuses its expression.
 - **Kinds of value are function clauses, not a protocol**: they differ in what they are, not in
   how they run. A head that acts on a whole column is a clause that sees the column, never a
   function applied per row.
@@ -74,6 +76,19 @@ entry beginning "An after_stat reads its stat's computed variables".
   each value once its columns are found: a function by name the table's engine runs
   (`DataFrame.operations/1`), and given numbers where its value is a column of the table or a
   constant, an after_stat's columns being the stat's output, unknown at the call.
+- **`{:reorder, [value, by]}` is R's `reorder()`: `value` read as discrete, as a factor reads it,
+  its levels ordered by the mean of `by`** (design-log §4, the entries beginning "Ordering,
+  viridis and `log10` by name" and "The frame's mean is R's"). `dtype/2` says `:category`,
+  `evaluate/2` gives `value`'s values, and `category/2` computes the declaration through the
+  frame: `by` mutated into the table, `value` put beside it as the category its factor would be
+  (a table's category keeping its levels and ordered flag, so the reordering is ordered where it
+  is), `summarise/3`'s `mean` of `by` for each, and only that summary read, its levels sorted by
+  mean, minus infinity first, ties keeping their order and a missing mean (`nil`, NaN, or a level
+  no row holds) last, as R's `order()` sorts its scores. Each value is a column or a function by
+  name, so the engine computes all of it; it goes where a factor goes, a factor's own or an
+  after_stat's value. **`check/2` refuses it where the engine has no `mean` and where `by` is a
+  column that is not numbers**, booleans and dates among them, where R warns and orders nothing
+  or averages them; R's `FUN` and `decreasing`, and a factor as `value`, wait for a caller.
 - **An expression's type is the frame's**, decided when its column enters the evaluated frame, so
   it is known only when the plot is run; a check that needs it runs then (the axis's kind, a
   computed weight). `dtype/2` answers at the call for a column and a constant and says `:computed`
@@ -82,7 +97,8 @@ entry beginning "An after_stat reads its stat's computed variables".
   expression's text, a capture of a `Kernel` operator written as the operator whether or not the
   compiler inlined it, an operand that is itself an operator's call in parentheses, any other
   capture as `inspect/1` names its function; a function by name as a call to it,
-  `log10(carat)`; an after_stat's its value's, as ggplot2 strips
-  `after_stat()`, never a fallback; `:none` for an expression with a closure anywhere in it; and
+  `log10(carat)`; a reordering as R's call, `reorder(class, hwy)`; an after_stat's its value's,
+  as ggplot2 strips `after_stat()`, never a fallback; `:none` for an expression with a closure
+  anywhere in it; and
   for a constant its aesthetic's canonical name, as a fallback (`{:fallback, name}`), which the
   assembly ranks below any layer's title.
