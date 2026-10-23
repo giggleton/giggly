@@ -1,6 +1,7 @@
 ---
 paths:
   - "lib/giggly/color_operations.ex"
+  - "priv/palettes/**"
   - "test/giggly/color_operations_test.exs"
 ---
 
@@ -39,3 +40,15 @@ beginning "A library's owner nests".
   the rounded 0.008856 and 7.787 and the library the exact fractions, one colour in 35,007 of seven
   R gradients, a gradient no default reaches. Its tests pin R's colours; a conversion added for
   another palette is checked against R the same way before it is trusted.
+- **A viridis palette's colours are exactly R's `viridisLite::viridis()`** (`viridis/2`): R's own
+  "fmm" splines through each palette's 256 colours in L*a*b*, their coefficients copied into
+  `priv/palettes/viridis_splines.csv` as R holds them and read at compile time behind a
+  `CorePurity` waiver of their own, never fitted here; the places spaced by R's `seq()`, which it
+  repeats since it cannot call `Scale.Palette`'s, each evaluated alone; converted back as
+  grDevices' `convertColor()` converts, the library handed grDevices' white point (its own D65,
+  (0.3137, 0.3291), by `c2to3()`) and the sRGB matrix inverted from it, not farver's; each channel
+  rounded to five decimals as R's `round()` rounds, a tie to even, which `Float.round/2` does not
+  keep, then clipped and written as `rgb()` writes a byte; the alpha `rgb()`'s byte, dropped when
+  opaque. It matched R on every colour of 19,794 calls, every palette and count to 256 among
+  them; its tests pin R's colours. `viridis_options/0` names the palettes, as `Plot` checks
+  `option:` against them.

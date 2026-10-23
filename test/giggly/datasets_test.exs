@@ -71,4 +71,35 @@ defmodule Giggly.DatasetsTest do
 
     assert Enum.at(value01s, 3) === 0.00047060434153896666
   end
+
+  # Golden: R 4.6.1 with ggplot2 4.0.3, `colSums(is.na(txhousing))`, `sum(txhousing$sales, na.rm =
+  # TRUE)`, `sum(txhousing$year)`, the count of `unique(txhousing$city)`, whole numbers so no
+  # summation order can move them, and `sprintf("%.17g", txhousing$date[2])`, the first date 15
+  # significant digits cannot write. They move only if ggplot2's txhousing does.
+  test "txhousing decodes to R's every row, its missing values nil, and a date only 17 digits write" do
+    txhousing = Giggly.Datasets.txhousing()
+
+    assert Enum.map(txhousing, fn {name, values} -> {name, Enum.count(values, &is_nil/1)} end) ==
+             [
+               city: 0,
+               year: 0,
+               month: 0,
+               sales: 568,
+               volume: 568,
+               median: 616,
+               listings: 1424,
+               inventory: 1467,
+               date: 0
+             ]
+
+    sales = Keyword.fetch!(txhousing, :sales)
+    years = Keyword.fetch!(txhousing, :year)
+    cities = Keyword.fetch!(txhousing, :city)
+    dates = Keyword.fetch!(txhousing, :date)
+
+    assert {Enum.sum_by(sales, fn sale -> sale || 0 end), Enum.sum(years),
+            length(Enum.uniq(cities))} === {4_415_202.0, 17_266_790, 46}
+
+    assert Enum.at(dates, 1) === 2000.0833333333333
+  end
 end

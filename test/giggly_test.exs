@@ -1412,6 +1412,101 @@ defmodule GigglyTest do
                 ["#132B43", "#336A98", "#7F7F7F", "#56B1F7"]}
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1, whose default colour and fill scale for an ordered factor is
+    # `scale_colour_ordinal()`, `scale_colour_viridis_d()`: `factor(c("low", "high", "mid", NA),
+    # levels = c("low", "mid", "high"), ordered = TRUE)` takes #440154, #FDE725, #21908C and `NA`.
+    test "an ordered factor's colour and fill are viridis's by default, a missing one none" do
+      levels = ["low", "mid", "high"]
+
+      frame =
+        [
+          x: [1, 2, 3, 4],
+          y: [1, 2, 3, 4],
+          q: Giggly.Factor.new(["low", "high", "mid", nil], levels: levels, ordered: true)
+        ]
+        |> Plot.new(%{x: :x, y: :y, colour: :q, fill: :q})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      viridis = ["#440154", "#FDE725", "#21908C", nil]
+      assert {DataFrame.pull(frame, :color), DataFrame.pull(frame, :fill)} === {viridis, viridis}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1, which adds the scale the first layer's column needs: a
+    # plain column of "a", "b" and "c" before an ordered factor of them gives both layers hues,
+    # #F8766D, #00BA38 and #619CFF, and the factor first gives both viridis's, #440154, #21908C
+    # and #FDE725; `factor(v, levels = c(8, 4, 6), ordered = TRUE)` over 6, 4 and 8 takes
+    # #FDE725, #21908C and #440154.
+    test "the first layer's column decides, and a factor the mapping orders is ordered too" do
+      rows = [
+        x: [1, 2, 3],
+        y: [1, 2, 3],
+        q: Giggly.Factor.new(["a", "b", "c"], ordered: true),
+        p: ["a", "b", "c"],
+        v: [6, 4, 8]
+      ]
+
+      colors = fn first, second ->
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_point(%{colour: first})
+          |> Plot.geom_point(%{colour: second})
+
+        Enum.map([0, 1], fn index ->
+          plot
+          |> Giggly.layer_data(index)
+          |> DataFrame.pull(:color)
+        end)
+      end
+
+      ordered_in_mapping =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: {:factor, [:v], levels: [8, 4, 6], ordered: true}})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      hues = ["#F8766D", "#00BA38", "#619CFF"]
+      viridis = ["#440154", "#21908C", "#FDE725"]
+
+      assert {colors.(:p, :q), colors.(:q, :p), DataFrame.pull(ordered_in_mapping, :color)} ===
+               {[hues, hues], [viridis, viridis], ["#FDE725", "#21908C", "#440154"]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fills `geom_bar()` of "a", "b", "b", "c", "c", "c" by
+    # `after_stat(factor(count, ordered = TRUE))` #440154, #21908C and #FDE725, viridis's.
+    test "an ordered factor an after_stat makes takes viridis too" do
+      frame =
+        %{"class" => ["a", "b", "b", "c", "c", "c"]}
+        |> Plot.new(%{x: :class, fill: {:after_stat, [{:factor, [:count], ordered: true}]}})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :fill) === ["#440154", "#21908C", "#FDE725"]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 gives an ordered factor of three levels the opacities 0.1,
+    # 0.55 and 1, `scale_alpha_ordinal()`'s, as a plain one's, and `scale_colour_discrete()` hues.
+    test "an ordered factor's other scales are the discrete ones, and a plot's scale wins" do
+      rows = [x: [1, 2, 3], y: [1, 2, 3], q: Giggly.Factor.new(["a", "b", "c"], ordered: true)]
+
+      alphas =
+        rows
+        |> Plot.new(%{x: :x, y: :y, alpha: :q})
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      hues =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :q})
+        |> Plot.geom_point()
+        |> Plot.scale_color_discrete()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(alphas, :alpha), DataFrame.pull(hues, :color)} ===
+               {[0.1, 0.55, 1.0], ["#F8766D", "#00BA38", "#619CFF"]}
+    end
+
     test "a colour mapped to dates is refused when the plot is run, until its scale arrives" do
       plot =
         %{"x" => [1, 2], "y" => [1, 2], "d" => [~D[2020-01-01], ~D[2020-02-01]]}

@@ -35,8 +35,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
-  `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_gradient`, `_gradient2`, `_gradientn` and
-  `_continuous`, each with its `scale_fill_` twin, `scale_alpha_continuous/2`,
+  `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_gradient`, `_gradient2`,
+  `_gradientn`, `_continuous` and `_viridis_c`, each with its `scale_fill_` twin,
+  `scale_alpha_continuous/2`,
   `scale_alpha_discrete/2`, the size scales `scale_size_continuous/2`, `scale_size_area/2`,
   `scale_radius/2` and `scale_size_discrete/2`, the shape scales `scale_shape_discrete/2` and
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
@@ -120,7 +121,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
   palette live here as values, and a test pins the discrete and continuous functions' to
   `Scale.new/2`'s. gradient2 records its midpoint as the scale's rescaler, `{:mid, midpoint}`, and
-  `scale_size_area/2` its `rescale_max()`, `:max`. **A size scale function takes the options R's
+  `scale_size_area/2` its `rescale_max()`, `:max`. **A viridis scale function takes R's options**:
+  `option:`, a palette by name, one of `ColorOperations.viridis_options/0`, never R's letters,
+  `begin:` and `end:`, places from 0 to 1 (`validate_palette_place/1`), and `direction:`;
+  `scale_color_viridis_d/2` records `{:viridis, ...}` with `alpha:` too, its missing value
+  `:none`, R's `NA`, the scale an ordered factor gets by default (`Scale.new(:ordinal, ...)`, a
+  test pinning the two equal); `scale_color_viridis_c/2` records the gradient through the
+  palette's six colours, as R's scale holds `pal_gradient_n()` of them, and takes no `alpha:`
+  (design-log §4, the entry beginning "`scale_*_viridis_c/2` takes no"). **A size scale function
+  takes the options R's
   does**: `na_value:` only on `scale_size_area/2` and `scale_size_discrete/2`, as R's
   `scale_size_continuous()` and `scale_radius()` refuse `na.value`, and no `transform:` (design-log
   §4, the entry beginning "A scale's `rescaler`"); a size, a range's ends and `max_size:` 0 or

@@ -1188,6 +1188,25 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # Golden: scales 1.4.0's `pal_viridis(alpha, begin, end, direction, option)(n)`,
+  # `viridisLite::viridis()` 0.4.3, in R 4.6.1, its opaque alpha FF dropped.
+  describe "map/2 through the viridis palette" do
+    test "the levels take viridis's colours, from begin to end, in the palette and alpha given" do
+      viridis = fn options ->
+        {:viridis,
+         Map.merge(%{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}, options)}
+      end
+
+      assert {mapped_levels(viridis.(%{}), ~w(a b c)),
+              mapped_levels(
+                viridis.(%{option: :magma, begin: 0.2, direction: -1, alpha: 0.5}),
+                ~w(a b c)
+              ), mapped_levels(viridis.(%{option: :plasma, end: 0.8}), ~w(a b c d))} ===
+               {["#440154", "#21908C", "#FDE725"], ["#FCFDBF80", "#DE496880", "#3B0F7080"],
+                ["#0D0887", "#8405A7", "#D35171", "#FCA636"]}
+    end
+  end
+
   # Golden: ggplot2 4.0.3's `scale_colour_manual()` in R 4.6.1, `layer_data()` and
   # `get_guide_data()` over mtcars's `factor(cyl)` and small tables: an unnamed list takes the
   # levels in order, a named one colours by name and shows only the levels it names, `NA` among

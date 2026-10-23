@@ -324,8 +324,8 @@ defmodule Giggly.Assembly do
       end)
 
     non_position_scales =
-      Map.new(non_position_columns, fn {aesthetic, first_column} ->
-        untrained = non_position_scale(plot, aesthetic, first_column)
+      Map.new(non_position_columns, fn {aesthetic, {first_column, ordered}} ->
+        untrained = non_position_scale(plot, aesthetic, first_column, ordered)
         {aesthetic, train_non_position(untrained, aesthetic, positioned_data)}
       end)
 
@@ -1097,10 +1097,12 @@ defmodule Giggly.Assembly do
 
   # The untrained scale of `aesthetic`, one other than position that a layer maps: the plot's own
   # scale for it, which must take the kind of column its first column needs, or else ggplot2's
-  # default for the aesthetic and that kind, as ggplot2 adds a default scale only for an aesthetic
-  # the plot has none for. A plot's scale that does not take it is refused when the plot is run,
-  # naming that column, as ggplot2 refuses "Continuous value supplied to a discrete scale".
-  defp non_position_scale(%Plot{scales: scales}, aesthetic, first_column) do
+  # default for the aesthetic and that kind, its ordinal one where the first column is an ordered
+  # factor, as ggplot2 adds a default scale only for an aesthetic the plot has none for, from the
+  # `scale_type()` of the first layer's column. A plot's scale that does not take it is refused
+  # when the plot is run, naming that column, as ggplot2 refuses "Continuous value supplied to a
+  # discrete scale".
+  defp non_position_scale(%Plot{scales: scales}, aesthetic, first_column, ordered) do
     {_index, _aesthetic, _column, _dtype, kind} = first_column
 
     case Map.fetch(scales, aesthetic) do
@@ -1110,7 +1112,8 @@ defmodule Giggly.Assembly do
           else: raise(ArgumentError, untaken_message(scale, aesthetic, first_column))
 
       :error ->
-        Scale.new(kind, aesthetic)
+        default_kind = if ordered, do: :ordinal, else: kind
+        Scale.new(default_kind, aesthetic)
     end
   end
 
@@ -1153,6 +1156,7 @@ defmodule Giggly.Assembly do
   # The columns evaluated before the stats come first, read from `layer_frames`, and those computed
   # after, from `statistic_frames`, each in layer order, as ggplot2 adds the scales of every layer's
   # evaluated aesthetics before any stat runs and an after_stat's as its layer's stat is mapped.
+  # Beside the first goes whether it is an ordered factor, read from its frame.
   defp non_position_columns(plot, layer_frames, statistic_frames) do
     for aesthetic <- Scale.non_position_aesthetics(),
         selected? = fn mapped -> mapped == aesthetic end,
@@ -1163,9 +1167,27 @@ defmodule Giggly.Assembly do
         into: %{} do
       if Scale.discrete_only?(aesthetic), do: Enum.each(columns, &check_discrete/1)
       checked_kind(columns, "an aesthetic has one scale")
-      {aesthetic, hd(columns)}
+
+      ordered =
+        if evaluated == [],
+          do: ordered?(computed, statistic_frames),
+          else: ordered?(evaluated, layer_frames)
+
+      {aesthetic, {hd(columns), ordered}}
     end
   end
+
+  # Whether the first of `columns` is an ordered factor, read from its layer's frame in `frames`.
+  defp ordered?([{index, aesthetic, _value, :category, _kind} | _rest], frames) do
+    {:category, declaration} =
+      frames
+      |> Enum.at(index)
+      |> DataFrame.category(aesthetic)
+
+    Keyword.fetch!(declaration, :ordered)
+  end
+
+  defp ordered?(_columns, _frames), do: false
 
   # A column of an aesthetic whose every scale is discrete, refused unless its type is one a
   # discrete scale takes, or one no scale can place, which `checked_kind/2` refuses.

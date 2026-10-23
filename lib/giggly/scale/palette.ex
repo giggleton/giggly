@@ -39,10 +39,14 @@ defmodule Giggly.Scale.Palette do
   #     many greys from the level `start` to `finish`, 0 black and 1 white, as R's `pal_grey()`
   #     takes them from `grey.colors()`: the levels spaced evenly once raised to the power 2.2,
   #     each brought back by the power `1 / 2.2` and written as R's `gray()` writes it, its byte
-  #     `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which finds the second half
-  #     by steps back from the end, where `seq()` steps on from the start; the bytes are the same
-  #     either way, for every one of 20,000 random ranges and counts, so they are spaced as `seq()`
-  #     spaces them.
+  #     `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which steps on from the
+  #     start as `seq()` does, so they are spaced as `seq()` spaces them.
+  #   * `{:viridis, %{option: option, begin: begin, end: end, direction: direction, alpha:
+  #     alpha}}`, a discrete colour scale's: given the number of levels, that many colours of the
+  #     viridis palette `option`, as R's `pal_viridis()` takes them from `viridisLite::viridis()`
+  #     (`Giggly.ColorOperations.viridis/2`), from `begin` to `end`, or `end` to `begin` for a
+  #     `direction` of -1, with an alpha of `alpha`. ggplot2's default, an ordered factor's, is
+  #     the palette `:viridis` from 0 to 1, opaque.
   #   * `{:shape, :solid | :open}`, a discrete shape scale's: given the number of levels, that many
   #     of six shapes, by name, as R's `pal_shape()` gives them: solid, R's 16, 17, 15, 3, 7 and 8,
   #     or open, its 1, 2, 0, 3, 7 and 8. More than six levels cannot be drawn: R warns and leaves
@@ -81,6 +85,14 @@ defmodule Giggly.Scale.Palette do
                direction: 1 | -1
              }}
           | {:gray, {number(), number()}}
+          | {:viridis,
+             %{
+               option: atom(),
+               begin: number(),
+               end: number(),
+               direction: 1 | -1,
+               alpha: number()
+             }}
           | {:shape, :solid | :open}
           | :linetype
           | {:manual, [manual_value()] | %{term() => manual_value()}}
@@ -205,9 +217,10 @@ defmodule Giggly.Scale.Palette do
   # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
   # every range, chroma, luminance and count its test pins.
   #
-  # A grey palette's are `grey.colors()`'s, a shape or line type palette's its first shapes or line
-  # types, and a manual one's its first values, as the opening comment says; a shape or line type
-  # palette for more levels than it holds, or a manual palette of too few values, raises.
+  # A grey palette's are `grey.colors()`'s, a viridis palette's `viridisLite::viridis()`'s, a shape
+  # or line type palette's its first shapes or line types, and a manual one's its first values, as
+  # the opening comment says; a shape or line type palette for more levels than it holds, or a
+  # manual palette of too few values, raises.
   #
   # An area sequence's are the square roots of `spread/2` from `low * low` to `high * high`.
   #
@@ -216,7 +229,7 @@ defmodule Giggly.Scale.Palette do
   @doc false
   @spec discrete({:sequence | :area_sequence, {number(), number()}}, non_neg_integer()) ::
           [number()]
-  @spec discrete({:hue | :gray, term()}, non_neg_integer()) :: [ColorOperations.t()]
+  @spec discrete({:hue | :gray | :viridis, term()}, non_neg_integer()) :: [ColorOperations.t()]
   @spec discrete({:shape, :solid | :open}, non_neg_integer()) :: [atom()]
   @spec discrete(:linetype, non_neg_integer()) :: [tuple()]
   @spec discrete({:manual, list()}, non_neg_integer()) :: [manual_value()]
@@ -247,6 +260,8 @@ defmodule Giggly.Scale.Palette do
     |> spread(count)
     |> Enum.map(fn level -> gray(:math.pow(level, 1 / @gray_gamma)) end)
   end
+
+  def discrete({:viridis, parameters}, count), do: ColorOperations.viridis(count, parameters)
 
   def discrete({:shape, fill}, count) do
     shapes = Map.fetch!(@shapes, fill)

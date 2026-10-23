@@ -179,7 +179,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   `defaults(computed_mapping, stat$default_aes)`: the plot's own scale for it, refused when run
   unless it takes the kind of column the first column needs (`Scale.takes?/2`, naming that
   column, where ggplot2 fails with "Continuous value
-  supplied to a discrete scale"), or else ggplot2's default for that kind (`Scale.new/2`), the
+  supplied to a discrete scale"), or else ggplot2's default for that kind (`Scale.new/2`), its
+  ordinal one where that first column is an ordered factor (its frame's `DataFrame.category/2`),
+  as ggplot2's `scale_type()` names an ordered factor's `"ordinal"`, the
   columns evaluated before the stats first and those computed after them next, each in layer
   order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
   it checked as an axis's are, and on an aesthetic whose every scale is discrete

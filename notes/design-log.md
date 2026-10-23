@@ -130,8 +130,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   coefficients from `splinefun()`, copied into `priv/` and read at compile time behind a waiver of
   their own, so Giggly only evaluates the cubic; R's `viridis(n)` for every palette and `n` to 256
   pins it. The options are R's: `option:` (the eight palettes by name), `begin:`, `end:`,
-  `direction:`, `alpha:`; `_c` is the gradient over six. *Left out:* `_b` (no binned scales),
-  `scale_*_ordinal()`'s `type`. *Rejected: viridis as its own increment* (the plan) — Steve.
+  `direction:`, and on `_d` `alpha:`; `_c` is the gradient over six. *Left out:* `_b` (no binned
+  scales), `scale_*_ordinal()`'s `type`. *Rejected: viridis as its own increment* (the plan) —
+  Steve.
+
+- **`scale_*_viridis_c/2` takes no `alpha:` (2026-10-22, Steve, building step 4; checked in
+  R).** R's `scale_colour_viridis_c(alpha = 0.3)` runs its gradient through six colours each
+  ending `4D`, and `colour_ramp()` blends their alpha with their L*a*b*, so every value and the
+  colour bar are drawn at that opacity. Giggly's gradient refuses a colour with an alpha of its
+  own, a gradient through such colours deferred with the colour scales, and `_c` records a
+  gradient, so `alpha:` waits for that gradient as its first caller; no notebook example gives
+  `_c` an alpha. `_d` takes it, each colour carrying `rgb()`'s byte. *Rejected: a gradient
+  through colours with an alpha now* — farver's alpha byte, the blend and the colour bar's
+  opacity each to check against R, for no example.
 
 - **A factor carries R's `ordered` flag from the increment that brings levels (2026-10-22, Steve,
   scoping Phase 3's tenth increment; checked in R).** `ordered: true` on `Giggly.Factor.new/2` and
@@ -2269,6 +2280,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Add the viridis scales and txhousing, and colour an ordered factor by viridis
+  (ordering, step 4); §4: "Viridis joins the tenth increment" (amended), "`scale_*_viridis_c/2`
+  takes no `alpha:`"
 - 2026-10-22 — Give diamonds R's levels for cut, color and clarity (ordering, step 3); §4: "A
   table's column carries its levels as a `Giggly.Factor`", "A factor carries R's `ordered` flag"
 - 2026-10-22 — Read a table's factor columns, and order facet panels by their levels (ordering,

@@ -118,4 +118,74 @@ defmodule Giggly.ColorOperationsTest do
       end
     end
   end
+
+  # Golden: viridisLite 0.4.3's `viridis(n, alpha, begin, end, direction, option)` in R 4.6.1, its
+  # opaque alpha FF dropped; the same evaluation matched every colour of 19,794 calls, every
+  # palette and count to 256 among them. It moves only with R's splines, which
+  # `priv/palettes/viridis_splines.csv` copies, or grDevices' constants.
+  describe "viridis/2" do
+    test "the palettes are viridisLite's eight, in the order of its options A to H" do
+      assert ColorOperations.viridis_options() ===
+               [:magma, :inferno, :plasma, :viridis, :cividis, :rocket, :mako, :turbo]
+    end
+
+    test "each palette's colours are viridisLite's" do
+      expected = [
+        magma: ["#000004", "#51127C", "#B63679", "#FB8861", "#FCFDBF"],
+        inferno: ["#000004", "#56106E", "#BB3754", "#F98C0A", "#FCFFA4"],
+        plasma: ["#0D0887", "#7E03A8", "#CC4678", "#F89441", "#F0F921"],
+        viridis: ["#440154", "#3B528B", "#21908C", "#5DC863", "#FDE725"],
+        cividis: ["#00204D", "#414D6B", "#7C7B78", "#BCAF6F", "#FFEA46"],
+        rocket: ["#03051A", "#611F53", "#CB1B4F", "#F4875E", "#FAEBDD"],
+        mako: ["#0B0405", "#3E356B", "#357BA2", "#49C1AD", "#DEF5E5"],
+        turbo: ["#30123B", "#28BBEC", "#A2FC3C", "#FB8022", "#7A0403"]
+      ]
+
+      for {option, colours} <- expected do
+        assert viridis(5, option: option) === colours
+      end
+    end
+
+    # Unrounded, the middle colour's green would be 0x8D.
+    test "a place between knots is the splines' colour, rounded to five decimals as R converts it" do
+      assert viridis(3) === ["#440154", "#21908C", "#FDE725"]
+    end
+
+    test "begin and end narrow the palette, and a direction of -1 runs it from end to begin" do
+      assert viridis(4, begin: 0.25, end: 0.75) ===
+               ["#3B528B", "#287C8E", "#20A486", "#5DC863"]
+
+      assert viridis(4, begin: 0.25, end: 0.75, direction: -1) ===
+               ["#5DC863", "#20A486", "#287C8E", "#3B528B"]
+
+      assert viridis(4, begin: 0.75, end: 0.25) ===
+               ["#5DC863", "#20A486", "#287C8E", "#3B528B"]
+    end
+
+    test "one colour is begin's, or end's for a direction of -1, two are both ends, none is none" do
+      assert viridis(1, begin: 0.2, end: 0.8) === ["#414487"]
+      assert viridis(1, begin: 0.2, end: 0.8, direction: -1) === ["#7AD151"]
+      assert viridis(2, option: :turbo) === ["#30123B", "#7A0403"]
+      assert viridis(0) === []
+    end
+
+    test "an alpha is rgb()'s byte, appended, and dropped when it is opaque" do
+      assert viridis(3, alpha: 0.3) === ["#4401544D", "#21908C4D", "#FDE7254D"]
+      assert viridis(3, alpha: 0.5) === ["#44015480", "#21908C80", "#FDE72580"]
+      assert viridis(3, alpha: 0.0) === ["#44015400", "#21908C00", "#FDE72500"]
+      assert viridis(3, alpha: 0.998) === ["#440154FE", "#21908CFE", "#FDE725FE"]
+      assert viridis(3, alpha: 0.999) === ["#440154", "#21908C", "#FDE725"]
+    end
+  end
+
+  # R's defaults, `viridis(n)`, with the options given.
+  defp viridis(count, options \\ []) do
+    parameters =
+      Map.merge(
+        %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0},
+        Map.new(options)
+      )
+
+    ColorOperations.viridis(count, parameters)
+  end
 end

@@ -5,7 +5,8 @@ defmodule Giggly.Datasets do
 
   Each dataset is a keyword list of columns, in the dataset's own order, which `Giggly.Plot.new/2`
   reads as a table, as do Explorer's `DataFrame.new/1` and Kino's data table. A column of numbers
-  holds integers or floats, as each dataset's doc shows; a name is a string, and a date a `Date`.
+  holds integers or floats, as each dataset's doc shows; a name is a string, a date a `Date`, and
+  a value the data lacks `nil`.
   Each is kept in Giggly's `priv/datasets` with a header saying where it came from, and read when
   Giggly compiles, so asking for one reads nothing.
   """
@@ -30,6 +31,9 @@ defmodule Giggly.Datasets do
 
   @economics_long_path Application.app_dir(:giggly, "priv/datasets/economics_long.csv")
   @external_resource @economics_long_path
+
+  @txhousing_path Application.app_dir(:giggly, "priv/datasets/txhousing.csv")
+  @external_resource @txhousing_path
 
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
@@ -104,6 +108,20 @@ defmodule Giggly.Datasets do
     value01: :float
   ]
 
+  # How each of txhousing's columns is read; the file's header gives their order. R stores `year`
+  # and `month` as integers and every other number as a double, whole ones included.
+  @txhousing_types [
+    city: :string,
+    year: :integer,
+    month: :integer,
+    sales: :float,
+    volume: :float,
+    median: :float,
+    listings: :float,
+    inventory: :float,
+    date: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -134,15 +152,22 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @economics_long_text File.read!(@economics_long_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @txhousing_text File.read!(@txhousing_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
-  # its table of types already holds, and read by its type.
+  # its table of types already holds, and read by its type, a float's R writes as NA missing.
   @parsed Map.new(
             [
               mtcars: {@mtcars_text, @mtcars_types},
               mpg: {@mpg_text, @mpg_types},
               diamonds: {@diamonds_text, @diamonds_types},
               economics: {@economics_text, @economics_types},
-              economics_long: {@economics_long_text, @economics_long_types}
+              economics_long: {@economics_long_text, @economics_long_types},
+              txhousing: {@txhousing_text, @txhousing_types}
             ],
             fn {dataset, {text, types}} ->
               columns =
@@ -162,9 +187,13 @@ defmodule Giggly.Datasets do
                         &String.to_integer/1
 
                       :float ->
-                        fn value ->
-                          {number, ""} = Float.parse(value)
-                          number
+                        fn
+                          "NA" ->
+                            nil
+
+                          value ->
+                            {number, ""} = Float.parse(value)
+                            number
                         end
 
                       :date ->
@@ -178,14 +207,18 @@ defmodule Giggly.Datasets do
             end
           )
 
-  # The small datasets are kept as their columns. diamonds is kept compressed, its columns in
-  # Erlang's external term format, and decoded each time it is asked for: as columns it would be
-  # some 18 MB held wherever this module is loaded, a release loading every module at boot, where
-  # compressed it is half a megabyte, decoded in a few tens of milliseconds, with no IO either way.
+  # The small datasets are kept as their columns. diamonds and txhousing are kept compressed, their
+  # columns in Erlang's external term format, and decoded each time they are asked for: as columns
+  # they would be some 18 MB and 2 MB held wherever this module is loaded, a release loading every
+  # module at boot, where compressed they are half a megabyte and a tenth of one, decoded in a few
+  # tens of milliseconds and a few, with no IO either way.
   @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long])
   @diamonds @parsed
             |> Map.fetch!(:diamonds)
             |> :erlang.term_to_binary(compressed: 9)
+  @txhousing @parsed
+             |> Map.fetch!(:txhousing)
+             |> :erlang.term_to_binary(compressed: 9)
 
   @doc """
   R's `mtcars`: fuel consumption and ten aspects of design and performance for 32 cars (1973-74
@@ -356,4 +389,38 @@ defmodule Giggly.Datasets do
   """
   @spec economics_long() :: [{atom(), [Date.t() | String.t() | number()]}]
   def economics_long, do: Map.fetch!(@datasets, :economics_long)
+
+  @doc """
+  ggplot2's `txhousing`: housing sales in Texas, a row for each month from January 2000 to July
+  2015 and each of 46 multiple listing service areas, 8,602 in all, from the TAMU real estate
+  center, [trerc.tamu.edu](https://trerc.tamu.edu/).
+
+  The columns: `city`, the area's name; `year` and `month`, of the sales, integers; `sales`, the
+  number of sales; `volume`, their total value, in dollars; `median`, the median sale price, in
+  dollars; `listings`, the total active listings; `inventory`, the months it would take to sell
+  every listing at the current pace of sales; and `date`, the year and month as a decimal, `year +
+  (month - 1) / 12`. Every number but the year and month is a float, and a value the data lacks
+  is `nil`, as R's is `NA`. It is kept compressed and decoded each time it is asked for, in a few
+  milliseconds, so bind it once.
+
+      iex> txhousing = Giggly.Datasets.txhousing()
+      iex> Keyword.keys(txhousing)
+      [:city, :year, :month, :sales, :volume, :median, :listings, :inventory, :date]
+      iex> txhousing |> Keyword.fetch!(:city) |> length()
+      8602
+      iex> Enum.map(txhousing, fn {name, values} -> {name, Enum.at(values, 2)} end)
+      [
+        city: "Abilene",
+        year: 2000,
+        month: 3,
+        sales: 130.0,
+        volume: 9285000.0,
+        median: 58100.0,
+        listings: 784.0,
+        inventory: 6.8,
+        date: 2000.1666666666667
+      ]
+  """
+  @spec txhousing() :: [{atom(), [String.t() | number() | nil]}]
+  def txhousing, do: :erlang.binary_to_term(@txhousing)
 end

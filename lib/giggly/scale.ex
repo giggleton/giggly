@@ -156,6 +156,10 @@ defmodule Giggly.Scale do
   # ggplot2's default shape palette, `pal_shape()`'s solid shapes.
   @shape_palette {:shape, :solid}
 
+  # ggplot2's default colour palette for an ordered factor, `scale_colour_viridis_d()`'s, R's
+  # `viridis()` with its defaults.
+  @viridis_palette {:viridis, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}}
+
   # ggplot2's default continuous colour palette, `pal_seq_gradient("#132B43", "#56B1F7")`.
   @gradient_palette {:gradient, ["#132B43", "#56B1F7"]}
 
@@ -174,9 +178,13 @@ defmodule Giggly.Scale do
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
   # ggplot2's default palette, value for a missing value and guide for it: a colour bar for a
   # continuous colour or fill, and a legend for the rest. A shape's and a line type's are discrete
-  # alone (`discrete_only?/1`).
+  # alone (`discrete_only?/1`). An ordered factor's, `:ordinal`, as ggplot2's `scale_type()` names
+  # it, is a discrete scale: for a colour or fill viridis, as `scale_colour_ordinal()` takes
+  # `scale_colour_viridis_d()`, its missing value none, R's `NA`; for any other aesthetic the
+  # discrete one, which ggplot2's ordinal alpha, size and line width scales match, its ordinal
+  # shape scale only warning and line type having none.
   @doc false
-  @spec new(:continuous | :discrete, atom()) :: t()
+  @spec new(:continuous | :discrete | :ordinal, atom()) :: t()
   def new(:continuous, :alpha),
     do: %Continuous{palette: {:rescale, @alpha_range}, guide: :legend}
 
@@ -202,6 +210,11 @@ defmodule Giggly.Scale do
 
   def new(:discrete, :shape), do: %Discrete{palette: @shape_palette, guide: :legend}
   def new(:discrete, :linetype), do: %Discrete{palette: :linetype, guide: :legend}
+
+  def new(:ordinal, aesthetic) when aesthetic in @color_aesthetics,
+    do: %Discrete{palette: @viridis_palette, na_value: :none, guide: :legend}
+
+  def new(:ordinal, aesthetic), do: new(:discrete, aesthetic)
 
   # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a date scale,
   # or another continuous scale.

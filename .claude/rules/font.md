@@ -19,7 +19,7 @@ Sans table, why a plain module rather than a behaviour, and why the table is a f
   `priv/fonts/liberation_sans.txt` is regenerated from vdiffr's `glyph_dims.h` as its header
   says. The ascent of "M", the descent of "gjpqyQ" and the missing-glyph width are read from it,
   never restated as constants.
-- **The table is read at compile time and only then**, behind the tree's one `CorePurity` waiver;
+- **The table is read at compile time and only then**, behind a `CorePurity` waiver of its own;
   measuring reads nothing. `@external_resource` recompiles the module when the file changes, and
   the path comes from `Application.app_dir/2`.
 - **vdiffr's and R's rules, which make ggplot2's snapshot layouts reproducible:** a string's width

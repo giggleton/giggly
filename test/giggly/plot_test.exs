@@ -3192,11 +3192,80 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_color_continuous/2, [na_value: "grey50"], ~s(got: "grey50")},
             {&Plot.scale_alpha_continuous/2, [range: {0, 2}], "each an opacity from 0 to 1"},
             {&Plot.scale_alpha_continuous/2, [range: 1], "got: 1"},
-            {&Plot.scale_alpha_discrete/2, [na_value: 2], "got: 2"}
+            {&Plot.scale_alpha_discrete/2, [na_value: 2], "got: 2"},
+            {&Plot.scale_color_viridis_d/2, [option: :D], "expected one of [:magma, :inferno, "},
+            {&Plot.scale_fill_viridis_c/2, [option: "plasma"], ~s(got: "plasma")},
+            {&Plot.scale_color_viridis_c/2, [begin: 1.5],
+             "a place in the palette, from 0, its start, to 1, its end, got: 1.5"},
+            {&Plot.scale_fill_viridis_d/2, [end: -1], "got: -1"},
+            {&Plot.scale_color_viridis_d/2, [begin: "a"], ~s(got: "a")},
+            {&Plot.scale_color_viridis_d/2, [direction: 0], "expected one of [1, -1], got: 0"},
+            {&Plot.scale_fill_viridis_d/2, [alpha: 2], "from 0 to 1, got: 2"},
+            {&Plot.scale_color_viridis_c/2, [alpha: 0.5], "unknown options [:alpha]"}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
         assert error.message =~ shown
       end
+    end
+
+    # Golden: the defaults of ggplot2 4.0.3's `scale_colour_viridis_d()` and
+    # `scale_colour_viridis_c()`, read with `args()` in R 4.6.1, `pal_viridis()`'s: alpha 1, begin
+    # 0, end 1, direction 1, option "D", viridis; the discrete scale's missing colour
+    # `discrete_scale()`'s `NA`, the continuous one's grey50; and the continuous gradient through
+    # `viridisLite::viridis(6)`, #440154, #414487, #2A788E, #22A884, #7AD151 and #FDE725.
+    test "a viridis scale records its palette, R's defaults, and an ordered factor's default" do
+      plot = Plot.new(@rows)
+      viridis = %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}
+
+      discrete = %Scale.Discrete{palette: {:viridis, viridis}, guide: :legend, na_value: :none}
+
+      continuous = %Scale.Continuous{
+        palette: {:gradient, ["#440154", "#414487", "#2A788E", "#22A884", "#7AD151", "#FDE725"]},
+        guide: :colorbar,
+        na_value: "#7F7F7F"
+      }
+
+      assert {Plot.scale_color_viridis_d(plot).scales.color,
+              Plot.scale_fill_viridis_d(plot).scales.fill,
+              Plot.scale_color_viridis_c(plot).scales.color,
+              Plot.scale_fill_viridis_c(plot).scales.fill} ===
+               {discrete, discrete, continuous, continuous}
+
+      assert {discrete, discrete} === {Scale.new(:ordinal, :color), Scale.new(:ordinal, :fill)}
+    end
+
+    # Golden: `viridisLite::viridis(6, begin = 0.2, end = 0.9, direction = -1, option = "magma")`
+    # in R 4.6.1, the gradient `scale_colour_viridis_c()` runs through with those options.
+    test "a viridis scale records the options it is given, as floats" do
+      plot = Plot.new(@rows)
+
+      discrete =
+        Plot.scale_fill_viridis_d(plot,
+          option: :cividis,
+          begin: 0,
+          end: 1,
+          direction: -1,
+          alpha: 0
+        )
+
+      continuous =
+        Plot.scale_color_viridis_c(plot,
+          option: :magma,
+          begin: 0.2,
+          end: 0.9,
+          direction: -1,
+          na_value: "red"
+        )
+
+      assert {discrete.scales.fill.palette, continuous.scales.color} ===
+               {{:viridis, %{option: :cividis, begin: 0.0, end: 1.0, direction: -1, alpha: 0.0}},
+                %Scale.Continuous{
+                  palette:
+                    {:gradient,
+                     ["#FECE91", "#FC8C63", "#E44F64", "#AD347C", "#742181", "#3B0F70"]},
+                  guide: :colorbar,
+                  na_value: "#FF0000"
+                }}
     end
 
     test "labels not one for each break or limit, or without breaks, are refused at the call" do
@@ -3247,6 +3316,8 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_fill_gray/2, "scale_fill_gray", discrete},
             {&Plot.scale_color_discrete/2, "scale_color_discrete", discrete},
             {&Plot.scale_fill_discrete/2, "scale_fill_discrete", discrete},
+            {&Plot.scale_color_viridis_d/2, "scale_color_viridis_d", discrete},
+            {&Plot.scale_fill_viridis_d/2, "scale_fill_viridis_d", discrete},
             {&Plot.scale_alpha_discrete/2, "scale_alpha_discrete", discrete},
             {&Plot.scale_color_gradient/2, "scale_color_gradient", continuous},
             {&Plot.scale_fill_gradient/2, "scale_fill_gradient", continuous},
@@ -3258,6 +3329,8 @@ defmodule Giggly.PlotTest do
              [colors: ["red"]] ++ continuous},
             {&Plot.scale_color_continuous/2, "scale_color_continuous", continuous},
             {&Plot.scale_fill_continuous/2, "scale_fill_continuous", continuous},
+            {&Plot.scale_color_viridis_c/2, "scale_color_viridis_c", continuous},
+            {&Plot.scale_fill_viridis_c/2, "scale_fill_viridis_c", continuous},
             {&Plot.scale_alpha_continuous/2, "scale_alpha_continuous", continuous},
             {&Plot.scale_size_continuous/2, "scale_size_continuous", continuous},
             {&Plot.scale_size_area/2, "scale_size_area", continuous},
@@ -3662,6 +3735,8 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_fill_gray/2, [], :discrete},
       {&Plot.scale_color_discrete/2, [], :discrete},
       {&Plot.scale_fill_discrete/2, [], :discrete},
+      {&Plot.scale_color_viridis_d/2, [], :discrete},
+      {&Plot.scale_fill_viridis_d/2, [], :discrete},
       {&Plot.scale_alpha_discrete/2, [], :alpha},
       {&Plot.scale_color_gradient/2, [], :continuous},
       {&Plot.scale_fill_gradient/2, [], :continuous},
@@ -3671,6 +3746,8 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_fill_gradientn/2, [colors: ["red"]], :continuous},
       {&Plot.scale_color_continuous/2, [], :continuous},
       {&Plot.scale_fill_continuous/2, [], :continuous},
+      {&Plot.scale_color_viridis_c/2, [], :continuous},
+      {&Plot.scale_fill_viridis_c/2, [], :continuous},
       {&Plot.scale_alpha_continuous/2, [], :alpha},
       {&Plot.scale_size_continuous/2, [], :size},
       {&Plot.scale_size_area/2, [], :size},

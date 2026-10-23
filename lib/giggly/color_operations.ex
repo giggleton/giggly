@@ -30,6 +30,25 @@ defmodule Giggly.ColorOperations do
   # matrices. With them it gives R's colours exactly but where L* is below 8, where farver's
   # conversion from Lab keeps the rounded 0.008856 and 7.787 and the library the exact fractions
   # (one colour in 35,007 of seven R gradients' samples).
+  #
+  # `viridis/2` is R's `viridisLite::viridis(n, alpha, begin, end, direction, option)`: `count`
+  # places spaced from `begin` to `end` by R's `seq()`, the two swapped for a `direction` of -1;
+  # the palette's colour at each place, its L*, a* and b* each a cubic spline evaluated there; that
+  # colour converted back to sRGB as grDevices' `convertColor()` converts it; and the alpha
+  # appended. The splines are R's own, the "fmm" splines `grDevices::colorRamp(space = "Lab",
+  # interpolate = "spline")` fits through a palette's 256 colours, their coefficients copied into
+  # `priv/palettes/viridis_splines.csv`, whose header says how R wrote them, and read when Giggly
+  # compiles; a place's value is `y + dx * (b + dx * (c + dx * d))` at the knot at or before it,
+  # found by bisection as R's `spline_eval()` finds it. R keeps the last place's knot while it
+  # still holds the next place, which changes no colour. The conversion is the library's again,
+  # handed grDevices' constants this time: its white point made from its own D65, (0.3137, 0.3291),
+  # by its `c2to3()`, and the sRGB matrix it inverts from that, which are not farver's; then each
+  # channel companded, rounded to five decimals as R's `round()` rounds, clipped to 0 to 1, and
+  # written as `rgb()` writes it, the byte `255 * channel + 0.5` truncated. R multiplies each
+  # channel by 255 and divides it again on the way, which changes no byte of any value the
+  # rounding gives, and is left out. The alpha is `rgb()`'s byte too, dropped when it is opaque.
+  # It matched R on every colour of every palette for every count to 256, and on thousands of
+  # beginnings, ends, directions and alphas.
 
   # The library's one caller: it may call `Color` and nothing else, and only a boundary that lists
   # it may call it. `Giggly` lists `Color` too, as boundary lets a sub-boundary list only what its
@@ -63,6 +82,67 @@ defmodule Giggly.ColorOperations do
     [0.2126729, 0.7151522, 0.0721750],
     [0.0193339, 0.1191920, 0.9503041]
   ]
+
+  # grDevices' white point, its D65 made into XYZ by `c2to3()`: `c(x / y, 1, (1 - sum(c(x, y))) /
+  # y)`.
+  @grdevices_d65_x 0.3137
+  @grdevices_d65_y 0.3291
+  @grdevices_white_point {@grdevices_d65_x / @grdevices_d65_y, 1.0,
+                          (1 - (@grdevices_d65_x + @grdevices_d65_y)) / @grdevices_d65_y}
+
+  # grDevices' matrix from XYZ to linear sRGB, `solve(M)` of its sRGB converter's `M`, each row a
+  # channel's.
+  @grdevices_to_srgb [
+    [3.2065205171444631, -1.5210417837736552, -0.49331084879145581],
+    [-0.97198254620123181, 1.8812686516084869, 0.041672484599589325],
+    [0.055838338593097898, -0.20474057484135891, 1.0609284332688589]
+  ]
+
+  # viridisLite's palettes, in the order of its options A to H, which the splines' file holds.
+  @viridis_options [:magma, :inferno, :plasma, :viridis, :cividis, :rocket, :mako, :turbo]
+
+  @viridis_splines_path Application.app_dir(:giggly, "priv/palettes/viridis_splines.csv")
+  @external_resource @viridis_splines_path
+
+  # why: the splines are read once, at compile time; no IO happens when a colour is made
+  # instead of: the coefficients as literals in this module — rejected because they are R's
+  #   numbers, kept as the file R writes so they can be regenerated and diffed against their
+  #   source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @viridis_splines_text File.read!(@viridis_splines_path)
+
+  # Each palette's knots, a tuple, and its three channels' splines, L*, a* and b*, each a tuple of
+  # the values and the coefficients b, c and d, each a tuple in knot order, by the palette's name;
+  # the file's comment lines and its header skipped.
+  @viridis_splines @viridis_splines_text
+                   |> String.split("\n", trim: true)
+                   |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
+                   |> Enum.drop(1)
+                   |> Enum.map(fn line ->
+                     [palette | numbers] = String.split(line, ",")
+
+                     values =
+                       Enum.map(numbers, fn number ->
+                         {value, ""} = Float.parse(number)
+                         value
+                       end)
+
+                     {String.to_existing_atom(palette), values}
+                   end)
+                   |> Enum.chunk_by(fn {palette, _values} -> palette end)
+                   |> Map.new(fn [{palette, _values} | _rows] = rows ->
+                     [knots | coefficients] =
+                       rows
+                       |> Enum.map(fn {_palette, values} -> values end)
+                       |> Enum.zip_with(&List.to_tuple/1)
+
+                     channels =
+                       coefficients
+                       |> Enum.chunk_every(4)
+                       |> Enum.map(&List.to_tuple/1)
+
+                     {palette, {knots, channels}}
+                   end)
 
   # The names the library's table holds that CSS does not define: chroma-key colours.
   @not_css ["chromablue", "chromagreen"]
@@ -133,6 +213,122 @@ defmodule Giggly.ColorOperations do
     |> Lindbloom.lab_to_xyz(@white_point)
     |> from_xyz()
   end
+
+  # viridisLite's palettes by name, in the order of its options A to H.
+  @doc false
+  @spec viridis_options() :: [atom(), ...]
+  def viridis_options, do: @viridis_options
+
+  # `count` colours of the viridis palette `option`, one of `viridis_options/0`, as R's
+  # `viridis()` makes them, as the opening comment says: from `begin` to `end`, each from 0 to 1,
+  # in that order for a `direction` of 1 and the other for -1, with an alpha from 0 to 1.
+  @doc false
+  @spec viridis(non_neg_integer(), %{
+          option: atom(),
+          begin: number(),
+          end: number(),
+          direction: 1 | -1,
+          alpha: number()
+        }) :: [t()]
+  def viridis(count, %{option: option, begin: begin, end: finish} = parameters)
+      when is_integer(count) and count >= 0 do
+    {knots, channels} = Map.fetch!(@viridis_splines, option)
+    {from, to} = directed({begin, finish}, parameters.direction)
+    alpha = alpha_digits(parameters.alpha)
+
+    from
+    |> places(to, count)
+    |> Enum.map(fn place -> viridis_color(place, knots, channels) <> alpha end)
+  end
+
+  defp directed(ends, 1), do: ends
+  defp directed({begin, finish}, -1), do: {finish, begin}
+
+  # `count` places from `from` to `to`, as R's `seq(from, to, length.out = count)` spaces them:
+  # the first `from` and the last `to` exactly, each one between `from` plus its index times the
+  # step, in that order of operations, as `Giggly.Scale.Palette` spaces a palette's levels, which
+  # this boundary cannot call; one place is `from`.
+  defp places(_from, _to, 0), do: []
+  defp places(from, _to, 1), do: [from]
+
+  defp places(from, to, count) do
+    step = (to - from) / (count - 1)
+    between = Enum.map(1..(count - 2)//1, fn index -> from + index * step end)
+    Enum.concat([[from], between, [to]])
+  end
+
+  # The palette's colour at `place`, uppercase `#RRGGBB`: each channel's spline at the place, from
+  # the knot at or before it, converted to sRGB as grDevices converts it.
+  defp viridis_color(place, knots, channels) do
+    knot = knot_before(place, knots, 0, tuple_size(knots))
+    distance = place - elem(knots, knot)
+
+    channels
+    |> Enum.map(fn {values, linear, quadratic, cubic} ->
+      elem(values, knot) +
+        distance *
+          (elem(linear, knot) + distance * (elem(quadratic, knot) + distance * elem(cubic, knot)))
+    end)
+    |> List.to_tuple()
+    |> Lindbloom.lab_to_xyz(@grdevices_white_point)
+    |> Lindbloom.xyz_to_rgb(@grdevices_to_srgb)
+    |> Tuple.to_list()
+    |> Enum.map_join(fn channel -> hex_pair(grdevices_byte(channel)) end)
+    |> then(fn digits -> "#" <> digits end)
+  end
+
+  # The last knot at or before `place`, found by bisection as R's `spline_eval()` finds it, between
+  # `low`, at or before the place, and `high`, after it or past the last knot.
+  defp knot_before(place, knots, low, high) when high > low + 1 do
+    middle = div(low + high, 2)
+
+    if place < elem(knots, middle),
+      do: knot_before(place, knots, low, middle),
+      else: knot_before(place, knots, middle, high)
+  end
+
+  defp knot_before(_place, _knots, low, _high), do: low
+
+  # A linear sRGB channel as grDevices writes it: companded, rounded to five decimals and clipped
+  # to 0 to 1, as `convertColor()` trims it, then `rgb()`'s byte.
+  defp grdevices_byte(linear) do
+    linear
+    |> Lindbloom.srgb_compand()
+    |> round_to_five_decimals()
+    |> max(0.0)
+    |> min(1.0)
+    |> rgb_byte()
+  end
+
+  # `value` rounded to five decimals as R's `round(value, 5)` rounds it: of the two five-decimal
+  # numbers either side, each found by dividing by 100,000, the nearer, or, as near as each other,
+  # the one whose last decimal is even; a negative value's magnitude is rounded and its sign put
+  # back.
+  defp round_to_five_decimals(value) when value < 0, do: -round_to_five_decimals(-value)
+
+  defp round_to_five_decimals(value) do
+    scaled = value * 100_000
+    floor = Float.floor(scaled)
+    lower = floor / 100_000
+    upper = Float.ceil(scaled) / 100_000
+    above = upper - value
+    below = value - lower
+
+    if above < below or (above == below and :math.fmod(floor, 2.0) == 1.0),
+      do: upper,
+      else: lower
+  end
+
+  # The digits an alpha from 0 to 1 adds to a colour, `rgb()`'s byte, none when it is opaque.
+  defp alpha_digits(alpha) do
+    case rgb_byte(alpha) do
+      255 -> ""
+      byte -> hex_pair(byte)
+    end
+  end
+
+  # An intensity from 0 to 1 as `rgb()` writes it: the byte `255 * intensity + 0.5` truncated.
+  defp rgb_byte(intensity), do: trunc(255 * intensity + 0.5)
 
   # The colour farver writes for XYZ on its scale, Y of 100 for white: through its matrix, each
   # channel a byte.

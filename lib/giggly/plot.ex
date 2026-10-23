@@ -91,9 +91,11 @@ defmodule Giggly.Plot do
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
   value's colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2`
-  greys, `scale_color_discrete/2` either; `scale_color_gradient/2`, `scale_color_gradient2/2`,
-  `scale_color_gradientn/2` and `scale_color_continuous/2` blend a gradient through two, three or
-  any number of colours; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
+  greys, `scale_color_discrete/2` either, and `scale_color_viridis_d/2` takes colours from a
+  viridis palette, as an ordered factor gets by default; `scale_color_gradient/2`,
+  `scale_color_gradient2/2`, `scale_color_gradientn/2` and `scale_color_continuous/2` blend a
+  gradient through two, three or any number of colours, and `scale_color_viridis_c/2` through a
+  viridis palette; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
   `scale_alpha_discrete/2` set opacities. `scale_size_continuous/2` and `scale_size_area/2` size
   points by area, the second from 0, `scale_radius/2` by width, and `scale_size_discrete/2` a
   discrete column's values in order. `scale_shape_discrete/2` gives a discrete column's values six
@@ -1381,6 +1383,14 @@ defmodule Giggly.Plot do
   # The default gradient's ends, which a continuous colour scale takes when given no palette.
   @gradient_defaults [low: "#132B43", high: "#56B1F7"]
 
+  # The viridis palettes' defaults, R's `viridis()`'s, which an ordered factor's colour and fill
+  # scales take: the palette `:viridis` from its start to its end, opaque.
+  @viridis_defaults [option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0]
+
+  # How many colours of a viridis palette a continuous scale's gradient runs through, as ggplot2's
+  # `scale_colour_viridis_c()` takes `pal_viridis()(6)`.
+  @viridis_gradient_colors 6
+
   # An alpha scale's default range, which leaves every value visible.
   @alpha_range_default {0.1, 1.0}
 
@@ -1448,6 +1458,52 @@ defmodule Giggly.Plot do
                           na_value: Keyword.put(@color_na_value_spec, :default, "#FF0000")
                         ] ++ @discrete_color_legend_option_specs
                       )
+
+  # The options every viridis scale takes: the palette, and where in it and which way round its
+  # colours are taken.
+  @viridis_option_specs [
+    option: [
+      type: {:in, ColorOperations.viridis_options()},
+      default: @viridis_defaults[:option],
+      doc:
+        "The palette: `:viridis`, `:magma`, `:inferno`, `:plasma`, `:cividis`, `:rocket`, " <>
+          "`:mako` or `:turbo`."
+    ],
+    begin: [
+      type: {:custom, __MODULE__, :validate_palette_place, []},
+      default: @viridis_defaults[:begin],
+      doc: "Where in the palette the colours begin, from 0, its start, to 1, its end."
+    ],
+    end: [
+      type: {:custom, __MODULE__, :validate_palette_place, []},
+      default: @viridis_defaults[:end],
+      doc: "Where in the palette the colours end, from 0, its start, to 1, its end."
+    ],
+    direction: [
+      type: {:in, [1, -1]},
+      default: @viridis_defaults[:direction],
+      doc: "1 to take the colours from `begin:` to `end:`, -1 from `end:` to `begin:`."
+    ]
+  ]
+
+  @discrete_viridis_scale_options NimbleOptions.new!(
+                                    @viridis_option_specs ++
+                                      [
+                                        alpha: [
+                                          type: {:custom, __MODULE__, :validate_alpha, []},
+                                          default: @viridis_defaults[:alpha],
+                                          doc: "The colours' opacity, from 0 to 1."
+                                        ],
+                                        na_value:
+                                          Keyword.put(@color_na_value_spec, :default, :none)
+                                      ] ++ @discrete_color_legend_option_specs
+                                  )
+
+  @continuous_viridis_scale_options NimbleOptions.new!(
+                                      @viridis_option_specs ++
+                                        [na_value: @color_na_value_spec] ++
+                                        @continuous_color_legend_option_specs
+                                    )
 
   @discrete_color_scale_options NimbleOptions.new!(
                                   [
@@ -3405,6 +3461,69 @@ defmodule Giggly.Plot do
       )
 
   @doc """
+  Gives the plot a discrete colour scale from a viridis palette, replacing any colour scale it had.
+
+  The palettes change evenly to the eye, in colour and in grey, and are made to be read by people
+  with the common forms of colour blindness. The values take colours spaced evenly from `begin:`
+  to `end:` of the palette `option:`, in order. An ordered factor mapped to colour gets
+  this scale by default; a missing value has no colour, so its mark is not drawn, unless
+  `na_value:` gives one. Raises `NimbleOptions.ValidationError` for an option it does not take or
+  a value it cannot use, and `ArgumentError` for a list of labels not one for each break or limit
+  given; a column of numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_viridis_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_viridis_d(option: :magma)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#B63679", "#000004", "#FCFDBF"]
+  """
+  @spec scale_color_viridis_d(t(), keyword()) :: t()
+  def scale_color_viridis_d(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :color,
+        options,
+        @discrete_viridis_scale_options,
+        "Plot.scale_color_viridis_d/2",
+        &discrete_viridis_scale/1
+      )
+
+  @doc """
+  Gives the plot a discrete fill scale from a viridis palette, replacing any fill scale it had, as
+  `scale_color_viridis_d/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@discrete_viridis_scale_options)}
+
+      iex> plot =
+      ...>   %{"drv" => ["f", "r"], "hwy" => [28, 19]}
+      ...>   |> Giggly.Plot.new(%{x: :drv, y: :hwy, fill: :drv})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_viridis_d(direction: -1)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#FDE725", "#440154"]
+  """
+  @spec scale_fill_viridis_d(t(), keyword()) :: t()
+  def scale_fill_viridis_d(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do:
+      legend_scale(
+        plot,
+        :fill,
+        options,
+        @discrete_viridis_scale_options,
+        "Plot.scale_fill_viridis_d/2",
+        &discrete_viridis_scale/1
+      )
+
+  @doc """
   Gives the plot a discrete colour scale, replacing any colour scale it had: hues spaced evenly
   round the colour wheel, as a discrete column gets by default, or the colours of `palette:`, in
   order.
@@ -3711,6 +3830,69 @@ defmodule Giggly.Plot do
       @continuous_color_scale_options,
       "Plot.scale_fill_continuous/2",
       &continuous_color_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale, a gradient through a viridis palette, replacing any
+  colour scale it had.
+
+  The gradient runs through six colours spaced evenly from `begin:` to `end:` of the palette
+  `option:`, blended in CIE L*a*b* between neighbours, as `scale_color_gradientn/2` blends its
+  colours; its guide is a colour bar unless `guide:` names another. Raises
+  `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, and
+  `ArgumentError` for a list of labels without a list of breaks as long; a column that is not
+  numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_viridis_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_viridis_c()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#440154", "#2B9089", "#FDE725"]
+  """
+  @spec scale_color_viridis_c(t(), keyword()) :: t()
+  def scale_color_viridis_c(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      @continuous_viridis_scale_options,
+      "Plot.scale_color_viridis_c/2",
+      &continuous_viridis_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale, a gradient through a viridis palette, replacing any fill
+  scale it had, as `scale_color_viridis_c/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(@continuous_viridis_scale_options)}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_viridis_c(option: :plasma, begin: 0.2)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#6A00A8", "#E06663", "#F0F921"]
+  """
+  @spec scale_fill_viridis_c(t(), keyword()) :: t()
+  def scale_fill_viridis_c(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      @continuous_viridis_scale_options,
+      "Plot.scale_fill_viridis_c/2",
+      &continuous_viridis_scale/1
     )
   end
 
@@ -5007,6 +5189,19 @@ defmodule Giggly.Plot do
   def validate_number_pair(other),
     do: {:error, "expected {first, last}, two numbers, got: #{inspect(other)}"}
 
+  # NimbleOptions' check of a place in a palette: a number from 0, its start, to 1, its end, kept
+  # as a float.
+  @doc false
+  @spec validate_palette_place(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_palette_place(place) when is_number(place) and place >= 0 and place <= 1,
+    do: {:ok, place / 1}
+
+  def validate_palette_place(other),
+    do:
+      {:error,
+       "expected a place in the palette, from 0, its start, to 1, its end, got: " <>
+         inspect(other)}
+
   # NimbleOptions' check of a grey's level: a number from 0, black, to 1, white, kept as a float.
   @doc false
   @spec validate_gray_level(term()) :: {:ok, float()} | {:error, String.t()}
@@ -6012,6 +6207,27 @@ defmodule Giggly.Plot do
     {start, options} = Keyword.pop!(validated, :start)
     {finish, options} = Keyword.pop!(options, :end)
     discrete_legend({:gray, {start, finish}}, options)
+  end
+
+  defp discrete_viridis_scale(validated) do
+    {viridis, options} = Keyword.split(validated, Keyword.keys(@viridis_defaults))
+    discrete_legend({:viridis, Map.new(viridis)}, options)
+  end
+
+  # A continuous colour scale, a gradient through a viridis palette's colours, opaque, as ggplot2's
+  # `scale_colour_viridis_c()` takes `pal_gradient_n()` through them.
+  defp continuous_viridis_scale(validated) do
+    {viridis, options} = Keyword.split(validated, Keyword.keys(@viridis_defaults))
+
+    parameters =
+      viridis
+      |> Map.new()
+      |> Map.put(:alpha, @viridis_defaults[:alpha])
+
+    continuous_legend(
+      {:gradient, ColorOperations.viridis(@viridis_gradient_colors, parameters)},
+      options
+    )
   end
 
   # A discrete colour scale of its palette's colours, or of the default hues.

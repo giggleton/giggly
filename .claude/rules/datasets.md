@@ -24,7 +24,8 @@ pages".
   `unemploy` and every `mtcars` column but its names are whole but doubles), so a bar's width,
   which R's `resolution()` takes from a column's type, is R's, and a whole double is written `4`
   wherever a value is written as text (`Giggly.AsCharacter`).
-  R's row names become a first column, and a factor a `Giggly.Factor` of its labels with R's
+  R's row names become a first column, a value R's data lacks (`NA`) `nil`, and a factor a
+  `Giggly.Factor` of its labels with R's
   levels and ordered flag (`diamonds`' `cut`, `color` and `clarity`), the levels a list beside the
   dataset's reading, copied from R's `levels()`, the factor built each time the dataset is asked
   for.
@@ -33,8 +34,9 @@ pages".
   each column is read.
 - **A dataset too big to hold as columns is kept compressed** (`:erlang.term_to_binary/2` at level
   9) and decoded each time it is asked for, still with no IO: `diamonds` as columns would be some
-  18 MB held wherever the module is loaded, and a release loads every module at boot, where
-  compressed it is half a megabyte decoded in a few tens of milliseconds. The small ones stay
+  18 MB and `txhousing` 2 MB held wherever the module is loaded, and a release loads every module
+  at boot, where compressed they are half a megabyte and a tenth of one, decoded in a few tens of
+  milliseconds and a few. The small ones stay
   columns; whether they join it is open (design-log §4, the entry beginning "ggplot2's
   `diamonds` is shipped whole").
 - **Each dataset's file has a read and a `CorePurity` waiver of its own**, worded as

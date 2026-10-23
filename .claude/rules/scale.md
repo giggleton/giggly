@@ -29,8 +29,10 @@ grid lines are placed by the coordinate system".
   `pal_rescale()`, `{:gradient, colors}` for a continuous colour or fill, R's `pal_gradient_n()`,
   `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high, length.out = n)` as
   ggplot2's ordinal alpha takes it, and for a discrete colour or fill `{:hue, %{hue:, chroma:,
-  luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`, or
-  `{:manual, values}`, a list or a map from value to colour, shape or line type, R's manual
+  luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`,
+  `{:viridis, %{option:, begin:, end:, direction:, alpha:}}`, R's `pal_viridis()`
+  (`ColorOperations.viridis/2`), or `{:manual, values}`, a list or a map from value to colour,
+  shape or line type, R's manual
   palette, or `{:manual, values, breaks}`, a list named by breaks; for size,
   `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled, `{:abs_area, max}`,
   R's `abs_area()`, the square root of the place's size rescaled onto 0 to `max`, and, discrete,
@@ -43,7 +45,11 @@ grid lines are placed by the coordinate system".
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
   to 6 discrete; `shape`: the solid shapes, discrete alone; `linetype`: R's 13, discrete alone;
   `linewidth`: 1 to 6 rescaled, or 2 to 6 discrete by `seq()`; as floats, as `Plot`'s scale
-  functions record them), one of `non_position_aesthetics/0`.
+  functions record them), one of `non_position_aesthetics/0`. **`new(:ordinal, aesthetic)` is an
+  ordered factor's, ggplot2's ordinal scale**, `scale_type()`'s word for it: viridis for colour
+  and fill, its missing value `:none`, R's `NA`, as `scale_colour_ordinal()` takes
+  `scale_colour_viridis_d()`, and the discrete scale for the rest, which ggplot2's ordinal ones
+  match.
 - **A shape or line type scale is discrete alone** (`discrete_only?/1`), as R's
   `scale_shape_continuous()` and `scale_linetype_continuous()` abort, neither having an order:
   `new/2` makes none continuous, and the assembly refuses a continuous or a date column of the
@@ -101,9 +107,8 @@ grid lines are placed by the coordinate system".
   hue modulo 360 first, which changes no colour, cosine and sine repeating, so it is left out.
 - **The grey palette is exactly R's `pal_grey()`, `grey.colors()`**: the levels spaced evenly
   once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
-  byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, whose second half steps back
-  from the end; spacing them with `seq()` changes no byte on any range and count sampled
-  (`Scale.Palette`'s comment), so `seq()` it is.
+  byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which in R 4.6.1 steps on
+  from the start as `seq()` does, so `seq()` it is.
 - **A manual palette gives a list's colours, shapes or line types to the levels in order, and a
   map's by value** (`Discrete.key/1`), a level the map lacks taking the `na_value`; a map with no
   given limits narrows the scale's limits to the levels it names, the missing value kept, as
@@ -172,7 +177,8 @@ grid lines are placed by the coordinate system".
   gives no breaks (so no minor breaks), no minor breaks, or `{position, :none}` for each break,
   which the axis draws as ticks alone.
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists
-  `Giggly.ColorOperations`, which gives the hue palette its colours, as R's `scales` lists farver,
+  `Giggly.ColorOperations`, which gives the hue and viridis palettes their colours, as R's `scales`
+  lists farver,
   and `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a column and hands its values here, so the namespace stays
   extractable, as R's `scales` stands beside ggplot2. Anything that needs a frame belongs to the
   caller.
