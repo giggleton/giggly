@@ -288,7 +288,10 @@ defmodule Giggly.MappingTest do
             {:reorder, [{fn class -> class end, [:class]}, :hwy]}
           ] do
         assert {:error, reason} = Mapping.resolve(value)
-        assert reason =~ "computed by the table's engine, which runs no Elixir function"
+
+        assert reason =~
+                 "computed by the table's engine, which runs no Elixir function, so its values " <>
+                   "are columns and functions by name"
       end
     end
 
@@ -502,7 +505,8 @@ defmodule Giggly.MappingTest do
         {{:reorder, ["class", "am"]}, ~s{"am" is a :boolean column}},
         {{:reorder, ["class", {:log10, ["class"]}]},
          ~s{log10 takes numbers, and "class" is a :string column}},
-        {{:reorder, [{:log10, ["day"]}, "am"]}, ~s{"am" is a :boolean column}}
+        {{:reorder, [{:log10, ["day"]}, "am"]}, ~s{"am" is a :boolean column}},
+        {{:reorder, [{:log10, ["class"]}, {:log10, ["day"]}]}, ~s{"class" is a :string column}}
       ]
 
       for {value, cause} <- refusals do
@@ -656,12 +660,12 @@ defmodule Giggly.MappingTest do
              ]
     end
 
-    # Golden: R 4.6.1's reorder() of a, a, b, b, c, c, d, d, e, e, f, f, g, g, h by 1, NaN, NA, 2,
-    # NA, NA, NaN, NaN, Inf, 1, -Inf, 1, Inf, -Inf, 5 has the levels f, h, e, a, b, c, d, g, its
-    # means NaN, NA, NA, NaN, Inf, -Inf, NaN and 5; of a, NA, b, a by 3, 1, 2, 3 the levels b, a;
+    # Golden: R 4.6.1's reorder() of a, a, b, b, c, c, d, d, e, e, f, f, g, g, h, j by 1, NaN, NA,
+    # 2, NA, NA, NaN, NaN, Inf, 1, -Inf, 1, Inf, -Inf, 5, -2 has the levels f, j, h, e, a, b, c, d,
+    # g, its means NaN, NA, NA, NaN, Inf, -Inf, NaN, 5 and -2; of a, NA, b, a by 3, 1, 2, 3 the levels b, a;
     # of the factor a, b with levels z, a, b by 2, 1 the levels b, a, z, z's mean NA.
     test "a missing mean goes last, NA or NaN alike, and a missing value is no level" do
-      letters = ~w(a a b b c c d d e e f f g g h)
+      letters = ~w(a a b b c c d d e e f f g g h j)
 
       by = [
         1.0,
@@ -678,7 +682,8 @@ defmodule Giggly.MappingTest do
         1.0,
         :infinity,
         :neg_infinity,
-        5.0
+        5.0,
+        -2.0
       ]
 
       missing = DataFrame.new([{"letter", letters}, {"by", by}])
@@ -693,7 +698,7 @@ defmodule Giggly.MappingTest do
       assert Enum.map([missing, gaps, unused], fn frame ->
                Mapping.category({:reorder, ["letter", "by"]}, frame)
              end) === [
-               {:category, levels: ~w(f h e a b c d g), ordered: false},
+               {:category, levels: ~w(f j h e a b c d g), ordered: false},
                {:category, levels: ["b", "a"], ordered: false},
                {:category, levels: ["b", "a", "z"], ordered: false}
              ]

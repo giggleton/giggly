@@ -264,45 +264,107 @@ defmodule Giggly.DataFrame.ArithmeticTest do
     assert means === [nil, nil, nil, nil, nil, :nan, :nan, :infinity, :neg_infinity, :nan]
   end
 
-  # Golden: R 4.6.1's mean() of c(63.9, 61, 62), c(0.2, 0.1, 0.3), c(0.1, 0.2) and c(1e16, 1,
-  # -1e16), printed to 17 significant digits: 62.299999999999997, 0.20000000000000001,
-  # 0.15000000000000002 and 0.33365885416666669. Their sums in extended precision divided by the
-  # count are 62.300000000000004, 0.19999999999999998, 0.15000000000000002 and
-  # 0.33333333333333331: R's correction pass, run in a long double, moves the first two to the
-  # nearest double and the last away from a third.
+  # Golden: R 4.6.1's mean() of c(63.9, 61, 62), c(0.2, 0.1, 0.3), c(0.1, 0.2), c(1e16, 1,
+  # -1e16), 318315.3026679394 and c(0.2, 1/3, 0.15, 0.15, 1/3, 1/3), printed to 17 significant
+  # digits: 62.299999999999997, 0.20000000000000001, 0.15000000000000002, 0.33365885416666669,
+  # 318315.3026679394 and 0.25, the last rounded up to a power of two. Their
+  # sums in extended precision divided by the count are 62.300000000000004, 0.19999999999999998,
+  # 0.15000000000000002 and 0.33333333333333331: R's correction pass, run in a long double, moves
+  # the first two to the nearest double and the fourth away from a third.
   test "mean works a double's mean out in R's long double, its correction pass included" do
     means =
       Enum.map(
-        [[63.9, 61.0, 62.0], [0.2, 0.1, 0.3], [0.1, 0.2], [1.0e16, 1.0, -1.0e16]],
+        [
+          [63.9, 61.0, 62.0],
+          [0.2, 0.1, 0.3],
+          [0.1, 0.2],
+          [1.0e16, 1.0, -1.0e16],
+          [318_315.3026679394],
+          [0.2, 1 / 3, 0.15, 0.15, 1 / 3, 1 / 3]
+        ],
         &Arithmetic.mean/1
       )
 
-    assert means === [62.3, 0.2, 0.15000000000000002, 0.33365885416666669]
+    assert means === [
+             62.3,
+             0.2,
+             0.15000000000000002,
+             0.33365885416666669,
+             318_315.3026679394,
+             0.25
+           ]
+  end
+
+  # Golden: R 4.6.1's mean() of c(-63.9, -61, -62), c(-40L, -1L), c(-3L, 2L) and c(-20L, 19L,
+  # 943L, 658L) is -62.299999999999997, -20.5, -0.5 and 400, the last two summing through -1.
+  test "mean of negative numbers, and of numbers whose sum passes through minus one" do
+    means =
+      Enum.map(
+        [[-63.9, -61.0, -62.0], [-40, -1], [-3, 2], [-20, 19, 943, 658]],
+        &Arithmetic.mean/1
+      )
+
+    assert means === [-62.3, -20.5, -0.5, 400.0]
   end
 
   # Golden: R 4.6.1's mean() of c(1e308, 1e308), c(xmax, xmax, -xmax) for the largest double xmax,
-  # and c(-1e308, -1e308, -1e308) is 1e308, 5.9923104495410527e307 and -1e308, where a sum in
-  # doubles is past the largest.
+  # c(-1e308, -1e308, -1e308) and four groups more is 1e308, 5.9923104495410527e307, -1e308,
+  # 6.9897163132118515e307, 7.0402622397762528e307, 2.3338916697571253e307 and
+  # 8.6468525515221684e307, where a sum in doubles is past the largest.
   test "mean of doubles whose sum is past the largest double divides each by the count first" do
     largest = 1.797_693_134_862_315_7e308
 
-    means =
-      Enum.map(
-        [[1.0e308, 1.0e308], [largest, largest, -largest], [-1.0e308, -1.0e308, -1.0e308]],
-        &Arithmetic.mean/1
-      )
+    groups = [
+      [1.0e308, 1.0e308],
+      [largest, largest, -largest],
+      [-1.0e308, -1.0e308, -1.0e308],
+      [4.168_599_793_333_291e307, 1.765_594_128_393_718_4e308, -8.553_921_376_349_224e306],
+      [1.464_632_171_521_229_2e308, 5.489_737_992_779_053e307, 9.847_270_113_374_125e306],
+      [9.037_815_588_600_006e307, 1.503_107_267_045_453_3e308, -1.706_721_324_978_316_3e308],
+      [
+        4.988_551_670_890_670_5e307,
+        1.667_861_330_012_879_3e308,
+        1.075_487_726_028_560_3e308,
+        2.165_367_974_783_605e307
+      ]
+    ]
 
-    assert means === [1.0e308, 5.992_310_449_541_052_7e307, -1.0e308]
+    assert Enum.map(groups, &Arithmetic.mean/1) === [
+             1.0e308,
+             5.992_310_449_541_052_7e307,
+             -1.0e308,
+             6.989_716_313_211_851_5e307,
+             7.040_262_239_776_252_8e307,
+             2.333_891_669_757_125_3e307,
+             8.646_852_551_522_168_4e307
+           ]
   end
 
-  # Golden: R 4.6.1's mean() of c(5e-324, 5e-324) and c(5e-324, 0) is 4.9406564584124654e-324
-  # and 0, half the least double a tie rounded to even, and 1 / mean(-0) is Inf, its sum begun
-  # from plus zero.
+  # Golden: R 4.6.1's mean() of c(5e-324, 5e-324), c(5e-324, 0), -5e-324, c(-2.1e-322, 2.27e-322)
+  # and c(7.4e-323, -1e-323) is 4.9406564584124654e-324, 0, -4.9406564584124654e-324,
+  # 9.8813129168249309e-324 and 2.9643938750474793e-323, rounded to a multiple of the least
+  # double, half of it a tie rounded to even; and 1 / mean(-0) is Inf, its sum begun from plus
+  # zero.
   test "mean rounds to a double last, below the least normal one too, and has no minus zero" do
-    means =
-      Enum.map([[5.0e-324, 5.0e-324], [5.0e-324, 0.0], [-0.0], [-0.0, -0.0]], &Arithmetic.mean/1)
+    groups = [
+      [5.0e-324, 5.0e-324],
+      [5.0e-324, 0.0],
+      [-5.0e-324],
+      [-2.1e-322, 2.27e-322],
+      [7.4e-323, -1.0e-323],
+      [-0.0],
+      [-0.0, -0.0]
+    ]
 
-    assert means === [5.0e-324, 0.0, 0.0, 0.0]
+    assert Enum.map(groups, &Arithmetic.mean/1) === [
+             5.0e-324,
+             0.0,
+             -5.0e-324,
+             1.0e-323,
+             3.0e-323,
+             0.0,
+             0.0
+           ]
   end
 
   # Golden: R 4.6.1's mean(c(1L, 2L)) is 1.5 and mean(c(640883879L, integer(4094))) is
@@ -312,5 +374,17 @@ defmodule Giggly.DataFrame.ArithmeticTest do
     many = [640_883_879 | List.duplicate(0, 4094)]
 
     assert {Arithmetic.mean([1, 2]), Arithmetic.mean(many)} === {1.5, 156_503.99975579977}
+  end
+
+  # Golden: R 4.6.1's mean() of c(988267548L, integer(2046)), c(958952461L, integer(2046)) and
+  # c(1689158812L, integer(2046)) is 482788.25012212998, 468467.25012212998 and
+  # 825187.49975574005: each quotient's 64th bit is decided by whether anything is left below
+  # it, and that bit decides the double.
+  test "mean of integers rounds its quotient as the exact quotient would be rounded" do
+    sums = [988_267_548, 958_952_461, 1_689_158_812]
+
+    means = Enum.map(sums, fn sum -> Arithmetic.mean([sum | List.duplicate(0, 2046)]) end)
+
+    assert means === [482_788.25012212998, 468_467.25012212998, 825_187.49975574005]
   end
 end
