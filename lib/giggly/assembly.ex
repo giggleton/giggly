@@ -948,7 +948,7 @@ defmodule Giggly.Assembly do
   defp evaluated_column(aesthetic, value, paneled_data) do
     values = Mapping.evaluate(value, paneled_data)
 
-    case Mapping.category(value) do
+    case Mapping.category(value, paneled_data) do
       :none -> {aesthetic, values}
       category -> {aesthetic, values, category}
     end

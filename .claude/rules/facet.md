@@ -52,9 +52,13 @@ is built, step by step: the entry beginning "`facet_wrap` is built in steps".
   facet column, the value written as ggplot2's `label_value()` writes it, R's `as.character()`
   (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`), a missing value
   `NA`. The null facet's one panel draws both axes and has no strip.
-- **Panels made from values are ordered as a discrete scale orders its levels**, by the key the
-  assembly hands the facet (`Scale.level_key/1`): column by column, a missing value last, strings
-  by bytes rather than R's locale. Only the combinations the tables make get a panel.
+- **Panels made from values are ordered column by column, as R's vctrs combines the tables'
+  columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
+  levels, the first table's and then those each later one adds; any other as a discrete scale
+  orders its levels, by the key the assembly hands the facet (`Scale.level_key/1`), so a factor
+  beside text in another table sorts as text; a missing value last, strings by bytes rather than
+  R's locale. Only the combinations the tables make get a panel, so a level no row holds makes
+  none. A factor in one table beside numbers in another, where R fails, sorts by the key.
 - **`facet_wrap` lays its panels out as ggplot2 does**, row by row: with neither `nrow:` nor
   `ncol:`, by R's `n2mfrow()` with rows and columns swapped, as ggplot2's `wrap_dims()` takes it;
   given one, the other is as many as the panels need; given both, they must hold every panel, or

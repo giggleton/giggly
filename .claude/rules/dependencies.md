@@ -132,8 +132,11 @@ semver or the changelog).
   checks nothing an unclassified protocol implementation calls, so that line only narrows, and the
   hook passes it (Giggly's copy of the hook; Tack's stops it). Every `defimpl` here opens with it,
   since each kind of facet, coordinate system, geom, stat and position computes in one. Leaving it
-  out compiles in silence, so `test/giggly/boundary_declarations_test.exs` fails on any protocol
-  implementation in the app not classified into its protocol's boundary.
+  out compiles in silence, so `test/giggly/boundary_declarations_test.exs` fails on any
+  implementation of one of Giggly's own protocols not classified into its protocol's boundary. An
+  implementation of a protocol from outside Giggly (`Giggly.Factor`'s `Enumerable`) has no
+  protocol boundary and stays unclassified, so nothing checks what it calls (design-log §4, the
+  entry beginning "A table's column carries its levels").
 - **Disabling a check is pinned by a test, not scored by the hook** (the hook only *lists* one in a
   widening's deny message). `check: [in/out/apps/aliases]`, `dirty_xrefs:` and `top_level?:` are
   the options that make the compiler enforce *less*, and `test/giggly/boundary_declarations_test.exs`

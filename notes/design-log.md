@@ -169,7 +169,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   in a mapping* — every `diamonds` example would write a factor where R names a column, and
   panels could not be ordered. *Rejected: `Table.Reader` metadata under a namespaced key* — a user
   wraps a whole table to order one column. *Rejected: `Giggly.Category`* — `Factor` is the
-  mapping's `{:factor, ...}` word.
+  mapping's `{:factor, ...}` word. Its `Enumerable` implementation is left unclassified, since
+  Elixir's protocol has no boundary, and the declarations test checks only Giggly's own
+  protocols' implementations (Steve, building step 2). *Rejected: classifying it into
+  `Giggly.Factor`'s boundary* — its calls would be checked, but it is a move the gate asks for.
 
 - **Size, shape and line type are Phase 3's eighth increment, in seven steps: a point's look
   (its fixed look and a mapped fill), a line's fixed look, mapped size, `geom_count()`, mapped
@@ -2266,6 +2269,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Read a table's factor columns, and order facet panels by their levels (ordering,
+  step 2); §4: "A table's column carries its levels as a `Giggly.Factor`" (amended)
 - 2026-10-22 — Give a factor its levels, and train a discrete scale as R's discrete_range()
   (ordering, step 1); §4: "A discrete scale fed levelled and plain values", "A factor carries R's
   `ordered` flag", "`{:factor, [value], levels: [...]}` gives a factor its levels"

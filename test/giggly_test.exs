@@ -441,6 +441,54 @@ defmodule GigglyTest do
                {[{4.0, 2}, {6.0, 3}, {8.0, 1}], [8.0, 4.0, nil]}
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1 over `f = factor(c("a", "b"), levels = c("c", "b", "a"))`:
+    # `aes(f, y, colour = f)` places and colours b then a, `c` holding no row; `aes(factor(f), y)`
+    # too, titled `factor(f)`.
+    test "a table's factor keeps its levels, mapped as it is or inside factor()" do
+      table = %{"f" => Giggly.Factor.new(["a", "b"], levels: ["c", "b", "a"]), "y" => [1, 2]}
+
+      column =
+        table
+        |> Plot.new(%{x: :f, y: :y, colour: :f})
+        |> Plot.geom_point()
+
+      factor =
+        table
+        |> Plot.new(%{x: {:factor, [:f]}, y: :y})
+        |> Plot.geom_point()
+
+      [legend] = Giggly.Assembly.run(column).legends
+
+      assert {Giggly.panel_scales(column, 1).x.levels,
+              Enum.map(legend.keys, fn key -> key.label end),
+              Giggly.panel_scales(factor, 1).x.levels, Giggly.Assembly.run(factor).guide_titles.x} ===
+               {["b", "a"], ["b", "a"], ["b", "a"], "factor(f)"}
+    end
+
+    # Golden: ggplot2 4.0.3's `facet_wrap(vars(class2))` in R 4.6.1, `class2` being
+    # `reorder(mpg$class, mpg$displ)`: the panels in its levels' order.
+    test "a table's factor orders a facet's panels" do
+      mpg = Giggly.Datasets.mpg()
+
+      levels = ["compact", "subcompact", "midsize", "minivan", "pickup", "suv", "2seater"]
+
+      class2 =
+        mpg
+        |> Keyword.fetch!(:class)
+        |> Giggly.Factor.new(levels: levels)
+
+      layout =
+        mpg
+        |> Enum.concat(class2: class2)
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:class2)
+        |> Giggly.Assembly.run()
+        |> Map.fetch!(:layout)
+
+      assert DataFrame.pull(layout, "class2") === levels
+    end
+
     # Golden: ggplot2 4.0.3 in R 4.6.1 labels a colour legend of `TRUE` and `FALSE` `FALSE`, `TRUE`.
     test "a column of true and false is labelled as R writes it" do
       [legend] =

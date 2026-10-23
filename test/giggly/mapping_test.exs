@@ -273,26 +273,34 @@ defmodule Giggly.MappingTest do
     end
   end
 
-  describe "category/1" do
+  describe "category/2" do
     test "a factor is declared a category with its options, an after_stat as its value" do
-      assert Enum.map(
-               [
-                 {:factor, ["cyl"]},
-                 {:factor, ["cyl"], levels: [8, 4], ordered: true},
-                 {:after_stat, [{:factor, ["count"], levels: [2, 1]}]},
-                 {:after_stat, ["count"]},
-                 "cyl",
-                 {:constant, 4}
-               ],
-               &Mapping.category/1
-             ) === [
-               :category,
-               {:category, levels: [8, 4], ordered: true},
-               {:category, levels: [2, 1]},
-               :none,
-               :none,
-               :none
-             ]
+      assert {Mapping.category({:factor, ["hwy"]}, @frame),
+              Mapping.category({:factor, ["hwy"], levels: [31, 29], ordered: true}, @frame),
+              Mapping.category(
+                {:after_stat, [{:factor, ["count"], levels: [3.0, 1.0]}]},
+                @statistic
+              ), Mapping.category({:after_stat, ["count"]}, @statistic),
+              Mapping.category("class", @frame), Mapping.category({:constant, 4}, @frame)} ===
+               {:category, {:category, levels: [31, 29], ordered: true},
+                {:category, levels: [3.0, 1.0]}, :none, :none, :none}
+    end
+
+    test "a table's category keeps its declaration, and a factor of it its levels and ordered" do
+      table =
+        DataFrame.new([
+          {"cut", ["Ideal", "Fair"],
+           {:category, levels: ["Fair", "Good", "Ideal"], ordered: true}}
+        ])
+
+      declared = {:category, levels: ["Fair", "Good", "Ideal"], ordered: true}
+
+      assert {Mapping.category("cut", table), Mapping.category({:factor, ["cut"]}, table),
+              Mapping.category({:factor, ["cut"], ordered: false}, table),
+              Mapping.category({:factor, ["cut"], levels: ["Ideal", "Fair"]}, table)} ===
+               {declared, declared,
+                {:category, levels: ["Fair", "Good", "Ideal"], ordered: false},
+                {:category, ordered: true, levels: ["Ideal", "Fair"]}}
     end
   end
 

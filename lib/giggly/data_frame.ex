@@ -44,7 +44,8 @@ defmodule Giggly.DataFrame do
   equivalent of pandas' and Polars' `object` type, so a column the plot never uses cannot refuse the
   table.
 
-  One more is never worked out from values, only declared when a column is built: `:category`,
+  One more is never worked out from values, only declared when a column is built, or read from a
+  table whose column is a `Giggly.Factor`: `:category`,
   Explorer's name for a categorical column, which a plot reads as discrete whatever its values
   are. Its values are typed, and an integer among floats becomes a float, as any column's; it may
   hold anything but a `:term`'s values or lists. A category has levels, the values it may hold in
@@ -97,9 +98,10 @@ defmodule Giggly.DataFrame do
   # no caller. It owns the `table` library, which `Giggly` lists too, as
   # boundary lets a sub-boundary list only what its parent does; no other domain lists it, and
   # here `from_table/1` is the one caller.
-  use Boundary, deps: [Table], exports: [Arithmetic]
+  use Boundary, deps: [Giggly.Factor, Table], exports: [Arithmetic]
 
   alias Giggly.DataFrame.Lists
+  alias Giggly.Factor
 
   @typedoc "A frame, read through the functions here."
   @opaque t :: Lists.t()
@@ -234,7 +236,9 @@ defmodule Giggly.DataFrame do
   # the first row's keys; a list of keyword lists keeps its written order. Raises `ArgumentError`
   # when the input is a list or map that is not a table, when two of its names become the same
   # string (`:wt` and `"wt"`), when its columns differ in length, or when a column mixes two types;
-  # a value with no `Table.Reader` implementation raises `Protocol.UndefinedError`.
+  # a value with no `Table.Reader` implementation raises `Protocol.UndefinedError`. A column given
+  # as a `Giggly.Factor` is a category with the factor's levels and ordered flag, refused as `new/1`
+  # refuses a category's.
   @doc false
   @spec from_table(Table.Reader.t()) :: t()
   def from_table(table) do
@@ -255,11 +259,21 @@ defmodule Giggly.DataFrame do
     columns =
       for {name, source_name} <- string_names(source_names) do
         %{^source_name => values} = values_by_source_name
-        {name, Enum.to_list(values)}
+        read_column(name, values)
       end
 
     check_lengths(columns)
   end
+
+  # A column as the frame builds it: a factor's values declared a category with its levels and
+  # ordered flag, any other column's values read into a list.
+  defp read_column(name, %Factor{values: values, levels: :default, ordered: ordered}),
+    do: {name, values, {:category, ordered: ordered}}
+
+  defp read_column(name, %Factor{values: values, levels: levels, ordered: ordered}),
+    do: {name, values, {:category, levels: levels, ordered: ordered}}
+
+  defp read_column(name, values), do: {name, Enum.to_list(values)}
 
   # Pairs each source name with its string form, remembering which source name first claimed each
   # string so a second claim can say which two names collided.
@@ -285,7 +299,7 @@ defmodule Giggly.DataFrame do
   # `table` checks no lengths, and reading rows from columns stops at the shortest, so a short
   # column would silently misalign every row after it ends.
   defp check_lengths(columns) do
-    lengths = Enum.map(columns, fn {name, values} -> {name, length(values)} end)
+    lengths = Enum.map(columns, fn column -> {elem(column, 0), length(elem(column, 1))} end)
 
     case Enum.uniq_by(lengths, fn {_name, length} -> length end) do
       [_first, _second | _rest] ->

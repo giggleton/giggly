@@ -13,8 +13,11 @@ defmodule Giggly.Facet.Wrap do
   # those with each combination of the others' values made so far, so a value only such a table
   # holds makes a panel with each. A table holding none of them, or no rows, makes none, and unless
   # some table holds them all the layout is refused, naming what each lacks. The panels are ordered
-  # by the first column's values, then the next's, each as a discrete scale orders its levels, by
-  # the key the assembly hands over, so a missing value (`nil`) gets a panel of its own, last. They
+  # by the first column's values, then the next's, each as R's vctrs combines the tables' columns:
+  # by their levels where every table holding the column holds it as a category, the first's and
+  # then the levels each later one adds; else as a discrete scale orders its levels, by the key the
+  # assembly hands over, so a factor beside a column of text sorts as text. A missing value (`nil`)
+  # gets a panel of its own, last. They
   # fill the layout a row at a time, left to right. With neither a number of rows nor of columns,
   # the layout is ggplot2's (R's `n2mfrow()`, rows and columns swapped): one row for up to three
   # panels, two for up to six, three for up to twelve, and beyond that as many columns as the
@@ -112,6 +115,8 @@ defmodule Giggly.Facet.Wrap do
     # some crosses its own with those made so far. Each is a list in the columns' order, sorted by
     # the first column's values, then the next's.
     defp combinations(frames, facets, order_key) do
+      column_keys = Enum.map(facets, fn name -> column_key(frames, name, order_key) end)
+
       {complete, partial} =
         Enum.split_with(frames, fn frame -> held(frame, facets) == facets end)
 
@@ -126,13 +131,47 @@ defmodule Giggly.Facet.Wrap do
         partial
         |> Enum.reduce(made, fn frame, so_far -> crossed(frame, so_far, facets) end)
         |> Enum.map(fn values -> Enum.map(facets, fn name -> Map.fetch!(values, name) end) end)
-        |> Enum.sort_by(fn values -> Enum.map(values, order_key) end)
+        |> Enum.sort_by(fn values -> sort_key(values, column_keys) end)
 
       case combinations do
         [] -> raise ArgumentError, no_panels_message(facets)
         combinations -> combinations
       end
     end
+
+    # How a facet column's values are ordered: by the places of the levels of the tables holding it,
+    # in table order, where every one holds it as a category, a missing value after them, as vctrs
+    # combines factors; else by the caller's key, as vctrs makes a factor beside text text.
+    defp column_key(frames, name, order_key) do
+      holding = Enum.filter(frames, fn frame -> name in DataFrame.names(frame) end)
+
+      if Enum.all?(holding, fn frame -> Map.fetch!(DataFrame.dtypes(frame), name) == :category end),
+         do: level_place(holding, name),
+         else: order_key
+    end
+
+    defp level_place(holding, name) do
+      place_by_level =
+        holding
+        |> Enum.flat_map(fn frame -> levels(frame, name) end)
+        |> Enum.uniq()
+        |> Enum.with_index()
+        |> Map.new()
+
+      fn
+        nil -> {1, nil}
+        level -> {0, Map.fetch!(place_by_level, level)}
+      end
+    end
+
+    defp levels(frame, name) do
+      {:category, declaration} = DataFrame.category(frame, name)
+      Keyword.fetch!(declaration, :levels)
+    end
+
+    # A combination's values in column order, each turned into its column's sort key.
+    defp sort_key(values, column_keys),
+      do: Enum.zip_with(values, column_keys, fn value, column_key -> column_key.(value) end)
 
     # The combinations made so far, with each combination of the columns `frame` holds crossed with
     # each of the others' values made so far. A table holding none of them, or no rows, adds none.

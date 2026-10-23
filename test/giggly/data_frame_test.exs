@@ -1,7 +1,7 @@
 defmodule Giggly.DataFrameTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.DataFrame
+  alias Giggly.{DataFrame, Factor}
 
   doctest Giggly.DataFrame
 
@@ -35,6 +35,40 @@ defmodule Giggly.DataFrameTest do
         end
 
       assert error.message =~ ":wt"
+    end
+
+    test "a factor's column is a category with its levels and ordered flag, others missing" do
+      frame =
+        DataFrame.from_table(%{
+          "cut" =>
+            Factor.new(["Ideal", "Gold", "Fair"], levels: ["Fair", "Ideal"], ordered: true),
+          "color" => Factor.new(["E", "D", "E"]),
+          "price" => [326, 327, 334]
+        })
+
+      assert {DataFrame.dtypes(frame), DataFrame.category(frame, "cut"),
+              DataFrame.category(frame, "color"), DataFrame.pull(frame, "cut")} ===
+               {%{"cut" => :category, "color" => :category, "price" => :integer},
+                {:category, levels: ["Fair", "Ideal"], ordered: true},
+                {:category, levels: ["D", "E"], ordered: false}, ["Ideal", nil, "Fair"]}
+    end
+
+    test "a factor's levels are refused as a category's are, naming its column" do
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.from_table(%{"cut" => Factor.new(["Fair"], levels: ["Fair", "Fair"])})
+        end
+
+      assert error.message =~ ~s(column "cut")
+    end
+
+    test "a factor's column is counted with the others, so one too short is refused" do
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.from_table(%{"cut" => Factor.new(["Fair"]), "price" => [326, 327]})
+        end
+
+      assert error.message =~ ~s("cut" has 1)
     end
   end
 

@@ -85,15 +85,18 @@ defmodule Giggly.BoundaryDeclarationsTest do
              "the intent, it is a decision for the user, made in this file."
   end
 
-  test "every protocol implementation is classified into its protocol's boundary" do
+  test "every implementation of Giggly's own protocols is classified into its protocol's boundary" do
     # Boundary checks nothing a protocol implementation calls until the implementation is
     # classified, so an unclassified `defimpl`, where each kind of facet, coordinate system, geom,
-    # stat and position does its computing, compiles clean with every call it makes unchecked.
+    # stat and position does its computing, compiles clean with every call it makes unchecked. An
+    # implementation of a protocol from outside Giggly (`Giggly.Factor`'s `Enumerable`) has no
+    # protocol boundary to be classified into, and is left out.
     {:ok, modules} = :application.get_key(:giggly, :modules)
 
     implementations =
       Enum.filter(modules, fn module ->
-        Code.ensure_loaded?(module) and function_exported?(module, :__impl__, 1)
+        Code.ensure_loaded?(module) and function_exported?(module, :__impl__, 1) and
+          module.__impl__(:protocol) in modules
       end)
 
     # Every kind is a protocol implementation, so finding none means the search broke, not that

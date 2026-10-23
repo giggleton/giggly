@@ -235,6 +235,55 @@ defmodule Giggly.FacetTest do
     end
   end
 
+  describe "the wrapped panels of a factor" do
+    # The facet's values in panel order, read from the layout over `frames`.
+    defp panel_values(facets, frames) do
+      layout = layout_of(wrap(facets), frames)
+      Enum.map(facets, fn name -> DataFrame.pull(layout, name) end)
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 lays `facet_wrap(~f)` out over `f = factor(c("b", "a"),
+    # levels = c("b", "a"))` b, a; over levels `c("c", "b", "a")` holding only b and a, b, a too.
+    test "a factor's panels follow its levels, a level no row holds making none" do
+      held = DataFrame.new([{"f", ["a", "b"], {:category, levels: ["b", "a"]}}])
+      unheld = DataFrame.new([{"f", ["a", "b"], {:category, levels: ["c", "b", "a"]}}])
+
+      assert {panel_values(["f"], [held]), panel_values(["f"], [unheld])} ===
+               {[["b", "a"]], [["b", "a"]]}
+    end
+
+    # Golden: as above, the plot's data a factor with levels `c("b", "a")` and a layer's table a
+    # factor with levels `c("z", "a")`: vctrs combines the two into levels b, a, z.
+    test "two tables' factors follow the first's levels, then those the next adds" do
+      plot_data = DataFrame.new([{"f", ["a", "b"], {:category, levels: ["b", "a"]}}])
+      layer_table = DataFrame.new([{"f", ["a", "z"], {:category, levels: ["z", "a"]}}])
+
+      assert panel_values(["f"], [plot_data, layer_table]) === [["b", "a", "z"]]
+    end
+
+    # Golden: as above, a factor with levels `c("b", "a")` in one table beside the text `c` and
+    # `a` in the other, either way round: vctrs makes the column text, sorted a, b, c.
+    test "a factor beside a column of text in another table is sorted as text" do
+      factor = DataFrame.new([{"f", ["b", "a"], {:category, levels: ["b", "a"]}}])
+      text = DataFrame.new([{"f", ["c", "a"]}])
+
+      assert {panel_values(["f"], [factor, text]), panel_values(["f"], [text, factor])} ===
+               {[["a", "b", "c"]], [["a", "b", "c"]]}
+    end
+
+    # Golden: as above, `facet_wrap(~f + g)` over f `b, b, a` with levels `c("b", "a")` and g
+    # `y, z, y` with levels `c("z", "y")`: panels (b, z), (b, y), (a, y).
+    test "two factor columns order the panels by the first's levels, then the second's" do
+      frame =
+        DataFrame.new([
+          {"f", ["b", "b", "a"], {:category, levels: ["b", "a"]}},
+          {"g", ["y", "z", "y"], {:category, levels: ["z", "y"]}}
+        ])
+
+      assert panel_values(["f", "g"], [frame]) === [["b", "b", "a"], ["z", "y", "y"]]
+    end
+  end
+
   describe "the wrapped layout's axes and strips" do
     test "a panel draws an axis on each side with no panel beside it" do
       facet_layout = layout(wrap(["g"]), distinct_values(5))

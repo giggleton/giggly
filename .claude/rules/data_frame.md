@@ -2,7 +2,9 @@
 paths:
   - "lib/giggly/data_frame.ex"
   - "lib/giggly/data_frame/**"
+  - "lib/giggly/factor.ex"
   - "test/giggly/data_frame_test.exs"
+  - "test/giggly/factor_test.exs"
 ---
 
 # The data frame
@@ -33,10 +35,10 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `put/4`, `category/2`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3`, `join/3`
   and the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
   user another operation is a decision (CLAUDE.md, Conventions).
-- **The frame owns the `table` library.** Its `deps:` is `Table` alone, which the root lists too,
-  as boundary lets a sub-boundary list only what its parent does, and no other domain lists it
-  (`.claude/rules/dependencies.md`). A domain that uses the frame lists `Giggly.DataFrame`, its
-  sibling under the umbrella.
+- **The frame owns the `table` library.** Its `deps:` is `Table` and `Giggly.Factor`, `Table`
+  listed by the root too, as boundary lets a sub-boundary list only what its parent does, and by
+  no other domain (`.claude/rules/dependencies.md`). A domain that uses the frame lists
+  `Giggly.DataFrame`, its sibling under the umbrella.
 - **User column names are strings; every column the pipeline writes is an atom.** `from_table/1`
   converts them and refuses two that become the same string. Never turn a string name into an
   atom: that creates atoms from caller input, and it would let a user column pass for an aesthetic.
@@ -106,7 +108,13 @@ column names become strings", "Column types belong to the frame" and "Every boun
   held as `0.0`. The type holds them, so `select/2`, `split/2`, `slice/2`, `filter/2`, a column
   `mutate/2` names alone, `join/3`, `summarise/3`'s `by` columns and its `first` carry them;
   `dtypes/1` reports `:category`, `category/2` the declaration `put/4` would make again, and
-  `put/3` works a type out afresh.
+  `put/3` works a type out afresh. **A table's column given as a `Giggly.Factor` is read as a
+  category with its levels and ordered flag** (`from_table/1`), refused as one declared so is.
+- **`Giggly.Factor` is a column type of its own boundary, API**: `new/2` holds a column's values,
+  its levels or `:default` and its ordered flag, its options checked by NimbleOptions, which its
+  boundary lists alone; it checks nothing of the values, which the frame types when it reads the
+  table. It enumerates as its values, so `Table.Reader`, Explorer and Kino read the column as
+  they are; the frame and `Giggly.Datasets` list it.
 - **`:term` is the one type whose values are not checked against each other.** It holds whatever
   has no type of its own (maps, tuples, `Decimal`…), so a column the plot never uses cannot refuse
   the table. When something needs one of those checked or plotted, it gets a named type of its own,

@@ -487,16 +487,34 @@ defmodule Giggly.Mapping do
     DataFrame.select(statistic, renames)
   end
 
-  # How the column `value` makes is declared a category when it enters a frame
-  # (`t:Giggly.DataFrame.category/0`): a factor's, with the levels it gives and whether it is
-  # ordered, an after_stat's as its value's; `:none` for any other value, whose type the frame
-  # reads from its values.
+  # How the column `value` makes from `table` is declared a category when it enters a frame
+  # (`t:Giggly.DataFrame.category/0`): a column of the table that is a category as the table
+  # declares it, levels and all; a factor with the levels it gives and whether it is ordered, each
+  # it leaves out kept from its value's where that is a category, as R's `factor()` of a factor
+  # keeps its levels' order and `is.ordered()`; an after_stat's as its value's in the stat's
+  # output; `:none` for any other value, whose type the frame reads from its values.
   @doc false
-  @spec category(resolved()) :: DataFrame.category() | :none
-  def category({:factor, [_value]}), do: :category
-  def category({:factor, [_value], options}), do: {:category, options}
-  def category({:after_stat, [value]}), do: category(value)
-  def category(_value), do: :none
+  @spec category(resolved(), DataFrame.t()) :: DataFrame.category() | :none
+  def category(name, table) when is_binary(name) do
+    case DataFrame.dtypes(table) do
+      %{^name => :category} -> DataFrame.category(table, name)
+      %{} -> :none
+    end
+  end
+
+  def category({:factor, [value]}, table), do: factor_category(category(value, table), [])
+
+  def category({:factor, [value], options}, table),
+    do: factor_category(category(value, table), options)
+
+  def category({:after_stat, [value]}, statistic), do: category(value, by_name(statistic))
+  def category(_value, _table), do: :none
+
+  defp factor_category({:category, inherited}, options),
+    do: {:category, Keyword.merge(inherited, options)}
+
+  defp factor_category(:none, []), do: :category
+  defp factor_category(:none, options), do: {:category, options}
 
   # When `value` is evaluated, its stage, as ggplot2's `stage()` names them: `:after_stat` against
   # its stat's output, once the stat has run; `:start`, every other, against the layer's data.

@@ -15,7 +15,7 @@ entry beginning "An after_stat reads its stat's computed variables".
 ## Rules
 
 - **A value's shape is matched here and nowhere else.** `Plot` and the assembly ask this module
-  (`resolve/1`, `columns/1`, `stage/1`, `dtype/2`, `category/1`, `evaluate/2`, `title/2`) and
+  (`resolve/1`, `columns/1`, `stage/1`, `dtype/2`, `category/2`, `evaluate/2`, `title/2`) and
   never match a tuple or a string themselves. Its boundary lists `Giggly.DataFrame` and
   `Giggly.AsCharacter`, which writes a factor's levels in its title; `Plot` lists it for the checks
   at the call and the assembly for evaluation and titles. **`Plot` calls
@@ -41,12 +41,14 @@ entry beginning "An after_stat reads its stat's computed variables".
   how they run. A head that acts on a whole column is a clause that sees the column, never a
   function applied per row.
 - **`{:factor, [value]}` reads its value as discrete: its column is declared `:category`**, which
-  the frame cannot read from values, so `dtype/2` says so and `category/1` gives the declaration
-  the assembly makes when the column enters the evaluated frame. **`{:factor, [value], levels:
-  [...], ordered: true}` gives its levels and marks it ordered**, R's `factor(x, levels = ...,
-  ordered = TRUE)` (design-log §4, the entry beginning "`{:factor, [value], levels: [...]}`"),
-  held with its options as written; the frame types the levels with the values, so levels of
-  another type are refused when the plot is run. It is the whole of a mapping value, a factor's
+  the frame cannot read from values, so `dtype/2` says so and `category/2` gives the declaration
+  the assembly makes when the column enters the evaluated frame. **A column of the table that is
+  a category keeps its declaration**, levels and all, and a factor of one keeps its levels and
+  ordered flag but those it gives itself, as R's `factor()` of a factor does. **`{:factor,
+  [value], levels: [...], ordered: true}` gives its levels and marks it ordered**, R's `factor(x,
+  levels = ..., ordered = TRUE)` (design-log §4, the entry beginning "`{:factor, [value], levels:
+  [...]}`"), held with its options as written; the frame types the levels with the values, so levels
+  of another type are refused when the plot is run. It is the whole of a mapping value, a factor's
   own or an after_stat's, never an expression's argument, refused at the call, since R hands a
   function a factor's level codes. Its title is `factor()` around its value's text and its
   options as R writes the arguments, in the order given (`levels = c(8, 4, 6)`, `ordered =
