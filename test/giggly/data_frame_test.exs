@@ -823,6 +823,66 @@ defmodule Giggly.DataFrameTest do
       assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, columns) end
     end
 
+    test "log10 is each number's base-10 logarithm, R's at zero, below it, and missing" do
+      frame =
+        DataFrame.new(
+          x: [1000.0, 0.3, 0.0, -0.0, -1.0, nil, :nan, :infinity, :neg_infinity],
+          n: [100, 1, 0, -5, nil, 10, 10, 10, 10]
+        )
+
+      mutated = DataFrame.mutate(frame, x: {:log10, [:x]}, n: {:log10, [:n]})
+
+      # R's log10(1000) is 3 exactly, where log(1000) / log(10) is 2.9999999999999996.
+      assert DataFrame.pull(mutated, :x) === [
+               3.0,
+               -0.5228787452803376,
+               :neg_infinity,
+               :neg_infinity,
+               :nan,
+               nil,
+               :nan,
+               :infinity,
+               :nan
+             ]
+
+      assert DataFrame.pull(mutated, :n) === [
+               2.0,
+               0.0,
+               :neg_infinity,
+               :nan,
+               nil,
+               1.0,
+               1.0,
+               1.0,
+               1.0
+             ]
+
+      assert DataFrame.dtypes(mutated) == %{x: :float, n: :float}
+    end
+
+    test "log10 of a column of only missing values is missing in every row, a float" do
+      frame = DataFrame.new(x: [nil, nil])
+
+      mutated = DataFrame.mutate(frame, log: {:log10, [:x]})
+
+      assert DataFrame.pull(mutated, :log) === [nil, nil]
+      assert DataFrame.dtypes(mutated).log == :float
+    end
+
+    test "log10 of a column that is not numbers is refused, booleans and a category of numbers too" do
+      frame =
+        DataFrame.new([
+          {:label, ["a"]},
+          {:kept, [true]},
+          {:day, [~D[2026-10-22]]},
+          {:cyl, [4], :category}
+        ])
+
+      for name <- [:label, :kept, :day, :cyl] do
+        assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, log: {:log10, [name]}) end
+      end
+    end
+
     test "cut numbers each value's interval from 1, closed on the right, the lowest at both ends" do
       frame = DataFrame.new(x: [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, -1.0, 5.0, nil, :nan])
 
@@ -877,6 +937,16 @@ defmodule Giggly.DataFrameTest do
 
       assert DataFrame.pull(mutated, :kept) === [true]
       assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, gap: nil) end
+    end
+  end
+
+  describe "operations/1" do
+    test "the frame runs every operation its expressions name" do
+      frame = DataFrame.new(x: [1.0])
+
+      operations = DataFrame.operations(frame)
+
+      assert Enum.sort(operations) == [:<, :>, :and, :cut, :is_finite, :log10, :not, :or]
     end
   end
 

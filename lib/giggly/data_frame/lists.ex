@@ -66,6 +66,10 @@ defmodule Giggly.DataFrame.Lists do
   defp reported({:list, dtype}), do: {:list, reported(dtype)}
   defp reported(dtype), do: dtype
 
+  # Every operation an expression names, each run below (`evaluated/2`).
+  @impl DataFrame
+  def operations(%__MODULE__{}), do: [:<, :>, :and, :cut, :is_finite, :log10, :not, :or]
+
   @impl DataFrame
   def category(%__MODULE__{} = frame, name), do: declaration(column(frame, name))
 
@@ -266,6 +270,12 @@ defmodule Giggly.DataFrame.Lists do
     {:boolean, Enum.map(values, &negated/1)}
   end
 
+  defp evaluated(frame, {:log10, [argument]}) do
+    {dtype, values} = evaluated(frame, argument)
+    numbers(dtype)
+    {:float, Enum.map(values, &logarithm/1)}
+  end
+
   defp evaluated(frame, {:cut, [argument], options}) do
     {dtype, values} = evaluated(frame, argument)
     numbers(dtype)
@@ -291,6 +301,15 @@ defmodule Giggly.DataFrame.Lists do
   defp finite(nil), do: nil
   defp finite(value) when is_number(value), do: true
   defp finite(value) when value in @non_finite_floats, do: false
+
+  # A number's base-10 logarithm, as R's `log10()` gives it: minus infinity for zero, NaN for a
+  # negative number, minus infinity included, missing for a missing value, and a positive number's
+  # by C's `log10()`, as R's, which a float divided by `ln(10)` misses in the last bit.
+  defp logarithm(nil), do: nil
+  defp logarithm(value) when is_number(value) and value > 0, do: :math.log10(value)
+  defp logarithm(value) when value == 0, do: :neg_infinity
+  defp logarithm(:infinity), do: :infinity
+  defp logarithm(_negative_or_nan), do: :nan
 
   # The interval of `breaks` a number falls in, numbered from 1, as R's `.bincode()` finds it with
   # `include.lowest = TRUE`: missing for a missing value, NaN or a number outside the breaks; else

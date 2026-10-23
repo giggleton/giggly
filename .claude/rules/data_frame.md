@@ -32,8 +32,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `put/4`, `category/2`, `split/2`, `slice/2`, `filter/2`, `mutate/2`, `summarise/3`, `join/3`
-  and the callbacks are the pipeline's, `@doc false`, and `Lists` is `@moduledoc false`; offering a
+  `put/4`, `category/2`, `operations/1`, `split/2`, `slice/2`, `filter/2`, `mutate/2`,
+  `summarise/3`, `join/3` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
+  `@moduledoc false`; offering a
   user another operation is a decision (CLAUDE.md, Conventions).
 - **The frame owns the `table` library.** Its `deps:` is `Table` and `Giggly.Factor`, `Table`
   listed by the root too, as boundary lets a sub-boundary list only what its parent does, and by
@@ -53,17 +54,23 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `closed:`, R's `cut(include.lowest = TRUE)`, numbering each value's interval from 1). Values
   follow Explorer's semantics, as types do: a missing value passes through an operation, a filter
   keeps only the rows whose value is true, `and` and `or` are SQL's three-valued and and or, and
-  `<` and `>` put NaN above every number, both infinities included. A column named alone
+  `<` and `>` put NaN above every number, both infinities included; `log10` is R's `log10()`,
+  zero's minus infinity and a negative number's NaN, a float, by `:math.log10`, which matches
+  R's to the last bit where a division of natural logarithms does not. A column named alone
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
-  none, raises `FunctionClauseError`; the mapping's expressions by name will reuse the grammar.
+  none, raises `FunctionClauseError`. **An implementation names the operations it runs**
+  (`operations/1`), the list frame every one, a test pinning the list, so a caller can refuse
+  what an engine cannot run before running it; a mapping's function by name is an expression in
+  this grammar.
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
   any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
   them, and the facet repeats a table across the panels; `summarise/3`, the first group-by
   aggregate, with the stats that count; `filter/2`, `mutate/2`, the `is_finite` and `and`
   operations and the `n_distinct` and `first` aggregates, with counting's rows, weights and carried
-  columns; `cut`, with binning's bins; `join/3`, the `or`, `not`, `<` and `>` operations and the
+  columns; `cut`, with binning's bins; `log10` and `operations/1`, with a mapping's functions by
+  name; `join/3`, the `or`, `not`, `<` and `>` operations and the
   `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
   and whiskers. Not designed ahead.
 - **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,

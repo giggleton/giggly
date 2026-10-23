@@ -15,7 +15,8 @@ entry beginning "An after_stat reads its stat's computed variables".
 ## Rules
 
 - **A value's shape is matched here and nowhere else.** `Plot` and the assembly ask this module
-  (`resolve/1`, `columns/1`, `stage/1`, `dtype/2`, `category/2`, `evaluate/2`, `title/2`) and
+  (`resolve/1`, `columns/1`, `stage/1`, `dtype/2`, `category/2`, `check/2`, `evaluate/2`,
+  `title/2`) and
   never match a tuple or a string themselves. Its boundary lists `Giggly.DataFrame` and
   `Giggly.AsCharacter`, which writes a factor's levels in its title; `Plot` lists it for the checks
   at the call and the assembly for evaluation and titles. **`Plot` calls
@@ -23,7 +24,8 @@ entry beginning "An after_stat reads its stat's computed variables".
   into `Coord` and `Geom` do.
 - **A plot holds each value resolved, and the mapping stays a map** (`Mapping.t()`, no struct): a
   column by its name as a string, a constant as `{:constant, term}`, an expression as its function
-  and its resolved arguments. A string in a held mapping is always a column.
+  and its resolved arguments, a function by name as its name and its resolved value. A string in
+  a held mapping is always a column.
 - **An atom or a string is a column; nothing else is read as a name.** `true`, `false` and `nil`
   are atoms and name none, and `2.5` is a constant, never the column `"2.5"`.
 - **A wrapper only where the type is ambiguous.** A number, a boolean, a date or a time is a
@@ -36,7 +38,10 @@ entry beginning "An after_stat reads its stat's computed variables".
   a factor or an after_stat of other than one value, a factor's options other than a keyword list
   of `levels:` and `ordered:`, each once (levels a list of one or more values a column can hold,
   of one type, integers and floats being one, none `nil` and none twice by `==`; `ordered:` a
-  boolean), and an after_stat inside another value. A refused argument refuses its expression.
+  boolean), an after_stat inside another value, an atom naming none of `:after_stat`,
+  `:constant`, `:factor` and the functions by name, the refusal listing them, and a function by
+  name given other than as many values as it takes, or a capture or a closure among them. A
+  refused argument refuses its expression.
 - **Kinds of value are function clauses, not a protocol**: they differ in what they are, not in
   how they run. A head that acts on a whole column is a clause that sees the column, never a
   function applied per row.
@@ -60,6 +65,15 @@ entry beginning "An after_stat reads its stat's computed variables".
   stat offers is `Plot`'s check at the call, `columns/1` naming them. It is the whole of a mapping
   value, never inside another, so it is refused in an expression, a factor or an after_stat;
   inside it, any value but another after_stat, a factor included.
+- **A function by name, `{:log10, [value]}`, is computed by the frame** (design-log §4, the
+  entries beginning "A mapping names a function only as a shortcut" and "A function by name's
+  value"): the names and how many values each takes are `@functions`, `functions/0`, each one
+  the list frame runs, which a test pins; `evaluate/2` hands the value to `DataFrame.mutate/2` as
+  it is, the frame's expression, since its value is a column, a constant or another function by
+  name. **`check/2` is the call's check against the table a layer draws**, which `Plot` runs on
+  each value once its columns are found: a function by name the table's engine runs
+  (`DataFrame.operations/1`), and given numbers where its value is a column of the table or a
+  constant, an after_stat's columns being the stat's output, unknown at the call.
 - **An expression's type is the frame's**, decided when its column enters the evaluated frame, so
   it is known only when the plot is run; a check that needs it runs then (the axis's kind, a
   computed weight). `dtype/2` answers at the call for a column and a constant and says `:computed`
@@ -67,7 +81,8 @@ entry beginning "An after_stat reads its stat's computed variables".
 - **A value's title is ggplot2's `make_labels()` read for Elixir**: a column's name; an
   expression's text, a capture of a `Kernel` operator written as the operator whether or not the
   compiler inlined it, an operand that is itself an operator's call in parentheses, any other
-  capture as `inspect/1` names its function; an after_stat's its value's, as ggplot2 strips
+  capture as `inspect/1` names its function; a function by name as a call to it,
+  `log10(carat)`; an after_stat's its value's, as ggplot2 strips
   `after_stat()`, never a fallback; `:none` for an expression with a closure anywhere in it; and
   for a constant its aesthetic's canonical name, as a fallback (`{:fallback, name}`), which the
   assembly ranks below any layer's title.

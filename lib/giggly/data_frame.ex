@@ -77,7 +77,9 @@ defmodule Giggly.DataFrame do
   #     parameters that are not row values: `{:is_finite, [x]}`, whether each number is finite,
   #     `{:and, [left, right]}` and `{:or, [left, right]}`, whether both or either are true, and
   #     `{:not, [x]}`, whether it is false, each a boolean; `{:<, [left, right]}` and `{:>, [left,
-  #     right]}`, whether one number is below or above another, a boolean; `{:cut, [x], breaks:
+  #     right]}`, whether one number is below or above another, a boolean; `{:log10, [x]}`, a
+  #     number's base-10 logarithm, a float, as R's `log10()` gives it, zero's minus infinity and
+  #     a negative number's NaN; `{:cut, [x], breaks:
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
@@ -91,6 +93,8 @@ defmodule Giggly.DataFrame do
   # infinities included, as Explorer orders a float. An
   # expression outside this vocabulary, or an operation given a column of the wrong type, whether
   # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
+  # An implementation names the operations it runs (`operations/1`), so a caller can refuse an
+  # expression the frame's engine cannot run before running it.
 
   # Its own boundary, exporting this module and `Giggly.DataFrame.Arithmetic`, R's arithmetic on
   # the doubles a frame holds: callers reach a frame through the functions below, so an
@@ -154,6 +158,7 @@ defmodule Giggly.DataFrame do
           | {:not, [expression()]}
           | {:<, [expression()]}
           | {:>, [expression()]}
+          | {:log10, [expression()]}
           | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."
@@ -199,6 +204,10 @@ defmodule Giggly.DataFrame do
   # Adds or replaces a column declared a category, as `put/4` describes.
   @doc false
   @callback put(t(), name(), list(), category()) :: t()
+
+  # The operations its expressions may name, as `operations/1` describes.
+  @doc false
+  @callback operations(t()) :: [atom()]
 
   # A category's declaration, as `category/2` describes.
   @doc false
@@ -379,6 +388,12 @@ defmodule Giggly.DataFrame do
   @spec put(t(), name(), list(), category()) :: t()
   def put(%implementation{} = frame, name, values, category),
     do: implementation.put(frame, name, values, category)
+
+  # The operations an expression may name that the frame's implementation runs as the Expressions
+  # comment above describes them: the list frame runs every one, and an engine those it can.
+  @doc false
+  @spec operations(t()) :: [atom()]
+  def operations(%implementation{} = frame), do: implementation.operations(frame)
 
   # How the category `name` is declared, its levels and whether it is ordered, as `put/4` would
   # declare it again: `{:category, levels: levels, ordered: ordered}`. Raises

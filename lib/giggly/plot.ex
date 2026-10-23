@@ -5586,6 +5586,7 @@ defmodule Giggly.Plot do
     unmet = Keyword.get(facts, :unmet, "neither its mapping nor the plot's maps it")
     check_inherited(plot, layer, before_stat, function)
     check_after_stat(layer, after_stat, function, facts)
+    check_computable(plot, layer, combined_mapping, function)
     check_accepted(layer.mapping, layer.accepted, function)
     check_required(given, Keyword.fetch!(facts, :required), function, unmet, Map.keys(after_stat))
     check_exclusive(before_stat, Keyword.get(facts, :exclusive, []), function)
@@ -6012,6 +6013,28 @@ defmodule Giggly.Plot do
           raise ArgumentError,
                 "#{given_message(layer, aesthetic, value, function)}, but " <>
                   uncomputed_message(name, computed)
+      end
+    end)
+  end
+
+  # Each value the layer draws with, its own or one it takes from the plot's mapping, its columns
+  # found, can be computed from the table it draws, as far as the call can tell
+  # (`Mapping.check/2`): each function it names by an atom one the table's engine runs, and given
+  # numbers where it takes them, where R fails when the plot is built ("non-numeric argument to
+  # mathematical function").
+  defp check_computable(plot, layer, mapping, function) do
+    table = drawn_table(plot, layer.data)
+
+    mapping
+    |> Enum.sort()
+    |> Enum.each(fn {aesthetic, value} ->
+      case Mapping.check(value, table) do
+        :ok ->
+          :ok
+
+        {:error, reason} ->
+          raise ArgumentError,
+                "#{given_message(layer, aesthetic, value, function)}, but #{reason}"
       end
     end)
   end

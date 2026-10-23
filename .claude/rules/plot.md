@@ -178,7 +178,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   fails with "object not found"; so the plot's mapping may name a column only layers' own tables
   hold. This covers what the plot itself knows — names, and which aesthetics a geom takes and
   needs; whether a column's type suits an axis is the scales' question, answered when the plot is
-  run. A facet's columns are named at the call, and none, one named twice, or a value that is not a
+  run. **Each value a layer draws with, its own or the plot's, is checked against the table it
+  draws by `Mapping.check/2`** once its columns are found: a function by name the table's engine
+  runs, given numbers where the call can tell its value's type, where R fails when the plot is
+  built ("non-numeric argument to mathematical function"). A facet's columns are named at the
+  call, and none, one named twice, or a value that is not a
   column reference is refused there; whether some table holds them all, and whether `nrow:` and
   `ncol:` hold the panels, are the facet's questions, answered when the plot is run, since a layer
   added later may bring a column and counting the panels is its computation.

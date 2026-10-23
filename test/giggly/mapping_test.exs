@@ -10,6 +10,14 @@ defmodule Giggly.MappingTest do
   # A stat's output, its columns named by atoms as every column Giggly computes is.
   @statistic DataFrame.new(count: [1.0, 3.0], prop: [0.25, 0.75], x: [1, 2])
 
+  # A frame implementation standing in for an engine that computes none of the functions a mapping
+  # names, as no frame Giggly has yet is: it answers only which operations it runs.
+  defmodule Engine do
+    defstruct []
+
+    def operations(%__MODULE__{}), do: [:and, :or]
+  end
+
   describe "resolve/1" do
     test "a column named by an atom or a string is held by its name as a string" do
       assert {Mapping.resolve(:hwy), Mapping.resolve("hwy")} === {{:ok, "hwy"}, {:ok, "hwy"}}
@@ -57,8 +65,68 @@ defmodule Giggly.MappingTest do
     end
 
     test "a tuple that is neither an expression nor a constant is refused" do
-      assert {:error, reason} = Mapping.resolve({:fctor, [:cyl]})
+      assert {:error, reason} = Mapping.resolve({"cyl", [:cyl]})
       assert reason =~ "a tuple is an expression"
+    end
+
+    test "an atom naming nothing a mapping knows is refused, naming each it knows" do
+      for name <- [:fctor, :sqrt] do
+        assert {:error, reason} = Mapping.resolve({name, [:cyl]})
+        assert reason =~ "#{inspect(name)} is none of the names a mapping knows"
+        assert reason =~ ":after_stat, :constant, :factor, :log10"
+        assert reason =~ "a capture, {&Module.function/arity, [values]}"
+      end
+    end
+
+    test "a function by name is held with its value resolved, inside an expression too" do
+      multiply = &Kernel.*/2
+
+      assert Enum.map(
+               [
+                 {:log10, [:carat]},
+                 {:log10, [{:log10, [:price]}]},
+                 {:log10, [100]},
+                 {multiply, [{:log10, [:price]}, 2]}
+               ],
+               &Mapping.resolve/1
+             ) === [
+               {:ok, {:log10, ["carat"]}},
+               {:ok, {:log10, [{:log10, ["price"]}]}},
+               {:ok, {:log10, [{:constant, 100}]}},
+               {:ok, {multiply, [{:log10, ["price"]}, {:constant, 2}]}}
+             ]
+    end
+
+    test "a capture or a closure inside a function by name is refused, the engine computing it" do
+      inside = [
+        {:log10, [{&Kernel.+/2, [:price, 1]}]},
+        {:log10, [{fn price -> price + 1 end, [:price]}]},
+        {:log10, [{:log10, [{&Kernel.+/2, [:price, 1]}]}]}
+      ]
+
+      for value <- inside do
+        assert {:error, reason} = Mapping.resolve(value)
+        assert reason =~ "computed by the table's engine, which runs no Elixir function"
+        assert reason =~ "{&:math.log10/1, [value]}"
+      end
+    end
+
+    test "a function by name given values not in a list, or other than one, is refused" do
+      assert {:error, not_a_list} = Mapping.resolve({:log10, :carat})
+      assert {:error, two} = Mapping.resolve({:log10, [:hwy, :cty]})
+      assert {:error, none} = Mapping.resolve({:log10, []})
+
+      assert not_a_list =~ "arguments are a list"
+      assert two =~ "log10 takes 1 argument(s), and the expression gives it 2"
+      assert none =~ "gives it 0"
+    end
+
+    test "a factor or an after_stat inside a function by name is refused, as in any expression" do
+      assert {:error, factor} = Mapping.resolve({:log10, [{:factor, [:cyl]}]})
+      assert {:error, after_stat} = Mapping.resolve({:log10, [{:after_stat, [:count]}]})
+
+      assert factor =~ "a factor reads a whole column"
+      assert after_stat =~ "an after_stat is the whole of a mapping value"
     end
 
     test "an expression whose arguments are not a list is refused" do
@@ -210,6 +278,10 @@ defmodule Giggly.MappingTest do
       assert Mapping.columns({:factor, ["cyl"], levels: [8, 4]}) === ["cyl"]
     end
 
+    test "a function by name reads its value's columns" do
+      assert Mapping.columns({:log10, [{:log10, ["price"]}]}) === ["price"]
+    end
+
     test "an after_stat's columns are the stat's variables its value reads" do
       {:ok, value} = Mapping.resolve({:after_stat, [{&Kernel.//2, [:count, :prop]}]})
 
@@ -225,6 +297,10 @@ defmodule Giggly.MappingTest do
               Mapping.dtype(expression, @frame)} === {:string, :float, :computed}
     end
 
+    test "a function by name's type is not known at the call, as an expression's" do
+      assert Mapping.dtype({:log10, ["hwy"]}, @frame) === :computed
+    end
+
     test "a factor's type is a category, whatever its value's" do
       assert Mapping.dtype({:factor, ["hwy"]}, @frame) === :category
     end
@@ -237,6 +313,78 @@ defmodule Giggly.MappingTest do
       assert {Mapping.dtype({:after_stat, ["count"]}, @statistic),
               Mapping.dtype({:after_stat, [{:factor, ["count"]}]}, @statistic)} ===
                {:float, :category}
+    end
+  end
+
+  describe "functions/0" do
+    test "the frame computes every function a mapping names" do
+      assert Mapping.functions() -- DataFrame.operations(@frame) === []
+    end
+  end
+
+  describe "check/2" do
+    test "a function by name given numbers, a column, a constant or itself, can be computed" do
+      table = DataFrame.new([{"hwy", [29, 24]}, {"weight", [2.5, nil]}, {"gap", [nil, nil]}])
+
+      values = [
+        "hwy",
+        {:log10, ["hwy"]},
+        {:log10, ["weight"]},
+        {:log10, ["gap"]},
+        {:log10, [{:constant, 100}]},
+        {:log10, [{:log10, ["hwy"]}]},
+        {:factor, [{:log10, ["hwy"]}]}
+      ]
+
+      assert Enum.map(values, fn value -> Mapping.check(value, table) end) ===
+               List.duplicate(:ok, 7)
+    end
+
+    # R's log10() fails on text ("non-numeric argument to mathematical function"), a factor
+    # ("'log10' not meaningful for factors") and a date; it reads TRUE as 1, Giggly's frame, as
+    # Explorer's, never reading a boolean as a number.
+    test "a function by name given a column or a constant that is not numbers is refused" do
+      table =
+        DataFrame.new([
+          {"class", ["suv", "compact"]},
+          {"cut", ["Fair", "Good"], :category},
+          {"day", [~D[2026-10-22], ~D[2026-10-23]]},
+          {"am", [true, false]}
+        ])
+
+      refusals = [
+        {{:log10, ["class"]}, ~s{log10 takes numbers, and "class" is a :string column}},
+        {{:log10, ["cut"]}, ~s{"cut" is a :category column}},
+        {{:log10, ["day"]}, ~s{"day" is a :date column}},
+        {{:log10, ["am"]}, ~s{"am" is a :boolean column}},
+        {{:log10, [{:constant, true}]}, "true is a :boolean constant"},
+        {{:log10, [{:log10, [{:constant, "a"}]}]}, ~s{"a" is a :string constant}},
+        {{:factor, [{:log10, ["class"]}], ordered: true}, ~s{"class" is a :string column}},
+        {{&Kernel.*/2, [{:log10, ["class"]}, {:constant, 2}]}, ~s{"class" is a :string column}}
+      ]
+
+      for {value, cause} <- refusals do
+        assert {:error, reason} = Mapping.check(value, table)
+        assert reason =~ cause
+      end
+    end
+
+    test "an after_stat's columns are the stat's output, unknown at the call, its constants not" do
+      table = DataFrame.new([{"count", ["a", "b"]}])
+
+      assert Mapping.check({:after_stat, [{:log10, ["count"]}]}, table) === :ok
+
+      assert {:error, reason} =
+               Mapping.check({:after_stat, [{:log10, [{:constant, "a"}]}]}, table)
+
+      assert reason =~ ~s{"a" is a :string constant}
+    end
+
+    test "a function by name the table's engine cannot compute is refused, naming it" do
+      assert Mapping.check({:factor, ["hwy"]}, %Engine{}) === :ok
+
+      assert Mapping.check({:after_stat, [{:log10, ["count"]}]}, %Engine{}) ===
+               {:error, "the engine holding the table cannot compute log10"}
     end
   end
 
@@ -260,6 +408,16 @@ defmodule Giggly.MappingTest do
       assert Mapping.evaluate({:factor, ["hwy"], levels: [31, 29]}, @frame) === [29, 24, 31]
     end
 
+    test "a function by name is what the frame computes, R's log10 at zero, below it and missing" do
+      frame = DataFrame.new([{"carat", [1000, 0.0, -1.0, nil]}])
+      {:ok, nested} = Mapping.resolve({&Kernel.*/2, [{:log10, [:hwy]}, 2]})
+
+      # R's log10(c(29, 24, 31)) * 2, as Erlang's :math.log10 gives it, digit for digit.
+      assert {Mapping.evaluate({:log10, ["carat"]}, frame), Mapping.evaluate(nested, @frame)} ===
+               {[3.0, :neg_infinity, :nan, nil],
+                [2.924795995797912, 2.760422483423212, 2.9827233876685453]}
+    end
+
     test "a function of no arguments gives a value in every row" do
       assert Mapping.evaluate({fn -> 1 end, []}, @frame) === [1, 1, 1]
     end
@@ -268,8 +426,9 @@ defmodule Giggly.MappingTest do
       {:ok, value} = Mapping.resolve({:after_stat, [{&Kernel.*/2, [:prop, 100]}]})
 
       assert {Mapping.evaluate(value, @statistic),
-              Mapping.evaluate({:after_stat, ["count"]}, @statistic)} ===
-               {[25.0, 75.0], [1.0, 3.0]}
+              Mapping.evaluate({:after_stat, ["count"]}, @statistic),
+              Mapping.evaluate({:after_stat, [{:log10, ["count"]}]}, @statistic)} ===
+               {[25.0, 75.0], [1.0, 3.0], [0.0, 0.47712125471966244]}
     end
   end
 
@@ -365,6 +524,30 @@ defmodule Giggly.MappingTest do
       assert {Mapping.title({&:math.log10/1, ["carat"]}, :x),
               Mapping.title({&String.pad_leading/2, ["class", {:constant, 3}]}, :x)} ===
                {{:title, ":math.log10(carat)"}, {:title, "String.pad_leading(class, 3)"}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(log10(carat))` `log10(carat)`, and so
+    # `log10(log10(price))`, `log10(100)`, `log10(price) * 2`, `factor(log10(cyl))` and
+    # `after_stat(log10(count))` `log10(count)`.
+    test "a function by name is titled as a call to it, its value's text inside" do
+      assert Enum.map(
+               [
+                 {:log10, ["carat"]},
+                 {:log10, [{:log10, ["price"]}]},
+                 {:log10, [{:constant, 100}]},
+                 {&Kernel.*/2, [{:log10, ["price"]}, {:constant, 2}]},
+                 {:factor, [{:log10, ["cyl"]}]},
+                 {:after_stat, [{:log10, ["count"]}]}
+               ],
+               fn value -> Mapping.title(value, :x) end
+             ) === [
+               {:title, "log10(carat)"},
+               {:title, "log10(log10(price))"},
+               {:title, "log10(100)"},
+               {:title, "log10(price) * 2"},
+               {:title, "factor(log10(cyl))"},
+               {:title, "log10(count)"}
+             ]
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 titles `aes(colour = factor(cyl))` `factor(cyl)`.

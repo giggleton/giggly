@@ -13,6 +13,12 @@ defmodule Giggly.Mapping do
       its arguments are in that row, so `{&Kernel.//2, [:hwy, :cty]}` divides each row's `hwy` by
       its `cty`. Each argument is a value, so it may be a column, a constant or another expression,
       and the function takes as many arguments as it is given.
+    * **A function by name**, `{:log10, [value]}`, is a common function Elixir lacks, computed by
+      the engine holding the table: `log10` is the base-10 logarithm, minus infinity for 0, NaN
+      for a negative number and missing for a missing value. Its value is a column, a constant
+      or another function by name, never a capture or a closure, which the engine cannot run, so
+      the logarithm of what a capture computes is a capture too, `{&:math.log10/1, [value]}`.
+      Any other function is written as a capture.
     * **A constant**, `{:constant, term}`, is the term in every row. A number, a boolean, a date or
       a time is a constant written alone; a string or an atom would name a column, so a constant
       one is written `{:constant, "smooth"}`.
@@ -35,7 +41,9 @@ defmodule Giggly.Mapping do
   A constant is a value a column can hold: `nil`, a list, and a value with no column type of its
   own (a map, a tuple, a struct other than a date or a time) are refused, and so are a function
   alone, a tuple that is neither an expression nor a constant, and a function given a number of
-  arguments it does not take. A factor's levels are refused unless they are a list of one or more
+  arguments it does not take. A function by name is refused where the table's engine cannot run
+  it, and `log10` where its value is a column or a constant that is not numbers, a factor's
+  column among them. A factor's levels are refused unless they are a list of one or more
   values a column can hold, of one type, none of them `nil` and none given twice (`4` and `4.0`
   are one); levels of another type than the value's are refused when the plot is run. A layer
   whose stat computes nothing, and so documents no variables, refuses every after_stat.
@@ -77,6 +85,7 @@ defmodule Giggly.Mapping do
     * an expression by its text, as Elixir writes the call: a capture of one of `Kernel`'s
       operators as the operator, `hwy / cty`, and any other capture as a call to the function it
       names, `:math.log10(carat)`, as `inspect/1` names it;
+    * a function by name as a call to it, `log10(carat)`;
     * an expression whose function is a closure, such as `fn hwy -> hwy * 2 end`, has no text, so
       its guide has no title until `Giggly.Plot.labs/2` gives it one;
     * a factor by its value's text inside `factor()`, `factor(cyl)`, and its options as R writes
@@ -87,6 +96,15 @@ defmodule Giggly.Mapping do
 
   So a capture is the form to write where the title should say what was computed, and a closure
   the form to write inline, with a title from `labs/2`.
+
+      iex> svg =
+      ...>   %{"carat" => [0.23, 1.5], "price" => [326, 18823]}
+      ...>   |> Giggly.Plot.new(%{x: {:log10, [:carat]}, y: {:log10, [:price]}})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> svg =~ ">log10(carat)</text>" and svg =~ ">log10(price)</text>"
+      true
 
       iex> svg =
       ...>   %{"hwy" => [29, 24], "cty" => [18, 16]}
@@ -100,11 +118,13 @@ defmodule Giggly.Mapping do
 
   # The grammar of a mapping value, and the one place its shapes are matched: `Giggly.Plot` resolves
   # each value as it enters (`resolve/1`) and checks the columns it reads (`columns/1`) and, for a
-  # weight, its type where the call can tell it (`dtype/2`); the assembly evaluates it against a
+  # weight, its type where the call can tell it (`dtype/2`), and whether the table it draws can
+  # compute it (`check/2`); the assembly evaluates it against a
   # layer's table (`evaluate/2`) and titles its guide (`title/2`). A value is held resolved: a
   # column by its name as a string, a constant as `{:constant, term}`, a factor as
   # `{:factor, [resolved]}`, an after_stat as `{:after_stat, [resolved]}`, an expression as its
-  # function and its resolved arguments. When a value is evaluated is its stage (`stage/1`): an
+  # function or its name and its resolved arguments, a function by name so being an expression
+  # the frame computes as it is. When a value is evaluated is its stage (`stage/1`): an
   # after_stat's against its stat's output, every other against the layer's data. A value's
   # kinds differ in what they are, not in how they run, so they are function clauses rather than a
   # protocol. `Plot` calls only the checks; that holds by review, as the assembly's calls into
@@ -146,11 +166,19 @@ defmodule Giggly.Mapping do
              end)
              |> Map.new()
 
+  # The functions a mapping names by an atom, each with how many arguments it takes: common ones
+  # Elixir lacks, which the engine holding the table computes (design-log §4, the entry beginning
+  # "A mapping names a function only as a shortcut").
+  @functions %{log10: 1}
+
   @typedoc "A column, named by an atom or a string."
   @type column :: atom() | String.t()
 
-  @typedoc "An expression: a function and the values it is applied to in each row."
-  @type expression :: {function(), [value()]}
+  @typedoc """
+  An expression: a function and the values it is applied to in each row, or a function by name
+  and the value it is computed from.
+  """
+  @type expression :: {function(), [value()]} | {:log10, [value()]}
 
   @typedoc """
   A constant: `{:constant, term}`, or a number, a boolean, a date or a time written alone.
@@ -185,6 +213,7 @@ defmodule Giggly.Mapping do
           | {:factor, [resolved()], [levels: [term()], ordered: boolean()]}
           | {:after_stat, [resolved()]}
           | {function(), [resolved()]}
+          | {:log10, [resolved()]}
 
   @typedoc "A mapping as a plot holds it: aesthetic to resolved value."
   @type t :: %{optional(atom()) => resolved()}
@@ -224,8 +253,21 @@ defmodule Giggly.Mapping do
   def resolve({function, arguments}) when is_function(function) and is_list(arguments),
     do: expression(function, arguments)
 
-  def resolve({function, _arguments}) when is_function(function),
-    do: {:error, "an expression's arguments are a list of values"}
+  def resolve({name, arguments}) when is_map_key(@functions, name) and is_list(arguments),
+    do: named(name, arguments)
+
+  def resolve({function, _arguments})
+      when is_function(function) or is_map_key(@functions, function),
+      do: {:error, "an expression's arguments are a list of values"}
+
+  def resolve({name, arguments}) when is_atom(name) and is_list(arguments) do
+    known = Enum.sort([:after_stat, :constant, :factor | functions()])
+
+    {:error,
+     "#{inspect(name)} is none of the names a mapping knows " <>
+       "(#{Enum.map_join(known, ", ", &inspect/1)}); any other function is a capture, " <>
+       "{&Module.function/arity, [values]}"}
+  end
 
   def resolve(value) when is_tuple(value),
     do:
@@ -234,21 +276,52 @@ defmodule Giggly.Mapping do
   def resolve(value), do: constant(value)
 
   defp expression(function, arguments) when is_function(function, length(arguments)) do
-    resolved = Enum.map(arguments, &argument/1)
-
-    case Enum.find(resolved, fn result -> match?({:error, _reason}, result) end) do
-      nil -> {:ok, {function, Enum.map(resolved, fn {:ok, argument} -> argument end)}}
-      error -> error
-    end
+    with {:ok, resolved} <- each_resolved(arguments, &argument/1), do: {:ok, {function, resolved}}
   end
 
   defp expression(function, arguments) do
     {:arity, arity} = Function.info(function, :arity)
+    arity_error(inspect(function), arity, arguments)
+  end
 
+  # A function by name, given as many values as it takes, none of them a function.
+  defp named(name, arguments) do
+    case Map.fetch!(@functions, name) do
+      arity when arity == length(arguments) ->
+        with {:ok, resolved} <- each_resolved(arguments, &named_argument/1),
+             do: {:ok, {name, resolved}}
+
+      arity ->
+        arity_error(Atom.to_string(name), arity, arguments)
+    end
+  end
+
+  defp arity_error(function_text, arity, arguments) do
     {:error,
-     "#{inspect(function)} takes #{arity} argument(s), and the expression gives it " <>
+     "#{function_text} takes #{arity} argument(s), and the expression gives it " <>
        "#{length(arguments)}"}
   end
+
+  # Each of `arguments` as `resolve_argument` resolves it, or the first refusal.
+  defp each_resolved(arguments, resolve_argument) do
+    resolved = Enum.map(arguments, resolve_argument)
+
+    case Enum.find(resolved, fn result -> match?({:error, _reason}, result) end) do
+      nil -> {:ok, Enum.map(resolved, fn {:ok, argument} -> argument end)}
+      error -> error
+    end
+  end
+
+  # A function by name's argument: any value an expression takes but a capture or a closure, which
+  # the table's engine cannot run, so the engine computes a function by name whole.
+  defp named_argument({function, _arguments}) when is_function(function),
+    do:
+      {:error,
+       "a function by name is computed by the table's engine, which runs no Elixir function, " <>
+         "so its values are columns, constants and functions by name; write the whole as a " <>
+         "capture instead, such as {&:math.log10/1, [value]}"}
+
+  defp named_argument(value), do: argument(value)
 
   # An expression's argument: any value inside another but a factor, which reads a whole column as
   # discrete, as R hands a function its level codes, where a function applied in each row sees one
@@ -422,6 +495,65 @@ defmodule Giggly.Mapping do
 
   defp column_names({:factor, [value], _options}), do: column_names(value)
 
+  # The functions a mapping names by an atom, each of which the frame computes.
+  @doc false
+  @spec functions() :: [atom()]
+  def functions, do: Map.keys(@functions)
+
+  # Whether `value` can be computed from `table`, the table it is evaluated against, as far as the
+  # call can tell, or why not, worded to follow "maps :x to …, but": each function it names by an
+  # atom one the engine holding the table runs (`DataFrame.operations/1`), and each of their
+  # values whose type the call can tell, a column of the table or a constant, numbers. An
+  # after_stat's columns are its stat's output, whose types are known only when the plot is run.
+  @doc false
+  @spec check(resolved(), DataFrame.t()) :: :ok | {:error, String.t()}
+  def check(value, table) do
+    operations = DataFrame.operations(table)
+    stage = stage(value)
+
+    value
+    |> calls()
+    |> first_refusal(fn call -> call_refusal(call, operations, table, stage) end)
+  end
+
+  # Each function by name `value` calls, with its values, outermost first.
+  defp calls(name) when is_binary(name), do: []
+  defp calls({:constant, _term}), do: []
+  defp calls({:factor, [value], _options}), do: calls(value)
+
+  defp calls({name, arguments} = call) when is_map_key(@functions, name),
+    do: [call | Enum.flat_map(arguments, &calls/1)]
+
+  # An expression's arguments, or a factor's or an after_stat's one value.
+  defp calls({_function_or_head, arguments}), do: Enum.flat_map(arguments, &calls/1)
+
+  defp call_refusal({name, arguments}, operations, table, stage) do
+    if name in operations,
+      do:
+        first_refusal(arguments, fn argument -> numbers_refusal(name, argument, table, stage) end),
+      else: {:error, "the engine holding the table cannot compute #{name}"}
+  end
+
+  # A value of a function that takes numbers is refused where the call can tell it holds none.
+  defp numbers_refusal(name, argument, table, stage) do
+    case known_dtype(argument, table, stage) do
+      dtype when dtype in [:integer, :float, :null, :computed] ->
+        :ok
+
+      dtype ->
+        {:error, "#{name} takes numbers, and #{typed_text(argument, dtype)}"}
+    end
+  end
+
+  defp known_dtype(name, _table, :after_stat) when is_binary(name), do: :computed
+  defp known_dtype(value, table, _stage), do: dtype(value, table)
+
+  defp typed_text(name, dtype) when is_binary(name),
+    do: "#{inspect(name)} is a #{inspect(dtype)} column"
+
+  defp typed_text({:constant, term}, dtype),
+    do: "#{inspect(term)} is a #{inspect(dtype)} constant"
+
   # The type of the column `value` makes from `table`, the table it is evaluated against (the stat's
   # output for an after_stat, which is known only when the plot is run), where it can be told: a
   # column's own and a constant's, as the frame types them; `:category` for a factor, which the
@@ -449,8 +581,9 @@ defmodule Giggly.Mapping do
   end
 
   # What `value` is in each row of `frame`, in row order: a column's values, a constant in every
-  # row, or an expression's function applied in each row to its arguments' values there, a
-  # function of no arguments called once per row. An after_stat's `frame` is its stat's output.
+  # row, a function by name as the frame computes it, or an expression's function applied in each
+  # row to its arguments' values there, a function of no arguments called once per row. An
+  # after_stat's `frame` is its stat's output.
   @doc false
   @spec evaluate(resolved(), DataFrame.t()) :: list()
   def evaluate(name, frame) when is_binary(name), do: DataFrame.pull(frame, name)
@@ -461,6 +594,15 @@ defmodule Giggly.Mapping do
   def evaluate({:factor, [value]}, frame), do: evaluate(value, frame)
   def evaluate({:factor, [value], _options}, frame), do: evaluate(value, frame)
   def evaluate({:after_stat, [value]}, statistic), do: evaluate(value, by_name(statistic))
+
+  # A function by name is computed by the frame, whose expression it already is: its columns by
+  # name, its constants and its functions by name. Its column is named by an atom, which no column
+  # of a table is.
+  def evaluate({name, _arguments} = expression, frame) when is_map_key(@functions, name) do
+    frame
+    |> DataFrame.mutate(evaluated: expression)
+    |> DataFrame.pull(:evaluated)
+  end
 
   def evaluate({function, []}, frame) do
     rows = DataFrame.row_count(frame)
@@ -546,6 +688,9 @@ defmodule Giggly.Mapping do
       written -> "factor(#{Enum.join([written | Enum.map(options, &option_text/1)], ", ")})"
     end
   end
+
+  defp text({name, arguments}) when is_map_key(@functions, name),
+    do: "#{name}(#{Enum.map_join(arguments, ", ", &text/1)})"
 
   defp text({function, arguments}) do
     texts = Enum.map(arguments, &text/1)

@@ -126,6 +126,43 @@ defmodule Giggly.PlotTest do
       assert error.message =~ ":category"
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails to build `ggplot(mpg, aes(log10(class), hwy)) +
+    # geom_point()`: "non-numeric argument to mathematical function".
+    test "a function by name given a column that is not numbers is refused by the layer" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      own =
+        assert_raise ArgumentError, fn -> Plot.geom_point(plot, %{y: {:log10, [:cyl]}}) end
+
+      inherited =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new(%{x: :wt, y: {:log10, [:cyl]}})
+          |> Plot.geom_point()
+        end
+
+      assert String.starts_with?(
+               own.message,
+               ~s(Plot.geom_point/3 maps :y to {:log10, ["cyl"]}, but )
+             )
+
+      assert String.starts_with?(
+               inherited.message,
+               ~s(Plot.geom_point/3 takes :y from the plot's mapping, which maps it to ) <>
+                 ~s({:log10, ["cyl"]}, but )
+             )
+
+      assert {own.message =~ ":string column", inherited.message =~ ":string column"} ===
+               {true, true}
+    end
+
+    test "a plot's function by name is checked against each layer's table, not at new/2" do
+      plot = Plot.new(@rows, %{x: :wt, y: {:log10, [:cyl]}})
+      own = %{"wt" => [3.0], "cyl" => [6]}
+
+      assert [%Plot.Layer{}] = Plot.geom_point(plot, data: own).reversed_layers
+    end
+
     test "an expression's weight is not checked at the call, its type known only when run" do
       plot = Plot.new(@rows, %{x: :cyl})
 

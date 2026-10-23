@@ -2068,6 +2068,22 @@ defmodule GigglyTest do
       assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :group)} === {[2, 1, 2], [2, 1, 2]}
     end
 
+    # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data() of ggplot(d, aes(log10(x), y)) +
+    # geom_point() for x of 0, -1, NA, NaN, 1, 10 and 100: x is -Inf, NA, NA, NA, 0, 1, 2 ("NaNs
+    # produced"), the x scale's range 0 to 2, the finite values alone, and the three missing rows
+    # are not drawn.
+    test "log10 by name is R's, its minus infinity kept and its NaN missing on the axis" do
+      plot =
+        %{"x" => [0, -1, nil, :nan, 1, 10, 100], "y" => [1, 2, 3, 4, 5, 6, 7]}
+        |> Plot.new(%{x: {:log10, [:x]}, y: :y})
+        |> Plot.geom_point()
+
+      frame = Giggly.layer_data(plot)
+
+      assert {DataFrame.pull(frame, :x), Giggly.panel_scales(plot).x.range} ===
+               {[:neg_infinity, nil, nil, nil, 0.0, 1.0, 2.0], {0.0, 2.0}}
+    end
+
     test "an expression whose results are of two types is refused when run, naming its aesthetic" do
       either = fn value -> if value == 1, do: 1, else: "a" end
 

@@ -113,12 +113,26 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   titled `log10(carat)`, as R titles it, and computed by the frame's `mutate/2` as R computes it
   (0 gives minus infinity, a negative number NaN, a missing value passes through); each frame
   implementation says which names it runs, Lists all of them, which a test pins, and the call
-  refuses a name the table's engine cannot run. `{&Kernel.//2, [:hwy, :cty]}` and Kernel's other
+  refuses a name the table's engine cannot run, and one given a column or a constant that is not
+  numbers, as R fails ("non-numeric argument to mathematical function"), a boolean too, which R
+  reads as 1 or 0, since the frame, as Explorer's, reads none as a number. `{&Kernel.//2, [:hwy,
+  :cty]}` and Kernel's other
   operators stay captures, titled as Elixir writes them and computed on lists, as any function
   is; an engine could later run them by recognising the capture, as titles already do. `sqrt`,
   `log`, `exp` and the rest arrive with their callers. *Rejected: the operators by name*
   (`{:/, [:hwy, :cty]}`, proposed, all their families or only those the notebooks write) — a
   second spelling of a function Elixir already has.
+
+- **A function by name's value is a column, a constant or another function by name, never a
+  capture or a closure (2026-10-22, Steve, building step 5: "A").** The engine computes a
+  function by name whole, so it runs every value it reads and the call can check every type.
+  `log10(price + 1)` stays a capture throughout, `{&:math.log10/1, [{&Kernel.+/2, [:price,
+  1]}]}`, titled `:math.log10(price + 1)`, as it drew before; no caller writes one, the
+  notebooks, r4ds and the ggplot2 book applying `log10()` to a bare column only. A function by
+  name inside a capture (`log10(price) * 2`) is computed by the frame and handed to the capture.
+  *Rejected: accepting a capture inside* (the capture computed on lists and handed to the frame
+  as a column, titled as R's) — a temporary column, a type known only when run, and no caller;
+  it can arrive later without breaking anything.
 
 - **Viridis joins the tenth increment: `scale_color_viridis_d/2`, `scale_fill_viridis_d/2`, their
   `_c` forms, an ordered factor's default colour and fill scale, and `Giggly.Datasets.txhousing/0`
@@ -483,7 +497,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   frame operations* — dodge2's per-bar steps need arithmetic in expressions, a sort and an ordered
   running sum within groups, three new kinds of operation whose first caller would be a table
   drawn at once; the running sum arrives with a stat that needs it (`stat_ecdf()`), arithmetic
-  with expressions by name.
+  with an engine that runs the operators' captures (the entry beginning "A mapping names a
+  function only as a shortcut").
 
 - **`Plot.position_dodge2/1` arrives with dodging by clusters, taking `preserve:`, `padding:` and
   `reverse:` (2026-10-22, Steve, scoping distributions' step 5).** It returns `%Position.Dodge2{}`,
@@ -2282,6 +2297,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Map log10 by name, computed by the table's frame (ordering, step 5); §4: "A
+  mapping names a function only as a shortcut" (amended), "A function by name's value is a
+  column, a constant or another function by name"
 - 2026-10-22 — Add the viridis scales and txhousing, and colour an ordered factor by viridis
   (ordering, step 4); §4: "Viridis joins the tenth increment" (amended), "`scale_*_viridis_c/2`
   takes no `alpha:`"
@@ -2543,7 +2561,7 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   `summarise` with count, sum, min, max, mean, quantile, and window functions for cumulative
   sums; (2) a mapping's expressions by name (`{:log10, [:carat]}`), the engine validating each
   name at the call and refusing what it cannot run, an Elixir function kept as the Lists-only
-  escape; (3) with the first engine, the stages before the stat as columns and aggregates — the
+  escape (built for `log10` 2026-10-22, a capture inside one refused); (3) with the first engine, the stages before the stat as columns and aggregates — the
   facet writing `panel` by a join rather than `split/2`, `group` as a window rank, training as
   one batched aggregate per layer, discrete mapping as a join against the level table — and
   `Plot.new/2` taking an engine's handle as itself, `Table.Reader` for Lists alone; a lazy
@@ -2555,11 +2573,13 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   does the same binning in SQL and smooths the small result in the client) but not in its
   convolution, which runs on the 512; loess and gam smooths are not relational, `lm` with one
   predictor is (sufficient statistics, SQL's `regr_*`); R's doubles to the last digit hold for Lists and become a
-  conformance suite with tolerances for engines whose summation or quantile differs (Polars sums
-  pairwise, DuckDB compensated, Postgres plain; `percentile_cont` exists in Postgres alone;
-  Explorer 0.13's `quantile` in a query is hard-coded to nearest-rank interpolation, not R's
-  type 7, so an Explorer engine refuses a box's hinges or computes them otherwise, checked
-  2026-10-21 in its `expressions.rs`).
+  conformance suite with tolerances for engines whose summation, quantile or logarithm differs
+  (Polars sums pairwise, DuckDB compensated, Postgres plain; `percentile_cont` exists in Postgres
+  alone; Explorer 0.13's `quantile` in a query is hard-coded to nearest-rank interpolation, not
+  R's type 7, so an Explorer engine refuses a box's hinges or computes them otherwise, checked
+  2026-10-21 in its `expressions.rs`; it has no `log10`, only `log(x, 10)`, which divides natural
+  logarithms and misses R's `log10()` in the last bit on 7,144 of 12,064 values tried, where
+  Erlang's `:math.log10`, the list frame's, matched R on all, checked 2026-10-22 by running it).
   **The precedent is Mosaic** (uwdata/mosaic, read from its source 2026-10-20: `packages/mosaic/
   sql/src/transforms/`, `packages/mosaic/core/src/`, `packages/vgplot/plot/src/marks/`), a
   JavaScript grammar whose marks are clients of a coordinator and compute in DuckDB; no Elixir
