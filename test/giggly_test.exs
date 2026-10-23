@@ -7440,10 +7440,36 @@ defmodule GigglyTest do
       assert golden?(plot, "theme_colorbar")
     end
 
+    # Golden: test/golden/theme_margins.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_margins.R: every element and clip path matches but svglite's around
+    # the whole drawing. Margins on sides theme_gray() leaves at 0 are counted where ggplot2 counts
+    # them: below the x axis's labels, above the title, below the caption, and right of a legend's
+    # title, which then makes the legend wider; a legend with no labels keeps its keys' height
+    # whatever size its labels' text. It moves with what moves test/golden/labs.svg, and with how
+    # a title, an axis or a legend is measured.
+    test "theme margins count on every side ggplot2 counts, and labels a legend lacks take no room" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, colour: {:factor, [:cyl]}})
+        |> Plot.geom_point()
+        |> Plot.labs(title: "Fuel economy", subtitle: "By weight", caption: "A caption")
+        |> Plot.scale_color_discrete(labels: :none)
+        |> Plot.theme(
+          axis_text_x: [margin: [top: 2, bottom: 3]],
+          plot_title: [margin: [top: 6, bottom: 4]],
+          plot_caption: [margin: [top: 2, bottom: 5]],
+          legend_title: [margin: [right: 40]],
+          legend_text: [size: 30]
+        )
+
+      assert golden?(plot, "theme_margins")
+    end
+
     # Golden: test/golden/theme_radial.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/theme_radial.R: every element matches, and every clip path but svglite's
-    # around the whole drawing. A radial panel's angle and radius axes take their own elements. It
-    # moves with what moves test/golden/radial.svg.
+    # around the whole drawing. A radial panel's angle and radius axes take their own elements, and
+    # ticks turned into the circle leave the labels their margin from its edge. It moves with what
+    # moves test/golden/radial.svg.
     test "theme settings style a radial panel's angle and radius axes apart" do
       plot =
         Giggly.Datasets.mpg()
@@ -7452,7 +7478,7 @@ defmodule GigglyTest do
         |> Plot.coord_radial()
         |> Plot.theme(
           axis_text_theta: [colour: "blue", margin: [top: 8]],
-          axis_ticks_length_theta: {4, :pt},
+          axis_ticks_length_theta: {-4, :pt},
           axis_ticks_r: [colour: "red"],
           axis_text_r: [margin: [left: 2, right: 6]],
           panel_grid_major_x: [colour: "#00FF00"]

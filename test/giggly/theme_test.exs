@@ -77,6 +77,10 @@ defmodule Giggly.ThemeTest do
                {72.0, 8.5039370078740149, 5.7600000000000016, 28.799999999999997}
     end
 
+    test "a title's size is a number of points as a float, though given a whole number" do
+      assert complete(%{axis_title: %{size: 12}}).axis_title_x_bottom.size === 12.0
+    end
+
     # ggplot2's colour bar sets its own white ticks only where the theme leaves `legend.ticks`
     # unset (`replace_null()`), so a colour the theme gives every line does not reach them, and one
     # it gives the ticks takes the width of the theme's lines.
@@ -85,6 +89,13 @@ defmodule Giggly.ThemeTest do
               complete(%{legend_ticks: %{color: "#000000"}}).legend_ticks} ===
                {%{color: "#FFFFFF", line_width: 0.375},
                 %{color: "#000000", line_width: 1.0669783464566929}}
+    end
+
+    # Golden: ggplot2 4.0.3 draws a colour bar's ticks black and 2.13 points wide for
+    # `legend.ticks = element_line(linewidth = 1)`, the colour every line inherits.
+    test "a colour bar's ticks the theme sets without a colour take the lines' ink" do
+      assert complete(%{legend_ticks: %{linewidth: 1}}).legend_ticks ===
+               %{color: "#000000", line_width: 2.1339566929133857}
     end
   end
 

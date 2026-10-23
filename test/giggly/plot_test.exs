@@ -3933,6 +3933,25 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a size or a line width of 0, a share of a margin and a border of :none are taken" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(
+          axis_text: [size: 0],
+          panel_grid: [linewidth: {:rel, 0}],
+          legend_margin: {:rel, 2},
+          panel_background: [color: :none]
+        )
+
+      assert plot.theme.settings === %{
+               axis_text: %{size: 0},
+               panel_grid: %{linewidth: {:rel, 0}},
+               legend_margin: {:rel, 2},
+               panel_background: %{color: :none}
+             }
+    end
+
     test "an element the theme does not know, or a property its kind does not have, is refused" do
       plot = Plot.new(@rows)
 
@@ -3957,7 +3976,10 @@ defmodule Giggly.PlotTest do
             {[spacing: {1, :px}], {:spacing, []}, {1, :px}},
             {[plot_margin: [top: 1, top: 2]], {:plot_margin, []}, [top: 1, top: 2]},
             {[plot_margin: [middle: 1]], {:plot_margin, []}, [middle: 1]},
-            {[axis_text: [margin: {:rel, 2}]], {:margin, [:axis_text]}, {:rel, 2}}
+            {[axis_text: [margin: {:rel, 2}]], {:margin, [:axis_text]}, {:rel, 2}},
+            {[axis_text: [color: "grey50"]], {:color, [:axis_text]}, "grey50"},
+            {[spacing: {:rel, "a"}], {:spacing, []}, {:rel, "a"}},
+            {[plot_margin: [top: "x"]], {:plot_margin, []}, [top: "x"]}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert {{error.key, error.keys_path}, error.message =~ inspect(value)} == {key, true}

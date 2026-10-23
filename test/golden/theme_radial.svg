@@ -261,18 +261,18 @@
 <circle cx='474.47' cy='280.15' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
 <circle cx='474.47' cy='280.15' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
 <circle cx='442.61' cy='354.00' r='1.95' style='stroke-width: 0.71; stroke: #000000; fill: #000000;' />
-<text x='527.30' y='105.59' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>2</text>
-<text x='604.99' y='330.61' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>3</text>
-<text x='449.99' y='508.91' text-anchor='middle' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>4</text>
-<text x='220.20' y='458.91' text-anchor='end' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>5</text>
-<text x='149.67' y='231.53' text-anchor='end' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>6</text>
-<text x='310.23' y='58.33' text-anchor='middle' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>7</text>
-<polyline points='520.37,113.94 522.97,110.91 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
-<polyline points='593.31,324.67 597.22,325.45 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
-<polyline points='445.50,491.65 446.74,495.44 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
-<polyline points='227.47,444.82 224.78,447.76 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
-<polyline points='161.26,231.88 157.37,230.98 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
-<polyline points='314.29,69.68 313.17,65.85 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<text x='524.70' y='108.61' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>2</text>
+<text x='601.08' y='329.84' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>3</text>
+<text x='448.75' y='505.13' text-anchor='middle' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>4</text>
+<text x='222.89' y='455.97' text-anchor='end' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>5</text>
+<text x='153.56' y='232.43' text-anchor='end' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>6</text>
+<text x='311.35' y='62.15' text-anchor='middle' style='font-size: 8.80px; fill: #0000FF; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='4.89px' lengthAdjust='spacingAndGlyphs'>7</text>
+<polyline points='520.37,113.94 517.78,116.96 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<polyline points='593.31,324.67 589.40,323.90 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<polyline points='445.50,491.65 444.26,487.86 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<polyline points='227.47,444.82 230.16,441.88 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<polyline points='161.26,231.88 165.14,232.78 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
+<polyline points='314.29,69.68 315.41,73.50 ' style='stroke-width: 1.07; stroke: #333333; stroke-linecap: butt; fill: none;' />
 <text x='86.71' y='224.46' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>20</text>
 <text x='86.71' y='161.69' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>30</text>
 <text x='86.71' y='98.91' text-anchor='middle' style='font-size: 8.80px; fill: #4D4D4D; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='9.79px' lengthAdjust='spacingAndGlyphs'>40</text>
