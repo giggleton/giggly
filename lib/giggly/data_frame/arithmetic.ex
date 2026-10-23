@@ -120,19 +120,19 @@ defmodule Giggly.DataFrame.Arithmetic do
   @spec lesser(double(), double()) :: double()
   def lesser(_left, right) when right in [nil, :nan], do: right
   def lesser(left, _right) when left in [nil, :nan], do: left
-  def lesser(left, right), do: if(rank(right) < rank(left), do: right, else: left)
+  def lesser(left, right), do: if(sort_key(right) < sort_key(left), do: right, else: left)
 
   @doc false
   @spec greater(double(), double()) :: double()
   def greater(_left, right) when right in [nil, :nan], do: right
   def greater(left, _right) when left in [nil, :nan], do: left
-  def greater(left, right), do: if(rank(right) > rank(left), do: right, else: left)
+  def greater(left, right), do: if(sort_key(right) > sort_key(left), do: right, else: left)
 
   # Whether `left` is below `right`, R's `<`: missing where either is missing or NaN.
   @doc false
   @spec less?(double(), double()) :: boolean() | nil
   def less?(left, right) when nil in [left, right] or :nan in [left, right], do: nil
-  def less?(left, right), do: rank(left) < rank(right)
+  def less?(left, right), do: sort_key(left) < sort_key(right)
 
   # The largest of `values`, R's `max()`: missing where any is, else NaN where any is NaN, else
   # an infinity beats every number.
@@ -293,8 +293,15 @@ defmodule Giggly.DataFrame.Arithmetic do
     {next, next}
   end
 
-  # Where a double that is neither missing nor NaN falls among the others.
-  defp rank(:neg_infinity), do: {0, 0}
-  defp rank(:infinity), do: {2, 0}
-  defp rank(number), do: {1, number}
+  # Where a double falls when sorted, as R's `order()` sorts doubles: by value, minus infinity
+  # before every number and infinity after, and a missing one, `nil` (R's `NA`) or NaN, last, the
+  # missing ones alike, so a stable sort keeps them in the order they came, as R's does. Every
+  # ordering of the frame's doubles reads it, a comparison too, which puts NaN above every number
+  # as Explorer compares a float.
+  @doc false
+  @spec sort_key(double()) :: {0..3, number()}
+  def sort_key(:neg_infinity), do: {0, 0}
+  def sort_key(number) when is_number(number), do: {1, number}
+  def sort_key(:infinity), do: {2, 0}
+  def sort_key(missing) when missing in [nil, :nan], do: {3, 0}
 end

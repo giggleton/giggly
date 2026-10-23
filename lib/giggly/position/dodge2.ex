@@ -65,7 +65,9 @@ defmodule Giggly.Position.Dodge2 do
 
       placed =
         rows
-        |> Enum.sort_by(fn row -> {row.panel, x_key(row.x), group_key(row.group, position)} end)
+        |> Enum.sort_by(fn row ->
+          {row.panel, Arithmetic.sort_key(row.x), group_key(row.group, position)}
+        end)
         |> Enum.chunk_by(fn row -> row.panel end)
         |> Enum.flat_map(fn panel_rows -> dodge_panel(panel_rows, share, position) end)
 
@@ -115,12 +117,6 @@ defmodule Giggly.Position.Dodge2 do
         |> padded(padding)
       end)
     end
-
-    # R's order: by value, minus infinity first and infinity after every number, a missing x last,
-    # those missing in the order they came, as R's `order()` keeps them.
-    defp x_key(x) when x in [nil, :nan], do: {2, 0}
-    defp x_key(:neg_infinity), do: {0, 0}
-    defp x_key(x), do: {1, x}
 
     defp group_key(group, %{reverse: false}), do: group
     defp group_key(group, %{reverse: true}), do: -group

@@ -42,6 +42,7 @@ defmodule Giggly.Geom.Line do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{DataFrame, Geom}
+    alias Giggly.DataFrame.Arithmetic
 
     @impl Giggly.Geom
     def setup_data(%{orientation: orientation}, frame, _axis_kinds) do
@@ -51,7 +52,9 @@ defmodule Giggly.Geom.Line do
           DataFrame.pull(frame, :group),
           DataFrame.pull(frame, orientation)
         ]
-        |> Enum.zip_with(fn [panel, group, position] -> {panel, group, sort_key(position)} end)
+        |> Enum.zip_with(fn [panel, group, position] ->
+          {panel, group, Arithmetic.sort_key(position)}
+        end)
         |> Enum.with_index()
         |> Enum.sort_by(fn {key, _index} -> key end)
         |> Enum.map(fn {_key, index} -> index end)
@@ -88,12 +91,5 @@ defmodule Giggly.Geom.Line do
         mitre_limit: geom.mitre_limit
       }
     end
-
-    # Where a position sorts, as R's `order()` sorts a double: minus infinity first, then the
-    # numbers, then plus infinity, and a missing value last.
-    defp sort_key(:neg_infinity), do: {0, 0}
-    defp sort_key(position) when is_number(position), do: {1, position}
-    defp sort_key(:infinity), do: {2, 0}
-    defp sort_key(missing) when missing in [nil, :nan], do: {3, 0}
   end
 end

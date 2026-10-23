@@ -26,7 +26,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   and take a magnitude, a maximum, a sum, running sums or a mean, as IEEE arithmetic and R's
   `pmin()`, `pmax()`, `max()`, `sum()`, `cumsum()`, `mean()` and `<` do, a missing value and NaN
   where both meet resolved as R resolves them, and **a result past the largest double an
-  infinity of its sign**, as IEEE rounds it, where Erlang raises. **A sum, running sums and a mean
+  infinity of its sign**, as IEEE rounds it, where Erlang raises. **The order of the frame's
+  doubles has one home, `sort_key/1`**, R's `order()`: minus infinity, the numbers, infinity, a
+  missing value last; every family that sorts or compares them reads it, never a key of its own. **A sum, running sums and a mean
   are R's digit for digit** (`sum/2`, which `summarise/3`'s sum calls, `cumulative_sum/1` and
   `mean/1`; design-log §4, the entries beginning "The frame's sums are R's" and "The frame's mean
   is R's"): every step R takes in its long double, a mean's correction pass and its division of

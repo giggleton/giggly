@@ -156,6 +156,7 @@ defmodule Giggly.Mapping do
   use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: []
 
   alias Giggly.{AsCharacter, DataFrame}
+  alias Giggly.DataFrame.Arithmetic
 
   # Kernel's operators, each with a capture of it, which the compiler turns into a capture of the
   # function the operator is inlined as (`&Kernel.!=/2` is `&:erlang."/="/2`), so a capture of
@@ -772,16 +773,14 @@ defmodule Giggly.Mapping do
     ordered_levels =
       levels
       |> Enum.with_index()
-      |> Enum.sort_by(fn {level, index} -> {mean_order(Map.get(means, level)), index} end)
+      |> Enum.sort_by(fn {level, index} ->
+        mean = Map.get(means, level)
+        {Arithmetic.sort_key(mean), index}
+      end)
       |> Enum.map(fn {level, _index} -> level end)
 
     {:category, levels: ordered_levels, ordered: ordered}
   end
-
-  defp mean_order(:neg_infinity), do: {0, 0}
-  defp mean_order(mean) when is_float(mean), do: {1, mean}
-  defp mean_order(:infinity), do: {2, 0}
-  defp mean_order(_missing), do: {3, 0}
 
   defp factor_category({:category, inherited}, options),
     do: {:category, Keyword.merge(inherited, options)}

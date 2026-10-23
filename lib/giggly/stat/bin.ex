@@ -355,7 +355,7 @@ defmodule Giggly.Stat.Bin do
       given
       |> transform.()
       |> Enum.reject(fn position -> position in [nil, :nan] end)
-      |> Enum.sort_by(&order/1)
+      |> Enum.sort_by(&Arithmetic.sort_key/1)
     end
 
     defp breaks(%{binwidth: width} = stat, %{limits: limits}) when is_number(width),
@@ -363,11 +363,6 @@ defmodule Giggly.Stat.Bin do
 
     defp breaks(%{bins: bins} = stat, %{limits: limits}),
       do: bins_breaks(limits, bins, stat.center, stat.boundary)
-
-    # Where a position sorts, as R's `sort()` orders the infinities.
-    defp order(:neg_infinity), do: {0, 0}
-    defp order(:infinity), do: {2, 0}
-    defp order(position), do: {1, position}
 
     # Breaks `bins` many spanning the limits, R's `bin_breaks_bins()`: an axis of zero width, its
     # ends equal as the axis gives it, takes bins 0.1 wide; one bin spans the limits; more are

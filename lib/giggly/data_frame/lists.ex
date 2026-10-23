@@ -340,8 +340,10 @@ defmodule Giggly.DataFrame.Lists do
 
   defp interval(value, breaks, closed) when closed in [:right, :left] do
     last = tuple_size(breaks) - 1
+    lowest = elem(breaks, 0)
+    highest = elem(breaks, last)
 
-    if below?(value, elem(breaks, 0)) or below?(elem(breaks, last), value) do
+    if Arithmetic.less?(value, lowest) or Arithmetic.less?(highest, value) do
       nil
     else
       search(value, breaks, closed, 0, last)
@@ -354,31 +356,17 @@ defmodule Giggly.DataFrame.Lists do
     middle = div(low + high, 2)
     break = elem(breaks, middle)
 
-    if below?(break, value) or (closed == :left and value == break),
+    if Arithmetic.less?(break, value) or (closed == :left and value == break),
       do: search(value, breaks, closed, middle, high),
       else: search(value, breaks, closed, low, middle)
   end
-
-  # Whether `low` is below `high`, an infinity below or above every number.
-  defp below?(:neg_infinity, high), do: high != :neg_infinity
-  defp below?(_low, :neg_infinity), do: false
-  defp below?(:infinity, _high), do: false
-  defp below?(_low, :infinity), do: true
-  defp below?(low, high), do: low < high
 
   # Whether `left` is below (`:<`) or above (`:>`) `right`, missing where either is, NaN above
   # every number and both infinities, as Explorer orders it.
   defp compared(_comparison, nil, _right), do: nil
   defp compared(_comparison, _left, nil), do: nil
-  defp compared(:<, left, right), do: rank(left) < rank(right)
-  defp compared(:>, left, right), do: rank(left) > rank(right)
-
-  # Where a number that is not missing sorts, as Explorer sorts a float: minus infinity below every
-  # number, infinity above, and NaN above that.
-  defp rank(:neg_infinity), do: {0, 0}
-  defp rank(:infinity), do: {2, 0}
-  defp rank(:nan), do: {3, 0}
-  defp rank(number), do: {1, number}
+  defp compared(:<, left, right), do: Arithmetic.sort_key(left) < Arithmetic.sort_key(right)
+  defp compared(:>, left, right), do: Arithmetic.sort_key(left) > Arithmetic.sort_key(right)
 
   # Whether either is true, by SQL's three-valued logic: true beats missing, and missing beats
   # false.
@@ -556,7 +544,7 @@ defmodule Giggly.DataFrame.Lists do
   defp quantile(values, probability) do
     sorted =
       values
-      |> Enum.sort_by(&rank/1)
+      |> Enum.sort_by(&Arithmetic.sort_key/1)
       |> List.to_tuple()
 
     place = 1 + (tuple_size(sorted) - 1) * probability
@@ -577,10 +565,10 @@ defmodule Giggly.DataFrame.Lists do
   # The least and the greatest of numbers none of which is missing, an infinity below or above
   # every number; missing where there are none.
   defp least([]), do: nil
-  defp least(values), do: Enum.min_by(values, &rank/1)
+  defp least(values), do: Enum.min_by(values, &Arithmetic.sort_key/1)
 
   defp greatest([]), do: nil
-  defp greatest(values), do: Enum.max_by(values, &rank/1)
+  defp greatest(values), do: Enum.max_by(values, &Arithmetic.sort_key/1)
 
   # The sum of `values` as R adds doubles (`Arithmetic.sum/2`), a missing one, `nil` (R's `NA`) or
   # NaN, making it missing or left out, as `missing` says.
@@ -719,7 +707,7 @@ defmodule Giggly.DataFrame.Lists do
   # by value, minus infinity first and NaN last; dates and times by time; anything else in term
   # order, so strings by their bytes and `false` before `true`.
   defp sorted_levels(levels, dtype) when dtype in [:integer, :float],
-    do: Enum.sort_by(levels, &rank/1)
+    do: Enum.sort_by(levels, &Arithmetic.sort_key/1)
 
   defp sorted_levels(levels, :date), do: Enum.sort(levels, Date)
   defp sorted_levels(levels, :time), do: Enum.sort(levels, Time)

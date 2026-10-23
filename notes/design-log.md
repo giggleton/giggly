@@ -2323,6 +2323,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Give the frame's doubles one sort order, Arithmetic.sort_key/1 (seven private
+  copies replaced)
 - 2026-10-23 — Give the frame's arithmetic R's infinities, and add its sums in the long double;
   §4: "The frame's sums are R's", "The frame's first group-by aggregate" (amended)
 - 2026-10-23 — Reorder by name, by R's mean() in an emulated long double (ordering, step 6); §4:

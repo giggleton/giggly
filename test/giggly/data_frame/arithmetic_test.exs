@@ -176,6 +176,19 @@ defmodule Giggly.DataFrame.ArithmeticTest do
     assert magnitudes === [2.5, :infinity, :infinity, :nan, nil]
   end
 
+  # Golden: R 4.6.1's order(c(3, NA, -Inf, NaN, Inf, -1, 0, NA)) is 3, 6, 7, 1, 5, 2, 4, 8: minus
+  # infinity, the numbers, infinity, and the missing values, NA and NaN alike, last in the order
+  # they came.
+  test "sort_key sorts as R's order() does, the missing values last in their order" do
+    order =
+      [3, nil, :neg_infinity, :nan, :infinity, -1, 0, nil]
+      |> Enum.with_index(1)
+      |> Enum.sort_by(fn {value, _index} -> Arithmetic.sort_key(value) end)
+      |> Enum.map(fn {_value, index} -> index end)
+
+    assert order === [3, 6, 7, 1, 5, 2, 4, 8]
+  end
+
   # Golden: R 4.6.1's max() of c(1, NA, NaN), c(NaN, NA), c(1, NaN), c(1, Inf, -Inf),
   # c(-Inf, -Inf) and c(2, -5, 1) is NA, NA, NaN, Inf, -Inf and 2.
   test "maximum is R's max(): missing before NaN in any order, an infinity beyond every number" do
