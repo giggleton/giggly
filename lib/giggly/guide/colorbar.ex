@@ -9,19 +9,19 @@ defmodule Giggly.Guide.Colorbar do
   # draws them, as a table of its own (`Giggly.Scene`) for the box of guides beside the panels,
   # laid out as ggplot2 lays out a vertical colour bar through its legend's layout:
   #
-  #   * the theme's legend margin inside the edge on every side;
-  #   * the title, as deep as its lines (`Giggly.Guide.Parts`), left-aligned and centred down its
-  #     row as grid centres text, then the title's margin below it; a title of `:none` takes
-  #     neither;
-  #   * the bar, as wide as a key and five keys long (`legend.key.height` times 5), the gradient
-  #     filling it from its bottom, the scale's low end, to its top, with no border;
-  #   * a white tick at each break's place up the bar, across each side, reaching the theme's tick
-  #     length into it, and the break's label right of the bar, the labels' margin from it, centred
-  #     on its tick;
-  #   * the label column as wide as the widest label, or wider when the title is wider than the
-  #     bar and its labels, which leaves the room at the labels' right; with no labels, neither the
-  #     column nor its margin, but the room a wider title needs right of the bar, its ticks still
-  #     drawn, as ggplot2 draws a scale with no labels.
+  #   * the theme's legend margin inside the edge, each side its own;
+  #   * the title, laid out as a legend's (`Giggly.Guide.Parts`);
+  #   * the bar, as wide as a key and five keys long (`legend.key.width`, and `legend.key.height`
+  #     times 5), the gradient filling it from its bottom, the scale's low end, to its top, with
+  #     no border;
+  #   * a tick at each break's place up the bar, across each side, in the theme's colour bar ticks
+  #     (white when the theme sets none), reaching the theme's tick length into it, and the break's
+  #     label right of the bar, the labels' left margin from it, centred on its tick, its margins
+  #     above and below not counted, as ggplot2's colour bar counts only those beside its labels;
+  #   * the label column as wide as the widest label and the labels' right margin, or wider when
+  #     the title is wider than the bar and its labels, which leaves the room at the labels'
+  #     right; with no labels, neither the column nor its margins, but the room a wider title needs
+  #     right of the bar, its ticks still drawn, as ggplot2 draws a scale with no labels.
   #
   # Drawn in ggplot2's order: the background, the title, the bar, the ticks on its right side and
   # then on its left, each from the bar's inside outward, and the labels.
@@ -52,7 +52,8 @@ defmodule Giggly.Guide.Colorbar do
     def draw(_guide, %{title: title, keys: keys, decor: decor}, %Theme{} = theme) do
       %Theme{
         legend_margin: margin,
-        legend_key_size: key_size,
+        legend_key_width: key_width,
+        legend_key_height: key_height,
         legend_title: title_look,
         legend_text: text_look
       } = theme
@@ -60,14 +61,16 @@ defmodule Giggly.Guide.Colorbar do
       labels = Enum.map(keys, fn key -> key.label end)
       places = Enum.map(keys, fn key -> key.place end)
       label_widths = Parts.label_widths(labels, text_look)
-      label_margin = Parts.label_margin(labels, text_look)
+      {label_margin, labels_width} = Parts.label_columns(labels, label_widths, text_look)
       title_width = Parts.legend_title_width(title, title_look)
-      label_column = max(Enum.max(label_widths), title_width - key_size - label_margin)
+      label_column = max(labels_width, title_width - key_width - label_margin)
       {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
       bar_row = 2 + length(title_rows)
 
-      widths = [margin, key_size, label_margin, label_column, margin]
-      heights = Enum.concat([[margin], title_rows, [@bar_keys * key_size, margin]])
+      widths = [margin.left, key_width, label_margin, label_column, margin.right]
+
+      heights =
+        Enum.concat([[margin.top], title_rows, [@bar_keys * key_height, margin.bottom]])
 
       columns = length(widths)
       background = Parts.background(columns, length(heights), theme)
@@ -80,7 +83,7 @@ defmodule Giggly.Guide.Colorbar do
           Enum.concat([
             [background],
             title_cells,
-            [bar_cell(decor, places, {bar_row, key_size}, theme)],
+            [bar_cell(decor, places, {bar_row, key_width}, theme)],
             label_cells(labels, label_widths, {bar_row, places}, text_look)
           ])
       }

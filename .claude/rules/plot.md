@@ -21,8 +21,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five
   families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
   `Giggly.Position`, `Giggly.Stat`), `Giggly.Guide`, whose legend's struct `guide_legend/1`
-  builds, and `Giggly.Scale`, whose `Continuous` and `Discrete` structs it writes and whose
-  `Discrete.key/1` it reads to refuse a discrete value named twice, and exports nothing beyond
+  builds, `Giggly.Scale`, whose `Continuous` and `Discrete` structs it writes and whose
+  `Discrete.key/1` it reads to refuse a discrete value named twice, and `Giggly.Theme`, whose tree
+  `theme/2` builds its schema from and whose `merge/2` it calls, and exports nothing beyond
   `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
   and draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root,
@@ -43,7 +44,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
   `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
   `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
-  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1` and `labs/2`.**
+  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `labs/2` and
+  `theme/2`.**
   `computed_mapping/2`, `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a
   layer draws, `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`, not
@@ -162,9 +164,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   data units, as given**, for the scale to transform; a shortcut records its transformation in
   `transform`, and takes every other option `scale_x_continuous/2` does; limits in either order are
   recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair given high to low,
-  as ggplot2's `limits()` does (design-log §4, the entry beginning "Transformations are"). The theme
-  is still a name, `theme: :gray`, until a user can set one; what a misspelt name does arrives with
-  that option, and it must raise at the call.
+  as ggplot2's `limits()` does (design-log §4, the entry beginning "Transformations are").
 - **A mistake raises from the call that wrote it, or from the layer that draws it.** Each layer
   function resolves its own mapping against the table it draws, its own or the plot's, and checks
   what the geom can use there, so a misspelt column or an unusable aesthetic is reported by the
@@ -257,7 +257,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`,
-  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions and `labs/2`), so a misspelt
+  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions, `labs/2` and `theme/2`), so
+  a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as
   `:none` in the kind's struct, but a scale's, whose `:none` removes, is `:default`. A continuous or
@@ -275,6 +276,21 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   or `:none` (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not
   checked, since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2`
   takes the titles").
+- **A plot records its theme (`theme`) as the complete theme's name and the settings `theme/2`
+  has merged** (design-log §4, the entry beginning "A theme is set element by element"):
+  `%{complete: :gray, settings: %{}}` until a call sets one. **`theme/2` checks its settings
+  against a schema built from `Theme.elements/0`**, an option per element of ggplot2's tree, each
+  checked as its kind: a line's, a rectangle's or a text's properties a keyword list
+  (`color:`, canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`,
+  points; a text's `margin:`), a size or a line width `{:rel, share}` too, both 0 or more; a
+  length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or
+  `{:rel, share}`, held as `{amount, unit}`; a margin one length or a keyword list of
+  `:top`, `:right`, `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a
+  map of all four, a margin element's `{:rel, share}` too, a text's margin never. A colour is
+  opaque, a rectangle's border `:none` too (`validate_theme_color/1`, `validate_theme_border/1`),
+  until a theme needs transparency. An element or a property given twice raises from
+  `Aesthetics.canonicalize/1`, as `labs/2`'s does. The validated settings are handed to
+  `Theme.merge/2`, so a later call's properties replace only those it gives, as R's `+` does.
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
   `fill`, `alpha`, `shape`, `size`, `linetype` and `linewidth` alone, each as a scale's `guide:`

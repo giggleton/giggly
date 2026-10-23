@@ -101,28 +101,26 @@ defmodule Giggly.Guide.Axis do
 
   # An axis whose scale has no labels draws its ticks alone and reaches only as far as they do, as
   # ggplot2's leaves out the labels and their room.
-  defp axis([{_place, :none} | _rest] = breaks, side, _look, theme) do
+  defp axis([{_place, :none} | _rest] = breaks, side, look, theme) do
     places = Enum.map(breaks, fn {place, _label} -> place end)
-    tick_length = theme.axis_ticks_length
+    {_text_look, ticks} = elements(theme, look)
+
+    depth = reach(ticks)
 
     case side do
-      :bottom -> {tick_length, [bottom_ticks(places, tick_length, theme)]}
-      :left -> {tick_length, [left_ticks(places, tick_length, theme)]}
+      :bottom -> {depth, [bottom_ticks(places, depth, ticks)]}
+      :left -> {depth, [left_ticks(places, depth, ticks)]}
     end
   end
 
-  defp axis(
-         breaks,
-         :bottom,
-         :x,
-         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
-       ) do
+  # Labels below the panel count their margins above and below them, as ggplot2's do.
+  defp axis(breaks, :bottom, :x, theme) do
     {places, labels} = Enum.unzip(breaks)
-    height = tick_length + text_look.margin + Parts.line_height(text_look.size)
+    {%{margin: margin} = text_look, ticks} = elements(theme, :x)
+    height = reach(ticks) + margin.top + Parts.line_height(text_look.size) + margin.bottom
 
     # A cell's y runs up from its bottom; the panel's edge is the cell's top.
-    label_top = 1 - (tick_length + text_look.margin) / height
-    ticks = bottom_ticks(places, height, theme)
+    label_top = 1 - (reach(ticks) + margin.top) / height
 
     text = %Text{
       x: places,
@@ -140,47 +138,60 @@ defmodule Giggly.Guide.Axis do
       ascent: Font.ascent(text_look.size)
     }
 
-    {height, [ticks, text]}
+    {height, [bottom_ticks(places, height, ticks), text]}
   end
 
-  defp axis(
-         breaks,
-         :left,
-         :y,
-         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
-       ) do
+  # Labels left of the panel count their margins either side of them, as ggplot2's do.
+  defp axis(breaks, :left, :y, theme) do
     {places, labels} = Enum.unzip(breaks)
+    {%{margin: margin} = text_look, ticks} = elements(theme, :y)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
-    width = Enum.max(label_widths) + text_look.margin + tick_length
+    width = margin.left + Enum.max(label_widths) + margin.right + reach(ticks)
 
     # The panel's edge is the cell's right; the labels end at the margin.
-    label_end = 1 - (tick_length + text_look.margin) / width
-    text = left_labels({places, labels, label_widths}, label_end, 1.0, theme)
+    label_end = 1 - (reach(ticks) + margin.right) / width
+    text = left_labels({places, labels, label_widths}, label_end, 1.0, text_look)
 
-    {width, [text, left_ticks(places, width, theme)]}
+    {width, [text, left_ticks(places, width, ticks)]}
   end
 
-  defp axis(
-         breaks,
-         :left,
-         :r,
-         %Theme{axis_ticks_length: tick_length, axis_text: text_look} = theme
-       ) do
+  defp axis(breaks, :left, :r, theme) do
     {places, labels} = Enum.unzip(breaks)
+    {%{margin: margin} = text_look, ticks} = elements(theme, :r)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     label_width = Enum.max(label_widths)
-    width = text_look.margin + label_width + text_look.margin + tick_length
+    width = margin.left + label_width + margin.right + reach(ticks)
 
     # The labels are centred on the middle of the widest, between the two margins.
-    label_middle = 1 - (tick_length + text_look.margin + label_width / 2) / width
-    text = left_labels({places, labels, label_widths}, label_middle, 0.5, theme)
+    label_middle = 1 - (reach(ticks) + margin.right + label_width / 2) / width
+    text = left_labels({places, labels, label_widths}, label_middle, 0.5, text_look)
 
-    {width, [text, left_ticks(places, width, theme)]}
+    {width, [text, left_ticks(places, width, ticks)]}
   end
+
+  # The theme's elements an axis drawn in `look` is drawn with, ggplot2's for that axis on its side
+  # (`axis.text.x.bottom`, `axis.ticks.x.bottom`, `axis.ticks.length.x.bottom`): its labels' look,
+  # and its ticks' look with their length.
+  defp elements(%Theme{} = theme, :x),
+    do:
+      {theme.axis_text_x_bottom,
+       ticks(theme.axis_ticks_x_bottom, theme.axis_ticks_length_x_bottom)}
+
+  defp elements(%Theme{} = theme, :y),
+    do: {theme.axis_text_y_left, ticks(theme.axis_ticks_y_left, theme.axis_ticks_length_y_left)}
+
+  defp elements(%Theme{} = theme, :r),
+    do: {theme.axis_text_r, ticks(theme.axis_ticks_r, theme.axis_ticks_length_r)}
+
+  defp ticks(look, length), do: Map.put(look, :length, length)
+
+  # How far ticks reach out from the panel: their length, or none for ticks turned into the panel
+  # by a negative length, which take no room, as ggplot2's measure the range from 0 to the length.
+  defp reach(ticks), do: max(ticks.length, 0.0)
 
   # The labels of an axis to the panel's left, anchored at `x_place` across the axis's cell by
   # `hjust` of their widths, each centred on its break.
-  defp left_labels({places, labels, label_widths}, x_place, hjust, %Theme{axis_text: text_look}) do
+  defp left_labels({places, labels, label_widths}, x_place, hjust, text_look) do
     %Text{
       x: List.duplicate(x_place, length(places)),
       y: places,
@@ -199,16 +210,16 @@ defmodule Giggly.Guide.Axis do
   end
 
   # The ticks of an axis `height` points deep below the panel, reaching down from the panel's edge,
-  # the cell's top.
-  defp bottom_ticks(places, height, %Theme{axis_ticks: ticks_look, axis_ticks_length: tick_length}) do
-    tick_end = 1 - tick_length / height
+  # the cell's top, or up into the panel for a negative length.
+  defp bottom_ticks(places, height, ticks) do
+    tick_end = 1 - ticks.length / height
 
     %Polylines{
       lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
       offsets: :none,
-      stroke_width: ticks_look.line_width,
+      stroke_width: ticks.line_width,
       dashes: :none,
-      color: List.duplicate(ticks_look.color, length(places)),
+      color: List.duplicate(ticks.color, length(places)),
       opacity: List.duplicate(1.0, length(places)),
       line_end: :butt,
       line_join: :round,
@@ -217,16 +228,16 @@ defmodule Giggly.Guide.Axis do
   end
 
   # The ticks of an axis `width` points wide to the panel's left, reaching in to the panel's edge,
-  # the cell's right.
-  defp left_ticks(places, width, %Theme{axis_ticks: ticks_look, axis_ticks_length: tick_length}) do
-    tick_end = 1 - tick_length / width
+  # the cell's right, from inside the panel for a negative length.
+  defp left_ticks(places, width, ticks) do
+    tick_end = 1 - ticks.length / width
 
     %Polylines{
       lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
       offsets: :none,
-      stroke_width: ticks_look.line_width,
+      stroke_width: ticks.line_width,
       dashes: :none,
-      color: List.duplicate(ticks_look.color, length(places)),
+      color: List.duplicate(ticks.color, length(places)),
       opacity: List.duplicate(1.0, length(places)),
       line_end: :butt,
       line_join: :round,
@@ -240,15 +251,17 @@ defmodule Giggly.Guide.Axis do
   defp title(:none, _side, _theme), do: {0.0, []}
 
   # A title hangs from its place, the top of its first line, toward the axis, each line centred
-  # along the panel's side (`Giggly.Guide.Parts`).
-  defp title(text, :bottom, %Theme{axis_title: title_look}) do
-    height = title_look.margin + Parts.title_height(text, title_look)
-    place = {0.5, 1 - title_look.margin / height}
+  # along the panel's side (`Giggly.Guide.Parts`). Below the panel it counts its margins above and
+  # below it, and to its left those either side of it, as ggplot2's does.
+  defp title(text, :bottom, %Theme{axis_title_x_bottom: %{margin: margin} = title_look}) do
+    height = margin.top + Parts.title_height(text, title_look) + margin.bottom
+    place = {0.5, 1 - margin.top / height}
     {height, [Parts.title_text(text, place, 0, {0.5, 1.0}, title_look)]}
   end
 
-  defp title(text, :left, %Theme{axis_title: title_look}) do
-    width = title_look.margin + Parts.title_height(text, title_look)
-    {width, [Parts.title_text(text, {0.0, 0.5}, 90, {0.5, 1.0}, title_look)]}
+  defp title(text, :left, %Theme{axis_title_y_left: %{margin: margin} = title_look}) do
+    width = margin.left + Parts.title_height(text, title_look) + margin.right
+    place = {margin.left / width, 0.5}
+    {width, [Parts.title_text(text, place, 90, {0.5, 1.0}, title_look)]}
   end
 end

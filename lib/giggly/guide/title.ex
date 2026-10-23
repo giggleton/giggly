@@ -8,10 +8,12 @@ defmodule Giggly.Guide.Title do
   # subtitle's and the caption's spanning the panels (`plot.title.position = "panel"`), the tag's
   # in a row and column of its own (`plot.tag.position = "topleft"`).
   #
-  # The title hangs from the top of its cell, left-aligned, with its margin below it, and so does
-  # the subtitle. The caption hangs from its margin below the top of its cell, right-aligned. The
-  # tag is centred in its cell both ways, as wide as its widest line. A label of `:none` draws
-  # nothing and takes no room, as ggplot2 leaves out a label set to `NULL`.
+  # Each counts its margins on every side, as ggplot2's do. The title hangs from its margin below the
+  # top of its cell, left-aligned its left margin in, with its margin below it, and so does the
+  # subtitle. The caption hangs from its margin below the top of its cell, right-aligned its right
+  # margin in. The tag is centred both ways in what its margins leave of its cell, which is as wide
+  # as its widest line and its margins either side. A label of `:none` draws nothing and takes no
+  # room, as ggplot2 leaves out a label set to `NULL`.
 
   alias Giggly.Guide.Parts
   alias Giggly.Theme
@@ -43,28 +45,36 @@ defmodule Giggly.Guide.Title do
     }
   end
 
-  # A title above the panels, hanging left-aligned from its cell's top, its margin below it.
+  # A title above the panels, hanging left-aligned from its margin below its cell's top, its left
+  # margin in, its margin below it.
   defp above(:none, _look), do: {0.0, []}
 
-  defp above(label, look) do
-    height = Parts.title_height(label, look) + look.margin
-    {height, [Parts.title_text(label, {0.0, 1.0}, 0, {0.0, 1.0}, look)]}
+  defp above(label, %{margin: margin} = look) do
+    height = margin.top + Parts.title_height(label, look) + margin.bottom
+    place = {0.0, 1 - margin.top / height}
+    {height, [Parts.title_text(label, place, 0, {0.0, 1.0}, look, margin.left)]}
   end
 
-  # A title below the panels, hanging right-aligned from its margin below its cell's top.
+  # A title below the panels, hanging right-aligned from its margin below its cell's top, its right
+  # margin in, its margin below it.
   defp below(:none, _look), do: {0.0, []}
 
-  defp below(label, look) do
-    height = look.margin + Parts.title_height(label, look)
-    place = {1.0, 1 - look.margin / height}
-    {height, [Parts.title_text(label, place, 0, {1.0, 1.0}, look)]}
+  defp below(label, %{margin: margin} = look) do
+    height = margin.top + Parts.title_height(label, look) + margin.bottom
+    place = {1.0, 1 - margin.top / height}
+    {height, [Parts.title_text(label, place, 0, {1.0, 1.0}, look, -margin.right)]}
   end
 
-  # The tag, centred in a cell as wide as its widest line and as deep as its lines.
+  # The tag, centred in what its margins leave of a cell as wide as its widest line and as deep as
+  # its lines, its margins included.
   defp tag(:none, _look), do: {{0.0, 0.0}, []}
 
-  defp tag(label, look) do
-    size = {Parts.title_width(label, look), Parts.title_height(label, look)}
-    {size, [Parts.title_text(label, {0.5, 0.5}, 0, {0.5, 0.5}, look)]}
+  defp tag(label, %{margin: margin} = look) do
+    width = Parts.title_width(label, look)
+    height = Parts.title_height(label, look)
+    cell_width = margin.left + width + margin.right
+    cell_height = margin.top + height + margin.bottom
+    place = {(margin.left + width / 2) / cell_width, 1 - (margin.top + height / 2) / cell_height}
+    {{cell_width, cell_height}, [Parts.title_text(label, place, 0, {0.5, 0.5}, look)]}
   end
 end

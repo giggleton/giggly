@@ -75,10 +75,17 @@ panel's grid lines are placed by the coordinate system".
   tick and label at its break on the circle's edge, offset outward along the break's angle in
   points, each label justified by that angle, as ggplot2 justifies it.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
-  ticks' colour, width and length, the labels' and titles' size, colour and margin. How a label is
-  hung from its tick, the radius axis's labels centred between two margins (`axis.text.r`), the
-  angle axis's labels justified by their angles, and the y title's 90-degree turn are the guide's
-  until a theme can set them.
+  ticks' colour, width and length, the labels' and titles' size, colour and margin, **each axis's
+  from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`, a
+  radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
+  axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick
+  labels and the axes' titles those across the axis (an x axis's above and below, a y axis's
+  either side), the angle axis's labels the widest side, strips, the plot's titles and a legend's
+  title and labels every side, a colour bar's labels those either side. **A negative tick
+  length turns the ticks into the panel and takes no room**: an axis is measured from the longer
+  of 0 and its ticks, as ggplot2 measures the range from 0. How a label is hung from its tick, the
+  radius axis's labels centred between two margins, the angle axis's labels justified by their
+  angles, and the y title's 90-degree turn are the guide's until a theme can set them.
 - **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early. **One
   whose scale has no labels** (`{place, :none}` breaks) **draws its ticks alone and reaches only as
   far as they do**, as ggplot2's `labels = NULL` leaves the labels' room out (2.74 points, the
@@ -86,8 +93,9 @@ panel's grid lines are placed by the coordinate system".
 - **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
   and round a radial panel's circle the labels and then the ticks.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
-  centred, its baseline half an ascent below the middle, the strip text's margin above and below a
-  line of text, so it is as tall as the margin twice, an ascent and the deepest descent. A panel
+  centred in what the strip text's margins leave, its baseline half an ascent below that middle,
+  the margins above and below a line of text, so it is as tall as those margins, an ascent and the
+  deepest descent, and moved along by half the difference of the margins either side. A panel
   has one strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
   stacks them.
 - **An axis is drawn per panel, its title once per plot.** `Axis.draw/3` draws one panel's axes;
@@ -106,18 +114,20 @@ panel's grid lines are placed by the coordinate system".
   left-aligned and centred down its row, as grid centres text, the title's margin below, or neither
   for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key on the key
   background with each layer's glyph over it, its label the text margin to its right,
-  centred as the title is; **each row as tall as the theme's key or its tallest glyph, and the
-  keys' column as wide as the theme's key or the widest glyph in any key**, from the room each
-  glyph needs, which rendering hands over with it (`Geom.key_size/2`), as ggplot2's
-  `measure_legend_keys()` sizes them, each key's background filling its whole cell and its glyphs
-  placed in it as drawn; the label column as wide as the widest label, or wider when the title
-  is, leaving the room at the labels' right. **With no labels (every key's `:none`), the
-  labels' margin and column take no room but what a wider title needs right of the keys**, as
-  ggplot2 leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
-  `label_margin/2`, which the colour bar shares). Drawn in ggplot2's order: background, title,
-  each key's background and glyphs, then the labels. Every size is in points. **Its one parameter,
-  `reverse`, is the assembly's to apply**, handing the keys over last first, so the drawing takes
-  them in the order given.
+  centred as the title is; **each row as tall as the theme's key height, its tallest glyph or its
+  label with the labels' margins above and below, and the keys' column as wide as the theme's key
+  width or the widest glyph in any key**, from the room each glyph needs, which rendering hands
+  over with it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()` sizes them and its
+  `measure_grobs()` takes the taller of a key and its label, each key's background filling its
+  whole cell and its glyphs placed in it as drawn; the label column as wide as the widest label
+  and the labels' right margin, or wider when the title, its margins either side included, is,
+  leaving the room at the labels' right. **With no labels (every key's `:none`), the labels'
+  margins and column take no room but what a wider title needs right of the keys**, as ggplot2
+  leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
+  `Parts.label_columns/3`, which the colour bar shares). Drawn in ggplot2's order: background,
+  title, each key's background and glyphs, then the labels. Every size is in points. **Its one
+  parameter, `reverse`, is the assembly's to apply**, handing the keys over last first, so the
+  drawing takes them in the order given.
 - **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them
   on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
   order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,
@@ -125,10 +135,12 @@ panel's grid lines are placed by the coordinate system".
   the box's width and its table, which rendering centres down the panels.
 - **A colour bar is drawn as ggplot2's gradient form at its defaults** (`Guide.Colorbar`, design-log
   §4, the entry beginning "The colour bar is drawn as ggplot2's gradient form"): laid out as a
-  legend, its one key row the bar, a key wide and five keys long (`legend.key.height` times 5);
+  legend, its one key row the bar, `legend.key.width` wide and five keys long (`legend.key.height`
+  times 5);
   the bar a `Scene.Gradient` through the colours the assembly sampled (`bins`, 15, ggplot2's
   `nbin` for the gradient form), from its bottom, the scale's low end, to its top, with no border;
-  a white tick `legend.ticks.length` into each side at each break's place, the right side's and
+  a tick in the theme's colour bar ticks (white unless the theme sets them)
+  `legend.ticks.length` into each side at each break's place, the right side's and
   then the left's, each drawn from inside the bar outward; each label the labels' margin right of
   the bar, centred on its tick, and with no labels the ticks alone, the room laid out as a
   legend's. It draws no layer's glyph.

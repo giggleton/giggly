@@ -5,11 +5,11 @@ defmodule Giggly.Guide.Strip do
   # the panel's value of one column, on a background as wide as the panel. `draw/2` draws a
   # panel's strips, one for each of its labels, top to bottom; a panel with no labels has none.
   #
-  # It looks as the theme says (`Giggly.Theme`): the background fills the strip's cell, and the
-  # label is centred in it, with the strip text's margin above and below a line of text, so a strip
-  # is as tall as the margin twice and a line's ascent and deepest descent, as ggplot2 measures it.
-  # The label's baseline is half an ascent below the strip's middle, as an axis label beside its
-  # tick is.
+  # It looks as the theme says (`Giggly.Theme`'s `strip_background_x` and `strip_text_x_top`): the
+  # background fills the strip's cell, and the label is centred in what the strip text's margins
+  # leave of it, its margins above and below a line of text, so a strip is as tall as those margins
+  # and a line's ascent and deepest descent, as ggplot2 measures it. The label's baseline is half an
+  # ascent below the middle of that line, as an axis label beside its tick is.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Rect, Text}
@@ -22,13 +22,14 @@ defmodule Giggly.Guide.Strip do
 
   # The strip labelled `label`, in `theme`'s look: how tall it is, in points, and its primitives,
   # placed in a cell that tall and as wide as the panel.
-  defp strip(label, %Theme{strip_background: background, strip_text: text_look}) do
-    size = text_look.size
-    height = 2 * text_look.margin + Font.ascent(size) + Font.descent(size)
+  defp strip(label, %Theme{strip_background_x: background, strip_text_x_top: text_look}) do
+    %{size: size, margin: margin} = text_look
+    line_height = Font.ascent(size) + Font.descent(size)
+    height = margin.top + line_height + margin.bottom
 
     text = %Text{
       x: [0.5],
-      y: [0.5],
+      y: [(margin.bottom + line_height / 2) / height],
       labels: [label],
       widths: [Font.width(label, size)],
       size: size,
@@ -37,7 +38,7 @@ defmodule Giggly.Guide.Strip do
       opacity: [1.0],
       angle: 0,
       hjust: [0.5],
-      offset: [{0.0, -Font.ascent(size) / 2}],
+      offset: [{(margin.left - margin.right) / 2, -Font.ascent(size) / 2}],
       check_overlap: false,
       ascent: Font.ascent(size)
     }

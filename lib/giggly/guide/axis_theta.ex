@@ -5,9 +5,9 @@ defmodule Giggly.Guide.AxisTheta do
   # panel, over its layers, a tick at each break reaching out from the circle's edge along the
   # break's angle, and the break's label beyond it. `Giggly.Guide.Axis.draw_inside/3` draws it.
   #
-  # It looks as an x axis does (`Giggly.Theme`), as ggplot2's `axis.text.theta` and
-  # `axis.ticks.theta` inherit the x axis's look: each tick reaches the theme's tick length out from
-  # the circle, and each label's anchor sits the tick length and the labels' margin out, the label
+  # It looks as the theme's angle axis does (`Giggly.Theme`'s `axis_text_theta` and the rest), which
+  # inherits the x axis's look: each tick reaches its tick length out from the circle, and each
+  # label's anchor sits the tick length and the widest side of the labels' margin out, the label
   # justified by its angle so it stands clear of the circle: centred above a break at 12 o'clock,
   # starting to the right of one at 3, hanging below one at 6 and ending to the left of one at 9,
   # its `hjust` `0.5 - sin(angle) / 2` and its `vjust` `0.5 - cos(angle) / 2`, the share of its
@@ -26,11 +26,18 @@ defmodule Giggly.Guide.AxisTheta do
   @doc false
   @spec draw([Giggly.Coord.theta_break()], Theme.t()) :: [Giggly.Scene.primitive()]
   def draw(breaks, %Theme{
-        axis_ticks: ticks_look,
-        axis_ticks_length: tick_length,
-        axis_text: text_look
+        axis_ticks_theta: ticks_look,
+        axis_ticks_length_theta: tick_length,
+        axis_text_theta: text_look
       }) do
-    label_offset = tick_length + text_look.margin
+    # A label sits its margin's widest side beyond its tick, or beyond the circle for a tick turned
+    # into the panel by a negative length, as ggplot2's does.
+    widest_margin =
+      text_look.margin
+      |> Map.values()
+      |> Enum.max()
+
+    label_offset = max(tick_length, 0.0) + widest_margin
 
     # A scale with no labels has a tick at each break and nothing beside it.
     labels =

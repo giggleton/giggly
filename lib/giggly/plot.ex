@@ -108,12 +108,20 @@ defmodule Giggly.Plot do
   Each axis and legend is titled by what is mapped to it, as `Giggly.Mapping` describes. `labs/2`
   titles them otherwise, and gives the plot a title, a subtitle, a caption and a tag; a scale's
   name titles its axis over both.
+
+  ## Theme
+
+  Everything but the marks is drawn in ggplot2's default theme, a grey panel with white grid lines.
+  `theme/2` changes any element of it by name, each inheriting what it leaves unset from its parent
+  in ggplot2's tree, so setting `text: [size: 14]` makes every label bigger, and
+  `axis_text_x: [color: "red"]` reddens only the x axis's labels.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
   # checks a layer against, the guides, whose legend's struct it builds, the scales, whose
-  # untrained structs it writes, NimbleOptions, which validates its functions' options at the
+  # untrained structs it writes, the theme, whose tree `theme/2` builds its schema from and whose
+  # settings it merges, NimbleOptions, which validates its functions' options at the
   # call, the colour operations, which read a colour an option sets, and the mapping grammar, whose
   # checks resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never
   # the evaluation, which holds by review), and nothing that runs it. The six families' roots are
@@ -135,6 +143,7 @@ defmodule Giggly.Plot do
       Giggly.Position,
       Giggly.Scale,
       Giggly.Stat,
+      Giggly.Theme,
       NimbleOptions
     ],
     exports: []
@@ -150,7 +159,8 @@ defmodule Giggly.Plot do
     Mapping,
     Position,
     Scale,
-    Stat
+    Stat,
+    Theme
   }
 
   alias Giggly.Plot.Layer
@@ -195,8 +205,11 @@ defmodule Giggly.Plot do
   @typedoc "The guides `guides/2` sets, by aesthetic, each winning over its scale's own."
   @type guides :: %{optional(aesthetic()) => guide()}
 
-  @typedoc "The look everything but the marks is drawn in."
-  @type theme :: :gray
+  @typedoc """
+  The look everything but the marks is drawn in: the complete theme, by name, and the settings
+  `theme/2` has laid over it, by element.
+  """
+  @type theme :: %{complete: :gray, settings: %{optional(atom()) => term()}}
 
   @typedoc """
   The labels `labs/2` sets, by what each titles: an aesthetic's guide, or the plot's `:title`,
@@ -2032,6 +2045,74 @@ defmodule Giggly.Plot do
                   tag: [doc: "The plot's tag, at its top left."] ++ @label_option
                 )
 
+  # The units a theme length may be given in, and a margin's sides, in ggplot2's order.
+  @theme_units [:pt, :cm, :mm, :in, :lines]
+  @theme_sides [:top, :right, :bottom, :left]
+  @theme_no_margin Map.new(@theme_sides, fn side -> {side, {0, :pt}} end)
+
+  # `theme/2`'s options: one for each element of the theme a setting may give, from the theme's
+  # tree (`Giggly.Theme.elements/0`), each checked as its kind is: a line's, a rectangle's or a
+  # text's properties, a length, or a margin.
+  @theme_color [
+    type: {:custom, __MODULE__, :validate_theme_color, []},
+    doc: "Its colour, an opaque CSS colour (`colour:` too)."
+  ]
+  @theme_linewidth [
+    type: {:custom, __MODULE__, :validate_theme_linewidth, []},
+    doc: "How wide it is, in millimetres, or `{:rel, share}`, a share of its parent's."
+  ]
+  @theme_element_types %{
+    line: [type: :keyword_list, keys: [color: @theme_color, linewidth: @theme_linewidth]],
+    rect: [
+      type: :keyword_list,
+      keys: [
+        fill: [
+          type: {:custom, __MODULE__, :validate_theme_color, []},
+          doc: "Its fill, an opaque CSS colour."
+        ],
+        color: [
+          type: {:custom, __MODULE__, :validate_theme_border, []},
+          doc:
+            "Its border's colour, an opaque CSS colour, or `:none` for no border (`colour:` too)."
+        ],
+        linewidth: @theme_linewidth
+      ]
+    ],
+    text: [
+      type: :keyword_list,
+      keys: [
+        color: @theme_color,
+        size: [
+          type: {:custom, __MODULE__, :validate_theme_size, []},
+          doc: "How big it is, in points, or `{:rel, share}`, a share of its parent's size."
+        ],
+        margin: [
+          type: {:custom, __MODULE__, :validate_theme_margin, [:text]},
+          doc:
+            "The space on each side of it: one length for every side, or a keyword list of " <>
+              "`:top`, `:right`, `:bottom` and `:left`, a side left out 0."
+        ]
+      ]
+    ],
+    length: [type: {:custom, __MODULE__, :validate_theme_length, []}],
+    margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:element]}]
+  }
+  # The elements whose settings are a line's, a rectangle's or a text's properties, whose spelling
+  # `theme/2` canonicalizes (`colour:`) before checking them.
+  @theme_drawn_kinds for {name, kind, _parent, _description} <- Theme.elements(),
+                         kind in [:line, :rect, :text],
+                         into: %{},
+                         do: {name, kind}
+  @theme_options NimbleOptions.new!(
+                   for {name, kind, parent, description} <- Theme.elements() do
+                     inherits =
+                       if parent == :none, do: "", else: " Inherits from `#{inspect(parent)}`."
+
+                     {name,
+                      [doc: description <> inherits] ++ Map.fetch!(@theme_element_types, kind)}
+                   end
+                 )
+
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   # An end of a date scale's limits: a date, or `nil` for one the data decides.
@@ -2063,7 +2144,7 @@ defmodule Giggly.Plot do
       coord: %Coord.Cartesian{},
       scales: %{},
       guides: %{},
-      theme: :gray,
+      theme: %{complete: :gray, settings: %{}},
       labels: %{},
       reversed_layers: []
     }
@@ -4583,6 +4664,62 @@ defmodule Giggly.Plot do
     struct!(Guide.Legend, validated)
   end
 
+  @doc """
+  Changes the look everything but the marks is drawn in: its backgrounds, grid lines, axes,
+  strips, legends and titles, each an element of the theme, set by name.
+
+  The theme is a tree of elements, each inheriting what it leaves unset from its parent: every
+  text inherits from `:text`, every line from `:line` and every rectangle from `:rect`, so
+  `text: [size: 14]` makes every label bigger, and the x axis's tick labels below the panels,
+  `:axis_text_x_bottom`, inherit from `:axis_text_x`, which inherits from `:axis_text`. A line,
+  a rectangle or a text is a keyword list of the properties it sets; a size or a line width may be
+  `{:rel, share}`, a share of its parent's. A setting replaces only the properties it gives, so
+  `theme(axis_text: [color: "red"])` keeps the labels' size, and a later call's properties replace
+  an earlier one's.
+
+  A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
+  `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin
+  is one length for every side, a keyword list of `:top`, `:right`, `:bottom` and `:left`, a side
+  left out 0, or `{:rel, share}`.
+
+  Raises `NimbleOptions.ValidationError` for an element it does not know or a value it cannot use,
+  and `ArgumentError` for an element or a property given twice.
+
+  ## Options
+
+  #{NimbleOptions.docs(@theme_options)}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme(panel_background: [fill: "white"], axis_text: [color: "red"])
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #EBEBEB", svg =~ "fill: #FF0000"}
+      {false, true}
+  """
+  @spec theme(t(), keyword()) :: t()
+  def theme(%__MODULE__{theme: theme} = plot, settings) when is_list(settings) do
+    validated =
+      settings
+      |> Aesthetics.canonicalize()
+      |> Enum.map(fn
+        {name, element} when is_map_key(@theme_drawn_kinds, name) and is_list(element) ->
+          {name, Aesthetics.canonicalize(element)}
+
+        setting ->
+          setting
+      end)
+      |> NimbleOptions.validate!(@theme_options)
+      |> Map.new(fn
+        {name, element} when is_list(element) -> {name, Map.new(element)}
+        setting -> setting
+      end)
+
+    %{plot | theme: %{theme | settings: Theme.merge(theme.settings, validated)}}
+  end
+
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
   # the layer's column is used, and less any aesthetic the layer sets to one value, which wins over
   # a mapping, as ggplot2's `compute_aesthetics()` drops the aesthetics a layer's `aes_params` set.
@@ -4690,6 +4827,125 @@ defmodule Giggly.Plot do
            "\"#4682B4\", \"transparent\", or :none, got: #{inspect(color)}"}
     end
   end
+
+  # NimbleOptions' check of a theme element's colour: an opaque CSS colour, kept in its one
+  # spelling, uppercase hex.
+  @doc false
+  @spec validate_theme_color(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def validate_theme_color(color) do
+    case validate_color(color) do
+      {:ok, <<"#", _digits::binary-size(6)>> = opaque} ->
+        {:ok, opaque}
+
+      {:ok, _not_opaque} ->
+        {:error,
+         "expected an opaque CSS colour, one with no alpha of its own, got: #{inspect(color)}"}
+
+      {:error, _message} = error ->
+        error
+    end
+  end
+
+  # NimbleOptions' check of a theme rectangle's border colour: an opaque CSS colour, or `:none` for
+  # no border.
+  @doc false
+  @spec validate_theme_border(term()) :: {:ok, String.t() | :none} | {:error, String.t()}
+  def validate_theme_border(:none), do: {:ok, :none}
+  def validate_theme_border(color), do: validate_theme_color(color)
+
+  # NimbleOptions' check of a theme element's line width: millimetres, 0 or more, or a share of its
+  # parent's, `{:rel, share}`, 0 or more.
+  @doc false
+  @spec validate_theme_linewidth(term()) ::
+          {:ok, number() | {:rel, number()}} | {:error, String.t()}
+  def validate_theme_linewidth(width), do: theme_amount(width, "a width in millimetres")
+
+  # NimbleOptions' check of a theme text's size: points, 0 or more, or a share of its parent's,
+  # `{:rel, share}`, 0 or more.
+  @doc false
+  @spec validate_theme_size(term()) :: {:ok, number() | {:rel, number()}} | {:error, String.t()}
+  def validate_theme_size(size), do: theme_amount(size, "a size in points")
+
+  defp theme_amount(amount, _what) when is_number(amount) and amount >= 0, do: {:ok, amount}
+
+  defp theme_amount({:rel, share} = relative, _what) when is_number(share) and share >= 0,
+    do: {:ok, relative}
+
+  defp theme_amount(amount, what) do
+    {:error,
+     "expected #{what}, 0 or more, or {:rel, share}, a share of its parent's, " <>
+       "got: #{inspect(amount)}"}
+  end
+
+  # NimbleOptions' check of a theme length: a number of ggplot2's points, `{amount, unit}` in one of
+  # `Giggly.Theme`'s units, or a share of its parent's, `{:rel, share}`; kept as `{amount, unit}`.
+  @doc false
+  @spec validate_theme_length(term()) :: {:ok, Theme.measure()} | {:error, String.t()}
+  def validate_theme_length({:rel, share} = relative) when is_number(share), do: {:ok, relative}
+
+  def validate_theme_length(length) do
+    case theme_length(length) do
+      :error ->
+        {:error,
+         "expected a length: a number of points, {amount, unit} with a unit of " <>
+           "#{inspect(@theme_units)}, or {:rel, share}, got: #{inspect(length)}"}
+
+      measure ->
+        {:ok, measure}
+    end
+  end
+
+  # NimbleOptions' check of a theme margin: one length for every side, or a keyword list of
+  # `:top`, `:right`, `:bottom` and `:left`, each a length, a side left out 0; for a margin
+  # element, as `for` says, a share of its parent's, `{:rel, share}`, too.
+  @doc false
+  @spec validate_theme_margin(term(), :element | :text) ::
+          {:ok, Theme.sides() | {:rel, number()}} | {:error, String.t()}
+  def validate_theme_margin({:rel, share} = relative, :element) when is_number(share),
+    do: {:ok, relative}
+
+  def validate_theme_margin(margin, _for) when is_list(margin) do
+    sides = Enum.map(margin, fn side -> theme_side(side) end)
+
+    if :error in sides or
+         length(Enum.uniq_by(sides, fn {side, _length} -> side end)) < length(sides),
+       do: theme_margin_error(margin),
+       else: {:ok, Map.merge(@theme_no_margin, Map.new(sides))}
+  end
+
+  def validate_theme_margin(margin, _for) do
+    case theme_length(margin) do
+      :error -> theme_margin_error(margin)
+      measure -> {:ok, Map.new(@theme_sides, fn side -> {side, measure} end)}
+    end
+  end
+
+  defp theme_margin_error(margin) do
+    {:error,
+     "expected a margin: one length for every side, or a keyword list of " <>
+       "#{inspect(@theme_sides)}, each given once, each a number of points or {amount, unit} " <>
+       "with a unit of #{inspect(@theme_units)}, got: #{inspect(margin)}"}
+  end
+
+  # A side of a margin given as a keyword list, `{side, length}` with its length as a theme holds
+  # it; `:error` for anything else.
+  defp theme_side({side, length}) when side in @theme_sides do
+    case theme_length(length) do
+      :error -> :error
+      measure -> {side, measure}
+    end
+  end
+
+  defp theme_side(_other), do: :error
+
+  # A length as a theme holds it, `{amount, unit}`, a number being ggplot2's points; `:error` for
+  # anything else.
+  defp theme_length(amount) when is_number(amount), do: {amount, :pt}
+
+  defp theme_length({amount, unit} = measure) when is_number(amount) and unit in @theme_units,
+    do: measure
+
+  defp theme_length(_other), do: :error
 
   # NimbleOptions' check of a `linewidth:` option: a width in millimetres, 0 or more, kept as a
   # float.

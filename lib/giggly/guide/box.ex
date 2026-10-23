@@ -16,7 +16,7 @@ defmodule Giggly.Guide.Box do
   # panels.
   @doc false
   @spec draw([{float(), Scene.t()}], Theme.t()) :: {float(), Scene.t()}
-  def draw(guides, %Theme{legend_spacing: spacing}) do
+  def draw(guides, %Theme{legend_spacing_y: spacing}) do
     width =
       guides
       |> Enum.map(fn {guide_width, _scene} -> guide_width end)

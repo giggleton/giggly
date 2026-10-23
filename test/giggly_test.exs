@@ -7315,6 +7315,151 @@ defmodule GigglyTest do
 
       assert error.key == [:widht]
     end
+
+    # Golden: test/golden/theme_backgrounds.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_backgrounds.R: every element matches once positions are rounded to
+    # two decimals, and every clip path but svglite's around the whole drawing. The element
+    # reference page's example: rectangles set through the theme, and a margin in centimetres. It
+    # moves with what moves test/golden/point.svg, and with how a theme's settings are laid over
+    # theme_gray().
+    test "a theme setting fills and borders the backgrounds and widens the plot's margin" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          panel_background: [fill: "white"],
+          plot_margin: {2, :cm},
+          plot_background: [fill: "#E5E5E5", colour: "black", linewidth: 1]
+        )
+
+      assert golden?(plot, "theme_backgrounds")
+    end
+
+    # Golden: test/golden/theme_ticks.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_ticks.R: every element and clip path matches but svglite's around the
+    # whole drawing. The theme reference page's example: ticks of their own length on each axis,
+    # the x axis's negative, turned into the panel and taking no room, and the x labels' margin in
+    # centimetres. It moves with what moves test/golden/point.svg, and with how an axis is
+    # measured.
+    test "a negative tick length turns the ticks into the panel, where they take no room" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(
+          title: "Fuel economy declines as weight increases",
+          caption: "A caption",
+          tag: "A"
+        )
+        |> Plot.theme(
+          axis_ticks_length_y: {0.25, :cm},
+          axis_ticks_length_x: {-0.25, :cm},
+          axis_text_x: [margin: [top: {0.3, :cm}]]
+        )
+
+      assert golden?(plot, "theme_ticks")
+    end
+
+    # Golden: test/golden/theme_text.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_text.R: every element and clip path matches but svglite's around the
+    # whole drawing. Text set at the root reaches every label, a share of a size is the parent's
+    # share, every title counts the margins ggplot2 counts, and the grid lines and ticks are set
+    # by axis. It moves with what moves test/golden/labs.svg, and with how an element inherits.
+    test "theme settings reach every element that inherits them, by axis and by side" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.labs(
+          title: "Fuel economy declines as weight increases",
+          caption: "A caption",
+          tag: "A"
+        )
+        |> Plot.theme(
+          text: [size: 14],
+          axis_text: [colour: "red", size: {:rel, 1.5}],
+          axis_title_y: [margin: [right: 10, left: 5]],
+          axis_title_x: [margin: [top: 2, bottom: 6]],
+          plot_title: [size: {:rel, 2}, margin: [bottom: 10, left: 20]],
+          plot_caption: [margin: [top: 4, right: 12]],
+          plot_tag: [margin: [top: 3, right: 7, bottom: 5, left: 2]],
+          panel_grid_major_y: [colour: "black"],
+          panel_grid_minor_x: [colour: "red", linewidth: {:rel, 2}],
+          axis_ticks_y: [linewidth: 2]
+        )
+
+      assert golden?(plot, "theme_text")
+    end
+
+    # Golden: test/golden/theme_legend.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_legend.R: every element and clip path matches but svglite's around the
+    # whole drawing. Labels taller than their keys make their rows taller, every margin counts on
+    # each side ggplot2 counts it, and a length in lines is grid's line of text. It moves with how
+    # a legend, a strip or the panels are laid out.
+    test "theme settings size a legend's keys, rows and margins and its strips and spacing" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.theme(
+          strip_background: [colour: "black", fill: "white"],
+          strip_text: [colour: "blue", margin: [top: 2, right: 8, bottom: 10, left: 0]],
+          panel_spacing: {1, :lines},
+          legend_key: [fill: "white", colour: "black"],
+          legend_text: [size: 20, colour: "red", margin: [top: 3, right: 4, bottom: 1, left: 10]],
+          legend_title: [margin: [top: 2, right: 30, bottom: 12, left: 6]],
+          legend_key_width: {1, :cm},
+          legend_margin: [top: 10, right: 4, bottom: 6, left: 2],
+          legend_box_spacing: {3, :mm}
+        )
+
+      assert golden?(plot, "theme_legend")
+    end
+
+    # Golden: test/golden/theme_colorbar.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_colorbar.R: every element and clip path matches but svglite's
+    # around the whole drawing and the bar's fill, which vdiffr's device cannot draw, as
+    # test/golden/point_colourbar.svg's. Ticks the theme sets take the theme's lines' width, not
+    # the colour bar's own white default. It moves with what moves
+    # test/golden/point_colourbar.svg.
+    test "theme settings colour a colour bar's ticks and size its bar" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          legend_ticks: [colour: "black"],
+          legend_key_width: {0.8, :cm},
+          legend_key_height: {0.5, :in},
+          legend_ticks_length: {:rel, 0.5},
+          legend_text: [margin: [left: 2, right: 9]]
+        )
+
+      assert golden?(plot, "theme_colorbar")
+    end
+
+    # Golden: test/golden/theme_radial.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_radial.R: every element matches, and every clip path but svglite's
+    # around the whole drawing. A radial panel's angle and radius axes take their own elements. It
+    # moves with what moves test/golden/radial.svg.
+    test "theme settings style a radial panel's angle and radius axes apart" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.coord_radial()
+        |> Plot.theme(
+          axis_text_theta: [colour: "blue", margin: [top: 8]],
+          axis_ticks_length_theta: {4, :pt},
+          axis_ticks_r: [colour: "red"],
+          axis_text_r: [margin: [left: 2, right: 6]],
+          panel_grid_major_x: [colour: "#00FF00"]
+        )
+
+      assert golden?(plot, "theme_radial")
+    end
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`
@@ -7335,6 +7480,16 @@ defmodule GigglyTest do
       |> DataFrame.pull(:shape)
 
     {shapes, keys}
+  end
+
+  # Whether `plot`, drawn at vdiffr's size, is the golden `name` in test/golden/, byte for byte.
+  defp golden?(plot, name) do
+    svg =
+      plot
+      |> Giggly.to_svg(width: 960, height: 768)
+      |> IO.iodata_to_binary()
+
+    svg == File.read!("test/golden/#{name}.svg")
   end
 
   # Each row's `aesthetic` in the plot's layer's table, and each key of its one legend, its label

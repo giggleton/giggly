@@ -7,9 +7,11 @@ defmodule Giggly.Guide.Grid do
   # (`Giggly.Coord.grid/2`), drawn under whatever the panel's layers draw.
   #
   # It looks as the theme says (`Giggly.Theme`): the panel's background, then its minor grid lines
-  # and its major ones over them. They are drawn in ggplot2's order: the background, the minor lines
-  # at the y axis's minor breaks, then at the x axis's, then the major lines at the y axis's breaks
-  # and then at the x axis's, so a major line is drawn over a minor one and an x line over a y.
+  # and its major ones over them, each line in the look of the axis whose breaks it marks
+  # (`panel_grid_minor_y` and the rest). They are drawn in ggplot2's order: the background, the
+  # minor lines at the y axis's minor breaks, then at the x axis's, then the major lines at the y
+  # axis's breaks and then at the x axis's, so a major line is drawn over a minor one and an x line
+  # over a y.
 
   alias Giggly.{Coord, Theme}
   alias Giggly.Scene.{Polygons, Polylines, Rect}
@@ -26,17 +28,13 @@ defmodule Giggly.Guide.Grid do
 
   # The panel's background and the lines of `grid`, in `theme`'s look and ggplot2's order, placed in
   # the panel's cell.
-  defp grid(%{major: major, minor: minor, background: shape}, %Theme{
-         panel_background: background,
-         panel_grid_major: major_look,
-         panel_grid_minor: minor_look
-       }) do
+  defp grid(%{major: major, minor: minor, background: shape}, %Theme{} = theme) do
     [
-      background(shape, background),
-      lines(minor.y, minor_look),
-      lines(minor.x, minor_look),
-      lines(major.y, major_look),
-      lines(major.x, major_look)
+      background(shape, theme.panel_background),
+      lines(minor.y, theme.panel_grid_minor_y),
+      lines(minor.x, theme.panel_grid_minor_x),
+      lines(major.y, theme.panel_grid_major_y),
+      lines(major.x, theme.panel_grid_major_x)
     ]
   end
 

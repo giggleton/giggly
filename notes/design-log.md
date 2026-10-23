@@ -79,6 +79,35 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The theme is Phase 3's eleventh increment, in six steps: `theme/2` with inheritance,
+  removal with `:none`, the panel border and axis lines, the complete themes, where the legends
+  go, text's face, angle and alignment (2026-10-23, Steve, agreeing the proposal; checked against
+  ggplot2 4.0.3's source and R).** 25 waiting examples need nothing but the theme, and 20 draw once
+  it lands. The complete themes are `theme_gray()`, `bw`, `linedraw`, `light`, `dark`, `minimal`,
+  `classic` and `void`, each with `base_size`, `base_line_size` and `base_rect_size`, one spelling
+  (`theme_gray`, as `scale_color_gray/2`). An inside legend's placement is written as data on the
+  scene's cell, laid out by the generic table code, never in the SVG writer, so the layout split a
+  second backend needs moves it with the rest. *Rejected: `theme_set()`* — global state, which the
+  pure core forbids; a shared look is the user's own function piped before the plot's settings.
+  *Deferred:* `theme_test()`; `base_family`/`header_family` (one font); `ink`/`paper`/`accent`,
+  which in ggplot2 4 colour the layers too; `%+replace%`; `theme_sub_*()`; `element_geom()` and
+  `palette.*`; `aspect.ratio`; a draw-time theme (`to_svg(plot, theme: ...)`), with colours as CSS
+  variables.
+
+- **A theme is set element by element, by ggplot2's flat names, each element a keyword list
+  checked against its kind (2026-10-23, Steve).** `theme(axis_text: [color: "red", size: {:rel,
+  1.5}], plot_margin: {2, :cm})`: the key says the kind, so no `element_text()` constructor is
+  needed (R's give a value its class, for dispatch and extension classes; a struct in a slot stays
+  possible later). A length is a number of ggplot2's points, `{amount, unit}` or `{:rel, share}`; a
+  margin one length or a keyword list of sides, a side left out 0. R's rules hold exactly: an
+  element or property left out inherits, `theme/2` merges into what the plot has (R's `+`), and a
+  later complete theme replaces earlier settings. The plot records the complete theme's name and
+  the merged settings; `Giggly.Theme` holds the tree and resolves it when drawn (`calc_element()`),
+  converting units in grid's order, and lists nothing: `Plot` builds its schema from the tree.
+  *Rejected: element constructors (ggity's)* — they check nothing the key does not. *Rejected:
+  nesting by family (`axis: [text: ...]`)* — splits R's flat names at an arbitrary dot.
+  *Rejected: order-independent settings* — the same code would draw unlike R's.
+
 - **Ordering, viridis and `log10` by name are Phase 3's tenth increment, in seven steps: levels
   from the mapping, levels from the table, `diamonds`' levels, viridis, `log10`, `reorder()`, the
   notebooks (2026-10-22, Steve, agreeing the proposal; checked against R, ggplot2 4.0.3, scales
@@ -1461,9 +1490,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   derivation is now the private `gray/0` in `Giggly.Theme`, called by `complete(:gray)`; it
   becomes public with the first theme a user can choose. *Rejected: keeping the behaviour for
   uniformity* — the rule is that a behaviour serves kinds that differ in behaviour, and plain
-  functions serve kinds that differ in data. *Deferred to the first theme setting a user can
-  make:* the plot holding the theme's value, or the call that builds it, rather than its name,
-  once a theme takes arguments.
+  functions serve kinds that differ in data.
 
 - **The scene's circle primitive is `Circles`, not `Points` (2026-10-14, Steve).** The scene names
   its primitives after grid's, and this one holds positions and their radii, grid's
@@ -1751,26 +1778,23 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   (`panel.ontop`); minor ticks on an axis; the panel's border (`render_fg`, blank in
   `theme_gray()`).
 
-- **The theme is a resolved value that every drawing function takes, recorded by name and set
-  by nobody yet; the plot's background is the first element added to it (2026-10-12, Steve).** A
-  plot records `theme: :gray`, as it records its facet and coordinate system, and `Giggly.Theme`
-  resolves the name into the complete theme (ggplot2's `complete_theme()`): every element it
-  draws, worked out from `theme_gray()`'s arguments (base size 11, black ink on white paper,
-  lines and borders 11/22 mm) as ggplot2's `theme-defaults.R` works them out, each length and
-  line width in points and each colour a hex string, so the TeX-point and millimetre conversions
-  happen once, where the theme declares them. The assembly carries the name unread; rendering
-  resolves it and hands the complete theme to the guide. The axis look moved out of the guide's
-  module attributes into it, and the plot margin out of rendering's. The plot's background, a
+- **The theme is a resolved value that every drawing function takes; the plot's background is
+  the first element added to it (2026-10-12, Steve).** A plot records its theme, as it records its
+  facet and coordinate system, and `Giggly.Theme` resolves it into the complete theme (ggplot2's
+  `complete_theme()`): every element it draws, worked out from `theme_gray()`'s arguments (base
+  size 11, black ink on white paper, lines and borders 11/22 mm) as ggplot2's `theme-defaults.R`
+  works them out, each length and line width in points and each colour a hex string, so the
+  TeX-point and millimetre conversions happen once, in the theme. The assembly carries the theme
+  unread; rendering resolves it and hands the complete theme to the guide. The axis look moved
+  out of the guide's module attributes into it, and the plot margin out of rendering's. The
+  plot's background, a
   white fill with a white 0.5 mm border, is drawn first, in a cell spanning the whole table,
   margin included, as ggplot2's `table_add_background()` adds it: without it the drawing is
   transparent outside the panel, and on a dark page its grey labels vanish. The scene gained
   `Rect` (grid's `rectGrob()` at its default place and size, filling its cell) and cells that span
   ranges of rows and columns, and SVG writes svglite's rectangle markup. svglite's own page
   rectangle is left out with the rest of its preamble, since the plot's background covers it.
-  *Rejected: a theme users can set, now* (`theme/2`, complete themes and their arguments, element
-  constructors, ggplot2's inheritance with `rel()` and `element_blank()`) — it brings
-  NimbleOptions and §7's "absent" question, which ggplot2's `NULL` (inherit) and `element_blank()`
-  (remove) are exactly, and Phase 0 put the theme tree in Phase 3. *Rejected: module attributes
+  *Rejected: module attributes
   until a theme can be set* (what the guide's rules said) — the look would sit in three drawing
   modules sharing derived values (paper white is the grid lines' colour and the background's, 0.5
   mm the tick's width and the major grid line's, the margin half a line), each copying the
@@ -1786,7 +1810,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   vary. **The name is `:gray`** (Steve): the American spelling the aesthetics' `color` set,
   plotnine's `theme_gray`, and the spelling ggplot2's own documentation lists and its examples
   use, though ggplot2 defines the function as `theme_grey` and makes `theme_gray` the alias.
-  *Rejected: `:grey`.* Accepting the other spelling waits for the public function. **A golden is
+  *Rejected: `:grey`.* **A golden is
   checked against ggplot2's drawing of the same plot** (Steve): `test/golden/point.R` draws the
   golden's plot with ggplot2 (4.0.3) and vdiffr (1.0.9), which Docker's `r-base` image installs,
   as ggplot2's snapshots are drawn but with no title row, since vdiffr adds `theme_test()` only to
@@ -1797,12 +1821,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   grows with each deliberate difference, such as Elixir-style labels, and two stored files that
   must agree; *and the scratchpad alone*, where increment 8's R checks were lost with the session.
   New boundary: `Theme` lists nothing; `Render` and `Guide` gained `Theme`; `Scene` exports
-  `Rect`. *Deferred to first reader:* a theme a user can set, and accepting `:grey`; default
-  aesthetics from `element_geom`; the panel's border (blank in `theme_gray()`); x and y styled
-  apart; text alignment and angle in the theme; theme values as CSS classes, ggity's way (the
-  LiveView layer; only colours could move, since the layout is measured from the sizes); the
-  theme's fonts. The panel's background and grid lines are this increment's second step (since
-  built, see the entry beginning "The panel's grid lines are placed").
+  `Rect`. *Deferred to first reader:* default aesthetics from `element_geom`; the panel's border
+  (blank in `theme_gray()`); text alignment and angle in the theme; theme values as CSS classes,
+  ggity's way (the LiveView layer; only colours could move, since the layout is measured from the
+  sizes); the theme's fonts. The panel's background and grid lines are this increment's second
+  step (since built, see the entry beginning "The panel's grid lines are placed").
 
 - **An axis is titled by the first layer to map its aesthetic, and the title is drawn by the
   axis's guide (2026-10-12, Steve).** The assembly titles each axis with the name of the column
@@ -2335,6 +2358,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Let theme/2 set the theme's elements, inherited through ggplot2's tree (theme,
+  step 1); §4: "The theme is Phase 3's eleventh increment", "A theme is set element by element",
+  "The theme is a resolved value" (amended), "A theme is a function" (amended)
 - 2026-10-23 — Draw the notebook examples ordering, viridis and log10 by name made drawable
   (ordering, step 7); §4: "A random sample of a table's rows"
 - 2026-10-23 — Give the frame's doubles one sort order, Arithmetic.sort_key/1 (seven private

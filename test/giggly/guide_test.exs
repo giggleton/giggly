@@ -7,7 +7,7 @@ defmodule Giggly.GuideTest do
     test "an axis with no breaks and a title of :none draw nothing and take no room" do
       coord = %Coord.Cartesian{}
       params = Coord.panel_params(coord, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
-      theme = Theme.complete(:gray)
+      theme = Theme.complete(%{complete: :gray, settings: %{}})
 
       assert {Guide.Axis.draw(coord, params, theme),
               Guide.Axis.titles(coord, params, %{x: :none, y: :none}, theme)} ===
@@ -20,7 +20,7 @@ defmodule Giggly.GuideTest do
       coord = %Coord.Cartesian{}
       breaks = [{2.0, :none}, {3.0, :none}]
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, breaks, []})
-      theme = Theme.complete(:gray)
+      theme = Theme.complete(%{complete: :gray, settings: %{}})
       %{bottom: {height, bottom}, left: {width, left}} = Guide.Axis.draw(coord, params, theme)
 
       assert {Float.round(height, 2), width == height,
@@ -34,7 +34,7 @@ defmodule Giggly.GuideTest do
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
 
       assert coord
-             |> Guide.Axis.draw_inside(params, Theme.complete(:gray))
+             |> Guide.Axis.draw_inside(params, Theme.complete(%{complete: :gray, settings: %{}}))
              |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
     end
   end
@@ -51,7 +51,11 @@ defmodule Giggly.GuideTest do
         end)
 
       {width, scene} =
-        Guide.draw(%Guide.Legend{}, %{title: "year", keys: keys}, Theme.complete(:gray))
+        Guide.draw(
+          %Guide.Legend{},
+          %{title: "year", keys: keys},
+          Theme.complete(%{complete: :gray, settings: %{}})
+        )
 
       height = height(scene)
 
@@ -65,7 +69,7 @@ defmodule Giggly.GuideTest do
         Guide.draw(
           %Guide.Legend{},
           %{title: "a_long_column_name", keys: keys},
-          Theme.complete(:gray)
+          Theme.complete(%{complete: :gray, settings: %{}})
         )
 
       height = height(scene)
@@ -86,7 +90,11 @@ defmodule Giggly.GuideTest do
         end)
 
       {_width, scene} =
-        Guide.draw(%Guide.Legend{}, %{title: "cyl", keys: keys}, Theme.complete(:gray))
+        Guide.draw(
+          %Guide.Legend{},
+          %{title: "cyl", keys: keys},
+          Theme.complete(%{complete: :gray, settings: %{}})
+        )
 
       [_margin, {:points, key_column} | _labels] = scene.widths
 
@@ -105,7 +113,7 @@ defmodule Giggly.GuideTest do
   # colour legend's 81.18 by 147.25, both at one left edge.
   describe "Box.draw/2" do
     test "legends stack in the order given, as wide as the widest, each hung from the box's left" do
-      theme = Theme.complete(:gray)
+      theme = Theme.complete(%{complete: :gray, settings: %{}})
       alpha = legend("cyl", ~w(4 5 6 7 8), theme)
       colour = legend("class", ~w(2seater compact midsize minivan pickup subcompact suv), theme)
 
@@ -139,7 +147,7 @@ defmodule Giggly.GuideTest do
         end)
 
       decor = [{0.0, "#132B43"}, {1.0, "#56B1F7"}]
-      theme = Theme.complete(:gray)
+      theme = Theme.complete(%{complete: :gray, settings: %{}})
 
       {width, scene} =
         Guide.draw(%Guide.Colorbar{bins: 15}, %{title: "cty", keys: keys, decor: decor}, theme)

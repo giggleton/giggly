@@ -34,31 +34,39 @@ defmodule Giggly.Guide.Parts do
     }
   end
 
-  # A legend's title rows, top down, and its cell, in `look`, left-aligned in the second row across
-  # `columns` and centred down it as grid centres text: none for a title of `:none`, which takes
-  # no room, as ggplot2's legend leaves out a title it is given as `NULL`; otherwise the title's
-  # depth and its margin below it.
+  # A legend's title rows, top down, and its cell, in `look`: none for a title of `:none`, which
+  # takes no room, as ggplot2's legend leaves out a title it is given as `NULL`; otherwise the
+  # title's margin above it and its depth, then its margin below it. The title is left-aligned its
+  # left margin into the second row across `columns`, and centred down what its margin above leaves
+  # of the row, as grid centres text.
   @doc false
   @spec title_rows(String.t() | :none, Theme.title(), Range.t()) :: {[float()], [Cell.t()]}
   def title_rows(:none, _look, _columns), do: {[], []}
 
-  def title_rows(title, look, columns) do
+  def title_rows(title, %{margin: margin} = look, columns) do
+    height = title_height(title, look)
+    row = margin.top + height
+    place = {0.0, 1 - (margin.top + height / 2) / row}
+
     cell = %Cell{
       rows: 2..2,
       columns: columns,
       clip: :off,
       hang: :none,
-      primitives: [title_text(title, {0.0, 0.5}, 0, {0.0, 0.5}, look)]
+      primitives: [title_text(title, place, 0, {0.0, 0.5}, look, margin.left)]
     }
 
-    {[title_height(title, look), look.margin], [cell]}
+    {[row, margin.bottom], [cell]}
   end
 
-  # How wide a legend's title is, in points: none for `:none`.
+  # How wide a legend's title is, in points, its margins either side of it included: none for
+  # `:none`.
   @doc false
   @spec legend_title_width(String.t() | :none, Theme.title()) :: float()
   def legend_title_width(:none, _look), do: 0.0
-  def legend_title_width(title, look), do: title_width(title, look)
+
+  def legend_title_width(title, %{margin: margin} = look),
+    do: margin.left + title_width(title, look) + margin.right
 
   # How deep `title` is, set in `look`, in points: a line spacing for each line after the first,
   # then a line of text.
@@ -78,13 +86,19 @@ defmodule Giggly.Guide.Parts do
     |> Enum.max()
   end
 
-  # `title` set in `look`, each of its lines a label anchored at `place` in its cell, turned
-  # `angle` degrees, justified `hjust` along its baseline and stacked `vjust` of the way down from
-  # its top.
+  # `title` set in `look`, each of its lines a label anchored at `place` in its cell and moved
+  # `along` points along its baseline, turned `angle` degrees, justified `hjust` along its baseline
+  # and stacked `vjust` of the way down from its top.
   @doc false
-  @spec title_text(String.t(), {float(), float()}, number(), {float(), float()}, Theme.title()) ::
-          Text.t()
-  def title_text(title, {x_place, y_place}, angle, {hjust, vjust}, look) do
+  @spec title_text(
+          String.t(),
+          {float(), float()},
+          number(),
+          {float(), float()},
+          Theme.title(),
+          float()
+        ) :: Text.t()
+  def title_text(title, {x_place, y_place}, angle, {hjust, vjust}, look, along \\ 0.0) do
     lines = lines(title)
     count = length(lines)
     ascent = Font.ascent(look.size)
@@ -102,7 +116,7 @@ defmodule Giggly.Guide.Parts do
       hjust: List.duplicate(hjust, count),
       offset:
         Enum.with_index(lines, fn _line, index ->
-          {0.0, ((1 - vjust) * (count - 1) - index) * look.line_spacing - vjust * ascent}
+          {along, ((1 - vjust) * (count - 1) - index) * look.line_spacing - vjust * ascent}
         end),
       check_overlap: false,
       ascent: ascent
@@ -112,11 +126,11 @@ defmodule Giggly.Guide.Parts do
   defp lines(title), do: String.split(title, "\n")
 
   # `label`, `width` points wide, in `look`, left-aligned in a cell of `row` and `columns` and
-  # centred down it, as grid centres text with `vjust = 0.5`: its baseline half its ascent below
-  # the middle.
+  # centred down what its margins above and below leave of it, as grid centres text with `vjust =
+  # 0.5`: its baseline half its ascent below that middle.
   @doc false
   @spec text_cell(String.t(), float(), Theme.text(), pos_integer(), Range.t()) :: Cell.t()
-  def text_cell(label, width, look, row, columns) do
+  def text_cell(label, width, %{margin: margin} = look, row, columns) do
     %Cell{
       rows: row..row,
       columns: columns,
@@ -134,7 +148,7 @@ defmodule Giggly.Guide.Parts do
           opacity: [1.0],
           angle: 0,
           hjust: [0.0],
-          offset: [{0.0, -Font.ascent(look.size) / 2}],
+          offset: [{0.0, (margin.bottom - margin.top) / 2 - Font.ascent(look.size) / 2}],
           check_overlap: false,
           ascent: Font.ascent(look.size)
         }
@@ -152,13 +166,26 @@ defmodule Giggly.Guide.Parts do
     end)
   end
 
-  # The margin between a guide's keys and its labels, in `look`: none when every label is `:none`,
-  # as ggplot2 leaves out the labels' column and its margin for a scale with no labels.
+  # The margin between a guide's keys and its labels, the labels' left margin in `look`, and the
+  # labels' column, the widest of `label_widths` and the labels' right margin: none of either when
+  # every label is `:none`, as ggplot2 leaves out the labels and their margins for a scale with no
+  # labels.
   @doc false
-  @spec label_margin([String.t() | :none], Theme.text()) :: float()
-  def label_margin(labels, look) do
-    if Enum.all?(labels, fn label -> label == :none end), do: 0.0, else: look.margin
+  @spec label_columns([String.t() | :none], [float()], Theme.text()) :: {float(), float()}
+  def label_columns(labels, label_widths, %{margin: margin}) do
+    if Enum.all?(labels, fn label -> label == :none end),
+      do: {0.0, 0.0},
+      else: {margin.left, Enum.max(label_widths) + margin.right}
   end
+
+  # How tall a guide's label is in `look`, its margins above and below it included: none for
+  # `:none`.
+  @doc false
+  @spec label_height(String.t() | :none, Theme.text()) :: float()
+  def label_height(:none, _look), do: 0.0
+
+  def label_height(_label, %{size: size, margin: margin}),
+    do: margin.top + line_height(size) + margin.bottom
 
   # How tall a line of text `size` points is: its ascent and its deepest descent.
   @doc false

@@ -211,9 +211,9 @@ defmodule Giggly.Render do
     |> Map.put(:sizes, sizes)
   end
 
-  # The columns, left to right, each named and sized: the margin, the tag, the y title, then for
-  # each column of panels its left axes and its panels, the panel spacing between, then any legend
-  # beyond the theme's spacing from the panels, then the margin.
+  # The columns, left to right, each named and sized: the margin's left side, the tag, the y title,
+  # then for each column of panels its left axes and its panels, the panel spacing across between,
+  # then any legend beyond the theme's spacing from the panels, then the margin's right side.
   defp widths(panels, grid, {{title_width, _title}, labels}, legend, theme) do
     %{tag: {{tag_width, _tag_height}, _tag}} = labels
 
@@ -239,19 +239,19 @@ defmodule Giggly.Render do
 
     Enum.concat([
       [
-        {:margin, {:points, theme.plot_margin}},
+        {:margin_left, {:points, theme.plot_margin.left}},
         {:tag, {:points, tag_width}},
         {:title_left, {:points, title_width}}
       ],
-      spaced(panel_columns, theme),
+      spaced(panel_columns, theme.panel_spacing_x),
       legend_columns,
-      [{:margin, {:points, theme.plot_margin}}]
+      [{:margin_right, {:points, theme.plot_margin.right}}]
     ])
   end
 
-  # The rows, top to bottom, each named and sized: the margin, the tag, the plot's title and its
-  # subtitle, then for each row of panels its strips, its panels and its bottom axes, the panel
-  # spacing between, then the x title, the plot's caption and the margin.
+  # The rows, top to bottom, each named and sized: the margin's top, the tag, the plot's title and
+  # its subtitle, then for each row of panels its strips, its panels and its bottom axes, the panel
+  # spacing down between, then the x title, the plot's caption and the margin's bottom.
   defp heights(panels, grid, {{title_height, _title}, labels}, theme) do
     %{
       tag: {{_tag_width, tag_height}, _tag},
@@ -288,23 +288,24 @@ defmodule Giggly.Render do
 
     Enum.concat([
       [
-        {:margin, {:points, theme.plot_margin}},
+        {:margin_top, {:points, theme.plot_margin.top}},
         {:tag, {:points, tag_height}},
         {:plot_title, {:points, plot_title_height}},
         {:plot_subtitle, {:points, subtitle_height}}
       ],
-      spaced(panel_rows, theme),
+      spaced(panel_rows, theme.panel_spacing_y),
       [
         {:title_bottom, {:points, title_height}},
         {:plot_caption, {:points, caption_height}},
-        {:margin, {:points, theme.plot_margin}}
+        {:margin_bottom, {:points, theme.plot_margin.bottom}}
       ]
     ])
   end
 
-  defp spaced(groups, theme) do
+  # Groups of columns or rows with `spacing` points between each group and the next.
+  defp spaced(groups, spacing) do
     groups
-    |> Enum.intersperse([{:spacing, {:points, theme.panel_spacing}}])
+    |> Enum.intersperse([{:spacing, {:points, spacing}}])
     |> Enum.concat()
   end
 

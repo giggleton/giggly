@@ -12,7 +12,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert {plot.facet, plot.coord, plot.theme} ==
-               {%Facet.Null{}, %Coord.Cartesian{clip: :on}, :gray}
+               {%Facet.Null{}, %Coord.Cartesian{clip: :on}, %{complete: :gray, settings: %{}}}
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 draws `ggplot(df, aes(wt, height)) + geom_point(data = df2)`
@@ -3893,6 +3893,86 @@ defmodule Giggly.PlotTest do
           assert_raise NimbleOptions.ValidationError, fn -> Plot.guides(plot, [{key, :none}]) end
 
         assert error.key == [key]
+      end
+    end
+  end
+
+  describe "theme/2" do
+    test "settings are recorded by element, a later call's properties merged into an earlier's" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.theme(axis_text: [colour: "red", size: 9], spacing: 3)
+        |> Plot.theme(
+          axis_text: [size: {:rel, 2}],
+          plot_margin: [top: {1, :cm}],
+          spacing: {1, :lines}
+        )
+
+      assert plot.theme === %{
+               complete: :gray,
+               settings: %{
+                 axis_text: %{color: "#FF0000", size: {:rel, 2}},
+                 spacing: {1, :lines},
+                 plot_margin: %{top: {1, :cm}, right: {0, :pt}, bottom: {0, :pt}, left: {0, :pt}}
+               }
+             }
+    end
+
+    test "a margin of one length is that length on every side, a number ggplot2's points" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(legend_margin: 4, axis_text: [margin: {2, :mm}])
+
+      assert plot.theme.settings === %{
+               legend_margin: %{top: {4, :pt}, right: {4, :pt}, bottom: {4, :pt}, left: {4, :pt}},
+               axis_text: %{
+                 margin: %{top: {2, :mm}, right: {2, :mm}, bottom: {2, :mm}, left: {2, :mm}}
+               }
+             }
+    end
+
+    test "an element the theme does not know, or a property its kind does not have, is refused" do
+      plot = Plot.new(@rows)
+
+      for {settings, key} <- [
+            {[axis_text_z: []], [:axis_text_z]},
+            {[axis_text: [linewidth: 2]], [:linewidth]},
+            {[panel_grid: [size: 2]], [:size]}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
+        assert error.key == key
+      end
+    end
+
+    test "a value an element cannot use is refused at its key, naming the value" do
+      plot = Plot.new(@rows)
+
+      for {settings, key, value} <- [
+            {[axis_text: [color: "#FF000080"]], {:color, [:axis_text]}, "#FF000080"},
+            {[panel_grid: [colour: :none]], {:color, [:panel_grid]}, :none},
+            {[axis_text: [size: -1]], {:size, [:axis_text]}, -1},
+            {[panel_grid: [linewidth: {:rel, -1}]], {:linewidth, [:panel_grid]}, {:rel, -1}},
+            {[spacing: {1, :px}], {:spacing, []}, {1, :px}},
+            {[plot_margin: [top: 1, top: 2]], {:plot_margin, []}, [top: 1, top: 2]},
+            {[plot_margin: [middle: 1]], {:plot_margin, []}, [middle: 1]},
+            {[axis_text: [margin: {:rel, 2}]], {:margin, [:axis_text]}, {:rel, 2}}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
+        assert {{error.key, error.keys_path}, error.message =~ inspect(value)} == {key, true}
+      end
+    end
+
+    test "an element or a property given twice is refused, naming it" do
+      plot = Plot.new(@rows)
+
+      for {settings, name} <- [
+            {[spacing: 1, spacing: 2], ":spacing"},
+            {[axis_text: [color: "red", colour: "blue"]], ":color"}
+          ] do
+        error = assert_raise ArgumentError, fn -> Plot.theme(plot, settings) end
+        assert error.message =~ name
       end
     end
   end

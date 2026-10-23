@@ -28,7 +28,8 @@ ggplot2's facets' order".
   table, as `table_add_background()` adds it, which shows only when the table keeps its
   proportions and fills the drawing one way alone; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
-  carries the theme's name; `Theme.complete/1` turns it into the elements, which the guide and
+  carries the plot's theme, its complete theme's name and its settings; `Theme.complete/1` turns
+  it into the elements, which the guide and
   rendering itself read. A geom is handed no theme: the point keeps its own look until default
   aesthetics are filled from the theme in the assembly.
 - **Rendering arranges the panels as the layout table says, knowing no facet.** Each layout row
@@ -40,7 +41,8 @@ ggplot2's facets' order".
   `aspect_ratio`, radially 1) gives each panel row that ratio as its weight and keeps the scene's
   proportions, as ggplot2's facets give the panel rows the ratio in null units and respect the
   table, so the panels keep their shape and the table is centred in the drawing.
-  The margin is the theme's, on every side, and so is the spacing between panels. Above each row
+  The margin is the theme's, each side its own, and so is the spacing between panels, across
+  (`panel_spacing_x`) and down (`panel_spacing_y`). Above each row
   of panels are its strips, a row per strip layer as tall as its tallest strip; below it a row as
   tall as its tallest measured bottom axis, and left of each column a column as wide as its widest
   measured left axis. **A bottom axis with an empty cell under it is not measured**, as ggplot2's
