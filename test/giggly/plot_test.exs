@@ -3952,6 +3952,20 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a line, a rectangle or a text set to :none is recorded as removed" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(axis_text: :none, panel_grid: :none, rect: :none, legend_position: :none)
+
+      assert plot.theme.settings === %{
+               axis_text: :none,
+               panel_grid: :none,
+               rect: :none,
+               legend_position: :none
+             }
+    end
+
     test "an element the theme does not know, or a property its kind does not have, is refused" do
       plot = Plot.new(@rows)
 
@@ -3979,7 +3993,12 @@ defmodule Giggly.PlotTest do
             {[axis_text: [margin: {:rel, 2}]], {:margin, [:axis_text]}, {:rel, 2}},
             {[axis_text: [color: "grey50"]], {:color, [:axis_text]}, "grey50"},
             {[spacing: {:rel, "a"}], {:spacing, []}, {:rel, "a"}},
-            {[plot_margin: [top: "x"]], {:plot_margin, []}, [top: "x"]}
+            {[plot_margin: [top: "x"]], {:plot_margin, []}, [top: "x"]},
+            {[spacing: :none], {:spacing, []}, :none},
+            {[spacing: {:rel, 2}], {:spacing, []}, {:rel, 2}},
+            {[margins: {:rel, 2}], {:margins, []}, {:rel, 2}},
+            {[plot_margin: :none], {:plot_margin, []}, :none},
+            {[legend_position: :left], {:legend_position, []}, :left}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert {{error.key, error.keys_path}, error.message =~ inspect(value)} == {key, true}

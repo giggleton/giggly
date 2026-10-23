@@ -28,6 +28,17 @@ defmodule Giggly.GuideTest do
                {2.74, true, [Giggly.Scene.Polylines, Giggly.Scene.Polylines]}
     end
 
+    test "an angle axis whose labels the theme removes draws its ticks alone" do
+      coord = %Coord.Radial{}
+      breaks = [{2.0, "2"}, {3.0, "3"}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
+      theme = Theme.complete(%{complete: :gray, settings: %{axis_text_theta: :none}})
+
+      assert coord
+             |> Guide.Axis.draw_inside(params, theme)
+             |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
+    end
+
     test "an axis around a radial panel with no labels draws its ticks alone" do
       coord = %Coord.Radial{}
       breaks = [{2.0, :none}, {3.0, :none}]
@@ -105,6 +116,21 @@ defmodule Giggly.GuideTest do
 
       assert {key_column, key_rows} === {34.02, [17.28, 21.71, 28.53, 34.02]}
     end
+
+    # Golden: with `legend.text = element_blank()`, ggplot2 4.0.3's legend for mpg's `colour = drv`
+    # through vdiffr 1.0.9 is 28.24 by 78.13 points, its labels and their margins gone.
+    test "labels the theme removes draw nothing and take no room" do
+      theme = Theme.complete(%{complete: :gray, settings: %{legend_text: :none}})
+      {width, scene} = legend("drv", ~w(4 f r), theme)
+
+      texts =
+        for cell <- scene.cells, %Giggly.Scene.Text{labels: labels} <- cell.primitives, do: labels
+
+      legend_height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(legend_height, 2), texts} ===
+               {28.24, 78.13, [["drv"]]}
+    end
   end
 
   # Golden: the legends ggplot2 4.0.3 stacks for mpg's `alpha = cyl` above `colour = class`
@@ -170,6 +196,39 @@ defmodule Giggly.GuideTest do
 
       [%Giggly.Scene.Text{y: label_places, labels: label_texts}] = labels.primitives
       assert {label_places, label_texts} === {places, ~w(10 15 20 25 30 35)}
+    end
+
+    # Golden: with `legend.title`, `legend.text`, `legend.ticks` and `legend.background` set to
+    # `element_blank()`, ggplot2 4.0.3's legend box for the same scale is 28.24 by 97.36 points,
+    # its margin around the bar alone.
+    test "a title, labels, ticks and background the theme removes draw nothing and take no room" do
+      keys = [%{label: "10", place: 0.0385, glyphs: [], sizes: []}]
+
+      theme =
+        Theme.complete(%{
+          complete: :gray,
+          settings: %{
+            legend_title: :none,
+            legend_text: :none,
+            legend_ticks: :none,
+            legend_background: :none
+          }
+        })
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{title: "cty", keys: keys, decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}]},
+          theme
+        )
+
+      scene_height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(scene_height, 2),
+              Enum.map(scene.cells, fn cell ->
+                Enum.map(cell.primitives, fn primitive -> primitive.__struct__ end)
+              end)} ===
+               {28.24, 97.36, [[Giggly.Scene.Gradient]]}
     end
   end
 

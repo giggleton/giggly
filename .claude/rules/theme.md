@@ -12,7 +12,8 @@ design-log §4, the entry beginning "The theme is a resolved value"; why a theme
 not a module implementing a behaviour: the entry beginning "A theme is a function"; why settings
 are flat names with keyword-list elements, and R's rules for inheriting and merging: the entry
 beginning "A theme is set element by element"; the increment's steps and what waits: the entry
-beginning "The theme is Phase 3's eleventh increment".
+beginning "The theme is Phase 3's eleventh increment"; what a removal takes and what it leaves:
+the entry beginning "An element set to `:none` is removed".
 
 ## Rules
 
@@ -22,8 +23,9 @@ beginning "The theme is Phase 3's eleventh increment".
   completes a plot's theme at build time.
 - **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
   element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
-  `:length`, `:margin`), the one element it inherits from (`:none` for a root) and what it styles,
-  which `Plot` turns into `theme/2`'s schema and documentation, so the vocabulary has one home.
+  `:length`, `:margin`, or `:position`, `legend_position`'s `:right` or `:none`), the one element
+  it inherits from (`:none` for a root) and what it styles, which `Plot` turns into `theme/2`'s
+  schema and documentation, so the vocabulary has one home.
   **An element arrives with its first reader**: the tree holds what something draws and the
   elements those inherit from, and the struct holds only the leaves something draws, by axis and
   side (`axis_text_x_bottom`, `axis_ticks_length_y_left`, a radial panel's `theta` and `r`), the
@@ -33,14 +35,24 @@ beginning "The theme is Phase 3's eleventh increment".
   the parent's resolved one, a length or a margin given so is that share of its parent's in the
   parent's unit; a text's margin is replaced whole, its sides never inherited one by one.
   **`merge/2` is ggplot2's `add_theme()`**: a line's, a rectangle's or a text's properties
-  replace only the properties given, a length or a margin replaces the one before.
+  replace only the properties given, a length or a margin replaces the one before, and so do a
+  removal and an element given after one.
+- **A line, a rectangle or a text set to `:none` is removed and works out as `:none`**, as
+  `calc_element()` works a blank out: a complete theme's elements take a removed parent's removal;
+  an element a setting gives, which `complete/1` marks `inherit_blank: false`, skips every removed
+  element above it. A root's unset property is `theme_gray()`'s, as ggplot2 fills a root from its
+  default theme; under a removed root passed over, a property nothing gives is grid's default
+  (the `@grid_` attributes), a share of a parent that gives none is nothing, one with no parent
+  at all the share itself, and one inherited from a parent still a share is taken of it again.
+  A length or a margin is never removed.
 - **Two drawn elements are worked out as ggplot2's guides work them out**, not by the tree
   alone: a legend's title and labels take their default margins from a `text` laid over the
   theme, the root text's margin widened by `legend_key_spacing` on the side facing the keys (below
   the title, left of the labels), which a margin set on `legend_title`, `legend_text` or `title`
-  replaces; and a colour bar's ticks are `guide_colourbar()`'s white 0.5 / .pt mm only where the
+  replaces, and which replaces a removed root text, so they are drawn where every other text is
+  removed; and a colour bar's ticks are `guide_colourbar()`'s white 0.5 / .pt mm only where the
   settings leave `legend_ticks` unset (`replace_null()`), so a colour given every line never
-  reaches them.
+  reaches them, made as a setting is, so they skip a removed `line`.
 - **A complete theme is a function in `Giggly.Theme` that builds its tree of partial elements**,
   as ggplot2's are functions (`theme_gray()`), never a module implementing a behaviour: themes
   differ only in their values, where facets and coordinate systems differ in what they do. A theme
@@ -58,12 +70,13 @@ beginning "The theme is Phase 3's eleventh increment".
   knows no scene primitive: the drawing builds primitives from its elements.
 - **A theme holds sizes, colours, line widths, margins and spacing; alignment and angle stay with
   the drawing** (the y title turned 90 degrees, labels hung from their ticks) until a theme can
-  set them; so do line types, line ends, text faces and families.
+  set them; so do line types, text faces and families. A line's end is resolved (`line_end`,
+  `theme_gray()`'s butt, grid's round under a removed `line`), which no setting gives yet.
 - **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): removing an element (`:none`) and `legend_position`; the panel border, axis lines,
-  line types and `panel_ontop`; the other complete themes and accepting their arguments; where
-  the legends go; text's face, angle and alignment. A theme colour is opaque, a rectangle's border
-  `:none` too, until a theme needs transparency (`theme_void()`'s paper).
+  increment"): the panel border, axis lines, line types and ends, and `panel_ontop`; the other
+  complete themes and accepting their arguments; where else the legends go; text's face, angle and
+  alignment. A theme colour is opaque, a rectangle's border `:none` too, until a theme needs
+  transparency (`theme_void()`'s paper).
 - **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
   fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
   assembly, arrive with a default a theme can change, which neither a set nor a mapped colour

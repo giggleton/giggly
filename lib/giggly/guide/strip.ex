@@ -9,7 +9,9 @@ defmodule Giggly.Guide.Strip do
   # background fills the strip's cell, and the label is centred in what the strip text's margins
   # leave of it, its margins above and below a line of text, so a strip is as tall as those margins
   # and a line's ascent and deepest descent, as ggplot2 measures it. The label's baseline is half an
-  # ascent below the middle of that line, as an axis label beside its tick is.
+  # ascent below the middle of that line, as an axis label beside its tick is. A strip whose text
+  # the theme removes is not drawn at all, its background with it, and takes no room, as ggplot2's
+  # is; a background the theme removes leaves the label alone.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Rect, Text}
@@ -18,6 +20,7 @@ defmodule Giggly.Guide.Strip do
   # `render_strips()` for strips above a panel.
   @doc false
   @spec draw([String.t()], Theme.t()) :: [Giggly.Guide.drawn()]
+  def draw(_labels, %Theme{strip_text_x_top: :none}), do: []
   def draw(labels, theme), do: Enum.map(labels, fn label -> strip(label, theme) end)
 
   # The strip labelled `label`, in `theme`'s look: how tall it is, in points, and its primitives,
@@ -43,10 +46,12 @@ defmodule Giggly.Guide.Strip do
       ascent: Font.ascent(size)
     }
 
-    {height,
-     [
-       %Rect{fill: background.fill, color: background.color, stroke_width: background.line_width},
-       text
-     ]}
+    background_rect = background(background)
+    {height, Enum.concat(background_rect, [text])}
   end
+
+  defp background(:none), do: []
+
+  defp background(look),
+    do: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
 end

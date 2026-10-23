@@ -29,7 +29,8 @@ defmodule Giggly.Render do
   # strip's always, as `theme_gray()`'s `strip.clip` says.
   #
   # A plot with legends, one for each aesthetic other than position that a layer maps, or for
-  # several merged, gives them a column right of the panels, the theme's legend spacing from them:
+  # several merged, gives them a column right of the panels, the theme's legend spacing from them,
+  # unless the theme puts the legends nowhere:
   # each legend is a table of its own, its keys' glyphs drawn by the geom of each layer that maps
   # one of its aesthetics (`Giggly.Geom`), and the legends are stacked in a box (`Giggly.Guide`),
   # nested in a cell spanning the panels' rows and centred down them, as ggplot2 places its guide
@@ -172,13 +173,14 @@ defmodule Giggly.Render do
 
   defp draw_layer(_geom, :error, _coord, _params), do: []
 
-  # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none, or its width
-  # and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs
+  # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none or where the
+  # theme puts them nowhere (`legend_position: :none`), or its width and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs
   # drawn by the geom of every layer that maps one of the legend's aesthetics and draws in that
   # key, in the order the layers were added, at the key's values of the aesthetics it maps and with
   # what the layer sets, as ggplot2 draws each such layer's `draw_key` in the keys it keeps, and the
   # room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by.
   defp draw_legend([], _theme), do: :none
+  defp draw_legend(_legends, %Theme{legend_position: :none}), do: :none
 
   defp draw_legend(legends, theme) do
     legends
@@ -353,7 +355,7 @@ defmodule Giggly.Render do
       columns: 1..column_count,
       clip: :on,
       hang: :none,
-      primitives: [background_rect(theme.plot_background)]
+      primitives: background_rect(theme.plot_background)
     }
 
     panel_cells =
@@ -495,6 +497,10 @@ defmodule Giggly.Render do
     }
   end
 
+  # The plot's background, none where the theme removes it; its cell stays, empty, as svglite
+  # writes ggplot2's clipping of a background that draws nothing.
+  defp background_rect(:none), do: []
+
   defp background_rect(%{fill: fill, color: color, line_width: line_width}),
-    do: %Rect{fill: fill, color: color, stroke_width: line_width}
+    do: [%Rect{fill: fill, color: color, stroke_width: line_width}]
 end

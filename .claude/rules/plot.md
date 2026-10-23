@@ -289,8 +289,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   map of all four, a margin element's `{:rel, share}` too, a text's margin never. A colour is
   opaque, a rectangle's border `:none` too (`validate_theme_color/1`, `validate_theme_border/1`),
   until a theme needs transparency. An element or a property given twice raises from
-  `Aesthetics.canonicalize/1`, as `labs/2`'s does. The validated settings are handed to
-  `Theme.merge/2`, so a later call's properties replace only those it gives, as R's `+` does.
+  `Aesthetics.canonicalize/1`, as `labs/2`'s does. **A line, a rectangle or a text may be `:none`,
+  removed**, taken aside before the schema checks the rest, so a mistake inside an element is
+  reported at its property; a length or a margin may not, and the roots `spacing` and `margins`
+  take no `{:rel, share}`, as R refuses both. `legend_position:` is `:right` or `:none`. The
+  validated settings are handed to `Theme.merge/2`, so a later call's properties replace only
+  those it gives, as R's `+` does.
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
   `fill`, `alpha`, `shape`, `size`, `linetype` and `linewidth` alone, each as a scale's `guide:`

@@ -26,7 +26,8 @@ ggplot2's facets' order".
   cell is clipped when the assembly says the coordinate system clips panels; each strip's cell is
   clipped, as `theme_gray()`'s `strip.clip = "on"` says; the plot's background is clipped to the
   table, as `table_add_background()` adds it, which shows only when the table keeps its
-  proportions and fills the drawing one way alone; every other cell is not.
+  proportions and fills the drawing one way alone, its cell kept, empty, where the theme removes
+  it, as svglite writes the clip; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
   carries the plot's theme, its complete theme's name and its settings; `Theme.complete/1` turns
   it into the elements, which the guide and
@@ -72,7 +73,8 @@ ggplot2's facets' order".
   where the layer has no rows, as one only another table makes, draws nothing of it, as ggplot2
   gives it an empty grob, and its geom is not called.
 - **A plot with legends gives them a column right of the panels**, the theme's legend spacing
-  from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`.
+  from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`,
+  **and none where the theme's `legend_position` is `:none`**, neither column nor spacing.
   Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked
   in the guide's box (`Guide.Box.draw/2`), in the order the assembly gives them; its cell spans
   the panels' rows, from the first's top to the last's bottom, the strips above the first row left

@@ -7486,6 +7486,122 @@ defmodule GigglyTest do
 
       assert golden?(plot, "theme_radial")
     end
+
+    # Golden: test/golden/theme_blank.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_blank.R: every element and clip path matches. The element reference
+    # page's "Blank elements" example. It moves with what moves test/golden/point.svg, and with how
+    # an axis with no labels is measured.
+    test "a removed background draws nothing and removed labels take no room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.theme(panel_background: :none, axis_text: :none)
+
+      assert golden?(plot, "theme_blank")
+    end
+
+    # Golden: test/golden/theme_removed.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_removed.R: every element and clip path matches. Each removal takes
+    # its room with it, removed ticks count as no length, removed strip text takes the strip, and
+    # an element a setting gives skips its removed parent. It moves with how an axis, a strip, a
+    # legend or the plot's labels are laid out.
+    test "removed elements take their room, and an element a setting gives skips a removed parent" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.labs(title: "Title", subtitle: "Subtitle", caption: "Caption", tag: "A")
+        |> Plot.theme(
+          axis_text: :none,
+          axis_text_x: [colour: "red"],
+          axis_ticks_x: :none,
+          axis_title_x: :none,
+          panel_grid_minor: :none,
+          strip_text: :none,
+          legend_title: :none,
+          legend_key: :none,
+          plot_subtitle: :none,
+          plot_tag: :none
+        )
+
+      assert golden?(plot, "theme_removed")
+    end
+
+    # Golden: test/golden/theme_roots.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_roots.R: every element and clip path matches but the bar's fill, which
+    # vdiffr's device cannot draw, as test/golden/theme_colorbar.svg's. Under a removed root, what
+    # a setting gives falls to grid's defaults, and a colour bar's own ticks are still drawn. It
+    # moves with what moves test/golden/theme_colorbar.svg.
+    test "under a removed line or rect, what a setting gives falls to grid's defaults" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty, shape: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.theme(
+          line: :none,
+          rect: :none,
+          panel_grid_major_y: [colour: "red"],
+          legend_key: [colour: "blue"]
+        )
+
+      assert golden?(plot, "theme_roots")
+    end
+
+    # Golden: test/golden/theme_root_text.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_root_text.R: every element matches once positions are rounded to
+    # two decimals, and every clip path. Under a removed root text, what a setting gives is drawn
+    # at grid's defaults where nothing above gives a property, and a legend's title and labels are
+    # drawn in theme_gray()'s look. It moves with how a title breaks over lines.
+    test "under a removed root text, a legend's title and labels are still drawn" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.labs(title: "Title", subtitle: "A subtitle\nover two lines", caption: "Caption")
+        |> Plot.theme(
+          text: :none,
+          plot_subtitle: [colour: "red"],
+          axis_text_y: [colour: "red", size: 10]
+        )
+
+      assert golden?(plot, "theme_root_text")
+    end
+
+    # Golden: test/golden/theme_legend_none.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_legend_none.R: every element and clip path matches. It moves
+    # with what moves test/golden/point.svg.
+    test "legend_position: :none draws no legends, and the panel takes their room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv, size: :cyl})
+        |> Plot.geom_point()
+        |> Plot.theme(legend_position: :none)
+
+      assert golden?(plot, "theme_legend_none")
+    end
+
+    # Golden: test/golden/theme_radial_removed.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_radial_removed.R: every element matches, and every clip path
+    # but svglite's around the whole drawing. The angle axis's labels keep their place beyond
+    # removed ticks. It moves with what moves test/golden/radial.svg.
+    test "removed ticks round a radial panel leave its labels where they were" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.coord_radial()
+        |> Plot.theme(
+          axis_ticks: :none,
+          axis_text_r: :none,
+          panel_background: :none,
+          panel_grid_minor: :none
+        )
+
+      assert golden?(plot, "theme_radial_removed")
+    end
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`

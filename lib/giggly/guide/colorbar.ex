@@ -24,7 +24,8 @@ defmodule Giggly.Guide.Colorbar do
   #     right of the bar, its ticks still drawn, as ggplot2 draws a scale with no labels.
   #
   # Drawn in ggplot2's order: the background, the title, the bar, the ticks on its right side and
-  # then on its left, each from the bar's inside outward, and the labels.
+  # then on its left, each from the bar's inside outward, and the labels. A title or labels the
+  # theme removes draw as none given; a background or ticks it removes draw nothing.
 
   @enforce_keys [:bins]
   defstruct @enforce_keys
@@ -58,7 +59,8 @@ defmodule Giggly.Guide.Colorbar do
         legend_text: text_look
       } = theme
 
-      labels = Enum.map(keys, fn key -> key.label end)
+      title = Parts.title(title, title_look)
+      labels = Parts.labels(keys, text_look)
       places = Enum.map(keys, fn key -> key.place end)
       label_widths = Parts.label_widths(labels, text_look)
       {label_margin, labels_width} = Parts.label_columns(labels, label_widths, text_look)
@@ -81,7 +83,7 @@ defmodule Giggly.Guide.Colorbar do
         keep_proportions: false,
         cells:
           Enum.concat([
-            [background],
+            background,
             title_cells,
             [bar_cell(decor, places, {bar_row, key_width}, theme)],
             label_cells(labels, label_widths, {bar_row, places}, text_look)
@@ -106,20 +108,28 @@ defmodule Giggly.Guide.Colorbar do
         clip: :off,
         hang: :none,
         primitives: [
-          %Gradient{stops: decor, stroke_width: @bar_stroke_width},
-          %Polylines{
-            lines: lines,
-            offsets: :none,
-            stroke_width: ticks_look.line_width,
-            dashes: :none,
-            color: List.duplicate(ticks_look.color, length(lines)),
-            opacity: List.duplicate(1.0, length(lines)),
-            line_end: :butt,
-            line_join: :round,
-            mitre_limit: 10.0
-          }
+          %Gradient{stops: decor, stroke_width: @bar_stroke_width} | ticks(lines, ticks_look)
         ]
       }
+    end
+
+    # The ticks across the bar, none where the theme removes them.
+    defp ticks(_lines, :none), do: []
+
+    defp ticks(lines, look) do
+      [
+        %Polylines{
+          lines: lines,
+          offsets: :none,
+          stroke_width: look.line_width,
+          dashes: :none,
+          color: List.duplicate(look.color, length(lines)),
+          opacity: List.duplicate(1.0, length(lines)),
+          line_end: look.line_end,
+          line_join: :round,
+          mitre_limit: 10.0
+        }
+      ]
     end
 
     # The labels, each at its tick's place up the bar's row, left-aligned in the label column and

@@ -13,7 +13,8 @@ defmodule Giggly.Guide.Title do
   # subtitle. The caption hangs from its margin below the top of its cell, right-aligned its right
   # margin in. The tag is centred both ways in what its margins leave of its cell, which is as wide
   # as its widest line and its margins either side. A label of `:none` draws nothing and takes no
-  # room, as ggplot2 leaves out a label set to `NULL`.
+  # room, as ggplot2 leaves out a label set to `NULL`, and so does one whose look the theme
+  # removes.
 
   alias Giggly.Guide.Parts
   alias Giggly.Theme
@@ -48,6 +49,7 @@ defmodule Giggly.Guide.Title do
   # A title above the panels, hanging left-aligned from its margin below its cell's top, its left
   # margin in, its margin below it.
   defp above(:none, _look), do: {0.0, []}
+  defp above(_label, :none), do: {0.0, []}
 
   defp above(label, %{margin: margin} = look) do
     height = margin.top + Parts.title_height(label, look) + margin.bottom
@@ -58,6 +60,7 @@ defmodule Giggly.Guide.Title do
   # A title below the panels, hanging right-aligned from its margin below its cell's top, its right
   # margin in, its margin below it.
   defp below(:none, _look), do: {0.0, []}
+  defp below(_label, :none), do: {0.0, []}
 
   defp below(label, %{margin: margin} = look) do
     height = margin.top + Parts.title_height(label, look) + margin.bottom
@@ -68,6 +71,7 @@ defmodule Giggly.Guide.Title do
   # The tag, centred in what its margins leave of a cell as wide as its widest line and as deep as
   # its lines, its margins included.
   defp tag(:none, _look), do: {{0.0, 0.0}, []}
+  defp tag(_label, :none), do: {{0.0, 0.0}, []}
 
   defp tag(label, %{margin: margin} = look) do
     width = Parts.title_width(label, look)

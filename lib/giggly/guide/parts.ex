@@ -6,7 +6,8 @@ defmodule Giggly.Guide.Parts do
   # `GuideColourbar` lays itself out through `GuideLegend`'s measuring and arranging: the
   # background over the whole table, the title's rows above the keys, a line of text left-aligned
   # in its cell and centred down it, how wide the labels are and how far from the keys, and how
-  # tall a line of text is.
+  # tall a line of text is; and the title and labels as the theme leaves them, none where it
+  # removes them, so a guide draws them as it draws a title or labels it is not given.
   #
   # And a title, which every guide and the plot's own titles (`Giggly.Guide.Title`) draw alike: a
   # label that may run over several lines, split where it breaks, each line drawn by itself as R's
@@ -21,18 +22,37 @@ defmodule Giggly.Guide.Parts do
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Cell, Rect, Text}
 
-  # The guide's background, spanning a table of `columns` and `rows`, in `theme`'s look.
+  # The guide's background, spanning a table of `columns` and `rows`, in `theme`'s look: its cell,
+  # or none where the theme removes it.
   @doc false
-  @spec background(pos_integer(), pos_integer(), Theme.t()) :: Cell.t()
+  @spec background(pos_integer(), pos_integer(), Theme.t()) :: [Cell.t()]
+  def background(_columns, _rows, %Theme{legend_background: :none}), do: []
+
   def background(columns, rows, %Theme{legend_background: look}) do
-    %Cell{
-      rows: 1..rows,
-      columns: 1..columns,
-      clip: :off,
-      hang: :none,
-      primitives: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
-    }
+    [
+      %Cell{
+        rows: 1..rows,
+        columns: 1..columns,
+        clip: :off,
+        hang: :none,
+        primitives: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
+      }
+    ]
   end
+
+  # A guide's title as drawn in `look`: `:none` where the theme removes the title, so the guide
+  # draws as one with no title, as ggplot2's does.
+  @doc false
+  @spec title(String.t() | :none, Theme.title()) :: String.t() | :none
+  def title(_title, :none), do: :none
+  def title(title, _look), do: title
+
+  # The labels of a guide's `keys` as drawn in `look`: each `:none` where the theme removes the
+  # labels, so the guide draws as one whose scale has no labels, as ggplot2's does.
+  @doc false
+  @spec labels([%{label: String.t() | :none}], Theme.text()) :: [String.t() | :none]
+  def labels(keys, :none), do: Enum.map(keys, fn _key -> :none end)
+  def labels(keys, _look), do: Enum.map(keys, fn key -> key.label end)
 
   # A legend's title rows, top down, and its cell, in `look`: none for a title of `:none`, which
   # takes no room, as ggplot2's legend leaves out a title it is given as `NULL`; otherwise the
@@ -169,13 +189,13 @@ defmodule Giggly.Guide.Parts do
   # The margin between a guide's keys and its labels, the labels' left margin in `look`, and the
   # labels' column, the widest of `label_widths` and the labels' right margin: none of either when
   # every label is `:none`, as ggplot2 leaves out the labels and their margins for a scale with no
-  # labels.
+  # labels, or for labels the theme removes, whose `look` is `:none`.
   @doc false
   @spec label_columns([String.t() | :none], [float()], Theme.text()) :: {float(), float()}
-  def label_columns(labels, label_widths, %{margin: margin}) do
+  def label_columns(labels, label_widths, look) do
     if Enum.all?(labels, fn label -> label == :none end),
       do: {0.0, 0.0},
-      else: {margin.left, Enum.max(label_widths) + margin.right}
+      else: {look.margin.left, Enum.max(label_widths) + look.margin.right}
   end
 
   # How tall a guide's label is in `look`, its margins above and below it included: none for

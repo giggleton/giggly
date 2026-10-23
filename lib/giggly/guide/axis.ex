@@ -15,7 +15,9 @@ defmodule Giggly.Guide.Axis do
   # system says each side shows, once for the plot, however many panels it has.
   #
   # It looks as the theme says (`Giggly.Theme`): its ticks reach the theme's tick length out from
-  # the panel's edge, and its labels sit the labels' margin beyond them. The labels below the panel
+  # the panel's edge, and its labels sit the labels' margin beyond them. Ticks the theme removes
+  # draw nothing and count as no length, as ggplot2's axis counts them; labels it removes draw as a
+  # scale with no labels does, and so does a title. The labels below the panel
   # are centred on their ticks and hang from their tops; those to its left end at the margin and are
   # centred on their ticks. A radial panel's radius axis, to its left, is drawn in the radius
   # axis's look, ggplot2's `axis.text.r`: its labels are centred between the margin and a margin
@@ -35,8 +37,8 @@ defmodule Giggly.Guide.Axis do
   alias Giggly.Guide.Parts
   alias Giggly.Scene.{Polylines, Text}
 
-  # Ticks are opaque, their ends cut square and their corners round, as `theme_gray()`'s `line`
-  # element draws every line.
+  # Ticks are opaque, their ends as the theme's ticks say and their corners round, as
+  # `theme_gray()`'s `line` element draws every line.
 
   # The axis drawn on each side of the panel that `panel_params` describes under `coord`, by side,
   # in the look the coordinate system names and `theme`'s. An axis with no breaks draws nothing and
@@ -65,7 +67,7 @@ defmodule Giggly.Guide.Axis do
 
   # The title of the axis on each side of a panel that `panel_params` describes under `coord`, by
   # side, given each aesthetic's title, `:none` for none, in `theme`'s look. A title of `:none`
-  # draws nothing and takes no room.
+  # draws nothing and takes no room, and so does one the theme removes.
   @doc false
   @spec titles(
           Coord.t(),
@@ -98,25 +100,24 @@ defmodule Giggly.Guide.Axis do
   # left) and `theme`'s: how far it reaches from the panel, in points, and its primitives, placed
   # in a cell that deep.
   defp axis([], _side, _look, _theme), do: {0.0, []}
+  defp axis(breaks, side, look, theme), do: draw_axis(breaks, side, look, elements(theme, look))
 
-  # An axis whose scale has no labels draws its ticks alone and reaches only as far as they do, as
-  # ggplot2's leaves out the labels and their room.
-  defp axis([{_place, :none} | _rest] = breaks, side, look, theme) do
+  # An axis whose scale has no labels, or whose labels the theme removes, draws its ticks alone and
+  # reaches only as far as they do, as ggplot2's leaves out the labels and their room.
+  defp draw_axis(breaks, side, _look, {text_look, ticks})
+       when text_look == :none or elem(hd(breaks), 1) == :none do
     places = Enum.map(breaks, fn {place, _label} -> place end)
-    {_text_look, ticks} = elements(theme, look)
-
     depth = reach(ticks)
 
     case side do
-      :bottom -> {depth, [bottom_ticks(places, depth, ticks)]}
-      :left -> {depth, [left_ticks(places, depth, ticks)]}
+      :bottom -> {depth, bottom_ticks(places, depth, ticks)}
+      :left -> {depth, left_ticks(places, depth, ticks)}
     end
   end
 
   # Labels below the panel count their margins above and below them, as ggplot2's do.
-  defp axis(breaks, :bottom, :x, theme) do
+  defp draw_axis(breaks, :bottom, :x, {%{margin: margin} = text_look, ticks}) do
     {places, labels} = Enum.unzip(breaks)
-    {%{margin: margin} = text_look, ticks} = elements(theme, :x)
     height = reach(ticks) + margin.top + Parts.line_height(text_look.size) + margin.bottom
 
     # A cell's y runs up from its bottom; the panel's edge is the cell's top.
@@ -138,13 +139,13 @@ defmodule Giggly.Guide.Axis do
       ascent: Font.ascent(text_look.size)
     }
 
-    {height, [bottom_ticks(places, height, ticks), text]}
+    tick_lines = bottom_ticks(places, height, ticks)
+    {height, Enum.concat(tick_lines, [text])}
   end
 
   # Labels left of the panel count their margins either side of them, as ggplot2's do.
-  defp axis(breaks, :left, :y, theme) do
+  defp draw_axis(breaks, :left, :y, {%{margin: margin} = text_look, ticks}) do
     {places, labels} = Enum.unzip(breaks)
-    {%{margin: margin} = text_look, ticks} = elements(theme, :y)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     width = margin.left + Enum.max(label_widths) + margin.right + reach(ticks)
 
@@ -152,12 +153,11 @@ defmodule Giggly.Guide.Axis do
     label_end = 1 - (reach(ticks) + margin.right) / width
     text = left_labels({places, labels, label_widths}, label_end, 1.0, text_look)
 
-    {width, [text, left_ticks(places, width, ticks)]}
+    {width, [text | left_ticks(places, width, ticks)]}
   end
 
-  defp axis(breaks, :left, :r, theme) do
+  defp draw_axis(breaks, :left, :r, {%{margin: margin} = text_look, ticks}) do
     {places, labels} = Enum.unzip(breaks)
-    {%{margin: margin} = text_look, ticks} = elements(theme, :r)
     label_widths = Enum.map(labels, fn label -> Font.width(label, text_look.size) end)
     label_width = Enum.max(label_widths)
     width = margin.left + label_width + margin.right + reach(ticks)
@@ -166,7 +166,7 @@ defmodule Giggly.Guide.Axis do
     label_middle = 1 - (reach(ticks) + margin.right + label_width / 2) / width
     text = left_labels({places, labels, label_widths}, label_middle, 0.5, text_look)
 
-    {width, [text, left_ticks(places, width, ticks)]}
+    {width, [text | left_ticks(places, width, ticks)]}
   end
 
   # The theme's elements an axis drawn in `look` is drawn with, ggplot2's for that axis on its side
@@ -183,10 +183,15 @@ defmodule Giggly.Guide.Axis do
   defp elements(%Theme{} = theme, :r),
     do: {theme.axis_text_r, ticks(theme.axis_ticks_r, theme.axis_ticks_length_r)}
 
+  # Ticks the theme removes are `:none`, whatever their length, as ggplot2's axis sets the length of
+  # blank ticks to 0.
+  defp ticks(:none, _length), do: :none
   defp ticks(look, length), do: Map.put(look, :length, length)
 
   # How far ticks reach out from the panel: their length, or none for ticks turned into the panel
-  # by a negative length, which take no room, as ggplot2's measure the range from 0 to the length.
+  # by a negative length, which take no room, as ggplot2's measure the range from 0 to the length,
+  # or for ticks the theme removes.
+  defp reach(:none), do: 0.0
   defp reach(ticks), do: max(ticks.length, 0.0)
 
   # The labels of an axis to the panel's left, anchored at `x_place` across the axis's cell by
@@ -210,45 +215,57 @@ defmodule Giggly.Guide.Axis do
   end
 
   # The ticks of an axis `height` points deep below the panel, reaching down from the panel's edge,
-  # the cell's top, or up into the panel for a negative length.
+  # the cell's top, or up into the panel for a negative length; none for ticks the theme removes.
+  defp bottom_ticks(_places, _height, :none), do: []
+
   defp bottom_ticks(places, height, ticks) do
     tick_end = 1 - ticks.length / height
 
-    %Polylines{
-      lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
-      offsets: :none,
-      stroke_width: ticks.line_width,
-      dashes: :none,
-      color: List.duplicate(ticks.color, length(places)),
-      opacity: List.duplicate(1.0, length(places)),
-      line_end: :butt,
-      line_join: :round,
-      mitre_limit: 10.0
-    }
+    [
+      %Polylines{
+        lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
+        offsets: :none,
+        stroke_width: ticks.line_width,
+        dashes: :none,
+        color: List.duplicate(ticks.color, length(places)),
+        opacity: List.duplicate(1.0, length(places)),
+        line_end: ticks.line_end,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+    ]
   end
 
   # The ticks of an axis `width` points wide to the panel's left, reaching in to the panel's edge,
-  # the cell's right, from inside the panel for a negative length.
+  # the cell's right, from inside the panel for a negative length; none for ticks the theme removes.
+  defp left_ticks(_places, _width, :none), do: []
+
   defp left_ticks(places, width, ticks) do
     tick_end = 1 - ticks.length / width
 
-    %Polylines{
-      lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
-      offsets: :none,
-      stroke_width: ticks.line_width,
-      dashes: :none,
-      color: List.duplicate(ticks.color, length(places)),
-      opacity: List.duplicate(1.0, length(places)),
-      line_end: :butt,
-      line_join: :round,
-      mitre_limit: 10.0
-    }
+    [
+      %Polylines{
+        lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
+        offsets: :none,
+        stroke_width: ticks.line_width,
+        dashes: :none,
+        color: List.duplicate(ticks.color, length(places)),
+        opacity: List.duplicate(1.0, length(places)),
+        line_end: ticks.line_end,
+        line_join: :round,
+        mitre_limit: 10.0
+      }
+    ]
   end
 
   # The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
   # the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
   # side.
   defp title(:none, _side, _theme), do: {0.0, []}
+
+  # A title the theme removes draws as no title, as ggplot2's does.
+  defp title(_text, :bottom, %Theme{axis_title_x_bottom: :none}), do: {0.0, []}
+  defp title(_text, :left, %Theme{axis_title_y_left: :none}), do: {0.0, []}
 
   # A title hangs from its place, the top of its first line, toward the axis, each line centred
   # along the panel's side (`Giggly.Guide.Parts`). Below the panel it counts its margins above and

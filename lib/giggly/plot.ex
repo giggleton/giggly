@@ -114,7 +114,8 @@ defmodule Giggly.Plot do
   Everything but the marks is drawn in ggplot2's default theme, a grey panel with white grid lines.
   `theme/2` changes any element of it by name, each inheriting what it leaves unset from its parent
   in ggplot2's tree, so setting `text: [size: 14]` makes every label bigger, and
-  `axis_text_x: [color: "red"]` reddens only the x axis's labels.
+  `axis_text_x: [color: "red"]` reddens only the x axis's labels. An element set to `:none` is
+  removed, with everything that inherits from it, and `legend_position: :none` draws no legends.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -2094,8 +2095,9 @@ defmodule Giggly.Plot do
         ]
       ]
     ],
-    length: [type: {:custom, __MODULE__, :validate_theme_length, []}],
-    margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:element]}]
+    length: [type: {:custom, __MODULE__, :validate_theme_length, [:element]}],
+    margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:element]}],
+    position: [type: {:in, [:right, :none]}]
   }
   # The elements whose settings are a line's, a rectangle's or a text's properties, whose spelling
   # `theme/2` canonicalizes (`colour:`) before checking them.
@@ -2103,13 +2105,22 @@ defmodule Giggly.Plot do
                          kind in [:line, :rect, :text],
                          into: %{},
                          do: {name, kind}
+  # A root length or margin is checked as one with no parent to take a share of.
+  @theme_root_types %{
+    length: [type: {:custom, __MODULE__, :validate_theme_length, [:root]}],
+    margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:root]}]
+  }
   @theme_options NimbleOptions.new!(
                    for {name, kind, parent, description} <- Theme.elements() do
                      inherits =
                        if parent == :none, do: "", else: " Inherits from `#{inspect(parent)}`."
 
-                     {name,
-                      [doc: description <> inherits] ++ Map.fetch!(@theme_element_types, kind)}
+                     type =
+                       if parent == :none and is_map_key(@theme_root_types, kind),
+                         do: Map.fetch!(@theme_root_types, kind),
+                         else: Map.fetch!(@theme_element_types, kind)
+
+                     {name, [doc: description <> inherits] ++ type}
                    end
                  )
 
@@ -4680,7 +4691,19 @@ defmodule Giggly.Plot do
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin
   is one length for every side, a keyword list of `:top`, `:right`, `:bottom` and `:left`, a side
-  left out 0, or `{:rel, share}`.
+  left out 0, or `{:rel, share}`. `:spacing` and `:margins`, which inherit from nothing, take no
+  share.
+
+  A line, a rectangle or a text set to `:none` is removed: it draws nothing and takes no room, and
+  the elements that inherit from it go with it, so `axis_text: :none` removes every axis's tick
+  labels and the room they took. An element a setting gives is drawn all the same, inheriting from
+  the nearest element above it that is not removed, so `theme(axis_text: :none, axis_text_x:
+  [color: "red"])` keeps the x axis's labels, red and at the size of `:text`; a later setting of a
+  removed element replaces the removal. Under a removed `:line`, `:rect` or `:text`, a property
+  nothing above an element gives is drawn at the drawing's own default: black, filled white, a
+  line 0.75 points wide with round ends, text 12 points with its lines 1.2 sizes apart, and no
+  margin.
+  `legend_position: :none` draws no legends.
 
   Raises `NimbleOptions.ValidationError` for an element it does not know or a value it cannot use,
   and `ArgumentError` for an element or a property given twice.
@@ -4698,12 +4721,32 @@ defmodule Giggly.Plot do
       ...>   |> IO.iodata_to_binary()
       iex> {svg =~ "fill: #EBEBEB", svg =~ "fill: #FF0000"}
       {false, true}
+
+  Removing the panel's background and the tick labels leaves the axes' titles the only text:
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme(panel_background: :none, axis_text: :none)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #EBEBEB", length(Regex.scan(~r/<text/, svg))}
+      {false, 2}
   """
   @spec theme(t(), keyword()) :: t()
   def theme(%__MODULE__{theme: theme} = plot, settings) when is_list(settings) do
-    validated =
+    # A removal is taken aside before the schema checks the rest, which keeps a mistake inside an
+    # element reported at its property.
+    {removals, given} =
       settings
       |> Aesthetics.canonicalize()
+      |> Enum.split_with(fn {name, element} ->
+        is_map_key(@theme_drawn_kinds, name) and element == :none
+      end)
+
+    validated =
+      given
       |> Enum.map(fn
         {name, element} when is_map_key(@theme_drawn_kinds, name) and is_list(element) ->
           {name, Aesthetics.canonicalize(element)}
@@ -4716,6 +4759,7 @@ defmodule Giggly.Plot do
         {name, element} when is_list(element) -> {name, Map.new(element)}
         setting -> setting
       end)
+      |> Map.merge(Map.new(removals))
 
     %{plot | theme: %{theme | settings: Theme.merge(theme.settings, validated)}}
   end
@@ -4877,29 +4921,37 @@ defmodule Giggly.Plot do
        "got: #{inspect(amount)}"}
   end
 
-  # NimbleOptions' check of a theme length: a number of ggplot2's points, `{amount, unit}` in one of
-  # `Giggly.Theme`'s units, or a share of its parent's, `{:rel, share}`; kept as `{amount, unit}`.
+  # NimbleOptions' check of a theme length: a number of ggplot2's points, or `{amount, unit}` in
+  # one of `Giggly.Theme`'s units, kept as `{amount, unit}`; for an element with a parent, as `role`
+  # says, a share of its parent's, `{:rel, share}`, too, which a root (`:root`) has none to take,
+  # as ggplot2 refuses one there.
   @doc false
-  @spec validate_theme_length(term()) :: {:ok, Theme.measure()} | {:error, String.t()}
-  def validate_theme_length({:rel, share} = relative) when is_number(share), do: {:ok, relative}
+  @spec validate_theme_length(term(), :element | :root) ::
+          {:ok, Theme.measure()} | {:error, String.t()}
+  def validate_theme_length({:rel, share} = relative, :element) when is_number(share),
+    do: {:ok, relative}
 
-  def validate_theme_length(length) do
+  def validate_theme_length(length, role) do
     case theme_length(length) do
       :error ->
         {:error,
-         "expected a length: a number of points, {amount, unit} with a unit of " <>
-           "#{inspect(@theme_units)}, or {:rel, share}, got: #{inspect(length)}"}
+         "expected a length: a number of points or {amount, unit} with a unit of " <>
+           "#{inspect(@theme_units)}#{share_choice(role)}, got: #{inspect(length)}"}
 
       measure ->
         {:ok, measure}
     end
   end
 
+  defp share_choice(:element), do: ", or {:rel, share}"
+  defp share_choice(:root), do: ""
+
   # NimbleOptions' check of a theme margin: one length for every side, or a keyword list of
   # `:top`, `:right`, `:bottom` and `:left`, each a length, a side left out 0; for a margin
-  # element, as `for` says, a share of its parent's, `{:rel, share}`, too.
+  # element with a parent, as `for` says, a share of its parent's, `{:rel, share}`, too, which a
+  # text's margin never is and a root margin (`:root`) has none to take.
   @doc false
-  @spec validate_theme_margin(term(), :element | :text) ::
+  @spec validate_theme_margin(term(), :element | :text | :root) ::
           {:ok, Theme.sides() | {:rel, number()}} | {:error, String.t()}
   def validate_theme_margin({:rel, share} = relative, :element) when is_number(share),
     do: {:ok, relative}

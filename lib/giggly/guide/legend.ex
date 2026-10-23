@@ -25,7 +25,8 @@ defmodule Giggly.Guide.Legend do
   #     with no labels.
   #
   # The legend's background spans the whole table, under everything; then the title, each key's
-  # background and glyphs, and the labels, in ggplot2's drawing order.
+  # background and glyphs, and the labels, in ggplot2's drawing order. A title or labels the theme
+  # removes draw as none given; a background or a key's background it removes draws nothing.
 
   defstruct reverse: false
 
@@ -50,7 +51,8 @@ defmodule Giggly.Guide.Legend do
         legend_text: text_look
       } = theme
 
-      labels = Enum.map(keys, fn key -> key.label end)
+      title = Parts.title(title, title_look)
+      labels = Parts.labels(keys, text_look)
       label_widths = Parts.label_widths(labels, text_look)
       {label_margin, labels_width} = Parts.label_columns(labels, label_widths, text_look)
       title_width = Parts.legend_title_width(title, title_look)
@@ -63,10 +65,10 @@ defmodule Giggly.Guide.Legend do
 
       # A row is as tall as its key or its label, whichever is taller, as ggplot2's are.
       key_rows =
-        Enum.map(keys, fn key ->
+        Enum.zip_with(keys, labels, fn key, label ->
           [key]
           |> key_extent(key_height, fn {_width, height} -> height end)
-          |> max(Parts.label_height(key.label, text_look))
+          |> max(Parts.label_height(label, text_look))
         end)
 
       heights = Enum.concat([[margin.top], title_rows, key_rows, [margin.bottom]])
@@ -77,7 +79,7 @@ defmodule Giggly.Guide.Legend do
         keep_proportions: false,
         cells:
           Enum.concat([
-            [Parts.background(length(widths), length(heights), theme)],
+            Parts.background(length(widths), length(heights), theme),
             title_cells,
             key_cells(keys, first_key_row, theme),
             label_cells(labels, label_widths, text_look, first_key_row)
@@ -107,12 +109,16 @@ defmodule Giggly.Guide.Legend do
           columns: 2..2,
           clip: :off,
           hang: :none,
-          primitives: [
-            %Rect{fill: look.fill, color: look.color, stroke_width: look.line_width} | glyphs
-          ]
+          primitives: key_background(look) ++ glyphs
         }
       end)
     end
+
+    # A key's background, none where the theme removes it.
+    defp key_background(:none), do: []
+
+    defp key_background(look),
+      do: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
 
     # Each key's label in its row, a key of no label drawing none.
     defp label_cells(labels, label_widths, text_look, first_row) do

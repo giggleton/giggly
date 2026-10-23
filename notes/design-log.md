@@ -108,6 +108,24 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   nesting by family (`axis: [text: ...]`)* — splits R's flat names at an arbitrary dot.
   *Rejected: order-independent settings* — the same code would draw unlike R's.
 
+- **An element set to `:none` is removed, as ggplot2's `element_blank()`, and under a removed
+  root a property nothing above gives falls to grid's default (2026-10-23, Steve, choosing grid's
+  defaults; checked in R).** A removal draws nothing and takes no room, and `calc_element()`'s
+  rule holds: a complete theme's elements take a removed parent's removal, one a setting gives
+  skips every removed element above it, a later setting replaces a removal. Under a removed
+  `line`, `rect` or `text` R draws what such an element leaves unset at grid's defaults: black,
+  white, 0.75-point lines with round ends, 12-point text 1.2 apart, no margin, a share with no
+  parent the share itself. So a line's end joined the theme ahead of step 3. Only lines,
+  rectangles and texts are removed: R refuses a blank length or margin, and a share at the roots
+  `spacing` and `margins`, which `theme/2` now refuses too. `text: :none` leaves the legends'
+  titles and labels, as ggplot2's legend replaces the root with its own text. *Rejected: the
+  complete theme's root for such a property* — draws unlike R where `theme_void()`'s users add
+  lines back. *Rejected: NimbleOptions' `{:or, ...}` for `:none`* — it reports a mistake inside an
+  element at the element. *Found, for step 4:* R lays settings over a complete theme added
+  explicitly one by one, so a removal then a setting of one element drops the complete theme's
+  properties there (11 points, not 8.8), where a plot with none added merges its settings first,
+  as Giggly does. *Deferred:* `inherit_blank:` as a property.
+
 - **Ordering, viridis and `log10` by name are Phase 3's tenth increment, in seven steps: levels
   from the mapping, levels from the table, `diamonds`' levels, viridis, `log10`, `reorder()`, the
   notebooks (2026-10-22, Steve, agreeing the proposal; checked against R, ggplot2 4.0.3, scales
@@ -2358,6 +2376,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Let theme/2 remove an element with :none and put the legends nowhere (theme, step
+  2); §4: "An element set to `:none` is removed"
 - 2026-10-23 — Let theme/2 set the theme's elements, inherited through ggplot2's tree (theme,
   step 1); §4: "The theme is Phase 3's eleventh increment", "A theme is set element by element",
   "The theme is a resolved value" (amended), "A theme is a function" (amended)

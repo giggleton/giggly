@@ -75,9 +75,9 @@ panel's grid lines are placed by the coordinate system".
   tick and label at its break on the circle's edge, offset outward along the break's angle in
   points, each label justified by that angle, as ggplot2 justifies it.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
-  ticks' colour, width and length, the labels' and titles' size, colour and margin, **each axis's
-  from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`, a
-  radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
+  ticks' colour, width, end and length, the labels' and titles' size, colour and margin, **each
+  axis's from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`,
+  a radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
   axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick
   labels and the axes' titles those across the axis (an x axis's above and below, a y axis's
   either side), the angle axis's labels the widest side, strips, the plot's titles and a legend's
@@ -90,6 +90,13 @@ panel's grid lines are placed by the coordinate system".
   whose scale has no labels** (`{place, :none}` breaks) **draws its ticks alone and reaches only as
   far as they do**, as ggplot2's `labels = NULL` leaves the labels' room out (2.74 points, the
   ticks' length, where labels make 13.37); around a radial panel, its ticks alone.
+- **An element the theme removes (`:none`) draws nothing and takes no room.** Removed ticks count
+  as no length beside the panel, as ggplot2's axis sets blank ticks' length to 0, but round a
+  radial panel the labels keep their offset beyond them, as `guide_axis_theta()` keeps it; removed
+  labels or a removed title draw as an axis, a legend or a colour bar given none
+  (`Parts.labels/2`, `Parts.title/2`); a strip whose text is removed is not drawn, its background
+  with it, and takes no room; a removed background, key background, group of grid lines or of
+  ticks draws nothing.
 - **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
   and round a radial panel's circle the labels and then the ticks.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
