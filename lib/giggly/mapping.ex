@@ -689,8 +689,8 @@ defmodule Giggly.Mapping do
     end
   end
 
-  defp text({name, arguments}) when is_map_key(@functions, name),
-    do: "#{name}(#{Enum.map_join(arguments, ", ", &text/1)})"
+  # A function by name takes one value, as every one so far does.
+  defp text({name, [value]}) when is_map_key(@functions, name), do: "#{name}(#{text(value)})"
 
   defp text({function, arguments}) do
     texts = Enum.map(arguments, &text/1)
