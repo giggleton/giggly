@@ -2269,6 +2269,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-22 — Give diamonds R's levels for cut, color and clarity (ordering, step 3); §4: "A
+  table's column carries its levels as a `Giggly.Factor`", "A factor carries R's `ordered` flag"
 - 2026-10-22 — Read a table's factor columns, and order facet panels by their levels (ordering,
   step 2); §4: "A table's column carries its levels as a `Giggly.Factor`" (amended)
 - 2026-10-22 — Give a factor its levels, and train a discrete scale as R's discrete_range()

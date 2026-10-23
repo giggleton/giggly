@@ -5500,20 +5500,17 @@ defmodule GigglyTest do
     # drawings of the same plots, made by the R script beside each: every element matches, the x
     # axis drawn before the y as in test/golden/point.svg, and every clip path. scale_shape()'s first
     # example and its `solid = FALSE`: a hundred diamonds R picks at random, each cut in one of the
-    # palette's shapes. R's cut is an ordered factor; the limits give the scale its levels' order,
-    # which Giggly's column of strings would sort alphabetically. They move with what moves
-    # test/golden/point_shapes.svg, and with how a legend lays out its keys.
+    # palette's shapes, in the order of R's levels of cut, which the sample keeps. They move with
+    # what moves test/golden/point_shapes.svg, and with how a legend lays out its keys.
     test "a discrete shape draws each value in one of six shapes, solid or open, with a legend" do
-      cuts = ["Fair", "Good", "Very Good", "Premium", "Ideal"]
-
       diamonds =
         @diamond_sample
         |> diamond_rows()
         |> Plot.new(%{x: :carat, y: :price})
         |> Plot.geom_point(%{shape: :cut})
 
-      assert {to_svg(Plot.scale_shape_discrete(diamonds, limits: cuts)),
-              to_svg(Plot.scale_shape_discrete(diamonds, limits: cuts, solid: false))} ==
+      assert {to_svg(Plot.scale_shape_discrete(diamonds)),
+              to_svg(Plot.scale_shape_discrete(diamonds, solid: false))} ==
                {File.read!("test/golden/shape_solid.svg"),
                 File.read!("test/golden/shape_open.svg")}
     end
@@ -6031,6 +6028,22 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/bar.svg")
+    end
+
+    # Golden: test/golden/diamonds_cut.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/diamonds_cut.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. scale_discrete's first example: the
+    # diamonds of each cut, the axis in R's levels' order, Fair to Ideal. It moves with what moves
+    # test/golden/bar.svg, and with the dataset's levels.
+    test "a dataset's factor draws its axis in its levels' order" do
+      svg =
+        Giggly.Datasets.diamonds()
+        |> Plot.new(%{x: :cut})
+        |> Plot.geom_bar()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/diamonds_cut.svg")
     end
 
     # Golden: test/golden/dodge.svg, checked against ggplot2's drawing of the same plot, made by
@@ -7176,12 +7189,19 @@ defmodule GigglyTest do
   end
 
   # The rows of `Giggly.Datasets.diamonds/0` at `indices`, counted from 1 as R counts rows, each
-  # column a list.
+  # column a list, or a factor with its levels, as R's `diamonds[indices, ]` keeps them.
   defp diamond_rows(indices) do
-    Map.new(Giggly.Datasets.diamonds(), fn {name, values} ->
-      column = List.to_tuple(values)
-      {name, Enum.map(indices, fn index -> elem(column, index - 1) end)}
+    Map.new(Giggly.Datasets.diamonds(), fn {name, column} ->
+      {name, rows_of_column(column, indices)}
     end)
+  end
+
+  defp rows_of_column(%Giggly.Factor{values: values} = factor, indices),
+    do: %{factor | values: rows_of_column(values, indices)}
+
+  defp rows_of_column(values, indices) do
+    by_index = List.to_tuple(values)
+    Enum.map(indices, fn index -> elem(by_index, index - 1) end)
   end
 
   defp edges(frame) do

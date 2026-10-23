@@ -10,8 +10,11 @@ defmodule Giggly.Datasets do
   Giggly compiles, so asking for one reads nothing.
   """
 
-  # A dataset is data: it calls nothing, and nothing in Giggly calls it.
-  use Boundary, deps: [], exports: []
+  # A dataset is data: it calls only `Giggly.Factor`, to give a factor R's levels, and nothing in
+  # Giggly calls it.
+  use Boundary, deps: [Giggly.Factor], exports: []
+
+  alias Giggly.Factor
 
   @mtcars_path Application.app_dir(:giggly, "priv/datasets/mtcars.csv")
   @external_resource @mtcars_path
@@ -57,6 +60,14 @@ defmodule Giggly.Datasets do
     hwy: :integer,
     fl: :string,
     class: :string
+  ]
+
+  # R's levels of diamonds's three ordered factors, `levels(diamonds$cut)` and the others in R
+  # 4.6.1 with ggplot2 4.0.3, which `diamonds/0` gives the columns read as their labels.
+  @diamonds_levels [
+    cut: ["Fair", "Good", "Very Good", "Premium", "Ideal"],
+    color: ["D", "E", "F", "G", "H", "I", "J"],
+    clarity: ["I1", "SI2", "SI1", "VS2", "VS1", "VVS2", "VVS1", "IF"]
   ]
 
   # How each of diamonds's columns is read; the file's header gives their order. R stores `table`
@@ -253,8 +264,9 @@ defmodule Giggly.Datasets do
   `"VVS2"` and `"VVS1"` to `"IF"`, the best; `depth`, the total depth as a percentage of the
   mean width, `2 * z / (x + y)`; `table`, the width of the top relative to the widest point;
   `price`, in US dollars; and `x`, `y` and `z`, the length, width and depth in millimetres.
-  `cut`, `color` and `clarity` are strings, so they sort alphabetically, not in the order given
-  here. It is kept compressed and decoded each time it is asked for, in a few tens of
+  `cut`, `color` and `clarity` are `Giggly.Factor`s with those levels, in that order, and
+  ordered, as R's are, so a plot orders them as given here, not alphabetically; each enumerates
+  as its values. It is kept compressed and decoded each time it is asked for, in a few tens of
   milliseconds, so bind it once.
 
       iex> diamonds = Giggly.Datasets.diamonds()
@@ -276,8 +288,20 @@ defmodule Giggly.Datasets do
         z: 2.31
       ]
   """
-  @spec diamonds() :: [{atom(), [String.t() | number()]}]
-  def diamonds, do: :erlang.binary_to_term(@diamonds)
+  @spec diamonds() :: [{atom(), [number()] | Factor.t()}]
+  def diamonds do
+    @diamonds
+    |> :erlang.binary_to_term()
+    |> Enum.map(fn {name, values} -> diamonds_column(name, values) end)
+  end
+
+  # A column of diamonds as R holds it: one of its ordered factors with R's levels, or as read.
+  defp diamonds_column(name, values) do
+    case Keyword.fetch(@diamonds_levels, name) do
+      {:ok, levels} -> {name, Factor.new(values, levels: levels, ordered: true)}
+      :error -> {name, values}
+    end
+  end
 
   @doc """
   ggplot2's `economics`: US economic time series, one row a month from July 1967 to April 2015,

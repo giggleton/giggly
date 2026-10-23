@@ -11,8 +11,7 @@
 # scale_shape()'s first example: a hundred diamonds picked at random after set.seed(596), their
 # price by carat, each cut in one of the palette's solid shapes. Its cut is an ordered factor,
 # which ggplot2 gives scale_shape_ordinal(), warning and drawing as scale_shape() does; Giggly's
-# test takes the same rows and gives the scale cut's levels as its limits, which Giggly's column of
-# strings would otherwise sort alphabetically.
+# test takes the same rows, which keep diamonds' levels of cut.
 # First checked with ggplot2 4.0.3 and vdiffr 1.0.9: every element matches, the x axis drawn before
 # the y as test/golden/point.R describes, and every clip path.
 

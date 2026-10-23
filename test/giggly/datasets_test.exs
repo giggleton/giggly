@@ -22,6 +22,21 @@ defmodule Giggly.DatasetsTest do
            }
   end
 
+  # Golden: R 4.6.1 with ggplot2 4.0.3's `levels()` of diamonds' `cut`, `color` and `clarity`,
+  # each `is.ordered()`. They move only if ggplot2's diamonds does.
+  test "diamonds' cut, color and clarity are factors with R's levels, ordered" do
+    diamonds = Giggly.Datasets.diamonds()
+
+    assert Enum.map([:cut, :color, :clarity], fn name ->
+             %Giggly.Factor{levels: levels, ordered: ordered} = Keyword.fetch!(diamonds, name)
+             {levels, ordered}
+           end) == [
+             {["Fair", "Good", "Very Good", "Premium", "Ideal"], true},
+             {["D", "E", "F", "G", "H", "I", "J"], true},
+             {["I1", "SI2", "SI1", "VS2", "VS1", "VVS2", "VVS1", "IF"], true}
+           ]
+  end
+
   # Golden: R 4.6.1 with ggplot2 4.0.3, `sum(economics$unemploy)` and
   # `sum(as.numeric(economics$date))`, whole numbers so no summation order can move them, and the
   # first and last dates. They move only if ggplot2's economics does.

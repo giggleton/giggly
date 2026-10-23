@@ -24,8 +24,10 @@ pages".
   `unemploy` and every `mtcars` column but its names are whole but doubles), so a bar's width,
   which R's `resolution()` takes from a column's type, is R's, and a whole double is written `4`
   wherever a value is written as text (`Giggly.AsCharacter`).
-  R's row names become a first column, and a factor its labels, in no order until level order
-  exists.
+  R's row names become a first column, and a factor a `Giggly.Factor` of its labels with R's
+  levels and ordered flag (`diamonds`' `cut`, `color` and `clarity`), the levels a list beside the
+  dataset's reading, copied from R's `levels()`, the factor built each time the dataset is asked
+  for.
 - **The file is read once, at compile time** (`@external_resource` and `File.read!/1`), so asking
   for a dataset does no IO. The file's header gives the column order; the module holds only how
   each column is read.
@@ -39,6 +41,7 @@ pages".
   `Giggly.Font`'s, so adding a dataset adds a waiver, which stops and asks (design-log §4, the
   entry beginning "Each dataset's file is read behind a waiver of its own"). Only the parsing is
   shared.
-- **A dataset is public API with no caller in Giggly**, and its boundary lists nothing. Each
+- **A dataset is public API with no caller in Giggly**, and its boundary lists `Giggly.Factor`
+  alone, to give a factor its levels. Each
   arrives with the first example that draws it, a notebook's or a golden's (`economics_long` with
   `scale_linetype()`'s own, ahead of its notebook).
