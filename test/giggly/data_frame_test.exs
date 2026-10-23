@@ -200,6 +200,18 @@ defmodule Giggly.DataFrameTest do
         end
 
       assert error.message =~ ":payload"
+      assert error.message =~ "its values have no type"
+      assert error.message =~ "%{id: 1}"
+    end
+
+    test "a category's levels with no type of their own are refused, naming the column" do
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new([{:payload, [1], {:category, levels: [%{id: 1}]}}])
+        end
+
+      assert error.message =~ "column :payload"
+      assert error.message =~ "its levels have no type"
       assert error.message =~ "%{id: 1}"
     end
 
@@ -270,8 +282,57 @@ defmodule Giggly.DataFrameTest do
         end
 
       assert repeated.message =~ ":cyl is declared a category with the level 4.0 twice"
-      assert missing.message =~ "nil among its levels"
+      assert missing.message =~ "column :cyl is declared a category with nil among its levels"
+      assert other.message =~ "column :cyl"
       assert other.message =~ ~s{levels ("4") are of another type than its values (4)}
+    end
+
+    # Golden: R 4.6.1's `levels(factor(c(-0, 0), levels = c(-0)))` is `0`: both zeros are the level.
+    test "a given level of minus zero is the level zero, which a zero of either sign is" do
+      frame = DataFrame.new([{:x, [0.0, -0.0], {:category, levels: [-0.0]}}])
+
+      assert {DataFrame.category(frame, :x), DataFrame.pull(frame, :x)} ===
+               {{:category, levels: [0.0], ordered: false}, [0.0, 0.0]}
+    end
+
+    test "a category's ordered flag is true or false" do
+      assert_raise FunctionClauseError, fn ->
+        DataFrame.new([{:x, ["a"], {:category, ordered: "yes"}}])
+      end
+    end
+
+    # Golden: R 4.6.1 orders `factor()` of `as.POSIXct(c("2020-02-01", "2019-12-31",
+    # "2020-01-15 12:00:00"))` by time, and of times of day 10:00:00.5 and 10:01:00 by time: their
+    # fields' term order would put the first day of a month before the last of an earlier one.
+    test "a category of times or date-times is in order of time" do
+      days = [~N[2020-02-01 00:00:00], ~N[2019-12-31 00:00:00], ~N[2020-01-15 12:00:00]]
+      zoned = Enum.map(days, fn day -> DateTime.from_naive!(day, "Etc/UTC") end)
+      times = [~T[10:01:00], ~T[10:00:00.5]]
+
+      frame = DataFrame.new([{:day, days, :category}, {:zoned, zoned, :category}])
+      clock = DataFrame.new([{:time, times, :category}])
+
+      levels = fn table, name ->
+        {:category, declaration} = DataFrame.category(table, name)
+        Keyword.fetch!(declaration, :levels)
+      end
+
+      assert {levels.(frame, :day), levels.(frame, :zoned), levels.(clock, :time)} ===
+               {Enum.map([1, 2, 0], fn index -> Enum.at(days, index) end),
+                Enum.map([1, 2, 0], fn index -> Enum.at(zoned, index) end),
+                [~T[10:00:00.5], ~T[10:01:00]]}
+    end
+
+    test "a list of a category's values is reported a list of a category" do
+      frame =
+        DataFrame.new([
+          {:fill, ["a", "b", "a"], {:category, levels: ["b", "a"]}},
+          {:panel, [1, 1, 2]}
+        ])
+
+      summarised = DataFrame.summarise(frame, [:panel], fills: {:list, [:fill]})
+
+      assert DataFrame.dtypes(summarised).fills == {:list, :category}
     end
 
     test "a category's levels and ordered flag travel with it through every operation" do

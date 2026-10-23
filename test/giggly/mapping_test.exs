@@ -112,6 +112,7 @@ defmodule Giggly.MappingTest do
     test "a factor's options are refused unless levels of one type, none twice, and a flag" do
       refused = [
         {[level: [4]], "a factor's options are levels: and ordered:"},
+        {[levels: [4], level: [6]], "a factor's options are levels: and ordered:"},
         {[{"levels", [4]}], "a factor's options are levels: and ordered:"},
         {[levels: [4], levels: [6]], "a factor's options are each given once"},
         {[levels: []], "a factor's levels are a list of one or more values"},

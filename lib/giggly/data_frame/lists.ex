@@ -611,7 +611,7 @@ defmodule Giggly.DataFrame.Lists do
       |> Enum.uniq()
       |> sorted_levels(dtype)
 
-    {levels, Enum.map(values, &level_of/1)}
+    {levels, Enum.map(values, &as_level/1)}
   end
 
   defp levelled(name, dtype, values, levels) when is_list(levels) do
@@ -636,7 +636,7 @@ defmodule Giggly.DataFrame.Lists do
         category_values =
           widened
           |> cast(values)
-          |> Enum.map(fn value -> among(level_of(value), level_set) end)
+          |> Enum.map(fn value -> among(as_level(value), level_set) end)
 
         {category_levels, category_values}
 
@@ -664,9 +664,6 @@ defmodule Giggly.DataFrame.Lists do
   # level, as R writes both `0`; any other value as it is, a missing one missing.
   defp as_level(value) when is_float(value), do: value + 0.0
   defp as_level(value), do: value
-
-  defp level_of(nil), do: nil
-  defp level_of(value), do: as_level(value)
 
   # The level, if it is among the levels; else missing.
   defp among(level, level_set) do

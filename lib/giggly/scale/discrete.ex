@@ -137,11 +137,13 @@ defmodule Giggly.Scale.Discrete do
   defp ordered_old(old, true), do: Enum.reject(old, &is_nil/1) ++ Enum.filter(old, &is_nil/1)
   defp ordered_old(old, false), do: Enum.sort_by(old, &Giggly.Scale.level_key/1)
 
-  # A factor's levels lead where the held levels' order is not a factor's, so the two swap; the
-  # levels not yet held follow, and the whole is sorted unless the leading levels are a factor's.
-  defp merged(old, false, new, true), do: merged(new, true, old, false)
+  # A factor's levels lead where the held levels' order is not a factor's, so the two swap.
+  defp merged(old, false, new, true), do: appended(new, true, old)
+  defp merged(old, old_factor, new, _new_factor), do: appended(old, old_factor, new)
 
-  defp merged(old, old_factor, new, _new_factor) do
+  # The levels not yet held follow those held, and the whole is sorted unless the leading levels
+  # are a factor's.
+  defp appended(old, old_factor, new) do
     held = MapSet.new(old, &key/1)
 
     case Enum.reject(new, fn level -> MapSet.member?(held, key(level)) end) do
