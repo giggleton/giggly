@@ -150,17 +150,51 @@ defmodule Giggly.ThemeTest do
                 }}
     end
 
+    # Each property an element of each kind may leave to grid: a text's colour and margin, a
+    # title's line spacing too, a line's colour and end, and a rectangle's fill and border.
+    test "every property nothing above an element under a removed root gives is grid's default" do
+      text =
+        complete(%{
+          text: :none,
+          axis_text: :none,
+          axis_text_x: :none,
+          axis_text_x_bottom: %{size: 10}
+        })
+
+      title = complete(%{text: :none, plot_tag: %{size: 15}})
+      line = complete(%{line: :none, legend_ticks: %{linewidth: 1}})
+      fill = complete(%{rect: :none, legend_background: %{color: "#FF0000"}})
+
+      border =
+        complete(%{rect: :none, strip_background: :none, strip_background_x: %{fill: "#FF0000"}})
+
+      assert {text.axis_text_x_bottom, title.plot_tag, line.legend_ticks, fill.legend_background,
+              border.strip_background_x} ===
+               {%{size: 10.0, color: "#000000", margin: sides(0, 0, 0, 0)},
+                %{
+                  size: 15.0,
+                  color: "#000000",
+                  margin: sides(0, 0, 0, 0),
+                  line_spacing: 21.599999999999998
+                }, %{color: "#000000", line_width: 2.1339566929133857, line_end: :round},
+                %{fill: "#FFFFFF", color: "#FF0000", line_width: 0.75},
+                %{fill: "#FF0000", color: "#000000", line_width: 0.75}}
+    end
+
     # A share with no element above it at all is the share itself; a share of a parent that gives
     # none is nothing, so grid's default; and a share inherited from a parent whose own is still a
     # share is taken of it again, as ggplot2's `combine_elements()` works them out.
     test "a share with nothing above it to be a share of is worked out as R works it out" do
-      assert {complete(%{text: :none, strip_text: %{color: "#FF0000"}}).strip_text_x_top.size,
+      lines = complete(%{line: :none, panel_grid: %{linewidth: {:rel, 2}}})
+
+      assert {complete(%{text: :none, strip_text: %{size: {:rel, 2}}}).strip_text_x_top.size,
+              {lines.panel_grid_major_x.line_width, lines.panel_grid_minor_x.line_width},
               complete(%{text: :none, axis_text_x: %{color: "#FF0000"}}).axis_text_x_bottom.size,
               complete(%{text: %{size: {:rel, 2}}}).axis_text_x_bottom.size,
               complete(%{text: :none, plot_title: %{size: {:rel, 2}}}).plot_title.size,
               complete(%{line: :none, axis_ticks_x: %{linewidth: {:rel, 2}}}).axis_ticks_x_bottom} ===
-               {0.8, 0.6400000000000001, 2.5600000000000005, 12.0,
-                %{color: "#333333", line_width: 0.75, line_end: :round}}
+               {2.0, {4.2679133858267715, 2.1339566929133857}, 0.6400000000000001,
+                2.5600000000000005, 12.0, %{color: "#333333", line_width: 0.75, line_end: :round}}
     end
 
     # ggplot2's legend lays a text of its own over the root text to give its title and labels
@@ -196,6 +230,16 @@ defmodule Giggly.ThemeTest do
 
       assert Map.take(complete(merged).axis_text_x_bottom, [:color, :size]) ===
                %{color: "#FF0000", size: 12.0}
+    end
+
+    test "a line's or a rectangle's properties replace only the ones given, as a text's do" do
+      assert Theme.merge(
+               %{panel_grid: %{color: "#FF0000"}, panel_background: %{fill: "#FF0000"}},
+               %{panel_grid: %{linewidth: 2}, panel_background: %{color: :none}}
+             ) === %{
+               panel_grid: %{color: "#FF0000", linewidth: 2},
+               panel_background: %{fill: "#FF0000", color: :none}
+             }
     end
 
     test "a length or a margin replaces the one before whole" do

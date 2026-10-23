@@ -28,6 +28,17 @@ defmodule Giggly.GuideTest do
                {2.74, true, [Giggly.Scene.Polylines, Giggly.Scene.Polylines]}
     end
 
+    test "a radial panel's background is the polygon round its disc, its border opaque" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{1.0, 4.0}, [], []}, {{1.0, 4.0}, [], []})
+
+      theme =
+        Theme.complete(%{complete: :gray, settings: %{panel_background: %{color: "#FF0000"}}})
+
+      assert [%Giggly.Scene.Polygons{color: ["#FF0000"], color_opacity: [1.0]} | _lines] =
+               Guide.Grid.draw(coord, params, theme)
+    end
+
     test "an angle axis whose labels the theme removes draws its ticks alone" do
       coord = %Coord.Radial{}
       breaks = [{2.0, "2"}, {3.0, "3"}]

@@ -3996,6 +3996,7 @@ defmodule Giggly.PlotTest do
             {[plot_margin: [top: "x"]], {:plot_margin, []}, [top: "x"]},
             {[spacing: :none], {:spacing, []}, :none},
             {[spacing: {:rel, 2}], {:spacing, []}, {:rel, 2}},
+            {[panel_spacing: {:rel, "a"}], {:panel_spacing, []}, {:rel, "a"}},
             {[margins: {:rel, 2}], {:margins, []}, {:rel, 2}},
             {[plot_margin: :none], {:plot_margin, []}, :none},
             {[legend_position: :left], {:legend_position, []}, :left}

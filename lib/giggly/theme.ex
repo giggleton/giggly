@@ -503,7 +503,7 @@ defmodule Giggly.Theme do
   # passed over.
   defp root(_name, nil), do: nil
 
-  defp root(name, element) when is_map(element) and is_map_key(@drawn_kinds, name) do
+  defp root(name, element) when is_map_key(@drawn_kinds, name) do
     gray()
     |> Map.fetch!(name)
     |> Map.merge(element)
