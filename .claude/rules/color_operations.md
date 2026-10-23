@@ -50,5 +50,9 @@ beginning "A library's owner nests".
   rounded to five decimals as R's `round()` rounds, a tie to even, which `Float.round/2` does not
   keep, then clipped and written as `rgb()` writes a byte; the alpha `rgb()`'s byte, dropped when
   opaque. It matched R on every colour of 19,794 calls, every palette and count to 256 among
-  them; its tests pin R's colours. `viridis_options/0` names the palettes, as `Plot` checks
-  `option:` against them.
+  them; its tests pin R's colours, two places whose channel lands exactly on a rounding tie among
+  them. **At such a tie R's own answer depends on its BLAS**, which rounds the matrix product's
+  last bit by library and processor (of 1,003 tie places a search found, OpenBLAS gives Giggly's
+  colour at 885, R's internal product at 875); Giggly adds the products left to right, as the
+  sum written out in R does. `viridis_options/0` names the palettes, as `Plot` checks `option:`
+  against them.

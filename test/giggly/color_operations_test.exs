@@ -169,6 +169,26 @@ defmodule Giggly.ColorOperationsTest do
       assert viridis(0) === []
     end
 
+    # Evaluated from the second knot back, the place would be #0F0788.
+    test "a place before the second knot is the first knot's spline's" do
+      assert viridis(1, begin: 0.002, option: :plasma) === ["#0F0787"]
+    end
+
+    # Golden: `viridis(1, begin = place, option = "turbo")`, whose blue is exactly 0.982355 and
+    # 0.966665 before R rounds it, each tie a byte apart either way, found by a search over the
+    # palettes and read back from R with OpenBLAS, whose last bit here agrees with Giggly's.
+    test "a channel on a five-decimal tie rounds to the even last decimal, as R's round() does" do
+      assert viridis(1, begin: 0.21809360163495614, option: :turbo) === ["#37A7FB"]
+      assert viridis(1, begin: 0.22852560046188131, option: :turbo) === ["#32ADF6"]
+    end
+
+    # The count is built as the test runs: a literal the guard refuses fails the type checker.
+    test "a count below none is refused" do
+      count = length([:one]) - 2
+
+      assert_raise FunctionClauseError, fn -> viridis(count) end
+    end
+
     test "an alpha is rgb()'s byte, appended, and dropped when it is opaque" do
       assert viridis(3, alpha: 0.3) === ["#4401544D", "#21908C4D", "#FDE7254D"]
       assert viridis(3, alpha: 0.5) === ["#44015480", "#21908C80", "#FDE72580"]

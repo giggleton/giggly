@@ -132,7 +132,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   pins it. The options are R's: `option:` (the eight palettes by name), `begin:`, `end:`,
   `direction:`, and on `_d` `alpha:`; `_c` is the gradient over six. *Left out:* `_b` (no binned
   scales), `scale_*_ordinal()`'s `type`. *Rejected: viridis as its own increment* (the plan) —
-  Steve.
+  Steve. *Rejected: OpenBLAS's arithmetic* (found in step 4's mutation pass) — R's colour where a
+  channel lands exactly on a rounding tie depends on its BLAS and processor, so no one R answer
+  exists there to copy; Giggly sums as R's code reads.
 
 - **`scale_*_viridis_c/2` takes no `alpha:` (2026-10-22, Steve, building step 4; checked in
   R).** R's `scale_colour_viridis_c(alpha = 0.3)` runs its gradient through six colours each

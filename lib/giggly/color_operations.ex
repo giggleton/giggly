@@ -48,7 +48,11 @@ defmodule Giggly.ColorOperations do
   # channel by 255 and divides it again on the way, which changes no byte of any value the
   # rounding gives, and is left out. The alpha is `rgb()`'s byte too, dropped when it is opaque.
   # It matched R on every colour of every palette for every count to 256, and on thousands of
-  # beginnings, ends, directions and alphas.
+  # beginnings, ends, directions and alphas. R multiplies by the matrix through its BLAS, whose
+  # last bit depends on the library and the processor, so where a channel lands exactly on a
+  # rounding tie R's own answer varies: of 1,003 such places a search found, R with OpenBLAS gives
+  # Giggly's colour at 885 and R's internal product at 875. Giggly adds the three products left to
+  # right, as the sum written out in R does.
 
   # The library's one caller: it may call `Color` and nothing else, and only a boundary that lists
   # it may call it. `Giggly` lists `Color` too, as boundary lets a sub-boundary list only what its
@@ -113,11 +117,13 @@ defmodule Giggly.ColorOperations do
 
   # Each palette's knots, a tuple, and its three channels' splines, L*, a* and b*, each a tuple of
   # the values and the coefficients b, c and d, each a tuple in knot order, by the palette's name;
-  # the file's comment lines and its header skipped.
+  # the file's comment lines skipped, and its header the columns in the order they are read.
   @viridis_splines @viridis_splines_text
                    |> String.split("\n", trim: true)
                    |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
-                   |> Enum.drop(1)
+                   |> then(fn ["palette,x,L.y,L.b,L.c,L.d,a.y,a.b,a.c,a.d,b.y,b.b,b.c,b.d" | rows] ->
+                     rows
+                   end)
                    |> Enum.map(fn line ->
                      [palette | numbers] = String.split(line, ",")
 
@@ -302,10 +308,8 @@ defmodule Giggly.ColorOperations do
 
   # `value` rounded to five decimals as R's `round(value, 5)` rounds it: of the two five-decimal
   # numbers either side, each found by dividing by 100,000, the nearer, or, as near as each other,
-  # the one whose last decimal is even; a negative value's magnitude is rounded and its sign put
-  # back.
-  defp round_to_five_decimals(value) when value < 0, do: -round_to_five_decimals(-value)
-
+  # the one whose last decimal is even. R rounds a negative value's magnitude and puts its sign
+  # back; a negative channel is clipped to 0 whichever way it rounds, so that is left out.
   defp round_to_five_decimals(value) do
     scaled = value * 100_000
     floor = Float.floor(scaled)
