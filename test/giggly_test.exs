@@ -7602,6 +7602,25 @@ defmodule GigglyTest do
 
       assert golden?(plot, "theme_radial_removed")
     end
+
+    # Golden: test/golden/theme_ticks_unlabelled.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_ticks_unlabelled.R: every element and clip path matches.
+    # Ticks hang from the panel's edge in points, so an axis with no labels whose ticks take no
+    # room still draws them. It moves with what moves test/golden/theme_ticks.svg.
+    test "an axis with no labels and ticks of no length or turned inward takes no room" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous(labels: :none)
+        |> Plot.theme(
+          axis_ticks_length_x: {-3, :pt},
+          axis_ticks_length_y: {0, :pt},
+          axis_text_y: :none
+        )
+
+      assert golden?(plot, "theme_ticks_unlabelled")
+    end
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`

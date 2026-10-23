@@ -2376,6 +2376,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Hang an axis's ticks from the panel's edge, so an unlabelled axis of no depth
+  draws them (the zero-depth ticks card)
 - 2026-10-23 — Let theme/2 remove an element with :none and put the legends nowhere (theme, step
   2); §4: "An element set to `:none` is removed"
 - 2026-10-23 — Let theme/2 set the theme's elements, inherited through ggplot2's tree (theme,

@@ -69,10 +69,12 @@ panel's grid lines are placed by the coordinate system".
   That is the fixed width or height of the axis's column or row in the scene, measured when the
   scene is built, as ggplot2's `measure_grobs` measures an axis while building its table.
 - **Primitives are placed in the axis's cell.** Along the panel's side, at the break's place (the
-  cell spans the side); across it, at fractions of the axis's own depth. A label's baseline is
-  offset from its anchor in points, since a label centred on a break sits half a line below it
-  whatever height the panel turns out to be. The angle axis is placed in the panel's cell: each
-  tick and label at its break on the circle's edge, offset outward along the break's angle in
+  cell spans the side); across it, a label at fractions of the axis's own depth and a tick hung
+  from the panel's edge, reaching its length in points, so ticks are drawn however deep the cell
+  is, none deep included, as ggplot2 draws an unlabelled axis's ticks of no length. A label's
+  baseline is offset from its anchor in points, since a label centred on a break sits half a line
+  below it whatever height the panel turns out to be. The angle axis is placed in the panel's cell:
+  each tick and label at its break on the circle's edge, offset outward along the break's angle in
   points, each label justified by that angle, as ggplot2 justifies it.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
   ticks' colour, width, end and length, the labels' and titles' size, colour and margin, **each

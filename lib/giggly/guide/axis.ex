@@ -110,8 +110,8 @@ defmodule Giggly.Guide.Axis do
     depth = reach(ticks)
 
     case side do
-      :bottom -> {depth, bottom_ticks(places, depth, ticks)}
-      :left -> {depth, left_ticks(places, depth, ticks)}
+      :bottom -> {depth, bottom_ticks(places, ticks)}
+      :left -> {depth, left_ticks(places, ticks)}
     end
   end
 
@@ -139,7 +139,7 @@ defmodule Giggly.Guide.Axis do
       ascent: Font.ascent(text_look.size)
     }
 
-    tick_lines = bottom_ticks(places, height, ticks)
+    tick_lines = bottom_ticks(places, ticks)
     {height, Enum.concat(tick_lines, [text])}
   end
 
@@ -153,7 +153,7 @@ defmodule Giggly.Guide.Axis do
     label_end = 1 - (reach(ticks) + margin.right) / width
     text = left_labels({places, labels, label_widths}, label_end, 1.0, text_look)
 
-    {width, [text | left_ticks(places, width, ticks)]}
+    {width, [text | left_ticks(places, ticks)]}
   end
 
   defp draw_axis(breaks, :left, :r, {%{margin: margin} = text_look, ticks}) do
@@ -166,7 +166,7 @@ defmodule Giggly.Guide.Axis do
     label_middle = 1 - (reach(ticks) + margin.right + label_width / 2) / width
     text = left_labels({places, labels, label_widths}, label_middle, 0.5, text_look)
 
-    {width, [text | left_ticks(places, width, ticks)]}
+    {width, [text | left_ticks(places, ticks)]}
   end
 
   # The theme's elements an axis drawn in `look` is drawn with, ggplot2's for that axis on its side
@@ -214,17 +214,17 @@ defmodule Giggly.Guide.Axis do
     }
   end
 
-  # The ticks of an axis `height` points deep below the panel, reaching down from the panel's edge,
-  # the cell's top, or up into the panel for a negative length; none for ticks the theme removes.
-  defp bottom_ticks(_places, _height, :none), do: []
+  # The ticks of an axis below the panel, each hung from the panel's edge, the top of the axis's
+  # cell, and reaching its length down from it in points, or up into the panel for a negative
+  # length, so they are drawn however deep the cell is, none deep included, as ggplot2 draws zero
+  # and negative lengths; none for ticks the theme removes.
+  defp bottom_ticks(_places, :none), do: []
 
-  defp bottom_ticks(places, height, ticks) do
-    tick_end = 1 - ticks.length / height
-
+  defp bottom_ticks(places, ticks) do
     [
       %Polylines{
-        lines: Enum.map(places, fn place -> [{place, tick_end}, {place, 1.0}] end),
-        offsets: :none,
+        lines: Enum.map(places, fn place -> [{place, 1.0}, {place, 1.0}] end),
+        offsets: List.duplicate([{0.0, -ticks.length}, {0.0, 0.0}], length(places)),
         stroke_width: ticks.line_width,
         dashes: :none,
         color: List.duplicate(ticks.color, length(places)),
@@ -236,17 +236,16 @@ defmodule Giggly.Guide.Axis do
     ]
   end
 
-  # The ticks of an axis `width` points wide to the panel's left, reaching in to the panel's edge,
-  # the cell's right, from inside the panel for a negative length; none for ticks the theme removes.
-  defp left_ticks(_places, _width, :none), do: []
+  # The ticks of an axis to the panel's left, each hung from the panel's edge, the right of the
+  # axis's cell, reaching its length left of it in points, or into the panel for a negative
+  # length; none for ticks the theme removes.
+  defp left_ticks(_places, :none), do: []
 
-  defp left_ticks(places, width, ticks) do
-    tick_end = 1 - ticks.length / width
-
+  defp left_ticks(places, ticks) do
     [
       %Polylines{
-        lines: Enum.map(places, fn place -> [{tick_end, place}, {1.0, place}] end),
-        offsets: :none,
+        lines: Enum.map(places, fn place -> [{1.0, place}, {1.0, place}] end),
+        offsets: List.duplicate([{-ticks.length, 0.0}, {0.0, 0.0}], length(places)),
         stroke_width: ticks.line_width,
         dashes: :none,
         color: List.duplicate(ticks.color, length(places)),
