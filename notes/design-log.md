@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The theme's element tree is a boundary of its own, `Giggly.ElementTree`, beside `Giggly.Theme`
+  (2026-10-24, Steve, choosing a peer over an export).** It holds ggplot2's `.element_tree` as far
+  as Giggly draws, each element's name, kind, parent and description, and the `kind` type. `Theme`
+  works out its kinds and parents from it and `Plot` builds `theme/2`'s schema and documentation
+  from it, both in module attributes, and only those two list it. A module attribute's call makes
+  its module depend at compile time on the whole file it calls, so while the table was in
+  `theme.ex` every edit to `Theme`, and every `Theme` mutant, recompiled `plot.ex`; now only an edit
+  to the table does. *Rejected: leaving the table in `Theme`* — that recompile on every theme step.
+  *Rejected: `Giggly.Theme.Tree`, exported by `Theme`* — a boundary exports to every dependent, so
+  `Assembly`, `Guide` and `Render` could read it too. *Rejected: `top_level?: true` to keep that
+  name* — boundary's docs discourage it, and the namespace would place it inside `Theme` while the
+  boundary placed it beside.
+
 - **Legends go where the theme puts them, each box placed as grid places a viewport, by a hang on
   its cell (2026-10-24, Steve, agreeing the proposal and including the box's margin and background;
   checked in R).** `legend_position` takes ggplot2's six places: a side's column or row outside the
@@ -163,9 +176,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   margin one length or a keyword list of sides, a side left out 0. R's rules hold exactly: an
   element or property left out inherits, `theme/2` merges into what the plot has (R's `+`), and a
   later complete theme replaces earlier settings. The plot records the complete theme's name and
-  sizes and the merged settings; `Giggly.Theme` holds the tree and resolves it when drawn
-  (`calc_element()`), converting units in grid's order, and lists nothing: `Plot` builds its schema
-  from the tree. *Rejected: element constructors (ggity's)* — they check nothing the key does not.
+  sizes and the merged settings; `Giggly.ElementTree` holds the tree, from which `Plot` builds its
+  schema, and `Giggly.Theme` resolves it when drawn (`calc_element()`), converting units in grid's
+  order. *Rejected: element constructors (ggity's)* — they check nothing the key does not.
   *Rejected: nesting by family (`axis: [text: ...]`)* — splits R's flat names at an arbitrary dot.
   *Rejected: order-independent settings* — the same code would draw unlike R's.
 
@@ -2425,6 +2438,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Move the theme's element tree into Giggly.ElementTree, beside Theme, so an edit to
+  Theme no longer recompiles Plot; §4: "The theme's element tree is a boundary of its own", "A
+  theme is set element by element" (amended)
 - 2026-10-24 — Let theme/2 place the legends on any side or inside the panels, run their keys
   across, and stack them either way (theme, step 6); §4: "Legends go where the theme puts them"
 - 2026-10-24 — Fill each layer's defaults from the theme, as ggplot2 4's element_geom gives them

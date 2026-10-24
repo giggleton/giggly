@@ -1,6 +1,7 @@
 ---
 paths:
   - "lib/giggly/theme.ex"
+  - "lib/giggly/element_tree.ex"
 ---
 
 # The theme
@@ -20,7 +21,8 @@ unused, and where the dashes and the axes' lines are worked out: the entry begin
 border is never filled"; how a plot chooses a complete theme, what it records, and why settings
 are laid over one in turn: the entry beginning "A plot chooses a complete theme"; where the
 legends go and why a placement is resolved to `{x, y}`: the entry beginning "Legends go where the
-theme puts them".
+theme puts them"; why the element tree is a boundary of its own beside the theme: the entry
+beginning "The theme's element tree is a boundary of its own".
 
 ## Rules
 
@@ -31,13 +33,16 @@ theme puts them".
   `:none` draws in `theme_gray()` at its default sizes. This namespace resolves it with
   `complete/1` into a `%Giggly.Theme{}` when the plot is assembled, once the positions are final,
   as ggplot2's `plot_theme()` completes a plot's theme at build time.
-- **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
-  element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
-  `:length`, `:margin`, `:boolean`, `panel_ontop`'s, or a legend's placement: `:position`,
-  `:point`, `:justification` by name or share, `:box_justification` by name alone,
-  `:direction`, `:location`), the one element
-  it inherits from (`:none` for a root) and what it styles, which `Plot` turns into `theme/2`'s
-  schema and documentation, so the vocabulary has one home.
+- **The tree is ggplot2's (`.element_tree`), as far as Giggly draws:
+  `Giggly.ElementTree.elements/0`** lists each element's name (ggplot2's, dots as underscores), its
+  kind (`:line`, `:rect`, `:text`, `:length`, `:margin`, `:boolean`, `panel_ontop`'s, or a legend's
+  placement: `:position`, `:point`, `:justification` by name or share, `:box_justification` by name
+  alone, `:direction`, `:location`), the one element it inherits from (`:none` for a root) and what
+  it styles, which `Theme` works out each element's kind and parent from and `Plot` turns into
+  `theme/2`'s schema and documentation, both while compiling, so the vocabulary has one home. **The
+  tree is read only in module attributes, and only by `Theme` and `Plot`**, the only boundaries that
+  list it: it holds the table and its `kind` type and calls nothing, so `Plot` is recompiled when
+  the table changes, never when `Theme` does.
   **An element arrives with its first reader**: the tree holds what something draws and the
   elements those inherit from, and the struct holds only the leaves something draws, by axis and
   side (`axis_text_x_bottom`, `axis_ticks_length_y_left`, a radial panel's `theta` and `r`), the
@@ -98,10 +103,10 @@ theme puts them".
   that reads the theme converts anything. **The layers' defaults (`geom`) are the exception, in a
   layer's units**: millimetres and colours in their one spelling, as they become the values of a
   layer's aesthetics, which a layer may set instead.
-- **A theme is values and calls nothing.** Its boundary lists nothing; `Plot` lists it to build
-  `theme/2`'s schema, choose a complete theme and merge settings, the assembly to complete it and
-  read the layers' defaults, rendering and the guide to read the complete theme. It knows no
-  scene primitive: the drawing builds primitives from its elements.
+- **A theme is values and calls nothing.** Its boundary lists only the element tree, which it
+  reads while compiling; `Plot` lists it to choose a complete theme and merge settings, the
+  assembly to complete it and read the layers' defaults, rendering and the guide to read the
+  complete theme. It knows no scene primitive: the drawing builds primitives from its elements.
 - **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, and
   whether the panel is drawn over its layers; alignment and angle stay with the drawing** (the y
   title turned 90 degrees, labels hung from their ticks) until a theme can set them; so do text

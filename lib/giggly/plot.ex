@@ -125,23 +125,24 @@ defmodule Giggly.Plot do
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
   # facet, coordinate system, geom, stat and position, whose structs it builds and whose facts it
-  # checks a layer against, the guides, whose legend's struct it builds, the scales, whose
-  # untrained structs it writes, the theme, whose tree `theme/2` builds its schema from and whose
-  # settings it merges, NimbleOptions, which validates its functions' options at the
-  # call, the colour operations, which read a colour an option sets, and the mapping grammar, whose
-  # checks resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never
-  # the evaluation, which holds by review), and nothing that runs it. The six families' roots are
+  # checks a layer against, the guides, whose legend's struct it builds, the scales, whose untrained
+  # structs it writes, the theme's element tree, which `theme/2` builds its schema from, the theme,
+  # whose settings it merges, NimbleOptions, which validates its functions' options at the call, the
+  # colour operations, which read a colour an option sets, and the mapping grammar, whose checks
+  # resolve each mapping value as it enters (`Giggly.Mapping`; it calls those alone, never the
+  # evaluation, which holds by review), and nothing that runs it. The six families' roots are
   # protocols that compute and draw, the guides' other modules that hold no struct draw, and the
   # scales' root trains and maps; `GigglyCredo.Check.PlotRunsNothing` keeps them all out of these
   # files, which boundary cannot, since a boundary always exports its root. A layer is read only
-  # through `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so
-  # `Layer` stays private.
+  # through `computed_mapping/2`, `layer_geom/1`, `layer_stat/1` and `layer_position/1`, so `Layer`
+  # stays private.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
       Giggly.ColorOperations,
       Giggly.Coord,
       Giggly.DataFrame,
+      Giggly.ElementTree,
       Giggly.Facet,
       Giggly.Geom,
       Giggly.Guide,
@@ -159,6 +160,7 @@ defmodule Giggly.Plot do
     ColorOperations,
     Coord,
     DataFrame,
+    ElementTree,
     Facet,
     Geom,
     Guide,
@@ -2089,8 +2091,8 @@ defmodule Giggly.Plot do
   @theme_no_margin Map.new(@theme_sides, fn side -> {side, {0, :pt}} end)
 
   # `theme/2`'s options: one for each element of the theme a setting may give, from the theme's
-  # tree (`Giggly.Theme.elements/0`), each checked as its kind is: a line's, a rectangle's or a
-  # text's properties, a length, or a margin.
+  # tree (`Giggly.ElementTree.elements/0`), each checked as its kind is: a line's, a rectangle's or
+  # a text's properties, a length, or a margin.
   @theme_color [
     type: {:custom, __MODULE__, :validate_theme_color, []},
     doc: "Its colour, a CSS colour, which may have an alpha of its own (`colour:` too)."
@@ -2163,7 +2165,7 @@ defmodule Giggly.Plot do
   }
   # The elements whose settings are a line's, a rectangle's or a text's properties, whose spelling
   # `theme/2` canonicalizes (`colour:`) before checking them.
-  @theme_drawn_kinds for {name, kind, _parent, _description} <- Theme.elements(),
+  @theme_drawn_kinds for {name, kind, _parent, _description} <- ElementTree.elements(),
                          kind in [:line, :rect, :text],
                          into: %{},
                          do: {name, kind}
@@ -2173,7 +2175,7 @@ defmodule Giggly.Plot do
     margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:root]}]
   }
   @theme_options NimbleOptions.new!(
-                   for {name, kind, parent, description} <- Theme.elements() do
+                   for {name, kind, parent, description} <- ElementTree.elements() do
                      inherits =
                        if parent == :none, do: "", else: " Inherits from `#{inspect(parent)}`."
 

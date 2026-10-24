@@ -22,13 +22,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`, `Giggly.Position`, `Giggly.Stat`),
   `Giggly.Guide`, whose legend's struct `guide_legend/1` builds, `Giggly.Scale`, whose `Continuous`
   and `Discrete` structs it writes and whose `Discrete.key/1` it reads to refuse a discrete value
-  named twice, and `Giggly.Theme`, whose tree `theme/2` builds its schema from and whose `choose/2`
-  and `merge/2` it calls, and exports nothing beyond `Plot`. **`GigglyCredo.Check.PlotRunsNothing`
-  keeps those families' roots, the protocols that compute and draw, every `Giggly.Guide` module
-  holding no struct, which draw, and `Giggly.Scale`'s root, which trains and maps, out of its
-  files** — no call, no module passed as a value, no `import` — which boundary cannot, since a
-  boundary always exports its root and every export to all its dependents (design-log §4, the entry
-  beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and never runs one.
+  named twice, `Giggly.ElementTree`, the theme's tree, which `theme/2` builds its schema from, and
+  `Giggly.Theme`, whose `choose/2` and `merge/2` it calls, and exports nothing beyond `Plot`.
+  **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute and
+  draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root, which
+  trains and maps, out of its files** — no call, no module passed as a value, no `import` — which
+  boundary cannot, since a boundary always exports its root and every export to all its dependents
+  (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
+  never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3` and
   `geom_boxplot/3` among them), `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
@@ -286,18 +287,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   whole, the settings before it dropped, as R's `+ theme_bw()` drops them. Every theme function
   takes the three sizes, `theme_void/2`'s widths drawing nothing; `base_family:`, `header_family:`,
   `ink:`, `paper:` and `accent:` wait, and raise as unknown. **`theme/2` checks its settings against
-  a schema built from `Theme.elements/0`**, an option per element of ggplot2's tree, each checked as
-  its kind: a line's, a rectangle's or a text's properties a keyword list (`color:`, canonicalized
-  first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`, points; a text's `margin:`; a
-  line's and a rectangle's `linetype:`, as a layer's (`validate_linetype/1`), held as its pattern,
-  and a line's `lineend:`), a size or a line width `{:rel, share}` too, both 0 or more; a length a
-  number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or `{:rel,
-  share}`, held as `{amount, unit}`; a margin one length or a keyword list of `:top`, `:right`,
-  `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a map of all four, a
-  margin element's `{:rel, share}` too, a text's margin never. A colour is any CSS colour, an alpha
-  of its own and `"transparent"` too, held as uppercase hex, a rectangle's fill and border `:none`
-  too (`validate_theme_color/1`, `validate_theme_rect_color/1`), a line's or a text's never, since
-  none takes one yet; the border's `fill:` is taken, as R takes it, though the border is never
+  a schema built from `ElementTree.elements/0`**, an option per element of ggplot2's tree, each
+  checked as its kind: a line's, a rectangle's or a text's properties a keyword list (`color:`,
+  canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`, points; a text's
+  `margin:`; a line's and a rectangle's `linetype:`, as a layer's (`validate_linetype/1`), held as
+  its pattern, and a line's `lineend:`), a size or a line width `{:rel, share}` too, both 0 or more;
+  a length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or
+  `{:rel, share}`, held as `{amount, unit}`; a margin one length or a keyword list of `:top`,
+  `:right`, `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a map of all
+  four, a margin element's `{:rel, share}` too, a text's margin never. A colour is any CSS colour,
+  an alpha of its own and `"transparent"` too, held as uppercase hex, a rectangle's fill and border
+  `:none` too (`validate_theme_color/1`, `validate_theme_rect_color/1`), a line's or a text's never,
+  since none takes one yet; the border's `fill:` is taken, as R takes it, though the border is never
   filled. An element or a property given twice raises from `Aesthetics.canonicalize/1`, as
   `labs/2`'s does. **A line, a rectangle or a text may be `:none`, removed**, taken aside before the
   schema checks the rest, so a mistake inside an element is reported at its property; a length or a
