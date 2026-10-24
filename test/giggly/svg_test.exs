@@ -243,23 +243,32 @@ defmodule Giggly.SVGTest do
       assert rotations === ["-30", "-30", "-92", "-0", "45", "-29", "0"]
     end
 
-    # Not vdiffr's, which writes every family as `sans`: Giggly names the family a layer sets.
-    test "a label's font is the default list, or the family named, quoted and escaped" do
+    # Not vdiffr's, which writes every family as `sans`: Giggly names the family. A browser reads
+    # the last as the CSS string "Bob's \"Font\" & Co \\".
+    test "a label's font is the default list, a CSS generic, or its name quoted and escaped before the list" do
       families =
-        Enum.map(["", "Times New Roman", ~s(Bob's "Font" & Co)], fn family ->
-          [_whole, style] =
-            Regex.run(
-              ~r/font-family: (.*);' textLength/,
-              draw(whole([one_label(%{family: family})]))
-            )
+        Enum.map(
+          ["", "sans", "serif", "mono", "Times New Roman", ~s(Bob's "Font" & Co \\)],
+          fn family ->
+            [_whole, style] =
+              Regex.run(
+                ~r/font-family: (.*);' textLength/,
+                draw(whole([one_label(%{family: family})]))
+              )
 
-          style
-        end)
+            style
+          end
+        )
+
+      default = ~s("Liberation Sans", Arial, Helvetica, sans-serif)
 
       assert families === [
-               ~s("Liberation Sans", Arial, Helvetica, sans-serif),
-               ~s("Times New Roman"),
-               ~s("Bob&apos;s &quot;Font&quot; &amp; Co")
+               default,
+               default,
+               "serif",
+               "monospace",
+               ~s("Times New Roman", ) <> default,
+               ~s("Bob&apos;s \\&quot;Font\\&quot; &amp; Co \\\\", ) <> default
              ]
     end
 

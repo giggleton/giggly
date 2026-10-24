@@ -3908,7 +3908,9 @@ defmodule Giggly.PlotTest do
                     name: :bw,
                     base_size: 11.0,
                     base_line_size: 0.5,
-                    base_rect_size: 0.5
+                    base_rect_size: 0.5,
+                    base_family: "",
+                    header_family: :none
                   },
                   settings: %{}
                 },
@@ -3916,8 +3918,37 @@ defmodule Giggly.PlotTest do
                   name: :void,
                   base_size: 16.0,
                   base_line_size: 0.7272727272727273,
-                  base_rect_size: 0.7272727272727273
-                }, %{name: :classic, base_size: 11.0, base_line_size: 1.0, base_rect_size: 0.0}}
+                  base_rect_size: 0.7272727272727273,
+                  base_family: "",
+                  header_family: :none
+                },
+                %{
+                  name: :classic,
+                  base_size: 11.0,
+                  base_line_size: 1.0,
+                  base_rect_size: 0.0,
+                  base_family: "",
+                  header_family: :none
+                }}
+    end
+
+    # ggplot2's `header_family = NULL`, the titles taking the base family, is recorded as `:none`.
+    test "each records its base family, \"\" unless given, and its header family, :none unless given" do
+      plot = Plot.new(@rows)
+
+      families =
+        Enum.map(
+          [
+            Plot.theme_gray(plot, base_family: "serif", header_family: "Lobster"),
+            Plot.theme_void(plot, header_family: ""),
+            Plot.theme_minimal(plot, base_family: "mono")
+          ],
+          fn themed ->
+            {themed.theme.complete.base_family, themed.theme.complete.header_family}
+          end
+        )
+
+      assert families === [{"serif", "Lobster"}, {"", ""}, {"mono", :none}]
     end
 
     test "every function records its own theme and the base size given, 0 too" do
@@ -3981,14 +4012,16 @@ defmodule Giggly.PlotTest do
       assert plot.theme.settings === %{axis_text: {:replace, %{color: "#FF0000"}}}
     end
 
-    test "a base size or width it cannot use is refused at its key, naming the value" do
+    test "a base size, width or family it cannot use is refused at its key, naming the value" do
       plot = Plot.new(@rows)
 
       for {options, key, value} <- [
             {[base_size: -1], :base_size, -1},
             {[base_size: "11"], :base_size, "11"},
             {[base_line_size: -0.5], :base_line_size, -0.5},
-            {[base_rect_size: :none], :base_rect_size, :none}
+            {[base_rect_size: :none], :base_rect_size, :none},
+            {[base_family: :serif], :base_family, :serif},
+            {[header_family: :none], :header_family, :none}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme_bw(plot, options) end
         assert {error.key, error.message =~ inspect(value)} == {key, true}
@@ -4000,13 +4033,15 @@ defmodule Giggly.PlotTest do
 
       unknown =
         assert_raise NimbleOptions.ValidationError, fn ->
-          Plot.theme_void(plot, base_family: "serif")
+          Plot.theme_void(plot, ink: "navy")
         end
 
       twice =
-        assert_raise ArgumentError, fn -> Plot.theme_gray(plot, base_size: 1, base_size: 2) end
+        assert_raise ArgumentError, fn ->
+          Plot.theme_gray(plot, base_family: "serif", base_family: "mono")
+        end
 
-      assert {unknown.message =~ "base_family", twice.message =~ ":base_size"} == {true, true}
+      assert {unknown.message =~ "ink", twice.message =~ ":base_family"} == {true, true}
     end
   end
 
@@ -4127,6 +4162,18 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a text's family is recorded as named, the default's \"\" too" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(title: [family: "Lobster Two"], axis_text: [family: ""])
+
+      assert plot.theme.settings === %{
+               title: %{family: "Lobster Two"},
+               axis_text: %{family: ""}
+             }
+    end
+
     test "a colour may have an alpha of its own, transparent too" do
       plot =
         @rows
@@ -4161,7 +4208,7 @@ defmodule Giggly.PlotTest do
             {[axis_text: [linewidth: 2]], [:linewidth]},
             {[panel_grid: [size: 2]], [:size]},
             {[panel_background: [lineend: :round]], [:lineend]},
-            {[axis_text: [family: "Times"]], [:family]}
+            {[axis_text: [fill: "red"]], [:fill]}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert error.key == key
@@ -4208,6 +4255,7 @@ defmodule Giggly.PlotTest do
             {[axis_line: [lineend: :flat]], {:lineend, [:axis_line]}, :flat},
             {[panel_ontop: :yes], {:panel_ontop, []}, :yes},
             {[axis_text: [face: :oblique]], {:face, [:axis_text]}, :oblique},
+            {[axis_text: [family: :serif]], {:family, [:axis_text]}, :serif},
             {[axis_text: [face: 2]], {:face, [:axis_text]}, 2},
             {[axis_text: [face: "bold"]], {:face, [:axis_text]}, "bold"},
             {[axis_text: [angle: "45"]], {:angle, [:axis_text]}, "45"},

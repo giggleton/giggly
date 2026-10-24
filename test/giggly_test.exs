@@ -4699,6 +4699,25 @@ defmodule GigglyTest do
                 }, %{color: nil, fill: "#595959", linewidth: 1.0, linetype: {}, alpha: nil}}
     end
 
+    # `geom_text(aes(label = l))` with `theme_gray(base_family = "serif", header_family = "mono")`
+    # and with `theme(text = element_text(family = "Lobster"))`: R's families "serif" and "".
+    test "a text's family is the theme's base family, which the root text's never reaches" do
+      family = fn theme ->
+        @three
+        |> Plot.new(%{x: :x, y: :y, label: :l})
+        |> Plot.geom_text()
+        |> theme.()
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:family)
+        |> Enum.uniq()
+      end
+
+      assert {family.(fn plot ->
+                Plot.theme_gray(plot, base_family: "serif", header_family: "mono")
+              end), family.(fn plot -> Plot.theme(plot, text: [family: "Lobster"]) end)} ===
+               {["serif"], [""]}
+    end
+
     # `geom_col()`, `geom_col(alpha = 0.5)` and `ggplot(data.frame(x = 1, y = c(1:5, 20)), aes(x,
     # y)) + geom_boxplot()`, each with `theme_void()`
     test "theme_void()'s clear paper reaches a bar's fill and a box's fill and outline" do
@@ -8450,6 +8469,79 @@ defmodule GigglyTest do
         |> Plot.theme(axis_title_y: [angle: 0, vjust: 0.5], axis_title_x: [hjust: 1])
 
       assert golden?(plot, "theme_text_axis_titles")
+    end
+
+    # Golden: test/golden/theme_family_base_header.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/theme_family_base_header.R: every element and clip path
+    # matches, each label measured as vdiffr measures every family. It moves with which texts take
+    # which family, or how a family is written.
+    test "a complete theme's base family reaches every text and its header family only the titles" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.labs(
+          title: "Fuel economy declines as engine size increases",
+          subtitle: "Two seaters are the exception",
+          caption: "Data from fueleconomy.gov",
+          tag: "A"
+        )
+        |> Plot.theme_gray(base_family: "serif", header_family: "mono")
+
+      assert golden?(plot, "theme_family_base_header")
+    end
+
+    # Golden: test/golden/theme_family_void.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_family_void.R: every element and clip path matches.
+    test "theme_void()'s families reach the strips, the legend and the plot's titles" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.labs(
+          title: "Fuel economy declines as engine size increases",
+          subtitle: "Two seaters are the exception",
+          caption: "Data from fueleconomy.gov",
+          tag: "A"
+        )
+        |> Plot.theme_void(base_family: "serif", header_family: "mono")
+
+      assert golden?(plot, "theme_family_void")
+    end
+
+    # Golden: test/golden/theme_family_elements.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_family_elements.R: every element and clip path matches but
+    # the background's edge, which R writes as its rounding error. A family R has no generic name
+    # for is written by its name, then the default fonts.
+    test "a text element's own family draws its texts" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.theme(
+          axis_text: [family: "mono"],
+          strip_text: [family: "serif"],
+          legend_title: [family: "serif"],
+          legend_text: [family: "Lobster"]
+        )
+
+      assert golden?(plot, "theme_family_elements")
+    end
+
+    # Golden: test/golden/theme_family_geom_text.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_family_geom_text.R: every element and clip path matches; the
+    # one departure is test/golden/point.R's, the x axis drawn before the y.
+    test "a layer's labels and its legend's keys take the base family" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model, colour: {:factor, [:cyl]}})
+        |> Plot.geom_text()
+        |> Plot.theme_gray(base_family: "serif")
+
+      assert golden?(plot, "theme_family_geom_text")
     end
 
     # Golden: test/golden/theme_text_plot_titles.svg, checked against ggplot2's drawing of the same

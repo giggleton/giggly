@@ -88,10 +88,13 @@ size has a weight".
   clipping changes and writes each clip path once: theme_void()'s panel, filling the drawing,
   shares the background's group.
 - **A label is drawn at the width `Giggly.Font` measured** (`textLength`), so the drawing agrees
-  with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
-  widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,
-  which is not a CSS generic family; a family a layer names is written alone, quoted, its quotes
-  escaped, and drawn at the measured width all the same, and so is a bold or italic label, measured
+  with the layout whatever font the browser picks. **Its `font-family` is written by its family**
+  (design-log §4, the entry beginning "A text's family is the theme's"): `""` and R's `"sans"` the
+  fonts with those widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never
+  vdiffr's `sans`, which is not a CSS generic family; R's `"serif"` and `"mono"` CSS's `serif` and
+  `monospace`; any other name, R's `"symbol"` included, a CSS string, its quotes and backslashes
+  escaped for CSS and the whole for the attribute, then the default list, for a browser that lacks
+  it. Each is drawn at the measured width all the same, and so is a bold or italic label, measured
   as plain text, as vdiffr measures every face but the symbol one. **An empty label is not
   written**, as svglite writes none, though the room measured for it stays. Text escapes `&`, `<`
   and `>`, as svglite does.
@@ -117,7 +120,8 @@ size has a weight".
   change to the product. Beside each golden is the R script that draws its plot with ggplot2 and
   vdiffr (`test/golden/*.R`), never run by the suite; its header gives the Docker command
   and the element-by-element comparison, which leaves out only what svglite writes and Giggly does
-  not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, and a
+  not (its XML declaration, stylesheet, page rectangle and clip groups), the font list, which
+  vdiffr writes `sans` for every family, and a
   black stroke and a `fill: none`, which svglite leaves to its stylesheet; a golden with lines
   compares `<line>` elements too. **vdiffr's device draws no gradient**, and writes a colour bar's
   rectangle unfilled: that `fill` is the one difference there, and the gradient is checked against

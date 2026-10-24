@@ -79,6 +79,38 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A text's family is the theme's, inherited as any property, and every complete theme takes
+  `base_family:` and `header_family:` (2026-10-24, Steve: "Let's get family working with the
+  default implementation"; checked in R).** `base_family` is the root text's family and the
+  `geom` element's, so the layers'; `header_family`, where given, is `title`'s, which ggplot2's
+  tree gives only the axes' titles, the legends' titles and the plot's title, so the subtitle,
+  caption, tag, strips, tick labels and legend labels keep the base family, as `calc_element()`
+  gives every leaf of the eight themes; unset is `:none`, R's `NULL`. `theme(text: [family:])`
+  never reaches a layer. Every family is measured with the built-in table, as vdiffr measures
+  each. The SVG writes `""` and `"sans"` as the default list, `"serif"` and `"mono"` as CSS's
+  `serif` and `monospace`, and any other name as a CSS string before the default list.
+  *Rejected: a named family written alone* — a browser lacking it draws its own default, often a
+  serif, at sans widths. *Rejected: a family argument to `Giggly.Font` now* — no measure differs
+  by family until the package does. *Rejected: following ggplot2's docs, which give the tag the
+  header family* — R gives it the base. *Rejected: CSS's names for the Symbol font for R's
+  `"symbol"`* (Steve) — what a reader sees would turn on the fonts their machine has; it is
+  written as any other name.
+
+- **A font family is a name, measured by an optional package of its own where that package has
+  the family, and by the built-in Liberation Sans table otherwise (2026-10-24, Steve, after
+  surveys of Hex and checks in R).** `family:`, `base_family:`, `header_family:` and a layer's
+  `family:` name fonts; no font value travels in a plot. The package is a Rust NIF over
+  HarfBuzz's shaping (harfrust, skrifa, wuff; Rustler and rustler_precompiled), in its own
+  repository, and never depends on Giggly. Giggly will list it as an optional dependency and hold
+  the adapter behind `Code.ensure_loaded?`, with no behaviour yet, keeping R's rounding itself.
+  `""` and R's generic names stay on the built-in table unless a font is registered under that
+  name, so the goldens never move. *Rejected: a TrueType parser of our own* — no ligatures or
+  contextual forms, which svglite's HarfBuzz applies, and a thousand lines to own. *Rejected:
+  Hex's parsers* — none reads GPOS kerning correctly (`truetype_metrics`, `opentype`,
+  `tincture`). *Rejected: measuring by rendering (resvg, libvips)* — the ink box, not the advance
+  ggplot2 lays out with. *Rejected: fonts as values passed to `to_svg/2`* — names are the only
+  input. *Open:* how the package finds a family's files (a registry is recommended).
+
 - **Text's face, angle, justification and line height are the theme's, and every text a guide
   draws is placed and measured by one rule, ggplot2's `titleGrob()` (2026-10-24, Steve, agreeing
   the proposal and its three recommendations; checked in R).** A text takes `face:`, `angle:`,
@@ -2011,8 +2043,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and consistent with `true` and `false`, which keep Elixir's spelling); *rejected: an empty
   label*, which reads as a missing label rather than a missing value. **`Giggly.Font` is a plain
   module with no behaviour**, which amends Phase 0's "a text-metrics service behind an interface":
-  its functions are the only route to a text's size, and nothing chooses a font yet; a behaviour
-  arrives with a second font (the theme's family, or a backend that can measure). It holds the
+  its functions are the only route to a text's size, and every family is measured alike; a
+  behaviour arrives, if at all, with a second measurer (the entry beginning "A font family is a
+  name"). It holds the
   whole of vdiffr's Liberation Sans table, 2,242 glyphs, so Greek and Cyrillic are measured right,
   and a character the font lacks takes vdiffr's own fallback width. The table is
   `priv/fonts/liberation_sans.txt`, copied from vdiffr with its provenance in a header and read at
@@ -2454,6 +2487,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Give a theme's texts a font family by name, and every complete theme
+  base_family and header_family, each family measured by the built-in table (fonts, the family
+  step); §4: "A text's family is the theme's", "A font family is a name"
 - 2026-10-24 — Let theme/2 set a text's face, angle, justification and line height, every text
   placed as ggplot2's titleGrob places it (theme, step 7); §4: "Text's face, angle, justification
   and line height are the theme's"

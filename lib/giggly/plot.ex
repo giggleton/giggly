@@ -215,8 +215,9 @@ defmodule Giggly.Plot do
 
   @typedoc """
   The look everything but the marks is drawn in: the complete theme a `theme_*` function chose,
-  by name with its base sizes, or `:none` for none, which draws the plot in `theme_gray/2`'s at
-  its default sizes, and the settings `theme/2` has laid over it, by element.
+  by name with its base sizes and families, `:none` for a header family not given, or `:none`
+  for none, which draws the plot in `theme_gray/2`'s at its defaults, and the settings `theme/2`
+  has laid over it, by element.
   """
   @type theme :: %{
           complete:
@@ -224,7 +225,9 @@ defmodule Giggly.Plot do
               name: :gray | :bw | :linedraw | :light | :dark | :minimal | :classic | :void,
               base_size: float(),
               base_line_size: float(),
-              base_rect_size: float()
+              base_rect_size: float(),
+              base_family: String.t(),
+              header_family: String.t() | :none
             }
             | :none,
           settings: %{optional(atom()) => term()}
@@ -942,9 +945,10 @@ defmodule Giggly.Plot do
     family: [
       type: :string,
       doc:
-        "The font every label is drawn in, by name, such as `\"Times New Roman\"`; the " <>
-          "default sans-serif when not given. A label is measured as the default font " <>
-          "measures it, and drawn at that width."
+        ~s(The font every label is drawn in, by name, such as `"Times New Roman"`, or one ) <>
+          ~s(of the generic families `"sans"`, `"serif"` and `"mono"`; the theme's ) <>
+          "`base_family` when not given, the default sans-serif at its default. A label is " <>
+          "measured as the default font measures it, and drawn at that width."
     ]
   ]
 
@@ -2145,6 +2149,12 @@ defmodule Giggly.Plot do
           type: {:custom, __MODULE__, :validate_theme_size, []},
           doc: "How big it is, in points, or `{:rel, share}`, a share of its parent's size."
         ],
+        family: [
+          type: :string,
+          doc:
+            ~s(The font it is drawn in, by name, such as `"Lobster"`, or one of the generic ) <>
+              ~s(families `"sans"`, `"serif"` and `"mono"`; `""` is the default sans-serif.)
+        ],
         face: [
           type: {:in, [:plain, :bold, :italic, :bold_italic]},
           doc: "Its face: `:plain`, `:bold`, `:italic` or `:bold_italic`."
@@ -2214,8 +2224,8 @@ defmodule Giggly.Plot do
                    end
                  )
 
-  # The options of the functions choosing a complete theme: its base sizes, each one the theme
-  # works out its own default for where it is not given.
+  # The options of the functions choosing a complete theme: its base sizes and families, each one
+  # the theme works out its own default for where it is not given.
   @complete_theme_options NimbleOptions.new!(
                             base_size: [
                               type: {:custom, __MODULE__, :validate_base_size, []},
@@ -2235,6 +2245,20 @@ defmodule Giggly.Plot do
                               doc:
                                 "How wide its rectangles' borders are, in millimetres, 0 or " <>
                                   "more. `base_size / 22` unless given."
+                            ],
+                            base_family: [
+                              type: :string,
+                              doc:
+                                "The font its text and its layers' text are drawn in, by " <>
+                                  "name, as `theme/2`'s `family:` takes one. `\"\"`, the " <>
+                                  "default sans-serif, unless given."
+                            ],
+                            header_family: [
+                              type: :string,
+                              doc:
+                                "The font its titles are drawn in, by name: the axes' and " <>
+                                  "the legends' titles and the plot's title. The base " <>
+                                  "family unless given."
                             ]
                           )
 
@@ -4848,6 +4872,10 @@ defmodule Giggly.Plot do
   1` puts its top toward the left. A legend's labels sit right of their keys, left-aligned and
   centred on them, and its title is left-aligned, unless `:legend_text` or `:legend_title` says
   otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines.
+  `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
+  "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
+  [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.
+  Every family is measured as the default sans-serif is, and each label drawn at that width.
 
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin
@@ -4974,6 +5002,18 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.to_svg()
       ...>   |> IO.iodata_to_binary()
       iex> {svg =~ "fill: #EBEBEB", svg =~ "font-size: 12.80px"}
+      {true, true}
+
+  Its text in a serif font, and its titles, here the axes', in a monospaced one:
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_gray(base_family: "serif", header_family: "mono")
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "font-family: serif;", svg =~ "font-family: monospace;"}
       {true, true}
   """
   @spec theme_gray(t(), keyword()) :: t()
@@ -5126,12 +5166,12 @@ defmodule Giggly.Plot do
     do: complete_theme(plot, :void, options)
 
   defp complete_theme(plot, name, options) do
-    sizes =
+    bases =
       options
       |> Aesthetics.canonicalize()
       |> NimbleOptions.validate!(@complete_theme_options)
 
-    %{plot | theme: Theme.choose(name, sizes)}
+    %{plot | theme: Theme.choose(name, bases)}
   end
 
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,

@@ -24,13 +24,15 @@ legends go and why a placement is resolved to `{x, y}`: the entry beginning "Leg
 theme puts them"; why the element tree is a boundary of its own beside the theme: the entry
 beginning "The theme's element tree is a boundary of its own"; why text's face, angle and
 justification are the theme's, and which of R's values are refused: the entry beginning "Text's
-face, angle, justification and line height are the theme's".
+face, angle, justification and line height are the theme's"; which texts each of a complete
+theme's families reaches: the entry beginning "A text's family is the theme's".
 
 ## Rules
 
 - **A plot records its theme as the complete theme it chose and the settings laid over it**:
   `%{complete: :none, settings: %{}}` until a complete theme is chosen, which `choose/2` records
-  as `%{name:, base_size:, base_line_size:, base_rect_size:}`, the widths `base_size / 22` unless
+  as `%{name:, base_size:, base_line_size:, base_rect_size:, base_family:, header_family:}`, the
+  widths `base_size / 22`, the base family `""` and the header family `:none`, R's `NULL`, unless
   given, with no settings, as ggplot2 drops a plot's earlier settings with the theme it replaces;
   `:none` draws in `theme_gray()` at its default sizes. This namespace resolves it with
   `complete/1` into a `%Giggly.Theme{}` when the plot is assembled, once the positions are final,
@@ -97,12 +99,17 @@ face, angle, justification and line height are the theme's".
   line's width, `base_rect_size` every border's; a legend's keys stay 1.2 of grid's lines, and
   `theme_void()` takes neither width, its borders 0 wide; and the layers' defaults: `base_size`
   the text's size and the points' (`base_size / 11 * 1.5`), `base_line_size` the lines' and the
-  borders' widths, `theme_void()`'s too, never `base_rect_size`.
+  borders' widths, `theme_void()`'s too, never `base_rect_size`. **So do the families**:
+  `base_family` the root text's family and the layers' (`geom`'s); `header_family`, where given,
+  `title`'s, so of what Giggly draws only the axes' titles, the legends' titles and the plot's
+  title take it, as ggplot2's tree gives no other text `title` for a parent; where it is `:none`,
+  `title` sets no family. A family set on `text` never reaches a layer, and under a removed root
+  text passed over, a family nothing gives is grid's `""`.
 - **The complete theme holds every element already worked out, in the scene's units:** lengths,
   margins and line widths in points (1/72 inch), each colour an `#RRGGBB` beside its opacity (a
   rectangle's `fill_opacity` and `color_opacity`, a line's or a text's `opacity`), its alpha over
-  255, 0 for `:none`, every margin a map of its four sides, every text's face, its angle in degrees
-  and its justification as floats. **A length is held as `{amount, unit}`
+  255, 0 for `:none`, every margin a map of its four sides, every text's family as named, its
+  face, its angle in degrees and its justification as floats. **A length is held as `{amount, unit}`
   until worked out, and converted in grid's order of operations** (TeX's points over 72.27,
   centimetres over 2.54, millimetres over 10 and then 2.54, lines of text as a 12-point font at a
   line height of 1.2 over 72; then times 72), and a line width from millimetres as R's engine hands
@@ -115,10 +122,10 @@ face, angle, justification and line height are the theme's".
   assembly to complete it and read the layers' defaults, rendering and the guide to read the
   complete theme. It knows no scene primitive: the drawing builds primitives from its elements.
 - **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, text's
-  faces, angles and justification, and whether the panel is drawn over its layers**: the y title
-  turned 90 degrees and the labels hung from their ticks are `theme_gray()`'s and `theme_void()`'s
-  settings, the only complete themes that set any (the rest inherit `gray/1`'s, as R's do). Text
-  families and a line's corners (`linejoin`, round, as `theme_gray()`'s) stay with the drawing.
+  families, faces, angles and justification, and whether the panel is drawn over its layers**:
+  the y title turned 90 degrees and the labels hung from their ticks are `theme_gray()`'s and
+  `theme_void()`'s settings, the only complete themes that set any (the rest inherit `gray/1`'s,
+  as R's do). A line's corners (`linejoin`, round, as `theme_gray()`'s) stay with the drawing.
 - **A line type is worked out into `dashes` in points, as svglite writes R's**: each length of
   its pattern times the width in R's line-width units (`linewidth * .pt`), or 1 where narrower,
   `:none` for a solid one. A line of the blank line type works out `dashes: :blank`, which the
@@ -147,12 +154,13 @@ face, angle, justification and line height are the theme's".
   increment"): from legend placement, `legend.title.position`,
   `legend.text.position`, `legend.byrow`, `legend.key.spacing.x` and `.y` as settings (a legend
   running across spaces its keys `legend_key_spacing` both ways, as ggplot2 does when neither is
-  set), `legend.key.justification`, `legend.frame`. A complete theme's `ink`, `paper`, `accent`
-  and fonts, and `theme_test()`, wait beyond the increment.
+  set), `legend.key.justification`, `legend.frame`. A complete theme's `ink`, `paper` and
+  `accent`, `theme(geom:)`, and `theme_test()`, wait beyond the increment.
 - **The layers' defaults are the complete theme's `geom` element, ggplot2's `element_geom()`**,
   which every complete theme sets in its tree from its base sizes (`gray/1`, inherited by the
   themes built on it, and `void/1`): black ink; white paper, `theme_void()`'s clear; the lines'
-  and the borders' widths, solid; the text's family, `""`, and size; the points' size and shape.
+  and the borders' widths, solid; the text's family, the base family, and size; the points' size
+  and shape.
   No setting reaches it, since `theme/2` cannot set `geom` yet. Each geom reads what it draws with
   from it (`Geom.default_aesthetics/2`), mixing its colours from the ink and paper. **The
   palettes are not the theme's:** ggplot2 4's `set_palettes()` takes a scale's palette from the

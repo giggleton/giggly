@@ -11,9 +11,9 @@ defmodule Giggly.Guide.Parts do
   #
   # And the one rule every text a guide draws is placed and measured by, ggplot2's `titleGrob()`:
   # an axis's labels and title, a strip's label, a legend's title and labels, the plot's titles.
-  # A text is drawn in its look's face, turned its angle, and justified by its `hjust` and `vjust`
-  # in its own turned frame, as grid's text grob draws it. It is anchored in its room at its
-  # justification turned with it a quarter turn at a time (`turned_justification/1`, ggplot2's
+  # A text is drawn in its look's family and face, turned its angle, and justified by its `hjust`
+  # and `vjust` in its own turned frame, as grid's text grob draws it. It is anchored in its room at
+  # its justification turned with it a quarter turn at a time (`turned_justification/1`, ggplot2's
   # `rotate_just()`), moved by the margins it counts (`anchor/2`), and it is as wide and as deep as
   # the box grid's text grob takes, turned, with the font's descent turned with it added
   # (`extent/2`): a level label is a line of text deep, one turned 90 degrees as deep as it is
@@ -302,7 +302,7 @@ defmodule Giggly.Guide.Parts do
       labels: Enum.map(lines, fn {line, _place, _offset} -> line end),
       widths: Enum.map(lines, fn {line, _place, _offset} -> Font.width(line, look.size) end),
       size: look.size,
-      family: "",
+      family: look.family,
       face: look.face,
       color: List.duplicate(look.color, count),
       opacity: List.duplicate(look.opacity, count),

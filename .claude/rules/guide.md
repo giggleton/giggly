@@ -39,16 +39,16 @@ panel's grid lines are placed by the coordinate system".
   rule every text a guide draws is placed by.
 - **Every text a guide draws is placed and measured by one rule in `Guide.Parts`, ggplot2's
   `titleGrob()`** (design-log §4, the entry beginning "Text's face, angle, justification and line
-  height are the theme's"): drawn in its look's face, turned its `angle` and justified by its
-  `hjust` and `vjust` in its own turned frame (`text/4`); anchored at its justification turned a
-  quarter turn at a time (`turned_justification/1`, `rotate_just()`) of its room, moved by the
-  margins it counts (`anchor/2`), as a share of the room and an offset in points, so it sits right
-  in a room bigger than itself; and as wide and deep as grid's box round it turned, with the
+  height are the theme's"): drawn in its look's family and face, turned its `angle` and justified
+  by its `hjust` and `vjust` in its own turned frame (`text/4`); anchored at its justification
+  turned a quarter turn at a time (`turned_justification/1`, `rotate_just()`) of its room, moved by
+  the margins it counts (`anchor/2`), as a share of the room and an offset in points, so it sits
+  right in a room bigger than itself; and as wide and deep as grid's box round it turned, with the
   font's descent turned (`extent/2`), an axis's or a colour bar's labels measured together as one
-  grob. A title may break over lines (the entry beginning "A title may run over several lines"):
-  each line a label of its own, its `line_spacing` below the one before, stacked `vjust` of the
-  way down from its top as R's graphics engine stacks lines; tick labels, strips and a legend's
-  labels stay one line.
+  grob, whatever its family. A title may break over lines (the entry beginning "A title may run
+  over several lines"): each line a label of its own, its `line_spacing` below the one before,
+  stacked `vjust` of the way down from its top as R's graphics engine stacks lines; tick labels,
+  strips and a legend's labels stay one line.
 - **A guide takes its breaks and its axis's line from the coordinate system, already placed**
   (`Coord.axes/2`), so ticks and marks are placed by one rule. Where an axis is drawn, which
   aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a
@@ -89,7 +89,7 @@ panel's grid lines are placed by the coordinate system".
   the panel's cell. A panel draws the lines of the axes it draws, as their ticks.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
   ticks' and lines' colour, opacity, width, end, dashes and length, the labels' and titles' size,
-  colour, opacity and margin, the backgrounds' fill and border each at its opacity, **each
+  colour, opacity, family and margin, the backgrounds' fill and border each at its opacity, **each
   axis's from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`,
   a radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
   axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick

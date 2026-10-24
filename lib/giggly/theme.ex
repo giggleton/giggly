@@ -91,16 +91,19 @@ defmodule Giggly.Theme do
   # are worked out for each side of its keys they are drawn on, as ggplot2's legend works them out
   # for where it puts them.
   #
-  # A text's face, its angle and its justification are the theme's too, as ggplot2's
+  # A text's family, its face, its angle and its justification are the theme's too, as ggplot2's
   # `element_text()` gives them, and so is the spacing of a title's lines: the y axis's title is
   # turned 90 degrees because `theme_gray()` turns it, and a tick label hangs from its tick because
   # the theme justifies it so. A legend's title and labels take their justification from the text
-  # their side lays over the theme, as their margins do.
+  # their side lays over the theme, as their margins do. A family is a font's name, `""` the
+  # device's own: a complete theme's `base_family` is its root text's family and its layers', and
+  # its `header_family`, where given, is `title`'s, which the axes' titles, the legends' titles and
+  # the plot's title inherit, as ggplot2's tree gives no other text `title` for a parent.
   #
   # When a plot is rendered, every function that draws something other than a mark takes the
   # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths, line
-  # types and ends, spacing, text's faces, angles and justification, and whether the panel's
-  # background and grid are drawn over its layers.
+  # types and ends, spacing, text's families, faces, angles and justification, and whether the
+  # panel's background and grid are drawn over its layers.
 
   # A theme is values: it calls nothing, and reads only its element tree, while compiling. The
   # complete theme is this module's struct, which a boundary listing this one reads.
@@ -180,14 +183,18 @@ defmodule Giggly.Theme do
   @type name :: :gray | :bw | :linedraw | :light | :dark | :minimal | :classic | :void
 
   @typedoc """
-  A complete theme a plot chose: its name and its base sizes, its text's size in points and its
-  lines' and borders' widths in millimetres.
+  A complete theme a plot chose: its name, its base sizes, its text's size in points and its
+  lines' and borders' widths in millimetres, and its families, its text's and its layers'
+  (`base_family`, `""` the device's own) and its titles' (`header_family`, `:none` where the
+  titles take the base family).
   """
   @type chosen :: %{
           name: name(),
           base_size: float(),
           base_line_size: float(),
-          base_rect_size: float()
+          base_rect_size: float(),
+          base_family: String.t(),
+          header_family: String.t() | :none
         }
 
   @typedoc """
@@ -293,17 +300,18 @@ defmodule Giggly.Theme do
   @type face :: :plain | :bold | :italic | :bold_italic
 
   @typedoc """
-  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, its `face`, the
-  `angle` it is turned, in degrees anticlockwise, its `hjust` and `vjust`, where it sits across
-  and up as shares of its width and height, in its own turned frame, and its `margin`: the space
-  in points on each side of it, of which the drawing counts the sides ggplot2 counts; or `:none`,
-  removed.
+  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, its `family`, a font's
+  name, `""` the device's own, its `face`, the `angle` it is turned, in degrees anticlockwise, its
+  `hjust` and `vjust`, where it sits across and up as shares of its width and height, in its own
+  turned frame, and its `margin`: the space in points on each side of it, of which the drawing
+  counts the sides ggplot2 counts; or `:none`, removed.
   """
   @type text ::
           %{
             size: float(),
             color: String.t(),
             opacity: float(),
+            family: String.t(),
             face: face(),
             angle: float(),
             hjust: float(),
@@ -313,15 +321,16 @@ defmodule Giggly.Theme do
           | :none
 
   @typedoc """
-  A title's text, which may run over several lines: its `size`, `color`, `opacity`, `face`,
-  `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the distance in points
-  from one line's baseline to the next's; or `:none`, removed.
+  A title's text, which may run over several lines: its `size`, `color`, `opacity`, `family`,
+  `face`, `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the distance
+  in points from one line's baseline to the next's; or `:none`, removed.
   """
   @type title ::
           %{
             size: float(),
             color: String.t(),
             opacity: float(),
+            family: String.t(),
             face: face(),
             angle: float(),
             hjust: float(),
@@ -423,8 +432,8 @@ defmodule Giggly.Theme do
   @typedoc """
   The layers' defaults, ggplot2's `element_geom()`: the ink and paper their colours are mixed
   from, each a colour in its one spelling; the width and line type of their lines and of their
-  borders, in millimetres; their text's family, `""` for the device's own, and its size, and their
-  points' size, in millimetres, and shape.
+  borders, in millimetres; their text's family, the theme's base family, `""` for the device's
+  own, and its size, and their points' size, in millimetres, and shape.
   """
   @type geom :: %{
           ink: String.t(),
@@ -453,15 +462,17 @@ defmodule Giggly.Theme do
 
   # grid's own defaults, which a property nothing in the theme gives falls to, as R draws it: black,
   # a white fill, a line 1/96 inch wide, which svglite writes in points, with round ends, and a
-  # 12-point font with its lines 1.2 apart, which also make grid's line of text, plain, level and
-  # centred both ways, as grid's `textGrob()` draws text. R itself fails on a text whose
-  # justification only a removed root would give; the drawing centres it, as grid would.
+  # 12-point font with its lines 1.2 apart, which also make grid's line of text, in the device's
+  # own family, plain, level and centred both ways, as grid's `textGrob()` draws text. R itself
+  # fails on a text whose justification only a removed root would give; the drawing centres it, as
+  # grid would.
   @grid_color "#000000"
   @grid_fill "#FFFFFF"
   @grid_line_width 72 / 96
   @grid_line_end :round
   @grid_font_size 12
   @grid_line_height 1.2
+  @grid_family ""
   @grid_face :plain
   @grid_angle 0
   @grid_justification 0.5
@@ -479,13 +490,17 @@ defmodule Giggly.Theme do
   # The complete themes, by name.
   @names [:gray, :bw, :linedraw, :light, :dark, :minimal, :classic, :void]
 
-  # A complete theme's sizes unless a plot gives others, as ggplot2's take them: an 11-point base
-  # size, and lines and borders `base_size / 22` millimetres wide.
+  # A complete theme's sizes and families unless a plot gives others, as ggplot2's take them: an
+  # 11-point base size, lines and borders `base_size / 22` millimetres wide, the device's own
+  # family, and titles in the base family.
   @default_base_size 11.0
-  @default_sizes %{
+  @default_base_family ""
+  @default_bases %{
     base_size: @default_base_size,
     base_line_size: @default_base_size / 22,
-    base_rect_size: @default_base_size / 22
+    base_rect_size: @default_base_size / 22,
+    base_family: @default_base_family,
+    header_family: :none
   }
 
   # Every complete theme's ink and paper, black on white, and `theme_void()`'s paper, its ink with
@@ -522,21 +537,24 @@ defmodule Giggly.Theme do
   # inherit it.
   @legend_spacing {0.5, :lines}
 
-  # A plot's theme with the complete theme `name` chosen, at the sizes `sizes` gives, floats as
-  # `Giggly.Plot`'s checks keep them, its text's in points and its lines' and borders' in
-  # millimetres, and any it leaves out ggplot2's defaults: 11 points, and `base_size / 22` for
-  # each width. Its settings are none, as ggplot2 drops a plot's earlier settings with the theme a
-  # complete theme replaces.
+  # A plot's theme with the complete theme `name` chosen, at the sizes and in the families `bases`
+  # gives, sizes floats as `Giggly.Plot`'s checks keep them, its text's in points and its lines'
+  # and borders' in millimetres, and any it leaves out ggplot2's defaults: 11 points,
+  # `base_size / 22` for each width, the device's own family, and titles in the base family,
+  # `:none`, as ggplot2's `header_family = NULL`. Its settings are none, as ggplot2 drops a plot's
+  # earlier settings with the theme a complete theme replaces.
   @doc false
   @spec choose(name(), keyword()) :: plot_theme()
-  def choose(name, sizes) when name in @names do
-    base_size = Keyword.get(sizes, :base_size, @default_base_size)
+  def choose(name, bases) when name in @names do
+    base_size = Keyword.get(bases, :base_size, @default_base_size)
 
     chosen = %{
       name: name,
       base_size: base_size,
-      base_line_size: Keyword.get(sizes, :base_line_size, base_size / 22),
-      base_rect_size: Keyword.get(sizes, :base_rect_size, base_size / 22)
+      base_line_size: Keyword.get(bases, :base_line_size, base_size / 22),
+      base_rect_size: Keyword.get(bases, :base_rect_size, base_size / 22),
+      base_family: Keyword.get(bases, :base_family, @default_base_family),
+      header_family: Keyword.get(bases, :header_family, :none)
     }
 
     %{complete: chosen, settings: %{}}
@@ -598,17 +616,17 @@ defmodule Giggly.Theme do
     |> worked_out()
   end
 
-  # The elements of the complete theme a plot chose, at its sizes, or of theme_gray() at its
-  # default sizes for a plot that chose none.
-  defp tree(:none), do: gray(@default_sizes)
-  defp tree(%{name: :gray} = sizes), do: gray(sizes)
-  defp tree(%{name: :bw} = sizes), do: bw(sizes)
-  defp tree(%{name: :linedraw} = sizes), do: linedraw(sizes)
-  defp tree(%{name: :light} = sizes), do: light(sizes)
-  defp tree(%{name: :dark} = sizes), do: dark(sizes)
-  defp tree(%{name: :minimal} = sizes), do: minimal(sizes)
-  defp tree(%{name: :classic} = sizes), do: classic(sizes)
-  defp tree(%{name: :void} = sizes), do: void(sizes)
+  # The elements of the complete theme a plot chose, at its sizes and in its families, or of
+  # theme_gray() at its defaults for a plot that chose none.
+  defp tree(:none), do: gray(@default_bases)
+  defp tree(%{name: :gray} = bases), do: gray(bases)
+  defp tree(%{name: :bw} = bases), do: bw(bases)
+  defp tree(%{name: :linedraw} = bases), do: linedraw(bases)
+  defp tree(%{name: :light} = bases), do: light(bases)
+  defp tree(%{name: :dark} = bases), do: dark(bases)
+  defp tree(%{name: :minimal} = bases), do: minimal(bases)
+  defp tree(%{name: :classic} = bases), do: classic(bases)
+  defp tree(%{name: :void} = bases), do: void(bases)
 
   # `elements` with `settings` laid over them, as ggplot2's `add_theme()` lays a `theme()` over a
   # complete theme: a line's, a rectangle's or a text's properties replace only the properties
@@ -794,12 +812,12 @@ defmodule Giggly.Theme do
   end
 
   # A root as its element gives it, a property a line, a rectangle or a text leaves unset taken
-  # from theme_gray()'s at its default sizes, as ggplot2 fills a root from its default theme;
-  # nothing for a removed root passed over.
+  # from theme_gray()'s at its defaults, as ggplot2 fills a root from its default theme; nothing
+  # for a removed root passed over.
   defp root(_name, nil), do: nil
 
   defp root(name, element) when is_map_key(@drawn_kinds, name) do
-    @default_sizes
+    @default_bases
     |> gray()
     |> Map.fetch!(name)
     |> Map.merge(element)
@@ -960,6 +978,7 @@ defmodule Giggly.Theme do
       size: size(text),
       color: color,
       opacity: opacity,
+      family: Map.get(text, :family, @grid_family),
       face: Map.get(text, :face, @grid_face),
       angle: Map.get(text, :angle, @grid_angle) / 1,
       hjust: Map.get(text, :hjust, @grid_justification) / 1,
@@ -1020,15 +1039,16 @@ defmodule Giggly.Theme do
   defp line_width_units(%{}), do: 1.0
 
   # ggplot2's default theme, `theme_gray()` (defined there as `theme_grey()`), at its base sizes:
-  # the text's in points, and the lines' and the borders' widths in millimetres, black ink on white
-  # paper; its elements as `theme_gray()` gives them, in ggplot2's `theme-defaults.R`, each leaving
-  # unset what it inherits, as far as Giggly draws.
+  # the text's in points, and the lines' and the borders' widths in millimetres, and in its
+  # families, black ink on white paper; its elements as `theme_gray()` gives them, in ggplot2's
+  # `theme-defaults.R`, each leaving unset what it inherits, as far as Giggly draws.
   #
   # `half_line`, half the base size, spaces most things, and each colour is ink mixed toward paper
   # by ggplot2's `col_mix()`. Lines are solid ink, `base_line_size` wide, their ends cut square;
   # rectangles are filled with paper and bordered in solid ink `base_rect_size` wide; text is plain
-  # ink at the base size, level and centred both ways, its lines 0.9 lines of R's graphics engine
-  # apart. The spacing is `half_line` and so is every margin.
+  # ink at the base size in the base family, level and centred both ways, its lines 0.9 lines of
+  # R's graphics engine apart, and the titles in the header family where one is given. The spacing
+  # is `half_line` and so is every margin.
   #
   # The plot's background is bordered in paper. The panel's background is light grey (ink mixed
   # 92% toward paper) with no border, drawn under the layers, and its grid lines are paper, the
@@ -1049,15 +1069,15 @@ defmodule Giggly.Theme do
   # the base size with `half_line` below it, its subtitle at the base size with `half_line` below
   # it, both left-aligned and hanging, its caption 0.8 of it with `half_line` above it,
   # right-aligned and hanging, and its tag 1.2 times it, centred both ways.
-  defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size} = sizes) do
+  defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size} = bases) do
     half_line = base_size / 2
 
     %{
-      geom: geom(sizes, @paper),
+      geom: geom(bases, @paper),
       line: %{color: @ink, linewidth: line_size, linetype: {}, lineend: :butt},
       rect: %{fill: @paper, color: @ink, linewidth: rect_size, linetype: {}},
-      text: root_text(base_size),
-      title: %{},
+      text: root_text(bases),
+      title: titles(bases),
       spacing: {half_line, :pt},
       margins: sides(half_line, half_line, half_line, half_line),
       axis_line: :none,
@@ -1102,8 +1122,8 @@ defmodule Giggly.Theme do
   # `theme_bw()`: theme_gray()'s elements, these replaced whole. The panel is white, bordered dark
   # grey (20% toward paper), with light grey grid lines (92%), the minor ones half as wide, and a
   # strip is light grey (85.1%) bordered as the panel is.
-  defp bw(sizes) do
-    sizes
+  defp bw(bases) do
+    bases
     |> gray()
     |> Map.merge(%{
       panel_background: %{fill: @paper, color: :none},
@@ -1118,8 +1138,8 @@ defmodule Giggly.Theme do
   # The axes' labels are ink, and their ticks ink half a line wide; the panel's border is ink, and
   # its grid lines ink a tenth of a line wide, the minor ones a twentieth; a strip is ink with its
   # text paper.
-  defp linedraw(%{base_size: base_size} = sizes) do
-    sizes
+  defp linedraw(%{base_size: base_size} = bases) do
+    bases
     |> bw()
     |> Map.merge(%{
       axis_text: %{color: @ink, size: {:rel, 0.8}},
@@ -1137,8 +1157,8 @@ defmodule Giggly.Theme do
   # light grey (70.2% toward paper); its grid lines are lighter grey (87.1%), half a line wide, the
   # minor ones a quarter; the axes' ticks are the border's grey, half a line wide; a strip is the
   # border's grey with its text paper.
-  defp light(%{base_size: base_size} = sizes) do
-    sizes
+  defp light(%{base_size: base_size} = bases) do
+    bases
     |> gray()
     |> Map.merge(%{
       panel_background: %{fill: @paper, color: :none},
@@ -1156,8 +1176,8 @@ defmodule Giggly.Theme do
   # toward paper), and so is a legend key, which inherits it; its grid lines are darker (42%), half
   # a line wide, the minor ones a quarter; the axes' ticks are theme_gray()'s, half a line wide; a
   # strip is near black (15%) with its text near white (89.9%).
-  defp dark(%{base_size: base_size} = sizes) do
-    sizes
+  defp dark(%{base_size: base_size} = bases) do
+    bases
     |> gray()
     |> Map.merge(%{
       panel_background: %{fill: @ink_toward_paper_49_9, color: :none},
@@ -1178,8 +1198,8 @@ defmodule Giggly.Theme do
   # the axes below and left of the panels `0.45 * base_size` from them in their stead; no
   # background to the panels, the strips, the legends or their keys, and no border; the plot's
   # background is paper with no border.
-  defp minimal(%{base_size: base_size} = sizes) do
-    sizes
+  defp minimal(%{base_size: base_size} = bases) do
+    bases
     |> bw()
     |> Map.merge(%{
       axis_ticks: :none,
@@ -1198,8 +1218,8 @@ defmodule Giggly.Theme do
   # the axes' lines drawn in ink with square ends, their ticks and labels ink, since each element
   # replaced leaves its colour to `line` and `text`; a strip is paper bordered in ink twice as wide
   # as a border, which its clipping halves.
-  defp classic(sizes) do
-    sizes
+  defp classic(bases) do
+    bases
     |> bw()
     |> Map.merge(%{
       panel_border: :none,
@@ -1219,16 +1239,17 @@ defmodule Giggly.Theme do
   # legend or inside the legends' box, and no background to the box; no space set between legends,
   # which the box makes half a line, nor a justification, which centres them; legends 0.2
   # centimetres from the panels, their titles left-aligned; and the plot's title and subtitle with
-  # `half_line` above them, as its caption has, each aligned as theme_gray()'s.
-  defp void(%{base_size: base_size} = sizes) do
+  # `half_line` above them, as its caption has, each aligned as theme_gray()'s. Its text and its
+  # titles take its families as theme_gray()'s do.
+  defp void(%{base_size: base_size} = bases) do
     half_line = base_size / 2
 
     %{
-      geom: geom(sizes, @clear_paper),
+      geom: geom(bases, @clear_paper),
       line: :none,
       rect: %{fill: @clear_paper, color: :none, linewidth: 0, linetype: {}},
-      text: root_text(base_size),
-      title: %{},
+      text: root_text(bases),
+      title: titles(bases),
       spacing: {half_line, :pt},
       margins: sides(half_line, half_line, half_line, half_line),
       axis_text: :none,
@@ -1259,12 +1280,13 @@ defmodule Giggly.Theme do
     }
   end
 
-  # Every complete theme's root text at `base_size`: plain ink, level, centred both ways, its lines
-  # 0.9 lines of R's graphics engine apart, with no margin.
-  defp root_text(base_size) do
+  # Every complete theme's root text at its base size and in its base family: plain ink, level,
+  # centred both ways, its lines 0.9 lines of R's graphics engine apart, with no margin.
+  defp root_text(%{base_size: base_size, base_family: base_family}) do
     %{
       color: @ink,
       size: base_size,
+      family: base_family,
       face: :plain,
       angle: 0,
       hjust: 0.5,
@@ -1274,14 +1296,22 @@ defmodule Giggly.Theme do
     }
   end
 
+  # Every complete theme's `title`: in its header family where one is given, and otherwise setting
+  # nothing, so the titles take the root text's family, as ggplot2's `header_family = NULL` leaves
+  # `title`'s family unset.
+  defp titles(%{header_family: :none}), do: %{}
+  defp titles(%{header_family: header_family}), do: %{family: header_family}
+
   # The layers' defaults, ggplot2's `element_geom()` as every complete theme sets it from its base
   # sizes: its ink, and `paper`; its lines' and its borders' widths `base_line_size`, never
-  # `base_rect_size`, and solid; its text's family the device's own, `""`, as the theme's
-  # `base_family` is, and its size the base size in millimetres (`base_size / .pt`);
-  # its points' size 1.5 times the base size over 11, and the solid circle. They stay in a layer's
-  # millimetres, since they become the values of a layer's aesthetics, which a layer may set
-  # instead, and no setting reaches them.
-  defp geom(%{base_size: base_size, base_line_size: line_size}, paper) do
+  # `base_rect_size`, and solid; its text's family the base family, never the header family, and
+  # its size the base size in millimetres (`base_size / .pt`); its points' size 1.5 times the base
+  # size over 11, and the solid circle. They stay in a layer's millimetres, since they become the
+  # values of a layer's aesthetics, which a layer may set instead, and no setting reaches them.
+  defp geom(
+         %{base_size: base_size, base_line_size: line_size, base_family: base_family},
+         paper
+       ) do
     %{
       ink: @ink,
       paper: paper,
@@ -1289,7 +1319,7 @@ defmodule Giggly.Theme do
       borderwidth: line_size,
       linetype: {},
       bordertype: {},
-      family: "",
+      family: base_family,
       fontsize: base_size / @font_points_per_millimetre,
       pointsize: base_size / 11 * 1.5,
       pointshape: :circle

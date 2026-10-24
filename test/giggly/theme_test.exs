@@ -247,6 +247,71 @@ defmodule Giggly.ThemeTest do
     end
   end
 
+  # ggplot2 4.0.3's `calc_element()` of each text Giggly draws, and `layer_data()`'s family for
+  # `geom_text()`, under each complete theme with `base_family = "serif", header_family =
+  # "mono"`: `title` alone takes the header family, and of what Giggly draws only the axes'
+  # titles, the legends' titles and the plot's title inherit from it.
+  describe "complete/1, text's family" do
+    test "each complete theme's titles take the header family, every other text and the layers the base" do
+      leaves =
+        [:axis_text_x_bottom, :axis_text_y_left, :axis_text_theta, :axis_text_r] ++
+          [:axis_title_x_bottom, :axis_title_y_left, :strip_text_x_top, :legend_title_top] ++
+          [:legend_title_left, :legend_text_right, :legend_text_bottom, :plot_title] ++
+          [:plot_subtitle, :plot_caption, :plot_tag]
+
+      families = fn name ->
+        theme = chosen(name, base_family: "serif", header_family: "mono")
+
+        texts =
+          Enum.map(leaves, fn leaf ->
+            case Map.fetch!(theme, leaf) do
+              :none -> :none
+              look -> look.family
+            end
+          end)
+
+        {texts, theme.geom.family}
+      end
+
+      gray = {
+        ["serif", "serif", "serif", "serif", "mono", "mono", "serif", "mono", "mono"] ++
+          ["serif", "serif", "mono", "serif", "serif", "serif"],
+        "serif"
+      }
+
+      void = {
+        [:none, :none, :none, :none, :none, :none, "serif", "mono", "mono"] ++
+          ["serif", "serif", "mono", "serif", "serif", "serif"],
+        "serif"
+      }
+
+      assert {Enum.map([:gray, :bw, :linedraw, :light, :dark, :minimal, :classic], families),
+              families.(:void)} === {List.duplicate(gray, 7), void}
+    end
+
+    # R: `theme_grey(base_family = "serif")`'s `plot.title` is "serif"; with `header_family =
+    # ""`, it is "".
+    test "the titles take the base family unless a header family is given, the device's own too" do
+      assert {chosen(:gray, base_family: "serif").plot_title.family,
+              chosen(:gray, base_family: "serif", header_family: "").plot_title.family,
+              chosen(:gray, base_family: "serif", header_family: "").axis_text_x_bottom.family} ===
+               {"serif", "", "serif"}
+    end
+
+    # R: `theme(text = element_text(family = "Lobster"))` gives `plot.title` "Lobster" and
+    # `geom_text()`'s `layer_data()` family ""; `theme_grey(base_family = "serif") + theme(text =
+    # element_text(family = ""))` gives `axis.text.x` "".
+    test "the root text's family reaches every text but never the layers" do
+      lobster = complete(%{text: %{family: "Lobster"}})
+
+      unset =
+        chosen(:gray, [base_family: "serif"], %{text: %{family: ""}}).axis_text_x_bottom.family
+
+      assert {lobster.plot_title.family, lobster.legend_text_right.family, lobster.geom.family,
+              unset} === {"Lobster", "Lobster", "", ""}
+    end
+  end
+
   describe "complete/1 with elements removed" do
     test "a removed element takes every element that inherits from it" do
       theme = complete(%{axis_text: :none})
@@ -263,6 +328,7 @@ defmodule Giggly.ThemeTest do
         size: 11.0,
         color: "#FF0000",
         opacity: 1.0,
+        family: "",
         face: :plain,
         angle: 0.0,
         hjust: 0.5,
@@ -315,6 +381,7 @@ defmodule Giggly.ThemeTest do
                   size: 12.0,
                   color: "#FF0000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.0,
@@ -348,6 +415,7 @@ defmodule Giggly.ThemeTest do
                   size: 10.0,
                   color: "#000000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.5,
@@ -358,6 +426,7 @@ defmodule Giggly.ThemeTest do
                   size: 15.0,
                   color: "#000000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.5,
@@ -424,6 +493,7 @@ defmodule Giggly.ThemeTest do
                   size: 11.0,
                   color: "#000000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.0,
@@ -435,6 +505,7 @@ defmodule Giggly.ThemeTest do
                   size: 8.8,
                   color: "#000000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.0,
@@ -852,6 +923,7 @@ defmodule Giggly.ThemeTest do
                   size: 11.0,
                   color: "#FF0000",
                   opacity: 1.0,
+                  family: "",
                   face: :plain,
                   angle: 0.0,
                   hjust: 0.5,
@@ -1001,7 +1073,9 @@ defmodule Giggly.ThemeTest do
                      name: :light,
                      base_size: 16.0,
                      base_line_size: 0.7272727272727273,
-                     base_rect_size: 0.7272727272727273
+                     base_rect_size: 0.7272727272727273,
+                     base_family: "",
+                     header_family: :none
                    },
                    settings: %{}
                  },
@@ -1010,7 +1084,9 @@ defmodule Giggly.ThemeTest do
                      name: :dark,
                      base_size: 11.0,
                      base_line_size: 2.0,
-                     base_rect_size: 0.5
+                     base_rect_size: 0.5,
+                     base_family: "",
+                     header_family: :none
                    },
                    settings: %{}
                  }

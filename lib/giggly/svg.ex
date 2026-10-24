@@ -692,10 +692,25 @@ defmodule Giggly.SVG do
   defp text_fill("#000000", opacity) when opacity == 1, do: ""
   defp text_fill(color, opacity), do: fill_style(color, opacity)
 
-  # The default family, `""`, is drawn in the fonts whose widths `Giggly.Font` measures with; any
-  # other is named, quoted, and drawn at those widths all the same.
-  defp font_family(""), do: @font_family
-  defp font_family(family), do: [?", escape_attribute(family), ?"]
+  # The default family, `""`, and R's generic `"sans"` are drawn in the fonts whose widths
+  # `Giggly.Font` measures with; R's other generic names in CSS's, `"serif"` in `serif` and
+  # `"mono"` in `monospace`; any other is named, quoted as a CSS string, and then the default
+  # fonts, for a browser that lacks it. Each is drawn at the widths measured all the same.
+  defp font_family(family) when family in ["", "sans"], do: @font_family
+  defp font_family("serif"), do: "serif"
+  defp font_family("mono"), do: "monospace"
+  defp font_family(family), do: [css_string(family), ", ", @font_family]
+
+  # `text` as a CSS string in an attribute: quoted, its quotes and backslashes escaped for CSS,
+  # and the whole escaped for the attribute.
+  defp css_string(text) do
+    quoted =
+      text
+      |> String.replace("\\", "\\\\")
+      |> String.replace("\"", "\\\"")
+
+    [?", escape_attribute(quoted), ?"]
+  end
 
   # svglite writes no anchor for text anchored at its start, SVG's default.
   defp text_anchor(anchor) when anchor == 0.0, do: ""

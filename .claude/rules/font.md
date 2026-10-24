@@ -28,4 +28,8 @@ Sans table, why a plain module rather than a behaviour, and why the table is a f
   is the deepest descent among "gjpqyQ", whatever the text.
 - **Sizes are points (1/72 inch), as font sizes are.** ggplot2's theme lengths are TeX points
   (1/72.27 inch) and are converted where they are declared, not here.
-- **No behaviour until a second font**: the theme's text family, or a backend that can measure.
+- **Every family is measured with the one table**, `""`, R's generic names and any font named
+  alike, as vdiffr measures every family with Liberation Sans, so a family changes how a label is
+  drawn, never its width; measuring takes no family. A measurer by family waits for the optional
+  package that will measure the families registered with it (design-log §4, the entry beginning
+  "A font family is a name").

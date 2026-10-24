@@ -283,17 +283,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   complete theme function records the theme `Theme.choose/2` makes**, its name and its `base_size:`
   (points), `base_line_size:` and `base_rect_size:` (millimetres), each 0 or more
   (`validate_base_size/1`, `validate_linewidth/1`), canonicalized first so one given twice is
-  refused, the widths `base_size / 22` unless given, with no settings: the plot's theme is replaced
-  whole, the settings before it dropped, as R's `+ theme_bw()` drops them. Every theme function
-  takes the three sizes, `theme_void/2`'s widths drawing nothing; `base_family:`, `header_family:`,
+  refused, the widths `base_size / 22` unless given, and its `base_family:` and `header_family:`,
+  any string, the header family `:none` unless given, with no settings: the plot's theme is
+  replaced whole, the settings before it dropped, as R's `+ theme_bw()` drops them. Every theme
+  function takes the three sizes and the two families, `theme_void/2`'s widths drawing nothing;
   `ink:`, `paper:` and `accent:` wait, and raise as unknown. **`theme/2` checks its settings against
   a schema built from `ElementTree.elements/0`**, an option per element of ggplot2's tree, each
   checked as its kind: a line's, a rectangle's or a text's properties a keyword list (`color:`,
   canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`, points; a text's
   `margin:`, its `face:` (`:plain`, `:bold`, `:italic`, `:bold_italic`; R's `"oblique"` and its
   numbers refused), its `angle:`, `hjust:` and `vjust:`, any number kept as a float, never a word,
-  which R's `element_text()` refuses, and its `lineheight:`, 0 or more, where R takes a negative
-  too, its `family:` waiting with `base_family:`; a line's and a rectangle's `linetype:`, as a
+  which R's `element_text()` refuses, its `lineheight:`, 0 or more, where R takes a negative
+  too, and its `family:`, any string, as named; a line's and a rectangle's `linetype:`, as a
   layer's (`validate_linetype/1`), held as its pattern, and a line's `lineend:`), a size or a line
   width `{:rel, share}` too, both 0 or more;
   a length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or

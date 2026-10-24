@@ -3,9 +3,10 @@ defmodule Giggly.Scene.Text do
 
   # Labels, each at its `x` and `y` in the cell's units, all set at one `size` (in points) in one
   # font `family` and `face` and turned `angle` degrees anticlockwise: grid's `textGrob()`. A
-  # `family` of `""` is the default sans-serif, as R's is; any other is the font's name. The face is
-  # `:plain`, `:bold`, `:italic` or `:bold_italic`, grid's `fontface`; it changes how a label is
-  # drawn, never its measured width.
+  # `family` of `""` is the default sans-serif, as R's is; `"sans"`, `"serif"` and `"mono"` are R's
+  # generic families; any other is the font's name. The face is `:plain`, `:bold`, `:italic` or
+  # `:bold_italic`, grid's `fontface`. Neither changes a label's measured width, only how it is
+  # drawn.
   #
   # Each label has its own colour and opacity, `color` an `#RRGGBB` and `opacity` from 0 to 1, as
   # grid's graphical parameters are one per label, so labels in many colours need one text.

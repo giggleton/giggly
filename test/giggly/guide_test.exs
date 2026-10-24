@@ -173,6 +173,7 @@ defmodule Giggly.GuideTest do
         size: 11.0,
         color: "#000000",
         opacity: 1.0,
+        family: "",
         face: :plain,
         angle: 0.0,
         hjust: 0.2,
