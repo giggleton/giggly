@@ -13,7 +13,8 @@ why rendering draws in a resolved theme: the entry beginning "The theme is a res
 why the assembly resolves it: the entry beginning "Each layer's defaults are filled in"; why it
 arranges the panels a facet lays out: the entry beginning "`facet_wrap` is built in steps"; why
 every plot's cells are drawn in facets' order: the entry beginning "Every plot's cells are drawn in
-ggplot2's facets' order".
+ggplot2's facets' order"; where the legends go and why a box is placed by a hang: the entry
+beginning "Legends go where the theme puts them".
 
 ## Rules
 
@@ -79,18 +80,28 @@ ggplot2's facets' order".
   ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows. A panel
   where the layer has no rows, as one only another table makes, draws nothing of it, as ggplot2
   gives it an empty grob, and its geom is not called.
-- **A plot with legends gives them a column right of the panels**, the theme's legend spacing
-  from them, as wide as the widest, before the margin, as ggplot2 places its guide box `"right"`,
-  **and none where the theme's `legend_position` is `:none`**, neither column nor spacing.
+- **A plot's legends go where the theme puts them (`legend_position`), as ggplot2's
+  `table_add_legends()` places its guide boxes**: a column right of the panels, or left of the y
+  title inside the tag's column; a row above the panels below the plot's title and subtitle, or
+  below the x title above the caption; each the theme's legend spacing from the panels and as
+  wide or as tall as the box; inside the panels with no room of their own; **or nowhere
+  (`:none`), neither column nor spacing**. A box beside the panels spans the panels' rows or
+  columns, or with `legend_location: :plot` every row from the first strip to the x title or
+  every column between the tag and the right margin; a box inside spans every panel, the first
+  row's strips left out, whatever the location, as `find_panel()` finds them. **The box is placed
+  in its cell by a `{:at, ...}` hang, as grid places a viewport**: beside the panels its
+  justification's point at the same point of its cell, inside its justification's point at
+  `legend_position_inside`, so the placement is data on the cell and the generic layout code lays
+  it out. Each legend runs as `legend_direction` says, or across above or below the panels and
+  down elsewhere, as ggplot2's `Guides$draw()` decides, and that direction by position is handed
+  to `Guide.Box.draw/3` for its own defaults.
   Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked
-  in the guide's box (`Guide.Box.draw/2`), in the order the assembly gives them; its cell spans
-  the panels' rows, from the first's top to the last's bottom, the strips above the first row left
-  out, and its table is centred down it; the cell is drawn after the axes' titles and before the
-  plot's labels. Each key's glyphs are drawn by the geom of every layer that maps one of the
-  legend's aesthetics and draws in that key (`Geom.draw_key/2`), in layer order, at the key's
-  values of the aesthetics that layer maps, with what it sets, both laid over its geom's defaults
-  under the theme (the layer's `defaults`), and with whether its marks are
-  horizontal (`flipped_aes`, the assembly's `flipped`), as ggplot2 hands `draw_key` the layer's
+  in the guide's box (`Guide.Box.draw/3`), in the order the assembly gives them; the cell is
+  drawn after the axes' titles and before the plot's labels. Each key's glyphs are drawn by the geom
+  of every layer that maps one of the legend's aesthetics and draws in that key (`Geom.draw_key/2`),
+  in layer order, at the key's values of the aesthetics that layer maps, with what it sets, both
+  laid over its geom's defaults under the theme (the layer's `defaults`), and with whether its marks
+  are horizontal (`flipped_aes`, the assembly's `flipped`), as ggplot2 hands `draw_key` the layer's
   `flipped_aes`, so a box's key is turned, and handed to the guide with the
   room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by, so rendering
   measures nothing itself; a key no layer draws in keeps its background and label.

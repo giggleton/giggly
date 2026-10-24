@@ -7783,6 +7783,236 @@ defmodule GigglyTest do
       assert golden?(plot, "theme_legend_none")
     end
 
+    # Golden: test/golden/legend_left.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/legend_left.R: every element and clip path matches but the background's left
+    # edge, which R writes as its rounding error. The legend's column is outside the y axis's
+    # title and inside the tag's. It moves with how a legend or the plot's table is laid out.
+    test "legend_position: :left puts the legends left of the y axis's title" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.labs(tag: "A")
+        |> Plot.theme(legend_position: :left)
+
+      assert golden?(plot, "legend_left")
+    end
+
+    # Golden: test/golden/legend_top_rows.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_top_rows.R: every element and clip path matches. Seven keys
+    # running across take two rows, filled a column at a time, the title left of them. It moves
+    # with how a legend or the plot's table is laid out.
+    test "legend_position: :top runs a legend's keys across, in rows of five, below the title" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.labs(title: "Title")
+        |> Plot.theme(legend_position: :top)
+
+      assert golden?(plot, "legend_top_rows")
+    end
+
+    # Golden: test/golden/legend_bottom_guides.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_bottom_guides.R: every element and clip path matches
+    # vdiffr's but the bar's fill, which vdiffr's device cannot draw, and every stop matches
+    # svglite's. A colour bar and two legends side by side below the x axis's title. It moves with
+    # how a legend, a colour bar, the box or the plot's table is laid out.
+    test "legend_position: :bottom puts the guides side by side below the plot, running across" do
+      plot =
+        %{
+          "x" => Enum.to_list(1..5),
+          "y" => Enum.to_list(1..5),
+          "p" => Enum.to_list(1..5),
+          "q" => ["1", "2", "3", "4", "5"],
+          "r" => ["1", "2", "3", "4", "5"]
+        }
+        |> Plot.new(%{x: :x, y: :y, colour: :p, size: :q, shape: :r})
+        |> Plot.geom_point()
+        |> Plot.labs(caption: "Caption")
+        |> Plot.theme(legend_position: :bottom)
+
+      assert golden?(plot, "legend_bottom_guides")
+    end
+
+    # Golden: test/golden/legend_inside.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_inside.R: every element and clip path matches. The box's top right
+    # corner at a point of the panel, each legend at the box's right. It moves with how a legend
+    # or the box is laid out, or where an inside box goes.
+    test "legend_position: :inside puts the box's justification at its point of the panel" do
+      plot =
+        Plot.theme(mtcars_by_cylinders(),
+          legend_position: :inside,
+          legend_position_inside: {0.95, 0.95},
+          legend_justification: {:right, :top},
+          legend_box_just: :right,
+          legend_margin: 6
+        )
+
+      assert golden?(plot, "legend_inside")
+    end
+
+    # Golden: test/golden/legend_inside_facet.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_inside_facet.R: every element and clip path matches but the
+    # background's left edge, which R writes as its rounding error. The box spans every panel, the
+    # first row's strips left out. It moves with what moves test/golden/facet_wrap.svg and where an
+    # inside box goes.
+    test "an inside box spans all the panels, so it can sit in a facet's empty corner" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:class)
+        |> Plot.theme(
+          legend_position: :inside,
+          legend_position_inside: {1, 0},
+          legend_justification: {1, 0}
+        )
+
+      assert golden?(plot, "legend_inside_facet")
+    end
+
+    # Golden: test/golden/legend_justification_top.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/legend_justification_top.R: every element and clip path
+    # matches. It moves with how a legend or the box is laid out.
+    test "legend_justification: :top hangs the box from the panels' top" do
+      plot = Plot.theme(mtcars_by_cylinders(), legend_justification: :top)
+
+      assert golden?(plot, "legend_justification_top")
+    end
+
+    # Golden: test/golden/legend_box_background.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_box_background.R: every element and clip path matches. The
+    # box's background takes nothing from `rect`, as ggplot2's guide box draws it. It moves with
+    # how a legend or the box is laid out.
+    test "legend_box_background draws the box's background over its margin, as given" do
+      plot = Plot.theme(mtcars_by_cylinders(), legend_box_background: [], legend_box_margin: 6)
+
+      assert golden?(plot, "legend_box_background")
+    end
+
+    # Golden: test/golden/legend_bottom_plot.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_bottom_plot.R: every element and clip path matches. Lined up
+    # with the plot, the box justified left starts at the y axis's title. It moves with how a
+    # legend or the plot's table is laid out.
+    test "legend_location: :plot lines a box below the panels up with the whole plot" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          legend_position: :bottom,
+          legend_location: :plot,
+          legend_justification: :left
+        )
+
+      assert golden?(plot, "legend_bottom_plot")
+    end
+
+    # Golden: test/golden/legend_box_horizontal.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_box_horizontal.R: every element and clip path matches. It
+    # moves with how a legend or the box is laid out.
+    test "legend_box: :horizontal sets the legends side by side, each hung from the box's top" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv, size: :cyl})
+        |> Plot.geom_point()
+        |> Plot.theme(legend_box: :horizontal)
+
+      assert golden?(plot, "legend_box_horizontal")
+    end
+
+    # Golden: test/golden/colorbar_top.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/colorbar_top.R: every element and clip path matches vdiffr's but the bar's
+    # fill, which vdiffr's device cannot draw, and every stop matches svglite's, the gradient
+    # across the bar. It moves with what moves test/golden/point_colourbar.svg and how a colour
+    # bar running across is laid out.
+    test "a colour bar above the panels runs across, its labels below it and its title left" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :hwy})
+        |> Plot.geom_point()
+        |> Plot.theme(legend_position: :top)
+
+      assert golden?(plot, "colorbar_top")
+    end
+
+    # Golden: test/golden/colorbar_inside.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/colorbar_inside.R: every element and clip path matches vdiffr's but the
+    # bar's fill, and every stop matches svglite's. It moves with what moves
+    # test/golden/point_colourbar.svg and where an inside box goes.
+    test "a colour bar inside the panel runs up, its corner at the theme's point" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :hwy})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          legend_position: :inside,
+          legend_position_inside: {0.05, 0.95},
+          legend_justification: {0, 1}
+        )
+
+      assert golden?(plot, "colorbar_inside")
+    end
+
+    # Golden: test/golden/legend_direction.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_direction.R: every element and clip path matches. It moves with
+    # how a legend running across or the box is laid out.
+    test "legend_direction: :horizontal runs the keys across, the legends still stacked down" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv, size: :cyl})
+        |> Plot.geom_point()
+        |> Plot.theme(legend_direction: :horizontal)
+
+      assert golden?(plot, "legend_direction")
+    end
+
+    # Golden: test/golden/theme_void_legends.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_void_legends.R: every element and clip path matches. It moves
+    # with the space theme_void() leaves between legends, or how the box is laid out.
+    test "theme_void() sets its legends half a line apart, as ggplot2's guide box does" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv, size: :cyl})
+        |> Plot.geom_point()
+        |> Plot.theme_void()
+
+      assert golden?(plot, "theme_void_legends")
+    end
+
+    # Golden: test/golden/legend_columns.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_columns.R: every element and clip path matches. Twenty-five keys
+    # running down take two columns, filled a column at a time. It moves with how a legend is laid
+    # out.
+    test "a legend running down takes a column for each twenty keys" do
+      plot =
+        %{
+          "x" => Enum.to_list(1..25),
+          "y" => Enum.to_list(1..25),
+          "key" => Enum.map(?a..?y, fn code -> <<code>> end)
+        }
+        |> Plot.new(%{x: :x, y: :y, colour: :key})
+        |> Plot.geom_point()
+
+      assert golden?(plot, "legend_columns")
+    end
+
+    # Golden: test/golden/legend_title_tall.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_title_tall.R: every element and clip path matches. A title left of
+    # the keys and taller than them leaves half the extra room above them and half below. It moves
+    # with how a legend running across is laid out.
+    test "a title left of the keys, taller than them, centres them down its height" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: "Drive\nof\nthe car")
+        |> Plot.theme(legend_position: :bottom)
+
+      assert golden?(plot, "legend_title_tall")
+    end
+
     # Golden: test/golden/theme_radial_removed.svg, checked against ggplot2's drawing of the same
     # plot, made by test/golden/theme_radial_removed.R: every element matches, and every clip path
     # but svglite's around the whole drawing. The angle axis's labels keep their place beyond
@@ -8103,6 +8333,20 @@ defmodule GigglyTest do
   end
 
   # Whether `plot`, drawn at vdiffr's size, is the golden `name` in test/golden/, byte for byte.
+  # theme()'s reference page's `p2`: mtcars' fuel economy against weight, coloured by cylinders
+  # and shaped by engine, both as factors, with its axes' and legends' titles.
+  defp mtcars_by_cylinders do
+    Giggly.Datasets.mtcars()
+    |> Plot.new(%{x: :wt, y: :mpg})
+    |> Plot.geom_point(%{colour: {:factor, [:cyl]}, shape: {:factor, [:vs]}})
+    |> Plot.labs(
+      x: "Weight (1000 lbs)",
+      y: "Fuel economy (mpg)",
+      colour: "Cylinders",
+      shape: "Transmission"
+    )
+  end
+
   defp golden?(plot, name) do
     svg =
       plot

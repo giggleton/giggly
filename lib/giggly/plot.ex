@@ -68,8 +68,9 @@ defmodule Giggly.Plot do
       ["#56B1F7", "#132B43", "#7F7F7F"]
 
   A legend or colour bar is drawn for each mapped aesthetic, stacked down the right of the panels
-  in the order of the aesthetics' names (`alpha`, `color`, `fill`, `shape`, `size`). Two with the
-  same title and labels, such as a colour and a fill mapped to one column, are drawn as one.
+  unless the theme puts them elsewhere (`theme/2`'s `legend_position:`), in the order of the
+  aesthetics' names (`alpha`, `color`, `fill`, `shape`, `size`). Two with the same title and
+  labels, such as a colour and a fill mapped to one column, are drawn as one.
 
   ## Guides
 
@@ -117,8 +118,9 @@ defmodule Giggly.Plot do
   default, each at a base size of its own. `theme/2` changes any element of it by name, each
   inheriting what it leaves unset from its parent in ggplot2's tree, so setting
   `text: [size: 14]` makes every label bigger, and `axis_text_x: [color: "red"]` reddens only the
-  x axis's labels. An element set to `:none` is removed, with everything that inherits from it,
-  and `legend_position: :none` draws no legends.
+  x axis's labels. An element set to `:none` is removed, with everything that inherits from it.
+  `legend_position:` puts the legends left, right, above or below the panels, inside them, or
+  nowhere (`:none`).
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -2083,6 +2085,7 @@ defmodule Giggly.Plot do
   # The units a theme length may be given in, and a margin's sides, in ggplot2's order.
   @theme_units [:pt, :cm, :mm, :in, :lines]
   @theme_sides [:top, :right, :bottom, :left]
+  @theme_justification_names [:center, :left, :right, :top, :bottom]
   @theme_no_margin Map.new(@theme_sides, fn side -> {side, {0, :pt}} end)
 
   # `theme/2`'s options: one for each element of the theme a setting may give, from the theme's
@@ -2150,7 +2153,12 @@ defmodule Giggly.Plot do
     ],
     length: [type: {:custom, __MODULE__, :validate_theme_length, [:element]}],
     margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:element]}],
-    position: [type: {:in, [:right, :none]}],
+    position: [type: {:in, [:right, :left, :top, :bottom, :inside, :none]}],
+    point: [type: {:custom, __MODULE__, :validate_theme_point, []}],
+    justification: [type: {:custom, __MODULE__, :validate_theme_justification, [:shares]}],
+    box_justification: [type: {:custom, __MODULE__, :validate_theme_justification, [:names]}],
+    direction: [type: {:in, [:horizontal, :vertical]}],
+    location: [type: {:in, [:panel, :plot]}],
     boolean: [type: :boolean]
   }
   # The elements whose settings are a line's, a rectangle's or a text's properties, whose spelling
@@ -2219,6 +2227,14 @@ defmodule Giggly.Plot do
   """
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
+
+  # A theme justification's point across or up: its name, or, where it `takes` `:shares`, a
+  # number.
+  defguardp is_justification_across(across, takes)
+            when across in [:left, :center, :right] or (takes == :shares and is_number(across))
+
+  defguardp is_justification_up(up, takes)
+            when up in [:bottom, :center, :top] or (takes == :shares and is_number(up))
 
   # An end of a date scale's limits: a date, or `nil` for one the data decides.
   defguardp is_date_limit(limit) when is_struct(limit, Date) or is_nil(limit)
@@ -4811,7 +4827,25 @@ defmodule Giggly.Plot do
   nothing above an element gives is drawn at the drawing's own default: black, filled white, a
   solid line 0.75 points wide with round ends, text 12 points with its lines 1.2 sizes apart, and no
   margin.
-  `legend_position: :none` draws no legends.
+
+  The legends go right of the panels unless `legend_position:` puts them left of the panels
+  (`:left`), above (`:top`) or below (`:bottom`), inside them (`:inside`), or nowhere (`:none`).
+  Beside the panels they are stacked in a box the theme's spacing from them, one above another on
+  the left and right and side by side above and below, their keys running down and across; a box
+  above or below the panels sits below the plot's title and above its caption, and one on the left
+  outside the y axis's title. `legend_direction:` runs every legend's keys one way, and
+  `legend_box:` arranges the legends one way, wherever they go. Which point of the box is placed
+  at the same point of the room beside the panels is its justification, `:center` unless
+  `legend_justification:` or the side's own (`legend_justification_right:` and the rest) says
+  otherwise: `:top` hangs a box right of the panels from their top. The room beside the panels is
+  as long as the panels, or as the whole plot with `legend_location: :plot`. Inside the panels,
+  the box's justification is placed at `legend_position_inside:`, `{x, y}` as shares of the panels'
+  width and height, or at the same point of the panels when none is given, so `legend_position:
+  :inside, legend_justification_inside: {1, 0}` puts the box in the panels' bottom right corner.
+  `legend_box_just:` places each legend in the box, `legend_box_margin:` spaces them from its
+  edge, and `legend_box_background:` draws its background, which no complete theme draws, as its
+  setting gives it, taking nothing from `:rect`: `legend_box_background: []` is white with a black
+  border 0.75 points wide.
 
   Raises `NimbleOptions.ValidationError` for an element it does not know or a value it cannot use,
   and `ArgumentError` for an element or a property given twice.
@@ -5296,6 +5330,42 @@ defmodule Giggly.Plot do
     do: measure
 
   defp theme_length(_other), do: :error
+
+  # NimbleOptions' check of a theme point, `{x, y}`, each a number, a share of the panels' width or
+  # height, which may lie beyond them.
+  @doc false
+  @spec validate_theme_point(term()) :: {:ok, {number(), number()}} | {:error, String.t()}
+  def validate_theme_point({x, y} = point) when is_number(x) and is_number(y), do: {:ok, point}
+
+  def validate_theme_point(point),
+    do: {:error, "expected a point: {x, y}, each a number, got: #{inspect(point)}"}
+
+  # NimbleOptions' check of a theme justification: `:center` or a side, or `{horizontal,
+  # vertical}`, each the name of a point across or up, or, where `takes` is `:shares`, a number, a
+  # share of the box's width or height, as grid's `valid.just()` reads one; ggplot2's
+  # `legend.box.just` takes names alone (`:names`).
+  @doc false
+  @spec validate_theme_justification(term(), :shares | :names) ::
+          {:ok, Theme.justification()} | {:error, String.t()}
+  def validate_theme_justification(name, _takes) when name in @theme_justification_names,
+    do: {:ok, name}
+
+  def validate_theme_justification({across, up} = justification, takes)
+      when is_justification_across(across, takes) and is_justification_up(up, takes),
+      do: {:ok, justification}
+
+  def validate_theme_justification(justification, takes) do
+    {:error,
+     "expected a justification: one of #{inspect(@theme_justification_names)}, or " <>
+       "{horizontal, vertical}, each #{justification_sides(takes)}, got: " <>
+       inspect(justification)}
+  end
+
+  defp justification_sides(:shares),
+    do: "a number or :left, :center or :right across and :bottom, :center or :top up"
+
+  defp justification_sides(:names),
+    do: ":left, :center or :right across and :bottom, :center or :top up"
 
   # NimbleOptions' check of a `linewidth:` option: a width in millimetres, 0 or more, kept as a
   # float.

@@ -23,7 +23,7 @@ defmodule Giggly.ThemeTest do
     test "a text's size reaches every text that inherits it, as each one's share" do
       theme = complete(%{text: %{size: 20}})
 
-      assert {theme.axis_text_x_bottom.size, theme.legend_text.size, theme.plot_title.size,
+      assert {theme.axis_text_x_bottom.size, theme.legend_text_right.size, theme.plot_title.size,
               theme.strip_text_x_top.size} === {16.0, 16.0, 24.0, 16.0}
     end
 
@@ -280,8 +280,8 @@ defmodule Giggly.ThemeTest do
     test "a removed root text leaves a legend's title and labels in theme_gray()'s look" do
       theme = complete(%{text: :none})
 
-      assert {theme.legend_title, theme.legend_text, theme.axis_title_x_bottom, theme.plot_title,
-              theme.strip_text_x_top} ===
+      assert {theme.legend_title_top, theme.legend_text_right, theme.axis_title_x_bottom,
+              theme.plot_title, theme.strip_text_x_top} ===
                {%{
                   size: 11.0,
                   color: "#000000",
@@ -311,6 +311,128 @@ defmodule Giggly.ThemeTest do
     test "the legends go right of the panels unless the theme puts them nowhere" do
       assert {complete(%{}).legend_position, complete(%{legend_position: :none}).legend_position} ===
                {:right, :none}
+    end
+  end
+
+  # Golden: `calc_element()` over each complete theme in ggplot2 4.0.3 (R 4.6.1), and the guide
+  # box's own tables (`ggplotGrob()`, R's spacing in points by `convertUnit(..., "bigpts")`): every
+  # theme sets `legend.position` "right" and `legend.justification` "center" but theme_void(),
+  # which sets no justification, read as centred, and no `legend.spacing`, which the guide box
+  # makes half a line, 7.2 points between theme_void()'s legends; none sets `legend.direction`,
+  # `legend.box`, `legend.box.just` or `legend.location`, and each a box margin of 0 and no box
+  # background. A justification is worked out as grid's `valid.just()` reads one: "top" 0.5 and
+  # 1, "left" 0 and 0.5, c("right", "top") 1 and 1, c(0.3, 0.8) as it is; a name beside a number,
+  # which R refuses as one character vector, Giggly reads side by side, each as R reads it alone.
+  # They move with the themes' legend values or how a justification is read.
+  describe "complete/1, where the legends go" do
+    test "every complete theme puts its legends right of the panels, centred, in a bare box" do
+      for name <- [:gray, :bw, :linedraw, :light, :dark, :minimal, :classic, :void] do
+        theme = chosen(name)
+
+        assert {theme.legend_position, theme.legend_justification_right, theme.legend_location,
+                theme.legend_direction, theme.legend_box, theme.legend_box_just,
+                theme.legend_box_margin, theme.legend_box_background} ===
+                 {:right, {0.5, 0.5}, :panel, :none, :none, :none, sides(0, 0, 0, 0), :none},
+               "#{name}"
+      end
+    end
+
+    test "legends are twice the spacing apart, and half a line under theme_void()" do
+      gray = chosen(:gray)
+      void = chosen(:void)
+      set = chosen(:void, [], %{legend_spacing: {3, :pt}})
+
+      assert {gray.legend_spacing_x, gray.legend_spacing_y, void.legend_spacing_x,
+              void.legend_spacing_y, set.legend_spacing_x} ===
+               {10.958904109589042, 10.958904109589042, 7.199999999999999, 7.199999999999999,
+                2.9887920298879207}
+    end
+
+    test "a justification is worked out as grid reads one, by name or by share" do
+      justification = fn given ->
+        complete(%{legend_justification: given}).legend_justification_right
+      end
+
+      assert Enum.map(
+               [:top, :left, :bottom, :right, :center, {:right, :top}, {0.3, 0.8}, {:left, 2}],
+               justification
+             ) ===
+               [
+                 {0.5, 1.0},
+                 {0.0, 0.5},
+                 {0.5, 0.0},
+                 {1.0, 0.5},
+                 {0.5, 0.5},
+                 {1.0, 1.0},
+                 {0.3, 0.8},
+                 {0.0, 2.0}
+               ]
+    end
+
+    test "each side's justification is the legends' unless its own is given" do
+      theme = complete(%{legend_justification: :top, legend_justification_inside: {1, 0}})
+
+      assert {theme.legend_justification_top, theme.legend_justification_bottom,
+              theme.legend_justification_left, theme.legend_justification_right,
+              theme.legend_justification_inside} ===
+               {{0.5, 1.0}, {0.5, 1.0}, {0.5, 1.0}, {0.5, 1.0}, {1.0, 0.0}}
+    end
+
+    test "an inside box goes at its justification's point of the panels unless given one" do
+      justified = complete(%{legend_justification_inside: :right})
+      placed = complete(%{legend_justification_inside: :right, legend_position_inside: {0.9, 1}})
+
+      assert {justified.legend_position_inside, placed.legend_position_inside,
+              placed.legend_justification_inside} === {{1.0, 0.5}, {0.9, 1.0}, {1.0, 0.5}}
+    end
+
+    test "the direction, the arrangement and the place in the box are the settings'" do
+      theme =
+        complete(%{
+          legend_direction: :horizontal,
+          legend_box: :vertical,
+          legend_box_just: {:right, :bottom},
+          legend_location: :plot
+        })
+
+      assert {theme.legend_direction, theme.legend_box, theme.legend_box_just,
+              theme.legend_location} === {:horizontal, :vertical, {1.0, 0.0}, :plot}
+    end
+
+    # Golden: ggplot2 4.0.3's guide box draws `legend.box.background` as the theme holds it,
+    # through vdiffr 1.0.9 (R 4.6.1): `element_rect()` white with a black border 0.75 points wide
+    # under `rect = element_rect(fill = "yellow", colour = "red")` too, and `element_rect(linewidth
+    # = 2, colour = "blue")` blue and 4.27 wide, filled white.
+    test "the legends' box background takes nothing from rect, its unset properties grid's" do
+      given = complete(%{rect: %{fill: "#FFFF00", color: "#FF0000"}, legend_box_background: %{}})
+      blue = complete(%{legend_box_background: %{linewidth: 2, color: "#0000FF"}})
+
+      assert {given.legend_box_background, Float.round(blue.legend_box_background.line_width, 2),
+              blue.legend_box_background.color, blue.legend_box_background.fill,
+              complete(%{}).legend_box_background} ===
+               {%{
+                  fill: "#FFFFFF",
+                  fill_opacity: 1.0,
+                  color: "#000000",
+                  color_opacity: 1.0,
+                  line_width: 0.75,
+                  dashes: :none
+                }, 4.27, "#0000FF", "#FFFFFF", :none}
+    end
+
+    # Golden: ggplot2 4.0.3's guides lay their text over the theme with the root text's margin
+    # widened by `legend.key.spacing`, 5.5 points, on the side facing the keys
+    # (`position_margin()`): below a title above them, right of one left of them, left of labels
+    # right of them and above labels below a colour bar.
+    test "a legend's title and labels are widened by the keys' spacing on the side facing them" do
+      theme = complete(%{})
+      gap = 5.4794520547945211
+
+      assert {theme.legend_key_spacing, theme.legend_title_top.margin,
+              theme.legend_title_left.margin, theme.legend_text_right.margin,
+              theme.legend_text_bottom.margin} ===
+               {gap, sides(0, 0, gap, 0), sides(0, gap, 0, 0), sides(0, 0, 0, gap),
+                sides(gap, 0, 0, 0)}
     end
   end
 
@@ -507,7 +629,7 @@ defmodule Giggly.ThemeTest do
                   line_width: 0.0,
                   dashes: :none
                 }, sides(0, 0, 0, 0), :none, 0.0, :none, :none, sides(0, 0, 0, 0),
-                5.669291338582677, 5.4794520547945211, sides(5.4794520547945211, 0, 0, 0),
+                5.669291338582677, 7.199999999999999, sides(5.4794520547945211, 0, 0, 0),
                 sides(0, 0, 0, 0)}
 
       # Its margins are half its base size, as theme_gray()'s, though no element it draws takes

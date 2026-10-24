@@ -9,11 +9,12 @@ defmodule Giggly.SVG do
   # scale, the one that fits whichever way runs out first, as grid does a layout with `respect`, and
   # the table, which then fills the drawing only one way, is centred in it. Each cell's box runs
   # from the start of its first column and row to the end of its last, or hangs a height of its own
-  # from its rows' top or a width of its own from its columns' right, and its primitives are placed
-  # in that box, and moved by any offset they carry in points, cells in the order the scene lists
-  # them; a clipped cell's are drawn in a group cut off at the box, as svglite writes one. A scene
-  # nested in a cell, such as a legend, is laid out in the cell's box the same way, centred in it
-  # when all its sizes are in points. The document's user unit is the point, as svglite writes it:
+  # from its rows' top or a width of its own from its columns' right, or is a box of its own size
+  # with one of its points placed at a point of its rows and columns, as grid places a viewport, and
+  # its primitives are placed in that box, and moved by any offset they carry in points, cells in
+  # the order the scene lists them; a clipped cell's are drawn in a group cut off at the box, as
+  # svglite writes one. A scene nested in a cell, such as a legend, is laid out in the cell's box
+  # the same way. The document's user unit is the point, as svglite writes it:
   # the `viewBox` is the size in points and `width` and `height` carry `pt`, so a radius of 1.95 is
   # 1.95 points at the size the plot is shown. A position is written with two decimals, a size, an
   # opacity or an offset as svglite writes a number, more decimals the nearer it is to 0, and each
@@ -124,19 +125,6 @@ defmodule Giggly.SVG do
     spans(sizes, share, (total - length) / 2)
   end
 
-  # The sizes laid out in `total` from `start`, the shares splitting what the sizes in points leave,
-  # and centred in `total` when they take less of it, as they do when none is a share.
-  defp centred_spans(sizes, total, start) do
-    share = split(sizes, total)
-
-    length =
-      sizes
-      |> Enum.map(fn size -> length(size, share) end)
-      |> Enum.sum()
-
-    spans(sizes, share, start + (total - length) / 2)
-  end
-
   # Each size's start and length, the first starting at `start`.
   defp spans(sizes, share, start) do
     {spans, _end} =
@@ -214,14 +202,22 @@ defmodule Giggly.SVG do
   end
 
   # A hanging cell's box: from its rows' top as tall as it says, or as wide as it says ending at its
-  # columns' right or starting at their left.
+  # columns' right; or as wide and as tall as it says, its own point `{hjust, vjust}` at the point
+  # `{x, y}` of its rows and columns, as grid places a viewport, each a share from their left or
+  # their bottom.
   defp hang(box, :none), do: box
   defp hang({columns, {top, _height}}, {:top, height}), do: {columns, {top, height}}
 
   defp hang({{left, width}, rows}, {:right, own_width}),
     do: {{left + width - own_width, own_width}, rows}
 
-  defp hang({{left, _width}, rows}, {:left, own_width}), do: {{left, own_width}, rows}
+  defp hang(
+         {{left, width}, {top, height}},
+         {:at, {x, y}, {hjust, vjust}, {own_width, own_height}}
+       ),
+       do:
+         {{left + x * width - hjust * own_width, own_width},
+          {top + (1 - y) * height - (1 - vjust) * own_height, own_height}}
 
   # A cell's start and length in one direction: from its first column's or row's start to its
   # last one's end.
@@ -239,12 +235,11 @@ defmodule Giggly.SVG do
   defp moved({x_position, y_position}, {across, up}), do: {x_position + across, y_position - up}
 
   # A scene nested in a cell, laid out in the cell's box as grid lays out a layout in a viewport:
-  # its sizes in points take their length and its shares split what is left, and a table of points
-  # alone, smaller than the box, is centred in it both ways, as gtable centres a legend in the plot.
-  # Its cells are drawn as the whole scene's are.
+  # its sizes in points take their length and its shares split what is left, from the box's top
+  # left. Its cells are drawn as the whole scene's are.
   defp primitive(%Scene{keep_proportions: false} = scene, {{left, width}, {top, height}}) do
-    column_spans = centred_spans(scene.widths, width, left)
-    row_spans = centred_spans(scene.heights, height, top)
+    column_spans = spans(scene.widths, split(scene.widths, width), left)
+    row_spans = spans(scene.heights, split(scene.heights, height), top)
     cells(scene.cells, column_spans, row_spans)
   end
 
@@ -304,24 +299,25 @@ defmodule Giggly.SVG do
     ]
   end
 
-  # A gradient's rectangle fills its cell, filled with a linear gradient up it, as svglite writes
-  # one: the gradient in a `<defs>` of its own, running at the rectangle's middle from its bottom
-  # edge to its top in the drawing's points (`userSpaceOnUse`), each stop at its offset, written as
+  # A gradient's rectangle fills its cell, filled with a linear gradient up it or across it, as
+  # svglite writes one: the gradient in a `<defs>` of its own, running at the rectangle's middle
+  # from its bottom edge to its top, or from its left edge to its right, in the drawing's points
+  # (`userSpaceOnUse`), each stop at its offset, written as
   # svglite writes a number below 1, in its colour, opaque; then the rectangle, filled with it and
   # stroked none. Its id is its content's, `lg` and the MD5 of what it holds, so two drawings on one
   # page share an id only when they share the gradient and cannot fill each other's bars.
-  defp primitive(%Gradient{} = gradient, {{left, width}, {top, height}}) do
-    middle = left + width / 2
+  defp primitive(%Gradient{} = gradient, {{left, width}, {top, height}} = box) do
+    {{x1, y1}, {x2, y2}} = gradient_ends(gradient.direction, box)
 
     definition = [
       "gradientUnits='userSpaceOnUse' spreadMethod='pad' x1='",
-      number(middle),
+      number(x1),
       "' y1='",
-      number(top + height),
+      number(y1),
       "' x2='",
-      number(middle),
+      number(x2),
       "' y2='",
-      number(top),
+      number(y2),
       "'>\n",
       Enum.map(gradient.stops, fn {offset, color} ->
         [
@@ -512,6 +508,13 @@ defmodule Giggly.SVG do
     |> Enum.reject(fn label -> label.label == "" end)
     |> Enum.map(fn label -> text_label(label, text) end)
   end
+
+  # Where a gradient up or across its box starts and ends, in the drawing's points.
+  defp gradient_ends(:up, {{left, width}, {top, height}}),
+    do: {{left + width / 2, top + height}, {left + width / 2, top}}
+
+  defp gradient_ends(:across, {{left, width}, {top, height}}),
+    do: {{left, top + height / 2}, {left + width, top + height / 2}}
 
   # A label as svglite writes one: anchored at the start, middle or end nearest its `hjust`, and
   # moved back along its baseline by the part of its width between there and its `hjust`.

@@ -43,7 +43,8 @@ size has a weight".
   beside the SVG in ggplot2's own visual-test snapshots.
 - **A gradient is written as svglite writes one**: a `<defs>` of its own holding a
   `<linearGradient>` (`gradientUnits='userSpaceOnUse'`, `spreadMethod='pad'`) from the rectangle's
-  bottom edge to its top at its middle, in the drawing's points, each `<stop>` at its offset,
+  bottom edge to its top at its middle, or from its left edge to its right for one running across,
+  in the drawing's points, each `<stop>` at its offset,
   written as an opacity is between 0 and 1 and with two decimals at the ends, in its colour,
   `stop-opacity='1.00'`; then the `<rect>` filled `url(#…)` and stroked `none`. **Its id comes from
   its content**, `lg` and the MD5 of what the gradient holds, where svglite's counts up from
@@ -123,6 +124,8 @@ size has a weight".
   measures with the font files and sits a hundredth of a point from vdiffr.
   Any other difference is a finding or a stated departure, named in the script's header: the
   plain plot's axes drawn in the other order, a background edge written as R's rounding error.
-- **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, its
-  sizes in points taking their length, its shares what is left, and a table of points alone centred
-  in the box both ways; its cells are then written as any other.
+- **A nested scene is laid out in its cell's box as the whole scene is in the drawing**, from the
+  box's top left, its sizes in points taking their length and its shares what is left; its cells
+  are then written as any other. **A cell's box is worked out by the generic table code before
+  anything is written** (`hang/2`, every hang form, `{:at, ...}` as grid places a viewport), the
+  layout a second backend would share; nothing that writes a primitive places a legend.

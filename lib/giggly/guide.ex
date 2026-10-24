@@ -48,12 +48,14 @@ defprotocol Giggly.Guide do
   @type drawn :: {float(), [Scene.primitive()]}
 
   @typedoc """
-  A guide of an aesthetic other than position, as rendering hands it over: its title and its keys,
-  each its label, the glyphs the layers drawing in it draw, and the room each layer's glyph needs,
-  `{width, height}` in points, among what the assembly gave each key and the guide.
+  A guide of an aesthetic other than position, as rendering hands it over: its title, which way
+  its keys run, `:vertical` down or `:horizontal` across, and its keys, each its label, the glyphs
+  the layers drawing in it draw, and the room each layer's glyph needs, `{width, height}` in
+  points, among what the assembly gave each key and the guide.
   """
   @type legend :: %{
           required(:title) => String.t(),
+          required(:direction) => :horizontal | :vertical,
           required(:keys) => [
             %{
               required(:label) => String.t(),
@@ -65,7 +67,7 @@ defprotocol Giggly.Guide do
         }
 
   # The guide `guide` draws for `legend`, in `theme`'s look: its width in points and its table, a
-  # nested `Giggly.Scene` sized in points, for the box of guides right of the panels.
+  # nested `Giggly.Scene` sized in points, for the box of guides beside or inside the panels.
   @doc false
   @spec draw(t(), legend(), Theme.t()) :: {float(), Scene.t()}
   def draw(guide, legend, theme)

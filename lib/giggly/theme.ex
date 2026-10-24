@@ -77,6 +77,20 @@ defmodule Giggly.Theme do
   # millimetres, since they become the values of a layer's aesthetics. The assembly reads it to fill
   # in what each layer leaves unset.
   #
+  # Where the legends go is the theme's too, as ggplot2's is: beside the panels on a side, inside
+  # them at a point of them, or nowhere; which way each legend's keys run; which point of the
+  # legends' box is placed there, a justification for each place, by name or by share as grid's
+  # `valid.just()` reads one, centred where nothing gives one, as `theme_void()` gives none; what a
+  # box beside the panels lines up with; and how several legends are arranged in the box and
+  # where each sits in it. Which way the keys run, how the legends are arranged and where each sits
+  # are `:none` where the theme leaves them to where the legends go, which the drawing works out as
+  # ggplot2's guides do. A theme that sets no space between legends, as `theme_void()` sets none,
+  # has half a line between them, as ggplot2's guide box fills it in. The box's background is
+  # worked out as its own setting gives it, inheriting nothing, as ggplot2's guide box draws it
+  # without working it out through the tree. A legend's title and labels
+  # are worked out for each side of its keys they are drawn on, as ggplot2's legend works them out
+  # for where it puts them.
+  #
   # When a plot is rendered, every function that draws something other than a mark takes the
   # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths, line
   # types and ends, and spacing, and whether the panel's background and grid are drawn over its
@@ -123,13 +137,29 @@ defmodule Giggly.Theme do
     :legend_key,
     :legend_key_width,
     :legend_key_height,
-    :legend_title,
-    :legend_text,
+    :legend_key_spacing,
+    :legend_title_top,
+    :legend_title_left,
+    :legend_text_right,
+    :legend_text_bottom,
     :legend_ticks,
     :legend_ticks_length,
+    :legend_spacing_x,
     :legend_spacing_y,
-    :legend_box_spacing,
     :legend_position,
+    :legend_position_inside,
+    :legend_direction,
+    :legend_justification_top,
+    :legend_justification_bottom,
+    :legend_justification_left,
+    :legend_justification_right,
+    :legend_justification_inside,
+    :legend_location,
+    :legend_box,
+    :legend_box_just,
+    :legend_box_margin,
+    :legend_box_background,
+    :legend_box_spacing,
     :plot_title,
     :plot_subtitle,
     :plot_caption,
@@ -183,10 +213,53 @@ defmodule Giggly.Theme do
   @type plot_theme :: %{complete: chosen() | :none, settings: settings()}
 
   @typedoc """
-  What kind of value an element is; a position says where something goes, and a boolean whether
-  something is done.
+  What kind of value an element is: a line, a rectangle or a text, a length or a margin; where the
+  legends go (`:position`); a point of the panels (`:point`); which point of a box is placed
+  (`:justification`, by name or number, or `:box_justification`, by name alone); which way keys or
+  legends run (`:direction`); what a box lines up with (`:location`); or whether something is
+  done (`:boolean`).
   """
-  @type kind :: :line | :rect | :text | :length | :margin | :position | :boolean
+  @type kind ::
+          :line
+          | :rect
+          | :text
+          | :length
+          | :margin
+          | :position
+          | :point
+          | :justification
+          | :box_justification
+          | :direction
+          | :location
+          | :boolean
+
+  @typedoc """
+  Where the legends go: beside the panels on a side, inside them, or nowhere, `:none`.
+  """
+  @type position :: :right | :left | :top | :bottom | :inside | :none
+
+  @typedoc "Which way a legend's keys, or several legends, run."
+  @type direction :: :horizontal | :vertical
+
+  @typedoc """
+  A point of something, `{x, y}`, each a share of its width or height from its left or its
+  bottom, as grid's `npc` units are, and may lie beyond it.
+  """
+  @type point :: {float(), float()}
+
+  @typedoc """
+  Which point of a box is placed, as a setting gives it: `:center`; a side, `:left`, `:right`,
+  `:top` or `:bottom`, the middle of that side; or `{horizontal, vertical}`, each a share of the
+  box's width or height or the name of one, `:left`, `:center` or `:right` across and
+  `:bottom`, `:center` or `:top` up, as grid's `valid.just()` reads them.
+  """
+  @type justification ::
+          :center
+          | :left
+          | :right
+          | :top
+          | :bottom
+          | {:left | :center | :right | number(), :bottom | :center | :top | number()}
 
   @typedoc """
   How a line or a border is dashed: `:none` for a solid one, or the lengths in points of its
@@ -258,13 +331,21 @@ defmodule Giggly.Theme do
   whose breaks they mark, the panel's border, and whether the background and grid are drawn over
   the layers; each axis's ticks, their length, its line, its labels and its title, by axis and
   side, a radial panel's angle axis (`theta`) and radius axis (`r`) apart; the space between
-  panels across and down; the background and text of the strips above each panel; and a legend's
-  background, the margin inside it, each key's background, width and height, the title, the
-  labels, a colour bar's ticks and how far each reaches into the bar, the space between one
-  legend and the next below it, the space between the panels and the legends, and where the
-  legends go, `:right` or `:none` for no legends; the plot's title, subtitle, caption and tag; and
-  the layers' defaults (`geom`). Every length is in points but the layers' defaults, which are in
-  a layer's millimetres; a line, a rectangle or a text the theme removes is `:none`.
+  panels across and down; the background and text of the strips above each panel; a legend's
+  background, the margin inside it, each key's background, width and height, the space between
+  its keys, its title above its keys or left of them, its labels right of its keys or below a
+  colour bar, each with its margin facing the keys widened by the keys' spacing, a colour bar's
+  ticks and how far each reaches into the bar; the space between one legend and the next beside
+  it or below it; where the legends go (`legend_position`), the point of the panels an inside box
+  goes at (`legend_position_inside`), which way each legend's keys run (`legend_direction`),
+  which point of the box is placed there on each side (`legend_justification_top` and the rest,
+  `{x, y}`), what a box beside the panels lines up with (`legend_location`), how several legends
+  are arranged in the box (`legend_box`) and where each sits in it (`legend_box_just`), the
+  direction, the arrangement and the place in the box `:none` where the theme leaves them to the
+  position; the box's margin, background and space from the panels; the plot's title, subtitle,
+  caption and tag; and the layers' defaults (`geom`). Every length is in points but the layers'
+  defaults, which are in a layer's millimetres; a line, a rectangle or a text the theme removes is
+  `:none`.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -303,13 +384,29 @@ defmodule Giggly.Theme do
           legend_key: rect(),
           legend_key_width: float(),
           legend_key_height: float(),
-          legend_title: title(),
-          legend_text: text(),
+          legend_key_spacing: float(),
+          legend_title_top: title(),
+          legend_title_left: title(),
+          legend_text_right: text(),
+          legend_text_bottom: text(),
           legend_ticks: line(),
           legend_ticks_length: float(),
+          legend_spacing_x: float(),
           legend_spacing_y: float(),
+          legend_position: position(),
+          legend_position_inside: point(),
+          legend_direction: direction() | :none,
+          legend_justification_top: point(),
+          legend_justification_bottom: point(),
+          legend_justification_left: point(),
+          legend_justification_right: point(),
+          legend_justification_inside: point(),
+          legend_location: :panel | :plot,
+          legend_box: direction() | :none,
+          legend_box_just: point() | :none,
+          legend_box_margin: margin(),
+          legend_box_background: rect(),
           legend_box_spacing: float(),
-          legend_position: :right | :none,
           plot_title: title(),
           plot_subtitle: title(),
           plot_caption: title(),
@@ -385,6 +482,8 @@ defmodule Giggly.Theme do
     {:legend_background, :rect, :rect, "Each legend's background."},
     {:legend_margin, :margin, :margins, "The margin inside each legend's edge."},
     {:legend_spacing, :length, :spacing, "The space between legends."},
+    {:legend_spacing_x, :length, :legend_spacing,
+     "The space between a legend and the next beside it."},
     {:legend_spacing_y, :length, :legend_spacing,
      "The space between a legend and the next below it."},
     {:legend_key, :rect, :panel_background, "The background of each legend key."},
@@ -400,7 +499,46 @@ defmodule Giggly.Theme do
     {:legend_text, :text, :text, "The legends' labels."},
     {:legend_title, :text, :title, "The legends' titles."},
     {:legend_position, :position, :none,
-     "Where the legends go: `:right`, beside the panels, or `:none`, for no legends."},
+     "Where the legends go: `:right`, `:left`, `:top` or `:bottom`, beside the panels on that " <>
+       "side, `:inside`, over them, or `:none`, for no legends."},
+    {:legend_position_inside, :point, :none,
+     "Where the legends' box goes when they are inside the panels: `{x, y}`, each a share of " <>
+       "the panels' width or height from their left or bottom; at its justification unless " <>
+       "given."},
+    {:legend_direction, :direction, :none,
+     "Which way each legend's keys run: `:horizontal` or `:vertical`; across above or below " <>
+       "the panels and down elsewhere unless given."},
+    {:legend_justification, :justification, :none,
+     "Which point of the legends' box is placed where it goes: `:center`, a side (`:left`, " <>
+       "`:right`, `:top`, `:bottom`), or `{horizontal, vertical}`, each a share of the box's " <>
+       "width or height or `:left`, `:center` or `:right` across and `:bottom`, `:center` or " <>
+       "`:top` up; beside the panels, the same point of the room beside them."},
+    {:legend_justification_top, :justification, :legend_justification,
+     "The justification of legends above the panels."},
+    {:legend_justification_bottom, :justification, :legend_justification,
+     "The justification of legends below the panels."},
+    {:legend_justification_left, :justification, :legend_justification,
+     "The justification of legends left of the panels."},
+    {:legend_justification_right, :justification, :legend_justification,
+     "The justification of legends right of the panels."},
+    {:legend_justification_inside, :justification, :legend_justification,
+     "The justification of legends inside the panels."},
+    {:legend_location, :location, :none,
+     "What legends beside the panels line up with: `:panel`, the panels, or `:plot`, the " <>
+       "axes and their titles too."},
+    {:legend_box, :direction, :none,
+     "How several legends are arranged: `:horizontal`, side by side, or `:vertical`, one " <>
+       "above another; side by side above or below the panels and one above another " <>
+       "elsewhere unless given."},
+    {:legend_box_just, :box_justification, :none,
+     "Which point of each legend is placed at the same point of its room in the box: as " <>
+       "`:legend_justification` takes, by name alone; at the box's top, centred across above " <>
+       "or below the panels and at its left elsewhere, unless given."},
+    {:legend_box_margin, :margin, :margins, "The margin inside the legends' box."},
+    {:legend_box_background, :rect, :none,
+     "The background of the legends' box, over its margin too, drawn as its own setting gives " <>
+       "it: what that leaves unset is the drawing's default, a white fill and a solid black " <>
+       "border 0.75 points wide, never `:rect`'s."},
     {:legend_box_spacing, :length, :spacing, "The space between the panels and the legends."},
     {:panel_background, :rect, :rect, "The panels' background, under the layers."},
     {:panel_border, :rect, :rect, "The panels' border, drawn over the layers and never filled."},
@@ -501,6 +639,11 @@ defmodule Giggly.Theme do
     linewidth: 0.5 / @font_points_per_millimetre,
     inherit_blank: false
   }
+
+  # The space between legends when the theme sets none, as `theme_void()` sets none: half a line,
+  # as ggplot2's guide box fills it in (`Guides$assemble()`), before the spacing across and down
+  # inherit it.
+  @legend_spacing {0.5, :lines}
 
   # The elements a setting may give, each its name, kind, the element it inherits from (`:none`
   # for a root) and what it styles, in ggplot2's order, for `Giggly.Plot.theme/2` to check its
@@ -622,9 +765,9 @@ defmodule Giggly.Theme do
   defp worked_out(theme) do
     gap = distance(theme, :legend_key_spacing)
     text_margin = text_margin(calculated(theme, :text))
-    legend_title_theme = beside_keys(theme, text_margin, :bottom, gap)
-    legend_text_theme = beside_keys(theme, text_margin, :left, gap)
     legend_ticks_theme = Map.put_new(theme, :legend_ticks, @colorbar_ticks)
+    legend_spacing_theme = Map.put_new(theme, :legend_spacing, @legend_spacing)
+    inside = justification(theme, :legend_justification_inside)
 
     %__MODULE__{
       plot_background: rect(theme, :plot_background),
@@ -663,13 +806,29 @@ defmodule Giggly.Theme do
       legend_key: rect(theme, :legend_key),
       legend_key_width: distance(theme, :legend_key_width),
       legend_key_height: distance(theme, :legend_key_height),
-      legend_title: title(legend_title_theme, :legend_title),
-      legend_text: text(legend_text_theme, :legend_text),
+      legend_key_spacing: gap,
+      legend_title_top: title(beside_keys(theme, text_margin, :bottom, gap), :legend_title),
+      legend_title_left: title(beside_keys(theme, text_margin, :right, gap), :legend_title),
+      legend_text_right: text(beside_keys(theme, text_margin, :left, gap), :legend_text),
+      legend_text_bottom: text(beside_keys(theme, text_margin, :top, gap), :legend_text),
       legend_ticks: line(legend_ticks_theme, :legend_ticks),
       legend_ticks_length: distance(theme, :legend_ticks_length),
-      legend_spacing_y: distance(theme, :legend_spacing_y),
-      legend_box_spacing: distance(theme, :legend_box_spacing),
+      legend_spacing_x: distance(legend_spacing_theme, :legend_spacing_x),
+      legend_spacing_y: distance(legend_spacing_theme, :legend_spacing_y),
       legend_position: calculated(theme, :legend_position),
+      legend_position_inside: inside_point(calculated(theme, :legend_position_inside), inside),
+      legend_direction: given(calculated(theme, :legend_direction)),
+      legend_justification_top: justification(theme, :legend_justification_top),
+      legend_justification_bottom: justification(theme, :legend_justification_bottom),
+      legend_justification_left: justification(theme, :legend_justification_left),
+      legend_justification_right: justification(theme, :legend_justification_right),
+      legend_justification_inside: inside,
+      legend_location: location(calculated(theme, :legend_location)),
+      legend_box: given(calculated(theme, :legend_box)),
+      legend_box_just: box_justification(calculated(theme, :legend_box_just)),
+      legend_box_margin: margin(theme, :legend_box_margin),
+      legend_box_background: box_background(theme),
+      legend_box_spacing: distance(theme, :legend_box_spacing),
       plot_title: title(theme, :plot_title),
       plot_subtitle: title(theme, :plot_subtitle),
       plot_caption: title(theme, :plot_caption),
@@ -692,6 +851,45 @@ defmodule Giggly.Theme do
     widened = Map.update!(margin, side, fn length -> {points(length) + gap, :points} end)
     lay_over(theme, %{text: %{margin: widened}})
   end
+
+  # A justification worked out as grid's `valid.just()` reads one, `{x, y}`, each a share of the
+  # box's width or height; centred where nothing gives one, as `theme_void()` gives none and grid
+  # reads `NULL`.
+  defp justification(theme, name), do: point(calculated(theme, name))
+
+  defp point(nil), do: {0.5, 0.5}
+  defp point(:center), do: {0.5, 0.5}
+  defp point(:left), do: {0.0, 0.5}
+  defp point(:right), do: {1.0, 0.5}
+  defp point(:top), do: {0.5, 1.0}
+  defp point(:bottom), do: {0.5, 0.0}
+  defp point({horizontal, vertical}), do: {share(horizontal), share(vertical)}
+
+  defp share(:left), do: 0.0
+  defp share(:bottom), do: 0.0
+  defp share(:center), do: 0.5
+  defp share(:right), do: 1.0
+  defp share(:top), do: 1.0
+  defp share(amount), do: amount / 1
+
+  # The point of the panels an inside box goes at: where a setting puts it, or at its own
+  # justification, as ggplot2's guide box places it.
+  defp inside_point(nil, justification), do: justification
+  defp inside_point({x, y}, _justification), do: {x / 1, y / 1}
+
+  # Where each legend sits in the box, `:none` where the theme leaves it to the legends'
+  # position, which the box works out.
+  defp box_justification(nil), do: :none
+  defp box_justification(justification), do: point(justification)
+
+  # What a box beside the panels lines up with: the panels unless the theme says otherwise, as
+  # ggplot2's `table_add_legends()` takes `legend.location`.
+  defp location(nil), do: :panel
+  defp location(location), do: location
+
+  # A direction the theme gives, `:none` where it leaves it to the legends' position.
+  defp given(nil), do: :none
+  defp given(direction), do: direction
 
   # The element `name` of `theme` worked out: what it sets, and what it leaves unset taken from
   # the element it inherits from, worked out in turn, as ggplot2's `calc_element()` works it out;
@@ -752,7 +950,8 @@ defmodule Giggly.Theme do
     Map.new(parent, fn {side, {amount, unit}} -> {side, {share * amount, unit}} end)
   end
 
-  defp inherit(kind, element, _parent) when kind in [:length, :margin], do: element
+  defp inherit(kind, element, _parent) when kind in [:length, :margin, :justification],
+    do: element
 
   defp inherit(_kind, element, parent) do
     parent
@@ -812,28 +1011,31 @@ defmodule Giggly.Theme do
   # A line, a rectangle or a text worked out, `:none` for one removed, a property nothing above it
   # gives grid's default. A rectangle's border of the blank line type is no border, as R's graphics
   # engine draws none.
-  defp rect(theme, name) do
-    case calculated(theme, name) do
-      :none ->
-        :none
+  defp rect(theme, name), do: rect_look(calculated(theme, name))
 
-      rect ->
-        {fill, fill_opacity} = paint(Map.get(rect, :fill, @grid_fill))
-        {color, color_opacity} = paint(Map.get(rect, :color, @grid_color))
+  # The legends' box's background as its own element gives it, inheriting nothing, so what it
+  # leaves unset is grid's default, as ggplot2's `package_box()` draws `legend.box.background` as
+  # the theme holds it, never through `calc_element()`.
+  defp box_background(theme), do: rect_look(Map.fetch!(theme, :legend_box_background))
 
-        look = %{
-          fill: fill,
-          fill_opacity: fill_opacity,
-          color: color,
-          color_opacity: color_opacity,
-          line_width: line_width(rect),
-          dashes: dashes(rect)
-        }
+  defp rect_look(:none), do: :none
 
-        case look.dashes do
-          :blank -> %{look | color: :none, color_opacity: 0.0, dashes: :none}
-          _dashes -> look
-        end
+  defp rect_look(rect) do
+    {fill, fill_opacity} = paint(Map.get(rect, :fill, @grid_fill))
+    {color, color_opacity} = paint(Map.get(rect, :color, @grid_color))
+
+    look = %{
+      fill: fill,
+      fill_opacity: fill_opacity,
+      color: color,
+      color_opacity: color_opacity,
+      line_width: line_width(rect),
+      dashes: dashes(rect)
+    }
+
+    case look.dashes do
+      :blank -> %{look | color: :none, color_opacity: 0.0, dashes: :none}
+      _dashes -> look
     end
   end
 
@@ -959,7 +1161,8 @@ defmodule Giggly.Theme do
   # A legend has no border; the space between legends, and between the panels and the legends, is
   # twice the spacing; each key is 1.2 lines square on the panel's background (`legend_key`
   # inherits it), whatever the base size; its labels are 0.8 of the base size; a colour bar's
-  # ticks reach a fifth of a key into the bar. The plot's title is 1.2 times the base size with
+  # ticks reach a fifth of a key into the bar; the legends go right of the panels, centred, in a
+  # box with no margin and no background. The plot's title is 1.2 times the base size with
   # `half_line` below it, its subtitle at the base size with `half_line` below it, its caption 0.8
   # of it with `half_line` above it, and its tag 1.2 times it.
   defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size} = sizes) do
@@ -987,8 +1190,11 @@ defmodule Giggly.Theme do
       legend_key_size: {1.2, :lines},
       legend_text: %{size: {:rel, 0.8}},
       legend_ticks_length: {:rel, 0.2},
-      legend_box_spacing: {:rel, 2},
       legend_position: :right,
+      legend_justification: :center,
+      legend_box_margin: sides(0, 0, 0, 0),
+      legend_box_background: :none,
+      legend_box_spacing: {:rel, 2},
       panel_background: %{fill: @ink_toward_paper_92, color: :none},
       panel_border: :none,
       panel_grid: %{color: @paper},
@@ -1124,9 +1330,11 @@ defmodule Giggly.Theme do
   # plot's titles: no lines at all; rectangles filled with its paper, ink with no alpha, with no
   # border, so the plot's background is drawn and seen through; no axes, their ticks of no length;
   # no background to the panels, the strips or the legends, nor to the legends' keys, which inherit
-  # the panels'; the strips' text with no margin of its own; no margin round the plot or inside a
-  # legend, legends a spacing apart and 0.2 centimetres from the panels; and the plot's title and
-  # subtitle with `half_line` above them, as its caption has.
+  # the panels'; the strips' text with no margin of its own; no margin round the plot, inside a
+  # legend or inside the legends' box, and no background to the box; no space set between legends,
+  # which the box makes half a line, nor a justification, which centres them; legends 0.2
+  # centimetres from the panels; and the plot's title and subtitle with `half_line` above them, as
+  # its caption has.
   defp void(%{base_size: base_size} = sizes) do
     half_line = base_size / 2
 
@@ -1147,9 +1355,11 @@ defmodule Giggly.Theme do
       legend_title: %{},
       legend_key_spacing: {:rel, 1},
       legend_margin: sides(0, 0, 0, 0),
+      legend_box_margin: sides(0, 0, 0, 0),
       legend_box_spacing: {0.2, :cm},
       legend_ticks_length: {:rel, 0.2},
       legend_background: :none,
+      legend_box_background: :none,
       strip_text: %{size: {:rel, 0.8}},
       strip_background: :none,
       panel_ontop: false,

@@ -13,7 +13,8 @@ the entry beginning "Axes are drawn"; why there is a scene between rendering and
 entry beginning "Three values with one function"; why a position can be offset in points: the entry
 beginning "A primitive's position is a place in its cell plus an offset in points"; why a share
 has a weight and a scene can keep its proportions: the entry beginning "A `:rest` size has a
-weight".
+weight"; why a box of legends is placed by a hang: the entry beginning "Legends go where the
+theme puts them".
 
 ## Rules
 
@@ -29,14 +30,19 @@ weight".
   centred in the drawing, its background covering the table alone. Nothing is measured later, so
   a backend needs no font. The docs say widths and heights, not "tracks".
 - **A cell's box is its rows and columns, unless it hangs.** `hang: {:top, height}` makes the box
-  `height` points tall from the top of its rows, `hang: {:right, width}` `width` points wide
-  ending at the right of its columns, and `hang: {:left, width}` `width` points wide from their
-  left, whatever they measure: ggplot2 measures an axis below a panel with an empty cell under it
-  as taking no room, and the axis hangs into the empty space; a left axis narrower than its column
-  (free y scales) sits against its panel; and a legend narrower than its box hangs from the box's
-  left, as `legend.box.just` justifies it. Every bottom
+  `height` points tall from the top of its rows, and `hang: {:right, width}` `width` points wide
+  ending at the right of its columns, whatever they measure: ggplot2 measures an axis below a
+  panel with an empty cell under it as taking no room, and the axis hangs into the empty space;
+  and a left axis narrower than its column (free y scales) sits against its panel. Every bottom
   axis hangs from its panel's edge at its own height, and every left axis at its own width, which
-  are the row's and the column's when it is the one that measures them.
+  are the row's and the column's when it is the one that measures them. **`hang: {:at, {x, y},
+  {hjust, vjust}, {width, height}}` makes the box `width` by `height` points, its own point
+  `{hjust, vjust}` at the point `{x, y}` of its rows and columns**, each a share from their left
+  or bottom and either free to lie beyond them, as grid places a viewport (`viewport(x, y, width,
+  height, just)`): a box of legends beside the panels at its justification's point of its cell,
+  inside them at a point of the panels, and each legend in the box at the box's justification.
+  The placement is data on the cell, laid out by the generic table code a backend runs, never by
+  code that writes a legend.
 - **Primitives are placed in their cell's units, 0 to 1 across and up, offset from there in points,
   and sized in points**, as grid adds a unit in points to one in the viewport's own. A primitive
   never knows the cell's size; the backend places it in the cell's box and moves it by its offset: a
@@ -85,11 +91,12 @@ weight".
   round, as ggplot2's `GeomRect` draws a bar or a rectangle and R's graphics engine a point's
   square. A background that is not rectangular is a polygon (`Polygons`), closed round its outline,
   as are a point's triangles, diamonds and filled square. **A gradient (`Gradient`) is a rectangle
-  filling its cell with a linear gradient running up it**, from the cell's bottom to its top through
-  its stops, each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()`
-  filled with a `linearGradient()`, as ggplot2's colour bar draws its bar.
+  filling its cell with a linear gradient running up it** (`direction: :up`), from the cell's
+  bottom to its top, **or across it** (`:across`), from its left to its right, through its stops,
+  each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled with
+  a `linearGradient()`, as ggplot2's colour bar draws its bar.
 - **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
-  as gtable nests one table in another: its sizes in points take their length and its shares split
-  what is left of the box, and a table of sizes in points alone is centred in the box both ways,
-  as grid centres a fixed table in its viewport. A nested scene never keeps its proportions. A
-  legend is one.
+  as gtable nests one table in another: its sizes in points take their length from the box's top
+  left and its shares split what is left of the box. Each nested table is hung at its own size
+  (`{:at, ...}`), so it fills its box, as grid fills a viewport sized to a table. A nested scene
+  never keeps its proportions. A legend is one, and so is the box of legends.

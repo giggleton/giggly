@@ -18,7 +18,9 @@ beginning "The theme is Phase 3's eleventh increment"; what a removal takes and 
 the entry beginning "An element set to `:none` is removed"; why the border's fill is taken and
 unused, and where the dashes and the axes' lines are worked out: the entry beginning "The panel's
 border is never filled"; how a plot chooses a complete theme, what it records, and why settings
-are laid over one in turn: the entry beginning "A plot chooses a complete theme".
+are laid over one in turn: the entry beginning "A plot chooses a complete theme"; where the
+legends go and why a placement is resolved to `{x, y}`: the entry beginning "Legends go where the
+theme puts them".
 
 ## Rules
 
@@ -31,8 +33,9 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   as ggplot2's `plot_theme()` completes a plot's theme at build time.
 - **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
   element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
-  `:length`, `:margin`, `:position`, `legend_position`'s `:right` or `:none`, or `:boolean`,
-  `panel_ontop`'s), the one element
+  `:length`, `:margin`, `:boolean`, `panel_ontop`'s, or a legend's placement: `:position`,
+  `:point`, `:justification` by name or share, `:box_justification` by name alone,
+  `:direction`, `:location`), the one element
   it inherits from (`:none` for a root) and what it styles, which `Plot` turns into `theme/2`'s
   schema and documentation, so the vocabulary has one home.
   **An element arrives with its first reader**: the tree holds what something draws and the
@@ -59,14 +62,16 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   (the `@grid_` attributes), a share of a parent that gives none is nothing, one with no parent
   at all the share itself, and one inherited from a parent still a share is taken of it again.
   A length or a margin is never removed.
-- **Two drawn elements are worked out as ggplot2's guides work them out**, not by the tree
-  alone: a legend's title and labels take their default margins from a `text` laid over the
-  theme, the root text's margin widened by `legend_key_spacing` on the side facing the keys (below
-  the title, left of the labels), which a margin set on `legend_title`, `legend_text` or `title`
-  replaces, and which replaces a removed root text, so they are drawn where every other text is
-  removed; and a colour bar's ticks are `guide_colourbar()`'s white 0.5 / .pt mm only where the
-  settings leave `legend_ticks` unset (`replace_null()`), so a colour given every line never
-  reaches them, made as a setting is, so they skip a removed `line`.
+- **Two drawn elements are worked out as ggplot2's guides work them out**, not by the tree alone: a
+  legend's title and labels take their default margins from a `text` laid over the theme, the root
+  text's margin widened by `legend_key_spacing` on the side facing the keys, worked out for each
+  side they are drawn on (`legend_title_top`, below it; `legend_title_left`, right of it;
+  `legend_text_right`, left of it; `legend_text_bottom`, above it, below a colour bar), which a
+  margin set on `legend_title`, `legend_text` or `title` replaces, and which replaces a removed root
+  text, so they are drawn where every other text is removed; and a colour bar's ticks are
+  `guide_colourbar()`'s white 0.5 / .pt mm only where the settings leave `legend_ticks` unset
+  (`replace_null()`), so a colour given every line never reaches them, made as a setting is, so they
+  skip a removed `line`.
 - **A complete theme is a function in `Giggly.Theme` that builds its tree of partial elements
   from its base sizes**, as ggplot2's are functions (`theme_gray()`), never a module implementing
   a behaviour: themes differ only in their values, where facets and coordinate systems differ in
@@ -110,9 +115,27 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
 - **`theme_gray()` removes the axis lines and the panels' border and draws the panel under its
   layers** (`axis_line` and `panel_border` `:none`, `panel_ontop: false`), so they are drawn only
   where a setting gives them, inheriting from `line` and `rect` past the removal.
+- **A legend's placement is resolved as ggplot2's guide box reads it**: each justification to
+  `{x, y}` as grid's `valid.just()` reads a name or a share, centred where nothing gives one, as
+  `theme_void()` gives none; `legend_position_inside` to its point, or the inside justification's
+  where unset; `legend_location` to `:panel` where unset; `legend_direction`, `legend_box` and
+  `legend_box_just` to `:none` where unset, which rendering and `Guide.Box` work out from the
+  position, as ggplot2's `Guides$draw()` and `package_box()` do, so the theme never holds a
+  default that depends on where the legends go. **A theme that leaves `legend_spacing` unset has
+  half a line between legends** (`theme_void()`'s 7.2 points), as `Guides$assemble()` fills it in
+  before `legend_spacing_x` and `_y` inherit it. **`legend_box_background` is a root and is
+  worked out as its setting gives it, inheriting nothing**, its unset properties grid's (white,
+  a black border 0.75 points wide), as `package_box()` draws `theme$legend.box.background`
+  without `calc_element()`, though ggplot2's tree names `rect` its parent (design-log §4, the
+  entry beginning "Legends go where the theme puts them"). Values R takes loosely are refused at
+  the call: an unknown position, box or location, a numeric `legend_position`, numbers in
+  `legend_box_just`.
 - **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): where else the legends go; text's face, angle and alignment. A complete theme's
-  `ink`, `paper`, `accent` and fonts, and `theme_test()`, wait beyond the increment.
+  increment"): text's face, angle and alignment. From legend placement: `legend.title.position`,
+  `legend.text.position`, `legend.byrow`, `legend.key.spacing.x` and `.y` as settings (a legend
+  running across spaces its keys `legend_key_spacing` both ways, as ggplot2 does when neither is
+  set), `legend.key.justification`, `legend.frame`. A complete theme's `ink`, `paper`, `accent`
+  and fonts, and `theme_test()`, wait beyond the increment.
 - **The layers' defaults are the complete theme's `geom` element, ggplot2's `element_geom()`**,
   which every complete theme sets in its tree from its base sizes (`gray/1`, inherited by the
   themes built on it, and `void/1`): black ink; white paper, `theme_void()`'s clear; the lines'
@@ -127,14 +150,15 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   titles, and the plot's own, `theme_gray()`'s `plot.title` (1.2 times the base size, `half_line`
   below it), `plot.subtitle` (the base size, `half_line` below), `plot.caption` (0.8 of it,
   `half_line` above) and `plot.tag` (1.2 times it, no margin), all black.
-- **A legend's look is `theme_gray()`'s at its defaults**: paper white with no border, `half_line`
-  inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` above the next
-  legend (`legend.spacing.y`, from `legend.spacing`) and `2 * half_line` from the panels
-  (`legend.box.spacing`); keys 1.2 lines square as grid works lines out at its own defaults, a
-  12-point font at line height 1.2, 17.28 points, not at the base size, on the panel's background
-  (`legend.key` inherits it); the title black at the base size with `half_line` below it, the
-  labels black at 0.8 of it and `half_line` from the keys (`legend.key.spacing`, from `spacing`);
-  a colour bar's ticks white and 0.5 / .pt millimetres wide, `guide_colourbar()`'s default since
-  `theme_gray()` sets no `legend.ticks`, worked out in R's order of operations to svglite's 0.38,
-  reaching a fifth of the key size into the bar (`legend.ticks.length`, `rel(0.2)` of
-  `legend.key.size`).
+- **A legend's look is `theme_gray()`'s at its defaults**: right of the panels, centred
+  (`legend.justification`), in a box with no margin and no background; paper white with no border,
+  `half_line` inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` from
+  the next legend below or beside it (`legend.spacing.y` and `.x`, from `legend.spacing`) and
+  `2 * half_line` from the panels (`legend.box.spacing`); keys 1.2 lines square as grid works lines
+  out at its own defaults, a 12-point font at line height 1.2, 17.28 points, not at the base size,
+  on the panel's background (`legend.key` inherits it); the title black at the base size with
+  `half_line` below it, the labels black at 0.8 of it and `half_line` from the keys
+  (`legend.key.spacing`, from `spacing`); a colour bar's ticks white and 0.5 / .pt millimetres wide,
+  `guide_colourbar()`'s default since `theme_gray()` sets no `legend.ticks`, worked out in R's order
+  of operations to svglite's 0.38, reaching a fifth of the key size into the bar
+  (`legend.ticks.length`, `rel(0.2)` of `legend.key.size`).

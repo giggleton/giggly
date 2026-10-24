@@ -88,6 +88,35 @@ defmodule Giggly.Guide.Parts do
     {[row, margin.bottom], [cell]}
   end
 
+  # A legend's title left of its keys, in `look`, beside a grid whose rows are `heights` points
+  # tall: the title's column, as wide as it and its margins either side; the grid's heights with
+  # the room a title taller than them leaves, half above and half below, as ggplot2's
+  # `add_title()` leaves it; the row and the column the grid then starts at; and the title's cell,
+  # left-aligned its left margin into the second column, spanning the grid's rows and centred down
+  # them, moved by half the difference of its margins below and above, as grid centres text with
+  # its margins (`titleGrob()`). A title of `:none` takes no room.
+  @doc false
+  @spec title_column(String.t() | :none, Theme.title(), [float()]) ::
+          {[float()], [float()], pos_integer(), [Cell.t()]}
+  def title_column(:none, _look, heights), do: {[], heights, 2, []}
+
+  def title_column(title, %{margin: margin} = look, heights) do
+    height = Enum.sum(heights)
+    left_over = max(margin.top + title_height(title, look) + margin.bottom - height, 0.0)
+    place = {0.0, 0.5 + (margin.bottom - margin.top) / 2 / height}
+
+    cell = %Cell{
+      rows: 3..(length(heights) + 2),
+      columns: 2..2,
+      clip: :off,
+      hang: :none,
+      primitives: [title_text(title, place, 0, {0.0, 0.5}, look, margin.left)]
+    }
+
+    room = [left_over / 2]
+    {[legend_title_width(title, look)], Enum.concat([room, heights, room]), 3, [cell]}
+  end
+
   # How wide a legend's title is, in points, its margins either side of it included: none for
   # `:none`.
   @doc false

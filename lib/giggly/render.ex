@@ -33,12 +33,16 @@ defmodule Giggly.Render do
   # strip's always, as `theme_gray()`'s `strip.clip` says.
   #
   # A plot with legends, one for each aesthetic other than position that a layer maps, or for
-  # several merged, gives them a column right of the panels, the theme's legend spacing from them,
-  # unless the theme puts the legends nowhere:
-  # each legend is a table of its own, its keys' glyphs drawn by the geom of each layer that maps
-  # one of its aesthetics (`Giggly.Geom`), and the legends are stacked in a box (`Giggly.Guide`),
-  # nested in a cell spanning the panels' rows and centred down them, as ggplot2 places its guide
-  # box to the right, and drawn last.
+  # several merged, places them where the theme puts them (`legend_position`), as ggplot2's
+  # `table_add_legends()` does: in a column right of the panels or left of the y title, or a row
+  # above the panels below the plot's title or below the x title above the caption, the theme's
+  # legend spacing from the panels; or inside the panels; or nowhere. Each legend is a table of
+  # its own, its keys running down or across, its keys' glyphs drawn by the geom of each layer that
+  # maps one of its aesthetics (`Giggly.Geom`), and the legends are stacked in a box
+  # (`Giggly.Guide`), nested in a cell spanning the panels' rows or columns, or the whole plot's
+  # where the theme lines them up with it, or every panel for a box inside them, and placed in it
+  # by the theme's justification, at its point of the cell or, inside, at the theme's point of the
+  # panels, as grid places a viewport (`Giggly.Scene.Cell`'s `hang`).
   #
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
@@ -107,7 +111,7 @@ defmodule Giggly.Render do
 
     legend = draw_legend(assembly.legends, theme)
     widths = widths(panels, grid, {left_title, labels}, legend, theme)
-    heights = heights(panels, grid, {bottom_title, labels}, theme)
+    heights = heights(panels, grid, {bottom_title, labels}, legend, theme)
 
     %Scene{
       widths: Enum.map(widths, fn {_name, size} -> size end),
@@ -186,21 +190,32 @@ defmodule Giggly.Render do
   defp draw_layer(_geom, :error, _coord, _params), do: []
 
   # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none or where the
-  # theme puts them nowhere (`legend_position: :none`), or its width and table: each legend drawn by its guide (`Giggly.Guide.draw/3`), each key handed the glyphs
-  # drawn by the geom of every layer that maps one of the legend's aesthetics and draws in that
-  # key, in the order the layers were added, at the key's values of the aesthetics it maps and with
-  # what the layer sets, as ggplot2 draws each such layer's `draw_key` in the keys it keeps, and the
-  # room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by.
+  # theme puts them nowhere (`legend_position: :none`), or where the box goes, its width and height
+  # and its table: each legend drawn by its guide (`Giggly.Guide.draw/3`), its keys running as the
+  # theme says, or across above or below the panels and down elsewhere, as ggplot2's guides run,
+  # each key handed the glyphs drawn by the geom of every layer that maps one of the legend's
+  # aesthetics and draws in that key, in the order the layers were added, at the key's values of
+  # the aesthetics it maps and with what the layer sets, as ggplot2 draws each such layer's
+  # `draw_key` in the keys it keeps, and the room each glyph needs (`Geom.key_size/2`), which the
+  # guide sizes the key by.
   defp draw_legend([], _theme), do: :none
   defp draw_legend(_legends, %Theme{legend_position: :none}), do: :none
 
-  defp draw_legend(legends, theme) do
-    legends
-    |> Enum.map(fn %{guide: guide, keys: keys, layers: layers} = legend ->
-      drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers) end)
-      Guide.draw(guide, %{legend | keys: drawn_keys}, theme)
-    end)
-    |> Guide.Box.draw(theme)
+  defp draw_legend(legends, %Theme{legend_position: position} = theme) do
+    box_direction = if position in [:top, :bottom], do: :horizontal, else: :vertical
+
+    direction =
+      if theme.legend_direction == :none, do: box_direction, else: theme.legend_direction
+
+    {width, height, box} =
+      legends
+      |> Enum.map(fn %{guide: guide, keys: keys, layers: layers} = legend ->
+        drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers) end)
+        Guide.draw(guide, Map.merge(legend, %{keys: drawn_keys, direction: direction}), theme)
+      end)
+      |> Guide.Box.draw(box_direction, theme)
+
+    %{position: position, width: width, height: height, box: box}
   end
 
   # A key with the glyphs each layer drawing in it draws, with the key's values of the aesthetics
@@ -233,9 +248,11 @@ defmodule Giggly.Render do
     |> Map.put(:sizes, sizes)
   end
 
-  # The columns, left to right, each named and sized: the margin's left side, the tag, the y title,
-  # then for each column of panels its left axes and its panels, the panel spacing across between,
-  # then any legend beyond the theme's spacing from the panels, then the margin's right side.
+  # The columns, left to right, each named and sized: the margin's left side, the tag, any legends
+  # on the left and the theme's spacing from the panels, the y title, then for each column of
+  # panels its left axes and its panels, the panel spacing across between, then any legends on the
+  # right beyond the theme's spacing from the panels, then the margin's right side, as ggplot2's
+  # `table_add_legends()` adds them outside the axes' titles.
   defp widths(panels, grid, {{title_width, _title}, labels}, legend, theme) do
     %{tag: {{tag_width, _tag_height}, _tag}} = labels
 
@@ -247,34 +264,33 @@ defmodule Giggly.Render do
         ]
       end)
 
-    legend_columns =
-      case legend do
-        :none ->
-          []
-
-        {legend_width, _scene} ->
-          [
-            {:legend_spacing, {:points, theme.legend_box_spacing}},
-            {:legend, {:points, legend_width}}
-          ]
-      end
-
     Enum.concat([
-      [
-        {:margin_left, {:points, theme.plot_margin.left}},
-        {:tag, {:points, tag_width}},
-        {:title_left, {:points, title_width}}
-      ],
+      [{:margin_left, {:points, theme.plot_margin.left}}, {:tag, {:points, tag_width}}],
+      beside(legend, :left, theme),
+      [{:title_left, {:points, title_width}}],
       spaced(panel_columns, theme.panel_spacing_x),
-      legend_columns,
+      beside(legend, :right, theme),
       [{:margin_right, {:points, theme.plot_margin.right}}]
     ])
   end
 
+  # The legends' column or row on `side`, the theme's spacing between it and the panels, where the
+  # legends go on that side: as wide or as tall as their box, and none elsewhere.
+  defp beside(%{position: side} = legend, side, theme) do
+    size = if side in [:left, :right], do: legend.width, else: legend.height
+    spacing = {:legend_spacing, {:points, theme.legend_box_spacing}}
+    legend = {:legend, {:points, size}}
+    if side in [:left, :top], do: [legend, spacing], else: [spacing, legend]
+  end
+
+  defp beside(_legend, _side, _theme), do: []
+
   # The rows, top to bottom, each named and sized: the margin's top, the tag, the plot's title and
-  # its subtitle, then for each row of panels its strips, its panels and its bottom axes, the panel
-  # spacing down between, then the x title, the plot's caption and the margin's bottom.
-  defp heights(panels, grid, {{title_height, _title}, labels}, theme) do
+  # its subtitle, any legends above the panels and the theme's spacing from them, then for each row
+  # of panels its strips, its panels and its bottom axes, the panel spacing down between, then the
+  # x title, any legends below the panels beyond the theme's spacing from them, the plot's caption
+  # and the margin's bottom, as ggplot2 adds the legends' rows before the plot's labels'.
+  defp heights(panels, grid, {{title_height, _title}, labels}, legend, theme) do
     %{
       tag: {{_tag_width, tag_height}, _tag},
       title: {plot_title_height, _plot_title},
@@ -315,9 +331,11 @@ defmodule Giggly.Render do
         {:plot_title, {:points, plot_title_height}},
         {:plot_subtitle, {:points, subtitle_height}}
       ],
+      beside(legend, :top, theme),
       spaced(panel_rows, theme.panel_spacing_y),
+      [{:title_bottom, {:points, title_height}}],
+      beside(legend, :bottom, theme),
       [
-        {:title_bottom, {:points, title_height}},
         {:plot_caption, {:points, caption_height}},
         {:margin_bottom, {:points, theme.plot_margin.bottom}}
       ]
@@ -452,7 +470,7 @@ defmodule Giggly.Render do
       bottom_axis_cells,
       left_axis_cells,
       titles,
-      legend_cells(Keyword.fetch!(options, :legend), grid, columns, rows),
+      legend_cells(Keyword.fetch!(options, :legend), grid, {columns, rows}, theme),
       label_cells(Keyword.fetch!(options, :labels), grid, columns, rows)
     ])
   end
@@ -487,21 +505,72 @@ defmodule Giggly.Render do
     Enum.concat(spanning, [cell(rows, :tag, columns, :tag, primitives: tag)])
   end
 
-  # The legend's cell, last, as ggplot2 adds its guide box: right of the panels, spanning their
-  # rows, from the first's top to the last's bottom, its table centred down them.
-  defp legend_cells(:none, _grid, _columns, _rows), do: []
+  # The legends' cell, as ggplot2 adds its guide box (`table_add_legends()`): beside the panels,
+  # spanning their rows or columns, or, where the theme lines legends up with the plot
+  # (`legend_location: :plot`), the axes and their titles too, every row from the first strip to the
+  # x title or every column from the legends on the left to those on the right; inside the panels,
+  # spanning them all, from the first row's top to the last's bottom, the strips above the first
+  # left out, whatever the location. The box is placed as a viewport of its own size: beside the
+  # panels, its justification's point at the same point of its cell, and inside, its
+  # justification's point at the theme's point of the panels.
+  defp legend_cells(:none, _grid, _indexes, _theme), do: []
 
-  defp legend_cells({_width, scene}, grid, columns, rows) do
+  defp legend_cells(%{position: position} = legend, grid, {columns, rows}, theme) do
+    {cell_rows, cell_columns} =
+      legend_span(position, grid, {columns, rows}, theme.legend_location)
+
+    {place, justification} = legend_place(position, theme)
+
     [
       %Cell{
-        rows: Map.fetch!(rows, {:panel_row, 1})..Map.fetch!(rows, {:panel_row, grid.rows}),
-        columns: Map.fetch!(columns, :legend)..Map.fetch!(columns, :legend),
+        rows: cell_rows,
+        columns: cell_columns,
         clip: :off,
-        hang: :none,
-        primitives: [scene]
+        hang: {:at, place, justification, {legend.width, legend.height}},
+        primitives: [legend.box]
       }
     ]
   end
+
+  defp legend_span(position, grid, {columns, rows}, location) when position in [:left, :right] do
+    column = Map.fetch!(columns, :legend)
+    {side_span(rows, grid.rows, :row, location), column..column}
+  end
+
+  defp legend_span(position, grid, {columns, rows}, location) when position in [:top, :bottom] do
+    row = Map.fetch!(rows, :legend)
+    {row..row, side_span(columns, grid.columns, :column, location)}
+  end
+
+  defp legend_span(:inside, grid, {columns, rows}, _location),
+    do:
+      {side_span(rows, grid.rows, :row, :panel),
+       side_span(columns, grid.columns, :column, :panel)}
+
+  # The rows or columns a box beside the panels spans: the panels', or the whole table's between
+  # the plot's labels, the margins and the tag.
+  defp side_span(indexes, count, :row, :panel),
+    do: Map.fetch!(indexes, {:panel_row, 1})..Map.fetch!(indexes, {:panel_row, count})
+
+  defp side_span(indexes, _count, :row, :plot),
+    do: (Map.fetch!(indexes, :plot_subtitle) + 1)..Map.fetch!(indexes, :title_bottom)
+
+  defp side_span(indexes, count, :column, :panel),
+    do: Map.fetch!(indexes, {:panel_column, 1})..Map.fetch!(indexes, {:panel_column, count})
+
+  defp side_span(indexes, _count, :column, :plot),
+    do: (Map.fetch!(indexes, :tag) + 1)..(Map.fetch!(indexes, :margin_right) - 1)
+
+  # The point of its cell the box is placed at, and the point of the box placed there.
+  defp legend_place(:right, theme), do: both(theme.legend_justification_right)
+  defp legend_place(:left, theme), do: both(theme.legend_justification_left)
+  defp legend_place(:top, theme), do: both(theme.legend_justification_top)
+  defp legend_place(:bottom, theme), do: both(theme.legend_justification_bottom)
+
+  defp legend_place(:inside, theme),
+    do: {theme.legend_position_inside, theme.legend_justification_inside}
+
+  defp both(justification), do: {justification, justification}
 
   # A cell in one named row and one named column.
   defp cell(rows, row_name, columns, column_name, options) do

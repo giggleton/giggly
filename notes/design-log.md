@@ -79,6 +79,24 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Legends go where the theme puts them, each box placed as grid places a viewport, by a hang on
+  its cell (2026-10-24, Steve, agreeing the proposal and including the box's margin and background;
+  checked in R).** `legend_position` takes ggplot2's six places: a side's column or row outside the
+  axes' titles, spanning the panels or, with `legend_location: :plot`, the plot; inside, every
+  panel, whatever the location. A justification is resolved to `{x, y}` as `valid.just()` reads it;
+  direction, arrangement and box justification stay `:none` until rendering works them out by
+  position, as `Guides$draw()` and `package_box()` do. A box is placed by `hang: {:at, point,
+  justification, size}`, which the generic layout lays out, so `{:left, w}` and nested tables'
+  centring went. `theme_void()`'s unset `legend.spacing` is half a line, as `Guides$assemble()`
+  fills it. The box's background inherits nothing (Steve: "what R draws"), as `package_box()` reads
+  `legend.box.background` raw: 0.75 points of grid's black, not `rect`'s 1.07. *Rejected: inheriting
+  `rect`*, as ggplot2's tree says and its drawing does not. *Rejected: a new cell field for the
+  anchor* — a hang already says where a cell's box sits. *Rejected: null-unit rows round the box*,
+  ggplot2's side margins — they cannot put a box's point anywhere but its justification. *Rejected:
+  R's loose values* (an unknown position drawing none). *Deferred:* a guide's own position,
+  direction, `nrow`, `ncol`, `byrow`; title and label positions; `legend.key.spacing.x`/`.y` as
+  settings.
+
 - **Each layer's defaults are filled in from the theme as columns, as ggplot2 4's `use_defaults()`
   fills `default_aes` from `element_geom()` (2026-10-24, Steve, choosing columns and leaving out
   R's refilled `width`; checked in R).** Each geom gives its defaults (`Geom.default_aesthetics/2`)
@@ -2407,6 +2425,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Let theme/2 place the legends on any side or inside the panels, run their keys
+  across, and stack them either way (theme, step 6); §4: "Legends go where the theme puts them"
 - 2026-10-24 — Fill each layer's defaults from the theme, as ggplot2 4's element_geom gives them
   (theme, step 5); §4: "Each layer's defaults are filled in from the theme", "A plot chooses a
   complete theme" (amended), "The theme is a resolved value" (amended)

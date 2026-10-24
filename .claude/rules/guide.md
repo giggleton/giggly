@@ -23,7 +23,8 @@ panel's grid lines are placed by the coordinate system".
 ## Rules
 
 - **The root is a protocol and holds nothing else** (`defprotocol` allows only its functions):
-  `draw/3` draws a guide of an aesthetic other than position, as a table of its own, for the box.
+  `draw/3` draws a guide of an aesthetic other than position, as a table of its own, for the box,
+  its keys running the way rendering hands it (`direction`, `:vertical` or `:horizontal`).
   **A kind is one module**, its struct, whose fields are its parameters, and its drawing, in a
   `defimpl Giggly.Guide` whose first line classifies it into this boundary. A scale names its guide
   (`:axis` for a position, `:legend`, `:colorbar`, `:none`) or holds a legend's struct, which
@@ -89,7 +90,8 @@ panel's grid lines are placed by the coordinate system".
   axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick
   labels and the axes' titles those across the axis (an x axis's above and below, a y axis's
   either side), the angle axis's labels the widest side, strips, the plot's titles and a legend's
-  title and labels every side, a colour bar's labels those either side. **A negative tick
+  title and labels every side, a colour bar's labels those across the bar (either side of one
+  running up, above and below one running across). **A negative tick
   length turns the ticks into the panel and takes no room**: an axis is measured from the longer
   of 0 and its ticks, as ggplot2 measures the range from 0. How a label is hung from its tick, the
   radius axis's labels centred between two margins, the angle axis's labels justified by their
@@ -122,42 +124,53 @@ panel's grid lines are placed by the coordinate system".
   labels, `guide_axis()`'s `cap` cutting the axis line back to the breaks, minor ticks, axes as
   kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
-  FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `nrow`, `ncol`,
-  `override.aes`, `theme`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal
-  bar, and its raster and rectangles displays.
+  FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `position`,
+  `direction`, `nrow`, `ncol`, `override.aes`, `theme`), the keys filled a row at a time
+  (`legend.byrow`), titles and labels on other sides of the keys, and `guide_colourbar()`'s
+  options: `nbin`, `reverse`, and its raster and rectangles displays.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
-  `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays out a vertical legend at its
-  defaults**: the legend margin inside the edge; the title above, as deep as its lines,
-  left-aligned and centred down its row, as grid centres text, the title's margin below, or neither
-  for a title of `:none`, as ggplot2 leaves out a `NULL` title; a row per key, the key on the key
-  background with each layer's glyph over it, its label the text margin to its right,
-  centred as the title is; **each row as tall as the theme's key height, its tallest glyph or its
-  label with the labels' margins above and below, and the keys' column as wide as the theme's key
-  width or the widest glyph in any key**, from the room each glyph needs, which rendering hands
-  over with it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()` sizes them and its
-  `measure_grobs()` takes the taller of a key and its label, each key's background filling its
-  whole cell and its glyphs placed in it as drawn; the label column as wide as the widest label
-  and the labels' right margin, or wider when the title, its margins either side included, is,
-  leaving the room at the labels' right. **With no labels (every key's `:none`), the labels'
-  margins and column take no room but what a wider title needs right of the keys**, as ggplot2
-  leaves them out for a scale's `labels = NULL` (`Parts.label_widths/2` and
-  `Parts.label_columns/3`, which the colour bar shares). Drawn in ggplot2's order: background,
-  title, each key's background and glyphs, then the labels. Every size is in points. **Its one
-  parameter, `reverse`, is the assembly's to apply**, handing the keys over last first, so the
-  drawing takes them in the order given.
-- **A plot's legends are stacked in a box (`Box.draw/2`), as ggplot2's `package_box()` stacks them
-  on the right**: a column as wide as the widest legend, each in a row as tall as it is, in the
-  order given, `legend.spacing.y` between, each hung from the column's left (`legend.box.just`,
-  left and top), with no margin or background of its own (`theme_gray()`'s); `Box.draw/2` returns
-  the box's width and its table, which rendering centres down the panels.
+  `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays one out at its defaults**: the legend
+  margin inside the edge; **the keys in a grid filled a column at a time**, one column for each
+  twenty keys running down, one row for each five running across, as ggplot2's `setup_params()`
+  shares them out (`ceiling(n / 20)` columns, `ceiling(n / 5)` rows); each key on the key
+  background with each layer's glyph over it, its label the text margin to its right, centred as
+  the title is; **each row as tall as the theme's key height, its tallest glyph or its tallest
+  label with the labels' margins above and below, and each column of keys as wide as the theme's
+  key width or its widest glyph**, from the room each glyph needs, which rendering hands over with
+  it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()` sizes them, each key's background
+  filling its whole cell and its glyphs placed in it as drawn; each column of labels as wide as its
+  widest label and the labels' right margin; `legend_key_spacing` between a column's labels and
+  the next column, and between rows running across, none between rows running down, as ggplot2
+  gives a vertical legend none unless `legend.key.spacing.y` is set. **The title above keys
+  running down** (`legend_title_top`), as deep as its lines, left-aligned and centred down its
+  row, its margin below, a title wider than the keys and their labels leaving the room right of
+  the last column; **left of keys running across** (`legend_title_left`), centred down the rows,
+  a title taller than them leaving half the room above and half below, as `add_title()` does; a
+  title of `:none` takes no room, as ggplot2 leaves out a `NULL` title. **With no labels (every
+  key's `:none`), the labels' margins and columns take no room**, as ggplot2 leaves them out for a
+  scale's `labels = NULL` (`Parts.label_widths/2` and `Parts.label_columns/3`, which the colour bar
+  shares). Drawn in ggplot2's order: background, title, each key's background and glyphs, then the
+  labels. Every size is in points. **Its one parameter, `reverse`, is the assembly's to apply**,
+  handing the keys over last first, so the drawing takes them in the order given.
+- **A plot's legends are stacked in a box (`Box.draw/3`), as ggplot2's `package_box()` stacks
+  them**: in a column, `legend_spacing_y` apart, or a row, `legend_spacing_x` apart, as
+  `legend_box` says, a row above or below the panels and a column elsewhere unless it is given;
+  in the order given; each legend's point at the same point of its room by `legend_box_just`, or
+  at its room's top, left in a column and centred in a row, by where the box goes whatever the
+  arrangement, as ggplot2 justifies them (a `{:at, ...}` hang); `legend_box_margin` round them
+  and `legend_box_background` under them, over the margin too. `Box.draw/3` takes the direction
+  legends run where the box goes, which rendering works out once, and returns the box's width,
+  height and table, which rendering places.
 - **A colour bar is drawn as ggplot2's gradient form at its defaults** (`Guide.Colorbar`, design-log
   §4, the entry beginning "The colour bar is drawn as ggplot2's gradient form"): laid out as a
-  legend, its one key row the bar, `legend.key.width` wide and five keys long (`legend.key.height`
-  times 5);
-  the bar a `Scene.Gradient` through the colours the assembly sampled (`bins`, 15, ggplot2's
-  `nbin` for the gradient form), from its bottom, the scale's low end, to its top, with no border;
-  a tick in the theme's colour bar ticks (white unless the theme sets them)
-  `legend.ticks.length` into each side at each break's place, the right side's and
-  then the left's, each drawn from inside the bar outward; each label the labels' margin right of
-  the bar, centred on its tick, and with no labels the ticks alone, the room laid out as a
-  legend's. It draws no layer's glyph.
+  legend, its one key row the bar, running up `legend.key.width` wide and five keys long
+  (`legend.key.height` times 5), or across five keys long and a key tall; the bar a
+  `Scene.Gradient` through the colours the assembly sampled (`bins`, 15, ggplot2's `nbin` for the
+  gradient form), from its bottom or its left, the scale's low end, to its top or its right, with
+  no border; a tick in the theme's colour bar ticks (white unless the theme sets them)
+  `legend.ticks.length` into each side at each break's place, the right side's and then the
+  left's, or the bottom's and then the top's, each drawn from inside the bar outward; each label
+  centred on its tick, the labels' margin right of a bar running up (`legend_text_right`) or hung
+  its margin below one running across (`legend_text_bottom`), the title above or left of the bar
+  as a legend's, and with no labels the ticks alone, the room laid out as a legend's. It draws no
+  layer's glyph.

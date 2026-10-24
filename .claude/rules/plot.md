@@ -302,7 +302,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `labs/2`'s does. **A line, a rectangle or a text may be `:none`, removed**, taken aside before the
   schema checks the rest, so a mistake inside an element is reported at its property; a length or a
   margin may not, and the roots `spacing` and `margins` take no `{:rel, share}`, as R refuses both.
-  `legend_position:` is `:right` or `:none`, and `panel_ontop:` `true` or `false`. The validated
+  `legend_position:` is one of ggplot2's six places (`:right`, `:left`, `:top`, `:bottom`,
+  `:inside`, `:none`), never R's deprecated pair of numbers; `legend_position_inside:` two numbers
+  (`validate_theme_point/1`); a justification a name or `{horizontal, vertical}`, each a name or a
+  number, `legend_box_just:` names alone, as R refuses numbers there
+  (`validate_theme_justification/2`); `legend_direction:` and `legend_box:` `:horizontal` or
+  `:vertical`, `legend_location:` `:panel` or `:plot`, each refusing what R reads loosely (an
+  unknown position, R drawing no legends); and `panel_ontop:` `true` or `false`. The validated
   settings are handed to `Theme.merge/2` with the plot's theme, so a later call's properties replace
   only those it gives, as R's `+` does, and under a chosen complete theme an element given after its
   removal replaces the theme's whole.

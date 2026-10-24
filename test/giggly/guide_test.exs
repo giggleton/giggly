@@ -120,7 +120,7 @@ defmodule Giggly.GuideTest do
       {width, scene} =
         Guide.draw(
           %Guide.Legend{},
-          %{title: "year", keys: keys},
+          %{title: "year", keys: keys, direction: :vertical},
           Theme.complete(%{complete: :none, settings: %{}})
         )
 
@@ -135,7 +135,7 @@ defmodule Giggly.GuideTest do
       {width, scene} =
         Guide.draw(
           %Guide.Legend{},
-          %{title: "a_long_column_name", keys: keys},
+          %{title: "a_long_column_name", keys: keys, direction: :vertical},
           Theme.complete(%{complete: :none, settings: %{}})
         )
 
@@ -159,15 +159,16 @@ defmodule Giggly.GuideTest do
       {_width, scene} =
         Guide.draw(
           %Guide.Legend{},
-          %{title: "cyl", keys: keys},
+          %{title: "cyl", keys: keys, direction: :vertical},
           Theme.complete(%{complete: :none, settings: %{}})
         )
 
       [_margin, {:points, key_column} | _labels] = scene.widths
 
+      # The key rows follow the margin and the title's two rows, a row of no spacing after each.
       key_rows =
         scene.heights
-        |> Enum.slice(-5, 4)
+        |> Enum.slice(3..-2//2)
         |> Enum.map(fn {:points, height} -> Float.round(height, 2) end)
 
       assert {key_column, key_rows} === {34.02, [17.28, 21.71, 28.53, 34.02]}
@@ -192,27 +193,28 @@ defmodule Giggly.GuideTest do
   # Golden: the legends ggplot2 4.0.3 stacks for mpg's `alpha = cyl` above `colour = class`
   # (`guides(order =)`), through vdiffr 1.0.9 (R 4.6.1), test/golden/point_colour_alpha.R: the alpha
   # legend's background 38.61 by 112.69 points, then 10.96 points of `legend.spacing.y`, then the
-  # colour legend's 81.18 by 147.25, both at one left edge.
-  describe "Box.draw/2" do
+  # colour legend's 81.18 by 147.25, both at one left edge, in a box with no margin.
+  describe "Box.draw/3" do
     test "legends stack in the order given, as wide as the widest, each hung from the box's left" do
       theme = Theme.complete(%{complete: :none, settings: %{}})
       alpha = legend("cyl", ~w(4 5 6 7 8), theme)
       colour = legend("class", ~w(2seater compact midsize minivan pickup subcompact suv), theme)
 
-      {width, box} = Guide.Box.draw([alpha, colour], theme)
+      {width, height, box} = Guide.Box.draw([alpha, colour], :vertical, theme)
 
       [alpha_legend, colour_legend] = box.cells
+      {:at, place, justification, {alpha_width, alpha_height}} = alpha_legend.hang
+      {:at, _place, _justification, {colour_width, colour_height}} = colour_legend.hang
 
-      assert {Float.round(width, 2),
+      assert {Float.round(width, 2), Float.round(height, 2),
               Enum.map(box.heights, fn {:points, height} -> Float.round(height, 2) end)} ===
-               {81.18, [112.69, 10.96, 147.25]}
+               {81.18, 270.9, [0.0, 112.69, 10.96, 147.25, 0.0]}
 
-      assert {alpha_legend.rows, alpha_legend.hang, colour_legend.rows, colour_legend.hang} ===
-               {1..1, {:left, alpha_width(alpha_legend)}, 3..3, {:left, width}}
+      assert {alpha_legend.rows, colour_legend.rows, place, justification, colour_width} ===
+               {2..2, 4..4, {0.0, 1.0}, {0.0, 1.0}, width}
 
-      alpha_legend_width = alpha_width(alpha_legend)
-
-      assert Float.round(alpha_legend_width, 2) === 38.61
+      assert {Float.round(alpha_width, 2), Float.round(alpha_height, 2),
+              Float.round(colour_height, 2)} === {38.61, 112.69, 147.25}
     end
   end
 
@@ -232,7 +234,11 @@ defmodule Giggly.GuideTest do
       theme = Theme.complete(%{complete: :none, settings: %{}})
 
       {width, scene} =
-        Guide.draw(%Guide.Colorbar{bins: 15}, %{title: "cty", keys: keys, decor: decor}, theme)
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{title: "cty", keys: keys, decor: decor, direction: :vertical},
+          theme
+        )
 
       scene_height = height(scene)
       assert {Float.round(width, 2), Float.round(scene_height, 2)} === {43.51, 112.69}
@@ -274,7 +280,12 @@ defmodule Giggly.GuideTest do
       {width, scene} =
         Guide.draw(
           %Guide.Colorbar{bins: 15},
-          %{title: "cty", keys: keys, decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}]},
+          %{
+            title: "cty",
+            keys: keys,
+            decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+            direction: :vertical
+          },
           theme
         )
 
@@ -294,12 +305,97 @@ defmodule Giggly.GuideTest do
       {_width, scene} =
         Guide.draw(
           %Guide.Colorbar{bins: 15},
-          %{title: "cty", keys: keys, decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}]},
+          %{
+            title: "cty",
+            keys: keys,
+            decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+            direction: :vertical
+          },
           theme
         )
 
       [_background, _title, bar, _labels] = scene.cells
       assert structs(bar.primitives) === [Giggly.Scene.Gradient]
+    end
+  end
+
+  # Golden: the legends' backgrounds ggplot2 4.0.3 draws above the panels through vdiffr 1.0.9
+  # (R 4.6.1): mpg's `colour = hwy` as a colour bar in its gradient form, 122.41 by 41.60 points,
+  # its bar 86.40 by 17.28 inside the 5.48-point margin, so the title's column 25.05 wide and the
+  # labels' row 13.36 deep; with `legend.title` and `legend.text` set to `element_blank()`, 97.36
+  # by 28.24, the bar alone in its margin; and mpg's `colour = drv` as a legend with its title
+  # removed, 100.47 by 28.24. They move with how a guide running across is laid out.
+  describe "draw/3 for guides running across" do
+    test "a colour bar is its margin round a title left of a bar five keys long, labelled below" do
+      places = [0.0625, 0.375, 0.6875, 1.0]
+
+      keys =
+        Enum.zip_with(~w(20 30 40 50), places, fn label, place ->
+          %{label: label, place: place, glyphs: [], sizes: []}
+        end)
+
+      decor = [{0.0, "#132B43"}, {1.0, "#56B1F7"}]
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{title: "hwy", keys: keys, decor: decor, direction: :horizontal},
+          Theme.complete(%{complete: :none, settings: %{}})
+        )
+
+      [_background, _title, bar, labels] = scene.cells
+      [%Giggly.Scene.Gradient{direction: :across}, ticks] = bar.primitives
+      [%Giggly.Scene.Text{x: label_places, hjust: hjust}] = labels.primitives
+      rounded = fn sizes -> Enum.map(sizes, fn {:points, size} -> Float.round(size, 2) end) end
+      scene_height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(scene_height, 2), rounded.(scene.widths),
+              rounded.(scene.heights)} ===
+               {122.41, 41.6, [5.48, 25.05, 86.4, 5.48], [5.48, 0.0, 17.28, 13.36, 0.0, 5.48]}
+
+      [[{first_place, inside}, {first_place, +0.0}] | _rest] = ticks.lines
+      [{top_place, top_inside}, {top_place, 1.0}] = Enum.at(ticks.lines, 4)
+
+      assert {first_place, Float.round(inside * 17.28, 2), top_place,
+              Float.round((1 - top_inside) * 17.28, 2), label_places, hjust} ===
+               {0.0625, 3.46, 0.0625, 3.46, places, List.duplicate(0.5, 4)}
+    end
+
+    test "a colour bar with its title and labels removed is the bar alone in its margin" do
+      keys = [%{label: "20", place: 0.0625, glyphs: [], sizes: []}]
+
+      theme =
+        Theme.complete(%{complete: :none, settings: %{legend_title: :none, legend_text: :none}})
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{
+            title: "hwy",
+            keys: keys,
+            decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+            direction: :horizontal
+          },
+          theme
+        )
+
+      scene_height = height(scene)
+
+      assert {Float.round(width, 2), Float.round(scene_height, 2),
+              Enum.map(scene.cells, fn cell -> structs(cell.primitives) end)} ===
+               {97.36, 28.24,
+                [[Giggly.Scene.Rect], [Giggly.Scene.Gradient, Giggly.Scene.Polylines]]}
+    end
+
+    test "a legend with its title removed is its keys and labels in a row" do
+      theme = Theme.complete(%{complete: :none, settings: %{legend_title: :none}})
+      keys = Enum.map(~w(4 f r), fn label -> %{label: label, glyphs: [], sizes: []} end)
+
+      {width, scene} =
+        Guide.draw(%Guide.Legend{}, %{title: "drv", keys: keys, direction: :horizontal}, theme)
+
+      scene_height = height(scene)
+      assert {Float.round(width, 2), Float.round(scene_height, 2)} === {100.47, 28.24}
     end
   end
 
@@ -309,11 +405,8 @@ defmodule Giggly.GuideTest do
   # A legend titled `title` with a key for each of `labels`, drawn with no glyphs.
   defp legend(title, labels, theme) do
     keys = Enum.map(labels, fn label -> %{label: label, glyphs: [], sizes: []} end)
-    Guide.draw(%Guide.Legend{}, %{title: title, keys: keys}, theme)
+    Guide.draw(%Guide.Legend{}, %{title: title, keys: keys, direction: :vertical}, theme)
   end
-
-  defp alpha_width(%{primitives: [legend]}),
-    do: Enum.sum(for {:points, width} <- legend.widths, do: width)
 
   defp height(scene), do: Enum.sum(for {:points, height} <- scene.heights, do: height)
 end

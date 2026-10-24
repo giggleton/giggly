@@ -463,6 +463,7 @@ defmodule Giggly.SVGTest do
     test "a gradient fills its cell with a linear gradient up it, as svglite writes one" do
       gradient = %Gradient{
         stops: [{0.0, "#132B43"}, {1 / 14, "#17334E"}, {2 / 14, "#1C3C5A"}, {1.0, "#56B1F7"}],
+        direction: :up,
         stroke_width: 0.75
       }
 
@@ -490,9 +491,33 @@ defmodule Giggly.SVGTest do
                  "style='stroke-width: 0.75; stroke: none; fill: url(##{id});' />\n"
     end
 
+    # Golden: svglite 2.2.2's drawing of ggplot2 4.0.3's colour bar above the panels (R 4.6.1),
+    # mpg's `colour = hwy` with `legend.position = "top"`: the gradient from the bar's left edge to
+    # its right at its middle, the bar 86.40 by 17.28 points with its top left at 342.97 and 10.96.
+    test "a gradient across its cell runs from its left edge to its right, as svglite writes one" do
+      gradient = %Gradient{
+        stops: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+        direction: :across,
+        stroke_width: 0.75
+      }
+
+      scene = %Giggly.Scene{
+        widths: [{:points, 342.97}, {:points, 86.4}, {:rest, 1}],
+        heights: [{:points, 10.96}, {:points, 17.28}, {:rest, 1}],
+        keep_proportions: false,
+        cells: [%Cell{rows: 2..2, columns: 2..2, clip: :off, hang: :none, primitives: [gradient]}]
+      }
+
+      drawn = draw(scene)
+
+      assert {drawn =~ "spreadMethod='pad' x1='342.97' y1='19.60' x2='429.37' y2='19.60'>",
+              drawn =~ "<rect x='342.97' y='10.96' width='86.40' height='17.28' "} ===
+               {true, true}
+    end
+
     test "a gradient's id is its content's, the same for the same gradient and another for another" do
       id = fn stops ->
-        gradient = %Gradient{stops: stops, stroke_width: 0.75}
+        gradient = %Gradient{stops: stops, direction: :up, stroke_width: 0.75}
         [_all, id] = Regex.run(~r/<linearGradient id='([^']*)'/, draw(whole([gradient])))
         id
       end
@@ -1237,10 +1262,12 @@ defmodule Giggly.SVGTest do
 
   # Golden: grid's drawing, through vdiffr 1.0.9's svglite (R 4.6.1), of a gtable 10 and 20 points
   # wide and 30 tall nested in the second column of one 100 points and a null wide, filling the
-  # page: grid centres a table of fixed sizes in its cell both ways. It moves with how a nested
-  # table is laid out.
+  # page, in a viewport 30 points square at x 0.5 and y 0.5 justified 0.5 and 0.5, at 0.9 and 0.9
+  # justified 1 and 1, and at 0.25 and 1.1 justified 0 and 0.5, beyond its cell's top: its left
+  # edges at 395, 628 and 255 points, its tops at 273, 57.6 and -72.6. It moves with how a hanging
+  # box or a nested table is laid out.
   describe "draw/3, a scene nested in a cell" do
-    test "a table of sizes in points is laid out in its cell and centred both ways" do
+    test "a box hung at a point of its cell by its own point, as grid places a viewport" do
       nested = %Scene{
         widths: [{:points, 10}, {:points, 20}],
         heights: [{:points, 30}],
@@ -1281,17 +1308,30 @@ defmodule Giggly.SVGTest do
         ]
       }
 
-      scene = %Scene{
-        widths: [{:points, 100}, {:rest, 1}],
-        heights: [{:rest, 1}],
-        keep_proportions: false,
-        cells: [%Cell{rows: 1..1, columns: 2..2, clip: :off, hang: :none, primitives: [nested]}]
-      }
+      drawn = fn place, justification ->
+        rects(
+          draw(%Scene{
+            widths: [{:points, 100}, {:rest, 1}],
+            heights: [{:rest, 1}],
+            keep_proportions: false,
+            cells: [
+              %Cell{
+                rows: 1..1,
+                columns: 2..2,
+                clip: :off,
+                hang: {:at, place, justification, {30, 30}},
+                primitives: [nested]
+              }
+            ]
+          })
+        )
+      end
 
-      assert rects(draw(scene)) === [
-               {"395.00", "273.00", "30.00", "30.00"},
-               {"405.00", "273.00", "20.00", "30.00"}
-             ]
+      assert {drawn.({0.5, 0.5}, {0.5, 0.5}), drawn.({0.9, 0.9}, {1, 1}),
+              drawn.({0.25, 1.1}, {0, 0.5})} ===
+               {[{"395.00", "273.00", "30.00", "30.00"}, {"405.00", "273.00", "20.00", "30.00"}],
+                [{"628.00", "57.60", "30.00", "30.00"}, {"638.00", "57.60", "20.00", "30.00"}],
+                [{"255.00", "-72.60", "30.00", "30.00"}, {"265.00", "-72.60", "20.00", "30.00"}]}
     end
 
     test "a nested table's shares split what its sizes in points leave of the cell" do
