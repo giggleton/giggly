@@ -202,6 +202,43 @@ defmodule Giggly.ThemeTest do
     # R's graphics engine spaces a text's lines `lineheight` times 1.2 times its size apart: the
     # title's 1.5 at 13.2 points, the axis title's 0 at 11, the subtitle's theme_gray() 0.9 at 11,
     # as test/golden/theme_text_lineheight.svg draws them, checked against R.
+    # ggplot2 4.0.3: each complete theme sets `legend.title`'s own `hjust = 0`, which beats what
+    # `title` gives, as `calc_element()` shows for theme_gray() and theme_void() with
+    # `title = element_text(hjust = 1)`; an axis's title takes it.
+    test "a justification given to title leaves a legend's title left-aligned, as its own" do
+      looks =
+        Enum.map([complete(%{title: %{hjust: 1}}), chosen(:void, [], %{title: %{hjust: 1}})], fn
+          theme -> {theme.legend_title_top.hjust, theme.legend_title_left.hjust}
+        end)
+
+      assert {looks, complete(%{title: %{hjust: 1}}).axis_title_x_bottom.hjust} ===
+               {[{0.0, 0.0}, {0.0, 0.0}], 1.0}
+    end
+
+    # ggplot2 4.0.3, `theme_gray() + theme(legend.title = element_blank()) + theme(legend.title =
+    # element_text(colour = "red")) + theme(text = element_text(hjust = 1))`: the legend's title,
+    # replaced whole, takes `hjust = 0, vjust = 0.5` from the text the legend lays over the root.
+    test "a legend title replaced whole takes the justification its side lays over the root text" do
+      theme =
+        chosen(:gray, [], %{
+          legend_title: {:replace, %{color: "#FF0000"}},
+          text: %{hjust: 1}
+        })
+
+      assert {theme.legend_title_top.hjust, theme.legend_title_top.vjust,
+              theme.legend_title_left.hjust} === {0.0, 0.5, 0.0}
+    end
+
+    # ggplot2 4.0.3's `calc_element()` of theme_void()'s `plot.subtitle` and `plot.caption`: a
+    # margin of 5.5 points above and none elsewhere, which the subtitle's right side and the
+    # caption's left are drawn by once a setting justifies them otherwise.
+    test "theme_void()'s subtitle and caption have half a line above them and no other margin" do
+      theme = chosen(:void)
+      margin = sides(5.4794520547945211, 0, 0, 0)
+
+      assert {theme.plot_subtitle.margin, theme.plot_caption.margin} === {margin, margin}
+    end
+
     test "a title's line height spaces its lines, a share of 1.2 times its size" do
       theme = complete(%{plot_title: %{lineheight: 1.5}, axis_title: %{lineheight: 0}})
 

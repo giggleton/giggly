@@ -112,14 +112,16 @@ defmodule Giggly.GuideTest do
   # how a legend is laid out.
   # Golden: R's `rotate_just()` and the width and height of ggplot2 4.0.3's `titleGrob()` under
   # vdiffr 1.0.9's device (R 4.6.1) for "a longer label" at 8.8 points, `hjust = 0.2, vjust =
-  # 0.7`, margins of 1, 2, 3 and 4 points, one angle in each quarter turn. It moves with how a
-  # text is anchored or measured.
+  # 0.7`, margins of 1, 2, 3 and 4 points: one angle in each quarter turn, one just short of the
+  # first quarter turn and of a whole turn, where a turn is read a quarter at a time, and one just
+  # below 0, which R's `%% 360` reads as 0 at the second step. It moves with how a text is
+  # anchored or measured.
   describe "Parts, the rule every text is placed and measured by" do
     test "a text is anchored at its justification turned a quarter turn at a time, and measured turned" do
       margin = %{top: 1.0, right: 2.0, bottom: 3.0, left: 4.0}
 
       measured =
-        Enum.map([30.0, 120.0, 210.0, 300.0], fn angle ->
+        Enum.map([30.0, 120.0, 210.0, 300.0, 89.5, 359.5, -1.0e-14], fn angle ->
           look = %{size: 8.8, angle: angle, hjust: 0.2, vjust: 0.7, margin: margin}
           {across, up} = Guide.Parts.turned_justification(look)
           {width, height} = Guide.Parts.extent(["a longer label"], look)
@@ -133,8 +135,61 @@ defmodule Giggly.GuideTest do
                {0.2, 0.7, 55.699669619, 37.245392899},
                {0.3, 0.2, 39.245392899, 53.699669619},
                {0.8, 0.3, 55.699669619, 37.245392899},
-               {0.7, 0.8, 39.245392899, 53.699669619}
+               {0.7, 0.8, 39.245392899, 53.699669619},
+               {0.2, 0.7, 14.343823445, 56.903739759},
+               {0.7, 0.8, 58.903739759, 12.343823445},
+               {0.2, 0.7, 58.83696, 11.88304}
              ]
+    end
+
+    # Golden: the place ggplot2 4.0.3's `titleGrob()` gives "a" at 30 degrees, `hjust = 0.2, vjust
+    # = 0.7`, margins of 1, 2, 3 and 4 points, counting its margins across (`margin_x`), as a y
+    # axis's title and labels do, up (`margin_y`), as an x axis's do, or both: across, `0.2npc -
+    # 0.4 + 3.2` points and up `0.7npc`, or `0.2npc` and `0.7npc - 0.7 + 0.9` points.
+    test "a text counts only the margins it is told to, moving its anchor by them" do
+      look = %{
+        size: 8.8,
+        angle: 30.0,
+        hjust: 0.2,
+        vjust: 0.7,
+        margin: %{top: 1.0, right: 2.0, bottom: 3.0, left: 4.0}
+      }
+
+      anchors =
+        Enum.map([:across, :up, :both], fn counted ->
+          {{across, up}, {across_offset, up_offset}} = Guide.Parts.anchor(look, counted)
+          rounded = fn number -> Float.round(number, 9) end
+          {across, up, rounded.(across_offset), rounded.(up_offset)}
+        end)
+
+      assert anchors === [{0.2, 0.7, 2.8, +0.0}, {0.2, 0.7, +0.0, 0.2}, {0.2, 0.7, 2.8, 0.2}]
+    end
+
+    # A title any wider than the keys and labels below it adds the rest of its room either side of
+    # them, split by its justification, as ggplot2's `add_title()` adds columns, here a fifth left
+    # of them and four fifths right; so the legend is as wide as the title and its margins.
+    test "a title even a fraction of a point wider than the keys leaves its room either side" do
+      look = %{
+        size: 11.0,
+        color: "#000000",
+        opacity: 1.0,
+        face: :plain,
+        angle: 0.0,
+        hjust: 0.2,
+        vjust: 0.5,
+        margin: %{top: 0.0, right: 0.0, bottom: 0.0, left: 0.0},
+        line_spacing: 11.88
+      }
+
+      {title_width, _height} = Guide.Parts.extent(["year"], look)
+
+      {widths, _heights, first, _cells} =
+        Guide.Parts.title_above("year", look, [title_width - 0.5])
+
+      [left, grid, right] = Enum.map(widths, fn width -> Float.round(width, 9) end)
+
+      assert {first, left, grid + left + right, right} ===
+               {3, 0.1, Float.round(title_width, 9), 0.4}
     end
   end
 
@@ -387,6 +442,39 @@ defmodule Giggly.GuideTest do
       assert {first_place, Float.round(inside * 17.28, 2), top_place,
               Float.round((1 - top_inside) * 17.28, 2), label_places, hjust} ===
                {0.0625, 3.46, 0.0625, 3.46, places, List.duplicate(0.5, 4)}
+    end
+
+    # Golden: ggplot2 4.0.3's colour bar below the panels for mpg's `colour = cty`, with
+    # `legend.text = element_text(margin = margin(t = 2, b = 4))`, through vdiffr 1.0.9: its
+    # background 116.90 by 42.10 points, the labels' row as deep as the labels and both margins.
+    test "the labels below a colour bar running across count their margins above and below" do
+      places = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+
+      keys =
+        Enum.zip_with(~w(10 15 20 25 30 35), places, fn label, place ->
+          %{label: label, place: place, glyphs: [], sizes: []}
+        end)
+
+      theme =
+        Theme.complete(%{
+          complete: :none,
+          settings: %{legend_text: %{margin: %{top: {2, :pt}, bottom: {4, :pt}}}}
+        })
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{
+            title: "cty",
+            keys: keys,
+            decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+            direction: :horizontal
+          },
+          theme
+        )
+
+      scene_height = height(scene)
+      assert {Float.round(width, 2), Float.round(scene_height, 2)} === {116.9, 42.1}
     end
 
     test "a colour bar with its title and labels removed is the bar alone in its margin" do

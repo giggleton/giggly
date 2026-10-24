@@ -8520,6 +8520,39 @@ defmodule GigglyTest do
       assert golden?(plot, "theme_text_legend_justified")
     end
 
+    # Golden: test/golden/theme_text_legend_labels.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/theme_text_legend_labels.R: every element and clip path
+    # matches. Each label is right-aligned in a cell of the labels' margin and their column alone,
+    # so it ends the labels' right margin in from the legend's edge.
+    test "a legend's labels right-aligned end at their column's right margin" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.theme(legend_text: [hjust: 1])
+
+      assert golden?(plot, "theme_text_legend_labels")
+    end
+
+    # ggplot2 4.0.3 through vdiffr 1.0.9, 2 by 2 inches: mpg's seven classes on the x axis overlap,
+    # and every one is drawn, as a guide's text never checks overlap (`titleGrob()`'s
+    # `check.overlap = FALSE`).
+    test "an axis's labels are all drawn, however they overlap" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+        |> Giggly.to_svg(width: 192, height: 192)
+        |> IO.iodata_to_binary()
+
+      missing =
+        Enum.reject(~w(2seater compact midsize minivan pickup subcompact suv), fn label ->
+          svg =~ ">#{label}</text>"
+        end)
+
+      assert missing == []
+    end
+
     # Golden: test/golden/theme_text_legend_across.svg, checked against ggplot2's drawing of the
     # same plot, made by test/golden/theme_text_legend_across.R: every element and clip path
     # matches. The title left of keys running across, turned on its side and taller than them, its
