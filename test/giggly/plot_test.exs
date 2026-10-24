@@ -4110,6 +4110,23 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    # A text's angle, justification and line height are numbers kept as floats, as R keeps a
+    # number; its face is a name, R's "bold.italic" spelled `:bold_italic`.
+    test "a text's face, angle, justification and line height are recorded, numbers as floats" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(
+          axis_text_x: [face: :bold, angle: 45, hjust: 1, vjust: -2],
+          plot_title: [face: :bold_italic, lineheight: 0, hjust: 0.5]
+        )
+
+      assert plot.theme.settings === %{
+               axis_text_x: %{face: :bold, angle: 45.0, hjust: 1.0, vjust: -2.0},
+               plot_title: %{face: :bold_italic, lineheight: 0.0, hjust: 0.5}
+             }
+    end
+
     test "a colour may have an alpha of its own, transparent too" do
       plot =
         @rows
@@ -4143,7 +4160,8 @@ defmodule Giggly.PlotTest do
             {[axis_text_z: []], [:axis_text_z]},
             {[axis_text: [linewidth: 2]], [:linewidth]},
             {[panel_grid: [size: 2]], [:size]},
-            {[panel_background: [lineend: :round]], [:lineend]}
+            {[panel_background: [lineend: :round]], [:lineend]},
+            {[axis_text: [family: "Times"]], [:family]}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert error.key == key
@@ -4188,7 +4206,15 @@ defmodule Giggly.PlotTest do
             {[panel_grid: [linetype: :wavy]], {:linetype, [:panel_grid]}, :wavy},
             {[panel_border: [linetype: {4, 16}]], {:linetype, [:panel_border]}, {4, 16}},
             {[axis_line: [lineend: :flat]], {:lineend, [:axis_line]}, :flat},
-            {[panel_ontop: :yes], {:panel_ontop, []}, :yes}
+            {[panel_ontop: :yes], {:panel_ontop, []}, :yes},
+            {[axis_text: [face: :oblique]], {:face, [:axis_text]}, :oblique},
+            {[axis_text: [face: 2]], {:face, [:axis_text]}, 2},
+            {[axis_text: [face: "bold"]], {:face, [:axis_text]}, "bold"},
+            {[axis_text: [angle: "45"]], {:angle, [:axis_text]}, "45"},
+            {[axis_text: [hjust: :left]], {:hjust, [:axis_text]}, :left},
+            {[axis_text: [vjust: :top]], {:vjust, [:axis_text]}, :top},
+            {[plot_title: [lineheight: -1]], {:lineheight, [:plot_title]}, -1},
+            {[plot_title: [lineheight: {:rel, 2}]], {:lineheight, [:plot_title]}, {:rel, 2}}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert {{error.key, error.keys_path}, error.message =~ inspect(value)} == {key, true}

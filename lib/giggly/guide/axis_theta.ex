@@ -9,18 +9,22 @@ defmodule Giggly.Guide.AxisTheta do
   # It looks as the theme's angle axis does (`Giggly.Theme`'s `axis_text_theta` and the rest), which
   # inherits the x axis's look: each tick reaches its tick length out from the circle, and each
   # label's anchor sits the tick length and the widest side of the labels' margin out, the label
-  # justified by its angle so it stands clear of the circle: centred above a break at 12 o'clock,
-  # starting to the right of one at 3, hanging below one at 6 and ending to the left of one at 9,
-  # its `hjust` `0.5 - sin(angle) / 2` and its `vjust` `0.5 - cos(angle) / 2`, the share of its
-  # height below its anchor, as ggplot2 justifies it. Neither is measured nor given room, as
+  # turned as the theme says and justified by its break's angle and that turn together so it
+  # stands clear of the circle: level, centred above a break at 12 o'clock, starting to the right
+  # of one at 3, hanging below one at 6 and ending to the left of one at 9, its `hjust`
+  # `0.5 - sin(angle + turn) / 2` and its `vjust` `0.5 - cos(angle + turn) / 2`, in its own turned
+  # frame, as ggplot2's `guide_axis_theta()` justifies it, whatever justification the theme gives.
+  # Each is placed as `Giggly.Guide.Parts` places a text, in the theme's face. Neither is measured
+  # nor given room, as
   # ggplot2's are not: the panel has room round its circle. Each label is a text of its own, since
   # each is justified its own way; the labels are drawn, then the ticks, then the line, as ggplot2
   # draws them. Labels, ticks or a line the theme removes draw nothing, and so do ticks or a line of
   # the blank line type; the labels keep their place beyond removed ticks, as ggplot2's angle axis
   # keeps the ticks' length in their offset.
 
-  alias Giggly.{Font, Theme}
-  alias Giggly.Scene.{Polylines, Text}
+  alias Giggly.Guide.Parts
+  alias Giggly.Scene.Polylines
+  alias Giggly.Theme
 
   # Ticks and the axis's line are drawn at their colour's opacity, their ends and dashes as the
   # theme says and their corners round, as `theme_gray()`'s `line` element draws every line.
@@ -58,30 +62,21 @@ defmodule Giggly.Guide.AxisTheta do
 
     label_offset = max(tick_length, 0.0) + widest_margin
 
+    # The text's turn, in the angle's radians, which justifies it with the break's angle.
+    turn = text_look.angle / 180 * :math.pi()
+
     # A scale with no labels has a tick at each break and nothing beside it.
     breaks
     |> Enum.reject(fn {_place, _angle, label} -> label == :none end)
-    |> Enum.map(fn {{x_place, y_place}, angle, label} ->
-      vjust = 0.5 - :math.cos(angle) / 2
-
-      %Text{
-        x: [x_place],
-        y: [y_place],
-        labels: [label],
-        widths: [Font.width(label, text_look.size)],
-        size: text_look.size,
-        family: "",
-        color: [text_look.color],
-        opacity: [text_look.opacity],
-        angle: 0,
-        hjust: [0.5 - :math.sin(angle) / 2],
-        offset: [
-          {label_offset * :math.sin(angle),
-           label_offset * :math.cos(angle) - vjust * Font.ascent(text_look.size)}
-        ],
-        check_overlap: false,
-        ascent: Font.ascent(text_look.size)
+    |> Enum.map(fn {place, angle, label} ->
+      look = %{
+        text_look
+        | hjust: 0.5 - :math.sin(angle + turn) / 2,
+          vjust: 0.5 - :math.cos(angle + turn) / 2
       }
+
+      offset = {label_offset * :math.sin(angle), label_offset * :math.cos(angle)}
+      Parts.text([label], [place], offset, look)
     end)
   end
 

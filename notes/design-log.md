@@ -79,6 +79,21 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Text's face, angle, justification and line height are the theme's, and every text a guide
+  draws is placed and measured by one rule, ggplot2's `titleGrob()` (2026-10-24, Steve, agreeing
+  the proposal and its three recommendations; checked in R).** A text takes `face:`, `angle:`,
+  `hjust:` and `vjust:` (numbers, as R's `element_text()` refuses words) and `lineheight:`;
+  `gray/1` and `void/1` give R's defaults, the y title's 90 degrees among them, and a legend's
+  title and labels take their justification from the text their side lays over the theme.
+  `Guide.Parts` anchors a text at `rotate_just()` of its room, moved by the margins it counts, and
+  measures grid's box round it turned with its descent, so 432 R drawings, every 15 degrees by
+  each justification, matched. A face is an SVG style, measured at plain widths, as vdiffr
+  measures. *Rejected: R's `"oblique"` and faces 1 to 4* — second spellings no example writes.
+  *Rejected: a negative `lineheight`*, which R stacks upward. *Rejected: failing where only a
+  removed root text gives a justification*, as R does — grid's centring, as every such property
+  falls to grid. *Rejected: a bold glyph table* — the goldens would leave R's. *Deferred:*
+  `family`, `guide_axis(angle =)`, multi-line labels and strips.
+
 - **The mutation pass runs muex's mutants in warm VMs, each against the whole suite (2026-10-24,
   Steve).** `warm.sh` starts workers that each load the app and the tests once, then compile each
   mutant over its module, recompile what read it while compiling and now reads something else, run
@@ -1052,13 +1067,13 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A title may run over several lines, drawn a line at a time as R's graphics engine draws them
   (2026-10-17, Steve: "Build multi-line now").** Every title, an axis's, a legend's and the plot's
-  own, splits where it breaks and draws each line as a label of its own, 0.9 x 1.2 font sizes below
-  the one before (ggplot2's `lineheight`), stacked by `vjust` as the engine stacks lines; it is as
-  deep as its lines spaced out and a line of text, ggplot2's `titleGrob` measure, and as wide as
-  its widest line. The scene and the backend learn nothing: a text's per-label offsets place each
-  line. Tick labels, strips and `geom_text()` labels stay one line. *Rejected: refusing a label
-  that breaks at the call* until multi-line text arrived, recommended because no waiting example
-  needs one; a title breaking over lines is common in ggplot2 practice.
+  own, splits where it breaks and draws each line as a label of its own, its `lineheight` (0.9
+  unless set) x 1.2 font sizes below the one before, stacked by `vjust` as the engine stacks
+  lines; it is as deep as its lines spaced out and a line of text, ggplot2's `titleGrob` measure,
+  and as wide as its widest line. The scene and the backend learn nothing: a text's per-label
+  offsets place each line. Tick labels, strips and `geom_text()` labels stay one line. *Rejected:
+  refusing a label that breaks at the call* until multi-line text arrived, recommended because no
+  waiting example needs one; a title breaking over lines is common in ggplot2 practice.
 
 - **`labs/2` takes the titles of the aesthetics a guide shows and the plot's title, subtitle,
   caption and tag, as text or `:none`, and the plot's labels are drawn in `Giggly.Guide`
@@ -1918,8 +1933,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   grows with each deliberate difference, such as Elixir-style labels, and two stored files that
   must agree; *and the scratchpad alone*, where increment 8's R checks were lost with the session.
   New boundary: `Theme` lists nothing; `Render` and `Guide` gained `Theme`; `Scene` exports
-  `Rect`. *Deferred to first reader:* the panel's border
-  (blank in `theme_gray()`); text alignment and angle in the theme; theme values as CSS classes,
+  `Rect`. *Deferred to first reader:* theme values as CSS classes,
   ggity's way (the LiveView layer; only colours could move, since the layout is measured from the
   sizes); the theme's fonts. The panel's background and grid lines are this increment's second
   step (since built, see the entry beginning "The panel's grid lines are placed").
@@ -2440,6 +2454,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Let theme/2 set a text's face, angle, justification and line height, every text
+  placed as ggplot2's titleGrob places it (theme, step 7); §4: "Text's face, angle, justification
+  and line height are the theme's"
 - 2026-10-24 — Run the mutation pass in warm VMs: muex's mutants, each against the whole suite;
   §4: "The mutation pass runs muex's mutants in warm VMs" ("Mutation testing picks each mutant's
   tests by coverage" deleted)

@@ -130,6 +130,86 @@ defmodule Giggly.ThemeTest do
     end
   end
 
+  # ggplot2 4.0.3's `calc_element()` of each text Giggly draws, under theme_gray() and
+  # theme_void(); every other complete theme gives theme_gray()'s.
+  describe "complete/1, text's face, angle and justification" do
+    test "each complete theme's texts are plain, level or turned, and justified as R's" do
+      looks = fn theme, leaves ->
+        Enum.map(leaves, fn leaf ->
+          %{face: face, angle: angle, hjust: hjust, vjust: vjust} = Map.fetch!(theme, leaf)
+          {leaf, face, angle, hjust, vjust}
+        end)
+      end
+
+      titles =
+        [:legend_title_top, :strip_text_x_top, :plot_title, :plot_subtitle] ++
+          [:plot_caption, :plot_tag]
+
+      gray_titles = [
+        {:legend_title_top, :plain, 0.0, 0.0, 0.5},
+        {:strip_text_x_top, :plain, 0.0, 0.5, 0.5},
+        {:plot_title, :plain, 0.0, 0.0, 1.0},
+        {:plot_subtitle, :plain, 0.0, 0.0, 1.0},
+        {:plot_caption, :plain, 0.0, 1.0, 1.0},
+        {:plot_tag, :plain, 0.0, 0.5, 0.5}
+      ]
+
+      axes =
+        [:axis_text_x_bottom, :axis_text_y_left, :axis_text_r, :axis_text_theta] ++
+          [:axis_title_x_bottom, :axis_title_y_left]
+
+      gray = complete(%{})
+      void = chosen(:void)
+
+      assert {looks.(gray, axes ++ titles), looks.(void, titles)} ===
+               {[
+                  {:axis_text_x_bottom, :plain, 0.0, 0.5, 1.0},
+                  {:axis_text_y_left, :plain, 0.0, 1.0, 0.5},
+                  {:axis_text_r, :plain, 0.0, 0.5, 0.5},
+                  {:axis_text_theta, :plain, 0.0, 0.5, 1.0},
+                  {:axis_title_x_bottom, :plain, 0.0, 0.5, 1.0},
+                  {:axis_title_y_left, :plain, 90.0, 0.5, 1.0}
+                  | gray_titles
+                ], gray_titles}
+    end
+
+    # ggplot2's legend lays a text of its own over the root text, its justification for the side
+    # its title or labels are drawn on, so the root's justification never reaches them, but its
+    # face and angle do, as R's `calc_element()` of the overlaid theme shows.
+    test "the root text's justification never reaches a legend's title and labels; its face and angle do" do
+      theme = complete(%{text: %{hjust: 1, vjust: 0, face: :bold, angle: 10}})
+
+      looks =
+        Enum.map(
+          [:legend_title_top, :legend_title_left, :legend_text_right, :legend_text_bottom] ++
+            [:axis_title_x_bottom, :strip_text_x_top],
+          fn leaf ->
+            %{face: face, angle: angle, hjust: hjust, vjust: vjust} = Map.fetch!(theme, leaf)
+            {face, angle, hjust, vjust}
+          end
+        )
+
+      assert looks === [
+               {:bold, 10.0, 0.0, 0.5},
+               {:bold, 10.0, 0.0, 0.5},
+               {:bold, 10.0, 0.0, 0.5},
+               {:bold, 10.0, 0.5, 1.0},
+               {:bold, 10.0, 1.0, 1.0},
+               {:bold, 10.0, 1.0, 0.0}
+             ]
+    end
+
+    # R's graphics engine spaces a text's lines `lineheight` times 1.2 times its size apart: the
+    # title's 1.5 at 13.2 points, the axis title's 0 at 11, the subtitle's theme_gray() 0.9 at 11,
+    # as test/golden/theme_text_lineheight.svg draws them, checked against R.
+    test "a title's line height spaces its lines, a share of 1.2 times its size" do
+      theme = complete(%{plot_title: %{lineheight: 1.5}, axis_title: %{lineheight: 0}})
+
+      assert {theme.plot_title.line_spacing, theme.axis_title_x_bottom.line_spacing,
+              theme.plot_subtitle.line_spacing} === {23.759999999999998, 0.0, 11.88}
+    end
+  end
+
   describe "complete/1 with elements removed" do
     test "a removed element takes every element that inherits from it" do
       theme = complete(%{axis_text: :none})
@@ -146,6 +226,10 @@ defmodule Giggly.ThemeTest do
         size: 11.0,
         color: "#FF0000",
         opacity: 1.0,
+        face: :plain,
+        angle: 0.0,
+        hjust: 0.5,
+        vjust: 1.0,
         margin: sides(2.1917808219178085, 0, 0, 0)
       }
 
@@ -194,6 +278,10 @@ defmodule Giggly.ThemeTest do
                   size: 12.0,
                   color: "#FF0000",
                   opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.0,
+                  vjust: 1.0,
                   margin: sides(0, 0, 5.4794520547945211, 0),
                   line_spacing: 17.28
                 }}
@@ -219,11 +307,24 @@ defmodule Giggly.ThemeTest do
 
       assert {text.axis_text_x_bottom, title.plot_tag, line.legend_ticks, fill.legend_background,
               border.strip_background_x} ===
-               {%{size: 10.0, color: "#000000", opacity: 1.0, margin: sides(0, 0, 0, 0)},
+               {%{
+                  size: 10.0,
+                  color: "#000000",
+                  opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.5,
+                  vjust: 0.5,
+                  margin: sides(0, 0, 0, 0)
+                },
                 %{
                   size: 15.0,
                   color: "#000000",
                   opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.5,
+                  vjust: 0.5,
                   margin: sides(0, 0, 0, 0),
                   line_spacing: 21.599999999999998
                 },
@@ -286,6 +387,10 @@ defmodule Giggly.ThemeTest do
                   size: 11.0,
                   color: "#000000",
                   opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.0,
+                  vjust: 0.5,
                   margin: sides(0, 0, 5.4794520547945211, 0),
                   line_spacing: 11.88
                 },
@@ -293,6 +398,10 @@ defmodule Giggly.ThemeTest do
                   size: 8.8,
                   color: "#000000",
                   opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.0,
+                  vjust: 0.5,
                   margin: sides(0, 0, 0, 5.4794520547945211)
                 }, :none, :none, :none}
     end
@@ -702,7 +811,16 @@ defmodule Giggly.ThemeTest do
       theme = chosen(:bw, [], %{axis_text: :none, axis_text_x: {:replace, %{color: "#FF0000"}}})
 
       assert {theme.axis_text_x_bottom, theme.axis_text_y_left} ===
-               {%{size: 11.0, color: "#FF0000", opacity: 1.0, margin: sides(0, 0, 0, 0)}, :none}
+               {%{
+                  size: 11.0,
+                  color: "#FF0000",
+                  opacity: 1.0,
+                  face: :plain,
+                  angle: 0.0,
+                  hjust: 0.5,
+                  vjust: 0.5,
+                  margin: sides(0, 0, 0, 0)
+                }, :none}
     end
 
     test "a colour with an alpha of its own is worked out as its opacity, none as nothing" do

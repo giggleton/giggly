@@ -37,7 +37,8 @@ size has a weight".
   `x2` and `y2` and the same `style` but `fill`, and text with `x` and `y` (or, turned,
   `transform='translate(x,y) rotate(-angle)'`, the angle in whole degrees as vdiffr writes it with
   `%0.0f`, a tie to the even one), `text-anchor` (left out for text anchored at its start, as
-  svglite leaves it out), a `style` of `font-size` (in `px`, the user unit), `fill` and
+  svglite leaves it out), a `style` of `font-size` (in `px`, the user unit), the face as vdiffr
+  writes it (`font-weight: bold;`, `font-style: italic;`, both for bold italic), `fill` and
   `fill-opacity` (left out for opaque black, SVG's default, as vdiffr leaves it out) and
   `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`. Output can then be set
   beside the SVG in ggplot2's own visual-test snapshots.
@@ -90,9 +91,10 @@ size has a weight".
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,
   which is not a CSS generic family; a family a layer names is written alone, quoted, its quotes
-  escaped, and drawn at the measured width all the same. **An empty label is not written**, as
-  svglite writes none, though the room measured for it stays. Text escapes `&`, `<` and `>`, as
-  svglite does.
+  escaped, and drawn at the measured width all the same, and so is a bold or italic label, measured
+  as plain text, as vdiffr measures every face but the symbol one. **An empty label is not
+  written**, as svglite writes none, though the room measured for it stays. Text escapes `&`, `<`
+  and `>`, as svglite does.
 - **A text checking overlap is drawn as grid's `textGrob(check.overlap = TRUE)` draws one**: each
   label's box placed and turned with it, in order, and left out when an edge of it crosses an edge
   of a box drawn before (`intersect()`): two edges along one line cross where they overlap, two

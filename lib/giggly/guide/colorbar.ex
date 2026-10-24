@@ -12,23 +12,24 @@ defmodule Giggly.Guide.Colorbar do
   #
   #   * the theme's legend margin inside the edge, each side its own;
   #   * the title, laid out as a legend's (`Giggly.Guide.Parts`): above a bar running up, left of
-  #     one running across, centred down the bar and its labels;
+  #     one running across, the room a title bigger than the bar and its labels leaves split by its
+  #     justification;
   #   * the bar, running up, as wide as a key and five keys long (`legend.key.width`, and
   #     `legend.key.height` times 5), the gradient filling it from its bottom, the scale's low end,
   #     to its top; running across, five keys long and as tall as a key, the gradient from its left
   #     to its right; with no border;
   #   * a tick at each break's place along the bar, across each side, in the theme's colour bar
   #     ticks (white when the theme sets none), reaching the theme's tick length into it, and the
-  #     break's label beside the bar, centred on its tick: running up, right of it, the labels'
-  #     left margin from it (`legend_text_right`), its margins above and below not counted; running
-  #     across, below it, hung its top margin below it (`legend_text_bottom`), its margins either
-  #     side not counted, as ggplot2's colour bar counts only those beside its labels;
-  #   * running up, the label column as wide as the widest label and the labels' right margin, or
-  #     wider when the title is wider than the bar and its labels, which leaves the room at the
-  #     labels' right; running across, the labels' row as deep as a label and its margins above and
-  #     below, a title taller than the bar and its labels leaving half the rest above them and half
-  #     below; with no labels, neither the column or row nor its margins, its ticks still drawn, as
-  #     ggplot2 draws a scale with no labels.
+  #     break's label beside the bar at its tick, placed as `Giggly.Guide.Parts` places a text:
+  #     running up, right of it (`legend_text_right`, left-aligned and centred on its tick unless
+  #     the theme says otherwise), its margins either side counted; running across, below it
+  #     (`legend_text_bottom`, centred and hung), its margins above and below counted, as ggplot2's
+  #     colour bar counts only those across its labels;
+  #   * running up, the labels' margin and their column, as wide as the labels turned, measured
+  #     together as one grob measures them, and the labels' right margin; running across, the
+  #     labels' row as deep as they are turned and their margins above and below; with no labels,
+  #     neither the column or row nor its margins, its ticks still drawn, as ggplot2 draws a scale
+  #     with no labels.
   #
   # Drawn in ggplot2's order: the background, the title, the bar, the ticks on its right side and
   # then on its left, or on its bottom and then its top, each from the bar's inside outward, and
@@ -43,9 +44,9 @@ defmodule Giggly.Guide.Colorbar do
   defimpl Giggly.Guide, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Guide
 
-    alias Giggly.{Font, Scene, Theme}
     alias Giggly.Guide.Parts
-    alias Giggly.Scene.{Cell, Gradient, Polylines, Text}
+    alias Giggly.{Scene, Theme}
+    alias Giggly.Scene.{Cell, Gradient, Polylines}
 
     # The bar is five keys long, as ggplot2's colour bar multiplies `legend.key.height` by 5.
     @bar_keys 5
@@ -91,22 +92,21 @@ defmodule Giggly.Guide.Colorbar do
 
       title = Parts.title(title, title_look)
       labels = Parts.labels(keys, text_look)
-      label_widths = Parts.label_widths(labels, text_look)
-      {label_margin, labels_width} = Parts.label_columns(labels, label_widths, text_look)
-      title_width = Parts.legend_title_width(title, title_look)
-      label_column = max(labels_width, title_width - key_width - label_margin)
-      {title_rows, title_cells} = Parts.title_rows(title, title_look, 2..4)
-      bar_row = 2 + length(title_rows)
+      {label_margin, labels_width} = label_column(labels, text_look)
+
+      {widths, title_heights, first, title_cells} =
+        Parts.title_above(title, title_look, [key_width, label_margin, labels_width])
+
+      bar_row = 2 + length(title_heights)
 
       cells =
         Enum.concat([
           title_cells,
-          [bar_cell({decor, :up}, ticks_up(places, key_width, theme), {bar_row, 2}, theme)],
-          right_label_cells(labels, label_widths, {bar_row, places}, text_look)
+          [bar_cell({decor, :up}, ticks_up(places, key_width, theme), {bar_row, first}, theme)],
+          right_label_cells(labels, {bar_row, (first + 1)..(first + 2)}, places, text_look)
         ])
 
-      bar_length = @bar_keys * key_height
-      {[key_width, label_margin, label_column], Enum.concat(title_rows, [bar_length]), cells}
+      {widths, Enum.concat(title_heights, [@bar_keys * key_height]), cells}
     end
 
     defp lay_out(:horizontal, {title, keys}, {decor, places}, %Theme{} = theme) do
@@ -119,11 +119,7 @@ defmodule Giggly.Guide.Colorbar do
 
       title = Parts.title(title, title_look)
       labels = Parts.labels(keys, text_look)
-
-      label_height =
-        labels
-        |> Enum.map(fn label -> Parts.label_height(label, text_look) end)
-        |> Enum.max()
+      label_height = label_row(labels, text_look)
 
       {title_widths, heights, first, title_cells} =
         Parts.title_column(title, title_look, [key_height, label_height])
@@ -139,7 +135,7 @@ defmodule Giggly.Guide.Colorbar do
               theme
             )
           ],
-          below_label_cells(labels, {first + 1, first}, {places, label_height}, text_look)
+          below_label_cells(labels, {first + 1, first}, places, text_look)
         ])
 
       bar_length = @bar_keys * key_width
@@ -199,71 +195,67 @@ defmodule Giggly.Guide.Colorbar do
       ]
     end
 
-    # The labels of a bar running up, each at its tick's place up the bar's row, left-aligned in
-    # the label column and centred on its tick as grid centres text, its baseline half its ascent
-    # below the place; none for a bar with no labels.
-    defp right_label_cells(labels, label_widths, {row, places}, text_look) do
-      if Enum.all?(labels, fn label -> label == :none end),
-        do: [],
-        else: [
-          label_cell(labels, label_widths, {row..row, 4..4}, text_look,
-            x: Enum.map(places, fn _place -> 0.0 end),
-            y: places,
-            hjust: 0.0,
-            offset: {0.0, -Font.ascent(text_look.size) / 2}
-          )
-        ]
+    # The labels' margin beside a bar running up and their column, as wide as the labels turned,
+    # measured together as ggplot2's colour bar measures its one grob of labels, and their right
+    # margin; none of either for a bar with no labels.
+    defp label_column(labels, look) do
+      if unlabelled?(labels) do
+        {0.0, 0.0}
+      else
+        {width, _height} = Parts.extent(labels, look)
+        {look.margin.left, width + look.margin.right}
+      end
     end
 
-    # The labels of a bar running across, each centred on its tick's place along the bar's column
-    # in the row below it, hung its top margin below the row's top, `label_height` points tall,
-    # its baseline an ascent lower, as grid hangs text from its top; none for a bar with no
-    # labels.
-    defp below_label_cells(labels, {row, column}, {places, label_height}, text_look) do
-      if Enum.all?(labels, fn label -> label == :none end),
-        do: [],
-        else: [
+    # How deep the labels' row below a bar running across is: the labels turned, measured together,
+    # and their margins above and below; none for a bar with no labels.
+    defp label_row(labels, look) do
+      if unlabelled?(labels) do
+        0.0
+      else
+        {_width, height} = Parts.extent(labels, look)
+        look.margin.top + height + look.margin.bottom
+      end
+    end
+
+    # The labels of a bar running up, each at its tick's place up the bar's row, across at its
+    # turned justification of the labels' margin and column, its margins either side counted;
+    # none for a bar with no labels.
+    defp right_label_cells(labels, {row, columns}, places, text_look) do
+      if unlabelled?(labels) do
+        []
+      else
+        {{across, _up}, offset} = Parts.anchor(text_look, :across)
+        label_places = Enum.map(places, fn place -> {across, place} end)
+        [label_cell(Parts.text(labels, label_places, offset, text_look), {row..row, columns})]
+      end
+    end
+
+    # The labels of a bar running across, each at its tick's place along the bar's column, up at
+    # its turned justification of the labels' row below the bar, its margins above and below
+    # counted; none for a bar with no labels.
+    defp below_label_cells(labels, {row, column}, places, text_look) do
+      if unlabelled?(labels) do
+        []
+      else
+        {{_across, up}, offset} = Parts.anchor(text_look, :up)
+        label_places = Enum.map(places, fn place -> {place, up} end)
+
+        [
           label_cell(
-            labels,
-            Parts.label_widths(labels, text_look),
-            {row..row, column..column},
-            text_look,
-            x: places,
-            y: Enum.map(places, fn _place -> 1 - text_look.margin.top / label_height end),
-            hjust: 0.5,
-            offset: {0.0, -Font.ascent(text_look.size)}
+            Parts.text(labels, label_places, offset, text_look),
+            {row..row, column..column}
           )
         ]
+      end
     end
 
-    defp label_cell(labels, label_widths, {rows, columns}, text_look, placing) do
-      count = length(labels)
-      hjust = Keyword.fetch!(placing, :hjust)
-      offset = Keyword.fetch!(placing, :offset)
+    # Whether a bar has no labels: every key's is `:none`, as a scale with no labels or labels the
+    # theme removes leave them.
+    defp unlabelled?(labels), do: Enum.all?(labels, fn label -> label == :none end)
 
-      %Cell{
-        rows: rows,
-        columns: columns,
-        clip: :off,
-        hang: :none,
-        primitives: [
-          %Text{
-            x: Keyword.fetch!(placing, :x),
-            y: Keyword.fetch!(placing, :y),
-            labels: labels,
-            widths: label_widths,
-            size: text_look.size,
-            family: "",
-            color: List.duplicate(text_look.color, count),
-            opacity: List.duplicate(text_look.opacity, count),
-            angle: 0,
-            hjust: List.duplicate(hjust, count),
-            offset: List.duplicate(offset, count),
-            check_overlap: false,
-            ascent: Font.ascent(text_look.size)
-          }
-        ]
-      }
+    defp label_cell(text, {rows, columns}) do
+      %Cell{rows: rows, columns: columns, clip: :off, hang: :none, primitives: [text]}
     end
   end
 end

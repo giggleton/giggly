@@ -4,20 +4,25 @@ defmodule Giggly.Guide.Parts do
   # The parts the guides of aesthetics other than position build their tables from, alike in a
   # legend (`Giggly.Guide.Legend`) and a colour bar (`Giggly.Guide.Colorbar`), as ggplot2's
   # `GuideColourbar` lays itself out through `GuideLegend`'s measuring and arranging: the
-  # background over the whole table, the title's rows above the keys, a line of text left-aligned
-  # in its cell and centred down it, how wide the labels are and how far from the keys, and how
-  # tall a line of text is; and the title and labels as the theme leaves them, none where it
-  # removes them, so a guide draws them as it draws a title or labels it is not given.
+  # background over the whole table, the title above or left of the keys with the room a title
+  # bigger than them leaves, a label in its cell, how wide the labels are and how far from the
+  # keys; and the title and labels as the theme leaves them, none where it removes them, so a
+  # guide draws them as it draws a title or labels it is not given.
   #
-  # And a title, which every guide and the plot's own titles (`Giggly.Guide.Title`) draw alike: a
-  # label that may run over several lines, split where it breaks, each line drawn by itself as R's
-  # graphics engine draws one, a line spacing below the one before. A title is as deep as its lines
-  # spaced out, the last a line of text tall, as ggplot2's `titleGrob` measures it, and as wide as
-  # its widest line. Its lines are anchored at one place and stacked as the engine stacks them,
-  # `vjust` of the way down from their top: the baseline of line `i` of `n`, counting from 0, is
-  # `((1 - vjust)(n - 1) - i)` line spacings above the place, less `vjust` of a line's ascent, so a
-  # title hangs from its place at 1 and is centred on it at 0.5; each line is justified along its
-  # baseline by `hjust`, as wide as itself.
+  # And the one rule every text a guide draws is placed and measured by, ggplot2's `titleGrob()`:
+  # an axis's labels and title, a strip's label, a legend's title and labels, the plot's titles.
+  # A text is drawn in its look's face, turned its angle, and justified by its `hjust` and `vjust`
+  # in its own turned frame, as grid's text grob draws it. It is anchored in its room at its
+  # justification turned with it a quarter turn at a time (`turned_justification/1`, ggplot2's
+  # `rotate_just()`), moved by the margins it counts (`anchor/2`), and it is as wide and as deep as
+  # the box grid's text grob takes, turned, with the font's descent turned with it added
+  # (`extent/2`): a level label is a line of text deep, one turned 90 degrees as deep as it is
+  # wide. A title may run over several lines, split where it breaks, each line drawn by itself as
+  # R's graphics engine draws one, a line spacing below the one before, stacked `vjust` of the way
+  # down from their top: the baseline of line `i` of `n`, counting from 0, is
+  # `((1 - vjust)(n - 1) - i)` line spacings above the anchor, less `vjust` of a line's ascent; a
+  # title is as deep as its lines spaced out and an ascent, as grid measures one, and as wide as its
+  # widest line. Tick labels, strips and a legend's labels stay one line.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Cell, Rect, Text}
@@ -63,164 +68,97 @@ defmodule Giggly.Guide.Parts do
   def labels(keys, :none), do: Enum.map(keys, fn _key -> :none end)
   def labels(keys, _look), do: Enum.map(keys, fn key -> key.label end)
 
-  # A legend's title rows, top down, and its cell, in `look`: none for a title of `:none`, which
-  # takes no room, as ggplot2's legend leaves out a title it is given as `NULL`; otherwise the
-  # title's margin above it and its depth, then its margin below it. The title is left-aligned its
-  # left margin into the second row across `columns`, and centred down what its margin above leaves
-  # of the row, as grid centres text.
+  # A legend's title above its keys, in `look`, over a grid of `widths`, left to right: the widths
+  # with the room a title wider than the grid leaves, split by the title's turned justification,
+  # left of the grid and right of it, as ggplot2's `add_title()` adds it; the title's row, as deep as
+  # it and its margins above and below; the column the grid then starts at; and the title's cell,
+  # spanning the grid's columns, the title anchored in it as `anchor/2` places it. A title of
+  # `:none` takes no room, as ggplot2's legend leaves out a title it is given as `NULL`.
   @doc false
-  @spec title_rows(String.t() | :none, Theme.title(), Range.t()) :: {[float()], [Cell.t()]}
-  def title_rows(:none, _look, _columns), do: {[], []}
+  @spec title_above(String.t() | :none, Theme.title(), [float()]) ::
+          {[float()], [float()], pos_integer(), [Cell.t()]}
+  def title_above(:none, _look, widths), do: {widths, [], 2, []}
 
-  def title_rows(title, %{margin: margin} = look, columns) do
-    height = title_height(title, look)
-    row = margin.top + height
-    place = {0.0, 1 - (margin.top + height / 2) / row}
+  def title_above(title, %{margin: margin} = look, widths) do
+    {title_width, title_height} = extent([title], look)
+    extra = max(margin.left + title_width + margin.right - Enum.sum(widths), 0.0)
+    {across, _up} = turned_justification(look)
+
+    {with_room, first} =
+      if extra > 0,
+        do: {Enum.concat([[across * extra], widths, [(1 - across) * extra]]), 3},
+        else: {widths, 2}
+
+    {place, offset} = anchor(look, :both)
 
     cell = %Cell{
       rows: 2..2,
-      columns: columns,
+      columns: first..(first + length(widths) - 1),
       clip: :off,
       hang: :none,
-      primitives: [title_text(title, place, 0, {0.0, 0.5}, look, margin.left)]
+      primitives: [text([title], [place], offset, look)]
     }
 
-    {[row, margin.bottom], [cell]}
+    {with_room, [margin.top + title_height + margin.bottom], first, [cell]}
   end
 
   # A legend's title left of its keys, in `look`, beside a grid whose rows are `heights` points
   # tall: the title's column, as wide as it and its margins either side; the grid's heights with
-  # the room a title taller than them leaves, half above and half below, as ggplot2's
-  # `add_title()` leaves it; the row and the column the grid then starts at; and the title's cell,
-  # left-aligned its left margin into the second column, spanning the grid's rows and centred down
-  # them, moved by half the difference of its margins below and above, as grid centres text with
-  # its margins (`titleGrob()`). A title of `:none` takes no room.
+  # the room a title taller than them leaves, split by the title's turned justification, above the
+  # grid and below it, as ggplot2's `add_title()` adds it; the row and the column the grid then
+  # starts at; and the title's cell, spanning the grid's rows, the title anchored in it as
+  # `anchor/2` places it. A title of `:none` takes no room.
   @doc false
   @spec title_column(String.t() | :none, Theme.title(), [float()]) ::
           {[float()], [float()], pos_integer(), [Cell.t()]}
   def title_column(:none, _look, heights), do: {[], heights, 2, []}
 
   def title_column(title, %{margin: margin} = look, heights) do
-    height = Enum.sum(heights)
-    left_over = max(margin.top + title_height(title, look) + margin.bottom - height, 0.0)
-    place = {0.0, 0.5 + (margin.bottom - margin.top) / 2 / height}
+    {title_width, title_height} = extent([title], look)
+    extra = max(margin.top + title_height + margin.bottom - Enum.sum(heights), 0.0)
+    {_across, up} = turned_justification(look)
+    {place, offset} = anchor(look, :both)
 
     cell = %Cell{
       rows: 3..(length(heights) + 2),
       columns: 2..2,
       clip: :off,
       hang: :none,
-      primitives: [title_text(title, place, 0, {0.0, 0.5}, look, margin.left)]
+      primitives: [text([title], [place], offset, look)]
     }
 
-    room = [left_over / 2]
-    {[legend_title_width(title, look)], Enum.concat([room, heights, room]), 3, [cell]}
+    heights = Enum.concat([[(1 - up) * extra], heights, [up * extra]])
+    {[margin.left + title_width + margin.right], heights, 3, [cell]}
   end
 
-  # How wide a legend's title is, in points, its margins either side of it included: none for
-  # `:none`.
+  # `label` in `look`, in a cell of `row` and `columns`, the labels' margin before it and their
+  # column, anchored as `anchor/2` places it, counting its margins on every side.
   @doc false
-  @spec legend_title_width(String.t() | :none, Theme.title()) :: float()
-  def legend_title_width(:none, _look), do: 0.0
+  @spec label_cell(String.t(), Theme.text(), pos_integer(), Range.t()) :: Cell.t()
+  def label_cell(label, look, row, columns) do
+    {place, offset} = anchor(look, :both)
 
-  def legend_title_width(title, %{margin: margin} = look),
-    do: margin.left + title_width(title, look) + margin.right
-
-  # How deep `title` is, set in `look`, in points: a line spacing for each line after the first,
-  # then a line of text.
-  @doc false
-  @spec title_height(String.t(), Theme.title()) :: float()
-  def title_height(title, look) do
-    (length(lines(title)) - 1) * look.line_spacing + line_height(look.size)
-  end
-
-  # How wide `title` is, set in `look`, in points: its widest line.
-  @doc false
-  @spec title_width(String.t(), Theme.title()) :: float()
-  def title_width(title, look) do
-    title
-    |> lines()
-    |> Enum.map(fn line -> Font.width(line, look.size) end)
-    |> Enum.max()
-  end
-
-  # `title` set in `look`, each of its lines a label anchored at `place` in its cell and moved
-  # `along` points along its baseline, turned `angle` degrees, justified `hjust` along its baseline
-  # and stacked `vjust` of the way down from its top.
-  @doc false
-  @spec title_text(
-          String.t(),
-          {float(), float()},
-          number(),
-          {float(), float()},
-          Theme.title(),
-          float()
-        ) :: Text.t()
-  def title_text(title, {x_place, y_place}, angle, {hjust, vjust}, look, along \\ 0.0) do
-    lines = lines(title)
-    count = length(lines)
-    ascent = Font.ascent(look.size)
-
-    %Text{
-      x: List.duplicate(x_place, count),
-      y: List.duplicate(y_place, count),
-      labels: lines,
-      widths: Enum.map(lines, fn line -> Font.width(line, look.size) end),
-      size: look.size,
-      family: "",
-      color: List.duplicate(look.color, count),
-      opacity: List.duplicate(look.opacity, count),
-      angle: angle,
-      hjust: List.duplicate(hjust, count),
-      offset:
-        Enum.with_index(lines, fn _line, index ->
-          {along, ((1 - vjust) * (count - 1) - index) * look.line_spacing - vjust * ascent}
-        end),
-      check_overlap: false,
-      ascent: ascent
-    }
-  end
-
-  defp lines(title), do: String.split(title, "\n")
-
-  # `label`, `width` points wide, in `look`, left-aligned in a cell of `row` and `columns` and
-  # centred down what its margins above and below leave of it, as grid centres text with `vjust =
-  # 0.5`: its baseline half its ascent below that middle.
-  @doc false
-  @spec text_cell(String.t(), float(), Theme.text(), pos_integer(), Range.t()) :: Cell.t()
-  def text_cell(label, width, %{margin: margin} = look, row, columns) do
     %Cell{
       rows: row..row,
       columns: columns,
       clip: :off,
       hang: :none,
-      primitives: [
-        %Text{
-          x: [0.0],
-          y: [0.5],
-          labels: [label],
-          widths: [width],
-          size: look.size,
-          family: "",
-          color: [look.color],
-          opacity: [look.opacity],
-          angle: 0,
-          hjust: [0.0],
-          offset: [{0.0, (margin.bottom - margin.top) / 2 - Font.ascent(look.size) / 2}],
-          check_overlap: false,
-          ascent: Font.ascent(look.size)
-        }
-      ]
+      primitives: [text([label], [place], offset, look)]
     }
   end
 
-  # Each of a guide's `labels`' width in points, set in `look`, a label of `:none` taking none.
+  # How wide each of a guide's `labels` is in `look`, turned, in points, a label of `:none` taking
+  # no room.
   @doc false
   @spec label_widths([String.t() | :none], Theme.text()) :: [float()]
   def label_widths(labels, look) do
     Enum.map(labels, fn
-      :none -> 0.0
-      label -> Font.width(label, look.size)
+      :none ->
+        0.0
+
+      label ->
+        {width, _height} = extent([label], look)
+        width
     end)
   end
 
@@ -236,17 +174,168 @@ defmodule Giggly.Guide.Parts do
       else: {look.margin.left, Enum.max(label_widths) + look.margin.right}
   end
 
-  # How tall a guide's label is in `look`, its margins above and below it included: none for
-  # `:none`.
+  # How tall a guide's label is in `look`, turned, its margins above and below it included: none
+  # for `:none`.
   @doc false
   @spec label_height(String.t() | :none, Theme.text()) :: float()
   def label_height(:none, _look), do: 0.0
 
-  def label_height(_label, %{size: size, margin: margin}),
-    do: margin.top + line_height(size) + margin.bottom
+  def label_height(label, %{margin: margin} = look) do
+    {_width, height} = extent([label], look)
+    margin.top + height + margin.bottom
+  end
 
-  # How tall a line of text `size` points is: its ascent and its deepest descent.
+  # The share of its room across and up that a text in `look` is anchored at: its justification
+  # turned with it a quarter turn at a time, as ggplot2's `rotate_just()` turns it, since grid
+  # justifies text in its own turned frame. A quarter turn takes `{1 - vjust, hjust}`, a half turn
+  # `{1 - hjust, 1 - vjust}`, three quarters `{vjust, 1 - hjust}`.
   @doc false
-  @spec line_height(float()) :: float()
-  def line_height(size), do: Font.ascent(size) + Font.descent(size)
+  @spec turned_justification(Theme.text() | Theme.title()) :: {float(), float()}
+  def turned_justification(%{angle: angle, hjust: hjust, vjust: vjust}) do
+    case trunc(turned_angle(angle) / 90) do
+      0 -> {hjust, vjust}
+      1 -> {1 - vjust, hjust}
+      2 -> {1 - hjust, 1 - vjust}
+      3 -> {vjust, 1 - hjust}
+    end
+  end
+
+  # Where a text in `look` is anchored in its room, as ggplot2's `titleGrob()` places it: across
+  # and up, the share of the room its turned justification gives, and the points its margins move
+  # it, `-right * across + left * (1 - across)` across when `counted` is `:across` or `:both`, and
+  # likewise up with its bottom and top when `:up` or `:both`, none otherwise.
+  @doc false
+  @spec anchor(Theme.text() | Theme.title(), :across | :up | :both) ::
+          {{float(), float()}, {float(), float()}}
+  def anchor(%{margin: margin} = look, counted) do
+    {across, up} = turned_justification(look)
+
+    across_offset =
+      if counted in [:across, :both],
+        do: -margin.right * across + margin.left * (1 - across),
+        else: 0.0
+
+    up_offset =
+      if counted in [:up, :both],
+        do: -margin.top * up + margin.bottom * (1 - up),
+        else: 0.0
+
+    {{across, up}, {across_offset, up_offset}}
+  end
+
+  # How wide and how deep `texts` drawn in `look` at one anchor are, in points, as ggplot2's
+  # `titleGrob()` measures them: the box grid's text grob takes round each text, as wide as its
+  # widest line and as deep as its lines spaced out and an ascent, justified at the anchor and
+  # turned with it, every text's box together; then the font's descent turned too, its sine added
+  # across and its cosine up. An axis's labels or a colour bar's are measured together, as one grob
+  # holds them; ggplot2 measures them along a line, so only the way across it counts.
+  @doc false
+  @spec extent([String.t()], Theme.text() | Theme.title()) :: {float(), float()}
+  def extent(texts, look) do
+    radians = look.angle / 180 * :math.pi()
+    cosine = :math.cos(radians)
+    sine = :math.sin(radians)
+    ascent = Font.ascent(look.size)
+
+    corners =
+      Enum.flat_map(texts, fn text ->
+        lines = lines(text, look)
+
+        width =
+          lines
+          |> Enum.map(fn line -> Font.width(line, look.size) end)
+          |> Enum.max()
+
+        height = (length(lines) - 1) * line_spacing(look) + ascent
+
+        for across <- [-look.hjust * width, width - look.hjust * width],
+            up <- [-look.vjust * height, height - look.vjust * height],
+            do: {across * cosine - up * sine, across * sine + up * cosine}
+      end)
+
+    {left, right} =
+      corners
+      |> Enum.map(fn {across, _up} -> across end)
+      |> Enum.min_max()
+
+    {bottom, top} =
+      corners
+      |> Enum.map(fn {_across, up} -> up end)
+      |> Enum.min_max()
+
+    descent = Font.descent(look.size)
+    descent_radians = turned_angle(look.angle) / 180 * :math.pi()
+
+    {right - left + abs(:math.sin(descent_radians)) * descent,
+     top - bottom + abs(:math.cos(descent_radians)) * descent}
+  end
+
+  # `texts` drawn in `look`, each anchored at its place in its cell, `places`, and moved `offset`
+  # points across and up the cell, as `anchor/2` moves a text by its margins: turned, justified
+  # `hjust` along its baseline, and each line of a title stacked `vjust` of the way down from its
+  # top, every line a label of its own, as grid's text grob draws them.
+  @doc false
+  @spec text([String.t()], [{float(), float()}], {float(), float()}, Theme.text() | Theme.title()) ::
+          Text.t()
+  def text(texts, places, offset, look) do
+    ascent = Font.ascent(look.size)
+    {along, up} = in_text_frame(offset, look.angle)
+
+    lines =
+      texts
+      |> Enum.zip_with(places, fn text, place ->
+        lines = lines(text, look)
+        count = length(lines)
+
+        Enum.with_index(lines, fn line, index ->
+          stacked = ((1 - look.vjust) * (count - 1) - index) * line_spacing(look)
+          {line, place, {along, up + stacked - look.vjust * ascent}}
+        end)
+      end)
+      |> Enum.concat()
+
+    count = length(lines)
+
+    %Text{
+      x: Enum.map(lines, fn {_line, {x_place, _y_place}, _offset} -> x_place end),
+      y: Enum.map(lines, fn {_line, {_x_place, y_place}, _offset} -> y_place end),
+      labels: Enum.map(lines, fn {line, _place, _offset} -> line end),
+      widths: Enum.map(lines, fn {line, _place, _offset} -> Font.width(line, look.size) end),
+      size: look.size,
+      family: "",
+      face: look.face,
+      color: List.duplicate(look.color, count),
+      opacity: List.duplicate(look.opacity, count),
+      angle: look.angle,
+      hjust: List.duplicate(look.hjust, count),
+      offset: Enum.map(lines, fn {_line, _place, offset} -> offset end),
+      check_overlap: false,
+      ascent: ascent
+    }
+  end
+
+  # An offset `{across, up}` in a cell's frame, in points, as an offset along and up a text turned
+  # `angle` degrees, the frame a text's offset is given in.
+  @doc false
+  @spec in_text_frame({float(), float()}, number()) :: {float(), float()}
+  def in_text_frame({across, up}, angle) do
+    radians = angle / 180 * :math.pi()
+    cosine = :math.cos(radians)
+    sine = :math.sin(radians)
+    {across * cosine + up * sine, up * cosine - across * sine}
+  end
+
+  # A title's lines, split where it breaks; any other text is one line.
+  defp lines(text, %{line_spacing: _spacing}), do: String.split(text, "\n")
+  defp lines(text, _look), do: [text]
+
+  # The distance from one line's baseline to the next's: a title's, and none for one-line text.
+  defp line_spacing(%{line_spacing: spacing}), do: spacing
+  defp line_spacing(_look), do: 0.0
+
+  # An angle in degrees as R's `%% 360` takes it, from 0 up to 360.
+  defp turned_angle(angle) do
+    once = angle - Float.floor(angle / 360) * 360
+    once - Float.floor(once / 360) * 360
+  end
 end

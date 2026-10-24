@@ -22,7 +22,9 @@ border is never filled"; how a plot chooses a complete theme, what it records, a
 are laid over one in turn: the entry beginning "A plot chooses a complete theme"; where the
 legends go and why a placement is resolved to `{x, y}`: the entry beginning "Legends go where the
 theme puts them"; why the element tree is a boundary of its own beside the theme: the entry
-beginning "The theme's element tree is a boundary of its own".
+beginning "The theme's element tree is a boundary of its own"; why text's face, angle and
+justification are the theme's, and which of R's values are refused: the entry beginning "Text's
+face, angle, justification and line height are the theme's".
 
 ## Rules
 
@@ -65,15 +67,19 @@ beginning "The theme's element tree is a boundary of its own".
   complete theme, as ggplot2 fills a root from its default theme, which a root a setting replaces
   whole shows; under a removed root passed over, a property nothing gives is grid's default
   (the `@grid_` attributes), a share of a parent that gives none is nothing, one with no parent
-  at all the share itself, and one inherited from a parent still a share is taken of it again.
+  at all the share itself, and one inherited from a parent still a share is taken of it again;
+  a text's justification nothing gives is centred, grid's, where R itself fails.
   A length or a margin is never removed.
 - **Two drawn elements are worked out as ggplot2's guides work them out**, not by the tree alone: a
   legend's title and labels take their default margins from a `text` laid over the theme, the root
   text's margin widened by `legend_key_spacing` on the side facing the keys, worked out for each
   side they are drawn on (`legend_title_top`, below it; `legend_title_left`, right of it;
-  `legend_text_right`, left of it; `legend_text_bottom`, above it, below a colour bar), which a
-  margin set on `legend_title`, `legend_text` or `title` replaces, and which replaces a removed root
-  text, so they are drawn where every other text is removed; and a colour bar's ticks are
+  `legend_text_right`, left of it; `legend_text_bottom`, above it, below a colour bar), and their
+  default justification from it too (a title and labels right of keys `{0, 0.5}`, labels below a
+  colour bar `{0.5, 1}`), so the root text's justification never reaches them while its face and
+  angle do; what `legend_title`, `legend_text` or `title` sets replaces both, and the laid text
+  replaces a removed root text, so they are drawn where every other text is removed; and a colour
+  bar's ticks are
   `guide_colourbar()`'s white 0.5 / .pt mm only where the settings leave `legend_ticks` unset
   (`replace_null()`), so a colour given every line never reaches them, made as a setting is, so they
   skip a removed `line`.
@@ -95,7 +101,8 @@ beginning "The theme's element tree is a boundary of its own".
 - **The complete theme holds every element already worked out, in the scene's units:** lengths,
   margins and line widths in points (1/72 inch), each colour an `#RRGGBB` beside its opacity (a
   rectangle's `fill_opacity` and `color_opacity`, a line's or a text's `opacity`), its alpha over
-  255, 0 for `:none`, every margin a map of its four sides. **A length is held as `{amount, unit}`
+  255, 0 for `:none`, every margin a map of its four sides, every text's face, its angle in degrees
+  and its justification as floats. **A length is held as `{amount, unit}`
   until worked out, and converted in grid's order of operations** (TeX's points over 72.27,
   centimetres over 2.54, millimetres over 10 and then 2.54, lines of text as a 12-point font at a
   line height of 1.2 over 72; then times 72), and a line width from millimetres as R's engine hands
@@ -107,10 +114,11 @@ beginning "The theme's element tree is a boundary of its own".
   reads while compiling; `Plot` lists it to choose a complete theme and merge settings, the
   assembly to complete it and read the layers' defaults, rendering and the guide to read the
   complete theme. It knows no scene primitive: the drawing builds primitives from its elements.
-- **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, and
-  whether the panel is drawn over its layers; alignment and angle stay with the drawing** (the y
-  title turned 90 degrees, labels hung from their ticks) until a theme can set them; so do text
-  faces and families, and a line's corners (`linejoin`, round, as `theme_gray()`'s).
+- **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, text's
+  faces, angles and justification, and whether the panel is drawn over its layers**: the y title
+  turned 90 degrees and the labels hung from their ticks are `theme_gray()`'s and `theme_void()`'s
+  settings, the only complete themes that set any (the rest inherit `gray/1`'s, as R's do). Text
+  families and a line's corners (`linejoin`, round, as `theme_gray()`'s) stay with the drawing.
 - **A line type is worked out into `dashes` in points, as svglite writes R's**: each length of
   its pattern times the width in R's line-width units (`linewidth * .pt`), or 1 where narrower,
   `:none` for a solid one. A line of the blank line type works out `dashes: :blank`, which the
@@ -135,8 +143,8 @@ beginning "The theme's element tree is a boundary of its own".
   entry beginning "Legends go where the theme puts them"). Values R takes loosely are refused at
   the call: an unknown position, box or location, a numeric `legend_position`, numbers in
   `legend_box_just`.
-- **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): text's face, angle and alignment. From legend placement: `legend.title.position`,
+- **What waits** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
+  increment"): from legend placement, `legend.title.position`,
   `legend.text.position`, `legend.byrow`, `legend.key.spacing.x` and `.y` as settings (a legend
   running across spaces its keys `legend_key_spacing` both ways, as ggplot2 does when neither is
   set), `legend.key.justification`, `legend.frame`. A complete theme's `ink`, `paper`, `accent`
@@ -150,11 +158,12 @@ beginning "The theme's element tree is a boundary of its own".
   palettes are not the theme's:** ggplot2 4's `set_palettes()` takes a scale's palette from the
   theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
 - **A title's look carries its line spacing** (`Theme.title()`: `line_spacing`, the points from
-  one line's baseline to the next's, 0.9 x 1.2 times its size, ggplot2's `lineheight` as R's
-  graphics engine reads it), since only titles break over lines: the axes' and the legends'
+  one line's baseline to the next's, its `lineheight`, 0.9 unless set, x 1.2 times its size, as
+  R's graphics engine reads it), since only titles break over lines: the axes' and the legends'
   titles, and the plot's own, `theme_gray()`'s `plot.title` (1.2 times the base size, `half_line`
-  below it), `plot.subtitle` (the base size, `half_line` below), `plot.caption` (0.8 of it,
-  `half_line` above) and `plot.tag` (1.2 times it, no margin), all black.
+  below it, left-aligned and hung), `plot.subtitle` (the base size, `half_line` below, the same),
+  `plot.caption` (0.8 of it, `half_line` above, right-aligned and hung) and `plot.tag` (1.2 times
+  it, no margin, centred), all black. Any other text takes a `lineheight` and holds none.
 - **A legend's look is `theme_gray()`'s at its defaults**: right of the panels, centred
   (`legend.justification`), in a box with no margin and no background; paper white with no border,
   `half_line` inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` from

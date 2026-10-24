@@ -110,6 +110,34 @@ defmodule Giggly.GuideTest do
   # on mpg, keys 2000 to 2008 by 2, and for a column named `a_long_column_name`, keys 2.5, 5.0 and
   # 7.5: 53.30 by 112.69 points, and 119.22 by 78.13. They move with the theme's legend values or
   # how a legend is laid out.
+  # Golden: R's `rotate_just()` and the width and height of ggplot2 4.0.3's `titleGrob()` under
+  # vdiffr 1.0.9's device (R 4.6.1) for "a longer label" at 8.8 points, `hjust = 0.2, vjust =
+  # 0.7`, margins of 1, 2, 3 and 4 points, one angle in each quarter turn. It moves with how a
+  # text is anchored or measured.
+  describe "Parts, the rule every text is placed and measured by" do
+    test "a text is anchored at its justification turned a quarter turn at a time, and measured turned" do
+      margin = %{top: 1.0, right: 2.0, bottom: 3.0, left: 4.0}
+
+      measured =
+        Enum.map([30.0, 120.0, 210.0, 300.0], fn angle ->
+          look = %{size: 8.8, angle: angle, hjust: 0.2, vjust: 0.7, margin: margin}
+          {across, up} = Guide.Parts.turned_justification(look)
+          {width, height} = Guide.Parts.extent(["a longer label"], look)
+          rounded = fn number -> Float.round(number, 9) end
+
+          {rounded.(across), rounded.(up), rounded.(4.0 + width + 2.0),
+           rounded.(1.0 + height + 3.0)}
+        end)
+
+      assert measured === [
+               {0.2, 0.7, 55.699669619, 37.245392899},
+               {0.3, 0.2, 39.245392899, 53.699669619},
+               {0.8, 0.3, 55.699669619, 37.245392899},
+               {0.7, 0.8, 39.245392899, 53.699669619}
+             ]
+    end
+  end
+
   describe "draw/3 for a legend" do
     test "a legend is its margin around a title above a key for each label" do
       keys =
@@ -165,10 +193,10 @@ defmodule Giggly.GuideTest do
 
       [_margin, {:points, key_column} | _labels] = scene.widths
 
-      # The key rows follow the margin and the title's two rows, a row of no spacing after each.
+      # The key rows follow the margin and the title's row, a row of no spacing after each.
       key_rows =
         scene.heights
-        |> Enum.slice(3..-2//2)
+        |> Enum.slice(2..-2//2)
         |> Enum.map(fn {:points, height} -> Float.round(height, 2) end)
 
       assert {key_column, key_rows} === {34.02, [17.28, 21.71, 28.53, 34.02]}
@@ -247,7 +275,7 @@ defmodule Giggly.GuideTest do
       [%Giggly.Scene.Gradient{stops: ^decor}, ticks] = bar.primitives
 
       {:points, bar_width} = Enum.at(scene.widths, 1)
-      {:points, bar_length} = Enum.at(scene.heights, 3)
+      {:points, bar_length} = Enum.at(scene.heights, 2)
       assert {Float.round(bar_width, 2), Float.round(bar_length, 2)} === {17.28, 86.4}
 
       assert {Float.round(ticks.stroke_width, 2), length(ticks.lines), ticks.color} ===

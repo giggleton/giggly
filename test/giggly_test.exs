@@ -8382,6 +8382,193 @@ defmodule GigglyTest do
 
       assert golden?(plot, "theme_alpha")
     end
+
+    # Golden: test/golden/theme_text_axis_x_45.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_axis_x_45.R: every element and clip path matches. The x
+    # axis's labels are turned 45 degrees and end at their ticks, and the axis is as deep as the
+    # widest label turned, its descent turned too. It moves with how a text is placed or measured.
+    test "axis_text_x: [angle: 45, hjust: 1] turns the labels to end at their ticks" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot()
+        |> Plot.theme(axis_text_x: [angle: 45, hjust: 1])
+
+      assert golden?(plot, "theme_text_axis_x_45")
+    end
+
+    # Golden: test/golden/theme_text_axis_x_90.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_axis_x_90.R: every element and clip path matches. Turned
+    # a quarter turn, each label is anchored at its turned justification, its end at the top of the
+    # labels' room and its middle on its tick, and the axis is as deep as the widest label.
+    test "axis_text_x: [angle: 90, hjust: 1, vjust: 0.5] stands the labels on end, centred on their ticks" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot()
+        |> Plot.theme(axis_text_x: [angle: 90, hjust: 1, vjust: 0.5])
+
+      assert golden?(plot, "theme_text_axis_x_90")
+    end
+
+    # Golden: test/golden/theme_text_axis_x_negative.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/theme_text_axis_x_negative.R: every element and clip path
+    # matches. The ggplot2 book's long labels, turned 30 degrees clockwise, three quarter turns and
+    # more as R reads the angle, each starting at its tick.
+    test "a negative angle turns the labels clockwise, justified as three quarter turns and more" do
+      plot =
+        %{"x" => ["label", "a long label", "an even longer label"], "y" => [1, 2, 3]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.theme(axis_text_x: [angle: -30, vjust: 1, hjust: 0])
+        |> Plot.labs(x: :none, y: :none)
+
+      assert golden?(plot, "theme_text_axis_x_negative")
+    end
+
+    # Golden: test/golden/theme_text_axis_y_30.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_axis_y_30.R: every element and clip path matches. The y
+    # axis is as wide as all its labels turned together, as one grob measures them.
+    test "axis_text_y: [angle: 30] turns the y axis's labels, the axis as wide as they are turned" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, y: :class})
+        |> Plot.geom_point()
+        |> Plot.theme(axis_text_y: [angle: 30])
+
+      assert golden?(plot, "theme_text_axis_y_30")
+    end
+
+    # Golden: test/golden/theme_text_axis_titles.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_axis_titles.R: every element and clip path matches. The
+    # y axis's title level, its column as wide as it, and the x axis's at the panel's right.
+    test "an axis's title is turned and justified as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.theme(axis_title_y: [angle: 0, vjust: 0.5], axis_title_x: [hjust: 1])
+
+      assert golden?(plot, "theme_text_axis_titles")
+    end
+
+    # Golden: test/golden/theme_text_plot_titles.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_plot_titles.R: every element and clip path matches. Each
+    # face is written as vdiffr writes it, after the size, and measured as plain text is.
+    test "the plot's titles are drawn in their faces and justified as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.labs(
+          title: "Fuel economy declines as engine size increases",
+          subtitle: "Two seaters are the exception",
+          caption: "Data from fueleconomy.gov",
+          tag: "A"
+        )
+        |> Plot.theme(
+          plot_title: [face: :bold, hjust: 0.5],
+          plot_subtitle: [face: :italic, hjust: 0.5],
+          plot_caption: [hjust: 0],
+          plot_tag: [face: :bold_italic]
+        )
+
+      assert golden?(plot, "theme_text_plot_titles")
+    end
+
+    # Golden: test/golden/theme_text_lineheight.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_lineheight.R: every element and clip path matches. A
+    # title's lines are `lineheight` times 1.2 font sizes apart, and it is as deep as they are.
+    test "a title's lineheight spaces its lines" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.labs(title: "Fuel economy\nby engine size", x: "Engine displacement\n(litres)")
+        |> Plot.theme(plot_title: [lineheight: 1.5, hjust: 1], axis_title_x: [lineheight: 0.6])
+
+      assert golden?(plot, "theme_text_lineheight")
+    end
+
+    # Golden: test/golden/theme_text_strip.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_text_strip.R: every element and clip path matches, but the
+    # background's edge, which R writes as its rounding error. Each strip's label bold, at its
+    # strip's left, its margin in.
+    test "a strip's label is drawn in its face and justified as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:class)
+        |> Plot.theme(strip_text: [hjust: 0, face: :bold])
+
+      assert golden?(plot, "theme_text_strip")
+    end
+
+    # Golden: test/golden/theme_text_legend_justified.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/theme_text_legend_justified.R: every element and clip path
+    # matches. The labels right-aligned in their column, and the title, wider than the keys and
+    # labels, right-aligned, its spare room left of them, as `add_title()` splits it.
+    test "a legend's labels and a title wider than them are justified as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: "Vehicle class, as the EPA lists it")
+        |> Plot.theme(legend_text: [hjust: 1], legend_title: [hjust: 1, face: :italic])
+
+      assert golden?(plot, "theme_text_legend_justified")
+    end
+
+    # Golden: test/golden/theme_text_legend_across.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/theme_text_legend_across.R: every element and clip path
+    # matches. The title left of keys running across, turned on its side and taller than them, its
+    # spare room above them, as its turned justification splits it.
+    test "a turned title left of a legend's keys leaves its room as its justification says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: "Drive train")
+        |> Plot.theme(
+          legend_position: :bottom,
+          legend_title: [angle: 90, vjust: 1],
+          legend_text: [face: :bold]
+        )
+
+      assert golden?(plot, "theme_text_legend_across")
+    end
+
+    # Golden: test/golden/theme_text_colorbar.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_colorbar.R: every element and clip path matches
+    # vdiffr's but the bar's fill, which vdiffr's device cannot draw, and every stop matches
+    # svglite's. The labels right-aligned in their column, the title centred over the bar and its
+    # labels, its spare room either side.
+    test "a colour bar's labels and title are justified as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.labs(colour: "City mileage, mpg")
+        |> Plot.theme(legend_text: [face: :bold, hjust: 1], legend_title: [hjust: 0.5])
+
+      assert golden?(plot, "theme_text_colorbar")
+    end
+
+    # Golden: test/golden/theme_text_theta.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_text_theta.R: every element matches, and every clip path but
+    # svglite's around the whole drawing. The labels round the circle turned 30 degrees and
+    # justified by their break's angle and that turn together, the radius axis's labels italic.
+    test "the labels round a radial panel are turned by the theme and justified with their angle" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.coord_radial()
+        |> Plot.theme(axis_text_theta: [angle: 30], axis_text_r: [face: :italic])
+
+      assert golden?(plot, "theme_text_theta")
+    end
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`

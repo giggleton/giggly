@@ -91,10 +91,16 @@ defmodule Giggly.Theme do
   # are worked out for each side of its keys they are drawn on, as ggplot2's legend works them out
   # for where it puts them.
   #
+  # A text's face, its angle and its justification are the theme's too, as ggplot2's
+  # `element_text()` gives them, and so is the spacing of a title's lines: the y axis's title is
+  # turned 90 degrees because `theme_gray()` turns it, and a tick label hangs from its tick because
+  # the theme justifies it so. A legend's title and labels take their justification from the text
+  # their side lays over the theme, as their margins do.
+  #
   # When a plot is rendered, every function that draws something other than a mark takes the
   # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths, line
-  # types and ends, and spacing, and whether the panel's background and grid are drawn over its
-  # layers; how text is aligned and turned is the drawing's until a theme can set it.
+  # types and ends, spacing, text's faces, angles and justification, and whether the panel's
+  # background and grid are drawn over its layers.
 
   # A theme is values: it calls nothing, and reads only its element tree, while compiling. The
   # complete theme is this module's struct, which a boundary listing this one reads.
@@ -283,24 +289,43 @@ defmodule Giggly.Theme do
   @typedoc "Space on each side of something, in points."
   @type margin :: %{top: float(), right: float(), bottom: float(), left: float()}
 
-  @typedoc """
-  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, and its `margin`: the
-  space in points on each side of it, of which the drawing counts the sides ggplot2 counts; or
-  `:none`, removed.
-  """
-  @type text ::
-          %{size: float(), color: String.t(), opacity: float(), margin: margin()} | :none
+  @typedoc "A text's face: plain, bold, italic, or bold and italic."
+  @type face :: :plain | :bold | :italic | :bold_italic
 
   @typedoc """
-  A title's text, which may run over several lines: its `size`, `color`, `opacity` and `margin`,
-  as text's, and its `line_spacing`, the distance in points from one line's baseline to the
-  next's; or `:none`, removed.
+  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, its `face`, the
+  `angle` it is turned, in degrees anticlockwise, its `hjust` and `vjust`, where it sits across
+  and up as shares of its width and height, in its own turned frame, and its `margin`: the space
+  in points on each side of it, of which the drawing counts the sides ggplot2 counts; or `:none`,
+  removed.
+  """
+  @type text ::
+          %{
+            size: float(),
+            color: String.t(),
+            opacity: float(),
+            face: face(),
+            angle: float(),
+            hjust: float(),
+            vjust: float(),
+            margin: margin()
+          }
+          | :none
+
+  @typedoc """
+  A title's text, which may run over several lines: its `size`, `color`, `opacity`, `face`,
+  `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the distance in points
+  from one line's baseline to the next's; or `:none`, removed.
   """
   @type title ::
           %{
             size: float(),
             color: String.t(),
             opacity: float(),
+            face: face(),
+            angle: float(),
+            hjust: float(),
+            vjust: float(),
             margin: margin(),
             line_spacing: float()
           }
@@ -428,13 +453,18 @@ defmodule Giggly.Theme do
 
   # grid's own defaults, which a property nothing in the theme gives falls to, as R draws it: black,
   # a white fill, a line 1/96 inch wide, which svglite writes in points, with round ends, and a
-  # 12-point font with its lines 1.2 apart, which also make grid's line of text.
+  # 12-point font with its lines 1.2 apart, which also make grid's line of text, plain, level and
+  # centred both ways, as grid's `textGrob()` draws text. R itself fails on a text whose
+  # justification only a removed root would give; the drawing centres it, as grid would.
   @grid_color "#000000"
   @grid_fill "#FFFFFF"
   @grid_line_width 72 / 96
   @grid_line_end :round
   @grid_font_size 12
   @grid_line_height 1.2
+  @grid_face :plain
+  @grid_angle 0
+  @grid_justification 0.5
 
   # ggplot2's line widths are millimetres, which grid draws as `.pt` line-width units each, and a
   # line-width unit is 1/96 inch, which svglite writes in points.
@@ -647,10 +677,14 @@ defmodule Giggly.Theme do
       legend_key_width: distance(theme, :legend_key_width),
       legend_key_height: distance(theme, :legend_key_height),
       legend_key_spacing: gap,
-      legend_title_top: title(beside_keys(theme, text_margin, :bottom, gap), :legend_title),
-      legend_title_left: title(beside_keys(theme, text_margin, :right, gap), :legend_title),
-      legend_text_right: text(beside_keys(theme, text_margin, :left, gap), :legend_text),
-      legend_text_bottom: text(beside_keys(theme, text_margin, :top, gap), :legend_text),
+      legend_title_top:
+        title(beside_keys(theme, {text_margin, :bottom, gap}, {0, 0.5}), :legend_title),
+      legend_title_left:
+        title(beside_keys(theme, {text_margin, :right, gap}, {0, 0.5}), :legend_title),
+      legend_text_right:
+        text(beside_keys(theme, {text_margin, :left, gap}, {0, 0.5}), :legend_text),
+      legend_text_bottom:
+        text(beside_keys(theme, {text_margin, :top, gap}, {0.5, 1}), :legend_text),
       legend_ticks: line(legend_ticks_theme, :legend_ticks),
       legend_ticks_length: distance(theme, :legend_ticks_length),
       legend_spacing_x: distance(legend_spacing_theme, :legend_spacing_x),
@@ -683,13 +717,16 @@ defmodule Giggly.Theme do
   defp text_margin(text), do: text.margin
 
   # `theme` with its root text's margin widened by `gap` on `side`, the side facing a legend's keys,
-  # as ggplot2's legend lays a text element over the theme to give its title and labels their
-  # default margins, which a margin the title's or the labels' own element sets replaces. Laid over
-  # a removed root text, it replaces the removal, and the root takes the rest from theme_gray()'s,
-  # so a legend's title and labels are drawn where every other text is removed, as ggplot2's are.
-  defp beside_keys(theme, margin, side, gap) do
+  # and its justification `{hjust, vjust}`, as ggplot2's legend lays a text element over the theme
+  # to give its title and labels their default margins and justification for that side, which
+  # what the title's or the labels' own element sets replaces: a title left-aligned and centred
+  # down, labels right of the keys the same, labels below a colour bar centred and hung. The root's
+  # face and angle are left as they are. Laid over a removed root text, it replaces the removal,
+  # and the root takes the rest from theme_gray()'s, so a legend's title and labels are drawn where
+  # every other text is removed, as ggplot2's are.
+  defp beside_keys(theme, {margin, side, gap}, {hjust, vjust}) do
     widened = Map.update!(margin, side, fn length -> {points(length) + gap, :points} end)
-    lay_over(theme, %{text: %{margin: widened}})
+    lay_over(theme, %{text: %{margin: widened, hjust: hjust, vjust: vjust}})
   end
 
   # A justification worked out as grid's `valid.just()` reads one, `{x, y}`, each a share of the
@@ -923,6 +960,10 @@ defmodule Giggly.Theme do
       size: size(text),
       color: color,
       opacity: opacity,
+      face: Map.get(text, :face, @grid_face),
+      angle: Map.get(text, :angle, @grid_angle) / 1,
+      hjust: Map.get(text, :hjust, @grid_justification) / 1,
+      vjust: Map.get(text, :vjust, @grid_justification) / 1,
       margin:
         text
         |> Map.get(:margin, @no_margin)
@@ -985,26 +1026,29 @@ defmodule Giggly.Theme do
   #
   # `half_line`, half the base size, spaces most things, and each colour is ink mixed toward paper
   # by ggplot2's `col_mix()`. Lines are solid ink, `base_line_size` wide, their ends cut square;
-  # rectangles are filled with paper and bordered in solid ink `base_rect_size` wide; text is ink
-  # at the base size, its lines 0.9 lines of R's graphics engine apart. The spacing is `half_line`
-  # and so is every margin.
+  # rectangles are filled with paper and bordered in solid ink `base_rect_size` wide; text is plain
+  # ink at the base size, level and centred both ways, its lines 0.9 lines of R's graphics engine
+  # apart. The spacing is `half_line` and so is every margin.
   #
   # The plot's background is bordered in paper. The panel's background is light grey (ink mixed
   # 92% toward paper) with no border, drawn under the layers, and its grid lines are paper, the
   # minor ones half as wide; there is no border over the panel. An axis draws no line; its ticks
   # are dark grey (20% toward paper), half the spacing long; its labels are grey
   # (30.2% toward paper), 0.8 of the base size, `0.8 * half_line / 2` from the ticks (a radius
-  # axis's on both sides); its title is `half_line / 2` from the labels. A strip is light grey
+  # axis's on both sides), the x axis's hanging from their ticks, the y axis's ending at theirs, a
+  # radius axis's centred; its title is `half_line / 2` from the labels, the x axis's hanging, the
+  # y axis's turned 90 degrees with its top toward the labels' far side. A strip is light grey
   # (85% toward paper) with no border, and its text near black (10% toward paper), 0.8 of the base
   # size, with `0.8 * half_line` around it.
   #
   # A legend has no border; the space between legends, and between the panels and the legends, is
   # twice the spacing; each key is 1.2 lines square on the panel's background (`legend_key`
-  # inherits it), whatever the base size; its labels are 0.8 of the base size; a colour bar's
-  # ticks reach a fifth of a key into the bar; the legends go right of the panels, centred, in a
-  # box with no margin and no background. The plot's title is 1.2 times the base size with
-  # `half_line` below it, its subtitle at the base size with `half_line` below it, its caption 0.8
-  # of it with `half_line` above it, and its tag 1.2 times it.
+  # inherits it), whatever the base size; its labels are 0.8 of the base size; its title is
+  # left-aligned; a colour bar's ticks reach a fifth of a key into the bar; the legends go right of
+  # the panels, centred, in a box with no margin and no background. The plot's title is 1.2 times
+  # the base size with `half_line` below it, its subtitle at the base size with `half_line` below
+  # it, both left-aligned and hanging, its caption 0.8 of it with `half_line` above it,
+  # right-aligned and hanging, and its tag 1.2 times it, centred both ways.
   defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size} = sizes) do
     half_line = base_size / 2
 
@@ -1012,23 +1056,24 @@ defmodule Giggly.Theme do
       geom: geom(sizes, @paper),
       line: %{color: @ink, linewidth: line_size, linetype: {}, lineend: :butt},
       rect: %{fill: @paper, color: @ink, linewidth: rect_size, linetype: {}},
-      text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
+      text: root_text(base_size),
       title: %{},
       spacing: {half_line, :pt},
       margins: sides(half_line, half_line, half_line, half_line),
       axis_line: :none,
       axis_text: %{size: {:rel, 0.8}, color: @ink_toward_paper_30_2},
-      axis_text_x: %{margin: sides(0.8 * half_line / 2, 0, 0, 0)},
-      axis_text_y: %{margin: sides(0, 0.8 * half_line / 2, 0, 0)},
-      axis_text_r: %{margin: sides(0, 0.8 * half_line / 2, 0, 0.8 * half_line / 2)},
+      axis_text_x: %{margin: sides(0.8 * half_line / 2, 0, 0, 0), vjust: 1},
+      axis_text_y: %{margin: sides(0, 0.8 * half_line / 2, 0, 0), hjust: 1},
+      axis_text_r: %{margin: sides(0, 0.8 * half_line / 2, 0, 0.8 * half_line / 2), hjust: 0.5},
       axis_ticks: %{color: @ink_toward_paper_20},
       axis_ticks_length: {:rel, 0.5},
-      axis_title_x: %{margin: sides(half_line / 2, 0, 0, 0)},
-      axis_title_y: %{margin: sides(0, half_line / 2, 0, 0)},
+      axis_title_x: %{margin: sides(half_line / 2, 0, 0, 0), vjust: 1},
+      axis_title_y: %{angle: 90, margin: sides(0, half_line / 2, 0, 0), vjust: 1},
       legend_background: %{color: :none},
       legend_spacing: {:rel, 2},
       legend_key_size: {1.2, :lines},
       legend_text: %{size: {:rel, 0.8}},
+      legend_title: %{hjust: 0},
       legend_ticks_length: {:rel, 0.2},
       legend_position: :right,
       legend_justification: :center,
@@ -1047,10 +1092,10 @@ defmodule Giggly.Theme do
         margin: strip_margin(half_line)
       },
       plot_background: %{color: @paper},
-      plot_title: %{size: {:rel, 1.2}, margin: sides(0, 0, half_line, 0)},
-      plot_subtitle: %{margin: sides(0, 0, half_line, 0)},
-      plot_caption: %{size: {:rel, 0.8}, margin: sides(half_line, 0, 0, 0)},
-      plot_tag: %{size: {:rel, 1.2}}
+      plot_title: %{size: {:rel, 1.2}, hjust: 0, vjust: 1, margin: sides(0, 0, half_line, 0)},
+      plot_subtitle: %{hjust: 0, vjust: 1, margin: sides(0, 0, half_line, 0)},
+      plot_caption: %{size: {:rel, 0.8}, hjust: 1, vjust: 1, margin: sides(half_line, 0, 0, 0)},
+      plot_tag: %{size: {:rel, 1.2}, hjust: 0.5, vjust: 0.5}
     }
   end
 
@@ -1173,8 +1218,8 @@ defmodule Giggly.Theme do
   # the panels'; the strips' text with no margin of its own; no margin round the plot, inside a
   # legend or inside the legends' box, and no background to the box; no space set between legends,
   # which the box makes half a line, nor a justification, which centres them; legends 0.2
-  # centimetres from the panels; and the plot's title and subtitle with `half_line` above them, as
-  # its caption has.
+  # centimetres from the panels, their titles left-aligned; and the plot's title and subtitle with
+  # `half_line` above them, as its caption has, each aligned as theme_gray()'s.
   defp void(%{base_size: base_size} = sizes) do
     half_line = base_size / 2
 
@@ -1182,7 +1227,7 @@ defmodule Giggly.Theme do
       geom: geom(sizes, @clear_paper),
       line: :none,
       rect: %{fill: @clear_paper, color: :none, linewidth: 0, linetype: {}},
-      text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
+      text: root_text(base_size),
       title: %{},
       spacing: {half_line, :pt},
       margins: sides(half_line, half_line, half_line, half_line),
@@ -1192,7 +1237,7 @@ defmodule Giggly.Theme do
       legend_key_size: {1.2, :lines},
       legend_position: :right,
       legend_text: %{size: {:rel, 0.8}},
-      legend_title: %{},
+      legend_title: %{hjust: 0},
       legend_key_spacing: {:rel, 1},
       legend_margin: sides(0, 0, 0, 0),
       legend_box_margin: sides(0, 0, 0, 0),
@@ -1206,11 +1251,26 @@ defmodule Giggly.Theme do
       panel_background: :none,
       panel_border: :none,
       plot_margin: sides(0, 0, 0, 0),
-      plot_title: %{size: {:rel, 1.2}, margin: sides(half_line, 0, 0, 0)},
-      plot_subtitle: %{margin: sides(half_line, 0, 0, 0)},
-      plot_caption: %{size: {:rel, 0.8}, margin: sides(half_line, 0, 0, 0)},
-      plot_tag: %{size: {:rel, 1.2}},
+      plot_title: %{size: {:rel, 1.2}, hjust: 0, vjust: 1, margin: sides(half_line, 0, 0, 0)},
+      plot_subtitle: %{hjust: 0, vjust: 1, margin: sides(half_line, 0, 0, 0)},
+      plot_caption: %{size: {:rel, 0.8}, hjust: 1, vjust: 1, margin: sides(half_line, 0, 0, 0)},
+      plot_tag: %{size: {:rel, 1.2}, hjust: 0.5, vjust: 0.5},
       plot_background: %{}
+    }
+  end
+
+  # Every complete theme's root text at `base_size`: plain ink, level, centred both ways, its lines
+  # 0.9 lines of R's graphics engine apart, with no margin.
+  defp root_text(base_size) do
+    %{
+      color: @ink,
+      size: base_size,
+      face: :plain,
+      angle: 0,
+      hjust: 0.5,
+      vjust: 0.5,
+      lineheight: 0.9,
+      margin: @no_margin
     }
   end
 

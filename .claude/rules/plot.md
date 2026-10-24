@@ -290,8 +290,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   a schema built from `ElementTree.elements/0`**, an option per element of ggplot2's tree, each
   checked as its kind: a line's, a rectangle's or a text's properties a keyword list (`color:`,
   canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`, points; a text's
-  `margin:`; a line's and a rectangle's `linetype:`, as a layer's (`validate_linetype/1`), held as
-  its pattern, and a line's `lineend:`), a size or a line width `{:rel, share}` too, both 0 or more;
+  `margin:`, its `face:` (`:plain`, `:bold`, `:italic`, `:bold_italic`; R's `"oblique"` and its
+  numbers refused), its `angle:`, `hjust:` and `vjust:`, any number kept as a float, never a word,
+  which R's `element_text()` refuses, and its `lineheight:`, 0 or more, where R takes a negative
+  too, its `family:` waiting with `base_family:`; a line's and a rectangle's `linetype:`, as a
+  layer's (`validate_linetype/1`), held as its pattern, and a line's `lineend:`), a size or a line
+  width `{:rel, share}` too, both 0 or more;
   a length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or
   `{:rel, share}`, held as `{amount, unit}`; a margin one length or a keyword list of `:top`,
   `:right`, `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a map of all

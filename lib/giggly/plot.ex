@@ -2145,6 +2145,32 @@ defmodule Giggly.Plot do
           type: {:custom, __MODULE__, :validate_theme_size, []},
           doc: "How big it is, in points, or `{:rel, share}`, a share of its parent's size."
         ],
+        face: [
+          type: {:in, [:plain, :bold, :italic, :bold_italic]},
+          doc: "Its face: `:plain`, `:bold`, `:italic` or `:bold_italic`."
+        ],
+        angle: [
+          type: {:custom, __MODULE__, :validate_angle, []},
+          doc: "How far it is turned, in degrees anticlockwise, any number."
+        ],
+        hjust: [
+          type: {:custom, __MODULE__, :validate_text_justification, []},
+          doc:
+            "Where it sits across, any number: 0 at its left, 0.5 centred, 1 at its right, in " <>
+              "its own turned frame."
+        ],
+        vjust: [
+          type: {:custom, __MODULE__, :validate_text_justification, []},
+          doc:
+            "Where it sits up, any number: 0 at its bottom, 0.5 centred, 1 at its top, in its " <>
+              "own turned frame."
+        ],
+        lineheight: [
+          type: {:custom, __MODULE__, :validate_lineheight, []},
+          doc:
+            "How far apart its lines are, 0 or more, a share of 1.2 times its size: a title's " <>
+              "lines are 0.9 apart unless given."
+        ],
         margin: [
           type: {:custom, __MODULE__, :validate_theme_margin, [:text]},
           doc:
@@ -4814,6 +4840,15 @@ defmodule Giggly.Plot do
   never filled, are removed until a setting gives them, and `panel_ontop: true` draws the panels'
   backgrounds and grid lines over the layers, under the border.
 
+  A text's `face:` makes it bold or italic, `angle:` turns it, and `hjust:` and `vjust:` place it
+  in its room: the room is as deep as the turned text, so `axis_text_x: [angle: 45, hjust: 1]`
+  turns the x axis's labels to end at their ticks and deepens the axis to fit them, and
+  `plot_title: [hjust: 0.5]` centres the title over the panels. The justification is the text's
+  own, along and across it once turned: the y axis's title is turned 90 degrees, so its `vjust:
+  1` puts its top toward the left. A legend's labels sit right of their keys, left-aligned and
+  centred on them, and its title is left-aligned, unless `:legend_text` or `:legend_title` says
+  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines.
+
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin
   is one length for every side, a keyword list of `:top`, `:right`, `:bottom` and `:left`, a side
@@ -5484,6 +5519,25 @@ defmodule Giggly.Plot do
   @spec validate_angle(term()) :: {:ok, float()} | {:error, String.t()}
   def validate_angle(angle) when is_number(angle), do: {:ok, angle / 1}
   def validate_angle(angle), do: {:error, "expected a number of degrees, got: #{inspect(angle)}"}
+
+  # NimbleOptions' check of a theme text's `hjust:` or `vjust:`: any number, kept as a float, never
+  # one of a text layer's words, which R's `element_text()` refuses.
+  @doc false
+  @spec validate_text_justification(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_text_justification(just) when is_number(just), do: {:ok, just / 1}
+
+  def validate_text_justification(just),
+    do:
+      {:error, "expected a number, a share of the text's width or height, got: #{inspect(just)}"}
+
+  # NimbleOptions' check of a theme text's `lineheight:`: a number 0 or more, kept as a float, where
+  # R takes a negative one too and stacks a title's lines upward.
+  @doc false
+  @spec validate_lineheight(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_lineheight(height) when is_number(height) and height >= 0, do: {:ok, height / 1}
+
+  def validate_lineheight(height),
+    do: {:error, "expected a line height, a number 0 or more, got: #{inspect(height)}"}
 
   # NimbleOptions' check of a bar's `width:`: any number, kept as a float, as R keeps one; a
   # negative width puts a bar's edges the other way round, which draws it as wide.

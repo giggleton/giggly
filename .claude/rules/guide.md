@@ -34,16 +34,21 @@ panel's grid lines are placed by the coordinate system".
   in them. The boundary exports the modules rendering draws with (`Axis`, `Box`, `Grid`, `Strip`,
   `Title`) and the kinds, whose structs the assembly and `Plot` build, never a kind's drawing;
   `Plot` may build a kind's struct and call nothing that draws (`PlotRunsNothing`). The parts both
-  kinds' tables are built from (the background, the title's rows, a line of text) are
+  kinds' tables are built from (the background, the title and its room, a label's cell) are
   `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's layout, and so is the
-  title every guide draws.
-- **Every title is drawn by `Parts.title_text/5` and measured by `Parts.title_height/2` and
-  `title_width/2`**, an axis's, a legend's or the plot's own, so each may break over lines
-  (design-log §4, the entry beginning "A title may run over several lines"): each line a label of
-  its own, a line spacing (the theme's `line_spacing`) below the one before, stacked `vjust` of the
-  way down from its top as R's graphics engine stacks lines and justified `hjust` by its own width;
-  the title as deep as its lines spaced out and a line of text, and as wide as its widest line.
-  Tick labels and strips stay one line.
+  rule every text a guide draws is placed by.
+- **Every text a guide draws is placed and measured by one rule in `Guide.Parts`, ggplot2's
+  `titleGrob()`** (design-log §4, the entry beginning "Text's face, angle, justification and line
+  height are the theme's"): drawn in its look's face, turned its `angle` and justified by its
+  `hjust` and `vjust` in its own turned frame (`text/4`); anchored at its justification turned a
+  quarter turn at a time (`turned_justification/1`, `rotate_just()`) of its room, moved by the
+  margins it counts (`anchor/2`), as a share of the room and an offset in points, so it sits right
+  in a room bigger than itself; and as wide and deep as grid's box round it turned, with the
+  font's descent turned (`extent/2`), an axis's or a colour bar's labels measured together as one
+  grob. A title may break over lines (the entry beginning "A title may run over several lines"):
+  each line a label of its own, its `line_spacing` below the one before, stacked `vjust` of the
+  way down from its top as R's graphics engine stacks lines; tick labels, strips and a legend's
+  labels stay one line.
 - **A guide takes its breaks and its axis's line from the coordinate system, already placed**
   (`Coord.axes/2`), so ticks and marks are placed by one rule. Where an axis is drawn, which
   aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a
@@ -52,15 +57,15 @@ panel's grid lines are placed by the coordinate system".
   `Axis.draw_inside/3` over the panel's layers, takes no title of its own, and is neither measured
   nor given room, as ggplot2's `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
-  out its axis titles: centred on the panel's side, hanging from the cell's edge away from the
-  axis, turned 90 degrees on the left, its first line farthest from the axis. A title of `:none`
-  draws nothing and takes no room; `""` takes a line's room and draws nothing.
-- **The plot's labels are drawn by `Guide.Title`, as `theme_gray()` draws `plot.title`,
-  `plot.subtitle`, `plot.caption` and `plot.tag`**: the title and the subtitle hanging left-aligned
-  from their cells' tops, their margins below; the caption hanging right-aligned from its margin
-  below its cell's top; the tag centred both ways in a cell as wide as its widest line and as deep
-  as its lines. It reports each one's depth, and the tag's width, in points, for rendering to lay
-  out; a label of `:none` takes no room.
+  out its axis titles, counting its margins across the axis alone: `theme_gray()`'s centred on
+  the panel's side, hanging from the cell's edge away from the axis, turned 90 degrees on the
+  left. A title of `:none` draws nothing and takes no room; `""` takes a line's room and draws
+  nothing.
+- **The plot's labels are drawn by `Guide.Title`**, each counting its margins on every side, in a
+  row as deep as it is turned and its margins, the tag in a cell as wide and as deep: as
+  `theme_gray()` draws them, the title and the subtitle hanging left-aligned, the caption hanging
+  right-aligned, the tag centred both ways. It reports each one's depth, and the tag's width, in
+  points, for rendering to lay out; a label of `:none` takes no room.
 - **The grid's lines and the background's shape come from the coordinate system** (`Coord.grid/2`):
   a background filling the panel is a rectangle, any other the polygon round its outline. The guide
   gives them the theme's look and ggplot2's order: the panel's background, the minor lines at the y
@@ -93,9 +98,11 @@ panel's grid lines are placed by the coordinate system".
   title and labels every side, a colour bar's labels those across the bar (either side of one
   running up, above and below one running across). **A negative tick
   length turns the ticks into the panel and takes no room**: an axis is measured from the longer
-  of 0 and its ticks, as ggplot2 measures the range from 0. How a label is hung from its tick, the
-  radius axis's labels centred between two margins, the angle axis's labels justified by their
-  angles, and the y title's 90-degree turn are the guide's until a theme can set them.
+  of 0 and its ticks, as ggplot2 measures the range from 0. **An axis's labels are each at their
+  break and across the axis at their turned justification of their room beyond the ticks**, the
+  room as deep as all of them turned. **The angle axis's labels are turned by the theme and
+  justified by their break's angle and that turn together, whatever justification the theme
+  gives**, as `guide_axis_theta()` justifies them.
 - **An axis with no breaks draws only its line and takes no room**, as ggplot2's exits early. **One
   whose scale has no labels** (`{place, :none}` breaks) **draws its ticks alone and reaches only as
   far as they do**, as ggplot2's `labels = NULL` leaves the labels' room out (2.74 points, the
@@ -112,17 +119,17 @@ panel's grid lines are placed by the coordinate system".
   the labels, to its left and round a radial panel's circle the labels and then the ticks, and
   round the circle the line last.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
-  centred in what the strip text's margins leave, its baseline half an ascent below that middle,
-  the margins above and below a line of text, so it is as tall as those margins, an ascent and the
-  deepest descent, and moved along by half the difference of the margins either side. A panel
-  has one strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
+  placed by the rule counting its margins on every side, `theme_gray()`'s centred, as tall as its
+  margins and the label turned, a level one an ascent and the deepest descent. A panel has one
+  strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
   stacks them.
 - **An axis is drawn per panel, its title once per plot.** `Axis.draw/3` draws one panel's axes;
   `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
   aesthetic on each side.
-- **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
-  labels, `guide_axis()`'s `cap` cutting the axis line back to the breaks, minor ticks, axes as
-  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
+- **What waits for its first reader:** axes above or to the right, `guide_axis()`'s `angle` and
+  its justification heuristic, dodged or thinned labels, `guide_axis()`'s `cap` cutting the axis
+  line back to the breaks, minor ticks, axes as kinds of the protocol (ggplot2's `guide_axis()` is
+  one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
   FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `position`,
   `direction`, `nrow`, `ncol`, `override.aes`, `theme`), the keys filled a row at a time
@@ -133,20 +140,23 @@ panel's grid lines are placed by the coordinate system".
   margin inside the edge; **the keys in a grid filled a column at a time**, one column for each
   twenty keys running down, one row for each five running across, as ggplot2's `setup_params()`
   shares them out (`ceiling(n / 20)` columns, `ceiling(n / 5)` rows); each key on the key
-  background with each layer's glyph over it, its label the text margin to its right, centred as
-  the title is; **each row as tall as the theme's key height, its tallest glyph or its tallest
-  label with the labels' margins above and below, and each column of keys as wide as the theme's
-  key width or its widest glyph**, from the room each glyph needs, which rendering hands over with
-  it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()` sizes them, each key's background
+  background with each layer's glyph over it, its label in a cell of the labels' margin and
+  column right of it, placed by the rule counting every side of its margin, `theme_gray()`'s
+  left-aligned and centred on the key; **each row as tall as the theme's key height, its tallest
+  glyph or its tallest label turned with the labels' margins above and below, and each column of
+  keys as wide as the theme's key width or its widest glyph**, from the room each glyph needs,
+  which rendering hands over with it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()`
+  sizes them, each key's background
   filling its whole cell and its glyphs placed in it as drawn; each column of labels as wide as its
-  widest label and the labels' right margin; `legend_key_spacing` between a column's labels and
-  the next column, and between rows running across, none between rows running down, as ggplot2
+  widest label turned and the labels' right margin; `legend_key_spacing` between a column's labels
+  and the next column, and between rows running across, none between rows running down, as ggplot2
   gives a vertical legend none unless `legend.key.spacing.y` is set. **The title above keys
-  running down** (`legend_title_top`), as deep as its lines, left-aligned and centred down its
-  row, its margin below, a title wider than the keys and their labels leaving the room right of
-  the last column; **left of keys running across** (`legend_title_left`), centred down the rows,
-  a title taller than them leaving half the room above and half below, as `add_title()` does; a
-  title of `:none` takes no room, as ggplot2 leaves out a `NULL` title. **With no labels (every
+  running down** (`legend_title_top`), in a row as deep as it and its margins spanning the keys'
+  columns, **or left of keys running across** (`legend_title_left`), in a column spanning their
+  rows, placed by the rule, `theme_gray()`'s left-aligned and centred down; **a title bigger than
+  the keys and their labels leaves the rest of its room either side of them, split by its turned
+  justification** (`Parts.title_above/3`, `title_column/3`, as `add_title()` adds columns or rows);
+  a title of `:none` takes no room, as ggplot2 leaves out a `NULL` title. **With no labels (every
   key's `:none`), the labels' margins and columns take no room**, as ggplot2 leaves them out for a
   scale's `labels = NULL` (`Parts.label_widths/2` and `Parts.label_columns/3`, which the colour bar
   shares). Drawn in ggplot2's order: background, title, each key's background and glyphs, then the
@@ -169,8 +179,9 @@ panel's grid lines are placed by the coordinate system".
   gradient form), from its bottom or its left, the scale's low end, to its top or its right, with
   no border; a tick in the theme's colour bar ticks (white unless the theme sets them)
   `legend.ticks.length` into each side at each break's place, the right side's and then the
-  left's, or the bottom's and then the top's, each drawn from inside the bar outward; each label
-  centred on its tick, the labels' margin right of a bar running up (`legend_text_right`) or hung
-  its margin below one running across (`legend_text_bottom`), the title above or left of the bar
-  as a legend's, and with no labels the ticks alone, the room laid out as a legend's. It draws no
+  left's, or the bottom's and then the top's, each drawn from inside the bar outward; the labels
+  at their ticks, placed by the rule, right of a bar running up (`legend_text_right`, left-aligned
+  and centred on the tick unless set) or below one running across (`legend_text_bottom`, centred
+  and hung), measured together as one grob; the title above or left of the bar as a legend's, its
+  room split alike; and with no labels the ticks alone, the room laid out as a legend's. It draws no
   layer's glyph.

@@ -2,8 +2,10 @@ defmodule Giggly.Scene.Text do
   @moduledoc false
 
   # Labels, each at its `x` and `y` in the cell's units, all set at one `size` (in points) in one
-  # font `family` and turned `angle` degrees anticlockwise: grid's `textGrob()`. A `family` of `""`
-  # is the default sans-serif, as R's is; any other is the font's name.
+  # font `family` and `face` and turned `angle` degrees anticlockwise: grid's `textGrob()`. A
+  # `family` of `""` is the default sans-serif, as R's is; any other is the font's name. The face is
+  # `:plain`, `:bold`, `:italic` or `:bold_italic`, grid's `fontface`; it changes how a label is
+  # drawn, never its measured width.
   #
   # Each label has its own colour and opacity, `color` an `#RRGGBB` and `opacity` from 0 to 1, as
   # grid's graphical parameters are one per label, so labels in many colours need one text.
@@ -29,6 +31,7 @@ defmodule Giggly.Scene.Text do
     :widths,
     :size,
     :family,
+    :face,
     :color,
     :opacity,
     :angle,
@@ -46,6 +49,7 @@ defmodule Giggly.Scene.Text do
           widths: [float()],
           size: float(),
           family: String.t(),
+          face: :plain | :bold | :italic | :bold_italic,
           color: [String.t()],
           opacity: [float()],
           angle: number(),

@@ -532,6 +532,7 @@ defmodule Giggly.SVG do
       " style='font-size: ",
       number(text.size),
       "px;",
+      font_face(text.face),
       text_fill(label.color, label.opacity),
       " font-family: ",
       font_family(text.family),
@@ -679,6 +680,13 @@ defmodule Giggly.SVG do
   defp round_whole(floor, _half) do
     if rem(trunc(floor), 2) == 0, do: floor, else: floor + 1
   end
+
+  # A face as vdiffr writes one, after the size: a weight for bold, a style for italic, both for
+  # bold italic, nothing for plain.
+  defp font_face(:plain), do: ""
+  defp font_face(:bold), do: " font-weight: bold;"
+  defp font_face(:italic), do: " font-style: italic;"
+  defp font_face(:bold_italic), do: " font-weight: bold; font-style: italic;"
 
   # A label's colour as vdiffr writes it: left out for opaque black, SVG's default.
   defp text_fill("#000000", opacity) when opacity == 1, do: ""

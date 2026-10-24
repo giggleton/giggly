@@ -14,24 +14,24 @@ defmodule Giggly.Guide.Legend do
   #     shared out evenly, as ggplot2 makes `ceiling(n / 20)` columns; across, a row for each five
   #     keys, `ceiling(n / 5)`, the keys shared out evenly among the columns;
   #   * each key on the key background, the glyph of each layer drawn over it, and its label right
-  #     of it, the labels' left margin from the key, centred on it; each row as tall as the theme's
-  #     key height, the tallest glyph drawn in it, or its tallest label with the labels' margins
-  #     above and below it, and each column of keys as wide as the theme's key width or the widest
-  #     glyph drawn in it, as ggplot2's `measure_legend_keys()` sizes them from the room each glyph
-  #     needs; each column of labels as wide as its widest label and the labels' right margin, or
-  #     with no labels, neither the column nor its margin, as ggplot2 leaves them out for a scale
-  #     with no labels;
+  #     of it, in a cell of the labels' margin and their column, placed as `Giggly.Guide.Parts`
+  #     places a text, its margins on every side counted: left-aligned the labels' left margin from
+  #     the key and centred on it unless the theme says otherwise; each row as tall as the theme's
+  #     key height, the tallest glyph drawn in it, or its tallest label turned with the labels'
+  #     margins above and below it, and each column of keys as wide as the theme's key width or the
+  #     widest glyph drawn in it, as ggplot2's `measure_legend_keys()` sizes them from the room each
+  #     glyph needs; each column of labels as wide as its widest label turned and the labels' right
+  #     margin, or with no labels, neither the column nor its margin, as ggplot2 leaves them out for
+  #     a scale with no labels;
   #   * the keys' spacing (`legend_key_spacing`) between one key and its label and the next column,
   #     and between rows of keys running across; none between rows running down, as ggplot2 gives
   #     a vertical legend none unless `legend.key.spacing.y` is set;
-  #   * the title, keys down, above the keys (`legend_title_top`), as deep as its lines
-  #     (`Giggly.Guide.Parts`) and its margin above them, left-aligned its left margin in and
-  #     centred down what its margin above leaves, as grid centres text, then its margin below it,
-  #     a title wider than the keys and their labels leaving the room right of the last column;
-  #     keys across, left of the keys (`legend_title_left`), as wide as it and its margins,
-  #     centred down the rows of keys, a title taller than the keys leaving half the room above
-  #     them and half below, as ggplot2's `add_title()` lays it out; a title of `:none` takes no
-  #     room.
+  #   * the title, keys down, above the keys (`legend_title_top`), as deep as it and its margins,
+  #     keys across, left of them (`legend_title_left`), as wide as it and its margins, placed as
+  #     `Giggly.Guide.Parts` places a text, left-aligned and centred down unless the theme says
+  #     otherwise; a title wider or taller than the keys and their labels leaves the rest of its
+  #     room either side of them, split by its justification, as ggplot2's `add_title()` lays it
+  #     out; a title of `:none` takes no room.
   #
   # The legend's background spans the whole table, under everything; then the title, each key's
   # background and glyphs, and the labels, in ggplot2's drawing order. A title or labels the theme
@@ -90,7 +90,7 @@ defmodule Giggly.Guide.Legend do
             Parts.background(length(widths), length(heights), theme),
             title_cells,
             key_cells(keys, rows, first, theme),
-            label_cells(labels, label_widths, {rows, first}, text_look)
+            label_cells(labels, {rows, first}, text_look)
           ])
       }
 
@@ -152,20 +152,14 @@ defmodule Giggly.Guide.Legend do
     defp row_spacing(:horizontal, theme), do: theme.legend_key_spacing
 
     # The grid's widths and heights with the title's room, where its first key's cell is, and the
-    # title's cell. Above the keys, a title wider than them leaves the rest of its room right of the
-    # last column; left of them, a title taller than them leaves half the rest above and half
-    # below.
+    # title's cell: above the keys or left of them, a title bigger than them leaving the rest of its
+    # room either side, as `Giggly.Guide.Parts` splits it.
     defp with_title(grid, title, look, :vertical) do
-      {title_rows, title_cells} = Parts.title_rows(title, look, 2..(length(grid.widths) + 1))
-      {before_last, [last]} = Enum.split(grid.widths, -1)
+      {widths, title_heights, first_column, title_cells} =
+        Parts.title_above(title, look, grid.widths)
 
-      last =
-        before_last
-        |> Enum.reduce(Parts.legend_title_width(title, look), fn width, left -> left - width end)
-        |> max(last)
-
-      {List.replace_at(grid.widths, -1, last), title_rows ++ grid.heights,
-       {2 + length(title_rows), 2}, title_cells}
+      {widths, title_heights ++ grid.heights, {2 + length(title_heights), first_column},
+       title_cells}
     end
 
     defp with_title(grid, title, look, :horizontal) do
@@ -221,15 +215,15 @@ defmodule Giggly.Guide.Legend do
         }
       ]
 
-    # Each key's label two columns right of its key, a key of no label drawing none.
-    defp label_cells(labels, label_widths, {rows, first}, text_look) do
+    # Each key's label in the labels' margin and column right of its key, a key of no label
+    # drawing none.
+    defp label_cells(labels, {rows, first}, text_look) do
       labels
-      |> Enum.zip(label_widths)
       |> Enum.with_index()
-      |> Enum.reject(fn {{label, _width}, _index} -> label == :none end)
-      |> Enum.map(fn {{label, width}, index} ->
+      |> Enum.reject(fn {label, _index} -> label == :none end)
+      |> Enum.map(fn {label, index} ->
         {row, column} = place(index, rows, first)
-        Parts.text_cell(label, width, text_look, row, (column + 2)..(column + 2))
+        Parts.label_cell(label, text_look, row, (column + 1)..(column + 2))
       end)
     end
 
