@@ -86,7 +86,9 @@ semver or the changelog).
   modules the filter skips, how `--files` is read, which lines `--since` keeps, which top-level
   entries a sandbox links and whether its baseline runs for a plain project (the skill's
   `--mirror .credo` rests on both), and that each mutant is still built from source in a sandbox
-  of its own and run in a fresh VM, so none reuses another's build.
+  of its own and run in a fresh VM, so none reuses another's build. The skill's warm runner
+  (`warm.exs`) builds its mutants and writes its report through muex's library, so a bump also
+  runs it and muex's own runner over one commit and compares the reports, as the skill says.
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored

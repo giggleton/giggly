@@ -1,13 +1,13 @@
 ---
 name: mutation-testing
-description: Mutation-tests the lines the last commit changed, with muex, and triages every surviving mutant — a behavior no test pins, unreachable or redundant code, an equivalent mutant, a message's wording — then writes the fixes and reports what it found. Run it right after every commit that changes `lib/` or `.credo/checks/` code; an after-commit hook names the commit, and the commit gate denies the next commit until this skill's final step has marked it. Also use it when the user asks for a mutation run, or asks which of a commit's lines no test pins.
+description: Mutation-tests the lines the last commit changed, running muex's mutants in warm VMs, and triages every surviving mutant — a behavior no test pins, unreachable or redundant code, an equivalent mutant, a message's wording — then writes the fixes and reports what it found. Run it right after every commit that changes `lib/` or `.credo/checks/` code; an after-commit hook names the commit, and the commit gate denies the next commit until this skill's final step has marked it. Also use it when the user asks for a mutation run, or asks which of a commit's lines no test pins.
 ---
 
 # Mutation testing — after a commit, over the lines it changed
 
-muex breaks the code one small edit at a time (a guard replaced with `true`, `==` with `!=`, a
-clause deleted) and reruns the tests against each mutant. A mutant that survives is a behavior no
-test pins — found from the code, not from the tests already written, which is the hole a
+muex's mutators break the code one small edit at a time (a guard replaced with `true`, `==` with
+`!=`, a clause deleted), and the tests are rerun against each mutant. A mutant that survives is a
+behavior no test pins — found from the code, not from the tests already written, which is the hole a
 hand-picked mutant misses.
 
 It runs after the commit, not in the review before it, and over the lines the commit changed, not
@@ -26,16 +26,62 @@ Before starting, `lib/`, `test/` and `.credo/` must match the commit. This must 
 git status --porcelain -- lib test .credo
 ```
 
-muex reads the changed line numbers from the commit but mutates and tests the files on disk, so an
-uncommitted edit there shifts the lines it mutates and changes the tests it runs. If it prints
+The runner reads the changed line numbers from the commit but mutates and tests the files on disk,
+so an uncommitted edit there shifts the lines it mutates and changes the tests it runs. If it prints
 anything, stop and say so: the pass is of the commit, not of the working tree.
 
 ## Running it
 
-**First, the baseline**: the whole suite, once, with no mutant, in a sandbox muex builds as it
-builds one for each mutant, with the run's `--mirror`. It must pass. muex runs this check itself
-only for an umbrella, since a plain project's sandbox links the real build; so Giggly's build is
-copied in first, and nothing is written to the real one:
+`warm.sh`, beside this file, runs the pass in warm VMs and writes muex's JSON report:
+
+```bash
+bash .claude/skills/mutation-testing/warm.sh <scratchpad>/mutation
+```
+
+Run it in the background, and edit nothing under `lib/` or `test/` until it finishes: a worker
+compiles readers and test files from disk while it runs. Even warm, a pass takes minutes, which is
+why it is not a `mix quality` step. How it works is `warm.exs`'s opening comment; what it rests
+on, and how it was checked against muex, is design-log §4, "The mutation pass runs in warm VMs".
+What matters for reading its report:
+- **The mutants are muex's**, built through its library as `mix muex --since HEAD~1 --no-optimize
+  --no-filter --files <the lib/ files the commit changed>` builds them. `--since HEAD~1` keeps only
+  the lines the commit added or changed, reading committed history, which is why the pass follows
+  the commit; `--no-optimize`, because muex's optimizer discards most mutants and reports a
+  confident false pass over the rest; `--no-filter`, because its filter skips modules it takes for
+  framework code, including any declaring several `@callback`s.
+- **Each worker checks its own baseline**: it loads the app and the tests once, runs the suite with
+  no mutant, and stops if anything fails, since every mutant would then be killed by that test.
+- **Every mutant meets the whole suite**, to its first failure, so none survives a test that was
+  never selected for it. A test file that can no longer load because the code it calls while
+  compiling raised has killed the mutant.
+- **A line no test runs** is found by one `:cover` run per worker, and its mutants are reported
+  `no_coverage` without running.
+- **A mutant that runs past 60 seconds** is reported `timeout`, and its worker carries on in a
+  fresh VM.
+- **A mutant that changes a struct's fields or defaults** is reported `struct_changed`, not judged:
+  every module that wrote the struct holds its defaults as they were compiled. Judge it by hand,
+  applying it to the file as Findings 1 says, against the whole suite.
+- **The report** is `<out>/muex.json`: every mutant with its `status`, `location`, `test_files` (the
+  failing test's file for a kill, every file for a survivor) and a `patch` of the mutated node
+  `before` and `after`. A statement deletion's node is the whole enclosing block, so diff the two to
+  see the line that went.
+
+**muex's own runner** builds each mutant in a sandbox copy of the project and runs a fresh
+`mix test` there. Two things still use it. A **repo-local credo check** (`.credo/checks/`) the
+commit changed, whose test loads it with `Code.require_file`, which a warm VM does not repeat. And
+**checking the runner**, after a muex bump or a change to `warm.exs`: run both over one commit and
+set the reports side by side. Every kill, survivor and uncovered line should match. muex may call
+a mutant invalid that the runner calls killed, when a test file failing to load beat the first
+failing test in its sandbox, and may let a mutant survive that its test selection never met.
+
+```bash
+MIX_ENV=test mix run --no-start .claude/skills/mutation-testing/warm.exs compare \
+  <scratchpad>/muex.json <scratchpad>/mutation/muex.json
+```
+
+First, muex's baseline: the whole suite in a sandbox built as muex builds one for each mutant. It
+must pass; muex runs this check itself only for an umbrella, since a plain project's sandbox links
+the real build, so Giggly's build is copied in first and nothing is written to the real one:
 
 ```bash
 base=<scratchpad>/muex-baseline && rm -rf "$base"
@@ -45,72 +91,26 @@ rm "$base/_build/test/lib/giggly" && cp -R _build/test/lib/giggly "$base/_build/
 (cd "$base" && MIX_ENV=test mix test)
 ```
 
-A test that fails there fails in every mutant's sandbox, and each mutant it judges is reported
-killed with no test of `lib/` tried, since a run stops at its first failure: stop and fix the
-sandbox or the test before running muex, and say so. It takes seconds.
-
-Then the run:
+Then, for a credo check, without `--coverage-guided` (muex writes a mutant only into a directory
+the sandbox mirrors, and `:cover` cannot see a module loaded with `Code.require_file`); for the
+runner's check, over `lib/` as the runner names it, with `--coverage-guided`:
 
 ```bash
+mix muex --since HEAD~1 --no-optimize --no-filter --verbose --mirror .credo \
+  --format json --output <scratchpad>/muex.json --files .credo/checks/<check>.ex
 mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided --mirror .credo \
   --format json --output <scratchpad>/muex.json \
   --files "$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'lib/*.ex' | paste -sd, -)"
 ```
 
-Run it in the background, and edit nothing under `lib/` or `test/` until it finishes: its
-sandboxes symlink the project, so an edit lands in every mutant still to be built.
-
-Every flag there carries weight:
-- **`--since HEAD~1`** — mutates only the lines the commit added or changed: muex diffs
-  `HEAD~1...HEAD` with no context lines and drops every mutant on another line. It reads committed
-  history only, which is why the pass follows the commit.
-- **`--files`, the commit's changed `lib/` files** — `--since` alone loads every file under `lib/`
-  and keeps the changed ones without saying how many; naming them makes `--verbose`'s count
-  checkable. `--diff-filter=d` leaves out a file the commit deleted, which cannot load. The value is
-  **one `--files`, comma-separated**: given `--files` twice, muex keeps only the last, so naming
-  each file in a flag of its own silently mutates only the last one. It splits the value on
-  commas, which is also why a brace glob (`lib/{a,b}.ex`) crashes its loader.
-- **`--no-optimize`** — the default optimizer discards most mutants, so a bare `mix muex` can
-  report a perfect score over a handful of them: a confident false pass.
-- **`--no-filter`** — the default filter skips modules it takes for framework code, including any
-  declaring several `@callback`s, which a behaviour module with real logic beside its callbacks
-  does.
-- **`--verbose`** — prints `Found <n> file(s)` before any mutant runs. Check that it counts every
-  file named: a file that never loads is never mutated, and the summary line does not say so. Its
-  `Scoping to <n> file(s) changed since HEAD~1` counts every file the commit added lines to, tests
-  and docs included, so it is not the number to check.
-- **`--coverage-guided`** — runs each test file once under `:cover` first, then runs against each
-  mutant exactly the test files that execute its line. Without it, muex picks a mutant's tests by
-  scanning test sources for module names, and the scan is blind to a grouped alias
-  (`alias Giggly.{DataFrame, Plot}`, after which `Plot.new` reads as a module named `Plot`) and to
-  `doctest Mod`. A module linked to some test files then runs only those, so a test file that
-  exercises it under a grouped alias never runs against its mutants and they "survive" it; that
-  happened to `Plot.computed_mapping/2`. Coverage also reports the lines no test executes at all.
-  The run leaves `cover/muex_cov_*.coverdata`, which git ignores. A line coverage holds no data
-  for (a multi-line expression's later lines, a module attribute, a protocol implementation's
-  body) falls back to the scan, which can choose every test file.
-- **`--mirror .credo`** — a plain project's sandbox links only the top-level entries muex names
-  (`Muex.Sandbox`'s `symlink_top_level/3`), not `.credo/`, and `test/credo_checks_test.exs`
-  requires its checks from `.credo/checks/` beside its own directory, so in a sandbox without it
-  every one of its tests fails. A mutant whose tests include it is then reported killed by that
-  failure before any test of `lib/` runs, since a run stops at its first failure. The baseline
-  above is what says so (design-log §4, "The mutation pass mirrors `.credo/`").
-- **`--format json --output`** — the terminal report gives only a count of the uncovered
-  mutants. The JSON report gives every mutant its `status`, `location`, the `test_files` that ran,
-  and a `patch` of the mutated node `before` and `after`. A statement deletion's node is the whole
-  enclosing block, so diff the two to see the line that went.
-  Write it outside the repository (the session's scratchpad); the terminal then prints one summary
-  line.
-
-**A repo-local credo check** (`.credo/checks/`) the commit changed is run on its own, with
-`--files .credo/checks/<check>.ex --since HEAD~1 --mirror .credo` and **without**
-`--coverage-guided`: muex writes a mutant only into a directory the sandbox mirrors, and refuses
-to write through the symlink otherwise; and `:cover` cannot see a module the test loads with
-`Code.require_file`, so every mutant would be reported uncovered. muex then picks the test file by
-the module's name, which `test/credo_checks_test.exs` gives through a single `alias`.
-
-Each mutant is one sandboxed `mix test`, so even a commit's lines take minutes, which is why it is
-not a `mix quality` step.
+- **`--mirror .credo`** — a plain project's sandbox links only the top-level entries muex names, not
+  `.credo/`, and `test/credo_checks_test.exs` requires its checks from `.credo/checks/`, so without
+  it every one of its tests fails and each mutant they judge is reported killed (design-log §4,
+  "The mutation pass mirrors `.credo/`").
+- **One `--files`, comma-separated**: given `--files` twice, muex keeps only the last; it splits the
+  value on commas, so a brace glob (`lib/{a,b}.ex`) crashes its loader. `--verbose` prints
+  `Found <n> file(s)`: check it counts every file named.
+- muex runs the mutants of one file one at a time, and a run of many mutants in one file is slow.
 
 ## Findings
 
@@ -126,9 +126,9 @@ mutant, run the test, copy the original back, `cmp` it against the copy, then `t
 restore within the same second as the mutant's compile leaves the mutant's `.beam` in place. Never
 loop `sed -i.bak`. A test that passes with the mutant applied has not closed the hole.
 
-Coverage-guided selection misses code read only at compile time (a module attribute table, such
-as `Aesthetics`' pairs): a survivor there is checked by hand against the full suite before it is
-called a hole.
+Every mutant met the whole suite, so a survivor is never a test that was not selected for it. A
+mutant in code read only at compile time (a module attribute table, such as `Aesthetics`' pairs)
+met its readers too, recompiled.
 
 ### 2. Code the mutant shows is unreachable or redundant
 
@@ -163,17 +163,17 @@ can reach, which is a finding on the code.
   messages:** a string the code produces as its output — an SVG element or attribute, a label, a
   class name — is behavior, and a literal mutant surviving there is a finding. No mutator's
   survivors are set aside as a kind; each one is judged where it landed.
-- **A deletion the gate catches instead of the tests.** muex compiles mutants without
+- **A deletion the gate catches instead of the tests.** Mutants are compiled without
   `--warnings-as-errors`, so deleting an `alias` the module still uses survives as warnings that
   `mix quality` would fail. Deleting a `use Boundary` declaration survives too; the waiver gate
   denies that edit (design-log §4).
 - **The score.** Equivalent mutants count against it, so it measures noise as well as holes; the
-  survivor list is the signal. muex also exits non-zero when the score falls below its default
-  `--fail-at` of 80; that exit status is not a failure of the pass.
+  survivor list is the signal. A muex run also exits non-zero when the score falls below its
+  default `--fail-at` of 80; that exit status is not a failure of the pass.
 
 ## What it cannot tell you
 
-muex stops at the first failing test, so it shows that some test catches each mutant — not that
+A run stops at the first failing test, so it shows that some test catches each mutant — not that
 each test catches something no other does. Duplication stays the judgment in
 `elixir-code-review`'s `test-quality.md`. And it mutates only the lines the commit changed, so a
 test the commit deleted or weakened that was the only pin on an unchanged line goes unseen; that
@@ -198,7 +198,7 @@ is the review's question about every deleted test, asked before the commit.
    last commit changed code and has no mark, so the fixes cannot be committed before it. This
    step is the **only** sanctioned way to produce the mark: running it without having triaged the
    run is falsifying the record, not passing the gate.
-4. **Report**, below. The fixes stay uncommitted until the user says to commit: what muex found
+4. **Report**, below. The fixes stay uncommitted until the user says to commit: what the pass found
    that changed something is what they decide on. Once committed, a fix that changed `lib/` lines
    gets a pass of its own, like any commit.
 

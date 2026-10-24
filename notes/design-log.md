@@ -79,6 +79,22 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The mutation pass runs muex's mutants in warm VMs, each against the whole suite (2026-10-24,
+  Steve).** `warm.sh` starts workers that each load the app and the tests once, then compile each
+  mutant over its module, recompile what read it while compiling and now reads something else, run
+  the whole suite to its first failure, and load the originals back; muex builds the mutants and
+  writes the JSON report, as a library, and one `:cover` run per worker finds the lines no test
+  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`); a mutant
+  that changes a struct's defaults is reported, not judged. Replayed over step 6's pass, every
+  kill, survivor and uncovered line matched muex's, and it killed three survivors muex's test
+  selection never ran against; the element tree split's pass took minutes where muex took hours.
+  *Rejected: muex's sandbox runner* — a fresh `mix test` a mutant and one file's mutants at a time;
+  kept for credo checks and for checking this runner. *Rejected: a runner backend patched into
+  muex* — a fork of a pinned dependency, where its public functions suffice. *Rejected: selecting
+  a mutant's tests by coverage* — warm, the whole suite costs seconds, and selection missed tests
+  (`computed_mapping/2` once, under a grouped alias). *Rejected: routing mutants among warm, app-
+  restarted and fresh VMs* — Giggly has no process for a mutant to reach.
+
 - **The theme's element tree is a boundary of its own, `Giggly.ElementTree`, beside `Giggly.Theme`
   (2026-10-24, Steve, choosing a peer over an export).** It holds ggplot2's `.element_tree` as far
   as Giggly draws, each element's name, kind, parent and description, and the `kind` type. `Theme`
@@ -1024,15 +1040,15 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   plotmath; `..count..` never (superseded).
 
 - **Mutation testing runs after each commit, over the lines it changed, and the commit gate holds
-  the next commit until it has run (2026-10-18, Steve).** The `mutation-testing` skill runs muex
-  with `--since HEAD~1` over the commit's changed `lib/` files, then triages, fixes and reports
-  what it found; the fixes are committed when Steve says so. `commit-gate.sh` denies any commit
-  while the last one changed code and has no mutation mark, and an after-commit hook names the
-  pass as due. *Rejected: running it in code review, before the commit, over whole files* — a run
-  took 30–60 minutes, and a comparison on 2026-10-17 found the commit's lines ran about 5% of the
-  mutants at almost no loss. *Rejected: the after-commit hook alone* — the gate exists because a
-  skill step slips under wrap-up pressure, and just after a commit is that moment. *Rejected:
-  whole modules for a commit that changes only tests* — the same cost for the same rare case.
+  the next commit until it has run (2026-10-18, Steve).** The `mutation-testing` skill runs muex's
+  mutants with `--since HEAD~1` over the commit's changed `lib/` files, then triages, fixes and
+  reports what it found; the fixes are committed when Steve says so. `commit-gate.sh` denies any
+  commit while the last one changed code and has no mutation mark, and an after-commit hook names
+  the pass as due. *Rejected: running it in code review, before the commit, over whole files* — a
+  run took 30–60 minutes, and a comparison on 2026-10-17 found the commit's lines ran about 5% of
+  the mutants at almost no loss. *Rejected: the after-commit hook alone* — the gate exists because a
+  skill step slips under wrap-up pressure, and just after a commit is that moment. *Rejected: whole
+  modules for a commit that changes only tests* — the same cost for the same rare case.
 
 - **A title may run over several lines, drawn a line at a time as R's graphics engine draws them
   (2026-10-17, Steve: "Build multi-line now").** Every title, an axis's, a legend's and the plot's
@@ -2085,20 +2101,6 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   first reader:* a stat's or position's further arguments; and a transformation's inverse and
   domain.
 
-- **Mutation testing picks each mutant's tests by coverage, and reports in JSON (2026-10-12,
-  Steve).** The mutation pass runs `mix muex` with `--coverage-guided --format json --output`: each
-  test file runs once under `:cover`, each mutant then runs exactly the test files that execute its
-  line, and a line no test executes is reported as an uncovered mutant, a fourth kind of finding.
-  The JSON report gives each mutant its status, location, test files, and the mutated node before
-  and after. *Rejected: muex's default selection* — it scans test sources for module names,
-  misses a grouped alias and a `doctest` line, and runs only the linked files when there are any,
-  so `Plot`'s mutants never ran against `giggly_test.exs` and a mutant of `computed_mapping/2`
-  "survived" a test that catches it; trialled on `plot.ex`, coverage selection removed that
-  survivor and one other, took about as long (412 s), and found `Plot.new/1` unexecuted.
-  *Rejected: writing tests so the scan sees them* (single-module aliases, a call per module) — the
-  suite's style would bend to a tool's parser and still miss `doctest`. *Rejected: the terminal
-  report* — it gives only a count of uncovered mutants.
-
 - **Position scales are chosen by column type, trained after grouping and mapped to data-space
   positions; what has no reader yet waits (2026-10-12, Steve).** `Giggly.Scale` (boundary lists
   nothing) takes plain values: `kind/1` gives `:continuous` for `:integer`, `:float` and `:null`,
@@ -2270,8 +2272,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   approval for a change that opens nothing.
 
 - **Mutation testing runs with muex, over the changed code; survivors are triaged, not scored
-  (2026-10-11, Steve).** The `mutation-testing` skill runs `mix muex` with the flags it gives
-  over the changed `lib/` files, as one comma-separated `--files`, and its report says of each
+  (2026-10-11, Steve).** The `mutation-testing` skill runs the mutants muex builds with the flags
+  it gives over the changed `lib/` files, and its report says of each
   survivor whether it is a missing test, unreachable or
   redundant code, an equivalent mutant, or the wording of a message whose datum the tests assert —
   and why. *Rejected: hand-picked mutants* — chosen by
@@ -2438,6 +2440,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Run the mutation pass in warm VMs: muex's mutants, each against the whole suite;
+  §4: "The mutation pass runs muex's mutants in warm VMs" ("Mutation testing picks each mutant's
+  tests by coverage" deleted)
 - 2026-10-24 — Move the theme's element tree into Giggly.ElementTree, beside Theme, so an edit to
   Theme no longer recompiles Plot; §4: "The theme's element tree is a boundary of its own", "A
   theme is set element by element" (amended)
