@@ -6,9 +6,11 @@ paths:
 # The theme
 
 `Giggly.Theme` gives everything a plot draws other than its marks its look: colours, sizes, line
-widths and spacing, ggplot2's complete theme, and the settings `Plot.theme/2` lays over it. Why the
-theme is a resolved value, why the point keeps its own look, and why it is called `:gray`:
-design-log §4, the entry beginning "The theme is a resolved value"; why a theme is a function and
+widths and spacing, ggplot2's complete theme, and the settings `Plot.theme/2` lays over it, and
+gives the layers their defaults. Why the theme is a resolved value and why it is called `:gray`:
+design-log §4, the entry beginning "The theme is a resolved value"; why the layers' defaults are
+filled in from it as columns: the entry beginning "Each layer's defaults are filled in from the
+theme"; why a theme is a function and
 not a module implementing a behaviour: the entry beginning "A theme is a function"; why settings
 are flat names with keyword-list elements, and R's rules for inheriting and merging: the entry
 beginning "A theme is set element by element"; the increment's steps and what waits: the entry
@@ -25,8 +27,8 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   as `%{name:, base_size:, base_line_size:, base_rect_size:}`, the widths `base_size / 22` unless
   given, with no settings, as ggplot2 drops a plot's earlier settings with the theme it replaces;
   `:none` draws in `theme_gray()` at its default sizes. This namespace resolves it with
-  `complete/1` into a `%Giggly.Theme{}` when the plot is drawn, as ggplot2's `plot_theme()`
-  completes a plot's theme at build time.
+  `complete/1` into a `%Giggly.Theme{}` when the plot is assembled, once the positions are final,
+  as ggplot2's `plot_theme()` completes a plot's theme at build time.
 - **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
   element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
   `:length`, `:margin`, `:position`, `legend_position`'s `:right` or `:none`, or `:boolean`,
@@ -77,7 +79,9 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
 - **The base sizes reach every element as ggplot2's do**: `base_size` every text's size and,
   through `half_line`, every spacing and margin and so the ticks' length; `base_line_size` every
   line's width, `base_rect_size` every border's; a legend's keys stay 1.2 of grid's lines, and
-  `theme_void()` takes neither width, its borders 0 wide.
+  `theme_void()` takes neither width, its borders 0 wide; and the layers' defaults: `base_size`
+  the text's size and the points' (`base_size / 11 * 1.5`), `base_line_size` the lines' and the
+  borders' widths, `theme_void()`'s too, never `base_rect_size`.
 - **The complete theme holds every element already worked out, in the scene's units:** lengths,
   margins and line widths in points (1/72 inch), each colour an `#RRGGBB` beside its opacity (a
   rectangle's `fill_opacity` and `color_opacity`, a line's or a text's `opacity`), its alpha over
@@ -86,10 +90,13 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   centimetres over 2.54, millimetres over 10 and then 2.54, lines of text as a 12-point font at a
   line height of 1.2 over 72; then times 72), and a line width from millimetres as R's engine hands
   it to svglite (`linewidth * .pt / 96 * 72`), so a resolved value is R's to the last bit; nothing
-  that reads the theme converts anything.
+  that reads the theme converts anything. **The layers' defaults (`geom`) are the exception, in a
+  layer's units**: millimetres and colours in their one spelling, as they become the values of a
+  layer's aesthetics, which a layer may set instead.
 - **A theme is values and calls nothing.** Its boundary lists nothing; `Plot` lists it to build
-  `theme/2`'s schema, choose a complete theme and merge settings, rendering and the guide to read
-  the complete theme. It knows no scene primitive: the drawing builds primitives from its elements.
+  `theme/2`'s schema, choose a complete theme and merge settings, the assembly to complete it and
+  read the layers' defaults, rendering and the guide to read the complete theme. It knows no
+  scene primitive: the drawing builds primitives from its elements.
 - **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, and
   whether the panel is drawn over its layers; alignment and angle stay with the drawing** (the y
   title turned 90 degrees, labels hung from their ticks) until a theme can set them; so do text
@@ -104,16 +111,16 @@ are laid over one in turn: the entry beginning "A plot chooses a complete theme"
   layers** (`axis_line` and `panel_border` `:none`, `panel_ontop: false`), so they are drawn only
   where a setting gives them, inheriting from `line` and `rect` past the removal.
 - **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): the layers' defaults from the theme; where else the legends go; text's face, angle
-  and alignment. A complete theme's `ink`, `paper`, `accent` and fonts, and `theme_test()`, wait
-  beyond the increment.
-- **The marks' look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
-  fills each layer's default aesthetics as columns, so its base sizes reach a point's size and
-  stroke, a text's size and a line's and a border's width, and `theme_void()`'s paper a bar's fill
-  and a box's; that stage, and the theme resolved in the assembly, are the theme's next step, so
-  until it lands the marks keep `theme_gray()`'s defaults at any base size. **Nor are the
-  palettes:** ggplot2 4's `set_palettes()` takes a scale's palette from the theme, and
-  `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
+  increment"): where else the legends go; text's face, angle and alignment. A complete theme's
+  `ink`, `paper`, `accent` and fonts, and `theme_test()`, wait beyond the increment.
+- **The layers' defaults are the complete theme's `geom` element, ggplot2's `element_geom()`**,
+  which every complete theme sets in its tree from its base sizes (`gray/1`, inherited by the
+  themes built on it, and `void/1`): black ink; white paper, `theme_void()`'s clear; the lines'
+  and the borders' widths, solid; the text's family, `""`, and size; the points' size and shape.
+  No setting reaches it, since `theme/2` cannot set `geom` yet. Each geom reads what it draws with
+  from it (`Geom.default_aesthetics/2`), mixing its colours from the ink and paper. **The
+  palettes are not the theme's:** ggplot2 4's `set_palettes()` takes a scale's palette from the
+  theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
 - **A title's look carries its line spacing** (`Theme.title()`: `line_spacing`, the points from
   one line's baseline to the next's, 0.9 x 1.2 times its size, ggplot2's `lineheight` as R's
   graphics engine reads it), since only titles break over lines: the axes' and the legends'

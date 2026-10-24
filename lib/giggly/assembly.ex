@@ -35,7 +35,10 @@ defmodule Giggly.Assembly do
   #      for a position does, then moves the layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
-  #  13. adds a scale for each aesthetic other than position that a layer maps (`alpha`, `color`,
+  #  13. completes the plot's theme (`Giggly.Theme`), its settings laid over the complete theme it
+  #      chose and every element worked out, as ggplot2's build completes it once the positions
+  #      are final;
+  #  14. adds a scale for each aesthetic other than position that a layer maps (`alpha`, `color`,
   #      `fill`), of the kind its columns need, those evaluated before the stats and then those
   #      computed after, trains it on every layer's column of that
   #      aesthetic, and maps each column through it, as ggplot2 trains and maps its non-position
@@ -46,13 +49,18 @@ defmodule Giggly.Assembly do
   #      the aesthetics' names, one with the title and labels of an earlier merged into it, as
   #      ggplot2 merges guides that would read alike; each legend
   #      is drawn by the geom of each layer that maps one of its aesthetics and can use it, with
-  #      what that layer sets, in the keys whose values the layer's table holds, and a legend no
-  #      layer can draw is dropped;
-  #  14. puts each aesthetic a layer sets, such as `alpha`, into every row of its table, last, as
+  #      what that layer sets over its geom's defaults under the complete theme, in the keys whose
+  #      values the layer's table holds, and a legend no layer can draw is dropped;
+  #  15. puts into each layer's table a column for each aesthetic its geom draws with that the table
+  #      lacks, the geom's default under the complete theme (`Giggly.Geom.default_aesthetics/2`), as
+  #      ggplot2's `use_defaults()` fills in a layer's `default_aes`: a point's size and stroke, a
+  #      text's size and a line's and a border's width from the theme's base sizes, a bar's fill and
+  #      a box's from its paper; a table with no rows gains none;
+  #  16. puts each aesthetic a layer sets, such as `alpha`, into every row of its table, last, as
   #      ggplot2's geoms apply a layer's `aes_params` once every scale has run: one value in every
   #      row, or an annotation's list, one value per row, refused where a facet has repeated the
   #      annotation's rows across its panels, as ggplot2 refuses it;
-  #  15. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
+  #  17. has the plot's coordinate system (`Giggly.Coord`) build each panel's params from the
   #      extents of the panel's scales and each axis's breaks and minor breaks on its extent, and
   #      say whether panels are clipped to their edges and what shape they keep, from the first
   #      panel's params, as ggplot2 asks it.
@@ -63,14 +71,14 @@ defmodule Giggly.Assembly do
   #
   # The result holds one `Giggly.DataFrame` per layer, in the order the layers were added, whose
   # columns are named by aesthetic plus `:panel` and `:group`, with each layer's geom and the rows
-  # it draws, the frame without the aesthetics other than position the layer carries unused; the
+  # it draws, the frame without the aesthetics other than position the layer carries unused, its
+  # geom's defaults in their place where it has them; the
   # layout table; the trained scales, by scale id; the trained scale of each aesthetic other than position
   # that a layer maps, by aesthetic, and the legend each gives; the plot's coordinate system, which rendering hands each
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
   # axis's title, the text of what the first layer to map the axis's aesthetic maps it to
-  # (ggplot2's `setup_plot_labels()`); and the plot's theme, the complete theme it chose and the
-  # settings laid over it, passed on for rendering, the only stage that reads a theme so far. The
+  # (ggplot2's `setup_plot_labels()`); and the plot's complete theme, which rendering draws in. The
   # data's own column names appear only as titles.
   #
   # Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
@@ -78,7 +86,7 @@ defmodule Giggly.Assembly do
   # The assembly reads a plot and hands each stage its input; what it may call is the plot, the
   # data frame, the aesthetic vocabulary (which columns are x and which y), the mapping grammar,
   # which evaluates and titles each mapping value, and the stages, each named as it arrives; the
-  # guides it lists only to build the kind of guide a scale names.
+  # guides it lists only to build the kind of guide a scale names, and the theme to complete it.
   use Boundary,
     deps: [
       Giggly.Aesthetics,
@@ -92,7 +100,8 @@ defmodule Giggly.Assembly do
       Giggly.Plot,
       Giggly.Position,
       Giggly.Scale,
-      Giggly.Stat
+      Giggly.Stat,
+      Giggly.Theme
     ],
     exports: []
 
@@ -108,7 +117,8 @@ defmodule Giggly.Assembly do
     Plot,
     Position,
     Scale,
-    Stat
+    Stat,
+    Theme
   }
 
   @enforce_keys [
@@ -140,8 +150,8 @@ defmodule Giggly.Assembly do
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
   for none; the title of each aesthetic's guide, the x and y axes' so far,
   `:none` for an axis no layer maps; the plot's own labels, its title, subtitle, caption and tag,
-  `:none` for each it has not; and the plot's theme, the complete theme it chose and the settings
-  laid over it, which rendering resolves.
+  `:none` for each it has not; and the plot's complete theme, its settings laid over the complete
+  theme it chose and every element worked out, which rendering draws in.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],
@@ -163,7 +173,7 @@ defmodule Giggly.Assembly do
             caption: String.t() | :none,
             tag: String.t() | :none
           },
-          theme: Plot.theme()
+          theme: Theme.t()
         }
 
   @typedoc """
@@ -178,9 +188,11 @@ defmodule Giggly.Assembly do
   its place up the bar and its colour (`decor`); and each layer that maps one of its aesthetics,
   in the order the layers were added, with those it maps, its geom drawing its glyph with the
   key's values of those aesthetics and the aesthetics the layer sets, as ggplot2's legend draws a
-  key for each such layer, its `aes_params` among the key's data, whether its marks are horizontal
-  (`flipped`), as ggplot2 hands `draw_key` the layer's `flipped_aes`, and whether it draws in each
-  key, in key order; a colour bar has none.
+  key for each such layer, its `aes_params` among the key's data, its geom's defaults under the
+  plot's complete theme, which the key's values and what the layer sets lie over, as ggplot2 fills
+  a key's data from the layer's `default_aes`, whether its marks are horizontal (`flipped`), as
+  ggplot2 hands `draw_key` the layer's `flipped_aes`, and whether it draws in each key, in key
+  order; a colour bar has none.
   """
   @type legend :: %{
           required(:guide) => struct(),
@@ -198,6 +210,7 @@ defmodule Giggly.Assembly do
             %{
               geom: struct(),
               aesthetics: [Plot.aesthetic()],
+              defaults: %{optional(Plot.aesthetic()) => term()},
               fixed: %{optional(Plot.aesthetic()) => term()},
               flipped: boolean(),
               draws: [boolean()]
@@ -325,6 +338,11 @@ defmodule Giggly.Assembly do
         )
       end)
 
+    # ggplot2 completes the plot's theme once the positions are final, before the scales of the
+    # other aesthetics, and fills each layer's defaults from it.
+    complete_theme = Theme.complete(theme)
+    element = complete_theme.geom
+
     non_position_scales =
       Map.new(non_position_columns, fn {aesthetic, {first_column, ordered}} ->
         untrained = non_position_scale(plot, aesthetic, first_column, ordered)
@@ -337,6 +355,7 @@ defmodule Giggly.Assembly do
       |> Enum.zip_with(positioned_data, fn {layer, index}, frame ->
         frame
         |> map_non_position(non_position_scales)
+        |> with_defaults(Plot.layer_geom(layer), element)
         |> set_fixed_last(Plot.layer_fixed(layer), index)
       end)
 
@@ -345,13 +364,17 @@ defmodule Giggly.Assembly do
     %__MODULE__{
       layer_data: fixed_data,
       drawn_data:
-        Enum.zip_with(layers, fixed_data, fn layer, frame -> drawn(frame, plot, layer) end),
+        Enum.zip_with(layers, fixed_data, fn layer, frame ->
+          frame
+          |> drawn(plot, layer)
+          |> with_defaults(Plot.layer_geom(layer), element)
+        end),
       layer_geoms: Enum.map(layers, &Plot.layer_geom/1),
       layout: layout,
       x_scales: final_x_scales,
       y_scales: final_y_scales,
       non_position_scales: non_position_scales,
-      legends: legends(non_position_scales, plot, Enum.zip(layers, positioned_data)),
+      legends: legends(non_position_scales, plot, Enum.zip(layers, positioned_data), element),
       coord: coord,
       panel_params: panel_params,
       clip: Coord.clip(coord),
@@ -363,8 +386,29 @@ defmodule Giggly.Assembly do
         Map.new([:title, :subtitle, :caption, :tag], fn name ->
           {name, Map.get(plot.labels, name, :none)}
         end),
-      theme: theme
+      theme: complete_theme
     }
+  end
+
+  # `frame` with a column for each aesthetic its geom draws with that it lacks, the geom's default
+  # under the plot's complete theme in every row, in the order the geom lists them, after the
+  # frame's own columns, as ggplot2's `use_defaults()` fills a layer's `default_aes` in; a frame
+  # with no rows gains none, as ggplot2 leaves an empty layer's table as it is.
+  defp with_defaults(frame, geom, element) do
+    case DataFrame.row_count(frame) do
+      0 ->
+        frame
+
+      rows ->
+        names = DataFrame.names(frame)
+
+        geom
+        |> Geom.default_aesthetics(element)
+        |> Enum.reject(fn {aesthetic, _value} -> aesthetic in names end)
+        |> Enum.reduce(frame, fn {aesthetic, value}, filled ->
+          DataFrame.put(filled, aesthetic, List.duplicate(value, rows))
+        end)
+    end
   end
 
   # The rows a layer's geom draws: its table without the aesthetics other than position it takes
@@ -484,7 +528,7 @@ defmodule Giggly.Assembly do
   # orders them by name, and a legend merged from several stands where its first would. Each layer
   # comes with its table, its positions final and its other aesthetics not yet mapped, as ggplot2's
   # guides read each layer's data before the scales map it.
-  defp legends(non_position_scales, plot, layers_and_data) do
+  defp legends(non_position_scales, plot, layers_and_data, element) do
     layers = Enum.map(layers_and_data, fn {layer, _frame} -> layer end)
 
     scale_legends =
@@ -518,7 +562,11 @@ defmodule Giggly.Assembly do
       Enum.any?(layers, fn layer -> draws_in?(legend, plot, layer) end)
     end)
     |> Enum.map(fn legend ->
-      Map.put(legend, :layers, key_layers(legend, non_position_scales, plot, layers_and_data))
+      Map.put(
+        legend,
+        :layers,
+        key_layers(legend, non_position_scales, plot, {layers_and_data, element})
+      )
     end)
   end
 
@@ -616,9 +664,9 @@ defmodule Giggly.Assembly do
   # added, with those it maps, its geom, what it sets, whether its marks are horizontal, and whether
   # it draws in each key; none for a colour bar, which draws no layer's glyph, as ggplot2's colour
   # bar keeps none.
-  defp key_layers(%{guide: %Guide.Colorbar{}}, _scales, _plot, _layers_and_data), do: []
+  defp key_layers(%{guide: %Guide.Colorbar{}}, _scales, _plot, _layers), do: []
 
-  defp key_layers(legend, scales, plot, layers_and_data) do
+  defp key_layers(legend, scales, plot, {layers_and_data, element}) do
     discrete =
       scales
       |> Map.fetch!(hd(legend.aesthetics))
@@ -627,9 +675,15 @@ defmodule Giggly.Assembly do
     for {layer, frame} <- layers_and_data,
         mapped = drawn_aesthetics(legend, plot, layer),
         mapped != [] do
+      geom = Plot.layer_geom(layer)
+
       %{
-        geom: Plot.layer_geom(layer),
+        geom: geom,
         aesthetics: mapped,
+        defaults:
+          geom
+          |> Geom.default_aesthetics(element)
+          |> Map.new(),
         fixed: Plot.layer_fixed(layer),
         flipped: flipped?(frame),
         draws: draws(legend.keys, frame, mapped, discrete)
@@ -698,7 +752,7 @@ defmodule Giggly.Assembly do
   # scale, as ggplot2's `map_df()` maps them, in name order. A value mapped to `:none`, a scale's
   # `na_value: :none`, is put in as `nil`, the table's missing value, as R's mapped column holds
   # `NA`: a column holds one type, so `:none` beside a colour would be refused, and a geom reads a
-  # missing colour as none (`Giggly.Geom.Mark.colors/3`).
+  # missing colour as none (`Giggly.Geom.Mark.colors/2`).
   defp map_non_position(frame, scales) do
     scales
     |> Enum.sort()

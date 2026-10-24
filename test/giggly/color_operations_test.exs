@@ -119,6 +119,47 @@ defmodule Giggly.ColorOperationsTest do
     end
   end
 
+  # Golden: scales 1.4.0's `col_mix(a, b, amount)` in R 4.6.1, its opaque alpha FF dropped; the
+  # same mixing matched every one of 3,012 random pairs and amounts, these ties among them. It moves
+  # only with scales' arithmetic or farver's rounding.
+  describe "mix/3" do
+    test "black ink mixed toward white or clear paper is ggplot2's geoms' default colours" do
+      assert Enum.map(
+               [{"#FFFFFF", 0.35}, {"#FFFFFF", 0.2}, {"#00000000", 0.35}, {"#00000000", 0.2}],
+               fn {paper, amount} -> ColorOperations.mix("#000000", paper, amount) end
+             ) === ["#595959", "#333333", "#000000A6", "#000000CC"]
+    end
+
+    test "each channel and the alpha is a share of the way between the two, rounded to a byte" do
+      assert ColorOperations.mix("#18C665", "#89CD3FE8", 0.048195409588515759) === "#1DC663FE"
+      assert ColorOperations.mix("#2E2DE1", "#AE802B27", 0.63301461911760271) === "#7F626E76"
+      assert ColorOperations.mix("#FB4AD9E4", "#820C22", 0.019754580687731504) === "#F949D5E5"
+    end
+
+    test "a channel or an alpha half way between two bytes rounds to the even one, as farver's" do
+      assert Enum.map(
+               [
+                 {"#000000", "#010101"},
+                 {"#000000", "#030303"},
+                 {"#7F7F7F", "#808080"},
+                 {"#00000000", "#00000005"},
+                 {"#000000FE", "#000000FF"}
+               ],
+               fn {from, to} -> ColorOperations.mix(from, to, 0.5) end
+             ) === ["#000000", "#020202", "#808080", "#00000002", "#000000FE"]
+    end
+
+    test "no share is the first colour and all of it the second" do
+      assert ColorOperations.mix("#123456", "#FEDCBA80", 0) === "#123456"
+      assert ColorOperations.mix("#123456", "#FEDCBA80", 1) === "#FEDCBA80"
+    end
+
+    test "an amount outside 0 to 1 is refused" do
+      assert_raise FunctionClauseError, fn -> ColorOperations.mix("#000000", "#FFFFFF", 1.5) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.mix("#000000", "#FFFFFF", -0.1) end
+    end
+  end
+
   # Golden: viridisLite 0.4.3's `viridis(n, alpha, begin, end, direction, option)` in R 4.6.1, its
   # opaque alpha FF dropped; the same evaluation matched every colour of 19,794 calls, every
   # palette and count to 256 among them. It moves only with R's splines, which

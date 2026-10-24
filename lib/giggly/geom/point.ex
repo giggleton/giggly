@@ -17,15 +17,17 @@ defmodule Giggly.Geom.Point do
   # (`Giggly.Geom.Shape`), worked out as ggplot2's `GeomPoint` hands it to grid: its font size is
   # `size * .pt + stroke * .stroke / 2` points, and its outline `stroke * .stroke / 2` line-width
   # units wide, from the row's size and stroke in millimetres; a stroke of `:none`, R's `NA`, or a
-  # missing one, adds nothing to the size and draws no outline and no lines. Unless a layer sets
-  # them, a point looks as ggplot2's default point does: the solid circle, `:circle` (R's 19), of
-  # size 1.5 with a 0.5 border, which grid draws with a radius of 1.95 points and a 0.71-point
-  # outline, the figures in ggplot2's own SVG test snapshots; black, or its row's colour, mapped or
-  # set; and no fill, or its row's fill, mapped or set. Its colour outlines the shape and fills the
-  # shapes R fills in a point's colour, and its fill fills shapes 21 to 25. A row's `alpha`, where
-  # its table has one, makes both that opaque, replacing their own, as ggplot2's `alpha()` and
-  # `fill_alpha()` do; a row without one keeps each colour's, which is opaque unless the colour
-  # carries an alpha, as ggplot2's default alpha, `NA`, leaves a colour (`Giggly.Geom.Mark`). A row
+  # missing one, adds nothing to the size and draws no outline and no lines. Unless a layer maps or
+  # sets them, a point looks as ggplot2's default point does under the plot's theme: the solid
+  # circle, `:circle` (R's 19), as big as the theme's points, 1.5 mm at its default sizes, its
+  # border as wide as the theme's borders, 0.5 mm, which grid draws with a radius of 1.95 points
+  # and a 0.71-point outline, the figures in ggplot2's own SVG test snapshots; in the theme's ink,
+  # black, or its row's colour; and with no fill, or its row's fill. Its colour outlines the shape
+  # and fills the shapes R fills in a point's colour, and its fill fills shapes 21 to 25. A row's
+  # `alpha`, unless missing, makes both that opaque, replacing their own, as ggplot2's `alpha()`
+  # and `fill_alpha()` do; a missing one, the default, keeps each colour's, which is opaque unless
+  # the colour carries an alpha, as ggplot2's default alpha, `NA`, leaves a colour
+  # (`Giggly.Geom.Mark`). A row
   # whose colour is `:none`, R's `NA`, or missing, as a scale's `na_value: :none` leaves it, draws
   # no point, as ggplot2's `GeomPoint` drops a row whose colour is missing, and so does a row whose
   # shape is `:none` or missing, or whose size is missing, as a size scale's missing value leaves
@@ -64,14 +66,6 @@ defmodule Giggly.Geom.Point do
     alias Giggly.Geom.{Mark, Shape}
     alias Giggly.Scene.{Circles, Polygons, Rectangles, Segments}
 
-    # ggplot2's default point: its shape, its size and border width in millimetres, its ink, and
-    # no fill.
-    @shape :circle
-    @size 1.5
-    @stroke 0.5
-    @color "#000000"
-    @fill :none
-
     # ggplot2's `.pt` (font points per millimetre) and `.stroke` (line-width units, 1/96 inch, per
     # millimetre), and a line-width unit in points, as svglite writes a line's width.
     @font_points_per_millimetre 72.27 / 25.4
@@ -87,6 +81,20 @@ defmodule Giggly.Geom.Point do
     @line_join :round
     @mitre_limit 10.0
 
+    # ggplot2's `GeomPoint$default_aes`: the theme's point shape, its ink, no fill, its point size,
+    # no alpha, and its borders' width as the outline's.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element) do
+      [
+        shape: element.pointshape,
+        color: element.ink,
+        fill: nil,
+        size: element.pointsize,
+        alpha: nil,
+        stroke: element.borderwidth
+      ]
+    end
+
     # A point is drawn at its x and y alone.
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
@@ -96,15 +104,15 @@ defmodule Giggly.Geom.Point do
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      colors = Mark.colors(placed, :color, @color)
-      fills = Mark.colors(placed, :fill, @fill)
+      colors = Mark.colors(placed, :color)
+      fills = Mark.colors(placed, :fill)
 
       [
         DataFrame.pull(placed, :x),
         DataFrame.pull(placed, :y),
-        Mark.values(placed, :shape, @shape),
-        Mark.values(placed, :size, @size),
-        Mark.values(placed, :stroke, @stroke),
+        DataFrame.pull(placed, :shape),
+        DataFrame.pull(placed, :size),
+        DataFrame.pull(placed, :stroke),
         colors,
         Mark.opacities(placed, colors),
         fills,
@@ -139,15 +147,15 @@ defmodule Giggly.Geom.Point do
     # `:none`, or a missing size, draws nothing.
     @impl Giggly.Geom
     def draw_key(_geom, key) do
-      color = Map.get(key, :color, @color)
-      fill = Map.get(key, :fill, @fill)
-      alpha = Map.get(key, :alpha)
+      color = Mark.key_color(key, :color)
+      fill = Mark.key_color(key, :fill)
+      alpha = Map.fetch!(key, :alpha)
 
       point = %{
         place: {0.5, 0.5},
-        shape: Map.get(key, :shape, @shape),
-        size: Map.get(key, :size, @size),
-        stroke: Map.get(key, :stroke, @stroke),
+        shape: Map.fetch!(key, :shape),
+        size: Map.fetch!(key, :size),
+        stroke: Map.fetch!(key, :stroke),
         color: {color, Mark.opacity(color, alpha)},
         fill: {fill, Mark.opacity(fill, alpha)}
       }
@@ -163,7 +171,7 @@ defmodule Giggly.Geom.Point do
     @impl Giggly.Geom
     def key_size(_geom, key) do
       side =
-        case Map.get(key, :size, @size) do
+        case Map.fetch!(key, :size) do
           nil -> 0.0
           size -> size * @points_per_millimetre
         end

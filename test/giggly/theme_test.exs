@@ -589,6 +589,66 @@ defmodule Giggly.ThemeTest do
     end
   end
 
+  # Golden: the defaults ggplot2 4.0.3's `layer_data()` shows in R 4.6.1 for points, lines, text,
+  # bars and box plots under each complete theme and at other base sizes, its geoms reading the
+  # theme's `element_geom()`: a point's size and stroke, a line's and a border's width, a text's
+  # size, and the paper a bar's and a box's fill are mixed from. They move with how a complete
+  # theme's base sizes reach its layers.
+  describe "complete/1's defaults for the layers" do
+    test "at the default sizes, black ink on white paper, 0.5 mm lines and 11-point text" do
+      assert complete(%{}).geom === %{
+               ink: "#000000",
+               paper: "#FFFFFF",
+               linewidth: 0.5,
+               borderwidth: 0.5,
+               linetype: {},
+               bordertype: {},
+               family: "",
+               fontsize: 3.8660578386605779,
+               pointsize: 1.5,
+               pointshape: :circle
+             }
+    end
+
+    test "the base size reaches the text's and the points' sizes, the line width every width" do
+      sixteen = chosen(:gray, base_size: 16.0).geom
+      eight = chosen(:gray, base_size: 8.0).geom
+
+      assert Enum.map([sixteen, eight], fn geom ->
+               {geom.fontsize, geom.pointsize, geom.linewidth, geom.borderwidth}
+             end) === [
+               {5.6233568562335678, 2.1818181818181817, 0.72727272727272729, 0.72727272727272729},
+               {2.8116784281167839, 1.0909090909090908, 0.36363636363636365, 0.36363636363636365}
+             ]
+    end
+
+    test "the borders take the line width, never the rectangles' base size" do
+      geom = chosen(:gray, base_line_size: 1.0, base_rect_size: 2.0).geom
+      assert {geom.linewidth, geom.borderwidth, geom.pointsize} === {1.0, 1.0, 1.5}
+    end
+
+    test "each theme gives theme_gray()'s defaults but theme_void(), whose paper is clear" do
+      for name <- [:bw, :linedraw, :light, :dark, :minimal, :classic] do
+        assert chosen(name, base_size: 16.0).geom === chosen(:gray, base_size: 16.0).geom
+      end
+
+      void = chosen(:void, base_size: 16.0, base_line_size: 1.0).geom
+
+      assert {void.paper, void.fontsize, void.linewidth} ===
+               {"#00000000", 5.6233568562335678, 1.0}
+    end
+
+    test "no setting reaches them, laid over a complete theme or over none" do
+      assert chosen(:gray, [base_size: 16.0], %{
+               text: %{size: 30.0},
+               line: %{linewidth: 3.0},
+               rect: %{fill: "#FF0000"}
+             }).geom === chosen(:gray, base_size: 16.0).geom
+
+      assert complete(%{line: %{linewidth: 3.0}}).geom === complete(%{}).geom
+    end
+  end
+
   describe "merge/2" do
     test "a line's, a rectangle's or a text's properties replace only the ones given" do
       merged = merge(%{axis_text: %{color: "#FF0000"}}, %{axis_text: %{size: 12}})

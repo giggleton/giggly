@@ -23,11 +23,12 @@ defmodule Giggly.Geom.Path do
   # width of the row it starts from, and a segment touching a missing position, or starting from a
   # row missing its width, is not drawn, as R's graphics engine draws no line of no width.
   #
-  # Every line looks as ggplot2's default line does unless its row says otherwise: solid, 0.5 mm
-  # wide, which grid draws 1.07 points wide, and black; or in its row's line type, as wide as its
-  # row's `linewidth`, in millimetres, and in its row's colour, each mapped or set. A row's
-  # `alpha`, where its table has one, makes its line that opaque, replacing its colour's own; a row
-  # without one keeps its colour's (`Giggly.Geom.Mark`). A dashed line is drawn with its dashes as
+  # A line the layer neither maps nor sets a look for looks as ggplot2's default line does under
+  # the plot's theme: solid, as wide as the theme's lines, 0.5 mm at its default sizes, which grid
+  # draws 1.07 points wide, and in its ink, black. Otherwise it is in its row's line type, as wide
+  # as its row's `linewidth`, in millimetres, and in its row's colour, each mapped or set. A row's
+  # `alpha`, unless missing, makes its line that opaque, replacing its colour's own; a missing one,
+  # the default, keeps its colour's (`Giggly.Geom.Mark`). A dashed line is drawn with its dashes as
   # svglite writes them (`Mark.dashes/2`), and a blank one is not drawn, as R's graphics engine
   # draws no line of R's `"blank"`. While any line is in a line type but solid, blank included, no
   # line's colour, alpha, width or line type may change along it: where one does, the panel is
@@ -61,10 +62,8 @@ defmodule Giggly.Geom.Path do
     alias Giggly.Geom.Mark
     alias Giggly.Scene.{Polylines, Segments}
 
-    # ggplot2's default line: its width in millimetres, its line type, solid, and its ink.
-    @line_width 0.5
-    @line_type {}
-    @color "#000000"
+    # The solid line type, which a line must keep all along it to be drawn as segments.
+    @solid {}
 
     # A legend's key, `draw_key_path()`: a line across the middle of the key, from a tenth of its
     # width to nine tenths, its corners grid's default, round.
@@ -74,6 +73,13 @@ defmodule Giggly.Geom.Path do
     # Points in a millimetre, grid's `"mm"` in the scene's points, which a key's room is measured
     # in.
     @points_per_millimetre 72 / 25.4
+
+    # ggplot2's `GeomPath$default_aes`: the theme's ink, its lines' width and line type, and no
+    # alpha.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element) do
+      [color: element.ink, linewidth: element.linewidth, linetype: element.linetype, alpha: nil]
+    end
 
     # A path is drawn at its x and y alone, in the data's order.
     @impl Giggly.Geom
@@ -116,8 +122,7 @@ defmodule Giggly.Geom.Path do
     @impl Giggly.Geom
     def draw_key(geom, key) do
       look =
-        {Map.get(key, :color, @color), Map.get(key, :linewidth, @line_width),
-         Map.get(key, :linetype, @line_type)}
+        {Mark.key_color(key, :color), Map.fetch!(key, :linewidth), Map.fetch!(key, :linetype)}
 
       case look do
         {color, line_width, line_type}
@@ -133,7 +138,7 @@ defmodule Giggly.Geom.Path do
               stroke_width: Mark.stroke_width(line_width),
               dashes: Mark.dashes(line_type, line_width),
               color: [Mark.hex(color)],
-              opacity: [Mark.opacity(color, Map.get(key, :alpha))],
+              opacity: [Mark.opacity(color, Map.fetch!(key, :alpha))],
               line_end: geom.line_end,
               line_join: :round,
               mitre_limit: 10.0
@@ -147,7 +152,7 @@ defmodule Giggly.Geom.Path do
     @impl Giggly.Geom
     def key_size(_geom, key) do
       side =
-        case Map.get(key, :linewidth, @line_width) do
+        case Map.fetch!(key, :linewidth) do
           nil -> 0.0
           line_width -> line_width * @points_per_millimetre
         end
@@ -280,22 +285,21 @@ defmodule Giggly.Geom.Path do
     defp solid?(rows) do
       rows
       |> Enum.group_by(fn row -> row.group end, fn row -> row.linetype end)
-      |> Enum.all?(fn {_group, line_types} -> Enum.uniq(line_types) == [@line_type] end)
+      |> Enum.all?(fn {_group, line_types} -> Enum.uniq(line_types) == [@solid] end)
     end
 
-    # Each row's positions, group, colour, black for a table without one, alpha, `nil` for a table
-    # without one, width, 0.5 for a table without one, and line type, solid for a table without
-    # one, a missing width or line type `nil`.
+    # Each row's positions, group, colour, alpha, width and line type, a missing width or line type
+    # `nil`.
     defp rows(frame) do
       Enum.zip_with(
         [
           DataFrame.pull(frame, :x),
           DataFrame.pull(frame, :y),
           DataFrame.pull(frame, :group),
-          Mark.colors(frame, :color, @color),
-          Mark.values(frame, :alpha, nil),
-          Mark.values(frame, :linewidth, @line_width),
-          Mark.values(frame, :linetype, @line_type)
+          Mark.colors(frame, :color),
+          DataFrame.pull(frame, :alpha),
+          DataFrame.pull(frame, :linewidth),
+          DataFrame.pull(frame, :linetype)
         ],
         fn [x_position, y_position, group, color, alpha, line_width, line_type] ->
           %{
@@ -313,7 +317,7 @@ defmodule Giggly.Geom.Path do
 
     # A row with both positions, a colour, a width and a line type, before it is placed, as R's
     # `complete.cases()` finds one, an infinite position counting as present and a colour of
-    # `:none` as missing, a colour read by `Mark.colors/3` so a missing one is `:none` too, and a
+    # `:none` as missing, a colour read by `Mark.colors/2` so a missing one is `:none` too, and a
     # blank line type, held as `:none` where a layer sets it, as present.
     defp complete?(row) do
       not missing?(row.x) and not missing?(row.y) and row.color != :none and

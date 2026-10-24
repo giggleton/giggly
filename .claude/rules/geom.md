@@ -12,12 +12,14 @@ system itself and how a point's look was derived: design-log §4, the entry begi
 coordinate system arrives with drawing"; why a geom is a struct of its kind whose module also
 holds the facts a plot checks: the entry beginning "Each facet, coordinate system, geom, stat and
 position is a struct"; why a geom has a say during the build: the entry beginning "A geom says
-where its marks sit".
+where its marks sit"; why its defaults are filled in from the theme as columns: the entry
+beginning "Each layer's defaults are filled in from the theme".
 
 ## Rules
 
 - **A geom never sees a panel's size, a pixel, a scale's range or a facet.** Its boundary lists
-  `Giggly.AsCharacter` for the text it writes, never a scale. It is handed one panel's rows, the
+  `Giggly.AsCharacter` for the text it writes and `Giggly.ColorOperations` to mix its default
+  colours, never a scale. It is handed one panel's rows, the
   plot's coordinate system and that panel's params, as ggplot2's `draw_panel()` is, places the rows
   with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
 - **A geom has a say during the build: `setup_data/3`** gives each row the extent it is drawn
@@ -27,6 +29,15 @@ where its marks sit".
   assembly calls it, and rendering calls `draw_panel/4`. **It is told whether each axis is
   discrete** (`axis_kinds`), which ggplot2's geoms read from a position's `mapped_discrete` class;
   a geom sees an axis's kind, never its range.
+- **A geom says what it draws with: `default_aesthetics/2`** gives each aesthetic it draws with
+  and its value where the layer neither maps nor sets it, ggplot2's `default_aes` in R's order,
+  worked out from the complete theme's `geom` element (`Giggly.Theme`: ink, paper, the lines' and
+  borders' widths and types, the text's family and size, the points' size and shape) as its
+  `from_theme()` reads `element_geom()`. The assembly fills them into the rows and the keys, so
+  every aesthetic a geom draws with is in every row and key it is handed and **a geom holds no
+  default look of its own**; a default R gives as `NA` is `nil`. R's defaults Giggly has no
+  aesthetic for are left out (text's `fontface` and `lineheight`, a box's `weight`), and so is the
+  `width` R puts back into a bar's and a box's table once set up, which is not the width drawn.
 - **A bar runs from 0 to its y, as R's `pmin(y, 0)` and `pmax(y, 0)` give its ends, an infinite
   one to the panel's edge**, its ends doubles, a missing y's missing; its sides are its x less and
   plus half its width, in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an infinite bin's are
@@ -53,17 +64,20 @@ where its marks sit".
 - **A geom is handed its layer's rows without the aesthetics other than position that the layer
   takes from the plot's mapping and cannot use** (the assembly's `drawn_data`), which ride along in
   `layer_data/2` and are drawn by nothing, so a geom never reads such a column as a value the layer
-  sets: a path's carried `stroke`, a point's carried `linewidth`.
+  sets: a path's carried `stroke`, a point's carried `linewidth`. Where one is among its geom's
+  defaults, the default takes its place in the rows drawn (a point's carried `stroke`), while
+  `layer_data/2` shows the carried column.
 - **A row missing a required position is not drawn.** ggplot2 also warns; a pure pipeline cannot,
   so how a dropped row is reported is open until something can report it.
-- **A point looks like ggplot2's default point unless its row says otherwise:** the solid circle
-  (`:circle`, R's 19), black, no fill, size 1.5 mm, border 0.5 mm, which grid draws as a circle of
-  radius 1.95 points with a 0.71-point outline. **A bar looks like ggplot2's default bar, and a
-  rectangle like its default rectangle:** filled `#595959`, ink mixed 35% toward paper, with no
-  border, its border's width 0.5 mm all the same. The defaults move to the theme with the
-  default-aesthetics stage. **A row's colour, mapped or set, replaces the default**: a point's
+- **A point's defaults are ggplot2's under the theme:** its point shape, the solid circle
+  (`:circle`, R's 19), its ink, no fill, its points' size (`base_size / 11 * 1.5` mm) and its
+  borders' width (`base_line_size`) as the outline; at the default sizes 1.5 and 0.5 mm, which
+  grid draws as a circle of radius 1.95 points with a 0.71-point outline. **A bar's and a
+  rectangle's:** no border, a fill of ink mixed 35% toward paper (`ColorOperations.mix/3`:
+  `#595959`, `#000000A6` on `theme_void()`'s clear paper), the borders' width and line type.
+  **A row's colour, mapped or set, replaces the default**: a point's
   colour and fill, a bar's fill and border, a line's colour, read from each row
-  (`Giggly.Geom.Mark.colors/3`), where the assembly put it, so the scene carries one per mark. A
+  (`Giggly.Geom.Mark.colors/2`), where the assembly put it, so the scene carries one per mark. A
   point takes `color` and `fill`, which fills only shapes 21 to 25; a bar takes both; a line takes
   `color`.
 - **A point is drawn in its row's shape as R's graphics engine draws it** (`Giggly.Geom.Shape`,
@@ -84,32 +98,35 @@ where its marks sit".
 - **A row's `alpha` replaces its colour's own alpha: a point's colour and fill alike, a bar's fill
   alone, a line's stroke**, as ggplot2's `GeomPoint` applies `alpha()` to the colour and
   `fill_alpha()` to the fill, `GeomRect` `fill_alpha()` to the fill and `GeomPath` `alpha()` to the
-  line; a row without one, or a table without the column, keeps the colour's own, opaque for a
-  colour with none, as ggplot2's default alpha, `NA`, leaves a colour. **A bar's border is never
+  line; a row whose alpha is missing, the default, keeps the colour's own, opaque for a colour
+  with none, as ggplot2's default alpha, `NA`, leaves a colour. **A bar's border is never
   given the row's alpha**, only its own. `Giggly.Geom.Mark` is the one home of the rule, and a
   colour reaches the scene as its `#RRGGBB` and an opacity.
 - **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
   and `GeomPath` drop the rows whose colour is missing (`handle_na()`, a path's at a group's ends),
   and a bar left unfilled or unbordered, whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's
   or a line's key draws nothing, and a bar's is left unfilled or unbordered. **A missing colour
-  draws as `:none` does** (`Mark.colors/3`): a frame's column holds one type, so a set `colour:
-  :none` fills its whole column, and a value a scale maps to `:none` (`na_value: :none`), or an
-  annotation's list's `:none`, is held as `nil`, as R's column holds `NA`.
+  draws as `:none` does** (`Mark.colors/2`, `Mark.key_color/2`): a frame's column holds one
+  type, so a set `colour: :none` fills its whole column, and a value a scale maps to `:none`
+  (`na_value: :none`), or an
+  annotation's list's `:none`, is held as `nil`, as R's column holds `NA`, and so is a default R
+  gives as `NA`, a rectangle's border or a point's fill.
 - **A geom draws its own legend key (`draw_key/2`) and says how much room it needs
   (`key_size/2`)**, as ggplot2's `draw_key` belongs to the geom: handed the key's aesthetic
-  values, the layer's set values among them as ggplot2's key data holds its `aes_params`, it draws
+  values, the layer's set values among them as ggplot2's key data holds its `aes_params`, laid
+  over its geom's defaults under the theme, as ggplot2 fills key data from `default_aes`, it draws
   in the key's cell **by fractions of the cell and offsets in points**, as grid places a glyph by
   `npc` and absolute units, so it is right in a key of any size, and reports `{width, height}` in
   points, which the legend sizes its rows and column by (design-log §4, the entry beginning "A
   scale's `rescaler`"). A point's key is the point at the middle in the key's shape, size,
   stroke, colour and fill, as `draw_key_point()` draws it, and needs its size in millimetres
   either way, its stroke left out, as `set_key_size()` reads it; a bar's is its fill short of the
-  key by its border's width, the key's `linewidth` or 0.5 mm, its corners offset half that
+  key by its border's width, the key's `linewidth`, its corners offset half that
   in, as `draw_key_polygon()` takes `linewidth` millimetres off the key, its fill at the key's
   alpha and its border in its own, as wide and in the line type the key says, a blank or missing
   one not drawn, and needs twice its border's width, `draw_key_polygon()`'s `linewidth / 5` cm; a
   path's is a segment across the middle from a tenth of the key's width to nine tenths, as
-  `draw_key_path()` draws it, as wide as the key's `linewidth` or 0.5 mm and in its line type, a
+  `draw_key_path()` draws it, as wide as the key's `linewidth` and in its line type, a
   blank or missing one drawing nothing, its ends the layer's and its corners round, and needs its
   width. **A key of a missing width, R's `NA`, draws nothing and needs no room**, a bar's because
   `draw_key_polygon()`'s rectangle then has no size. Each was checked against vdiffr's drawing of a
@@ -123,8 +140,9 @@ where its marks sit".
   colour, alpha and width, a segment touching a missing position, or starting from a missing width,
   left out, as `GeomPath` tests its groups' `colour`, `alpha`, `linewidth` and `linetype` for
   constancy and R's engine draws no line of no width. A discrete colour, line type or width groups
-  the rows, so it varies along a group only where `group` is mapped apart from it. A line is black,
-  or its row's colour, as wide as its row's `linewidth` in millimetres or 0.5 (1.07 points, worked
+  the rows, so it varies along a group only where `group` is mapped apart from it. A line is its
+  row's colour, the theme's ink by default, as wide as its row's `linewidth` in millimetres, the
+  theme's `base_line_size` by default (0.5 at the default sizes, 1.07 points, worked
   out as ggplot2's `linewidth * .pt` line-width units and svglite's points), with the geom's ends,
   corners and mitre limit (ggplot2's defaults: butt, round, 10); the lines run in group order, each
   run alike in width and line type one primitive, and segments in row order, each run of one width
@@ -137,9 +155,10 @@ where its marks sit".
 - **Text (`Geom.Text`) is drawn as ggplot2's `GeomText` draws it**: a label per row at its `x` and
   `y`, its row's value as R's `as.character()` writes it (`Giggly.AsCharacter`, which the scales'
   discrete levels share: a whole number with no point, a float in up to 15 significant digits,
-  scientific notation where it is shorter, `TRUE`, a date); black, or its row's colour at its row's
-  alpha as a point; 11 points, the theme's base size, or the layer's `size` in millimetres times
-  `.pt`; turned the layer's `angle`; justified by the layer's `hjust` along its baseline and `vjust`
+  scientific notation where it is shorter, `TRUE`, a date); its row's colour, the theme's ink by
+  default, at its row's alpha as a point; its size in millimetres times `.pt`, the layer's or else
+  the theme's base size (`base_size / .pt`); turned the layer's `angle`; justified by the layer's
+  `hjust` along its baseline and `vjust`
   up the ascent of "M", a number or one of ggplot2's words, and `:inward` and `:outward` by where
   each label falls in the panel, as `compute_just()` decides. A row missing its place or label, or
   whose colour is `:none`, is not drawn. **A geom measures the text it draws** (`Giggly.Font`),
@@ -159,7 +178,8 @@ where its marks sit".
 - **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
   rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
   rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). **Each
-  rectangle's border is as wide as its row's `linewidth`, 0.5 mm by default, and in its row's line
+  rectangle's border is as wide as its row's `linewidth`, the theme's `base_line_size` by default,
+  and in its row's line
   type**, dashed as a line is, a blank one leaving it unbordered, as R's engine draws a blank
   border transparent, and so a missing width, written 0 wide where svglite writes `nan`, and the
   dashes written whether or not the border has a colour; the
@@ -182,7 +202,9 @@ where its marks sit".
   and the median. Each part takes its look from the struct's map for it, which holds only what the
   layer gave (a look absent is the box's own, `:none` R's `NA`), else the box's row; lines never
   take the box's alpha and its fill does; the median is twice the box's width unless its look
-  gives one; the box is `#333333`, white, 0.5 mm, solid; staples and whiskers are cut square, the
+  gives one; the box is by default the theme's ink mixed 20% toward its paper (`#333333`,
+  `#000000CC` on clear paper), filled with its paper, as wide as its borders and solid, its
+  outliers its points' size, their stroke the layer's 0.5; staples and whiskers are cut square, the
   box and median cut square and mitred; a line of colour `:none` or missing, blank, or of missing
   width is not drawn, a box's border so left off, and a line missing an end is left out. **A box
   whose corners a scale's limits cut is drawn in the pieces left**, each run of two placed corners

@@ -354,7 +354,18 @@ defmodule Giggly.DataFrame do
       ...>   |> Giggly.Plot.geom_point()
       ...>   |> Giggly.layer_data()
       iex> Giggly.DataFrame.dtypes(frame)
-      %{x: :integer, y: :float, panel: :integer, group: :integer}
+      %{
+        x: :integer,
+        y: :float,
+        panel: :integer,
+        group: :integer,
+        shape: :atom,
+        color: :string,
+        fill: :null,
+        size: :float,
+        alpha: :null,
+        stroke: :float
+      }
   """
   @spec dtypes(t()) :: %{optional(name()) => dtype()}
   def dtypes(%implementation{} = frame), do: implementation.dtypes(frame)

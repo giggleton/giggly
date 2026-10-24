@@ -9,7 +9,8 @@ paths:
 built plot into a table of grobs. Why rendering is a stage of its own and is called this:
 design-log §4, the entry beginning "The coordinate system arrives with drawing"; why axes are
 cells beside the panel and the margin arrived with them: the entry beginning "Axes are drawn";
-why rendering resolves the theme: the entry beginning "The theme is a resolved value"; why it
+why rendering draws in a resolved theme: the entry beginning "The theme is a resolved value", and
+why the assembly resolves it: the entry beginning "Each layer's defaults are filled in"; why it
 arranges the panels a facet lays out: the entry beginning "`facet_wrap` is built in steps"; why
 every plot's cells are drawn in facets' order: the entry beginning "Every plot's cells are drawn in
 ggplot2's facets' order".
@@ -34,12 +35,11 @@ ggplot2's facets' order".
   table, as `table_add_background()` adds it, which shows only when the table keeps its
   proportions and fills the drawing one way alone, its cell kept, empty, where the theme removes
   it, as svglite writes the clip; every other cell is not.
-- **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
-  carries the plot's theme, the complete theme it chose (by name with its base sizes, or `:none`)
-  and its settings; `Theme.complete/1` turns it into the elements, which the guide and rendering
-  itself read, each colour beside its opacity, which every primitive drawn from the theme carries.
-  A geom is handed no theme: the marks keep their own look, whatever the base sizes, until default
-  aesthetics are filled from the theme in the assembly (the theme's next step).
+- **Rendering reads the complete theme the assembly worked out, and hands it on.** The assembly
+  completes the plot's theme (`Theme.complete/1`) where ggplot2's build does; the guide and
+  rendering itself read its elements, each colour beside its opacity, which every primitive drawn
+  from the theme carries. A geom is handed no theme: the marks take their look from their rows,
+  which hold the theme's defaults where the layer leaves its look unset.
 - **Rendering arranges the panels as the layout table says, knowing no facet.** Each layout row
   gives a panel's row and column, whether it draws its bottom and left axes, and its strip labels;
   a facet says where things go, and rendering lays them out as ggplot2's facets lay them out. An
@@ -88,7 +88,8 @@ ggplot2's facets' order".
   out, and its table is centred down it; the cell is drawn after the axes' titles and before the
   plot's labels. Each key's glyphs are drawn by the geom of every layer that maps one of the
   legend's aesthetics and draws in that key (`Geom.draw_key/2`), in layer order, at the key's
-  values of the aesthetics that layer maps, with what it sets and with whether its marks are
+  values of the aesthetics that layer maps, with what it sets, both laid over its geom's defaults
+  under the theme (the layer's `defaults`), and with whether its marks are
   horizontal (`flipped_aes`, the assembly's `flipped`), as ggplot2 hands `draw_key` the layer's
   `flipped_aes`, so a box's key is turned, and handed to the guide with the
   room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by, so rendering

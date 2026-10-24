@@ -8,7 +8,8 @@ paths:
 # Colour operations
 
 `Giggly.ColorOperations` reads a colour as a user writes one, makes the colours R's palettes make,
-and is the one module that calls the `color` library. Why colours are CSS's and carried as hex
+mixes two as ggplot2's geoms mix their defaults, and is the one module that calls the `color`
+library. Why colours are CSS's and carried as hex
 strings: design-log §4, the entry beginning "Colours are CSS's names and hex forms"; why the
 library is handed R's constants, and why the module is not called `Color`: the entry beginning
 "R's exact colours come from the `color` package"; why it nests under the umbrella: the entry
@@ -19,7 +20,7 @@ beginning "A library's owner nests".
 - **It is the `color` library's only caller.** Its boundary lists `Color` alone, which the root
   lists too, as boundary lets a sub-boundary list only what its parent does, and no other domain
   lists it, as `Giggly.DataFrame` owns `table` (`.claude/rules/dependencies.md`); a boundary that
-  needs a colour lists `Giggly.ColorOperations`, its sibling, as `Plot` and `Scale` do. A test
+  needs a colour lists `Giggly.ColorOperations`, its sibling, as `Plot`, `Scale` and `Geom` do. A test
   never calls the library either: its expected colours come from CSS's table, or from R.
 - **A colour has one spelling**: uppercase `#RRGGBB`, or `#RRGGBBAA` when it carries an alpha of its
   own, an alpha of FF dropped as opaque; and `:none`, R's `NA`, which draws nothing. No struct: it
@@ -40,6 +41,12 @@ beginning "A library's owner nests".
   the rounded 0.008856 and 7.787 and the library the exact fractions, one colour in 35,007 of seven
   R gradients, a gradient no default reaches. Its tests pin R's colours; a conversion added for
   another palette is checked against R the same way before it is trusted.
+- **A mix of two colours is exactly scales' `col_mix()`** (`mix/3`), as ggplot2's geoms mix their
+  default colours from the theme's ink and paper: farver's decoding, each channel a byte and the
+  alpha its byte over 255, `from * (1 - amount) + to * amount`, then each channel and the alpha
+  times 255 rounded as farver's `double2int()` rounds, a half to the even byte, and clamped. The
+  `color` library's own sRGB mix is not R's (it gives `#807F80` where R gives `#808080` for half
+  black, half white). It matched R on all of 3,012 random pairs and amounts, ties included.
 - **A viridis palette's colours are exactly R's `viridisLite::viridis()`** (`viridis/2`): R's own
   "fmm" splines through each palette's 256 colours in L*a*b*, their coefficients copied into
   `priv/palettes/viridis_splines.csv` as R holds them and read at compile time behind a

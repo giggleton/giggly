@@ -298,7 +298,9 @@ defmodule Giggly.Plot do
   # sets it, kept as a float.
   @linewidth_option [
     type: {:custom, __MODULE__, :validate_linewidth, []},
-    doc: "How wide every line is, in millimetres; 0.5 when not given."
+    doc:
+      "How wide every line is, in millimetres; the theme's `base_line_size` when not given, 0.5 " <>
+        "at its default sizes."
   ]
 
   # The line types, by name in the order of their numbers, 0 to 6, each held as its dash pattern:
@@ -367,15 +369,17 @@ defmodule Giggly.Plot do
 
   @point_size_option [
     type: {:custom, __MODULE__, :validate_size, []},
-    doc: "How big every point is, in millimetres; 1.5 when not given."
+    doc:
+      "How big every point is, in millimetres; 1.5 times the theme's `base_size` over 11 when " <>
+        "not given, 1.5 at its default sizes."
   ]
 
   @point_stroke_option [
     type: {:custom, __MODULE__, :validate_stroke, []},
     doc:
       "How heavy every point's outline is, in millimetres, or `:none` for no outline and no " <>
-        "lines; 0.5 when not given. The outline is drawn half that wide, and a heavier stroke " <>
-        "makes the shape bigger too."
+        "lines; the theme's `base_line_size` when not given, 0.5 at its default sizes. The " <>
+        "outline is drawn half that wide, and a heavier stroke makes the shape bigger too."
   ]
 
   @bar_color_option [
@@ -388,12 +392,18 @@ defmodule Giggly.Plot do
 
   @bar_fill_option [
     type: @color_type,
-    doc: "The colour every bar is filled with: " <> @color_forms <> "; `#595959` when not given."
+    doc:
+      "The colour every bar is filled with: " <>
+        @color_forms <>
+        "; when not given, the theme's ink mixed 35% toward its paper, `#595959`, or " <>
+        "`#000000A6` under `theme_void/2`, whose paper is clear."
   ]
 
   @bar_linewidth_option [
     type: {:custom, __MODULE__, :validate_linewidth, []},
-    doc: "How wide every bar's border is, in millimetres; 0.5 when not given."
+    doc:
+      "How wide every bar's border is, in millimetres; the theme's `base_line_size` when not " <>
+        "given, 0.5 at its default sizes."
   ]
 
   @bar_linetype_option [
@@ -789,14 +799,14 @@ defmodule Giggly.Plot do
                          type: {:custom, __MODULE__, :validate_shape, []},
                          doc:
                            "The shape the outliers are drawn in, by name or number, as " <>
-                             "`geom_point/3` takes one, or `:none` for none; the box's `:shape`, " <>
-                             "or `:circle`, when not given."
+                             "`geom_point/3` takes one, or `:none` for none; the box's `:shape` " <>
+                             "when not given."
                        ],
                        outlier_size: [
                          type: {:custom, __MODULE__, :validate_size, []},
                          doc:
-                           "How big the outliers are, in millimetres; the box's `:size`, or " <>
-                             "1.5, when not given."
+                           "How big the outliers are, in millimetres; the box's `:size`, " <>
+                             "the theme's points' size unless the layer sets one, when not given."
                        ],
                        outlier_stroke: [
                          type: {:custom, __MODULE__, :validate_stroke, []},
@@ -852,18 +862,24 @@ defmodule Giggly.Plot do
                            type: @color_type,
                            doc:
                              "The colour of every box's lines and outliers, written `colour:` " <>
-                               "or `color:`: " <> @color_forms <> "; `#333333` when not given."
+                               "or `color:`: " <>
+                               @color_forms <>
+                               "; when not given, the theme's ink mixed 20% toward its paper, " <>
+                               "`#333333`, or `#000000CC` under `theme_void/2`."
                          ],
                          fill: [
                            type: @color_type,
                            doc:
                              "The colour every box is filled with: " <>
-                               @color_forms <> "; white when not given."
+                               @color_forms <>
+                               "; the theme's paper when not given, white, or clear under " <>
+                               "`theme_void/2`."
                          ],
                          linewidth: [
                            type: {:custom, __MODULE__, :validate_linewidth, []},
                            doc:
-                             "How wide every box's lines are, in millimetres; 0.5 when not given."
+                             "How wide every box's lines are, in millimetres; the theme's " <>
+                               "`base_line_size` when not given, 0.5 at its default sizes."
                          ],
                          linetype: [
                            type: @linetype_type,
@@ -900,8 +916,8 @@ defmodule Giggly.Plot do
     size: [
       type: {:custom, __MODULE__, :validate_size, []},
       doc:
-        "How big every label is, in millimetres, each 2.85 points; 11 points, the theme's " <>
-          "base size, when not given."
+        "How big every label is, in millimetres, each 2.85 points; the theme's `base_size` " <>
+          "when not given, 11 points at its default sizes."
     ],
     angle: [
       type: {:custom, __MODULE__, :validate_angle, []},
@@ -965,12 +981,16 @@ defmodule Giggly.Plot do
     type: @color_type,
     doc:
       "The colour every rectangle is filled with: " <>
-        @color_forms <> "; `#595959` when not given."
+        @color_forms <>
+        "; when not given, the theme's ink mixed 35% toward its paper, `#595959`, or " <>
+        "`#000000A6` under `theme_void/2`, whose paper is clear."
   ]
 
   @rect_linewidth_option [
     type: {:custom, __MODULE__, :validate_linewidth, []},
-    doc: "How wide every rectangle's border is, in millimetres; 0.5 when not given."
+    doc:
+      "How wide every rectangle's border is, in millimetres; the theme's `base_line_size` when " <>
+        "not given, 0.5 at its default sizes."
   ]
 
   @rect_linetype_option [

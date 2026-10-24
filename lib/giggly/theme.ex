@@ -70,6 +70,13 @@ defmodule Giggly.Theme do
   # graphics engine takes it; a share inherited from a parent whose own is still a share is taken of
   # it again, as ggplot2's `combine_elements()` fills a property and then works out its share.
   #
+  # A complete theme also gives the layers their defaults, ggplot2's `element_geom()` (`geom`),
+  # which every complete theme sets from its base sizes and its paper, `theme_void()`'s clear, and
+  # no setting reaches: the ink and paper a layer's default colours are mixed from, the widths of
+  # its lines and borders, its text's family and size, and its points' size and shape, in a layer's
+  # millimetres, since they become the values of a layer's aesthetics. The assembly reads it to fill
+  # in what each layer leaves unset.
+  #
   # When a plot is rendered, every function that draws something other than a mark takes the
   # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths, line
   # types and ends, and spacing, and whether the panel's background and grid are drawn over its
@@ -126,7 +133,8 @@ defmodule Giggly.Theme do
     :plot_title,
     :plot_subtitle,
     :plot_caption,
-    :plot_tag
+    :plot_tag,
+    :geom
   ]
   defstruct @enforce_keys
 
@@ -254,8 +262,9 @@ defmodule Giggly.Theme do
   background, the margin inside it, each key's background, width and height, the title, the
   labels, a colour bar's ticks and how far each reaches into the bar, the space between one
   legend and the next below it, the space between the panels and the legends, and where the
-  legends go, `:right` or `:none` for no legends; and the plot's title, subtitle, caption and tag.
-  Every length is in points; a line, a rectangle or a text the theme removes is `:none`.
+  legends go, `:right` or `:none` for no legends; the plot's title, subtitle, caption and tag; and
+  the layers' defaults (`geom`). Every length is in points but the layers' defaults, which are in
+  a layer's millimetres; a line, a rectangle or a text the theme removes is `:none`.
   """
   @type t :: %__MODULE__{
           plot_background: rect(),
@@ -304,7 +313,27 @@ defmodule Giggly.Theme do
           plot_title: title(),
           plot_subtitle: title(),
           plot_caption: title(),
-          plot_tag: title()
+          plot_tag: title(),
+          geom: geom()
+        }
+
+  @typedoc """
+  The layers' defaults, ggplot2's `element_geom()`: the ink and paper their colours are mixed
+  from, each a colour in its one spelling; the width and line type of their lines and of their
+  borders, in millimetres; their text's family, `""` for the device's own, and its size, and their
+  points' size, in millimetres, and shape.
+  """
+  @type geom :: %{
+          ink: String.t(),
+          paper: String.t(),
+          linewidth: float(),
+          borderwidth: float(),
+          linetype: tuple(),
+          bordertype: tuple(),
+          family: String.t(),
+          fontsize: float(),
+          pointsize: float(),
+          pointshape: atom()
         }
 
   # ggplot2's element tree, as far as Giggly draws: each element, its kind, the element it inherits
@@ -644,7 +673,8 @@ defmodule Giggly.Theme do
       plot_title: title(theme, :plot_title),
       plot_subtitle: title(theme, :plot_subtitle),
       plot_caption: title(theme, :plot_caption),
-      plot_tag: title(theme, :plot_tag)
+      plot_tag: title(theme, :plot_tag),
+      geom: Map.fetch!(theme, :geom)
     }
   end
 
@@ -932,10 +962,11 @@ defmodule Giggly.Theme do
   # ticks reach a fifth of a key into the bar. The plot's title is 1.2 times the base size with
   # `half_line` below it, its subtitle at the base size with `half_line` below it, its caption 0.8
   # of it with `half_line` above it, and its tag 1.2 times it.
-  defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size}) do
+  defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size} = sizes) do
     half_line = base_size / 2
 
     %{
+      geom: geom(sizes, @paper),
       line: %{color: @ink, linewidth: line_size, linetype: {}, lineend: :butt},
       rect: %{fill: @paper, color: @ink, linewidth: rect_size, linetype: {}},
       text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
@@ -1096,10 +1127,11 @@ defmodule Giggly.Theme do
   # the panels'; the strips' text with no margin of its own; no margin round the plot or inside a
   # legend, legends a spacing apart and 0.2 centimetres from the panels; and the plot's title and
   # subtitle with `half_line` above them, as its caption has.
-  defp void(%{base_size: base_size}) do
+  defp void(%{base_size: base_size} = sizes) do
     half_line = base_size / 2
 
     %{
+      geom: geom(sizes, @clear_paper),
       line: :none,
       rect: %{fill: @clear_paper, color: :none, linewidth: 0, linetype: {}},
       text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
@@ -1129,6 +1161,28 @@ defmodule Giggly.Theme do
       plot_caption: %{size: {:rel, 0.8}, margin: sides(half_line, 0, 0, 0)},
       plot_tag: %{size: {:rel, 1.2}},
       plot_background: %{}
+    }
+  end
+
+  # The layers' defaults, ggplot2's `element_geom()` as every complete theme sets it from its base
+  # sizes: its ink, and `paper`; its lines' and its borders' widths `base_line_size`, never
+  # `base_rect_size`, and solid; its text's family the device's own, `""`, as the theme's
+  # `base_family` is, and its size the base size in millimetres (`base_size / .pt`);
+  # its points' size 1.5 times the base size over 11, and the solid circle. They stay in a layer's
+  # millimetres, since they become the values of a layer's aesthetics, which a layer may set
+  # instead, and no setting reaches them.
+  defp geom(%{base_size: base_size, base_line_size: line_size}, paper) do
+    %{
+      ink: @ink,
+      paper: paper,
+      linewidth: line_size,
+      borderwidth: line_size,
+      linetype: {},
+      bordertype: {},
+      family: "",
+      fontsize: base_size / @font_points_per_millimetre,
+      pointsize: base_size / 11 * 1.5,
+      pointshape: :circle
     }
   end
 

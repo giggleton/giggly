@@ -48,6 +48,9 @@ defmodule Giggly do
   Its columns are named by aesthetic, plus the `:panel` each row is drawn in and its `:group`, the
   series it belongs to; the data's own column names do not appear. Its x and y columns hold
   positions on the panel's scales: a discrete value is its level's position, counting from 1.
+  Every aesthetic the layer draws with is a column: one the layer neither maps nor sets holds its
+  default under the plot's theme, a point's `size` the theme's points' size, `nil` where the
+  default is none, as a point's `fill`.
   Raises `ArgumentError` when the plot has no layer at `index`; a negative index is refused too,
   not counted from the end.
 
@@ -57,7 +60,7 @@ defmodule Giggly do
       ...>   |> Giggly.Plot.geom_point()
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.names(frame)
-      [:x, :y, :panel, :group]
+      [:x, :y, :panel, :group, :shape, :color, :fill, :size, :alpha, :stroke]
       iex> Giggly.DataFrame.pull(frame, :x)
       [2, 1, 2]
       iex> Giggly.DataFrame.pull(frame, :panel)

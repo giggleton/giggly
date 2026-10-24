@@ -1,7 +1,7 @@
 defmodule Giggly.GeomTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Font, Geom}
+  alias Giggly.{Coord, DataFrame, Font, Geom, Theme}
   alias Giggly.Scene.{Circles, Polygons, Polylines, Rectangles, Segments, Text}
 
   @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
@@ -15,9 +15,39 @@ defmodule Giggly.GeomTest do
   # A colour's own alpha of 80, half-opaque: R holds it as the byte 128, so its opacity is 128/255.
   @half_alpha 128 / 255
 
+  # The layers' defaults under `theme_gray()` at its default sizes.
+  @element Theme.complete(%{complete: :none, settings: %{}}).geom
+
   # Dashes in points to two decimals, as svglite writes them.
   defp rounded(:none), do: :none
   defp rounded(dashes), do: Enum.map(dashes, fn length -> Float.round(length, 2) end)
+
+  # The primitives `geom` draws `frame`'s rows with, each default the frame lacks in every row, as
+  # the assembly hands a geom its rows.
+  defp draw_panel(geom, frame, coord, panel_params) do
+    rows = DataFrame.row_count(frame)
+
+    filled =
+      geom
+      |> Geom.default_aesthetics(@element)
+      |> Enum.reject(fn {aesthetic, _value} -> aesthetic in DataFrame.names(frame) end)
+      |> Enum.reduce(frame, fn {aesthetic, value}, filled ->
+        DataFrame.put(filled, aesthetic, List.duplicate(value, rows))
+      end)
+
+    Geom.draw_panel(geom, filled, coord, panel_params)
+  end
+
+  # A key's glyph and the room it needs, `key` laid over the geom's defaults, as rendering hands a
+  # geom a key.
+  defp draw_key(geom, key), do: Geom.draw_key(geom, Map.merge(key_defaults(geom), key))
+  defp key_size(geom, key), do: Geom.key_size(geom, Map.merge(key_defaults(geom), key))
+
+  defp key_defaults(geom) do
+    geom
+    |> Geom.default_aesthetics(@element)
+    |> Map.new()
+  end
 
   describe "draw_panel/4 for points" do
     test "a row missing its x or its y is not drawn" do
@@ -26,7 +56,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, nil, 2.0, 3.0], y: [1.0, 3.0, :nan, 2.0])
 
       assert [%Circles{x: [0.25, 0.75], y: [0.25, 0.5]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "each point is as opaque as its row's alpha, and opaque where it has none" do
@@ -46,7 +76,7 @@ defmodule Giggly.GeomTest do
                  color_opacity: [0.25, 1.0, 1.0],
                  fill_opacity: [0.25, 1.0, 1.0]
                }
-             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+             ] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "a table without alpha draws every point opaque" do
@@ -55,7 +85,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0])
 
       assert [%Circles{color_opacity: [1.0, 1.0], color: ["#000000", "#000000"]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     # Golden: svglite's drawing of ggplot2 4.0.3's points coloured "#FF000080" with an alpha mapped
@@ -73,7 +103,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Circles{color: ["#FF0000", "#FF0000"], color_opacity: [0.2, @half_alpha]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "each point is drawn in its row's colour, as a mapped colour gives one per row" do
@@ -93,7 +123,7 @@ defmodule Giggly.GeomTest do
                  color_opacity: [1.0, @half_alpha, 1.0]
                }
              ] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "a colour of :none, or a missing one, draws no point, as ggplot2 drops one whose colour is NA" do
@@ -101,7 +131,7 @@ defmodule Giggly.GeomTest do
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], color: [:none, nil])
 
-      drawn = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+      drawn = draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
       assert Enum.flat_map(drawn, fn %Circles{x: x_places} -> x_places end) === []
     end
@@ -117,7 +147,7 @@ defmodule Giggly.GeomTest do
         DataFrame.new(x: [1.0], y: [1.0], shape: [:circle_filled], size: [5.0], stroke: [5.0])
 
       assert [%Circles{radius: [radius], stroke_width: stroke_width}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
       assert_in_delta radius, 8.88, 0.005
       assert_in_delta stroke_width, 7.09, 0.005
@@ -146,7 +176,7 @@ defmodule Giggly.GeomTest do
                  fill: [:none, "#FF0000", "#FF0000", "#0000FF"],
                  fill_opacity: [_no_fill, 1.0, 1.0, 0.2]
                }
-             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+             ] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     # R's graphics engine draws each point whole before the next, so a point drawn later covers an
@@ -161,7 +191,7 @@ defmodule Giggly.GeomTest do
                %Segments{starts: [{0.25, 0.25}, {0.25, 0.25}]},
                %Rectangles{xmin: [0.5]},
                %Segments{starts: [{0.5, 0.5}, {0.5, 0.5}]}
-             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+             ] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     test "a run of elements of one kind and one outline width is one primitive" do
@@ -180,7 +210,7 @@ defmodule Giggly.GeomTest do
                %Circles{x: [0.25, 0.5]},
                %Circles{x: [0.75]},
                %Rectangles{xmin: [1.0]}
-             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+             ] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's shapes 0 to 25 at size 0 and stroke 0:
@@ -191,7 +221,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0], y: [1.0], shape: [:circle_plus], size: [0.0], stroke: [0.0])
 
       assert [%Segments{starts: [{0.25, 0.25}, {0.25, 0.25}]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's shapes 7 and 21 at size 5 and stroke NA:
@@ -214,7 +244,7 @@ defmodule Giggly.GeomTest do
       assert [
                %Rectangles{color: [:none], stroke_width: +0.0},
                %Circles{radius: [radius], color: [:none], fill: ["#FF0000"]}
-             ] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+             ] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
       assert_in_delta radius, 5.33, 0.005
     end
@@ -227,7 +257,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0], y: [1.0], size: [0.1], stroke: [0.0])
 
       assert [%Circles{radius: [radius]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
 
       assert_in_delta radius, 0.11, 0.005
     end
@@ -238,7 +268,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0, 3.0], y: [1.0, 1.0, 1.0], shape: [:none, nil, :square])
 
       assert [%Polygons{outlines: [[{0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}, {0.75, 0.25}]]}] =
-               Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
+               draw_panel(%Geom.Point{}, frame, coord, panel_params)
     end
 
     # ggplot2 4.0.3's `GeomPoint` drops a row whose size is missing, as a size scale's missing
@@ -248,8 +278,8 @@ defmodule Giggly.GeomTest do
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
       frame = DataFrame.new(x: [1.0, 3.0], y: [1.0, 1.0], size: [nil, 2.0])
 
-      assert [%Circles{x: [0.75]}] = Geom.draw_panel(%Geom.Point{}, frame, coord, panel_params)
-      assert Geom.draw_key(%Geom.Point{}, %{size: nil}) === []
+      assert [%Circles{x: [0.75]}] = draw_panel(%Geom.Point{}, frame, coord, panel_params)
+      assert draw_key(%Geom.Point{}, %{size: nil}) === []
     end
   end
 
@@ -267,7 +297,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax} ===
                {[0.0, 0.5], [0.25, 0.75], [0.0, 0.0], [0.5, 1.0]}
@@ -287,12 +317,12 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{fill_opacity: [0.5, 1.0, 1.0], color: [:none, :none, :none]}] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       without_alpha = DataFrame.new(xmin: [0.0], xmax: [1.0], ymin: [0.0], ymax: [2.0])
 
       assert [%Rectangles{fill_opacity: [1.0], fill: ["#595959"], color_opacity: [+0.0]}] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, without_alpha, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, without_alpha, coord, panel_params)
     end
 
     # Golden: svglite's drawing of ggplot2 4.0.3's `geom_col(fill = "#0000FF80", colour =
@@ -314,7 +344,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.fill, rectangles.fill_opacity, rectangles.color,
               rectangles.color_opacity} ===
@@ -337,7 +367,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
 
       assert {rectangles.fill, rectangles.fill_opacity, rectangles.color,
               rectangles.color_opacity} ===
@@ -368,7 +398,7 @@ defmodule Giggly.GeomTest do
                  color_opacity: [1.0, +0.0]
                }
              ] =
-               Geom.draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
+               draw_panel(%Geom.Bar{just: 0.5}, frame, coord, panel_params)
     end
   end
 
@@ -386,7 +416,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Rectangles{} = rectangles] =
-               Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+               draw_panel(%Geom.Rect{}, frame, coord, panel_params)
 
       assert {rectangles.xmin, rectangles.xmax, rectangles.ymin, rectangles.ymax} ===
                {[0.25, 0.0], [0.0, 0.5], [1.0, 0.25], [0.5, 1.0]}
@@ -411,7 +441,7 @@ defmodule Giggly.GeomTest do
           linetype: [{4, 4}, {4, 4}, {4, 4}, nil]
         )
 
-      assert [thin, thick, blank] = Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+      assert [thin, thick, blank] = draw_panel(%Geom.Rect{}, frame, coord, panel_params)
 
       assert {thin.xmin, thick.xmin, blank.xmin} === {[0.0, 0.25], [0.5], [0.75]}
 
@@ -442,7 +472,7 @@ defmodule Giggly.GeomTest do
           linewidth: [0.5, nil, 0.5]
         )
 
-      assert [first, missing, last] = Geom.draw_panel(%Geom.Rect{}, frame, coord, panel_params)
+      assert [first, missing, last] = draw_panel(%Geom.Rect{}, frame, coord, panel_params)
 
       assert {first.color, missing.color, missing.stroke_width, last.color} ===
                {["#000000"], [:none], 0.0, ["#000000"]}
@@ -501,7 +531,7 @@ defmodule Giggly.GeomTest do
                %Segments{opacity: [1.0, 1.0]},
                %Polygons{color: ["#333333"], color_opacity: [1.0], fill_opacity: [0.5]},
                %Segments{opacity: [1.0]}
-             ] = Geom.draw_panel(@box, frame, coord, params)
+             ] = draw_panel(@box, frame, coord, params)
     end
 
     test "a part whose colour is :none, or a blank border, is not drawn, the box still filled" do
@@ -509,15 +539,15 @@ defmodule Giggly.GeomTest do
       geom = %{@box | whisker: %{color: :none}, box: %{linetype: :none}}
 
       assert [%Circles{}, %Polygons{color: [:none], fill: ["#FFFFFF"]}, %Segments{}] =
-               Geom.draw_panel(geom, box_rows([]), coord, params)
+               draw_panel(geom, box_rows([]), coord, params)
     end
 
     test "the median is twice the box's width unless its look gives one" do
       {coord, params} = box_params()
       frame = box_rows(linewidth: [1.0])
-      [_outliers, _whiskers, _box, median] = Geom.draw_panel(@box, frame, coord, params)
+      [_outliers, _whiskers, _box, median] = draw_panel(@box, frame, coord, params)
       given = %{@box | median: %{linewidth: 0.5}}
-      [_outliers, _whiskers, _box, given_median] = Geom.draw_panel(given, frame, coord, params)
+      [_outliers, _whiskers, _box, given_median] = draw_panel(given, frame, coord, params)
 
       assert {median.stroke_width, given_median.stroke_width} ===
                {@two_millimetres, @default_width}
@@ -536,14 +566,14 @@ defmodule Giggly.GeomTest do
         alpha: 0.25
       }
 
-      [boxs | _rest] = Geom.draw_panel(@box, frame, coord, params)
-      looked = Geom.draw_panel(%{@box | outlier: look}, frame, coord, params)
+      [boxs | _rest] = draw_panel(@box, frame, coord, params)
+      looked = draw_panel(%{@box | outlier: look}, frame, coord, params)
 
       points = fn values ->
         [x: [1.0], y: [20.0]]
         |> Enum.concat(Enum.map(values, fn {aesthetic, value} -> {aesthetic, [value]} end))
         |> DataFrame.new()
-        |> then(fn points -> Geom.draw_panel(%Geom.Point{}, points, coord, params) end)
+        |> then(fn points -> draw_panel(%Geom.Point{}, points, coord, params) end)
       end
 
       assert [boxs] ===
@@ -566,7 +596,7 @@ defmodule Giggly.GeomTest do
       geom = %{@box | staplewidth: 0.25}
 
       assert [_outliers, %Segments{starts: starts, ends: ends} | _rest] =
-               Geom.draw_panel(geom, box_rows([]), coord, params)
+               draw_panel(geom, box_rows([]), coord, params)
 
       assert {starts, ends} ===
                {[{0.453125, 0.25}, {0.453125, 0.05}], [{0.546875, 0.25}, {0.546875, 0.05}]}
@@ -575,7 +605,7 @@ defmodule Giggly.GeomTest do
     test "the median takes its own colour and line type, else the box's" do
       {coord, params} = box_params()
       geom = %{@box | median: %{color: "#FF0000", linetype: {4, 4}}}
-      [_outliers, _whiskers, _box, median] = Geom.draw_panel(geom, box_rows([]), coord, params)
+      [_outliers, _whiskers, _box, median] = draw_panel(geom, box_rows([]), coord, params)
 
       assert {median.color, rounded(median.dashes)} === {["#FF0000"], [11.38, 11.38]}
     end
@@ -588,14 +618,14 @@ defmodule Giggly.GeomTest do
       cut_left = box_rows(xmin: [nil])
 
       assert [%Circles{}, %Segments{}, %Polygons{outlines: [left]}] =
-               Geom.draw_panel(@box, cut_left, coord, params)
+               draw_panel(@box, cut_left, coord, params)
 
       assert left === [{0.6875, 0.1125}, {0.6875, 0.2375}]
 
       cut_right = box_rows(xmax: [nil])
 
       assert [%Circles{}, %Segments{}, %Polygons{outlines: pieces}] =
-               Geom.draw_panel(%{@box | notch: true}, cut_right, coord, params)
+               draw_panel(%{@box | notch: true}, cut_right, coord, params)
 
       assert pieces === [
                [{0.3125, 0.2375}, {0.3125, 0.25562903736661297}],
@@ -604,7 +634,7 @@ defmodule Giggly.GeomTest do
 
       cut_both = box_rows(xmin: [nil], xmax: [nil])
 
-      assert [%Circles{}, %Segments{}] = Geom.draw_panel(@box, cut_both, coord, params)
+      assert [%Circles{}, %Segments{}] = draw_panel(@box, cut_both, coord, params)
     end
 
     test "a box keeping no outliers draws none" do
@@ -612,7 +642,7 @@ defmodule Giggly.GeomTest do
       frame = box_rows([], [:outliers])
 
       assert [%Segments{}, %Polygons{}, %Segments{}] =
-               Geom.draw_panel(@box, frame, coord, params)
+               draw_panel(@box, frame, coord, params)
     end
 
     test "boxes are drawn in the order of their groups, each whole before the next" do
@@ -643,7 +673,7 @@ defmodule Giggly.GeomTest do
                %Segments{starts: [{0.75, _third}, _fourth]},
                %Polygons{},
                %Segments{}
-             ] = Geom.draw_panel(@box, frame, coord, params)
+             ] = draw_panel(@box, frame, coord, params)
     end
   end
 
@@ -726,7 +756,7 @@ defmodule Giggly.GeomTest do
             linewidth: [width, width]
           )
 
-        assert [%Polylines{dashes: drawn}] = Geom.draw_panel(@path, frame, coord, params)
+        assert [%Polylines{dashes: drawn}] = draw_panel(@path, frame, coord, params)
         assert rounded(drawn) === dashes
       end
     end
@@ -735,7 +765,7 @@ defmodule Giggly.GeomTest do
     test "a blank line draws nothing", %{coord: coord, params: params} do
       frame = DataFrame.new(x: [0.0, 4.0], y: [0.0, 4.0], group: [1, 1], linetype: [:none, :none])
 
-      assert Geom.draw_panel(@path, frame, coord, params) === []
+      assert draw_panel(@path, frame, coord, params) === []
     end
 
     # ggplot2 4.0.3's `geom_path(aes(colour = y), linetype = "dashed")`, and "blank" alike: "can't
@@ -758,7 +788,7 @@ defmodule Giggly.GeomTest do
           )
 
         error =
-          assert_raise ArgumentError, fn -> Geom.draw_panel(@path, frame, coord, params) end
+          assert_raise ArgumentError, fn -> draw_panel(@path, frame, coord, params) end
 
         assert error.message =~ ":solid"
       end
@@ -779,7 +809,7 @@ defmodule Giggly.GeomTest do
           linewidth: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 2.0, 2.0]
         )
 
-      assert [solid, dashed] = Geom.draw_panel(@path, frame, coord, params)
+      assert [solid, dashed] = draw_panel(@path, frame, coord, params)
 
       assert {length(solid.lines), solid.dashes, solid.stroke_width, length(dashed.lines),
               rounded(dashed.dashes), dashed.stroke_width} ===
@@ -802,7 +832,7 @@ defmodule Giggly.GeomTest do
           )
 
         error =
-          assert_raise ArgumentError, fn -> Geom.draw_panel(@path, frame, coord, params) end
+          assert_raise ArgumentError, fn -> draw_panel(@path, frame, coord, params) end
 
         assert error.message =~ "cannot vary its colour, alpha, width or line type along it"
       end
@@ -823,7 +853,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Segments{dashes: :none, color: ["#FF0000", "#0000FF"], stroke_width: width}] =
-               Geom.draw_panel(@path, frame, coord, params)
+               draw_panel(@path, frame, coord, params)
 
       assert Float.round(width, 2) === 4.27
     end
@@ -848,7 +878,7 @@ defmodule Giggly.GeomTest do
           group: [1, 1, 1, 1, 1, 1, 1]
         )
 
-      assert [%Polylines{lines: lines}] = Geom.draw_panel(@path, frame, coord, params)
+      assert [%Polylines{lines: lines}] = draw_panel(@path, frame, coord, params)
       assert lines === [[{0.25, 0.25}, {0.5, 0.5}], [{1.0, 0.75}, {1.0, 1.0}]]
     end
 
@@ -865,7 +895,7 @@ defmodule Giggly.GeomTest do
           color: ["#FF0000", "#FF0000", "#0000FF"]
         )
 
-      assert [%Polylines{color: ["#FF0000"]}] = Geom.draw_panel(@path, frame, coord, params)
+      assert [%Polylines{color: ["#FF0000"]}] = draw_panel(@path, frame, coord, params)
     end
 
     test "a piece of one point between missing positions draws nothing",
@@ -873,7 +903,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0, 3.0, 4.0], y: [1.0, nil, 2.0, 3.0], group: [1, 1, 1, 1])
 
       assert [%Polylines{lines: [[{0.75, 0.5}, {1.0, 0.75}]]}] =
-               Geom.draw_panel(@path, frame, coord, params)
+               draw_panel(@path, frame, coord, params)
     end
 
     test "each group is a line in group order, in the alpha of its first row",
@@ -886,7 +916,7 @@ defmodule Giggly.GeomTest do
           alpha: [0.5, 0.25, 0.5, 0.25]
         )
 
-      assert [%Polylines{} = polylines] = Geom.draw_panel(@path, frame, coord, params)
+      assert [%Polylines{} = polylines] = draw_panel(@path, frame, coord, params)
       assert polylines.lines === [[{1.0, 0.0}, {0.0, 0.0}], [{0.0, 1.0}, {1.0, 1.0}]]
       assert polylines.opacity === [0.25, 0.5]
     end
@@ -896,10 +926,10 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0, 3.0], y: [1.0, 2.0, 3.0], group: [1, 1, 2])
 
       assert [%Polylines{lines: [[{0.25, 0.25}, {0.5, 0.5}]]}] =
-               Geom.draw_panel(@path, frame, coord, params)
+               draw_panel(@path, frame, coord, params)
 
       single = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 2])
-      assert Geom.draw_panel(@path, single, coord, params) === []
+      assert draw_panel(@path, single, coord, params) === []
     end
 
     test "where a group's alpha varies, every group is drawn as segments, each in its start's alpha",
@@ -912,7 +942,7 @@ defmodule Giggly.GeomTest do
           alpha: [0.1, 0.2, 0.3, 0.4, 0.5, 1.0, 1.0]
         )
 
-      assert [%Segments{} = segments] = Geom.draw_panel(@path, frame, coord, params)
+      assert [%Segments{} = segments] = draw_panel(@path, frame, coord, params)
       assert segments.starts === [{0.0, 0.0}, {0.75, 0.75}, {0.0, 1.0}]
       assert segments.ends === [{0.25, 0.25}, {1.0, 1.0}, {1.0, 1.0}]
       assert segments.opacity === [0.1, 0.4, 1.0]
@@ -934,7 +964,7 @@ defmodule Giggly.GeomTest do
           linetype: [{}, {}, {}, {}, {}, {}, {}, nil]
         )
 
-      assert [thin, thick] = Geom.draw_panel(@path, frame, coord, params)
+      assert [thin, thick] = draw_panel(@path, frame, coord, params)
 
       assert {thin.starts, thin.ends, thin.stroke_width, thick.starts, thick.ends,
               thick.stroke_width} ===
@@ -947,7 +977,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1], linewidth: [2.0, 2.0])
       geom = %Geom.Path{line_end: :round, line_join: :mitre, mitre_limit: 4.0}
 
-      assert [%Polylines{} = polylines] = Geom.draw_panel(geom, frame, coord, params)
+      assert [%Polylines{} = polylines] = draw_panel(geom, frame, coord, params)
 
       assert {polylines.stroke_width, polylines.line_end, polylines.line_join,
               polylines.mitre_limit} === {@two_millimetres, :round, :mitre, 4.0}
@@ -958,7 +988,7 @@ defmodule Giggly.GeomTest do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1])
 
       assert [%Polylines{opacity: [1.0], stroke_width: @default_width, color: ["#000000"]}] =
-               Geom.draw_panel(@path, frame, coord, params)
+               draw_panel(@path, frame, coord, params)
     end
 
     test "a line is drawn in the colour its layer sets, its row's alpha replacing the colour's own",
@@ -972,12 +1002,12 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Polylines{color: ["#FF0000"], opacity: [@half_alpha]}] =
-               Geom.draw_panel(@path, own, coord, params)
+               draw_panel(@path, own, coord, params)
 
       replaced = DataFrame.put(own, :alpha, [0.2, 0.4])
 
       assert [%Segments{color: ["#FF0000"], opacity: [0.2]}] =
-               Geom.draw_panel(@path, replaced, coord, params)
+               draw_panel(@path, replaced, coord, params)
     end
 
     test "each group's line is in its first row's colour, as a mapped colour gives one per group",
@@ -991,7 +1021,7 @@ defmodule Giggly.GeomTest do
         )
 
       assert [%Polylines{color: ["#F8766D", "#00BFC4"], opacity: [1.0, @half_alpha]}] =
-               Geom.draw_panel(@path, frame, coord, params)
+               draw_panel(@path, frame, coord, params)
     end
 
     test "where a group's colour varies, every group is drawn as segments, each in its start's colour",
@@ -1004,7 +1034,7 @@ defmodule Giggly.GeomTest do
           color: ["#F8766D", "#00BA38", "#619CFF", "#7F7F7F", "#7F7F7F"]
         )
 
-      assert [%Segments{} = segments] = Geom.draw_panel(@path, frame, coord, params)
+      assert [%Segments{} = segments] = draw_panel(@path, frame, coord, params)
       assert segments.starts === [{0.0, 0.0}, {0.25, 0.25}, {0.0, 1.0}]
       assert segments.color === ["#F8766D", "#00BA38", "#7F7F7F"]
       assert segments.opacity === [1.0, 1.0, 1.0]
@@ -1022,17 +1052,17 @@ defmodule Giggly.GeomTest do
           color: [nil, "#FF0000", "#FF0000"]
         )
 
-      assert Geom.draw_panel(@path, frame, coord, params) === []
+      assert draw_panel(@path, frame, coord, params) === []
 
       assert [%Polylines{lines: [[{0.5, 0.5}, {0.75, 0.75}]], color: ["#FF0000"]}] =
-               Geom.draw_panel(@path, missing, coord, params)
+               draw_panel(@path, missing, coord, params)
     end
 
     test "a line is drawn as a path through its rows", %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 3.0, 2.0], y: [1.0, 2.0, 3.0], group: [1, 1, 1])
 
-      assert Geom.draw_panel(@line, frame, coord, params) ===
-               Geom.draw_panel(@path, frame, coord, params)
+      assert draw_panel(@line, frame, coord, params) ===
+               draw_panel(@path, frame, coord, params)
     end
   end
 
@@ -1045,7 +1075,7 @@ defmodule Giggly.GeomTest do
 
     # Each row's place, label and the text the geom draws it in, from a frame of one row per label.
     defp text(frame, %{coord: coord, params: params}, geom \\ %Geom.Text{check_overlap: false}) do
-      [%Text{} = text] = Geom.draw_panel(geom, frame, coord, params)
+      [%Text{} = text] = draw_panel(geom, frame, coord, params)
       text
     end
 
@@ -1192,7 +1222,7 @@ defmodule Giggly.GeomTest do
       key = %{flipped_aes: false, linewidth: 1.0, linetype: {4, 4}, alpha: 0.5, fill: "#FF0000"}
       millimetre = 2 * @default_width
 
-      assert [whiskers, box, median, staples] = Geom.draw_key(@box, key)
+      assert [whiskers, box, median, staples] = draw_key(@box, key)
 
       assert {box.fill, box.fill_opacity, box.color_opacity, box.stroke_width} ===
                {["#FF0000"], [0.5], [1.0], millimetre}
@@ -1206,31 +1236,31 @@ defmodule Giggly.GeomTest do
       geom = %{@box | whisker: %{color: :none}}
 
       assert [%Rectangles{color: ["#333333"]}, %Polylines{}, %Polylines{}] =
-               Geom.draw_key(geom, %{flipped_aes: false})
+               draw_key(geom, %{flipped_aes: false})
 
       assert [%Rectangles{color: [:none]}] =
-               Geom.draw_key(@box, %{flipped_aes: false, linetype: nil})
+               draw_key(@box, %{flipped_aes: false, linetype: nil})
 
       assert [%Rectangles{color: [:none], stroke_width: +0.0}] =
-               Geom.draw_key(@box, %{flipped_aes: false, linewidth: nil})
+               draw_key(@box, %{flipped_aes: false, linewidth: nil})
     end
 
     test "a point's key is the point at the middle of the key, at the key's alpha" do
       assert [%Circles{x: [0.5], y: [0.5], color_opacity: [0.2]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2})
+               draw_key(%Geom.Point{}, %{alpha: 0.2})
 
       assert [%Circles{color_opacity: [1.0]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: nil})
+               draw_key(%Geom.Point{}, %{alpha: nil})
     end
 
     test "a point's key is in the colour its layer sets, the key's alpha replacing the colour's own" do
       assert [%Circles{color: ["#4682B4"], color_opacity: [0.2]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"})
+               draw_key(%Geom.Point{}, %{alpha: 0.2, color: "#4682B480"})
 
       assert [%Circles{color: ["#4682B4"], color_opacity: [@half_alpha]}] =
-               Geom.draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"})
+               draw_key(%Geom.Point{}, %{alpha: nil, color: "#4682B480"})
 
-      assert Geom.draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}) === []
+      assert draw_key(%Geom.Point{}, %{alpha: 0.2, color: :none}) === []
     end
 
     # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's `geom_point(shape = 21, size = 3)` filled
@@ -1240,20 +1270,20 @@ defmodule Giggly.GeomTest do
       key = %{alpha: nil, fill: "#F8766D", shape: :circle_filled, size: 3.0, stroke: 2.0}
 
       assert [%Circles{radius: [radius], stroke_width: stroke_width, fill: ["#F8766D"]}] =
-               Geom.draw_key(%Geom.Point{}, key)
+               draw_key(%Geom.Point{}, key)
 
       assert_in_delta radius, 4.62, 0.005
       assert_in_delta stroke_width, 2.83, 0.005
 
       assert [%Circles{radius: [no_stroke_radius], color: [:none]}] =
-               Geom.draw_key(%Geom.Point{}, %{key | stroke: :none})
+               draw_key(%Geom.Point{}, %{key | stroke: :none})
 
       assert_in_delta no_stroke_radius, 3.20, 0.005
-      assert Geom.draw_key(%Geom.Point{}, %{shape: :none}) === []
+      assert draw_key(%Geom.Point{}, %{shape: :none}) === []
     end
 
     test "a bar's key is its fill short of the key's edges by its border's width" do
-      assert [%Rectangles{} = key] = Geom.draw_key(%Geom.Bar{just: 0.5}, %{alpha: 0.55})
+      assert [%Rectangles{} = key] = draw_key(%Geom.Bar{just: 0.5}, %{alpha: 0.55})
       [{{left, bottom}, {right, top}}] = key.offsets
 
       assert {key.xmin, key.xmax, key.ymin, key.ymax} === {[0.0], [1.0], [0.0], [1.0]}
@@ -1269,20 +1299,20 @@ defmodule Giggly.GeomTest do
     test "a bar's key is short of the key by its border's width, which it is drawn at and dashed" do
       key = %{color: "#000000", linewidth: 1.5, linetype: {1, 3}}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{just: 0.5}, key)
+      assert [%Rectangles{} = drawn] = draw_key(%Geom.Bar{just: 0.5}, key)
       [{{left, _bottom}, {right, _top}}] = drawn.offsets
 
       assert {Float.round(17.28 + right - left, 2), Float.round(drawn.stroke_width, 2),
               rounded(drawn.dashes), drawn.color} === {13.03, 3.2, [4.27, 12.8], ["#000000"]}
 
       assert [%Rectangles{color: [:none], dashes: :none}] =
-               Geom.draw_key(%Geom.Bar{just: 0.5}, %{key | linetype: :none})
+               draw_key(%Geom.Bar{just: 0.5}, %{key | linetype: :none})
     end
 
     test "a bar's key is filled and bordered as its layer sets, the key's alpha its fill's alone" do
       key = %{alpha: 0.3, fill: "#0000FF80", color: "#FF000080"}
 
-      assert [%Rectangles{} = drawn] = Geom.draw_key(%Geom.Bar{just: 0.5}, key)
+      assert [%Rectangles{} = drawn] = draw_key(%Geom.Bar{just: 0.5}, key)
 
       assert {drawn.fill, drawn.fill_opacity, drawn.color, drawn.color_opacity} ===
                {["#0000FF"], [0.3], ["#FF0000"], [@half_alpha]}
@@ -1294,7 +1324,7 @@ defmodule Giggly.GeomTest do
       geom = %Geom.Path{line_end: :square, line_join: :mitre, mitre_limit: 4.0}
 
       assert [%Segments{} = key] =
-               Geom.draw_key(geom, %{alpha: 0.4, linewidth: 2.0})
+               draw_key(geom, %{alpha: 0.4, linewidth: 2.0})
 
       assert {key.starts, key.ends, key.opacity, key.stroke_width} ===
                {[{0.1, 0.5}], [{0.9, 0.5}], [0.4], @two_millimetres}
@@ -1307,10 +1337,10 @@ defmodule Giggly.GeomTest do
     # key of a blank line.
     test "a path's key is dashed as its line type, and a blank one draws none" do
       assert [%Segments{dashes: dashes}] =
-               Geom.draw_key(@path, %{linewidth: 1.0, linetype: {7, 3}})
+               draw_key(@path, %{linewidth: 1.0, linetype: {7, 3}})
 
       assert rounded(dashes) === [19.92, 8.54]
-      assert Geom.draw_key(@path, %{linetype: :none}) === []
+      assert draw_key(@path, %{linetype: :none}) === []
     end
 
     # Golden: ggplot2 4.0.3's legends through vdiffr 1.0.9 for a missing line type or width: a
@@ -1318,27 +1348,27 @@ defmodule Giggly.GeomTest do
     # `draw_key_polygon()`'s rectangle of a missing width has no size; a missing line type leaves a
     # bar's border blank, as `gg_par()` reads `NA` as `"blank"`.
     test "a key of a missing width draws nothing, and of a missing line type no line or border" do
-      assert {Geom.draw_key(@path, %{linewidth: nil}), Geom.draw_key(@path, %{linetype: nil}),
-              Geom.draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linewidth: nil})} ===
+      assert {draw_key(@path, %{linewidth: nil}), draw_key(@path, %{linetype: nil}),
+              draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linewidth: nil})} ===
                {[], [], []}
 
       assert [%Rectangles{color: [:none], dashes: :none}] =
-               Geom.draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linetype: nil})
+               draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linetype: nil})
     end
 
     test "a line's key is a path's, ggplot2's default width where the layer sets none" do
-      assert Geom.draw_key(@line, %{alpha: nil}) ===
-               Geom.draw_key(@path, %{alpha: nil})
+      assert draw_key(@line, %{alpha: nil}) ===
+               draw_key(@path, %{alpha: nil})
 
       assert [%Segments{opacity: [1.0], stroke_width: @default_width}] =
-               Geom.draw_key(@path, %{alpha: nil})
+               draw_key(@path, %{alpha: nil})
     end
 
     test "a text's key is the letter a at the middle of the key, in its colour at its alpha" do
       ascent = Font.ascent(11.0)
 
       assert [%Text{} = key] =
-               Geom.draw_key(
+               draw_key(
                  %Geom.Text{check_overlap: false},
                  %{color: "#F8766D", alpha: 0.5}
                )
@@ -1346,7 +1376,7 @@ defmodule Giggly.GeomTest do
       assert {key.labels, key.x, key.y, key.hjust, key.offset, key.color, key.opacity, key.size} ===
                {["a"], [0.5], [0.5], [0.5], [{0.0, -0.5 * ascent}], ["#F8766D"], [0.5], 11.0}
 
-      assert Geom.draw_key(%Geom.Text{check_overlap: false}, %{color: :none}) ===
+      assert draw_key(%Geom.Text{check_overlap: false}, %{color: :none}) ===
                []
     end
 
@@ -1357,7 +1387,7 @@ defmodule Giggly.GeomTest do
       margin = 0.1 * 11.0 * 1.2
 
       assert [%Text{} = key] =
-               Geom.draw_key(
+               draw_key(
                  %Geom.Text{check_overlap: false},
                  %{hjust: 0.0, vjust: 1.0}
                )
@@ -1376,7 +1406,7 @@ defmodule Giggly.GeomTest do
       places =
         Enum.map([100.0, 200.0, 300.0], fn angle ->
           [%Text{x: [x_place], y: [y_place], offset: [{along, up}]}] =
-            Geom.draw_key(
+            draw_key(
               %Geom.Text{check_overlap: false},
               %{hjust: 0.0, vjust: 1.0, angle: angle}
             )
@@ -1401,9 +1431,9 @@ defmodule Giggly.GeomTest do
 
     test "a path's key is in the colour its layer sets, and a colour of :none draws none" do
       assert [%Segments{color: ["#FF0000"], opacity: [@half_alpha]}] =
-               Geom.draw_key(@path, %{alpha: nil, color: "#FF000080"})
+               draw_key(@path, %{alpha: nil, color: "#FF000080"})
 
-      assert Geom.draw_key(@path, %{alpha: 0.4, color: :none}) === []
+      assert draw_key(@path, %{alpha: 0.4, color: :none}) === []
     end
   end
 
@@ -1413,22 +1443,22 @@ defmodule Giggly.GeomTest do
   # `height` on vdiffr's device.
   describe "key_size/2" do
     test "a point's key needs its size, in millimetres, either way; a missing size none" do
-      assert rounded_size(Geom.key_size(%Geom.Point{}, %{size: 8.0})) === {22.68, 22.68}
-      assert rounded_size(Geom.key_size(%Geom.Point{}, %{})) === {4.25, 4.25}
-      assert Geom.key_size(%Geom.Point{}, %{size: nil}) === {0.0, 0.0}
+      assert rounded_size(key_size(%Geom.Point{}, %{size: 8.0})) === {22.68, 22.68}
+      assert rounded_size(key_size(%Geom.Point{}, %{})) === {4.25, 4.25}
+      assert key_size(%Geom.Point{}, %{size: nil}) === {0.0, 0.0}
     end
 
     test "a path's or line's key needs its line's width; a bar's twice its border's" do
-      assert rounded_size(Geom.key_size(@path, %{linewidth: 8.0})) === {22.68, 22.68}
-      assert rounded_size(Geom.key_size(@line, %{})) === {1.42, 1.42}
+      assert rounded_size(key_size(@path, %{linewidth: 8.0})) === {22.68, 22.68}
+      assert rounded_size(key_size(@line, %{})) === {1.42, 1.42}
 
-      assert rounded_size(Geom.key_size(%Geom.Bar{just: 0.5}, %{linewidth: 4.0})) ===
+      assert rounded_size(key_size(%Geom.Bar{just: 0.5}, %{linewidth: 4.0})) ===
                {22.68, 22.68}
 
-      assert rounded_size(Geom.key_size(%Geom.Rect{}, %{})) === {2.83, 2.83}
+      assert rounded_size(key_size(%Geom.Rect{}, %{})) === {2.83, 2.83}
 
-      assert {Geom.key_size(@path, %{linewidth: nil}),
-              Geom.key_size(%Geom.Bar{just: 0.5}, %{linewidth: nil})} ===
+      assert {key_size(@path, %{linewidth: nil}),
+              key_size(%Geom.Bar{just: 0.5}, %{linewidth: nil})} ===
                {{0.0, 0.0}, {0.0, 0.0}}
     end
 
@@ -1437,16 +1467,16 @@ defmodule Giggly.GeomTest do
       text = %Geom.Text{check_overlap: false}
 
       assert Enum.map([0.0, 30.0, 90.0, 135.0], fn angle ->
-               rounded_size(Geom.key_size(text, %{size: 12.0, angle: angle}))
+               rounded_size(key_size(text, %{size: 12.0, angle: angle}))
              end) === [{21.87, 33.47}, {34.62, 38.86}, {33.47, 21.87}, {37.94, 37.94}]
 
-      assert rounded_size(Geom.key_size(text, %{size: 3.88})) === {9.02, 12.77}
+      assert rounded_size(key_size(text, %{size: 3.88})) === {9.02, 12.77}
     end
 
     test "a box's key needs its size and line width added, a missing one counting 0" do
-      assert rounded_size(Geom.key_size(@box, %{})) === {5.67, 5.67}
-      assert rounded_size(Geom.key_size(@box, %{size: 4.0, linewidth: nil})) === {11.34, 11.34}
-      assert Geom.key_size(@box, %{size: nil, linewidth: nil}) === {0.0, 0.0}
+      assert rounded_size(key_size(@box, %{})) === {5.67, 5.67}
+      assert rounded_size(key_size(@box, %{size: 4.0, linewidth: nil})) === {11.34, 11.34}
+      assert key_size(@box, %{size: nil, linewidth: nil}) === {0.0, 0.0}
     end
   end
 

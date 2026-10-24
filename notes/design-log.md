@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Each layer's defaults are filled in from the theme as columns, as ggplot2 4's `use_defaults()`
+  fills `default_aes` from `element_geom()` (2026-10-24, Steve, choosing columns and leaving out
+  R's refilled `width`; checked in R).** Each geom gives its defaults (`Geom.default_aesthetics/2`)
+  from the complete theme's `geom` element, which every complete theme builds from its base sizes
+  and paper. The assembly completes the theme once the positions are final, fills each layer's
+  missing columns after the non-position scales map and before the set values, and fills each
+  legend layer's keys the same way, so `layer_data/2` shows R's columns and no geom holds a look of
+  its own. Ink is mixed toward paper by `ColorOperations.mix/3`, scales' `col_mix()`. *Rejected:
+  geoms filling them as they draw* — `layer_data/2` would show fewer columns than R's, and every
+  drawing function would take the theme. *Rejected: the theme holding the mixed colours* — the
+  geoms' shares would sit in `Theme`. *Rejected: the `color` library's sRGB mix* — `#807F80` where
+  R gives `#808080`. *Rejected: R's `width` of 0.9, put back once a bar is set up* — not the width
+  it is drawn at. *Deferred:* `theme(geom = element_geom())`; text's `fontface` and `lineheight`.
+
 - **A plot chooses a complete theme with `theme_gray/2`, `theme_bw/2` and the rest, each taking
   `base_size:`, `base_line_size:` and `base_rect_size:`, and records it by name with its sizes, or
   `complete: :none` for none (2026-10-23, Steve, agreeing the proposal; checked in R).** R's `+
@@ -88,7 +102,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   records as `{:replace, element}`, what `%+replace%` would record. The widths default to
   `base_size / 22` at the call, so the plot holds what was resolved. Theme colours take an alpha,
   worked out as an opacity beside each `#RRGGBB`. In R the base sizes and `theme_void()`'s paper
-  also reach the layers' defaults (`element_geom`); Steve chose that as the next step. *Rejected:
+  also reach the layers' defaults (`element_geom`), a step of its own (the entry beginning "Each
+  layer's defaults are filled in"). *Rejected:
   `complete: :gray` with a flag* — `:none` says it. *Rejected: recording each call to fold when
   drawn* — the marker is the only difference. *Rejected: copying the tree into the plot* — loses
   the name. *Rejected: `theme(complete: :bw)`* — ggplot2's are functions.
@@ -727,7 +742,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   [:none, "red"]` was refused at the call: each made a column of colours beside `:none`, and a
   column holds one type. R's column holds `NA`, so `nil`, the table's missing value, is the same
   value, and the two `layer_data()`s agree: the assembly puts a value a scale maps to `:none` in
-  as `nil`, and `annotate/3` holds a list's `:none` so. `Geom.Mark.colors/3` reads it as
+  as `nil`, and `annotate/3` holds a list's `:none` so. `Geom.Mark.colors/2` reads it as
   `:none`, which every geom already draws as R draws `NA`: no point, line or label, a rectangle
   unfilled or unbordered. A scale still maps to `:none`, so a legend's key keeps it, and a set
   `colour: :none` still fills its column. *Rejected: the frame taking `:none` beside a string*:
@@ -1842,15 +1857,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   modules sharing derived values (paper white is the grid lines' colour and the background's, 0.5
   mm the tick's width and the major grid line's, the margin half a line), each copying the
   derivations and conversions, and every drawing function's signature would change when a theme
-  arrived. **The point keeps its own look** (Steve, over the plan's note that the theme's
-  `element_geom` would take it now): ggplot2 4 reads `element_geom` when its build fills each
-  layer's default aesthetics in as columns (`compute_geom_2`, which is why its `layer_data()`
-  shows colour, size, shape and stroke), and that stage, points drawn with a look per row, and the
-  theme resolved in the assembly, as ggplot2's `ggplot_build()` completes it, arrive with the
-  first mapped or set colour or size. *Rejected: the geom reading the theme as it draws* —
-  ggplot2 has no such shape, `Geom` would list `Theme`, and the defaults would move again; *and
-  the default-aesthetics stage now* — every row would hold the same values, which nothing can
-  vary. **The name is `:gray`** (Steve): the American spelling the aesthetics' `color` set,
+  arrived. **The name is `:gray`** (Steve): the American spelling the aesthetics' `color` set,
   plotnine's `theme_gray`, and the spelling ggplot2's own documentation lists and its examples
   use, though ggplot2 defines the function as `theme_grey` and makes `theme_gray` the alias.
   *Rejected: `:grey`.* **A golden is
@@ -1864,7 +1871,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   grows with each deliberate difference, such as Elixir-style labels, and two stored files that
   must agree; *and the scratchpad alone*, where increment 8's R checks were lost with the session.
   New boundary: `Theme` lists nothing; `Render` and `Guide` gained `Theme`; `Scene` exports
-  `Rect`. *Deferred to first reader:* default aesthetics from `element_geom`; the panel's border
+  `Rect`. *Deferred to first reader:* the panel's border
   (blank in `theme_gray()`); text alignment and angle in the theme; theme values as CSS classes,
   ggity's way (the LiveView layer; only colours could move, since the layout is measured from the
   sizes); the theme's fonts. The panel's background and grid lines are this increment's second
@@ -2400,6 +2407,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Fill each layer's defaults from the theme, as ggplot2 4's element_geom gives them
+  (theme, step 5); §4: "Each layer's defaults are filled in from the theme", "A plot chooses a
+  complete theme" (amended), "The theme is a resolved value" (amended)
 - 2026-10-23 — Let a plot choose any of ggplot2's eight complete themes at its base sizes, and
   give theme colours an alpha (theme, step 4); §4: "A plot chooses a complete theme", "The theme
   is Phase 3's eleventh increment" (amended), "A theme is a function" (amended)

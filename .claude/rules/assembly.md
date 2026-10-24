@@ -33,8 +33,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   takes the set one as its own, as `stat_count()` and `stat_boxplot()` do) → geom reparameterize
   (a bar to `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position →
   reset and retrain position scales → map positions again, censoring what limits cut → freeze
-  view scales → train non-position scales → build guides → map non-position scales →
-  `after_scale` → fixed values last. A stage arrives with its increment and goes where this order puts it.
+  view scales → complete the theme → train non-position scales → build guides → map
+  non-position scales → each geom's defaults under the theme → `after_scale` → fixed values last.
+  A stage arrives with its increment and goes where this order puts it.
 - **Each stage is its own domain, and `Assembly`'s `deps:` names them.** A stage is handed what it
   needs; it never reaches back into the assembly or the plot.
 - **The assembly calls the families' build functions, never their drawing ones**: the facet's,
@@ -73,7 +74,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   limit is missing its end, so it is not drawn; the non-position scales train on what remains.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames, the rows each layer's geom draws (`drawn_data`: its frame without the
-  aesthetics other than position it carries unused), each layer's geom, the layout table, the
+  aesthetics other than position it carries unused, its geom's defaults in their place), each
+  layer's geom, the layout table, the
   trained x and y scales keyed by
   scale id, the trained scale of each aesthetic other than position that a layer maps, by
   aesthetic (`non_position_scales`), the legends those scales give, merged and ordered
@@ -82,11 +84,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
   (`guide_titles`, the x and y axes' so far), the plot's own labels (`plot_labels`: its title,
-  subtitle, caption and tag, `:none` for each `labs/2` does not set), and the plot's theme, which
-  the assembly
-  passes on unread for rendering to resolve, the only stage that reads a theme so far; the first
-  build stage to read one (default aesthetics, or a palette a theme sets, which `theme_gray()`
-  does not) brings the resolution here, where ggplot2's build completes the theme.
+  subtitle, caption and tag, `:none` for each `labs/2` does not set), and the plot's complete
+  theme (`Theme.complete/1`), worked out here once the positions are final, where ggplot2's build
+  completes it, so the defaults stage reads it and rendering draws in it.
 - **The facet and the coordinate system run by the structs the plot records**, the null facet and
   cartesian coordinates included, through the protocols `Giggly.Facet` and `Giggly.Coord`; the
   assembly names no kind.
@@ -216,8 +216,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets
   `guides(order =)`. A legend is drawn by every layer that maps one of its aesthetics, its stat's
   default for one it neither maps nor sets included, and accepts it (`Plot.layer_accepted/1`),
-  with those it maps and accepts, each carrying what it sets (its `fixed`) for its keys, as
-  ggplot2's `matched_aes()` gives a layer only the key's aesthetics it
+  with those it maps and accepts, each carrying what it sets (its `fixed`) and its geom's
+  defaults under the theme (`defaults`) for its keys, as ggplot2's `compute_geom_2()` fills key
+  data, and as ggplot2's `matched_aes()` gives a layer only the key's aesthetics it
   maps and its geom knows and its key data holds a layer's `aes_params`; a layer that sets the
   legend's own aesthetic draws none. **A legend no layer draws in is dropped**, either kind, as
   ggplot2 drops a guide no layer matches: an aesthetic every layer takes from the plot's mapping
@@ -241,6 +242,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   written order, so the rest go by name, where ggplot2's follow the writing. A discrete alpha
   mapped with `x` therefore groups within each `x`, and `geom_bar(%{fill: :drv})` over the plot's
   `x` groups by drive train first, as ggplot2's do.
+- **Each layer's table gains a column for each aesthetic its geom draws with that it lacks**, its
+  geom's default under the complete theme (`Geom.default_aesthetics/2`) in every row, in the
+  geom's order after the table's own columns, once the non-position scales have mapped, as
+  ggplot2's `use_defaults()` fills `default_aes`: so `layer_data/2` shows R's columns, a value the
+  layer sets then replaces its default in place, and a column a stat dropped takes the default. A
+  table with no rows gains none, as R returns an empty layer early. The rows a geom draws gain the
+  same, a default taking the place of an aesthetic carried unused.
 - **The values a layer sets go in last, one value in every row or an annotation's list, one value
   per row**, as ggplot2's `use_defaults()` applies `aes_params`, so a line's set colours land on
   its rows once `setup_data/3` has put them in order, as in R. Under a facet that repeats an

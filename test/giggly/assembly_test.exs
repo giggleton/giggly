@@ -4,9 +4,21 @@ defmodule Giggly.AssemblyTest do
   alias Giggly.{Assembly, Geom, Guide, Plot}
 
   # Golden throughout: ggplot2 4.0.3's `get_guide_data()` for the same plot in R 4.6.1, printed to
-  # 17 significant digits. It moves with ggplot2's default alpha scales or how a legend's keys are
-  # chosen.
+  # 17 significant digits, and the defaults its legends' keys are filled with, as each layer's
+  # key data shows them (`decor`) under `theme_gray()` at its default sizes. It moves with
+  # ggplot2's default alpha scales, how a legend's keys are chosen, or a geom's defaults.
   describe "run/1, legends" do
+    @point_defaults %{
+      shape: :circle,
+      color: "#000000",
+      fill: nil,
+      size: 1.5,
+      alpha: nil,
+      stroke: 0.5
+    }
+
+    @bar_defaults %{color: nil, fill: "#595959", linewidth: 0.5, linetype: {}, alpha: nil}
+
     @keep_rows %{
       "x" => ["p", "q", "p", "q"],
       "y" => [1, 3, 2, 4],
@@ -40,6 +52,7 @@ defmodule Giggly.AssemblyTest do
                layers: [
                  %{
                    geom: %Geom.Point{},
+                   defaults: @point_defaults,
                    aesthetics: [:alpha],
                    fixed: %{},
                    flipped: false,
@@ -87,6 +100,7 @@ defmodule Giggly.AssemblyTest do
                 [
                   %{
                     geom: %Geom.Bar{just: 0.5},
+                    defaults: @bar_defaults,
                     aesthetics: [:alpha],
                     fixed: %{},
                     flipped: false,
@@ -189,6 +203,7 @@ defmodule Giggly.AssemblyTest do
                layers: [
                  %{
                    geom: %Geom.Bar{just: 0.5},
+                   defaults: @bar_defaults,
                    aesthetics: [:color, :fill],
                    fixed: %{},
                    flipped: false,
@@ -306,6 +321,7 @@ defmodule Giggly.AssemblyTest do
                 [
                   %{
                     geom: %Geom.Bar{just: 0.5},
+                    defaults: @bar_defaults,
                     aesthetics: [:fill],
                     fixed: %{},
                     flipped: false,
@@ -313,6 +329,7 @@ defmodule Giggly.AssemblyTest do
                   },
                   %{
                     geom: %Geom.Point{},
+                    defaults: @point_defaults,
                     aesthetics: [:color],
                     fixed: %{},
                     flipped: false,
@@ -352,7 +369,9 @@ defmodule Giggly.AssemblyTest do
 
     # ggplot2 4.0.3's layer_data() keeps an aesthetic the layer cannot use, and its geom never reads
     # it. A position stays in the rows drawn, as a geom reads only the positions it uses or works
-    # out, and a value the layer sets replaces the plot's mapping of it.
+    # out, and a value the layer sets replaces the plot's mapping of it. The geom's defaults follow
+    # the table's own columns, and in the rows drawn one takes the place of an aesthetic carried
+    # unused: the points' carried stroke is in their table, their default stroke in the rows drawn.
     test "an aesthetic a layer carries unused is in its table but not in the rows its geom draws" do
       data = %{"x" => [1, 2], "y" => [1, 3], "w" => [1, 2]}
 
@@ -366,14 +385,70 @@ defmodule Giggly.AssemblyTest do
       names = fn frames -> Enum.map(frames, &Giggly.DataFrame.names/1) end
 
       assert names.(assembly.layer_data) === [
-               [:x, :y, :linewidth, :stroke, :xmin, :panel, :group],
-               [:x, :y, :stroke, :xmin, :panel, :group, :linewidth]
+               [
+                 :x,
+                 :y,
+                 :linewidth,
+                 :stroke,
+                 :xmin,
+                 :panel,
+                 :group,
+                 :shape,
+                 :color,
+                 :fill,
+                 :size,
+                 :alpha
+               ],
+               [:x, :y, :stroke, :xmin, :panel, :group, :color, :linewidth, :linetype, :alpha]
              ]
 
       assert names.(assembly.drawn_data) === [
-               [:x, :y, :xmin, :panel, :group],
-               [:x, :y, :xmin, :panel, :group, :linewidth]
+               [:x, :y, :xmin, :panel, :group, :shape, :color, :fill, :size, :alpha, :stroke],
+               [:x, :y, :xmin, :panel, :group, :color, :linewidth, :linetype, :alpha]
              ]
+
+      [carried, drawn] =
+        Enum.map([assembly.layer_data, assembly.drawn_data], fn [points, _path] ->
+          Giggly.DataFrame.pull(points, :stroke)
+        end)
+
+      assert {carried, drawn} === {[1, 2], [0.5, 0.5]}
+    end
+
+    # ggplot2 4.0.3's key data (`decor`) for `ggplot(d, aes(x, y, colour = l)) + geom_point(stroke
+    # = 2) + theme_gray(base_size = 16)`, and for `geom_col()` with `theme_void()`: each key filled
+    # with its layer's defaults under the theme, what the layer sets laid over them.
+    test "each layer's keys take its geom's defaults under the plot's theme" do
+      rows = %{"x" => [1, 3, 5], "y" => [1, 3, 2], "l" => ["a", "b", "c"]}
+
+      layer = fn plot ->
+        [legend] = Assembly.run(plot).legends
+        [layer] = legend.layers
+        {layer.defaults, layer.fixed}
+      end
+
+      points =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :l})
+        |> Plot.geom_point(stroke: 2)
+        |> Plot.theme_gray(base_size: 16)
+
+      bars =
+        rows
+        |> Plot.new(%{x: :x, y: :y, colour: :l})
+        |> Plot.geom_col()
+        |> Plot.theme_void()
+
+      assert {layer.(points), layer.(bars)} ===
+               {{%{
+                   shape: :circle,
+                   color: "#000000",
+                   fill: nil,
+                   size: 2.1818181818181817,
+                   alpha: nil,
+                   stroke: 0.72727272727272729
+                 }, %{stroke: 2.0}},
+                {%{color: nil, fill: "#000000A6", linewidth: 0.5, linetype: {}, alpha: nil}, %{}}}
     end
 
     # ggplot2 4.0.3: bars coloured and filled by one column have one guide; `labs(fill = "F")` gives
@@ -464,6 +539,7 @@ defmodule Giggly.AssemblyTest do
       assert legend.layers === [
                %{
                  geom: %Geom.Bar{just: 0.5},
+                 defaults: @bar_defaults,
                  aesthetics: [:alpha],
                  fixed: %{},
                  flipped: false,
@@ -511,6 +587,7 @@ defmodule Giggly.AssemblyTest do
                  layers: [
                    %{
                      geom: %Geom.Point{},
+                     defaults: @point_defaults,
                      aesthetics: [:size],
                      fixed: %{},
                      flipped: false,

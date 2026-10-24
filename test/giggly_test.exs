@@ -868,7 +868,21 @@ defmodule GigglyTest do
         |> Plot.annotate(:text, x: 4, y: 25, label: "a")
         |> Giggly.layer_data(1)
 
-      assert DataFrame.names(frame) == [:x, :y, :panel, :group, :label]
+      assert DataFrame.names(frame) == [
+               :x,
+               :y,
+               :panel,
+               :group,
+               :color,
+               :family,
+               :size,
+               :angle,
+               :hjust,
+               :vjust,
+               :alpha,
+               :label
+             ]
+
       assert DataFrame.pull(frame, :group) == [-1]
     end
 
@@ -1377,14 +1391,20 @@ defmodule GigglyTest do
                 [1.0, 0.1, 0.55, 0.1, 0.55, 0.55, 0.1, 0.1, 0.55, 1.0, 0.1, 1.0]}
     end
 
-    test "counting drops an alpha that varies within a bar, so its bars have none" do
+    # R: `layer_data(ggplot(mpg, aes(class, alpha = year)) + geom_bar())`, whose alpha is `NA`.
+    test "counting drops an alpha that varies within a bar, so its bars take the default, none" do
       frame =
         Giggly.Datasets.mpg()
         |> Plot.new(%{x: :class, alpha: :year})
         |> Plot.geom_bar()
         |> Giggly.layer_data()
 
-      refute :alpha in DataFrame.names(frame)
+      alphas =
+        frame
+        |> DataFrame.pull(:alpha)
+        |> Enum.uniq()
+
+      assert alphas === [nil]
     end
 
     test "an alpha column no scale can map is refused, naming the layer, the column and its type" do
@@ -3743,7 +3763,11 @@ defmodule GigglyTest do
                :flipped_aes,
                :panel,
                :group,
-               :y
+               :y,
+               :color,
+               :linewidth,
+               :linetype,
+               :alpha
              ]
 
       assert Enum.map([:count, :x, :xmin, :xmax, :width], fn name ->
@@ -3997,7 +4021,9 @@ defmodule GigglyTest do
       "y" => [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 30.0]
     }
 
-    # `ggplot(data, aes(g, y)) + geom_boxplot()`, then with `outliers = FALSE`.
+    # `ggplot(data, aes(g, y)) + geom_boxplot()`, then with `outliers = FALSE`: R's columns in R's
+    # order, but `position_dodge2()`'s working columns (`order`, `xid`, `newx`, `new_width`) and the
+    # `weight` and `width` R adds back once the box is set up, which no box reads.
     test "a box reaches its outliers in ymin_final and ymax_final, its sides half its width out" do
       frame = box_layer(%{x: :g, y: :y})
 
@@ -4017,7 +4043,14 @@ defmodule GigglyTest do
                :ymin_final,
                :ymax_final,
                :xmin,
-               :xmax
+               :xmax,
+               :color,
+               :fill,
+               :size,
+               :alpha,
+               :shape,
+               :linetype,
+               :linewidth
              ]
 
       assert {DataFrame.pull(frame, :ymin_final), DataFrame.pull(frame, :ymax_final)} ===
@@ -4571,11 +4604,172 @@ defmodule GigglyTest do
 
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, printed to 17 significant
   # digits. It moves with `position_nudge()` and the aesthetics it reads.
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, its R beside each test,
+  # printed to 17 significant digits, R's `NA` Giggly's `nil`: each geom's `default_aes` read from
+  # the plot's complete theme's `element_geom()`. They move with the layers' defaults.
+  describe "layer_data/2, defaults from the theme" do
+    @three %{"x" => [1, 3, 5], "y" => [1, 3, 2], "l" => ["a", "b", "c"]}
+
+    defp first_row(frame, names),
+      do: Map.new(names, fn name -> {name, hd(DataFrame.pull(frame, name))} end)
+
+    # `ggplot(d, aes(x, y)) + geom_point() + theme_gray(base_size = 16)`
+    test "a point's size and stroke follow the theme's base size, after the table's own columns" do
+      frame =
+        @three
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.theme_gray(base_size: 16)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) === [
+               :x,
+               :y,
+               :panel,
+               :group,
+               :shape,
+               :color,
+               :fill,
+               :size,
+               :alpha,
+               :stroke
+             ]
+
+      assert first_row(frame, [:shape, :color, :fill, :size, :alpha, :stroke]) === %{
+               shape: :circle,
+               color: "#000000",
+               fill: nil,
+               size: 2.1818181818181817,
+               alpha: nil,
+               stroke: 0.72727272727272729
+             }
+    end
+
+    # `geom_point(size = 3, stroke = 1)` and `ggplot(d, aes(x, y, colour = l)) + geom_point()`, each
+    # with `theme_gray(base_size = 16)`
+    test "a value the layer sets or maps replaces the theme's, which fills the rest" do
+      set =
+        @three
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(size: 3, stroke: 1)
+        |> Plot.theme_gray(base_size: 16)
+        |> Giggly.layer_data()
+
+      mapped =
+        @three
+        |> Plot.new(%{x: :x, y: :y, colour: :l})
+        |> Plot.geom_point()
+        |> Plot.theme_gray(base_size: 16)
+        |> Giggly.layer_data()
+
+      assert {first_row(set, [:size, :stroke]), DataFrame.pull(mapped, :color),
+              first_row(mapped, [:size, :stroke])} ===
+               {%{size: 3.0, stroke: 1.0}, ["#F8766D", "#00BA38", "#619CFF"],
+                %{size: 2.1818181818181817, stroke: 0.72727272727272729}}
+    end
+
+    # `geom_line()`, `geom_text(aes(label = l))` and `geom_col()` with
+    # `theme_gray(base_size = 8)`, and `geom_col()` with `theme_gray(base_line_size = 1,
+    # base_rect_size = 2)`
+    test "a line's and a border's width follow the line width, a text's size the base size" do
+      layer = fn geom, sizes ->
+        @three
+        |> Plot.new(%{x: :x, y: :y, label: :l})
+        |> geom.()
+        |> Plot.theme_gray(sizes)
+        |> Giggly.layer_data()
+      end
+
+      line = layer.(&Plot.geom_line/1, base_size: 8)
+      text = layer.(&Plot.geom_text/1, base_size: 8)
+      bar = layer.(&Plot.geom_col/1, base_line_size: 1, base_rect_size: 2)
+
+      assert {first_row(line, [:color, :linewidth, :linetype, :alpha]),
+              first_row(text, [:color, :family, :size, :angle, :hjust, :vjust, :alpha]),
+              first_row(bar, [:color, :fill, :linewidth, :linetype, :alpha])} ===
+               {%{color: "#000000", linewidth: 0.36363636363636365, linetype: {}, alpha: nil},
+                %{
+                  color: "#000000",
+                  family: "",
+                  size: 2.8116784281167839,
+                  angle: 0.0,
+                  hjust: 0.5,
+                  vjust: 0.5,
+                  alpha: nil
+                }, %{color: nil, fill: "#595959", linewidth: 1.0, linetype: {}, alpha: nil}}
+    end
+
+    # `geom_col()`, `geom_col(alpha = 0.5)` and `ggplot(data.frame(x = 1, y = c(1:5, 20)), aes(x,
+    # y)) + geom_boxplot()`, each with `theme_void()`
+    test "theme_void()'s clear paper reaches a bar's fill and a box's fill and outline" do
+      bar = fn options ->
+        @three
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col(options)
+        |> Plot.theme_void()
+        |> Giggly.layer_data()
+        |> first_row([:fill, :alpha])
+      end
+
+      box =
+        %{"x" => [1, 1, 1, 1, 1, 1], "y" => [1, 2, 3, 4, 5, 20]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_boxplot()
+        |> Plot.theme_void()
+        |> Giggly.layer_data()
+        |> first_row([:color, :fill, :size, :shape, :linewidth])
+
+      assert {bar.([]), bar.(alpha: 0.5), box} ===
+               {%{fill: "#000000A6", alpha: nil}, %{fill: "#000000A6", alpha: 0.5},
+                %{
+                  color: "#000000CC",
+                  fill: "#00000000",
+                  size: 1.5,
+                  shape: :circle,
+                  linewidth: 0.5
+                }}
+    end
+
+    # `annotate("text", x = 2, y = 2, label = "hi")` with `theme_gray(base_size = 16)`, and
+    # `annotate("rect", xmin = 1, xmax = 2, ymin = 1, ymax = 2)` with `theme_void()`
+    test "an annotation takes the theme's defaults as any layer does" do
+      annotation = fn geom, options, theme ->
+        @three
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.annotate(geom, options)
+        |> theme.()
+        |> Giggly.layer_data(1)
+      end
+
+      text =
+        annotation.(:text, [x: 2, y: 2, label: "hi"], fn plot ->
+          Plot.theme_gray(plot, base_size: 16)
+        end)
+
+      rect = annotation.(:rect, [xmin: 1, xmax: 2, ymin: 1, ymax: 2], &Plot.theme_void/1)
+
+      assert {first_row(text, [:size, :label]), first_row(rect, [:color, :fill])} ===
+               {%{size: 5.6233568562335678, label: "hi"}, %{color: nil, fill: "#000000A6"}}
+    end
+
+    # `geom_point(data = data.frame(x = numeric(0), y = numeric(0)))`, whose table R leaves empty
+    test "a layer with no rows gains no defaults" do
+      frame =
+        @three
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_point(data: %{"x" => [], "y" => []})
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.names(frame) === [:x, :y, :panel, :group]
+    end
+  end
+
   describe "layer_data/2, nudged text" do
     @points %{"x" => [1, 2, 3], "y" => [1, 4, 2], "name" => ["a", "b", "c"]}
 
-    # R's columns in R's order, but the geom's defaults (colour, family, angle...), which Giggly's
-    # tables do not carry yet.
+    # R's columns in R's order, but `fontface` and `lineheight`, which Giggly's text does not take.
     test "a text layer's table says how far each row moved, 0 when nothing sets it" do
       frame =
         @points
@@ -4591,7 +4785,13 @@ defmodule GigglyTest do
                :group,
                :nudge_x,
                :nudge_y,
-               :size
+               :color,
+               :family,
+               :size,
+               :angle,
+               :hjust,
+               :vjust,
+               :alpha
              ]
 
       assert Enum.map([:x, :y, :nudge_x, :nudge_y], fn name -> DataFrame.pull(frame, name) end) ===
@@ -7749,13 +7949,14 @@ defmodule GigglyTest do
     # Golden: test/golden/theme_base_sizes.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/theme_base_sizes.R: every element and clip path matches, but the
     # background's edge, which R writes as its rounding error. Every text, spacing, margin, tick
-    # length, line width and border width follows the base sizes; the legend's keys keep their
-    # 1.2 lines. It moves with what moves test/golden/theme_light.svg.
-    test "a complete theme's base sizes reach every text, spacing, line and border" do
+    # length, line width and border width follows the base sizes, and so do the points' size and
+    # outline; the legend's keys keep their 1.2 lines. It moves with what moves
+    # test/golden/theme_light.svg, and with the points' defaults.
+    test "a complete theme's base sizes reach every text, spacing, line, border and point" do
       plot =
         Giggly.Datasets.mpg()
         |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
-        |> Plot.geom_point(size: 1.5, stroke: 0.5)
+        |> Plot.geom_point()
         |> Plot.facet_wrap(:drv, ncol: 2)
         |> Plot.labs(title: "Title")
         |> Plot.theme_light(base_size: 16, base_line_size: 1, base_rect_size: 2)
@@ -7768,12 +7969,13 @@ defmodule GigglyTest do
     # edge, which R writes as its rounding error. A setting given before a complete theme is
     # dropped; each given after it is laid over it in turn, so an element set after its removal
     # replaces the theme's whole, and a root replaced so takes what it leaves unset from
-    # theme_gray()'s at its default size. It moves with what moves test/golden/theme_bw.svg.
+    # theme_gray()'s at its default size; the points keep theme_bw()'s size at 16, which no setting
+    # reaches. It moves with what moves test/golden/theme_bw.svg, and with the points' defaults.
     test "settings are laid over a complete theme in turn, those before it dropped" do
       plot =
         Giggly.Datasets.mpg()
         |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
-        |> Plot.geom_point(size: 1.5, stroke: 0.5)
+        |> Plot.geom_point()
         |> Plot.facet_wrap(:drv, ncol: 2)
         |> Plot.labs(title: "Title")
         |> Plot.theme(plot_background: [fill: "red"])
@@ -7785,6 +7987,70 @@ defmodule GigglyTest do
         |> Plot.theme(text: [colour: "blue"])
 
       assert golden?(plot, "theme_order")
+    end
+
+    # Golden: test/golden/theme_layer_sizes.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_layer_sizes.R: every element and clip path matches. The points'
+    # size and outline, the lines' width and the labels' size follow the base sizes, in the panel
+    # and in the legend's keys. It moves with the layers' defaults or what draws them.
+    test "a complete theme's base sizes reach the points, lines and text a layer leaves unset" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 1, 2, 3],
+          "y" => [1, 3, 2, 2, 1, 3],
+          "g" => ["a", "a", "a", "b", "b", "b"]
+        }
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_line()
+        |> Plot.geom_point()
+        |> Plot.geom_text(%{label: :g}, nudge_y: 0.2)
+        |> Plot.theme_gray(base_size: 16, base_line_size: 1)
+
+      assert golden?(plot, "theme_layer_sizes")
+    end
+
+    # Golden: test/golden/theme_void_bars.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_void_bars.R: every element and clip path matches. theme_void()'s
+    # clear paper makes the bars' and the rectangle's fill black at an alpha of A6, in the panel
+    # and in the legend's keys. It moves with the rectangles' defaults or what draws them.
+    test "theme_void()'s clear paper reaches the fill of bars and rectangles" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [3, 1, 2], "g" => ["a", "b", "a"]}
+        |> Plot.new(%{x: :x, y: :y, colour: :g})
+        |> Plot.geom_col()
+        |> Plot.annotate(:rect, xmin: 2.6, xmax: 3.4, ymin: 2.5, ymax: 3)
+        |> Plot.theme_void()
+
+      assert golden?(plot, "theme_void_bars")
+    end
+
+    # Golden: test/golden/theme_void_boxplot.svg and boxplot_base_sizes.svg, each checked against
+    # ggplot2's drawing of the same plot, made by the R script beside it: every element and clip
+    # path matches, but boxplot_base_sizes.svg's background's edge, which R writes as its rounding
+    # error. Under theme_void() a box is filled with its clear paper and outlined black at an alpha
+    # of CC, in the panel and in the legend's keys; at a base size of 16 its lines take the
+    # borders' width, its median twice it, and its outliers the points' size. They move with the
+    # box plot's defaults or what draws it.
+    test "a complete theme's paper and base sizes reach a box plot's look" do
+      boxes = %{
+        "g" => List.duplicate("a", 6) ++ List.duplicate("b", 6),
+        "y" => [1, 2, 3, 4, 5, 12, 2, 3, 4, 5, 6, 0]
+      }
+
+      void =
+        boxes
+        |> Plot.new(%{x: :g, y: :y, linetype: :g})
+        |> Plot.geom_boxplot()
+        |> Plot.theme_void()
+
+      sized =
+        boxes
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_boxplot()
+        |> Plot.theme_gray(base_size: 16, base_line_size: 1)
+
+      assert golden?(void, "theme_void_boxplot")
+      assert golden?(sized, "boxplot_base_sizes")
     end
 
     # Golden: test/golden/theme_alpha.svg, checked against ggplot2's drawing of the same plot, made

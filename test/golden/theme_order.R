@@ -16,7 +16,8 @@
 # are black, the minor ones still removed. The root text, removed and then set blue, takes what it
 # leaves unset from theme_gray()'s at its default size of 11 points, so every text is 11 points or
 # its share of that, blue but where its element sets a colour, while the spacing and margins keep
-# theme_bw()'s at 16. The points are set at theme_gray()'s size and stroke.
+# theme_bw()'s at 16. The points take theme_bw()'s size at 16 and its lines' width, 16/22
+# millimetres, as their outline, which no setting changes.
 #
 # First checked with ggplot2 4.0.3 and vdiffr 1.0.9: every element and clip path matches, in
 # ggplot2's order, but the background's edge, which R writes as its rounding error.
@@ -24,7 +25,7 @@
 library(ggplot2)
 
 plot <- ggplot(mpg, aes(displ, hwy, colour = fl)) +
-  geom_point(size = 1.5, stroke = 0.5) +
+  geom_point() +
   facet_wrap(~drv, ncol = 2) +
   labs(title = "Title") +
   theme(plot.background = element_rect(fill = "red")) +

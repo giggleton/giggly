@@ -31,22 +31,24 @@ defmodule Giggly.Geom.Boxplot do
   # their groups, as ggplot2 splits a panel by group, each placed through the coordinate system
   # (`Giggly.Coord.transform/3`) and drawn whole before the next, its parts in R's order: its
   # outliers, as points (`Giggly.Geom.Point`) at its x, in the outliers' look, else its own colour,
-  # fill, shape, size and alpha, `:circle` and 1.5 by default, their stroke the look's; its staples,
-  # where `staplewidth` is not 0, across the ends of its whiskers, the upper first, `staplewidth` of
-  # its width; its whiskers, from `upper` to `ymax` and from `lower` to `ymin`; its box, a polygon
-  # round its hinges and sides, pinched in to its median between its notches where `notch` is set,
-  # `1 - notchwidth` of half its width; and its median across it, as far in. Each line is in its
-  # part's look, else the box's colour, line type and width, and never takes the box's alpha, as
-  # ggplot2 draws each with `alpha = NA`; the median is twice the box's width, ggplot2's `fatten`,
-  # unless its look gives a width; the box's fill takes the alpha and its border does not. A box is
-  # `#333333`, ink mixed 20% toward paper, filled white, its lines 0.5 mm wide and solid, as
-  # ggplot2's default box. Staples and whiskers are cut square at their ends, as ggplot2's
-  # `GeomSegment` draws them; the box and its median are cut square and mitred at their corners, as
-  # `GeomCrossbar` draws them. A line whose colour is `:none` or missing, whose line type is blank or
-  # whose width is missing is not drawn, as R's graphics engine draws none, and a box's border so is
-  # left off, its fill drawn; a line missing an end, one a scale's limits cut, is left out, and a box
-  # missing a corner is drawn in the runs of two corners or more left, as grid splits a polygon at a
-  # missing point. A box in radial coordinates is drawn between its placed corners, not curved.
+  # fill, shape, size and alpha, the theme's points' by default, their stroke the look's; its
+  # staples, where `staplewidth` is not 0, across the ends of its whiskers, the upper first,
+  # `staplewidth` of its width; its whiskers, from `upper` to `ymax` and from `lower` to `ymin`; its
+  # box, a polygon round its hinges and sides, pinched in to its median between its notches where
+  # `notch` is set, `1 - notchwidth` of half its width; and its median across it, as far in. Each
+  # line is in its part's look, else the box's colour, line type and width, and never takes the
+  # box's alpha, as ggplot2 draws each with `alpha = NA`; the median is twice the box's width,
+  # ggplot2's `fatten`, unless its look gives a width; the box's fill takes the alpha and its border
+  # does not. A box the layer neither maps nor sets a look for is ggplot2's default box under the
+  # plot's theme: the theme's ink mixed 20% toward its paper, `#333333` on white paper, filled with
+  # its paper, its lines as wide as the theme's borders, 0.5 mm at its default sizes, and solid.
+  # Staples and whiskers are cut square at their ends, as ggplot2's `GeomSegment` draws them; the
+  # box and its median are cut square and mitred at their corners, as `GeomCrossbar` draws them. A
+  # line whose colour is `:none` or missing, whose line type is blank or whose width is missing is
+  # not drawn, as R's graphics engine draws none, and a box's border so is left off, its fill drawn;
+  # a line missing an end, one a scale's limits cut, is left out, and a box missing a corner is
+  # drawn in the runs of two corners or more left, as grid splits a polygon at a missing point. A
+  # box in radial coordinates is drawn between its placed corners, not curved.
   #
   # Its legend key is ggplot2's `draw_key_boxplot()`, by fractions of the key: whiskers from a tenth
   # to a quarter of the way up and from three quarters to nine tenths, a box three quarters wide and
@@ -100,19 +102,14 @@ defmodule Giggly.Geom.Boxplot do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Aesthetics, Coord, DataFrame, Geom}
+    alias Giggly.{Aesthetics, ColorOperations, Coord, DataFrame, Geom}
     alias Giggly.DataFrame.Arithmetic
     alias Giggly.Geom.{Mark, Point}
     alias Giggly.Scene.{Polygons, Polylines, Rectangles, Segments}
 
-    # ggplot2's default box: its colour, ink mixed 20% toward paper, its fill, the paper, its lines'
-    # width in millimetres and line type, solid, and its outliers' shape and size.
-    @color "#333333"
-    @fill "#FFFFFF"
-    @line_width 0.5
-    @line_type {}
-    @shape :circle
-    @size 1.5
+    # How far a box's default colour is mixed from the theme's ink toward its paper, ggplot2's
+    # `col_mix(ink, paper, 0.2)`.
+    @color_toward_paper 0.2
 
     # ggplot2's median, `fatten` times the box's line width.
     @median_fatten 2
@@ -124,6 +121,23 @@ defmodule Giggly.Geom.Boxplot do
 
     # The columns a box is drawn from, beside its look.
     @drawn [:x, :xmin, :xmax, :lower, :middle, :upper, :ymin, :ymax, :notchlower, :notchupper]
+
+    # ggplot2's `GeomBoxplot$default_aes`, as far as Giggly draws a box: the theme's ink mixed
+    # toward its paper, a fill of its paper, its points' size, no alpha, its points' shape, and its
+    # borders' line type and width. R's `weight` and `width`, which no box reads once it is set up,
+    # are left out.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element) do
+      [
+        color: ColorOperations.mix(element.ink, element.paper, @color_toward_paper),
+        fill: element.paper,
+        size: element.pointsize,
+        alpha: nil,
+        shape: element.pointshape,
+        linetype: element.bordertype,
+        linewidth: element.borderwidth
+      ]
+    end
 
     @impl Giggly.Geom
     def setup_data(geom, frame, _axis_kinds) do
@@ -254,14 +268,14 @@ defmodule Giggly.Geom.Boxplot do
     # Each row of a vertical table as a box: where it is drawn and how it looks.
     defp boxes(frame) do
       looks = [
-        color: Mark.colors(frame, :color, @color),
-        fill: Mark.colors(frame, :fill, @fill),
-        alpha: Mark.values(frame, :alpha, nil),
+        color: Mark.colors(frame, :color),
+        fill: Mark.colors(frame, :fill),
+        alpha: DataFrame.pull(frame, :alpha),
         linetype: Mark.line_types(frame),
-        linewidth: Mark.values(frame, :linewidth, @line_width),
-        shape: Mark.values(frame, :shape, @shape),
-        size: Mark.values(frame, :size, @size),
-        outliers: Mark.values(frame, :outliers, []),
+        linewidth: DataFrame.pull(frame, :linewidth),
+        shape: DataFrame.pull(frame, :shape),
+        size: DataFrame.pull(frame, :size),
+        outliers: outliers(frame),
         group: DataFrame.pull(frame, :group)
       ]
 
@@ -503,12 +517,12 @@ defmodule Giggly.Geom.Boxplot do
     @impl Giggly.Geom
     def draw_key(geom, key) do
       base = %{
-        color: Map.get(key, :color, @color),
-        linewidth: Map.get(key, :linewidth, @line_width),
-        linetype: Map.get(key, :linetype, @line_type) || :none
+        color: Mark.key_color(key, :color),
+        linewidth: Map.fetch!(key, :linewidth),
+        linetype: Map.fetch!(key, :linetype) || :none
       }
 
-      fill = Map.get(key, :fill, @fill)
+      fill = Mark.key_color(key, :fill)
       turn = if Map.fetch!(key, :flipped_aes), do: &turned/1, else: &Function.identity/1
       reach = 0.375 * geom.staplewidth
 
@@ -519,7 +533,7 @@ defmodule Giggly.Geom.Boxplot do
           base,
           turn
         ),
-        key_box(line_look(geom.box, base), fill, Map.get(key, :alpha), turn),
+        key_box(line_look(geom.box, base), fill, Map.fetch!(key, :alpha), turn),
         key_lines([[{0.125, 0.5}, {0.875, 0.5}]], geom.median, base, turn),
         key_lines(
           [[{0.5 + reach, 0.1}, {0.5 - reach, 0.1}], [{0.5 + reach, 0.9}, {0.5 - reach, 0.9}]],
@@ -589,12 +603,19 @@ defmodule Giggly.Geom.Boxplot do
     @impl Giggly.Geom
     def key_size(_geom, key) do
       side =
-        [Map.get(key, :size, @size), Map.get(key, :linewidth, @line_width)]
+        [Map.fetch!(key, :size), Map.fetch!(key, :linewidth)]
         |> Enum.map(fn millimetres -> millimetres || 0.0 end)
         |> Enum.sum()
         |> Kernel.*(@points_per_millimetre)
 
       {side, side}
+    end
+
+    # Each box's outliers, none where the layer keeps none, whose column `setup_data/3` dropped.
+    defp outliers(frame) do
+      if :outliers in DataFrame.names(frame),
+        do: DataFrame.pull(frame, :outliers),
+        else: List.duplicate([], DataFrame.row_count(frame))
     end
 
     defp as_float(value) when is_integer(value), do: value / 1

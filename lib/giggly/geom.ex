@@ -26,8 +26,9 @@ defprotocol Giggly.Geom do
 
   # A geom places its rows through the coordinate system and draws them as scene primitives, sizes
   # a mark with no width given from the spacing of its positions (`Giggly.Resolution`), writes a
-  # text's label as R's `as.character()` writes it (`Giggly.AsCharacter`), and measures the text it
-  # draws (`Giggly.Font`), which the scene draws at the width measured.
+  # text's label as R's `as.character()` writes it (`Giggly.AsCharacter`), measures the text it
+  # draws (`Giggly.Font`), which the scene draws at the width measured, and mixes its default
+  # colours from the theme's ink and paper (`Giggly.ColorOperations`).
   # It exports its kinds, whose structs a plot records and whose facts it checks a layer against,
   # and nothing they draw with: that is in their protocol implementations, which no boundary
   # exports.
@@ -35,6 +36,7 @@ defprotocol Giggly.Geom do
     deps: [
       Giggly.Aesthetics,
       Giggly.AsCharacter,
+      Giggly.ColorOperations,
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Font,
@@ -47,6 +49,22 @@ defprotocol Giggly.Geom do
 
   @typedoc "Whether each axis's scale is discrete or continuous."
   @type axis_kinds :: %{x: :continuous | :discrete, y: :continuous | :discrete}
+
+  @typedoc """
+  The layers' defaults a plot's complete theme gives, `Giggly.Theme`'s `geom`, ggplot2's
+  `element_geom()`: its `ink` and `paper`, its lines' and borders' widths and line types, its
+  text's family and size and its points' size and shape.
+  """
+  @type element :: %{required(atom()) => term()}
+
+  # The aesthetics `geom` draws with, each with the value it takes where the layer neither maps nor
+  # sets it, worked out from `element`, the layers' defaults the plot's complete theme gives:
+  # ggplot2's `default_aes`, its `from_theme()` values read from the theme's `element_geom()`, in
+  # the order it lists them, so the columns a layer's table gains end it as R's do. A value R gives
+  # as `NA` is `nil`, the table's missing value.
+  @doc false
+  @spec default_aesthetics(t(), element()) :: keyword()
+  def default_aesthetics(geom, element)
 
   # `frame` with each row given the extent `geom` draws it over, in data space, after the layer's
   # stat and before its position: ggplot2's `setup_data()`. `axis_kinds` says whether each axis is

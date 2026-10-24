@@ -5,15 +5,16 @@ defmodule Giggly.Render do
   # ggplot2's rendering stage (`ggplot_gtable()`, in its `plot-render.R`) turns a built plot into a
   # table of grobs. A backend such as `Giggly.SVG` then draws the scene.
   #
-  # The plot's theme, its complete theme and the settings laid over it, is resolved first into its
-  # complete form (`Giggly.Theme`), which everything drawn here other than the marks takes its look
-  # from. Each layer's rows are split by panel, and each panel is drawn by itself: its background
-  # and grid lines (`Giggly.Guide`), then each layer's rows in it, drawn by the layer's geom
-  # (`Giggly.Geom`), in the order the layers were added, each handed the plot's coordinate system
-  # and that panel's params, then its foreground, any axis inside it and its border, never filled,
-  # as ggplot2's coordinate system draws `panel.border`; where the theme puts the panel on top, its
-  # background and grid lines are drawn after the layers, under the foreground. The panel's axes
-  # and strips (`Giggly.Guide`) are drawn beside it.
+  # The plot's complete theme, which the assembly worked out (`Giggly.Theme`), gives everything
+  # drawn here other than the marks its look; the marks take theirs from their rows, which hold the
+  # theme's defaults for the layers where a layer leaves its look unset. Each layer's rows are split
+  # by panel, and each panel is drawn by itself: its background and grid lines (`Giggly.Guide`),
+  # then each layer's rows in it, drawn by the layer's geom (`Giggly.Geom`), in the order the layers
+  # were added, each handed the plot's coordinate system and that panel's params, then its
+  # foreground, any axis inside it and its border, never filled, as ggplot2's coordinate system
+  # draws `panel.border`; where the theme puts the panel on top, its background and grid lines are
+  # drawn after the layers, under the foreground. The panel's axes and strips (`Giggly.Guide`) are
+  # drawn beside it.
   #
   # The panels are arranged as the layout table says, which is the facet's say: each at its row and
   # column, the axes it draws, and the strips above it. They are laid out as ggplot2's facets lay
@@ -49,7 +50,7 @@ defmodule Giggly.Render do
   # Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
   # here.
 
-  # Rendering reads the assembled plot and its layout, resolves its theme, has each layer's geom
+  # Rendering reads the assembled plot, its layout and its complete theme, has each layer's geom
   # draw and each axis's guide, and builds the scene from what they draw.
   use Boundary,
     deps: [
@@ -75,10 +76,9 @@ defmodule Giggly.Render do
           panel_params: panel_params,
           guide_titles: guide_titles,
           plot_labels: plot_labels,
-          theme: plot_theme
+          theme: theme
         } = assembly
       ) do
-    theme = Theme.complete(plot_theme)
     panels = draw_panels(assembly, theme)
     labels = Guide.Title.draw(plot_labels, theme)
 
@@ -204,15 +204,23 @@ defmodule Giggly.Render do
   end
 
   # A key with the glyphs each layer drawing in it draws, with the key's values of the aesthetics
-  # the layer maps, what the layer sets, and whether its marks are horizontal, in `flipped_aes`, as
+  # the layer maps and what the layer sets laid over its geom's defaults, as ggplot2 fills a key's
+  # data from the layer's `default_aes`, and whether its marks are horizontal, in `flipped_aes`, as
   # ggplot2 hands `draw_key` the layer's, and the room each layer's glyph needs.
   defp draw_key(%{values: values} = key, index, layers) do
     {glyphs, sizes} =
-      for %{geom: geom, aesthetics: aesthetics, fixed: fixed, flipped: flipped, draws: draws} <-
-            layers,
+      for %{
+            geom: geom,
+            aesthetics: aesthetics,
+            defaults: defaults,
+            fixed: fixed,
+            flipped: flipped,
+            draws: draws
+          } <- layers,
           Enum.at(draws, index) do
         key_values =
-          fixed
+          defaults
+          |> Map.merge(fixed)
           |> Map.merge(Map.take(values, aesthetics))
           |> Map.put(:flipped_aes, flipped)
 

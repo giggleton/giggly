@@ -16,16 +16,18 @@ defmodule Giggly.Geom.Rect do
   # corner is not drawn, and an infinite one reaches the panel's edge, where the coordinate system
   # puts it.
   #
-  # Every rectangle looks as ggplot2's default rectangle does: filled with ink mixed 35% toward
-  # paper, `#595959`, with no border, its border's width the theme's 0.5 mm all the same, as
-  # ggplot2's snapshots write it, and solid, or filled and bordered in its row's colours, mapped or
-  # set, `:none`, R's `NA`, or missing, leaving it unfilled or unbordered, its border as wide as its
+  # A rectangle the layer neither maps nor sets a look for looks as ggplot2's default rectangle
+  # does under the plot's theme: filled with the theme's ink mixed 35% toward its paper, `#595959`
+  # on white paper and `#000000A6` on `theme_void()`'s clear paper, with no border, its border's
+  # width the theme's borders' all the same, 0.5 mm at its default sizes, as ggplot2's snapshots
+  # write it, and solid. Otherwise it is filled and bordered in its row's colours, mapped or set,
+  # `:none`, R's `NA`, or missing, leaving it unfilled or unbordered, its border as wide as its
   # row's `linewidth`, in millimetres, and in its row's line type, dashed as svglite writes it
   # (`Mark.dashes/2`), a blank one leaving it unbordered, as R's graphics engine draws a blank
-  # border transparent. A row's `alpha`, where its table has one, makes the rectangle's fill that
-  # opaque, replacing the fill's own alpha, and leaves its border in its colour's own, as ggplot2's
-  # `GeomRect` applies `fill_alpha()` to the fill alone; a row without one keeps its fill's
-  # (`Giggly.Geom.Mark`). The rectangles are drawn in row order, each run of rectangles whose
+  # border transparent. A row's `alpha`, unless missing, makes the rectangle's fill that opaque,
+  # replacing the fill's own alpha, and leaves its border in its colour's own, as ggplot2's
+  # `GeomRect` applies `fill_alpha()` to the fill alone; a missing one, the default, keeps its
+  # fill's (`Giggly.Geom.Mark`). The rectangles are drawn in row order, each run of rectangles whose
   # borders are as wide and dashed alike one primitive. Its legend key is its fill short of the key
   # by its border's width, as `draw_key_polygon()` draws it.
 
@@ -47,15 +49,13 @@ defmodule Giggly.Geom.Rect do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Coord, DataFrame}
+    alias Giggly.{ColorOperations, Coord, DataFrame}
     alias Giggly.Geom.Mark
     alias Giggly.Scene.Rectangles
 
-    # ggplot2's default rectangle: its fill, its border's width in millimetres, and its border's
-    # line type, solid.
-    @fill "#595959"
-    @line_width 0.5
-    @line_type {}
+    # How far a rectangle's default fill is mixed from the theme's ink toward its paper, ggplot2's
+    # `col_mix(ink, paper, 0.35)`.
+    @fill_toward_paper 0.35
 
     # Points in a millimetre, grid's `"mm"` in the scene's points: a key's fill is its border's
     # width short of the key each way, as ggplot2's `draw_key_polygon()` takes `linewidth`
@@ -68,6 +68,19 @@ defmodule Giggly.Geom.Rect do
     @line_join :mitre
     @mitre_limit 10.0
 
+    # ggplot2's `GeomRect$default_aes`: no border, a fill of the theme's ink mixed toward its
+    # paper, and the theme's borders' width and line type.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element) do
+      [
+        color: nil,
+        fill: ColorOperations.mix(element.ink, element.paper, @fill_toward_paper),
+        linewidth: element.borderwidth,
+        linetype: element.bordertype,
+        alpha: nil
+      ]
+    end
+
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
@@ -75,15 +88,15 @@ defmodule Giggly.Geom.Rect do
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      fills = Mark.colors(placed, :fill, @fill)
+      fills = Mark.colors(placed, :fill)
 
       [:xmin, :xmax, :ymin, :ymax]
       |> Enum.map(fn name -> DataFrame.pull(placed, name) end)
       |> Enum.concat([
         fills,
         Mark.opacities(placed, fills),
-        Mark.colors(placed, :color, :none),
-        Mark.values(placed, :linewidth, @line_width),
+        Mark.colors(placed, :color),
+        DataFrame.pull(placed, :linewidth),
         Mark.line_types(placed)
       ])
       |> Enum.zip_with(fn [xmin, xmax, ymin, ymax, fill, fill_opacity, color, width, line_type] ->
@@ -133,7 +146,7 @@ defmodule Giggly.Geom.Rect do
     # missing width, R's `NA`, leaves the rectangle no size, so it draws nothing.
     @impl Giggly.Geom
     def draw_key(_geom, key) do
-      case Map.get(key, :linewidth, @line_width) do
+      case Map.fetch!(key, :linewidth) do
         nil -> []
         line_width -> key_rectangle(key, line_width)
       end
@@ -145,7 +158,7 @@ defmodule Giggly.Geom.Rect do
     @impl Giggly.Geom
     def key_size(_geom, key) do
       side =
-        case Map.get(key, :linewidth, @line_width) do
+        case Map.fetch!(key, :linewidth) do
           nil -> 0.0
           line_width -> 2 * line_width * @points_per_millimetre
         end
@@ -154,9 +167,10 @@ defmodule Giggly.Geom.Rect do
     end
 
     defp key_rectangle(key, line_width) do
-      fill = Map.get(key, :fill, @fill)
-      line_type = Map.get(key, :linetype, @line_type) || :none
-      border = border(Map.get(key, :color, :none), line_width, line_type)
+      fill = Mark.key_color(key, :fill)
+      line_type = Map.fetch!(key, :linetype) || :none
+      color = Mark.key_color(key, :color)
+      border = border(color, line_width, line_type)
       inset = line_width * @points_per_millimetre / 2
 
       [
@@ -167,7 +181,7 @@ defmodule Giggly.Geom.Rect do
           ymax: [1.0],
           offsets: [{{inset, inset}, {-inset, -inset}}],
           fill: [Mark.hex(fill)],
-          fill_opacity: [Mark.opacity(fill, Map.get(key, :alpha))],
+          fill_opacity: [Mark.opacity(fill, Map.fetch!(key, :alpha))],
           color: [Mark.hex(border)],
           color_opacity: [Mark.own_opacity(border)],
           stroke_width: Mark.stroke_width(line_width),

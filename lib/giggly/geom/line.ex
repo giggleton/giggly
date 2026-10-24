@@ -62,6 +62,14 @@ defmodule Giggly.Geom.Line do
       DataFrame.slice(frame, order)
     end
 
+    # A line's defaults are a path's, as ggplot2's `GeomLine` takes `GeomPath`'s `default_aes`.
+    @impl Giggly.Geom
+    def default_aesthetics(geom, element) do
+      geom
+      |> path()
+      |> Geom.default_aesthetics(element)
+    end
+
     @impl Giggly.Geom
     def draw_panel(geom, frame, coord, panel_params) do
       geom

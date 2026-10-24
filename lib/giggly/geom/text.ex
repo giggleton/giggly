@@ -14,18 +14,19 @@ defmodule Giggly.Geom.Text do
   # (`nil`, or the float `:nan`) is not drawn, as ggplot2 drops it, nor is one whose colour is
   # `:none`, R's `NA`, or missing.
   #
-  # Every label is drawn as ggplot2's default text is, until aesthetics can change it: black, or its
-  # row's colour, at its row's alpha as a point is (`Giggly.Geom.Mark`); 11 points, the theme's
-  # base size, or the layer's `size` in millimetres times ggplot2's `.pt`; turned the layer's
-  # `angle` degrees anticlockwise; centred on its place, or justified by the layer's `hjust` along
-  # its baseline and `vjust` up its height, a number from 0, its start or bottom, to 1, its end or
-  # top, or one of ggplot2's words: `:left`, `:center` and `:right`, `:bottom`, `:middle` and
-  # `:top`, and `:inward` and `:outward`, which justify each label toward or away from the middle
-  # of the panel by where it falls, as ggplot2's `compute_just()` does, swapping the two axes for
-  # text turned more than 45 degrees and reversing for text turned past 135. Its height for `vjust`
-  # is the ascent of "M", as R's graphics engine measures it, so a label at `vjust` 0 sits on its
-  # place and one at 1 hangs from it. Each label's width is measured (`Giggly.Font`), as the scene
-  # draws a label at the width measured.
+  # Every label is drawn as ggplot2's default text is under the plot's theme, but where its layer
+  # maps or sets its look: in the theme's ink, black, or its row's colour, at its row's alpha as a
+  # point is (`Giggly.Geom.Mark`); at the theme's base size, 11 points at its default sizes, which
+  # the theme gives in millimetres, or the layer's `size` in millimetres, either times ggplot2's
+  # `.pt`; turned the layer's `angle` degrees anticlockwise; centred on its place, or justified by
+  # the layer's `hjust` along its baseline and `vjust` up its height, a number from 0, its start or
+  # bottom, to 1, its end or top, or one of ggplot2's words: `:left`, `:center` and `:right`,
+  # `:bottom`, `:middle` and `:top`, and `:inward` and `:outward`, which justify each label toward
+  # or away from the middle of the panel by where it falls, as ggplot2's `compute_just()` does,
+  # swapping the two axes for text turned more than 45 degrees and reversing for text turned past
+  # 135. Its height for `vjust` is the ascent of "M", as R's graphics engine measures it, so a label
+  # at `vjust` 0 sits on its place and one at 1 hangs from it. Each label's width is measured
+  # (`Giggly.Font`), as the scene draws a label at the width measured.
 
   @enforce_keys [:check_overlap]
   defstruct @enforce_keys
@@ -49,10 +50,7 @@ defmodule Giggly.Geom.Text do
     alias Giggly.Geom.Mark
     alias Giggly.Scene.Text
 
-    # ggplot2's default text: its colour, the theme's ink, and its size, the theme's base size, in
-    # points; and the line height a legend key's margins are measured in lines of.
-    @color "#000000"
-    @font_size 11.0
+    # The line height a legend key's margins are measured in lines of.
     @line_height 1.2
 
     # ggplot2's `.pt`: font points per millimetre, which turns a `size` in millimetres into points.
@@ -74,6 +72,21 @@ defmodule Giggly.Geom.Text do
     # bottom, its middle, or its end or top.
     @word_places %{left: 0.0, bottom: 0.0, center: 0.5, middle: 0.5, right: 1.0, top: 1.0}
 
+    # ggplot2's `GeomText$default_aes`, as far as Giggly draws text: the theme's ink, its text's
+    # family and size, no angle, centred both ways, and no alpha.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element) do
+      [
+        color: element.ink,
+        family: element.family,
+        size: element.fontsize,
+        angle: 0.0,
+        hjust: 0.5,
+        vjust: 0.5,
+        alpha: nil
+      ]
+    end
+
     # Text is drawn at its x and y alone.
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
@@ -83,11 +96,11 @@ defmodule Giggly.Geom.Text do
     @impl Giggly.Geom
     def draw_panel(%{check_overlap: check_overlap}, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      font_size = font_size(Mark.set(placed, :size, :none))
-      angle = Mark.set(placed, :angle, 0.0)
-      hjust = Mark.set(placed, :hjust, 0.5)
-      vjust = Mark.set(placed, :vjust, 0.5)
-      colors = Mark.colors(placed, :color, @color)
+      font_size = font_size(Mark.set(placed, :size))
+      angle = Mark.set(placed, :angle)
+      hjust = Mark.set(placed, :hjust)
+      vjust = Mark.set(placed, :vjust)
+      colors = Mark.colors(placed, :color)
 
       drawn =
         [
@@ -126,7 +139,7 @@ defmodule Giggly.Geom.Text do
           labels: Enum.map(drawn, fn label -> label.label end),
           widths: Enum.map(drawn, fn label -> label.width end),
           size: font_size,
-          family: Mark.set(placed, :family, ""),
+          family: Mark.set(placed, :family),
           color: Enum.map(drawn, fn label -> label.color end),
           opacity: Enum.map(drawn, fn label -> label.opacity end),
           angle: angle,
@@ -147,15 +160,15 @@ defmodule Giggly.Geom.Text do
     # toward its top.
     @impl Giggly.Geom
     def draw_key(_geom, key) do
-      case Map.get(key, :color, @color) do
+      case Mark.key_color(key, :color) do
         :none ->
           []
 
         color ->
-          font_size = font_size(Map.get(key, :size, :none))
-          angle = Map.get(key, :angle, 0.0)
-          hjust = justification(Map.get(key, :hjust, 0.5), 0.5, 0.5, angle)
-          vjust = justification(Map.get(key, :vjust, 0.5), 0.5, 0.5, angle)
+          font_size = font_size(Map.fetch!(key, :size))
+          angle = Map.fetch!(key, :angle)
+          hjust = justification(Map.fetch!(key, :hjust), 0.5, 0.5, angle)
+          vjust = justification(Map.fetch!(key, :vjust), 0.5, 0.5, angle)
           {across, up} = turned_justification(angle, hjust, vjust)
           margin = @key_margin_lines * font_size * @line_height
 
@@ -171,9 +184,9 @@ defmodule Giggly.Geom.Text do
               labels: [label],
               widths: [Font.width(label, font_size)],
               size: font_size,
-              family: Map.get(key, :family, ""),
+              family: Map.fetch!(key, :family),
               color: [Mark.hex(color)],
-              opacity: [Mark.opacity(color, Map.get(key, :alpha))],
+              opacity: [Mark.opacity(color, Map.fetch!(key, :alpha))],
               angle: angle,
               hjust: [hjust],
               offset: [{along, toward_top - vjust * Font.ascent(font_size)}],
@@ -190,8 +203,8 @@ defmodule Giggly.Geom.Text do
     # sine and cosine, as `titleGrob()` adds it, and the measured margin each side.
     @impl Giggly.Geom
     def key_size(_geom, key) do
-      font_size = font_size(Map.get(key, :size, :none))
-      radians = Map.get(key, :angle, 0.0) * :math.pi() / 180
+      font_size = font_size(Map.fetch!(key, :size))
+      radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
       sine = abs(:math.sin(radians))
       width = Font.width("a", font_size)
@@ -213,9 +226,7 @@ defmodule Giggly.Geom.Text do
       {across * cosine + up * sine, up * cosine - across * sine}
     end
 
-    # The text's size in points: the layer's size in millimetres times `.pt`, or the theme's base
-    # size.
-    defp font_size(:none), do: @font_size
+    # The text's size in points: its size in millimetres, the layer's or the theme's, times `.pt`.
     defp font_size(millimetres), do: millimetres * @font_points_per_millimetre
 
     # A justification as a number, from ggplot2's `compute_just()`: a number as it is, a word by its

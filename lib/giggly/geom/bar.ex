@@ -128,6 +128,12 @@ defmodule Giggly.Geom.Bar do
       |> DataFrame.put(:ymax, Enum.map(y_positions, fn y -> toward_zero(y, :higher) end))
     end
 
+    # A bar's defaults are a rectangle's, as ggplot2's `GeomBar` takes `GeomRect`'s `default_aes`;
+    # its default width, which R adds back once the width has been read, is left out, since it is
+    # not the width the bar is drawn at.
+    @impl Giggly.Geom
+    def default_aesthetics(_geom, element), do: Geom.default_aesthetics(%Rect{}, element)
+
     # Each bar as a rectangle, ggplot2's `GeomRect` drawing it.
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params),

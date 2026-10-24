@@ -31,6 +31,12 @@ defmodule Giggly.ColorOperations do
   # conversion from Lab keeps the rounded 0.008856 and 7.787 and the library the exact fractions
   # (one colour in 35,007 of seven R gradients' samples).
   #
+  # `mix/3` is scales' `col_mix()` in its default space, as ggplot2's geoms mix their default
+  # colours from the theme's ink and paper: each colour's red, green and blue as farver decodes
+  # them, bytes, and its alpha, its byte over 255, each a share of the way from the one to the
+  # other, `from * (1 - amount) + to * amount`; then each channel, and the alpha times 255, rounded
+  # to a byte as farver writes one, a half to the even byte, the alpha dropped when it is opaque.
+  #
   # `viridis/2` is R's `viridisLite::viridis(n, alpha, begin, end, direction, option)`: `count`
   # places spaced from `begin` to `end` by R's `seq()`, the two swapped for a `direction` of -1;
   # the palette's colour at each place, its L*, a* and b* each a cubic spline evaluated there; that
@@ -220,6 +226,33 @@ defmodule Giggly.ColorOperations do
     |> from_xyz()
   end
 
+  # The colour `amount` of the way from `from` to `to`, each a colour in its one spelling, as the
+  # opening comment says: 0 is `from` and 1 is `to`.
+  @doc false
+  @spec mix(String.t(), String.t(), number()) :: String.t()
+  def mix(<<"#", _from_digits::binary>> = from, <<"#", _to_digits::binary>> = to, amount)
+      when is_number(amount) and amount >= 0 and amount <= 1 do
+    {from_channels, from_alpha} = channels(from)
+    {to_channels, to_alpha} = channels(to)
+
+    digits =
+      Enum.zip_with(from_channels, to_channels, fn from_channel, to_channel ->
+        hex_pair(rounded_byte(from_channel * (1 - amount) + to_channel * amount))
+      end)
+
+    alpha = rounded_byte((from_alpha * (1 - amount) + to_alpha * amount) * 255)
+    Enum.join(["#" | digits]) <> if(alpha == 255, do: "", else: hex_pair(alpha))
+  end
+
+  # A colour's red, green and blue as bytes, and its alpha from 0 to 1, as farver decodes them,
+  # opaque for a colour without one.
+  defp channels(<<"#", digits::binary-size(6)>>), do: channels("#" <> digits <> "FF")
+
+  defp channels(<<"#", digits::binary-size(8)>>) do
+    {:ok, <<red, green, blue, alpha>>} = Base.decode16(digits)
+    {[red, green, blue], alpha / 255}
+  end
+
   # viridisLite's palettes by name, in the order of its options A to H.
   @doc false
   @spec viridis_options() :: [atom(), ...]
@@ -344,13 +377,14 @@ defmodule Giggly.ColorOperations do
     |> then(fn digits -> "#" <> digits end)
   end
 
-  # A linear sRGB channel as farver writes it: companded, times 255, rounded to the nearest whole
-  # number, a half to the even one, and clamped to a byte. farver rounds as its `double2int()` does,
-  # by adding 1.5 times 2^52, which leaves a double no fraction, rounded as IEEE arithmetic rounds,
-  # so taking it away again leaves the rounded number.
-  defp byte(linear) do
-    scaled = Lindbloom.srgb_compand(linear) * 255
+  # A linear sRGB channel as farver writes it: companded, times 255, and a byte.
+  defp byte(linear), do: rounded_byte(Lindbloom.srgb_compand(linear) * 255)
 
+  # A value on a byte's scale as farver writes it: rounded to the nearest whole number, a half to
+  # the even one, and clamped to a byte. farver rounds as its `double2int()` does, by adding 1.5
+  # times 2^52, which leaves a double no fraction, rounded as IEEE arithmetic rounds, so taking it
+  # away again leaves the rounded number.
+  defp rounded_byte(scaled) do
     (scaled + @rounding - @rounding)
     |> trunc()
     |> max(0)
