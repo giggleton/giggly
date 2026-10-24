@@ -7982,20 +7982,92 @@ defmodule GigglyTest do
     end
 
     # Golden: test/golden/legend_columns.svg, checked against ggplot2's drawing of the same plot,
-    # made by test/golden/legend_columns.R: every element and clip path matches. Twenty-five keys
-    # running down take two columns, filled a column at a time. It moves with how a legend is laid
-    # out.
+    # made by test/golden/legend_columns.R: every element and clip path matches. Twenty-one keys
+    # running down, one more than a column holds, take two columns, filled a column at a time. It
+    # moves with how a legend is laid out.
     test "a legend running down takes a column for each twenty keys" do
       plot =
         %{
-          "x" => Enum.to_list(1..25),
-          "y" => Enum.to_list(1..25),
-          "key" => Enum.map(?a..?y, fn code -> <<code>> end)
+          "x" => Enum.to_list(1..21),
+          "y" => Enum.to_list(1..21),
+          "key" => Enum.map(?a..?u, fn code -> <<code>> end)
         }
         |> Plot.new(%{x: :x, y: :y, colour: :key})
         |> Plot.geom_point()
 
       assert golden?(plot, "legend_columns")
+    end
+
+    # Golden: test/golden/legend_right_plot.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/legend_right_plot.R: every element and clip path matches but the
+    # background's left edge, which R writes as its rounding error. Lined up with the plot, a box
+    # right of the panels is centred from the strips' top to the x axis's title. It moves with how
+    # the plot's table is laid out.
+    test "legend_location: :plot centres a box beside the panels on their strips and titles too" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:year)
+        |> Plot.labs(title: "Title", subtitle: "Subtitle")
+        |> Plot.theme(legend_location: :plot)
+
+      assert golden?(plot, "legend_right_plot")
+    end
+
+    # Golden: test/golden/legend_top_plot_tag.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_top_plot_tag.R: every element and clip path matches. Lined
+    # up with the plot, a box above the panel is centred from the y axis's title to the panel's
+    # right, the tag's column left out. It moves with how the plot's table is laid out.
+    test "legend_location: :plot centres a box above the panels on the axes' titles, not the tag" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_point()
+        |> Plot.labs(tag: "A")
+        |> Plot.theme(legend_position: :top, legend_location: :plot)
+
+      assert golden?(plot, "legend_top_plot_tag")
+    end
+
+    # Golden: test/golden/legend_bottom_box_margin.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/legend_bottom_box_margin.R: every element and clip path
+    # matches. An untitled legend's keys start at its margin, a row of keys is as tall as its
+    # tallest, and the box's margin and background surround legends side by side. It moves with
+    # how a legend running across or the box is laid out.
+    test "a box of legends side by side keeps its margin, an untitled legend and tall keys" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv, size: :cyl})
+        |> Plot.geom_point()
+        |> Plot.scale_size_continuous(range: {2, 10})
+        |> Plot.labs(colour: :none)
+        |> Plot.theme(
+          legend_position: :bottom,
+          legend_box_margin: [top: 4, right: 8, bottom: 12, left: 16],
+          legend_box_background: []
+        )
+
+      assert golden?(plot, "legend_bottom_box_margin")
+    end
+
+    # Golden: test/golden/legend_title_margins.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/legend_title_margins.R: every element and clip path matches. Six
+    # keys running across, one more than a row holds, take two rows; a title left of them with
+    # margins of its own, taller than the rows, leaves half the extra room above them and half
+    # below, and is moved down by half the difference of its margins. It moves with how a legend
+    # running across is laid out.
+    test "six keys running across take two rows, beside a title with margins of its own" do
+      plot =
+        %{"x" => Enum.to_list(1..6), "y" => Enum.to_list(1..6), "key" => ~w(a b c d e f)}
+        |> Plot.new(%{x: :x, y: :y, colour: :key})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          legend_position: :bottom,
+          legend_title: [margin: [top: 30, right: 6, bottom: 12]]
+        )
+
+      assert golden?(plot, "legend_title_margins")
     end
 
     # Golden: test/golden/legend_title_tall.svg, checked against ggplot2's drawing of the same plot,

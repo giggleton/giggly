@@ -8,16 +8,16 @@
 #
 # and compare the two drawings element by element, as test/golden/point.R describes.
 #
-# Twenty-five points coloured by the letters a to y: a legend running down takes a column for each
-# twenty keys, so its keys fill two columns a column at a time, thirteen and twelve, the keys'
-# spacing between the first column's labels and the second column's keys.
+# Twenty-one points coloured by the letters a to u: a legend running down takes a column for each
+# twenty keys, so one key more than twenty fills two columns a column at a time, eleven and ten,
+# the keys' spacing between the first column's labels and the second column's keys.
 #
 # First checked with ggplot2 4.0.3 and vdiffr 1.0.9: every element and clip path matches, and
 # the one departure is test/golden/point.R's, the x axis drawn before the y.
 
 library(ggplot2)
 
-df <- data.frame(x = 1:25, y = 1:25, key = letters[1:25])
+df <- data.frame(x = 1:21, y = 1:21, key = letters[1:21])
 plot <- ggplot(df, aes(x, y, colour = key)) +
   geom_point() +
   theme_gray()

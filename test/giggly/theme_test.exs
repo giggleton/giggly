@@ -321,7 +321,8 @@ defmodule Giggly.ThemeTest do
   # makes half a line, 7.2 points between theme_void()'s legends; none sets `legend.direction`,
   # `legend.box`, `legend.box.just` or `legend.location`, and each a box margin of 0 and no box
   # background. A justification is worked out as grid's `valid.just()` reads one: "top" 0.5 and
-  # 1, "left" 0 and 0.5, c("right", "top") 1 and 1, c(0.3, 0.8) as it is; a name beside a number,
+  # 1, "left" 0 and 0.5, c("right", "top") 1 and 1, c("center", "top") 0.5 and 1, c("left",
+  # "bottom") 0 and 0, c(0.3, 0.8) as it is; a name beside a number,
   # which R refuses as one character vector, Giggly reads side by side, each as R reads it alone.
   # They move with the themes' legend values or how a justification is read.
   describe "complete/1, where the legends go" do
@@ -354,7 +355,18 @@ defmodule Giggly.ThemeTest do
       end
 
       assert Enum.map(
-               [:top, :left, :bottom, :right, :center, {:right, :top}, {0.3, 0.8}, {:left, 2}],
+               [
+                 :top,
+                 :left,
+                 :bottom,
+                 :right,
+                 :center,
+                 {:right, :top},
+                 {:center, :top},
+                 {:left, :bottom},
+                 {0.3, 0.8},
+                 {:left, 2}
+               ],
                justification
              ) ===
                [
@@ -364,6 +376,8 @@ defmodule Giggly.ThemeTest do
                  {1.0, 0.5},
                  {0.5, 0.5},
                  {1.0, 1.0},
+                 {0.5, 1.0},
+                 {0.0, 0.0},
                  {0.3, 0.8},
                  {0.0, 2.0}
                ]
@@ -380,10 +394,11 @@ defmodule Giggly.ThemeTest do
 
     test "an inside box goes at its justification's point of the panels unless given one" do
       justified = complete(%{legend_justification_inside: :right})
-      placed = complete(%{legend_justification_inside: :right, legend_position_inside: {0.9, 1}})
+      placed = complete(%{legend_justification_inside: :right, legend_position_inside: {1, 0}})
 
+      # A point given in whole numbers is held as floats, as the theme holds every point.
       assert {justified.legend_position_inside, placed.legend_position_inside,
-              placed.legend_justification_inside} === {{1.0, 0.5}, {0.9, 1.0}, {1.0, 0.5}}
+              placed.legend_justification_inside} === {{1.0, 0.5}, {1.0, 0.0}, {1.0, 0.5}}
     end
 
     test "the direction, the arrangement and the place in the box are the settings'" do

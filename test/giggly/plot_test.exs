@@ -4046,6 +4046,26 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a justification is taken by any name, or by names or shares across and up" do
+      plot = Plot.new(@rows)
+
+      justifications =
+        [:center, :left, :right, :top, :bottom] ++
+          for across <- [:left, :center, :right, 0.25], up <- [:bottom, :center, :top, 2] do
+            {across, up}
+          end
+
+      for justification <- justifications do
+        assert Plot.theme(plot, legend_justification_top: justification).theme.settings ===
+                 %{legend_justification_top: justification}
+      end
+
+      for box_just <- [:center, :bottom, {:left, :bottom}, {:center, :center}, {:right, :top}] do
+        assert Plot.theme(plot, legend_box_just: box_just).theme.settings ===
+                 %{legend_box_just: box_just}
+      end
+    end
+
     test "a size or a line width of 0, a share of a margin and a border of :none are taken" do
       plot =
         @rows
@@ -4155,6 +4175,9 @@ defmodule Giggly.PlotTest do
             {[legend_position_inside: {"a", 1}], {:legend_position_inside, []}, {"a", 1}},
             {[legend_justification: :inside], {:legend_justification, []}, :inside},
             {[legend_justification: {:top, :left}], {:legend_justification, []}, {:top, :left}},
+            {[legend_justification: {:top, :bottom}], {:legend_justification, []},
+             {:top, :bottom}},
+            {[legend_box_just: {0.2, :top}], {:legend_box_just, []}, {0.2, :top}},
             {[legend_justification_top: {1, :right}], {:legend_justification_top, []},
              {1, :right}},
             {[legend_box_just: {0.2, 0.3}], {:legend_box_just, []}, {0.2, 0.3}},
