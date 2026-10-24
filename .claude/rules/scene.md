@@ -78,8 +78,9 @@ weight".
   drawn in a clipped cell is cut off at its box. Rendering sets which are
   (`.claude/rules/render.md`).
 - **A rectangle (`Rect`) fills its cell**, as grid's `rectGrob()` does at its default place and
-  size, which is how ggplot2 draws a background and the panel's border, its fill or border
-  `:none` and its border dashed as a line is; **rectangles placed and sized within their cell
+  size, which is how ggplot2 draws a background and the panel's border, its fill or border `:none`,
+  each at its own opacity (`fill_opacity`, `color_opacity`), as a theme's colour may have an alpha,
+  and its border dashed as a line is; **rectangles placed and sized within their cell
   (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, either way
   round, as ggplot2's `GeomRect` draws a bar or a rectangle and R's graphics engine a point's
   square. A background that is not rectangular is a polygon (`Polygons`), closed round its outline,

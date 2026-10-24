@@ -22,8 +22,8 @@ defmodule Giggly.Guide.AxisTheta do
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Polylines, Text}
 
-  # Ticks and the axis's line are opaque, their ends and dashes as the theme says and their
-  # corners round, as `theme_gray()`'s `line` element draws every line.
+  # Ticks and the axis's line are drawn at their colour's opacity, their ends and dashes as the
+  # theme says and their corners round, as `theme_gray()`'s `line` element draws every line.
 
   # The axis drawn from `breaks`, each its place on the circle's edge, its angle clockwise from
   # 12 o'clock and its label, and from `line`, the points of the circle its line runs round, in
@@ -72,7 +72,7 @@ defmodule Giggly.Guide.AxisTheta do
         size: text_look.size,
         family: "",
         color: [text_look.color],
-        opacity: [1.0],
+        opacity: [text_look.opacity],
         angle: 0,
         hjust: [0.5 - :math.sin(angle) / 2],
         offset: [
@@ -98,7 +98,7 @@ defmodule Giggly.Guide.AxisTheta do
         stroke_width: look.line_width,
         dashes: look.dashes,
         color: [look.color],
-        opacity: [1.0],
+        opacity: [look.opacity],
         line_end: look.line_end,
         line_join: :round,
         mitre_limit: 10.0
@@ -122,7 +122,7 @@ defmodule Giggly.Guide.AxisTheta do
         stroke_width: ticks_look.line_width,
         dashes: ticks_look.dashes,
         color: List.duplicate(ticks_look.color, length(breaks)),
-        opacity: List.duplicate(1.0, length(breaks)),
+        opacity: List.duplicate(ticks_look.opacity, length(breaks)),
         line_end: ticks_look.line_end,
         line_join: :round,
         mitre_limit: 10.0

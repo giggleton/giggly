@@ -121,7 +121,9 @@ defmodule Giggly.Guide.Legend do
       do: [
         %Rect{
           fill: look.fill,
+          fill_opacity: look.fill_opacity,
           color: look.color,
+          color_opacity: look.color_opacity,
           stroke_width: look.line_width,
           dashes: look.dashes
         }

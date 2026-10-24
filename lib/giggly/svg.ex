@@ -78,7 +78,7 @@ defmodule Giggly.SVG do
       " ",
       number(height),
       "' stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'>\n",
-      Enum.map(cells, fn cell -> cell(cell, column_spans, row_spans) end),
+      cells(cells, column_spans, row_spans),
       "</svg>\n"
     ]
   end
@@ -151,40 +151,66 @@ defmodule Giggly.SVG do
   defp length({:points, length}, _share), do: length
   defp length({:rest, weight}, share), do: share.(weight)
 
+  # The cells in order, each clipped one's primitives in a group cut off at its box, as svglite
+  # writes a clipping viewport: one group for clipped cells in a row that share a box, since
+  # svglite starts a group only where the clipping changes, and each box's clip path defined once,
+  # where it is first used, named by its edges so that two drawings on one page share a name only
+  # when they share the box.
+  defp cells(cells, column_spans, row_spans) do
+    {groups, _defined} =
+      cells
+      |> Enum.map(fn cell -> cell(cell, column_spans, row_spans) end)
+      |> Enum.chunk_by(fn {clip, _drawn} -> clip end)
+      |> Enum.map_reduce(MapSet.new(), fn [{clip, _drawn} | _rest] = chunk, defined ->
+        drawn = Enum.map(chunk, fn {_clip, cell_drawn} -> cell_drawn end)
+        group(drawn, clip, defined)
+      end)
+
+    groups
+  end
+
+  # A cell's primitives, drawn in its box, and the box they are cut off at, by its edges as they
+  # are written, `:off` for none.
   defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
     box = hang({span(column_spans, columns), span(row_spans, rows)}, cell.hang)
     drawn = Enum.map(cell.primitives, fn primitive -> primitive(primitive, box) end)
-    clip(drawn, cell.clip, box)
+
+    case {cell.clip, box} do
+      {:off, _box} ->
+        {:off, drawn}
+
+      {:on, {{left, width}, {top, height}}} ->
+        edges =
+          Enum.join([number(left), number(left + width), number(top), number(top + height)], "|")
+
+        {{edges, box}, drawn}
+    end
   end
 
-  # A clipped cell's primitives are drawn in a group cut off at the cell's box, as svglite writes a
-  # clipping viewport: the box's clip path, named by its edges so that two drawings on one page
-  # share a name only when they share the box, then the group.
-  defp clip(drawn, :off, _box), do: drawn
+  defp group(drawn, :off, defined), do: {drawn, defined}
 
-  defp clip(drawn, :on, {{left, width}, {top, height}}) do
-    edges =
-      Enum.join([number(left), number(left + width), number(top), number(top + height)], "|")
-
+  defp group(drawn, {edges, {{left, width}, {top, height}}}, defined) do
     id = ["cp", Base.encode64(edges)]
 
-    [
-      "<defs>\n  <clipPath id='",
-      id,
-      "'>\n    <rect x='",
-      number(left),
-      "' y='",
-      number(top),
-      "' width='",
-      number(width),
-      "' height='",
-      number(height),
-      "' />\n  </clipPath>\n</defs>\n<g clip-path='url(#",
-      id,
-      ")'>\n",
-      drawn,
-      "</g>\n"
-    ]
+    definition =
+      if MapSet.member?(defined, edges),
+        do: [],
+        else: [
+          "<defs>\n  <clipPath id='",
+          id,
+          "'>\n    <rect x='",
+          number(left),
+          "' y='",
+          number(top),
+          "' width='",
+          number(width),
+          "' height='",
+          number(height),
+          "' />\n  </clipPath>\n</defs>\n"
+        ]
+
+    {[definition, "<g clip-path='url(#", id, ")'>\n", drawn, "</g>\n"],
+     MapSet.put(defined, edges)}
   end
 
   # A hanging cell's box: from its rows' top as tall as it says, or as wide as it says ending at its
@@ -219,7 +245,7 @@ defmodule Giggly.SVG do
   defp primitive(%Scene{keep_proportions: false} = scene, {{left, width}, {top, height}}) do
     column_spans = centred_spans(scene.widths, width, left)
     row_spans = centred_spans(scene.heights, height, top)
-    Enum.map(scene.cells, fn cell -> cell(cell, column_spans, row_spans) end)
+    cells(scene.cells, column_spans, row_spans)
   end
 
   # Each circle at its own radius, its outline its colour at its opacity and its fill likewise, as
@@ -255,7 +281,9 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # A rectangle fills its cell, its dashes after its stroke, as svglite writes a rectangle.
+  # A rectangle fills its cell, its border and its fill each its colour at its opacity, its dashes
+  # after its stroke, as svglite writes a rectangle. A fill of `:none`, or one with no opacity, is
+  # SVG's `none`, which svglite leaves out and its stylesheet makes `none`.
   defp primitive(%Rect{} = rect, {{left, width}, {top, height}}) do
     [
       "<rect x='",
@@ -268,13 +296,11 @@ defmodule Giggly.SVG do
       number(height),
       "' style='stroke-width: ",
       significant(rect.stroke_width),
-      "; stroke: ",
-      paint(rect.color),
       ";",
+      stroke_style(rect.color, rect.color_opacity),
       dash_style(rect.dashes),
-      " fill: ",
-      paint(rect.fill),
-      ";' />\n"
+      fill_style(rect.fill, rect.fill_opacity),
+      "' />\n"
     ]
   end
 
@@ -763,11 +789,6 @@ defmodule Giggly.SVG do
     do: [" stroke-linejoin: miter; stroke-miterlimit: ", number(mitre_limit), ";"]
 
   defp line_join_style(:mitre, _mitre_limit), do: " stroke-linejoin: miter;"
-
-  # A border or a fill of `:none` is SVG's `none`: svglite writes a border whose colour is R's `NA`
-  # so, and leaves out such a fill, which its stylesheet then makes `none`.
-  defp paint(:none), do: "none"
-  defp paint(color), do: color
 
   # svglite writes a text's fill only when it is not black, SVG's default.
   # The characters svglite escapes in text.

@@ -82,8 +82,8 @@ panel's grid lines are placed by the coordinate system".
   axis of no depth's are drawn there too; round a radial panel, through the circle's points in
   the panel's cell. A panel draws the lines of the axes it draws, as their ticks.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
-  ticks' and lines' colour, width, end, dashes and length, the labels' and titles' size, colour
-  and margin, **each
+  ticks' and lines' colour, opacity, width, end, dashes and length, the labels' and titles' size,
+  colour, opacity and margin, the backgrounds' fill and border each at its opacity, **each
   axis's from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`,
   a radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
   axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick

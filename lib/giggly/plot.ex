@@ -111,11 +111,14 @@ defmodule Giggly.Plot do
 
   ## Theme
 
-  Everything but the marks is drawn in ggplot2's default theme, a grey panel with white grid lines.
-  `theme/2` changes any element of it by name, each inheriting what it leaves unset from its parent
-  in ggplot2's tree, so setting `text: [size: 14]` makes every label bigger, and
-  `axis_text_x: [color: "red"]` reddens only the x axis's labels. An element set to `:none` is
-  removed, with everything that inherits from it, and `legend_position: :none` draws no legends.
+  Everything but the marks is drawn in ggplot2's default theme, a grey panel with white grid lines,
+  unless a complete theme replaces it: `theme_bw/2`, `theme_linedraw/2`, `theme_light/2`,
+  `theme_dark/2`, `theme_minimal/2`, `theme_classic/2` or `theme_void/2`, or `theme_gray/2`, the
+  default, each at a base size of its own. `theme/2` changes any element of it by name, each
+  inheriting what it leaves unset from its parent in ggplot2's tree, so setting
+  `text: [size: 14]` makes every label bigger, and `axis_text_x: [color: "red"]` reddens only the
+  x axis's labels. An element set to `:none` is removed, with everything that inherits from it,
+  and `legend_position: :none` draws no legends.
   """
 
   # A plot is a description: it may use the aesthetic vocabulary, the data frame, the kinds of
@@ -207,10 +210,21 @@ defmodule Giggly.Plot do
   @type guides :: %{optional(aesthetic()) => guide()}
 
   @typedoc """
-  The look everything but the marks is drawn in: the complete theme, by name, and the settings
-  `theme/2` has laid over it, by element.
+  The look everything but the marks is drawn in: the complete theme a `theme_*` function chose,
+  by name with its base sizes, or `:none` for none, which draws the plot in `theme_gray/2`'s at
+  its default sizes, and the settings `theme/2` has laid over it, by element.
   """
-  @type theme :: %{complete: :gray, settings: %{optional(atom()) => term()}}
+  @type theme :: %{
+          complete:
+            %{
+              name: :gray | :bw | :linedraw | :light | :dark | :minimal | :classic | :void,
+              base_size: float(),
+              base_line_size: float(),
+              base_rect_size: float()
+            }
+            | :none,
+          settings: %{optional(atom()) => term()}
+        }
 
   @typedoc """
   The labels `labs/2` sets, by what each titles: an aesthetic's guide, or the plot's `:title`,
@@ -2056,7 +2070,7 @@ defmodule Giggly.Plot do
   # text's properties, a length, or a margin.
   @theme_color [
     type: {:custom, __MODULE__, :validate_theme_color, []},
-    doc: "Its colour, an opaque CSS colour (`colour:` too)."
+    doc: "Its colour, a CSS colour, which may have an alpha of its own (`colour:` too)."
   ]
   @theme_linewidth [
     type: {:custom, __MODULE__, :validate_theme_linewidth, []},
@@ -2086,12 +2100,13 @@ defmodule Giggly.Plot do
       keys: [
         fill: [
           type: {:custom, __MODULE__, :validate_theme_rect_color, []},
-          doc: "Its fill, an opaque CSS colour, or `:none` for none."
+          doc: "Its fill, a CSS colour, which may have an alpha of its own, or `:none` for none."
         ],
         color: [
           type: {:custom, __MODULE__, :validate_theme_rect_color, []},
           doc:
-            "Its border's colour, an opaque CSS colour, or `:none` for no border (`colour:` too)."
+            "Its border's colour, a CSS colour, which may have an alpha of its own, or `:none` " <>
+              "for no border (`colour:` too)."
         ],
         linewidth: @theme_linewidth,
         linetype: @theme_linetype
@@ -2143,6 +2158,46 @@ defmodule Giggly.Plot do
                    end
                  )
 
+  # The options of the functions choosing a complete theme: its base sizes, each one the theme
+  # works out its own default for where it is not given.
+  @complete_theme_options NimbleOptions.new!(
+                            base_size: [
+                              type: {:custom, __MODULE__, :validate_base_size, []},
+                              doc:
+                                "How big its text is, in points, 0 or more: every text's size " <>
+                                  "is a share of it, and the space between parts of the plot " <>
+                                  "half of it. 11 unless given."
+                            ],
+                            base_line_size: [
+                              type: {:custom, __MODULE__, :validate_linewidth, []},
+                              doc:
+                                "How wide its lines are, in millimetres, 0 or more. " <>
+                                  "`base_size / 22` unless given."
+                            ],
+                            base_rect_size: [
+                              type: {:custom, __MODULE__, :validate_linewidth, []},
+                              doc:
+                                "How wide its rectangles' borders are, in millimetres, 0 or " <>
+                                  "more. `base_size / 22` unless given."
+                            ]
+                          )
+
+  # What every function choosing a complete theme does to the plot's theme and the settings laid
+  # over it, for each one's documentation.
+  @complete_theme_doc """
+  It replaces the plot's theme whole, dropping the settings `theme/2` laid over the one before.
+  Each later `theme/2` call is laid over it in turn: its properties replace only those they give,
+  and an element set after a removal of the same element replaces the complete theme's element
+  whole, inheriting what it leaves unset from its parent.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not know or a size it cannot use,
+  and `ArgumentError` for an option given twice.
+
+  ## Options
+
+  #{NimbleOptions.docs(@complete_theme_options)}
+  """
+
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   # An end of a date scale's limits: a date, or `nil` for one the data decides.
@@ -2174,7 +2229,7 @@ defmodule Giggly.Plot do
       coord: %Coord.Cartesian{},
       scales: %{},
       guides: %{},
-      theme: %{complete: :gray, settings: %{}},
+      theme: %{complete: :none, settings: %{}},
       labels: %{},
       reversed_layers: []
     }
@@ -4705,7 +4760,14 @@ defmodule Giggly.Plot do
   a rectangle or a text is a keyword list of the properties it sets; a size or a line width may be
   `{:rel, share}`, a share of its parent's. A setting replaces only the properties it gives, so
   `theme(axis_text: [color: "red"])` keeps the labels' size, and a later call's properties replace
-  an earlier one's.
+  an earlier one's. A colour may have an alpha of its own (`"#FF000080"`, `"transparent"`), drawn
+  at that opacity.
+
+  The settings are laid over the plot's complete theme, the default unless `theme_gray/2`,
+  `theme_bw/2` or another chose one. After a chosen theme each call is laid over it in turn, so
+  an element set after a call removed it replaces the theme's element whole, inheriting what it
+  leaves unset from its parent; a plot that chose none merges its calls first and lays them over
+  the default at once, so there the element keeps the default's own properties.
 
   A line's `linetype:` and `lineend:` and a rectangle's `linetype:`, its border's, take what a
   layer's take: a line of the blank line type draws nothing but keeps its room, as an axis's
@@ -4803,7 +4865,182 @@ defmodule Giggly.Plot do
       end)
       |> Map.merge(Map.new(removals))
 
-    %{plot | theme: %{theme | settings: Theme.merge(theme.settings, validated)}}
+    %{plot | theme: Theme.merge(theme, validated)}
+  end
+
+  @doc """
+  Draws everything but the marks in the default theme, at the base sizes given: a grey panel
+  with white grid lines, the minor ones half as wide, dark grey ticks, grey tick labels, and
+  light grey strips.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_gray(base_size: 16)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #EBEBEB", svg =~ "font-size: 12.80px"}
+      {true, true}
+  """
+  @spec theme_gray(t(), keyword()) :: t()
+  def theme_gray(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :gray, options)
+
+  @doc """
+  Draws everything but the marks dark on light: a white panel bordered in dark grey, with light
+  grey grid lines, and light grey strips bordered as the panel is.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_bw()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #EBEBEB", svg =~ "stroke: #333333; fill: none;"}
+      {false, true}
+  """
+  @spec theme_bw(t(), keyword()) :: t()
+  def theme_bw(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :bw, options)
+
+  @doc """
+  Draws everything but the marks in black lines of various widths on white: a white panel
+  bordered in black, black grid lines a tenth of a line wide, the minor ones a twentieth, black
+  ticks and tick labels, and black strips with white labels.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_linedraw()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #4D4D4D", svg =~ "stroke-width: 0.11; stroke: #000000;"}
+      {false, true}
+  """
+  @spec theme_linedraw(t(), keyword()) :: t()
+  def theme_linedraw(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :linedraw, options)
+
+  @doc """
+  Draws everything but the marks in light grey lines on white: a white panel bordered in light
+  grey, lighter grey grid lines half as wide as a line, the minor ones a quarter, light grey
+  ticks, and light grey strips with white labels.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_light()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "stroke: #B3B3B3; fill: none;", svg =~ "stroke: #DEDEDE"}
+      {true, true}
+  """
+  @spec theme_light(t(), keyword()) :: t()
+  def theme_light(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :light, options)
+
+  @doc """
+  Draws everything but the marks on a dark panel: a mid-grey panel, and legend keys, with darker
+  grid lines half as wide as a line, the minor ones a quarter, thin dark grey ticks, and
+  near-black strips with near-white labels.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_dark()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "fill: #7F7F7F", svg =~ "stroke: #6B6B6B"}
+      {true, true}
+  """
+  @spec theme_dark(t(), keyword()) :: t()
+  def theme_dark(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :dark, options)
+
+  @doc """
+  Draws nothing behind the marks but their grid lines: no panel background, border or ticks, the
+  tick labels further from the panel in their stead, no background to the strips, the legends or
+  their keys, and a white plot background with no border.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_minimal()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "stroke: #EBEBEB", svg =~ "fill: #EBEBEB", svg =~ "stroke: #333333"}
+      {true, false, false}
+  """
+  @spec theme_minimal(t(), keyword()) :: t()
+  def theme_minimal(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :minimal, options)
+
+  @doc """
+  Draws the axes as lines, with no grid: black axis lines with square ends, black ticks and tick
+  labels, no border round the panel, and white strips bordered in black.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_classic()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "stroke-linecap: square", svg =~ "stroke: #FFFFFF; stroke-linecap: butt"}
+      {true, false}
+  """
+  @spec theme_classic(t(), keyword()) :: t()
+  def theme_classic(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :classic, options)
+
+  @doc """
+  Draws nothing but the marks, the legends, the strips' labels and the plot's titles: no axes,
+  grid lines or backgrounds, on a transparent plot with no margin round it. With no lines and no
+  borders to draw, only its base size changes what it draws.
+
+  #{@complete_theme_doc}
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme_void()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> length(Regex.scan(~r/<text|<polyline/, svg))
+      0
+  """
+  @spec theme_void(t(), keyword()) :: t()
+  def theme_void(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: complete_theme(plot, :void, options)
+
+  defp complete_theme(plot, name, options) do
+    sizes =
+      options
+      |> Aesthetics.canonicalize()
+      |> NimbleOptions.validate!(@complete_theme_options)
+
+    %{plot | theme: Theme.choose(name, sizes)}
   end
 
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
@@ -4914,26 +5151,17 @@ defmodule Giggly.Plot do
     end
   end
 
-  # NimbleOptions' check of a theme element's colour: an opaque CSS colour, kept in its one
-  # spelling, uppercase hex.
+  # NimbleOptions' check of a theme element's colour: a CSS colour, with an alpha of its own too,
+  # kept in its one spelling, uppercase hex; never `:none`, which no line or text takes yet.
   @doc false
   @spec validate_theme_color(term()) :: {:ok, String.t()} | {:error, String.t()}
-  def validate_theme_color(color) do
-    case validate_color(color) do
-      {:ok, <<"#", _digits::binary-size(6)>> = opaque} ->
-        {:ok, opaque}
+  def validate_theme_color(:none),
+    do: {:error, "expected a CSS colour, got: :none (an element itself may be :none, removed)"}
 
-      {:ok, _not_opaque} ->
-        {:error,
-         "expected an opaque CSS colour, one with no alpha of its own, got: #{inspect(color)}"}
+  def validate_theme_color(color), do: validate_color(color)
 
-      {:error, _message} = error ->
-        error
-    end
-  end
-
-  # NimbleOptions' check of a theme rectangle's fill or border colour: an opaque CSS colour, or
-  # `:none` for none.
+  # NimbleOptions' check of a theme rectangle's fill or border colour: a CSS colour, with an alpha
+  # of its own too, or `:none` for none.
   @doc false
   @spec validate_theme_rect_color(term()) :: {:ok, String.t() | :none} | {:error, String.t()}
   def validate_theme_rect_color(:none), do: {:ok, :none}
@@ -4951,6 +5179,14 @@ defmodule Giggly.Plot do
   @doc false
   @spec validate_theme_size(term()) :: {:ok, number() | {:rel, number()}} | {:error, String.t()}
   def validate_theme_size(size), do: theme_amount(size, "a size in points")
+
+  # NimbleOptions' check of a complete theme's `base_size:`: points, 0 or more, kept as a float.
+  @doc false
+  @spec validate_base_size(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_base_size(size) when is_number(size) and size >= 0, do: {:ok, size / 1}
+
+  def validate_base_size(size),
+    do: {:error, "expected a size in points, 0 or more, got: #{inspect(size)}"}
 
   defp theme_amount(amount, _what) when is_number(amount) and amount >= 0, do: {:ok, amount}
 

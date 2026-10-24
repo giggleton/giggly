@@ -42,8 +42,8 @@ defmodule Giggly.Guide.Axis do
   alias Giggly.Guide.Parts
   alias Giggly.Scene.{Polylines, Text}
 
-  # Ticks and the axis's line are opaque, their ends and dashes as the theme says and their
-  # corners round, as `theme_gray()`'s `line` element draws every line.
+  # Ticks and the axis's line are drawn at their colour's opacity, their ends and dashes as the
+  # theme says and their corners round, as `theme_gray()`'s `line` element draws every line.
 
   # The axis drawn on each side of the panel that `panel_params` describes under `coord`, by side,
   # in the look the coordinate system names and `theme`'s. An axis with no breaks draws only its
@@ -144,7 +144,7 @@ defmodule Giggly.Guide.Axis do
       size: text_look.size,
       family: "",
       color: List.duplicate(text_look.color, length(places)),
-      opacity: List.duplicate(1.0, length(places)),
+      opacity: List.duplicate(text_look.opacity, length(places)),
       angle: 0,
       hjust: List.duplicate(0.5, length(places)),
       offset: List.duplicate({0.0, -Font.ascent(text_look.size)}, length(places)),
@@ -222,7 +222,7 @@ defmodule Giggly.Guide.Axis do
       size: text_look.size,
       family: "",
       color: List.duplicate(text_look.color, length(places)),
-      opacity: List.duplicate(1.0, length(places)),
+      opacity: List.duplicate(text_look.opacity, length(places)),
       angle: 0,
       hjust: List.duplicate(hjust, length(places)),
       offset: List.duplicate({0.0, -Font.ascent(text_look.size) / 2}, length(places)),
@@ -253,7 +253,7 @@ defmodule Giggly.Guide.Axis do
         stroke_width: look.line_width,
         dashes: look.dashes,
         color: [look.color],
-        opacity: [1.0],
+        opacity: [look.opacity],
         line_end: look.line_end,
         line_join: :round,
         mitre_limit: 10.0
@@ -277,7 +277,7 @@ defmodule Giggly.Guide.Axis do
         stroke_width: ticks.line_width,
         dashes: ticks.dashes,
         color: List.duplicate(ticks.color, length(places)),
-        opacity: List.duplicate(1.0, length(places)),
+        opacity: List.duplicate(ticks.opacity, length(places)),
         line_end: ticks.line_end,
         line_join: :round,
         mitre_limit: 10.0
@@ -299,7 +299,7 @@ defmodule Giggly.Guide.Axis do
         stroke_width: ticks.line_width,
         dashes: ticks.dashes,
         color: List.duplicate(ticks.color, length(places)),
-        opacity: List.duplicate(1.0, length(places)),
+        opacity: List.duplicate(ticks.opacity, length(places)),
         line_end: ticks.line_end,
         line_join: :round,
         mitre_limit: 10.0

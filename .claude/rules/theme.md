@@ -15,13 +15,17 @@ beginning "A theme is set element by element"; the increment's steps and what wa
 beginning "The theme is Phase 3's eleventh increment"; what a removal takes and what it leaves:
 the entry beginning "An element set to `:none` is removed"; why the border's fill is taken and
 unused, and where the dashes and the axes' lines are worked out: the entry beginning "The panel's
-border is never filled".
+border is never filled"; how a plot chooses a complete theme, what it records, and why settings
+are laid over one in turn: the entry beginning "A plot chooses a complete theme".
 
 ## Rules
 
-- **A plot records its theme as the complete theme's name and the settings laid over it**
-  (`%{complete: :gray, settings: %{}}` until `theme/2` sets one), and this namespace resolves it
-  with `complete/1` into a `%Giggly.Theme{}` when the plot is drawn, as ggplot2's `plot_theme()`
+- **A plot records its theme as the complete theme it chose and the settings laid over it**:
+  `%{complete: :none, settings: %{}}` until a complete theme is chosen, which `choose/2` records
+  as `%{name:, base_size:, base_line_size:, base_rect_size:}`, the widths `base_size / 22` unless
+  given, with no settings, as ggplot2 drops a plot's earlier settings with the theme it replaces;
+  `:none` draws in `theme_gray()` at its default sizes. This namespace resolves it with
+  `complete/1` into a `%Giggly.Theme{}` when the plot is drawn, as ggplot2's `plot_theme()`
   completes a plot's theme at build time.
 - **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
   element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
@@ -39,12 +43,17 @@ border is never filled".
   parent's unit; a text's margin is replaced whole, its sides never inherited one by one.
   **`merge/2` is ggplot2's `add_theme()`**: a line's, a rectangle's or a text's properties
   replace only the properties given, a length or a margin replaces the one before, and so do a
-  removal and an element given after one.
+  removal and an element given after one. **Under a chosen complete theme, an element given after
+  a removal of it is `{:replace, element}`**, which `complete/1` puts in place of the theme's
+  element instead of merging into it, and properties given later merge into it, as ggplot2 lays
+  each setting over an added complete theme in turn; a plot that chose none merges its settings
+  first and lays them over `theme_gray()` as one, so there the element merges into the theme's.
 - **A line, a rectangle or a text set to `:none` is removed and works out as `:none`**, as
   `calc_element()` works a blank out: a complete theme's elements take a removed parent's removal;
   an element a setting gives, which `complete/1` marks `inherit_blank: false`, skips every removed
-  element above it. A root's unset property is `theme_gray()`'s, as ggplot2 fills a root from its
-  default theme; under a removed root passed over, a property nothing gives is grid's default
+  element above it. A root's unset property is `theme_gray()`'s at its default sizes whatever the
+  complete theme, as ggplot2 fills a root from its default theme, which a root a setting replaces
+  whole shows; under a removed root passed over, a property nothing gives is grid's default
   (the `@grid_` attributes), a share of a parent that gives none is nothing, one with no parent
   at all the share itself, and one inherited from a parent still a share is taken of it again.
   A length or a margin is never removed.
@@ -56,21 +65,31 @@ border is never filled".
   removed; and a colour bar's ticks are `guide_colourbar()`'s white 0.5 / .pt mm only where the
   settings leave `legend_ticks` unset (`replace_null()`), so a colour given every line never
   reaches them, made as a setting is, so they skip a removed `line`.
-- **A complete theme is a function in `Giggly.Theme` that builds its tree of partial elements**,
-  as ggplot2's are functions (`theme_gray()`), never a module implementing a behaviour: themes
-  differ only in their values, where facets and coordinate systems differ in what they do. A theme
-  derived from another, as `theme_bw()` is from `theme_grey()`, builds on that function's elements
-  by replacing some.
+- **A complete theme is a function in `Giggly.Theme` that builds its tree of partial elements
+  from its base sizes**, as ggplot2's are functions (`theme_gray()`), never a module implementing
+  a behaviour: themes differ only in their values, where facets and coordinate systems differ in
+  what they do. A theme derived from another builds on that function's elements by replacing some
+  whole, ggplot2's `%+replace%`, so what it leaves unset is inherited, never the base theme's:
+  `bw/1`, `light/1` and `dark/1` from `gray/1`, `linedraw/1`, `minimal/1` and `classic/1` from
+  `bw/1`; `void/1` is a tree of its own. Their colours are `col_mix()` of black ink and white
+  paper as ggplot2 rounds it, constants named by their share, and `theme_void()`'s paper is ink
+  with no alpha.
+- **The base sizes reach every element as ggplot2's do**: `base_size` every text's size and,
+  through `half_line`, every spacing and margin and so the ticks' length; `base_line_size` every
+  line's width, `base_rect_size` every border's; a legend's keys stay 1.2 of grid's lines, and
+  `theme_void()` takes neither width, its borders 0 wide.
 - **The complete theme holds every element already worked out, in the scene's units:** lengths,
-  margins and line widths in points (1/72 inch), colours as hex strings, every margin a map of its
-  four sides. **A length is held as `{amount, unit}` until worked out, and converted in grid's
-  order of operations** (TeX's points over 72.27, centimetres over 2.54, millimetres over 10 and
-  then 2.54, lines of text as a 12-point font at a line height of 1.2 over 72; then times 72), and
-  a line width from millimetres as R's engine hands it to svglite (`linewidth * .pt / 96 * 72`),
-  so a resolved value is R's to the last bit; nothing that reads the theme converts anything.
+  margins and line widths in points (1/72 inch), each colour an `#RRGGBB` beside its opacity (a
+  rectangle's `fill_opacity` and `color_opacity`, a line's or a text's `opacity`), its alpha over
+  255, 0 for `:none`, every margin a map of its four sides. **A length is held as `{amount, unit}`
+  until worked out, and converted in grid's order of operations** (TeX's points over 72.27,
+  centimetres over 2.54, millimetres over 10 and then 2.54, lines of text as a 12-point font at a
+  line height of 1.2 over 72; then times 72), and a line width from millimetres as R's engine hands
+  it to svglite (`linewidth * .pt / 96 * 72`), so a resolved value is R's to the last bit; nothing
+  that reads the theme converts anything.
 - **A theme is values and calls nothing.** Its boundary lists nothing; `Plot` lists it to build
-  `theme/2`'s schema and merge settings, rendering and the guide to read the complete theme. It
-  knows no scene primitive: the drawing builds primitives from its elements.
+  `theme/2`'s schema, choose a complete theme and merge settings, rendering and the guide to read
+  the complete theme. It knows no scene primitive: the drawing builds primitives from its elements.
 - **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, and
   whether the panel is drawn over its layers; alignment and angle stay with the drawing** (the y
   title turned 90 degrees, labels hung from their ticks) until a theme can set them; so do text
@@ -85,14 +104,16 @@ border is never filled".
   layers** (`axis_line` and `panel_border` `:none`, `panel_ontop: false`), so they are drawn only
   where a setting gives them, inheriting from `line` and `rect` past the removal.
 - **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): the other complete themes and accepting their arguments; where else the legends
-  go; text's face, angle and alignment. A theme colour is opaque, a rectangle's fill and border
-  `:none` too, until a theme needs transparency (`theme_void()`'s paper).
-- **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
-  fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
-  assembly, arrive with a default a theme can change, which neither a set nor a mapped colour
-  needed. **Nor are the palettes:** ggplot2 4's `set_palettes()` takes a scale's palette from the
-  theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
+  increment"): the layers' defaults from the theme; where else the legends go; text's face, angle
+  and alignment. A complete theme's `ink`, `paper`, `accent` and fonts, and `theme_test()`, wait
+  beyond the increment.
+- **The marks' look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
+  fills each layer's default aesthetics as columns, so its base sizes reach a point's size and
+  stroke, a text's size and a line's and a border's width, and `theme_void()`'s paper a bar's fill
+  and a box's; that stage, and the theme resolved in the assembly, are the theme's next step, so
+  until it lands the marks keep `theme_gray()`'s defaults at any base size. **Nor are the
+  palettes:** ggplot2 4's `set_palettes()` takes a scale's palette from the theme, and
+  `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
 - **A title's look carries its line spacing** (`Theme.title()`: `line_spacing`, the points from
   one line's baseline to the next's, 0.9 x 1.2 times its size, ggplot2's `lineheight` as R's
   graphics engine reads it), since only titles break over lines: the axes' and the legends'

@@ -35,10 +35,11 @@ ggplot2's facets' order".
   proportions and fills the drawing one way alone, its cell kept, empty, where the theme removes
   it, as svglite writes the clip; every other cell is not.
 - **Rendering resolves the plot's theme, once, and hands the complete theme on.** The assembly
-  carries the plot's theme, its complete theme's name and its settings; `Theme.complete/1` turns
-  it into the elements, which the guide and
-  rendering itself read. A geom is handed no theme: the point keeps its own look until default
-  aesthetics are filled from the theme in the assembly.
+  carries the plot's theme, the complete theme it chose (by name with its base sizes, or `:none`)
+  and its settings; `Theme.complete/1` turns it into the elements, which the guide and rendering
+  itself read, each colour beside its opacity, which every primitive drawn from the theme carries.
+  A geom is handed no theme: the marks keep their own look, whatever the base sizes, until default
+  aesthetics are filled from the theme in the assembly (the theme's next step).
 - **Rendering arranges the panels as the layout table says, knowing no facet.** Each layout row
   gives a panel's row and column, whether it draws its bottom and left axes, and its strip labels;
   a facet says where things go, and rendering lays them out as ggplot2's facets lay them out. An

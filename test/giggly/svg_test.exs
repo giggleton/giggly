@@ -64,6 +64,51 @@ defmodule Giggly.SVGTest do
     end
   end
 
+  # As svglite writes theme_void()'s bars, whose panel's clipping is the whole drawing's, as the
+  # plot's background's is: one group, its clip path written once; a clipping it returns to after
+  # another is named again but not defined again.
+  describe "draw/3, clipping cells" do
+    test "clipped cells in a row sharing a box are one group, each box's clip path defined once" do
+      rect = %Rect{
+        fill: "#EBEBEB",
+        fill_opacity: 1.0,
+        color: :none,
+        color_opacity: 0.0,
+        stroke_width: 0.75,
+        dashes: :none
+      }
+
+      cells =
+        for clip <- [:on, :on, :off, :on] do
+          %Cell{rows: 1..1, columns: 1..1, clip: clip, hang: :none, primitives: [rect]}
+        end
+
+      drawn =
+        draw(%Scene{
+          widths: [{:rest, 1}],
+          heights: [{:rest, 1}],
+          keep_proportions: false,
+          cells: cells
+        })
+
+      assert ~r/<clipPath|<g clip-path|<\/g>|<rect x[^>]*style/
+             |> Regex.scan(drawn)
+             |> List.flatten()
+             |> Enum.map(fn tag -> String.slice(tag, 0, 7) end) ===
+               [
+                 "<clipPa",
+                 "<g clip",
+                 "<rect x",
+                 "<rect x",
+                 "</g>",
+                 "<rect x",
+                 "<g clip",
+                 "<rect x",
+                 "</g>"
+               ]
+    end
+  end
+
   describe "draw/3, writing primitives" do
     test "text is anchored at the start, middle or end nearest its hjust, and moved the rest of its width" do
       text = fn x_place, hjust, angle ->
@@ -787,8 +832,22 @@ defmodule Giggly.SVGTest do
     # on a border of no colour too, and no fill, which svglite leaves to its stylesheet, `none`.
     test "a rectangle filling its cell writes its dashes after its stroke, and no fill as none" do
       rects = [
-        %Rect{fill: "#EBEBEB", color: :none, stroke_width: 1.07, dashes: [1.4226, 4.2679]},
-        %Rect{fill: :none, color: "#0000FF", stroke_width: 1.07, dashes: :none}
+        %Rect{
+          fill: "#EBEBEB",
+          fill_opacity: 1.0,
+          color: :none,
+          color_opacity: 0.0,
+          stroke_width: 1.07,
+          dashes: [1.4226, 4.2679]
+        },
+        %Rect{
+          fill: :none,
+          fill_opacity: 0.0,
+          color: "#0000FF",
+          color_opacity: 1.0,
+          stroke_width: 1.07,
+          dashes: :none
+        }
       ]
 
       assert Regex.scan(~r/<rect x[^>]*?style='([^']*)'/, draw(whole(rects)),
@@ -796,6 +855,39 @@ defmodule Giggly.SVGTest do
              ) === [
                ["stroke-width: 1.07; stroke: none; stroke-dasharray: 1.42,4.27; fill: #EBEBEB;"],
                ["stroke-width: 1.07; stroke: #0000FF; fill: none;"]
+             ]
+    end
+
+    # As svglite writes a panel's background filled half-transparent red and bordered blue at a
+    # quarter, and theme_void()'s background, filled with a colour of no opacity and no border.
+    test "a rectangle filling its cell writes its border and fill each at its opacity" do
+      rects = [
+        %Rect{
+          fill: "#FF0000",
+          fill_opacity: 128 / 255,
+          color: "#0000FF",
+          color_opacity: 64 / 255,
+          stroke_width: 4.27,
+          dashes: :none
+        },
+        %Rect{
+          fill: "#000000",
+          fill_opacity: 0.0,
+          color: :none,
+          color_opacity: 0.0,
+          stroke_width: 0.0,
+          dashes: :none
+        }
+      ]
+
+      assert Regex.scan(~r/<rect x[^>]*?style='([^']*)'/, draw(whole(rects)),
+               capture: :all_but_first
+             ) === [
+               [
+                 "stroke-width: 4.27; stroke: #0000FF; stroke-opacity: 0.25; fill: #FF0000; " <>
+                   "fill-opacity: 0.50;"
+               ],
+               ["stroke-width: 0.00; stroke: none; fill: none;"]
              ]
     end
 
@@ -1037,7 +1129,16 @@ defmodule Giggly.SVGTest do
           columns: column..column,
           clip: :off,
           hang: :none,
-          primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75, dashes: :none}]
+          primitives: [
+            %Rect{
+              fill: "#EBEBEB",
+              fill_opacity: 1.0,
+              color: :none,
+              color_opacity: 0.0,
+              stroke_width: 0.75,
+              dashes: :none
+            }
+          ]
         }
       end
 
@@ -1150,14 +1251,32 @@ defmodule Giggly.SVGTest do
             columns: 1..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75, dashes: :none}]
+            primitives: [
+              %Rect{
+                fill: "#EBEBEB",
+                fill_opacity: 1.0,
+                color: :none,
+                color_opacity: 0.0,
+                stroke_width: 0.75,
+                dashes: :none
+              }
+            ]
           },
           %Cell{
             rows: 1..1,
             columns: 2..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75, dashes: :none}]
+            primitives: [
+              %Rect{
+                fill: "#FFFFFF",
+                fill_opacity: 1.0,
+                color: :none,
+                color_opacity: 0.0,
+                stroke_width: 0.75,
+                dashes: :none
+              }
+            ]
           }
         ]
       }
@@ -1186,7 +1305,16 @@ defmodule Giggly.SVGTest do
             columns: 2..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75, dashes: :none}]
+            primitives: [
+              %Rect{
+                fill: "#FFFFFF",
+                fill_opacity: 1.0,
+                color: :none,
+                color_opacity: 0.0,
+                stroke_width: 0.75,
+                dashes: :none
+              }
+            ]
           }
         ]
       }

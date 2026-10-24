@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A plot chooses a complete theme with `theme_gray/2`, `theme_bw/2` and the rest, each taking
+  `base_size:`, `base_line_size:` and `base_rect_size:`, and records it by name with its sizes, or
+  `complete: :none` for none (2026-10-23, Steve, agreeing the proposal; checked in R).** R's `+
+  theme_bw()` replaces the plot's theme, so the function drops earlier settings. R lays each later
+  `theme()` over an added complete theme in turn, but merges a plot's own settings first when none
+  was added; the two differ only where an element is set after its removal, which a chosen theme
+  records as `{:replace, element}`, what `%+replace%` would record. The widths default to
+  `base_size / 22` at the call, so the plot holds what was resolved. Theme colours take an alpha,
+  worked out as an opacity beside each `#RRGGBB`. In R the base sizes and `theme_void()`'s paper
+  also reach the layers' defaults (`element_geom`); Steve chose that as the next step. *Rejected:
+  `complete: :gray` with a flag* — `:none` says it. *Rejected: recording each call to fold when
+  drawn* — the marker is the only difference. *Rejected: copying the tree into the plot* — loses
+  the name. *Rejected: `theme(complete: :bw)`* — ggplot2's are functions.
+
 - **The panel's border is never filled, though `theme/2` takes its `fill:`, and an axis's line
   comes from the coordinate system with its breaks (2026-10-23, Steve choosing to take the fill;
   checked in R).** ggplot2 draws `panel.border` with `fill = NA` and takes a fill without a
@@ -92,20 +106,21 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   one home for the dash rule* — `Theme` lists nothing, and would list a boundary for five lines.
   *Deferred:* `linejoin`, `arrow`, `guide_axis(cap =)`, a line colour of `:none`.
 
-- **The theme is Phase 3's eleventh increment, in six steps: `theme/2` with inheritance,
-  removal with `:none`, the panel border and axis lines, the complete themes, where the legends
-  go, text's face, angle and alignment (2026-10-23, Steve, agreeing the proposal; checked against
-  ggplot2 4.0.3's source and R).** 25 waiting examples need nothing but the theme, and 20 draw once
-  it lands. The complete themes are `theme_gray()`, `bw`, `linedraw`, `light`, `dark`, `minimal`,
-  `classic` and `void`, each with `base_size`, `base_line_size` and `base_rect_size`, one spelling
-  (`theme_gray`, as `scale_color_gray/2`). An inside legend's placement is written as data on the
-  scene's cell, laid out by the generic table code, never in the SVG writer, so the layout split a
-  second backend needs moves it with the rest. *Rejected: `theme_set()`* — global state, which the
-  pure core forbids; a shared look is the user's own function piped before the plot's settings.
-  *Deferred:* `theme_test()`; `base_family`/`header_family` (one font); `ink`/`paper`/`accent`,
-  which in ggplot2 4 colour the layers too; `%+replace%`; `theme_sub_*()`; `element_geom()` and
-  `palette.*`; `aspect.ratio`; a draw-time theme (`to_svg(plot, theme: ...)`), with colours as CSS
-  variables.
+- **The theme is Phase 3's eleventh increment, in seven steps: `theme/2` with inheritance,
+  removal with `:none`, the panel border and axis lines, the complete themes, the layers' defaults
+  from the theme, where the legends go, text's face, angle and alignment (2026-10-23, Steve,
+  agreeing the proposal, and adding the layers' defaults when step 4 found the base sizes reach
+  them; checked against ggplot2 4.0.3's source and R).** 25 waiting examples need nothing but the
+  theme, and 20 draw once it lands. The complete themes are `theme_gray()`, `bw`, `linedraw`,
+  `light`, `dark`, `minimal`, `classic` and `void`, each with `base_size`, `base_line_size` and
+  `base_rect_size`, one spelling (`theme_gray`, as `scale_color_gray/2`). An inside legend's
+  placement is written as data on the scene's cell, laid out by the generic table code, never in the
+  SVG writer, so the layout split a second backend needs moves it with the rest. *Rejected:
+  `theme_set()`* — global state, which the pure core forbids; a shared look is the user's own
+  function piped before the plot's settings. *Deferred:* `theme_test()`;
+  `base_family`/`header_family` (one font); `ink`/`paper`/`accent`, which in ggplot2 4 colour the
+  layers too; `%+replace%`; `theme_sub_*()`; `palette.*`; `aspect.ratio`; a draw-time theme
+  (`to_svg(plot, theme: ...)`), with colours as CSS variables.
 
 - **A theme is set element by element, by ggplot2's flat names, each element a keyword list
   checked against its kind (2026-10-23, Steve).** `theme(axis_text: [color: "red", size: {:rel,
@@ -115,10 +130,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   margin one length or a keyword list of sides, a side left out 0. R's rules hold exactly: an
   element or property left out inherits, `theme/2` merges into what the plot has (R's `+`), and a
   later complete theme replaces earlier settings. The plot records the complete theme's name and
-  the merged settings; `Giggly.Theme` holds the tree and resolves it when drawn (`calc_element()`),
-  converting units in grid's order, and lists nothing: `Plot` builds its schema from the tree.
-  *Rejected: element constructors (ggity's)* — they check nothing the key does not. *Rejected:
-  nesting by family (`axis: [text: ...]`)* — splits R's flat names at an arbitrary dot.
+  sizes and the merged settings; `Giggly.Theme` holds the tree and resolves it when drawn
+  (`calc_element()`), converting units in grid's order, and lists nothing: `Plot` builds its schema
+  from the tree. *Rejected: element constructors (ggity's)* — they check nothing the key does not.
+  *Rejected: nesting by family (`axis: [text: ...]`)* — splits R's flat names at an arbitrary dot.
   *Rejected: order-independent settings* — the same code would draw unlike R's.
 
 - **An element set to `:none` is removed, as ggplot2's `element_blank()`, and under a removed
@@ -134,10 +149,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   titles and labels, as ggplot2's legend replaces the root with its own text. *Rejected: the
   complete theme's root for such a property* — draws unlike R where `theme_void()`'s users add
   lines back. *Rejected: NimbleOptions' `{:or, ...}` for `:none`* — it reports a mistake inside an
-  element at the element. *Found, for step 4:* R lays settings over a complete theme added
-  explicitly one by one, so a removal then a setting of one element drops the complete theme's
-  properties there (11 points, not 8.8), where a plot with none added merges its settings first,
-  as Giggly does. *Deferred:* `inherit_blank:` as a property.
+  element at the element. *Deferred:* `inherit_blank:` as a property.
 
 - **Ordering, viridis and `log10` by name are Phase 3's tenth increment, in seven steps: levels
   from the mapping, levels from the table, `diamonds`' levels, viridis, `log10`, `reorder()`, the
@@ -1517,9 +1529,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   arguments (`theme_grey(base_size = 11, …)`), and the others are built from one by replacing
   elements (`theme_bw()` is `theme_grey()` `%+replace%` a few), neither of which a callback with
   no arguments can express. The behaviour bought nothing besides: names were resolved by a closed
-  match in `complete/1`, so no one could add a theme by implementing it. `theme_gray()`'s
-  derivation is now the private `gray/0` in `Giggly.Theme`, called by `complete(:gray)`; it
-  becomes public with the first theme a user can choose. *Rejected: keeping the behaviour for
+  match in `complete/1`, so no one could add a theme by implementing it. Each complete theme's
+  derivation is a private function of its base sizes in `Giggly.Theme` (`gray/1`, `bw/1` …),
+  which a user chooses through `Plot.theme_gray/2` and its kin. *Rejected: keeping the behaviour for
   uniformity* — the rule is that a behaviour serves kinds that differ in behaviour, and plain
   functions serve kinds that differ in data.
 
@@ -2388,6 +2400,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Let a plot choose any of ggplot2's eight complete themes at its base sizes, and
+  give theme colours an alpha (theme, step 4); §4: "A plot chooses a complete theme", "The theme
+  is Phase 3's eleventh increment" (amended), "A theme is a function" (amended)
 - 2026-10-23 — Let theme/2 draw the panel border and axis lines, and set line types, ends,
   panel_ontop and fill: :none (theme, step 3); §4: "The panel's border is never filled"
 - 2026-10-23 — Hang an axis's ticks from the panel's edge, so an unlabelled axis of no depth

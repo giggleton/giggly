@@ -5,10 +5,10 @@ defmodule Giggly.Render do
   # ggplot2's rendering stage (`ggplot_gtable()`, in its `plot-render.R`) turns a built plot into a
   # table of grobs. A backend such as `Giggly.SVG` then draws the scene.
   #
-  # The plot's theme, recorded by name, is resolved first into its complete form
-  # (`Giggly.Theme`), which everything drawn here other than the marks takes its look from. Each
-  # layer's rows are split by panel, and each panel is drawn by itself: its background and grid
-  # lines (`Giggly.Guide`), then each layer's rows in it, drawn by the layer's geom
+  # The plot's theme, its complete theme and the settings laid over it, is resolved first into its
+  # complete form (`Giggly.Theme`), which everything drawn here other than the marks takes its look
+  # from. Each layer's rows are split by panel, and each panel is drawn by itself: its background
+  # and grid lines (`Giggly.Guide`), then each layer's rows in it, drawn by the layer's geom
   # (`Giggly.Geom`), in the order the layers were added, each handed the plot's coordinate system
   # and that panel's params, then its foreground, any axis inside it and its border, never filled,
   # as ggplot2's coordinate system draws `panel.border`; where the theme puts the panel on top, its
@@ -75,10 +75,10 @@ defmodule Giggly.Render do
           panel_params: panel_params,
           guide_titles: guide_titles,
           plot_labels: plot_labels,
-          theme: theme_name
+          theme: plot_theme
         } = assembly
       ) do
-    theme = Theme.complete(theme_name)
+    theme = Theme.complete(plot_theme)
     panels = draw_panels(assembly, theme)
     labels = Guide.Title.draw(plot_labels, theme)
 
@@ -514,7 +514,16 @@ defmodule Giggly.Render do
   defp border_rect(:none), do: []
 
   defp border_rect(look) do
-    [%Rect{fill: :none, color: look.color, stroke_width: look.line_width, dashes: look.dashes}]
+    [
+      %Rect{
+        fill: :none,
+        fill_opacity: 0.0,
+        color: look.color,
+        color_opacity: look.color_opacity,
+        stroke_width: look.line_width,
+        dashes: look.dashes
+      }
+    ]
   end
 
   # The plot's background, none where the theme removes it; its cell stays, empty, as svglite
@@ -525,7 +534,9 @@ defmodule Giggly.Render do
     do: [
       %Rect{
         fill: look.fill,
+        fill_opacity: look.fill_opacity,
         color: look.color,
+        color_opacity: look.color_opacity,
         stroke_width: look.line_width,
         dashes: look.dashes
       }

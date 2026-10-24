@@ -126,7 +126,7 @@ defmodule Giggly.Guide.Colorbar do
           stroke_width: look.line_width,
           dashes: look.dashes,
           color: List.duplicate(look.color, length(lines)),
-          opacity: List.duplicate(1.0, length(lines)),
+          opacity: List.duplicate(look.opacity, length(lines)),
           line_end: look.line_end,
           line_join: :round,
           mitre_limit: 10.0
@@ -158,7 +158,7 @@ defmodule Giggly.Guide.Colorbar do
             size: text_look.size,
             family: "",
             color: List.duplicate(text_look.color, length(places)),
-            opacity: List.duplicate(1.0, length(places)),
+            opacity: List.duplicate(text_look.opacity, length(places)),
             angle: 0,
             hjust: List.duplicate(0.0, length(places)),
             offset: List.duplicate({0.0, -Font.ascent(text_look.size) / 2}, length(places)),

@@ -15,17 +15,29 @@ defmodule Giggly.Theme do
   # `elements/0` lists the tree as far as Giggly draws it: what something draws, and what that
   # inherits from.
   #
-  # A plot records its theme as the complete theme it is drawn in, by name, and the settings
-  # `Giggly.Plot.theme/2` has merged into it (`plot_theme`). `merge/2` merges settings as ggplot2
-  # adds a `theme()` to a plot's (`add_theme()`): a line's, a rectangle's or a text's properties
-  # replace only the properties they give, and a length or a margin replaces the one before. Each
-  # complete theme is a function here that builds its elements, as ggplot2's are functions
-  # (`theme_gray()`); themes differ only in their values, so none is a module implementing a
-  # behaviour, as each facet and coordinate system is. There is one so far, ggplot2's default,
-  # `gray/0`. `complete/1` lays the plot's settings over its complete theme, as ggplot2 completes a
+  # A plot records its theme as the complete theme it chose, by name with its base sizes, or
+  # `:none` for none, and the settings `Giggly.Plot.theme/2` has merged into it (`plot_theme`).
+  # `merge/2` merges settings as ggplot2 adds a `theme()` to a plot's (`add_theme()`): a line's, a
+  # rectangle's or a text's properties replace only the properties they give, and a length or a
+  # margin replaces the one before. Each complete theme is a function here that builds its
+  # elements from its base sizes, as ggplot2's are functions (`theme_gray()`); themes differ only
+  # in their values, so none is a module implementing a behaviour, as each facet and coordinate
+  # system is. They are ggplot2's eight: `gray/1`, its default; `bw/1`, `light/1` and `dark/1`,
+  # built from it by replacing some of its elements whole, as ggplot2's `%+replace%` replaces
+  # them; `linedraw/1`, `minimal/1` and `classic/1`, built from `bw/1` so; and `void/1`, a tree of
+  # its own. `complete/1` lays the plot's settings over its complete theme, as ggplot2 completes a
   # plot's theme when it builds the plot (`plot_theme()`), and works out every element something
-  # draws, each length and line width in points (1/72 inch) and each colour a hex string, so nothing
-  # that reads the complete theme converts anything.
+  # draws, each length and line width in points (1/72 inch) and each colour a hex string and its
+  # opacity apart, so nothing that reads the complete theme converts anything.
+  #
+  # The settings are laid over a plot's complete theme as ggplot2 lays them. A plot that chose none
+  # merges its settings among themselves and lays them over `gray/1` at its default sizes as one,
+  # as ggplot2 adds a plot's theme to its default theme. A plot that chose one has each setting laid
+  # over it in turn, so a setting given after a removal of the same element replaces the complete
+  # theme's element whole, which the settings record as `{:replace, element}`: ggplot2's
+  # `add_theme()` lays the removal over the complete theme's element, and the setting over the
+  # removal, which it replaces. Settings given before a complete theme are dropped with the theme
+  # they were laid over, as ggplot2's are.
   #
   # A length is held as an amount in a unit, as grid holds one: ggplot2's points (`:pt`, TeX's,
   # 1/72.27 inch), `:cm`, `:mm`, `:in`, or `:lines`, grid's lines of text at its own defaults, a
@@ -38,7 +50,8 @@ defmodule Giggly.Theme do
   # pattern times the line's width in R's line-width units, or 1 where it is narrower. A line of
   # the blank line type draws nothing but keeps its room, as R's graphics engine draws none, and a
   # rectangle's border of it is no border. A line's end is as its element gives it; a rectangle's
-  # fill may be `:none`, ggplot2's `NA`.
+  # fill may be `:none`, ggplot2's `NA`. A colour may have an alpha of its own, as `theme_void()`'s
+  # transparent paper has, worked out as the opacity it is drawn at.
   #
   # A line, a rectangle or a text set to `:none` is removed, ggplot2's `element_blank()`: it draws
   # nothing and takes no room, and works out as `:none` in the complete theme. ggplot2's rule for
@@ -47,8 +60,9 @@ defmodule Giggly.Theme do
   # element), so a removed parent takes them with it; an element a setting gives skips every removed
   # element above it and inherits from the next one up, as a `theme()`'s elements do. A setting
   # given after a removal replaces it, as ggplot2's `merge_element()` drops a blank. A root
-  # (`line`, `rect`, `text`) whose element leaves a property unset takes it from `theme_gray()`'s,
-  # as ggplot2 fills a root from its default theme; but a removed root that an element skips gives
+  # (`line`, `rect`, `text`) whose element leaves a property unset, as one a setting replaces whole
+  # may, takes it from `theme_gray()`'s at its default sizes, whatever the complete theme, as
+  # ggplot2 fills a root from its default theme; but a removed root that an element skips gives
   # it nothing, so a property nothing above gives falls to grid's own default, as R draws it:
   # black, a white fill, a solid line 1/96 inch wide with round ends, text 12 points with its lines
   # 1.2 apart and no margin. A share of a property its parent leaves unset is nothing too, and one
@@ -117,7 +131,18 @@ defmodule Giggly.Theme do
   defstruct @enforce_keys
 
   @typedoc "A complete theme's name, as a plot records it."
-  @type name :: :gray
+  @type name :: :gray | :bw | :linedraw | :light | :dark | :minimal | :classic | :void
+
+  @typedoc """
+  A complete theme a plot chose: its name and its base sizes, its text's size in points and its
+  lines' and borders' widths in millimetres.
+  """
+  @type chosen :: %{
+          name: name(),
+          base_size: float(),
+          base_line_size: float(),
+          base_rect_size: float()
+        }
 
   @typedoc """
   A unit a length is given in: ggplot2's points (`:pt`, 1/72.27 inch), centimetres, millimetres,
@@ -137,13 +162,17 @@ defmodule Giggly.Theme do
   """
   @type element :: %{optional(atom()) => term()} | measure() | sides() | {:rel, number()}
 
-  @typedoc "Settings by element, as `Giggly.Plot.theme/2` merges them."
-  @type settings :: %{optional(atom()) => element()}
+  @typedoc """
+  Settings by element, as `Giggly.Plot.theme/2` merges them: each an element, or one that
+  replaces the complete theme's element whole, `{:replace, element}`.
+  """
+  @type settings :: %{optional(atom()) => element() | {:replace, element()}}
 
   @typedoc """
-  A plot's theme: the complete theme it is drawn in, by name, and the settings laid over it.
+  A plot's theme: the complete theme it chose, `:none` for none, which draws it in `theme_gray()`
+  at its default sizes, and the settings laid over it.
   """
-  @type plot_theme :: %{complete: name(), settings: settings()}
+  @type plot_theme :: %{complete: chosen() | :none, settings: settings()}
 
   @typedoc """
   What kind of value an element is; a position says where something goes, and a boolean whether
@@ -158,27 +187,31 @@ defmodule Giggly.Theme do
   @type dashes :: :none | [float()]
 
   @typedoc """
-  A rectangle's look: its `fill`, `:none` for none (ggplot2's `NA`), the `color` of its border,
-  `:none` for no border, the border's `line_width`, in points, and its `dashes`; or `:none`,
+  A rectangle's look: its `fill`, an `#RRGGBB` or `:none` for none (ggplot2's `NA`), drawn at
+  `fill_opacity`, from 0 to 1, the `color` of its border, an `#RRGGBB` or `:none` for no border,
+  drawn at `color_opacity`, the border's `line_width`, in points, and its `dashes`; or `:none`,
   removed.
   """
   @type rect ::
           %{
             fill: String.t() | :none,
+            fill_opacity: float(),
             color: String.t() | :none,
+            color_opacity: float(),
             line_width: float(),
             dashes: dashes()
           }
           | :none
 
   @typedoc """
-  A line's `color`, `line_width`, in points, how its ends are drawn, `line_end`, and its `dashes`,
-  `:blank` for a line of the blank line type, which draws nothing but keeps its room; or `:none`,
-  removed.
+  A line's `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, its `line_width`, in points, how
+  its ends are drawn, `line_end`, and its `dashes`, `:blank` for a line of the blank line type,
+  which draws nothing but keeps its room; or `:none`, removed.
   """
   @type line ::
           %{
             color: String.t(),
+            opacity: float(),
             line_width: float(),
             line_end: :butt | :round | :square,
             dashes: dashes() | :blank
@@ -189,18 +222,27 @@ defmodule Giggly.Theme do
   @type margin :: %{top: float(), right: float(), bottom: float(), left: float()}
 
   @typedoc """
-  Text's `size` and `color`, and its `margin`: the space in points on each side of it, of which
-  the drawing counts the sides ggplot2 counts; or `:none`, removed.
-  """
-  @type text :: %{size: float(), color: String.t(), margin: margin()} | :none
-
-  @typedoc """
-  A title's text, which may run over several lines: its `size`, `color` and `margin`, as text's,
-  and its `line_spacing`, the distance in points from one line's baseline to the next's; or
+  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, and its `margin`: the
+  space in points on each side of it, of which the drawing counts the sides ggplot2 counts; or
   `:none`, removed.
   """
+  @type text ::
+          %{size: float(), color: String.t(), opacity: float(), margin: margin()} | :none
+
+  @typedoc """
+  A title's text, which may run over several lines: its `size`, `color`, `opacity` and `margin`,
+  as text's, and its `line_spacing`, the distance in points from one line's baseline to the
+  next's; or `:none`, removed.
+  """
   @type title ::
-          %{size: float(), color: String.t(), margin: margin(), line_spacing: float()} | :none
+          %{
+            size: float(),
+            color: String.t(),
+            opacity: float(),
+            margin: margin(),
+            line_spacing: float()
+          }
+          | :none
 
   @typedoc """
   A complete theme: the plot's background, drawn over the whole drawing, and the margin around
@@ -390,20 +432,37 @@ defmodule Giggly.Theme do
   # The margin of no space at all, ggplot2's `margin()`.
   @no_margin %{top: {0, :pt}, right: {0, :pt}, bottom: {0, :pt}, left: {0, :pt}}
 
-  # `theme_gray()`'s arguments.
-  @base_size 11.0
-  @base_line_size @base_size / 22
-  @base_rect_size @base_size / 22
+  # The complete themes, by name.
+  @names [:gray, :bw, :linedraw, :light, :dark, :minimal, :classic, :void]
+
+  # A complete theme's sizes unless a plot gives others, as ggplot2's take them: an 11-point base
+  # size, and lines and borders `base_size / 22` millimetres wide.
+  @default_base_size 11.0
+  @default_sizes %{
+    base_size: @default_base_size,
+    base_line_size: @default_base_size / 22,
+    base_rect_size: @default_base_size / 22
+  }
+
+  # Every complete theme's ink and paper, black on white, and `theme_void()`'s paper, its ink with
+  # no alpha (`alpha(ink, 0)`).
   @ink "#000000"
   @paper "#FFFFFF"
+  @clear_paper "#00000000"
 
-  @half_line @base_size / 2
-
-  # `col_mix(ink, paper, amount)` for black ink on white paper, as ggplot2 rounds it.
+  # `col_mix(ink, paper, amount)` for black ink on white paper, as ggplot2 rounds it, each named
+  # for its amount as a percentage.
   @ink_toward_paper_10 "#1A1A1A"
+  @ink_toward_paper_15 "#262626"
   @ink_toward_paper_20 "#333333"
   @ink_toward_paper_30_2 "#4D4D4D"
+  @ink_toward_paper_42 "#6B6B6B"
+  @ink_toward_paper_49_9 "#7F7F7F"
+  @ink_toward_paper_70_2 "#B3B3B3"
   @ink_toward_paper_85 "#D9D9D9"
+  @ink_toward_paper_85_1 "#D9D9D9"
+  @ink_toward_paper_87_1 "#DEDEDE"
+  @ink_toward_paper_89_9 "#E5E5E5"
   @ink_toward_paper_92 "#EBEBEB"
 
   # A colour bar's ticks when the theme sets none: `guide_colourbar()`'s own default, white and
@@ -421,23 +480,56 @@ defmodule Giggly.Theme do
   @spec elements() :: [{atom(), kind(), atom(), String.t()}]
   def elements, do: @elements
 
-  # `settings` with `new` merged in, as ggplot2 adds a `theme()` to a plot's: a line's, a
-  # rectangle's or a text's properties replace only the properties they give, and anything else
-  # replaces the element before: a length, a margin, a position, a removal (`:none`), and an
-  # element given after a removal, as ggplot2's `merge_element()` drops a blank.
+  # A plot's theme with the complete theme `name` chosen, at the sizes `sizes` gives, its text's
+  # in points and its lines' and borders' in millimetres, and any it leaves out ggplot2's
+  # defaults: 11 points, and `base_size / 22` for each width. Its settings are none, as ggplot2
+  # drops a plot's earlier settings with the theme a complete theme replaces.
   @doc false
-  @spec merge(settings(), settings()) :: settings()
-  def merge(settings, new) do
-    Map.merge(settings, new, fn name, old_element, new_element ->
-      case Map.fetch!(@kinds, name) do
-        kind when kind in [:line, :rect, :text] and is_map(old_element) and is_map(new_element) ->
-          Map.merge(old_element, new_element)
+  @spec choose(name(), keyword()) :: plot_theme()
+  def choose(name, sizes) when name in @names do
+    base_size = Keyword.get(sizes, :base_size, @default_base_size) / 1
 
-        _kind ->
-          new_element
-      end
-    end)
+    chosen = %{
+      name: name,
+      base_size: base_size,
+      base_line_size: Keyword.get(sizes, :base_line_size, base_size / 22) / 1,
+      base_rect_size: Keyword.get(sizes, :base_rect_size, base_size / 22) / 1
+    }
+
+    %{complete: chosen, settings: %{}}
   end
+
+  # `plot_theme` with the settings `new` merged into its own, as ggplot2 adds a `theme()` to a
+  # plot's (`add_theme()`): a line's, a rectangle's or a text's properties replace only the
+  # properties they give, and anything else replaces the element before: a length, a margin, a
+  # position, a removal (`:none`), and an element given after a removal, as ggplot2's
+  # `merge_element()` drops a blank. Under a complete theme the plot chose, an element given after
+  # a removal replaces the complete theme's element whole, `{:replace, element}`, since ggplot2
+  # has laid the removal over it; the properties given after that replace only their own.
+  @doc false
+  @spec merge(plot_theme(), settings()) :: plot_theme()
+  def merge(%{complete: complete, settings: settings} = plot_theme, new) do
+    merged =
+      Map.merge(settings, new, fn name, old_element, new_element ->
+        merged_element(complete, Map.fetch!(@kinds, name), old_element, new_element)
+      end)
+
+    %{plot_theme | settings: merged}
+  end
+
+  defp merged_element(complete, kind, :none, new)
+       when complete != :none and kind in [:line, :rect, :text] and is_map(new),
+       do: {:replace, new}
+
+  defp merged_element(_complete, kind, {:replace, old}, new)
+       when kind in [:line, :rect, :text] and is_map(new),
+       do: {:replace, Map.merge(old, new)}
+
+  defp merged_element(_complete, kind, old, new)
+       when kind in [:line, :rect, :text] and is_map(old) and is_map(new),
+       do: Map.merge(old, new)
+
+  defp merged_element(_complete, _kind, _old, new), do: new
 
   # The complete theme `plot_theme` draws in: its settings laid over its complete theme, and every
   # element something draws worked out. A setting's line, rectangle or text is marked to skip a
@@ -445,9 +537,12 @@ defmodule Giggly.Theme do
   # sets it); the complete theme's are not, so they take a removed parent's removal.
   @doc false
   @spec complete(plot_theme()) :: t()
-  def complete(%{complete: :gray, settings: settings}) do
+  def complete(%{complete: complete, settings: settings}) do
     marked =
       Map.new(settings, fn
+        {name, {:replace, element}} ->
+          {name, {:replace, Map.put(element, :inherit_blank, false)}}
+
         {name, element} when is_map(element) and is_map_key(@drawn_kinds, name) ->
           {name, Map.put(element, :inherit_blank, false)}
 
@@ -455,9 +550,42 @@ defmodule Giggly.Theme do
           setting
       end)
 
-    gray()
-    |> merge(marked)
+    complete
+    |> tree()
+    |> lay_over(marked)
     |> worked_out()
+  end
+
+  # The elements of the complete theme a plot chose, at its sizes, or of theme_gray() at its
+  # default sizes for a plot that chose none.
+  defp tree(:none), do: gray(@default_sizes)
+  defp tree(%{name: :gray} = sizes), do: gray(sizes)
+  defp tree(%{name: :bw} = sizes), do: bw(sizes)
+  defp tree(%{name: :linedraw} = sizes), do: linedraw(sizes)
+  defp tree(%{name: :light} = sizes), do: light(sizes)
+  defp tree(%{name: :dark} = sizes), do: dark(sizes)
+  defp tree(%{name: :minimal} = sizes), do: minimal(sizes)
+  defp tree(%{name: :classic} = sizes), do: classic(sizes)
+  defp tree(%{name: :void} = sizes), do: void(sizes)
+
+  # `elements` with `settings` laid over them, as ggplot2's `add_theme()` lays a `theme()` over a
+  # complete theme: a line's, a rectangle's or a text's properties replace only the properties
+  # they give, one that replaces an element replaces it whole, and anything else replaces the
+  # element before.
+  defp lay_over(elements, settings) do
+    Map.merge(elements, settings, fn name, old_element, new_element ->
+      case {Map.fetch!(@kinds, name), new_element} do
+        {_kind, {:replace, element}} ->
+          element
+
+        {kind, element}
+        when kind in [:line, :rect, :text] and is_map(old_element) and is_map(element) ->
+          Map.merge(old_element, element)
+
+        {_kind, element} ->
+          element
+      end
+    end)
   end
 
   # Every element something draws, worked out from `theme`'s elements as ggplot2's
@@ -532,7 +660,7 @@ defmodule Giggly.Theme do
   # so a legend's title and labels are drawn where every other text is removed, as ggplot2's are.
   defp beside_keys(theme, margin, side, gap) do
     widened = Map.update!(margin, side, fn length -> {points(length) + gap, :points} end)
-    merge(theme, %{text: %{margin: widened}})
+    lay_over(theme, %{text: %{margin: widened}})
   end
 
   # The element `name` of `theme` worked out: what it sets, and what it leaves unset taken from
@@ -561,12 +689,13 @@ defmodule Giggly.Theme do
   end
 
   # A root as its element gives it, a property a line, a rectangle or a text leaves unset taken
-  # from theme_gray()'s, as ggplot2 fills a root from its default theme; nothing for a removed root
-  # passed over.
+  # from theme_gray()'s at its default sizes, as ggplot2 fills a root from its default theme;
+  # nothing for a removed root passed over.
   defp root(_name, nil), do: nil
 
   defp root(name, element) when is_map_key(@drawn_kinds, name) do
-    gray()
+    @default_sizes
+    |> gray()
     |> Map.fetch!(name)
     |> Map.merge(element)
   end
@@ -659,15 +788,20 @@ defmodule Giggly.Theme do
         :none
 
       rect ->
+        {fill, fill_opacity} = paint(Map.get(rect, :fill, @grid_fill))
+        {color, color_opacity} = paint(Map.get(rect, :color, @grid_color))
+
         look = %{
-          fill: Map.get(rect, :fill, @grid_fill),
-          color: Map.get(rect, :color, @grid_color),
+          fill: fill,
+          fill_opacity: fill_opacity,
+          color: color,
+          color_opacity: color_opacity,
           line_width: line_width(rect),
           dashes: dashes(rect)
         }
 
         case look.dashes do
-          :blank -> %{look | color: :none, dashes: :none}
+          :blank -> %{look | color: :none, color_opacity: 0.0, dashes: :none}
           _dashes -> look
         end
     end
@@ -679,8 +813,11 @@ defmodule Giggly.Theme do
         :none
 
       line ->
+        {color, opacity} = paint(Map.get(line, :color, @grid_color))
+
         %{
-          color: Map.get(line, :color, @grid_color),
+          color: color,
+          opacity: opacity,
           line_width: line_width(line),
           line_end: Map.get(line, :lineend, @grid_line_end),
           dashes: dashes(line)
@@ -690,18 +827,8 @@ defmodule Giggly.Theme do
 
   defp text(theme, name) do
     case calculated(theme, name) do
-      :none ->
-        :none
-
-      text ->
-        %{
-          size: size(text),
-          color: Map.get(text, :color, @grid_color),
-          margin:
-            text
-            |> Map.get(:margin, @no_margin)
-            |> margin_points()
-        }
+      :none -> :none
+      text -> text_look(text)
     end
   end
 
@@ -711,18 +838,33 @@ defmodule Giggly.Theme do
         :none
 
       text ->
-        %{
-          size: size(text),
-          color: Map.get(text, :color, @grid_color),
-          margin:
-            text
-            |> Map.get(:margin, @no_margin)
-            |> margin_points(),
-          line_spacing:
-            Map.get(text, :lineheight, @grid_line_height) * @line_spacing_per_size * size(text)
-        }
+        look = text_look(text)
+        line_height = Map.get(text, :lineheight, @grid_line_height)
+        Map.put(look, :line_spacing, line_height * @line_spacing_per_size * look.size)
     end
   end
+
+  defp text_look(text) do
+    {color, opacity} = paint(Map.get(text, :color, @grid_color))
+
+    %{
+      size: size(text),
+      color: color,
+      opacity: opacity,
+      margin:
+        text
+        |> Map.get(:margin, @no_margin)
+        |> margin_points()
+    }
+  end
+
+  # A colour as the drawing paints it: its `#RRGGBB` and its opacity apart, its alpha over 255,
+  # opaque for a colour without one; no colour at none.
+  defp paint(:none), do: {:none, 0.0}
+  defp paint(<<"#", _digits::binary-size(6)>> = color), do: {color, 1.0}
+
+  defp paint(<<"#", digits::binary-size(6), alpha::binary-size(2)>>),
+    do: {"#" <> digits, String.to_integer(alpha, 16) / 255}
 
   # A text's size in points, as a float: grid's default where nothing gives one, and a share with
   # nothing above it to be a share of the share itself, as R's graphics engine takes it.
@@ -764,15 +906,16 @@ defmodule Giggly.Theme do
   defp line_width_units(%{linewidth: linewidth}), do: linewidth * @font_points_per_millimetre
   defp line_width_units(%{}), do: 1.0
 
-  # ggplot2's default theme, `theme_gray()` (defined there as `theme_grey()`), at its default
-  # arguments: an 11-point base size, black ink on white paper, and lines and borders half a
-  # millimetre wide; its elements as `theme_gray()` gives them, in ggplot2's `theme-defaults.R`,
-  # each leaving unset what it inherits, as far as Giggly draws.
+  # ggplot2's default theme, `theme_gray()` (defined there as `theme_grey()`), at its base sizes:
+  # the text's in points, and the lines' and the borders' widths in millimetres, black ink on white
+  # paper; its elements as `theme_gray()` gives them, in ggplot2's `theme-defaults.R`, each leaving
+  # unset what it inherits, as far as Giggly draws.
   #
   # `half_line`, half the base size, spaces most things, and each colour is ink mixed toward paper
-  # by ggplot2's `col_mix()`. Lines are solid ink, as wide as a line, their ends cut square;
-  # rectangles are filled with paper and bordered in solid ink; text is ink at the base size, its
-  # lines 0.9 lines of R's graphics engine apart. The spacing is `half_line` and so is every margin.
+  # by ggplot2's `col_mix()`. Lines are solid ink, `base_line_size` wide, their ends cut square;
+  # rectangles are filled with paper and bordered in solid ink `base_rect_size` wide; text is ink
+  # at the base size, its lines 0.9 lines of R's graphics engine apart. The spacing is `half_line`
+  # and so is every margin.
   #
   # The plot's background is bordered in paper. The panel's background is light grey (ink mixed
   # 92% toward paper) with no border, drawn under the layers, and its grid lines are paper, the
@@ -785,27 +928,29 @@ defmodule Giggly.Theme do
   #
   # A legend has no border; the space between legends, and between the panels and the legends, is
   # twice the spacing; each key is 1.2 lines square on the panel's background (`legend_key`
-  # inherits it); its labels are 0.8 of the base size; a colour bar's ticks reach a fifth of a key
-  # into the bar. The plot's title is 1.2 times the base size with `half_line` below it, its
-  # subtitle at the base size with `half_line` below it, its caption 0.8 of it with `half_line`
-  # above it, and its tag 1.2 times it.
-  defp gray do
+  # inherits it), whatever the base size; its labels are 0.8 of the base size; a colour bar's
+  # ticks reach a fifth of a key into the bar. The plot's title is 1.2 times the base size with
+  # `half_line` below it, its subtitle at the base size with `half_line` below it, its caption 0.8
+  # of it with `half_line` above it, and its tag 1.2 times it.
+  defp gray(%{base_size: base_size, base_line_size: line_size, base_rect_size: rect_size}) do
+    half_line = base_size / 2
+
     %{
-      line: %{color: @ink, linewidth: @base_line_size, linetype: {}, lineend: :butt},
-      rect: %{fill: @paper, color: @ink, linewidth: @base_rect_size, linetype: {}},
-      text: %{color: @ink, size: @base_size, lineheight: 0.9, margin: @no_margin},
+      line: %{color: @ink, linewidth: line_size, linetype: {}, lineend: :butt},
+      rect: %{fill: @paper, color: @ink, linewidth: rect_size, linetype: {}},
+      text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
       title: %{},
-      spacing: {@half_line, :pt},
-      margins: sides(@half_line, @half_line, @half_line, @half_line),
+      spacing: {half_line, :pt},
+      margins: sides(half_line, half_line, half_line, half_line),
       axis_line: :none,
       axis_text: %{size: {:rel, 0.8}, color: @ink_toward_paper_30_2},
-      axis_text_x: %{margin: sides(0.8 * @half_line / 2, 0, 0, 0)},
-      axis_text_y: %{margin: sides(0, 0.8 * @half_line / 2, 0, 0)},
-      axis_text_r: %{margin: sides(0, 0.8 * @half_line / 2, 0, 0.8 * @half_line / 2)},
+      axis_text_x: %{margin: sides(0.8 * half_line / 2, 0, 0, 0)},
+      axis_text_y: %{margin: sides(0, 0.8 * half_line / 2, 0, 0)},
+      axis_text_r: %{margin: sides(0, 0.8 * half_line / 2, 0, 0.8 * half_line / 2)},
       axis_ticks: %{color: @ink_toward_paper_20},
       axis_ticks_length: {:rel, 0.5},
-      axis_title_x: %{margin: sides(@half_line / 2, 0, 0, 0)},
-      axis_title_y: %{margin: sides(0, @half_line / 2, 0, 0)},
+      axis_title_x: %{margin: sides(half_line / 2, 0, 0, 0)},
+      axis_title_y: %{margin: sides(0, half_line / 2, 0, 0)},
       legend_background: %{color: :none},
       legend_spacing: {:rel, 2},
       legend_key_size: {1.2, :lines},
@@ -822,14 +967,174 @@ defmodule Giggly.Theme do
       strip_text: %{
         color: @ink_toward_paper_10,
         size: {:rel, 0.8},
-        margin: sides(0.8 * @half_line, 0.8 * @half_line, 0.8 * @half_line, 0.8 * @half_line)
+        margin: strip_margin(half_line)
       },
       plot_background: %{color: @paper},
-      plot_title: %{size: {:rel, 1.2}, margin: sides(0, 0, @half_line, 0)},
-      plot_subtitle: %{margin: sides(0, 0, @half_line, 0)},
-      plot_caption: %{size: {:rel, 0.8}, margin: sides(@half_line, 0, 0, 0)},
+      plot_title: %{size: {:rel, 1.2}, margin: sides(0, 0, half_line, 0)},
+      plot_subtitle: %{margin: sides(0, 0, half_line, 0)},
+      plot_caption: %{size: {:rel, 0.8}, margin: sides(half_line, 0, 0, 0)},
       plot_tag: %{size: {:rel, 1.2}}
     }
+  end
+
+  # `theme_bw()`: theme_gray()'s elements, these replaced whole. The panel is white, bordered dark
+  # grey (20% toward paper), with light grey grid lines (92%), the minor ones half as wide, and a
+  # strip is light grey (85.1%) bordered as the panel is.
+  defp bw(sizes) do
+    sizes
+    |> gray()
+    |> Map.merge(%{
+      panel_background: %{fill: @paper, color: :none},
+      panel_border: %{color: @ink_toward_paper_20},
+      panel_grid: %{color: @ink_toward_paper_92},
+      panel_grid_minor: %{linewidth: {:rel, 0.5}},
+      strip_background: %{fill: @ink_toward_paper_85_1, color: @ink_toward_paper_20}
+    })
+  end
+
+  # `theme_linedraw()`: theme_bw()'s elements, these replaced whole, every grey made ink or paper.
+  # The axes' labels are ink, and their ticks ink half a line wide; the panel's border is ink, and
+  # its grid lines ink a tenth of a line wide, the minor ones a twentieth; a strip is ink with its
+  # text paper.
+  defp linedraw(%{base_size: base_size} = sizes) do
+    sizes
+    |> bw()
+    |> Map.merge(%{
+      axis_text: %{color: @ink, size: {:rel, 0.8}},
+      axis_ticks: %{color: @ink, linewidth: {:rel, 0.5}},
+      panel_border: %{color: @ink, linewidth: {:rel, 1}},
+      panel_grid: %{color: @ink},
+      panel_grid_major: %{linewidth: {:rel, 0.1}},
+      panel_grid_minor: %{linewidth: {:rel, 0.05}},
+      strip_background: %{fill: @ink},
+      strip_text: %{color: @paper, size: {:rel, 0.8}, margin: strip_margin(base_size / 2)}
+    })
+  end
+
+  # `theme_light()`: theme_gray()'s elements, these replaced whole. The panel is white, bordered
+  # light grey (70.2% toward paper); its grid lines are lighter grey (87.1%), half a line wide, the
+  # minor ones a quarter; the axes' ticks are the border's grey, half a line wide; a strip is the
+  # border's grey with its text paper.
+  defp light(%{base_size: base_size} = sizes) do
+    sizes
+    |> gray()
+    |> Map.merge(%{
+      panel_background: %{fill: @paper, color: :none},
+      panel_border: %{color: @ink_toward_paper_70_2, linewidth: {:rel, 1}},
+      panel_grid: %{color: @ink_toward_paper_87_1},
+      panel_grid_major: %{linewidth: {:rel, 0.5}},
+      panel_grid_minor: %{linewidth: {:rel, 0.25}},
+      axis_ticks: %{color: @ink_toward_paper_70_2, linewidth: {:rel, 0.5}},
+      strip_background: %{fill: @ink_toward_paper_70_2, color: :none},
+      strip_text: %{color: @paper, size: {:rel, 0.8}, margin: strip_margin(base_size / 2)}
+    })
+  end
+
+  # `theme_dark()`: theme_gray()'s elements, these replaced whole. The panel is mid grey (49.9%
+  # toward paper), and so is a legend key, which inherits it; its grid lines are darker (42%), half
+  # a line wide, the minor ones a quarter; the axes' ticks are theme_gray()'s, half a line wide; a
+  # strip is near black (15%) with its text near white (89.9%).
+  defp dark(%{base_size: base_size} = sizes) do
+    sizes
+    |> gray()
+    |> Map.merge(%{
+      panel_background: %{fill: @ink_toward_paper_49_9, color: :none},
+      panel_grid: %{color: @ink_toward_paper_42},
+      panel_grid_major: %{linewidth: {:rel, 0.5}},
+      panel_grid_minor: %{linewidth: {:rel, 0.25}},
+      axis_ticks: %{color: @ink_toward_paper_20, linewidth: {:rel, 0.5}},
+      strip_background: %{fill: @ink_toward_paper_15, color: :none},
+      strip_text: %{
+        color: @ink_toward_paper_89_9,
+        size: {:rel, 0.8},
+        margin: strip_margin(base_size / 2)
+      }
+    })
+  end
+
+  # `theme_minimal()`: theme_bw()'s elements, these replaced whole. No ticks, and the labels of
+  # the axes below and left of the panels `0.45 * base_size` from them in their stead; no
+  # background to the panels, the strips, the legends or their keys, and no border; the plot's
+  # background is paper with no border.
+  defp minimal(%{base_size: base_size} = sizes) do
+    sizes
+    |> bw()
+    |> Map.merge(%{
+      axis_ticks: :none,
+      axis_text_x_bottom: %{margin: sides(0.45 * base_size, 0, 0, 0)},
+      axis_text_y_left: %{margin: sides(0, 0.45 * base_size, 0, 0)},
+      legend_background: :none,
+      legend_key: :none,
+      panel_background: :none,
+      panel_border: :none,
+      strip_background: :none,
+      plot_background: %{fill: @paper, color: :none}
+    })
+  end
+
+  # `theme_classic()`: theme_bw()'s elements, these replaced whole. No border and no grid lines;
+  # the axes' lines drawn in ink with square ends, their ticks and labels ink, since each element
+  # replaced leaves its colour to `line` and `text`; a strip is paper bordered in ink twice as wide
+  # as a border, which its clipping halves.
+  defp classic(sizes) do
+    sizes
+    |> bw()
+    |> Map.merge(%{
+      panel_border: :none,
+      panel_grid: :none,
+      axis_text: %{size: {:rel, 0.8}},
+      axis_line: %{lineend: :square},
+      axis_ticks: %{},
+      strip_background: %{linewidth: {:rel, 2}}
+    })
+  end
+
+  # `theme_void()`, a tree of its own, which draws only the legends, the strips' text and the
+  # plot's titles: no lines at all; rectangles filled with its paper, ink with no alpha, with no
+  # border, so the plot's background is drawn and seen through; no axes, their ticks of no length;
+  # no background to the panels, the strips or the legends, nor to the legends' keys, which inherit
+  # the panels'; the strips' text with no margin of its own; no margin round the plot or inside a
+  # legend, legends a spacing apart and 0.2 centimetres from the panels; and the plot's title and
+  # subtitle with `half_line` above them, as its caption has.
+  defp void(%{base_size: base_size}) do
+    half_line = base_size / 2
+
+    %{
+      line: :none,
+      rect: %{fill: @clear_paper, color: :none, linewidth: 0, linetype: {}},
+      text: %{color: @ink, size: base_size, lineheight: 0.9, margin: @no_margin},
+      title: %{},
+      spacing: {half_line, :pt},
+      margins: sides(half_line, half_line, half_line, half_line),
+      axis_text: :none,
+      axis_title: :none,
+      axis_ticks_length: {:rel, 0},
+      legend_key_size: {1.2, :lines},
+      legend_position: :right,
+      legend_text: %{size: {:rel, 0.8}},
+      legend_title: %{},
+      legend_key_spacing: {:rel, 1},
+      legend_margin: sides(0, 0, 0, 0),
+      legend_box_spacing: {0.2, :cm},
+      legend_ticks_length: {:rel, 0.2},
+      legend_background: :none,
+      strip_text: %{size: {:rel, 0.8}},
+      strip_background: :none,
+      panel_ontop: false,
+      panel_background: :none,
+      panel_border: :none,
+      plot_margin: sides(0, 0, 0, 0),
+      plot_title: %{size: {:rel, 1.2}, margin: sides(half_line, 0, 0, 0)},
+      plot_subtitle: %{margin: sides(half_line, 0, 0, 0)},
+      plot_caption: %{size: {:rel, 0.8}, margin: sides(half_line, 0, 0, 0)},
+      plot_tag: %{size: {:rel, 1.2}},
+      plot_background: %{}
+    }
+  end
+
+  # The margin round a strip's text, `0.8 * half_line` on every side.
+  defp strip_margin(half_line) do
+    sides(0.8 * half_line, 0.8 * half_line, 0.8 * half_line, 0.8 * half_line)
   end
 
   # A margin of ggplot2's points on each side, top, right, bottom and left.

@@ -7,7 +7,7 @@ defmodule Giggly.GuideTest do
     test "an axis with no breaks and a title of :none draw nothing and take no room" do
       coord = %Coord.Cartesian{}
       params = Coord.panel_params(coord, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
-      theme = Theme.complete(%{complete: :gray, settings: %{}})
+      theme = Theme.complete(%{complete: :none, settings: %{}})
 
       assert {Guide.Axis.draw(coord, params, theme),
               Guide.Axis.titles(coord, params, %{x: :none, y: :none}, theme)} ===
@@ -20,7 +20,7 @@ defmodule Giggly.GuideTest do
       coord = %Coord.Cartesian{}
       breaks = [{2.0, :none}, {3.0, :none}]
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, breaks, []})
-      theme = Theme.complete(%{complete: :gray, settings: %{}})
+      theme = Theme.complete(%{complete: :none, settings: %{}})
       %{bottom: {height, bottom}, left: {width, left}} = Guide.Axis.draw(coord, params, theme)
 
       assert {Float.round(height, 2), width == height,
@@ -33,7 +33,7 @@ defmodule Giggly.GuideTest do
       params = Coord.panel_params(coord, {{1.0, 4.0}, [], []}, {{1.0, 4.0}, [], []})
 
       theme =
-        Theme.complete(%{complete: :gray, settings: %{panel_background: %{color: "#FF0000"}}})
+        Theme.complete(%{complete: :none, settings: %{panel_background: %{color: "#FF0000"}}})
 
       assert [%Giggly.Scene.Polygons{color: ["#FF0000"], color_opacity: [1.0]} | _lines] =
                Guide.Grid.draw(coord, params, theme)
@@ -43,7 +43,7 @@ defmodule Giggly.GuideTest do
       coord = %Coord.Radial{}
       breaks = [{2.0, "2"}, {3.0, "3"}]
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
-      theme = Theme.complete(%{complete: :gray, settings: %{axis_text_theta: :none}})
+      theme = Theme.complete(%{complete: :none, settings: %{axis_text_theta: :none}})
 
       assert coord
              |> Guide.Axis.draw_inside(params, theme)
@@ -57,11 +57,11 @@ defmodule Giggly.GuideTest do
       coord = %Coord.Cartesian{}
       breaks = [{2.0, "2"}, {3.0, "3"}]
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, breaks, []})
-      solid = Theme.complete(%{complete: :gray, settings: %{}})
+      solid = Theme.complete(%{complete: :none, settings: %{}})
 
       blank =
         Theme.complete(%{
-          complete: :gray,
+          complete: :none,
           settings: %{
             axis_ticks: %{linetype: :none},
             axis_line: %{linetype: :none},
@@ -86,7 +86,7 @@ defmodule Giggly.GuideTest do
 
       theme =
         Theme.complete(%{
-          complete: :gray,
+          complete: :none,
           settings: %{axis_ticks: %{linetype: :none}, axis_line: %{linetype: :none}}
         })
 
@@ -101,7 +101,7 @@ defmodule Giggly.GuideTest do
       params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
 
       assert coord
-             |> Guide.Axis.draw_inside(params, Theme.complete(%{complete: :gray, settings: %{}}))
+             |> Guide.Axis.draw_inside(params, Theme.complete(%{complete: :none, settings: %{}}))
              |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
     end
   end
@@ -121,7 +121,7 @@ defmodule Giggly.GuideTest do
         Guide.draw(
           %Guide.Legend{},
           %{title: "year", keys: keys},
-          Theme.complete(%{complete: :gray, settings: %{}})
+          Theme.complete(%{complete: :none, settings: %{}})
         )
 
       height = height(scene)
@@ -136,7 +136,7 @@ defmodule Giggly.GuideTest do
         Guide.draw(
           %Guide.Legend{},
           %{title: "a_long_column_name", keys: keys},
-          Theme.complete(%{complete: :gray, settings: %{}})
+          Theme.complete(%{complete: :none, settings: %{}})
         )
 
       height = height(scene)
@@ -160,7 +160,7 @@ defmodule Giggly.GuideTest do
         Guide.draw(
           %Guide.Legend{},
           %{title: "cyl", keys: keys},
-          Theme.complete(%{complete: :gray, settings: %{}})
+          Theme.complete(%{complete: :none, settings: %{}})
         )
 
       [_margin, {:points, key_column} | _labels] = scene.widths
@@ -176,7 +176,7 @@ defmodule Giggly.GuideTest do
     # Golden: with `legend.text = element_blank()`, ggplot2 4.0.3's legend for mpg's `colour = drv`
     # through vdiffr 1.0.9 is 28.24 by 78.13 points, its labels and their margins gone.
     test "labels the theme removes draw nothing and take no room" do
-      theme = Theme.complete(%{complete: :gray, settings: %{legend_text: :none}})
+      theme = Theme.complete(%{complete: :none, settings: %{legend_text: :none}})
       {width, scene} = legend("drv", ~w(4 f r), theme)
 
       texts =
@@ -195,7 +195,7 @@ defmodule Giggly.GuideTest do
   # colour legend's 81.18 by 147.25, both at one left edge.
   describe "Box.draw/2" do
     test "legends stack in the order given, as wide as the widest, each hung from the box's left" do
-      theme = Theme.complete(%{complete: :gray, settings: %{}})
+      theme = Theme.complete(%{complete: :none, settings: %{}})
       alpha = legend("cyl", ~w(4 5 6 7 8), theme)
       colour = legend("class", ~w(2seater compact midsize minivan pickup subcompact suv), theme)
 
@@ -229,7 +229,7 @@ defmodule Giggly.GuideTest do
         end)
 
       decor = [{0.0, "#132B43"}, {1.0, "#56B1F7"}]
-      theme = Theme.complete(%{complete: :gray, settings: %{}})
+      theme = Theme.complete(%{complete: :none, settings: %{}})
 
       {width, scene} =
         Guide.draw(%Guide.Colorbar{bins: 15}, %{title: "cty", keys: keys, decor: decor}, theme)
@@ -262,7 +262,7 @@ defmodule Giggly.GuideTest do
 
       theme =
         Theme.complete(%{
-          complete: :gray,
+          complete: :none,
           settings: %{
             legend_title: :none,
             legend_text: :none,
@@ -289,7 +289,7 @@ defmodule Giggly.GuideTest do
 
     test "ticks of the blank line type draw nothing across the bar" do
       keys = [%{label: "10", place: 0.0385, glyphs: [], sizes: []}]
-      theme = Theme.complete(%{complete: :gray, settings: %{legend_ticks: %{linetype: :none}}})
+      theme = Theme.complete(%{complete: :none, settings: %{legend_ticks: %{linetype: :none}}})
 
       {_width, scene} =
         Guide.draw(

@@ -48,7 +48,9 @@ defmodule Giggly.Guide.Grid do
     do: [
       %Rect{
         fill: look.fill,
+        fill_opacity: look.fill_opacity,
         color: look.color,
+        color_opacity: look.color_opacity,
         stroke_width: look.line_width,
         dashes: look.dashes
       }
@@ -61,9 +63,9 @@ defmodule Giggly.Guide.Grid do
         offsets: :none,
         stroke_width: look.line_width,
         color: [look.color],
-        color_opacity: [1.0],
+        color_opacity: [look.color_opacity],
         fill: [look.fill],
-        fill_opacity: [1.0],
+        fill_opacity: [look.fill_opacity],
         dashes: look.dashes,
         line_end: :round,
         line_join: :round,
@@ -72,9 +74,9 @@ defmodule Giggly.Guide.Grid do
     ]
   end
 
-  # Lines in the theme's look, opaque, their ends and dashes as the theme says and their corners
-  # round, as `theme_gray()`'s `line` element draws every line; none of the blank line type, which
-  # R's graphics engine does not draw.
+  # Lines in the theme's look, at its colour's opacity, their ends and dashes as the theme says and
+  # their corners round, as `theme_gray()`'s `line` element draws every line; none of the blank
+  # line type, which R's graphics engine does not draw.
   defp lines(_lines, :none), do: []
   defp lines(_lines, %{dashes: :blank}), do: []
 
@@ -86,7 +88,7 @@ defmodule Giggly.Guide.Grid do
         stroke_width: look.line_width,
         dashes: look.dashes,
         color: List.duplicate(look.color, length(lines)),
-        opacity: List.duplicate(1.0, length(lines)),
+        opacity: List.duplicate(look.opacity, length(lines)),
         line_end: look.line_end,
         line_join: :round,
         mitre_limit: 10.0

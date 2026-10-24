@@ -38,7 +38,7 @@ defmodule Giggly.Guide.Strip do
       size: size,
       family: "",
       color: [text_look.color],
-      opacity: [1.0],
+      opacity: [text_look.opacity],
       angle: 0,
       hjust: [0.5],
       offset: [{(margin.left - margin.right) / 2, -Font.ascent(size) / 2}],
@@ -56,7 +56,9 @@ defmodule Giggly.Guide.Strip do
     do: [
       %Rect{
         fill: look.fill,
+        fill_opacity: look.fill_opacity,
         color: look.color,
+        color_opacity: look.color_opacity,
         stroke_width: look.line_width,
         dashes: look.dashes
       }

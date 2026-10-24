@@ -38,7 +38,9 @@ defmodule Giggly.Guide.Parts do
         primitives: [
           %Rect{
             fill: look.fill,
+            fill_opacity: look.fill_opacity,
             color: look.color,
+            color_opacity: look.color_opacity,
             stroke_width: look.line_width,
             dashes: look.dashes
           }
@@ -138,7 +140,7 @@ defmodule Giggly.Guide.Parts do
       size: look.size,
       family: "",
       color: List.duplicate(look.color, count),
-      opacity: List.duplicate(1.0, count),
+      opacity: List.duplicate(look.opacity, count),
       angle: angle,
       hjust: List.duplicate(hjust, count),
       offset:
@@ -172,7 +174,7 @@ defmodule Giggly.Guide.Parts do
           size: look.size,
           family: "",
           color: [look.color],
-          opacity: [1.0],
+          opacity: [look.opacity],
           angle: 0,
           hjust: [0.0],
           offset: [{0.0, (margin.bottom - margin.top) / 2 - Font.ascent(look.size) / 2}],

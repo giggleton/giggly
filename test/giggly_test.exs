@@ -7707,6 +7707,113 @@ defmodule GigglyTest do
 
       assert golden?(plot, "theme_ticks_unlabelled")
     end
+
+    # Golden: test/golden/theme_bw.svg, theme_linedraw.svg, theme_light.svg, theme_dark.svg,
+    # theme_minimal.svg, theme_classic.svg and theme_void.svg, each checked against ggplot2's
+    # drawing of the same plot, made by the R script beside it: every element and clip path
+    # matches, in ggplot2's order, but theme_void.svg's background's edge, which R writes as its
+    # rounding error. Each draws its panels, strips, axes, legend and titles in its theme's look,
+    # as its R script describes. They move with what moves test/golden/facet_wrap.svg.
+    for name <- [:bw, :linedraw, :light, :dark, :minimal, :classic, :void] do
+      test "theme_#{name}/2 draws the panels, strips, axes, legend and titles in its look" do
+        plot =
+          Giggly.Datasets.mpg()
+          |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
+          |> Plot.geom_point()
+          |> Plot.facet_wrap(:drv, ncol: 2)
+          |> Plot.labs(title: "Title", subtitle: "Subtitle", caption: "Caption", tag: "A")
+          |> then(fn plot -> apply(Plot, unquote(:"theme_#{name}"), [plot]) end)
+
+        assert golden?(plot, unquote("theme_#{name}"))
+      end
+    end
+
+    # Golden: test/golden/theme_radial_bw.svg, theme_radial_classic.svg, theme_radial_minimal.svg
+    # and theme_radial_void.svg, each checked against ggplot2's drawing of the same plot, made by
+    # the R script beside it: every element matches, in ggplot2's order, and every clip path but
+    # svglite's around the whole drawing. A radial panel's border, axis lines, missing ticks and
+    # missing axes, as each theme draws them. They move with what moves test/golden/radial.svg.
+    for name <- [:bw, :classic, :minimal, :void] do
+      test "theme_#{name}/2 draws a radial panel in its look" do
+        plot =
+          Giggly.Datasets.mpg()
+          |> Plot.new(%{x: :displ, y: :hwy})
+          |> Plot.geom_point()
+          |> Plot.coord_radial()
+          |> then(fn plot -> apply(Plot, unquote(:"theme_#{name}"), [plot]) end)
+
+        assert golden?(plot, unquote("theme_radial_#{name}"))
+      end
+    end
+
+    # Golden: test/golden/theme_base_sizes.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/theme_base_sizes.R: every element and clip path matches, but the
+    # background's edge, which R writes as its rounding error. Every text, spacing, margin, tick
+    # length, line width and border width follows the base sizes; the legend's keys keep their
+    # 1.2 lines. It moves with what moves test/golden/theme_light.svg.
+    test "a complete theme's base sizes reach every text, spacing, line and border" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
+        |> Plot.geom_point(size: 1.5, stroke: 0.5)
+        |> Plot.facet_wrap(:drv, ncol: 2)
+        |> Plot.labs(title: "Title")
+        |> Plot.theme_light(base_size: 16, base_line_size: 1, base_rect_size: 2)
+
+      assert golden?(plot, "theme_base_sizes")
+    end
+
+    # Golden: test/golden/theme_order.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_order.R: every element and clip path matches, but the background's
+    # edge, which R writes as its rounding error. A setting given before a complete theme is
+    # dropped; each given after it is laid over it in turn, so an element set after its removal
+    # replaces the theme's whole, and a root replaced so takes what it leaves unset from
+    # theme_gray()'s at its default size. It moves with what moves test/golden/theme_bw.svg.
+    test "settings are laid over a complete theme in turn, those before it dropped" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
+        |> Plot.geom_point(size: 1.5, stroke: 0.5)
+        |> Plot.facet_wrap(:drv, ncol: 2)
+        |> Plot.labs(title: "Title")
+        |> Plot.theme(plot_background: [fill: "red"])
+        |> Plot.theme_bw(base_size: 16)
+        |> Plot.theme(axis_text: :none, panel_grid: [colour: "red"])
+        |> Plot.theme(axis_text: [colour: "red"], panel_grid: :none)
+        |> Plot.theme(panel_grid_major: [linewidth: 1])
+        |> Plot.theme(text: :none)
+        |> Plot.theme(text: [colour: "blue"])
+
+      assert golden?(plot, "theme_order")
+    end
+
+    # Golden: test/golden/theme_alpha.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_alpha.R: every element and clip path matches, but the background's
+    # edge, which R writes as its rounding error. Each theme colour with an alpha of its own is
+    # drawn at that opacity, a stroke of none written `none` and a fill of none left out. It moves
+    # with what moves test/golden/facet_wrap.svg.
+    test "a theme's colours with an alpha of their own are drawn at their opacity" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :fl})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:drv, ncol: 2)
+        |> Plot.labs(title: "Title")
+        |> Plot.theme(
+          panel_background: [fill: "#FF000080", colour: "#0000FF40", linewidth: 2],
+          panel_grid_major: [colour: "#00FF0080"],
+          panel_grid_minor: [colour: "#00FF0000"],
+          axis_text: [colour: "#FF000080"],
+          axis_ticks: [colour: "#0000FF00"],
+          strip_background: [fill: "#00000080"],
+          strip_text: [colour: "#FFFFFF80"],
+          legend_key: [fill: "#0000FF33"],
+          plot_title: [colour: "#0000FFCC"],
+          plot_background: [fill: "transparent", colour: "#00000033"]
+        )
+
+      assert golden?(plot, "theme_alpha")
+    end
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`

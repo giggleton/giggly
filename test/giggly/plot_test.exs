@@ -12,7 +12,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert {plot.facet, plot.coord, plot.theme} ==
-               {%Facet.Null{}, %Coord.Cartesian{clip: :on}, %{complete: :gray, settings: %{}}}
+               {%Facet.Null{}, %Coord.Cartesian{clip: :on}, %{complete: :none, settings: %{}}}
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 draws `ggplot(df, aes(wt, height)) + geom_point(data = df2)`
@@ -3897,6 +3897,108 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "theme_gray/2 and the other complete themes" do
+    test "each records its name and base sizes, each width base_size / 22 unless given" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.theme_bw(plot).theme, Plot.theme_void(plot, base_size: 16).theme.complete,
+              Plot.theme_classic(plot, base_line_size: 1, base_rect_size: 0).theme.complete} ===
+               {%{
+                  complete: %{
+                    name: :bw,
+                    base_size: 11.0,
+                    base_line_size: 0.5,
+                    base_rect_size: 0.5
+                  },
+                  settings: %{}
+                },
+                %{
+                  name: :void,
+                  base_size: 16.0,
+                  base_line_size: 0.7272727272727273,
+                  base_rect_size: 0.7272727272727273
+                }, %{name: :classic, base_size: 11.0, base_line_size: 1.0, base_rect_size: 0.0}}
+    end
+
+    test "every function records its own theme" do
+      plot = Plot.new(@rows)
+
+      themed = [
+        Plot.theme_gray(plot),
+        Plot.theme_bw(plot),
+        Plot.theme_linedraw(plot),
+        Plot.theme_light(plot),
+        Plot.theme_dark(plot),
+        Plot.theme_minimal(plot),
+        Plot.theme_classic(plot),
+        Plot.theme_void(plot)
+      ]
+
+      assert Enum.map(themed, fn chosen -> chosen.theme.complete.name end) ===
+               [:gray, :bw, :linedraw, :light, :dark, :minimal, :classic, :void]
+    end
+
+    # ggplot2 replaces a plot's theme with a complete theme added to it, the settings laid over
+    # the one before with it.
+    test "a complete theme drops the settings given before it, and replaces an earlier one" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(axis_text: [color: "red"])
+        |> Plot.theme_minimal(base_size: 9)
+        |> Plot.theme(axis_ticks: :none)
+        |> Plot.theme_bw()
+
+      unset =
+        @rows
+        |> Plot.new()
+        |> Plot.theme_bw()
+
+      assert plot.theme === unset.theme
+    end
+
+    # The rule is Theme.merge/2's, pinned in its tests; here, that theme/2 hands it the plot's
+    # theme, the complete theme chosen with it.
+    test "after a complete theme, an element set after its removal is recorded as replacing" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme_bw()
+        |> Plot.theme(axis_text: :none)
+        |> Plot.theme(axis_text: [colour: "red"])
+
+      assert plot.theme.settings === %{axis_text: {:replace, %{color: "#FF0000"}}}
+    end
+
+    test "a base size or width it cannot use is refused at its key, naming the value" do
+      plot = Plot.new(@rows)
+
+      for {options, key, value} <- [
+            {[base_size: -1], :base_size, -1},
+            {[base_size: "11"], :base_size, "11"},
+            {[base_line_size: -0.5], :base_line_size, -0.5},
+            {[base_rect_size: :none], :base_rect_size, :none}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme_bw(plot, options) end
+        assert {error.key, error.message =~ inspect(value)} == {key, true}
+      end
+    end
+
+    test "an option it does not take, or one given twice, is refused, naming it" do
+      plot = Plot.new(@rows)
+
+      unknown =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.theme_void(plot, base_family: "serif")
+        end
+
+      twice =
+        assert_raise ArgumentError, fn -> Plot.theme_gray(plot, base_size: 1, base_size: 2) end
+
+      assert {unknown.message =~ "base_family", twice.message =~ ":base_size"} == {true, true}
+    end
+  end
+
   describe "theme/2" do
     test "settings are recorded by element, a later call's properties merged into an earlier's" do
       plot =
@@ -3910,7 +4012,7 @@ defmodule Giggly.PlotTest do
         )
 
       assert plot.theme === %{
-               complete: :gray,
+               complete: :none,
                settings: %{
                  axis_text: %{color: "#FF0000", size: {:rel, 2}},
                  spacing: {1, :lines},
@@ -3977,6 +4079,18 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a colour may have an alpha of its own, transparent too" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(axis_text: [color: "#ff000080"], panel_background: [fill: "transparent"])
+
+      assert plot.theme.settings === %{
+               axis_text: %{color: "#FF000080"},
+               panel_background: %{fill: "#00000000"}
+             }
+    end
+
     test "a line, a rectangle or a text set to :none is recorded as removed" do
       plot =
         @rows
@@ -4009,7 +4123,6 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for {settings, key, value} <- [
-            {[axis_text: [color: "#FF000080"]], {:color, [:axis_text]}, "#FF000080"},
             {[panel_grid: [colour: :none]], {:color, [:panel_grid]}, :none},
             {[axis_text: [size: -1]], {:size, [:axis_text]}, -1},
             {[panel_grid: [linewidth: {:rel, -1}]], {:linewidth, [:panel_grid]}, {:rel, -1}},
@@ -4029,7 +4142,6 @@ defmodule Giggly.PlotTest do
             {[panel_grid: [linetype: :wavy]], {:linetype, [:panel_grid]}, :wavy},
             {[panel_border: [linetype: {4, 16}]], {:linetype, [:panel_border]}, {4, 16}},
             {[axis_line: [lineend: :flat]], {:lineend, [:axis_line]}, :flat},
-            {[panel_background: [fill: "#FF000080"]], {:fill, [:panel_background]}, "#FF000080"},
             {[panel_ontop: :yes], {:panel_ontop, []}, :yes}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end

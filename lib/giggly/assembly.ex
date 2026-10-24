@@ -69,8 +69,9 @@ defmodule Giggly.Assembly do
   # geom and guide unread, each panel's params, by panel id, whether panels are clipped, and the
   # aspect ratio every panel keeps, `:none` when they take the shape the drawing leaves; each
   # axis's title, the text of what the first layer to map the axis's aesthetic maps it to
-  # (ggplot2's `setup_plot_labels()`); and the name of the plot's theme, passed on for rendering,
-  # the only stage that reads a theme so far. The data's own column names appear only as titles.
+  # (ggplot2's `setup_plot_labels()`); and the plot's theme, the complete theme it chose and the
+  # settings laid over it, passed on for rendering, the only stage that reads a theme so far. The
+  # data's own column names appear only as titles.
   #
   # Nothing outside Giggly calls this module: the functions in `Giggly` take a plot and run it here.
 
@@ -139,7 +140,8 @@ defmodule Giggly.Assembly do
   are clipped to their edges, and the aspect ratio, height over width, every panel keeps, `:none`
   for none; the title of each aesthetic's guide, the x and y axes' so far,
   `:none` for an axis no layer maps; the plot's own labels, its title, subtitle, caption and tag,
-  `:none` for each it has not; and the name of the plot's theme, which rendering resolves.
+  `:none` for each it has not; and the plot's theme, the complete theme it chose and the settings
+  laid over it, which rendering resolves.
   """
   @type t :: %__MODULE__{
           layer_data: [DataFrame.t()],

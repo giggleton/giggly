@@ -80,7 +80,11 @@ size has a weight".
   drawings inlined on one page share an id only when they share the box and cannot clip each
   other wrongly. The plot's background is clipped to the table, so when the table fills the
   drawing its group is clipped to the whole drawing, as svglite's is. svglite's group clipped to
-  the whole drawing, around everything else, does nothing visible and is left out.
+  the whole drawing, around everything else, does nothing visible and is left out. **Clipped
+  cells in a row that share a box are one group, and a box's clip path is defined once**, where
+  it is first used, a later group naming it again, as svglite starts a group only where the
+  clipping changes and writes each clip path once: theme_void()'s panel, filling the drawing,
+  shares the background's group.
 - **A label is drawn at the width `Giggly.Font` measured** (`textLength`), so the drawing agrees
   with the layout whatever font the browser picks. Its `font-family` lists the fonts with those
   widths (`"Liberation Sans", Arial, Helvetica`) and then `sans-serif`, never vdiffr's `sans`,

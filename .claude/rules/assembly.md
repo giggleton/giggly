@@ -82,8 +82,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   every panel keeps (`Coord.aspect/2`, from the first panel's params, as ggplot2 asks it), each
   asked once here so rendering never lists `Coord`, the title of each aesthetic's guide
   (`guide_titles`, the x and y axes' so far), the plot's own labels (`plot_labels`: its title,
-  subtitle, caption and tag, `:none` for each `labs/2` does not set), and the name of the plot's
-  theme, which the assembly
+  subtitle, caption and tag, `:none` for each `labs/2` does not set), and the plot's theme, which
+  the assembly
   passes on unread for rendering to resolve, the only stage that reads a theme so far; the first
   build stage to read one (default aesthetics, or a palette a theme sets, which `theme_gray()`
   does not) brings the resolution here, where ggplot2's build completes the theme.

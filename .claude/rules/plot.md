@@ -18,19 +18,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics`,
   `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
-  `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five
-  families whose kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`,
-  `Giggly.Position`, `Giggly.Stat`), `Giggly.Guide`, whose legend's struct `guide_legend/1`
-  builds, `Giggly.Scale`, whose `Continuous` and `Discrete` structs it writes and whose
-  `Discrete.key/1` it reads to refuse a discrete value named twice, and `Giggly.Theme`, whose tree
-  `theme/2` builds its schema from and whose `merge/2` it calls, and exports nothing beyond
-  `Plot`.
-  **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute
-  and draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root,
-  which trains and maps, out of its files** — no call, no module passed as a value, no `import` —
-  which boundary cannot, since a boundary always exports its root and every export to all its
-  dependents (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a
-  scale and never runs one.
+  `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five families whose
+  kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`, `Giggly.Position`, `Giggly.Stat`),
+  `Giggly.Guide`, whose legend's struct `guide_legend/1` builds, `Giggly.Scale`, whose `Continuous`
+  and `Discrete` structs it writes and whose `Discrete.key/1` it reads to refuse a discrete value
+  named twice, and `Giggly.Theme`, whose tree `theme/2` builds its schema from and whose `choose/2`
+  and `merge/2` it calls, and exports nothing beyond `Plot`. **`GigglyCredo.Check.PlotRunsNothing`
+  keeps those families' roots, the protocols that compute and draw, every `Giggly.Guide` module
+  holding no struct, which draw, and `Giggly.Scale`'s root, which trains and maps, out of its
+  files** — no call, no module passed as a value, no `import` — which boundary cannot, since a
+  boundary always exports its root and every export to all its dependents (design-log §4, the entry
+  beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3` and
   `geom_boxplot/3` among them), `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
@@ -44,8 +42,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
   `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
   `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
-  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `labs/2` and
-  `theme/2`.**
+  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `labs/2`,
+  `theme/2` and the complete theme functions (`theme_gray/2`, `theme_bw/2`, `theme_linedraw/2`,
+  `theme_light/2`, `theme_dark/2`, `theme_minimal/2`, `theme_classic/2`, `theme_void/2`).**
   `computed_mapping/2`, `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a
   layer draws, `layer_annotation?/1` whether it is an annotation) exist for the assembly and are
   `@doc false`, and `Layer` is `@moduledoc false`; an API type names no hidden one (`aesthetic`, not
@@ -257,7 +256,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`,
-  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions, `labs/2` and `theme/2`), so
+  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions, `labs/2`, `theme/2` and
+  the complete theme functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as
@@ -276,29 +276,36 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   or `:none` (`validate_label/1`); a label may break over lines. Which aesthetic a layer maps is not
   checked, since `labs/2` may come before the layers (design-log §4, the entry beginning "`labs/2`
   takes the titles").
-- **A plot records its theme (`theme`) as the complete theme's name and the settings `theme/2`
-  has merged** (design-log §4, the entry beginning "A theme is set element by element"):
-  `%{complete: :gray, settings: %{}}` until a call sets one. **`theme/2` checks its settings
-  against a schema built from `Theme.elements/0`**, an option per element of ggplot2's tree, each
-  checked as its kind: a line's, a rectangle's or a text's properties a keyword list
-  (`color:`, canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`,
-  points; a text's `margin:`; a line's and a rectangle's `linetype:`, as a layer's
-  (`validate_linetype/1`), held as its pattern, and a line's `lineend:`), a size or a line width
-  `{:rel, share}` too, both 0 or more; a
-  length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or
-  `{:rel, share}`, held as `{amount, unit}`; a margin one length or a keyword list of
-  `:top`, `:right`, `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a
-  map of all four, a margin element's `{:rel, share}` too, a text's margin never. A colour is
-  opaque, a rectangle's fill and border `:none` too (`validate_theme_color/1`,
-  `validate_theme_rect_color/1`), until a theme needs transparency; the border's `fill:` is taken,
-  as R takes it, though the border is never filled. An element or a property given twice raises from
-  `Aesthetics.canonicalize/1`, as `labs/2`'s does. **A line, a rectangle or a text may be `:none`,
-  removed**, taken aside before the schema checks the rest, so a mistake inside an element is
-  reported at its property; a length or a margin may not, and the roots `spacing` and `margins`
-  take no `{:rel, share}`, as R refuses both. `legend_position:` is `:right` or `:none`, and
-  `panel_ontop:` `true` or `false`. The
-  validated settings are handed to `Theme.merge/2`, so a later call's properties replace only
-  those it gives, as R's `+` does.
+- **A plot records its theme (`theme`) as the complete theme it chose and the settings `theme/2` has
+  merged** (design-log §4, the entries beginning "A theme is set element by element" and "A plot
+  chooses a complete theme"): `%{complete: :none, settings: %{}}` until a call sets one. **A
+  complete theme function records the theme `Theme.choose/2` makes**, its name and its `base_size:`
+  (points), `base_line_size:` and `base_rect_size:` (millimetres), each 0 or more
+  (`validate_base_size/1`, `validate_linewidth/1`), canonicalized first so one given twice is
+  refused, the widths `base_size / 22` unless given, with no settings: the plot's theme is replaced
+  whole, the settings before it dropped, as R's `+ theme_bw()` drops them. Every theme function
+  takes the three sizes, `theme_void/2`'s widths drawing nothing; `base_family:`, `header_family:`,
+  `ink:`, `paper:` and `accent:` wait, and raise as unknown. **`theme/2` checks its settings against
+  a schema built from `Theme.elements/0`**, an option per element of ggplot2's tree, each checked as
+  its kind: a line's, a rectangle's or a text's properties a keyword list (`color:`, canonicalized
+  first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`, points; a text's `margin:`; a
+  line's and a rectangle's `linetype:`, as a layer's (`validate_linetype/1`), held as its pattern,
+  and a line's `lineend:`), a size or a line width `{:rel, share}` too, both 0 or more; a length a
+  number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or `{:rel,
+  share}`, held as `{amount, unit}`; a margin one length or a keyword list of `:top`, `:right`,
+  `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a map of all four, a
+  margin element's `{:rel, share}` too, a text's margin never. A colour is any CSS colour, an alpha
+  of its own and `"transparent"` too, held as uppercase hex, a rectangle's fill and border `:none`
+  too (`validate_theme_color/1`, `validate_theme_rect_color/1`), a line's or a text's never, since
+  none takes one yet; the border's `fill:` is taken, as R takes it, though the border is never
+  filled. An element or a property given twice raises from `Aesthetics.canonicalize/1`, as
+  `labs/2`'s does. **A line, a rectangle or a text may be `:none`, removed**, taken aside before the
+  schema checks the rest, so a mistake inside an element is reported at its property; a length or a
+  margin may not, and the roots `spacing` and `margins` take no `{:rel, share}`, as R refuses both.
+  `legend_position:` is `:right` or `:none`, and `panel_ontop:` `true` or `false`. The validated
+  settings are handed to `Theme.merge/2` with the plot's theme, so a later call's properties replace
+  only those it gives, as R's `+` does, and under a chosen complete theme an element given after its
+  removal replaces the theme's whole.
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
   `fill`, `alpha`, `shape`, `size`, `linetype` and `linewidth` alone, each as a scale's `guide:`
