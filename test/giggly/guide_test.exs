@@ -50,6 +50,51 @@ defmodule Giggly.GuideTest do
              |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
     end
 
+    # Golden: ggplot2 4.0.3 (vdiffr 1.0.9, R 4.6.1) draws no tick of `element_line(linetype =
+    # "blank")` and leaves the panel where solid ticks leave it, as R's graphics engine draws no
+    # line of the blank line type.
+    test "ticks, an axis's line and grid lines of the blank line type draw nothing, the ticks keeping their room" do
+      coord = %Coord.Cartesian{}
+      breaks = [{2.0, "2"}, {3.0, "3"}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, breaks, []})
+      solid = Theme.complete(%{complete: :gray, settings: %{}})
+
+      blank =
+        Theme.complete(%{
+          complete: :gray,
+          settings: %{
+            axis_ticks: %{linetype: :none},
+            axis_line: %{linetype: :none},
+            panel_grid: %{linetype: :none}
+          }
+        })
+
+      %{bottom: {solid_height, _bottom}, left: {solid_width, _left}} =
+        Guide.Axis.draw(coord, params, solid)
+
+      %{bottom: {height, bottom}, left: {width, left}} = Guide.Axis.draw(coord, params, blank)
+
+      assert {height === solid_height, width === solid_width, structs(bottom), structs(left),
+              structs(Guide.Grid.draw(coord, params, blank))} ===
+               {true, true, [Giggly.Scene.Text], [Giggly.Scene.Text], [Giggly.Scene.Rect]}
+    end
+
+    test "round a radial panel, ticks and a line of the blank line type draw nothing" do
+      coord = %Coord.Radial{}
+      breaks = [{2.0, "2"}, {3.0, "3"}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
+
+      theme =
+        Theme.complete(%{
+          complete: :gray,
+          settings: %{axis_ticks: %{linetype: :none}, axis_line: %{linetype: :none}}
+        })
+
+      assert coord
+             |> Guide.Axis.draw_inside(params, theme)
+             |> structs() === [Giggly.Scene.Text, Giggly.Scene.Text]
+    end
+
     test "an axis around a radial panel with no labels draws its ticks alone" do
       coord = %Coord.Radial{}
       breaks = [{2.0, :none}, {3.0, :none}]
@@ -241,7 +286,25 @@ defmodule Giggly.GuideTest do
               end)} ===
                {28.24, 97.36, [[Giggly.Scene.Gradient]]}
     end
+
+    test "ticks of the blank line type draw nothing across the bar" do
+      keys = [%{label: "10", place: 0.0385, glyphs: [], sizes: []}]
+      theme = Theme.complete(%{complete: :gray, settings: %{legend_ticks: %{linetype: :none}}})
+
+      {_width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{title: "cty", keys: keys, decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}]},
+          theme
+        )
+
+      [_background, _title, bar, _labels] = scene.cells
+      assert structs(bar.primitives) === [Giggly.Scene.Gradient]
+    end
   end
+
+  # The kind of each primitive drawn, in drawing order.
+  defp structs(primitives), do: Enum.map(primitives, fn primitive -> primitive.__struct__ end)
 
   # A legend titled `title` with a key for each of `labels`, drawn with no glyphs.
   defp legend(title, labels, theme) do
