@@ -66,9 +66,13 @@ defprotocol Giggly.Coord do
 
   @typedoc """
   An axis as the coordinate system places it: the aesthetic it shows, whose title goes with it,
-  the look it is drawn in, and its breaks, placed along its side, 0 to 1, or around the circle.
+  the look it is drawn in, its breaks, placed along its side, 0 to 1, or around the circle, and
+  its line, run from minus to plus infinity along it: the places along its side the line passes
+  through, or the points in the panel round the circle, none for an axis that draws no line.
   """
-  @type placed_axis :: {:x | :y, look(), [break()] | [theta_break()]}
+  @type placed_axis ::
+          {:x | :y, look(), [break()], [float()]}
+          | {:x | :y, look(), [theta_break()], [{float(), float()}]}
 
   @typedoc "A line through points in the unit panel, each `{x, y}`."
   @type line :: [{float(), float()}]
@@ -123,10 +127,12 @@ defprotocol Giggly.Coord do
 
   # Each axis by where it is drawn: on a side of the panel, or `:theta`, around a radial panel's
   # circle inside it. Each says the aesthetic it shows, whose title goes with it, the look it is
-  # drawn in, and its breaks placed as `transform/3` places positions, so ticks and marks cannot
+  # drawn in, its breaks placed as `transform/3` places positions, so ticks and marks cannot
   # disagree, as ggplot2's axis guides take their breaks through the same transformation as the
-  # data. Which axis goes where is the coordinate system's: a cartesian panel draws its x axis at
-  # the bottom and its y axis on the left.
+  # data, and its line, run from minus to plus infinity along the axis and munched as `munch/3`
+  # munches a layer's, as ggplot2 munches an axis guide's line. Which axis goes where is the
+  # coordinate system's: a cartesian panel draws its x axis at the bottom and its y axis on the
+  # left.
   @doc false
   @spec axes(t(), panel_params()) :: %{optional(side() | :theta) => placed_axis()}
   def axes(coord, panel_params)

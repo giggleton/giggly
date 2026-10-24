@@ -53,5 +53,12 @@ defmodule Giggly.Guide.Strip do
   defp background(:none), do: []
 
   defp background(look),
-    do: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
+    do: [
+      %Rect{
+        fill: look.fill,
+        color: look.color,
+        stroke_width: look.line_width,
+        dashes: look.dashes
+      }
+    ]
 end

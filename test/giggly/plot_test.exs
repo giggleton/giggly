@@ -3952,6 +3952,31 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    # A line type is held as its dash pattern, as a layer's `linetype:` holds it, the blank one as
+    # `:none`; the border's fill is taken, as ggplot2 takes it, though the border is never filled.
+    test "a line type, a line's end, a fill of :none and panel_ontop are recorded as given" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.theme(
+          panel_grid: [linetype: :dashed, lineend: :round],
+          axis_ticks: [linetype: 3],
+          axis_line: [linetype: {2, 2}],
+          panel_background: [fill: :none, linetype: :blank],
+          panel_border: [fill: "blue"],
+          panel_ontop: true
+        )
+
+      assert plot.theme.settings === %{
+               panel_grid: %{linetype: {4, 4}, lineend: :round},
+               axis_ticks: %{linetype: {1, 3}},
+               axis_line: %{linetype: {2, 2}},
+               panel_background: %{fill: :none, linetype: :none},
+               panel_border: %{fill: "#0000FF"},
+               panel_ontop: true
+             }
+    end
+
     test "a line, a rectangle or a text set to :none is recorded as removed" do
       plot =
         @rows
@@ -3972,7 +3997,8 @@ defmodule Giggly.PlotTest do
       for {settings, key} <- [
             {[axis_text_z: []], [:axis_text_z]},
             {[axis_text: [linewidth: 2]], [:linewidth]},
-            {[panel_grid: [size: 2]], [:size]}
+            {[panel_grid: [size: 2]], [:size]},
+            {[panel_background: [lineend: :round]], [:lineend]}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert error.key == key
@@ -3999,7 +4025,12 @@ defmodule Giggly.PlotTest do
             {[panel_spacing: {:rel, "a"}], {:panel_spacing, []}, {:rel, "a"}},
             {[margins: {:rel, 2}], {:margins, []}, {:rel, 2}},
             {[plot_margin: :none], {:plot_margin, []}, :none},
-            {[legend_position: :left], {:legend_position, []}, :left}
+            {[legend_position: :left], {:legend_position, []}, :left},
+            {[panel_grid: [linetype: :wavy]], {:linetype, [:panel_grid]}, :wavy},
+            {[panel_border: [linetype: {4, 16}]], {:linetype, [:panel_border]}, {4, 16}},
+            {[axis_line: [lineend: :flat]], {:lineend, [:axis_line]}, :flat},
+            {[panel_background: [fill: "#FF000080"]], {:fill, [:panel_background]}, "#FF000080"},
+            {[panel_ontop: :yes], {:panel_ontop, []}, :yes}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> Plot.theme(plot, settings) end
         assert {{error.key, error.keys_path}, error.message =~ inspect(value)} == {key, true}

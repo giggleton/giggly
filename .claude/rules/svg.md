@@ -23,12 +23,13 @@ size has a weight".
 - **The document's unit is the point, written as svglite writes it:** `width` and `height` in `pt`,
   a `viewBox` of the size in points, positions with two decimals, circles with `cx`/`cy`/`r` and a
   `style` of `stroke-width`, `stroke`, `stroke-opacity`, `fill` and `fill-opacity`, rectangles with
-  `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border)
-  and `fill`, placed rectangles likewise, hung from their top left corner as grid hangs ggplot2's
-  bars, whichever way round their corners are given, as svglite writes one, a `stroke-opacity` after
-  the `stroke`, the line style below before the `fill` (`stroke-linecap: butt;
-  stroke-linejoin: miter` for `GeomRect`'s, none for a point's square), and a `fill-opacity` after
-  it, polygons with `points` and a `style` of `stroke-width`, `stroke`, `stroke-opacity`, the
+  `x`, `y`, `width` and `height` and a `style` of `stroke-width`, `stroke` (`none` for no border),
+  the dashes below and `fill` (`none` for no fill), placed rectangles likewise, hung from their
+  top left corner as grid hangs ggplot2's bars, whichever way round their corners are given, as
+  svglite writes one, a `stroke-opacity` after the `stroke`, the line style below before the
+  `fill` (`stroke-linecap: butt; stroke-linejoin: miter` for `GeomRect`'s, none for a point's
+  square), and a `fill-opacity` after it, polygons with `points` and a `style` of
+  `stroke-width`, `stroke`, `stroke-opacity`, the
   dashes and line style below (`stroke-linecap: butt; stroke-linejoin: miter` for a box plot's
   box, none for a point's polygon or a radial background), `fill` and `fill-opacity`, polylines
   with `points` and a `style` of `stroke-width`, `stroke` and `stroke-opacity`, the line style

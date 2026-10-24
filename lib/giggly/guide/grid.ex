@@ -11,7 +11,9 @@ defmodule Giggly.Guide.Grid do
   # (`panel_grid_minor_y` and the rest). They are drawn in ggplot2's order: the background, the
   # minor lines at the y axis's minor breaks, then at the x axis's, then the major lines at the y
   # axis's breaks and then at the x axis's, so a major line is drawn over a minor one and an x line
-  # over a y. A background or a group of lines the theme removes draws nothing.
+  # over a y. Lines and the background's border are dashed as the theme says, and the background
+  # may go unfilled. A background or a group of lines the theme removes draws nothing, and so does
+  # a group of lines of the blank line type.
 
   alias Giggly.{Coord, Theme}
   alias Giggly.Scene.{Polygons, Polylines, Rect}
@@ -43,7 +45,14 @@ defmodule Giggly.Guide.Grid do
   defp background(_shape, :none), do: []
 
   defp background(:panel, look),
-    do: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
+    do: [
+      %Rect{
+        fill: look.fill,
+        color: look.color,
+        stroke_width: look.line_width,
+        dashes: look.dashes
+      }
+    ]
 
   defp background(outline, look) do
     [
@@ -55,7 +64,7 @@ defmodule Giggly.Guide.Grid do
         color_opacity: [1.0],
         fill: [look.fill],
         fill_opacity: [1.0],
-        dashes: :none,
+        dashes: look.dashes,
         line_end: :round,
         line_join: :round,
         mitre_limit: 10.0
@@ -63,9 +72,11 @@ defmodule Giggly.Guide.Grid do
     ]
   end
 
-  # Lines in the theme's look, opaque, their ends as the theme says and their corners round, as
-  # `theme_gray()`'s `line` element draws every line.
+  # Lines in the theme's look, opaque, their ends and dashes as the theme says and their corners
+  # round, as `theme_gray()`'s `line` element draws every line; none of the blank line type, which
+  # R's graphics engine does not draw.
   defp lines(_lines, :none), do: []
+  defp lines(_lines, %{dashes: :blank}), do: []
 
   defp lines(lines, look) do
     [
@@ -73,7 +84,7 @@ defmodule Giggly.Guide.Grid do
         lines: lines,
         offsets: :none,
         stroke_width: look.line_width,
-        dashes: :none,
+        dashes: look.dashes,
         color: List.duplicate(look.color, length(lines)),
         opacity: List.duplicate(1.0, length(lines)),
         line_end: look.line_end,

@@ -13,7 +13,9 @@ not a module implementing a behaviour: the entry beginning "A theme is a functio
 are flat names with keyword-list elements, and R's rules for inheriting and merging: the entry
 beginning "A theme is set element by element"; the increment's steps and what waits: the entry
 beginning "The theme is Phase 3's eleventh increment"; what a removal takes and what it leaves:
-the entry beginning "An element set to `:none` is removed".
+the entry beginning "An element set to `:none` is removed"; why the border's fill is taken and
+unused, and where the dashes and the axes' lines are worked out: the entry beginning "The panel's
+border is never filled".
 
 ## Rules
 
@@ -23,7 +25,8 @@ the entry beginning "An element set to `:none` is removed".
   completes a plot's theme at build time.
 - **The tree is ggplot2's (`.element_tree`), as far as Giggly draws: `elements/0`** lists each
   element's name (ggplot2's, dots as underscores), its kind (`:line`, `:rect`, `:text`,
-  `:length`, `:margin`, or `:position`, `legend_position`'s `:right` or `:none`), the one element
+  `:length`, `:margin`, `:position`, `legend_position`'s `:right` or `:none`, or `:boolean`,
+  `panel_ontop`'s), the one element
   it inherits from (`:none` for a root) and what it styles, which `Plot` turns into `theme/2`'s
   schema and documentation, so the vocabulary has one home.
   **An element arrives with its first reader**: the tree holds what something draws and the
@@ -68,15 +71,23 @@ the entry beginning "An element set to `:none` is removed".
 - **A theme is values and calls nothing.** Its boundary lists nothing; `Plot` lists it to build
   `theme/2`'s schema and merge settings, rendering and the guide to read the complete theme. It
   knows no scene primitive: the drawing builds primitives from its elements.
-- **A theme holds sizes, colours, line widths, margins and spacing; alignment and angle stay with
-  the drawing** (the y title turned 90 degrees, labels hung from their ticks) until a theme can
-  set them; so do line types, text faces and families. A line's end is resolved (`line_end`,
-  `theme_gray()`'s butt, grid's round under a removed `line`), which no setting gives yet.
+- **A theme holds sizes, colours, line widths, line types and ends, margins and spacing, and
+  whether the panel is drawn over its layers; alignment and angle stay with the drawing** (the y
+  title turned 90 degrees, labels hung from their ticks) until a theme can set them; so do text
+  faces and families, and a line's corners (`linejoin`, round, as `theme_gray()`'s).
+- **A line type is worked out into `dashes` in points, as svglite writes R's**: each length of
+  its pattern times the width in R's line-width units (`linewidth * .pt`), or 1 where narrower,
+  `:none` for a solid one. A line of the blank line type works out `dashes: :blank`, which the
+  drawing skips while it keeps its room, as R's engine draws no such line; a rectangle's border
+  of it works out as no border (`color: :none`). A line's end is its `lineend`, `theme_gray()`'s
+  butt, grid's round under a removed `line`; a rectangle's fill may be `:none`, R's `NA`.
+- **`theme_gray()` removes the axis lines and the panels' border and draws the panel under its
+  layers** (`axis_line` and `panel_border` `:none`, `panel_ontop: false`), so they are drawn only
+  where a setting gives them, inheriting from `line` and `rect` past the removal.
 - **What waits, by step** (design-log §4, the entry beginning "The theme is Phase 3's eleventh
-  increment"): the panel border, axis lines, line types and ends, and `panel_ontop`; the other
-  complete themes and accepting their arguments; where else the legends go; text's face, angle and
-  alignment. A theme colour is opaque, a rectangle's border `:none` too, until a theme needs
-  transparency (`theme_void()`'s paper).
+  increment"): the other complete themes and accepting their arguments; where else the legends
+  go; text's face, angle and alignment. A theme colour is opaque, a rectangle's fill and border
+  `:none` too, until a theme needs transparency (`theme_void()`'s paper).
 - **The point's look is not the theme's yet.** ggplot2 4 reads its `element_geom` when the build
   fills each layer's default aesthetics as columns; that stage, and the theme resolved in the
   assembly, arrive with a default a theme can change, which neither a set nor a mapped colour

@@ -118,7 +118,14 @@ defmodule Giggly.Guide.Legend do
     defp key_background(:none), do: []
 
     defp key_background(look),
-      do: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
+      do: [
+        %Rect{
+          fill: look.fill,
+          color: look.color,
+          stroke_width: look.line_width,
+          dashes: look.dashes
+        }
+      ]
 
     # Each key's label in its row, a key of no label drawing none.
     defp label_cells(labels, label_widths, text_look, first_row) do

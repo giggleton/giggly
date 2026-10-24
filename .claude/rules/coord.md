@@ -42,7 +42,11 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   so a guide never reads the params and takes the title of that aesthetic. Cartesian: x at the
   bottom and y on the left, each in its own look. Radial: the radius axis on the left in the
   `:r` look, the angle axis `:theta`, around the circle inside the panel, and a bottom axis with
-  no breaks, which keeps the x title where ggplot2 draws it.
+  no breaks, which keeps the x title where ggplot2 draws it. **Each axis comes with its line**,
+  run from minus to plus infinity along its aesthetic and munched as ggplot2 munches an axis
+  guide's: on a side the places along it the line passes through, a cartesian side's whole length;
+  radially the radius axis's a ray up from the centre at the angle's end, the angle axis's the
+  circle at the edge as points in the panel, and none below the panel.
 - **`grid/2` places the panel's grid lines, so where a grid line runs is the coordinate
   system's call**, as ggplot2's `render_bg` differs by coordinate system (straight lines here,
   circles and spokes in polar). It returns lines of points in the unit panel, major and minor, by

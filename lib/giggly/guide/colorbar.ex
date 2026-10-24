@@ -113,8 +113,10 @@ defmodule Giggly.Guide.Colorbar do
       }
     end
 
-    # The ticks across the bar, none where the theme removes them.
+    # The ticks across the bar, dashed as the theme says; none where the theme removes them or
+    # gives them the blank line type.
     defp ticks(_lines, :none), do: []
+    defp ticks(_lines, %{dashes: :blank}), do: []
 
     defp ticks(lines, look) do
       [
@@ -122,7 +124,7 @@ defmodule Giggly.Guide.Colorbar do
           lines: lines,
           offsets: :none,
           stroke_width: look.line_width,
-          dashes: :none,
+          dashes: look.dashes,
           color: List.duplicate(look.color, length(lines)),
           opacity: List.duplicate(1.0, length(lines)),
           line_end: look.line_end,

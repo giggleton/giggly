@@ -61,9 +61,18 @@ defmodule Giggly.ThemeTest do
 
       assert {theme.panel_grid_major_x, theme.panel_grid_minor_x.line_width,
               theme.axis_ticks_y_left} ===
-               {%{color: "#FFFFFF", line_width: 4.2679133858267715, line_end: :butt},
-                2.1339566929133857,
-                %{color: "#333333", line_width: 4.2679133858267715, line_end: :butt}}
+               {%{
+                  color: "#FFFFFF",
+                  line_width: 4.2679133858267715,
+                  line_end: :butt,
+                  dashes: :none
+                }, 2.1339566929133857,
+                %{
+                  color: "#333333",
+                  line_width: 4.2679133858267715,
+                  line_end: :butt,
+                  dashes: :none
+                }}
     end
 
     test "each unit is converted into points as grid converts it" do
@@ -89,15 +98,20 @@ defmodule Giggly.ThemeTest do
     test "a colour bar's ticks are white unless the theme sets them" do
       assert {complete(%{line: %{color: "#FF0000"}}).legend_ticks,
               complete(%{legend_ticks: %{color: "#000000"}}).legend_ticks} ===
-               {%{color: "#FFFFFF", line_width: 0.375, line_end: :butt},
-                %{color: "#000000", line_width: 1.0669783464566929, line_end: :butt}}
+               {%{color: "#FFFFFF", line_width: 0.375, line_end: :butt, dashes: :none},
+                %{
+                  color: "#000000",
+                  line_width: 1.0669783464566929,
+                  line_end: :butt,
+                  dashes: :none
+                }}
     end
 
     # Golden: ggplot2 4.0.3 draws a colour bar's ticks black and 2.13 points wide for
     # `legend.ticks = element_line(linewidth = 1)`, the colour every line inherits.
     test "a colour bar's ticks the theme sets without a colour take the lines' ink" do
       assert complete(%{legend_ticks: %{linewidth: 1}}).legend_ticks ===
-               %{color: "#000000", line_width: 2.1339566929133857, line_end: :butt}
+               %{color: "#000000", line_width: 2.1339566929133857, line_end: :butt, dashes: :none}
     end
   end
 
@@ -140,8 +154,9 @@ defmodule Giggly.ThemeTest do
 
       assert {lines.panel_grid_major_x, lines.panel_grid_minor_x, lines.axis_ticks_x_bottom,
               rects.legend_key, rects.panel_background, texts.plot_subtitle} ===
-               {%{color: "#7F7F7F", line_width: 0.75, line_end: :round}, :none, :none,
-                %{fill: "#EBEBEB", color: "#0000FF", line_width: 0.75}, :none,
+               {%{color: "#7F7F7F", line_width: 0.75, line_end: :round, dashes: :none}, :none,
+                :none, %{fill: "#EBEBEB", color: "#0000FF", line_width: 0.75, dashes: :none},
+                :none,
                 %{
                   size: 12.0,
                   color: "#FF0000",
@@ -176,9 +191,14 @@ defmodule Giggly.ThemeTest do
                   color: "#000000",
                   margin: sides(0, 0, 0, 0),
                   line_spacing: 21.599999999999998
-                }, %{color: "#000000", line_width: 2.1339566929133857, line_end: :round},
-                %{fill: "#FFFFFF", color: "#FF0000", line_width: 0.75},
-                %{fill: "#FF0000", color: "#000000", line_width: 0.75}}
+                },
+                %{
+                  color: "#000000",
+                  line_width: 2.1339566929133857,
+                  line_end: :round,
+                  dashes: :none
+                }, %{fill: "#FFFFFF", color: "#FF0000", line_width: 0.75, dashes: :none},
+                %{fill: "#FF0000", color: "#000000", line_width: 0.75, dashes: :none}}
     end
 
     # A share with no element above it at all is the share itself; a share of a parent that gives
@@ -194,7 +214,8 @@ defmodule Giggly.ThemeTest do
               complete(%{text: :none, plot_title: %{size: {:rel, 2}}}).plot_title.size,
               complete(%{line: :none, axis_ticks_x: %{linewidth: {:rel, 2}}}).axis_ticks_x_bottom} ===
                {2.0, {4.2679133858267715, 2.1339566929133857}, 0.6400000000000001,
-                2.5600000000000005, 12.0, %{color: "#333333", line_width: 0.75, line_end: :round}}
+                2.5600000000000005, 12.0,
+                %{color: "#333333", line_width: 0.75, line_end: :round, dashes: :none}}
     end
 
     # ggplot2's legend lays a text of its own over the root text to give its title and labels
@@ -215,12 +236,99 @@ defmodule Giggly.ThemeTest do
 
     test "a colour bar's own ticks skip a removed line, ending as grid ends a line" do
       assert complete(%{line: :none}).legend_ticks ===
-               %{color: "#FFFFFF", line_width: 0.375, line_end: :round}
+               %{color: "#FFFFFF", line_width: 0.375, line_end: :round, dashes: :none}
     end
 
     test "the legends go right of the panels unless the theme puts them nowhere" do
       assert {complete(%{}).legend_position, complete(%{legend_position: :none}).legend_position} ===
                {:right, :none}
+    end
+  end
+
+  # Golden: the dashes svglite writes for these line types in ggplot2 4.0.3's drawings (vdiffr
+  # 1.0.9, R 4.6.1), two decimals of the values here: 5.69,5.69 for a dashed line half a
+  # millimetre wide, 2.00,2.00 for a quarter-millimetre line dashed 2 and 2, 5.69,17.07 for a
+  # dotted one 2 millimetres wide, and on rectangles 1.42,4.27 dotted and 2.85,8.54 twice as wide.
+  describe "complete/1 with line types, ends and the panel" do
+    test "a line is dashed in points, each length times its width in line-width units, or 1" do
+      theme =
+        complete(%{
+          panel_grid_major: %{linetype: {4, 4}},
+          panel_grid_minor: %{linetype: {2, 2}},
+          axis_ticks: %{linetype: {1, 3}, linewidth: 2}
+        })
+
+      assert {theme.panel_grid_major_x.dashes, theme.panel_grid_minor_y.dashes,
+              theme.axis_ticks_x_bottom.dashes} ===
+               {[5.690551181102363, 5.690551181102363], [2.0, 2.0],
+                [5.690551181102363, 17.071653543307086]}
+    end
+
+    test "a rectangle's border is dashed as a line is, whatever its colour" do
+      theme =
+        complete(%{
+          rect: %{linetype: {1, 3}, color: "#000000"},
+          panel_border: %{linewidth: {:rel, 2}}
+        })
+
+      assert {theme.panel_background, theme.panel_border.dashes} ===
+               {%{
+                  fill: "#EBEBEB",
+                  color: :none,
+                  line_width: 1.0669783464566929,
+                  dashes: [1.4226377952755906, 4.2679133858267715]
+                }, [2.8452755905511813, 8.535826771653543]}
+    end
+
+    # R's graphics engine draws no line of the blank line type, though the ticks keep their length,
+    # and no border of it, though the rectangle is drawn.
+    test "a line of the blank line type is marked blank, and a border of it is no border" do
+      theme =
+        complete(%{
+          axis_ticks: %{linetype: :none},
+          panel_border: %{color: "#FF0000", linetype: :none}
+        })
+
+      assert {theme.axis_ticks_y_left.dashes, theme.axis_ticks_length_y_left, theme.panel_border} ===
+               {:blank, 2.7397260273972606,
+                %{fill: "#FFFFFF", color: :none, line_width: 1.0669783464566929, dashes: :none}}
+    end
+
+    test "a line's end and a rectangle's fill are as a setting gives them, no fill too" do
+      theme = complete(%{axis_line: %{lineend: :square}, panel_background: %{fill: :none}})
+
+      assert {theme.axis_line_x_bottom.line_end, theme.panel_background.fill} === {:square, :none}
+    end
+
+    test "theme_gray() draws no axis lines or border, and the panel under the layers" do
+      theme = complete(%{})
+
+      assert {theme.axis_line_x_bottom, theme.axis_line_y_left, theme.axis_line_theta,
+              theme.axis_line_r, theme.panel_border, theme.panel_ontop} ===
+               {:none, :none, :none, :none, :none, false}
+    end
+
+    # An axis line a setting gives skips the removed `axis.line` and takes `line`'s look; the
+    # border takes `rect`'s, its fill too, which the drawing never uses.
+    test "an axis line or the border a setting gives inherits past theme_gray()'s removal" do
+      theme = complete(%{axis_line_x: %{color: "#FF0000"}, panel_border: %{}, panel_ontop: true})
+
+      red_line = %{
+        color: "#FF0000",
+        line_width: 1.0669783464566929,
+        line_end: :butt,
+        dashes: :none
+      }
+
+      assert {theme.axis_line_x_bottom, theme.axis_line_theta, theme.axis_line_y_left,
+              theme.panel_border, theme.panel_ontop} ===
+               {red_line, red_line, :none,
+                %{
+                  fill: "#FFFFFF",
+                  color: "#000000",
+                  line_width: 1.0669783464566929,
+                  dashes: :none
+                }, true}
     end
   end
 

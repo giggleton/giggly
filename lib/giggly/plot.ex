@@ -2062,21 +2062,39 @@ defmodule Giggly.Plot do
     type: {:custom, __MODULE__, :validate_theme_linewidth, []},
     doc: "How wide it is, in millimetres, or `{:rel, share}`, a share of its parent's."
   ]
+  @theme_linetype [
+    type: @linetype_type,
+    doc: "Its line type: " <> @linetype_forms <> "."
+  ]
   @theme_element_types %{
-    line: [type: :keyword_list, keys: [color: @theme_color, linewidth: @theme_linewidth]],
+    line: [
+      type: :keyword_list,
+      keys: [
+        color: @theme_color,
+        linewidth: @theme_linewidth,
+        linetype: @theme_linetype,
+        lineend: [
+          type: {:in, [:butt, :round, :square]},
+          doc:
+            "How its ends are drawn: cut square at the end (`:butt`), rounded (`:round`), or " <>
+              "cut square half its width beyond it (`:square`)."
+        ]
+      ]
+    ],
     rect: [
       type: :keyword_list,
       keys: [
         fill: [
-          type: {:custom, __MODULE__, :validate_theme_color, []},
-          doc: "Its fill, an opaque CSS colour."
+          type: {:custom, __MODULE__, :validate_theme_rect_color, []},
+          doc: "Its fill, an opaque CSS colour, or `:none` for none."
         ],
         color: [
-          type: {:custom, __MODULE__, :validate_theme_border, []},
+          type: {:custom, __MODULE__, :validate_theme_rect_color, []},
           doc:
             "Its border's colour, an opaque CSS colour, or `:none` for no border (`colour:` too)."
         ],
-        linewidth: @theme_linewidth
+        linewidth: @theme_linewidth,
+        linetype: @theme_linetype
       ]
     ],
     text: [
@@ -2097,7 +2115,8 @@ defmodule Giggly.Plot do
     ],
     length: [type: {:custom, __MODULE__, :validate_theme_length, [:element]}],
     margin: [type: {:custom, __MODULE__, :validate_theme_margin, [:element]}],
-    position: [type: {:in, [:right, :none]}]
+    position: [type: {:in, [:right, :none]}],
+    boolean: [type: :boolean]
   }
   # The elements whose settings are a line's, a rectangle's or a text's properties, whose spelling
   # `theme/2` canonicalizes (`colour:`) before checking them.
@@ -4688,6 +4707,13 @@ defmodule Giggly.Plot do
   `theme(axis_text: [color: "red"])` keeps the labels' size, and a later call's properties replace
   an earlier one's.
 
+  A line's `linetype:` and `lineend:` and a rectangle's `linetype:`, its border's, take what a
+  layer's take: a line of the blank line type draws nothing but keeps its room, as an axis's
+  ticks do, and a border of it is no border. A rectangle's `fill: :none` leaves it unfilled. The
+  axes' lines (`:axis_line`) and the panels' border (`:panel_border`), drawn over the layers and
+  never filled, are removed until a setting gives them, and `panel_ontop: true` draws the panels'
+  backgrounds and grid lines over the layers, under the border.
+
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin
   is one length for every side, a keyword list of `:top`, `:right`, `:bottom` and `:left`, a side
@@ -4701,7 +4727,7 @@ defmodule Giggly.Plot do
   [color: "red"])` keeps the x axis's labels, red and at the size of `:text`; a later setting of a
   removed element replaces the removal. Under a removed `:line`, `:rect` or `:text`, a property
   nothing above an element gives is drawn at the drawing's own default: black, filled white, a
-  line 0.75 points wide with round ends, text 12 points with its lines 1.2 sizes apart, and no
+  solid line 0.75 points wide with round ends, text 12 points with its lines 1.2 sizes apart, and no
   margin.
   `legend_position: :none` draws no legends.
 
@@ -4733,6 +4759,22 @@ defmodule Giggly.Plot do
       ...>   |> IO.iodata_to_binary()
       iex> {svg =~ "fill: #EBEBEB", length(Regex.scan(~r/<text/, svg))}
       {false, 2}
+
+  Drawing the axes' lines, and a dashed, unfilled border over the panel:
+
+      iex> svg =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.theme(
+      ...>     axis_line: [colour: "black"],
+      ...>     panel_border: [colour: "black", linetype: :dashed]
+      ...>   )
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {length(Regex.scan(~r/<polyline[^>]*#000000/, svg)),
+      ...>  svg =~ "stroke: #000000; stroke-dasharray: 5.69,5.69; fill: none;"}
+      {2, true}
   """
   @spec theme(t(), keyword()) :: t()
   def theme(%__MODULE__{theme: theme} = plot, settings) when is_list(settings) do
@@ -4890,12 +4932,12 @@ defmodule Giggly.Plot do
     end
   end
 
-  # NimbleOptions' check of a theme rectangle's border colour: an opaque CSS colour, or `:none` for
-  # no border.
+  # NimbleOptions' check of a theme rectangle's fill or border colour: an opaque CSS colour, or
+  # `:none` for none.
   @doc false
-  @spec validate_theme_border(term()) :: {:ok, String.t() | :none} | {:error, String.t()}
-  def validate_theme_border(:none), do: {:ok, :none}
-  def validate_theme_border(color), do: validate_theme_color(color)
+  @spec validate_theme_rect_color(term()) :: {:ok, String.t() | :none} | {:error, String.t()}
+  def validate_theme_rect_color(:none), do: {:ok, :none}
+  def validate_theme_rect_color(color), do: validate_theme_color(color)
 
   # NimbleOptions' check of a theme element's line width: millimetres, 0 or more, or a share of its
   # parent's, `{:rel, share}`, 0 or more.

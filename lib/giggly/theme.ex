@@ -33,6 +33,13 @@ defmodule Giggly.Theme do
   # converted into points only once worked out, so a share of one is taken in its own unit, as grid
   # takes it. A line width is in millimetres, as ggplot2 gives it, and a text's size in points.
   #
+  # A line or a rectangle's border is drawn in its line type, held as its dash pattern, as a
+  # layer's is, and worked out into its dashes in points as svglite writes them, each length of the
+  # pattern times the line's width in R's line-width units, or 1 where it is narrower. A line of
+  # the blank line type draws nothing but keeps its room, as R's graphics engine draws none, and a
+  # rectangle's border of it is no border. A line's end is as its element gives it; a rectangle's
+  # fill may be `:none`, ggplot2's `NA`.
+  #
   # A line, a rectangle or a text set to `:none` is removed, ggplot2's `element_blank()`: it draws
   # nothing and takes no room, and works out as `:none` in the complete theme. ggplot2's rule for
   # what inherits a removal, which `calc_element()` holds, holds here: a complete theme's elements
@@ -43,15 +50,16 @@ defmodule Giggly.Theme do
   # (`line`, `rect`, `text`) whose element leaves a property unset takes it from `theme_gray()`'s,
   # as ggplot2 fills a root from its default theme; but a removed root that an element skips gives
   # it nothing, so a property nothing above gives falls to grid's own default, as R draws it:
-  # black, a white fill, a line 1/96 inch wide, text 12 points with its lines 1.2 apart and no
-  # margin. A share of a property its parent leaves unset is nothing too, and one with nothing
-  # above it to be a share of is the share itself, in points or millimetres, as R's graphics engine
-  # takes it; a share inherited from a parent whose own is still a share is taken of it again, as
-  # ggplot2's `combine_elements()` fills a property and then works out its share.
+  # black, a white fill, a solid line 1/96 inch wide with round ends, text 12 points with its lines
+  # 1.2 apart and no margin. A share of a property its parent leaves unset is nothing too, and one
+  # with nothing above it to be a share of is the share itself, in points or millimetres, as R's
+  # graphics engine takes it; a share inherited from a parent whose own is still a share is taken of
+  # it again, as ggplot2's `combine_elements()` fills a property and then works out its share.
   #
   # When a plot is rendered, every function that draws something other than a mark takes the
-  # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths and
-  # spacing; how text is aligned and turned is the drawing's until a theme can set it.
+  # complete theme and reads the elements it draws. A theme holds sizes, colours, line widths, line
+  # types and ends, and spacing, and whether the panel's background and grid are drawn over its
+  # layers; how text is aligned and turned is the drawing's until a theme can set it.
 
   # A theme is values: it calls nothing, and the complete theme is this module's struct, which a
   # boundary listing this one reads.
@@ -65,6 +73,8 @@ defmodule Giggly.Theme do
     :panel_grid_major_y,
     :panel_grid_minor_x,
     :panel_grid_minor_y,
+    :panel_border,
+    :panel_ontop,
     :axis_ticks_x_bottom,
     :axis_ticks_y_left,
     :axis_ticks_theta,
@@ -73,6 +83,10 @@ defmodule Giggly.Theme do
     :axis_ticks_length_y_left,
     :axis_ticks_length_theta,
     :axis_ticks_length_r,
+    :axis_line_x_bottom,
+    :axis_line_y_left,
+    :axis_line_theta,
+    :axis_line_r,
     :axis_text_x_bottom,
     :axis_text_y_left,
     :axis_text_theta,
@@ -131,21 +145,45 @@ defmodule Giggly.Theme do
   """
   @type plot_theme :: %{complete: name(), settings: settings()}
 
-  @typedoc "What kind of value an element is; a position says where something goes."
-  @type kind :: :line | :rect | :text | :length | :margin | :position
-
   @typedoc """
-  A rectangle's look: its `fill`, the `color` of its border, `:none` for no border (ggplot2's
-  `NA`), and the border's `line_width`, in points; or `:none`, removed.
+  What kind of value an element is; a position says where something goes, and a boolean whether
+  something is done.
   """
-  @type rect :: %{fill: String.t(), color: String.t() | :none, line_width: float()} | :none
+  @type kind :: :line | :rect | :text | :length | :margin | :position | :boolean
 
   @typedoc """
-  A line's `color`, `line_width`, in points, and how its ends are drawn, `line_end`; or `:none`,
+  How a line or a border is dashed: `:none` for a solid one, or the lengths in points of its
+  dashes and of the gaps between them, in turn.
+  """
+  @type dashes :: :none | [float()]
+
+  @typedoc """
+  A rectangle's look: its `fill`, `:none` for none (ggplot2's `NA`), the `color` of its border,
+  `:none` for no border, the border's `line_width`, in points, and its `dashes`; or `:none`,
+  removed.
+  """
+  @type rect ::
+          %{
+            fill: String.t() | :none,
+            color: String.t() | :none,
+            line_width: float(),
+            dashes: dashes()
+          }
+          | :none
+
+  @typedoc """
+  A line's `color`, `line_width`, in points, how its ends are drawn, `line_end`, and its `dashes`,
+  `:blank` for a line of the blank line type, which draws nothing but keeps its room; or `:none`,
   removed.
   """
   @type line ::
-          %{color: String.t(), line_width: float(), line_end: :butt | :round | :square} | :none
+          %{
+            color: String.t(),
+            line_width: float(),
+            line_end: :butt | :round | :square,
+            dashes: dashes() | :blank
+          }
+          | :none
 
   @typedoc "Space on each side of something, in points."
   @type margin :: %{top: float(), right: float(), bottom: float(), left: float()}
@@ -167,7 +205,8 @@ defmodule Giggly.Theme do
   @typedoc """
   A complete theme: the plot's background, drawn over the whole drawing, and the margin around
   what is drawn on it; the panel's background and its major and minor grid lines, by the axis
-  whose breaks they mark; each axis's ticks, their length, its labels and its title, by axis and
+  whose breaks they mark, the panel's border, and whether the background and grid are drawn over
+  the layers; each axis's ticks, their length, its line, its labels and its title, by axis and
   side, a radial panel's angle axis (`theta`) and radius axis (`r`) apart; the space between
   panels across and down; the background and text of the strips above each panel; and a legend's
   background, the margin inside it, each key's background, width and height, the title, the
@@ -184,6 +223,8 @@ defmodule Giggly.Theme do
           panel_grid_major_y: line(),
           panel_grid_minor_x: line(),
           panel_grid_minor_y: line(),
+          panel_border: rect(),
+          panel_ontop: boolean(),
           axis_ticks_x_bottom: line(),
           axis_ticks_y_left: line(),
           axis_ticks_theta: line(),
@@ -192,6 +233,10 @@ defmodule Giggly.Theme do
           axis_ticks_length_y_left: float(),
           axis_ticks_length_theta: float(),
           axis_ticks_length_r: float(),
+          axis_line_x_bottom: line(),
+          axis_line_y_left: line(),
+          axis_line_theta: line(),
+          axis_line_r: line(),
           axis_text_x_bottom: text(),
           axis_text_y_left: text(),
           axis_text_theta: text(),
@@ -229,9 +274,16 @@ defmodule Giggly.Theme do
     {:title, :text, :text, "Every title: the axes', the legends' and the plot's."},
     {:spacing, :length, :none, "Every spacing between parts of the plot."},
     {:margins, :margin, :none, "Every margin inside a part of the plot."},
+    {:axis_line, :line, :line, "The axes' lines, along the panels' edges."},
     {:axis_text, :text, :text, "The axes' tick labels."},
     {:axis_ticks, :line, :line, "The axes' ticks."},
     {:axis_title, :text, :title, "The axes' titles."},
+    {:axis_line_x, :line, :axis_line, "The x axis's line."},
+    {:axis_line_x_bottom, :line, :axis_line_x, "The line of the x axis below the panels."},
+    {:axis_line_y, :line, :axis_line, "The y axis's line."},
+    {:axis_line_y_left, :line, :axis_line_y, "The line of the y axis left of the panels."},
+    {:axis_line_theta, :line, :axis_line_x, "The line round a radial panel's circle."},
+    {:axis_line_r, :line, :axis_line_y, "The line of a radial panel's radius axis."},
     {:axis_text_x, :text, :axis_text, "The x axis's tick labels."},
     {:axis_text_x_bottom, :text, :axis_text_x, "The tick labels of the x axis below the panels."},
     {:axis_text_y, :text, :axis_text, "The y axis's tick labels."},
@@ -280,6 +332,7 @@ defmodule Giggly.Theme do
      "Where the legends go: `:right`, beside the panels, or `:none`, for no legends."},
     {:legend_box_spacing, :length, :spacing, "The space between the panels and the legends."},
     {:panel_background, :rect, :rect, "The panels' background, under the layers."},
+    {:panel_border, :rect, :rect, "The panels' border, drawn over the layers and never filled."},
     {:panel_spacing, :length, :spacing, "The space between panels."},
     {:panel_spacing_x, :length, :panel_spacing, "The space between panels side by side."},
     {:panel_spacing_y, :length, :panel_spacing, "The space between panels one above another."},
@@ -292,6 +345,9 @@ defmodule Giggly.Theme do
      "The grid lines between the x axis's breaks."},
     {:panel_grid_minor_y, :line, :panel_grid_minor,
      "The grid lines between the y axis's breaks."},
+    {:panel_ontop, :boolean, :none,
+     "Whether the panels' background and grid lines are drawn over the layers, `true`, or " <>
+       "under them, `false`."},
     {:strip_background, :rect, :rect, "The strips' background."},
     {:strip_background_x, :rect, :strip_background, "The background of the strips above panels."},
     {:strip_text, :text, :text, "The strips' labels."},
@@ -421,6 +477,8 @@ defmodule Giggly.Theme do
       panel_grid_major_y: line(theme, :panel_grid_major_y),
       panel_grid_minor_x: line(theme, :panel_grid_minor_x),
       panel_grid_minor_y: line(theme, :panel_grid_minor_y),
+      panel_border: rect(theme, :panel_border),
+      panel_ontop: calculated(theme, :panel_ontop),
       axis_ticks_x_bottom: line(theme, :axis_ticks_x_bottom),
       axis_ticks_y_left: line(theme, :axis_ticks_y_left),
       axis_ticks_theta: line(theme, :axis_ticks_theta),
@@ -429,6 +487,10 @@ defmodule Giggly.Theme do
       axis_ticks_length_y_left: distance(theme, :axis_ticks_length_y_left),
       axis_ticks_length_theta: distance(theme, :axis_ticks_length_theta),
       axis_ticks_length_r: distance(theme, :axis_ticks_length_r),
+      axis_line_x_bottom: line(theme, :axis_line_x_bottom),
+      axis_line_y_left: line(theme, :axis_line_y_left),
+      axis_line_theta: line(theme, :axis_line_theta),
+      axis_line_r: line(theme, :axis_line_r),
       axis_text_x_bottom: text(theme, :axis_text_x_bottom),
       axis_text_y_left: text(theme, :axis_text_y_left),
       axis_text_theta: text(theme, :axis_text_theta),
@@ -589,18 +651,25 @@ defmodule Giggly.Theme do
   defp margin_points(sides), do: Map.new(sides, fn {side, length} -> {side, points(length)} end)
 
   # A line, a rectangle or a text worked out, `:none` for one removed, a property nothing above it
-  # gives grid's default.
+  # gives grid's default. A rectangle's border of the blank line type is no border, as R's graphics
+  # engine draws none.
   defp rect(theme, name) do
     case calculated(theme, name) do
       :none ->
         :none
 
       rect ->
-        %{
+        look = %{
           fill: Map.get(rect, :fill, @grid_fill),
           color: Map.get(rect, :color, @grid_color),
-          line_width: line_width(rect)
+          line_width: line_width(rect),
+          dashes: dashes(rect)
         }
+
+        case look.dashes do
+          :blank -> %{look | color: :none, dashes: :none}
+          _dashes -> look
+        end
     end
   end
 
@@ -613,7 +682,8 @@ defmodule Giggly.Theme do
         %{
           color: Map.get(line, :color, @grid_color),
           line_width: line_width(line),
-          line_end: Map.get(line, :lineend, @grid_line_end)
+          line_end: Map.get(line, :lineend, @grid_line_end),
+          dashes: dashes(line)
         }
     end
   end
@@ -660,15 +730,39 @@ defmodule Giggly.Theme do
   defp size(%{size: size}), do: size / 1
   defp size(%{}), do: @grid_font_size / 1
 
-  # A line width in points, from millimetres, in R's order of operations: its line-width units,
-  # `linewidth * .pt`, over 96 and times 72, as svglite writes them; grid's default where nothing
-  # gives one, and a share with nothing above it to be a share of the share itself in millimetres,
-  # as ggplot2 hands it to R's graphics engine.
-  defp line_width(%{linewidth: {:rel, share}}), do: millimetre_points(share)
-  defp line_width(%{linewidth: linewidth}), do: millimetre_points(linewidth)
+  # A line width in points, from millimetres, in R's order of operations: its line-width units
+  # (`line_width_units/1`) over 96 and times 72, as svglite writes them; grid's default where
+  # nothing gives one.
+  defp line_width(%{linewidth: _linewidth} = element), do: line_width_units(element) / 96 * 72
   defp line_width(%{}), do: @grid_line_width
 
-  defp millimetre_points(linewidth), do: linewidth * @font_points_per_millimetre / 96 * 72
+  # How a line or a border is dashed, in points, as svglite writes R's line type (`scale_lty()`):
+  # each length of its pattern times its width in R's line-width units, `linewidth * .pt`, or 1
+  # where it is narrower; `:none` for a solid one, the line type nothing gives grid's, and
+  # `:blank` for the blank line type, `:none` as a setting holds it.
+  defp dashes(element) do
+    case Map.get(element, :linetype, {}) do
+      {} ->
+        :none
+
+      :none ->
+        :blank
+
+      pattern ->
+        unit = max(line_width_units(element), 1.0)
+
+        pattern
+        |> Tuple.to_list()
+        |> Enum.map(fn length -> length * unit end)
+    end
+  end
+
+  # A line width in R's line-width units, as ggplot2 hands one to R's graphics engine, `linewidth *
+  # .pt`: 1, grid's default, where nothing gives one, and a share with nothing above it to be a
+  # share of the share itself in millimetres.
+  defp line_width_units(%{linewidth: {:rel, share}}), do: share * @font_points_per_millimetre
+  defp line_width_units(%{linewidth: linewidth}), do: linewidth * @font_points_per_millimetre
+  defp line_width_units(%{}), do: 1.0
 
   # ggplot2's default theme, `theme_gray()` (defined there as `theme_grey()`), at its default
   # arguments: an 11-point base size, black ink on white paper, and lines and borders half a
@@ -676,13 +770,14 @@ defmodule Giggly.Theme do
   # each leaving unset what it inherits, as far as Giggly draws.
   #
   # `half_line`, half the base size, spaces most things, and each colour is ink mixed toward paper
-  # by ggplot2's `col_mix()`. Lines are ink, as wide as a line, their ends cut square; rectangles are filled with paper
-  # and bordered in ink; text is ink at the base size, its lines 0.9 lines of R's graphics engine
-  # apart. The spacing is `half_line` and so is every margin.
+  # by ggplot2's `col_mix()`. Lines are solid ink, as wide as a line, their ends cut square;
+  # rectangles are filled with paper and bordered in solid ink; text is ink at the base size, its
+  # lines 0.9 lines of R's graphics engine apart. The spacing is `half_line` and so is every margin.
   #
   # The plot's background is bordered in paper. The panel's background is light grey (ink mixed
-  # 92% toward paper) with no border, and its grid lines are paper, the minor ones half as wide.
-  # An axis's ticks are dark grey (20% toward paper), half the spacing long; its labels are grey
+  # 92% toward paper) with no border, drawn under the layers, and its grid lines are paper, the
+  # minor ones half as wide; there is no border over the panel. An axis draws no line; its ticks
+  # are dark grey (20% toward paper), half the spacing long; its labels are grey
   # (30.2% toward paper), 0.8 of the base size, `0.8 * half_line / 2` from the ticks (a radius
   # axis's on both sides); its title is `half_line / 2` from the labels. A strip is light grey
   # (85% toward paper) with no border, and its text near black (10% toward paper), 0.8 of the base
@@ -696,12 +791,13 @@ defmodule Giggly.Theme do
   # above it, and its tag 1.2 times it.
   defp gray do
     %{
-      line: %{color: @ink, linewidth: @base_line_size, lineend: :butt},
-      rect: %{fill: @paper, color: @ink, linewidth: @base_rect_size},
+      line: %{color: @ink, linewidth: @base_line_size, linetype: {}, lineend: :butt},
+      rect: %{fill: @paper, color: @ink, linewidth: @base_rect_size, linetype: {}},
       text: %{color: @ink, size: @base_size, lineheight: 0.9, margin: @no_margin},
       title: %{},
       spacing: {@half_line, :pt},
       margins: sides(@half_line, @half_line, @half_line, @half_line),
+      axis_line: :none,
       axis_text: %{size: {:rel, 0.8}, color: @ink_toward_paper_30_2},
       axis_text_x: %{margin: sides(0.8 * @half_line / 2, 0, 0, 0)},
       axis_text_y: %{margin: sides(0, 0.8 * @half_line / 2, 0, 0)},
@@ -718,8 +814,10 @@ defmodule Giggly.Theme do
       legend_box_spacing: {:rel, 2},
       legend_position: :right,
       panel_background: %{fill: @ink_toward_paper_92, color: :none},
+      panel_border: :none,
       panel_grid: %{color: @paper},
       panel_grid_minor: %{linewidth: {:rel, 0.5}},
+      panel_ontop: false,
       strip_background: %{fill: @ink_toward_paper_85, color: :none},
       strip_text: %{
         color: @ink_toward_paper_10,

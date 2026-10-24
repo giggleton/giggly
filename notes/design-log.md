@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The panel's border is never filled, though `theme/2` takes its `fill:`, and an axis's line
+  comes from the coordinate system with its breaks (2026-10-23, Steve choosing to take the fill;
+  checked in R).** ggplot2 draws `panel.border` with `fill = NA` and takes a fill without a
+  warning; one also reaches the border from `rect`, so refusing it given directly would give
+  `panel_border` a schema of its own. `Coord.axes/2` places each axis's line beside its breaks, as
+  ggplot2's guide munches its `decor` through the coordinate system: radially a ray of 30 points
+  and a circle of 186, which no guide could place. The theme works a line type into dashes in
+  points as it works out a line width, so svglite's rule sits in `Theme` and in `Geom.Mark`, each
+  pinned to R's numbers. *Rejected: refusing the border's `fill:`* — a special case for what R
+  takes. *Rejected: a protocol function for axis lines* — a line belongs to its axis. *Rejected:
+  one home for the dash rule* — `Theme` lists nothing, and would list a boundary for five lines.
+  *Deferred:* `linejoin`, `arrow`, `guide_axis(cap =)`, a line colour of `:none`.
+
 - **The theme is Phase 3's eleventh increment, in six steps: `theme/2` with inheritance,
   removal with `:none`, the panel border and axis lines, the complete themes, where the legends
   go, text's face, angle and alignment (2026-10-23, Steve, agreeing the proposal; checked against
@@ -1951,9 +1964,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   its second step** (Steve, over my proposal to defer them past the background), with `labs/2`
   later; the two steps are reviewed and committed apart. The plot margin arrived with the axes,
   since without it the leftmost label touches the drawing's edge. *Deferred to first reader:* the
-  transformation's inverse and domain (the first transformation that is not the identity); the
-  axis line (blank in `theme_grey()`); axes above or to the right, and
-  secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
+  transformation's inverse and domain (the first transformation that is not the identity); axes
+  above or to the right, and secondary axes; angled, dodged or thinned labels; a scale's `breaks:`, `labels:` and
   `n.breaks:` (§7's "absent" question); more fonts, bold and italic; cell names and z-order beyond
   list order; a polyline's fill (the first with area); and the plot's title.
 
@@ -2376,6 +2388,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-23 — Let theme/2 draw the panel border and axis lines, and set line types, ends,
+  panel_ontop and fill: :none (theme, step 3); §4: "The panel's border is never filled"
 - 2026-10-23 — Hang an axis's ticks from the panel's edge, so an unlabelled axis of no depth
   draws them (the zero-depth ticks card)
 - 2026-10-23 — Let theme/2 remove an element with :none and put the legends nowhere (theme, step

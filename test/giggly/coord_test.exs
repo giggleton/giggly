@@ -205,8 +205,8 @@ defmodule Giggly.CoordTest do
         )
 
       assert Coord.axes(@cartesian, params) === %{
-               bottom: {:x, :x, [{0.25, "1"}, {0.75, "3"}]},
-               left: {:y, :y, [{0.5, "15"}]}
+               bottom: {:x, :x, [{0.25, "1"}, {0.75, "3"}], [0.0, 1.0]},
+               left: {:y, :y, [{0.5, "15"}], [0.0, 1.0]}
              }
     end
 
@@ -220,17 +220,39 @@ defmodule Giggly.CoordTest do
           {{-2.5, 52.5}, [{0.0, "0"}, {50.0, "50"}], [25.0]}
         )
 
-      assert Coord.axes(@radial, params) === %{
-               bottom: {:x, :x, []},
-               left: {:y, :r, [{0.51818181818181819, "0"}, {0.88181818181818183, "50"}]},
+      assert %{
+               bottom: {:x, :x, [], []},
+               left: {:y, :r, [{0.51818181818181819, "0"}, {0.88181818181818183, "50"}], _r_line},
                theta:
                  {:x, :theta,
                   [
                     {{0.61269302273657189, 0.88379718944579899}, 0.28559933214452665, "0.0"},
                     {{0.5, 0.099999999999999978}, 3.14159265358979312, "5.0"},
                     {{0.38730697726342811, 0.88379718944579899}, 5.99758597503505975, "10.0"}
-                  ]}
-             }
+                  ], _theta_line}
+             } = Coord.axes(@radial, params)
+    end
+
+    # Golden: the axis lines ggplot2 4.0.3 draws round a radial panel (`theme(axis.line =
+    # element_line())`, R 4.6.1, vdiffr 1.0.9): the radius axis's 30 points in equal steps from the
+    # centre's height to the circle's top, and the angle axis's 186 round the circle from 12
+    # o'clock, both munched as a spoke and a circle of the grid are, whatever the extents.
+    test "a radial panel's axis lines run up the radius at 12 o'clock and round the circle's edge" do
+      params =
+        Coord.panel_params(
+          @radial,
+          {{-0.5, 10.5}, [{0.0, "0.0"}], []},
+          {{-2.5, 52.5}, [{0.0, "0"}], []}
+        )
+
+      %{left: {:y, :r, _r_breaks, r_line}, theta: {:x, :theta, _theta_breaks, theta_line}} =
+        Coord.axes(@radial, params)
+
+      assert {length(r_line), hd(r_line), Enum.at(r_line, 1), List.last(r_line)} ===
+               {30, 0.5, 0.5137931034482759, 0.9}
+
+      assert {length(theta_line), hd(theta_line), List.last(theta_line)} ===
+               {186, {0.5, 0.9}, {0.5, 0.9}}
     end
   end
 

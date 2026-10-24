@@ -10,7 +10,10 @@ defmodule Giggly.Render do
   # layer's rows are split by panel, and each panel is drawn by itself: its background and grid
   # lines (`Giggly.Guide`), then each layer's rows in it, drawn by the layer's geom
   # (`Giggly.Geom`), in the order the layers were added, each handed the plot's coordinate system
-  # and that panel's params; the panel's axes and strips (`Giggly.Guide`) are drawn beside it.
+  # and that panel's params, then its foreground, any axis inside it and its border, never filled,
+  # as ggplot2's coordinate system draws `panel.border`; where the theme puts the panel on top, its
+  # background and grid lines are drawn after the layers, under the foreground. The panel's axes
+  # and strips (`Giggly.Guide`) are drawn beside it.
   #
   # The panels are arranged as the layout table says, which is the facet's say: each at its row and
   # column, the axes it draws, and the strips above it. They are laid out as ggplot2's facets lay
@@ -146,24 +149,33 @@ defmodule Giggly.Render do
         end)
         |> Enum.concat()
 
+      background = Guide.Grid.draw(coord, params, theme)
+
+      foreground =
+        coord
+        |> Guide.Axis.draw_inside(params, theme)
+        |> Enum.concat(border_rect(theme.panel_border))
+
       %{
         panel: panel,
         row: row,
         column: column,
-        # The panel's background and grid under its layers, and any axis inside it over them, as
-        # ggplot2's coordinate system draws its background and foreground.
-        primitives:
-          Enum.concat([
-            Guide.Grid.draw(coord, params, theme),
-            layer_primitives,
-            Guide.Axis.draw_inside(coord, params, theme)
-          ]),
+        primitives: panel_primitives({background, layer_primitives, foreground}, theme),
         bottom: if(axis_bottom, do: bottom_axis, else: :none),
         left: if(axis_left, do: left_axis, else: :none),
         strips: Guide.Strip.draw(strip, theme)
       }
     end)
   end
+
+  # A panel's background and grid under its layers, and its foreground, any axis inside it and its
+  # border, over them, as ggplot2's coordinate system draws them; or, where the theme puts the
+  # panel on top, the background and grid over the layers, under the foreground.
+  defp panel_primitives({background, layers, foreground}, %Theme{panel_ontop: false}),
+    do: Enum.concat([background, layers, foreground])
+
+  defp panel_primitives({background, layers, foreground}, %Theme{panel_ontop: true}),
+    do: Enum.concat([layers, background, foreground])
 
   # A layer's rows in one panel drawn by its geom; a panel where the layer has none, as one whose
   # own table holds no row there, draws nothing of it, as ggplot2's `draw_layer()` gives such a
@@ -497,10 +509,25 @@ defmodule Giggly.Render do
     }
   end
 
+  # The panel's border, never filled, as ggplot2's coordinate system draws `panel.border` with no
+  # fill; none where the theme removes it.
+  defp border_rect(:none), do: []
+
+  defp border_rect(look) do
+    [%Rect{fill: :none, color: look.color, stroke_width: look.line_width, dashes: look.dashes}]
+  end
+
   # The plot's background, none where the theme removes it; its cell stays, empty, as svglite
   # writes ggplot2's clipping of a background that draws nothing.
   defp background_rect(:none), do: []
 
-  defp background_rect(%{fill: fill, color: color, line_width: line_width}),
-    do: [%Rect{fill: fill, color: color, stroke_width: line_width}]
+  defp background_rect(look),
+    do: [
+      %Rect{
+        fill: look.fill,
+        color: look.color,
+        stroke_width: look.line_width,
+        dashes: look.dashes
+      }
+    ]
 end

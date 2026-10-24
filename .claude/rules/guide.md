@@ -43,13 +43,13 @@ panel's grid lines are placed by the coordinate system".
   way down from its top as R's graphics engine stacks lines and justified `hjust` by its own width;
   the title as deep as its lines spaced out and a line of text, and as wide as its widest line.
   Tick labels and strips stay one line.
-- **A guide takes its breaks from the coordinate system, already placed** (`Coord.axes/2`), so
-  ticks and marks are placed by one rule. Where an axis is drawn, which aesthetic's title goes
-  there, and the look it is drawn in are the coordinate system's call; a guide draws the sides it
-  is given, in the looks it is given, with the titles it is handed by aesthetic. An axis the
-  coordinate system puts inside the panel (`:theta`) is drawn by `Axis.draw_inside/3` over the
-  panel's layers, takes no title of its own, and is neither measured nor given room, as ggplot2's
-  `guide_axis_theta()` is not.
+- **A guide takes its breaks and its axis's line from the coordinate system, already placed**
+  (`Coord.axes/2`), so ticks and marks are placed by one rule. Where an axis is drawn, which
+  aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a
+  guide draws the sides it is given, in the looks it is given, with the titles it is handed by
+  aesthetic. An axis the coordinate system puts inside the panel (`:theta`) is drawn by
+  `Axis.draw_inside/3` over the panel's layers, takes no title of its own, and is neither measured
+  nor given room, as ggplot2's `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
   out its axis titles: centred on the panel's side, hanging from the cell's edge away from the
   axis, turned 90 degrees on the left, its first line farthest from the axis. A title of `:none`
@@ -76,8 +76,14 @@ panel's grid lines are placed by the coordinate system".
   below it whatever height the panel turns out to be. The angle axis is placed in the panel's cell:
   each tick and label at its break on the circle's edge, offset outward along the break's angle in
   points, each label justified by that angle, as ggplot2 justifies it.
+- **An axis's line runs along the panel's edge and takes no room**, as ggplot2's axis draws its
+  line beside the table it measures: in the axis's cell, through the places along the side the
+  coordinate system gives it, at the cell's edge against the panel, so a hanging axis's and an
+  axis of no depth's are drawn there too; round a radial panel, through the circle's points in
+  the panel's cell. A panel draws the lines of the axes it draws, as their ticks.
 - **The look is the theme's** (`Giggly.Theme`), handed in by rendering already in points: the
-  ticks' colour, width, end and length, the labels' and titles' size, colour and margin, **each
+  ticks' and lines' colour, width, end, dashes and length, the labels' and titles' size, colour
+  and margin, **each
   axis's from the elements of its look and side** (`axis_text_x_bottom`, `axis_ticks_length_y_left`,
   a radius axis's `axis_text_r`, the angle axis's `axis_text_theta`), the grid's lines from the
   axis whose breaks they mark. **A text counts the sides of its margin ggplot2 counts**: tick
@@ -88,7 +94,7 @@ panel's grid lines are placed by the coordinate system".
   of 0 and its ticks, as ggplot2 measures the range from 0. How a label is hung from its tick, the
   radius axis's labels centred between two margins, the angle axis's labels justified by their
   angles, and the y title's 90-degree turn are the guide's until a theme can set them.
-- **An axis with no breaks draws nothing and takes no room**, as ggplot2's exits early. **One
+- **An axis with no breaks draws only its line and takes no room**, as ggplot2's exits early. **One
   whose scale has no labels** (`{place, :none}` breaks) **draws its ticks alone and reaches only as
   far as they do**, as ggplot2's `labels = NULL` leaves the labels' room out (2.74 points, the
   ticks' length, where labels make 13.37); around a radial panel, its ticks alone.
@@ -98,9 +104,11 @@ panel's grid lines are placed by the coordinate system".
   labels or a removed title draw as an axis, a legend or a colour bar given none
   (`Parts.labels/2`, `Parts.title/2`); a strip whose text is removed is not drawn, its background
   with it, and takes no room; a removed background, key background, group of grid lines or of
-  ticks draws nothing.
-- **Drawing order follows ggplot2's:** below the panel the ticks and then the labels, to its left
-  and round a radial panel's circle the labels and then the ticks.
+  ticks, or axis line draws nothing. **A line of the blank line type draws nothing but keeps its
+  room** (`dashes: :blank`): blank ticks keep their length, as R's engine draws no such line.
+- **Drawing order follows ggplot2's:** an axis's line first; below the panel the ticks and then
+  the labels, to its left and round a radial panel's circle the labels and then the ticks, and
+  round the circle the line last.
 - **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
   centred in what the strip text's margins leave, its baseline half an ascent below that middle,
   the margins above and below a line of text, so it is as tall as those margins, an ascent and the
@@ -111,8 +119,8 @@ panel's grid lines are placed by the coordinate system".
   `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
   aesthetic on each side.
 - **What waits for its first reader:** axes above or to the right, angled, dodged or thinned
-  labels, the axis line (blank in `theme_grey()`), minor ticks, axes as kinds of the protocol
-  (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
+  labels, `guide_axis()`'s `cap` cutting the axis line back to the breaks, minor ticks, axes as
+  kinds of the protocol (ggplot2's `guide_axis()` is one, and `guides(x =)` would choose it),
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
   FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `nrow`, `ncol`,
   `override.aes`, `theme`), and `guide_colourbar()`'s options: `nbin`, `reverse`, a horizontal

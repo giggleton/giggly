@@ -782,6 +782,23 @@ defmodule Giggly.SVGTest do
              ]
     end
 
+    # As svglite writes a rectangle filling its viewport, test/golden/theme_ontop.svg and
+    # test/golden/theme_border_lines.svg among its drawings: the dashes after the stroke, written
+    # on a border of no colour too, and no fill, which svglite leaves to its stylesheet, `none`.
+    test "a rectangle filling its cell writes its dashes after its stroke, and no fill as none" do
+      rects = [
+        %Rect{fill: "#EBEBEB", color: :none, stroke_width: 1.07, dashes: [1.4226, 4.2679]},
+        %Rect{fill: :none, color: "#0000FF", stroke_width: 1.07, dashes: :none}
+      ]
+
+      assert Regex.scan(~r/<rect x[^>]*?style='([^']*)'/, draw(whole(rects)),
+               capture: :all_but_first
+             ) === [
+               ["stroke-width: 1.07; stroke: none; stroke-dasharray: 1.42,4.27; fill: #EBEBEB;"],
+               ["stroke-width: 1.07; stroke: #0000FF; fill: none;"]
+             ]
+    end
+
     test "a segment is a line from its start to its end, its stroke carrying its opacity" do
       segments = %Segments{
         starts: [{0.1, 0.5}],
@@ -1020,7 +1037,7 @@ defmodule Giggly.SVGTest do
           columns: column..column,
           clip: :off,
           hang: :none,
-          primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75}]
+          primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75, dashes: :none}]
         }
       end
 
@@ -1133,14 +1150,14 @@ defmodule Giggly.SVGTest do
             columns: 1..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75}]
+            primitives: [%Rect{fill: "#EBEBEB", color: :none, stroke_width: 0.75, dashes: :none}]
           },
           %Cell{
             rows: 1..1,
             columns: 2..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75}]
+            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75, dashes: :none}]
           }
         ]
       }
@@ -1169,7 +1186,7 @@ defmodule Giggly.SVGTest do
             columns: 2..2,
             clip: :off,
             hang: :none,
-            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75}]
+            primitives: [%Rect{fill: "#FFFFFF", color: :none, stroke_width: 0.75, dashes: :none}]
           }
         ]
       }

@@ -14,7 +14,8 @@ defmodule Giggly.Coord.Cartesian do
   # too, as `scales::rescale()` puts them before ggplot2 squishes anything.
   #
   # The x axis is drawn below the panel and the y axis to its left, ggplot2's default places, each
-  # in its own aesthetic's look and each break placed by the same rescale as the data. Its grid
+  # in its own aesthetic's look and each break placed by the same rescale as the data, its line
+  # running the side's length, from minus to plus infinity along the axis. Its grid
   # lines are straight, each crossing the panel from edge to edge at a break or a minor break,
   # placed the same way; the lines crossing an axis of equal ends shrink to a point at its middle,
   # as ggplot2's do. Its background fills the panel, and a panel takes whatever shape the drawing
@@ -81,8 +82,8 @@ defmodule Giggly.Coord.Cartesian do
           y_breaks: y_breaks
         }) do
       %{
-        bottom: {:x, :x, place_breaks(x_breaks, x_range)},
-        left: {:y, :y, place_breaks(y_breaks, y_range)}
+        bottom: {:x, :x, place_breaks(x_breaks, x_range), axis_line(x_range)},
+        left: {:y, :y, place_breaks(y_breaks, y_range), axis_line(y_range)}
       }
     end
 
@@ -130,6 +131,10 @@ defmodule Giggly.Coord.Cartesian do
         [{left, place}, {right, place}]
       end)
     end
+
+    # An axis's line runs from minus to plus infinity along it, which puts its ends at the panel's
+    # edges, or both at its middle when its extent has equal ends, as a grid line's.
+    defp axis_line(range), do: [rescale(:neg_infinity, range), rescale(:infinity, range)]
 
     defp place_breaks(breaks, range) do
       Enum.map(breaks, fn {position, label} -> {rescale(position, range), label} end)

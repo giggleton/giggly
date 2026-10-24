@@ -255,7 +255,7 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # A rectangle fills its cell.
+  # A rectangle fills its cell, its dashes after its stroke, as svglite writes a rectangle.
   defp primitive(%Rect{} = rect, {{left, width}, {top, height}}) do
     [
       "<rect x='",
@@ -269,9 +269,11 @@ defmodule Giggly.SVG do
       "' style='stroke-width: ",
       significant(rect.stroke_width),
       "; stroke: ",
-      stroke(rect.color),
-      "; fill: ",
-      rect.fill,
+      paint(rect.color),
+      ";",
+      dash_style(rect.dashes),
+      " fill: ",
+      paint(rect.fill),
       ";' />\n"
     ]
   end
@@ -762,9 +764,10 @@ defmodule Giggly.SVG do
 
   defp line_join_style(:mitre, _mitre_limit), do: " stroke-linejoin: miter;"
 
-  # A border of `:none` is SVG's `none`, as svglite writes a border whose colour is R's `NA`.
-  defp stroke(:none), do: "none"
-  defp stroke(color), do: color
+  # A border or a fill of `:none` is SVG's `none`: svglite writes a border whose colour is R's `NA`
+  # so, and leaves out such a fill, which its stylesheet then makes `none`.
+  defp paint(:none), do: "none"
+  defp paint(color), do: color
 
   # svglite writes a text's fill only when it is not black, SVG's default.
   # The characters svglite escapes in text.

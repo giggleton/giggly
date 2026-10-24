@@ -35,7 +35,14 @@ defmodule Giggly.Guide.Parts do
         columns: 1..columns,
         clip: :off,
         hang: :none,
-        primitives: [%Rect{fill: look.fill, color: look.color, stroke_width: look.line_width}]
+        primitives: [
+          %Rect{
+            fill: look.fill,
+            color: look.color,
+            stroke_width: look.line_width,
+            dashes: look.dashes
+          }
+        ]
       }
     ]
   end

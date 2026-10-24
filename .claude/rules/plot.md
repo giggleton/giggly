@@ -282,17 +282,21 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   against a schema built from `Theme.elements/0`**, an option per element of ggplot2's tree, each
   checked as its kind: a line's, a rectangle's or a text's properties a keyword list
   (`color:`, canonicalized first, `colour:` too; `fill:`; `linewidth:`, millimetres; `size:`,
-  points; a text's `margin:`), a size or a line width `{:rel, share}` too, both 0 or more; a
+  points; a text's `margin:`; a line's and a rectangle's `linetype:`, as a layer's
+  (`validate_linetype/1`), held as its pattern, and a line's `lineend:`), a size or a line width
+  `{:rel, share}` too, both 0 or more; a
   length a number of ggplot2's points, `{amount, unit}` (`:pt`, `:cm`, `:mm`, `:in`, `:lines`) or
   `{:rel, share}`, held as `{amount, unit}`; a margin one length or a keyword list of
   `:top`, `:right`, `:bottom` and `:left`, each given once, a side left out `{0, :pt}`, held as a
   map of all four, a margin element's `{:rel, share}` too, a text's margin never. A colour is
-  opaque, a rectangle's border `:none` too (`validate_theme_color/1`, `validate_theme_border/1`),
-  until a theme needs transparency. An element or a property given twice raises from
+  opaque, a rectangle's fill and border `:none` too (`validate_theme_color/1`,
+  `validate_theme_rect_color/1`), until a theme needs transparency; the border's `fill:` is taken,
+  as R takes it, though the border is never filled. An element or a property given twice raises from
   `Aesthetics.canonicalize/1`, as `labs/2`'s does. **A line, a rectangle or a text may be `:none`,
   removed**, taken aside before the schema checks the rest, so a mistake inside an element is
   reported at its property; a length or a margin may not, and the roots `spacing` and `margins`
-  take no `{:rel, share}`, as R refuses both. `legend_position:` is `:right` or `:none`. The
+  take no `{:rel, share}`, as R refuses both. `legend_position:` is `:right` or `:none`, and
+  `panel_ontop:` `true` or `false`. The
   validated settings are handed to `Theme.merge/2`, so a later call's properties replace only
   those it gives, as R's `+` does.
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`

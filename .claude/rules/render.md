@@ -22,7 +22,13 @@ ggplot2's facets' order".
   lines (`Guide.Grid`), axes (`Guide.Axis`) and strips (`Guide.Strip`), handed the plot's coordinate system and that panel's params, which
   rendering passes on unread; rendering arranges what they draw into cells, the panel's background
   and grid under its layers and any axis inside the panel over them, as ggplot2's coordinate
-  system draws its background and foreground (`render_bg`, `render_fg`). The panel's
+  system draws its background and foreground (`render_bg`, `render_fg`). **Rendering draws the
+  panel's border itself, last in the panel's cell**, a `Rect` filling it as the plot's background
+  does, **never filled**, as `render_fg()` draws `panel.border` with `fill = NA`: a `fill:` the
+  border's element gives is taken and unused, as R's is (design-log §4, the entry beginning "The
+  panel's border is never filled"). **With
+  `panel_ontop` the background and grid are drawn after the layers**, under the foreground, as
+  ggplot2's `draw_panel()` orders them. The panel's
   cell is clipped when the assembly says the coordinate system clips panels; each strip's cell is
   clipped, as `theme_gray()`'s `strip.clip = "on"` says; the plot's background is clipped to the
   table, as `table_add_background()` adds it, which shows only when the table keeps its

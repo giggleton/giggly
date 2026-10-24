@@ -66,10 +66,11 @@ weight".
   path's legend key, a point's plus or cross and a box plot's whiskers, staples and median),
   placed `Rectangles` and `Polygons` say how their ends (`:butt`, `:round`, `:square`) and corners
   (`:round`, `:mitre`, `:bevel`) are drawn and their mitre limit; the guides' lines are
-  theme_gray()'s, butt and round, a bar's border `GeomRect`'s and a box's `GeomCrossbar`'s, butt
-  and mitred, and a point's lines grid's own, round. **Each also carries its `dashes`**, the
-  lengths of its dashes and gaps in turn, in points, or `:none` for a solid line, one for the
-  primitive as its `stroke_width` is: worked out by the geom, so the backend measures nothing.
+  the theme's, `theme_gray()`'s butt and round, a bar's border `GeomRect`'s and a box's
+  `GeomCrossbar`'s, butt and mitred, and a point's lines grid's own, round. **Each also carries its
+  `dashes`**, the lengths of its dashes and gaps in turn, in points, or `:none` for a solid line,
+  one for the primitive as its `stroke_width` is: worked out by the geom or the theme, so the
+  backend measures nothing.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's
   `t`, `l`, `b` and `r`). Names and z-order beyond list order arrive with their first reader.
@@ -77,7 +78,8 @@ weight".
   drawn in a clipped cell is cut off at its box. Rendering sets which are
   (`.claude/rules/render.md`).
 - **A rectangle (`Rect`) fills its cell**, as grid's `rectGrob()` does at its default place and
-  size, which is how ggplot2 draws a background; **rectangles placed and sized within their cell
+  size, which is how ggplot2 draws a background and the panel's border, its fill or border
+  `:none` and its border dashed as a line is; **rectangles placed and sized within their cell
   (`Rectangles`)** run from `xmin` to `xmax` and `ymin` to `ymax` in the cell's units, either way
   round, as ggplot2's `GeomRect` draws a bar or a rectangle and R's graphics engine a point's
   square. A background that is not rectangular is a polygon (`Polygons`), closed round its outline,

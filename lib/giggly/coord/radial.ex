@@ -23,7 +23,10 @@ defmodule Giggly.Coord.Radial do
   # The radius axis is drawn to the panel's left in the radius axis's look, its breaks placed up
   # the radius at the angle's start, 12 o'clock, as ggplot2 draws it outside a full circle. The
   # angle axis is drawn around the circle inside the panel, each break on the circle's edge at its
-  # angle. Nothing is drawn below the panel, though the x axis's title still goes there.
+  # angle. The radius axis's line runs up the panel's left edge from the centre's height to the
+  # circle's top, munched as a spoke is, and the angle axis's round the circle's edge, munched as a
+  # grid circle is, as ggplot2 munches an axis guide's line. Nothing is drawn below the panel,
+  # though the x axis's title still goes there.
   #
   # The grid is a spoke from the centre to the edge at each of the angle's breaks and minor breaks,
   # and a circle all the way round at each of the radius's, each run from minus to plus infinity
@@ -164,7 +167,11 @@ defmodule Giggly.Coord.Radial do
     end
 
     # ggplot2 places an axis's breaks as data, the other aesthetic at minus infinity for the radius
-    # axis, the angle's start, and at plus infinity for the angle axis, the circle's edge.
+    # axis, the angle's start, and at plus infinity for the angle axis, the circle's edge. Each
+    # line is munched from minus to plus infinity along its aesthetic, the other at plus infinity,
+    # as ggplot2 munches an axis guide's line: the radius axis's a ray up from the centre at the
+    # angle's end, a full turn, where the start is, whose heights up the panel its side takes, and
+    # the angle axis's the circle at the edge. Nothing is drawn below the panel.
     @impl Giggly.Coord
     def axes(_coord, params) do
       r_breaks =
@@ -178,7 +185,18 @@ defmodule Giggly.Coord.Radial do
           {place({position, :infinity}, params), angle(position, params.theta_range), label}
         end)
 
-      %{bottom: {:x, :x, []}, left: {:y, :r, r_breaks}, theta: {:x, :theta, theta_breaks}}
+      r_line =
+        [{:infinity, :neg_infinity}, {:infinity, :infinity}]
+        |> munch(params)
+        |> Enum.map(fn {_x_place, y_place} -> y_place end)
+
+      theta_line = munch([{:neg_infinity, :infinity}, {:infinity, :infinity}], params)
+
+      %{
+        bottom: {:x, :x, [], []},
+        left: {:y, :r, r_breaks, r_line},
+        theta: {:x, :theta, theta_breaks, theta_line}
+      }
     end
 
     @impl Giggly.Coord

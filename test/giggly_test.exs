@@ -7603,6 +7603,92 @@ defmodule GigglyTest do
       assert golden?(plot, "theme_radial_removed")
     end
 
+    # Golden: test/golden/theme_border_lines.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_border_lines.R: every element and clip path matches, in
+    # ggplot2's order. Each panel's border is drawn over its points, never filled, and each axis a
+    # panel draws has its line before its ticks, taking no room, a hanging axis's too; lines and
+    # borders are dashed, their dashes growing with their width. It moves with what moves
+    # test/golden/theme_ticks.svg.
+    test "a border over each panel's layers and a line along each axis it draws, dashed as set" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.facet_wrap(:drv, ncol: 2)
+        |> Plot.theme(
+          panel_border: [colour: "blue", linetype: :dashed],
+          axis_line: [colour: "red", linewidth: 1, lineend: :square],
+          axis_ticks: [linetype: :dotted, lineend: :round, linewidth: 1],
+          panel_grid_minor: [linetype: {2, 2}]
+        )
+
+      assert golden?(plot, "theme_border_lines")
+    end
+
+    # Golden: test/golden/theme_ontop.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/theme_ontop.R: every element and clip path matches. The panel's unfilled
+    # background and grid lines are drawn over the points; rectangles are unfilled or dashed as
+    # set; ticks of the blank line type draw nothing but keep their room. It moves with what moves
+    # test/golden/point.svg.
+    test "panel_ontop draws the panel over the layers, and a rectangle may go unfilled or dashed" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, shape: :drv})
+        |> Plot.geom_point()
+        |> Plot.theme(
+          panel_ontop: true,
+          panel_background: [fill: :none, colour: "#7F7F7F"],
+          legend_key: [fill: :none],
+          legend_background: [colour: "black", linetype: :dotted],
+          plot_background: [colour: "black", linetype: :dashed, linewidth: 1],
+          axis_ticks_x: [linetype: :blank]
+        )
+
+      assert golden?(plot, "theme_ontop")
+    end
+
+    # Golden: test/golden/theme_radial_lines.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_radial_lines.R: every element matches, in ggplot2's order,
+    # and every clip path but svglite's around the whole drawing. The radius axis's line runs up
+    # from the centre at the panel's edge, the angle axis's round the circle after its ticks, and
+    # the border, unclipped, last. It moves with what moves test/golden/radial.svg.
+    test "a radial panel's axis lines run up its radius and round its circle, under its border" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.coord_radial()
+        |> Plot.theme(
+          axis_line: [colour: "red"],
+          axis_line_theta: [linewidth: 1],
+          panel_border: [colour: "blue"],
+          panel_grid_major: [linetype: :dashed],
+          panel_background: [fill: :none, colour: "darkgreen", linetype: :dotted],
+          panel_ontop: true
+        )
+
+      assert golden?(plot, "theme_radial_lines")
+    end
+
+    # Golden: test/golden/theme_axis_line_removed.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_axis_line_removed.R: every element and clip path matches.
+    # Axis lines set under a removed line take grid's defaults, and an axis with no breaks draws
+    # its line alone, taking no room. It moves with what moves test/golden/theme_roots.svg.
+    test "an axis line under a removed line is drawn at grid's defaults, with no breaks too" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.scale_x_continuous(breaks: :none)
+        |> Plot.theme(
+          line: :none,
+          axis_line: [],
+          axis_line_y: [colour: "red", linetype: :dashed]
+        )
+
+      assert golden?(plot, "theme_axis_line_removed")
+    end
+
     # Golden: test/golden/theme_ticks_unlabelled.svg, checked against ggplot2's drawing of the same
     # plot, made by test/golden/theme_ticks_unlabelled.R: every element and clip path matches.
     # Ticks hang from the panel's edge in points, so an axis with no labels whose ticks take no
