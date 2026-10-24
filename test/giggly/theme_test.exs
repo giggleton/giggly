@@ -451,6 +451,15 @@ defmodule Giggly.ThemeTest do
                 }, "#000000", "#000000", "#FFFFFF"}
     end
 
+    # theme_linedraw() gives the border and the grid lines their ink, so a colour given every line
+    # and rectangle does not reach them, as it reaches the strips', whose element gives none.
+    test "theme_linedraw()'s border and grid lines keep their own ink under a root's colour" do
+      theme = chosen(:linedraw, [], %{rect: %{color: "#FF0000"}, line: %{color: "#FF0000"}})
+
+      assert {theme.panel_border.color, theme.panel_grid_major_x.color,
+              theme.strip_background_x.color} === {"#000000", "#000000", "#FF0000"}
+    end
+
     test "theme_light() and theme_dark() draw thinner grid lines in their own greys" do
       light = chosen(:light)
       dark = chosen(:dark)
@@ -484,6 +493,7 @@ defmodule Giggly.ThemeTest do
 
     test "theme_void() draws no axes or backgrounds, on transparent paper with no margins" do
       theme = chosen(:void)
+      shared = chosen(:void, [], %{legend_margin: {:rel, 2}})
 
       assert {theme.plot_background, theme.plot_margin, theme.axis_text_x_bottom,
               theme.axis_ticks_length_y_left, theme.panel_grid_major_x, theme.legend_key,
@@ -499,6 +509,18 @@ defmodule Giggly.ThemeTest do
                 }, sides(0, 0, 0, 0), :none, 0.0, :none, :none, sides(0, 0, 0, 0),
                 5.669291338582677, 5.4794520547945211, sides(5.4794520547945211, 0, 0, 0),
                 sides(0, 0, 0, 0)}
+
+      # Its margins are half its base size, as theme_gray()'s, though no element it draws takes
+      # them: a legend's margin set as a share does; its legends go right, their colour bars'
+      # ticks a fifth of a key long, its panel under its layers and its titles' lines 0.9 apart.
+      assert {shared.legend_margin, theme.legend_position, theme.legend_ticks_length,
+              theme.panel_ontop, theme.plot_title.line_spacing} ===
+               {sides(
+                  10.958904109589042,
+                  10.958904109589042,
+                  10.958904109589042,
+                  10.958904109589042
+                ), :right, 3.456, false, 14.256}
     end
 
     test "the base sizes reach every size, spacing, line and border, but a legend's keys" do
@@ -521,12 +543,29 @@ defmodule Giggly.ThemeTest do
     test "an element a setting replaces whole takes what it leaves unset from its parent" do
       replaced = chosen(:bw, [], %{axis_text: {:replace, %{color: "#FF0000"}}})
       merged = chosen(:bw, [], %{axis_text: %{color: "#FF0000"}})
-      root = chosen(:bw, [base_size: 16], %{text: {:replace, %{color: "#0000FF"}}})
+      root = chosen(:bw, [base_size: 16.0], %{text: {:replace, %{color: "#0000FF"}}})
+      background = chosen(:dark, [], %{panel_background: {:replace, %{fill: "#FF0000"}}})
 
       assert {replaced.axis_text_x_bottom.size, replaced.axis_text_x_bottom.margin.top,
               merged.axis_text_x_bottom.size, root.axis_title_x_bottom.size,
-              root.axis_title_x_bottom.color, root.plot_margin.top} ===
-               {11.0, 2.1917808219178085, 8.8, 11.0, "#0000FF", 7.970112079701121}
+              root.axis_title_x_bottom.color, root.plot_margin.top, background.panel_background} ===
+               {11.0, 2.1917808219178085, 8.8, 11.0, "#0000FF", 7.970112079701121,
+                %{
+                  fill: "#FF0000",
+                  fill_opacity: 1.0,
+                  color: "#000000",
+                  color_opacity: 1.0,
+                  line_width: 1.0669783464566929,
+                  dashes: :none
+                }}
+    end
+
+    # A setting is marked to skip a removed element above it, replacing one whole too.
+    test "an element a setting replaces whole skips a removed parent" do
+      theme = chosen(:bw, [], %{axis_text: :none, axis_text_x: {:replace, %{color: "#FF0000"}}})
+
+      assert {theme.axis_text_x_bottom, theme.axis_text_y_left} ===
+               {%{size: 11.0, color: "#FF0000", opacity: 1.0, margin: sides(0, 0, 0, 0)}, :none}
     end
 
     test "a colour with an alpha of its own is worked out as its opacity, none as nothing" do
@@ -575,38 +614,55 @@ defmodule Giggly.ThemeTest do
 
       settings =
         chosen
-        |> Theme.merge(%{axis_text: :none, panel_grid: %{color: "#FF0000"}})
-        |> Theme.merge(%{axis_text: %{color: "#FF0000"}, panel_grid: :none})
-        |> Theme.merge(%{axis_text: %{size: 12}, panel_grid: %{linewidth: 2}})
+        |> Theme.merge(%{
+          axis_text: :none,
+          panel_grid: %{color: "#FF0000"},
+          panel_border: :none,
+          axis_ticks: :none
+        })
+        |> Theme.merge(%{
+          axis_text: %{color: "#FF0000"},
+          panel_grid: :none,
+          panel_border: %{color: "#FF0000"},
+          axis_ticks: %{color: "#FF0000"}
+        })
+        |> Theme.merge(%{
+          axis_text: %{size: 12, color: "#0000FF"},
+          panel_grid: %{linewidth: 2},
+          axis_ticks: :none
+        })
         |> Map.fetch!(:settings)
 
       assert settings === %{
-               axis_text: {:replace, %{color: "#FF0000", size: 12}},
-               panel_grid: {:replace, %{linewidth: 2}}
+               axis_text: {:replace, %{color: "#0000FF", size: 12}},
+               panel_grid: {:replace, %{linewidth: 2}},
+               panel_border: {:replace, %{color: "#FF0000"}},
+               axis_ticks: :none
              }
     end
 
     test "choosing a complete theme drops the settings and records the sizes, widths from size" do
-      assert {Theme.choose(:light, base_size: 16), Theme.choose(:dark, base_line_size: 2)} === {
-               %{
-                 complete: %{
-                   name: :light,
-                   base_size: 16.0,
-                   base_line_size: 0.7272727272727273,
-                   base_rect_size: 0.7272727272727273
+      assert {Theme.choose(:light, base_size: 16.0), Theme.choose(:dark, base_line_size: 2.0)} ===
+               {
+                 %{
+                   complete: %{
+                     name: :light,
+                     base_size: 16.0,
+                     base_line_size: 0.7272727272727273,
+                     base_rect_size: 0.7272727272727273
+                   },
+                   settings: %{}
                  },
-                 settings: %{}
-               },
-               %{
-                 complete: %{
-                   name: :dark,
-                   base_size: 11.0,
-                   base_line_size: 2.0,
-                   base_rect_size: 0.5
-                 },
-                 settings: %{}
+                 %{
+                   complete: %{
+                     name: :dark,
+                     base_size: 11.0,
+                     base_line_size: 2.0,
+                     base_rect_size: 0.5
+                   },
+                   settings: %{}
+                 }
                }
-             }
     end
 
     test "a length or a margin replaces the one before whole" do

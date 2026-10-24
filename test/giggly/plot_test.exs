@@ -3920,22 +3920,33 @@ defmodule Giggly.PlotTest do
                 }, %{name: :classic, base_size: 11.0, base_line_size: 1.0, base_rect_size: 0.0}}
     end
 
-    test "every function records its own theme" do
+    test "every function records its own theme and the base size given, 0 too" do
       plot = Plot.new(@rows)
 
       themed = [
-        Plot.theme_gray(plot),
-        Plot.theme_bw(plot),
-        Plot.theme_linedraw(plot),
-        Plot.theme_light(plot),
-        Plot.theme_dark(plot),
-        Plot.theme_minimal(plot),
-        Plot.theme_classic(plot),
-        Plot.theme_void(plot)
+        Plot.theme_gray(plot, base_size: 9),
+        Plot.theme_bw(plot, base_size: 9),
+        Plot.theme_linedraw(plot, base_size: 9),
+        Plot.theme_light(plot, base_size: 9),
+        Plot.theme_dark(plot, base_size: 9),
+        Plot.theme_minimal(plot, base_size: 9),
+        Plot.theme_classic(plot, base_size: 9),
+        Plot.theme_void(plot, base_size: 0)
       ]
 
-      assert Enum.map(themed, fn chosen -> chosen.theme.complete.name end) ===
-               [:gray, :bw, :linedraw, :light, :dark, :minimal, :classic, :void]
+      assert Enum.map(themed, fn chosen ->
+               {chosen.theme.complete.name, chosen.theme.complete.base_size}
+             end) ===
+               [
+                 gray: 9.0,
+                 bw: 9.0,
+                 linedraw: 9.0,
+                 light: 9.0,
+                 dark: 9.0,
+                 minimal: 9.0,
+                 classic: 9.0,
+                 void: 0.0
+               ]
     end
 
     # ggplot2 replaces a plot's theme with a complete theme added to it, the settings laid over

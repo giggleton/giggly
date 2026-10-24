@@ -480,20 +480,21 @@ defmodule Giggly.Theme do
   @spec elements() :: [{atom(), kind(), atom(), String.t()}]
   def elements, do: @elements
 
-  # A plot's theme with the complete theme `name` chosen, at the sizes `sizes` gives, its text's
-  # in points and its lines' and borders' in millimetres, and any it leaves out ggplot2's
-  # defaults: 11 points, and `base_size / 22` for each width. Its settings are none, as ggplot2
-  # drops a plot's earlier settings with the theme a complete theme replaces.
+  # A plot's theme with the complete theme `name` chosen, at the sizes `sizes` gives, floats as
+  # `Giggly.Plot`'s checks keep them, its text's in points and its lines' and borders' in
+  # millimetres, and any it leaves out ggplot2's defaults: 11 points, and `base_size / 22` for
+  # each width. Its settings are none, as ggplot2 drops a plot's earlier settings with the theme a
+  # complete theme replaces.
   @doc false
   @spec choose(name(), keyword()) :: plot_theme()
   def choose(name, sizes) when name in @names do
-    base_size = Keyword.get(sizes, :base_size, @default_base_size) / 1
+    base_size = Keyword.get(sizes, :base_size, @default_base_size)
 
     chosen = %{
       name: name,
       base_size: base_size,
-      base_line_size: Keyword.get(sizes, :base_line_size, base_size / 22) / 1,
-      base_rect_size: Keyword.get(sizes, :base_rect_size, base_size / 22) / 1
+      base_line_size: Keyword.get(sizes, :base_line_size, base_size / 22),
+      base_rect_size: Keyword.get(sizes, :base_rect_size, base_size / 22)
     }
 
     %{complete: chosen, settings: %{}}
@@ -517,13 +518,12 @@ defmodule Giggly.Theme do
     %{plot_theme | settings: merged}
   end
 
-  defp merged_element(complete, kind, :none, new)
-       when complete != :none and kind in [:line, :rect, :text] and is_map(new),
-       do: {:replace, new}
+  # Only a line, a rectangle or a text may be removed, so only one is ever replaced whole.
+  defp merged_element(complete, _kind, :none, new) when complete != :none and is_map(new),
+    do: {:replace, new}
 
-  defp merged_element(_complete, kind, {:replace, old}, new)
-       when kind in [:line, :rect, :text] and is_map(new),
-       do: {:replace, Map.merge(old, new)}
+  defp merged_element(_complete, _kind, {:replace, old}, new) when is_map(new),
+    do: {:replace, Map.merge(old, new)}
 
   defp merged_element(_complete, kind, old, new)
        when kind in [:line, :rect, :text] and is_map(old) and is_map(new),
