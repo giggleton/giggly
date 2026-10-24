@@ -1429,6 +1429,23 @@ defmodule Giggly.GeomTest do
              ]
     end
 
+    # Golden: ggplot2 4.0.3's keys for text set `hjust = "inward", vjust = "outward"`, unturned and
+    # turned 90 degrees, through vdiffr 1.0.9, each drawn where the key set `hjust = 0.5, vjust =
+    # 0.5` is: `draw_key_text()` asks `compute_just()` against the key's middle, along the text or,
+    # turned, across it, and a label at the middle is centred.
+    test "a text's key justified inward or outward is centred, turned or not" do
+      for angle <- [0.0, 90.0] do
+        assert draw_key(
+                 %Geom.Text{check_overlap: false},
+                 %{hjust: :inward, vjust: :outward, angle: angle}
+               ) ===
+                 draw_key(
+                   %Geom.Text{check_overlap: false},
+                   %{hjust: 0.5, vjust: 0.5, angle: angle}
+                 )
+      end
+    end
+
     test "a path's key is in the colour its layer sets, and a colour of :none draws none" do
       assert [%Segments{color: ["#FF0000"], opacity: [@half_alpha]}] =
                draw_key(@path, %{alpha: nil, color: "#FF000080"})

@@ -164,8 +164,9 @@ beginning "Each layer's defaults are filled in from the theme".
   whose colour is `:none`, is not drawn. **A geom measures the text it draws** (`Giggly.Font`),
   since the scene draws a label at its measured width; **whether labels overlap is the backend's to
   decide** (`Scene.Text`'s `check_overlap`), since it turns on the panel's size in points, which no
-  geom sees. Its key is the letter "a" at the layer's justification, turned as `rotate_just()` turns
-  it, a tenth of a line of its own text in from the key's edges, an offset turned into the text's
+  geom sees. Its key is the letter "a" at the layer's justification (`:inward` and `:outward` read
+  against the key's middle, so centred), turned as `rotate_just()` turns it, a tenth of a line of
+  its own text in from the key's edges, an offset turned into the text's
   frame, as `draw_key_text()` draws it, and needs the box round the letter turned with it, the
   font's descent added by the angle's sine and cosine and a margin each side of a tenth of a line
   of grid's default 12-point font, not its own, as `draw_key_text()` measures it, outside the
