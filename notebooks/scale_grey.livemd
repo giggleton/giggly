@@ -72,8 +72,14 @@ p
 p + scale_colour_grey() + theme_bw()
 ```
 
-Not in Giggly yet: `theme_bw()`. Every Giggly plot is drawn in ggplot2's default theme,
-`theme_gray()`, with its grey panel.
+`theme_bw()` is `Giggly.Plot.theme_bw/2`.
+
+```elixir
+p
+|> Plot.scale_color_gray()
+|> Plot.theme_bw()
+|> render.()
+```
 
 ## Missing values
 

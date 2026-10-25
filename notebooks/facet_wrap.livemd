@@ -199,7 +199,7 @@ ggplot(economics_long, aes(date, value)) +
   theme(strip.background = element_blank(), strip.placement = "outside")
 ```
 
-Not in Giggly yet: `strip.position` and changing the theme.
+Not in Giggly yet: `strip.position` and the theme's `strip.placement` setting.
 
 ## The direction the panels fill
 

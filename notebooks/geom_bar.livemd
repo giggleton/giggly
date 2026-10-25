@@ -117,9 +117,8 @@ ggplot(mpg, aes(y = class)) +
  theme(legend.position = "top")
 ```
 
-Not in Giggly yet: `position_stack()` and its `reverse` option, and changing the theme, here to put
-the legend above the plot. Giggly names a position by an atom, `position: :stack`, which takes no
-options yet.
+Not in Giggly yet: `position_stack()` and its `reverse` option. Giggly names a position by an atom,
+`position: :stack`, which takes no options yet.
 
 ## Columns
 

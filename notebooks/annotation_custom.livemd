@@ -39,7 +39,7 @@ base + annotation_custom(
 
 `geom_blank()` draws nothing, but its data still sets the scales.
 
-Not in Giggly yet: `geom_blank()`, `theme_bw()`, `annotation_custom()`, and `grid` grobs.
+Not in Giggly yet: `geom_blank()`, `annotation_custom()`, and `grid` grobs.
 
 ## An inset plot
 
@@ -55,5 +55,5 @@ base +
 
 `ggplotGrob()` turns a whole plot into a grob, to be drawn inside another.
 
-Not in Giggly yet: `ggplotGrob()` and `grid` grobs, changing the theme, here to border the inset,
-`annotation_custom()`, and the `geom_blank()` and `theme_bw()` of `base`.
+Not in Giggly yet: `ggplotGrob()` and `grid` grobs, `annotation_custom()`, and the `geom_blank()` of
+`base`.

@@ -156,7 +156,11 @@ Not in Giggly yet: `guide_legend()`'s `title` option.
 p + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: changing the theme, here to put the legends below the plot.
+```elixir
+p
+|> Plot.theme(legend_position: :bottom)
+|> render.()
+```
 
 ## The order of the legends
 

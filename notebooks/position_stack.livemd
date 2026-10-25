@@ -143,8 +143,7 @@ ggplot(series, aes(time, value)) +
   theme(legend.position = "top")
 ```
 
-Not in Giggly yet: `geom_area()`, `position_stack()`'s `reverse` option, `coord_flip()`, and
-changing the theme, here to put the legend above the plot.
+Not in Giggly yet: `geom_area()`, `position_stack()`'s `reverse` option and `coord_flip()`.
 
 ## Stacking lines and points
 

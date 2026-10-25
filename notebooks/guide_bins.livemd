@@ -44,8 +44,8 @@ p + guides(size = guide_bins(
 ))
 ```
 
-Not in Giggly yet: `scale_size_binned()`, `guide_bins()`, and changing the theme, here to remove the
-legend's axis line.
+Not in Giggly yet: `scale_size_binned()`, and `guide_bins()` and its `theme` option, here to remove
+the legend's axis line.
 
 ## Showing the limits
 
@@ -67,8 +67,8 @@ p + guides(size = guide_bins(
 ))
 ```
 
-Not in Giggly yet: `scale_size_binned()`, `guide_bins()`, and changing the theme, here to put
-arrowheads on the legend's axis line.
+Not in Giggly yet: `scale_size_binned()`, `guide_bins()` and its `theme` option, and
+`element_line()`'s `arrow` option, here to put arrowheads on the legend's axis line.
 
 ## Merged legends
 

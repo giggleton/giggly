@@ -198,8 +198,7 @@ p +
   theme_dark()
 ```
 
-Not in Giggly yet: `scale_fill_brewer()` and its `direction` option, and `theme_dark()`. Giggly
-draws every plot in ggplot2's default theme, `theme_gray()`.
+Not in Giggly yet: `scale_fill_brewer()` and its `direction` option.
 
 ## Continuous colours
 

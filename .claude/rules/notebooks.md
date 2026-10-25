@@ -13,26 +13,29 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
 
 ## Rules
 
-- **A notebook follows its ggplot2 reference page: every example, in the page's order**, each
-  with ggplot2's code first, verbatim: every line of the page's examples, comments included,
-  appears once across the notebook's R blocks. One Giggly can draw is drawn with Giggly's code;
-  one it cannot keeps its ggplot2 code and names what it waits for, so the notebook is also the
-  page's list of what remains. Drawn means the same plot built with Giggly's own counterparts of
-  the example's functions, checked against R; a plot Giggly could only imitate (`qplot()`, a
-  computed column standing in for `cut_width(carat, 0.25)`) waits. An argument ggplot2 does not
-  recognise, and so draws as its default (`hjust = 'outside'`, centred), is left out of Giggly's
-  cell, and the prose says so (design-log §4, the entry beginning "A notebook leaves out an
-  argument"). An example R refuses on purpose (`should_stop()`) that Giggly refuses too is shown
-  by a cell that runs Giggly's line in `try`/`rescue` and returns the message, so every cell still
-  runs and no verdict is written (the entry beginning "An example R refuses on purpose").
+- **A notebook follows its ggplot2 reference page: every example, in the page's order**, each with
+  ggplot2's code first, verbatim: every line of the page's examples, comments included, appears once
+  across the notebook's R blocks. One Giggly can draw is drawn with Giggly's code; one it cannot
+  keeps its ggplot2 code and names what it waits for, so the notebook is also the page's list of
+  what remains. Drawn means the same plot built with Giggly's own counterparts of the example's
+  functions, checked against R; a plot Giggly could only imitate (`qplot()`, a computed column
+  standing in for `cut_width(carat, 0.25)`) waits. An example that sets ggplot2's active theme
+  (`set_theme()`, `update_theme()`) is drawn with the plot's own theme, which Giggly offers in its
+  place (design-log §4, the entry beginning "An example that sets ggplot2's active theme"). An
+  argument ggplot2 does not recognise, and so draws as its default (`hjust = 'outside'`, centred),
+  is left out of Giggly's cell, and the prose says so (the entry beginning "A notebook leaves out an
+  argument"). An example R refuses on purpose (`should_stop()`) that Giggly refuses too is shown by
+  a cell that runs Giggly's line in `try`/`rescue` and returns the message, so every cell still runs
+  and no verdict is written (the entry beginning "An example R refuses on purpose").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
-  words in every notebook** ("mapping a text's `size`", "a character as a shape",
-  "`geom_jitter()`", "a whole-column function in a mapping"), so when a feature lands, searching the
-  notebooks for its name finds every example waiting for it, and those are drawn; a verdict still
-  waiting drops the pieces that landed and keeps the rest (design-log §4, the entries beginning "A
-  verdict names a missing expression" and "A verdict names a text's mapped size"). **An About
-  sentence says what Giggly has and names what it lacks by that name** ("maps no `xend`", "no binned
-  scales"), never "no X but <what exists>", which a search for the next feature cannot find.
+  words in every notebook** ("mapping a text's `size`", "a character as a shape", "`geom_jitter()`",
+  "a whole-column function in a mapping", "the theme's `strip.placement` setting"), so when a
+  feature lands, searching the notebooks for its name finds every example waiting for it, and those
+  are drawn; a verdict still waiting drops the pieces that landed and keeps the rest (design-log §4,
+  the entries beginning "A verdict names a missing expression" and "A verdict names a text's mapped
+  size"). **An About sentence says what Giggly has and names what it lacks by that name** ("maps no
+  `xend`", "no binned scales"), never "no X but <what exists>", which a search for the next feature
+  cannot find.
 - **An expression is written as a function by name where Giggly names R's** (`{:log10,
   [:carat]}`, titled `log10(carat)` as R titles it), **and otherwise as a capture wherever one
   function computes it** (`{&Kernel.//2, [:unemploy, :pop]}`), so its guide is titled by the call;

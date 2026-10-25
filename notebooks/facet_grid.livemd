@@ -112,7 +112,7 @@ ggplot(mpg, aes(drv, model)) +
 ```
 
 Not in Giggly yet: `facet_grid()` and its `space` option, which sizes each panel in proportion to
-its scales, and changing the theme, here to turn the row strips' text horizontal.
+its scales, and the theme's `strip.text.y` setting, here to turn the row strips' text horizontal.
 
 ## Margins
 

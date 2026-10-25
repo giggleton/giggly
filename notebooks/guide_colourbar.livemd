@@ -23,7 +23,7 @@ size and the look and place of its ticks and labels. `guide_colorbar()` is the s
 draws a continuous colour's or fill's colour bar as ggplot2 does at its defaults, in its gradient
 form (`display = "gradient"`, fifteen colours), and chooses one by name, `:colorbar`, in a scale's
 `guide:` or in `Giggly.Plot.guides/2`, but has none of the rest yet: no `guide_colourbar()` and its
-options, and every plot drawn in ggplot2's default theme, `theme_gray()`, with no way to change it.
+options.
 
 ## The basic form
 
@@ -82,8 +82,8 @@ p1 + guides(fill = guide_colourbar(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and changing the
-theme.
+Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and the theme's
+`legend.text.position` setting.
 
 ## The number of bins
 
@@ -134,5 +134,5 @@ p2 +
   )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, `guide_legend()`'s
-`theme` option, and changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and `guide_legend()`'s
+`theme` option.

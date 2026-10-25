@@ -33,12 +33,12 @@ when a column of numbers is mapped to `colour` or `fill`, blending smoothly thro
 colour. Their default palette is a setting of the theme. Giggly has
 `Giggly.Plot.scale_color_continuous/2` and `Giggly.Plot.scale_fill_continuous/2`, along the gradient
 from `#132B43` to `#56B1F7` by default or through the colours `palette:` gives, but no binned scales
-(`scale_colour_binned()`), and draws every plot in ggplot2's default theme, `theme_gray()`, with no
-way to change one. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
-returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
-defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in
-these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular
-models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
+(`scale_colour_binned()`), and takes no palette from the theme (`palette.colour.continuous`). A plot
+is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`. The data in these examples is
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
+to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## A palette given to the scale
 
@@ -71,7 +71,7 @@ p
 p + theme(palette.colour.continuous = c("#DEEBF7", "#9ECAE1", "#3182BD"))
 ```
 
-Not in Giggly yet: changing the theme, here its `palette.colour.continuous` setting.
+Not in Giggly yet: the theme's `palette.colour.continuous` setting.
 
 ## A default for every plot
 
@@ -86,7 +86,7 @@ old <- update_theme(palette.colour.continuous = c("#E5F5E0", "#A1D99B", "#31A354
 p
 ```
 
-Not in Giggly yet: changing the theme.
+Not in Giggly yet: the theme's `palette.colour.continuous` setting.
 
 ## Binned colours
 
@@ -96,7 +96,7 @@ p + scale_colour_binned() +
   theme(palette.colour.continuous = c("#EFEDF5", "#BCBDDC", "#756BB1"))
 ```
 
-Not in Giggly yet: `scale_colour_binned()` and changing the theme.
+Not in Giggly yet: `scale_colour_binned()` and the theme's `palette.colour.continuous` setting.
 
 ## Restoring the theme
 

@@ -29,13 +29,16 @@ A theme draws everything in a plot that is not data: titles, labels, fonts, back
 legends and strips. `theme()` changes parts of one plot's theme. Each part is an element, such as
 `element_text()`, `element_line()`, `element_rect()`, or `element_blank()` to draw nothing, and an
 element takes what it does not set from a more general one: `axis.title.x.bottom` from
-`axis.title.x`, that from `axis.title`, and that from `text`. Every Giggly plot is drawn in
-ggplot2's default theme, `theme_gray()`, and there is no way to change it yet. A plot is described
-with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
-aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`,
-R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to
-`mtcars`, R's name for it.
+`axis.title.x`, that from `axis.title`, and that from `text`. Giggly changes a plot's theme with
+`Giggly.Plot.theme/2`, each element named as ggplot2 names it with underscores for its dots
+(`axis_title_x_bottom`): a line, a rectangle or a text is a keyword list of its properties,
+`element_blank()` is `:none`, `rel(2)` is `{:rel, 2}`, and a length such as `unit(.25, "cm")` is
+`{0.25, :cm}`. It has no `element_geom()`, and no palettes in the theme
+(`palette.colour.continuous`). A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data in these examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from
+the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## A plot with a title
 
@@ -64,8 +67,20 @@ p1 + theme(plot.title = element_text(size = rel(2)))
 p1 + theme(plot.background = element_rect(fill = "green"))
 ```
 
-Not in Giggly yet: changing the theme, here the title's size and the background behind the whole
-plot.
+`rel(2)` doubles the title's size. CSS's `"green"` is `#008000`, darker than R's, `#00FF00`, so
+this background is darker than ggplot2's.
+
+```elixir
+p1
+|> Plot.theme(plot_title: [size: {:rel, 2}])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(plot_background: [fill: "green"])
+|> render.()
+```
 
 ## The panel's background, border and gridlines
 
@@ -81,7 +96,35 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here the panel's background, its border and its gridlines.
+R's `"grey50"` is a name CSS lacks, so the cell writes its hex, `"#7F7F7F"`. The border is
+drawn over the points and never filled.
+
+```elixir
+p1
+|> Plot.theme(panel_background: [fill: "white", colour: "#7F7F7F"])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(panel_border: [linetype: :dashed])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(panel_grid_major: [colour: "black"])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(
+  panel_grid_major_y: :none,
+  panel_grid_minor_y: :none
+)
+|> render.()
+```
 
 ## Gridlines over the data
 
@@ -94,7 +137,17 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here drawing the panel's gridlines over the points.
+R's `NA`, no fill, is `:none`, and `"grey50"` is written as its hex, `"#7F7F7F"`.
+
+```elixir
+p1
+|> Plot.theme(
+  panel_background: [fill: :none],
+  panel_grid_major: [colour: "#7F7F7F"],
+  panel_ontop: true
+)
+|> render.()
+```
 
 ## Axis lines, text and ticks
 
@@ -106,7 +159,26 @@ p1 + theme(axis.text = element_text(colour = "blue"))
 p1 + theme(axis.ticks = element_line(linewidth = 2))
 ```
 
-Not in Giggly yet: changing the theme, here the axes' lines, text and ticks.
+`theme_gray()` draws no axis lines until a setting gives them. R's `"grey80"` is a name CSS
+lacks, so the cell writes its hex, `"#CCCCCC"`.
+
+```elixir
+p1
+|> Plot.theme(axis_line: [linewidth: 3, colour: "#CCCCCC"])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(axis_text: [colour: "blue"])
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme(axis_ticks: [linewidth: 2])
+|> render.()
+```
 
 ## The y axis's title
 
@@ -115,7 +187,11 @@ Not in Giggly yet: changing the theme, here the axes' lines, text and ticks.
 p1 + theme(axis.title.y = element_text(size = rel(1.5), angle = 90))
 ```
 
-Not in Giggly yet: changing the theme, here the size and angle of the y axis's title.
+```elixir
+p1
+|> Plot.theme(axis_title_y: [size: {:rel, 1.5}, angle: 90])
+|> render.()
+```
 
 ## The length and direction of ticks
 
@@ -128,8 +204,18 @@ p1 + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here the length of the ticks and the margin above the x
-axis's text.
+`unit(.25, "cm")` is `{0.25, :cm}`, and a negative length points the x axis's ticks into the
+panel. `margin(t = .3, unit = "cm")` is a keyword list of the sides it sets, `[top: {0.3, :cm}]`.
+
+```elixir
+p1
+|> Plot.theme(
+  axis_ticks_length_y: {0.25, :cm},
+  axis_ticks_length_x: {-0.25, :cm},
+  axis_text_x: [margin: [top: {0.3, :cm}]]
+)
+|> render.()
+```
 
 ## A plot with legends
 
@@ -172,7 +258,26 @@ p2 + theme(legend.justification = "top")
 p2 + theme(legend.position = "bottom")
 ```
 
-Not in Giggly yet: changing the theme, here where the legends go.
+A position is an atom, and so is a justification given by name: `:top` hangs the legends right
+of the panels from their top.
+
+```elixir
+p2
+|> Plot.theme(legend_position: :none)
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme(legend_justification: :top)
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme(legend_position: :bottom)
+|> render.()
+```
 
 ## Legends inside the panel
 
@@ -188,7 +293,20 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here placing the legends inside the panel.
+`c(.95, .95)` is `{0.95, 0.95}`, shares of the panel's width and height, and `c("right", "top")`
+is `{:right, :top}`. `margin_auto(6)`, 6 points on every side, is `6`.
+
+```elixir
+p2
+|> Plot.theme(
+  legend_position: :inside,
+  legend_position_inside: {0.95, 0.95},
+  legend_justification: {:right, :top},
+  legend_box_just: :right,
+  legend_margin: 6
+)
+|> render.()
+```
 
 ## A box around the legends
 
@@ -201,7 +319,17 @@ p2 + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here the box around the legends and its margin.
+`element_rect()` with nothing set is `[]`: a white background with a black border, as ggplot2
+draws it, since the box's background takes nothing from the theme's other rectangles.
+
+```elixir
+p2
+|> Plot.theme(
+  legend_box_background: [],
+  legend_box_margin: 6
+)
+|> render.()
+```
 
 ## Legend keys, text and titles
 
@@ -213,7 +341,25 @@ p2 + theme(legend.text = element_text(size = 8, colour = "red"))
 p2 + theme(legend.title = element_text(face = "bold"))
 ```
 
-Not in Giggly yet: changing the theme, here the legends' keys, text and titles.
+A text's `face` is an atom, `:bold`.
+
+```elixir
+p2
+|> Plot.theme(legend_key: [fill: "white", colour: "black"])
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme(legend_text: [size: 8, colour: "red"])
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme(legend_title: [face: :bold])
+|> render.()
+```
 
 ## Strips
 
@@ -230,11 +376,13 @@ p3
 ```
 
 ```elixir
-mtcars
-|> Plot.new(%{x: :wt, y: :mpg})
-|> Plot.geom_point()
-|> Plot.facet_wrap(:cyl)
-|> render.()
+p3 =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+  |> Plot.facet_wrap(:cyl)
+
+render.(p3)
 ```
 
 ```r
@@ -246,8 +394,31 @@ p3 + theme(strip.text.x.top = element_text(colour = "white", face = "bold"))
 p3 + theme(panel.spacing = unit(1, "lines"))
 ```
 
-Not in Giggly yet: changing the theme, here the strips' background and text and the space
-between the panels.
+`unit(1, "lines")` is `{1, :lines}`.
+
+```elixir
+p3
+|> Plot.theme(strip_background: [colour: "black", fill: "white"])
+|> render.()
+```
+
+```elixir
+p3
+|> Plot.theme(strip_text_x: [colour: "white", face: :bold])
+|> render.()
+```
+
+```elixir
+p3
+|> Plot.theme(strip_text_x_top: [colour: "white", face: :bold])
+|> render.()
+```
+
+```elixir
+p3
+|> Plot.theme(panel_spacing: {1, :lines})
+|> render.()
+```
 
 ## Default colours for layers
 
@@ -262,7 +433,7 @@ p4 <- ggplot(mtcars, aes(wt, mpg)) +
 p4 + theme(geom = element_geom(ink = "dodgerblue"))
 ```
 
-Not in Giggly yet: changing the theme, here the colour every layer draws in.
+Not in Giggly yet: `element_geom()`, here to set the colour every layer draws in.
 
 ## Accent and paper colours
 
@@ -272,8 +443,8 @@ p4 + geom_smooth(method = "lm", formula = y ~ x) +
   theme(geom = element_geom(accent = "tomato", paper = "orchid"))
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and changing the theme, here the
-accent and paper colours layers draw with.
+Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and `element_geom()`, here to set
+the accent and paper colours layers draw with.
 
 ## A default palette
 
@@ -283,5 +454,5 @@ p4 + aes(colour = drat) +
   theme(palette.colour.continuous = c("white", "pink", "hotpink"))
 ```
 
-Not in Giggly yet: adding a mapping with `+ aes()`, and changing the theme, here the palette a
-continuous `colour` scale draws from.
+Not in Giggly yet: adding a mapping with `+ aes()`, and the theme's `palette.colour.continuous`
+setting, the palette a continuous `colour` scale draws from.

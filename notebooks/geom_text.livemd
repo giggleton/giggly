@@ -142,7 +142,7 @@ p
 ```
 
 `family` names the font. Giggly measures a label as its default font does, and draws it at that
-width in the font named, where the browser has it.
+width in the font named, or in the default sans-serif font where the browser lacks it.
 
 ```elixir
 p

@@ -16,10 +16,11 @@ draw yet keeps its ggplot2 code and names what it is waiting for, so the page is
 what remains.
 
 An axis is the guide that draws a position scale, such as the x or y scale, as ticks, labels and a
-title. `guide_axis()` changes how one is drawn: it can spread crowded labels over several rows,
-turn them to an angle or drop those that overlap, add minor ticks, and cut the axis line back to
-the outermost breaks. It is given to a scale's `guide` argument or to `guides()`. Giggly has no
-guides yet, and no way to change how an axis is drawn.
+title. `guide_axis()` changes how one is drawn: it can spread crowded labels over several rows, turn
+them to an angle or drop those that overlap, add minor ticks, and cut the axis line back to the
+outermost breaks. It is given to a scale's `guide` argument or to `guides()`. Giggly has no axis
+guides yet (`guide_axis()`); `Giggly.Plot.theme/2` styles an axis's line, ticks and labels, and
+turns its labels with `angle:`.
 
 ## Dodging and turning labels
 

@@ -1843,6 +1843,25 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   shorter notebooks, but base R, not plotting, as the entry above found. *Rejected: a list
   literal* — Elixir's formatter puts each of 1,000 numbers on a line of its own.
 
+- **An example that sets ggplot2's active theme is drawn with the plot's own theme (2026-10-24,
+  Steve: "go", in the theme sweep).** get_theme's `set_theme(theme_bw())` and `update_theme()`
+  change a global theme Giggly rejects (the entry beginning "The theme is Phase 3's eleventh
+  increment"); the plot drawn after each is the plot choosing `Plot.theme_bw/2` or setting
+  `Plot.theme/2`, the counterpart Giggly offers, and the prose says Giggly has no active theme.
+  `replace_theme()`'s example waits on `%+replace%`, deferred: removing an element and setting
+  it again under a chosen theme draws the same, but only imitates it. This answers §7's "How a
+  notebook treats an example of a function Giggly will not offer" for the active theme alone.
+  *Rejected: a verdict waiting on the active theme* — one that never comes true. *Rejected:
+  drawing `replace_theme()`'s example by removal* — the imitation `notebooks.md` forbids.
+
+- **A verdict names a theme element Giggly lacks "the theme's `X` setting", by ggplot2's dotted
+  name (2026-10-24, Steve: "go", in the theme sweep).** Once `theme/2` landed, "changing the
+  theme" named something Giggly has, so the sweep took it out of every verdict and named what
+  still waits: "the theme's `strip.placement` setting", `legend.byrow`,
+  `palette.colour.continuous`; `element_geom()` by its function, and an element set in a guide's
+  own theme by that guide's `theme` option. *Rejected: keeping "changing the theme, here its `X`
+  setting"* — it says Giggly cannot change a theme, which `theme/2` does.
+
 - **The panel is clipped to its edges; the coordinate system records it and the assembly carries
   it to rendering (2026-10-13, Steve).** What is drawn in the panel is cut off at its edges, as
   every ggplot2 coordinate system does by default (`coord_cartesian(clip = "on")`, applied in
@@ -2487,6 +2506,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Draw the notebook examples the theme and its families unlock, and narrow every
+  verdict to what still waits (theme, the notebook sweep); §4: "An example that sets ggplot2's
+  active theme", "A verdict names a theme element Giggly lacks"
 - 2026-10-24 — Give a theme's texts a font family by name, and every complete theme
   base_family and header_family, each family measured by the built-in table (fonts, the family
   step); §4: "A text's family is the theme's", "A font family is a name"
@@ -2771,7 +2793,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   say "Not in Giggly yet", which will never become true. Options: draw them with the replacement,
   as `labs(x:)` for `xlab()`, which `notebooks.md` allows as a counterpart, though `ggplot()` for
   `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
-  Settled when the first such example could otherwise be drawn.
+  Settled when the first such example could otherwise be drawn. The active theme's functions,
+  which Giggly rejects as global state, are answered (§4, the entry beginning "An example that
+  sets ggplot2's active theme").
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

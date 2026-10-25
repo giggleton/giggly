@@ -81,8 +81,8 @@ p1 + guides(fill = guide_legend(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `title` and `theme` options, and changing the
-theme.
+Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `title` and `theme` options, and the theme's
+`legend.title.position` and `legend.text.position` settings.
 
 ## A horizontal legend
 
@@ -104,7 +104,8 @@ p1 +
 The keys run across, with the title above them and each label below its key, turned on its
 side.
 
-Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `theme` option, and changing the theme.
+Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `theme` option, and the theme's
+`legend.title.position` and `legend.text.position` settings.
 
 ## Keys drawn opaque
 
@@ -137,7 +138,8 @@ p + guides(col = guide_legend(nrow = 8, theme = theme(legend.byrow = TRUE)))
 
 `legend.byrow = TRUE` fills the keys in row by row, rather than column by column.
 
-Not in Giggly yet: `guide_legend()`'s `nrow`, `ncol` and `theme` options, and changing the theme.
+Not in Giggly yet: `guide_legend()`'s `nrow`, `ncol` and `theme` options, and the theme's
+`legend.byrow` setting.
 
 ## Keys in reverse order
 

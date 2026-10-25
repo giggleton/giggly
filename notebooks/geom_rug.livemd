@@ -103,8 +103,8 @@ p +
   theme(plot.margin = margin_auto(1, unit = "cm"))
 ```
 
-Not in Giggly yet: `geom_rug()` and its `outside` and `sides` options, `coord_cartesian()`'s
-`clip` option, and changing the theme, here to give the plot a margin of 1 cm on every side.
+Not in Giggly yet: `geom_rug()` and its `outside` and `sides` options, and `coord_cartesian()`'s
+`clip` option.
 
 ## Longer rug lines
 

@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,11 +31,18 @@ a list of what remains.
 In ggplot2's theme system, the `element_` functions say how the parts of a plot that are not data
 are drawn: `element_blank()` draws nothing and takes no space, `element_rect()` draws borders and
 backgrounds, `element_line()` lines and `element_text()` text, and `element_geom()` sets the
-defaults that layers draw with. `element_polygon()` and `element_point()` are not drawn in
-standard plots and serve extensions. `rel()` gives a size relative to the parent element's, and
-`margin()`, `margin_part()` and `margin_auto()` give the margins around an element. Giggly draws
-every plot in ggplot2's default theme, `theme_gray()`, and has none of these yet: there is no way
-to change the theme.
+defaults that layers draw with. `element_polygon()` and `element_point()` are not drawn in standard
+plots and serve extensions. `rel()` gives a size relative to the parent element's, and `margin()`,
+`margin_part()` and `margin_auto()` give the margins around an element. Giggly sets a plot's
+elements with `Giggly.Plot.theme/2`: a line, a rectangle or a text is a keyword list of its
+properties, `element_blank()` is `:none`, `rel(1.5)` is `{:rel, 1.5}`, and a margin is one length
+for every side or a keyword list of the sides it sets, so `margin()` and `margin_auto()` are written
+as lengths. It has no `margin_part()`, `element_geom()`, `element_polygon()` or `element_point()`,
+and no `arrow` on a line. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
+which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
+`Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38
+popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## Blank elements
 
@@ -39,8 +57,19 @@ plot + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here to remove the panel's background and the axes' tick
-labels.
+```elixir
+plot =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy})
+  |> Plot.geom_point()
+
+plot
+|> Plot.theme(
+  panel_background: :none,
+  axis_text: :none
+)
+|> render.()
+```
 
 ## Styling text
 
@@ -51,8 +80,11 @@ plot + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here to draw the tick labels in red at a size relative to
-their parent element's, with `rel()`.
+```elixir
+plot
+|> Plot.theme(axis_text: [colour: "red", size: {:rel, 1.5}])
+|> render.()
+```
 
 ## An axis line with an arrow
 
@@ -63,8 +95,8 @@ plot + theme(
 )
 ```
 
-Not in Giggly yet: changing the theme, here to draw each axis's line, ending in an arrow made by
-`grid`'s `arrow()`.
+Not in Giggly yet: `element_line()`'s `arrow` option, here to end each axis's line in an arrow
+made by `grid`'s `arrow()`.
 
 ## Backgrounds and margins
 
@@ -80,10 +112,23 @@ plot + theme(
 )
 ```
 
-`margin_auto(2, unit = "cm")` gives the same 2 cm margin on all four sides.
+`margin_auto(2, unit = "cm")` gives the same 2 cm margin on all four sides, which Giggly writes
+as one length, `{2, :cm}`. R's `"grey90"` is a name CSS lacks, so the cell writes its hex,
+`"#E5E5E5"`.
 
-Not in Giggly yet: changing the theme, here to give the panel a white background, and the whole
-plot a margin and a light grey background with a black border.
+```elixir
+plot
+|> Plot.theme(
+  panel_background: [fill: "white"],
+  plot_margin: {2, :cm},
+  plot_background: [
+    fill: "#E5E5E5",
+    colour: "black",
+    linewidth: 1
+  ]
+)
+|> render.()
+```
 
 ## Defaults for layers
 

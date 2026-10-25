@@ -29,17 +29,20 @@ draw yet keeps its ggplot2 code and names what it is waiting for, so the page is
 what remains.
 
 A complete theme sets how everything in a plot that is not data is drawn: backgrounds, gridlines,
-axes, text, legends and strips. `theme_gray()`, also spelt `theme_grey()`, is ggplot2's default:
-a grey panel with white gridlines. The others vary it, from `theme_bw()`'s dark lines on white,
-through `theme_classic()`'s axis lines without gridlines, to `theme_void()`, which draws nothing
-but the data; `theme_test()` is meant for visual tests and should not change. Each takes a base
-font size and family, base sizes for lines and rectangles, and ink, paper and accent colours.
-`theme()` adjusts a theme rather than replacing it. Every Giggly plot is drawn in `theme_gray()`;
-there is no other theme and no way to change one yet. A plot is described with `Giggly.Plot` and
-drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
-so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
-cell with `Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974
-*Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
+axes, text, legends and strips. `theme_gray()`, also spelt `theme_grey()`, is ggplot2's default: a
+grey panel with white gridlines. The others vary it, from `theme_bw()`'s dark lines on white,
+through `theme_classic()`'s axis lines without gridlines, to `theme_void()`, which draws nothing but
+the data; `theme_test()` is meant for visual tests and should not change. Each takes a base font
+size and family, base sizes for lines and rectangles, and ink, paper and accent colours. `theme()`
+adjusts a theme rather than replacing it. Giggly has each of them but `theme_test()`, spelt one way,
+as `Giggly.Plot.theme_gray/2`, `Giggly.Plot.theme_bw/2` and the rest, each taking `base_size:`,
+`base_family:`, `header_family:`, `base_line_size:` and `base_rect_size:`, but no ink, paper or
+accent colours (`ink`, `paper`, `accent`). A plot that chooses none is drawn in `theme_gray()`, and
+`Giggly.Plot.theme/2` adjusts a theme. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## The default theme
 
@@ -70,8 +73,9 @@ p1 + theme_gray() # the default
 ```
 
 The cell makes `mtcars2` as `within()` does, each factor's values as text: `vs` and `am` as their
-words, and `cyl` and `gear` as their numbers written out, so `gear` is discrete and its legend
-lists 3, 4 and 5. Giggly draws every plot in `theme_gray()` already, so it needs no theme added.
+words, and `cyl` and `gear` as their numbers written out, so `gear` is discrete and its legend lists
+3, 4 and 5. `Giggly.Plot.theme_gray/2` draws the plot in `theme_gray()`, which is Giggly's default
+too.
 
 ```elixir
 words = %{vs: %{0.0 => "V-shaped", 1.0 => "Straight"}, am: %{0.0 => "Automatic", 1.0 => "Manual"}}
@@ -99,10 +103,12 @@ p1 =
     tag: "Figure 1",
     x: "Weight (1000 lbs)",
     y: "Fuel economy (mpg)",
-    colour: "Gears"
+        colour: "Gears"
   )
 
-render.(p1)
+p1
+|> Plot.theme_gray()
+|> render.()
 ```
 
 ## Other complete themes
@@ -117,8 +123,47 @@ p1 + theme_classic()
 p1 + theme_void()
 ```
 
-Not in Giggly yet: the themes `theme_bw()`, `theme_linedraw()`, `theme_light()`, `theme_dark()`,
-`theme_minimal()`, `theme_classic()` and `theme_void()`.
+```elixir
+p1
+|> Plot.theme_bw()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_linedraw()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_light()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_dark()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_minimal()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_classic()
+|> render.()
+```
+
+```elixir
+p1
+|> Plot.theme_void()
+|> render.()
+```
 
 ## The default theme with panels
 
@@ -143,5 +188,4 @@ p2 + theme_classic()
 p2 + theme_void()
 ```
 
-Not in Giggly yet: `facet_grid()`, and the themes `theme_bw()`, `theme_linedraw()`,
-`theme_light()`, `theme_dark()`, `theme_minimal()`, `theme_classic()` and `theme_void()`.
+Not in Giggly yet: `facet_grid()`.

@@ -17,8 +17,8 @@ a list of what remains.
 
 `guide_axis_stack()` draws several position guides for one axis, one beyond another: the first
 closest to the panel, the rest outward in the order given. Each is given as a guide's name, such as
-`"axis"`, or as a call to a guide function. Giggly has no axis guides yet, and no way to change how
-an axis is drawn.
+`"axis"`, or as a call to a guide function. Giggly has no axis guides yet (`guide_axis()`);
+`Giggly.Plot.theme/2` styles an axis's line, ticks and labels.
 
 ## A normal axis and a capped one
 
@@ -32,6 +32,5 @@ p <- ggplot(mpg, aes(displ, hwy)) +
 p + guides(x = guide_axis_stack("axis", guide_axis(cap = "both")))
 ```
 
-Not in Giggly yet: changing the theme, here to draw the axis lines that `theme_gray()` leaves out,
-`guide_axis_stack()`, and `guide_axis()` with its `cap` option, which stops the axis line at the
-outermost breaks.
+Not in Giggly yet: `guide_axis_stack()`, and `guide_axis()` with its `cap` option, which stops the
+axis line at the outermost breaks.
