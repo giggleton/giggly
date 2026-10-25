@@ -30,12 +30,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary lists none; binning first read them. The inverse of the transformation arrives with its
   first reader (`stat_function()`), and a stat's own parameters with the option that sets them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
-  `compute_panel()` does. **Counting, binning and the box plot's summary carry a group's constant
-  columns** (`Giggly.Stat.Carry`): a column holding one
+  `compute_panel()` does. **Counting, binning, the box plot's summary and smoothing carry a group's
+  constant columns** (`Giggly.Stat.Carry`): a column holding one
   value within every group goes to that group's rows with its type, a factor's category included
   with its levels and ordered flag, as R carries a factor, and one that varies within any group is
-  dropped (ggplot2 also warns, which a pure pipeline cannot); counting at each place keeps only
-  the columns it counts over.
+  dropped (ggplot2 also warns, which a pure pipeline cannot), smoothing reading only the groups it
+  fits, as ggplot2 reads only those its stat gives rows; counting at each place keeps only the
+  columns it counts over.
 - **A stat sums through the frame (`DataFrame.summarise/3`), as R sums**: counting's counts plain,
   as `rowsum()` adds, every other sum, a proportion's total among them, extended, as `sum()`
   adds in its long double, so `layer_data/2` holds R's doubles (design-log §4, the entries
@@ -48,7 +49,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   width from its counted positions. Nothing checks this but review. **Aligning pulls its panels'
   rows** (design-log §4, the entry beginning "Smoothing and densities compute over the rows"): its
   output is as large as its input, as the identity's is, and interpolating each group at the
-  others' places has no frame operation.
+  others' places has no frame operation. **Smoothing's fit is three passes of sums through the
+  frame**, its arithmetic the frame's `+ - * /`, pulling a row a group.
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
   into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a
@@ -56,11 +58,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A stat names what a mapping's after_stat can read: its computed variables as ggplot2
   documents them** (`computed_variables/0`: counting's `count` and `prop`, not the `width` and
   `flipped_aes` its table also holds; the box plot's summary's whiskers, hinges, notches and
-  `width`, each in either orientation, not its `outliers` or `relvarwidth`), **and the aesthetics
-  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's `weight`, the box
-  plot's summary's `x`, `y` and `weight`, and counting at each place's, which `StatSum` sums
-  without declaring), module functions beside its accepted aesthetics, which `Plot` reads at the
-  call. A stat with neither, the identity, computes nothing an after_stat can read.
+  `width`, each in either orientation, not its `outliers` or `relvarwidth`; smoothing's `y`,
+  `ymin`, `ymax` and `se`, each in either orientation), **and the aesthetics
+  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's and smoothing's
+  `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each place's, which
+  `StatSum` sums without declaring), module functions beside its accepted aesthetics, which
+  `Plot` reads at the call. A stat with neither, the identity, computes nothing an after_stat can
+  read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the rows
   there or the sum of their weights, a missing weight (`nil` or NaN) adding nothing and an
   infinite one making the count infinite, its `prop` the count's share of its group's total, the
@@ -131,3 +135,26 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   one axis mapped (y at x 0, or x), else the continuous axis beside a discrete one, else y where
   every group holds one x and x where every group holds one y, else y, where R also warns. A width
   that is not a number is refused when the plot is run.
+- **Smoothing is ggplot2's `stat_smooth()` with `method = "lm"`, R's `lm(y ~ x, weights =
+  weight)` read through `predict()`** (design-log §4, the entries beginning "A linear smooth fits
+  the slope" and "A smooth given no method is refused when the plot is run"): per panel and per
+  group, `n` rows at R's `seq()` from the group's least x to its greatest, or across the unwidened
+  extent of the panel's axis it runs along with `fullrange`, its y axis along y, where ggplot2
+  reads `scales$x` (design-log §4, the entry beginning "A full-range smooth spans"); `y` the
+  weighted mean of y plus the slope times the distance from the weighted mean
+  of x; with `se`, `se` the residuals' variance times one over the weights' total plus that
+  distance squared over x's sum of squares, square-rooted, and `ymin` and `ymax` `y` ∓ `se` times
+  Giggly's t quantile at `level` (`Giggly.Stat.TDistribution`: Abramowitz and Stegun 26.7.3-4,
+  bisected, R's `qt()` within 1e-12 up to a level of 0.999, design-log §4, the entry beginning "The
+  t quantile keeps"); and `flipped_aes`, along y with x and y swapped. Its values are R's within
+  1e-12 of the largest magnitude the group's column holds, its x R's to the last digit. A row
+  missing or infinite in x or y is left out; a group of fewer than two distinct x is fitted
+  nothing. **Its weights are R's `lm()`'s**: a missing one leaves its row out, a negative or
+  infinite one fits the group nothing, where ggplot2 also warns, and a zero one leaves its row out
+  of the fit and of the degrees of freedom, the rows weighted above 0 less two, so a group of
+  only zero weights is fitted nothing. Weighted rows at one x give a flat curve at their weighted
+  mean with a degree of freedom more, as R drops a slope it cannot fit; otherwise the slope is
+  fitted however little x varies. Of no degrees of freedom, `se` and the band are NaN. **A smooth
+  given no method (`:none`) is refused when the plot is run**, naming loess where the largest
+  group in any panel has under 1,000 rows, every row counted, and gam otherwise. A weight that is
+  not a number is refused when the plot is run.

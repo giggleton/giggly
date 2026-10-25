@@ -21,9 +21,10 @@ defprotocol Giggly.Geom do
   # ggplot2's does and which are drawn as rectangles, as ggplot2's `GeomBar` is a `GeomRect`, paths
   # (`Giggly.Geom.Path`) and lines (`Giggly.Geom.Line`), which draw as paths once their rows are in
   # order, as ggplot2's `GeomLine` is a `GeomPath`, text (`Giggly.Geom.Text`), box plots
-  # (`Giggly.Geom.Boxplot`), which draw their outliers as points, and ribbons
-  # (`Giggly.Geom.Ribbon`) and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y,
-  # as ggplot2's `GeomArea` is a `GeomRibbon`. A geom drawing lines places its rows with
+  # (`Giggly.Geom.Boxplot`), which draw their outliers as points, ribbons (`Giggly.Geom.Ribbon`)
+  # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
+  # `GeomArea` is a `GeomRibbon`, and smooths (`Giggly.Geom.Smooth`), each group a ribbon under a
+  # line, as ggplot2's `GeomSmooth` draws one. A geom drawing lines places its rows with
   # `Giggly.Coord.munch/3`, which cuts them to follow the panel's curves.
 
   # A geom places its rows through the coordinate system and draws them as scene primitives, sizes
@@ -45,7 +46,7 @@ defprotocol Giggly.Geom do
       Giggly.Resolution,
       Giggly.Scene
     ],
-    exports: [Area, Bar, Boxplot, Line, Path, Point, Rect, Ribbon, Text]
+    exports: [Area, Bar, Boxplot, Line, Path, Point, Rect, Ribbon, Smooth, Text]
 
   alias Giggly.{Coord, DataFrame, Scene}
 

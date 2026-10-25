@@ -963,6 +963,7 @@ defmodule Giggly.ThemeTest do
       assert complete(%{}).geom === %{
                ink: "#000000",
                paper: "#FFFFFF",
+               accent: "#3366FF",
                linewidth: 0.5,
                borderwidth: 0.5,
                linetype: {},
@@ -998,8 +999,8 @@ defmodule Giggly.ThemeTest do
 
       void = chosen(:void, base_size: 16.0, base_line_size: 1.0).geom
 
-      assert {void.paper, void.fontsize, void.linewidth} ===
-               {"#00000000", 5.6233568562335678, 1.0}
+      assert {void.paper, void.accent, void.fontsize, void.linewidth} ===
+               {"#00000000", "#3366FF", 5.6233568562335678, 1.0}
     end
 
     test "no setting reaches them, laid over a complete theme or over none" do

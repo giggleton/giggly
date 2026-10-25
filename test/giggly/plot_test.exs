@@ -2273,6 +2273,195 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_smooth/3 and stat_smooth/3" do
+    @points %{
+      "x" => [1, 2, 3, 4],
+      "y" => [1.0, 3.0, 2.0, 4.0],
+      "w" => [1, 2, 1, 2],
+      "s" => ~w(a b c d)
+    }
+
+    test "a smooth layer records its geom and stat with ggplot2's defaults, and no method given" do
+      plot =
+        @points
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_smooth()
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Smooth{
+                   se: true,
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0
+                 },
+                 stat: %Stat.Smooth{
+                   method: :none,
+                   se: true,
+                   level: 0.95,
+                   n: 80,
+                   fullrange: false,
+                   orientation: :x
+                 },
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{},
+                 fixed: %{},
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "stat_smooth/3 records what geom_smooth/3 does, its options in the geom and the stat" do
+      options = [
+        method: :lm,
+        se: false,
+        level: 0.9,
+        n: 5,
+        fullrange: true,
+        orientation: :y,
+        lineend: :round,
+        linejoin: :mitre,
+        linemitre: 2
+      ]
+
+      plot = Plot.new(@points, %{x: :x, y: :y})
+      [geom_layer] = Plot.geom_smooth(plot, options).reversed_layers
+      [stat_layer] = Plot.stat_smooth(plot, options).reversed_layers
+
+      assert geom_layer == stat_layer
+
+      assert %Plot.Layer{
+               geom: %Geom.Smooth{
+                 se: false,
+                 line_end: :round,
+                 line_join: :mitre,
+                 mitre_limit: 2.0
+               },
+               stat: %Stat.Smooth{
+                 method: :lm,
+                 se: false,
+                 level: 0.9,
+                 n: 5,
+                 fullrange: true,
+                 orientation: :y
+               }
+             } = geom_layer
+    end
+
+    test "a smooth's look is set for every curve, its colour resolved and its alpha a float" do
+      plot =
+        @points
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_smooth(
+          method: :lm,
+          colour: "red",
+          fill: "steelblue",
+          alpha: 1,
+          linewidth: 2,
+          linetype: 2
+        )
+
+      assert [
+               %Plot.Layer{
+                 fixed: %{
+                   color: "#FF0000",
+                   fill: "#4682B4",
+                   alpha: 1.0,
+                   linewidth: 2.0,
+                   linetype: {4, 4}
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a level is a number above 0 and below 1, kept as a float" do
+      plot = Plot.new(@points, %{x: :x, y: :y})
+
+      assert [%Plot.Layer{stat: %Stat.Smooth{level: 0.5}}] =
+               Plot.geom_smooth(plot, level: 0.5).reversed_layers
+
+      for level <- [0, 1, 1.5, -0.1, "0.95"] do
+        assert_raise NimbleOptions.ValidationError, ~r/above 0 and below 1/, fn ->
+          Plot.geom_smooth(plot, level: level)
+        end
+      end
+    end
+
+    test "a method, a count, an orientation or a flag not offered is refused" do
+      plot = Plot.new(@points, %{x: :x, y: :y})
+
+      assert_raise NimbleOptions.ValidationError, ~r/method/, fn ->
+        Plot.geom_smooth(plot, method: :loess)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/:n option/, fn ->
+        Plot.stat_smooth(plot, n: 0)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/orientation/, fn ->
+        Plot.geom_smooth(plot, orientation: :z)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/fullrange/, fn ->
+        Plot.geom_smooth(plot, fullrange: :yes)
+      end
+    end
+
+    test "a smooth needs x and y, takes a weight, and refuses a band's ends" do
+      plot = Plot.new(@points, %{x: :x})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_smooth(plot, method: :lm) end
+      assert error.message =~ "Plot.geom_smooth/3 needs :y"
+
+      error = assert_raise ArgumentError, fn -> Plot.stat_smooth(plot, method: :lm) end
+      assert error.message =~ "Plot.stat_smooth/3 needs :y"
+
+      assert %Plot{} = Plot.geom_smooth(plot, %{y: :y, weight: :w}, method: :lm)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_smooth(plot, %{y: :y, ymin: :y}, method: :lm)
+        end
+
+      assert error.message =~ ":ymin"
+    end
+
+    test "a weight column that is not numbers is refused at the call" do
+      plot = Plot.new(@points, %{x: :x, y: :y})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_smooth(plot, %{weight: :s}, method: :lm)
+        end
+
+      assert error.message =~ "Plot.geom_smooth/3 maps :weight to \"s\", a :string column"
+      assert error.message =~ "a smooth weighs each row by its weight"
+    end
+
+    test "an after_stat reads the fit's values but no other stat's, and never the weight" do
+      plot = Plot.new(@points, %{x: :x, y: :y})
+
+      assert %Plot{} =
+               Plot.geom_smooth(plot, %{alpha: {:after_stat, [:se]}}, method: :lm)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_smooth(plot, %{alpha: {:after_stat, [:count]}}, method: :lm)
+        end
+
+      assert error.message =~ "count"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_smooth(plot, %{weight: {:after_stat, [:se]}}, method: :lm)
+        end
+
+      assert error.message =~ ":weight"
+    end
+  end
+
   describe "geom_rect/3" do
     test "a rectangle layer records its geom, the identity stat and position, and its corners" do
       plot =

@@ -431,13 +431,14 @@ defmodule Giggly.Theme do
 
   @typedoc """
   The layers' defaults, ggplot2's `element_geom()`: the ink and paper their colours are mixed
-  from, each a colour in its one spelling; the width and line type of their lines and of their
+  from and the accent a smooth is drawn in, each a colour in its one spelling; the width and line type of their lines and of their
   borders, in millimetres; their text's family, the theme's base family, `""` for the device's
   own, and its size, and their points' size, in millimetres, and shape.
   """
   @type geom :: %{
           ink: String.t(),
           paper: String.t(),
+          accent: String.t(),
           linewidth: float(),
           borderwidth: float(),
           linetype: tuple(),
@@ -508,6 +509,10 @@ defmodule Giggly.Theme do
   @ink "#000000"
   @paper "#FFFFFF"
   @clear_paper "#00000000"
+
+  # The accent every complete theme gives the layers, ggplot2's `element_geom(accent =)`, a
+  # smooth's colour.
+  @accent "#3366FF"
 
   # `col_mix(ink, paper, amount)` for black ink on white paper, as ggplot2 rounds it, each named
   # for its amount as a percentage.
@@ -1303,7 +1308,7 @@ defmodule Giggly.Theme do
   defp titles(%{header_family: header_family}), do: %{family: header_family}
 
   # The layers' defaults, ggplot2's `element_geom()` as every complete theme sets it from its base
-  # sizes: its ink, and `paper`; its lines' and its borders' widths `base_line_size`, never
+  # sizes: its ink, `paper` and accent; its lines' and its borders' widths `base_line_size`, never
   # `base_rect_size`, and solid; its text's family the base family, never the header family, and
   # its size the base size in millimetres (`base_size / .pt`); its points' size 1.5 times the base
   # size over 11, and the solid circle. They stay in a layer's millimetres, since they become the
@@ -1315,6 +1320,7 @@ defmodule Giggly.Theme do
     %{
       ink: @ink,
       paper: paper,
+      accent: @accent,
       linewidth: line_size,
       borderwidth: line_size,
       linetype: {},

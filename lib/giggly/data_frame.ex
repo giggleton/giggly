@@ -83,14 +83,19 @@ defmodule Giggly.DataFrame do
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
-  #     too, a number outside them all missing.
+  #     too, a number outside them all missing; `{:+, [left, right]}`, `{:-, [left, right]}`,
+  #     `{:*, [left, right]}` and `{:/, [left, right]}`, one number added to, less, times or over
+  #     another, as IEEE arithmetic gives it (`Giggly.DataFrame.Arithmetic`): an integer where
+  #     both are integers and the operation is not a division, as Explorer types it, and a float
+  #     otherwise.
   #
   # Values follow Explorer's semantics, as types do: a missing value passes through an operation
   # as missing, so `is_finite` is missing where its number is, `and` is false where either side
   # is false, true where both are true and missing otherwise, and `or` true where either side is
   # true, false where both are false and missing otherwise (SQL's three-valued logic); a
   # comparison is missing where either number is, and puts NaN above every number, both
-  # infinities included, as Explorer orders a float. An
+  # infinities included, as Explorer orders a float; arithmetic is missing where either number
+  # is, NaN or not, as Explorer's is, where R keeps its first operand. An
   # expression outside this vocabulary, or an operation given a column of the wrong type, whether
   # or not it has rows, raises `FunctionClauseError`. Operations arrive with their first caller.
   # An implementation names the operations it runs (`operations/1`), the aggregates

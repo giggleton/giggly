@@ -31,9 +31,9 @@ beginning "Each layer's defaults are filled in from the theme".
   a geom sees an axis's kind, never its range.
 - **A geom says what it draws with: `default_aesthetics/2`** gives each aesthetic it draws with
   and its value where the layer neither maps nor sets it, ggplot2's `default_aes` in R's order,
-  worked out from the complete theme's `geom` element (`Giggly.Theme`: ink, paper, the lines' and
-  borders' widths and types, the text's family and size, the points' size and shape) as its
-  `from_theme()` reads `element_geom()`. The assembly fills them into the rows and the keys, so
+  worked out from the complete theme's `geom` element (`Giggly.Theme`: ink, paper, accent, the
+  lines' and borders' widths and types, the text's family and size, the points' size and shape) as
+  its `from_theme()` reads `element_geom()`. The assembly fills them into the rows and the keys, so
   every aesthetic a geom draws with is in every row and key it is handed and **a geom holds no
   default look of its own**; a default R gives as `NA` is `nil`. R's defaults Giggly has no
   aesthetic for are left out (text's `fontface` and `lineheight`, a box's `weight`), and so is the
@@ -221,6 +221,19 @@ beginning "Each layer's defaults are filled in from the theme".
   y; it draws, and takes its defaults and key, as a ribbon does (`Ribbon.draw/5`), dropping a row
   missing its `x` or `y`. It holds no requirements of its own: the stat before it, aligning or a
   density, needs its `x` and `y`, and `Plot` checks a layer against the stat's.
+- **A smooth (`Geom.Smooth`) is set up and drawn as ggplot2's `GeomSmooth` does it**: its setup
+  writes its stat's orientation into every row's `flipped_aes` and puts its rows in order as a
+  line's, along y where flipped; a panel is drawn a group at a time, in group order, each whole
+  before the next: where its struct's `se`, its band as a ribbon's (`Ribbon.draw/5` with the
+  ribbon's own defaults, both edges outlined, cut square, round corners) in no colour, so a row
+  missing an end leaves it off and a curve of no degrees of freedom has none, then its line as a
+  path's, in its colour's own alpha, never the row's, which fills the band. Its defaults are
+  ggplot2's under the theme: the theme's accent (`#3366FF`), a fill of ink mixed 60% toward paper
+  (`#999999`, `#00000066` on clear paper), twice the lines' width, their line type, a weight of 1
+  and an alpha of 0.4. **Its key is `draw_key_smooth()`'s**: where `se`, the band's fill at the
+  key's alpha over the whole key, unbordered at grid's default width (0.75 points), then a path's
+  key at an alpha of 1, so a colour's own alpha leaves the key, needing a path's room; each
+  checked against vdiffr's drawing (`test/golden/smooth_lm*.svg`).
 - **A box plot (`Geom.Boxplot`) is set up and drawn as ggplot2's `GeomBoxplot` does it**
   (design-log §4, the entry beginning "A box plot takes R's options"). Its setup works along the
   stat's `flipped_aes`, flipped and flipped back; drops `outliers` where the layer keeps none, so

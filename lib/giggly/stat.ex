@@ -20,9 +20,11 @@ defprotocol Giggly.Stat do
   # at each combination of their aesthetics, as `geom_count()` defaults `stat = "sum"`, and
   # binning (`Giggly.Stat.Bin`) the rows in each bin of the axis, as `geom_histogram()` defaults
   # `stat = "bin"`, the box plot's summary (`Giggly.Stat.Boxplot`) each group's quartiles,
-  # whiskers and outliers, as `geom_boxplot()` defaults `stat = "boxplot"`, and aligning
+  # whiskers and outliers, as `geom_boxplot()` defaults `stat = "boxplot"`, aligning
   # (`Giggly.Stat.Align`) each group of areas at every other group's places, as `geom_area()`
-  # defaults `stat = "align"`.
+  # defaults `stat = "align"`, and smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
+  # as `geom_smooth()` defaults `stat = "smooth"`, its band's quantile Giggly's own
+  # (`Giggly.Stat.TDistribution`).
   #
   # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
   # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
@@ -39,7 +41,7 @@ defprotocol Giggly.Stat do
   # implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
-    exports: [Align, Bin, Boxplot, Count, Identity, Sum]
+    exports: [Align, Bin, Boxplot, Count, Identity, Smooth, Sum]
 
   alias Giggly.DataFrame
 

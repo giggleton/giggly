@@ -4245,6 +4245,98 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_smooth" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mpg, aes(displ, hwy))` and
+    # `aes(displ, hwy, colour = drv)` with `geom_smooth(method = lm, n = 2)`: the stat's columns, the
+    # constant ones it carries, then the geom's defaults, a mapped colour in the defaults' stead.
+    test "a smooth's table holds the fit, then the carried columns, then the geom's defaults" do
+      plain =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_smooth(method: :lm, n: 2)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(plain) == [
+               :x,
+               :y,
+               :ymin,
+               :ymax,
+               :se,
+               :flipped_aes,
+               :panel,
+               :group,
+               :color,
+               :fill,
+               :linewidth,
+               :linetype,
+               :weight,
+               :alpha
+             ]
+
+      assert Enum.map([:color, :fill, :linewidth, :linetype, :weight, :alpha], fn name ->
+               plain
+               |> DataFrame.pull(name)
+               |> Enum.uniq()
+             end) == [["#3366FF"], ["#999999"], [1.0], [{}], [1.0], [0.4]]
+
+      coloured =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_smooth(method: :lm, n: 2)
+        |> Giggly.layer_data()
+
+      carried =
+        coloured
+        |> DataFrame.names()
+        |> Enum.take(9)
+
+      assert carried == [:x, :y, :ymin, :ymax, :se, :flipped_aes, :color, :panel, :group]
+
+      assert DataFrame.pull(coloured, :color) ==
+               ["#F8766D", "#F8766D", "#00BA38", "#00BA38", "#619CFF", "#619CFF"]
+    end
+
+    # Golden: `layer_data()` with `theme_void(base_line_size = 1)`: the band mixed toward the clear
+    # paper, the line twice the theme's lines' width.
+    test "under theme_void() the band is ink mixed toward clear paper and the line twice its width" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_smooth(method: :lm, n: 2)
+        |> Plot.theme_void(base_line_size: 1)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :fill), DataFrame.pull(frame, :linewidth)} ==
+               {["#00000066", "#00000066"], [2.0, 2.0]}
+    end
+
+    # Golden: `layer_data()` for two rows, `(1, 1)` and `(2, 3)`: no degrees of freedom, so the
+    # standard error is NaN and the band's ends missing, the position scale mapping NaN to `NA`.
+    test "a fit of no degrees of freedom has a NaN standard error and its band's ends missing" do
+      frame =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 3.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_smooth(method: :lm, n: 3)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :ymin) == [nil, nil, nil]
+      assert DataFrame.pull(frame, :ymax) == [nil, nil, nil]
+      assert DataFrame.pull(frame, :se) == [:nan, :nan, :nan]
+    end
+
+    # A smooth given no method is refused by its stat, which counts every row of the layer it is
+    # handed: mpg's 234, which ggplot2 fits by loess.
+    test "a smooth given no method is refused when run, counting every row" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_smooth()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ "234 rows"
+    end
+  end
+
   describe "layer_data/2, dodged by clusters" do
     # `ggplot(mtcars, aes(factor(cyl), fill = factor(vs)))` with `geom_bar(position = "dodge2")`,
     # then `position_dodge2(preserve = "single")`.
@@ -8919,6 +9011,104 @@ defmodule GigglyTest do
         )
 
       assert golden?(plot, "area_identity")
+    end
+
+    # Golden: test/golden/smooth_lm.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/smooth_lm.R: every element matches, in order, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_smooth()'s linear fit over mpg's points, its
+    # band drawn before its line. It moves with lm's fit, the t quantile, a ribbon's or a line's
+    # drawing, or a smooth's defaults under the theme.
+    test "a linear smooth is drawn over its band, the line in the theme's accent" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :lm)
+
+      assert golden?(plot, "smooth_lm")
+    end
+
+    # Golden: test/golden/smooth_lm_groups.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_lm_groups.R. A fit for each drive, each band before its own line, and the
+    # keys draw_key_smooth()'s, the band's fill over the key and a line across it. It moves with a
+    # smooth's key, or how a panel's groups are drawn.
+    test "each group's smooth is drawn whole before the next, its key a band under a line" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_smooth(method: :lm)
+
+      assert golden?(plot, "smooth_lm_groups")
+    end
+
+    # Golden: test/golden/smooth_lm_no_se.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_lm_no_se.R. geom_smooth()'s reference page's fit for each class with no
+    # band, the keys a line over a point and no fill. It moves with a smooth's key without its band.
+    test "a smooth without its band draws its line alone, its key a line" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(se: false, method: :lm)
+
+      assert golden?(plot, "smooth_lm_no_se")
+    end
+
+    # Golden: test/golden/smooth_lm_horizontal.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_lm_horizontal.R. displ fitted along hwy, the line and band running up the
+    # panel. It moves with a smooth along y, or a turned ribbon.
+    test "a smooth along y fits x to y and runs up the panel" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :lm, orientation: :y)
+
+      assert golden?(plot, "smooth_lm_horizontal")
+    end
+
+    # Golden: test/golden/smooth_lm_fullrange.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_lm_fullrange.R. Each drive's fit across the x axis's extent, a 99% band
+    # and a look the layer sets, the line's ends round. It moves with fullrange, the level, or set
+    # values reaching the line, the band and the keys.
+    test "a full-range smooth spans the x axis, at its level, in the look the layer sets" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_smooth(
+          method: :lm,
+          fullrange: true,
+          level: 0.99,
+          fill: "orange",
+          alpha: 0.2,
+          linewidth: 2,
+          linetype: :dashed,
+          lineend: :round,
+          n: 20
+        )
+
+      assert golden?(plot, "smooth_lm_fullrange")
+    end
+
+    # Golden: test/golden/smooth_lm_two_rows.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_lm_two_rows.R. Weighted fits in two panels: `a`'s weight of 0 leaves it two
+    # rows and no degrees of freedom, so its line has no band, and `c` holds one x, so it draws
+    # nothing and has no key. It moves with weights, a fit of no degrees of freedom, or a band whose
+    # ends are missing.
+    test "a smooth of no degrees of freedom draws no band, and a group of one x draws nothing" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 1, 2, 3, 4, 2, 2],
+          "y" => [1, 3, 2, 2, 1, 4, 3, 5, 6],
+          "w" => [1, 1, 0, 2, 1, 1, 3, 1, 1],
+          "g" => ["a", "a", "a", "b", "b", "b", "b", "c", "c"],
+          "panel" => ["p", "p", "p", "q", "q", "q", "q", "q", "q"]
+        }
+        |> Plot.new(%{x: :x, y: :y, weight: :w, colour: :g})
+        |> Plot.geom_smooth(method: :lm)
+        |> Plot.facet_wrap(:panel)
+
+      assert golden?(plot, "smooth_lm_two_rows")
     end
   end
 

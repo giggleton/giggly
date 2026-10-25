@@ -71,6 +71,10 @@ defmodule Giggly.DataFrame.Lists do
   @impl DataFrame
   def operations(%__MODULE__{}) do
     [
+      :*,
+      :+,
+      :-,
+      :/,
       :<,
       :>,
       :and,
@@ -291,6 +295,20 @@ defmodule Giggly.DataFrame.Lists do
     {:boolean, Enum.map(values, &negated/1)}
   end
 
+  defp evaluated(frame, {operator, [left, right]}) when operator in [:+, :-, :*, :/] do
+    {left_dtype, left_values} = evaluated(frame, left)
+    {right_dtype, right_values} = evaluated(frame, right)
+    numbers(left_dtype)
+    numbers(right_dtype)
+
+    computed =
+      Enum.zip_with(left_values, right_values, fn left_value, right_value ->
+        arithmetic(operator, left_value, right_value)
+      end)
+
+    {arithmetic_dtype(operator, left_dtype, right_dtype), computed}
+  end
+
   defp evaluated(frame, {:log10, [argument]}) do
     {dtype, values} = evaluated(frame, argument)
     numbers(dtype)
@@ -322,6 +340,20 @@ defmodule Giggly.DataFrame.Lists do
   defp finite(nil), do: nil
   defp finite(value) when is_number(value), do: true
   defp finite(value) when value in @non_finite_floats, do: false
+
+  # One number added to, less, times or over another: missing where either is, as Explorer's
+  # arithmetic is, NaN included, and otherwise as IEEE arithmetic gives it, R's.
+  defp arithmetic(_operator, nil, _right), do: nil
+  defp arithmetic(_operator, _left, nil), do: nil
+  defp arithmetic(:+, left, right), do: Arithmetic.add(left, right)
+  defp arithmetic(:-, left, right), do: Arithmetic.subtract(left, right)
+  defp arithmetic(:*, left, right), do: Arithmetic.multiply(left, right)
+  defp arithmetic(:/, left, right), do: Arithmetic.divide(left, right)
+
+  # An arithmetic operation's type, Explorer's: integers where both numbers are and it adds,
+  # subtracts or multiplies, and floats otherwise.
+  defp arithmetic_dtype(operator, :integer, :integer) when operator != :/, do: :integer
+  defp arithmetic_dtype(_operator, _left_dtype, _right_dtype), do: :float
 
   # A number's base-10 logarithm, as R's `log10()` gives it: minus infinity for zero, NaN for a
   # negative number, minus infinity included, missing for a missing value, and a positive number's

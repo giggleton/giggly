@@ -506,6 +506,82 @@ defmodule Giggly.Plot.Options do
                   ] ++ @band_look_options ++ @line_style_options
                 )
 
+  # `geom_smooth/3`'s and `stat_smooth/3`'s options, validated at the call: how each curve is
+  # fitted, and how its line and band look.
+  @smooth_options NimbleOptions.new!(
+                    [
+                      data: @data_option,
+                      method: [
+                        type: {:in, [:lm]},
+                        doc:
+                          "How each curve is fitted: `:lm`, a straight line by least squares, " <>
+                            "each row weighted by its `:weight` where one is mapped. Giggly has " <>
+                            "no other method yet, so it must be given: a smooth given none " <>
+                            "raises `ArgumentError` when the plot is drawn, naming the method " <>
+                            "ggplot2 would choose, loess where the largest group holds under " <>
+                            "1,000 rows and gam otherwise."
+                      ],
+                      se: [
+                        type: :boolean,
+                        default: true,
+                        doc:
+                          "Whether each curve is drawn over its band, the confidence interval " <>
+                            "around it at `level:`."
+                      ],
+                      level: [
+                        type: {:custom, __MODULE__, :validate_level, []},
+                        default: 0.95,
+                        doc: "How confident each band is, above 0 and below 1."
+                      ],
+                      n: [
+                        type: :pos_integer,
+                        default: 80,
+                        doc: "How many evenly spaced places along x each curve is worked out at."
+                      ],
+                      fullrange: [
+                        type: :boolean,
+                        default: false,
+                        doc:
+                          "Whether each curve spans the panel's axis it runs along, short of its " <>
+                            "widening, rather than its own group's extent along it."
+                      ],
+                      orientation: [
+                        type: {:in, [:x, :y]},
+                        default: :x,
+                        doc:
+                          "The axis each curve runs along: `:x`, y fitted to x, or `:y`, x " <>
+                            "fitted to y, for a curve that runs up the panel."
+                      ],
+                      alpha: [
+                        type: {:custom, __MODULE__, :validate_alpha, []},
+                        doc:
+                          "How opaque every band's fill is, from 0, invisible, to 1, opaque; 0.4 " <>
+                            "when not given. The line keeps its colour's own alpha."
+                      ],
+                      color: [
+                        type: @color_type,
+                        doc:
+                          "The colour of every curve's line, written `colour:` or `color:`: " <>
+                            @color_forms <> "; the theme's accent, `#3366FF`, when not given."
+                      ],
+                      fill: [
+                        type: @color_type,
+                        doc:
+                          "The colour every band is filled with: " <>
+                            @color_forms <>
+                            "; when not given, the theme's ink mixed 60% toward its paper, " <>
+                            "`#999999`, or `#00000066` under `theme_void/2`, whose paper is clear."
+                      ],
+                      linewidth: [
+                        type: {:custom, __MODULE__, :validate_linewidth, []},
+                        doc:
+                          "How wide every curve's line is, in millimetres; twice the theme's " <>
+                            "`base_line_size` when not given, 1 at its default sizes."
+                      ],
+                      linetype: @linetype_option
+                    ] ++ @line_style_options
+                  )
+
   # How a frequency polygon cuts its axis into bins: binning's options but `pad`, which a frequency
   # polygon always takes.
   @freqpoly_binning_options Keyword.delete(@binning_options, :pad)
@@ -2145,6 +2221,10 @@ defmodule Giggly.Plot.Options do
   def path, do: @path_options
 
   @doc false
+  @spec smooth() :: NimbleOptions.t()
+  def smooth, do: @smooth_options
+
+  @doc false
   @spec line() :: NimbleOptions.t()
   def line, do: @line_options
 
@@ -2360,6 +2440,16 @@ defmodule Giggly.Plot.Options do
 
   def validate_alpha(alpha),
     do: {:error, "expected a number from 0 to 1, got: #{inspect(alpha)}"}
+
+  # NimbleOptions' check of a smooth's confidence level: a number above 0 and below 1, kept as a
+  # float, where R also takes 1, an infinite band, and past it, none.
+  @doc false
+  @spec validate_level(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_level(level) when is_number(level) and level > 0 and level < 1,
+    do: {:ok, level / 1}
+
+  def validate_level(level),
+    do: {:error, "expected a number above 0 and below 1, got: #{inspect(level)}"}
 
   # NimbleOptions' check of an option that sets a colour: a CSS colour, kept in its one spelling,
   # uppercase hex, or `:none`.

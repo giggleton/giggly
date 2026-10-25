@@ -64,7 +64,10 @@ column names become strings", "Column types belong to the frame" and "Every boun
   `closed:`, R's `cut(include.lowest = TRUE)`, numbering each value's interval from 1). Values
   follow Explorer's semantics, as types do: a missing value passes through an operation, a filter
   keeps only the rows whose value is true, `and` and `or` are SQL's three-valued and and or, and
-  `<` and `>` put NaN above every number, both infinities included; `log10` is R's `log10()`,
+  `<` and `>` put NaN above every number, both infinities included; `+`, `-`, `*` and `/` are
+  IEEE arithmetic (`Arithmetic`), missing where either side is, NaN beside a missing value too, as
+  Explorer's is, where R keeps its first operand, integers where both sides are and it does not
+  divide, as Explorer types them, floats otherwise; `log10` is R's `log10()`,
   zero's minus infinity and a negative number's NaN, a float, by `:math.log10`, which matches
   R's to the last bit where a division of natural logarithms does not. A column named alone
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
@@ -82,7 +85,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   columns; `cut`, with binning's bins; `log10` and `operations/1`, with a mapping's functions by
   name; `join/3`, the `or`, `not`, `<` and `>` operations and the
   `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
-  and whiskers; the `mean` aggregate, with a mapping's reordering. Not designed ahead.
+  and whiskers; the `mean` aggregate, with a mapping's reordering; `+`, `-`, `*` and `/`, with a
+  linear smooth's sums. Not designed ahead.
 - **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,
   the key columns must be of one type in both frames, and a column besides them in both is
   refused, never suffixed.

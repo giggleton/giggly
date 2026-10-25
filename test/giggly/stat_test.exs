@@ -570,6 +570,451 @@ defmodule Giggly.StatTest do
     end
   end
 
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_smooth(method = lm,
+  # formula = y ~ x)` over the table named, with the options given, printed to 17 significant
+  # digits; a band ggplot2's position scale has mapped from NaN to `NA` is NaN as the stat hands it
+  # on. Each table is built here as the stat is handed it, its rows in one panel, and the curves'
+  # values held to R's within 1e-12 of the largest magnitude the group's column holds, their x to
+  # the last digit (design-log §4, the entry beginning "A stat's values reached by another route").
+  describe "compute_layer/3 for smooths" do
+    # Golden: `ggplot(mpg, aes(displ, hwy))`, `n = 5`, and `level = 0.99`.
+    test "a straight line by least squares, its standard error and band, R's" do
+      frame = mpg_frame(x: column(:displ), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      curve = fit(frame, n: 5)
+
+      assert DataFrame.names(curve) == [:x, :y, :ymin, :ymax, :se, :flipped_aes, :panel, :group]
+      assert DataFrame.pull(curve, :x) === [1.6, 2.95, 4.300000000000001, 5.65, 7.0]
+
+      assert_near(curve, :y, [
+        30.048708961974306,
+        25.282414073646258,
+        20.516119185318214,
+        15.74982429699017,
+        10.983529408662125
+      ])
+
+      assert_near(curve, :ymin, [
+        29.177681481115854,
+        24.749409315380124,
+        19.928881322448479,
+        14.779797710668415,
+        9.5439447865978266
+      ])
+
+      assert_near(curve, :ymax, [
+        30.919736442832757,
+        25.815418831912393,
+        21.103357048187949,
+        16.719850883311924,
+        12.423114030726424
+      ])
+
+      assert_near(curve, :se, [
+        0.44209163598339901,
+        0.27052756743860312,
+        0.29805368167214519,
+        0.49233881814122216,
+        0.73066388224365719
+      ])
+
+      assert DataFrame.pull(curve, :flipped_aes) == List.duplicate(false, 5)
+      assert DataFrame.pull(curve, :group) == List.duplicate(-1, 5)
+
+      wider = fit(frame, n: 5, level: 0.99)
+
+      assert_near(wider, :ymin, [
+        28.900514560883146,
+        24.579803544535324,
+        19.742018205643912,
+        14.471128595878064,
+        9.0858590833560804
+      ])
+
+      assert_near(wider, :ymax, [
+        31.196903363065466,
+        25.985024602757193,
+        21.290220164992515,
+        17.028519998102276,
+        12.88119973396817
+      ])
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy, colour = drv))`, `n = 3`.
+    test "each group is fitted over its own x, its constant columns carried" do
+      drives = column(:drv)
+
+      frame =
+        DataFrame.new(
+          x: column(:displ),
+          y: column(:hwy),
+          color: drives,
+          panel: List.duplicate(1, 234),
+          group: Enum.map(drives, fn drive -> %{"4" => 1, "f" => 2, "r" => 3}[drive] end)
+        )
+
+      curve = fit(frame, n: 3)
+
+      assert DataFrame.names(curve) ==
+               [:x, :y, :ymin, :ymax, :se, :flipped_aes, :color, :panel, :group]
+
+      assert DataFrame.pull(curve, :x) ===
+               [1.8, 4.15, 6.5, 1.6, 3.45, 5.3, 3.8, 5.4, 7.0]
+
+      assert DataFrame.pull(curve, :color) == ["4", "4", "4", "f", "f", "f", "r", "r", "r"]
+
+      assert_near(curve, :y, [
+        25.501837825142381,
+        18.737395044330924,
+        11.972952263519463,
+        31.61361558658114,
+        24.948457943583477,
+        18.283300300585815,
+        22.270651443922095,
+        20.793149764942914,
+        19.315648085963733
+      ])
+
+      assert_near(curve, :se, [
+        0.52443516861157324,
+        0.24247355656876632,
+        0.582462543489639,
+        0.55793905791605802,
+        0.53277594598695344,
+        1.3313504630657205,
+        1.4759989024636737,
+        0.76192951167722667,
+        1.8497269496943667
+      ])
+
+      assert_near(curve, :ymin, [
+        24.461499522127355,
+        18.256392732768553,
+        10.817503257938689,
+        30.507201497242619,
+        23.891943249483482,
+        15.643182371425006,
+        19.217315081370455,
+        19.216978482008951,
+        15.489196354281269
+      ])
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy, weight = cyl))`, `n = 3`.
+    test "a weight weighs each row in the fit" do
+      frame =
+        mpg_frame(
+          x: column(:displ),
+          y: column(:hwy),
+          weight: column(:cyl),
+          group: List.duplicate(-1, 234)
+        )
+
+      curve = fit(frame, n: 3)
+
+      assert_near(curve, :y, [29.485343372486021, 20.5461007962069, 11.606858219927783])
+      assert_near(curve, :ymin, [28.508819903604689, 20.01455244656032, 10.285913370947808])
+      assert_near(curve, :se, [0.49563632310251754, 0.26978836450479377, 0.67044804229810806])
+    end
+
+    # Golden: five rows, weighted 1, 1, 0, 1, 1; 1, NaN, 1, 1, NA; and 1, 1e-300, 1, 1, 1. R's
+    # `lm()` leaves out a row weighted 0 as it leaves out one missing its weight, but counts a
+    # weight above 0, however small, in its degrees of freedom.
+    test "a row weighted 0 or missing its weight is left out of the fit and its degrees of freedom" do
+      zero_weighted = weighted_frame([1, 1, 0, 1, 1])
+      zero = fit(zero_weighted, n: 3)
+
+      assert DataFrame.pull(zero, :x) === [1.0, 3.0, 5.0]
+      assert_near(zero, :y, [2.4949999999999997, 3.6749999999999998, 4.8549999999999995])
+      assert_near(zero, :ymin, [-0.39327082063530394, 1.8837704767037238, 1.9667291793646955])
+      assert_near(zero, :se, [0.67127676855377638, 0.41630817911734586, 0.67127676855377649])
+
+      missing_weighted = weighted_frame([1, :nan, 1, 1, nil])
+      missing = fit(missing_weighted, n: 3)
+
+      assert_near(missing, :y, [1.785714285714286, 3.6428571428571428, 5.5])
+      assert_near(missing, :ymax, [11.602758434175989, 9.7311294698820845, 17.97724535695577])
+
+      tiny_weighted = weighted_frame([1, 1.0e-300, 1, 1, 1])
+      tiny = fit(tiny_weighted, n: 3)
+
+      assert_near(tiny, :y, [2.0457142857142854, 3.3828571428571426, 4.7199999999999998])
+      assert_near(tiny, :ymin, [0.12499316408040206, 2.3128502681803118, 3.0855375008900978])
+    end
+
+    # A negative or infinite weight makes R's `lm()` fail, and a group of only zero weights leaves
+    # it nothing to fit, so ggplot2 draws nothing for the group.
+    test "a group with a negative or infinite weight, or every weight 0, is fitted nothing" do
+      for weights <- [[1, -1, 1, 1, 1], [1, :infinity, 1, 1, 1], [0, 0, 0, 0, 0]] do
+        frame = weighted_frame(weights)
+        curve = fit(frame, n: 3)
+
+        assert DataFrame.row_count(curve) == 0
+      end
+    end
+
+    # Golden: rows at x 1, 2, 2, 2 and 3 weighted 0, 1, 2, 1 and 0: the weighted rows hold one x,
+    # so R's `lm()` drops the slope and fits their weighted mean, 3.25, with two degrees of freedom.
+    test "where the weighted rows hold one x the curve is flat at their weighted mean" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 2.0, 2.0, 3.0],
+          y: [1.0, 2.0, 3.0, 5.0, 4.0],
+          weight: [0, 1, 2, 1, 0],
+          panel: [1, 1, 1, 1, 1],
+          group: [-1, -1, -1, -1, -1]
+        )
+
+      curve = fit(frame, n: 3)
+
+      assert DataFrame.pull(curve, :x) === [1.0, 2.0, 3.0]
+      assert DataFrame.pull(curve, :y) == [3.25, 3.25, 3.25]
+      assert_near(curve, :se, List.duplicate(0.770551750371122, 3))
+      assert_near(curve, :ymin, List.duplicate(-0.065416592147534036, 3))
+      assert_near(curve, :ymax, List.duplicate(6.5654165921475336, 3))
+    end
+
+    # Golden: two rows, `(1, 1)` and `(2, 3)`, which the line meets exactly, leaving no degrees of
+    # freedom; and `ggplot(g, aes(x, y, group = g, label = lab))`, `b`'s rows at one x and labelled
+    # two ways, `a`'s and `c`'s labelled one.
+    test "a group with no degrees of freedom has no band, and one holding one x has no curve" do
+      frame =
+        DataFrame.new(x: [1.0, 2.0], y: [1.0, 3.0], panel: [1, 1], group: [-1, -1])
+
+      curve = fit(frame, n: 3)
+
+      assert_near(curve, :y, [1.0000000000000009, 2.0000000000000009, 3.0000000000000009])
+      assert DataFrame.pull(curve, :ymin) == [:nan, :nan, :nan]
+      assert DataFrame.pull(curve, :ymax) == [:nan, :nan, :nan]
+      assert DataFrame.pull(curve, :se) == [:nan, :nan, :nan]
+
+      grouped =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 1.0, 1.0, 1.0, 2.0],
+          y: [1.0, 3.0, 2.0, 1.0, 2.0, 3.0, 4.0],
+          label: ["p", "p", "p", "q", "r", "s", "s"],
+          panel: List.duplicate(1, 7),
+          group: [1, 1, 1, 2, 2, 3, 3]
+        )
+
+      fitted = fit(grouped, n: 3)
+
+      assert DataFrame.pull(fitted, :group) == [1, 1, 1, 3, 3, 3]
+      assert DataFrame.pull(fitted, :label) == ["p", "p", "p", "s", "s", "s"]
+      assert DataFrame.pull(fitted, :x) === [1.0, 2.0, 3.0, 1.0, 1.5, 2.0]
+
+      assert_near(fitted, :se, [
+        1.1180339887498949,
+        0.70710678118654724,
+        1.1180339887498942,
+        :nan,
+        :nan,
+        :nan
+      ])
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy))`, `n = 3`, `orientation = "y"`: displ fitted along hwy.
+    test "along y, x is fitted to y and the columns are y's first" do
+      frame = mpg_frame(x: column(:displ), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      curve = fit(frame, n: 3, orientation: :y)
+
+      assert DataFrame.names(curve) == [:y, :x, :xmin, :xmax, :se, :flipped_aes, :panel, :group]
+      assert DataFrame.pull(curve, :y) === [12.0, 28.0, 44.0]
+      assert_near(curve, :x, [5.3731603964144945, 2.7139476492438277, 0.054734902073160896])
+      assert_near(curve, :xmin, [5.1405923747444175, 2.5788242627289999, -0.33136040655595933])
+      assert_near(curve, :se, [0.11804033677125192, 0.068582128941652887, 0.19596339999415183])
+      assert DataFrame.pull(curve, :flipped_aes) == [true, true, true]
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy, colour = drv))`, `n = 3`, `fullrange = TRUE`, the x
+    # axis's extent displ's range, 1.6 to 7; and along y, the y axis's extent 10 to 46, from
+    # `ggplot(mpg, aes(hwy, displ)) + expand_limits(x = c(10, 46))` with `fullrange = TRUE`, the
+    # same fit along x, since ggplot2's along y reads the x axis (design-log §4, the entry
+    # beginning "A full-range smooth spans").
+    test "with fullrange each curve spans the panel's axis it runs along" do
+      drives = column(:drv)
+
+      frame =
+        mpg_frame(
+          x: column(:displ),
+          y: column(:hwy),
+          group: Enum.map(drives, fn drive -> %{"4" => 1, "f" => 2, "r" => 3}[drive] end)
+        )
+
+      curve = fit(frame, n: 3, fullrange: true)
+
+      span = [1.6, 4.300000000000001, 7.0]
+      assert DataFrame.pull(curve, :x) === span ++ span ++ span
+
+      assert_near(curve, :y, [
+        26.077535083083781,
+        18.305622100874871,
+        10.533709118665964,
+        31.61361558658114,
+        21.886088215719681,
+        12.158560844858229,
+        24.30221625251847,
+        21.8089321692411,
+        19.315648085963733
+      ])
+
+      single = mpg_frame(x: column(:displ), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      along_y =
+        fit(single, n: 3, fullrange: true, orientation: :y)
+
+      assert DataFrame.pull(along_y, :y) === [10.0, 28.0, 46.0]
+      assert_near(along_y, :x, [5.7055619898108283, 2.7139476492438277, -0.2776666913231729])
+      assert_near(along_y, :xmin, [5.4404516142134751, 2.5788242627289999, -0.6985442587005366])
+      assert_near(along_y, :xmax, [5.9706723654081815, 2.8490710357586555, 0.14321087605419081])
+      assert_near(along_y, :se, [0.13455726970691714, 0.068582128941652887, 0.21361720083411376])
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy))`, `n = 3`, `se = FALSE`; and `aes(cty, hwy)`, cty's
+    # whole numbers spaced as doubles.
+    test "without se only the fitted values, and whole-number x spaced as floats" do
+      frame = mpg_frame(x: column(:displ), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      curve = fit(frame, n: 3, se: false)
+
+      assert DataFrame.names(curve) == [:x, :y, :flipped_aes, :panel, :group]
+      assert_near(curve, :y, [30.048708961974306, 20.516119185318214, 10.983529408662125])
+
+      city = mpg_frame(x: column(:cty), y: column(:hwy), group: List.duplicate(-1, 234))
+      spaced = fit(city, n: 3)
+
+      assert DataFrame.pull(spaced, :x) === [9.0, 22.0, 35.0]
+      assert_near(spaced, :y, [12.929141592266197, 30.316064526646961, 47.702987461027725])
+    end
+
+    # Golden: `ggplot(mpg, aes(displ, hwy))` with `n = 1` and `n = 2`, R's `seq()` giving the low
+    # end alone, then both ends.
+    test "a curve of one place is at its group's least x, of two at both ends" do
+      frame = mpg_frame(x: column(:displ), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      one = fit(frame, n: 1)
+      two = fit(frame, n: 2)
+
+      assert DataFrame.pull(one, :x) === [1.6]
+      assert_near(one, :y, [30.048708961974306])
+      assert DataFrame.pull(two, :x) === [1.6, 7.0]
+      assert_near(two, :y, [30.048708961974306, 10.983529408662125])
+    end
+
+    test "a row missing or infinite in x or y is left out" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, nil, :infinity, 4.0, 5.0],
+          y: [2.0, 3.5, 3.0, 9.0, 9.0, :nan, :neg_infinity],
+          panel: List.duplicate(1, 7),
+          group: List.duplicate(-1, 7)
+        )
+
+      complete =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [2.0, 3.5, 3.0],
+          panel: [1, 1, 1],
+          group: [-1, -1, -1]
+        )
+
+      assert fit(frame, n: 3) ==
+               fit(complete, n: 3)
+    end
+
+    # ggplot2 fits a smooth given no method by loess where the layer's largest group in any panel
+    # has under 1,000 rows, every row counted, and by gam from 1,000.
+    test "a smooth given no method is refused, naming the method ggplot2 would choose" do
+      loess =
+        DataFrame.new(
+          x: List.duplicate(nil, 1000),
+          y: List.duplicate(1.0, 1000),
+          panel: List.duplicate(1, 500) ++ List.duplicate(2, 500),
+          group: List.duplicate(-1, 1000)
+        )
+
+      assert_raise ArgumentError,
+                   ~r/largest group has 500 rows, so ggplot2 would fit it by loess/,
+                   fn ->
+                     fit(loess, [method: :none], [1, 2])
+                   end
+
+      gam = DataFrame.put(loess, :panel, List.duplicate(1, 1000))
+
+      assert_raise ArgumentError,
+                   ~r/largest group has 1000 rows, so ggplot2 would fit it by gam/,
+                   fn ->
+                     fit(gam, method: :none)
+                   end
+    end
+
+    test "a weight that is not a number is refused" do
+      frame = DataFrame.new(x: [1.0], y: [1.0], weight: ["a"], panel: [1], group: [-1])
+
+      assert_raise ArgumentError, ~r/weight is a :string column/, fn ->
+        fit(frame, n: 3)
+      end
+    end
+  end
+
+  # The table a smooth by least squares with ggplot2's defaults but `options` computes from
+  # `frame`, in the panels given.
+  defp fit(frame, options, panels \\ [1]) do
+    stat = smooth(options)
+    Stat.compute_layer(stat, frame, smooth_axes(panels))
+  end
+
+  # A smooth by least squares with ggplot2's defaults but those given.
+  defp smooth(options) do
+    struct!(
+      %Stat.Smooth{method: :lm, se: true, level: 0.95, n: 80, fullrange: false, orientation: :x},
+      options
+    )
+  end
+
+  # Each panel's axes as a smooth reads them: the extents a full range spans, x's mpg's displ's
+  # and y's wider than its hwy, 10 to 46.
+  defp smooth_axes(panels) do
+    x_axis = %{limits: {1.6, 7}, discrete: false, transform: fn values -> values end}
+    y_axis = %{x_axis | limits: {10, 46}}
+    Map.new(panels, fn panel -> {panel, %{x: x_axis, y: y_axis}} end)
+  end
+
+  # Five rows a line is fitted to, weighted as given.
+  defp weighted_frame(weights) do
+    DataFrame.new(
+      x: [1.0, 2.0, 3.0, 4.0, 5.0],
+      y: [2.0, 3.5, 3.0, 5.0, 4.2],
+      weight: weights,
+      panel: [1, 1, 1, 1, 1],
+      group: [-1, -1, -1, -1, -1]
+    )
+  end
+
+  # Each of a column's values within 1e-12 of R's, as a share of the largest magnitude R's holds,
+  # and NaN where R's is.
+  defp assert_near(frame, name, expected) do
+    actual = DataFrame.pull(frame, name)
+
+    largest =
+      expected
+      |> Enum.filter(&is_number/1)
+      |> Enum.map(&abs/1)
+      |> Enum.max()
+
+    assert length(actual) == length(expected)
+
+    Enum.zip_with(actual, expected, fn
+      value, :nan ->
+        assert value == :nan, "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
+
+      value, wanted ->
+        assert abs(value - wanted) <= 1.0e-12 * largest,
+               "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
+    end)
+  end
+
   # An area layer's table as aligning is handed it, its fill one colour per group.
   defp area_frame(columns) do
     group = Keyword.fetch!(columns, :group)

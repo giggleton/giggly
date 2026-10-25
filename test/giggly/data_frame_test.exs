@@ -883,6 +883,107 @@ defmodule Giggly.DataFrameTest do
       end
     end
 
+    # Golden: Explorer 0.13.0's `Series.add/2`, `subtract/2`, `multiply/2` and `divide/2` of the
+    # same columns, their values and types.
+    test "arithmetic of integers keeps integers but a division, which gives floats" do
+      frame = DataFrame.new(a: [1, 2, nil], b: [3, 0, 4])
+
+      mutated =
+        DataFrame.mutate(frame,
+          sum: {:+, [:a, :b]},
+          difference: {:-, [:a, :b]},
+          product: {:*, [:a, :b]},
+          quotient: {:/, [:a, :b]}
+        )
+
+      assert DataFrame.pull(mutated, :sum) === [4, 2, nil]
+      assert DataFrame.pull(mutated, :difference) === [-2, 2, nil]
+      assert DataFrame.pull(mutated, :product) === [3, 0, nil]
+      assert DataFrame.pull(mutated, :quotient) === [0.3333333333333333, :infinity, nil]
+
+      dtypes = DataFrame.dtypes(mutated)
+
+      assert Map.take(dtypes, [:sum, :difference, :product, :quotient]) ==
+               %{sum: :integer, difference: :integer, product: :integer, quotient: :float}
+    end
+
+    # Golden: Explorer 0.13.0, as above.
+    test "arithmetic of floats is IEEE's, an infinity and NaN included, a float" do
+      frame = DataFrame.new(a: [1.5, :nan, :infinity], b: [0.5, 1.0, :infinity], n: [1, 2, 3])
+
+      mutated =
+        DataFrame.mutate(frame,
+          sum: {:+, [:n, :a]},
+          difference: {:-, [:a, :b]},
+          product: {:*, [:a, :b]},
+          quotient: {:/, [:a, :b]}
+        )
+
+      assert DataFrame.pull(mutated, :sum) === [2.5, :nan, :infinity]
+      assert DataFrame.pull(mutated, :difference) === [1.0, :nan, :nan]
+      assert DataFrame.pull(mutated, :product) === [0.75, :nan, :infinity]
+      assert DataFrame.pull(mutated, :quotient) === [3.0, :nan, :nan]
+      assert DataFrame.dtypes(mutated).sum == :float
+    end
+
+    # Golden: Explorer 0.13.0, as above.
+    test "a division by zero is an infinity of the numerator's sign, or NaN, integers included" do
+      frame = DataFrame.new(x: [0.0, 1.0, -1.0], n: [0, 1, -1], zero: [0, 0, 0])
+
+      mutated = DataFrame.mutate(frame, x: {:/, [:x, :zero]}, n: {:/, [:n, :zero]})
+
+      assert DataFrame.pull(mutated, :x) === [:nan, :infinity, :neg_infinity]
+      assert DataFrame.pull(mutated, :n) === [:nan, :infinity, :neg_infinity]
+    end
+
+    # Golden: Explorer 0.13.0, as above; R's `NaN + NA` keeps its first operand where Explorer's
+    # gives a missing value either way.
+    test "arithmetic is missing where either number is, beside NaN or an infinity too" do
+      frame = DataFrame.new(a: [:nan, nil, :infinity, 1.0e308], b: [nil, :nan, nil, 10.0])
+
+      mutated = DataFrame.mutate(frame, sum: {:+, [:a, :b]}, product: {:*, [:a, :b]})
+
+      assert DataFrame.pull(mutated, :sum) === [nil, nil, nil, 1.0e308]
+      assert DataFrame.pull(mutated, :product) === [nil, nil, nil, :infinity]
+    end
+
+    test "arithmetic takes constants and other operations, an integer constant keeping integers" do
+      frame = DataFrame.new(n: [1, 2], x: [0.5, 2.0])
+
+      mutated =
+        DataFrame.mutate(frame,
+          more: {:+, [:n, 2]},
+          half: {:+, [:n, 2.5]},
+          squared: {:*, [:x, {:-, [:x, 1]}]}
+        )
+
+      assert DataFrame.pull(mutated, :more) === [3, 4]
+      assert DataFrame.pull(mutated, :half) === [3.5, 4.5]
+      assert DataFrame.pull(mutated, :squared) === [-0.25, 2.0]
+      assert DataFrame.dtypes(mutated).more == :integer
+    end
+
+    test "arithmetic of a column that is not numbers is refused, on either side" do
+      frame =
+        DataFrame.new([
+          {:n, [1]},
+          {:label, ["a"]},
+          {:kept, [true]},
+          {:day, [~D[2026-10-22]]},
+          {:cyl, [4], :category}
+        ])
+
+      for operator <- [:+, :-, :*, :/], name <- [:label, :kept, :day, :cyl] do
+        assert_raise FunctionClauseError, fn ->
+          DataFrame.mutate(frame, out: {operator, [:n, name]})
+        end
+
+        assert_raise FunctionClauseError, fn ->
+          DataFrame.mutate(frame, out: {operator, [name, :n]})
+        end
+      end
+    end
+
     test "cut numbers each value's interval from 1, closed on the right, the lowest at both ends" do
       frame = DataFrame.new(x: [0.0, 0.5, 1.0, 2.0, 3.0, 4.0, -1.0, 5.0, nil, :nan])
 
@@ -947,6 +1048,10 @@ defmodule Giggly.DataFrameTest do
       operations = DataFrame.operations(frame)
 
       assert Enum.sort(operations) == [
+               :*,
+               :+,
+               :-,
+               :/,
                :<,
                :>,
                :and,

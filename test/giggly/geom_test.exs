@@ -23,6 +23,8 @@ defmodule Giggly.GeomTest do
     mitre_limit: 10.0
   }
 
+  @smooth %Geom.Smooth{se: true, line_end: :butt, line_join: :round, mitre_limit: 10.0}
+
   @continuous %{x: :continuous, y: :continuous}
 
   # A cartesian panel 2 wide and 4 tall.
@@ -761,6 +763,40 @@ defmodule Giggly.GeomTest do
         DataFrame.new(x: [3.0, 1.0, 2.0], y: [1.0, 2.0, 3.0], panel: [1, 1, 1], group: [1, 1, 1])
 
       assert Geom.setup_data(@path, frame, %{x: :continuous, y: :continuous}) === frame
+    end
+  end
+
+  describe "setup_data/3 for smooths" do
+    test "rows are put in order of panel, group and x, the stat's orientation in every row" do
+      frame =
+        DataFrame.new(
+          x: [2.0, 3.0, 1.0, 2.0, 0.0],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0],
+          flipped_aes: [false, nil, false, false, false],
+          panel: [1, 1, 1, 1, 2],
+          group: [1, 2, 1, 1, 1]
+        )
+
+      set_up = Geom.setup_data(@smooth, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :y) === [3.0, 1.0, 4.0, 2.0, 5.0]
+      assert DataFrame.pull(set_up, :flipped_aes) == List.duplicate(false, 5)
+    end
+
+    test "a smooth the stat ran along y puts its rows in order of y" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [3.0, 1.0, 2.0],
+          flipped_aes: [true, true, true],
+          panel: [1, 1, 1],
+          group: [1, 1, 1]
+        )
+
+      set_up = Geom.setup_data(@smooth, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :x) === [2.0, 3.0, 1.0]
+      assert DataFrame.pull(set_up, :flipped_aes) == [true, true, true]
     end
   end
 
@@ -1562,6 +1598,38 @@ defmodule Giggly.GeomTest do
 
       assert [%Rectangles{line_end: :butt, line_join: :mitre}] = draw_key(%Geom.Rect{}, key)
       assert key_size(@area, key) == key_size(%Geom.Rect{}, key)
+    end
+  end
+
+  describe "draw_key/2 for smooths" do
+    # Golden: ggplot2 4.0.3's `geom_smooth(aes(colour = drv), method = lm)` through vdiffr 1.0.9:
+    # each key's band a rectangle over the whole key, `stroke-width: 0.75; stroke: none`, at the
+    # band's alpha, then its line; and `aes(fill = drv)` with `colour = "#FF000080"`, whose keys'
+    # lines vdiffr writes with no opacity, where the panel's are 0.50, as `draw_key_smooth()` sets
+    # an alpha of 1.
+    test "a smooth's key is its band over the whole key, then its line at an alpha of 1" do
+      key = %{color: "#FF000080", fill: "#999999", alpha: 0.4}
+
+      assert [
+               %Rectangles{
+                 xmin: [+0.0],
+                 xmax: [1.0],
+                 ymin: [+0.0],
+                 ymax: [1.0],
+                 offsets: :none,
+                 fill: ["#999999"],
+                 fill_opacity: [0.4],
+                 color: [:none],
+                 stroke_width: 0.75
+               },
+               %Segments{color: ["#FF0000"], opacity: [1.0], line_end: :butt}
+             ] = draw_key(@smooth, key)
+
+      assert [%Segments{line_end: :round}] =
+               draw_key(%{@smooth | se: false, line_end: :round}, key)
+
+      sized = Map.put(key, :linewidth, 1.5)
+      assert Geom.key_size(@smooth, sized) == Geom.key_size(@path, sized)
     end
   end
 

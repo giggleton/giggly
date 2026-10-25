@@ -1035,6 +1035,82 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of smooths: a curve fitted to each group's rows, for the trend through a cloud of
+  points, drawn over its band, the confidence interval around it.
+
+  With `method: :lm`, the one method Giggly has, each curve is a straight line by least squares,
+  `y` fitted to `x`, each row weighted by its `:weight` where one is mapped, worked out at `n:`
+  evenly spaced places from the group's least `x` to its greatest, or across the whole x axis
+  with `fullrange: true`. Its band runs the line's standard error times the t distribution's
+  quantile at `level:` either side of it. A row missing `x` or `y`, or at an infinite one, is
+  left out, and so is one missing its weight or weighted 0; a group holding fewer than two
+  distinct `x`, or a weight below 0 or infinite, is drawn nothing, and one whose weighted rows
+  hold one `x` is drawn flat at their weighted mean. Where the line meets every row, as through
+  two, no band is drawn. A smooth given no method raises `ArgumentError` when the plot is drawn,
+  naming the method ggplot2 would choose, loess or gam, which Giggly does not have yet.
+
+  Smooths use `:x`, `:y`, `:weight`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and
+  `:linewidth`, and need `:x` and `:y`; a `:weight` column must hold numbers. A curve's line is
+  drawn in its colour's own alpha, and `:alpha` fills its band.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.smooth())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 3.0, 4.0], "y" => [1.0, 3.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_smooth(method: :lm, n: 3)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :y)}
+      {[1.0, 2.5, 4.0], [1.2999999999999998, 2.5, 3.7]}
+
+  Without its band, a curve carries no standard error:
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 3.0, 4.0], "y" => [1.0, 3.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_smooth(method: :lm, se: false, n: 3)
+      ...>   |> Giggly.layer_data()
+      iex> :se in Giggly.DataFrame.names(frame)
+      false
+  """
+  @spec geom_smooth(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_smooth(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_smooth(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_smooth(plot, %{}, options)
+
+  def geom_smooth(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: smooth_layer(plot, mapping, options, "Plot.geom_smooth/3")
+
+  @doc """
+  Adds a layer of smooths, as `geom_smooth/3` does: the same curves, options and refusals.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.smooth())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 3.0, 4.0], "y" => [1.0, 3.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.stat_smooth(method: :lm, n: 2)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [1.2999999999999998, 3.7]
+  """
+  @spec stat_smooth(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_smooth(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_smooth(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_smooth(plot, %{}, options)
+
+  def stat_smooth(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: smooth_layer(plot, mapping, options, "Plot.stat_smooth/3")
+
+  @doc """
   Adds a layer of text: each row's `label` at its `x` and `y`.
 
   Text is written as it is; a whole number has no decimal point (`21`, not `21.0`), any other
@@ -3490,6 +3566,46 @@ defmodule Giggly.Plot do
     check_exclusive(before_stat, Keyword.get(facts, :exclusive, []), function)
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
+  end
+
+  # The layer `geom_smooth/3` and `stat_smooth/3` add, a curve fitted to each group, its mistakes
+  # named as `function`'s: its method, `:none` when not given, and how its curves are worked out
+  # in the stat, whether its band is drawn in the geom too, and how its lines are drawn.
+  defp smooth_layer(plot, mapping, options, function) do
+    validated = layer_options(options, Options.smooth())
+    data = own_data(validated)
+    se = Keyword.fetch!(validated, :se)
+
+    layer = %Layer{
+      geom: %Geom.Smooth{
+        se: se,
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.Smooth{
+        method: Keyword.get(validated, :method, :none),
+        se: se,
+        level: Keyword.fetch!(validated, :level),
+        n: Keyword.fetch!(validated, :n),
+        fullrange: Keyword.fetch!(validated, :fullrange),
+        orientation: Keyword.fetch!(validated, :orientation)
+      },
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Smooth.accepted_aesthetics() ++ Geom.Smooth.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.Smooth.required_aesthetics(),
+      computed: Stat.Smooth.computed_variables(),
+      dropped: Stat.Smooth.dropped_aesthetics()
+    )
+    |> check_numbers(layer, function, :weight, "a smooth weighs each row by its weight")
   end
 
   # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its

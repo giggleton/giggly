@@ -30,8 +30,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   boundary cannot, since a boundary always exports its root and every export to all its dependents
   (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
   never runs one.
-- **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3` and
-  `geom_boxplot/3` among them), `stat_sum/3`, `stat_bin/3`, `annotate/3`, the facet functions
+- **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
+  `geom_boxplot/3` and `geom_smooth/3` among them), `stat_sum/3`, `stat_bin/3`, `stat_smooth/3`,
+  `annotate/3`, the facet functions
   (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
@@ -65,7 +66,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   entry beginning "A frequency polygon takes no"), and `geom_ribbon/3` `%Geom.Ribbon{}` with the
   identity stat and position, and `geom_area/3` `%Geom.Area{}` with `%Stat.Align{}`, as ggplot2's
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
-  the geom's struct and the stat's. **A ribbon's `orientation:`, `:x` or `:y`, is checked at the
+  the geom's struct and the stat's, and `geom_smooth/3` and `stat_smooth/3` both `%Geom.Smooth{}`
+  with `%Stat.Smooth{}` and `%Position.Identity{}`, as ggplot2's are aliases: `se:` a field of
+  both, `method:`, `level:`, above 0 and below 1 where R also takes 1, an infinite band, and past
+  it, none, `n:`, `fullrange:` and `orientation:` the stat's, and `method:` recorded `:none` when
+  not given, which the stat refuses when the plot is run (design-log §4, the entry beginning "A
+  smooth given no method"). **A ribbon's `orientation:`, `:x` or `:y`, is checked at the
   call against its range**: along x it needs `:ymin` or `:ymax`, along y `:xmin` or `:xmax`, mapped,
   where ggplot2 aborts when it draws; not given, it is recorded `:none` and
   the geom reads the range. **The binning options are fields of
@@ -200,7 +206,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   accepting too what its geom draws (`:alpha`), which counting carries, and a count layer against
   `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's, and a box plot
   layer against `Stat.Boxplot`'s (`:x` or `:y` needed, both allowed, `:width` taken) and
-  `Geom.Boxplot`'s. **An after_stat,
+  `Geom.Boxplot`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
+  taken) and `Geom.Smooth`'s, which takes no band's ends, its stat writing them. **An after_stat,
   the layer's own or the plot's, is checked at the call against the variables the layer's stat
   documents** (`Stat.Count.computed_variables/0`; none for a layer that computes nothing, which
   refuses every one), never against the table, and refused for an aesthetic its stat consumes
@@ -223,10 +230,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   "`Plot.position_dodge2/1` arrives").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area and point functions
-  `fill:`,
+  function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, smooth and point
+  functions `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
-  the line, bar, rectangle, ribbon and area
+  the line, bar, rectangle, ribbon, area and smooth
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
@@ -265,7 +272,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`,
-  `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `annotate/3`, the scale functions, the guide
+  `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`, `annotate/3`,
+  the scale functions, the guide
   functions, `labs/2`, `theme/2` and the complete theme functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.

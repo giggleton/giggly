@@ -79,6 +79,47 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A full-range smooth spans the axis it runs along, its y axis along y, where ggplot2 spans the x
+  axis's extent (2026-10-25, Steve: "B").** ggplot2's `StatSmooth` flips its data to fit along y
+  but reads `scales$x$dimension()` unflipped, so `geom_smooth(orientation = "y", fullrange =
+  TRUE)` over mpg's `aes(displ, hwy)` runs its curve at hwy 1.6 to 7, displ's range, below every
+  car's 12 to 44, and stretches the y axis to it, where `fullrange` is documented to expand the
+  line to the range of the plot. Giggly reads the axis the curve runs along, its values checked
+  against R's same fit along x, `aes(hwy, displ)` over a widened axis. *Rejected: R's x axis* —
+  the drawing would be R's, but the curve leaves the data it was fitted to for another axis's
+  numbers.
+
+- **A linear smooth fits the slope however little x varies, where R's `lm()` drops it (2026-10-25,
+  Steve: "A").** R's `lm()` reads x as one with the intercept once its spread about its mean is
+  under a ten-millionth of its size (`lm.fit()`'s QR tolerance, 1e-7) and draws a flat line at the
+  mean with a degree of freedom more: x from 1,000,000,000.1 to .9, or two minutes of timestamps
+  in seconds since 1970. Giggly's three passes centre x first, so its size never matters, and fit
+  the least-squares slope, as Scholar's regression would; a curve is flat only where its weighted
+  rows hold one x, which R draws flat too. Every dataset checked (mpg, mtcars, diamonds,
+  economics) fits a slope both ways. *Rejected: R's tolerance, from x's spread about its mean
+  against its spread about 0* — the drawing would stay R's, but R's flat line comes from its
+  method, not the data.
+
+- **A smooth given no method is refused when the plot is run, naming the method ggplot2 would
+  choose (2026-10-25, Steve: "B").** ggplot2 picks loess where a layer's largest group in any panel
+  has under 1,000 rows and gam otherwise, as the plot is built, and a facet added after the layer
+  changes the answer (txhousing: gam whole, loess by city). So the stat counts every row as
+  `setup_params()` does and names one; steps 4 and 5 replace the refusal with the fit and keep the
+  count. *Rejected: refusing at the call* — the error would point at the line that wrote it, but
+  could only name both methods, and the choice moves to the run once loess lands.
+
+- **The t quantile keeps the agreed closed form, held to R's within 1e-12 for levels up to 0.999
+  (2026-10-25, Steve: "A").** A&S 26.7.3-4 give the share within ±t, so near a level of 1 the
+  little outside it keeps fewer digits than R's `qt()`, which works from the tail: over 1 to
+  100,000 degrees of freedom the quantile is within 7e-14 of R's, relatively, for levels 0.1 to
+  0.99, 4e-13 at 0.999 and 1.2e-10 at 0.999999; mpg's band is within 1e-13 of its column at
+  0.99999 and 1.7e-12 at 0.999999, past the bar and far below a drawing's resolution. Near a level
+  of 0 R's drifts (3.5e-10 at 4 degrees of freedom, against exact decimals) where Giggly's does
+  not. Powers of a rounded cos²θ drift 1e-11 at large df, so every 32nd is worked out afresh from
+  the logarithm of its complement and the terms added with Neumaier's compensation. *Rejected: a
+  second series summing the tail for high levels* — the bar everywhere, for levels hardly anyone
+  sets, at about three times the terms.
+
 - **Smoothing and densities are Phase 3's twelfth increment, in five steps: ribbons and areas
   (`geom_ribbon()`, `geom_area()` with its stat_align, stacking areas), linear smooths
   (`geom_smooth()` and `stat_smooth()` with `method: :lm` and its band), densities
@@ -2593,6 +2634,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-25 — Fit linear smooths: geom_smooth/3 and stat_smooth/3 with method: :lm, lm summed
+  through the frame and its band's quantile Giggly's own (smoothing and densities, step 2); §4: "A
+  linear smooth fits the slope", "A smooth given no method is refused when the plot is run", "The
+  t quantile keeps the agreed closed form", "A full-range smooth spans the axis it runs along"
 - 2026-10-25 — Draw ribbons and areas: geom_ribbon/3, and geom_area/3 aligning its groups as
   stat_align does and stacking them (smoothing and densities, step 1); §4: "Smoothing and
   densities are Phase 3's twelfth increment", "Nx is a core dependency", "Smoothing and densities

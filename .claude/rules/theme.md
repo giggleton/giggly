@@ -155,10 +155,11 @@ theme's families reaches: the entry beginning "A text's family is the theme's".
   `legend.text.position`, `legend.byrow`, `legend.key.spacing.x` and `.y` as settings (a legend
   running across spaces its keys `legend_key_spacing` both ways, as ggplot2 does when neither is
   set), `legend.key.justification`, `legend.frame`. A complete theme's `ink`, `paper` and
-  `accent`, `theme(geom:)`, and `theme_test()`, wait beyond the increment.
+  `accent` as options, `theme(geom:)`, and `theme_test()`, wait beyond the increment.
 - **The layers' defaults are the complete theme's `geom` element, ggplot2's `element_geom()`**,
   which every complete theme sets in its tree from its base sizes (`gray/1`, inherited by the
-  themes built on it, and `void/1`): black ink; white paper, `theme_void()`'s clear; the lines'
+  themes built on it, and `void/1`): black ink; white paper, `theme_void()`'s clear; the accent
+  `#3366FF`, a smooth's colour, in every theme; the lines'
   and the borders' widths, solid; the text's family, the base family, and size; the points' size
   and shape.
   No setting reaches it, since `theme/2` cannot set `geom` yet. Each geom reads what it draws with
