@@ -64,6 +64,7 @@ defmodule Giggly.Stat.Align do
     use Boundary, classify_to: Giggly.Stat
 
     alias Giggly.DataFrame
+    alias Giggly.Stat.Curve
 
     # How far either side of each place a group is also interpolated, as a share of the places'
     # range, ggplot2's `0.001`.
@@ -191,11 +192,17 @@ defmodule Giggly.Stat.Align do
     defp interpolated(rows, places, adjust) do
       known = standing_in(rows, adjust)
       [first | _rest] = known
-      knots = Enum.sort_by(known, fn row -> row.x end)
+
+      knots =
+        known
+        |> Enum.sort_by(fn row -> row.x end)
+        |> Enum.map(fn row -> {row.x, row.y} end)
+
+      interpolated = Curve.interpolate(knots, places)
 
       inside =
         places
-        |> Enum.map(fn place -> {place, interpolate(knots, place)} end)
+        |> Enum.zip_with(interpolated, fn place, y -> {place, y} end)
         |> Enum.reject(fn {_place, y} -> is_nil(y) end)
 
       [{low, _y} | _rest] = inside
@@ -225,23 +232,6 @@ defmodule Giggly.Stat.Align do
         end)
       end
     end
-
-    # The y at `place` along the rows sorted by x, linear between the rows either side and exactly
-    # a row's y at its x, as R's `approxfun()` interpolates; `nil` outside them, where no two rows
-    # stand either side.
-    defp interpolate(knots, place) do
-      knots
-      |> Enum.chunk_every(2, 1, :discard)
-      |> Enum.find_value(fn [low, high] -> between(low, high, place) end)
-    end
-
-    defp between(low, _high, place) when place == low.x, do: low.y
-    defp between(_low, high, place) when place == high.x, do: high.y
-
-    defp between(low, high, place) when place > low.x and place < high.x,
-      do: low.y + (high.y - low.y) * ((place - low.x) / (high.x - low.x))
-
-    defp between(_low, _high, _place), do: nil
 
     # The layer's table aligned: each aligned row taken from the row it carries, its x and y put in
     # and the padding marked, the rows of a panel kept as they are taking none, and the columns in

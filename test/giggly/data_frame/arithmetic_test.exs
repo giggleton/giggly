@@ -338,6 +338,60 @@ defmodule Giggly.DataFrame.ArithmeticTest do
            ]
   end
 
+  # Golden: R 4.6.1's var() of c(1, NA), c(1, NaN), 1, numeric(0), c(1, Inf), c(Inf, Inf),
+  # c(-Inf, Inf), c(1L, 2L, 4L), c(1e154, 3e154) and c(1e-200, 3e-200): NA, NA, NA, NA, NaN, NaN,
+  # NaN, 2.3333333333333335, Inf and 0, the last two squared past a double's range in R's long
+  # double and rounded back.
+  test "variance is R's var(): missing where a value is or for fewer than two, NaN for an infinity" do
+    variances =
+      Enum.map(
+        [
+          [1.0, nil],
+          [1.0, :nan],
+          [1.0],
+          [],
+          [1.0, :infinity],
+          [:infinity, :infinity],
+          [:neg_infinity, :infinity],
+          [1, 2, 4],
+          [1.0e154, 3.0e154],
+          [1.0e-200, 3.0e-200]
+        ],
+        &Arithmetic.variance/1
+      )
+
+    assert variances === [
+             nil,
+             nil,
+             nil,
+             nil,
+             :nan,
+             :nan,
+             :nan,
+             2.3333333333333335,
+             :infinity,
+             0.0
+           ]
+  end
+
+  # Golden: R 4.6.1's var() of c(3758990132.12738, -3902233189.5651264) and of
+  # c(100000000.16079396, 100000000.18124922), from a run of 3,000 random vectors all of which
+  # this matched digit for digit: 2.934717139242258e19 and 2.092087511498253e-4. Squaring each
+  # distance in doubles gives 2.9347171392422584e19 for the first, and taking the distances from
+  # the mean before it is rounded to a double gives 2.0920875114971427e-4 for the second.
+  test "variance squares each distance from R's mean, a double, in R's long double" do
+    variances =
+      Enum.map(
+        [
+          [3_758_990_132.12738, -3_902_233_189.5651264],
+          [100_000_000.16079396, 100_000_000.18124922]
+        ],
+        &Arithmetic.variance/1
+      )
+
+    assert variances === [2.934_717_139_242_258e19, 2.092087511498253e-4]
+  end
+
   # Golden: R 4.6.1's mean() of c(NA, NaN), c(NaN, NA), c(1, NaN, NA), c(Inf, NA), c(NA_integer_,
   # 1L), c(1, NaN), c(Inf, NaN), c(Inf, 1), c(-Inf, 1) and c(Inf, -Inf) is NA, NA, NA, NA, NA,
   # NaN, NaN, Inf, -Inf and NaN: NA wherever it is, where R's sum() keeps the first missing value.

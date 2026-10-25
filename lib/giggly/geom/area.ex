@@ -30,7 +30,7 @@ defmodule Giggly.Geom.Area do
           orientation: :x | :y,
           outline_type: Giggly.Geom.Ribbon.outline_type(),
           line_end: Polylines.line_end(),
-          line_join: Polylines.line_join(),
+          line_join: :none | Polylines.line_join(),
           mitre_limit: float()
         }
 

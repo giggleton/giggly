@@ -79,7 +79,8 @@ defmodule Giggly.DataFrame do
   #     `{:not, [x]}`, whether it is false, each a boolean; `{:<, [left, right]}` and `{:>, [left,
   #     right]}`, whether one number is below or above another, a boolean; `{:log10, [x]}`, a
   #     number's base-10 logarithm, a float, as R's `log10()` gives it, zero's minus infinity and
-  #     a negative number's NaN; `{:cut, [x], breaks:
+  #     a negative number's NaN; `{:floor, [x]}`, the greatest whole number at or below a float, a
+  #     float, as Explorer floors one; `{:cut, [x], breaks:
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
@@ -165,6 +166,7 @@ defmodule Giggly.DataFrame do
           | {:<, [expression()]}
           | {:>, [expression()]}
           | {:log10, [expression()]}
+          | {:floor, [expression()]}
           | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."
@@ -172,6 +174,7 @@ defmodule Giggly.DataFrame do
           {:sum, [name()]}
           | {:sum, [name()], [summation: :extended | :plain, missing: :propagate | :skip]}
           | {:mean, [name()]}
+          | {:variance, [name()]}
           | {:n_distinct, [name()]}
           | {:first, [name()]}
           | {:quantile, [name()], [probability: number()]}
@@ -483,7 +486,10 @@ defmodule Giggly.DataFrame do
   #   * `{:mean, [column]}`, the mean of a column of numbers, a float, as R's `mean()` works it
   #     out in a long double (`Giggly.DataFrame.Arithmetic.mean/1`), digit for digit, missing where
   #     the group holds a `nil` (R's `NA`), else NaN where it holds NaN or both infinities, else an
-  #     infinity where it holds one.
+  #     infinity where it holds one;
+  #   * `{:variance, [column]}`, the variance of a column of numbers, a float, as R's `var()` works
+  #     it out (`Giggly.DataFrame.Arithmetic.variance/1`), digit for digit, missing where the group
+  #     holds a missing value or fewer than two, else NaN where it holds an infinity.
   #
   # `count`, `min`, `max` and `quantile` leave a missing value out, one that is `nil` (R's `NA`) or
   # NaN, as R's `is.na()` reads one and as R's statistics call them, with `na.rm = TRUE`; a group
@@ -497,10 +503,10 @@ defmodule Giggly.DataFrame do
   # group's sum missing, `nil` where one is, else NaN, as R's `sum()` gives `NA` or `NaN`; `:skip`
   # leaves it out, as `rowsum(na.rm = TRUE)` does, a group of only missing values summing to 0. An infinity is no missing value: it adds as IEEE
   # adds one, so the sum is that infinity, or NaN where both meet, as R's is. A sum, a minimum, a
-  # maximum, a mean or a quantile of a column of another type and an option not listed are refused
-  # with an `ArgumentError`; an empty `by`, an option's value not listed, a quantile with no
-  # probability, an aggregate not listed and an aggregate's name shared with a `by` column raise
-  # `FunctionClauseError`.
+  # maximum, a mean, a variance or a quantile of a column of another type and an option not listed
+  # are refused with an `ArgumentError`; an empty `by`, an option's value not listed, a quantile
+  # with no probability, an aggregate not listed and an aggregate's name shared with a `by` column
+  # raise `FunctionClauseError`.
   @doc false
   @spec summarise(t(), [name(), ...], [{name(), aggregate()}]) :: t()
   def summarise(%implementation{} = frame, [_first | _rest] = by, aggregates)

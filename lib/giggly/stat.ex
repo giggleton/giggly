@@ -22,9 +22,12 @@ defprotocol Giggly.Stat do
   # `stat = "bin"`, the box plot's summary (`Giggly.Stat.Boxplot`) each group's quartiles,
   # whiskers and outliers, as `geom_boxplot()` defaults `stat = "boxplot"`, aligning
   # (`Giggly.Stat.Align`) each group of areas at every other group's places, as `geom_area()`
-  # defaults `stat = "align"`, and smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
+  # defaults `stat = "align"`, smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
   # as `geom_smooth()` defaults `stat = "smooth"`, its band's quantile Giggly's own
-  # (`Giggly.Stat.TDistribution`).
+  # (`Giggly.Stat.TDistribution`), and densities (`Giggly.Stat.Density`) each group's kernel
+  # density estimate, as `geom_density()` defaults `stat = "density"`. Smoothing and densities
+  # space their places and aligning and densities read a curve between its points as R does
+  # (`Giggly.Stat.Curve`).
   #
   # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
   # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
@@ -34,14 +37,15 @@ defprotocol Giggly.Stat do
   # (`dropped_aesthetics/0`), which `Giggly.Plot` checks a layer against at the call.
 
   # A stat is handed a layer's table and each panel's axes and returns a table, reading,
-  # summarising and building tables through the data frame, and sizes what it counts at by the
-  # spacing of its positions (`Giggly.Resolution`). An axis is plain values and a function the
+  # summarising and building tables through the data frame, sizes what it counts at by the
+  # spacing of its positions (`Giggly.Resolution`), and convolves a density's binned rows with its
+  # kernel through `Giggly.Tensor`, the one door to Nx. An axis is plain values and a function the
   # assembly builds round the panel's scale, so this boundary lists no scale. It exports its
   # kinds, whose structs a plot records, and nothing they compute with: that is in their protocol
   # implementations, which no boundary exports.
   use Boundary,
-    deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
-    exports: [Align, Bin, Boxplot, Count, Identity, Smooth, Sum]
+    deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution, Giggly.Tensor],
+    exports: [Align, Bin, Boxplot, Count, Density, Identity, Smooth, Sum]
 
   alias Giggly.DataFrame
 

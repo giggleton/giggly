@@ -1047,6 +1047,674 @@ defmodule Giggly.StatTest do
     )
   end
 
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_density()` with the
+  # options named, printed to 17 significant digits; the layer's places are R's to the last digit
+  # and every other value R's within 1e-12 of the largest magnitude R's column holds, as the
+  # estimate's convolution is Nx's, not R's (design-log §4, the entry beginning "A stat's values
+  # reached by another route"). Each table is built here as the stat is handed it, its axis's
+  # extent the column's, as the scale gives it.
+  describe "compute_layer/3 for densities" do
+    # Golden: `ggplot(mpg, aes(hwy))` with `geom_density(n = 5)`.
+    test "a kernel density estimate across the panel's axis, R's density()" do
+      curve = estimate(hwy_frame(), n: 5)
+
+      assert DataFrame.names(curve) ==
+               [
+                 :x,
+                 :density,
+                 :scaled,
+                 :ndensity,
+                 :count,
+                 :wdensity,
+                 :n,
+                 :flipped_aes,
+                 :panel,
+                 :group
+               ]
+
+      assert DataFrame.pull(curve, :x) === [12.0, 20.0, 28.0, 36.0, 44.0]
+
+      assert_near(curve, :density, [
+        0.0093474699133166347,
+        0.042495683230208497,
+        0.061011211809190169,
+        0.0058194146438834563,
+        0.0021303835656945004
+      ])
+
+      assert_near(curve, :scaled, [
+        0.15320905184690362,
+        0.69652252381270252,
+        1.0,
+        0.095382708707432581,
+        0.03491790283328873
+      ])
+
+      assert_near(curve, :ndensity, [
+        0.15320905184690362,
+        0.69652252381270252,
+        1.0,
+        0.095382708707432581,
+        0.03491790283328873
+      ])
+
+      assert_near(curve, :count, [
+        2.1873079597160925,
+        9.9439898758687892,
+        14.276623563350499,
+        1.3617430266687287,
+        0.4985097543725131
+      ])
+
+      assert_near(curve, :wdensity, [
+        2.1873079597160925,
+        9.9439898758687892,
+        14.276623563350499,
+        1.3617430266687287,
+        0.4985097543725131
+      ])
+
+      assert DataFrame.pull(curve, :n) === [234, 234, 234, 234, 234]
+      assert DataFrame.pull(curve, :flipped_aes) == List.duplicate(false, 5)
+    end
+
+    # Golden: `aes(hwy, colour = drv)` with `geom_density(n = 3, trim = TRUE)`.
+    test "trimmed, each group's curve spans its own rows, its constant columns carried" do
+      drives = column(:drv)
+
+      frame =
+        DataFrame.new(
+          x: column(:hwy),
+          color: drives,
+          panel: List.duplicate(1, 234),
+          group: Enum.map(drives, fn drive -> %{"4" => 1, "f" => 2, "r" => 3}[drive] end)
+        )
+
+      curve = estimate(frame, n: 3, trim: true)
+
+      assert DataFrame.names(curve) == [
+               :x,
+               :density,
+               :scaled,
+               :ndensity,
+               :count,
+               :wdensity,
+               :n,
+               :flipped_aes,
+               :color,
+               :panel,
+               :group
+             ]
+
+      assert DataFrame.pull(curve, :x) === [12.0, 20.0, 28.0, 17.0, 30.5, 44.0, 15.0, 20.5, 26.0]
+
+      assert_near(curve, :density, [
+        0.018756264653155847,
+        0.067707446243681121,
+        0.019685004730588509,
+        0.0047392001781116824,
+        0.063740471487487044,
+        0.0094821463652452771,
+        0.045231355553014323,
+        0.070632082114653674,
+        0.067514684782176274
+      ])
+
+      assert DataFrame.pull(curve, :n) === [103, 103, 103, 106, 106, 106, 25, 25, 25]
+      assert DataFrame.pull(curve, :color) == ["4", "4", "4", "f", "f", "f", "r", "r", "r"]
+    end
+
+    # Golden: `ggplot(mpg, aes(y = hwy))` with `geom_density(n = 3)`.
+    test "along y, a density's places are its y" do
+      frame =
+        DataFrame.new(
+          y: column(:hwy),
+          panel: List.duplicate(1, 234),
+          group: List.duplicate(-1, 234)
+        )
+
+      curve = estimate(frame, [n: 3], y: {12, 44})
+
+      names = DataFrame.names(curve)
+
+      assert Enum.take(names, 2) == [:y, :density]
+      assert DataFrame.pull(curve, :y) === [12.0, 28.0, 44.0]
+
+      assert_near(curve, :density, [
+        0.0093474699133166347,
+        0.061011211809190169,
+        0.0021303835656945004
+      ])
+
+      assert DataFrame.pull(curve, :flipped_aes) == [true, true, true]
+    end
+
+    # Golden: `geom_density(n = 3)` with `bw = "nrd"`, `bw = 2, adjust = 0.5` and `adjust = 0.5`.
+    test "the bandwidth is Scott's variation, or a number, times adjust" do
+      frame = hwy_frame()
+
+      assert_near(estimate(frame, n: 3, bandwidth: :nrd), :density, [
+        0.010703054593875718,
+        0.0594769157228573,
+        0.0019081911116291537
+      ])
+
+      assert_near(
+        estimate(frame, n: 3, bandwidth: 2.0, adjust: 0.5),
+        :density,
+        [0.0091777389352147819, 0.057902375821687106, 0.0034269815200093467]
+      )
+
+      assert_near(estimate(frame, n: 3, adjust: 0.5), :density, [
+        0.0098624475627717458,
+        0.056015751487052672,
+        0.0037942645867074447
+      ])
+    end
+
+    # Golden: `geom_density()` of x 1, 1, 1, 1 and 5, of interquartile range 0, with `n = 3`; of
+    # 2, 2 and 2, of standard deviation 0 too, and of 0, 0 and 0, with `n = 2`.
+    test "Silverman's rule falls back to the deviation, then the first x's magnitude, then 1" do
+      spread = estimate(one_panel(x: [1.0, 1.0, 1.0, 1.0, 5.0]), [n: 3], x: {1, 5})
+      assert DataFrame.pull(spread, :x) === [1.0, 3.0, 5.0]
+
+      assert_near(spread, :density, [
+        0.27368767872964633,
+        0.078712368993667264,
+        0.06914226247925695
+      ])
+
+      level = estimate(one_panel(x: [2.0, 2.0, 2.0]), [n: 2], x: {2, 2})
+      assert DataFrame.pull(level, :x) === [2.0, 2.0]
+      assert_near(level, :density, [0.27608016217533199, 0.27608016217533199])
+
+      zero = estimate(one_panel(x: [0.0, 0.0, 0.0]), [n: 2], x: {0, 0})
+      assert DataFrame.pull(zero, :x) === [0.0, 0.0]
+      assert_near(zero, :density, [0.55216032435066398, 0.55216032435066398])
+    end
+
+    # Golden: `geom_density(n = 5, kernel = k)` for each of R's other six kernels.
+    test "each kernel is R's, scaled so its standard deviation is the bandwidth" do
+      frame = hwy_frame()
+
+      for {kernel, expected} <- [
+            epanechnikov: [
+              0.0088260398714720342,
+              0.043917264095601635,
+              0.062105473251687998,
+              0.0052049697347955727,
+              0.0019460960903589183
+            ],
+            rectangular: [
+              0.011651647613228242,
+              0.055516673921852194,
+              0.069224494643297205,
+              0.0054831282885779891,
+              0.002056173108216749
+            ],
+            triangular: [
+              0.0095911826824394419,
+              0.044370140062685574,
+              0.061103031234799265,
+              0.0056764834447801549,
+              0.002231852025117578
+            ],
+            biweight: [
+              0.008920122966081195,
+              0.043575489682529389,
+              0.062072312371462303,
+              0.0054633917227592376,
+              0.0019881960806204047
+            ],
+            cosine: [
+              0.0089026400318507597,
+              0.043323449020884718,
+              0.06187082046694594,
+              0.0055076346108025335,
+              0.0020094502788162065
+            ],
+            optcosine: [
+              0.008917997236684759,
+              0.043953984185432608,
+              0.062157352233790972,
+              0.0053170587371680518,
+              0.0019620187026103326
+            ]
+          ] do
+        assert_near(estimate(frame, n: 5, kernel: kernel), :density, expected)
+      end
+    end
+
+    # Golden: the first four densities of `geom_density()` with `n = 513` and `n = 1024`, on a grid
+    # of 1,024 points, and `n = 1025`, on one of 2,048; at 512 the first is 0.0093474699133166347.
+    test "past 512 places the grid is the least power of two holding them" do
+      frame = hwy_frame()
+
+      for {places, expected} <- [
+            {513,
+             [
+               0.0093440973253974512,
+               0.0096322930753769409,
+               0.0099292897269487659,
+               0.010234306646215257
+             ]},
+            {1024,
+             [
+               0.0093440973253974512,
+               0.0094875351129041895,
+               0.0096325812303428328,
+               0.0097801165728798791
+             ]},
+            {1025,
+             [
+               0.0093438740768239468,
+               0.0094869353369978621,
+               0.0096322592476193077,
+               0.0097794977338738244
+             ]}
+          ] do
+        densities =
+          frame
+          |> estimate(n: places)
+          |> DataFrame.pull(:density)
+
+        assert length(densities) == places
+        assert_near_values(:density, Enum.take(densities, 4), expected)
+      end
+    end
+
+    # Golden: `geom_density(n = 5)` with `bounds = c(15, 40)`, `c(-Inf, 40)` and `c(12, Inf)`.
+    test "rows outside finite bounds are left out and the curve folded back inside them" do
+      frame = hwy_frame()
+
+      both = estimate(frame, n: 5, bounds: {15.0, 40.0})
+
+      assert DataFrame.pull(both, :x) === [
+               15.0,
+               16.785714285714285,
+               18.571428571428573,
+               20.357142857142858,
+               22.142857142857142,
+               23.928571428571431,
+               25.714285714285715,
+               27.5,
+               29.285714285714285,
+               31.071428571428573,
+               32.857142857142861,
+               34.642857142857139,
+               36.428571428571431,
+               38.214285714285715,
+               40.0
+             ]
+
+      assert_near(both, :density, [
+        0.050031419536183508,
+        0.048185717632693498,
+        0.045109547793543481,
+        0.042033377954393464,
+        0.04136685214362535,
+        0.047298043077601881,
+        0.05471484190889328,
+        0.062131640740185574,
+        0.053655920865872758,
+        0.038999826942791478,
+        0.024348090938645626,
+        0.0096974433296185044,
+        0.0061319000090605136,
+        0.0040779618187483406,
+        0.0039958042911358484
+      ])
+
+      assert_near(both, :scaled, [
+        0.80524864529811346,
+        0.7755423333208048,
+        0.72603181335862377,
+        0.67652129339644285,
+        0.66579365442171645,
+        0.76125533647802734,
+        0.88062766823900651,
+        1.0,
+        0.8635844833109183,
+        0.62769671745634625,
+        0.39187909169277318,
+        0.15607898349522228,
+        0.098692066329008371,
+        0.06563422066706813,
+        0.064311906840590446
+      ])
+
+      assert_near(both, :count, [
+        11.207037976105106,
+        10.793600749723343,
+        10.10453870575374,
+        9.4154766617841368,
+        9.2661748801720787,
+        10.594761649382821,
+        12.256124587592094,
+        13.917487525801569,
+        12.018926273955497,
+        8.7359612351852913,
+        5.4539723702566203,
+        2.1722273058345452,
+        1.3735456020295551,
+        0.91346344739962826,
+        0.89506016121442999
+      ])
+
+      assert_near(both, :wdensity, [
+        11.207037976105108,
+        10.793600749723344,
+        10.104538705753741,
+        9.4154766617841368,
+        9.2661748801720805,
+        10.594761649382823,
+        12.256124587592096,
+        13.917487525801571,
+        12.018926273955499,
+        8.7359612351852913,
+        5.4539723702566212,
+        2.1722273058345452,
+        1.3735456020295553,
+        0.91346344739962837,
+        0.89506016121443022
+      ])
+
+      assert DataFrame.pull(both, :n) === [
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224,
+               224
+             ]
+
+      high = estimate(frame, n: 5, bounds: {:neg_infinity, 40.0})
+
+      assert DataFrame.pull(high, :x) === [
+               12.0,
+               15.111111111111111,
+               18.222222222222221,
+               21.333333333333336,
+               24.444444444444443,
+               27.555555555555557,
+               30.666666666666668,
+               33.777777777777779,
+               36.888888888888886,
+               40.0
+             ]
+
+      assert_near(high, :density, [
+        0.0090785963347333985,
+        0.027497846380733781,
+        0.045917096426734159,
+        0.058524690283392126,
+        0.068807621664313104,
+        0.062951860398695131,
+        0.035577842270091524,
+        0.011407691408269067,
+        0.0062841931831204402,
+        0.0018926232758501756
+      ])
+
+      assert DataFrame.pull(high, :n) === [231, 231, 231, 231, 231, 231, 231, 231, 231, 231]
+
+      low = estimate(frame, n: 5, bounds: {12.0, :infinity})
+
+      assert DataFrame.pull(low, :x) === [
+               12.0,
+               15.555555555555555,
+               19.111111111111111,
+               22.666666666666664,
+               26.222222222222221,
+               29.777777777777779,
+               33.333333333333329,
+               36.888888888888886,
+               40.444444444444443,
+               44.0
+             ]
+
+      assert_near(low, :density, [
+        0.045684457485645653,
+        0.04568445748564566,
+        0.043505297465042163,
+        0.041326137444438658,
+        0.041761599277643696,
+        0.042197061110848692,
+        0.023278868808583889,
+        0.00436067650631905,
+        0.0032456920900197804,
+        0.0021307076737205112
+      ])
+
+      assert DataFrame.pull(low, :n) === [234, 234, 234, 234, 234, 234, 234, 234, 234, 234]
+    end
+
+    # Golden: x 1, 2, 3, 5 and 8 weighted 1, 2, 0, 3 and 1.5 with `geom_density(n = 4)`, and with
+    # `n = 2, bounds = c(1.5, 6)`; and x 1, 2, 3 and 5 weighted -1, -2, -1 and -3, every share of
+    # their total above 0.
+    test "each row weighs its weight's share of its group's, the count counting rows" do
+      weighted = one_panel(x: [1.0, 2.0, 3.0, 5.0, 8.0], weight: [1, 2, 0, 3, 1.5])
+
+      plain = estimate(weighted, [n: 4], x: {1, 8})
+      assert DataFrame.pull(plain, :x) === [1.0, 3.3333333333333335, 5.666666666666667, 8.0]
+
+      assert_near(plain, :density, [
+        0.096609158747373886,
+        0.11549046046156743,
+        0.11703559875729051,
+        0.067897701221173279
+      ])
+
+      assert_near(plain, :scaled, [
+        0.82546814621526254,
+        0.98679770674794931,
+        1.0,
+        0.5801457158516371
+      ])
+
+      assert_near(plain, :count, [
+        0.4830457937368694,
+        0.57745230230783717,
+        0.58517799378645252,
+        0.33948850610586639
+      ])
+
+      assert_near(plain, :wdensity, [
+        0.72456869060530416,
+        0.8661784534617557,
+        0.87776699067967889,
+        0.50923275915879962
+      ])
+
+      assert DataFrame.pull(plain, :n) === [5, 5, 5, 5]
+
+      bounded = estimate(weighted, [n: 2, bounds: {1.5, 6.0}], x: {1, 8})
+
+      assert DataFrame.pull(bounded, :x) === [
+               1.5,
+               2.3999999999999999,
+               3.2999999999999998,
+               4.2000000000000002,
+               5.0999999999999996,
+               6.0
+             ]
+
+      assert_near(bounded, :density, [
+        0.27992537705456555,
+        0.28890886270585009,
+        0.23135029064179111,
+        0.17379171857773204,
+        0.12882039388460825,
+        0.12222099298053157
+      ])
+
+      assert_near(bounded, :count, [
+        0.83977613116369665,
+        0.86672658811755032,
+        0.69405087192537329,
+        0.52137515573319615,
+        0.38646118165382476,
+        0.36666297894159472
+      ])
+
+      assert_near(bounded, :wdensity, [
+        1.399626885272828,
+        1.4445443135292506,
+        1.1567514532089558,
+        0.8689585928886604,
+        0.64410196942304143,
+        0.61110496490265798
+      ])
+
+      assert DataFrame.pull(bounded, :n) === [3, 3, 3, 3, 3, 3]
+
+      negative =
+        estimate(one_panel(x: [1.0, 2.0, 3.0, 5.0], weight: [-1, -2, -1, -3]), [n: 3], x: {1, 5})
+
+      assert_near(negative, :density, [
+        0.13727118201433733,
+        0.15270579846961316,
+        0.19750721008117639
+      ])
+
+      assert_near(negative, :count, [
+        0.54908472805734931,
+        0.61082319387845263,
+        0.79002884032470555
+      ])
+
+      assert_near(negative, :wdensity, [
+        -0.96089827410036133,
+        -1.0689405892872921,
+        -1.3825504705682348
+      ])
+    end
+
+    # Golden: x 1, 2, 3 and 9 weighted 0, 0, 0 and 1 with `n = 2, bounds = c(0, 5)`: the rows
+    # inside weigh nothing, so the curve is 0 and scaled NaN, as R divides 0 by 0.
+    test "rows inside the bounds weighing nothing give a curve of 0, its scaled values NaN" do
+      curve =
+        estimate(
+          one_panel(x: [1.0, 2.0, 3.0, 9.0], weight: [0, 0, 0, 1]),
+          [n: 2, bounds: {0.0, 5.0}],
+          x: {1, 9}
+        )
+
+      assert DataFrame.pull(curve, :x) === [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]
+      assert DataFrame.pull(curve, :density) === [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      assert DataFrame.pull(curve, :scaled) === [:nan, :nan, :nan, :nan, :nan, :nan]
+      assert DataFrame.pull(curve, :wdensity) === [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      assert DataFrame.pull(curve, :n) === [3, 3, 3, 3, 3, 3]
+    end
+
+    # Golden: x 1, NA, 2, Inf, 4 and 7 with `n = 3`.
+    test "a row missing its x, or at an infinite one, is left out" do
+      curve = estimate(one_panel(x: [1.0, nil, 2.0, :infinity, 4.0, 7.0]), [n: 3], x: {1, 7})
+
+      assert_near(curve, :density, [
+        0.12752436585743054,
+        0.11197965090664466,
+        0.075127057915767986
+      ])
+
+      assert DataFrame.pull(curve, :n) === [4, 4, 4]
+    end
+
+    # Golden: x 1, 2, 3 and 7 in groups a, a, a and b, coloured p, p, p and q, with `n = 2`; and x
+    # 1, 2, 3, 7 and 8 in groups a, a, a, b and b with `bounds = c(0, 5)`: a group of one row, or of
+    # none inside the bounds, is one row of missing values, its constant columns carried.
+    test "a group of fewer than two rows inside the bounds is a row of missing values" do
+      lone =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 7.0],
+          color: ["p", "p", "p", "q"],
+          panel: [1, 1, 1, 1],
+          group: [1, 1, 1, 2]
+        )
+
+      curve = estimate(lone, [n: 2], x: {1, 7})
+
+      densities = DataFrame.pull(curve, :density)
+
+      assert DataFrame.pull(curve, :x) === [1.0, 7.0, nil]
+      assert List.last(densities) == nil
+      assert DataFrame.pull(curve, :n) === [3, 3, nil]
+      assert DataFrame.pull(curve, :color) == ["p", "p", "q"]
+
+      outside =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 7.0, 8.0],
+          panel: [1, 1, 1, 1, 1],
+          group: [1, 1, 1, 2, 2]
+        )
+
+      bounded = estimate(outside, [n: 2, bounds: {0.0, 5.0}], x: {1, 8})
+
+      places = DataFrame.pull(bounded, :x)
+
+      assert DataFrame.pull(bounded, :group) == [1, 1, 1, 1, 1, 1, 2]
+      assert List.last(places) == nil
+    end
+
+    # Golden: ggplot2 computes nothing for a panel where R's `density()` fails, warning
+    # "Computation failed in `stat_density()`": a negative weight beside positive ones, a missing,
+    # NaN or infinite one, weights totalling 0, Scott's rule for rows at one x, a missing weight
+    # where some rows are outside the bounds; the panel beside it is computed. A lone row whose
+    # weight is missing is a row of missing values, its group too few to fail.
+    test "a panel where any group's estimate fails is given no rows, and the others are" do
+      for {weights, options} <- [
+            {[1, -1, 2], []},
+            {[1, nil, 2], []},
+            {[1, :nan, 2], []},
+            {[1, :infinity, 2], []},
+            {[0, 0, 0], []},
+            {[1, nil, 2], bounds: {0.0, 2.5}}
+          ] do
+        frame = two_panels(x: [1.0, 2.0, 3.0], weight: weights)
+
+        panels =
+          frame
+          |> estimate([n: 2] ++ options, x: {1, 3})
+          |> DataFrame.pull(:panel)
+          |> Enum.uniq()
+
+        assert panels == [2], "weights #{inspect(weights)}, #{inspect(options)}"
+      end
+
+      level = two_panels(x: [2.0, 2.0, 2.0], weight: [1, 1, 1])
+
+      level_curve = estimate(level, [n: 2, bandwidth: :nrd], x: {1, 3})
+
+      assert DataFrame.pull(level_curve, :panel) == [2, 2]
+
+      lone =
+        DataFrame.new(x: [1.0, 5.0, 6.0], weight: [nil, 1, 1], panel: [1, 1, 1], group: [1, 2, 2])
+
+      lone_curve = estimate(lone, [n: 2], x: {1, 6})
+
+      assert DataFrame.pull(lone_curve, :n) === [nil, 2, 2]
+    end
+
+    test "a weight that is not a number is refused, naming its type" do
+      frame = one_panel(x: [1.0, 2.0], weight: ["light", "heavy"])
+
+      error = assert_raise ArgumentError, fn -> estimate(frame, [], x: {1, 2}) end
+
+      assert error.message ==
+               "a density spreads each row's weight over its grid, so a weight must be a " <>
+                 "number, but the layer's weight is a :string column"
+    end
+  end
+
   # The table a smooth by least squares with ggplot2's defaults but `options` computes from
   # `frame`, in the panels given.
   defp fit(frame, options, panels \\ [1]) do
@@ -1083,9 +1751,11 @@ defmodule Giggly.StatTest do
 
   # Each of a column's values within 1e-12 of R's, as a share of the largest magnitude R's holds,
   # and NaN where R's is.
-  defp assert_near(frame, name, expected) do
-    actual = DataFrame.pull(frame, name)
+  defp assert_near(frame, name, expected),
+    do: assert_near_values(name, DataFrame.pull(frame, name), expected)
 
+  # Values within 1e-12 of R's, of the largest magnitude R's hold, NaN where R's is.
+  defp assert_near_values(name, actual, expected) do
     largest =
       expected
       |> Enum.filter(&is_number/1)
@@ -1102,6 +1772,59 @@ defmodule Giggly.StatTest do
         assert abs(value - wanted) <= 1.0e-12 * largest,
                "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
     end)
+  end
+
+  # The table a density with ggplot2's defaults but `options` computes from `frame`, each of its
+  # panels' axes the extent `limits` gives it, x's mpg's hwy's unless given.
+  defp estimate(frame, options, limits \\ []) do
+    stat =
+      struct!(
+        %Stat.Density{
+          bandwidth: :nrd0,
+          adjust: 1.0,
+          kernel: :gaussian,
+          n: 512,
+          trim: false,
+          bounds: {:neg_infinity, :infinity}
+        },
+        options
+      )
+
+    panel_axes = %{
+      x: extent_axis(Keyword.get(limits, :x, {12, 44})),
+      y: extent_axis(Keyword.get(limits, :y, {0, 1}))
+    }
+
+    Stat.compute_layer(stat, frame, %{1 => panel_axes, 2 => panel_axes})
+  end
+
+  defp extent_axis(limits),
+    do: %{limits: limits, discrete: false, transform: fn values -> values end}
+
+  # mpg's highway mileage in one panel and one group.
+  defp hwy_frame do
+    DataFrame.new(x: column(:hwy), panel: List.duplicate(1, 234), group: List.duplicate(-1, 234))
+  end
+
+  # A table of the columns given in one panel and one group.
+  defp one_panel(columns) do
+    rows =
+      columns
+      |> Keyword.fetch!(:x)
+      |> length()
+
+    columns
+    |> Enum.concat(panel: List.duplicate(1, rows), group: List.duplicate(-1, rows))
+    |> DataFrame.new()
+  end
+
+  # The columns given in panel 1, beside x 1, 2 and 3, each weighted 1, in panel 2.
+  defp two_panels(columns) do
+    columns
+    |> Enum.map(fn {name, values} -> {name, values ++ [1.0, 2.0, 3.0]} end)
+    |> Keyword.update!(:weight, fn weights -> Enum.take(weights, 3) ++ [1, 1, 1] end)
+    |> Enum.concat(panel: [1, 1, 1, 2, 2, 2], group: [-1, -1, -1, -1, -1, -1])
+    |> DataFrame.new()
   end
 
   # An area layer's table as aligning is handed it, its fill one colour per group.

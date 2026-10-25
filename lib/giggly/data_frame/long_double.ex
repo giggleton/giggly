@@ -1,8 +1,8 @@
 defmodule Giggly.DataFrame.LongDouble do
   @moduledoc false
 
-  # R's long double, in which R's `sum()`, `cumsum()` and `mean()` add and divide: the x87's
-  # extended precision, 64
+  # R's long double, in which R's `sum()`, `cumsum()` and `mean()` add and divide, and `var()`
+  # squares too: the x87's extended precision, 64
   # significant bits where a double has 53, every result rounded to the nearest, a tie to the even
   # one. A finite value is held exactly as `{mantissa, exponent}`, the integer `mantissa` times 2 to
   # the `exponent`, and each operation computes its result exactly and rounds it to 64 bits, so the
@@ -67,6 +67,12 @@ defmodule Giggly.DataFrame.LongDouble do
   @doc false
   @spec subtract(t(), t()) :: t()
   def subtract(left, {right, exponent}), do: add(left, {-right, exponent})
+
+  # `left * right`, rounded.
+  @doc false
+  @spec multiply(t(), t()) :: t()
+  def multiply({left, left_exponent}, {right, right_exponent}),
+    do: rounded({left * right, left_exponent + right_exponent})
 
   # Whether `left` is below, equal to or above `right`, exactly.
   @doc false

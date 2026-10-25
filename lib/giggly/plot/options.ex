@@ -506,6 +506,139 @@ defmodule Giggly.Plot.Options do
                   ] ++ @band_look_options ++ @line_style_options
                 )
 
+  # How a layer of densities estimates each group's, options of `geom_density/3` and
+  # `stat_density/3`.
+  @density_estimate_options [
+    bw: [
+      type: {:custom, __MODULE__, :validate_bandwidth, []},
+      default: :nrd0,
+      doc:
+        "How smooth each curve is, its bandwidth, the kernel's standard deviation in the axis's " <>
+          "transformed units: a number above 0, or a rule worked out from each group's rows, " <>
+          "taking no weight: Silverman's rule of thumb (`:nrd0`), 0.9 times the lesser of the " <>
+          "rows' standard deviation and their interquartile range over 1.34, times the rows to " <>
+          "the power -0.2, or Scott's variation of it (`:nrd`), 1.06 times the lesser."
+    ],
+    adjust: [
+      type: {:custom, __MODULE__, :validate_adjust, []},
+      default: 1.0,
+      doc:
+        "A multiple of the bandwidth, above 0: `adjust: 0.5` halves it, for a curve that " <>
+          "follows the rows more closely, and `adjust: 2` doubles it, for a smoother one."
+    ],
+    kernel: [
+      type:
+        {:in,
+         [:gaussian, :epanechnikov, :rectangular, :triangular, :biweight, :cosine, :optcosine]},
+      default: :gaussian,
+      doc:
+        "The shape put at each row and summed, scaled so its standard deviation is the " <>
+          "bandwidth: a normal curve (`:gaussian`), a parabola (`:epanechnikov`), a block " <>
+          "(`:rectangular`), a tent (`:triangular`), a parabola squared (`:biweight`), or a " <>
+          "cosine's hump (`:cosine`) or a narrower one (`:optcosine`)."
+    ],
+    n: [
+      type: :pos_integer,
+      default: 512,
+      doc:
+        "How many evenly spaced places each curve is worked out at, twice as many with one " <>
+          "finite bound and three times with two."
+    ],
+    trim: [
+      type: :boolean,
+      default: false,
+      doc:
+        "Whether each curve spans only its own group's extent rather than the panel's axis, " <>
+          "short of its widening; trimmed curves no longer share their places, so they do not " <>
+          "stack."
+    ],
+    bounds: [
+      type: {:custom, __MODULE__, :validate_bounds, []},
+      default: {:neg_infinity, :infinity},
+      doc:
+        "Limits the rows are known to lie within, `{low, high}`, the low a number or " <>
+          "`:neg_infinity`, the high a number or `:infinity`, not below the low: the rows " <>
+          "outside them are left out, and each curve's part beyond a finite one is folded back " <>
+          "inside it, so the curve does not spill past a limit the data cannot."
+    ],
+    orientation: @runs_along_option
+  ]
+
+  # How every curve of a `geom_density/3` layer looks, set by its options.
+  @density_look_options [
+    alpha: [
+      type: {:custom, __MODULE__, :validate_alpha, []},
+      doc:
+        "How opaque every curve's fill is, from 0, invisible, to 1, opaque; its outline keeps " <>
+          "its colour's own alpha."
+    ],
+    color: [
+      type: @color_type,
+      doc:
+        "The colour of every curve's outline, written `colour:` or `color:`: " <>
+          @color_forms <> "; the theme's ink, black, when not given."
+    ],
+    fill: [
+      type: @color_type,
+      doc:
+        "The colour every curve is filled with down to 0: " <>
+          @color_forms <> "; none when not given."
+    ],
+    linewidth: [
+      type: {:custom, __MODULE__, :validate_linewidth, []},
+      doc:
+        "How wide every curve's outline is, in millimetres; the theme's `base_line_size` when " <>
+          "not given, 0.5 at its default sizes."
+    ],
+    linetype: [
+      type: @linetype_type,
+      doc:
+        "The line type of every curve's outline: " <>
+          @linetype_forms <> "; `:solid` when not given."
+    ]
+  ]
+
+  # How areas of densities that share an `x` are placed, its default the function's own.
+  @density_position_option [
+    type: {:in, [:identity, :stack]},
+    doc:
+      "How curves that share an `x` are placed: each drawn where it is, overlapping " <>
+        "(`:identity`), or piled on one another (`:stack`)."
+  ]
+
+  # `geom_density/3`'s options, validated at the call: how each curve is estimated, and how it
+  # looks.
+  @density_options NimbleOptions.new!(
+                     [
+                       data: @data_option,
+                       position: [default: :identity] ++ @density_position_option,
+                       outline_type: [default: :upper] ++ @outline_type_option
+                     ] ++
+                       @density_estimate_options ++ @density_look_options ++ @line_style_options
+                   )
+
+  # How an area of densities' outline is drawn, `stat_density/3`'s: a line's, its corners given no
+  # default, so a key's are mitred where the layer gives none.
+  @stat_density_line_style_options Keyword.replace!(@line_style_options, :linejoin,
+                                     type: {:in, [:round, :mitre, :bevel]},
+                                     doc:
+                                       "How a line turns a corner: rounded (`:round`), pointed " <>
+                                         "(`:mitre`) or cut off (`:bevel`); when not given, " <>
+                                         "rounded, and pointed in a legend's keys."
+                                   )
+
+  # `stat_density/3`'s options, validated at the call: how each curve is estimated, and how its
+  # area looks.
+  @stat_density_options NimbleOptions.new!(
+                          [
+                            data: @data_option,
+                            position: [default: :stack] ++ @density_position_option,
+                            outline_type: [default: :both] ++ @outline_type_option
+                          ] ++
+                            @density_estimate_options ++
+                            @band_look_options ++ @stat_density_line_style_options
+                        )
+
   # `geom_smooth/3`'s and `stat_smooth/3`'s options, validated at the call: how each curve is
   # fitted, and how its line and band look.
   @smooth_options NimbleOptions.new!(
@@ -2225,6 +2358,14 @@ defmodule Giggly.Plot.Options do
   def smooth, do: @smooth_options
 
   @doc false
+  @spec density() :: NimbleOptions.t()
+  def density, do: @density_options
+
+  @doc false
+  @spec stat_density() :: NimbleOptions.t()
+  def stat_density, do: @stat_density_options
+
+  @doc false
   @spec line() :: NimbleOptions.t()
   def line, do: @line_options
 
@@ -2449,6 +2590,45 @@ defmodule Giggly.Plot.Options do
 
   def validate_level(level),
     do: {:error, "expected a number above 0 and below 1, got: #{inspect(level)}"}
+
+  # NimbleOptions' check of a density's `bw:`: one of the rules by name, or a finite number above 0,
+  # kept as a float, as R keeps a double.
+  @doc false
+  @spec validate_bandwidth(term()) :: {:ok, :nrd0 | :nrd | float()} | {:error, String.t()}
+  def validate_bandwidth(rule) when rule in [:nrd0, :nrd], do: {:ok, rule}
+  def validate_bandwidth(width) when is_number(width) and width > 0, do: {:ok, width / 1}
+
+  def validate_bandwidth(width),
+    do: {:error, "expected a bandwidth, :nrd0, :nrd or a number above 0, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a density's `adjust:`: a number above 0, kept as a float.
+  @doc false
+  @spec validate_adjust(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_adjust(adjust) when is_number(adjust) and adjust > 0, do: {:ok, adjust / 1}
+
+  def validate_adjust(adjust),
+    do:
+      {:error, "expected a multiple of the bandwidth, a number above 0, got: #{inspect(adjust)}"}
+
+  # NimbleOptions' check of a density's `bounds:`: `{low, high}`, the low a number or
+  # `:neg_infinity`, the high a number or `:infinity`, not below the low, each number kept as a
+  # float; bounds high to low would keep no row, where R draws a row of missing values.
+  @doc false
+  @spec validate_bounds(term()) ::
+          {:ok, {float() | :neg_infinity, float() | :infinity}} | {:error, String.t()}
+  def validate_bounds({low, high})
+      when (is_number(low) or low == :neg_infinity) and (is_number(high) or high == :infinity) and
+             not (is_number(low) and is_number(high) and low > high),
+      do: {:ok, {bound(low), bound(high)}}
+
+  def validate_bounds(bounds),
+    do:
+      {:error,
+       "expected bounds {low, high}, the low a number or :neg_infinity, the high a number or " <>
+         ":infinity, not below the low, got: #{inspect(bounds)}"}
+
+  defp bound(bound) when is_number(bound), do: bound / 1
+  defp bound(infinity), do: infinity
 
   # NimbleOptions' check of an option that sets a colour: a CSS colour, kept in its one spelling,
   # uppercase hex, or `:none`.

@@ -31,7 +31,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   missing value last; every family that sorts or compares them reads it, never a key of its own. **A sum, running sums and a mean
   are R's digit for digit** (`sum/2`, which `summarise/3`'s sum calls, `cumulative_sum/1` and
   `mean/1`; design-log §4, the entries beginning "The frame's sums are R's" and "The frame's mean
-  is R's"): every step R takes in its long double, a mean's correction pass and its division of
+  is R's"), **and so is a variance** (`variance/1`, R's `var()`: each value's distance from R's
+  mean, a double, squared and summed, checked on 3,000 vectors): every step R takes in its long
+  double, a mean's correction pass and its division of
   each value where the sum is past the largest double included, taken in
   `Giggly.DataFrame.LongDouble`, which holds a value exactly and rounds each result to 64 bits, as
   the x87 does, and only `Arithmetic` calls; so a running sum may pass the largest double and come
@@ -69,7 +71,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   Explorer's is, where R keeps its first operand, integers where both sides are and it does not
   divide, as Explorer types them, floats otherwise; `log10` is R's `log10()`,
   zero's minus infinity and a negative number's NaN, a float, by `:math.log10`, which matches
-  R's to the last bit where a division of natural logarithms does not. A column named alone
+  R's to the last bit where a division of natural logarithms does not; `floor` is a float's
+  greatest whole number at or below it, a float, as Explorer floors one, an integer refused, as
+  Explorer refuses it. A column named alone
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
   none, raises `FunctionClauseError`. **An implementation names the operations it runs**
@@ -86,7 +90,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
   name; `join/3`, the `or`, `not`, `<` and `>` operations and the
   `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
   and whiskers; the `mean` aggregate, with a mapping's reordering; `+`, `-`, `*` and `/`, with a
-  linear smooth's sums. Not designed ahead.
+  linear smooth's sums; `floor` and the `variance` aggregate, with a density's grid and bandwidth.
+  Not designed ahead.
 - **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,
   the key columns must be of one type in both frames, and a column besides them in both is
   refused, never suffixed.
@@ -97,7 +102,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   worked in R's order, `(1 - h) * lower + h * higher`, which a test pins where the textbook order
   differs), each leaving a missing value (`nil` or NaN) out, as R's statistics call them, and
   missing, or 0, for a group of none; `mean`, R's `mean()`, a float, missing wherever a `nil`
-  is, else NaN where a NaN is or both infinities meet; and a sum. **A sum's spec says how it
+  is, else NaN where a NaN is or both infinities meet; `variance`, R's `var()`, a float, missing
+  wherever a value is missing or for fewer than two, else NaN where an infinity is; and a sum.
+  **A sum's spec says how it
   adds** (design-log §4, the entry beginning "The frame's first group-by aggregate"):
   `summation: :extended`, the default, as R's `sum()` adds in extended precision, or `:plain`,
   in row order, as `rowsum()`;

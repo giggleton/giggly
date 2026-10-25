@@ -7,7 +7,10 @@ defmodule Giggly.Geom.Ribbon do
   # ranges given), which edges are outlined (`outline_type`: `:both`, the upper and the lower edge
   # each a line, `:upper`, `:lower`, or `:full`, the band's whole border), and how its outlines'
   # ends and corners are drawn (`line_end`, `line_join`, `mitre_limit`, ggplot2's `lineend`,
-  # `linejoin` and `linemitre`). Areas (`Giggly.Geom.Area`) are drawn as ribbons from 0 to their y,
+  # `linejoin` and `linemitre`), its corners `:none` where the layer gives it none, as
+  # `stat_density()` gives none, drawn round, as ggplot2's `draw_group()` draws them, and keyed
+  # mitred, as `draw_key_polygon()` draws a key whose layer has no `linejoin`). Areas
+  # (`Giggly.Geom.Area`) are drawn as ribbons from 0 to their y,
   # as ggplot2's `GeomArea` is a `GeomRibbon`. Use it through `Giggly.Geom`.
   #
   # Ribbons use `:x`, `:y`, `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:color`,
@@ -65,7 +68,7 @@ defmodule Giggly.Geom.Ribbon do
           orientation: :none | :x | :y,
           outline_type: outline_type(),
           line_end: Polylines.line_end(),
-          line_join: Polylines.line_join(),
+          line_join: :none | Polylines.line_join(),
           mitre_limit: float()
         }
 
@@ -306,10 +309,14 @@ defmodule Giggly.Geom.Ribbon do
       fill_opacity: Enum.map(outlines, fn _outline -> Mark.opacity(fill, look.alpha) end),
       dashes: dashes,
       line_end: geom.line_end,
-      line_join: geom.line_join,
+      line_join: drawn_join(geom.line_join),
       mitre_limit: geom.mitre_limit
     }
   end
+
+  # How a ribbon's corners are drawn: as its layer gives them, or round where it gives none.
+  defp drawn_join(:none), do: :round
+  defp drawn_join(line_join), do: line_join
 
   # The polygon's border, its colour, width in points and dashes: the piece's outline where it is
   # `:full`, a blank line type or a missing width leaving it none, as R's graphics engine draws such
@@ -360,7 +367,7 @@ defmodule Giggly.Geom.Ribbon do
             color: Enum.map(lines, fn _line -> Mark.hex(line_color) end),
             opacity: Enum.map(lines, fn _line -> Mark.own_opacity(line_color) end),
             line_end: geom.line_end,
-            line_join: geom.line_join,
+            line_join: drawn_join(geom.line_join),
             mitre_limit: geom.mitre_limit
           }
         ]
@@ -439,10 +446,13 @@ defmodule Giggly.Geom.Ribbon do
     def draw_panel(geom, frame, coord, panel_params),
       do: Ribbon.draw(geom, frame, coord, panel_params, [:x, :ymin, :ymax])
 
-    # A legend's key, ggplot2's `draw_key_polygon()`, its corners and ends the layer's, and the
-    # room it needs, a rectangle's.
+    # A legend's key, ggplot2's `draw_key_polygon()`, its corners and ends the layer's, its corners
+    # mitred where the layer gives none, and the room it needs, a rectangle's.
     @impl Giggly.Geom
-    def draw_key(geom, key), do: Rect.polygon_key(key, geom.line_end, geom.line_join)
+    def draw_key(geom, key), do: Rect.polygon_key(key, geom.line_end, key_join(geom.line_join))
+
+    defp key_join(:none), do: :mitre
+    defp key_join(line_join), do: line_join
 
     @impl Giggly.Geom
     def key_size(_geom, key), do: Geom.key_size(%Rect{}, key)

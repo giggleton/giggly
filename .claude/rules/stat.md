@@ -2,6 +2,7 @@
 paths:
   - "lib/giggly/stat.ex"
   - "lib/giggly/stat/**"
+  - "lib/giggly/tensor.ex"
 ---
 
 # Stats
@@ -30,12 +31,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary lists none; binning first read them. The inverse of the transformation arrives with its
   first reader (`stat_function()`), and a stat's own parameters with the option that sets them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
-  `compute_panel()` does. **Counting, binning, the box plot's summary and smoothing carry a group's
-  constant columns** (`Giggly.Stat.Carry`): a column holding one
+  `compute_panel()` does. **Counting, binning, the box plot's summary, smoothing and densities
+  carry a group's constant columns** (`Giggly.Stat.Carry`): a column holding one
   value within every group goes to that group's rows with its type, a factor's category included
   with its levels and ordered flag, as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot), smoothing reading only the groups it
-  fits, as ggplot2 reads only those its stat gives rows; counting at each place keeps only the
+  fits and densities only those of panels given rows, as ggplot2 reads only those its stat gives
+  rows; counting at each place keeps only the
   columns it counts over.
 - **A stat sums through the frame (`DataFrame.summarise/3`), as R sums**: counting's counts plain,
   as `rowsum()` adds, every other sum, a proportion's total among them, extended, as `sum()`
@@ -50,7 +52,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   rows** (design-log §4, the entry beginning "Smoothing and densities compute over the rows"): its
   output is as large as its input, as the identity's is, and interpolating each group at the
   others' places has no frame operation. **Smoothing's fit is three passes of sums through the
-  frame**, its arithmetic the frame's `+ - * /`, pulling a row a group.
+  frame**, its arithmetic the frame's `+ - * /`, pulling a row a group. **A density is four passes
+  through the frame**, its grid points `floor` in an expression, pulling a row a group and its
+  totals at each grid point.
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
   into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a
@@ -59,12 +63,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   documents them** (`computed_variables/0`: counting's `count` and `prop`, not the `width` and
   `flipped_aes` its table also holds; the box plot's summary's whiskers, hinges, notches and
   `width`, each in either orientation, not its `outliers` or `relvarwidth`; smoothing's `y`,
-  `ymin`, `ymax` and `se`, each in either orientation), **and the aesthetics
-  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's and smoothing's
-  `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each place's, which
-  `StatSum` sums without declaring), module functions beside its accepted aesthetics, which
-  `Plot` reads at the call. A stat with neither, the identity, computes nothing an after_stat can
-  read.
+  `ymin`, `ymax` and `se`, each in either orientation; a density's `density`, `count`, `scaled`,
+  `ndensity`, `wdensity` and `n`), **and the aesthetics
+  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's, smoothing's and a
+  density's `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each
+  place's, which `StatSum` sums without declaring), module functions beside its accepted aesthetics,
+  which `Plot` reads at the call. A stat with neither, the identity, computes nothing an after_stat
+  can read.
 - **Counting is ggplot2's `stat_count()`**: a row per distinct x of each group, its `count` the rows
   there or the sum of their weights, a missing weight (`nil` or NaN) adding nothing and an
   infinite one making the count infinite, its `prop` the count's share of its group's total, the
@@ -158,3 +163,29 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   given no method (`:none`) is refused when the plot is run**, naming loess where the largest
   group in any panel has under 1,000 rows, every row counted, and gam otherwise. A weight that is
   not a number is refused when the plot is run.
+- **Densities are ggplot2's `stat_density()`, R's `density()`** (design-log §4, the entry beginning
+  "A density takes ggplot2's options"): per panel and per group, along whichever of x and y is
+  mapped, exactly one, flipped and flipped back; `n` places at R's `seq()` across the panel's axis
+  short of its widening, or the group's own extent with `trim`; the bandwidth a number, or
+  Silverman's rule (`:nrd0`, falling back as `bw.nrd0()` does) or Scott's (`:nrd`) from the
+  group's rows inside the bounds, unweighted, by the frame's `variance`, `quantile` and `first`,
+  times `adjust`; each row's share of its group's weights spread linearly over a grid of at least
+  512 points, a power of two past that, four bandwidths past the places either end, each part kept
+  where it lands on the grid and summed plain, lower and upper parts apart; convolved with one of
+  R's seven kernels through `Giggly.Tensor`, raised to 0, and read at the places by R's `approx()`
+  formula (`Giggly.Stat.Curve`, which also spaces smoothing's places and reads aligning's
+  groups). Its values are R's within 1e-12 of the largest magnitude the group's column holds, its
+  places R's to the last digit. **With a finite bound** the rows outside are left out, the rest's
+  shares divided by what they leave where that is above 0, and the curve worked out on the axis
+  widened by its width beyond each finite bound, on `n` times one more than their count of places,
+  then folded back inside, as `reflect_density()` does. A row missing or infinite in x is left out;
+  a group of fewer than two rows inside the bounds is one row of missing values. **Where R's
+  `density()` fails the whole panel is given no rows**, as ggplot2 catches the failure per panel:
+  a share missing, infinite or below 0, which weights totalling 0 make too, a bandwidth not finite
+  and above 0, or a missing share total with rows outside the bounds. A weight that is not a number
+  is refused when the plot is run; a discrete axis is computed on, as R computes it.
+- **`Giggly.Tensor` is the one module that builds a tensor, and a stat reaches Nx only through it**
+  (design-log §4, the entry beginning "Nx is a core dependency"): lists in and out, every tensor on
+  `Nx.BinaryBackend` in 64-bit floats, so a user's default backend never reaches a drawing, the
+  transform's threshold 0 (`eps: 0`), and a `defn`, when one arrives, through `Nx.Defn.Evaluator`.
+  Its boundary lists Nx, as the root does, and Stat lists it; it is held here, beside its callers.

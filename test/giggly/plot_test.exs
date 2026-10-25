@@ -2273,6 +2273,242 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_density/3 and stat_density/3" do
+    @values %{
+      "x" => [1.0, 2.0, 4.0, 4.0],
+      "y" => [1, 2, 3, 4],
+      "w" => [1, 2, 1, 2],
+      "s" => ~w(a b c d)
+    }
+
+    test "a density layer records its geom, stat and position with ggplot2's defaults" do
+      plot =
+        @values
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_density()
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Density{
+                   orientation: :x,
+                   outline_type: :upper,
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0
+                 },
+                 stat: %Stat.Density{
+                   bandwidth: :nrd0,
+                   adjust: 1.0,
+                   kernel: :gaussian,
+                   n: 512,
+                   trim: false,
+                   bounds: {:neg_infinity, :infinity}
+                 },
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{},
+                 fixed: %{},
+                 accepted: [
+                   :group,
+                   :weight,
+                   :x,
+                   :y,
+                   :alpha,
+                   :color,
+                   :fill,
+                   :linetype,
+                   :linewidth
+                 ],
+                 annotation: false
+               }
+             ]
+    end
+
+    # ggplot2's `stat_density()` draws areas, stacked and outlined on both edges, with no `linejoin`
+    # of its own, so its keys' corners are mitred while its outlines' are round.
+    test "stat_density/3 records an area stacked and outlined on both edges, its corners unset" do
+      plot = Plot.new(@values, %{x: :x})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Area{outline_type: :both, line_join: :none},
+                 stat: %Stat.Density{bandwidth: :nrd0},
+                 position: %Position.Stack{},
+                 accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth]
+               }
+             ] = Plot.stat_density(plot).reversed_layers
+
+      assert [%Plot.Layer{geom: %Geom.Area{line_join: :bevel}, position: %Position.Identity{}}] =
+               Plot.stat_density(plot, linejoin: :bevel, position: :identity).reversed_layers
+    end
+
+    test "the estimate's options are the stat's, each number kept as a float" do
+      options = [
+        bw: 1,
+        adjust: 2,
+        kernel: :epanechnikov,
+        n: 10,
+        trim: true,
+        bounds: {1, :infinity}
+      ]
+
+      plot = Plot.new(@values, %{x: :x})
+
+      for function <- [&Plot.geom_density/2, &Plot.stat_density/2] do
+        [layer] = function.(plot, options).reversed_layers
+
+        assert layer.stat == %Stat.Density{
+                 bandwidth: 1.0,
+                 adjust: 2.0,
+                 kernel: :epanechnikov,
+                 n: 10,
+                 trim: true,
+                 bounds: {1.0, :infinity}
+               }
+      end
+
+      [scott] = Plot.geom_density(plot, bw: :nrd, bounds: {:neg_infinity, 3}).reversed_layers
+      assert {scott.stat.bandwidth, scott.stat.bounds} == {:nrd, {:neg_infinity, 3.0}}
+    end
+
+    test "a density's look is set for every curve, and its position chosen" do
+      [layer] =
+        @values
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_density(
+          colour: "red",
+          fill: "steelblue",
+          alpha: 1,
+          linewidth: 2,
+          linetype: 2,
+          position: :stack,
+          outline_type: :full
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Density{outline_type: :full},
+               position: %Position.Stack{},
+               fixed: %{
+                 color: "#FF0000",
+                 fill: "#4682B4",
+                 alpha: 1.0,
+                 linewidth: 2.0,
+                 linetype: {4, 4}
+               }
+             } = layer
+    end
+
+    test "a bandwidth, a multiple, bounds, a kernel or a count not offered is refused" do
+      plot = Plot.new(@values, %{x: :x})
+
+      for bandwidth <- [0, -1, :infinity, :silverman, :ucv, "nrd0"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a bandwidth/, fn ->
+            Plot.geom_density(plot, bw: bandwidth)
+          end
+
+        assert error.message =~ "got: #{inspect(bandwidth)}"
+      end
+
+      for adjust <- [0, -0.5, "1"] do
+        assert_raise NimbleOptions.ValidationError, ~r/a multiple of the bandwidth/, fn ->
+          Plot.stat_density(plot, adjust: adjust)
+        end
+      end
+
+      for bounds <- [{3, 1}, {:infinity, 5}, {1, :neg_infinity}, [1, 2], {1, nil}, {1}] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/bounds \{low, high\}/, fn ->
+            Plot.geom_density(plot, bounds: bounds)
+          end
+
+        assert error.message =~ "got: #{inspect(bounds)}"
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/kernel/, fn ->
+        Plot.geom_density(plot, kernel: :gauss)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/:n option/, fn ->
+        Plot.geom_density(plot, n: 0)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
+        Plot.geom_density(plot, position: :dodge)
+      end
+    end
+
+    test "bounds may meet" do
+      plot = Plot.new(@values, %{x: :x})
+
+      [layer] = Plot.geom_density(plot, bounds: {2, 2}).reversed_layers
+      assert layer.stat.bounds == {2.0, 2.0}
+    end
+
+    test "a density runs along the one of x and y mapped, and a contrary orientation is refused" do
+      assert [%Plot.Layer{}] =
+               @values
+               |> Plot.new(%{y: :x})
+               |> Plot.geom_density(orientation: :y)
+               |> Map.fetch!(:reversed_layers)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @values
+          |> Plot.new(%{x: :x})
+          |> Plot.geom_density(orientation: :y)
+        end
+
+      assert error.message ==
+               "Plot.geom_density/3 estimates along x here, because :x is mapped, so " <>
+                 "orientation: :y cannot apply. To estimate along y, map :y instead of :x; " <>
+                 "orientation: :y can then stay or be left out."
+    end
+
+    test "x and y together, or neither, are refused" do
+      both =
+        assert_raise ArgumentError, fn ->
+          @values
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.stat_density()
+        end
+
+      assert both.message ==
+               "Plot.stat_density/3 maps :x, :y, but takes only one of them, since it runs " <>
+                 "along one and computes the other"
+
+      neither =
+        assert_raise ArgumentError, fn ->
+          @values
+          |> Plot.new()
+          |> Plot.geom_density()
+        end
+
+      assert neither.message =~ "one of :x, :y"
+    end
+
+    test "a weight that is not numbers, an unusable aesthetic or an unknown after_stat is refused" do
+      plot = Plot.new(@values, %{x: :x})
+
+      weight =
+        assert_raise ArgumentError, fn -> Plot.geom_density(plot, %{weight: :s}) end
+
+      assert weight.message =~ "a density spreads each row's weight"
+
+      assert_raise ArgumentError, ~r/:size/, fn -> Plot.geom_density(plot, %{size: :y}) end
+
+      for variable <- [:density, :count, :scaled, :ndensity, :wdensity, :n] do
+        assert [_layer] =
+                 Plot.geom_density(plot, %{y: {:after_stat, [variable]}}).reversed_layers
+      end
+
+      assert_raise ArgumentError, ~r/prop/, fn ->
+        Plot.geom_density(plot, %{y: {:after_stat, [:prop]}})
+      end
+    end
+  end
+
   describe "geom_smooth/3 and stat_smooth/3" do
     @points %{
       "x" => [1, 2, 3, 4],

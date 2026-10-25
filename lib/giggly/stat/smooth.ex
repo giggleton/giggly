@@ -87,7 +87,7 @@ defmodule Giggly.Stat.Smooth do
 
     alias Giggly.{Aesthetics, DataFrame}
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Stat.{Carry, TDistribution}
+    alias Giggly.Stat.{Carry, Curve, TDistribution}
 
     # The columns the stat writes, in ggplot2's order.
     @computed [:x, :y, :ymin, :ymax, :se, :flipped_aes]
@@ -329,7 +329,7 @@ defmodule Giggly.Stat.Smooth do
         # Each place a double, as R's positions are, though the axis's ends be whole numbers.
         positions =
           low
-          |> sequence(high, stat.n)
+          |> Curve.places(high, stat.n)
           |> Enum.map(fn position -> position / 1 end)
 
         {key, curve(line, positions, stat)}
@@ -340,18 +340,6 @@ defmodule Giggly.Stat.Smooth do
     # the panel's axis's unwidened extent, as ggplot2's `dimension()`.
     defp extent(false, %{x_low: low, x_high: high}, _axis), do: {low, high}
     defp extent(true, _extent, %{limits: limits}), do: limits
-
-    # `count` evenly spaced values from `low` to `high`, R's `seq(low, high, length.out = count)`:
-    # its ends exactly, and between them `low` plus each step of the span over one less than the
-    # count. A fitted group spans two x or more, so its ends never meet, where R repeats `low`.
-    defp sequence(low, _high, 1), do: [low]
-    defp sequence(low, high, 2), do: [low, high]
-
-    defp sequence(low, high, count) do
-      step = (high - low) / (count - 1)
-      inner = Enum.map(1..(count - 2), fn index -> low + index * step end)
-      Enum.concat([[low], inner, [high]])
-    end
 
     # The curve's rows, each its x, fitted value and, with `se`, its standard error and band.
     defp curve(line, positions, %{se: false}) do

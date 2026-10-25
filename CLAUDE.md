@@ -57,7 +57,7 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **Scales** (`Giggly.Scale`, kinds, transformations, training, mapping, palettes) —
   `.claude/rules/scale.md`.
 - **Colours** (`Giggly.ColorOperations`, reading a colour) — `.claude/rules/color_operations.md`.
-- **Stats** (`Giggly.Stat`, the protocol a layer's stat runs through) — `.claude/rules/stat.md`.
+- **Stats** (`Giggly.Stat`, a layer's stat; `Giggly.Tensor`, Nx's door) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the protocol positions run through) — `.claude/rules/position.md`.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
   `.claude/rules/coord.md`.

@@ -4245,6 +4245,89 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_density" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mpg, aes(hwy))` with
+    # `geom_density(n = 2)` and `stat_density(n = 2)`: the stat's columns, the area's ends, then the
+    # geom's defaults, a density's the ink, no fill, a weight of 1 and the lines' width, an area's
+    # no outline and the ink mixed 20% toward the paper.
+    test "a density's table holds the estimate, the area's ends, then the geom's defaults" do
+      density =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.geom_density(n: 2)
+        |> Giggly.layer_data()
+
+      estimated = [:x, :density, :scaled, :ndensity, :count, :wdensity, :n, :flipped_aes]
+
+      assert DataFrame.names(density) ==
+               estimated ++
+                 [:panel, :group, :y, :ymin, :ymax] ++
+                 [:color, :fill, :weight, :alpha, :linewidth, :linetype]
+
+      assert Enum.map([:color, :fill, :weight, :alpha, :linewidth, :linetype], fn name ->
+               density
+               |> DataFrame.pull(name)
+               |> Enum.uniq()
+             end) == [["#000000"], [nil], [1.0], [nil], [0.5], [{}]]
+
+      area =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.stat_density(n: 2)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(area) ==
+               estimated ++
+                 [:panel, :group, :y, :ymin, :ymax] ++
+                 [:color, :fill, :linewidth, :linetype, :alpha]
+
+      fills = DataFrame.pull(area, :fill)
+
+      assert Enum.uniq(fills) == ["#333333"]
+    end
+
+    # Golden: `layer_data()` for `aes(hwy, after_stat(count), fill = drv)` with
+    # `geom_density(position = "stack", n = 2)`: each drive's count piled on the later drives', as
+    # stacking piles groups, and y titled by the count.
+    test "stacked densities' counts pile on one another" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, y: {:after_stat, [:count]}, fill: :drv})
+        |> Plot.geom_density(position: :stack, n: 2)
+
+      frame = Giggly.layer_data(plot)
+
+      assert_near(frame, :ymin, [
+        0.086481081459680462,
+        1.0049779768480946,
+        0.086481080230485133,
+        0.0,
+        0.0,
+        0.0
+      ])
+
+      assert_near(frame, :ymax, [
+        2.0180717891262669,
+        1.0049779768480946,
+        0.086481081459680462,
+        1.0049779768480946,
+        0.086481080230485133,
+        0.0
+      ])
+
+      assert Giggly.Assembly.run(plot).guide_titles.y == "count"
+    end
+
+    test "the axis a density takes is titled density" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{y: :hwy})
+        |> Plot.geom_density()
+
+      assert Giggly.Assembly.run(plot).guide_titles == %{x: "density", y: "hwy"}
+    end
+  end
+
   describe "layer_data/2, for geom_smooth" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mpg, aes(displ, hwy))` and
     # `aes(displ, hwy, colour = drv)` with `geom_smooth(method = lm, n = 2)`: the stat's columns, the
@@ -9110,6 +9193,104 @@ defmodule GigglyTest do
 
       assert golden?(plot, "smooth_lm_two_rows")
     end
+
+    # Golden: test/golden/density.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density.R. mpg's highway mileage estimated across the whole x axis, outlined along
+    # its top in the theme's ink and unfilled. It moves with the estimate, an area's drawing, or a
+    # density's defaults under the theme.
+    test "a density is outlined along its top and left unfilled" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.geom_density()
+
+      assert golden?(plot, "density")
+    end
+
+    # Golden: test/golden/density_groups.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density_groups.R. A curve for each drive, filled at alpha 0.3, the rows outside
+    # xlim() cut before the estimate, the keys an area's, filled and bordered. It moves with the
+    # estimate over cut rows, or a density's key.
+    test "each group's density is filled and outlined in its colours, its key an area's" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, fill: :drv, colour: :drv})
+        |> Plot.geom_density(alpha: 0.3)
+        |> Plot.xlim(15, 40)
+
+      assert golden?(plot, "density_groups")
+    end
+
+    # Golden: test/golden/density_horizontal.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density_horizontal.R. hwy mapped to y alone: the curve runs up the panel and x
+    # takes the density. It moves with an estimate along y, or a turned area.
+    test "a density along y runs up the panel" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{y: :hwy})
+        |> Plot.geom_density()
+
+      assert golden?(plot, "density_horizontal")
+    end
+
+    # Golden: test/golden/density_stacked.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density_stacked.R. Each drive's count stacked, so the curves pile up. It moves
+    # with stacking areas, or an after_stat reading the count.
+    test "densities' counts stack into the count of every row" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, y: {:after_stat, [:count]}, fill: :drv})
+        |> Plot.geom_density(position: :stack)
+
+      assert golden?(plot, "density_stacked")
+    end
+
+    # Golden: test/golden/stat_density.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/stat_density.R. stat_density/3's areas stacked, then each drawn where it is,
+    # outlined dashed along both edges; its keys' corners mitred, its outlines' round, as ggplot2
+    # draws an area of densities given no `linejoin`. It moves with an area's defaults, its outline
+    # or its key.
+    test "stat_density/3 draws areas, outlined on both edges, their keys' corners mitred" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy, fill: :drv})
+        |> Plot.stat_density()
+        |> Plot.stat_density(colour: "black", position: :identity, alpha: 0.2, linetype: :dashed)
+
+      assert golden?(plot, "stat_density")
+    end
+
+    # Golden: test/golden/density_bounds.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density_bounds.R. The unbounded estimate in red spills below 12, the bounded one
+    # in blue folds it back, on twice the places. It moves with the fold, or its places.
+    test "a bounded density folds its tail back inside the bound" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :hwy})
+        |> Plot.geom_density(colour: "red")
+        |> Plot.geom_density(bounds: {12, :infinity}, colour: "blue")
+
+      assert golden?(plot, "density_bounds")
+    end
+
+    # Golden: test/golden/density_dropped.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/density_dropped.R. A negative weight in the first panel leaves it empty, and the
+    # second's group of one row, a row of missing values, draws nothing beside the other's curve.
+    # It moves with a panel that fails, or a group of too few rows.
+    test "a density draws nothing in a panel that fails, nor for a group of one row" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 5, 8, 1, 2, 4, 6, 9],
+          "w" => [1, 2, -1, 3, 1, 1, 1, 2, 1, 1],
+          "g" => ~w(a a a a a b b b b c),
+          "p" => ~w(p p p p p q q q q q)
+        }
+        |> Plot.new(%{x: :x, weight: :w, group: :g})
+        |> Plot.geom_density()
+        |> Plot.facet_wrap(:p)
+
+      assert golden?(plot, "density_dropped")
+    end
   end
 
   # Lake Huron's levels from 1875 to 1904, R's `LakeHuron`.
@@ -9165,6 +9346,24 @@ defmodule GigglyTest do
       colour: "Cylinders",
       shape: "Transmission"
     )
+  end
+
+  # A column within 1e-12 of R's, of the largest magnitude R's holds, as a value reached by
+  # another route than R's is held (design-log §4, the entry beginning "A stat's values reached").
+  defp assert_near(frame, name, expected) do
+    actual = DataFrame.pull(frame, name)
+
+    largest =
+      expected
+      |> Enum.map(&abs/1)
+      |> Enum.max()
+
+    assert length(actual) == length(expected)
+
+    Enum.zip_with(actual, expected, fn value, wanted ->
+      assert abs(value - wanted) <= 1.0e-12 * largest,
+             "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
+    end)
   end
 
   defp golden?(plot, name) do

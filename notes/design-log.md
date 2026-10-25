@@ -79,6 +79,22 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A density takes ggplot2's options, `bounds:` and all seven kernels among them, and a failing
+  estimate leaves its panel empty, as R's does (2026-10-25, Steve: "A" for bounds, "A" for the
+  kernels; checked against ggplot2 4.0.3 and R 4.6.1).** `geom_density/3` and `stat_density/3`
+  take `bw:` (`:nrd0`, `:nrd` or a number), `adjust:`, `kernel:`, `n:`, `trim:`, `bounds:` and
+  `orientation:`, and compute `density`, `count`, `scaled`, `ndensity`, `wdensity` and `n`.
+  `bounds:` folds a curve's tails back inside a finite bound on `n` times one more than the finite
+  bounds' count of places, as ggplot2 does; bounds high to low are refused at the call, where R
+  keeps no row. Where R's `density()` fails (a share missing, infinite or below 0, a bandwidth not
+  finite and above 0) ggplot2 draws nothing for the whole panel, and so does Giggly.
+  `stat_density/3` gives its area no line join, drawn round and keyed mitred, as R falls back. The
+  grid's totals are summed plain, as R's binning adds in doubles: long-double sums came closer to
+  R on one case of four and further on two. *Rejected: deferring `bounds:`* — on the reference
+  page, and its fold is the curve's own interpolation. *Rejected: the Gaussian kernel alone* —
+  each other kernel is one formula on the kernel's grid. *Deferred:* the `ucv`, `bcv` and `SJ`
+  bandwidths, `position_fill()`, a density given to another geom by name.
+
 - **A full-range smooth spans the axis it runs along, its y axis along y, where ggplot2 spans the x
   axis's extent (2026-10-25, Steve: "B").** ggplot2's `StatSmooth` flips its data to fit along y
   but reads `scales$x$dimension()` unflipped, so `geom_smooth(orientation = "y", fullrange =
@@ -2635,6 +2651,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-25 — Estimate densities: geom_density/3 and stat_density/3, binned through the frame and
+  convolved by Nx through Giggly.Tensor (smoothing and densities, step 3); §4: "A density takes
+  ggplot2's options"
 - 2026-10-25 — Fit linear smooths: geom_smooth/3 and stat_smooth/3 with method: :lm, lm summed
   through the frame and its band's quantile Giggly's own (smoothing and densities, step 2); §4: "A
   linear smooth fits the slope", "A smooth given no method is refused when the plot is run", "The

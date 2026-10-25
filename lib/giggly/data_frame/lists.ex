@@ -81,6 +81,7 @@ defmodule Giggly.DataFrame.Lists do
       :count,
       :cut,
       :first,
+      :floor,
       :is_finite,
       :list,
       :log10,
@@ -91,7 +92,8 @@ defmodule Giggly.DataFrame.Lists do
       :not,
       :or,
       :quantile,
-      :sum
+      :sum,
+      :variance
     ]
   end
 
@@ -315,6 +317,12 @@ defmodule Giggly.DataFrame.Lists do
     {:float, Enum.map(values, &logarithm/1)}
   end
 
+  defp evaluated(frame, {:floor, [argument]}) do
+    {dtype, values} = evaluated(frame, argument)
+    floats(dtype)
+    {:float, Enum.map(values, &floored/1)}
+  end
+
   defp evaluated(frame, {:cut, [argument], options}) do
     {dtype, values} = evaluated(frame, argument)
     numbers(dtype)
@@ -335,6 +343,7 @@ defmodule Giggly.DataFrame.Lists do
   # column has rows, as an engine checks an expression's types before it runs.
   defp numbers(dtype) when dtype in [:integer, :float, :null], do: :ok
   defp booleans(dtype) when dtype in [:boolean, :null], do: :ok
+  defp floats(dtype) when dtype in [:float, :null], do: :ok
 
   # Whether a number is finite, missing where it is.
   defp finite(nil), do: nil
@@ -363,6 +372,11 @@ defmodule Giggly.DataFrame.Lists do
   defp logarithm(value) when value == 0, do: :neg_infinity
   defp logarithm(:infinity), do: :infinity
   defp logarithm(_negative_or_nan), do: :nan
+
+  # The greatest whole number at or below a float, a float, as Explorer floors one: missing for a
+  # missing value, and NaN, an infinity and minus zero as they are.
+  defp floored(value) when is_float(value), do: Float.floor(value)
+  defp floored(value), do: value
 
   # The interval of `breaks` a number falls in, numbered from 1, as R's `.bincode()` finds it with
   # `include.lowest = TRUE`: missing for a missing value, NaN or a number outside the breaks; else
@@ -488,6 +502,11 @@ defmodule Giggly.DataFrame.Lists do
   defp aggregated(frame, {:mean, [name]}, groups) do
     {_dtype, values} = numbers_column(frame, name, "a mean averages numbers")
     {:float, by_group(values, groups, &Arithmetic.mean/1)}
+  end
+
+  defp aggregated(frame, {:variance, [name]}, groups) do
+    {_dtype, values} = numbers_column(frame, name, "a variance spreads numbers")
+    {:float, by_group(values, groups, &Arithmetic.variance/1)}
   end
 
   defp aggregated(frame, {:min, [name]}, groups) do

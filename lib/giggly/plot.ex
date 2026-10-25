@@ -1111,6 +1111,98 @@ defmodule Giggly.Plot do
       do: smooth_layer(plot, mapping, options, "Plot.stat_smooth/3")
 
   @doc """
+  Adds a layer of densities: for each group, a smoothed estimate of how its rows are distributed
+  along `x`, a smoothed histogram drawn as a curve over the area beneath it, for a variable that
+  comes from a smooth distribution.
+
+  Each curve is a kernel density estimate: a kernel, a normal curve unless `kernel:` says
+  otherwise, put at each row and summed, its spread the bandwidth, `bw:` times `adjust:`, so a
+  narrower one follows the rows more closely. Each row weighs as its `:weight` where one is mapped,
+  the weights taking their share of their group's total. A curve spans the whole x axis, short of
+  its widening, at `n:` evenly spaced places, so curves of different groups share their places,
+  unless `trim: true` keeps each to its own group's extent. With `bounds:`, rows outside them are
+  left out, and the part of a curve beyond a finite bound is folded back inside it.
+
+  Densities use `:x` or `:y`, `:weight`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and
+  `:linewidth`, and need exactly one of `:x` and `:y`: the curve runs along the one mapped, so
+  mapping `:y` alone draws curves that run up the panel. A `:weight` column must hold numbers. Each
+  curve is outlined along its top in the theme's ink and left unfilled unless a fill is mapped or
+  set; curves are drawn over one another unless `position: :stack` piles them. A row missing its
+  `x`, or at an infinite one, is left out. A group of fewer than two rows is a single row of
+  missing values, drawn as nothing. A panel where some group's weight is missing, infinite or
+  below 0, or adds up to 0, or where a rule gives no bandwidth above 0, as for rows all at one
+  `x`, is drawn nothing.
+
+  A density computes each place's `density`; `count`, the density times the group's rows, whose
+  curves add up when stacked; `wdensity`, the density times the group's total weight; `scaled` and
+  `ndensity`, the density over the group's greatest; and `n`, the group's rows, which a mapping
+  reads with an after_stat (`Giggly.Mapping`): `%{x: :carat, y: {:after_stat, [:count]}, fill:
+  :cut}` with `position: :stack` piles each cut's curve to the density of every diamond. The y
+  axis is titled `density` unless something else is mapped there.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.density())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 4.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x})
+      ...>   |> Giggly.Plot.geom_density(n: 3)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :n)}
+      {[1.0, 2.5, 4.0], [4, 4, 4]}
+  """
+  @spec geom_density(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_density(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_density(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_density(plot, %{}, options)
+
+  def geom_density(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.density())
+    geom = struct!(Geom.Density, density_geom_fields(validated))
+
+    density_layer(plot, mapping, validated, geom, Geom.Density.accepted_aesthetics(),
+      function: "Plot.geom_density/3"
+    )
+  end
+
+  @doc """
+  Adds a layer of densities, each the same estimate `geom_density/3` makes, drawn as areas
+  (`geom_area/3`): filled with the theme's ink mixed 20% toward its paper and unoutlined unless a
+  colour is mapped or set, and piled on one another unless `position: :identity` draws each where
+  it is. It takes `geom_density/3`'s options, and computes and refuses what it does.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.stat_density())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 4.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x})
+      ...>   |> Giggly.Plot.stat_density(n: 2)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [1.0, 4.0]
+  """
+  @spec stat_density(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_density(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_density(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_density(plot, %{}, options)
+
+  def stat_density(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.stat_density())
+    geom = struct!(Geom.Area, density_geom_fields(validated))
+
+    density_layer(plot, mapping, validated, geom, Geom.Area.accepted_aesthetics(),
+      function: "Plot.stat_density/3"
+    )
+  end
+
+  @doc """
   Adds a layer of text: each row's `label` at its `x` and `y`.
 
   Text is written as it is; a whole number has no decimal point (`21`, not `21.0`), any other
@@ -3608,6 +3700,54 @@ defmodule Giggly.Plot do
     |> check_numbers(layer, function, :weight, "a smooth weighs each row by its weight")
   end
 
+  # The fields of the area a layer of densities is drawn as, its geom's or `stat_density/3`'s,
+  # from its validated options: its orientation, the one it is given or along x, which the
+  # density's own, written in each row, overrides as the area is set up, and its corners, `:none`
+  # where `stat_density/3` is given none.
+  defp density_geom_fields(validated) do
+    [
+      orientation: Keyword.get(validated, :orientation, :x),
+      outline_type: Keyword.fetch!(validated, :outline_type),
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.get(validated, :linejoin, :none),
+      mitre_limit: Keyword.fetch!(validated, :linemitre)
+    ]
+  end
+
+  # The layer `geom_density/3` and `stat_density/3` add, a density estimated for each group and
+  # drawn by `geom`, which uses `geom_aesthetics`, its mistakes named as `function`'s.
+  defp density_layer(plot, mapping, validated, geom, geom_aesthetics, function: function) do
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: geom,
+      stat: %Stat.Density{
+        bandwidth: Keyword.fetch!(validated, :bw),
+        adjust: Keyword.fetch!(validated, :adjust),
+        kernel: Keyword.fetch!(validated, :kernel),
+        n: Keyword.fetch!(validated, :n),
+        trim: Keyword.fetch!(validated, :trim),
+        bounds: Keyword.fetch!(validated, :bounds)
+      },
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Density.accepted_aesthetics() ++ geom_aesthetics),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.Density.required_aesthetics(),
+      exclusive: Stat.Density.exclusive_aesthetics(),
+      computed: Stat.Density.computed_variables(),
+      dropped: Stat.Density.dropped_aesthetics()
+    )
+    |> check_numbers(layer, function, :weight, "a density spreads each row's weight")
+    |> check_runs_along(layer, validated, function, "estimate")
+  end
+
   # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its
   # mistakes named as `function`'s.
   defp count_layer(plot, mapping, options, function) do
@@ -4166,7 +4306,7 @@ defmodule Giggly.Plot do
       [_first, _second | _rest] = both ->
         raise ArgumentError,
               "#{function} maps #{inspect_all(both)}, but takes only one of them, " <>
-                "since it counts along one and the count is the other"
+                "since it runs along one and computes the other"
 
       _one_or_none ->
         :ok

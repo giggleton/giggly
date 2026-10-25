@@ -860,6 +860,27 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(mutated) == %{x: :float, n: :float}
     end
 
+    # Golden: Explorer 0.13.0's Series.floor/1 of the same floats, and its refusal of integers.
+    test "floor is each float's greatest whole number at or below it, a float, as Explorer floors" do
+      frame =
+        DataFrame.new(x: [1.5, -1.5, -0.0, 2.0, nil, :nan, :infinity, :neg_infinity, 4.5e15])
+
+      mutated = DataFrame.mutate(frame, x: {:floor, [:x]})
+
+      assert DataFrame.pull(mutated, :x) ===
+               [1.0, -2.0, -0.0, 2.0, nil, :nan, :infinity, :neg_infinity, 4.5e15]
+
+      assert DataFrame.dtypes(mutated) == %{x: :float}
+    end
+
+    test "floor of a column that is not floats is refused, integers too" do
+      frame = DataFrame.new(n: [1], label: ["a"], kept: [true])
+
+      for name <- [:n, :label, :kept] do
+        assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, x: {:floor, [name]}) end
+      end
+    end
+
     test "log10 of a column of only missing values is missing in every row, a float" do
       frame = DataFrame.new(x: [nil, nil])
 
@@ -1064,6 +1085,7 @@ defmodule Giggly.DataFrameTest do
                :count,
                :cut,
                :first,
+               :floor,
                :is_finite,
                :list,
                :log10,
@@ -1074,7 +1096,8 @@ defmodule Giggly.DataFrameTest do
                :not,
                :or,
                :quantile,
-               :sum
+               :sum,
+               :variance
              ]
     end
   end
@@ -1349,6 +1372,17 @@ defmodule Giggly.DataFrameTest do
       assert Map.take(dtypes, [:y, :n]) == %{y: :float, n: :float}
     end
 
+    # Golden: R 4.6.1's tapply(c(30.5, 26, 35, 29.25, NA, 7), c(1, 1, 1, 1, 2, 3), var) is
+    # 13.890625, NA and NA.
+    test "variance is each group's variance as R's var() works it out, missing where it is" do
+      frame = DataFrame.new(group: [1, 1, 1, 1, 2, 3], y: [30.5, 26, 35, 29.25, nil, 7])
+
+      summarised = DataFrame.summarise(frame, [:group], spread: {:variance, [:y]})
+
+      assert DataFrame.pull(summarised, :spread) === [13.890625, nil, nil]
+      assert DataFrame.dtypes(summarised).spread == :float
+    end
+
     test "a frame of no rows summarises into no rows, its columns named" do
       frame = DataFrame.new(group: [], weight: [])
 
@@ -1370,14 +1404,15 @@ defmodule Giggly.DataFrameTest do
       assert error.message =~ ":string"
     end
 
-    test "a quantile, a minimum, a maximum or a mean of a column that is not numbers is refused" do
+    test "a quantile, a minimum, a maximum, a mean or a variance of a column not numbers is refused" do
       frame = DataFrame.new(group: [1], label: ["a"])
 
       for {aggregate, purpose} <- [
             {{:quantile, [:label], probability: 0.5}, "a quantile orders numbers"},
             {{:min, [:label]}, "a minimum compares numbers"},
             {{:max, [:label]}, "a maximum compares numbers"},
-            {{:mean, [:label]}, "a mean averages numbers"}
+            {{:mean, [:label]}, "a mean averages numbers"},
+            {{:variance, [:label]}, "a variance spreads numbers"}
           ] do
         error =
           assert_raise ArgumentError, fn ->

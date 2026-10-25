@@ -194,7 +194,9 @@ beginning "Each layer's defaults are filled in from the theme".
   **Its key is ggplot2's `draw_key_polygon()`, `Rect.polygon_key/3`, which bars, ribbons and areas
   share**, its ends and corners the layer's, as `draw_key_polygon()` reads the layer's `lineend`
   and `linejoin`: a rectangle's and a bar's cut square and mitred, a ribbon's and an area's as
-  their struct says, round corners by default.
+  their struct says, round corners by default, and mitred where its corners are `:none`, as
+  `stat_density/3` leaves an area's, since `draw_key_polygon()` falls back to mitred corners while
+  `GeomRibbon$draw_group()` draws round ones.
 - **A ribbon (`Geom.Ribbon`) is set up and drawn as ggplot2's `GeomRibbon` does it.** Its setup
   runs along its struct's `orientation`, or, where that is `:none`, along y where it has no `ymin`
   or `ymax`, as `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range (`Plot` makes sure it
@@ -221,6 +223,11 @@ beginning "Each layer's defaults are filled in from the theme".
   y; it draws, and takes its defaults and key, as a ribbon does (`Ribbon.draw/5`), dropping a row
   missing its `x` or `y`. It holds no requirements of its own: the stat before it, aligning or a
   density, needs its `x` and `y`, and `Plot` checks a layer against the stat's.
+- **A density (`Geom.Density`) is an area with a look of its own**, as ggplot2's `GeomDensity` is a
+  `GeomArea`: set up, drawn and keyed as an area of its struct's fields, following the orientation
+  its stat writes; its defaults are ggplot2's under the theme, the theme's ink, no fill, a weight
+  of 1, no alpha and the lines' width and line type, so it is outlined along its top and left
+  unfilled. Each was checked against vdiffr's drawing (`test/golden/density*.svg`).
 - **A smooth (`Geom.Smooth`) is set up and drawn as ggplot2's `GeomSmooth` does it**: its setup
   writes its stat's orientation into every row's `flipped_aes` and puts its rows in order as a
   line's, along y where flipped; a panel is drawn a group at a time, in group order, each whole
