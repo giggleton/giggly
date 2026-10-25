@@ -423,6 +423,89 @@ defmodule Giggly.Plot.Options do
                   ] ++ @line_style_options
                 )
 
+  # How every band of a ribbon or area layer looks, set by its options.
+  @band_look_options [
+    alpha: [
+      type: {:custom, __MODULE__, :validate_alpha, []},
+      doc:
+        "How opaque every band's fill is, from 0, invisible, to 1, opaque; its outline keeps " <>
+          "its colour's own alpha."
+    ],
+    color: [
+      type: @color_type,
+      doc:
+        "The colour of every band's outline, written `colour:` or `color:`: " <>
+          @color_forms <> "; no outline when not given."
+    ],
+    fill: [
+      type: @color_type,
+      doc:
+        "The colour every band is filled with: " <>
+          @color_forms <>
+          "; when not given, the theme's ink mixed 20% toward its paper, `#333333`, or " <>
+          "`#000000CC` under `theme_void/2`, whose paper is clear."
+    ],
+    linewidth: [
+      type: {:custom, __MODULE__, :validate_linewidth, []},
+      doc:
+        "How wide every band's outline is, in millimetres; the theme's `base_line_size` when " <>
+          "not given, 0.5 at its default sizes."
+    ],
+    linetype: [
+      type: @linetype_type,
+      doc:
+        "The line type of every band's outline: " <>
+          @linetype_forms <> "; `:solid` when not given."
+    ]
+  ]
+
+  # Which of a band's edges are outlined, ggplot2's `outline.type`, its default the function's own.
+  @outline_type_option [
+    type: {:in, [:both, :upper, :lower, :full]},
+    doc:
+      "Which of each band's edges its outline draws: the upper and the lower, each a line " <>
+        "(`:both`), the upper alone (`:upper`), the lower alone (`:lower`), or the band's whole " <>
+        "border (`:full`)."
+  ]
+
+  # `geom_ribbon/3`'s options, validated at the call.
+  @ribbon_options NimbleOptions.new!(
+                    [
+                      data: @data_option,
+                      orientation: [
+                        type: {:in, [:x, :y]},
+                        doc:
+                          "The axis each band runs along, `:x` or `:y`; when not given, along " <>
+                            "y where the layer is given neither `:ymin` nor `:ymax`, and along " <>
+                            "x otherwise. A band along x needs `:ymin` or `:ymax`, and one along " <>
+                            "y `:xmin` or `:xmax`."
+                      ],
+                      outline_type: [default: :both] ++ @outline_type_option
+                    ] ++ @band_look_options ++ @line_style_options
+                  )
+
+  # `geom_area/3`'s options, validated at the call.
+  @area_options NimbleOptions.new!(
+                  [
+                    data: @data_option,
+                    position: [
+                      type: {:in, [:stack, :identity]},
+                      default: :stack,
+                      doc:
+                        "How areas that share an `x` are placed: piled on one another " <>
+                          "(`:stack`), or each drawn where it is, overlapping (`:identity`)."
+                    ],
+                    orientation: [
+                      type: {:in, [:x, :y]},
+                      default: :x,
+                      doc:
+                        "The axis each area runs along: `:x`, from 0 up to its `y`, or `:y`, " <>
+                          "from 0 across to its `x`, for areas that run up the panel."
+                    ],
+                    outline_type: [default: :upper] ++ @outline_type_option
+                  ] ++ @band_look_options ++ @line_style_options
+                )
+
   # How a frequency polygon cuts its axis into bins: binning's options but `pad`, which a frequency
   # polygon always takes.
   @freqpoly_binning_options Keyword.delete(@binning_options, :pad)
@@ -2048,6 +2131,14 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec bin() :: NimbleOptions.t()
   def bin, do: @bin_options
+
+  @doc false
+  @spec ribbon() :: NimbleOptions.t()
+  def ribbon, do: @ribbon_options
+
+  @doc false
+  @spec area() :: NimbleOptions.t()
+  def area, do: @area_options
 
   @doc false
   @spec path() :: NimbleOptions.t()

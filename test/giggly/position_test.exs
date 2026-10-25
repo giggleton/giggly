@@ -128,6 +128,46 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_area(stat = "identity")` of the
+  # same rows, each band set up from 0 to its y as the area geom sets it up and in its order.
+  describe "compute_layer/2 for stacking areas" do
+    test "each row's xmin and xmax is its x, and the bands at an x pile up, the first group on top" do
+      stacked = Position.compute_layer(%Position.Stack{}, area_rows([1.0, 3.0, 2.0, 4.0]))
+
+      assert Enum.map([:y, :ymin, :ymax, :xmin, :xmax], fn name ->
+               DataFrame.pull(stacked, name)
+             end) ===
+               [
+                 [3.0, 7.0, 2.0, 4.0],
+                 [2.0, 4.0, 0.0, 0.0],
+                 [3.0, 7.0, 2.0, 4.0],
+                 [1.0, 2.0, 1.0, 2.0],
+                 [1.0, 2.0, 1.0, 2.0]
+               ]
+    end
+
+    test "a band below zero piles down from zero, keeping its ymax below its ymin" do
+      stacked = Position.compute_layer(%Position.Stack{}, area_rows([1.0, -3.0, -2.0, 4.0]))
+
+      assert Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(stacked, name) end) ===
+               [[1.0, 0.0, 0.0, 4.0], [0.0, 0.0, 0.0, 0.0], [1.0, -3.0, -2.0, 4.0]]
+    end
+  end
+
+  # Two groups of areas at x 1 and 2, in the order the area geom sets them up in, each band from 0
+  # to its y.
+  defp area_rows(heights) do
+    DataFrame.new(
+      x: [1.0, 2.0, 1.0, 2.0],
+      y: heights,
+      panel: [1, 1, 1, 1],
+      group: [1, 1, 2, 2],
+      flipped_aes: [false, false, false, false],
+      ymin: [0.0, 0.0, 0.0, 0.0],
+      ymax: heights
+    )
+  end
+
   # `frame` dodged by clusters with R's defaults: `preserve = "total"`, `padding = 0.1`.
   defp dodged_by_clusters(frame) do
     Position.compute_layer(

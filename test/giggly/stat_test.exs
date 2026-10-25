@@ -368,6 +368,145 @@ defmodule Giggly.StatTest do
     end
   end
 
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for
+  # `geom_area(position = "identity")` of the table named, whose x, y and `align_padding` are the
+  # stat's, printed to 17 significant digits; each table is built here as the stat is handed it.
+  describe "compute_layer/3 for aligning" do
+    # Golden: `ggplot(crossing, aes(x, y, fill = g))`, `a` at y 1 and `b` from -1 to 1 at x 1 and
+    # 3, so `b` crosses zero at 2 and each place is also 0.002 either side.
+    test "each group is interpolated at every place and crossing, padded with 0 at each end" do
+      frame = area_frame(x: [1, 3, 1, 3], y: [1, 1, -1, 1], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      places = [
+        0.998,
+        1.0,
+        1.002,
+        1.998,
+        2.0,
+        2.0019999999999998,
+        2.9980000000000002,
+        3.0,
+        3.0019999999999998
+      ]
+
+      assert DataFrame.pull(aligned, :x) == places ++ places
+
+      assert DataFrame.pull(aligned, :y) ==
+               [0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0] ++
+                 [0.0, -1.0, -0.998, -0.0020000000000000018, 0.0, 0.0019999999999997797] ++
+                 [0.99800000000000022, 1.0, 0.0]
+
+      padding = [true, false, false, false, false, false, false, false, true]
+      assert DataFrame.pull(aligned, :align_padding) == padding ++ padding
+      assert DataFrame.pull(aligned, :group) == List.duplicate(1, 9) ++ List.duplicate(2, 9)
+      flipped = DataFrame.pull(aligned, :flipped_aes)
+      assert Enum.uniq(flipped) == [false]
+      assert [:x, :y | _rest] = DataFrame.names(aligned)
+    end
+
+    # Golden: `ggplot(dupes, aes(x, y, fill = g))`: `a` holds three rows at x 2, out of order, and
+    # `b` a missing and an infinite x.
+    test "a row missing or infinite is left out, and the rows sharing an x stand in as two" do
+      frame =
+        area_frame(
+          x: [3, 1, 2, 2, 2, 1, 3, nil, :infinity],
+          y: [1, 2, 3, 0.5, 4, 2, 2, 5, 1],
+          group: [1, 1, 1, 1, 1, 2, 2, 2, 2]
+        )
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.pull(aligned, :y) ==
+               [0.0, 2.0, 2.0020040080160322, 3.0, 4.0] ++
+                 [3.9940000000000007, 1.0059999999999993, 1.0, 0.0] ++
+                 [0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 0.0]
+    end
+
+    # Golden: `ggplot(small, aes(y, x, fill = g)) + geom_area(orientation = "y", position =
+    # "identity")`, `small` holding `a` at x 1 and 2 and `b` at x 1 and 3.
+    test "along y, the groups are aligned up the y positions, y leading the columns" do
+      frame = area_frame(x: [1, 3, 2, 2], y: [1, 2, 1, 3], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :y}, frame, %{})
+
+      assert DataFrame.pull(aligned, :y) ==
+               [0.998, 1.0, 1.002, 1.998, 2.0, 2.0019999999999998] ++
+                 [0.998, 1.0, 1.002, 1.998, 2.0, 2.0019999999999998, 2.9980000000000002] ++
+                 [3.0, 3.0019999999999998]
+
+      assert DataFrame.pull(aligned, :x) ==
+               [0.0, 1.0, 1.004, 2.996, 3.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 0.0]
+
+      flipped = DataFrame.pull(aligned, :flipped_aes)
+      assert Enum.uniq(flipped) == [true]
+      assert [:y, :x | _rest] = DataFrame.names(aligned)
+    end
+
+    # Golden: `ggplot(d, aes(x, y)) + geom_area(aes(fill = g), position = "identity") +
+    # facet_wrap(~p)`, panel `one` holding one group and panel `two` `a` at x 1 and 2 and `b`
+    # twice at x 3; the columns keep the first panel's order, as R binds the panels' tables.
+    test "a panel of one group keeps its rows, and a group of one x is left out" do
+      frame =
+        area_frame(
+          x: [1, 2, 3, 1, 2, 3, 3],
+          y: [1, 2, 1, 1, 2, 3, 4],
+          group: [1, 1, 1, 1, 1, 2, 2],
+          panel: [1, 1, 1, 2, 2, 2, 2]
+        )
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.pull(aligned, :x) == [1, 2, 3, 0.998, 1.0, 1.002, 1.998, 2.0, 2.002]
+      assert DataFrame.pull(aligned, :y) == [1, 2, 1, 0.0, 1.0, 1.002, 1.998, 2.0, 0.0]
+      assert DataFrame.pull(aligned, :panel) == [1, 1, 1, 2, 2, 2, 2, 2, 2]
+      groups = DataFrame.pull(aligned, :group)
+      assert Enum.uniq(groups) == [1]
+
+      assert DataFrame.pull(aligned, :align_padding) ==
+               [nil, nil, nil, true, false, false, false, false, true]
+
+      assert [:fill, :x, :y | _rest] = DataFrame.names(aligned)
+    end
+
+    test "a panel of one group, in every panel, leaves the table as it is" do
+      frame = area_frame(x: [1, 2], y: [1, 2], group: [1, 1])
+
+      assert Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{}) == frame
+    end
+
+    # ggplot2's `StatAlign` builds each group's rows from its first row's other columns, so a fill
+    # that varies along a group takes the first row's, the row first in the data where every x
+    # differs, and the first at the lowest x where some share one.
+    test "every other column is the group's first row's, and aligning computes nothing" do
+      frame =
+        [x: [2, 1, 1, 1, 2], y: [1, 2, 3, 4, 5], group: [1, 1, 2, 2, 2]]
+        |> area_frame()
+        |> DataFrame.put(:fill, ["#111111", "#222222", "#333333", "#444444", "#555555"])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      fills = DataFrame.pull(aligned, :fill)
+      assert Enum.dedup(fills) == ["#111111", "#333333"]
+      assert Stat.default_mapping(%Stat.Align{orientation: :x}) == %{}
+    end
+  end
+
+  # An area layer's table as aligning is handed it, its fill one colour per group.
+  defp area_frame(columns) do
+    group = Keyword.fetch!(columns, :group)
+    rows = length(group)
+
+    DataFrame.new(
+      fill: Enum.map(group, fn id -> if id == 1, do: "#F8766D", else: "#00BFC4" end),
+      x: Keyword.fetch!(columns, :x),
+      y: Keyword.fetch!(columns, :y),
+      panel: Keyword.get(columns, :panel, List.duplicate(1, rows)),
+      group: group
+    )
+  end
+
   defp box, do: %Stat.Boxplot{coef: 1.5, width: :none, orientation: :none}
 
   defp width_frame(widths) do

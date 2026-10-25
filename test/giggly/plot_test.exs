@@ -2073,6 +2073,168 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_ribbon/3 and geom_area/3" do
+    @bands %{"x" => [1, 2], "low" => [1.0, 2.0], "high" => [3.0, 4.0], "g" => ["a", "b"]}
+
+    test "a ribbon layer records its geom with ggplot2's outline, ends and corners by default" do
+      plot =
+        @bands
+        |> Plot.new(%{x: :x, ymin: :low, ymax: :high})
+        |> Plot.geom_ribbon()
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Ribbon{
+                   orientation: :none,
+                   outline_type: :both,
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0
+                 },
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{},
+                 fixed: %{},
+                 accepted: Geom.Ribbon.accepted_aesthetics(),
+                 annotation: false
+               }
+             ]
+    end
+
+    test "an area layer records its geom, aligning and stacking, along x and outlined on top" do
+      plot =
+        @bands
+        |> Plot.new(%{x: :x, y: :high})
+        |> Plot.geom_area()
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Area{
+                   orientation: :x,
+                   outline_type: :upper,
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0
+                 },
+                 stat: %Stat.Align{orientation: :x},
+                 position: %Position.Stack{},
+                 accepted: [:group, :x, :y, :alpha, :color, :fill, :linetype, :linewidth]
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "the options choose the band's orientation, outline, position, ends and corners" do
+      ribbon =
+        @bands
+        |> Plot.new(%{y: :x, xmin: :low, xmax: :high})
+        |> Plot.geom_ribbon(orientation: :y, outline_type: :full, linejoin: :mitre, linemitre: 2)
+
+      area =
+        @bands
+        |> Plot.new(%{x: :high, y: :x})
+        |> Plot.geom_area(orientation: :y, position: :identity, outline_type: :lower)
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Ribbon{
+                   orientation: :y,
+                   outline_type: :full,
+                   line_join: :mitre,
+                   mitre_limit: 2.0
+                 }
+               }
+             ] = ribbon.reversed_layers
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Area{orientation: :y, outline_type: :lower},
+                 stat: %Stat.Align{orientation: :y},
+                 position: %Position.Identity{}
+               }
+             ] = area.reversed_layers
+    end
+
+    test "a band's look is set for every band, its colour resolved and its alpha a float" do
+      plot =
+        @bands
+        |> Plot.new(%{x: :x, ymin: :low, ymax: :high})
+        |> Plot.geom_ribbon(colour: "red", fill: "steelblue", alpha: 1, linewidth: 2, linetype: 2)
+
+      assert [
+               %Plot.Layer{
+                 fixed: %{
+                   color: "#FF0000",
+                   fill: "#4682B4",
+                   alpha: 1.0,
+                   linewidth: 2.0,
+                   linetype: {4, 4}
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a ribbon needs one of x and y, of ymin and xmin, and of ymax and xmax" do
+      plot = Plot.new(@bands, %{x: :x})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_ribbon(plot, %{ymin: :low}) end
+      assert error.message =~ "Plot.geom_ribbon/3 needs one of :ymax, :xmax"
+
+      assert %Plot{} = Plot.geom_ribbon(plot, %{ymin: :low, xmax: :high})
+    end
+
+    # ggplot2 4.0.3 aborts drawing `geom_ribbon(aes(x, ymin = low, ymax = high), orientation =
+    # "y")`: "Either xmin or xmax must be given as an aesthetic."
+    test "a ribbon given an orientation needs its range across it, mapped or not" do
+      plot = Plot.new(@bands, %{x: :x, ymin: :low, ymax: :high})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_ribbon(plot, orientation: :y) end
+
+      assert error.message =~
+               "Plot.geom_ribbon/3 runs along y with orientation: :y, so it needs :xmin or :xmax"
+
+      assert %Plot{} = Plot.geom_ribbon(plot, orientation: :x)
+
+      assert %Plot{} =
+               @bands
+               |> Plot.new(%{y: :x, ymin: :low})
+               |> Plot.geom_ribbon(%{xmax: :high}, orientation: :y)
+    end
+
+    test "an area needs x and y, and refuses a range or an after_stat" do
+      plot = Plot.new(@bands, %{x: :x})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_area(plot) end
+      assert error.message =~ "Plot.geom_area/3 needs :y"
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_area(plot, %{y: :high, ymin: :low}) end
+      assert error.message =~ ":ymin"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_area(plot, %{y: :high, fill: {:after_stat, [:count]}})
+        end
+
+      assert error.message =~ "after_stat"
+    end
+
+    test "an outline type, an orientation or a position not offered is refused" do
+      plot = Plot.new(@bands, %{x: :x, ymin: :low, ymax: :high, y: :high})
+
+      assert_raise NimbleOptions.ValidationError, ~r/outline_type/, fn ->
+        Plot.geom_ribbon(plot, outline_type: :middle)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/orientation/, fn ->
+        Plot.geom_ribbon(plot, orientation: :z)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
+        Plot.geom_area(plot, position: :dodge)
+      end
+    end
+  end
+
   describe "geom_rect/3" do
     test "a rectangle layer records its geom, the identity stat and position, and its corners" do
       plot =

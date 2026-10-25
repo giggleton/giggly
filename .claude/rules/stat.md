@@ -45,7 +45,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   that scales with the layer's rows (choosing the rows, weighing them, counting, finding a group's
   constant columns) runs through the frame's operations, so an engine holding the table could run
   it, and what a stat works out on lists is its own small output, a share from its counts, a
-  width from its counted positions. Nothing checks this but review.
+  width from its counted positions. Nothing checks this but review. **Aligning pulls its panels'
+  rows** (design-log §4, the entry beginning "Smoothing and densities compute over the rows"): its
+  output is as large as its input, as the identity's is, and interpolating each group at the
+  others' places has no frame operation.
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
   ggplot2's `after_stat()` defaults (`%{x: :count, y: :count}` for counting). The assembly puts it
   into an aesthetic the layer maps to nothing, and titles that aesthetic's guide by it as a
@@ -99,6 +102,20 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   panel, with no `abs()`, divided as R divides, an infinity or NaN where the total is zero. A
   row missing its x or y, or at an infinite one, is not counted. size takes `n` by default; it
   computes `n` and `prop` and consumes `weight`.
+- **Aligning is ggplot2's `stat_align()`, `geom_area()`'s stat, R's to the last digit**: rows
+  missing or infinite in x or y left out first, as ggplot2's stats drop them; a panel of one group
+  kept as it is; in a panel of several, the places are its rows' distinct x and the points where a
+  group's consecutive rows (in the panel's order) cross zero, each also `adjust` either side, a
+  thousandth of the places' range or a third of their smallest gap, sorted and distinct; each group
+  with more than one distinct x, in group order, becomes a row at each place within its x range,
+  its y R's `approx()` formula, exactly a row's y at its x, after the first and last rows at each
+  shared x stand in for them, the first moved `adjust` left, padded by a row of y 0 `adjust` beyond
+  each end marked `align_padding`; every other column is the group's first row's, the first at its
+  lowest x where some share one. `flipped_aes` says the orientation, along y with x and y swapped,
+  and the columns come x and y first where the first panel was aligned, as R binds them; it needs
+  `x` and `y` and computes nothing an after_stat can read. **A padding row a scale's limits cut
+  keeps its missing x in `layer_data/2`**, where ggplot2's `finish_layer()` drops it; the area
+  leaves it out when drawn, so the drawing is R's (Steve, 2026-10-25: "B").
 - **The box plot's summary is ggplot2's `stat_boxplot()`** (design-log §4, the entries beginning
   "A box's outliers are a list column" and "A box plot takes R's options"): per panel and per
   group, one row per box, its quartiles the frame's `quantile` (R's type 7), its outliers the rows

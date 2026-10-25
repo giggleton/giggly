@@ -7,6 +7,28 @@ defmodule Giggly.GeomTest do
   @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
   @line %Geom.Line{orientation: :x, line_end: :butt, line_join: :round, mitre_limit: 10.0}
 
+  @ribbon %Geom.Ribbon{
+    orientation: :none,
+    outline_type: :both,
+    line_end: :butt,
+    line_join: :round,
+    mitre_limit: 10.0
+  }
+
+  @area %Geom.Area{
+    orientation: :x,
+    outline_type: :upper,
+    line_end: :butt,
+    line_join: :round,
+    mitre_limit: 10.0
+  }
+
+  @continuous %{x: :continuous, y: :continuous}
+
+  # A cartesian panel 2 wide and 4 tall.
+  @cartesian %Coord.Cartesian{}
+  @params Coord.panel_params(%Coord.Cartesian{}, {{0.0, 2.0}, [], []}, {{0.0, 4.0}, [], []})
+
   # A 0.5 mm line, ggplot2's default, in points: `0.5 * .pt` line-width units of 1/96 inch, as
   # ggplot2 and svglite work it out.
   @default_width 0.5 * (72.27 / 25.4) / 96 * 72
@@ -42,6 +64,21 @@ defmodule Giggly.GeomTest do
   # geom a key.
   defp draw_key(geom, key), do: Geom.draw_key(geom, Map.merge(key_defaults(geom), key))
   defp key_size(geom, key), do: Geom.key_size(geom, Map.merge(key_defaults(geom), key))
+
+  # A band's rows as a ribbon's setup leaves them, along x, outlined in red, in one panel and group.
+  defp band(x_positions, lows, highs) do
+    rows = length(x_positions)
+
+    DataFrame.new(
+      x: x_positions,
+      ymin: lows,
+      ymax: highs,
+      panel: List.duplicate(1, rows),
+      group: List.duplicate(1, rows),
+      flipped_aes: List.duplicate(false, rows),
+      color: List.duplicate("#FF0000", rows)
+    )
+  end
 
   defp key_defaults(geom) do
     geom
@@ -727,6 +764,224 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  # Each golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the plot named.
+  describe "setup_data/3 for ribbons and areas" do
+    # Golden: `ggplot(ribbon, aes(x = y, ymax = hi, xmin = lo)) + geom_ribbon()`.
+    test "a ribbon given a ymax runs along x, in order, its y its ymin or else its ymax" do
+      frame =
+        DataFrame.new(
+          x: [3, 1, 2],
+          ymax: [3.0, 2.0, 4.0],
+          panel: [1, 1, 1],
+          group: [-1, -1, -1]
+        )
+
+      set_up = Geom.setup_data(@ribbon, frame, @continuous)
+
+      assert {DataFrame.pull(set_up, :x), DataFrame.pull(set_up, :y)} ===
+               {[1, 2, 3], [2.0, 4.0, 3.0]}
+
+      assert DataFrame.pull(set_up, :flipped_aes) === [false, false, false]
+    end
+
+    # Golden: `ggplot(ribbon, aes(y = y, xmin = lo, xmax = hi)) + geom_ribbon()`.
+    test "a ribbon given no ymin or ymax runs along y, its x its xmin" do
+      frame =
+        DataFrame.new(
+          y: [3, 1, 2],
+          xmin: [1.0, 0.5, 2.0],
+          xmax: [3.0, 2.0, 4.0],
+          panel: [1, 1, 1],
+          group: [-1, -1, -1]
+        )
+
+      set_up = Geom.setup_data(@ribbon, frame, @continuous)
+
+      assert {DataFrame.pull(set_up, :y), DataFrame.pull(set_up, :x)} ===
+               {[1, 2, 3], [0.5, 2.0, 1.0]}
+
+      assert DataFrame.pull(set_up, :flipped_aes) === [true, true, true]
+      assert [:y, :xmin, :xmax, :panel, :group | _rest] = DataFrame.names(set_up)
+    end
+
+    test "a ribbon runs as its layer says, whatever its range" do
+      frame =
+        DataFrame.new(
+          x: [1, 2],
+          y: [2, 1],
+          xmin: [1.0, 0.5],
+          xmax: [2.0, 1.5],
+          ymin: [3.0, 2.0],
+          panel: [1, 1],
+          group: [-1, -1]
+        )
+
+      along_y = Geom.setup_data(%{@ribbon | orientation: :y}, frame, @continuous)
+      along_x = Geom.setup_data(%{@ribbon | orientation: :x}, frame, @continuous)
+
+      assert {DataFrame.pull(along_y, :flipped_aes), DataFrame.pull(along_x, :flipped_aes)} ===
+               {[true, true], [false, false]}
+
+      assert {DataFrame.pull(along_y, :x), DataFrame.pull(along_x, :y)} ===
+               {[0.5, 1.0], [3.0, 2.0]}
+    end
+
+    test "an area runs from 0 to its y, in order of panel, group and x" do
+      frame =
+        DataFrame.new(x: [2, 1, 1], y: [3.0, 4.0, 5.0], panel: [1, 1, 2], group: [1, 1, 1])
+
+      set_up = Geom.setup_data(@area, frame, @continuous)
+
+      assert Enum.map([:x, :ymin, :ymax], fn name -> DataFrame.pull(set_up, name) end) ===
+               [[1, 2, 1], [0.0, 0.0, 0.0], [4.0, 3.0, 5.0]]
+    end
+
+    test "an area runs along y where its stat says so, over the layer's orientation" do
+      frame =
+        DataFrame.new(
+          x: [3.0, 4.0],
+          y: [2, 1],
+          panel: [1, 1],
+          group: [1, 1],
+          flipped_aes: [true, true]
+        )
+
+      set_up = Geom.setup_data(@area, frame, @continuous)
+
+      assert Enum.map([:y, :xmin, :xmax], fn name -> DataFrame.pull(set_up, name) end) ===
+               [[1, 2], [0.0, 0.0], [4.0, 3.0]]
+    end
+  end
+
+  describe "draw_panel/4 for ribbons and areas" do
+    # Golden: ggplot2 4.0.3's `geom_ribbon(colour = "red")` through vdiffr 1.0.9: a polygon of no
+    # border out along `ymax` and back along `ymin`, then the upper and the lower edge, each a line.
+    test "a piece is a polygon out along its upper edge and back along its lower, then its lines" do
+      assert [%Polygons{} = polygon, %Polylines{} = lines] =
+               draw_panel(
+                 @ribbon,
+                 band([0.0, 1.0, 2.0], [0.0, 1.0, 0.0], [2.0, 3.0, 2.0]),
+                 @cartesian,
+                 @params
+               )
+
+      assert polygon.outlines === [
+               [{0.0, 0.5}, {0.5, 0.75}, {1.0, 0.5}, {1.0, 0.0}, {0.5, 0.25}, {0.0, 0.0}]
+             ]
+
+      assert {polygon.stroke_width, polygon.color, polygon.fill} === {0.0, [:none], ["#333333"]}
+
+      assert lines.lines === [
+               [{0.0, 0.5}, {0.5, 0.75}, {1.0, 0.5}],
+               [{1.0, 0.0}, {0.5, 0.25}, {0.0, 0.0}]
+             ]
+
+      assert {lines.color, lines.stroke_width} === {["#FF0000", "#FF0000"], @default_width}
+    end
+
+    # Golden: ggplot2 4.0.3's `geom_ribbon(colour = "red")` of `lo = c(1, NA, 1, 1.2, NA)` through
+    # vdiffr 1.0.9: a polygon of two points for the first row alone, with no line, then the third
+    # and fourth rows' polygon and lines.
+    test "a row missing a position splits its group, a piece of one row drawing no lines" do
+      frame =
+        band([0.0, 0.5, 1.0, 1.5, 2.0], [1.0, nil, 1.0, 1.2, nil], [2.0, 2.5, 2.2, 2.4, 2.6])
+
+      assert [%Polygons{outlines: [lone]}, %Polygons{outlines: [piece]}, %Polylines{lines: lines}] =
+               draw_panel(@ribbon, frame, @cartesian, @params)
+
+      assert {length(lone), length(piece), length(lines)} === {2, 4, 2}
+    end
+
+    test "the outline draws the upper edge alone, the lower alone, or the polygon's border" do
+      frame = band([0.0, 2.0], [0.0, 0.0], [4.0, 4.0])
+
+      assert [_polygon, %Polylines{lines: [[{+0.0, 1.0}, {1.0, 1.0}]]}] =
+               draw_panel(%{@ribbon | outline_type: :upper}, frame, @cartesian, @params)
+
+      assert [_polygon, %Polylines{lines: [[{1.0, +0.0}, {+0.0, +0.0}]]}] =
+               draw_panel(%{@ribbon | outline_type: :lower}, frame, @cartesian, @params)
+
+      assert [%Polygons{color: ["#FF0000"], stroke_width: @default_width}] =
+               draw_panel(%{@ribbon | outline_type: :full}, frame, @cartesian, @params)
+    end
+
+    test "the fill is at the row's alpha and the lines at their colour's own" do
+      frame =
+        [0.0, 2.0]
+        |> band([0.0, 0.0], [4.0, 4.0])
+        |> DataFrame.put(:alpha, [0.5, 0.5])
+        |> DataFrame.put(:color, ["#FF000080", "#FF000080"])
+
+      assert [%Polygons{fill_opacity: [0.5]}, %Polylines{opacity: [@half_alpha, @half_alpha]}] =
+               draw_panel(@ribbon, frame, @cartesian, @params)
+    end
+
+    # Golden: ggplot2 4.0.3's default `geom_area()` through vdiffr 1.0.9: its upper edge a line of
+    # `stroke: none`.
+    test "an outline of no colour is written with none, and a blank or missing one not drawn" do
+      frame = band([0.0, 2.0], [0.0, 0.0], [4.0, 4.0])
+      uncoloured = DataFrame.put(frame, :color, [nil, nil])
+
+      assert [_polygon, %Polylines{color: [:none, :none], opacity: [+0.0, +0.0]}] =
+               draw_panel(@ribbon, uncoloured, @cartesian, @params)
+
+      assert [_polygon] =
+               draw_panel(
+                 @ribbon,
+                 DataFrame.put(frame, :linetype, [:none, :none]),
+                 @cartesian,
+                 @params
+               )
+
+      assert [_polygon] =
+               draw_panel(
+                 @ribbon,
+                 DataFrame.put(frame, :linewidth, [nil, nil]),
+                 @cartesian,
+                 @params
+               )
+    end
+
+    test "a ribbon whose look varies along it is refused" do
+      frame =
+        [0.0, 2.0]
+        |> band([0.0, 0.0], [4.0, 4.0])
+        |> DataFrame.put(:fill, ["#FF0000", "#0000FF"])
+
+      error =
+        assert_raise ArgumentError, fn -> draw_panel(@ribbon, frame, @cartesian, @params) end
+
+      assert error.message =~ "cannot vary its fill along it"
+      assert error.message =~ "gradient"
+    end
+
+    test "an area's padding is left off its upper edge, kept on its lower" do
+      frame =
+        [0.0, 0.5, 1.5, 2.0]
+        |> band([0.0, 0.0, 0.0, 0.0], [0.0, 4.0, 4.0, 0.0])
+        |> DataFrame.put(:y, [0.0, 4.0, 4.0, 0.0])
+        |> DataFrame.put(:align_padding, [true, false, false, true])
+
+      assert [%Polygons{outlines: [outline]}, %Polylines{lines: [upper, lower]}] =
+               draw_panel(%{@area | outline_type: :both}, frame, @cartesian, @params)
+
+      assert {length(outline), upper, length(lower)} === {6, [{0.25, 1.0}, {0.75, 1.0}], 4}
+    end
+
+    test "an area drops a row missing its y, and a ribbon one missing its ymin" do
+      frame =
+        [0.0, 1.0, 2.0]
+        |> band([0.0, nil, 0.0], [2.0, 4.0, 2.0])
+        |> DataFrame.put(:y, [2.0, 4.0, 2.0])
+
+      assert [%Polygons{outlines: [_first, _second]}] =
+               draw_panel(%{@area | outline_type: :both}, frame, @cartesian, @params)
+
+      assert [%Polygons{outlines: [_lone]}, %Polygons{outlines: [_last]}] =
+               draw_panel(@ribbon, frame, @cartesian, @params)
+    end
+  end
+
   describe "draw_panel/4 for paths, in a line type" do
     setup do
       coord = %Coord.Cartesian{}
@@ -1214,6 +1469,24 @@ defmodule Giggly.GeomTest do
 
       assert %Text{angle: +0.0, family: "", check_overlap: false} =
                text(DataFrame.new(x: [0.2], y: [0.2], label: ["a"]), context)
+    end
+  end
+
+  describe "draw_key/2 for ribbons, areas and rectangles" do
+    # Golden: ggplot2 4.0.3's `geom_area(aes(fill = type))` through vdiffr 1.0.9: each key's
+    # rectangle `stroke-linecap: butt` with grid's round corners, as `draw_key_polygon()` takes the
+    # layer's `linejoin`, where a rectangle's key is mitred.
+    test "a ribbon's and an area's key is a rectangle's, its ends and corners the layer's" do
+      key = %{fill: "#F8766D"}
+
+      assert [%Rectangles{line_end: :butt, line_join: :round, mitre_limit: 10.0}] =
+               draw_key(@ribbon, key)
+
+      assert [%Rectangles{line_end: :square, line_join: :bevel}] =
+               draw_key(%{@area | line_end: :square, line_join: :bevel}, key)
+
+      assert [%Rectangles{line_end: :butt, line_join: :mitre}] = draw_key(%Geom.Rect{}, key)
+      assert key_size(@area, key) == key_size(%Geom.Rect{}, key)
     end
   end
 

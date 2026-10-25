@@ -62,7 +62,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `%Stat.Bin{}` and their position, `:stack` unless `position:` says otherwise, and
   `geom_freqpoly/3` `%Geom.Path{}` with `%Stat.Bin{pad: true}` and `%Position.Identity{}`, as
   ggplot2's `geom_freqpoly()` pads whatever it is given, so it takes no `pad:` (design-log §4, the
-  entry beginning "A frequency polygon takes no"). **The binning options are fields of
+  entry beginning "A frequency polygon takes no"), and `geom_ribbon/3` `%Geom.Ribbon{}` with the
+  identity stat and position, and `geom_area/3` `%Geom.Area{}` with `%Stat.Align{}`, as ggplot2's
+  `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
+  the geom's struct and the stat's. **A ribbon's `orientation:`, `:x` or `:y`, is checked at the
+  call against its range**: along x it needs `:ymin` or `:ymax`, along y `:xmin` or `:xmax`, mapped
+  before the stat or set, where ggplot2 aborts when it draws; not given, it is recorded `:none` and
+  the geom reads the range. **The binning options are fields of
   `%Stat.Bin{}`**, ggplot2's: `bins:` (30), `binwidth:`, above 0, `center:`, `boundary:`,
   `breaks:`, two or more distinct numbers, `closed:` (`:right` or `:left`), `pad:` and `drop:`
   (`:none`, `:all` or `:extremes`), numbers kept as floats as R keeps doubles, an option not given
@@ -217,10 +223,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   "`Plot.position_dodge2/1` arrives").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar, rectangle and point functions `fill:`,
+  function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area and point functions
+  `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
-  the line, bar and rectangle
-  functions `linewidth:`, in millimetres, and `linetype:`, a line's or a border's,
+  the line, bar, rectangle, ribbon and area
+  functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
@@ -247,7 +254,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   option that chooses how a geom draws** (`lineend:`, `linejoin:`, `linemitre:`, `geom_line/3`'s
   `orientation:`, `geom_text/3`'s `check_overlap:`, the bar functions' `just:`) **is a field of the
   geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`,
-  `0.5`).
+  `0.5`), and so is a ribbon's and an area's `outline_type:` (`:both` and `:upper`) and
+  `orientation:` (`:none`, the range's, and `:x`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`, `fill:`, `width:` and `just:`,
   0 to 1; every geom function's
@@ -257,8 +265,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`,
-  `geom_rect/3`, `annotate/3`, the scale functions, the guide functions, `labs/2`, `theme/2` and
-  the complete theme functions), so
+  `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `annotate/3`, the scale functions, the guide
+  functions, `labs/2`, `theme/2` and the complete theme functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as

@@ -4177,6 +4177,74 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_area" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(crossing, aes(x, y, fill = g))
+    # + geom_area()`, `a` at y 1 and `b` from -1 to 1 at x 1 and 3, printed to 17 significant
+    # digits: `b` crosses zero at 2, and the bands below zero pile apart from those above.
+    test "areas are aligned at each other's places and crossings, then piled from zero" do
+      frame =
+        %{"g" => ["a", "a", "b", "b"], "x" => [1, 3, 1, 3], "y" => [1, 1, -1, 1]}
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_area()
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) == [
+               :x,
+               :y,
+               :fill,
+               :panel,
+               :group,
+               :align_padding,
+               :flipped_aes,
+               :ymin,
+               :ymax,
+               :xmin,
+               :xmax,
+               :color,
+               :linewidth,
+               :linetype,
+               :alpha
+             ]
+
+      assert DataFrame.pull(frame, :ymin) ==
+               [0.0, 0.0, 0.0, 0.0, 0.0, 0.0019999999999997797, 0.99800000000000022, 1.0] ++
+                 List.duplicate(0.0, 10)
+
+      assert DataFrame.pull(frame, :ymax) ==
+               [0.0, 1.0, 1.0, 1.0, 1.0, 1.0019999999999998, 1.9980000000000002, 2.0, 0.0] ++
+                 [0.0, -1.0, -0.998, -0.0020000000000000018, 0.0, 0.0019999999999997797] ++
+                 [0.99800000000000022, 1.0, 0.0]
+    end
+
+    # ggplot2 4.0.3 drops the padding rows `xlim(1, 4)` cuts, at x 0.997 and 4.003, in
+    # `StatAlign$finish_layer()`, leaving 20 rows; Giggly keeps them, their x missing, and the
+    # drawing matches R's, as the area leaves them out (design-log §4, the entry beginning
+    # "Smoothing and densities are Phase 3's twelfth").
+    test "a padding row a scale's limits cut keeps its missing x" do
+      frame =
+        %{
+          "time" => [1, 1, 2, 2, 3, 3, 4, 4],
+          "type" => ["a", "b", "a", "b", "a", "b", "a", "b"],
+          "value" => [8, 10, 7, 11, 14, 12, 11, 9]
+        }
+        |> Plot.new(%{x: :time, y: :value, fill: :type})
+        |> Plot.geom_area()
+        |> Plot.xlim(1, 4)
+        |> Giggly.layer_data()
+
+      x_positions = DataFrame.pull(frame, :x)
+      padding = DataFrame.pull(frame, :align_padding)
+
+      cut =
+        Enum.zip_with(x_positions, padding, fn
+          nil, true -> :cut
+          _x, _padding -> :kept
+        end)
+
+      assert Enum.frequencies(cut) == %{cut: 4, kept: 20}
+    end
+  end
+
   describe "layer_data/2, dodged by clusters" do
     # `ggplot(mtcars, aes(factor(cyl), fill = factor(vs)))` with `geom_bar(position = "dodge2")`,
     # then `position_dodge2(preserve = "single")`.
@@ -8694,6 +8762,184 @@ defmodule GigglyTest do
 
       assert golden?(plot, "theme_text_theta")
     end
+
+    # Golden: test/golden/ribbon.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/ribbon.R: every element and clip path matches, the x axis drawn before the y as
+    # in test/golden/point.svg. geom_ribbon()'s band around a line from ggplot2's reference page,
+    # in R's grey70, under the line. It moves with how a ribbon or a line is drawn.
+    test "a ribbon is a band from its ymin to its ymax, its polygon out and back" do
+      plot =
+        huron()
+        |> Plot.new(%{x: :year})
+        |> Plot.geom_ribbon(
+          %{ymin: {&Kernel.-/2, [:level, 1]}, ymax: {&Kernel.+/2, [:level, 1]}},
+          fill: "#B3B3B3"
+        )
+        |> Plot.geom_line(%{y: :level})
+
+      assert golden?(plot, "ribbon")
+    end
+
+    # Golden: test/golden/ribbon_outlines.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/ribbon_outlines.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Four ribbons broken by a missing row, outlined on
+    # both edges, the upper, the lower and whole, each piece's polygon before its lines, the fill
+    # alone at the alpha, and a piece of one row a polygon of two points with no line. It moves
+    # with how a ribbon splits into pieces or draws its outline.
+    test "a ribbon's outline draws the edges its outline type names, in its colour alone" do
+      plot =
+        0
+        |> shifted_band([1, 1.5, 1, nil, 1.2, 1])
+        |> Plot.new(%{x: :x, ymin: :lo, ymax: :hi})
+        |> Plot.geom_ribbon(outline_type: :both, colour: "red", fill: "pink", alpha: 0.5)
+        |> Plot.geom_ribbon(
+          data: shifted_band(2, [1, 1.5, 1, nil, 1.2, 1]),
+          outline_type: :upper,
+          colour: "blue",
+          linewidth: 1,
+          linetype: :dashed
+        )
+        |> Plot.geom_ribbon(
+          data: shifted_band(4, [1, 1.5, 1, nil, 1.2, 1]),
+          outline_type: :lower,
+          colour: "darkgreen"
+        )
+        |> Plot.geom_ribbon(
+          data: shifted_band(6, [1, nil, 1, nil, 1.2, 1]),
+          outline_type: :full,
+          colour: "black",
+          fill: "orange",
+          linewidth: 0.8
+        )
+
+      assert golden?(plot, "ribbon_outlines")
+    end
+
+    # Golden: test/golden/ribbon_horizontal.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/ribbon_horizontal.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. A ribbon given xmin and xmax runs up the panel, and
+    # an area along y from 0 across to its x, its upper edge a line of no stroke. It moves with how
+    # a band's orientation is decided or turned.
+    test "a ribbon or an area runs up the panel along y" do
+      plot =
+        %{"y" => Enum.to_list(1..8), "lo" => [1, 2, 1.5, 3, 2.5, 2, 3, 2.5]}
+        |> Map.put("hi", [3, 3.5, 4, 5, 4, 4.5, 5, 6])
+        |> Plot.new()
+        |> Plot.geom_area(%{x: :lo, y: :y}, orientation: :y, fill: "steelblue", alpha: 0.5)
+        |> Plot.geom_ribbon(%{y: :y, xmin: :lo, xmax: :hi}, colour: "black", fill: :none)
+
+      assert golden?(plot, "ribbon_horizontal")
+    end
+
+    # Golden: test/golden/ribbon_radial.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/ribbon_radial.R: every element matches, in order, and every clip path but
+    # svglite's around the whole drawing. Each edge munched on its own round the circle. It moves
+    # with what moves test/golden/line_radial.svg, and with how a ribbon's edges are munched.
+    test "a ribbon in radial coordinates follows the circle along each edge" do
+      plot =
+        %{
+          "x" => Enum.to_list(1..6),
+          "lo" => [1, 2, 1.5, 3, 2.5, 2],
+          "hi" => [3, 3.5, 4, 5, 4, 4.5]
+        }
+        |> Plot.new(%{x: :x, ymin: :lo, ymax: :hi})
+        |> Plot.geom_ribbon(colour: "black")
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "ribbon_radial")
+    end
+
+    # Golden: test/golden/area.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/area.R: every element and clip path matches, the x axis drawn before the y as in
+    # test/golden/point.svg. geom_area()'s default look over one group. It moves with a ribbon's
+    # defaults under the theme.
+    test "an area is filled from 0 to its y in the theme's ink mixed toward its paper" do
+      plot =
+        %{"a" => [1, 2, 3, 4, 5], "b" => [1.0, 4.0, 9.0, 16.0, 25.0]}
+        |> Plot.new(%{x: :a, y: :b})
+        |> Plot.geom_area()
+
+      assert golden?(plot, "area")
+    end
+
+    # Golden: test/golden/area_stacked.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/area_stacked.R: every element and clip path matches, the x axis drawn before
+    # the y as in test/golden/point.svg. position_stack()'s stacked areas from ggplot2's reference
+    # page, each group aligned and padded, piled with the first group on top, and the legend's
+    # keys' corners round, the layer's. It moves with aligning, stacking, or a band's key.
+    test "areas at the same x pile on one another, the first group on top" do
+      plot =
+        %{
+          "time" => Enum.flat_map(1..4, fn time -> List.duplicate(time, 4) end),
+          "type" => Enum.flat_map(1..4, fn _time -> ["a", "b", "c", "d"] end),
+          "value" => [8, 10, 7, 11, 14, 12, 11, 9, 14, 11, 8, 2, 8, 10, 7, 12]
+        }
+        |> Plot.new(%{x: :time, y: :value})
+        |> Plot.geom_area(%{fill: :type})
+
+      assert golden?(plot, "area_stacked")
+    end
+
+    # Golden: test/golden/area_unaligned.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/area_unaligned.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Three groups at different x, one crossing zero
+    # twice, aligned at every x and crossing and piled, those below zero apart. It moves with
+    # aligning's places and crossings, or stacking below zero.
+    test "areas at different x are aligned at each other's x and crossings before they pile" do
+      plot =
+        %{
+          "g" => ["a", "a", "a", "b", "b", "b", "c", "c", "c"],
+          "x" => [1, 3, 5, 2, 4, 6, 1.5, 3.5, 5.5],
+          "y" => [2, 5, 1, 3, 6, 7, -1, 2, -2]
+        }
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_area(colour: "black")
+
+      assert golden?(plot, "area_unaligned")
+    end
+
+    # Golden: test/golden/area_identity.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/area_identity.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Two groups' areas overlapping where they are, each
+    # bordered whole, the border taking no alpha. It moves with how a band's whole border is drawn.
+    test "areas drawn where they are overlap, each bordered whole" do
+      plot =
+        %{
+          "g" => List.duplicate("a", 5) ++ List.duplicate("b", 5),
+          "x" => Enum.concat(1..5, 1..5),
+          "y" => [1, 3, 2, 4, 3, 2, 1, 3, 2, 4]
+        }
+        |> Plot.new(%{x: :x, y: :y, fill: :g})
+        |> Plot.geom_area(
+          position: :identity,
+          alpha: 0.4,
+          colour: "black",
+          linewidth: 0.8,
+          outline_type: :full
+        )
+
+      assert golden?(plot, "area_identity")
+    end
+  end
+
+  # Lake Huron's levels from 1875 to 1904, R's `LakeHuron`.
+  defp huron do
+    %{
+      "year" => Enum.to_list(1875..1904),
+      "level" =>
+        [580.38, 581.86, 580.97, 580.80, 579.79, 580.39, 580.42, 580.82, 581.40, 581.32] ++
+          [581.44, 581.68, 581.17, 580.53, 580.01, 579.91, 579.14, 579.16, 579.55, 579.67] ++
+          [578.44, 578.24, 579.10, 579.09, 579.35, 578.82, 579.32, 579.01, 579.00, 579.80]
+    }
+  end
+
+  # The band test/golden/ribbon_outlines.R shifts up by `offset`, its lows `lows`.
+  defp shifted_band(offset, lows) do
+    %{
+      "x" => Enum.to_list(1..6),
+      "lo" => Enum.map(lows, fn low -> low && low + offset end),
+      "hi" => Enum.map([2, 2.5, 2.2, 2.4, 2.6, 2], fn high -> high + offset end)
+    }
   end
 
   # The layer's shapes, and the legend's keys, each its label and shape, of a plot of `rows`

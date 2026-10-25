@@ -31,6 +31,9 @@ defmodule Giggly.Geom.Rect do
   # borders are as wide and dashed alike one primitive. Its legend key is its fill short of the key
   # by its border's width, as `draw_key_polygon()` draws it.
 
+  alias Giggly.Geom.Mark
+  alias Giggly.Scene.{Polylines, Rectangles}
+
   defstruct []
 
   @type t :: %__MODULE__{}
@@ -46,11 +49,67 @@ defmodule Giggly.Geom.Rect do
   @spec required_aesthetics() :: [atom()]
   def required_aesthetics, do: [:xmax, :xmin, :ymax, :ymin]
 
+  # Points in a millimetre, grid's `"mm"` in the scene's points: a key's fill is its border's width
+  # short of the key each way, as ggplot2's `draw_key_polygon()` takes `linewidth` millimetres off
+  # it, half each side.
+  @points_per_millimetre 72 / 25.4
+
+  # A legend's key as ggplot2's `draw_key_polygon()` draws one, which rectangles, bars, ribbons and
+  # areas share: the key's fill short of the key's edges by its border's width,
+  # `unit(1, "npc") - unit(linewidth, "mm")` wide and tall, so its corners are offset half the
+  # border's width in from the key's, in the key's fill at its alpha and its border's colour,
+  # width and line type, a missing line type blank, its corners and ends the layer's
+  # (`line_join`, `line_end`), as `draw_key_polygon()` reads the layer's `linejoin` and `lineend`,
+  # at grid's mitre limit; a missing width, R's `NA`, leaves the rectangle no size, so it draws
+  # nothing.
+  @doc false
+  @spec polygon_key(%{optional(atom()) => term()}, Polylines.line_end(), Polylines.line_join()) ::
+          [Rectangles.t()]
+  def polygon_key(key, line_end, line_join) do
+    case Map.fetch!(key, :linewidth) do
+      nil -> []
+      line_width -> [key_rectangle(key, line_width, line_end, line_join)]
+    end
+  end
+
+  defp key_rectangle(key, line_width, line_end, line_join) do
+    fill = Mark.key_color(key, :fill)
+    line_type = Map.fetch!(key, :linetype) || :none
+    color = Mark.key_color(key, :color)
+    border = border(color, line_width, line_type)
+    inset = line_width * @points_per_millimetre / 2
+
+    %Rectangles{
+      xmin: [0.0],
+      xmax: [1.0],
+      ymin: [0.0],
+      ymax: [1.0],
+      offsets: [{{inset, inset}, {-inset, -inset}}],
+      fill: [Mark.hex(fill)],
+      fill_opacity: [Mark.opacity(fill, Map.fetch!(key, :alpha))],
+      color: [Mark.hex(border)],
+      color_opacity: [Mark.own_opacity(border)],
+      stroke_width: Mark.stroke_width(line_width),
+      dashes: Mark.dashes(line_type, line_width),
+      line_end: line_end,
+      line_join: line_join,
+      mitre_limit: 10.0
+    }
+  end
+
+  # A border's colour at its width and in its line type: none where it is blank, or where its
+  # width is missing, R's `NA`, as R's graphics engine draws a border of no width transparent.
+  @doc false
+  @spec border(String.t() | :none, number() | nil, tuple() | :none) :: String.t() | :none
+  def border(_color, _width, :none), do: :none
+  def border(_color, nil, _line_type), do: :none
+  def border(color, _width, _line_type), do: color
+
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{ColorOperations, Coord, DataFrame}
-    alias Giggly.Geom.Mark
+    alias Giggly.Geom.{Mark, Rect}
     alias Giggly.Scene.Rectangles
 
     # How far a rectangle's default fill is mixed from the theme's ink toward its paper, ggplot2's
@@ -104,7 +163,7 @@ defmodule Giggly.Geom.Rect do
           extent: [xmin, xmax, ymin, ymax],
           fill: fill,
           fill_opacity: fill_opacity,
-          border: border(color, width, line_type),
+          border: Rect.border(color, width, line_type),
           line: {width || 0.0, line_type}
         }
       end)
@@ -133,24 +192,10 @@ defmodule Giggly.Geom.Rect do
       }
     end
 
-    # A border's colour at its width and in its line type: none where it is blank, or where its
-    # width is missing, R's `NA`, as R's graphics engine draws a border of no width transparent.
-    defp border(_color, _width, :none), do: :none
-    defp border(_color, nil, _line_type), do: :none
-    defp border(color, _width, _line_type), do: color
-
-    # A legend's key: the rectangle's fill short of the key's edges by its border's width, as
-    # ggplot2's `draw_key_polygon()` draws it, `unit(1, "npc") - unit(linewidth, "mm")` wide and
-    # tall, so its corners are offset half the border's width in from the key's, in the key's fill
-    # at its alpha and its border's colour, width and line type, a missing line type blank; a
-    # missing width, R's `NA`, leaves the rectangle no size, so it draws nothing.
+    # A legend's key, `draw_key_polygon()`'s, its corners mitred and its ends cut square, as
+    # `geom_rect()`'s are.
     @impl Giggly.Geom
-    def draw_key(_geom, key) do
-      case Map.fetch!(key, :linewidth) do
-        nil -> []
-        line_width -> key_rectangle(key, line_width)
-      end
-    end
+    def draw_key(_geom, key), do: Rect.polygon_key(key, @line_end, @line_join)
 
     # The room a key's rectangle needs, its border's width twice, in millimetres, either way, as
     # ggplot2's `draw_key_polygon()` sizes its glyph, `linewidth / 5` centimetres; a missing width
@@ -164,33 +209,6 @@ defmodule Giggly.Geom.Rect do
         end
 
       {side, side}
-    end
-
-    defp key_rectangle(key, line_width) do
-      fill = Mark.key_color(key, :fill)
-      line_type = Map.fetch!(key, :linetype) || :none
-      color = Mark.key_color(key, :color)
-      border = border(color, line_width, line_type)
-      inset = line_width * @points_per_millimetre / 2
-
-      [
-        %Rectangles{
-          xmin: [0.0],
-          xmax: [1.0],
-          ymin: [0.0],
-          ymax: [1.0],
-          offsets: [{{inset, inset}, {-inset, -inset}}],
-          fill: [Mark.hex(fill)],
-          fill_opacity: [Mark.opacity(fill, Map.fetch!(key, :alpha))],
-          color: [Mark.hex(border)],
-          color_opacity: [Mark.own_opacity(border)],
-          stroke_width: Mark.stroke_width(line_width),
-          dashes: Mark.dashes(line_type, line_width),
-          line_end: @line_end,
-          line_join: @line_join,
-          mitre_limit: @mitre_limit
-        }
-      ]
     end
   end
 end

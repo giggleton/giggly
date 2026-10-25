@@ -2,12 +2,14 @@ defmodule Giggly.Position.Stack do
   @moduledoc false
 
   # Stacking, ggplot2's `position_stack()`: the bars at one x piled on one another, as `geom_col()`
-  # and `geom_bar()` default `position = "stack"`. It takes no parameters yet; ggplot2's
-  # `vjust = 1`, `reverse = FALSE` and `fill = FALSE` are how it stacks. Run it through
-  # `Giggly.Position`.
+  # and `geom_bar()` default `position = "stack"`, and the areas, as `geom_area()` does. It takes
+  # no parameters yet; ggplot2's `vjust = 1`, `reverse = FALSE` and `fill = FALSE` are how it
+  # stacks. Run it through `Giggly.Position`.
   #
   # Nothing moves unless two rows of the layer share an x, in any panel, as ggplot2 skips stacking
-  # when every x differs. Otherwise each panel's bars are stacked by their `xmin`, those reaching
+  # when every x differs. Otherwise a layer whose rows have no `xmin`, as an area's have none, has
+  # each row's `xmin` and `xmax` set to its x, as ggplot2's `collide()` sets them, and each panel's
+  # bars, or an area's bands from 0 to its y, are stacked by their `xmin`, those reaching
   # below zero separately from the rest, each pile in the order of its x and then of its group,
   # highest group first, so the pile matches the legend's order, as ggplot2's `collide()` orders
   # them. Each bar takes the next stretch of its pile, `ymin` to `ymax`, as long as its y, and its
@@ -61,6 +63,8 @@ defmodule Giggly.Position.Stack do
     end
 
     defp stacked(frame) do
+      frame = with_edges(frame)
+
       stacked_rows =
         @columns
         |> Enum.map(fn name -> DataFrame.pull(frame, name) end)
@@ -73,6 +77,20 @@ defmodule Giggly.Position.Stack do
       Enum.reduce(@placed, frame, fn name, placed ->
         DataFrame.put(placed, name, Enum.map(stacked_rows, fn row -> Map.fetch!(row, name) end))
       end)
+    end
+
+    # The frame with each mark's `xmin` and `xmax` its x where it has none, as an area's rows have
+    # none, as ggplot2's `collide()` adds them before it piles the marks by their `xmin`.
+    defp with_edges(frame) do
+      if :xmin in DataFrame.names(frame) do
+        frame
+      else
+        x_positions = DataFrame.pull(frame, :x)
+
+        frame
+        |> DataFrame.put(:xmin, x_positions)
+        |> DataFrame.put(:xmax, x_positions)
+      end
     end
 
     defp row(values) do

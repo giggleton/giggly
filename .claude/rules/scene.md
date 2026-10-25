@@ -67,7 +67,8 @@ theme puts them".
   parameters are, so a mapped aesthetic needs no primitive per value. **A colour is `#RRGGBB`
   beside its opacity**, never with an alpha of its own: a placed rectangle's border's
   `color_opacity` is its colour's own alpha, since ggplot2 never gives a border the row's; a
-  shape's `fill` and `color` may be `:none`, R's `NA`, which draws none.
+  shape's `fill` and `color` may be `:none`, R's `NA`, which draws none, and so may a polyline's
+  `color`, written with no stroke, as svglite writes a ribbon's outline of no colour.
 - **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
   `polylineGrob()`, a line through points, one per tick, grid line or group), `Segments`
   (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it, a

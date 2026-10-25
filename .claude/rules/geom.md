@@ -191,6 +191,35 @@ beginning "Each layer's defaults are filled in from the theme".
   at the panel's edge, where the coordinate system puts it. Its corners are `xmin`, `xmax`,
   `ymin` and `ymax`; ggplot2 4.0 also places one by `x` and `width`, `y` and `height`, which
   waits, and so does a rectangle in radial coordinates, drawn square as a bar is.
+  **Its key is ggplot2's `draw_key_polygon()`, `Rect.polygon_key/3`, which bars, ribbons and areas
+  share**, its ends and corners the layer's, as `draw_key_polygon()` reads the layer's `lineend`
+  and `linejoin`: a rectangle's and a bar's cut square and mitred, a ribbon's and an area's as
+  their struct says, round corners by default.
+- **A ribbon (`Geom.Ribbon`) is set up and drawn as ggplot2's `GeomRibbon` does it.** Its setup
+  runs along its struct's `orientation`, or, where that is `:none`, along y where it has no `ymin`
+  or `ymax`, as `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range (`Plot` makes sure it
+  has a range, and refuses an orientation whose range is not given); writes `flipped_aes`; puts
+  its rows in order of panel, group and the position it runs along, as `order()` puts them; and
+  sets its `y` to its `ymin`, or its `ymax` where it has none. **It is drawn a piece at a time**:
+  a row missing (`nil`, `:nan`; an infinity is the panel's edge) a position it needs, a ribbon's
+  `x`, `ymin` and `ymax`, an area's `x` and `y`, each turned along y, is dropped, and each run of
+  a group's rows left is a piece, as `handle_na()` numbers runs; each piece, in row order, is a
+  polygon out along its `ymax` and back along its `ymin`, filled at its alpha and bordered only
+  where `outline_type` is `:full`, then its outline, `:both` edges, `:upper` or `:lower`, each a
+  line of the piece's colour at its colour's own alpha, never the row's, each edge munched on its
+  own. A line of fewer than two points, a blank line type or a missing width draws no line, and a
+  colour of `:none`, the default, is written with no stroke, as svglite writes one. A piece whose
+  colour, fill, alpha, width or line type varies along it is refused when drawn: ggplot2 refuses a
+  colour, width or line type that varies, and draws a varying fill or alpha as a gradient, which
+  waits. A row `align_padding` marks is left off the upper edge. Its defaults are ggplot2's under
+  the theme: no outline, a fill of ink mixed 20% toward paper (`#333333`), the borders' width
+  and line type.
+- **An area (`Geom.Area`) is a ribbon from 0 to its y**, as ggplot2's `GeomArea` is a
+  `GeomRibbon`: its setup runs along y where its stat's `flipped_aes` says so, as aligning writes
+  it, else as its struct's `orientation` says (`:x` unless the layer gives `:y`, as ggplot2 calls
+  an area ambiguous), puts its rows in order as a ribbon's, and sets `ymin` to 0 and `ymax` to its
+  y; it draws, and takes its defaults and key, as a ribbon does (`Ribbon.draw/5`), dropping a row
+  missing its `x` or `y`.
 - **A box plot (`Geom.Boxplot`) is set up and drawn as ggplot2's `GeomBoxplot` does it**
   (design-log §4, the entry beginning "A box plot takes R's options"). Its setup works along the
   stat's `flipped_aes`, flipped and flipped back; drops `outliers` where the layer keeps none, so

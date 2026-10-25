@@ -79,6 +79,79 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Smoothing and densities are Phase 3's twelfth increment, in five steps: ribbons and areas
+  (`geom_ribbon()`, `geom_area()` with its stat_align, stacking areas), linear smooths
+  (`geom_smooth()` and `stat_smooth()` with `method: :lm` and its band), densities
+  (`geom_density()`, `stat_density()`), loess, and gam (2026-10-25, Steve, agreeing the proposal
+  decision by decision; checked against ggplot2 4.0.3's source and R).** Stats were the thinnest
+  family, nothing fitting a curve or estimating a density, and `geom_smooth()` is the layer most
+  used after points: in r4ds and the ggplot2 book about 55 smooths name no method on tables under
+  1,000 rows (loess), 18 use lm, one gam. A smooth with no method raises, naming what waits, until
+  loess and gam land. The theme's `geom` element gains `accent` (#3366FF), the smooth's colour. The
+  t quantile is Giggly's own, the t distribution's closed form for whole degrees of freedom
+  (Abramowitz & Stegun 26.7.3-4) inverted by bisection: Nx and Scholar have no distributions, and
+  Hex's `statistics` is good to 4 decimals. gam's use of Scholar is asked with its step.
+  *Deferred:* `formula:`, `method_args:`, `xseq:`, `method: :glm`, a function as a method; the
+  `ucv`, `bcv` and `SJ` bandwidths; a gradient fill along a ribbon, refused when drawn;
+  `position_fill()`; `stat_align()` as a function; a geom given a stat by name; ggplot2's messages;
+  a stat's `finish_layer()` (Steve: "B"), which in ggplot2 only `StatAlign` overrides, to drop a
+  padding row a limit cuts, so such a row keeps its missing x in `layer_data/2`, the drawing R's;
+  `annotate("ribbon")` and `annotate("area")`; a ribbon's positions set as options
+  (`geom_ribbon(ymin = 0)`, which R takes without training the axes on them) (Steve: "Defer").
+
+- **Nx is a core dependency, reached only through `Giggly.Tensor`, which takes and gives lists and
+  pins every tensor to `Nx.BinaryBackend` in `f64` and every `defn` to `Nx.Defn.Evaluator`
+  (2026-10-25, Steve: "Core").** A density's FFT, loess's local fits and gam's linear algebra run
+  on Nx, which reads its default backend and `defn` options from the application environment and
+  the process dictionary on every call; so no other module builds a tensor, and a user's EXLA
+  default cannot change a drawing. Nx starts its own application (a `:pg` scope for
+  `Nx.Serving`), which Giggly never calls. `Nx.fft` takes `eps: 0`, since its default, 1e-10,
+  zeroes a density's tails. *Rejected: an optional `giggly_nx` package* — the most-used smooth
+  would raise without it, and loess and gam would need a public smoothing-method behaviour
+  designed with one implementation. *Rejected: `to_tensor` on the frame* (Steve asked) — the list
+  hop costs 0.05 ms at 1,024 values and 4 ms at 53,940, against 1.4 s for one gam product; should
+  an engine need it, the frame hands a column as a binary of doubles and `Giggly.Tensor` pins it,
+  so Nx stays out of the frame.
+
+- **Smoothing and densities compute over the rows through the frame where an engine could, and on
+  Nx only what the frame has summarised; three stats pull their rows (2026-10-25, Steve).** A
+  density's count, variance (a new `variance` aggregate, R's `var()`) and quartiles, each row's
+  binning slot and shares (arithmetic and `floor` in expressions) and the slots' totals (two
+  grouped sums, of lower and of upper shares, merged on the summarised output) are frame
+  operations; Nx sees the 1,024 binned values. lm is three passes of sums (means, centred sums,
+  residuals), Scholar's centre-then-solve method, pulling a row per group. Interpolation,
+  stat_align's and a density's, is R's `approx()` formula on lists. stat_align pulls the panel's
+  rows, its output as large as its input, as the identity's is, so an engine would save nothing;
+  loess and gam pull each group's, since no engine can run them (§7, "Engine backends"). *Rejected:
+  binning or lm on pulled rows in Nx or Scholar* — every row would cross into Elixir. *Rejected: an
+  operation stacking two tables for the binning* — summing in another order than R's moves the
+  result 1e-16 of the peak. *Rejected: Scholar's interpolation* (Steve: "formula") — the same
+  numbers to 2e-16, 14 times slower, and over every row in stat_align.
+
+- **loess is Giggly's own: a quadratic fit at each of the curve's points, tricube-weighted over
+  `span` of the nearest rows, as R's `loess(surface = "direct")`, named as a departure from R's
+  default (2026-10-25, Steve).** R's default fits at a k-d tree's vertices and joins them with
+  cubic pieces, its cells cut by a rule only its Fortran states. On the notebooks' 700 by 433
+  drawing the direct curve sits up to 1.75 points (mpg), 2.30 (mtcars) and 5.76 (faithful) from
+  R's default, a third of a point to a point on average, its band's edges up to 7.1; R's
+  approximation of the band's two traces moves it less than 2.5e-4 of the curve's height, so the
+  gap is the surface's alone. Its goldens are drawn by R in direct mode. *Rejected: no loess* — a
+  smooth with no method would keep raising on every table under 1,000 rows, the common call.
+  *Rejected: R's k-d tree* — a port. *Rejected: gam at every size* — another method, not a
+  departure.
+
+- **A stat's values reached by another route than R's are held to R's within a tolerance
+  (2026-10-25, Steve).** Density (R's FFT), lm (the frame's sums against R's QR), the t quantile
+  and loess in R's direct mode are held to 1e-12 of the largest magnitude R's column holds in the
+  group, about a thousand times the gap measured (an FFT against a plain sum, 5-8e-16 of the
+  peak). gam is held to 1e-3 of the range of the group's y data, its standard errors to 1e-3
+  relative, since R's own optimiser, run tighter, moves its curve 2.4e-4 of its range and its
+  standard errors 4.5e-4 (diamonds); its goldens are checked through their layer data, as 1e-3 is
+  up to a third of a point. x columns, stat_align and stacking stay R's to the last digit.
+  *Rejected: a bar per value* — a density's tails and a curve near zero are round-off in R itself.
+  *Rejected: the range of a curve for gam* — it vanishes where a fit comes out flat. *Rejected:
+  porting R's FFT* — Giggly ports no R or C source.
+
 - **A text's family is the theme's, inherited as any property, and every complete theme takes
   `base_family:` and `header_family:` (2026-10-24, Steve: "Let's get family working with the
   default implementation"; checked in R).** `base_family` is the root text's family and the
@@ -531,7 +604,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `join` and `summarise` with aggregates, so an engine holding the table does it and nothing of
   the layer's table crosses into Elixir; what a stat pulls is its own output, small by
   construction, so `density` from a bin's counts or a box's fences from its hinges may be worked
-  out on lists. Each operation arrives with the stat that first needs it, and the expression form
+  out on lists. Three stats pull their rows instead (the entry beginning "Smoothing and densities
+  compute"). Each operation arrives with the stat that first needs it, and the expression form
   `mutate` takes is the one a mapping's named expressions will reuse (§7, "Engine backends").
   Counting and counting at each place, which pull their input to choose rows, weigh them and
   carry a group's constant columns, come under the rule in the same increment, first, the panel's
@@ -2519,6 +2593,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-25 — Draw ribbons and areas: geom_ribbon/3, and geom_area/3 aligning its groups as
+  stat_align does and stacking them (smoothing and densities, step 1); §4: "Smoothing and
+  densities are Phase 3's twelfth increment", "Nx is a core dependency", "Smoothing and densities
+  compute over the rows through the frame", "loess is Giggly's own", "A stat's values reached by
+  another route"
 - 2026-10-24 — Move Plot's option schemas, NimbleOptions checks and shared defaults into
   Giggly.Plot.Options; §4: "`Plot`'s options live in `Giggly.Plot.Options`"
 - 2026-10-24 — Draw the notebook examples the theme and its families unlock, and narrow every

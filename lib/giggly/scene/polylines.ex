@@ -2,10 +2,11 @@ defmodule Giggly.Scene.Polylines do
   @moduledoc false
 
   # Lines, each through its points in order, given as `{x, y}` in the cell's units, all of one
-  # `stroke_width` (in points), each in its `color`, `#RRGGBB`, as opaque as its `opacity`, from 0
-  # to 1, and never filled: grid's `polylineGrob()`, which ggplot2 draws an axis's ticks and a
-  # panel's grid lines with, one line per tick or grid line, and a layer's lines with, one per
-  # group, each in its group's colour. `line_end` is
+  # `stroke_width` (in points), each in its `color`, `#RRGGBB`, or `:none`, written with no stroke,
+  # as svglite writes a ribbon's outline of R's `NA`, as opaque as its `opacity`, from 0 to 1, and
+  # never filled: grid's `polylineGrob()`, which ggplot2 draws an axis's ticks and a panel's grid
+  # lines with, one line per tick or grid line, and a layer's lines with, one per group, each in
+  # its group's colour. `line_end` is
   # how a line's ends are drawn (`:butt`, cut square at the end; `:round`; `:square`, cut square
   # half the line's width beyond it), `line_join` how it turns a corner (`:round`, `:mitre` or
   # `:bevel`), and `mitre_limit` how far a mitred corner may reach, in widths of the line, before
@@ -44,7 +45,7 @@ defmodule Giggly.Scene.Polylines do
           offsets: :none | [[{float(), float()}]],
           stroke_width: float(),
           dashes: dashes(),
-          color: [String.t()],
+          color: [String.t() | :none],
           opacity: [float()],
           line_end: line_end(),
           line_join: line_join(),

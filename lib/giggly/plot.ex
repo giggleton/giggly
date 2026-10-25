@@ -905,6 +905,136 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of ribbons: the band between each group's `ymin` and `ymax` along its `x`, for a
+  range around a line, or between its `xmin` and `xmax` up its `y`.
+
+  Ribbons use `:x`, `:y`, `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:fill`,
+  `:color`, `:linetype` and `:linewidth`, and need one of `:x` and `:y`, one of `:ymin` and
+  `:xmin`, and one of `:ymax` and `:xmax`. A band runs along x, or along y where it is given
+  neither `:ymin` nor `:ymax`, or as `orientation:` says. Each group is a band of its own, its rows
+  in order along it, and a row missing a position breaks its band there. A band is filled, at its
+  alpha, and outlined only where a colour is mapped or set, its outline taking no alpha but its
+  colour's own; its look cannot change along it: a colour, fill, alpha, width or line type that
+  changes within a group raises `ArgumentError` when the plot is drawn.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.ribbon())}
+
+      iex> frame =
+      ...>   %{"x" => [2, 1, 3], "low" => [1.0, 0.5, 2.0], "high" => [3.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, ymin: :low, ymax: :high})
+      ...>   |> Giggly.Plot.geom_ribbon()
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :ymin)}
+      {[1, 2, 3], [0.5, 1.0, 2.0]}
+
+  A band given `:xmin` and `:xmax` runs up the panel:
+
+      iex> frame =
+      ...>   %{"y" => [1, 2], "low" => [1.0, 0.5], "high" => [3.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{y: :y, xmin: :low, xmax: :high})
+      ...>   |> Giggly.Plot.geom_ribbon(colour: "black")
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :flipped_aes)
+      [true, true]
+  """
+  @spec geom_ribbon(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_ribbon(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_ribbon(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_ribbon(plot, %{}, options)
+
+  def geom_ribbon(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.ribbon())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Ribbon{
+        orientation: Keyword.get(validated, :orientation, :none),
+        outline_type: Keyword.fetch!(validated, :outline_type),
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_ribbon/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Ribbon.accepted_aesthetics(),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_ribbon/3", required: Geom.Ribbon.required_aesthetics())
+    |> check_band_range(layer, "Plot.geom_ribbon/3")
+  end
+
+  @doc """
+  Adds a layer of areas: the band from 0 to each group's `y` along its `x`, for how much a series
+  holds over time, or from 0 to its `x` up its `y` with `orientation: :y`.
+
+  Areas use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`, and
+  need `:x` and `:y`. Each group is an area of its own, its rows in order along it, and areas at
+  one `x` are piled on one another, the first group on top, unless `position: :identity` draws
+  each where it is. So that groups whose rows sit at different places pile into one another, each
+  group with more than one row is first worked out at every `x` the panel's groups have, and
+  wherever a group crosses 0, along a straight line between its own rows, and at its ends drops to
+  0 a hair beyond them. A row missing `x` or `y` is left out. An area is filled, at its alpha, and
+  its upper edge outlined only where a colour is mapped or set, taking no alpha but its colour's
+  own; its look cannot change along it, as a ribbon's cannot (`geom_ribbon/3`).
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.area())}
+
+      iex> frame =
+      ...>   %{"t" => [1, 2, 1, 2], "g" => ["a", "a", "b", "b"], "v" => [1.0, 1.0, 2.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :t, y: :v, fill: :g})
+      ...>   |> Giggly.Plot.geom_area()
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :ymax)
+      [0.0, 3.0, 3.0, 3.0, 3.0, 0.0, 0.0, 2.0, 2.0, 2.0, 2.0, 0.0]
+  """
+  @spec geom_area(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_area(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_area(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_area(plot, %{}, options)
+
+  def geom_area(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.area())
+    data = own_data(validated)
+    orientation = Keyword.fetch!(validated, :orientation)
+
+    layer = %Layer{
+      geom: %Geom.Area{
+        orientation: orientation,
+        outline_type: Keyword.fetch!(validated, :outline_type),
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.Align{orientation: orientation},
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_area/3"),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.Align.accepted_aesthetics() ++ Geom.Area.accepted_aesthetics()),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_area/3",
+      required: Stat.Align.required_aesthetics(),
+      computed: Stat.Align.computed_variables(),
+      dropped: Stat.Align.dropped_aesthetics()
+    )
+  end
+
+  @doc """
   Adds a layer of text: each row's `label` at its `x` and `y`.
 
   Text is written as it is; a whole number has no decimal point (`21`, not `21.0`), any other
@@ -3468,6 +3598,7 @@ defmodule Giggly.Plot do
     end
   end
 
+  defp position(:identity), do: %Position.Identity{}
   defp position(:stack), do: %Position.Stack{}
   defp position(:dodge), do: %Position.Dodge{}
   defp position(:dodge2), do: position_dodge2()
@@ -3667,6 +3798,32 @@ defmodule Giggly.Plot do
 
       _agreeing_or_not_given ->
         plot
+    end
+  end
+
+  # A band given an axis to run along needs its range across the other: `ymin` or `ymax` along x,
+  # `xmin` or `xmax` along y, mapped before the stat or set, as ggplot2's `GeomRibbon` aborts
+  # without one; a band given none runs along the axis its range says.
+  defp check_band_range(plot, %Layer{geom: %{orientation: :none}}, _function), do: plot
+
+  defp check_band_range(plot, %Layer{geom: %{orientation: orientation}} = layer, function) do
+    {along, range} = if orientation == :x, do: {"x", [:ymin, :ymax]}, else: {"y", [:xmin, :xmax]}
+
+    given =
+      plot
+      |> computed_mapping(layer)
+      |> Enum.reject(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
+      |> Enum.map(fn {aesthetic, _value} -> aesthetic end)
+      |> Enum.concat(Map.keys(layer.fixed))
+
+    if Enum.any?(range, fn aesthetic -> aesthetic in given end) do
+      plot
+    else
+      raise ArgumentError,
+            "#{function} runs along #{along} with orientation: #{inspect(orientation)}, so it " <>
+              "needs #{Enum.map_join(range, " or ", &inspect/1)} for the band's range across " <>
+              "it, but neither its mapping nor the plot's maps either. Map them, or leave " <>
+              "orientation: out to run along the axis the range is given for."
     end
   end
 
