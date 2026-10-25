@@ -1313,11 +1313,19 @@ defmodule Giggly.PlotTest do
       plot =
         @rows
         |> Plot.new(%{x: :cyl, y: :mpg})
-        |> Plot.geom_boxplot(coef: 3, width: 0.3, orientation: :x, fill: "white", size: 3)
+        |> Plot.geom_boxplot(
+          coef: 3,
+          width: 0.3,
+          orientation: :x,
+          fill: "white",
+          size: 3,
+          alpha: 0.4,
+          linewidth: 2
+        )
 
       assert [%Plot.Layer{stat: stat, fixed: fixed}] = plot.reversed_layers
       assert stat == %Stat.Boxplot{coef: 3.0, width: 0.3, orientation: :x}
-      assert fixed == %{fill: "#FFFFFF", size: 3.0, width: 0.3}
+      assert fixed === %{fill: "#FFFFFF", size: 3.0, width: 0.3, alpha: 0.4, linewidth: 2.0}
     end
 
     test "varwidth: dodges each box at its own width, whatever position is given" do
@@ -1647,6 +1655,15 @@ defmodule Giggly.PlotTest do
                  }
                }
              ] = plot.reversed_layers
+    end
+
+    test "a line's corners are rounded, mitred or bevelled" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for join <- [:round, :mitre, :bevel] do
+        assert [%Plot.Layer{geom: %Geom.Path{line_join: ^join}}] =
+                 Plot.geom_path(plot, linejoin: join).reversed_layers
+      end
     end
 
     test "a line width and an alpha are set for every line, whole numbers as floats" do
@@ -2343,6 +2360,19 @@ defmodule Giggly.PlotTest do
       end
     end
 
+    # ggplot2 4.0.3: `layer_data(ggplot() + annotate("col", x = 1, y = 3, width = c(0.5, 0.8)))`
+    # has two rows, xmin 0.75 and 0.6, xmax 1.25 and 1.4.
+    test "a list of bar widths counts annotations as a position's list does" do
+      frame =
+        @rows
+        |> Plot.new()
+        |> Plot.annotate(:col, x: 1, y: 3, width: [0.5, 0.8])
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :xmin) === [0.75, 0.6]
+      assert DataFrame.pull(frame, :xmax) === [1.25, 1.4]
+    end
+
     test "a dash pattern given to an annotation is one line type, and a list of one too" do
       plot = Plot.new(@rows)
 
@@ -2534,7 +2564,7 @@ defmodule Giggly.PlotTest do
           minor_breaks: :none,
           labels: labeller
         )
-        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {0.5, 1}, add: 2])
+        |> Plot.scale_y_continuous(labels: :none, expand: [mult: {1, 2}, add: 2])
 
       assert plot.scales === %{
                x: %Scale.Continuous{
@@ -2544,7 +2574,7 @@ defmodule Giggly.PlotTest do
                  minor_breaks: :none,
                  labels: labeller
                },
-               y: %Scale.Continuous{labels: :none, expand: [mult: {0.5, 1.0}, add: {2.0, 2.0}]}
+               y: %Scale.Continuous{labels: :none, expand: [mult: {1.0, 2.0}, add: {2.0, 2.0}]}
              }
     end
 
@@ -4071,14 +4101,38 @@ defmodule Giggly.PlotTest do
       plot =
         @rows
         |> Plot.new()
-        |> Plot.theme(legend_margin: 4, axis_text: [margin: {2, :mm}])
+        |> Plot.theme(legend_margin: 4, axis_text: [margin: {2, :mm}], margins: 3)
 
       assert plot.theme.settings === %{
                legend_margin: %{top: {4, :pt}, right: {4, :pt}, bottom: {4, :pt}, left: {4, :pt}},
                axis_text: %{
                  margin: %{top: {2, :mm}, right: {2, :mm}, bottom: {2, :mm}, left: {2, :mm}}
-               }
+               },
+               margins: %{top: {3, :pt}, right: {3, :pt}, bottom: {3, :pt}, left: {3, :pt}}
              }
+    end
+
+    test "every line end, face, legend position, direction and location is taken by name" do
+      plot = Plot.new(@rows)
+
+      for {element, values} <- [
+            legend_position: [:right, :left, :top, :bottom, :inside, :none],
+            legend_direction: [:horizontal, :vertical],
+            legend_location: [:panel, :plot]
+          ],
+          value <- values do
+        assert Plot.theme(plot, [{element, value}]).theme.settings === %{element => value}
+      end
+
+      for line_end <- [:butt, :round, :square] do
+        assert Plot.theme(plot, axis_line: [lineend: line_end]).theme.settings ===
+                 %{axis_line: %{lineend: line_end}}
+      end
+
+      for face <- [:plain, :bold, :italic, :bold_italic] do
+        assert Plot.theme(plot, legend_title: [face: face]).theme.settings ===
+                 %{legend_title: %{face: face}}
+      end
     end
 
     test "a justification is taken by any name, or by names or shares across and up" do
@@ -4233,6 +4287,7 @@ defmodule Giggly.PlotTest do
             {[spacing: {:rel, 2}], {:spacing, []}, {:rel, 2}},
             {[panel_spacing: {:rel, "a"}], {:panel_spacing, []}, {:rel, "a"}},
             {[margins: {:rel, 2}], {:margins, []}, {:rel, 2}},
+            {[plot_margin: {:rel, :half}], {:plot_margin, []}, {:rel, :half}},
             {[plot_margin: :none], {:plot_margin, []}, :none},
             {[legend_position: :middle], {:legend_position, []}, :middle},
             {[legend_position: {0.5, 0.5}], {:legend_position, []}, {0.5, 0.5}},

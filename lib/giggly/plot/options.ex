@@ -2709,7 +2709,7 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec validate_expand(term()) ::
           {:ok, [mult: {float(), float()}, add: {float(), float()}]} | {:error, String.t()}
-  def validate_expand(expansion) when is_list(expansion) do
+  def validate_expand(expansion) do
     with true <- Keyword.keyword?(expansion),
          [] <- Keyword.keys(expansion) -- [:mult, :add],
          {:ok, mult} <- expansion_ends(Keyword.get_values(expansion, :mult)),
@@ -2719,8 +2719,6 @@ defmodule Giggly.Plot.Options do
       _invalid -> expansion_error(expansion)
     end
   end
-
-  def validate_expand(expansion), do: expansion_error(expansion)
 
   defp expansion_ends([]), do: {:ok, {0.0, 0.0}}
 
@@ -3042,18 +3040,13 @@ defmodule Giggly.Plot.Options do
   def validate_palette_colors(other),
     do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
 
-  # NimbleOptions' check of a manual scale's `values:` for `aesthetic`: a colour scale's a list of
-  # colours (`validate_palette_colors/1`), a shape scale's a list of at least one shape
-  # (`validate_shape/1`), a line type scale's a list of at least one line type
-  # (`validate_linetype/1`), or any one's a map from a value (`discrete_values/1`) to its colour,
-  # shape or line type.
+  # NimbleOptions' check of a manual scale's `values:` for `aesthetic`: a list of at least one
+  # colour (`validate_color/1`), shape (`validate_shape/1`) or line type (`validate_linetype/1`),
+  # or a map from a value (`discrete_values/1`) to its colour, shape or line type.
   @doc false
   @spec validate_manual_values(term(), :color | :shape | :linetype) ::
           {:ok, list() | %{term() => ColorOperations.t() | atom() | tuple()}}
           | {:error, String.t()}
-  def validate_manual_values(values, :color) when is_list(values),
-    do: validate_palette_colors(values)
-
   def validate_manual_values([_first | _rest] = values, aesthetic),
     do: checked_each(values, manual_check(aesthetic))
 
