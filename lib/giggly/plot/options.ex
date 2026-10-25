@@ -2441,12 +2441,11 @@ defmodule Giggly.Plot.Options do
   def validate_alpha(alpha),
     do: {:error, "expected a number from 0 to 1, got: #{inspect(alpha)}"}
 
-  # NimbleOptions' check of a smooth's confidence level: a number above 0 and below 1, kept as a
-  # float, where R also takes 1, an infinite band, and past it, none.
+  # NimbleOptions' check of a smooth's confidence level: a number above 0 and below 1, so a float,
+  # where R also takes 1, an infinite band, and past it, none.
   @doc false
   @spec validate_level(term()) :: {:ok, float()} | {:error, String.t()}
-  def validate_level(level) when is_number(level) and level > 0 and level < 1,
-    do: {:ok, level / 1}
+  def validate_level(level) when is_float(level) and level > 0 and level < 1, do: {:ok, level}
 
   def validate_level(level),
     do: {:error, "expected a number above 0 and below 1, got: #{inspect(level)}"}

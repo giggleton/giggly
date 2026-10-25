@@ -24,13 +24,14 @@ defmodule Giggly.Stat.Smooth do
   # negative or infinite one, so such a group is fitted nothing, where ggplot2 also warns, which a
   # pure pipeline cannot; it leaves out a row of weight 0 before fitting, so the degrees of freedom
   # are the rows of a weight above 0 less two, and a group whose weights are all 0 is fitted
-  # nothing. Where its weighted rows hold one x, its curve is flat at their weighted mean, with a
-  # degree of freedom more, as R's `lm()` drops the slope it cannot fit; where they hold more, the
-  # slope is fitted however little x varies, where R's `lm()` drops it once x's spread is under a
-  # ten-millionth of its size (design-log §4, the entry beginning "A linear smooth fits the
-  # slope"). Of no degrees of freedom, the band and `se` are NaN. A group's constant columns are
-  # carried to its rows (`Giggly.Stat.Carry`), counted over the groups fitted, as ggplot2 reads
-  # only the groups its fit gives rows.
+  # nothing. A weight that is not a number is refused by the frame as it finds each group's least
+  # weight, naming the column and its type. Where its weighted rows hold one x, its curve is flat
+  # at their weighted mean, with a degree of freedom more, as R's `lm()` drops the slope it cannot
+  # fit; where they hold more, the slope is fitted however little x varies, where R's `lm()` drops
+  # it once x's spread is under a ten-millionth of its size (design-log §4, the entry beginning "A
+  # linear smooth fits the slope"). Of no degrees of freedom, the band and `se` are NaN. A group's
+  # constant columns are carried to its rows (`Giggly.Stat.Carry`), counted over the groups
+  # fitted, as ggplot2 reads only the groups its fit gives rows.
   #
   # Its fullrange reads the panel's axis it runs along, its y axis along y, where ggplot2's
   # `StatSmooth` reads `scales$x` though it fits along y (design-log §4, the entry beginning "A
@@ -101,7 +102,6 @@ defmodule Giggly.Stat.Smooth do
     @impl Giggly.Stat
     def compute_layer(stat, frame, axes) do
       check_method(stat, frame)
-      check_weight(frame)
       flipped = stat.orientation == :y
 
       frame
@@ -129,19 +129,6 @@ defmodule Giggly.Stat.Smooth do
               "largest group in any panel has under 1,000 rows and by gam otherwise; this " <>
               "layer's largest group has #{largest} rows, so ggplot2 would fit it by #{method}, " <>
               "which Giggly does not have yet; give method: :lm for a straight line"
-    end
-
-    # A weight weighs each row in the fit, so it must hold numbers, as counting's must.
-    defp check_weight(frame) do
-      case DataFrame.dtypes(frame) do
-        %{weight: dtype} when dtype not in [:integer, :float, :null] ->
-          raise ArgumentError,
-                "a smooth weighs each row in its fit, so a weight must be a number, but the " <>
-                  "layer's weight is a #{inspect(dtype)} column"
-
-        _numbers_or_no_weight ->
-          :ok
-      end
     end
 
     defp flip(frame, false), do: frame
@@ -214,12 +201,9 @@ defmodule Giggly.Stat.Smooth do
             ]}
          ]}
 
-      kept = for name <- DataFrame.names(rows), do: {name, name}
-
       rows
       |> DataFrame.join(checked, [:panel, :group])
       |> DataFrame.filter(fitted)
-      |> DataFrame.select(kept)
     end
 
     # Each fitted group's line, by `{panel, group}`: the weights' total, the weighted means of x and
@@ -341,14 +325,21 @@ defmodule Giggly.Stat.Smooth do
           |> Map.fetch!(stat.orientation)
 
         {low, high} = extent(stat.fullrange, extent, along)
-        {key, curve(line, sequence(low, high, stat.n), stat)}
+
+        # Each place a double, as R's positions are, though the axis's ends be whole numbers.
+        positions =
+          low
+          |> sequence(high, stat.n)
+          |> Enum.map(fn position -> position / 1 end)
+
+        {key, curve(line, positions, stat)}
       end)
     end
 
     # The positions the curve spans along the axis it runs along: the group's, or with `fullrange`
     # the panel's axis's unwidened extent, as ggplot2's `dimension()`.
-    defp extent(false, %{x_low: low, x_high: high}, _axis), do: {low / 1, high / 1}
-    defp extent(true, _extent, %{limits: {low, high}}), do: {low / 1, high / 1}
+    defp extent(false, %{x_low: low, x_high: high}, _axis), do: {low, high}
+    defp extent(true, _extent, %{limits: limits}), do: limits
 
     # `count` evenly spaced values from `low` to `high`, R's `seq(low, high, length.out = count)`:
     # its ends exactly, and between them `low` plus each step of the span over one less than the

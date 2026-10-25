@@ -144,5 +144,32 @@ defmodule Giggly.Stat.TDistributionTest do
     test "is NaN for no degrees of freedom, as R's qt() is" do
       assert TDistribution.central_quantile(0.95, 0) == :nan
     end
+
+    # Golden: R 4.6.1's `-qt((1 - 0.999) / 2, 86377)`, where summing the series without Neumaier's
+    # compensation misses by 1.1e-12.
+    test "is R's quantile within 1e-12 where plain summation would not be" do
+      expected = 3.2906393776039278
+      quantile = TDistribution.central_quantile(0.999, 86_377)
+
+      assert abs(quantile - expected) <= 1.0e-12 * expected
+    end
+
+    # Golden: R 4.6.1's `dt(0, 100)`. Near a level of 0 the quantile is the level over twice the
+    # density at 0, to first order, and the cos²θ that 66 or more degrees of freedom work out afresh
+    # from its logarithm rounds to 1.
+    test "is the level over twice the density at 0 for a level near 0" do
+      expected = 1.0e-9 / (2 * 0.39794618693589384)
+      quantile = TDistribution.central_quantile(1.0e-9, 100)
+
+      assert abs(quantile - expected) <= 1.0e-12 * expected
+    end
+
+    test "refuses a level of 0, 1 or past it, and degrees of freedom below 0" do
+      for {level, degrees_of_freedom} <- [{0.0, 5}, {1.0, 5}, {1.5, 5}, {0.95, -1}] do
+        assert_raise FunctionClauseError, fn ->
+          TDistribution.central_quantile(level, degrees_of_freedom)
+        end
+      end
+    end
   end
 end

@@ -8,8 +8,10 @@ defmodule Giggly.Geom.Smooth do
   # `line_join`, `mitre_limit`, ggplot2's `lineend`, `linejoin` and `linemitre`). Use it through
   # `Giggly.Geom`.
   #
-  # Smooths use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`,
-  # and need `:x` and `:y`; the stat before them writes the band, so it is not a smooth's to map.
+  # Smooths use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`;
+  # what they cannot be drawn without, `:x` and `:y`, the stat before them needs, so a layer is
+  # checked against the stat's requirements, and the stat writes the band, so it is not a smooth's
+  # to map.
   #
   # While the plot is assembled (`setup_data/3`), its rows run along y where its stat says so in
   # `flipped_aes`, written afresh into every row, and are put in order of panel, group and the
@@ -44,11 +46,6 @@ defmodule Giggly.Geom.Smooth do
   @doc false
   @spec accepted_aesthetics() :: [atom()]
   def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y]
-
-  # The aesthetics a layer of smooths cannot be drawn without.
-  @doc false
-  @spec required_aesthetics() :: [atom()]
-  def required_aesthetics, do: [:x, :y]
 
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom

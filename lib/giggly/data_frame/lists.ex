@@ -342,8 +342,8 @@ defmodule Giggly.DataFrame.Lists do
   defp finite(value) when value in @non_finite_floats, do: false
 
   # One number added to, less, times or over another: missing where either is, as Explorer's
-  # arithmetic is, NaN included, and otherwise as IEEE arithmetic gives it, R's.
-  defp arithmetic(_operator, nil, _right), do: nil
+  # arithmetic is, NaN included, and otherwise as IEEE arithmetic gives it, R's. A missing first
+  # number `Arithmetic` gives as missing already, NaN beside it or not.
   defp arithmetic(_operator, _left, nil), do: nil
   defp arithmetic(:+, left, right), do: Arithmetic.add(left, right)
   defp arithmetic(:-, left, right), do: Arithmetic.subtract(left, right)

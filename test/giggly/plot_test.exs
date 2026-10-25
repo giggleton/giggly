@@ -2332,6 +2332,12 @@ defmodule Giggly.PlotTest do
 
       assert geom_layer == stat_layer
 
+      [bare] = Plot.stat_smooth(plot).reversed_layers
+      assert bare.stat.method == :none
+
+      [mapped] = Plot.stat_smooth(plot, %{weight: :w}).reversed_layers
+      assert mapped.mapping == %{weight: "w"}
+
       assert %Plot.Layer{
                geom: %Geom.Smooth{
                  se: false,
@@ -2383,9 +2389,12 @@ defmodule Giggly.PlotTest do
                Plot.geom_smooth(plot, level: 0.5).reversed_layers
 
       for level <- [0, 1, 1.5, -0.1, "0.95"] do
-        assert_raise NimbleOptions.ValidationError, ~r/above 0 and below 1/, fn ->
-          Plot.geom_smooth(plot, level: level)
-        end
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/above 0 and below 1/, fn ->
+            Plot.geom_smooth(plot, level: level)
+          end
+
+        assert error.message =~ "got: #{inspect(level)}"
       end
     end
 

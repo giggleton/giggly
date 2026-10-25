@@ -116,7 +116,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   0.99999 and 1.7e-12 at 0.999999, past the bar and far below a drawing's resolution. Near a level
   of 0 R's drifts (3.5e-10 at 4 degrees of freedom, against exact decimals) where Giggly's does
   not. Powers of a rounded cos²θ drift 1e-11 at large df, so every 32nd is worked out afresh from
-  the logarithm of its complement and the terms added with Neumaier's compensation. *Rejected: a
+  the logarithm of its complement and the terms added with Neumaier's compensation, which plain
+  summation misses at 0.999 (1.1e-12, at 86,377 degrees of freedom). *Rejected: a
   second series summing the tail for high levels* — the bar everywhere, for levels hardly anyone
   sets, at about three times the terms.
 

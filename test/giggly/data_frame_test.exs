@@ -963,6 +963,12 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(mutated).more == :integer
     end
 
+    test "an operation of two numbers outside the vocabulary is refused, over rows or none" do
+      for frame <- [DataFrame.new(a: [1.0], b: [2.0]), DataFrame.new(a: [], b: [])] do
+        assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, out: {:pow, [:a, :b]}) end
+      end
+    end
+
     test "arithmetic of a column that is not numbers is refused, on either side" do
       frame =
         DataFrame.new([

@@ -1601,6 +1601,27 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for smooths" do
+    # Past 32 groups a map's keys come in no order, so the groups are drawn in their own.
+    test "a panel's smooths are drawn in the order of their groups, past 32 of them" do
+      groups = Enum.to_list(1..40)
+
+      frame =
+        DataFrame.new(
+          x: Enum.flat_map(groups, fn _group -> [0.0, 2.0] end),
+          y: Enum.flat_map(groups, fn group -> [group / 10, group / 10] end),
+          panel: List.duplicate(1, 80),
+          group: Enum.flat_map(groups, fn group -> [group, group] end),
+          flipped_aes: List.duplicate(false, 80)
+        )
+
+      lines = draw_panel(%{@smooth | se: false}, frame, @cartesian, @params)
+
+      heights = Enum.map(lines, fn %Polylines{lines: [[{_x, y} | _rest]]} -> y end)
+      assert {length(heights), heights} == {40, Enum.sort(heights)}
+    end
+  end
+
   describe "draw_key/2 for smooths" do
     # Golden: ggplot2 4.0.3's `geom_smooth(aes(colour = drv), method = lm)` through vdiffr 1.0.9:
     # each key's band a rectangle over the whole key, `stroke-width: 0.75; stroke: none`, at the

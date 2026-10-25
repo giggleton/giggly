@@ -926,27 +926,99 @@ defmodule Giggly.StatTest do
     # ggplot2 fits a smooth given no method by loess where the layer's largest group in any panel
     # has under 1,000 rows, every row counted, and by gam from 1,000.
     test "a smooth given no method is refused, naming the method ggplot2 would choose" do
-      loess =
-        DataFrame.new(
-          x: List.duplicate(nil, 1000),
-          y: List.duplicate(1.0, 1000),
-          panel: List.duplicate(1, 500) ++ List.duplicate(2, 500),
-          group: List.duplicate(-1, 1000)
-        )
+      loess = unfitted([999])
 
       assert_raise ArgumentError,
-                   ~r/largest group has 500 rows, so ggplot2 would fit it by loess/,
+                   ~r/largest group has 999 rows, so ggplot2 would fit it by loess/,
                    fn ->
-                     fit(loess, [method: :none], [1, 2])
+                     fit(loess, method: :none)
                    end
 
-      gam = DataFrame.put(loess, :panel, List.duplicate(1, 1000))
+      gam = unfitted([999, 1000])
 
       assert_raise ArgumentError,
                    ~r/largest group has 1000 rows, so ggplot2 would fit it by gam/,
                    fn ->
-                     fit(gam, method: :none)
+                     fit(gam, [method: :none], [1, 2])
                    end
+
+      empty = unfitted([])
+
+      assert_raise ArgumentError,
+                   ~r/largest group has 0 rows, so ggplot2 would fit it by loess/,
+                   fn ->
+                     fit(empty, method: :none)
+                   end
+    end
+
+    test "names what an after_stat can read, each in either orientation, and the weight it consumes" do
+      assert Stat.Smooth.computed_variables() == [:se, :x, :xmax, :xmin, :y, :ymax, :ymin]
+      assert Stat.Smooth.dropped_aesthetics() == [:weight]
+    end
+
+    # A plot's mapping may carry a band's columns into a smooth layer, unused; the stat's own take
+    # their place, as ggplot2 binds its computed columns over those its rows held.
+    test "a band's columns the rows already hold give way to the stat's own" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [2.0, 3.5, 3.0],
+          ymin: [0.0, 0.0, 0.0],
+          ymax: [9.0, 9.0, 9.0],
+          se: [5.0, 5.0, 5.0],
+          flipped_aes: [true, true, true],
+          panel: [1, 1, 1],
+          group: [-1, -1, -1]
+        )
+
+      plain = DataFrame.select(frame, x: :x, y: :y, panel: :panel, group: :group)
+
+      assert fit(frame, n: 3) == fit(plain, n: 3)
+    end
+
+    # Golden: `ggplot(mpg, aes(cty, hwy))` with `n = 2`, R's x doubles, and a full range over an
+    # axis whose ends are whole numbers.
+    test "whole-number ends are spaced as floats, a curve of two places too" do
+      city = mpg_frame(x: column(:cty), y: column(:hwy), group: List.duplicate(-1, 234))
+
+      spaced = fit(city, n: 2)
+      assert DataFrame.pull(spaced, :x) === [9.0, 35.0]
+
+      axis = %{limits: {2, 7}, discrete: false, transform: fn values -> values end}
+      stat = smooth(n: 2, fullrange: true)
+      whole = Stat.compute_layer(stat, city, %{1 => %{x: axis, y: axis}})
+
+      assert DataFrame.pull(whole, :x) === [2.0, 7.0]
+    end
+
+    test "a carried factor keeps its levels" do
+      frame =
+        DataFrame.new([
+          {:x, [1.0, 2.0, 3.0, 1.0, 2.0, 3.0]},
+          {:y, [1.0, 3.0, 2.0, 2.0, 1.0, 4.0]},
+          {:color, ["r", "r", "r", "f", "f", "f"],
+           {:category, levels: ["r", "f"], ordered: false}},
+          {:panel, List.duplicate(1, 6)},
+          {:group, [1, 1, 1, 2, 2, 2]}
+        ])
+
+      curve = fit(frame, n: 2)
+
+      assert DataFrame.pull(curve, :color) == ["r", "r", "f", "f"]
+      assert DataFrame.category(curve, :color) == {:category, levels: ["r", "f"], ordered: false}
+    end
+
+    # Golden: R 4.6.1's `lm()` of two rows, `(5.7, 2.9)` and `(1.3, 0.8)`, leaves residuals of
+    # exactly 0 and no degrees of freedom, so its standard error is NaN, where the frame's sums
+    # leave a residual a hair from 0.
+    test "a fit of no degrees of freedom has a NaN error whatever its sums leave of the residuals" do
+      frame = DataFrame.new(x: [5.7, 1.3], y: [2.9, 0.8], panel: [1, 1], group: [-1, -1])
+
+      curve = fit(frame, n: 3)
+
+      assert DataFrame.pull(curve, :se) == [:nan, :nan, :nan]
+      assert DataFrame.pull(curve, :ymin) == [:nan, :nan, :nan]
+      assert_near(curve, :y, [0.79999999999999982, 1.8499999999999996, 2.8999999999999995])
     end
 
     test "a weight that is not a number is refused" do
@@ -956,6 +1028,23 @@ defmodule Giggly.StatTest do
         fit(frame, n: 3)
       end
     end
+  end
+
+  # A layer's rows, a group of each count's rows in a panel of its own, none of them placed.
+  defp unfitted(counts) do
+    panels =
+      counts
+      |> Enum.with_index(1)
+      |> Enum.flat_map(fn {count, panel} -> List.duplicate(panel, count) end)
+
+    rows = length(panels)
+
+    DataFrame.new(
+      x: List.duplicate(nil, rows),
+      y: List.duplicate(1.0, rows),
+      panel: panels,
+      group: List.duplicate(-1, rows)
+    )
   end
 
   # The table a smooth by least squares with ggplot2's defaults but `options` computes from

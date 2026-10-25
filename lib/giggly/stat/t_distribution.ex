@@ -20,9 +20,10 @@ defmodule Giggly.Stat.TDistribution do
   # is then within a hair of 1, and its powers taken from that rounded double would drift by the
   # power times its rounding; so each 32nd power is worked out afresh as exp(k log(1 - u)), u =
   # t² / (ν + t²) held to its last bit, and the powers between from it, and the terms are added
-  # with Neumaier's compensation. The t is then found by bisection: doubling from 1 until the share
-  # reaches `level`, then halving the interval until its ends are neighbouring doubles, the end
-  # whose share lies nearer `level` kept.
+  # with Neumaier's compensation, of which only its first case arises: the running sum, from 1, is
+  # never smaller than a term. The t is then found by bisection: doubling from 1 until the share
+  # reaches `level`, then halving the interval until its ends are neighbouring doubles, the upper
+  # kept, the least double whose share reaches `level`.
   #
   # Against R's `qt()` over 1 to 100,000 degrees of freedom it is within 7e-14 of R's quantile,
   # relatively, for levels from 0.1 to 0.99, and 4e-13 at 0.999. Past about 0.99999 the share
@@ -59,7 +60,7 @@ defmodule Giggly.Stat.TDistribution do
 
     cond do
       middle == low or middle == high ->
-        nearer(low, high, level, degrees_of_freedom)
+        high
 
       share_within(middle, degrees_of_freedom) < level ->
         bisect(middle, high, level, degrees_of_freedom)
@@ -67,13 +68,6 @@ defmodule Giggly.Stat.TDistribution do
       true ->
         bisect(low, middle, level, degrees_of_freedom)
     end
-  end
-
-  # Of two neighbouring doubles, the one whose share lies nearer `level`, the lower on a tie.
-  defp nearer(low, high, level, degrees_of_freedom) do
-    low_gap = abs(share_within(low, degrees_of_freedom) - level)
-    high_gap = abs(share_within(high, degrees_of_freedom) - level)
-    if low_gap <= high_gap, do: low, else: high
   end
 
   # A(t | ν), the share of the distribution within `-quantile` and `quantile`.
@@ -85,13 +79,17 @@ defmodule Giggly.Stat.TDistribution do
     log_cosine_squared = log1p(-(quantile * quantile / spread))
     powers = {cosine_squared, log_cosine_squared}
 
+    # The last power of cos²θ is ν - 3 for an odd ν and ν - 2 for an even one, so either series
+    # runs to the term half ν, rounded down, less one.
+    last = div(degrees_of_freedom, 2) - 1
+
     if rem(degrees_of_freedom, 2) == 1 do
       root = :math.sqrt(degrees_of_freedom)
       theta = :math.atan2(quantile, root)
-      terms = series(div(degrees_of_freedom - 3, 2), powers, &odd_ratio/1)
+      terms = series(last, powers, &odd_ratio/1)
       2 / :math.pi() * (theta + quantile * root / spread * terms)
     else
-      terms = series(div(degrees_of_freedom - 2, 2), powers, &even_ratio/1)
+      terms = series(last, powers, &even_ratio/1)
       quantile / :math.sqrt(spread) * terms
     end
   end
@@ -124,16 +122,11 @@ defmodule Giggly.Stat.TDistribution do
   defp next_power(_index, power, {cosine_squared, _log_cosine_squared}),
     do: power * cosine_squared
 
-  # A term added to a running sum with Neumaier's compensation for what the addition rounds away.
+  # A term added to a running sum with Neumaier's compensation for what the addition rounds away,
+  # in the case where the sum is the larger: it starts at 1, and every term is at most 1.
   defp add({total, compensation}, term) do
     sum = total + term
-
-    lost =
-      if abs(total) >= abs(term),
-        do: total - sum + term,
-        else: term - sum + total
-
-    {sum, compensation + lost}
+    {sum, compensation + (total - sum + term)}
   end
 
   # log(1 + value) held to its last bits for a `value` near 0, where `1 + value` rounds most of
