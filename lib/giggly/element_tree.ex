@@ -6,9 +6,9 @@ defmodule Giggly.ElementTree do
   # holds what something draws, and what that inherits from.
   #
   # `Giggly.Theme` works out each element's kind and parent from it, and `Giggly.Plot` builds
-  # `theme/2`'s options and their documentation from it, so the vocabulary has one home. Both read
-  # it while compiling, in module attributes, so it is a module of its own: `Giggly.Plot` is
-  # recompiled when the tree changes, never when `Giggly.Theme` does. It is a boundary beside
+  # `theme/2`'s options (`Giggly.Plot.Options`) and their documentation from it, so the vocabulary
+  # has one home. Both read it while compiling, in module attributes, so it is a module of its own:
+  # `Giggly.Plot` is recompiled when the tree changes, never when `Giggly.Theme` does. It is a boundary beside
   # `Giggly.Theme` rather than inside it, so only the boundaries that list it may read it.
 
   # The tree is values: it calls nothing.

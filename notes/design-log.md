@@ -155,6 +155,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   name* — boundary's docs discourage it, and the namespace would place it inside `Theme` while the
   boundary placed it beside.
 
+- **`Plot`'s options live in `Giggly.Plot.Options`, inside `Plot`'s boundary: every function's
+  schema, the checks NimbleOptions calls and the defaults the functions share (2026-10-24,
+  Steve).** `plot.ex` had grown to 7,200 lines, 3,000 of them schemas and their checks, the
+  checks public on the API module because NimbleOptions calls them by name; every increment added
+  more. `Plot` keeps its functions and their documentation, which writes each schema in while
+  compiling, and reads a schema through an accessor per schema, so a misspelt name fails to
+  compile; the two values guards read are copied into `Plot` attributes. No boundary changes.
+  *Rejected: a top-level `Giggly.Options` for every domain* — Plot has 51 of the 55 schemas, and
+  its checks read colours, shapes, the element tree and guides, so `Format` would reach the geoms
+  through it, against extracting the scales half. *Rejected: an `Options` module in every domain*
+  — nothing else needs one. *Rejected: one `schema(name)` lookup* — a misspelt name fails only
+  when called.
+
 - **Legends go where the theme puts them, each box placed as grid places a viewport, by a hang on
   its cell (2026-10-24, Steve, agreeing the proposal and including the box's margin and background;
   checked in R).** `legend_position` takes ggplot2's six places: a side's column or row outside the
@@ -2506,6 +2519,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-24 — Move Plot's option schemas, NimbleOptions checks and shared defaults into
+  Giggly.Plot.Options; §4: "`Plot`'s options live in `Giggly.Plot.Options`"
 - 2026-10-24 — Draw the notebook examples the theme and its families unlock, and narrow every
   verdict to what still waits (theme, the notebook sweep); §4: "An example that sets ggplot2's
   active theme", "A verdict names a theme element Giggly lacks"

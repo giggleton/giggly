@@ -121,7 +121,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   field from its schema's defaults, R's function defaults** (gray's missing value red, gradient2's
   ends `muted()`), since
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
-  palette live here as values, and a test pins the discrete and continuous functions' to
+  palette live in `Plot.Options` as values, and a test pins the discrete and continuous functions' to
   `Scale.new/2`'s. gradient2 records its midpoint as the scale's rescaler, `{:mid, midpoint}`, and
   `scale_size_area/2` its `rescale_max()`, `:max`. **A viridis scale function takes R's options**:
   `option:`, a palette by name, one of `ColorOperations.viridis_options/0`, never R's letters,
@@ -269,6 +269,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   writing a date in it with `Calendar.strftime/3`, so a format it cannot write (`"%W"`) raises
   there. A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and
   `nil` only for a limit the data supplies (design-log §4, the entry beginning "Absent").
+- **The schemas, the checks NimbleOptions calls and the defaults the functions share live in
+  `Giggly.Plot.Options`**, `@moduledoc false` and inside `Plot`'s boundary, so the API module
+  holds the functions and their documentation (design-log §4, the entry beginning "`Plot`'s
+  options live in `Giggly.Plot.Options`"): a schema is read through its accessor, named after its
+  function or family of scale functions (`Options.point()`, `Options.hue_scale()`), so a misspelt
+  name fails to compile, and a value a guard reads is copied into a `Plot` attribute
+  (`@theme_drawn_kinds`). The `validate_*` checks named in these rules are its functions, public
+  only so NimbleOptions can call them by name.
 - **A plot records its labels (`labels`), each by what it titles, as `labs/2` sets them**: an
   aesthetic a guide shows (`x`, `y`, `color`, `fill`, `alpha`, `shape`, `size`, `linetype`,
   `linewidth`) or the plot's `title`, `subtitle`, `caption` and `tag`, each a string or `:none`,

@@ -43,10 +43,10 @@ theme's families reaches: the entry beginning "A text's family is the theme's".
   placement: `:position`, `:point`, `:justification` by name or share, `:box_justification` by name
   alone, `:direction`, `:location`), the one element it inherits from (`:none` for a root) and what
   it styles, which `Theme` works out each element's kind and parent from and `Plot` turns into
-  `theme/2`'s schema and documentation, both while compiling, so the vocabulary has one home. **The
-  tree is read only in module attributes, and only by `Theme` and `Plot`**, the only boundaries that
-  list it: it holds the table and its `kind` type and calls nothing, so `Plot` is recompiled when
-  the table changes, never when `Theme` does.
+  `theme/2`'s schema (in `Plot.Options`) and documentation, both while compiling, so the vocabulary
+  has one home. **The tree is read only in module attributes, and only by `Theme` and `Plot`**, the
+  only boundaries that list it: it holds the table and its `kind` type and calls nothing, so `Plot`
+  is recompiled when the table changes, through `Plot.Options`, never when `Theme` does.
   **An element arrives with its first reader**: the tree holds what something draws and the
   elements those inherit from, and the struct holds only the leaves something draws, by axis and
   side (`axis_text_x_bottom`, `axis_ticks_length_y_left`, a radial panel's `theta` and `r`), the
