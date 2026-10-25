@@ -10,8 +10,8 @@ defmodule Giggly.Geom.Area do
   # it through `Giggly.Geom`.
   #
   # Areas use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`, and
-  # need `:x` and `:y`; an aesthetic joins the accepted list with the scale that maps it, so a
-  # mapping never silently does nothing.
+  # need `:x` and `:y`, which the stat before them needs too; an aesthetic joins the accepted list
+  # with the scale that maps it, so a mapping never silently does nothing.
   #
   # While the plot is assembled (`setup_data/3`), an area runs along y where its stat says so in
   # `flipped_aes`, as aligning does, or else where the layer says so, writes that in `flipped_aes`,
@@ -34,15 +34,12 @@ defmodule Giggly.Geom.Area do
           mitre_limit: float()
         }
 
-  # The aesthetics a layer of areas can use, from its own mapping or the plot's.
+  # The aesthetics a layer of areas can use, from its own mapping or the plot's. What it cannot be
+  # drawn without, `:x` and `:y`, the stat that runs before it needs, aligning or a density, so a
+  # layer is checked against the stat's requirements.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
   def accepted_aesthetics, do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y]
-
-  # The aesthetics a layer of areas cannot be drawn without.
-  @doc false
-  @spec required_aesthetics() :: [atom()]
-  def required_aesthetics, do: [:x, :y]
 
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom

@@ -2096,7 +2096,20 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{},
                  fixed: %{},
-                 accepted: Geom.Ribbon.accepted_aesthetics(),
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :fill,
+                   :group,
+                   :linetype,
+                   :linewidth,
+                   :x,
+                   :xmax,
+                   :xmin,
+                   :y,
+                   :ymax,
+                   :ymin
+                 ],
                  annotation: false
                }
              ]
@@ -2199,6 +2212,31 @@ defmodule Giggly.PlotTest do
                @bands
                |> Plot.new(%{y: :x, ymin: :low})
                |> Plot.geom_ribbon(%{xmax: :high}, orientation: :y)
+
+      along_x = Plot.new(@bands, %{x: :x})
+      assert %Plot{} = Plot.geom_ribbon(along_x, %{ymin: :low, xmax: :high}, orientation: :x)
+      assert %Plot{} = Plot.geom_ribbon(along_x, %{ymax: :high, xmin: :low}, orientation: :x)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @bands
+          |> Plot.new(%{y: :x, xmin: :low, xmax: :high})
+          |> Plot.geom_ribbon(orientation: :x)
+        end
+
+      assert error.message =~ "runs along x with orientation: :x, so it needs :ymin or :ymax"
+    end
+
+    test "a column a band layer names that its table lacks is reported by the layer's function" do
+      plot = Plot.new(@bands, %{x: :x})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_ribbon(plot, %{ymin: :lo, ymax: :high}) end
+
+      assert error.message =~ "Plot.geom_ribbon/3"
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_area(plot, %{y: :hight}) end
+      assert error.message =~ "Plot.geom_area/3"
     end
 
     test "an area needs x and y, and refuses a range or an after_stat" do
@@ -2215,7 +2253,7 @@ defmodule Giggly.PlotTest do
           Plot.geom_area(plot, %{y: :high, fill: {:after_stat, [:count]}})
         end
 
-      assert error.message =~ "after_stat"
+      assert error.message =~ "its stat computes no variables"
     end
 
     test "an outline type, an orientation or a position not offered is refused" do

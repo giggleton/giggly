@@ -87,9 +87,8 @@ defmodule Giggly.Stat.Align do
 
       panels =
         rows
-        |> Enum.group_by(fn row -> row.panel end)
-        |> Enum.sort_by(fn {panel, _rows} -> panel end)
-        |> Enum.map(fn {_panel, panel_rows} -> panel(panel_rows) end)
+        |> chunked_by(fn row -> row.panel end)
+        |> Enum.map(&panel/1)
 
       if Enum.all?(panels, fn panel -> match?({:as_is, _rows}, panel) end),
         do: kept,
@@ -109,9 +108,15 @@ defmodule Giggly.Stat.Align do
       {places, adjust} = places(rows)
 
       rows
-      |> Enum.group_by(fn row -> row.group end)
-      |> Enum.sort_by(fn {group, _rows} -> group end)
-      |> Enum.flat_map(fn {_group, group_rows} -> group(group_rows, places, adjust) end)
+      |> chunked_by(fn row -> row.group end)
+      |> Enum.flat_map(fn group_rows -> group(group_rows, places, adjust) end)
+    end
+
+    # The rows by `key`, in its order, each run's rows in their own, as R's `split()` orders them.
+    defp chunked_by(rows, key) do
+      rows
+      |> Enum.sort_by(key)
+      |> Enum.chunk_by(key)
     end
 
     # The panel's places, ggplot2's `unique_loc`: its rows' distinct x and the places their
@@ -132,10 +137,12 @@ defmodule Giggly.Stat.Align do
 
       adjust = adjust(locations)
 
+      # No two places meet, `adjust` being at most a third of the smallest gap, so they stay sorted
+      # and distinct, as R's second `unique(sort(...))` keeps them.
       places =
-        locations
-        |> Enum.flat_map(fn location -> [location - adjust, location, location + adjust] end)
-        |> distinct()
+        Enum.flat_map(locations, fn location ->
+          [location - adjust, location, location + adjust]
+        end)
 
       {places, adjust}
     end
@@ -211,25 +218,21 @@ defmodule Giggly.Stat.Align do
         rows
       else
         rows
-        |> Enum.group_by(fn row -> row.x end)
-        |> Enum.sort_by(fn {x, _rows} -> x end)
+        |> chunked_by(fn row -> row.x end)
         |> Enum.flat_map(fn
-          {_x, [one]} -> [one]
-          {_x, [first | rest]} -> [%{first | x: first.x - adjust}, List.last(rest)]
+          [one] -> [one]
+          [first | rest] -> [%{first | x: first.x - adjust}, List.last(rest)]
         end)
       end
     end
 
     # The y at `place` along the rows sorted by x, linear between the rows either side and exactly
-    # a row's y at its x, as R's `approxfun()` interpolates; `nil` outside them.
-    defp interpolate([first | _rest] = knots, place) do
-      if place < first.x or place > List.last(knots).x do
-        nil
-      else
-        knots
-        |> Enum.chunk_every(2, 1, :discard)
-        |> Enum.find_value(fn [low, high] -> between(low, high, place) end)
-      end
+    # a row's y at its x, as R's `approxfun()` interpolates; `nil` outside them, where no two rows
+    # stand either side.
+    defp interpolate(knots, place) do
+      knots
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.find_value(fn [low, high] -> between(low, high, place) end)
     end
 
     defp between(low, _high, place) when place == low.x, do: low.y

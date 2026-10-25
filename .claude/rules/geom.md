@@ -219,7 +219,8 @@ beginning "Each layer's defaults are filled in from the theme".
   it, else as its struct's `orientation` says (`:x` unless the layer gives `:y`, as ggplot2 calls
   an area ambiguous), puts its rows in order as a ribbon's, and sets `ymin` to 0 and `ymax` to its
   y; it draws, and takes its defaults and key, as a ribbon does (`Ribbon.draw/5`), dropping a row
-  missing its `x` or `y`.
+  missing its `x` or `y`. It holds no requirements of its own: the stat before it, aligning or a
+  density, needs its `x` and `y`, and `Plot` checks a layer against the stat's.
 - **A box plot (`Geom.Boxplot`) is set up and drawn as ggplot2's `GeomBoxplot` does it**
   (design-log §4, the entry beginning "A box plot takes R's options"). Its setup works along the
   stat's `flipped_aes`, flipped and flipped back; drops `outliers` where the layer keeps none, so

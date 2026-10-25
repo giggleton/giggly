@@ -66,8 +66,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   identity stat and position, and `geom_area/3` `%Geom.Area{}` with `%Stat.Align{}`, as ggplot2's
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's. **A ribbon's `orientation:`, `:x` or `:y`, is checked at the
-  call against its range**: along x it needs `:ymin` or `:ymax`, along y `:xmin` or `:xmax`, mapped
-  before the stat or set, where ggplot2 aborts when it draws; not given, it is recorded `:none` and
+  call against its range**: along x it needs `:ymin` or `:ymax`, along y `:xmin` or `:xmax`, mapped,
+  where ggplot2 aborts when it draws; not given, it is recorded `:none` and
   the geom reads the range. **The binning options are fields of
   `%Stat.Bin{}`**, ggplot2's: `bins:` (30), `binwidth:`, above 0, `center:`, `boundary:`,
   `breaks:`, two or more distinct numbers, `closed:` (`:right` or `:left`), `pad:` and `drop:`

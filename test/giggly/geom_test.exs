@@ -836,6 +836,32 @@ defmodule Giggly.GeomTest do
                [[1, 2, 1], [0.0, 0.0, 0.0], [4.0, 3.0, 5.0]]
     end
 
+    test "a ribbon given a ymin alone runs along x" do
+      frame =
+        DataFrame.new(
+          x: [2, 1],
+          ymin: [1.0, 0.5],
+          xmax: [3.0, 2.0],
+          panel: [1, 1],
+          group: [-1, -1]
+        )
+
+      set_up = Geom.setup_data(@ribbon, frame, @continuous)
+
+      assert {DataFrame.pull(set_up, :flipped_aes), DataFrame.pull(set_up, :y)} ===
+               {[false, false], [0.5, 1.0]}
+    end
+
+    # ggplot2's `order(data$PANEL, data$group, data$x)`: a lower panel first, whatever its group.
+    test "a band's rows are put in order of panel before group" do
+      frame =
+        DataFrame.new(x: [1, 1], y: [3.0, 4.0], panel: [2, 1], group: [1, 2])
+
+      set_up = Geom.setup_data(@area, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :ymax) === [4.0, 3.0]
+    end
+
     test "an area runs along y where its stat says so, over the layer's orientation" do
       frame =
         DataFrame.new(
@@ -940,6 +966,55 @@ defmodule Giggly.GeomTest do
                  @cartesian,
                  @params
                )
+    end
+
+    test "a whole border of the blank line type or a missing width is not drawn" do
+      frame = band([0.0, 2.0], [0.0, 0.0], [4.0, 4.0])
+      full = %{@ribbon | outline_type: :full}
+
+      assert [%Polygons{color: [:none], stroke_width: +0.0, dashes: :none}] =
+               draw_panel(
+                 full,
+                 DataFrame.put(frame, :linetype, [:none, :none]),
+                 @cartesian,
+                 @params
+               )
+
+      assert [%Polygons{color: [:none], stroke_width: +0.0}] =
+               draw_panel(full, DataFrame.put(frame, :linewidth, [nil, nil]), @cartesian, @params)
+    end
+
+    test "a position of NaN breaks a band as a missing one does" do
+      frame = band([0.0, 1.0, 2.0], [0.0, :nan, 0.0], [2.0, 2.0, 2.0])
+
+      assert [%Polygons{}, %Polygons{}] = draw_panel(@ribbon, frame, @cartesian, @params)
+    end
+
+    # ggplot2's `GeomRibbon` numbers each stretch of an area's complete rows, a row missing its
+    # ymin in none: each stretch is an outline in the order of its rows, and a row in none is on
+    # no line.
+    test "an area's stretches are outlined in order, and its rows missing a ymin in no line" do
+      rows = 70
+      x_positions = Enum.map(1..rows, fn index -> index / 35 end)
+      lows = Enum.map(1..rows, fn index -> if rem(index, 2) == 0, do: nil, else: 0.0 end)
+
+      frame =
+        x_positions
+        |> band(lows, List.duplicate(2.0, rows))
+        |> DataFrame.put(:y, List.duplicate(2.0, rows))
+
+      assert [%Polygons{outlines: outlines}] = draw_panel(@area, frame, @cartesian, @params)
+
+      firsts = Enum.map(outlines, fn [{x, _y} | _rest] -> x end)
+      assert {length(outlines), firsts} == {35, Enum.sort(firsts)}
+
+      gapped =
+        [0.0, 0.5, 1.0, 1.5, 2.0]
+        |> band([0.0, nil, nil, 0.0, 0.0], [2.0, 2.0, 2.0, 2.0, 2.0])
+        |> DataFrame.put(:y, [2.0, 2.0, 2.0, 2.0, 2.0])
+
+      assert [%Polygons{}, %Polylines{lines: [_upper, _lower]}] =
+               draw_panel(%{@area | outline_type: :both}, gapped, @cartesian, @params)
     end
 
     test "a ribbon whose look varies along it is refused" do

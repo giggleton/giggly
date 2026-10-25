@@ -476,19 +476,96 @@ defmodule Giggly.StatTest do
       assert Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{}) == frame
     end
 
-    # ggplot2's `StatAlign` builds each group's rows from its first row's other columns, so a fill
-    # that varies along a group takes the first row's, the row first in the data where every x
-    # differs, and the first at the lowest x where some share one.
+    # Golden: `ggplot(threshold, aes(x, y, group = g)) + geom_area(position = "identity")`, `b`
+    # rising from 0.5 to 2: a group that stays above zero crosses nothing, so the places are the
+    # rows' x alone, 0.01 either side.
+    test "a group that stays on one side of zero adds no place" do
+      frame = area_frame(x: [0, 10, 4, 6], y: [5, 5, 0.5, 2], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.pull(aligned, :x) ==
+               [-0.01, 0.0, 0.01, 3.9900000000000002, 4.0, 4.0099999999999998] ++
+                 [5.9900000000000002, 6.0, 6.0099999999999998, 9.9900000000000002, 10.0] ++
+                 [10.01, 3.9900000000000002, 4.0, 4.0099999999999998, 5.9900000000000002] ++
+                 [6.0, 6.0099999999999998]
+    end
+
+    # Golden: `ggplot(rounding, aes(x, y, group = g)) + geom_area(position = "identity")`, `b`
+    # crossing zero between (2, -0.7) and (3.4, 2.8): R's `-y0 * (x1 - x0) / (y1 - y0) + x0` puts it
+    # at 2.28, where the same line worked from its other end gives 2.2800000000000002.
+    test "a crossing is worked out from the row before it, in R's order" do
+      frame = area_frame(x: [2, 3.4, 2, 3.4], y: [1, 1, -0.7, 2.8], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      places =
+        [1.9985999999999999, 2.0, 2.0013999999999998, 2.2786, 2.2799999999999998] ++
+          [2.2813999999999997, 3.3986000000000001, 3.3999999999999999, 3.4013999999999998]
+
+      assert DataFrame.pull(aligned, :x) == places ++ places
+    end
+
+    # Golden: `ggplot(gap, aes(x, y, group = g)) + geom_area(position = "identity")`, places at 0,
+    # 1000 and 1000.3: a thousandth of their range, 1.0003, is more than a third of their smallest
+    # gap, so each place is that third, about 0.1, either side.
+    test "the places' spread is a third of their smallest gap where that is less" do
+      frame = area_frame(x: [0, 1000.3, 1000, 1000.3], y: [1, 1, 2, 2], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.pull(aligned, :x) ==
+               [-0.099999999999984837, 0.0, 0.099999999999984837, 999.89999999999998, 1000.0] ++
+                 [1000.1, 1000.1999999999999, 1000.3, 1000.4, 999.89999999999998, 1000.0] ++
+                 [1000.1, 1000.1999999999999, 1000.3, 1000.4]
+    end
+
+    # Golden: `ggplot(single, aes(x, y, group = g)) + geom_area(position = "identity")`, both groups
+    # at x 1 alone: R has no rows.
+    test "a panel whose groups share one x aligns to nothing" do
+      frame = area_frame(x: [1, 1, 1, 1], y: [1, 2, 3, 4], group: [1, 1, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.row_count(aligned) == 0
+    end
+
+    test "the panels and their groups come in order, whatever the rows' order" do
+      frame =
+        area_frame(
+          x: [1, 2, 1, 2, 1, 2, 1, 2],
+          y: [1, 1, 2, 2, 3, 3, 4, 4],
+          group: [2, 2, 1, 1, 2, 2, 1, 1],
+          panel: [2, 2, 2, 2, 1, 1, 1, 1]
+        )
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert {DataFrame.pull(aligned, :panel), DataFrame.pull(aligned, :group)} ==
+               {List.duplicate(1, 12) ++ List.duplicate(2, 12),
+                List.duplicate(1, 6) ++
+                  List.duplicate(2, 6) ++ List.duplicate(1, 6) ++ List.duplicate(2, 6)}
+    end
+
+    # Golden: `ggplot(d, aes(x, y, group = g, colour = c)) + geom_area(position = "identity") +
+    # scale_colour_identity()`, `g` 2 holding rows at x 1 and 2 and `g` 1 at x 2, 1 and 1: each
+    # group's rows carry its first row's other columns, `#111111`, and, where some share an x, the
+    # first at the lowest, `#444444`, not the first in the data.
     test "every other column is the group's first row's, and aligning computes nothing" do
       frame =
-        [x: [2, 1, 1, 1, 2], y: [1, 2, 3, 4, 5], group: [1, 1, 2, 2, 2]]
+        [x: [1, 2, 2, 1, 1], y: [1, 2, 3, 4, 5], group: [2, 2, 1, 1, 1]]
         |> area_frame()
         |> DataFrame.put(:fill, ["#111111", "#222222", "#333333", "#444444", "#555555"])
 
       aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
 
-      fills = DataFrame.pull(aligned, :fill)
-      assert Enum.dedup(fills) == ["#111111", "#333333"]
+      assert DataFrame.pull(aligned, :fill) ==
+               List.duplicate("#444444", 7) ++ List.duplicate("#111111", 6)
+
+      assert DataFrame.pull(aligned, :x) ==
+               [0.998, 0.999, 1.0, 1.001, 1.999, 2.0, 2.001] ++
+                 [0.999, 1.0, 1.001, 1.999, 2.0, 2.001]
+
       assert Stat.default_mapping(%Stat.Align{orientation: :x}) == %{}
     end
   end

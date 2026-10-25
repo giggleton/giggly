@@ -3802,8 +3802,9 @@ defmodule Giggly.Plot do
   end
 
   # A band given an axis to run along needs its range across the other: `ymin` or `ymax` along x,
-  # `xmin` or `xmax` along y, mapped before the stat or set, as ggplot2's `GeomRibbon` aborts
-  # without one; a band given none runs along the axis its range says.
+  # `xmin` or `xmax` along y, mapped, as ggplot2's `GeomRibbon` aborts without one; a band given
+  # none runs along the axis its range says. A ribbon's identity stat has refused every
+  # after_stat by now, and no option sets a range, so the mapping alone gives one.
   defp check_band_range(plot, %Layer{geom: %{orientation: :none}}, _function), do: plot
 
   defp check_band_range(plot, %Layer{geom: %{orientation: orientation}} = layer, function) do
@@ -3812,9 +3813,7 @@ defmodule Giggly.Plot do
     given =
       plot
       |> computed_mapping(layer)
-      |> Enum.reject(fn {_aesthetic, value} -> Mapping.stage(value) == :after_stat end)
-      |> Enum.map(fn {aesthetic, _value} -> aesthetic end)
-      |> Enum.concat(Map.keys(layer.fixed))
+      |> Map.keys()
 
     if Enum.any?(range, fn aesthetic -> aesthetic in given end) do
       plot
