@@ -23,7 +23,7 @@ defmodule Giggly.Stat.Density do
   # R's `density()` method, as its documentation gives it: the weighted rows spread linearly over
   # a grid of evenly spaced points, at least 512, a power of two past that, running from four
   # bandwidths below the curve's first place to four above its last, each row's share split
-  # between the two points either side of it by how near it is to each, and kept where it lands on
+  # between the two points either side of it by how near it is to each, every row landing inside
   # the grid; those totals, padded with as many zeros, convolved with the kernel at each distance
   # along the grid, wrapping round, by the fast Fourier transform (`Giggly.Tensor`); what is left
   # below 0 by round-off raised to 0; and the curve read at each of its places by R's `approx()`
@@ -116,9 +116,6 @@ defmodule Giggly.Stat.Density do
     alias Giggly.DataFrame.Arithmetic
     alias Giggly.Stat.{Carry, Curve}
 
-    # The columns a density writes, in ggplot2's order.
-    @computed [:x, :density, :scaled, :ndensity, :count, :wdensity, :n, :flipped_aes]
-
     # The fewest points R's `density()` spreads its rows over.
     @least_points 512
 
@@ -169,10 +166,12 @@ defmodule Giggly.Stat.Density do
     end
 
     defp densities(frame, stat, along, flipped) do
+      # Every column but the place, which the estimate writes afresh: a stat's table holds
+      # aesthetics, `panel` and `group`, none of them another column a density writes.
       carried =
         frame
         |> DataFrame.names()
-        |> Enum.reject(fn name -> name in @computed end)
+        |> Enum.reject(fn name -> name == :x end)
 
       rows =
         frame
@@ -311,7 +310,6 @@ defmodule Giggly.Stat.Density do
       points = stat.n * (finite_bounds + 1)
       grid = grid_points(points)
       {from, to} = extent(stat.trim, group, axis)
-      {from, to} = {min(from, to), max(from, to)}
       width = to - from
       from = if is_number(low_bound), do: from - width, else: from
       to = if is_number(high_bound), do: to + width, else: to
@@ -518,11 +516,7 @@ defmodule Giggly.Stat.Density do
     end
 
     # The grid's points, evenly spaced from its low end to its high.
-    defp grid(plan) do
-      plan.low
-      |> Curve.places(plan.high, plan.grid)
-      |> Enum.map(fn point -> point / 1 end)
-    end
+    defp grid(plan), do: Curve.places(plan.low, plan.high, plan.grid)
 
     # The estimate at each grid point: the totals at the grid's points, padded with as many
     # zeros, convolved with the kernel at each distance along the padded grid, wrapping round, and
@@ -534,8 +528,8 @@ defmodule Giggly.Stat.Density do
         totals
         |> Enum.reduce(%{}, fn {point, lower, upper}, signal ->
           signal
-          |> on_grid(point, lower, plan.grid)
-          |> on_grid(point + 1, upper, plan.grid)
+          |> added(point, lower)
+          |> added(point + 1, upper)
         end)
         |> then(fn signal ->
           Enum.map(0..(slots - 1), fn slot -> Map.get(signal, slot, 0.0) end)
@@ -552,27 +546,26 @@ defmodule Giggly.Stat.Density do
       |> Enum.map(fn value -> if value < 0, do: 0.0, else: value end)
     end
 
-    # A part of a share added at a grid point, kept only where the point is on the grid.
-    defp on_grid(signal, point, part, grid) when point >= 0 and point < grid,
+    # A part of a share added at a grid point. Every row's place is inside the grid, which runs
+    # four bandwidths past the curve's places either end, so its parts land on the grid's points.
+    defp added(signal, point, part),
       do: Map.update(signal, point, part, fn total -> total + part end)
 
-    defp on_grid(signal, _point, _part, _grid), do: signal
-
     # The distance from the first point of the padded grid to each, wrapping round: R's `kords`,
-    # 0 up to just past the grid's span over its first half and back down through the negatives
-    # over its second, the distance from the first grid point each way.
+    # 0 up to just past the grid's span over its first half and back down over its second, the
+    # distance from the first grid point the shorter way. R gives the second half's as negatives,
+    # which every kernel, symmetric, reads alike.
     defp distances(plan) do
       slots = 2 * plan.grid
       span = (slots - 1) / (plan.grid - 1) * (plan.high - plan.low)
 
       upward =
-        0
+        0.0
         |> Curve.places(span, slots)
-        |> Enum.map(fn distance -> distance / 1 end)
         |> List.to_tuple()
 
       Enum.map(0..(slots - 1), fn index ->
-        if index <= plan.grid, do: elem(upward, index), else: -elem(upward, slots - index)
+        if index <= plan.grid, do: elem(upward, index), else: elem(upward, slots - index)
       end)
     end
 
@@ -625,11 +618,8 @@ defmodule Giggly.Stat.Density do
     # A curve with a finite bound folded back inside it: read on as many places from the lower
     # bound or its start, whichever is higher, to the upper bound or its end, whichever is lower,
     # its height there plus its heights at each place's reflection in each finite bound, 0 beyond
-    # its ends, as ggplot2's `reflect_density()` reads it; else as it is.
-    defp reflected(places, estimated, _plan, {low, high})
-         when not is_number(low) and not is_number(high),
-         do: {places, estimated}
-
+    # its ends, as ggplot2's `reflect_density()` reads it, so a curve with no finite bound is read
+    # at its own places, each its height, and nothing added.
     defp reflected(places, estimated, plan, {low, high}) do
       knots = Enum.zip(places, estimated)
       left = if is_number(low), do: max(plan.from, low), else: plan.from

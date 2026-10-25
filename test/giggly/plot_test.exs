@@ -2340,12 +2340,17 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{geom: %Geom.Area{line_join: :bevel}, position: %Position.Identity{}}] =
                Plot.stat_density(plot, linejoin: :bevel, position: :identity).reversed_layers
+
+      for line_join <- [:round, :mitre] do
+        [layer] = Plot.stat_density(plot, linejoin: line_join).reversed_layers
+        assert layer.geom.line_join == line_join
+      end
     end
 
     test "the estimate's options are the stat's, each number kept as a float" do
       options = [
-        bw: 1,
-        adjust: 2,
+        bw: 2,
+        adjust: 3,
         kernel: :epanechnikov,
         n: 10,
         trim: true,
@@ -2357,14 +2362,27 @@ defmodule Giggly.PlotTest do
       for function <- [&Plot.geom_density/2, &Plot.stat_density/2] do
         [layer] = function.(plot, options).reversed_layers
 
-        assert layer.stat == %Stat.Density{
-                 bandwidth: 1.0,
-                 adjust: 2.0,
+        assert layer.stat === %Stat.Density{
+                 bandwidth: 2.0,
+                 adjust: 3.0,
                  kernel: :epanechnikov,
                  n: 10,
                  trim: true,
                  bounds: {1.0, :infinity}
                }
+      end
+
+      for kernel <- [
+            :gaussian,
+            :epanechnikov,
+            :rectangular,
+            :triangular,
+            :biweight,
+            :cosine,
+            :optcosine
+          ] do
+        [layer] = Plot.geom_density(plot, kernel: kernel).reversed_layers
+        assert layer.stat.kernel == kernel
       end
 
       [scott] = Plot.geom_density(plot, bw: :nrd, bounds: {:neg_infinity, 3}).reversed_layers
@@ -2412,9 +2430,12 @@ defmodule Giggly.PlotTest do
       end
 
       for adjust <- [0, -0.5, "1"] do
-        assert_raise NimbleOptions.ValidationError, ~r/a multiple of the bandwidth/, fn ->
-          Plot.stat_density(plot, adjust: adjust)
-        end
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a multiple of the bandwidth/, fn ->
+            Plot.stat_density(plot, adjust: adjust)
+          end
+
+        assert error.message =~ "got: #{inspect(adjust)}"
       end
 
       for bounds <- [{3, 1}, {:infinity, 5}, {1, :neg_infinity}, [1, 2], {1, nil}, {1}] do
@@ -2447,7 +2468,7 @@ defmodule Giggly.PlotTest do
     end
 
     test "a density runs along the one of x and y mapped, and a contrary orientation is refused" do
-      assert [%Plot.Layer{}] =
+      assert [%Plot.Layer{geom: %Geom.Density{orientation: :y}}] =
                @values
                |> Plot.new(%{y: :x})
                |> Plot.geom_density(orientation: :y)
@@ -2505,6 +2526,10 @@ defmodule Giggly.PlotTest do
 
       assert_raise ArgumentError, ~r/prop/, fn ->
         Plot.geom_density(plot, %{y: {:after_stat, [:prop]}})
+      end
+
+      assert_raise ArgumentError, ~r/:weight/, fn ->
+        Plot.geom_density(plot, %{weight: {:after_stat, [:density]}})
       end
     end
   end

@@ -873,6 +873,15 @@ defmodule Giggly.DataFrameTest do
       assert DataFrame.dtypes(mutated) == %{x: :float}
     end
 
+    test "floor of a column of only missing values is missing in every row, a float" do
+      frame = DataFrame.new(x: [nil, nil])
+
+      mutated = DataFrame.mutate(frame, x: {:floor, [:x]})
+
+      assert {DataFrame.pull(mutated, :x), DataFrame.dtypes(mutated)} ===
+               {[nil, nil], %{x: :float}}
+    end
+
     test "floor of a column that is not floats is refused, integers too" do
       frame = DataFrame.new(n: [1], label: ["a"], kept: [true])
 

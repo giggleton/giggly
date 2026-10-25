@@ -372,6 +372,36 @@ defmodule Giggly.StatTest do
   # `geom_area(position = "identity")` of the table named, whose x, y and `align_padding` are the
   # stat's, printed to 17 significant digits; each table is built here as the stat is handed it.
   describe "compute_layer/3 for aligning" do
+    # Golden: `layer_data()` for x 3, 1 and 2 at y 3, 1 and 4 in group a, and x 1, 2 and 3 at y 2 in
+    # group b, with `geom_area(position = "identity")`: a group's rows out of order along x are
+    # read in order, as R's `approxfun()` sorts them.
+    test "a group's rows are read in order along x, whatever order they come in" do
+      frame = area_frame(x: [3, 1, 2, 1, 2, 3], y: [3, 1, 4, 2, 2, 2], group: [1, 1, 1, 2, 2, 2])
+
+      aligned = Stat.compute_layer(%Stat.Align{orientation: :x}, frame, %{})
+
+      assert DataFrame.pull(aligned, :y) === [
+               0.0,
+               1.0,
+               1.006,
+               3.9939999999999998,
+               4.0,
+               3.9980000000000002,
+               3.0019999999999998,
+               3.0,
+               0.0,
+               0.0,
+               2.0,
+               2.0,
+               2.0,
+               2.0,
+               2.0,
+               2.0,
+               2.0,
+               0.0
+             ]
+    end
+
     # Golden: `ggplot(crossing, aes(x, y, fill = g))`, `a` at y 1 and `b` from -1 to 1 at x 1 and
     # 3, so `b` crosses zero at 2 and each place is also 0.002 either side.
     test "each group is interpolated at every place and crossing, padded with 0 at each end" do
@@ -1690,6 +1720,36 @@ defmodule Giggly.StatTest do
         assert panels == [2], "weights #{inspect(weights)}, #{inspect(options)}"
       end
 
+      # Golden: one row inside the bounds whose weight is missing or NaN, beside two outside.
+      for weights <- [[nil, 1, 1], [:nan, 1, 1]] do
+        panels =
+          [x: [1.0, 10.0, 11.0], weight: weights]
+          |> two_panels()
+          |> estimate([n: 2, bounds: {0.0, 5.0}], x: {1, 11})
+          |> DataFrame.pull(:panel)
+          |> Enum.uniq()
+
+        assert panels == [2], "weights #{inspect(weights)}"
+      end
+
+      # Golden: weights all missing, a column of no type, which is not refused as not numbers.
+      unweighed =
+        [x: [1.0, 2.0, 3.0], weight: [nil, nil, nil]]
+        |> one_panel()
+        |> estimate([n: 2], x: {1, 3})
+
+      assert DataFrame.row_count(unweighed) == 0
+
+      # Golden: a bandwidth multiplied past a double's range, either way, in every panel.
+      for {bandwidth, adjust} <- [{1.0e-200, 1.0e-200}, {1.0e300, 1.0e10}] do
+        curve =
+          [x: [1.0, 2.0, 4.0], weight: [1, 1, 1]]
+          |> two_panels()
+          |> estimate([n: 2, bandwidth: bandwidth, adjust: adjust], x: {1, 4})
+
+        assert DataFrame.row_count(curve) == 0
+      end
+
       level = two_panels(x: [2.0, 2.0, 2.0], weight: [1, 1, 1])
 
       level_curve = estimate(level, [n: 2, bandwidth: :nrd], x: {1, 3})
@@ -1702,6 +1762,82 @@ defmodule Giggly.StatTest do
       lone_curve = estimate(lone, [n: 2], x: {1, 6})
 
       assert DataFrame.pull(lone_curve, :n) === [nil, 2, 2]
+    end
+
+    # Golden: x 1, 2, 3, 4 and 100 with `n = 3`, by Scott's rule and Silverman's: the outlier
+    # spreads the standard deviation past the interquartile range over 1.34, which each takes.
+    test "each rule takes the lesser of the deviation and the interquartile range over 1.34" do
+      frame = one_panel(x: [1.0, 2.0, 3.0, 4.0, 100.0])
+
+      assert_near(estimate(frame, [n: 3, bandwidth: :nrd], x: {1, 100}), :density, [
+        0.13427862842706603,
+        1.3341827710439745e-18,
+        0.069060656860154904
+      ])
+
+      assert_near(estimate(frame, [n: 3], x: {1, 100}), :density, [
+        0.14045001460737799,
+        2.1366406094490662e-18,
+        0.081088113076211041
+      ])
+    end
+
+    # Golden: x 1e300, -1e300, 1e300 and -1e300 with `n = 3`, by each rule: their variance is past
+    # the largest double, as R's `var()` gives it, and the interquartile range sets the bandwidth.
+    test "an infinite variance leaves the bandwidth to the interquartile range" do
+      frame = one_panel(x: [1.0e300, -1.0e300, 1.0e300, -1.0e300])
+
+      for {bandwidth, expected} <- [
+            nrd0: [2.2438109047126128e-301, 2.4189384779055763e-301, 2.2438109047126116e-301],
+            nrd: [2.0774389131283492e-301, 2.3497998516875738e-301, 2.0774389131283492e-301]
+          ] do
+        curve = estimate(frame, [n: 3, bandwidth: bandwidth], x: {-1.0e300, 1.0e300})
+        assert_near(curve, :density, expected)
+      end
+    end
+
+    # Golden: x 0, 0.001, ..., 0.05 and 1 with `n = 5`: rows a thousandth apart, closer than the
+    # grid's points, so the parts of neighbouring rows' shares add up at each point.
+    test "the parts of rows sharing a grid point add up" do
+      dense = Enum.map(0..51, fn step -> if step == 51, do: 1.0, else: step / 1000 end)
+
+      curve = estimate(one_panel(x: dense), [n: 5], x: {0, 1})
+
+      assert_near(curve, :density, [
+        10.110091411611174,
+        3.0346112246144055e-17,
+        4.5955010223629299e-16,
+        0.0,
+        0.98422669097874138
+      ])
+    end
+
+    # Golden: `geom_density(n = 1, bounds = c(-100, Inf))` over mpg's hwy: two places, the widened
+    # axis's low end and its high end, whole numbers held as doubles, and the reflection in -100
+    # past the curve's low end, adding 0.
+    test "a reflection past the curve's ends adds nothing, and its places are doubles" do
+      curve = estimate(hwy_frame(), n: 1, bounds: {-100.0, :infinity})
+
+      assert DataFrame.pull(curve, :x) === [-20.0, 44.0]
+
+      assert_near(curve, :density, [4.0203781816406096e-18, 0.0021307076737205072])
+    end
+
+    # Golden: a factor of drives carried with its levels and ordered flag, as R carries a factor.
+    test "a group's constant category is carried with its levels" do
+      frame =
+        DataFrame.new([
+          {:x, [1.0, 2.0, 4.0, 1.0, 3.0, 5.0]},
+          {:color, ["r", "r", "r", "f", "f", "f"],
+           {:category, levels: ["r", "f"], ordered: true}},
+          {:panel, [1, 1, 1, 1, 1, 1]},
+          {:group, [1, 1, 1, 2, 2, 2]}
+        ])
+
+      curve = estimate(frame, [n: 2], x: {1, 5})
+
+      assert DataFrame.pull(curve, :color) == ["r", "r", "f", "f"]
+      assert DataFrame.category(curve, :color) == {:category, levels: ["r", "f"], ordered: true}
     end
 
     test "a weight that is not a number is refused, naming its type" do

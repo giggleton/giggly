@@ -170,8 +170,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   Silverman's rule (`:nrd0`, falling back as `bw.nrd0()` does) or Scott's (`:nrd`) from the
   group's rows inside the bounds, unweighted, by the frame's `variance`, `quantile` and `first`,
   times `adjust`; each row's share of its group's weights spread linearly over a grid of at least
-  512 points, a power of two past that, four bandwidths past the places either end, each part kept
-  where it lands on the grid and summed plain, lower and upper parts apart; convolved with one of
+  512 points, a power of two past that, four bandwidths past the places either end, so every row
+  lands inside it, the parts summed plain, lower and upper apart; convolved with one of
   R's seven kernels through `Giggly.Tensor`, raised to 0, and read at the places by R's `approx()`
   formula (`Giggly.Stat.Curve`, which also spaces smoothing's places and reads aligning's
   groups). Its values are R's within 1e-12 of the largest magnitude the group's column holds, its
