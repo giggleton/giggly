@@ -2388,7 +2388,7 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{stat: %Stat.Smooth{level: 0.5}}] =
                Plot.geom_smooth(plot, level: 0.5).reversed_layers
 
-      for level <- [0, 1, 1.5, -0.1, "0.95"] do
+      for level <- [0, 0.0, 1, 1.0, 1.5, -0.1, "0.95"] do
         error =
           assert_raise NimbleOptions.ValidationError, ~r/above 0 and below 1/, fn ->
             Plot.geom_smooth(plot, level: level)
