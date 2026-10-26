@@ -4,8 +4,8 @@ defmodule Giggly.BoundaryDeclarationsTest do
   # Boundary declarations fail in one direction only. Too narrow fails loudly; too wide compiles in
   # silence. Every way to make the compiler enforce less is either absent from the tree or named in
   # `@sanctioned` with its reason, so widening costs an edit here, in the same diff — a visible act
-  # rather than a quiet one. `Tack.BoundaryDeclarations` is the scanner; the harness tests
-  # it against fabricated declarations, so this file reads only the real tree.
+  # rather than a quiet one. `Tack.BoundaryDeclarations` is the scanner; its own tests
+  # (`test/tack/`) run it against fabricated declarations, so this file reads only the real tree.
   use ExUnit.Case, async: true
 
   alias Tack.BoundaryDeclarations
@@ -16,9 +16,25 @@ defmodule Giggly.BoundaryDeclarationsTest do
 
   @umbrella "lib/giggly.ex"
 
+  # The compiled source a declaration can sit in: the library, and the gate's tooling copied from
+  # Tack, which is compiled too and could weaken the compiler as quietly. Test support is read by
+  # the test that needs it.
+  @declared_roots ["lib", "dev"]
+
+  test "every root the scans read holds compiled source, so a moved directory cannot empty them" do
+    # A root that no longer exists lists no files, and every scan below would pass over it having
+    # read nothing.
+    empty = for root <- @declared_roots, BoundaryDeclarations.source_files(root) == [], do: root
+
+    assert empty == [],
+           "The boundary scans read #{inspect(empty)}, which hold no compiled source: a " <>
+             "directory moved or renamed. Point @declared_roots at where the source is now."
+  end
+
   test "no declaration disables a check except where sanctioned, with a stated reason" do
     unsanctioned =
-      for path <- BoundaryDeclarations.source_files("lib"),
+      for root <- @declared_roots,
+          path <- BoundaryDeclarations.source_files(root),
           {token, effect} <- BoundaryDeclarations.disabled_checks_in(path),
           not Map.has_key?(@sanctioned, {path, token}),
           do: "  #{path}: #{token} — #{effect}"
@@ -49,7 +65,8 @@ defmodule Giggly.BoundaryDeclarationsTest do
 
   test "only the umbrella uses exports: :all" do
     offenders =
-      for path <- BoundaryDeclarations.source_files("lib"),
+      for root <- @declared_roots,
+          path <- BoundaryDeclarations.source_files(root),
           path != @umbrella,
           BoundaryDeclarations.exports_all_in?(path),
           do: path
@@ -72,9 +89,8 @@ defmodule Giggly.BoundaryDeclarationsTest do
 
   test "no declaration relaxes the strict default" do
     relaxed =
-      for path <-
-            BoundaryDeclarations.source_files("lib") ++
-              BoundaryDeclarations.source_files("test/support"),
+      for root <- ["test/support" | @declared_roots],
+          path <- BoundaryDeclarations.source_files(root),
           declaration <- BoundaryDeclarations.declarations_in(path),
           declaration =~ ~r/type:\s*:relaxed/,
           do: path

@@ -24,7 +24,8 @@ defmodule Giggly.MixProject do
         {"rules", "mix tack.rules_check"}
       ],
       aliases: aliases(),
-      elixirc_paths: elixirc_paths(Mix.env())
+      elixirc_paths: elixirc_paths(Mix.env()),
+      docs: docs()
     ]
   end
 
@@ -38,7 +39,6 @@ defmodule Giggly.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:tack, git: "git@github.com:srowley/tack.git", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:jump_credo_checks, "~> 0.6", only: [:dev, :test], runtime: false},
       {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
@@ -58,11 +58,31 @@ defmodule Giggly.MixProject do
     [quality: ["tack.quality"]]
   end
 
+  # `dev/` holds the gate's tooling, copied from Tack (`dev/tack.ex`): compiled for the dev and
+  # test environments, never for a user's build, and left out of the package.
   defp elixirc_paths(:test) do
-    ["lib", "test/support"]
+    ["lib", "dev", "test/support"]
+  end
+
+  defp elixirc_paths(:dev) do
+    ["lib", "dev"]
   end
 
   defp elixirc_paths(_environment) do
     ["lib"]
+  end
+
+  # The gate's tooling in `dev/` compiles in dev, where the docs are built, but is not Giggly's: its
+  # modules, Tack's and its mix tasks', are left out of the documentation.
+  defp docs do
+    [
+      filter_modules: fn module, _metadata ->
+        case Module.split(module) do
+          ["Tack" | _rest] -> false
+          ["Mix", "Tasks", "Tack" | _rest] -> false
+          _giggly -> true
+        end
+      end
+    ]
   end
 end

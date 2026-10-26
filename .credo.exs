@@ -53,6 +53,7 @@ plot_runs_nothing_roots =
         #
         included: [
           "lib/",
+          "dev/",
           "src/",
           "test/",
           "web/",
@@ -74,8 +75,8 @@ plot_runs_nothing_roots =
       # The repo-local checks, each one a rule this repo already states in prose (CLAUDE.md, a
       # `.claude/rules/*.md` file, a skill) made into a gate failure. They live outside `lib/`
       # deliberately: `lib/` compiles into the release, and a dev-only lint has no business there.
-      # The checks the harness ships (`Tack.Credo.Check.*`) come from the package and need
-      # no file here. See `.credo/checks/README.md`.
+      # The checks the harness ships (`Tack.Credo.Check.*`) are compiled from `dev/tack/`, Tack's
+      # code copied in, and need no file here. See `.credo/checks/README.md`.
       requires: [".credo/checks/"],
       #
       # If you want to enforce a style guide and need a more traditional linting

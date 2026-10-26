@@ -7,6 +7,7 @@ paths:
   - ".credo/checks/**"
   - ".claude/hooks/waiver-gate.sh"
   - ".github/workflows/**"
+  - "dev/**"
 ---
 
 # Dependencies, toolchain, lint and security waivers
@@ -46,8 +47,8 @@ semver or the changelog).
   a time like any other check. Outside `lib/` deliberately: `lib/` compiles into the release, a
   dev-only lint has no business there, and a check under `lib/` would want a boundary declaration
   and count against `rules_check`'s uncovered-file budget. The checks the harness ships
-  (`Tack.Credo.Check.*`) come from the package instead and need no copy. Four things hold
-  a new local check together:
+  (`Tack.Credo.Check.*`) are compiled from `dev/tack/` instead, with Tack's tests under
+  `test/tack/`. Four things hold a new local check together:
   **(1) A rule the `boundary` compiler already holds is not restated** — a web module naming
   `Repo`, a core module calling a context. Two homes for one rule is one home too many, and the
   compiler's home is the stricter of the two. What credo is for is what Boundary cannot see: the
@@ -79,6 +80,13 @@ semver or the changelog).
 - **`boundary` is the one dev tool that is not `only: [:dev, :test]`**, and must stay that way: it
   is a compiler, so it has to exist wherever `mix compile` runs, including a `:prod` release
   build. Scoping it away from prod makes the release build fail on an unknown compiler.
+- **`dev/` is Tack's code, copied, and stays Tack's.** The gate's runner, the rules check, the
+  boundary scanner, the credo checks and their tests (`test/tack/`) are copies of Tack's
+  (`dev/tack.ex` names the commit), kept byte for byte, so a fix in Tack is copied across with a
+  diff and a Giggly-only change is a decision to state in `dev/tack.ex`. They are copied rather
+  than depended on because Tack's repository is private and CI cannot fetch it. `dev/` compiles
+  in the dev and test environments only and is in neither the Hex package nor the documentation
+  (`docs/0` in `mix.exs` filters its modules out, since the docs are built in dev).
 - **`muex` is pinned exactly (`==`), not with `~>`.** It is young and releases fast, and the
   flags in the `mutation-testing` skill exist because its defaults give a confident false pass. So
   a bump goes through `dependency-updates` like any other, and before the skill is trusted again
@@ -179,11 +187,13 @@ semver or the changelog).
   `elixir-code-review` scopes its review against the local `main`; `commit-gate.sh` adds the
   mutation rule and the `post-commit` entry point, which `settings.json` registers as a
   PostToolUse hook; `docs-sync` routes a milestone to one §6 line and mechanism to module
-  documentation.
+  documentation. The code Giggly runs from Tack — `mix tack.quality`, `mix tack.rules_check`, the
+  credo checks, the boundary scanner — is copied into `dev/` (the rule above), so Tack is not a
+  dependency.
 - The `elixir:` requirement in `mix.exs` is the floor; the **exact** toolchain is pinned in
   `.tool-versions`, which CI reads.
 - The gate's tools: `ex_doc`, `credo` (with the `jump_credo_checks` and `ex_slop` plugins and
-  the `tack` checks), and `boundary`. Dependency-advisory scanning is Hex's own
+  Tack's checks, copied into `dev/`), and `boundary`. Dependency-advisory scanning is Hex's own
   `mix hex.audit` — no scanner dependency. `muex` is not a gate step: the `mutation-testing`
   skill runs it after each commit, over the lines the commit changed.
 - **The quality gate's steps** are the `quality_steps` list in `mix.exs`, run in order by

@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Tack's code is copied into `dev/`, not depended on (2026-10-26, Steve, as in Pica).** Tack's
+  repository is private, so CI could not fetch the `tack` dependency. The gate runner, the rules
+  check, the boundary scanner, the credo checks and their tests are copied byte for byte from
+  Tack's commit 9ae74d8 under Tack's names, so a fix in Tack can be diffed across and the
+  `CorePurity` waivers in `lib/` stay as they are; `dev/` compiles in dev and test only and is
+  left out of the package and, by `docs/0`'s filter, the documentation. The `Tack` boundary, the tasks' `classify_to: Tack` and the runner's
+  `Apply` waiver were approved one at a time. *Rejected: making Tack public* — Tack stays private.
+  *Rejected: renaming the copies into Giggly's own namespaces* — every waiver naming a check
+  changes, and a fix in Tack no longer diffs across. *Rejected: a CI deploy key* — CI would pass,
+  but a contributor still could not run the gate.
+
 - **`facet_grid` is Phase 3's thirteenth increment, in three steps: panels as data, drawing the
   grid, the notebook sweep (2026-10-26, Steve: "Go"; checked against ggplot2 4.0.3's source and
   R).** `Plot.facet_grid(plot, rows: :drv, cols: :cyl, scales: :free)`, each side a column or a
@@ -2756,6 +2767,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Copy Tack's gate tooling into dev/ so CI needs no private repository; §4: "Tack's
+  code is copied into `dev/`"
 - 2026-10-26 — Draw the notebook examples facet_grid unlocks, and narrow every verdict to what
   still waits (facet_grid, step 3, the notebook sweep); §4: "`facet_grid` is Phase 3's thirteenth
   increment", "A value an example computes in base R"
@@ -3161,6 +3174,3 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   map row's **extra key is dropped without a word**, since `table` takes the columns from the first
   row, which is the silent loss `from_table/1`'s length check exists to prevent; and `[]` is a
   table of no rows while `%{}` is refused as not a table.
-- **`tack` is a git dependency with no `ref`/`tag`.** `mix.lock` pins the commit, so builds are
-  reproducible, but `mix deps.update tack` floats to the branch head. Settled by pinning a `tag:`
-  once Tack publishes releases.
