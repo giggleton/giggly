@@ -353,14 +353,16 @@ defmodule Giggly.Render do
     ])
   end
 
-  # How many strips deep the deepest of the panels' strips on one side is.
+  # How many strips deep the deepest of the panels' strips on one side is. There is always a
+  # panel: every row of the layout has one.
   defp strip_layers(strips) do
     strips
     |> Enum.map(&length/1)
-    |> Enum.max(fn -> 0 end)
+    |> Enum.max()
   end
 
-  # How deep the deepest of the panels' strips on one side is, in points.
+  # How deep the deepest of the panels' strips on one side is, in points: any depth where there
+  # are none, since no row or column is then made for them.
   defp strip_depth(strips) do
     strips
     |> Enum.concat()
