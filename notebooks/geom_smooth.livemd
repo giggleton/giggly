@@ -199,9 +199,8 @@ ggplot(rpart::kyphosis, aes(Age, Kyphosis)) +
   binomial_smooth()
 ```
 
-Not in Giggly yet: `geom_jitter()` and its `height` option, `geom_smooth()` with `method = "glm"`,
-the logistic regression R's `glm()` fits, and its `method.args` option, and the `kyphosis` dataset
-from the `rpart` package.
+Not in Giggly yet: `geom_smooth()` with `method = "glm"`, the logistic regression R's `glm()` fits,
+and its `method.args` option, and the `kyphosis` dataset from the `rpart` package.
 
 ## Values between 0 and 1
 
@@ -222,6 +221,5 @@ ggplot(rpart::kyphosis, aes(Age, as.numeric(Kyphosis) - 1)) +
 regression to a natural spline of `x` from the `splines` package.
 
 Not in Giggly yet: a whole-column function in a mapping, here `as.numeric(Kyphosis)`, a factor's
-level codes, `geom_jitter()` and its `height` option, `geom_smooth()` with `method = "glm"`, the
-logistic regression R's `glm()` fits, and its `method.args` and `formula` options, and the
-`kyphosis` dataset from the `rpart` package.
+level codes, `geom_smooth()` with `method = "glm"`, the logistic regression R's `glm()` fits, and
+its `method.args` and `formula` options, and the `kyphosis` dataset from the `rpart` package.

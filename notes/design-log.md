@@ -79,10 +79,23 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
-- **`geom_jitter` is Phase 3's fourteenth increment, in three steps: the position and its API, the
-  frame's filter made public, the notebook sweep (2026-10-26, Steve; checked against ggplot2
-  4.0.3's source and R).** `geom_jitter/3` takes a point's options with `width:` and `height:`
-  or `position:`, refused together as R refuses them, and no `seed:`, as R's takes none;
+- **A table is the user's to shape; Giggly takes a column's order from a `Giggly.Factor` and does
+  no data wrangling (2026-10-26, Steve, settling how rows taken by hand lose a factor's levels).**
+  Rows taken from `diamonds` with `Enum` or Explorer lose `cut`'s levels, as a factor enumerates
+  as its values; the user shapes data with whatever tools they like and says a column's order with
+  `Giggly.Factor.new/2`, or a scale's `limits:`, and the notebooks' `subset()` cells take the rows
+  in Elixir and rebuild each factor, as the sampling cells do. The frame stays the pipeline's.
+  *Rejected: `Giggly.DataFrame.from_table/1` and `filter/2` made public* (built, then dropped) —
+  it would keep levels only for data already in a Giggly frame, the datasets, not a user's
+  Explorer or list data; it opens which other operations are public (`slice/2` next, then
+  `mutate/2`), each its own decision, Giggly drifting into a weak Explorer; and it freezes a
+  grammar shaped by the pipeline (no `==`, binning's `cut`) the engine work wants free.
+  *Rejected: `Giggly.Datasets.filter/2` taking a function of a row* — Giggly's own tables alone.
+
+- **`geom_jitter` is Phase 3's fourteenth increment, in two steps: the position and its API, the
+  notebook sweep (2026-10-26, Steve; checked against ggplot2 4.0.3's source and R).**
+  `geom_jitter/3` takes a point's options with `width:` and `height:` or `position:`, refused
+  together as R refuses them, and no `seed:`, as R's takes none;
   `position_jitter/1` takes `width:`, `height:` (0 or more, where R moves nothing for a negative)
   and `seed:`; `geom_point/3`'s `position:` is `:identity`, `:jitter` or that struct. An amount
   not given is 0.4 of each panel's spacing, as R's. A plot given no seed draws from seed 0
@@ -2794,6 +2807,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Draw the notebook examples geom_jitter unlocks, and narrow every verdict to what
+  still waits (geom_jitter, step 2, the notebook sweep); §4: "`geom_jitter` is Phase 3's fourteenth
+  increment", "A jitter's distances are Erlang's", "A table is the user's to shape"
 - 2026-10-26 — Jitter points: geom_jitter(), position_jitter() and geom_point()'s position:,
   each panel's distances drawn from a fixed seed (geom_jitter, step 1); §4: "`geom_jitter` is
   Phase 3's fourteenth increment", "A jitter's distances are Erlang's"
@@ -3114,14 +3130,6 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   R's stat carries each group's constant `y` beside its 512 rows, so the raster has a row of cells
   per count. `Plot.stat_density/3` refuses both: "maps :x, :y, but takes only one of them". Only a
   geom that reads that `y` (`geom_raster()`, `geom_tile()`) gives it a use, so it waits for one.
-- **Rows taken from a table by hand lose its factors' levels (found 2026-10-23, the ordering
-  sweep).** A `Giggly.Factor` enumerates as its values, so a user who filters or samples
-  `diamonds` with `Enum`, or reads it into Explorer, gets plain text, and `cut` sorts
-  alphabetically, where R's `subset()` and `diamonds[rows, ]` keep the factor. The notebooks
-  rebuild each factor by hand (§4, the entry beginning "A random sample of a table's rows").
-  Options: a public function that takes rows of a table and keeps its factors, or leaving the
-  rebuilding to the user, as the notebooks do. Settled when `geom_jitter()` arrives, whose
-  examples draw `subset(diamonds, carat > 1)`.
 - **How a notebook treats an example of a function Giggly will not offer (found 2026-10-17).**
   Giggly exposes no superseded or deprecated function (§4, the entry beginning "Giggly exposes no
   function"), yet 33 waiting examples call one, most of them `coord_map()`,

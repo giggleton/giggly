@@ -78,7 +78,7 @@ ggplot(mpg, aes(displ, cty)) +
 `displ` and `cty` take few distinct values, so many cars share a point and a rug line. Jittering
 moves each by a small random amount, so they can be told apart.
 
-Not in Giggly yet: `geom_rug()`, `geom_jitter()` and `position_jitter()`.
+Not in Giggly yet: `geom_rug()` and its `position` option.
 
 ## Rugs outside the panel
 

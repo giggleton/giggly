@@ -70,7 +70,41 @@ Parentheses around an assignment print its value, so this draws `d` as well as n
       geom_jitter())
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+R's `subset()` keeps the rows whose `carat` is above 1, 17,502 of them, each factor keeping its
+levels. The cell keeps the same rows of every column; a `Giggly.Factor` enumerates as its values
+alone, so `cut`, `color` and `clarity` are rebuilt with `Giggly.Factor.new/2`, keeping their levels
+and their order. The points are jittered by Erlang's random numbers, not R's, so they land
+elsewhere than ggplot2's, each within the same 0.4 of its place; nothing else in the drawing moves
+(`geom_jitter()`'s notebook says more).
+
+```elixir
+rows =
+  diamonds[:carat]
+  |> Enum.with_index()
+  |> Enum.filter(fn {carat, _row} -> carat > 1 end)
+  |> Enum.map(fn {_carat, row} -> row end)
+
+big_diamonds =
+  Enum.map(diamonds, fn {name, column} ->
+    values = column |> Enum.to_list() |> List.to_tuple()
+    taken = Enum.map(rows, fn row -> elem(values, row) end)
+
+    case column do
+      %Giggly.Factor{levels: levels, ordered: ordered} ->
+        {name, Giggly.Factor.new(taken, levels: levels, ordered: ordered)}
+
+      _values ->
+        {name, taken}
+    end
+  end)
+
+d =
+  big_diamonds
+  |> Plot.new(%{x: :cut, y: :clarity})
+  |> Plot.geom_jitter()
+
+render.(d)
+```
 
 ## The axis title and labels
 
@@ -89,9 +123,29 @@ d +
   )
 ```
 
-The labels are given by value, so the order they are written in does not matter.
+The labels are given by value, so the order they are written in does not matter. No cut is called
+`"Perfect"`, so `Premium` keeps its own label.
 
-Not in Giggly yet: `geom_jitter()`.
+```elixir
+d
+|> Plot.scale_x_discrete(name: "Cut")
+|> render.()
+```
+
+```elixir
+d
+|> Plot.scale_x_discrete(
+  name: "Cut",
+  labels: %{
+    "Fair" => "F",
+    "Good" => "G",
+    "Very Good" => "VG",
+    "Perfect" => "P",
+    "Ideal" => "I"
+  }
+)
+|> render.()
+```
 
 ## Which values are shown
 
@@ -101,7 +155,13 @@ Not in Giggly yet: `geom_jitter()`.
 d + scale_x_discrete(limits = c("Fair","Ideal"))
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+The other cuts are left out, so their points are not drawn.
+
+```elixir
+d
+|> Plot.scale_x_discrete(limits: ["Fair", "Ideal"])
+|> render.()
+```
 
 ## The xlim() and ylim() shortcuts
 
@@ -113,7 +173,17 @@ d + xlim("Fair","Ideal", "Good")
 d + ylim("I1", "IF")
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+```elixir
+d
+|> Plot.xlim(["Fair", "Ideal", "Good"])
+|> render.()
+```
+
+```elixir
+d
+|> Plot.ylim(["I1", "IF"])
+|> render.()
+```
 
 ## Ordering by another column
 

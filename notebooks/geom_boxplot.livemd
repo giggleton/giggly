@@ -138,8 +138,18 @@ p
 p + geom_boxplot(outlier.shape = NA) + geom_jitter(width = 0.2)
 ```
 
-Not in Giggly yet: `geom_jitter()`. Giggly hides the outliers with `outlier_shape: :none`, as
-`outlier.shape = NA` does.
+Giggly hides the outliers with `outlier_shape: :none`, as `outlier.shape = NA` does. The points are
+jittered by Erlang's random numbers, not R's, so they land elsewhere than ggplot2's, each within the
+same 0.2 of its place across and 0.4 up or down, and the y axis, which widens to hold them, can end
+a little elsewhere too, by no more than about 0.8 miles per gallon; nothing else in the drawing
+moves (`geom_jitter()`'s notebook says more).
+
+```elixir
+p
+|> Plot.geom_boxplot(outlier_shape: :none)
+|> Plot.geom_jitter(width: 0.2)
+|> render.()
+```
 
 ## Dodged boxes
 

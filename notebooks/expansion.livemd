@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 mtcars = Giggly.Datasets.mtcars()
+diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
   plot
@@ -35,7 +36,8 @@ for both ends or a pair, below and above. A plot is described with `Giggly.Plot`
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
 cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
 `Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
-Trend* US magazine, to `mtcars`, R's name for it.
+Trend* US magazine, and `Giggly.Datasets.diamonds/0`, ggplot2's `diamonds`, to `mtcars` and
+`diamonds`, their names in R.
 
 ## No space below the bars
 
@@ -66,7 +68,40 @@ ggplot(subset(diamonds, carat > 2), aes(cut, clarity)) +
   scale_x_discrete(expand = expansion(add = 2))
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+R's `subset()` keeps the rows whose `carat` is above 2, 1,889 of them, each factor keeping its
+levels. The cell keeps the same rows of every column; a `Giggly.Factor` enumerates as its values
+alone, so `cut`, `color` and `clarity` are rebuilt with `Giggly.Factor.new/2`, keeping their levels
+and their order. The points are jittered by Erlang's random numbers, not R's, so they land elsewhere
+than ggplot2's, each within the same 0.4 of its place; nothing else in the drawing moves
+(`geom_jitter()`'s notebook says more).
+
+```elixir
+rows =
+  diamonds[:carat]
+  |> Enum.with_index()
+  |> Enum.filter(fn {carat, _row} -> carat > 2 end)
+  |> Enum.map(fn {_carat, row} -> row end)
+
+biggest_diamonds =
+  Enum.map(diamonds, fn {name, column} ->
+    values = column |> Enum.to_list() |> List.to_tuple()
+    taken = Enum.map(rows, fn row -> elem(values, row) end)
+
+    case column do
+      %Giggly.Factor{levels: levels, ordered: ordered} ->
+        {name, Giggly.Factor.new(taken, levels: levels, ordered: ordered)}
+
+      _values ->
+        {name, taken}
+    end
+  end)
+
+biggest_diamonds
+|> Plot.new(%{x: :cut, y: :clarity})
+|> Plot.geom_jitter()
+|> Plot.scale_x_discrete(expand: [add: 2])
+|> render.()
+```
 
 ## The default expansion
 
@@ -82,4 +117,13 @@ ggplot(subset(diamonds, carat > 2), aes(cut, price)) +
   scale_y_continuous(expand = expansion(mult = .05))
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+The prices are whole dollars, so each point moves up to 40 cents up or down, too little to see.
+
+```elixir
+biggest_diamonds
+|> Plot.new(%{x: :cut, y: :price})
+|> Plot.geom_jitter()
+|> Plot.scale_x_discrete(expand: [add: 0.6])
+|> Plot.scale_y_continuous(expand: [mult: 0.05])
+|> render.()
+```

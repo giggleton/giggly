@@ -46,7 +46,11 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
 - **Where Giggly's drawing departs from R's by design, the prose says so and how far**: a loess
   curve, fitted at each point where R's default interpolates, names its largest gap from R's
   drawing and its band's, in points, as the notebook draws it (design-log §4, the entry beginning
-  "loess is Giggly's own").
+  "loess is Giggly's own"); jittered points, drawn from Erlang's random numbers, land elsewhere
+  than R's within the same distance of their places, which the jitter notebooks' About says, with
+  how far an axis widened to hold them may move, and so does each other notebook at its first
+  jittered example, which a drawing check makes R draw with Giggly's own distances (the entry
+  beginning "A jitter's distances are Erlang's").
 - **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
   CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
   `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`
@@ -59,7 +63,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
 - **Data comes from `Giggly.Datasets`**, the same table the ggplot2 example uses; a small table the
   example writes out in R, the cell writes out too. Where an example draws random numbers in R, the
   notebook takes the rows R actually produced and says so, a sample of a table's rows as the row
-  numbers R picks, each factor rebuilt with its levels, and where it computes values with base R
+  numbers R picks, each factor rebuilt with its levels; the rows a `subset()` keeps are taken in
+  Elixir, each factor rebuilt alike, since Giggly does no data wrangling (the entry beginning "A
+  table is the user's to shape"); and where it computes values with base R
   before plotting (`quantile()`, or a table built from a time series such as `LakeHuron`), it
   writes out R's values and says so (design-log §4, the entries beginning "A random sample of a
   table's rows", "A value an example computes in base R" and "A base-R time series").

@@ -45,7 +45,7 @@ Not in Giggly yet: `geom_violin()`.
 p + geom_violin() + geom_jitter(height = 0, width = 0.1)
 ```
 
-Not in Giggly yet: `geom_violin()` and `geom_jitter()` with its `height` and `width` options.
+Not in Giggly yet: `geom_violin()`.
 
 ## Scaling the widths
 

@@ -8,6 +8,8 @@ Mix.install([
 
 alias Giggly.Plot
 
+mtcars = Giggly.Datasets.mtcars()
+
 render = fn plot ->
   plot
   |> Giggly.to_svg()
@@ -34,7 +36,8 @@ reads `alpha`, and a discrete `colour` or `fill`, back with a legend by default,
 one title and the same labels. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
 write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`.
+`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, to `mtcars`, R's name for it.
 
 ## The basic form
 
@@ -120,9 +123,20 @@ p3 + guides(colour = guide_legend(override.aes = list(alpha = 1)))
 ```
 
 Keys are drawn as the layer draws its points, here almost transparent; `override.aes` draws them
-with an `alpha` of their own.
+with an `alpha` of their own. Giggly draws the first plot, writing `factor(cyl)` as `{:factor,
+[:cyl]}`; its points are jittered by Erlang's random numbers, not R's, so they land elsewhere than
+ggplot2's, each within the same 0.01 of its place (`geom_jitter()`'s notebook says more).
 
-Not in Giggly yet: jittered points (`geom_jitter()`) and `guide_legend()`'s `override.aes` option.
+```elixir
+p3 =
+  mtcars
+  |> Plot.new(%{x: :vs, y: :am, colour: {:factor, [:cyl]}})
+  |> Plot.geom_jitter(alpha: 0.2, width: 0.01, height: 0.01)
+
+render.(p3)
+```
+
+Not in Giggly yet: `guide_legend()`'s `override.aes` option.
 
 ## Rows and columns of keys
 

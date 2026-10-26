@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -16,10 +28,26 @@ cannot draw yet keeps its ggplot2 code and names what it is waiting for, so the 
 list of what remains.
 
 `position_jitter()` adds a little random noise to each position, which can make a small dataset
-easier to read when at least one of its positions is discrete: points that would sit on top of
-one another spread apart. The noise goes both ways, by up to 40% of the data's resolution unless
-`width` and `height` say otherwise, and a `seed` makes it the same every time. Giggly has none of
-it yet.
+easier to read when at least one of its positions is discrete: points that would sit on top of one
+another spread apart. The noise goes both ways, by up to 40% of the data's resolution unless `width`
+and `height` say otherwise, and a `seed` makes it the same every time. Giggly has
+`Giggly.Plot.position_jitter/1`, with `width:`, `height:` and `seed:`, which
+`Giggly.Plot.geom_point/3`'s `position:` takes, and `Giggly.Plot.geom_jitter/3`, which jitters its
+points with it.
+
+Giggly's jitter draws Erlang's random numbers, not R's, so its points land elsewhere than ggplot2's,
+each within the same distance of its place, and an axis that widens to hold them can end a little
+elsewhere too, by no more than about twice that distance; everything else in a drawing is ggplot2's.
+Where ggplot2 draws new numbers each time a plot is drawn unless given a `seed`, Giggly draws the
+same points every time, from a seed of 0 unless `seed:` gives another, and Giggly's `seed: 0` draws
+other numbers than ggplot2's `seed = 0`.
+
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The examples draw
+`Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from 1999
+to 2008, and `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
+magazine, which the setup cell binds to `mpg` and `mtcars`, their names in R.
 
 ## Jittered points beside boxplots
 
@@ -32,9 +60,16 @@ ggplot(mpg, aes(class, hwy)) +
   geom_jitter()
 ```
 
-`geom_jitter()` is a shortcut for `geom_point(position = "jitter")`.
+`geom_jitter()` is a shortcut for `geom_point(position = "jitter")`. The boxes' outline is
+`"grey50"`, a name only R has, written as its hex, `"#7F7F7F"`.
 
-Not in Giggly yet: `geom_jitter()`, points placed by `position_jitter()`.
+```elixir
+mpg
+|> Plot.new(%{x: :class, y: :hwy})
+|> Plot.geom_boxplot(colour: "#7F7F7F")
+|> Plot.geom_jitter()
+|> render.()
+```
 
 ## Too much jitter
 
@@ -46,7 +81,12 @@ ggplot(mtcars, aes(am, vs)) +
 
 `am` and `vs` are each 0 or 1, so unjittered points would sit on top of one another.
 
-Not in Giggly yet: `geom_jitter()` and `position_jitter()`.
+```elixir
+mtcars
+|> Plot.new(%{x: :am, y: :vs})
+|> Plot.geom_jitter()
+|> render.()
+```
 
 ## Less jitter
 
@@ -58,8 +98,22 @@ ggplot(mtcars, aes(am, vs)) +
   geom_jitter(position = position_jitter(width = 0.1, height = 0.1))
 ```
 
-Not in Giggly yet: `geom_jitter()` and `position_jitter()`, with their `width` and `height`
-options.
+The two draw the same points in Giggly, as both draw from a seed of 0, where ggplot2's each draw
+new ones.
+
+```elixir
+mtcars
+|> Plot.new(%{x: :am, y: :vs})
+|> Plot.geom_jitter(width: 0.1, height: 0.1)
+|> render.()
+```
+
+```elixir
+mtcars
+|> Plot.new(%{x: :am, y: :vs})
+|> Plot.geom_jitter(position: Plot.position_jitter(width: 0.1, height: 0.1))
+|> render.()
+```
 
 ## Reproducible jitter
 
@@ -72,7 +126,17 @@ ggplot(mtcars, aes(am, vs)) +
 ```
 
 With a `seed`, the position jitters both layers the same way, so each red point sits 0.2 above
-and to the right of its black one.
+and to the right of its black one. Giggly writes `am + 0.2` as `{&Kernel.+/2, [:am, 0.2]}`.
 
-Not in Giggly yet: `position_jitter()` and its `seed` option, and `geom_point()`'s `position`
-option.
+```elixir
+jitter = Plot.position_jitter(width: 0.1, height: 0.1, seed: 0)
+
+mtcars
+|> Plot.new(%{x: :am, y: :vs})
+|> Plot.geom_point(position: jitter)
+|> Plot.geom_point(%{x: {&Kernel.+/2, [:am, 0.2]}, y: {&Kernel.+/2, [:vs, 0.2]}},
+  position: jitter,
+  colour: "red"
+)
+|> render.()
+```

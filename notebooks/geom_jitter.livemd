@@ -28,13 +28,21 @@ what remains.
 
 `geom_jitter()` is a shortcut for `geom_point(position = "jitter")`: it moves each point by a small
 random amount, so that points which would sit on one another, as discrete values make them do, can
-be told apart. Giggly has no jitter yet, neither `geom_jitter()` nor `position_jitter()`; it draws
-the same points unmoved, with `Giggly.Plot.geom_point/3`. A plot is described with `Giggly.Plot` and
-drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
-so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
-cell with `Kino.Image`. The data in these examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel
-economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to `mpg`,
-ggplot2's name for it.
+be told apart. Giggly has both, `Giggly.Plot.geom_jitter/3`, with `width:` and `height:`, and
+`Giggly.Plot.position_jitter/1`, which `Giggly.Plot.geom_point/3`'s `position:` takes.
+
+Giggly's jitter draws Erlang's random numbers, not R's, so its points land elsewhere than ggplot2's,
+each within the same distance of its place, and an axis that widens to hold them can end a little
+elsewhere too, by no more than about twice that distance; everything else in a drawing is ggplot2's.
+Where ggplot2 draws new numbers each time a plot is drawn unless its position is given a `seed`,
+Giggly draws the same points every time, from a seed of 0 unless `position_jitter/1`'s `seed:` gives
+another.
+
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in these
+examples is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models
+from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's name for it.
 
 ## Points without jitter
 
@@ -47,8 +55,9 @@ Many cars share both a number of cylinders and a highway mileage, so their point
 of one another.
 
 ```elixir
-mpg
-|> Plot.new(%{x: :cyl, y: :hwy})
+p = Plot.new(mpg, %{x: :cyl, y: :hwy})
+
+p
 |> Plot.geom_point()
 |> render.()
 ```
@@ -59,7 +68,14 @@ mpg
 p + geom_jitter()
 ```
 
-Not in Giggly yet: `geom_jitter()` and the position it adds, `position_jitter()`.
+Each point moves up to 0.4 either way, 40% of the closest spacing of the values, which is 1 here,
+as both columns hold whole numbers; both axes widen to hold the points.
+
+```elixir
+p
+|> Plot.geom_jitter()
+|> render.()
+```
 
 ## Mapping colour
 
@@ -68,7 +84,11 @@ Not in Giggly yet: `geom_jitter()` and the position it adds, `position_jitter()`
 p + geom_jitter(aes(colour = class))
 ```
 
-Not in Giggly yet: `geom_jitter()`.
+```elixir
+p
+|> Plot.geom_jitter(%{colour: :class})
+|> render.()
+```
 
 ## Less jitter
 
@@ -83,7 +103,19 @@ ggplot(mpg, aes(cyl, hwy)) +
 Unless told otherwise, the jitter moves a point up to 40% of the data's resolution either way;
 a smaller `width` keeps each number of cylinders in a narrower column.
 
-Not in Giggly yet: `geom_jitter()` and its `width` option.
+```elixir
+mpg
+|> Plot.new(%{x: :cyl, y: :hwy})
+|> Plot.geom_jitter()
+|> render.()
+```
+
+```elixir
+mpg
+|> Plot.new(%{x: :cyl, y: :hwy})
+|> Plot.geom_jitter(width: 0.25)
+|> render.()
+```
 
 ## More jitter
 
@@ -95,4 +127,19 @@ ggplot(mpg, aes(cty, hwy)) +
   geom_jitter(width = 0.5, height = 0.5)
 ```
 
-Not in Giggly yet: `geom_jitter()` and its `width` and `height` options.
+City and highway mileages are whole numbers, so half a mile per gallon either way fills the gaps
+between them.
+
+```elixir
+mpg
+|> Plot.new(%{x: :cty, y: :hwy})
+|> Plot.geom_jitter()
+|> render.()
+```
+
+```elixir
+mpg
+|> Plot.new(%{x: :cty, y: :hwy})
+|> Plot.geom_jitter(width: 0.5, height: 0.5)
+|> render.()
+```
