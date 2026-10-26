@@ -19,8 +19,8 @@ A labeller writes the labels in a facet's strips from the values of its columns.
 builds one from a labeller for each column, or one for all the rows' strips and one for all the
 columns', and a default for the rest; each may be a labeller function, a function on strings, or a
 lookup table of the labels to show in place of the values. The result goes to the `labeller`
-argument of `facet_grid()` or `facet_wrap()`. Giggly has none of it yet: it has no `facet_grid()`,
-and `Giggly.Plot.facet_wrap/3` has no `labeller` option.
+argument of `facet_grid()` or `facet_wrap()`. Giggly has none of it yet: neither
+`Giggly.Plot.facet_grid/2` nor `Giggly.Plot.facet_wrap/3` takes a `labeller` option.
 
 ## A labeller for each column
 
@@ -34,7 +34,8 @@ p1 + facet_grid(
 )
 ```
 
-Not in Giggly yet: `facet_grid()`, `labeller()`, `label_both()` and `label_value()`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option, `labeller()`, `label_both()` and
+`label_value()`.
 
 ## A labeller for the rows and one for the columns
 
@@ -46,7 +47,8 @@ p1 + facet_grid(
 )
 ```
 
-Not in Giggly yet: `facet_grid()`, `labeller()`, `label_both()` and `label_value()`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option, `labeller()`, `label_both()` and
+`label_value()`.
 
 ## A function on strings
 
@@ -62,7 +64,7 @@ p2 <- ggplot(msleep, aes(x = sleep_total, y = awake)) + geom_point()
 p2 + facet_grid(vore ~ conservation, labeller = labeller(vore = capitalize))
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()` and `labeller()`.
+Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option and `labeller()`.
 
 ## A lookup table
 
@@ -87,7 +89,7 @@ p2 + facet_grid(vore ~ conservation, labeller = labeller(
 ))
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()` and `labeller()`.
+Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option and `labeller()`.
 
 ## Wrapping long labels
 
@@ -104,8 +106,8 @@ p3 +
   )
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()`, `labeller()`, and `label_wrap_gen()`,
-which wraps each label at 10 characters.
+Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option, `labeller()`, and
+`label_wrap_gen()`, which wraps each label at 10 characters.
 
 ## One labeller for several plots
 
@@ -125,5 +127,5 @@ p2 + facet_grid(vore ~ conservation, labeller = global_labeller)
 p3 + facet_wrap(~conservation2, labeller = global_labeller)
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()`, `labeller()`, `label_wrap_gen()`,
-`label_both()`, and `facet_wrap()`'s `labeller` option.
+Not in Giggly yet: the `msleep` dataset, `labeller()`, `label_wrap_gen()`, `label_both()`,
+`facet_grid()`'s `labeller` option, and `facet_wrap()`'s `labeller` option.

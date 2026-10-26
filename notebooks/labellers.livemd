@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,8 +31,14 @@ Labeller functions write the labels in the strips of `facet_grid()` and `facet_w
 `label_value()`, the default, shows each value alone; `label_both()` shows the column's name and
 the value; `label_context()` shows the value alone when the strips are for one column, and both
 when they are for several; `label_parsed()` reads the labels as R's plotmath expressions; and
-`label_wrap_gen()` makes a labeller that wraps long labels. Giggly has none of them yet: it has no
-`facet_grid()`, and `Giggly.Plot.facet_wrap/3` has no `labeller` option.
+`label_wrap_gen()` makes a labeller that wraps long labels. Giggly has none of them yet: the strips
+of `Giggly.Plot.facet_grid/2` and `Giggly.Plot.facet_wrap/3` show each value alone, as
+`label_value()` does, and neither takes a `labeller` option. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32
+cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for
+it.
 
 ## The default, values alone
 
@@ -36,7 +53,7 @@ p <- ggplot(mtcars, aes(wt, mpg)) + geom_point()
 p + facet_grid(. ~ cyl, labeller = label_value)
 ```
 
-Not in Giggly yet: `facet_grid()` and `label_value()`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option and `label_value()`.
 
 ## Names and values
 
@@ -45,8 +62,8 @@ Not in Giggly yet: `facet_grid()` and `label_value()`.
 p + facet_grid(. ~ cyl, labeller = label_both)
 ```
 
-Not in Giggly yet: `facet_grid()` and `label_both()`, which writes each strip as `cyl: 4` rather
-than `4`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option and `label_both()`, which writes each strip
+as `cyl: 4` rather than `4`.
 
 ## Labels that depend on context
 
@@ -59,7 +76,7 @@ row strips, for `am` alone, show values.
 p + facet_grid(am ~ vs+cyl, labeller = label_context)
 ```
 
-Not in Giggly yet: `facet_grid()` and `label_context()`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option and `label_context()`.
 
 ## Plotmath labels
 
@@ -72,7 +89,27 @@ p + facet_grid(. ~ cyl2)
 p + facet_grid(. ~ cyl2, labeller = label_parsed)
 ```
 
-Not in Giggly yet: `facet_grid()`, `label_parsed()` and R's plotmath expressions.
+Giggly draws the first plot, whose strips show `cyl2`'s labels as they are. The cell makes `cyl2`
+as the first line above does, a factor of the names with `Giggly.Factor.new/2`, its levels in the
+order of `cyl`'s values, and adds it to `mtcars`.
+
+```elixir
+names = %{4 => "alpha", 6 => "beta", 8 => "gamma"}
+cyl2 = Enum.map(mtcars[:cyl], fn cylinders -> names[round(cylinders)] end)
+mtcars = Keyword.put(mtcars, :cyl2, Giggly.Factor.new(cyl2, levels: ["alpha", "beta", "gamma"]))
+
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+
+p
+|> Plot.facet_grid(cols: :cyl2)
+|> render.()
+```
+
+Not in Giggly yet: `facet_grid()`'s `labeller` option, `label_parsed()` and R's plotmath
+expressions.
 
 ## A labeller's own options
 
@@ -84,4 +121,4 @@ Not in Giggly yet: `facet_grid()`, `label_parsed()` and R's plotmath expressions
 p + facet_grid(. ~ cyl, labeller = \(x) label_both(x, sep = "="))
 ```
 
-Not in Giggly yet: `facet_grid()` and `label_both()`.
+Not in Giggly yet: `facet_grid()`'s `labeller` option and `label_both()`.

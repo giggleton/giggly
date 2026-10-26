@@ -2756,6 +2756,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Draw the notebook examples facet_grid unlocks, and narrow every verdict to what
+  still waits (facet_grid, step 3, the notebook sweep); §4: "`facet_grid` is Phase 3's thirteenth
+  increment", "A value an example computes in base R"
 - 2026-10-26 — Draw facet_grid: the rows' strips right of the last column, turned, the first
   column split on outermost, strips above only the rows that have them, and the theme's y strips
   (facet_grid, step 2); §4: "`facet_grid` is Phase 3's thirteenth increment"

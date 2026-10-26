@@ -97,5 +97,4 @@ ggplot(df_lines) +
   theme_void(20)
 ```
 
-Not in Giggly yet: horizontal lines (`geom_hline()`), `scale_linetype_identity()` and
-`facet_grid()`.
+Not in Giggly yet: horizontal lines (`geom_hline()`) and `scale_linetype_identity()`.

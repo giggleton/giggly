@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,8 +32,15 @@ columns and a column of panels for each value of another. It suits two discrete 
 every combination occurs in the data; for one column with many values, ggplot2 suggests
 `facet_wrap()`. Its scales can be shared by every panel or free to vary along the rows or the
 columns, panels can take space in proportion to their scales, and margins add panels that hold
-the data for every value of a column. Giggly has no `facet_grid()` yet; it has
-`Giggly.Plot.facet_wrap/3`, which wraps a sequence of panels into rows.
+the data for every value of a column. Giggly has `Giggly.Plot.facet_grid/2`, which takes the
+rows' columns as `rows:`, the columns' as `cols:`, and `scales:`, shared or free along either. It
+takes no `space`, `margins`, `axes`, `axis.labels`, `labeller`, `switch`, `as.table`, `drop` or
+`shrink` options. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
+and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data
+is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from
+1999 to 2008; and `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend*
+US magazine. The setup cell binds them to `mpg` and `mtcars`, R's names for them.
 
 ## Rows, columns, or both
 
@@ -34,7 +53,32 @@ p + facet_grid(cols = vars(cyl))
 p + facet_grid(vars(drv), vars(cyl))
 ```
 
-Not in Giggly yet: `facet_grid()`.
+ggplot2 names the columns with `vars()`, and the last call passes the rows' and the columns' by
+position, rows first; Giggly names each column as a mapping does, by an atom or a string, given to
+`rows:` or `cols:`.
+
+```elixir
+plot =
+  mpg
+  |> Plot.new(%{x: :displ, y: :cty})
+  |> Plot.geom_point()
+
+plot
+|> Plot.facet_grid(rows: :drv)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.facet_grid(cols: :cyl)
+|> render.()
+```
+
+```elixir
+plot
+|> Plot.facet_grid(rows: :drv, cols: :cyl)
+|> render.()
+```
 
 ## The order of the panels
 
@@ -44,10 +88,8 @@ Not in Giggly yet: `facet_grid()`.
 ```
 
 This is advice rather than an example: the panels follow the order of a column's levels, which R
-sets with `factor()`. `Giggly.Plot.facet_wrap/3`'s panels follow a column's levels too, which
-`Giggly.Factor.new/2` sets in the table.
-
-Not in Giggly yet: `facet_grid()`.
+sets with `factor()`. `Giggly.Plot.facet_grid/2`'s rows and columns of panels follow a column's
+levels too, which `Giggly.Factor.new/2` sets in the table.
 
 ## Data repeated across panels
 
@@ -64,7 +106,18 @@ p +
   geom_point(data = df, colour = "red", size = 2)
 ```
 
-Not in Giggly yet: `facet_grid()`.
+The means are base R's `mean()`, so the cell writes out the two values R gives. A layer given a
+table of its own by `data:` draws that table, and one lacking the facet's columns is drawn in every
+panel.
+
+```elixir
+df = %{"displ" => [3.471794871794872], "cty" => [16.858974358974358]}
+
+plot
+|> Plot.facet_grid(cols: :cyl)
+|> Plot.geom_point(data: df, colour: "red", size: 2)
+|> render.()
+```
 
 ## Axes on every panel
 
@@ -79,8 +132,8 @@ ggplot(mpg, aes(cty, hwy)) +
   facet_grid(year ~ drv, axes = "all", axis.labels = "all_x")
 ```
 
-Not in Giggly yet: `facet_grid()` and its `axes` and `axis.labels` options, which here draw both
-axes on every panel but label only the x axes.
+Not in Giggly yet: `axes` and `axis.labels`, which here draw both axes on every panel but label
+only the x axes.
 
 ## Free scales
 
@@ -95,9 +148,19 @@ mt <- ggplot(mtcars, aes(mpg, wt, colour = factor(cyl))) +
 mt + facet_grid(vars(cyl), scales = "free")
 ```
 
-`Giggly.Plot.facet_wrap/3` takes the same `scales` option.
+`{:factor, [:cyl]}` is R's `factor(cyl)`, which makes the colour discrete. With `scales: :free`,
+each column of panels has an x scale of its own and each row a y scale.
 
-Not in Giggly yet: `facet_grid()`.
+```elixir
+mt =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt, colour: {:factor, [:cyl]}})
+  |> Plot.geom_point()
+
+mt
+|> Plot.facet_grid(rows: :cyl, scales: :free)
+|> render.()
+```
 
 ## Free space
 
@@ -111,8 +174,7 @@ ggplot(mpg, aes(drv, model)) +
   theme(strip.text.y = element_text(angle = 0))
 ```
 
-Not in Giggly yet: `facet_grid()` and its `space` option, which sizes each panel in proportion to
-its scales, and the theme's `strip.text.y` setting, here to turn the row strips' text horizontal.
+Not in Giggly yet: `space`, which sizes each panel in proportion to its scales.
 
 ## Margins
 
@@ -132,4 +194,4 @@ mg + facet_grid(vs + am ~ gear, margins = "am")
 mg + facet_grid(vs + am ~ gear, margins = "vs")
 ```
 
-Not in Giggly yet: `facet_grid()` and its `margins` option.
+Not in Giggly yet: `margins`.

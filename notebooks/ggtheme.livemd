@@ -72,18 +72,21 @@ p1 <- ggplot(mtcars2) +
 p1 + theme_gray() # the default
 ```
 
-The cell makes `mtcars2` as `within()` does, each factor's values as text: `vs` and `am` as their
-words, and `cyl` and `gear` as their numbers written out, so `gear` is discrete and its legend lists
+The cell makes `mtcars2` as `within()` does. `vs` and `am` become factors of their words, each
+with `Giggly.Factor.new/2` and its levels in R's order, so that the panels further down follow
+them; `cyl` and `gear` become their numbers written out, so `gear` is discrete and its legend lists
 3, 4 and 5. `Giggly.Plot.theme_gray/2` draws the plot in `theme_gray()`, which is Giggly's default
 too.
 
 ```elixir
-words = %{vs: %{0.0 => "V-shaped", 1.0 => "Straight"}, am: %{0.0 => "Automatic", 1.0 => "Manual"}}
+labels = %{vs: ["V-shaped", "Straight"], am: ["Automatic", "Manual"]}
 
 mtcars2 =
   Enum.map(mtcars, fn
     {column, values} when column in [:vs, :am] ->
-      {column, Enum.map(values, fn value -> words[column][value] end)}
+      levels = labels[column]
+      words = Enum.map(values, fn value -> Enum.at(levels, round(value)) end)
+      {column, Giggly.Factor.new(words, levels: levels)}
 
     {column, values} when column in [:cyl, :gear] ->
       {column, Enum.map(values, fn value -> Integer.to_string(round(value)) end)}
@@ -103,7 +106,7 @@ p1 =
     tag: "Figure 1",
     x: "Weight (1000 lbs)",
     y: "Fuel economy (mpg)",
-        colour: "Gears"
+    colour: "Gears"
   )
 
 p1
@@ -174,7 +177,16 @@ p2 <- p1 + facet_grid(vs ~ am)
 p2 + theme_gray() # the default
 ```
 
-Not in Giggly yet: `facet_grid()`.
+`vs ~ am` gives the panels a row for each value of `vs` and a column for each of `am`, which
+`Giggly.Plot.facet_grid/2` takes as `rows: :vs, cols: :am`.
+
+```elixir
+p2 = Plot.facet_grid(p1, rows: :vs, cols: :am)
+
+p2
+|> Plot.theme_gray()
+|> render.()
+```
 
 ## Other complete themes with panels
 
@@ -188,4 +200,44 @@ p2 + theme_classic()
 p2 + theme_void()
 ```
 
-Not in Giggly yet: `facet_grid()`.
+```elixir
+p2
+|> Plot.theme_bw()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_linedraw()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_light()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_dark()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_minimal()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_classic()
+|> render.()
+```
+
+```elixir
+p2
+|> Plot.theme_void()
+|> render.()
+```
