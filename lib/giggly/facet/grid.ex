@@ -23,8 +23,9 @@ defmodule Giggly.Facet.Grid do
   # as ggplot2's layout numbers them. A panel draws an axis only at the grid's margins, free scales
   # or not, ggplot2's default: below the last row and left of the first column, so each column's
   # bottom axis is its own x scale's. The panels of the first row have a strip above them for each
-  # of the columns' columns, in their order, labelled with its value as ggplot2's `label_value()`
-  # writes it.
+  # of the columns' columns, in their order, and those of the last column a strip right of them for
+  # each of the rows' columns, the first outermost, each labelled with its value as ggplot2's
+  # `label_value()` writes it.
 
   @enforce_keys [:rows, :cols, :scales]
   defstruct @enforce_keys
@@ -49,11 +50,18 @@ defmodule Giggly.Facet.Grid do
       row_values = values(frames, rows, order_key, "rows")
       column_values = values(frames, cols, order_key, "cols")
       last_row = length(row_values)
+      last_column = length(column_values)
 
       cells =
         for {row_value, row} <- Enum.with_index(row_values, 1),
             {column_value, column} <- Enum.with_index(column_values, 1),
-            do: %{row: row, column: column, values: row_value ++ column_value, top: column_value}
+            do: %{
+              row: row,
+              column: column,
+              values: row_value ++ column_value,
+              top: column_value,
+              right: row_value
+            }
 
       free_x = scales in [:free_x, :free]
       free_y = scales in [:free_y, :free]
@@ -70,7 +78,8 @@ defmodule Giggly.Facet.Grid do
             scale_y: Enum.map(cells, fn cell -> scale_id(cell.row, free_y) end),
             axis_bottom: Enum.map(cells, fn cell -> cell.row == last_row end),
             axis_left: Enum.map(cells, fn cell -> cell.column == 1 end),
-            strip: Enum.map(cells, &top_strip/1)
+            strip_top: Enum.map(cells, &top_strip/1),
+            strip_right: Enum.map(cells, fn cell -> right_strip(cell, last_column) end)
           ]
       )
     end
@@ -102,9 +111,19 @@ defmodule Giggly.Facet.Grid do
     defp scale_id(place, true), do: place
     defp scale_id(_place, false), do: @only_scale
 
-    # The first row's strips label the columns' values; the panels below have none.
+    # The first row's strips label the columns' values, top to bottom, and the last column's the
+    # rows', left to right, so the first column split on is outermost on both sides, as ggplot2's
+    # `build_strip()` turns the right side's round; the other panels have none.
     defp top_strip(%{row: 1, top: values}), do: Enum.map(values, &Combinations.label/1)
     defp top_strip(_cell), do: []
+
+    defp right_strip(%{column: last_column, right: values}, last_column) do
+      values
+      |> Enum.reverse()
+      |> Enum.map(&Combinations.label/1)
+    end
+
+    defp right_strip(_cell, _last_column), do: []
 
     defp inspect_all(terms), do: Enum.map_join(terms, ", ", &inspect/1)
   end

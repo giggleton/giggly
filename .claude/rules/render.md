@@ -42,7 +42,8 @@ beginning "Legends go where the theme puts them".
   from the theme carries. A geom is handed no theme: the marks take their look from their rows,
   which hold the theme's defaults where the layer leaves its look unset.
 - **Rendering arranges the panels as the layout table says, knowing no facet.** Each layout row
-  gives a panel's row and column, whether it draws its bottom and left axes, and its strip labels;
+  gives a panel's row and column, whether it draws its bottom and left axes, and its strip labels
+  above it and right of it;
   a facet says where things go, and rendering lays them out as ggplot2's facets lay them out. An
   arrangement those columns cannot express grows a case here.
 - **The panels share what the margin, axes, strips, titles and panel spacing leave, equally**,
@@ -52,7 +53,10 @@ beginning "Legends go where the theme puts them".
   table, so the panels keep their shape and the table is centred in the drawing.
   The margin is the theme's, each side its own, and so is the spacing between panels, across
   (`panel_spacing_x`) and down (`panel_spacing_y`). Above each row
-  of panels are its strips, a row per strip layer as tall as its tallest strip; below it a row as
+  of panels are its strips, a row per strip layer its panels have, each as tall as the tallest
+  strip above any panel; right of the last column a column per strip layer the panels have there,
+  each as wide as the widest, against the panels and before any legend, as ggplot2's `facet_grid`
+  seams them on with its strips inside; below each row a row as
   tall as its tallest measured bottom axis, and left of each column a column as wide as its widest
   measured left axis. **A bottom axis with an empty cell under it is not measured**, as ggplot2's
   `measure_axes()` sets it to nothing, so it hangs into the empty space (`Scene.Cell`'s `hang`);
@@ -69,11 +73,11 @@ beginning "Legends go where the theme puts them".
   label of `:none` takes a row or column of no size.
 - **Every plot's cells are drawn in ggplot2's facets' order**: the background first, over the
   whole table, margin included, as ggplot2's `table_add_background()` adds it; then the panels
-  column by column; the strips from the last row of panels to the first, left to right; the bottom
-  axes in that order; the left axes from the last column to the first, top to bottom; then the x
-  title and the y title, the legends, and the plot's subtitle, title, caption and tag. ggplot2's
-  plot without a facet draws its y axis before its x axis, which Giggly does not follow
-  (design-log §4).
+  column by column; the strips from the last row of panels to the first, left to right; the strips
+  right of the panels, top to bottom and left to right; the bottom axes as the strips above; the
+  left axes from the last column to the first, top to bottom; then the x title and the y title,
+  the legends, and the plot's subtitle, title, caption and tag. ggplot2's plot without a facet
+  draws its y axis before its x axis, which Giggly does not follow (design-log §4).
 - **Layers are drawn in the order they were added**, so a later layer is drawn over an earlier
   one.
 - **A layer's rows are split by panel, and each panel's are drawn by the layer's geom alone**, as

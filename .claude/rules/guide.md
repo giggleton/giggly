@@ -118,11 +118,14 @@ panel's grid lines are placed by the coordinate system".
 - **Drawing order follows ggplot2's:** an axis's line first; below the panel the ticks and then
   the labels, to its left and round a radial panel's circle the labels and then the ticks, and
   round the circle the line last.
-- **A strip is one label on a background as wide as its panel**, ggplot2's `label_value()` text
-  placed by the rule counting its margins on every side, `theme_gray()`'s centred, as tall as its
-  margins and the label turned, a level one an ascent and the deepest descent. A panel has one
-  strip per facet column, top to bottom, each drawn alone, as ggplot2's `assemble_strips()`
-  stacks them.
+- **A strip is one label on a background as long as its panel's side**, ggplot2's `label_value()`
+  text placed by the rule counting its margins on every side, each side the cell's own,
+  `theme_gray()`'s centred: above the panel (`strip_text_x_top`, `strip_background_x`) as tall as
+  its margins above and below and the label turned, a level one an ascent and the deepest descent;
+  right of it (`strip_text_y_right`, `strip_background_y`, `theme_gray()`'s text turned -90
+  degrees) as wide as its margins left and right and the label turned, as R measures it. A panel
+  has one strip per label it is given on a side, top to bottom or left to right, each drawn alone,
+  as ggplot2's `assemble_strips()` stacks them.
 - **An axis is drawn per panel, its title once per plot.** `Axis.draw/3` draws one panel's axes;
   `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
   aesthetic on each side.

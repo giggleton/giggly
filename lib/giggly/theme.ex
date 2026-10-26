@@ -142,7 +142,9 @@ defmodule Giggly.Theme do
     :panel_spacing_x,
     :panel_spacing_y,
     :strip_background_x,
+    :strip_background_y,
     :strip_text_x_top,
+    :strip_text_y_right,
     :legend_background,
     :legend_margin,
     :legend_key,
@@ -346,10 +348,10 @@ defmodule Giggly.Theme do
   whose breaks they mark, the panel's border, and whether the background and grid are drawn over
   the layers; each axis's ticks, their length, its line, its labels and its title, by axis and
   side, a radial panel's angle axis (`theta`) and radius axis (`r`) apart; the space between
-  panels across and down; the background and text of the strips above each panel; a legend's
-  background, the margin inside it, each key's background, width and height, the space between
-  its keys, its title above its keys or left of them, its labels right of its keys or below a
-  colour bar, each with its margin facing the keys widened by the keys' spacing, a colour bar's
+  panels across and down; the background and text of the strips above and right of the panels; a
+  legend's background, the margin inside it, each key's background, width and height, the space
+  between its keys, its title above its keys or left of them, its labels right of its keys or below
+  a colour bar, each with its margin facing the keys widened by the keys' spacing, a colour bar's
   ticks and how far each reaches into the bar; the space between one legend and the next beside
   it or below it; where the legends go (`legend_position`), the point of the panels an inside box
   goes at (`legend_position_inside`), which way each legend's keys run (`legend_direction`),
@@ -393,7 +395,9 @@ defmodule Giggly.Theme do
           panel_spacing_x: float(),
           panel_spacing_y: float(),
           strip_background_x: rect(),
+          strip_background_y: rect(),
           strip_text_x_top: text(),
+          strip_text_y_right: text(),
           legend_background: rect(),
           legend_margin: margin(),
           legend_key: rect(),
@@ -693,7 +697,9 @@ defmodule Giggly.Theme do
       panel_spacing_x: distance(theme, :panel_spacing_x),
       panel_spacing_y: distance(theme, :panel_spacing_y),
       strip_background_x: rect(theme, :strip_background_x),
+      strip_background_y: rect(theme, :strip_background_y),
       strip_text_x_top: text(theme, :strip_text_x_top),
+      strip_text_y_right: text(theme, :strip_text_y_right),
       legend_background: rect(theme, :legend_background),
       legend_margin: margin(theme, :legend_margin),
       legend_key: rect(theme, :legend_key),
@@ -1064,7 +1070,7 @@ defmodule Giggly.Theme do
   # radius axis's centred; its title is `half_line / 2` from the labels, the x axis's hanging, the
   # y axis's turned 90 degrees with its top toward the labels' far side. A strip is light grey
   # (85% toward paper) with no border, and its text near black (10% toward paper), 0.8 of the base
-  # size, with `0.8 * half_line` around it.
+  # size, with `0.8 * half_line` around it, turned 90 degrees clockwise in a strip right of a panel.
   #
   # A legend has no border; the space between legends, and between the panels and the legends, is
   # twice the spacing; each key is 1.2 lines square on the panel's background (`legend_key`
@@ -1116,6 +1122,7 @@ defmodule Giggly.Theme do
         size: {:rel, 0.8},
         margin: strip_margin(half_line)
       },
+      strip_text_y: %{angle: -90},
       plot_background: %{color: @paper},
       plot_title: %{size: {:rel, 1.2}, hjust: 0, vjust: 1, margin: sides(0, 0, half_line, 0)},
       plot_subtitle: %{hjust: 0, vjust: 1, margin: sides(0, 0, half_line, 0)},

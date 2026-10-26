@@ -46,10 +46,10 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
 - **The layout table holds only what a stage reads.** One row per panel: `panel`; the `row` and
   `column` rendering puts the panel's cell at (ggplot2's `ROW` and `COL`, spelled out); and the
   `scale_x`/`scale_y` ids scale training routes by; and what rendering arranges, which is the
-  facet's say: `axis_bottom` and `axis_left`, whether the panel draws each axis, and `strip`, its
-  strip labels top to bottom. Each column a facet splits on joins it, by its name in the data,
-  as in ggplot2's, a grid's rows' columns before its columns', and each row's panel is found from
-  its values there.
+  facet's say: `axis_bottom` and `axis_left`, whether the panel draws each axis, and `strip_top`
+  and `strip_right`, its strip labels above it top to bottom and right of it left to right. Each
+  column a facet splits on joins it, by its name in the data, as in ggplot2's, a grid's rows'
+  columns before its columns', and each row's panel is found from its values there.
 - **A wrapped panel draws an axis on each side with no panel beside it**, ggplot2's axes at the
   margins: below the last row and below a panel with an empty cell under it, left of the first
   column. **On a free axis (`scales: :free_x`, `:free_y` or `:free`) each panel has a scale of its
@@ -61,7 +61,10 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   axis only at its margins, free scales or not**, below the last row and left of the first
   column, ggplot2's `axes = "margins"`; **on a free axis each column of panels shares an x scale
   and each row a y scale, its id the column's or the row's**, as ggplot2 numbers `SCALE_X` by
-  `COL` and `SCALE_Y` by `ROW`; its first row's panels have the strips of its columns' columns.
+  `COL` and `SCALE_Y` by `ROW`; its first row's panels have the strips of its columns' columns and
+  its last column's those of its rows' columns, the first column split on outermost on both sides,
+  as ggplot2's `build_strip()` turns the right side's round. A wrapped panel's and the null
+  facet's are all above.
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
   levels, the first table's and then those each later one adds; any other as a discrete scale

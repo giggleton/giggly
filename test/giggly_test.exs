@@ -7047,6 +7047,72 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/facet_wrap_layer_data.svg")
     end
 
+    # Golden: test/golden/facet_grid.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/facet_grid.R: every element, in order, and every clip path match it.
+    # facet_grid()'s first examples together: a row of panels for each drive train crossed with a
+    # column for each cylinder count, the three pairs no car has drawn empty, the cylinders' strips
+    # above the first row and the drive trains' right of the last column, turned, axes only at the
+    # grid's margins. It moves with how panels are laid out, strips drawn or axes placed.
+    test "a grid crosses its rows with its columns, its strips above and right of the panels" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :cty})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :drv, cols: :cyl)
+
+      assert golden?(plot, "facet_grid")
+    end
+
+    # Golden: test/golden/facet_grid_free.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/facet_grid_free.R: every element, in order, and every clip path match it,
+    # but the background's edge, which R writes as its rounding error. Each column of panels shares
+    # an x scale and each row a y scale, the empty panel taking its column's and its row's, and the
+    # axes stay at the margins. It moves with what moves test/golden/facet_grid.svg, and with how
+    # free scales are trained.
+    test "a grid's free scales are shared down a column and along a row, its axes at the margins" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 10],
+          "y" => [1, 4, 2, 5],
+          "r" => ["a", "a", "b", "b"],
+          "c" => ["u", "u", "u", "v"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :r, cols: :c, scales: :free)
+
+      assert golden?(plot, "facet_grid_free")
+    end
+
+    # Golden: test/golden/facet_grid_two_rows.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/facet_grid_two_rows.R: every element, in order, and every clip path
+    # match it, but the background's edge, which R writes as its rounding error. Two columns split
+    # the rows, so each row has two strips right of it, the first column's outermost. It moves with
+    # what moves test/golden/facet_grid.svg.
+    test "a grid's rows split by two columns have two strips each, the first outermost" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: [:vs, :am], cols: :gear)
+
+      assert golden?(plot, "facet_grid_two_rows")
+    end
+
+    # Golden: test/golden/facet_grid_legend.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/facet_grid_legend.R: every element, in order, and every clip path match
+    # it. facet_grid()'s free scales example: the strips right of the panels, the legend beyond
+    # them. It moves with what moves test/golden/facet_grid_free.svg, and with where a legend goes.
+    test "a legend right of a grid is beyond the strips right of its panels" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt, colour: {:factor, [:cyl]}})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :cyl, scales: :free)
+
+      assert golden?(plot, "facet_grid_legend")
+    end
+
     # Golden: test/golden/scale_continuous.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/scale_continuous.R: every element matches it, the x axis drawn before the
     # y as in test/golden/point.svg, and every clip path. An x scale named "Weight", which titles
@@ -8928,6 +8994,40 @@ defmodule GigglyTest do
         |> Plot.theme(strip_text: [hjust: 0, face: :bold])
 
       assert golden?(plot, "theme_text_strip")
+    end
+
+    # Golden: test/golden/theme_text_strip_y.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_text_strip_y.R: every element, in order, and every clip path
+    # match it. The strips right of the panels with their text level, as wide as the widest label
+    # and its margins left and right, the label moved by each side of its margin, and no
+    # background.
+    test "a right strip's label is turned, placed in its margins and backed as the theme says" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :cty})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :drv)
+        |> Plot.theme(
+          strip_text_y: [angle: 0, margin: [top: 1, right: 2, bottom: 3, left: 6]],
+          strip_background_y: :none
+        )
+
+      assert golden?(plot, "theme_text_strip_y")
+    end
+
+    # Golden: test/golden/theme_removed_strip_y.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/theme_removed_strip_y.R: every element, in order, and every clip
+    # path match it. The right strips' text removed: they are not drawn and take no room, and the
+    # strips above stay.
+    test "a right strip whose text the theme removes is not drawn and takes no room" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :cty})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :drv, cols: :year)
+        |> Plot.theme(strip_text_y: :none)
+
+      assert golden?(plot, "theme_removed_strip_y")
     end
 
     # Golden: test/golden/theme_text_legend_justified.svg, checked against ggplot2's drawing of the

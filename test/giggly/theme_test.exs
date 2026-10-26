@@ -131,7 +131,8 @@ defmodule Giggly.ThemeTest do
   end
 
   # ggplot2 4.0.3's `calc_element()` of each text Giggly draws, under theme_gray() and
-  # theme_void(); every other complete theme gives theme_gray()'s.
+  # theme_void(); every other complete theme gives theme_gray()'s, the right strips' text turned
+  # -90 degrees in each but theme_void(), which leaves it level.
   describe "complete/1, text's face, angle and justification" do
     test "each complete theme's texts are plain, level or turned, and justified as R's" do
       looks = fn theme, leaves ->
@@ -171,6 +172,10 @@ defmodule Giggly.ThemeTest do
                   {:axis_title_y_left, :plain, 90.0, 0.5, 1.0}
                   | gray_titles
                 ], gray_titles}
+
+      assert {looks.(gray, [:strip_text_y_right]), looks.(void, [:strip_text_y_right])} ===
+               {[{:strip_text_y_right, :plain, -90.0, 0.5, 0.5}],
+                [{:strip_text_y_right, :plain, 0.0, 0.5, 0.5}]}
     end
 
     # ggplot2's legend lays a text of its own over the root text, its justification for the side

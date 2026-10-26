@@ -313,7 +313,10 @@ defmodule Giggly.FacetTest do
       frame = DataFrame.new([{"cyl", [4, nil, 4]}, {"drv", [:f, :r, :awd]}])
 
       facet_layout = layout(wrap(["cyl", "drv"]), frame)
-      assert DataFrame.pull(facet_layout, :strip) == [["4", "awd"], ["4", "f"], ["NA", "r"]]
+
+      assert {DataFrame.pull(facet_layout, :strip_top),
+              DataFrame.pull(facet_layout, :strip_right)} ==
+               {[["4", "awd"], ["4", "f"], ["NA", "r"]], [[], [], []]}
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 writes the strips of `facet_wrap(~ t + f)` over
@@ -326,7 +329,8 @@ defmodule Giggly.FacetTest do
       by_flag_and_number = layout(wrap(["t", "f"]), frame)
       by_cylinders = layout(wrap(["cyl"]), cylinders)
 
-      assert {DataFrame.pull(by_flag_and_number, :strip), DataFrame.pull(by_cylinders, :strip)} ===
+      assert {DataFrame.pull(by_flag_and_number, :strip_top),
+              DataFrame.pull(by_cylinders, :strip_top)} ===
                {[["FALSE", "1e+05"], ["TRUE", "0.5"], ["TRUE", "2"]], [["4"], ["6"], ["8"]]}
     end
   end
@@ -429,13 +433,26 @@ defmodule Giggly.FacetTest do
       end
     end
 
-    test "the first row's panels are labelled with the columns' values, a missing value as NA" do
-      frame = DataFrame.new([{"r", ["a", "b"]}, {"c", [nil, 4.0]}, {"d", [true, true]}])
-      labelled = layout(grid(["r"], ["c", "d"]), frame)
-      unlabelled = layout(grid(["r"], []), frame)
+    # Golden: ggplot2 4.0.3 in R 4.6.1 draws `facet_grid(v + a ~ g)`'s right strips a's nearest the
+    # panels, v's outermost, as the strips above put the first column on top.
+    test "the first row's panels are labelled with the columns' values, top to bottom, and the " <>
+           "last column's with the rows', left to right, a missing value as NA" do
+      frame =
+        DataFrame.new([
+          {"r", ["a", "b"]},
+          {"s", [1, 2]},
+          {"c", [nil, 4.0]},
+          {"d", [true, true]}
+        ])
 
-      assert DataFrame.pull(labelled, :strip) == [["4", "TRUE"], ["NA", "TRUE"], [], []]
-      assert DataFrame.pull(unlabelled, :strip) == [[], []]
+      both = layout(grid(["r", "s"], ["c", "d"]), frame)
+      rows_alone = layout(grid(["r"], []), frame)
+
+      assert {DataFrame.pull(both, :strip_top), DataFrame.pull(both, :strip_right)} ==
+               {[["4", "TRUE"], ["NA", "TRUE"], [], []], [[], ["1", "a"], [], ["2", "b"]]}
+
+      assert {DataFrame.pull(rows_alone, :strip_top), DataFrame.pull(rows_alone, :strip_right)} ==
+               {[[], []], [["a"], ["b"]]}
     end
   end
 

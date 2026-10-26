@@ -17,9 +17,10 @@ defmodule Giggly.Render do
   # drawn beside it.
   #
   # The panels are arranged as the layout table says, which is the facet's say: each at its row and
-  # column, the axes it draws, and the strips above it. They are laid out as ggplot2's facets lay
-  # them out: the panels share what the fixed sizes leave equally, the theme's panel spacing
-  # between them; above each row of panels are its strips, below it a row as tall as its tallest
+  # column, the axes it draws, and the strips above it and right of it. They are laid out as
+  # ggplot2's facets lay them out: the panels share what the fixed sizes leave equally, the theme's
+  # panel spacing between them; above each row of panels are its strips, right of the last column
+  # the strips right of the panels, against them, and below each row a row as tall as its tallest
   # bottom axis, and left of each column of panels a column as wide as its widest left axis. An
   # axis below a panel with an empty cell under it is not measured, as ggplot2 measures it, so it
   # hangs into the empty space and the rest of the row takes no room for it. The axes' titles are
@@ -46,10 +47,10 @@ defmodule Giggly.Render do
   #
   # Cells are drawn in ggplot2's order, the order its facets add grobs to the table: the panels
   # column by column; the strips, from the last row of panels to the first, left to right; the
-  # bottom axes in the same order; the left axes, from the last column to the first, top to
-  # bottom; then the x title and the y title, the legends, and the plot's subtitle, title, caption
-  # and tag. ggplot2's plot without a facet draws its y axis before its x axis; Giggly draws every
-  # plot in its facets' order.
+  # strips right of the panels, top to bottom, left to right; the bottom axes as the strips above;
+  # the left axes, from the last column to the first, top to bottom; then the x title and the y
+  # title, the legends, and the plot's subtitle, title, caption and tag. ggplot2's plot without a
+  # facet draws its y axis before its x axis; Giggly draws every plot in its facets' order.
   #
   # Nothing outside Giggly calls this module: `Giggly.to_svg/2` assembles a plot and renders it
   # here.
@@ -140,9 +141,9 @@ defmodule Giggly.Render do
        ) do
     layers_by_panel = Enum.map(drawn_data, fn frame -> DataFrame.split(frame, :panel) end)
 
-    [:panel, :row, :column, :axis_bottom, :axis_left, :strip]
+    [:panel, :row, :column, :axis_bottom, :axis_left, :strip_top, :strip_right]
     |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
-    |> Enum.zip_with(fn [panel, row, column, axis_bottom, axis_left, strip] ->
+    |> Enum.zip_with(fn [panel, row, column, axis_bottom, axis_left, strip_top, strip_right] ->
       params = Map.fetch!(panel_params, panel)
       %{bottom: bottom_axis, left: left_axis} = Guide.Axis.draw(coord, params, theme)
 
@@ -167,7 +168,8 @@ defmodule Giggly.Render do
         primitives: panel_primitives({background, layer_primitives, foreground}, theme),
         bottom: if(axis_bottom, do: bottom_axis, else: :none),
         left: if(axis_left, do: left_axis, else: :none),
-        strips: Guide.Strip.draw(strip, theme)
+        strips: Guide.Strip.draw(strip_top, :top, theme),
+        right_strips: Guide.Strip.draw(strip_right, :right, theme)
       }
     end)
   end
@@ -250,11 +252,19 @@ defmodule Giggly.Render do
 
   # The columns, left to right, each named and sized: the margin's left side, the tag, any legends
   # on the left and the theme's spacing from the panels, the y title, then for each column of
-  # panels its left axes and its panels, the panel spacing across between, then any legends on the
-  # right beyond the theme's spacing from the panels, then the margin's right side, as ggplot2's
+  # panels its left axes and its panels, the panel spacing across between, then the strips right of
+  # the last column, a column per strip, the nearest first, then any legends on the right beyond
+  # the theme's spacing from the panels, then the margin's right side, as ggplot2's
   # `table_add_legends()` adds them outside the axes' titles.
   defp widths(panels, grid, {{title_width, _title}, labels}, legend, theme) do
     %{tag: {{tag_width, _tag_height}, _tag}} = labels
+    right_strips = Enum.map(panels, fn panel -> panel.right_strips end)
+
+    # Every strip is as wide as the widest, as ggplot2's `assemble_strips()` makes them.
+    right_strip_columns =
+      Enum.map(1..strip_layers(right_strips)//1, fn layer ->
+        {{:strip_right, layer}, {:points, strip_depth(right_strips)}}
+      end)
 
     panel_columns =
       Enum.map(1..grid.columns//1, fn column ->
@@ -269,6 +279,7 @@ defmodule Giggly.Render do
       beside(legend, :left, theme),
       [{:title_left, {:points, title_width}}],
       spaced(panel_columns, theme.panel_spacing_x),
+      right_strip_columns,
       beside(legend, :right, theme),
       [{:margin_right, {:points, theme.plot_margin.right}}]
     ])
@@ -298,20 +309,20 @@ defmodule Giggly.Render do
       caption: {caption_height, _caption}
     } = labels
 
-    layers =
-      panels
-      |> Enum.map(fn panel -> length(panel.strips) end)
-      |> Enum.max()
-
     # Every strip is as tall as the tallest, as ggplot2's `assemble_strips()` makes them.
     strip_height =
       panels
-      |> Enum.flat_map(fn panel -> panel.strips end)
-      |> Enum.map(fn {height, _primitives} -> height end)
-      |> Enum.max(fn -> 0.0 end)
+      |> Enum.map(fn panel -> panel.strips end)
+      |> strip_depth()
 
     panel_rows =
       Enum.map(1..grid.rows//1, fn row ->
+        layers =
+          panels
+          |> Enum.filter(fn panel -> panel.row == row end)
+          |> Enum.map(fn panel -> panel.strips end)
+          |> strip_layers()
+
         strips =
           Enum.map(1..layers//1, fn layer ->
             {{:strip, row, layer}, {:points, strip_height}}
@@ -340,6 +351,21 @@ defmodule Giggly.Render do
         {:margin_bottom, {:points, theme.plot_margin.bottom}}
       ]
     ])
+  end
+
+  # How many strips deep the deepest of the panels' strips on one side is.
+  defp strip_layers(strips) do
+    strips
+    |> Enum.map(&length/1)
+    |> Enum.max(fn -> 0 end)
+  end
+
+  # How deep the deepest of the panels' strips on one side is, in points.
+  defp strip_depth(strips) do
+    strips
+    |> Enum.concat()
+    |> Enum.map(fn {depth, _primitives} -> depth end)
+    |> Enum.max(fn -> 0.0 end)
   end
 
   # Groups of columns or rows with `spacing` points between each group and the next.
@@ -420,6 +446,20 @@ defmodule Giggly.Render do
         end)
       end)
 
+    right_strip_cells =
+      panels
+      |> Enum.sort_by(fn panel -> {panel.row, panel.column} end)
+      |> Enum.flat_map(fn panel ->
+        panel.right_strips
+        |> Enum.with_index(1)
+        |> Enum.map(fn {{_width, primitives}, layer} ->
+          cell(rows, {:panel_row, panel.row}, columns, {:strip_right, layer},
+            clip: :on,
+            primitives: primitives
+          )
+        end)
+      end)
+
     bottom_axis_cells =
       panels
       |> Enum.reject(fn panel -> panel.bottom == :none end)
@@ -467,6 +507,7 @@ defmodule Giggly.Render do
       [background],
       panel_cells,
       strip_cells,
+      right_strip_cells,
       bottom_axis_cells,
       left_axis_cells,
       titles,

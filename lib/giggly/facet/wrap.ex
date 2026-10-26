@@ -74,8 +74,9 @@ defmodule Giggly.Facet.Wrap do
               end),
             axis_left:
               Enum.map(places, fn {row, column} -> free_y or {row, column - 1} not in occupied end),
-            strip:
-              Enum.map(combinations, fn values -> Enum.map(values, &Combinations.label/1) end)
+            strip_top:
+              Enum.map(combinations, fn values -> Enum.map(values, &Combinations.label/1) end),
+            strip_right: Enum.map(combinations, fn _values -> [] end)
           ]
       )
     end

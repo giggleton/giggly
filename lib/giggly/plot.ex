@@ -1547,6 +1547,10 @@ defmodule Giggly.Plot do
   all is drawn in every panel. The rows, and the columns, are ordered by their first column's
   values, then the next's, as an axis orders its levels, with a missing value (`nil`) last.
 
+  Each column of panels is labelled by strips above the first row, and each row by strips right of
+  the last column, turned to read downward unless the theme says otherwise (`strip_text_y`): a
+  strip for each column split on, the first outermost.
+
   The panels share each axis's scale, and an axis is drawn only at the grid's outer edges. Free
   scales give each column of panels an x scale of its own and each row a y scale, trained on its
   panels' rows alone; the axes stay at the edges, each column's below it and each row's left of

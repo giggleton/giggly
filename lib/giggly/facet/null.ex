@@ -30,7 +30,8 @@ defmodule Giggly.Facet.Null do
         scale_y: [@only_scale],
         axis_bottom: [true],
         axis_left: [true],
-        strip: [[]]
+        strip_top: [[]],
+        strip_right: [[]]
       )
     end
 
