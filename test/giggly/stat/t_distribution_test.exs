@@ -148,7 +148,10 @@ defmodule Giggly.Stat.TDistributionTest do
 
     # Golden: R 4.6.1's `qt(level / 2 + 0.5, df)` at fractional degrees of freedom, as a loess band
     # reads them, printed to 17 significant digits; a sweep of 2,000 random ones from 0.3 to 100,000
-    # sat within 1.6e-13, each worked from the incomplete beta function.
+    # sat within 1.6e-13, each worked from the incomplete beta function. The last three are where
+    # the other side of t² against ν misses by 1e-11 or more: the continued fraction at 54,321.5
+    # and a level of 0.05, the series at 1.3 and 0.999, and log x from 1 less t²'s share at 0.3 and
+    # 0.95.
     test "is R's quantile within 1e-12 for fractional degrees of freedom" do
       for {level, degrees_of_freedom, expected} <- [
             {0.95, 2.37, 3.7189208397974554},
@@ -158,7 +161,10 @@ defmodule Giggly.Stat.TDistributionTest do
             {0.5, 228.56, 0.6755646653583568},
             {0.999, 993.93, 3.3003423897184203},
             {0.8, 0.5, 10.270324410234281},
-            {0.95, 100_000.5, 1.9599877074159935}
+            {0.95, 100_000.5, 1.9599877074159935},
+            {0.05, 54_321.5, 0.062707067669643943},
+            {0.999, 1.3, 153.26589277351596},
+            {0.95, 0.3, 6582.0356994007961}
           ] do
         quantile = TDistribution.central_quantile(level, degrees_of_freedom)
 

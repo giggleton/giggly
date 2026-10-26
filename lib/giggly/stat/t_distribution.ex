@@ -45,7 +45,9 @@ defmodule Giggly.Stat.TDistribution do
   # each argument raised to 20 or more by the recurrence Γ(x + 1) = x Γ(x), with its leading terms
   # taken together, so nothing large cancels. The t is found by the same bisection. Against R's
   # `qt()` at 2,000 random fractional degrees of freedom from 0.3 to 100,000 and levels from 0.05
-  # to 0.999 it is within 1.6e-13 of R's quantile, relatively.
+  # to 0.999 it is within 1.6e-13 of R's quantile, relatively; over a grid of them, within 1e-12
+  # but at the fewest degrees of freedom and highest levels, 1.1e-12 at 0.3 and 0.999, where R's
+  # own is 9.4e-13 from the quantile worked out in 50-digit decimals and Giggly's 1.9e-13.
 
   # How many powers of cos²θ are taken from the one before before one is worked out afresh.
   @power_block 32
@@ -54,10 +56,8 @@ defmodule Giggly.Stat.TDistribution do
   # recurrence: there its first omitted term is below 1e-17.
   @stirling_from 20
 
-  # How near 1 each step of the continued fraction must leave it before the fraction stops, and the
-  # stand-in for a zero denominator in Lentz's method.
+  # How near 1 each step of the continued fraction must leave it before the fraction stops.
   @fraction_tolerance 1.0e-16
-  @tiny 1.0e-300
 
   # The t within which a share `level`, above 0 and below 1, of the t distribution with
   # `degrees_of_freedom` lies, a whole number or a fraction: NaN for none, as R's `qt()` gives it.
@@ -101,18 +101,17 @@ defmodule Giggly.Stat.TDistribution do
     half = degrees_of_freedom / 2
     spread = quantile * quantile + degrees_of_freedom
     log_beta = 0.5 * :math.log(:math.pi()) - log_gamma_step(half)
-    # log x as the logarithm of 1 less the share t² takes where x is near 1, and of the ratio
-    # where it is not, so neither rounds away.
-    log_x =
-      if quantile * quantile < degrees_of_freedom,
-        do: log1p(-(quantile * quantile / spread)),
-        else: :math.log(degrees_of_freedom) - :math.log(spread)
-
     log_complement = 2 * :math.log(quantile) - :math.log(spread)
 
-    if quantile * quantile < degrees_of_freedom,
-      do: incomplete_beta_series(0.5, half, log_complement, log_x, log_beta),
-      else: 1 - incomplete_beta(half, 0.5, log_x, log_complement, log_beta)
+    # log x as the logarithm of 1 less the share t² takes where x is near 1, and of the ratio
+    # where it is not, so neither rounds away.
+    if quantile * quantile < degrees_of_freedom do
+      log_x = log1p(-(quantile * quantile / spread))
+      incomplete_beta_series(0.5, half, log_complement, log_x, log_beta)
+    else
+      log_x = :math.log(degrees_of_freedom) - :math.log(spread)
+      1 - incomplete_beta(half, 0.5, log_x, log_complement, log_beta)
+    end
   end
 
   defp share_within(quantile, degrees_of_freedom) do
@@ -174,7 +173,9 @@ defmodule Giggly.Stat.TDistribution do
   # I_y(p, q), the regularized incomplete beta function at y, from log y, log(1 - y) and log B(p,
   # q): its factor y^p (1 - y)^q / (p B(p, q)) over its continued fraction 1 + d1 / (1 + d2 / (1 +
   # ...)), d(2m + 1) = -(p + m)(p + q + m) y / ((p + 2m)(p + 2m + 1)) and d(2m) = m(q - m) y / ((p +
-  # 2m - 1)(p + 2m)), evaluated by Lentz's method.
+  # 2m - 1)(p + 2m)), evaluated by Lentz's method without its stand-in for a zero denominator: at y
+  # of 1/2 or less, where it is read, every denominator and ratio the method takes stays above 1/2,
+  # checked over p from 0.15 to 50,000.
   defp incomplete_beta(p, q, log_y, log_complement, log_beta) do
     factor = :math.exp(p * log_y + q * log_complement - :math.log(p) - log_beta)
     factor / fraction(1, p, q, :math.exp(log_y), {1.0, 1.0, 0.0})
@@ -182,8 +183,8 @@ defmodule Giggly.Stat.TDistribution do
 
   defp fraction(step, p, q, y, {value, previous, denominator}) do
     coefficient = fraction_coefficient(step, p, q, y)
-    denominator = nonzero(1 + coefficient * denominator)
-    previous = nonzero(1 + coefficient / previous)
+    denominator = 1 + coefficient * denominator
+    previous = 1 + coefficient / previous
     change = previous / denominator
     value = value * change
 
@@ -201,9 +202,6 @@ defmodule Giggly.Stat.TDistribution do
     m = div(step, 2)
     m * (q - m) * y / ((p + 2 * m - 1) * (p + 2 * m))
   end
-
-  defp nonzero(value) when abs(value) < @tiny, do: @tiny
-  defp nonzero(value), do: value
 
   # I_y(p, q) from its series: its factor y^p (1 - y)^q / (p B(p, q)) times 1 plus the sum of the
   # terms T(0) = (p + q) y / (p + 1) and T(n + 1) = T(n) (p + q + n + 1) y / (p + n + 2), all

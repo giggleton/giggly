@@ -32,15 +32,17 @@ defmodule Giggly.Stat.Loess do
   # beginning "A loess curve stops at its rows"). Where a neighbourhood holds fewer than three
   # distinct x weighed above 0, or has no width, the quadratic is undetermined, and the group is
   # fitted nothing, where R warns and returns its pivoted solver's values (the entry beginning "A
-  # loess group whose neighbourhoods cannot hold a quadratic").
+  # loess group whose neighbourhoods cannot hold a quadratic"): a neighbourhood at a place, or with
+  # the band at a row, whose operator the band reads. Without the band, R's curve is its fits at the
+  # places alone, whatever it warns of at the rows.
 
   alias Giggly.DataFrame.Arithmetic
   alias Giggly.Stat.TDistribution
 
   # A loess curve's rows at `places`, from one group's rows' `xs`, `ys` and `weights`, all finite,
   # the weights 0 or more: each a map of its place `x` and curve `y`, and with `se` its `ymin`,
-  # `ymax` and standard error `se`, at `level`; or `:none` where a neighbourhood cannot hold a
-  # quadratic.
+  # `ymax` and standard error `se`, at `level`, all but `x` `nil` at a place outside the rows; or
+  # `:none` where a neighbourhood cannot hold a quadratic.
   @doc false
   @spec curve([number()], [number()], [number()], [float()], float(), boolean(), float()) ::
           [map()] | :none
@@ -52,13 +54,14 @@ defmodule Giggly.Stat.Loess do
     with {:ok, fits} <- local_fits(rows, inside, span),
          {:ok, band} <- band(rows, span, se, level) do
       fitted = Map.new(fits)
-      Enum.map(places, fn place -> row(place, Map.fetch(fitted, place), band, se) end)
+      Enum.map(places, fn place -> row(place, Map.fetch(fitted, place), band) end)
     end
   end
 
-  # A place's row: its fit's, or a missing one outside the rows.
-  defp row(place, {:ok, fit}, band, _se), do: curve_row(place, fit, band)
-  defp row(place, :error, _band, se), do: missing_row(place, se)
+  # A place's row: its fit's, or outside the rows a missing one, its band's columns missing too,
+  # which the smooth reads only with its band.
+  defp row(place, {:ok, fit}, band), do: curve_row(place, fit, band)
+  defp row(place, :error, _band), do: %{x: place, y: nil, ymin: nil, ymax: nil, se: nil}
 
   # Each place's fit, `{place, {value, operator}}`, or `:none` where any cannot be made.
   defp local_fits(rows, places, span) do
@@ -70,17 +73,32 @@ defmodule Giggly.Stat.Loess do
     end)
   end
 
-  # The quadratic fitted round `place`: its value there and the operator's row, or `:none`.
+  # The quadratic fitted round `place`: its value there and the operator's row, or `:none` where
+  # its neighbourhood has no width.
   defp local_fit(rows, place, span) do
     distances = Enum.map(rows, fn {x, _y, _weight} -> abs(x - place) end)
-    width = width(distances, span)
 
+    case width(distances, span) do
+      width when width > 0 -> weighed_fit(rows, distances, place, width)
+      _none -> :none
+    end
+  end
+
+  # The fit from each row's u, y, weight and x, or `:none` where fewer than three distinct x weigh
+  # above 0, which a quadratic needs.
+  defp weighed_fit(rows, distances, place, width) do
     weighed =
       Enum.zip_with(rows, distances, fn {x, y, weight}, distance ->
-        {(x - place) / nonzero(width), y, tricube(distance, width) * weight, x}
+        {(x - place) / width, y, tricube(distance, width) * weight, x}
       end)
 
-    if determined?(width, weighed), do: {:ok, solved(weighed)}, else: :none
+    distinct =
+      weighed
+      |> Enum.filter(fn {_u, _y, weight, _x} -> weight > 0 end)
+      |> Enum.map(fn {_u, _y, _weight, x} -> x end)
+      |> Enum.uniq()
+
+    if Enum.count_until(distinct, 3) == 3, do: {:ok, solved(weighed)}, else: :none
   end
 
   # d, the neighbourhood's width: the qth nearest distance, or past a span of 1 the largest times
@@ -100,28 +118,13 @@ defmodule Giggly.Stat.Loess do
     end
   end
 
-  # A width of 0 divides nothing: its neighbourhood is refused before any fit reads it.
-  defp nonzero(width) when width > 0, do: width
-  defp nonzero(_width), do: 1.0
-
-  defp tricube(distance, width) when width > 0 and distance < width do
+  defp tricube(distance, width) when distance < width do
     ratio = distance / width
     lessened = 1 - ratio * ratio * ratio
     lessened * lessened * lessened
   end
 
   defp tricube(_distance, _width), do: 0.0
-
-  # Whether a neighbourhood has width and three distinct x weighed above 0, which a quadratic needs.
-  defp determined?(width, weighed) do
-    distinct =
-      weighed
-      |> Enum.filter(fn {_u, _y, weight, _x} -> weight > 0 end)
-      |> Enum.map(fn {_u, _y, _weight, x} -> x end)
-      |> Enum.uniq()
-
-    width > 0 and Enum.count_until(distinct, 3) == 3
-  end
 
   # The fit from the weighed rows `{u, y, weight, x}`: the normal equations' sums of w uᵏ, k up to
   # 4, and of w uᵏ y, k up to 2, the first row of their inverse by cofactors, the value at the place
@@ -220,9 +223,6 @@ defmodule Giggly.Stat.Loess do
       se: error
     }
   end
-
-  defp missing_row(place, false), do: %{x: place, y: nil}
-  defp missing_row(place, true), do: %{x: place, y: nil, ymin: nil, ymax: nil, se: nil}
 
   defp square_root(value) when is_number(value), do: :math.sqrt(value)
   defp square_root(value), do: value

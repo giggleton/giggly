@@ -1273,15 +1273,19 @@ defmodule Giggly.StatTest do
 
     # R's loess warns and returns its pivoted solver's values for a neighbourhood that cannot hold a
     # quadratic: 4 rows at a span of 0.75 (q = 3, two rows weighed above 0); a tie at the 4th nearest
-    # of 10 at a span of 0.4; and every 4th nearest at no distance. It fits a negative weight's
-    # neighbourhood 0 and fails on an infinite one.
+    # of 10 at a span of 0.4; every 4th nearest at no distance; three rows at each of three x, the
+    # 6th nearest of 9 at the next x, so only one x weighs above 0, however many rows; and a span
+    # holding no row (q = 0). It fits a negative weight's neighbourhood 0 and fails on an infinite
+    # one.
     test "a group whose neighbourhoods cannot hold a quadratic is fitted nothing, nor a bad weight" do
       for {xs, options} <- [
             {[1.0, 2.0, 3.0, 4.0], []},
             {[0.0, 1.0, 2.0, 2.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], [span: 0.4]},
-            {[1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 4.0], [span: 0.5]}
+            {[1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 4.0], [span: 0.5]},
+            {[1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0], []},
+            {[1.0, 2.0, 3.0, 4.0, 5.0], [span: 0.1]}
           ] do
-        ys = Enum.map(xs, fn x -> x * x end)
+        ys = Enum.with_index(xs, fn x, index -> x * x + index end)
 
         curve =
           [x: xs, y: ys]
@@ -1302,6 +1306,51 @@ defmodule Giggly.StatTest do
           |> loess([], {1, 8})
 
         assert DataFrame.row_count(curve) == 0, "weight #{inspect(weight)}"
+      end
+    end
+
+    # Golden: R 4.6.1's `predict()` of `loess(y ~ x, span = 1, surface = "direct")` at `seq(0, 4,
+    # length.out = 4)`, as ggplot2 predicts a smooth without its band, printed to 17 significant
+    # digits. R warns of its pseudoinverse at the row at 2, the 4th nearest, 0 and 4, tied there, so
+    # that only two x weigh above 0, a neighbourhood at no place.
+    test "a neighbourhood that cannot hold a quadratic at a row alone fits the curve, not its band" do
+      frame = one_panel(x: [0.0, 1.0, 2.0, 4.0], y: [1.0, 3.0, 2.0, 5.0])
+
+      curve = loess(frame, [span: 1.0, n: 4, se: false], {0, 4})
+
+      assert_near(curve, :y, [1.0000000000000004, 3.0, 2.2592592592592591, 5.0])
+
+      banded = loess(frame, [span: 1.0, n: 4], {0, 4})
+
+      assert DataFrame.row_count(banded) == 0
+    end
+
+    # Each fit is worked in units of its neighbourhood's width, so a quadratic is fitted to x on
+    # any scale as at its own.
+    test "x a googolth of mtcars' disp is fitted the curve at disp, its places scaled" do
+      mtcars = Datasets.mtcars()
+
+      tiny =
+        mtcars
+        |> Keyword.fetch!(:disp)
+        |> Enum.map(fn disp -> disp * 1.0e-100 end)
+
+      scaled =
+        [x: tiny, y: Keyword.fetch!(mtcars, :wt)]
+        |> one_panel()
+        |> loess([], {71.1e-100, 472.0e-100})
+
+      curve = loess(mtcars_frame(), [], {71.1, 472})
+
+      places =
+        curve
+        |> DataFrame.pull(:x)
+        |> Enum.map(fn x -> x * 1.0e-100 end)
+
+      assert_near_values(:x, DataFrame.pull(scaled, :x), places)
+
+      for name <- [:y, :ymin, :ymax, :se] do
+        assert_near_values(name, DataFrame.pull(scaled, name), DataFrame.pull(curve, name))
       end
     end
 

@@ -154,7 +154,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   distance squared over x's sum of squares, square-rooted, and `ymin` and `ymax` `y` ∓ `se` times
   Giggly's t quantile at `level` (`Giggly.Stat.TDistribution`: Abramowitz and Stegun 26.7.3-4,
   bisected, or for a fraction of degrees of freedom the incomplete beta function, R's `qt()` within
-  1e-12 up to a level of 0.999, design-log §4, the entry beginning "The t quantile keeps"); and
+  1e-12 up to a level of 0.999 but at the fewest degrees of freedom, where R's own drifts,
+  design-log §4, the entry beginning "The t quantile keeps"); and
   `flipped_aes`, along y with x and y swapped. Its values are R's within
   1e-12 of the largest magnitude the group's column holds, its x R's to the last digit. A row
   missing or infinite in x or y is left out; a group of fewer than two distinct x is fitted
@@ -179,9 +180,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   quantile with δ₁ degrees of freedom. Its values are R's direct loess within 1e-12 of the largest
   magnitude a group's column holds, its band R's at δ₁; its places past the rows are missing. A
   row missing its weight is left out, a row of weight 0 kept, making `se` NaN, as R's; a negative
-  or infinite weight, or a neighbourhood holding fewer than three distinct x weighed above 0, fits
-  its group nothing. Every curve and golden is checked against ggplot2 drawing R's loess so
-  (`test/golden/giggly_loess.R`).
+  or infinite weight, or a neighbourhood at a place, or with `se` at a row, holding fewer than
+  three distinct x weighed above 0, fits its group nothing. Every curve and golden is checked
+  against ggplot2 drawing R's loess so (`test/golden/giggly_loess.R`).
 - **Densities are ggplot2's `stat_density()`, R's `density()`** (design-log §4, the entry beginning
   "A density takes ggplot2's options"): per panel and per group, along whichever of x and y is
   mapped, exactly one, flipped and flipped back; `n` places at R's `seq()` across the panel's axis

@@ -183,25 +183,21 @@ defmodule Giggly.Stat.Smooth do
     # The rows of the groups given a curve: every group lm fits, and those loess finds a quadratic
     # for in every neighbourhood.
     defp kept_rows(rows, extents, curves) do
-      if length(curves) == DataFrame.row_count(extents) do
-        rows
-      else
-        given = MapSet.new(curves, fn {key, _curve} -> key end)
+      given = MapSet.new(curves, fn {key, _curve} -> key end)
 
-        kept =
-          extents
-          |> rows_by_group([])
-          |> Enum.map(fn {key, _extent} -> key in given end)
+      kept =
+        extents
+        |> rows_by_group([])
+        |> Enum.map(fn {key, _extent} -> key in given end)
 
-        flags =
-          extents
-          |> DataFrame.select(panel: :panel, group: :group)
-          |> DataFrame.put(:kept, kept)
+      flags =
+        extents
+        |> DataFrame.select(panel: :panel, group: :group)
+        |> DataFrame.put(:kept, kept)
 
-        rows
-        |> DataFrame.join(flags, [:panel, :group])
-        |> DataFrame.filter(:kept)
-      end
+      rows
+      |> DataFrame.join(flags, [:panel, :group])
+      |> DataFrame.filter(:kept)
     end
 
     # The rows with each one's weight, 1 where the layer maps none, as R's `lm()` weighs each row

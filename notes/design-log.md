@@ -100,8 +100,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   0: q = ⌊n × span⌋ of 3 or less, a tie at the qth distance, or a qth distance of 0 leaves fewer.
   R warns and returns its pivoted solver's values there ("span too small", "reciprocal condition
   number 0", the rows' own y), and fits a negative weight's neighbourhood 0, none of it a formula
-  Giggly could reproduce without a port. *Rejected: Giggly's own minimum-norm fit, and negative
-  weights as the formula takes them* — a curve where R draws one, but not R's curve.
+  Giggly could reproduce without a port. The neighbourhoods are those at the places, and with a
+  band at the rows, whose operator it reads: without one, R draws its fits at the places alone,
+  whatever it warns of at the rows, and so does Giggly. *Rejected: Giggly's own minimum-norm fit,
+  and negative weights as the formula takes them* — a curve where R draws one, but not R's curve.
 
 - **A density takes ggplot2's options, `bounds:` and all seven kernels among them, and a failing
   estimate leaves its panel empty, as R's does (2026-10-25, Steve: "A" for bounds, "A" for the
@@ -153,9 +155,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   Steve: "A", and "A" for fractions, loess's step).** A loess band's degrees of freedom are its
   first trace, never whole: their share outside ±t is I_x(ν / 2, 1/2), from its continued fraction
   where t² ≥ ν and its series of positive terms below, the beta function from Stirling's series,
-  within 1.6e-13 of R's `qt()` over 2,000 random cases from 0.3 to 100,000 degrees of freedom.
-  *Rejected: interpolating between whole degrees of freedom* — 3.6e-3 of the quantile at 3.4, a
-  small group's band; rounding them, 7%. A&S 26.7.3-4 give the share within ±t, so near a level
+  within 1.6e-13 of R's `qt()` over 2,000 random cases from 0.3 to 100,000 degrees of freedom,
+  and over a grid within 1e-12 but at 0.3 and a level of 0.999, 1.1e-12, where R's own is 9.4e-13
+  from the quantile worked out in 50-digit decimals and Giggly's 1.9e-13. *Rejected:
+  interpolating between whole degrees of freedom* — 3.6e-3 of the quantile at 3.4, a small
+  group's band; rounding them, 7%. A&S 26.7.3-4 give the share within ±t, so near a level
   of 1 the little outside it keeps fewer digits than R's `qt()`, which works from the tail: over 1 to
   100,000 degrees of freedom the quantile is within 7e-14 of R's, relatively, for levels 0.1 to
   0.99, 4e-13 at 0.999 and 1.2e-10 at 0.999999; mpg's band is within 1e-13 of its column at
