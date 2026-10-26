@@ -68,10 +68,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's, and `geom_smooth/3` and `stat_smooth/3` both `%Geom.Smooth{}`
   with `%Stat.Smooth{}` and `%Position.Identity{}`, as ggplot2's are aliases: `se:` a field of
-  both, `method:` (`:lm` or `:loess`), `level:`, above 0 and below 1 where R also takes 1, an
-  infinite band, and past it, none, `n:`, `span:`, above 0 (`validate_span/1`), `fullrange:` and
+  both, `method:` (`:lm`, `:loess` or `:gam`), `level:`, above 0 and below 1 where R also takes 1,
+  an infinite band, and past it, none, `n:`, `span:`, above 0 (`validate_span/1`), `fullrange:` and
   `orientation:` the stat's, and `method:` recorded `:none` when not given, which the stat fits by
-  loess under 1,000 rows and refuses from there (design-log §4, the entry beginning "A smooth
+  loess under 1,000 rows and by gam from there (design-log §4, the entry beginning "A smooth
   given no method"). **`geom_density/3` records `%Geom.Density{}` with `%Stat.Density{}` and
   `%Position.Identity{}` unless `position: :stack`, and `stat_density/3` `%Geom.Area{}` outlined
   on both edges, its corners `:none` unless `linejoin:` gives them, with `%Stat.Density{}` and

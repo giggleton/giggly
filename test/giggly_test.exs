@@ -4407,9 +4407,14 @@ defmodule GigglyTest do
       assert DataFrame.pull(frame, :se) == [:nan, :nan, :nan]
     end
 
-    # A smooth given no method is refused by its stat, which counts every row of the layer it is
-    # handed: mpg's 234, which ggplot2 fits by loess.
-    test "a smooth given no method fits loess under 1,000 rows, and is refused from there" do
+    # A smooth given no method is chosen by its stat, which counts every row of the layer it is
+    # handed: mpg's 234, which ggplot2 fits by loess, and diamonds' 53,940, by gam. Golden: ggplot2
+    # 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(diamonds, aes(carat, price)) + geom_smooth(n =
+    # 5)`, printed to 17 significant digits: R's own gam, whose shrinkage turns on its rounding, so
+    # the places are R's to the last digit, the curve and band within 1e-3 of price's range, 326 to
+    # 18,823, and the standard errors within 1e-3 of R's, relatively (design-log §4, the entry
+    # beginning "A gam's shrinkage").
+    test "a smooth given no method fits loess under 1,000 rows, and gam from there" do
       plot = Plot.new(Giggly.Datasets.mpg(), %{x: :displ, y: :hwy})
 
       unstated = Plot.geom_smooth(plot)
@@ -4420,10 +4425,56 @@ defmodule GigglyTest do
       diamonds =
         Giggly.Datasets.diamonds()
         |> Plot.new(%{x: :carat, y: :price})
-        |> Plot.geom_smooth()
+        |> Plot.geom_smooth(n: 5)
+        |> Giggly.layer_data()
 
-      error = assert_raise ArgumentError, fn -> Giggly.layer_data(diamonds) end
-      assert error.message =~ "53940 rows"
+      assert DataFrame.pull(diamonds, :x) === [
+               0.20000000000000001,
+               1.4024999999999999,
+               2.605,
+               3.8075000000000001,
+               5.0099999999999998
+             ]
+
+      expected = [
+        y: [
+          274.15797358415392,
+          8796.0400057068618,
+          15_177.873996477458,
+          15_216.052215356953,
+          18_451.192605757598
+        ],
+        ymin: [
+          219.29388799430598,
+          8743.4455561742343,
+          14_987.781897466022,
+          14_608.599618456929,
+          16_537.308634488989
+        ],
+        ymax: [
+          329.02205917400187,
+          8848.6344552394894,
+          15_367.966095488893,
+          15_823.504812256977,
+          20_365.076577026208
+        ],
+        se: [
+          27.992394769806427,
+          26.834395911091232,
+          96.987546970688115,
+          309.93048938222017,
+          976.48935713364199
+        ]
+      ]
+
+      for {name, wanted} <- expected do
+        diamonds
+        |> DataFrame.pull(name)
+        |> Enum.zip_with(wanted, fn value, target ->
+          bar = if name == :se, do: 1.0e-3 * target, else: 1.0e-3 * (18_823 - 326)
+          assert abs(value - target) <= bar, "#{name}: #{value}, R #{target}"
+        end)
+      end
     end
   end
 
@@ -9349,6 +9400,62 @@ defmodule GigglyTest do
         |> Plot.geom_smooth(method: :loess, se: false, span: 0.3)
 
       assert golden?(plot, "smooth_loess_span")
+    end
+
+    # Golden: test/golden/smooth_gam.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_gam.R: R's own gam, so its curve and band sit within 0.13 points of R's
+    # and its y axis, spanning the band, within 0.15, held through its layer data in "a smooth given
+    # no method fits loess under 1,000 rows, and gam from there". diamonds' 53,940 rows, a smooth
+    # given no method fits by gam, drawn without the points. It moves with gam's fit or how a smooth
+    # is drawn.
+    test "a smooth given no method fits gam over a group of 1,000 rows or more" do
+      plot =
+        Giggly.Datasets.diamonds()
+        |> Plot.new(%{x: :carat, y: :price})
+        |> Plot.geom_smooth()
+
+      assert golden?(plot, "smooth_gam")
+    end
+
+    # Golden: test/golden/smooth_gam_points.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_gam_points.R, whose gam test/golden/giggly_gam.R fits as Giggly does. mpg's
+    # points under a gam. It moves with the spline, its shrinkage, REML's search, the normal
+    # quantile, or how a smooth is drawn.
+    test "a gam smooth bends as far as its rows bear out" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :gam)
+
+      assert golden?(plot, "smooth_gam_points")
+    end
+
+    # Golden: test/golden/smooth_gam_groups.svg, checked as test/golden/smooth_gam_points.svg is,
+    # made by test/golden/smooth_gam_groups.R. A gam for each drive, each band before its own line;
+    # the rear-wheel drives' 9 distinct displ are too few for 10 knots, and are drawn nothing but
+    # their key.
+    test "each group's gam is drawn whole before the next, a group too small for its knots none" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_smooth(method: :gam)
+
+      assert golden?(plot, "smooth_gam_groups")
+    end
+
+    # Golden: test/golden/smooth_gam_fullrange.svg, checked as test/golden/smooth_gam_points.svg is,
+    # made by test/golden/smooth_gam_fullrange.R. Over an axis from 0 to 10 the curve runs straight
+    # on past displ's 1.6 and 7, its outermost knots. It moves with the spline past its knots.
+    test "a gam across the full range runs straight past its outermost knots" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :gam, fullrange: true)
+        |> Plot.xlim(0, 10)
+
+      assert golden?(plot, "smooth_gam_fullrange")
     end
   end
 

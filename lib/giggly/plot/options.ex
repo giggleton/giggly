@@ -645,15 +645,14 @@ defmodule Giggly.Plot.Options do
                     [
                       data: @data_option,
                       method: [
-                        type: {:in, [:lm, :loess]},
+                        type: {:in, [:lm, :loess, :gam]},
                         doc:
-                          "How each curve is fitted: `:lm`, a straight line by least squares, " <>
-                            "or `:loess`, at each place a quadratic fitted to the nearest rows, " <>
-                            "nearer ones weighing more, each row weighted too by its `:weight` " <>
-                            "where one is mapped. When not given, loess where the largest group " <>
-                            "in any panel holds under 1,000 rows; past that, ggplot2 fits gam, " <>
-                            "which Giggly does not have yet, so such a smooth raises " <>
-                            "`ArgumentError` when the plot is drawn."
+                          "How each curve is fitted: `:lm`, a straight line by least squares; " <>
+                            "`:loess`, at each place a quadratic fitted to the nearest rows, " <>
+                            "nearer ones weighing more; or `:gam`, a smoothing spline, its " <>
+                            "wiggliness chosen from the rows; each row weighted too by its " <>
+                            "`:weight` where one is mapped. When not given, loess where the " <>
+                            "largest group in any panel holds under 1,000 rows, and gam from there."
                       ],
                       se: [
                         type: :boolean,

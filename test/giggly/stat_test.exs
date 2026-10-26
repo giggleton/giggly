@@ -954,8 +954,9 @@ defmodule Giggly.StatTest do
     end
 
     # ggplot2 fits a smooth given no method by loess where the layer's largest group in any panel
-    # has under 1,000 rows, every row counted, and by gam from 1,000.
-    test "a smooth given no method is fitted by loess under 1,000 rows, and refused at 1,000" do
+    # has under 1,000 rows, every row counted, and by gam from 1,000: mtcars' curve in a second
+    # panel is its loess beside 999 rows missing their x, and its gam beside 1,000.
+    test "a smooth given no method is fitted by loess under 1,000 rows, and by gam from 1,000" do
       for counts <- [[999], []] do
         curve =
           counts
@@ -965,13 +966,11 @@ defmodule Giggly.StatTest do
         assert DataFrame.row_count(curve) == 0
       end
 
-      gam = unfitted([999, 1000])
+      fitted = fn count, method -> fit(beside_mtcars(count), [method: method, n: 5], [1, 2]) end
 
-      assert_raise ArgumentError,
-                   ~r/largest group has 1000 rows, and Giggly does not have gam yet/,
-                   fn ->
-                     fit(gam, [method: :none], [1, 2])
-                   end
+      assert fitted.(999, :none) == fitted.(999, :loess)
+      assert fitted.(1000, :none) == fitted.(1000, :gam)
+      refute fitted.(999, :none) == fitted.(1000, :none)
     end
 
     test "names what an after_stat can read, each in either orientation, and the weight it consumes" do
@@ -1067,6 +1066,18 @@ defmodule Giggly.StatTest do
       y: List.duplicate(1.0, rows),
       panel: panels,
       group: List.duplicate(-1, rows)
+    )
+  end
+
+  # mtcars' disp and wt in panel 2, beside `count` rows in panel 1 missing their x.
+  defp beside_mtcars(count) do
+    mtcars = Datasets.mtcars()
+
+    DataFrame.new(
+      x: Enum.concat(List.duplicate(nil, count), Keyword.fetch!(mtcars, :disp)),
+      y: Enum.concat(List.duplicate(1.0, count), Keyword.fetch!(mtcars, :wt)),
+      panel: Enum.concat(List.duplicate(1, count), List.duplicate(2, 32)),
+      group: List.duplicate(-1, count + 32)
     )
   end
 
@@ -1370,6 +1381,271 @@ defmodule Giggly.StatTest do
 
       assert DataFrame.pull(curve, :group) == List.duplicate(2, 5)
       assert DataFrame.pull(curve, :color) == List.duplicate("r", 5)
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `layer_data()` for `ggplot(mtcars, aes(disp, wt))` with
+  # `geom_smooth(method = giggly_gam, n = 5)`, as below.
+  @mtcars_gam [
+    y: [
+      1.7443281587444082,
+      3.1870950840218324,
+      3.6011395507429245,
+      3.7475297123147961,
+      5.4942276182243317
+    ],
+    ymin: [
+      1.4404068382380499,
+      2.9606526855028874,
+      3.374692535870139,
+      3.4899696008808734,
+      5.0798034431232111
+    ],
+    ymax: [
+      2.0482494792507664,
+      3.4135374825407774,
+      3.82758656561571,
+      4.0050898237487189,
+      5.9086517933254523
+    ],
+    se: [
+      0.15506474756865485,
+      0.115533958942661,
+      0.11553631426851253,
+      0.13141063482060084,
+      0.2114447910114908
+    ]
+  ]
+
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_smooth(method =
+  # giggly_gam, n = 5)` with the options named, its gam mgcv's fitted as Giggly fits one
+  # (test/golden/giggly_gam.R), printed to 17 significant digits: the places are R's to the last
+  # digit, the curve and band within 1e-6 of the range of the group's y and the standard errors
+  # within 1e-5 of R's, relatively (design-log §4, the entry beginning "A gam's shrinkage"). They
+  # move with the spline, its shrinkage, REML's search or the normal quantile.
+  describe "compute_layer/3 for gam smooths" do
+    test "a cubic spline through ten knots, its wiggliness by REML, its band the normal's" do
+      curve = gam(mtcars_frame(), [], {71.1, 472})
+
+      assert DataFrame.names(curve) == [:x, :y, :ymin, :ymax, :se, :flipped_aes, :panel, :group]
+
+      assert DataFrame.pull(curve, :x) === [
+               71.099999999999994,
+               171.32499999999999,
+               271.54999999999995,
+               371.77499999999998,
+               472.0
+             ]
+
+      assert_gam(curve, @mtcars_gam)
+    end
+
+    # Golden: `aes(disp, wt, weight = qsec)`.
+    test "each row is weighed by its weight" do
+      frame = mtcars_frame(weight: Keyword.fetch!(Datasets.mtcars(), :qsec))
+
+      assert_gam(gam(frame, [], {71.1, 472}),
+        y: [
+          1.753780265844664,
+          3.2040481450655816,
+          3.5940070236724142,
+          3.7607002522128341,
+          5.4884480328690888
+        ],
+        ymin: [
+          1.4601848846788668,
+          2.9813609716371272,
+          3.3692753165112679,
+          3.4941144721196356,
+          5.0761596544952585
+        ],
+        ymax: [
+          2.0473756470104614,
+          3.4267353184940359,
+          3.8187387308335605,
+          4.0272860323060327,
+          5.900736411242919
+        ],
+        se: [
+          0.1497963143617129,
+          0.11361799256771156,
+          0.11466114119126762,
+          0.13601565242830654,
+          0.21035507877997153
+        ]
+      )
+    end
+
+    # Golden: `aes(disp, wt, weight = w)`, w qsec but the first four rows' 0 and the fifth's
+    # missing: the four still place the knots, count towards the curve's sum of 0 and the scale's
+    # rows, but not REML's, as mgcv takes them, and the fifth is left out.
+    test "a row weighted 0 places the knots but adds nothing to the fit; a missing weight's is out" do
+      weights =
+        Datasets.mtcars()
+        |> Keyword.fetch!(:qsec)
+        |> Enum.drop(5)
+        |> then(fn rest -> Enum.concat([[0.0, 0.0, 0.0, 0.0, nil], rest]) end)
+
+      assert_gam(gam(mtcars_frame(weight: weights), [], {71.1, 472}),
+        y: [
+          1.7382303789173306,
+          3.3508317127929304,
+          3.6905582938192301,
+          3.7703114961561557,
+          5.5018160250483614
+        ],
+        ymin: [
+          1.4750994406715685,
+          3.1209579620856305,
+          3.4704279897199157,
+          3.5080112464227455,
+          5.136063729896553
+        ],
+        ymax: [
+          2.0013613171630924,
+          3.5807054635002302,
+          3.9106885979185444,
+          4.0326117458895663,
+          5.8675683202001698
+        ],
+        se: [
+          0.13425294562619791,
+          0.11728468100460751,
+          0.11231344342838663,
+          0.13382911716868329,
+          0.18661174288753049
+        ]
+      )
+    end
+
+    # Golden: `level = 0.8`, ±1.2815515655446008 standard errors; and `se = FALSE`.
+    test "the band holds level of the normal distribution, and without it the curve stands alone" do
+      curve = gam(mtcars_frame(), [level: 0.8], {71.1, 472})
+
+      assert_gam(curve,
+        ymin: [
+          1.5456046887370203,
+          3.0390323580652994,
+          3.4530738063148592,
+          3.5791202075312452,
+          5.2232502152773046
+        ],
+        ymax: [
+          1.943051628751796,
+          3.3351578099783654,
+          3.7492052951709898,
+          3.9159392170983471,
+          5.7652050211713588
+        ]
+      )
+
+      bare = gam(mtcars_frame(), [se: false], {71.1, 472})
+
+      assert DataFrame.names(bare) == [:x, :y, :flipped_aes, :panel, :group]
+      assert_gam(bare, y: Keyword.fetch!(@mtcars_gam, :y))
+    end
+
+    # Golden: `fullrange = TRUE` over `scale_x_continuous(limits = c(0, 600))`: disp's outermost
+    # knots are its 71.1 and 472, and the places at 0 and 600 lie past them.
+    test "past its outermost knots a curve runs straight on at its slope there" do
+      assert_gam(gam(mtcars_frame(), [fullrange: true], {0, 600}),
+        y: [
+          0.71719137369289854,
+          2.9422039894884984,
+          3.5709732198315205,
+          5.0497308249935662,
+          8.0976003991593881
+        ],
+        ymin: [
+          -0.41026381956136393,
+          2.7475863086868615,
+          3.3458661469961424,
+          4.7448801826754163,
+          6.4495051984277545
+        ],
+        ymax: [
+          1.844646566947161,
+          3.1368216702901353,
+          3.7960802926668986,
+          5.354581467311716,
+          9.7456955998910217
+        ],
+        se: [
+          0.57524281167791114,
+          0.099296559700461945,
+          0.11485265780952827,
+          0.15553890006284471,
+          0.84088034970621872
+        ]
+      )
+    end
+
+    # Golden: x 1.5 to 10.5, ten rows, n = 3. Ten distinct x are as few as ten knots take; with
+    # the last row left out, nine, mgcv fails, as it does on mtcars' three cylinder counts and on
+    # a group whose y are all one, and ggplot2 draws each nothing. That group's weights, found by
+    # search, put the weighted mean of its y 8.9e-16 from it, so its sums alone would fit it flat.
+    test "ten distinct x are fitted; fewer, or rows sharing one y, are fitted nothing" do
+      xs = Enum.map(1..10, fn index -> index + 0.5 end)
+      ys = [1.0, 3.0, 2.0, 5.0, 4.0, 6.0, 8.0, 7.0, 9.0, 12.0]
+
+      curve = gam(one_panel(x: xs, y: ys), [n: 3], {1.5, 10.5})
+
+      assert_gam(
+        curve,
+        [
+          y: [1.3254175385933609, 5.3885990818772918, 10.961597909195659],
+          ymin: [-0.22506819525458499, 4.406076063906621, 9.4111121753477107],
+          ymax: [2.8759032724413069, 6.3711220998479625, 12.512083643043606],
+          se: [0.79107868617891963, 0.5012964655068598, 0.79107868617892108]
+        ],
+        11.0
+      )
+
+      nine = one_panel(x: Enum.drop(xs, -1), y: Enum.drop(ys, -1))
+      mtcars = Datasets.mtcars()
+      cylinders = one_panel(x: Keyword.fetch!(mtcars, :cyl), y: Keyword.fetch!(mtcars, :wt))
+
+      flat =
+        one_panel(
+          x: xs,
+          y: List.duplicate(6.609818481797607, 10),
+          weight: [
+            2.931525636875121,
+            2.8297927156804357,
+            1.9184294111422857,
+            2.1128066477900607,
+            2.0838745586712895,
+            2.739083344047506,
+            1.7999692448792937,
+            2.0817807080989414,
+            2.451163671350072,
+            2.549674206345818
+          ]
+        )
+
+      for frame <- [nine, flat] do
+        curve = gam(frame, [n: 3], {1.5, 10.5})
+        assert DataFrame.row_count(curve) == 0
+      end
+
+      none = gam(cylinders, [n: 3], {4, 8})
+      assert DataFrame.row_count(none) == 0
+    end
+
+    # The spline is worked across its knots' range, so x on any scale is fitted as at its own:
+    # mgcv's own gam draws disp scaled so, its penalty rescaled.
+    test "x a googolth of mtcars' disp is fitted the curve at disp, its places scaled" do
+      mtcars = Datasets.mtcars()
+
+      tiny =
+        mtcars
+        |> Keyword.fetch!(:disp)
+        |> Enum.map(fn disp -> disp * 1.0e-100 end)
+
+      scaled =
+        gam(one_panel(x: tiny, y: Keyword.fetch!(mtcars, :wt)), [], {71.1e-100, 472.0e-100})
+
+      assert_gam(scaled, @mtcars_gam)
     end
   end
 
@@ -2253,6 +2529,34 @@ defmodule Giggly.StatTest do
     axis = %{limits: limits, discrete: false, transform: fn values -> values end}
     Stat.compute_layer(stat, frame, %{1 => %{x: axis, y: axis}})
   end
+
+  # The table a gam smooth with ggplot2's defaults, five places and `options` computes from `frame`,
+  # its one panel's axes the extent `limits`.
+  defp gam(frame, options, limits) do
+    stat = struct!(smooth(method: :gam, n: 5), options)
+    axis = %{limits: limits, discrete: false, transform: fn values -> values end}
+    Stat.compute_layer(stat, frame, %{1 => %{x: axis, y: axis}})
+  end
+
+  # A gam curve's columns `expected` gives, R's within the bar a gam is held to: the curve and band
+  # within 1e-6 of `range`, the range of the group's y, mtcars' wt's 1.513 to 5.424 unless given,
+  # and the standard errors within 1e-5 of R's, relatively.
+  defp assert_gam(frame, expected, range \\ 3.911) do
+    for {name, wanted} <- expected do
+      actual = DataFrame.pull(frame, name)
+      assert length(actual) == length(wanted)
+
+      Enum.zip_with(actual, wanted, fn value, target ->
+        assert_gam_value(name, value, target, range)
+      end)
+    end
+  end
+
+  defp assert_gam_value(:se, value, target, _range),
+    do: assert(abs(value - target) <= 1.0e-5 * target, "se: #{value}, R #{target}")
+
+  defp assert_gam_value(name, value, target, range),
+    do: assert(abs(value - target) <= 1.0e-6 * range, "#{name}: #{value}, R #{target}")
 
   # mtcars' disp and wt, with the columns given, in one panel and one group.
   defp mtcars_frame(columns \\ []) do

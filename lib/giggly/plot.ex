@@ -1040,7 +1040,8 @@ defmodule Giggly.Plot do
 
   Each curve is worked out at `n:` evenly spaced places from the group's least `x` to its
   greatest, or across the whole x axis with `fullrange: true`, and drawn over its band, its
-  standard error times the t distribution's quantile at `level:` either side of it. Each row is
+  standard error times a quantile at `level:` either side of it, the t distribution's for lm and
+  loess and the normal distribution's for gam. Each row is
   weighted by its `:weight` where one is mapped; a row missing `x` or `y`, or at an infinite one,
   or missing its weight, is left out, and a group holding fewer than two distinct `x`, or a weight
   below 0 or infinite, is drawn nothing.
@@ -1055,9 +1056,15 @@ defmodule Giggly.Plot do
   row weighted 0 leaves the band out; and a group too small for its span to hold three distinct `x`
   round each place, as one of five rows at the default span, is drawn nothing.
 
+  With `method: :gam`, each curve is a smoothing spline: a cubic curve through ten knots spread
+  evenly through the group's distinct `x`, its wiggliness penalised by as much as the rows bear
+  out, chosen by restricted maximum likelihood, and straight beyond the outermost knots, as
+  `fullrange: true` shows. A row weighted 0 still places the knots but adds nothing to the fit,
+  and a group of fewer than ten distinct `x`, or whose rows weighted above 0 share one `y`, is
+  drawn nothing.
+
   A smooth given no method fits loess where the largest group in any panel holds under 1,000 rows,
-  and otherwise raises `ArgumentError` when the plot is drawn: ggplot2 fits gam there, which Giggly
-  does not have yet.
+  and gam from there.
 
   Smooths use `:x`, `:y`, `:weight`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and
   `:linewidth`, and need `:x` and `:y`; a `:weight` column must hold numbers. A curve's line is

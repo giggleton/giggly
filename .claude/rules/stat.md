@@ -53,7 +53,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   output is as large as its input, as the identity's is, and interpolating each group at the
   others' places has no frame operation. **Smoothing's straight line is three passes of sums
   through the frame**, its arithmetic the frame's `+ - * /`, pulling a row a group; **its loess
-  pulls each group's rows**, by the frame's `list` aggregate, since no engine could run it. **A
+  pulls each group's rows**, by the frame's `list` aggregate, since no engine could run it; **its
+  gam sums each group's rows by knot interval through the frame**, each group split off and cut at
+  its own knots, pulling a row an interval. **A
   density is four passes
   through the frame**, its grid points `floor` in an expression, pulling a row a group and its
   totals at each grid point.
@@ -143,9 +145,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   every group holds one x and x where every group holds one y, else y, where R also warns. A width
   that is not a number is refused when the plot is run.
 - **Smoothing is ggplot2's `stat_smooth()` with `method = "lm"`, R's `lm(y ~ x, weights =
-  weight)` read through `predict()`, or `method = "loess"`, below** (design-log §4, the entries
-  beginning "A linear smooth fits
-  the slope" and "A smooth given no method is refused when the plot is run"): per panel and per
+  weight)` read through `predict()`, or `method = "loess"` or `"gam"`, below** (design-log §4, the
+  entries beginning "A linear smooth fits
+  the slope" and "A smooth given no method is fitted as ggplot2 chooses"): per panel and per
   group, `n` rows at R's `seq()` from the group's least x to its greatest, or across the unwidened
   extent of the panel's axis it runs along with `fullrange`, its y axis along y, where ggplot2
   reads `scales$x` (design-log §4, the entry beginning "A full-range smooth spans"); `y` the
@@ -166,7 +168,7 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   mean with a degree of freedom more, as R drops a slope it cannot fit; otherwise the slope is
   fitted however little x varies. Of no degrees of freedom, `se` and the band are NaN. **A smooth
   given no method (`:none`) is fitted by loess where the largest group in any panel has under
-  1,000 rows**, every row counted, and refused from there, naming gam. A weight that is not a
+  1,000 rows**, every row counted, and by gam from there. A weight that is not a
   number is refused when the plot is run.
 - **A loess smooth is R's `loess(y ~ x, weights = weight, span = span)` fitted directly at each
   place, as `surface = "direct"`** (`Giggly.Stat.Loess`; design-log §4, the entries beginning
@@ -183,6 +185,24 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   or infinite weight, or a neighbourhood at a place, or with `se` at a row, holding fewer than
   three distinct x weighed above 0, fits its group nothing. Every curve and golden is checked
   against ggplot2 drawing R's loess so (`test/golden/giggly_loess.R`).
+- **A gam smooth is mgcv's `gam(y ~ s(x, bs = "cs"), weights = weight, method = "REML")`**
+  (`Giggly.Stat.Gam`; design-log §4, the entries beginning "gam is Giggly's own" and "A gam's
+  shrinkage"), from Wood's published method: a natural cubic regression spline with 10 knots at
+  the type-7 quantiles of the group's distinct x, straight past its end knots, held to sum to 0
+  over the rows, unweighted; its penalty S = Dᵀ B⁻¹ D with the constant and the straight line
+  through the knots each given 0.055 of S's smallest positive eigenvalue, where mgcv's "cs" gives
+  0.1 and 0.01 along directions its rounding picks; λ minimising REML, searched over 61 values of
+  log λ a step apart and narrowed by golden section; `se` mgcv's Bayesian standard error, its
+  scale the weighted residuals over every row less the effective degrees of freedom, and the band
+  at Giggly's normal quantile (`Giggly.Stat.NormalDistribution`), as ggplot2 reads a gam's band.
+  Its values are within 1e-6 of the range of the group's y of mgcv fitting that model, its
+  standard errors 1e-5 relatively, its places R's to the last digit; R's own, over diamonds,
+  within 1e-3. Its 10 by 10 algebra is plain Elixir (`Giggly.Stat.Matrix`), never Nx. A row
+  missing its weight is left out; a row of weight 0 places the knots and counts for the
+  constraint and the scale, but not REML; a negative or infinite weight, fewer than 10 distinct
+  x, or rows weighted above 0 sharing one y fit its group nothing, where mgcv fails. Every curve
+  and golden is checked against ggplot2 drawing mgcv's gam so (`test/golden/giggly_gam.R`), and
+  one golden against R's own (`test/golden/smooth_gam.R`).
 - **Densities are ggplot2's `stat_density()`, R's `density()`** (design-log §4, the entry beginning
   "A density takes ggplot2's options"): per panel and per group, along whichever of x and y is
   mapped, exactly one, flipped and flipped back; `n` places at R's `seq()` across the panel's axis

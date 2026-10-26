@@ -6,13 +6,15 @@ defmodule Giggly.Stat.Smooth do
   # to its greatest, or across the unwidened extent of the panel's axis it runs along with
   # `fullrange`, R's `seq()`,
   # each its fitted `y`, and with `se` its standard error `se` and the band `ymin` to `ymax`, `y`
-  # less and plus the t quantile holding `level` of the distribution times `se`; and `flipped_aes`.
+  # less and plus the quantile holding `level` of the distribution times `se`, the t distribution's,
+  # or for gam the normal's; and `flipped_aes`.
   # Its method is a straight line by weighted least squares, R's `lm(y ~ x, weights = weight)`
   # read through `predict()` as ggplot2's `predictdf()` reads it, or a loess curve, R's `loess(y ~
-  # x, weights = weight, span = span)` fitted directly at each place (`Giggly.Stat.Loess`). A smooth
-  # given no method (`:none`) is fitted by loess where the largest group in any panel has under
-  # 1,000 rows, every row counted, as ggplot2 chooses, and refused from there, where ggplot2 fits
-  # gam, which Giggly does not have yet. Its orientation is the layer's (`:x`, or `:y` to fit x
+  # x, weights = weight, span = span)` fitted directly at each place (`Giggly.Stat.Loess`), or a
+  # gam curve, R's `mgcv::gam(y ~ s(x, bs = "cs"), weights = weight, method = "REML")`
+  # (`Giggly.Stat.Gam`). A smooth given no method (`:none`) is fitted by loess where the largest
+  # group in any panel has under 1,000 rows, every row counted, as ggplot2 chooses, and by gam from
+  # there. Its orientation is the layer's (`:x`, or `:y` to fit x
   # along y, the two swapped and swapped back, as ggplot2's `flip_data()` does), ggplot2's taking an
   # unstated one as along x. Run it through `Giggly.Stat`.
   #
@@ -34,7 +36,10 @@ defmodule Giggly.Stat.Smooth do
   # R's `loess()`, leaves out a row missing its weight and fails on an infinite one; a negative one
   # fits its group nothing, where R fits 0, and a row of weight 0 stays among the rows, making the
   # band NaN, as R's; a loess curve's places past its rows are missing, and a group whose
-  # neighbourhoods cannot hold a quadratic is fitted nothing (`Giggly.Stat.Loess`). A group's
+  # neighbourhoods cannot hold a quadratic is fitted nothing (`Giggly.Stat.Loess`). gam, as R's
+  # `gam()`, leaves out a row missing its weight and keeps a row of weight 0 for its knots, and
+  # a group of fewer than 10 distinct x, or whose rows weighted above 0 share one y, is fitted
+  # nothing (`Giggly.Stat.Gam`). A group's
   # constant columns are carried to its rows (`Giggly.Stat.Carry`), counted over the groups given a
   # curve, as ggplot2 reads only the groups its fit gives rows.
   #
@@ -55,13 +60,16 @@ defmodule Giggly.Stat.Smooth do
   # values are R's to within 1e-12 of the largest magnitude a group's column holds, its x R's to
   # the last digit (design-log §4, the entry beginning "A stat's values reached by another route").
   # A loess curve pulls each group's rows instead, by the frame's `list` aggregate, since no engine
-  # could run it, and is held to R's direct loess as closely.
+  # could run it, and is held to R's direct loess as closely. A gam curve sums each group's rows by
+  # knot interval through the frame and works out the rest on those sums, held to mgcv fitting the
+  # same model within 1e-6 of the range of the group's y, its standard errors 1e-5 relatively
+  # (design-log §4, the entry beginning "A gam's shrinkage").
 
   @enforce_keys [:method, :se, :level, :n, :span, :fullrange, :orientation]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          method: :none | :lm | :loess,
+          method: :none | :lm | :loess | :gam,
           se: boolean(),
           level: float(),
           n: pos_integer(),
@@ -96,7 +104,7 @@ defmodule Giggly.Stat.Smooth do
 
     alias Giggly.{Aesthetics, DataFrame}
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Stat.{Carry, Curve, Loess, TDistribution}
+    alias Giggly.Stat.{Carry, Curve, Gam, Loess, TDistribution}
 
     # The columns the stat writes, in ggplot2's order.
     @computed [:x, :y, :ymin, :ymax, :se, :flipped_aes]
@@ -121,7 +129,7 @@ defmodule Giggly.Stat.Smooth do
 
     # A smooth given no method is fitted as ggplot2 fits one: by loess where the layer's largest
     # group in any panel has under 1,000 rows, every row counted, as ggplot2's `setup_params()`
-    # counts them, and by gam from there, which Giggly does not have yet, so that is refused.
+    # counts them, and by gam from there.
     defp method(%{method: :none}, frame) do
       largest =
         frame
@@ -129,15 +137,7 @@ defmodule Giggly.Stat.Smooth do
         |> DataFrame.pull(:rows)
         |> Enum.max(fn -> 0 end)
 
-      if largest < @loess_rows do
-        :loess
-      else
-        raise ArgumentError,
-              "a smooth given no method: is fitted as ggplot2 fits one, by gam where its " <>
-                "largest group in any panel has 1,000 rows or more; this layer's largest group " <>
-                "has #{largest} rows, and Giggly does not have gam yet; give method: :loess or " <>
-                ":lm"
-      end
+      if largest < @loess_rows, do: :loess, else: :gam
     end
 
     defp method(%{method: method}, _frame), do: method
@@ -180,8 +180,8 @@ defmodule Giggly.Stat.Smooth do
       output(curves, groups, constant, stat.se, flipped)
     end
 
-    # The rows of the groups given a curve: every group lm fits, and those loess finds a quadratic
-    # for in every neighbourhood.
+    # The rows of the groups given a curve: every group lm fits, those loess finds a quadratic for
+    # in every neighbourhood, and those gam fits.
     defp kept_rows(rows, extents, curves) do
       given = MapSet.new(curves, fn {key, _curve} -> key end)
 
@@ -342,8 +342,9 @@ defmodule Giggly.Stat.Smooth do
 
     # Each fitted group's curve, in the groups' order: its x evenly spaced, and its fitted values,
     # standard errors and band, a straight line's for every group, a loess curve's for each whose
-    # every neighbourhood holds a quadratic. Loess pulls each group's rows, a row missing its weight
-    # left out, as R's `loess()` leaves it out.
+    # every neighbourhood holds a quadratic, and a gam curve's for each gam fits. Loess pulls each
+    # group's rows, a row missing its weight left out, as R's `loess()` leaves it out; gam reads
+    # each group's sums by knot interval (`Giggly.Stat.Gam`).
     defp curves(:lm, rows, extents, stat, axes) do
       fits = fits(rows)
 
@@ -383,6 +384,22 @@ defmodule Giggly.Stat.Smooth do
              ) do
           :none -> []
           curve -> [{key, curve}]
+        end
+      end)
+    end
+
+    defp curves(:gam, rows, extents, stat, axes) do
+      sums = Gam.sums(rows)
+
+      extents
+      |> rows_by_group([:x_low, :x_high])
+      |> Enum.flat_map(fn {key, extent} ->
+        with {:ok, group} <- Map.fetch(sums, key),
+             curve when is_list(curve) <-
+               Gam.curve(group, positions(key, extent, stat, axes), stat.se, stat.level) do
+          [{key, curve}]
+        else
+          _none -> []
         end
       end)
     end

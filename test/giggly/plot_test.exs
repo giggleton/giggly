@@ -2667,9 +2667,12 @@ defmodule Giggly.PlotTest do
     test "a method, a count, an orientation or a flag not offered is refused" do
       plot = Plot.new(@points, %{x: :x, y: :y})
 
-      assert_raise NimbleOptions.ValidationError, ~r/method/, fn ->
-        Plot.geom_smooth(plot, method: :gam)
-      end
+      error =
+        assert_raise NimbleOptions.ValidationError, ~r/method/, fn ->
+          Plot.geom_smooth(plot, method: :glm)
+        end
+
+      assert error.message =~ "[:lm, :loess, :gam]"
 
       for span <- [0, -0.5, "0.75"] do
         error =

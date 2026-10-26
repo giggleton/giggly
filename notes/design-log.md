@@ -79,6 +79,36 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **gam is Giggly's own: mgcv's `gam(y ~ s(x, bs = "cs"), method = "REML")` from Wood's published
+  method, its rows summed by knot interval through the frame, its 10 by 10 algebra in plain Elixir
+  and its search for λ its own (2026-10-25, Steve: "agree", then "A" for each; checked against
+  ggplot2 4.0.3 and mgcv 1.9.4).** ggplot2 reads a gam through `predictdf.glm()`, so its band is
+  the normal quantile's, not t's (`Stat.NormalDistribution`, bisection on `:math.erfc`). A cubic
+  regression spline (Wood 2017 §5.3.1) with 10 knots at the distinct x's type-7 quantiles, as R's
+  to 1.4e-14, straight past its end knots, summing to 0 over the rows unweighted; λ by REML (Wood
+  2011) over 61 values of log λ a step apart, then golden section; weights as mgcv's, a row of
+  weight 0 placing the knots and counting for the scale but not REML. It is within 1.1e-7 of the y
+  range of mgcv fitting the same model, its standard errors 4.4e-7. The row pass is 624 ms over
+  diamonds' 53,940 rows on the list engine, as lm's ~740. *Rejected: pulling the rows* — 62 ms, but
+  an engine can run sums. *Rejected: Nx* — a REML evaluation 3.9 ms against under 0.05, solves
+  3,000 times looser. *Rejected: Scholar's Brent* — its criterion must be `defn` on Nx, 74 ms a
+  group against 2-5, and Scholar 0.5.0 and Polaris 0.2.0 (Apache-2.0) with two widenings.
+  *Deferred:* `k:`, other bases, `formula:`, `method_args:`, the corrected covariance `Vc`.
+
+- **A gam's shrinkage gives the spline's constant and straight line each 0.055 of its penalty's
+  smallest positive eigenvalue, the mean of mgcv's 0.1 and 0.01, as mgcv's own pair turns on
+  rounding (2026-10-25, Steve: "A").** mgcv's "cs" gives its penalty's two zero eigenvalues 0.1 and
+  0.01 of the smallest positive one along the eigenvectors LAPACK returns for that two-dimensional
+  space, which rounding picks: the constant's share of the first runs from 0.43 to 0.86 across
+  datasets, and mpg's flips from 0.55 to 0.84 between OpenBLAS and reference LAPACK, moving R's own
+  curve 8e-4 of its range. Over 58 tables 0.055 sits nearest R's own: at 1,000 rows or more the
+  curve within 7.5e-4 of the y range and its standard errors 4.9%; under, 5.6e-3 and 7.2%. So gam
+  is held to mgcv fitting Giggly's model (`test/golden/giggly_gam.R`, through `paraPen`, tightly
+  converged) within 1e-6 of the range of the group's y and its standard errors 1e-5 relatively,
+  and to R's own over diamonds within 1e-3. *Rejected: one fixed pair of directions, the constant
+  0.1 and the line 0.01 or the reverse* — up to 2.0e-2 and 19% from R's own. *Rejected: R's own as
+  the bar everywhere* — no model reproduces its rounding.
+
 - **A loess band takes its first trace as its degrees of freedom, where R's exact statistics read
   δ₁² / δ₂ (2026-10-25, Steve: "B").** The band is the curve ∓ t × se; δ₁ = trace((I - L)ᵀ(I - L))
   costs n² and δ₂, the trace of its square, n³: 0.13 s at mpg's 234 rows, 2.2 s at 500 and 24 s at
@@ -143,12 +173,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   method, not the data.
 
 - **A smooth given no method is fitted as ggplot2 chooses when the plot is run: by loess where its
-  largest group in any panel has under 1,000 rows, and refused from there, naming gam (2026-10-25,
-  Steve: "B").** ggplot2 picks loess or gam as the plot is built, and a facet added after the layer
+  largest group in any panel has under 1,000 rows, and by gam from there (2026-10-25, Steve:
+  "B").** ggplot2 picks loess or gam as the plot is built, and a facet added after the layer
   changes the answer (txhousing: gam whole, loess by city). So the stat counts every row as
-  `setup_params()` does; step 5 replaces the refusal with gam and keeps the count. *Rejected:
-  refusing at the call* — the error would point at the line that wrote it, but the choice is the
-  run's.
+  `setup_params()` does. *Rejected: choosing at the call* — the line that wrote the layer would
+  know, but the choice is the run's.
 
 - **The t quantile keeps the agreed closed form for whole degrees of freedom, and takes a fraction
   from the incomplete beta function, held to R's within 1e-12 for levels up to 0.999 (2026-10-25,
@@ -178,11 +207,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   decision by decision; checked against ggplot2 4.0.3's source and R).** Stats were the thinnest
   family, nothing fitting a curve or estimating a density, and `geom_smooth()` is the layer most
   used after points: in r4ds and the ggplot2 book about 55 smooths name no method on tables under
-  1,000 rows (loess), 18 use lm, one gam. A smooth with no method raises, naming what waits, until
-  loess and gam land. The theme's `geom` element gains `accent` (#3366FF), the smooth's colour. The
-  t quantile is Giggly's own, the t distribution's closed form for whole degrees of freedom
-  (Abramowitz & Stegun 26.7.3-4) inverted by bisection: Nx and Scholar have no distributions, and
-  Hex's `statistics` is good to 4 decimals. gam's use of Scholar is asked with its step.
+  1,000 rows (loess), 18 use lm, one gam. The theme's `geom` element gains `accent` (#3366FF), the
+  smooth's colour. The t quantile is Giggly's own, the t distribution's closed form for whole
+  degrees of freedom (Abramowitz & Stegun 26.7.3-4) inverted by bisection: Nx and Scholar have no
+  distributions, and Hex's `statistics` is good to 4 decimals. gam takes no Scholar (the entry
+  beginning "gam is Giggly's own").
   *Deferred:* `formula:`, `method_args:`, `xseq:`, `method: :glm`, a function as a method; the
   `ucv`, `bcv` and `SJ` bandwidths; a gradient fill along a ribbon, refused when drawn;
   `position_fill()`; `stat_align()` as a function; a geom given a stat by name; ggplot2's messages;
@@ -193,10 +222,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **Nx is a core dependency, reached only through `Giggly.Tensor`, which takes and gives lists and
   pins every tensor to `Nx.BinaryBackend` in `f64` and every `defn` to `Nx.Defn.Evaluator`
-  (2026-10-25, Steve: "Core").** A density's FFT and gam's linear algebra run on Nx; loess runs in
-  plain Elixir (Steve: "A"), its 3 by 3 local fits 0.36 s at 999 rows against 12 s batched on the
-  binary backend, which decodes and re-encodes every number at every step and fuses nothing. Nx
-  reads its default backend and `defn` options from the application environment and
+  (2026-10-25, Steve: "Core").** A density's FFT runs on Nx; loess and gam run in plain Elixir
+  (Steve: "A" for each), loess's 3 by 3 local fits 0.36 s at 999 rows against 12 s batched on the
+  binary backend, which decodes and re-encodes every number at every step and fuses nothing, and
+  gam's 10 by 10 algebra eighty times faster than Nx's (the entry beginning "gam is Giggly's own").
+  Nx reads its default backend and `defn` options from the application environment and
   the process dictionary on every call; so no other module builds a tensor, and a user's EXLA
   default cannot change a drawing. Nx starts its own application (a `:pg` scope for
   `Nx.Serving`), which Giggly never calls. `Nx.fft` takes `eps: 0`, since its default, 1e-10,
@@ -216,7 +246,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   residuals), Scholar's centre-then-solve method, pulling a row per group. Interpolation,
   stat_align's and a density's, is R's `approx()` formula on lists. stat_align pulls the panel's
   rows, its output as large as its input, as the identity's is, so an engine would save nothing;
-  loess and gam pull each group's, since no engine can run them (§7, "Engine backends"). *Rejected:
+  loess pulls each group's, since no engine can run it (§7, "Engine backends"); gam sums each
+  group's by knot interval through the frame (the entry beginning "gam is Giggly's own"). *Rejected:
   binning or lm on pulled rows in Nx or Scholar* — every row would cross into Elixir. *Rejected: an
   operation stacking two tables for the binning* — summing in another order than R's moves the
   result 1e-16 of the peak. *Rejected: Scholar's interpolation* (Steve: "formula") — the same
@@ -239,13 +270,12 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and loess in R's direct mode, its band at the first trace's degrees of freedom (the entry
   beginning "A loess band takes its first trace"), are held to 1e-12 of the largest magnitude R's
   column holds in the group, about a thousand times the gap measured (an FFT against a plain sum,
-  5-8e-16 of the peak). gam is held to 1e-3 of the range of the group's y data, its standard
-  errors to 1e-3 relative, since R's own optimiser, run tighter, moves its curve 2.4e-4 of its
-  range and its standard errors 4.5e-4 (diamonds); its goldens are checked through their layer
-  data, as 1e-3 is up to a third of a point. x columns, stat_align and stacking stay R's to the
-  last digit. *Rejected: a bar per value* — a density's tails and a curve near zero are round-off
-  in R itself. *Rejected: the range of a curve for gam* — it vanishes where a fit comes out flat.
-  *Rejected: porting R's FFT* — Giggly ports no R or C source.
+  5-8e-16 of the peak). gam is held to mgcv fitting Giggly's model within 1e-6 of the range of
+  the group's y data, its standard errors 1e-5 relatively, and to R's own within 1e-3 over
+  diamonds (the entry beginning "A gam's shrinkage"). x columns, stat_align and stacking stay R's to
+  the last digit. *Rejected: a bar per value* — a density's tails and a curve near zero are
+  round-off in R itself. *Rejected: the range of a curve for gam* — it vanishes where a fit comes
+  out flat. *Rejected: porting R's FFT* — Giggly ports no R or C source.
 
 - **A text's family is the theme's, inherited as any property, and every complete theme takes
   `base_family:` and `header_family:` (2026-10-24, Steve: "Let's get family working with the
@@ -2688,6 +2718,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-25 — Fit gam smooths: method: :gam, and gam for a smooth given no method from 1,000
+  rows, mgcv's REML spline summed by knot interval through the frame and solved in plain Elixir
+  (smoothing and densities, step 5); §4: "gam is Giggly's own", "A gam's shrinkage", "A smooth
+  given no method", "Nx is a core dependency", "Smoothing and densities compute over the rows", "A
+  stat's values reached by another route"
 - 2026-10-25 — Fit loess smooths: method: :loess and span:, each place's quadratic fitted directly
   in plain Elixir, its band at the first trace and the t quantile at fractional degrees of freedom
   (smoothing and densities, step 4); §4: "A loess band takes its first trace", "A loess curve stops
