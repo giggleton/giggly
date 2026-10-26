@@ -31,5 +31,11 @@ defmodule Giggly.Stat.NormalDistributionTest do
       assert abs(NormalDistribution.central_quantile(0.999999) - 4.891638475671084) <=
                1.0e-11 * 4.891638475671084
     end
+
+    test "refuses a level of 0, 1 or past it" do
+      for level <- [0.0, 1.0, 1.5] do
+        assert_raise FunctionClauseError, fn -> NormalDistribution.central_quantile(level) end
+      end
+    end
   end
 end

@@ -1632,6 +1632,138 @@ defmodule Giggly.StatTest do
       assert DataFrame.row_count(none) == 0
     end
 
+    # Golden: `aes(disp, wt, weight = w)` with w 1e20 for every row, which R fits as it fits
+    # weights of 1, the curve and its standard errors the same within 2e-15. λ grows with the
+    # weights, 1e20 as large, so the search for it must start from the scale the sums give it.
+    test "every row weighed alike is fitted as rows of weight 1, however heavy" do
+      frame = mtcars_frame(weight: List.duplicate(1.0e20, 32))
+
+      assert_gam(gam(frame, [], {71.1, 472}), @mtcars_gam)
+    end
+
+    # Golden: ggplot2 4.0.3's own `geom_smooth(method = "gam", n = 3)` over x 1 to 20 and y 3x,
+    # then x 0.5 to 10, a step apart, and y 1,000,000 + x: the curve is the line, and the residuals
+    # are rounding's, R's standard errors under 1e-9, where Giggly's sum of their squares, worked
+    # out from its sums, comes out at 0 or just below it, and is held at 0, so the band has no
+    # width. At the least λ searched, D, the residuals' and the penalty's sum, comes out 0 or below
+    # in rounding too, and REML's criterion is not worked out there.
+    test "rows on a straight line are fitted the line, its band of no width" do
+      xs = Enum.map(1..20, fn index -> index / 1 end)
+
+      line = gam(one_panel(x: xs, y: Enum.map(xs, fn x -> 3 * x end)), [n: 3], {1.0, 20.0})
+
+      assert_gam(line, [y: [2.9999999999999805, 31.500000000000004, 60.000000000000021]], 57.0)
+      assert DataFrame.pull(line, :se) == [0.0, 0.0, 0.0]
+
+      halves = Enum.map(xs, fn x -> x / 2 end)
+
+      high =
+        gam(one_panel(x: halves, y: Enum.map(halves, fn x -> 1.0e6 + x end)), [n: 3], {0.5, 10.0})
+
+      assert_gam(
+        high,
+        [y: [1_000_000.4999999997, 1_000_005.2499999998, 1_000_010.0000000005]],
+        9.5
+      )
+
+      assert DataFrame.pull(high, :se) == [0.0, 0.0, 0.0]
+    end
+
+    # Golden: `geom_smooth(method = giggly_gam, n = 5, se = FALSE)` over 34 rows of a noisy sine,
+    # drawn at random and rounded: their criterion's least lies below the best of the places searched
+    # a step apart, so narrowing must look a step either side of it.
+    test "λ's least is sought a step either side of the best place searched" do
+      xs = [
+        0.17,
+        9.0,
+        4.7,
+        0.73,
+        2.01,
+        4.82,
+        5.92,
+        5.95,
+        3.76,
+        9.56,
+        0.51,
+        6.1,
+        2.38,
+        0.5,
+        4.12,
+        9.94,
+        5.73,
+        3.6,
+        6.99,
+        0.2,
+        1.36,
+        6.04,
+        4.87,
+        2.74,
+        6.28,
+        9.64,
+        9.35,
+        2.8,
+        7.9,
+        6.9,
+        7.71,
+        8.03,
+        4.08,
+        7.23
+      ]
+
+      ys = [
+        0.71,
+        -0.16,
+        -1.03,
+        0.35,
+        0.36,
+        -0.12,
+        -1.01,
+        -0.27,
+        -0.99,
+        -0.61,
+        0.05,
+        -0.7,
+        0.51,
+        0.97,
+        -0.54,
+        -1.46,
+        -0.59,
+        -1.4,
+        0.34,
+        0.07,
+        -0.12,
+        -0.38,
+        -1.06,
+        0.2,
+        0.03,
+        0.78,
+        1.25,
+        0.5,
+        0.92,
+        0.35,
+        1.42,
+        0.11,
+        -0.34,
+        1.25
+      ]
+
+      curve = gam(one_panel(x: xs, y: ys), [se: false], {0.17, 9.94})
+
+      assert_gam(
+        curve,
+        [
+          y: [
+            0.45365534637920213,
+            0.013244081728987209,
+            -0.70852653401181775,
+            0.64030379308448182,
+            -0.3735460491363024
+          ]
+        ],
+        2.88
+      )
+    end
+
     # The spline is worked across its knots' range, so x on any scale is fitted as at its own:
     # mgcv's own gam draws disp scaled so, its penalty rescaled.
     test "x a googolth of mtcars' disp is fitted the curve at disp, its places scaled" do

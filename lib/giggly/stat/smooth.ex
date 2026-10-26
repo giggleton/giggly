@@ -394,12 +394,12 @@ defmodule Giggly.Stat.Smooth do
       extents
       |> rows_by_group([:x_low, :x_high])
       |> Enum.flat_map(fn {key, extent} ->
-        with {:ok, group} <- Map.fetch(sums, key),
-             curve when is_list(curve) <-
-               Gam.curve(group, positions(key, extent, stat, axes), stat.se, stat.level) do
-          [{key, curve}]
-        else
-          _none -> []
+        case Map.fetch(sums, key) do
+          {:ok, group} ->
+            [{key, Gam.curve(group, positions(key, extent, stat, axes), stat.se, stat.level)}]
+
+          :error ->
+            []
         end
       end)
     end

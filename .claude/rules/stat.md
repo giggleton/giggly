@@ -200,7 +200,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   within 1e-3. Its 10 by 10 algebra is plain Elixir (`Giggly.Stat.Matrix`), never Nx. A row
   missing its weight is left out; a row of weight 0 places the knots and counts for the
   constraint and the scale, but not REML; a negative or infinite weight, fewer than 10 distinct
-  x, or rows weighted above 0 sharing one y fit its group nothing, where mgcv fails. Every curve
+  x, or rows weighted above 0 sharing one y fit its group nothing, where mgcv fails; rows on a
+  straight line are fitted the line with a band of no width, where R's is rounding's. Every curve
   and golden is checked against ggplot2 drawing mgcv's gam so (`test/golden/giggly_gam.R`), and
   one golden against R's own (`test/golden/smooth_gam.R`).
 - **Densities are ggplot2's `stat_density()`, R's `density()`** (design-log §4, the entry beginning

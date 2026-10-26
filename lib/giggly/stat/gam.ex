@@ -31,9 +31,11 @@ defmodule Giggly.Stat.Gam do
   # sum. It is searched over log λ at 61 places a step apart about the scale of Xᵀ W X's trace
   # over S's, then narrowed by golden-section search to 1e-11 round the least. The standard error
   # at x is √(φ xᵀ (Xᵀ W X + λ S)⁻¹ x), mgcv's Bayesian covariance, φ the weighted residuals' sum
-  # of squares over every row less the effective degrees of freedom, trace((Xᵀ W X + λ S)⁻¹ Xᵀ W
-  # X); the band is the curve ∓ the normal quantile at `level` times it, as ggplot2 reads a gam's
-  # band, its `predictdf()` for a glm (`Giggly.Stat.NormalDistribution`).
+  # of squares, held at 0 or above against rounding, over every row less the effective degrees of
+  # freedom, trace((Xᵀ W X + λ S)⁻¹ Xᵀ W X), so rows on a straight line are fitted the line with a
+  # band of no width, where R's band is rounding's width; the band is the curve ∓ the normal
+  # quantile at `level` times it, as ggplot2 reads a gam's band, its `predictdf()` for a glm
+  # (`Giggly.Stat.NormalDistribution`).
   #
   # What scales with the rows runs through the frame (design-log §4, the entry beginning
   # "Smoothing and densities compute over the rows"): each group's distinct x and their quantiles,
@@ -249,18 +251,15 @@ defmodule Giggly.Stat.Gam do
   defp curvature(width), do: width * width / 6
 
   # A group's curve at `places`, each a map of its place `x` and curve `y`, and with `se` its
-  # `ymin`, `ymax` and standard error `se` at `level`; or `:none` where no λ can be fitted.
+  # `ymin`, `ymax` and standard error `se` at `level`.
   @doc false
-  @spec curve(map(), [float()], boolean(), float()) :: [map()] | :none
+  @spec curve(map(), [float()], boolean(), float()) :: [map()]
   def curve(group_sums, places, se, level) do
     spline = spline(group_sums.knots)
     {gram, response, totals} = assembled(group_sums.blocks, spline)
     penalty = constrained(shrunk(spline), totals)
-
-    case fit(gram, response, penalty, group_sums) do
-      {:ok, fit} -> Enum.map(places, fn place -> curve_row(place, spline, fit, se, level) end)
-      :none -> :none
-    end
+    fit = fit(gram, response, penalty, group_sums)
+    Enum.map(places, fn place -> curve_row(place, spline, fit, se, level) end)
   end
 
   # The spline's knots, their widths across the knots' range, F with its rows at the end knots 0,
@@ -274,7 +273,6 @@ defmodule Giggly.Stat.Gam do
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.map(fn [low, high] -> (high - low) / range end)
 
-    inner = @knots - 2
     consecutive = Enum.chunk_every(widths, 2, 1, :discard)
 
     differences =
@@ -288,7 +286,7 @@ defmodule Giggly.Stat.Gam do
       consecutive
       |> Enum.with_index()
       |> Enum.map(fn {[width, next], row} ->
-        for column <- 0..(inner - 1), do: span(column - row, width, next)
+        for column <- 0..row, do: span(column - row, width, next)
       end)
 
     {:ok, factor} = Matrix.cholesky(spans)
@@ -321,10 +319,10 @@ defmodule Giggly.Stat.Gam do
   defp difference(2, _width, next), do: 1 / next
   defp difference(_offset, _width, _next), do: 0.0
 
-  # B's entry `offset` columns past its row's own.
+  # B's entry `offset` columns past its row's own, up to its diagonal: the lower triangle of the
+  # symmetric B, which is all its Cholesky factor reads.
   defp span(-1, width, _next), do: width / 6
   defp span(0, width, next), do: (width + next) / 3
-  defp span(1, _width, next), do: next / 6
   defp span(_offset, _width, _next), do: 0.0
 
   # Xᵀ W X, Xᵀ W y and the basis's column totals, each interval's 4 by 4 sums spread through its
@@ -426,7 +424,9 @@ defmodule Giggly.Stat.Gam do
     |> Matrix.multiply(projection)
   end
 
-  # The fit at the λ REML picks: β, the covariance's factor (Xᵀ W X + λ S)⁻¹ and the scale.
+  # The fit at the λ REML picks: β, the covariance's factor (Xᵀ W X + λ S)⁻¹ and the scale. A λ
+  # the criterion cannot be worked out at gives `:none`, an atom, which Erlang orders after every
+  # number, so neither the scan's least nor the narrowing settles on one.
   defp fit(gram, response, penalty, group_sums) do
     criterion = fn log_lambda ->
       criterion(log_lambda, gram, response, penalty, group_sums)
@@ -434,26 +434,17 @@ defmodule Giggly.Stat.Gam do
 
     scale_guess = :math.log(trace(gram) / trace(penalty))
 
-    scanned =
-      for step <- -@reach..@reach,
-          log_lambda = scale_guess + step,
-          value = criterion.(log_lambda),
-          value != :none,
-          do: {log_lambda, value}
+    least =
+      -@reach..@reach
+      |> Enum.map(fn step -> scale_guess + step end)
+      |> Enum.min_by(criterion)
 
-    case scanned do
-      [] ->
-        :none
-
-      _scanned ->
-        {least, _value} = Enum.min_by(scanned, fn {_log_lambda, value} -> value end)
-        log_lambda = narrowed(criterion, least - 1, least + 1)
-        {:ok, fitted(:math.exp(log_lambda), gram, response, penalty, group_sums)}
-    end
+    log_lambda = narrowed(criterion, least - 1, least + 1)
+    fitted(:math.exp(log_lambda), gram, response, penalty, group_sums)
   end
 
   # REML's criterion at log λ, or `:none` where Xᵀ W X + λ S is not positive definite as rounded
-  # or D is not above 0.
+  # or D, as rounded, is not above 0, as it can come out at the least λ for rows on a line.
   defp criterion(log_lambda, gram, response, penalty, group_sums) do
     lambda = :math.exp(log_lambda)
     matrix = penalised(gram, penalty, lambda)
@@ -479,7 +470,7 @@ defmodule Giggly.Stat.Gam do
   end
 
   # Golden-section search for the least of `criterion` between `low` and `high`, until they are
-  # within the narrowest width; a place it cannot be worked out at counts as greater than any.
+  # within the narrowest width.
   defp narrowed(criterion, low, high) do
     inner_low = high - @golden * (high - low)
     inner_high = low + @golden * (high - low)
@@ -496,7 +487,7 @@ defmodule Giggly.Stat.Gam do
     do: (low + high) / 2
 
   defp narrowed(criterion, {low, high}, {at_low, value_low} = inner_low, {at_high, value_high}) do
-    if below?(value_low, value_high) do
+    if value_low < value_high do
       moved = at_high - @golden * (at_high - low)
       narrowed(criterion, {low, at_high}, {moved, criterion.(moved)}, inner_low)
     else
@@ -504,10 +495,6 @@ defmodule Giggly.Stat.Gam do
       narrowed(criterion, {at_low, high}, {at_high, value_high}, {moved, criterion.(moved)})
     end
   end
-
-  defp below?(:none, _other), do: false
-  defp below?(_value, :none), do: true
-  defp below?(value, other), do: value < other
 
   defp fitted(lambda, gram, response, penalty, group_sums) do
     {:ok, factor} =
@@ -525,7 +512,11 @@ defmodule Giggly.Stat.Gam do
         sum + Matrix.dot(covariance_row, gram_row)
       end)
 
-    scale = (deviance - roughness) / (group_sums.rows - degrees_of_freedom)
+    # The residuals' sum of squares, D less the penalty's part, is 0 where the curve passes through
+    # every row, a straight line's say, and may come out just below it in rounding, where R's comes
+    # out just above it, its band rounding's width.
+    residual_squares = max(deviance - roughness, 0.0)
+    scale = residual_squares / (group_sums.rows - degrees_of_freedom)
     %{coefficients: coefficients, covariance: covariance, scale: scale, centre: group_sums.centre}
   end
 

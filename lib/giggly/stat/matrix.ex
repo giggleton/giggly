@@ -75,9 +75,10 @@ defmodule Giggly.Stat.Matrix do
   defp diagonal(index, index), do: 1.0
   defp diagonal(_column, _index), do: 0.0
 
-  # The Cholesky factor of a symmetric positive definite matrix, its rows of L in order, row i
-  # holding its i + 1 entries up to the diagonal, or `:none` where a pivot comes out at 0 or
-  # below, so the matrix is not positive definite as rounded.
+  # The Cholesky factor of a symmetric positive definite matrix, read from its lower triangle, each
+  # row's entries up to the diagonal, its rows of L in order, row i holding its i + 1 entries up to
+  # the diagonal, or `:none` where a pivot comes out at 0 or below, so the matrix is not positive
+  # definite as rounded.
   @doc false
   @spec cholesky([[number()]]) :: {:ok, [[float()]]} | :none
   def cholesky(matrix) do
@@ -155,7 +156,8 @@ defmodule Giggly.Stat.Matrix do
     end)
   end
 
-  # The factored matrix's inverse, a column solved for each column of the identity.
+  # The factored matrix's inverse, a column solved for each column of the identity, the columns
+  # its rows, as the inverse of a symmetric matrix is symmetric.
   @doc false
   @spec inverse([[float()]]) :: [[float()]]
   def inverse(factor) do
@@ -163,7 +165,6 @@ defmodule Giggly.Stat.Matrix do
     |> length()
     |> identity()
     |> Enum.map(fn column -> solve(factor, column) end)
-    |> transpose()
   end
 
   # A symmetric matrix's eigenvalues, greatest first.

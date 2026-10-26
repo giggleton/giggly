@@ -85,8 +85,14 @@ defmodule Giggly.Stat.MatrixTest do
       ])
     end
 
-    test "of a diagonal matrix are its diagonal, sorted" do
-      assert Matrix.eigenvalues([[1, 0], [0, 3]]) == [3.0, 1.0]
+    test "of a diagonal matrix are its diagonal, sorted, as floats" do
+      assert Matrix.eigenvalues([[1, 0], [0, 3]]) === [3.0, 1.0]
+    end
+
+    # Rotating the first two rows leaves their entries beside the third exactly 0, so a rotation
+    # meets an entry already 0, which it must pass over: its angle would divide by it.
+    test "of a block-diagonal matrix pass over the entries already 0" do
+      assert_close(Matrix.eigenvalues([[2, 1, 0], [1, 2, 0], [0, 0, 5]]), [5.0, 3.0, 1.0])
     end
   end
 

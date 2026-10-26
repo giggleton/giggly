@@ -401,12 +401,28 @@ defmodule WarmMutation do
         {:invalid, inspect(reason), []}
 
       {_calls, {:ok, source}} ->
-        if Muex.Tce.equivalent_source?(entry.ast, source) do
+        if same_bytecode?(entry, source, mutation) do
           {:equivalent, "compiles to the same bytecode as the original (TCE)", []}
         else
           judge_source(source, entry, world)
         end
     end
+  end
+
+  # Whether the mutant compiles to the original's bytecode, muex's TCE. muex 0.11.3's TCE walks the
+  # disassembled code as proper lists and raises on a literal improper list, which a mutant setting
+  # a list's tail to nil folds into one (`[{:squares, ...} | nil]`, 2026-10-25); such a mutant is
+  # not shown equivalent, as TCE calls one it cannot compile, and is judged.
+  defp same_bytecode?(entry, source, mutation) do
+    Muex.Tce.equivalent_source?(entry.ast, source)
+  rescue
+    error ->
+      IO.puts(
+        "[warm] TCE raised #{inspect(error.__struct__)} at #{entry.path}:" <>
+          "#{mutation.location.line} (#{Map.get(mutation, :description)}); judged"
+      )
+
+      false
   end
 
   defp judge_source(source, entry, world) do

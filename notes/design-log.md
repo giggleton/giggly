@@ -93,7 +93,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   an engine can run sums. *Rejected: Nx* — a REML evaluation 3.9 ms against under 0.05, solves
   3,000 times looser. *Rejected: Scholar's Brent* — its criterion must be `defn` on Nx, 74 ms a
   group against 2-5, and Scholar 0.5.0 and Polaris 0.2.0 (Apache-2.0) with two widenings.
-  *Deferred:* `k:`, other bases, `formula:`, `method_args:`, the corrected covariance `Vc`.
+  Rows on a straight line are fitted the line with a band of no width: the residuals' sum of
+  squares, worked out from the sums, comes out at 0 or just below it, and is held at 0, where R's,
+  from its residuals, is rounding's (5e-15). *Rejected: a second pass summing the residuals* — R's
+  way, at half again the time. *Deferred:* `k:`, other bases, `formula:`, `method_args:`, the
+  corrected covariance `Vc`.
 
 - **A gam's shrinkage gives the spline's constant and straight line each 0.055 of its penalty's
   smallest positive eigenvalue, the mean of mgcv's 0.1 and 0.01, as mgcv's own pair turns on
