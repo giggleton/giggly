@@ -199,7 +199,7 @@ defmodule Giggly.PositionTest do
         )
 
       levels = DataFrame.new(panel: [1, 1], x: [1, 3], y: [0.0, 0.0])
-      position = %Position.Jitter{height: 0.0, seed: 1}
+      position = %Position.Jitter{width: :none, height: 0.0, seed: 1}
       [first, _first_up, second, _second_up] = draws(1, 4)
 
       jittered_apart = Position.compute_layer(position, apart)
@@ -262,13 +262,33 @@ defmodule Giggly.PositionTest do
     # and sends the finite points to an infinity; Giggly's spacing leaves an infinity out.
     test "positions whose only gap is to an infinity are 1 apart, moving up to 0.4" do
       frame = DataFrame.new(panel: [1, 1, 1], x: [1.0, 2.0, 3.0], y: [1.0, 1.0, :neg_infinity])
-      jittered = Position.compute_layer(%Position.Jitter{width: 0.0, seed: 4}, frame)
+
+      jittered =
+        Position.compute_layer(%Position.Jitter{width: 0.0, height: :none, seed: 4}, frame)
+
       [_first_across, first_up, _second_across, second_up | _rest] = draws(4, 6)
 
       assert DataFrame.pull(jittered, :y) ===
                [1.0 + distance(first_up, 0.4), 1.0 + distance(second_up, 0.4), :neg_infinity]
     end
   end
+
+  describe "compute_layer/2 for jittering, given what Plot never gives" do
+    # `Plot.position_jitter/1` keeps every amount as a float, so an integer is a programmer error,
+    # refused rather than drawn from.
+    test "an amount that is not a float is refused" do
+      frame = DataFrame.new(panel: [1], x: [1.0], y: [1.0])
+
+      assert_raise FunctionClauseError, fn ->
+        Position.compute_layer(%Position.Jitter{width: untyped(1), height: :none, seed: 0}, frame)
+      end
+    end
+  end
+
+  # `value` with its type hidden from the compiler, so a test can hand a function a value its
+  # guards refuse.
+  @spec untyped(term()) :: term()
+  defp untyped(value), do: value
 
   # The first `count` numbers Erlang's `exsss` algorithm draws from `seed`, each from 0 to 1.
   defp draws(seed, count) do

@@ -26,7 +26,8 @@ defmodule Giggly.Position.Jitter do
   # Positions whose only gap is to an infinity, where R's `resolution()` is infinite and its jitter
   # sends the marks to infinity, are 1 apart, since `Giggly.Resolution` leaves an infinity out.
 
-  defstruct width: :none, height: :none, seed: 0
+  @enforce_keys [:width, :height, :seed]
+  defstruct @enforce_keys
 
   @type t :: %__MODULE__{width: :none | float(), height: :none | float(), seed: integer()}
 

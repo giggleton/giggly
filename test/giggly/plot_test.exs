@@ -957,6 +957,14 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.geom_jitter(plot, %{y: :mgp}) end
       assert error.message =~ "Plot.geom_jitter/3"
     end
+
+    test "an aesthetic points cannot use is refused by the layer that maps it" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_jitter(plot, %{label: :cyl}) end
+      assert error.message =~ "Plot.geom_jitter/3"
+      assert error.message =~ ":label"
+    end
   end
 
   describe "geom_count/3 and stat_sum/3" do
