@@ -33,7 +33,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3` and `geom_density/3` among them), `stat_sum/3`, `stat_bin/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
-  (`facet_wrap/3`), the coordinate functions (`coord_radial/1`), the scale functions
+  (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
   `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_gradient`, `_gradient2`,
@@ -207,7 +207,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   built ("non-numeric argument to mathematical function"), and a reordering by numbers, its mean
   one the engine runs, where R warns and orders nothing. A facet's columns are named at the
   call, and none, one named twice, or a value that is not a
-  column reference is refused there; whether some table holds them all, and whether `nrow:` and
+  column reference is refused there, a grid's counted over both sides (`rows:` and `cols:`), so a
+  column on both is named twice, as ggplot2 refuses it, and neither side given is none, where R
+  draws one panel; whether some table holds them all, and whether `nrow:` and
   `ncol:` hold the panels, are the facet's questions, answered when the plot is run, since a layer
   added later may bring a column and counting the panels is its computation.
 - **A layer is checked against the facts of the kind that reads its aesthetics first**: a point or
@@ -277,7 +279,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `0.5`), and so is a ribbon's and an area's `outline_type:` (`:both` and `:upper`) and
   `orientation:` (`:none`, the range's, and `:x`).
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; the bar functions' `position:`, `fill:`, `width:` and `just:`,
+  `nrow:`, `ncol:` and `scales:`; `facet_grid/2`'s `rows:`, `cols:` and `scales:`; the bar
+  functions' `position:`, `fill:`, `width:` and `just:`,
   0 to 1; every geom function's
   `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_count/3`'s and `stat_sum/3`'s `fill:`,
   `shape:`, `size:` and `stroke:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and

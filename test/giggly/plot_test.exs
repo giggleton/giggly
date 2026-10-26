@@ -3222,6 +3222,59 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "facet_grid/2" do
+    test "a plot records the grid facet with each side's columns by their names in the data" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.facet_grid(rows: [:cyl, "wt"], cols: :mpg, scales: :free_x)
+
+      assert plot.facet == %Facet.Grid{rows: ["cyl", "wt"], cols: ["mpg"], scales: :free_x}
+    end
+
+    test "a side left out splits on no columns, and the scales are fixed unless given" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.facet_grid(cols: :cyl)
+
+      assert plot.facet == %Facet.Grid{rows: [], cols: ["cyl"], scales: :fixed}
+    end
+
+    test "no column on either side is refused" do
+      plot = Plot.new(@rows)
+
+      for options <- [[], [rows: [], cols: []]] do
+        error = assert_raise ArgumentError, fn -> Plot.facet_grid(plot, options) end
+        assert error.message =~ "Plot.facet_grid/2 needs a column to facet by"
+      end
+    end
+
+    test "a column named twice, on one side or on both, is refused" do
+      plot = Plot.new(@rows)
+
+      error = assert_raise ArgumentError, fn -> Plot.facet_grid(plot, rows: :cyl, cols: "cyl") end
+      assert error.message =~ "Plot.facet_grid/2"
+      assert error.message =~ ~s(:cyl, "cyl")
+      assert error.message =~ ~s(column "cyl" more than once)
+
+      assert_raise ArgumentError, ~r/more than once/, fn ->
+        Plot.facet_grid(plot, rows: [:cyl, :wt, :cyl])
+      end
+    end
+
+    test "a value that is not a column reference, or a scales that is not one, is refused" do
+      plot = Plot.new(@rows)
+
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_grid(plot, rows: 4) end
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_grid(plot, cols: [:cyl, 4]) end
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.facet_grid(plot, rows: :cyl, scales: :free_z)
+      end
+    end
+  end
+
   describe "scale_x_continuous/2, scale_y_continuous/2, xlim/3, ylim/3 and lims/2" do
     test "a plot has no scales until a scale function gives it one" do
       assert Plot.new(@rows).scales === %{}

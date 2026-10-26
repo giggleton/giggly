@@ -609,6 +609,38 @@ defmodule GigglyTest do
                {[5.0, 6.0, 5.0, 6.0], [1, 1, 2, 2]}
     end
 
+    # Golden: ggplot2 4.0.3 in R 4.6.1, `facet_grid(r ~ c, scales = "free")` over the plot's data
+    # and a layer's table lacking r: the x scales' ranges 1 to 6, 10 to 10 and 5 to 5 by column,
+    # the y scales' 1 to 7 and 2 to 7 by row.
+    test "a grid's free scales are shared down each column and along each row" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 10],
+          "y" => [1, 4, 2, 5],
+          "r" => ["a", "a", "b", "b"],
+          "c" => ["u", "u", "u", "v"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_point(data: %{"x" => [5, 6], "y" => [3, 7], "c" => ["w", "u"]})
+        |> Plot.facet_grid(rows: :r, cols: :c, scales: :free)
+
+      ranges =
+        Enum.map(1..6, fn panel ->
+          scales = Giggly.panel_scales(plot, panel)
+          {scales.x.range, scales.y.range}
+        end)
+
+      assert ranges == [
+               {{1, 6}, {1, 7}},
+               {{10, 10}, {1, 7}},
+               {{5, 5}, {1, 7}},
+               {{1, 6}, {2, 7}},
+               {{10, 10}, {2, 7}},
+               {{5, 5}, {2, 7}}
+             ]
+    end
+
     test "each layer's columns are typed from its own table, so an axis refuses a second kind" do
       plot =
         %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}

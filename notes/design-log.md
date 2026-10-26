@@ -79,6 +79,21 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`facet_grid` is Phase 3's thirteenth increment, in three steps: panels as data, drawing the
+  grid, the notebook sweep (2026-10-26, Steve: "Go"; checked against ggplot2 4.0.3's source and
+  R).** `Plot.facet_grid(plot, rows: :drv, cols: :cyl, scales: :free)`, each side a column or a
+  list, ggplot2 4's own arguments, keywords since neither side is needed alone; neither given is
+  refused, as `facet_wrap/3` refuses none though R draws one panel. As ggplot2's `combine_vars()`,
+  the rows' values and the columns' are combined apart, each refused alone unless some table holds
+  all its columns, then crossed, so a pair no table holds is a panel drawn empty; free scales are
+  shared down a column and along a row, and axes stay at the margins. What `Facet.Wrap` computed
+  that the grid shares moved to `Facet.Combinations`. *Rejected: a formula form* — Elixir has none,
+  and a string (plotnine's `"drv ~ cyl"`) is R's grammar ported. *Deferred:* `space:` (Steve:
+  "A"), a piece of its own for both facets, since ggplot2 4.0.3's `facet_wrap` has one too and the
+  facet cannot know a scale's extent; `labeller`, its own increment for both; `margins`;
+  `switch` and `strip.placement`, with wrap's `strip.position`; `axes`, `axis.labels`,
+  `as.table`, `drop`, `shrink`; a layer's `layout`.
+
 - **A base-R time series an example turns into a table is written out as R gives it (2026-10-26,
   Steve: "A", in the smoothing sweep).** geom_ribbon's examples plot `huron`, built from
   `LakeHuron`, base R's 98 yearly levels of Lake Huron, a time series rather than a table; the cell
@@ -2741,6 +2756,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Lay out facet_grid's panels as data: rows: and cols: crossed into a grid, a pair
+  no table holds an empty panel, free scales shared down a column and along a row (facet_grid,
+  step 1); §4: "`facet_grid` is Phase 3's thirteenth increment"
 - 2026-10-26 — Draw the notebook examples ribbons, areas, smooths and densities unlock, and narrow
   every verdict to what still waits (smoothing and densities, the notebook sweep); §4: "A base-R
   time series an example turns into a table", "A verdict names an argument Giggly lacks even

@@ -20,9 +20,13 @@ defprotocol Giggly.Facet do
   # one module holding everything about it: its struct, whose fields are the facet's parameters,
   # and its computing, in a `defimpl Giggly.Facet` whose first line classifies it into this
   # boundary, since boundary checks nothing a protocol implementation calls until it is classified.
-  # There are two: ggplot2's null facet (`Giggly.Facet.Null`), a single panel, so every row is in
-  # panel 1, at row 1 and column 1, on scale 1 of each axis; and `facet_wrap`
-  # (`Giggly.Facet.Wrap`), a panel for each combination of some columns' values, laid out in rows.
+  # They are ggplot2's null facet (`Giggly.Facet.Null`), a single panel, so every row is in
+  # panel 1, at row 1 and column 1, on scale 1 of each axis; `facet_wrap`
+  # (`Giggly.Facet.Wrap`), a panel for each combination of some columns' values, laid out in rows;
+  # and `facet_grid` (`Giggly.Facet.Grid`), a row of panels for each combination of some columns'
+  # values crossed with a column of panels for each of others'. What the two that split on values
+  # share, the combinations the tables make and the panel each row is given by its values, is
+  # `Giggly.Facet.Combinations`'s.
   #
   # A facet that orders its panels by values orders them as a discrete scale orders its levels,
   # by the key the assembly hands it, so panels and axes agree while this namespace names nothing
@@ -32,7 +36,7 @@ defprotocol Giggly.Facet do
   # `as.character()` writes it (`Giggly.AsCharacter`), and nothing else.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: [Null, Wrap]
+  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: [Grid, Null, Wrap]
 
   alias Giggly.DataFrame
 

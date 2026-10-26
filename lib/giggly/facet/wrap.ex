@@ -7,17 +7,11 @@ defmodule Giggly.Facet.Wrap do
   # the panels out in, each `:none` when not given; and which axes' scales are free, ggplot2's
   # `scales`: `:fixed`, `:free_x`, `:free_y` or `:free`. Run it through `Giggly.Facet`.
   #
-  # The panels are those the plot's data and every layer's table make together, as ggplot2's
-  # `combine_vars()` makes them: each combination of the columns' values in a table holding them
-  # all, and then, for each table holding only some of them, in turn, each of its combinations of
-  # those with each combination of the others' values made so far, so a value only such a table
-  # holds makes a panel with each. A table holding none of them, or no rows, makes none, and unless
-  # some table holds them all the layout is refused, naming what each lacks. The panels are ordered
-  # by the first column's values, then the next's, each as R's vctrs combines the tables' columns:
-  # by their levels where every table holding the column holds it as a category, the first's and
-  # then the levels each later one adds; else as a discrete scale orders its levels, by the key the
-  # assembly hands over, so a factor beside a column of text sorts as text. A missing value (`nil`)
-  # gets a panel of its own, last. They
+  # The panels are the combinations of the facet's columns' values that the plot's data and every
+  # layer's table make together, ordered by the first column's values, then the next's, a missing
+  # value (`nil`) last, and each table's rows are given their panels, a table lacking some of the
+  # columns repeated in each panel of the values it has, all as `Giggly.Facet.Combinations` makes
+  # and gives them. They
   # fill the layout a row at a time, left to right. With neither a number of rows nor of columns,
   # the layout is ggplot2's (R's `n2mfrow()`, rows and columns swapped): one row for up to three
   # panels, two for up to six, three for up to twelve, and beyond that as many columns as the
@@ -26,17 +20,13 @@ defmodule Giggly.Facet.Wrap do
   # every panel uses that axis's scale 1; on a free one each panel has a scale of its own, numbered
   # as the panel is, as ggplot2's layout numbers them.
   #
-  # The layout carries each facet column, by its name in the data, as ggplot2's does, and each
-  # row's panel is found from its values there. A table lacking some of the columns has each of its
-  # rows repeated once for each combination of the missing columns' values in the layout, in panel
-  # order, as ggplot2's `map_data()` repeats them: all its rows for the first, then all for the
-  # next, so one lacking them all is drawn in every panel. It also says where each panel's axes and
-  # strip go. A panel draws an axis on each side that has no panel beside it, ggplot2's axes at the
-  # margins: below the last row, and below a panel with an empty cell under it, at the end of an
-  # unfilled last row; and left of the first column. On a free axis every panel draws its own, since
-  # no two share a scale. Each panel has a strip above it for each facet column, in the columns'
-  # order, labelled with its value as ggplot2's `label_value()` writes it, R's `as.character()`
-  # (`Giggly.AsCharacter`: `4` for a whole float, `TRUE`), with a missing value written `NA`.
+  # The layout carries each facet column, by its name in the data, as ggplot2's does. It also says
+  # where each panel's axes and strip go. A panel draws an axis on each side that has no panel
+  # beside it, ggplot2's axes at the margins: below the last row, and below a panel with an empty
+  # cell under it, at the end of an unfilled last row; and left of the first column. On a free axis
+  # every panel draws its own, since no two share a scale. Each panel has a strip above it for
+  # each facet column, in the columns' order, labelled with its value as ggplot2's `label_value()`
+  # writes it.
 
   @enforce_keys [:facets, :nrow, :ncol, :scales]
   defstruct @enforce_keys
@@ -51,14 +41,15 @@ defmodule Giggly.Facet.Wrap do
   defimpl Giggly.Facet, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Facet
 
-    alias Giggly.{AsCharacter, DataFrame}
+    alias Giggly.DataFrame
+    alias Giggly.Facet.Combinations
 
     # A fixed axis's one scale.
     @only_scale 1
 
     @impl Giggly.Facet
     def layout(%{facets: facets, scales: scales} = wrap, frames, order_key) do
-      combinations = combinations(frames, facets, order_key)
+      combinations = Combinations.combine(frames, facets, order_key, subject(facets))
       count = length(combinations)
       {_rows, columns} = dimensions(wrap, count)
       panels = Enum.to_list(1..count//1)
@@ -83,170 +74,15 @@ defmodule Giggly.Facet.Wrap do
               end),
             axis_left:
               Enum.map(places, fn {row, column} -> free_y or {row, column - 1} not in occupied end),
-            strip: Enum.map(combinations, fn values -> Enum.map(values, &label/1) end)
+            strip:
+              Enum.map(combinations, fn values -> Enum.map(values, &Combinations.label/1) end)
           ]
       )
     end
 
     @impl Giggly.Facet
-    def assign_panels(%{facets: facets}, frame, layout) do
-      panel_by_values =
-        [:panel | facets]
-        |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
-        |> Enum.zip_with(fn [panel | values] -> {values, panel} end)
-        |> Map.new()
-
-      missing = facets -- held(frame, facets)
-      fills = fills(layout, missing)
-      rows = Enum.to_list(0..(DataFrame.row_count(frame) - 1)//1)
-      repeated = DataFrame.slice(frame, Enum.flat_map(fills, fn _fill -> rows end))
-      fill_by_row = Enum.flat_map(fills, fn fill -> Enum.map(rows, fn _row -> fill end) end)
-
-      panels =
-        facets
-        |> Enum.map(fn name -> facet_values(name, missing, repeated, fill_by_row) end)
-        |> Enum.zip_with(fn values -> Map.fetch!(panel_by_values, values) end)
-
-      DataFrame.put(repeated, :panel, panels)
-    end
-
-    # The combinations of the facet columns' values the tables make, as ggplot2's `combine_vars()`
-    # makes them: every table holding all the columns gives its own, then each table holding only
-    # some crosses its own with those made so far. Each is a list in the columns' order, sorted by
-    # the first column's values, then the next's.
-    defp combinations(frames, facets, order_key) do
-      column_keys = Enum.map(facets, fn name -> column_key(frames, name, order_key) end)
-
-      {complete, partial} =
-        Enum.split_with(frames, fn frame -> held(frame, facets) == facets end)
-
-      check_complete(complete, frames, facets)
-
-      made =
-        complete
-        |> Enum.flat_map(fn frame -> rows_of(frame, facets) end)
-        |> Enum.uniq()
-
-      combinations =
-        partial
-        |> Enum.reduce(made, fn frame, so_far -> crossed(frame, so_far, facets) end)
-        |> Enum.map(fn values -> Enum.map(facets, fn name -> Map.fetch!(values, name) end) end)
-        |> Enum.sort_by(fn values -> sort_key(values, column_keys) end)
-
-      case combinations do
-        [] -> raise ArgumentError, no_panels_message(facets)
-        combinations -> combinations
-      end
-    end
-
-    # How a facet column's values are ordered: by the places of the levels of the tables holding it,
-    # in table order, where every one holds it as a category, a missing value after them, as vctrs
-    # combines factors; else by the caller's key, as vctrs makes a factor beside text text.
-    defp column_key(frames, name, order_key) do
-      holding = Enum.filter(frames, fn frame -> name in DataFrame.names(frame) end)
-
-      if Enum.all?(holding, fn frame -> Map.fetch!(DataFrame.dtypes(frame), name) == :category end),
-         do: level_place(holding, name),
-         else: order_key
-    end
-
-    defp level_place(holding, name) do
-      place_by_level =
-        holding
-        |> Enum.flat_map(fn frame -> levels(frame, name) end)
-        |> Enum.uniq()
-        |> Enum.with_index()
-        |> Map.new()
-
-      fn
-        nil -> {1, nil}
-        level -> {0, Map.fetch!(place_by_level, level)}
-      end
-    end
-
-    defp levels(frame, name) do
-      {:category, declaration} = DataFrame.category(frame, name)
-      Keyword.fetch!(declaration, :levels)
-    end
-
-    # A combination's values in column order, each turned into its column's sort key.
-    defp sort_key(values, column_keys),
-      do: Enum.zip_with(values, column_keys, fn value, column_key -> column_key.(value) end)
-
-    # The combinations made so far, with each combination of the columns `frame` holds crossed with
-    # each of the others' values made so far. A table holding none of them, or no rows, adds none.
-    defp crossed(frame, made, facets) do
-      held = held(frame, facets)
-      others = facets -- held
-
-      own =
-        frame
-        |> rows_of(held)
-        |> Enum.uniq()
-
-      crossings =
-        for other <- Enum.map(made, fn values -> Map.take(values, others) end),
-            values <- own,
-            do: Map.merge(other, values)
-
-      Enum.uniq(made ++ crossings)
-    end
-
-    # The facet columns `frame` holds, in the facet's order.
-    defp held(frame, facets) do
-      names = DataFrame.names(frame)
-      Enum.filter(facets, fn name -> name in names end)
-    end
-
-    # Each row's values of `columns`, by column name.
-    defp rows_of(frame, columns) do
-      columns
-      |> Enum.map(fn name -> DataFrame.pull(frame, name) end)
-      |> Enum.zip_with(fn values -> by_name(columns, values) end)
-    end
-
-    defp by_name(columns, values) do
-      columns
-      |> Enum.zip(values)
-      |> Map.new()
-    end
-
-    # Each combination of the `missing` columns' values in the layout, by column name, in panel
-    # order, a table's rows repeated once for each: one with none, when the table misses none.
-    defp fills(_layout, []), do: [%{}]
-
-    defp fills(layout, missing) do
-      layout
-      |> rows_of(missing)
-      |> Enum.uniq()
-    end
-
-    # A facet column's value in each row of the repeated table: its own, or the fill it was repeated
-    # for.
-    defp facet_values(name, missing, repeated, fill_by_row) do
-      if name in missing,
-        do: Enum.map(fill_by_row, fn fill -> Map.fetch!(fill, name) end),
-        else: DataFrame.pull(repeated, name)
-    end
-
-    defp check_complete([], frames, facets) do
-      lacking =
-        frames
-        |> Enum.with_index()
-        |> Enum.map_join("; ", fn {frame, index} ->
-          "#{table_name(index)} lacks #{inspect_all(facets -- held(frame, facets))}"
-        end)
-
-      raise ArgumentError,
-            "facet_wrap by #{inspect_all(facets)} needs a table holding every column it facets " <>
-              "by, but none holds them all: " <> lacking
-    end
-
-    defp check_complete(_complete, _frames, _facets), do: :ok
-
-    # The first table is the plot's data, and each after it a layer's, in the order added.
-    defp table_name(0), do: "the plot's data"
-    defp table_name(index), do: "the layer at index #{index - 1}'s table"
+    def assign_panels(%{facets: facets}, frame, layout),
+      do: Combinations.assign_panels(frame, layout, facets)
 
     # Each panel's scale on an axis: its own, numbered as the panel is, on a free axis.
     defp scale_ids(panels, true), do: panels
@@ -291,14 +127,8 @@ defmodule Giggly.Facet.Wrap do
 
     defp ceiling_divide(numerator, denominator), do: div(numerator + denominator - 1, denominator)
 
-    # A value as its strip writes it, ggplot2's `label_value()`.
-    defp label(nil), do: "NA"
-    defp label(value), do: AsCharacter.text(value)
-
-    defp no_panels_message(facets) do
-      "facet_wrap by #{inspect_all(facets)} has no panels to make: the tables holding its " <>
-        "columns have no rows"
-    end
+    # The facet and its columns, as a refusal names them.
+    defp subject(facets), do: "facet_wrap by #{inspect_all(facets)}"
 
     defp inspect_all(terms), do: Enum.map_join(terms, ", ", &inspect/1)
   end

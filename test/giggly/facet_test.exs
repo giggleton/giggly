@@ -15,6 +15,10 @@ defmodule Giggly.FacetTest do
     }
   end
 
+  defp grid(rows, cols, options \\ []) do
+    %Facet.Grid{rows: rows, cols: cols, scales: Keyword.get(options, :scales, :fixed)}
+  end
+
   defp layout(facet, frame), do: Facet.layout(facet, [frame], &Scale.level_key/1)
 
   # The layout over several tables: the plot's data first, then each layer's.
@@ -332,6 +336,177 @@ defmodule Giggly.FacetTest do
 
       assert {DataFrame.pull(free_y, :axis_bottom), DataFrame.pull(free_y, :axis_left)} ==
                {[false, false, true, true, true], [true, true, true, true, true]}
+    end
+  end
+
+  describe "the grid layout" do
+    # Rows a and b, columns u and v; no row holds a with v.
+    setup do
+      %{
+        data:
+          DataFrame.new([
+            {"x", [1, 2, 3, 10]},
+            {"r", ["a", "a", "b", "b"]},
+            {"c", ["u", "u", "v", "u"]}
+          ])
+      }
+    end
+
+    test "every row's values are crossed with every column's, a pair no table holds a panel too",
+         %{data: data} do
+      facet_layout = layout(grid(["r"], ["c"]), data)
+
+      assert {DataFrame.pull(facet_layout, :panel), places(facet_layout),
+              DataFrame.pull(facet_layout, "r"), DataFrame.pull(facet_layout, "c")} ==
+               {[1, 2, 3, 4], [{1, 1}, {1, 2}, {2, 1}, {2, 2}], ["a", "a", "b", "b"],
+                ["u", "v", "u", "v"]}
+
+      assert panels(grid(["r"], ["c"]), data, facet_layout, "x") == {[1, 1, 4, 3], [1, 2, 3, 10]}
+    end
+
+    test "a side splitting on nothing gives a single column or a single row of panels",
+         %{data: data} do
+      by_rows = layout(grid(["r"], []), data)
+      by_columns = layout(grid([], ["c"]), data)
+
+      assert {places(by_rows), places(by_columns)} ==
+               {[{1, 1}, {2, 1}], [{1, 1}, {1, 2}]}
+    end
+
+    test "a row of panels for each combination of several columns, ordered by the first" do
+      frame = DataFrame.new([{"v", [1, 0, 1, 0]}, {"a", [0, 0, 1, 1]}, {"g", [3, 3, 4, 4]}])
+      facet_layout = layout(grid(["v", "a"], ["g"]), frame)
+
+      assert {DataFrame.pull(facet_layout, "v"), DataFrame.pull(facet_layout, "a"),
+              DataFrame.pull(facet_layout, "g"), dimensions(facet_layout)} ==
+               {[0, 0, 0, 0, 1, 1, 1, 1], [0, 0, 1, 1, 0, 0, 1, 1], [3, 4, 3, 4, 3, 4, 3, 4],
+                {4, 2}}
+    end
+
+    test "every panel uses the first scale of each axis", %{data: data} do
+      facet_layout = layout(grid(["r"], ["c"]), data)
+
+      assert {DataFrame.pull(facet_layout, :scale_x), DataFrame.pull(facet_layout, :scale_y)} ==
+               {[1, 1, 1, 1], [1, 1, 1, 1]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 numbers `facet_grid(r ~ c, scales = "free")`'s SCALE_X by
+    # the panel's column and its SCALE_Y by its row.
+    test "a free axis gives each column of panels its x scale and each row its y scale",
+         %{data: data} do
+      free_x = layout(grid(["r"], ["c"], scales: :free_x), data)
+      free_y = layout(grid(["r"], ["c"], scales: :free_y), data)
+      free = layout(grid(["r"], ["c"], scales: :free), data)
+
+      assert Enum.map([free_x, free_y, free], fn facet_layout ->
+               {DataFrame.pull(facet_layout, :scale_x), DataFrame.pull(facet_layout, :scale_y)}
+             end) ==
+               [
+                 {[1, 2, 1, 2], [1, 1, 1, 1]},
+                 {[1, 1, 1, 1], [1, 1, 2, 2]},
+                 {[1, 2, 1, 2], [1, 1, 2, 2]}
+               ]
+    end
+
+    test "an axis is drawn only at the grid's margins, free scales or not", %{data: data} do
+      for scales <- [:fixed, :free] do
+        facet_layout = layout(grid(["r"], ["c"], scales: scales), data)
+
+        assert {DataFrame.pull(facet_layout, :axis_bottom),
+                DataFrame.pull(facet_layout, :axis_left)} ==
+                 {[false, false, true, true], [true, false, true, false]}
+      end
+    end
+
+    test "the first row's panels are labelled with the columns' values, a missing value as NA" do
+      frame = DataFrame.new([{"r", ["a", "b"]}, {"c", [nil, 4.0]}, {"d", [true, true]}])
+      labelled = layout(grid(["r"], ["c", "d"]), frame)
+      unlabelled = layout(grid(["r"], []), frame)
+
+      assert DataFrame.pull(labelled, :strip) == [["4", "TRUE"], ["NA", "TRUE"], [], []]
+      assert DataFrame.pull(unlabelled, :strip) == [[], []]
+    end
+  end
+
+  describe "the grid's panels over the plot's data and every layer's table" do
+    setup do
+      %{
+        plot_data:
+          DataFrame.new([
+            {"x", [1, 2, 3, 10]},
+            {"r", ["a", "a", "b", "b"]},
+            {"c", ["u", "u", "u", "v"]}
+          ])
+      }
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1, `facet_grid(r ~ c)` over the plot's data and a layer's
+    # table holding x 5 and 6 and c `w` and `u` but no r: panels a and b by u, v and w, the
+    # layer's rows in panels 3, 1, 6 and 4.
+    test "a value only a layer's table holds makes a column, the table lacking the rows' column " <>
+           "drawn down it",
+         %{plot_data: plot_data} do
+      extra = DataFrame.new([{"x", [5, 6]}, {"c", ["w", "u"]}])
+      facet = grid(["r"], ["c"])
+      facet_layout = layout_of(facet, [plot_data, plot_data, extra])
+
+      assert {DataFrame.pull(facet_layout, "r"), DataFrame.pull(facet_layout, "c")} ==
+               {["a", "a", "a", "b", "b", "b"], ["u", "v", "w", "u", "v", "w"]}
+
+      assert panels(facet, extra, facet_layout, "x") == {[3, 1, 6, 4], [5, 6, 5, 6]}
+    end
+
+    # Golden: as above, a layer's table holding r `b` alone draws in panels 3 and 4; one holding r
+    # `z` alone adds a row, its row drawn in panels 5 and 6.
+    test "a table holding the rows' column alone is drawn across its row, a new value a new row",
+         %{plot_data: plot_data} do
+      facet = grid(["r"], ["c"])
+      row_b = DataFrame.new([{"x", [7]}, {"r", ["b"]}])
+      row_z = DataFrame.new([{"x", [7]}, {"r", ["z"]}])
+      with_b = layout_of(facet, [plot_data, plot_data, row_b])
+      with_z = layout_of(facet, [plot_data, plot_data, row_z])
+
+      assert panels(facet, row_b, with_b, "x") == {[3, 4], [7, 7]}
+      assert dimensions(with_z) == {3, 2}
+      assert panels(facet, row_z, with_z, "x") == {[5, 6], [7, 7]}
+    end
+
+    # Golden: as above, `facet_grid(r ~ c)` over r `a, NA, a` and c `NA, u, u`: rows a then NA,
+    # columns u then NA, the rows in panels 2, 3 and 1.
+    test "a missing value is a row or a column of its own, last" do
+      frame = DataFrame.new([{"x", [1, 2, 3]}, {"r", ["a", nil, "a"]}, {"c", [nil, "u", "u"]}])
+      facet = grid(["r"], ["c"])
+      facet_layout = layout(facet, frame)
+
+      assert {DataFrame.pull(facet_layout, "r"), DataFrame.pull(facet_layout, "c")} ==
+               {["a", "a", nil, nil], ["u", nil, "u", nil]}
+
+      assert panels(facet, frame, facet_layout, "x") == {[2, 3, 1], [1, 2, 3]}
+    end
+
+    # ggplot2 checks the rows' columns and the columns' apart: "At least one layer must contain all
+    # faceting variables: `r` and `zz`", naming what each table lacks of those.
+    test "unless some table holds every column of a side, the layout is refused naming that side",
+         %{plot_data: plot_data} do
+      error =
+        assert_raise ArgumentError, fn ->
+          layout_of(grid(["r", "zz"], ["c"]), [plot_data, plot_data])
+        end
+
+      assert error.message =~ ~s(facet_grid by rows "r", "zz")
+
+      assert error.message =~
+               ~s(the plot's data lacks "zz"; the layer at index 0's table lacks "zz")
+
+      error = assert_raise ArgumentError, fn -> layout(grid(["r"], ["zz"]), plot_data) end
+      assert error.message =~ ~s(facet_grid by cols "zz")
+    end
+
+    test "data with no rows makes no panels and is refused" do
+      empty = DataFrame.new([{"r", []}, {"c", []}])
+
+      error = assert_raise ArgumentError, fn -> layout(grid(["r"], ["c"]), empty) end
+      assert error.message =~ "no rows"
     end
   end
 end

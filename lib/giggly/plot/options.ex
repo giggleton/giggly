@@ -36,6 +36,32 @@ defmodule Giggly.Plot.Options do
                         ]
                       )
 
+  # `facet_grid/2`'s options.
+  @facet_grid_options NimbleOptions.new!(
+                        rows: [
+                          type: {:or, [:atom, :string, {:list, {:or, [:atom, :string]}}]},
+                          default: [],
+                          doc:
+                            "The column, or list of columns, whose values give the rows of " <>
+                              "panels, each named as a mapping names one."
+                        ],
+                        cols: [
+                          type: {:or, [:atom, :string, {:list, {:or, [:atom, :string]}}]},
+                          default: [],
+                          doc:
+                            "The column, or list of columns, whose values give the columns of " <>
+                              "panels, each named as a mapping names one."
+                        ],
+                        scales: [
+                          type: {:in, [:fixed, :free_x, :free_y, :free]},
+                          default: :fixed,
+                          doc:
+                            "Whether the panels share each axis's scale (`:fixed`), or each " <>
+                              "column of panels has its own x scale (`:free_x`), each row its " <>
+                              "own y scale (`:free_y`), or both (`:free`)."
+                        ]
+                      )
+
   # A table of a layer's own, an option of every function that adds a layer, as ggplot2's `data =`
   # gives one; read after validation, as `new/2` reads the plot's.
   @data_option [
@@ -2332,6 +2358,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec facet_wrap() :: NimbleOptions.t()
   def facet_wrap, do: @facet_wrap_options
+
+  @doc false
+  @spec facet_grid() :: NimbleOptions.t()
+  def facet_grid, do: @facet_grid_options
 
   @doc false
   @spec point() :: NimbleOptions.t()

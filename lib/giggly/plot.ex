@@ -1534,6 +1534,69 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Splits the plot into a grid of panels: a row of panels for each combination of values of the
+  `rows:` columns that occurs in the data, and a column of panels for each of the `cols:`
+  columns', each given as a column or a list of columns named as a mapping names one:
+  `facet_grid(plot, rows: :drv, cols: :cyl)`. Leaving one out gives a single column or a single
+  row of panels.
+
+  Each layer's rows are drawn in the panel of their values. The rows' values and the columns' are
+  each those the plot's data and every layer's own table make together, and every row is crossed
+  with every column, so a pair of values no table holds still has a panel, drawn empty. A table
+  lacking some of the columns is drawn in every panel of the values it has, so one lacking them
+  all is drawn in every panel. The rows, and the columns, are ordered by their first column's
+  values, then the next's, as an axis orders its levels, with a missing value (`nil`) last.
+
+  The panels share each axis's scale, and an axis is drawn only at the grid's outer edges. Free
+  scales give each column of panels an x scale of its own and each row a y scale, trained on its
+  panels' rows alone; the axes stay at the edges, each column's below it and each row's left of
+  it.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.facet_grid())}
+
+  Raises `ArgumentError` when neither `rows:` nor `cols:` names a column, or a column is named
+  twice, in one of them or in both, and `NimbleOptions.ValidationError` for an option it does not
+  take or a value that is not a column reference. When the plot is run, since a layer added later
+  may bring a column, it raises `ArgumentError` unless the plot's data or some layer's own table
+  holds every column of `rows:`, and likewise of `cols:`, and when no table has a row to make a
+  panel from.
+
+      iex> plot =
+      ...>   %{
+      ...>     "wt" => [2.32, 2.62, 3.44, 2.2],
+      ...>     "mpg" => [22.8, 21.0, 18.7, 32.4],
+      ...>     "am" => [1, 1, 0, 1],
+      ...>     "cyl" => [4, 6, 8, 4]
+      ...>   }
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.facet_grid(rows: :am, cols: :cyl)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:panel)
+      [4, 5, 3, 4]
+  """
+  @spec facet_grid(t(), keyword()) :: t()
+  def facet_grid(%__MODULE__{} = plot, options) when is_list(options) do
+    options = NimbleOptions.validate!(options, Options.facet_grid())
+
+    references =
+      Enum.map([:rows, :cols], fn side ->
+        options
+        |> Keyword.fetch!(side)
+        |> List.wrap()
+      end)
+
+    [rows, cols] =
+      Enum.map(references, fn side -> Enum.map(side, fn reference -> to_string(reference) end) end)
+
+    check_facet_columns(rows ++ cols, Enum.concat(references), "Plot.facet_grid/2")
+    facet = %Facet.Grid{rows: rows, cols: cols, scales: Keyword.fetch!(options, :scales)}
+
+    %{plot | facet: facet}
+  end
+
+  @doc """
   Draws the plot in radial coordinates: x is the angle, running clockwise round a full circle from
   12 o'clock, and y the radius, out from the centre. A plot is cartesian until this is called.
 
@@ -4595,7 +4658,7 @@ defmodule Giggly.Plot do
   defp facet_columns(facets) do
     references = List.wrap(facets)
     columns = Enum.map(references, &facet_column/1)
-    check_facet_columns(columns, references)
+    check_facet_columns(columns, references, "Plot.facet_wrap/3")
     columns
   end
 
@@ -4607,18 +4670,18 @@ defmodule Giggly.Plot do
             "but a facet names a column, as an atom or a string"
   end
 
-  defp check_facet_columns([], _references) do
-    raise ArgumentError, "Plot.facet_wrap/3 needs a column to facet by, and was given none"
+  defp check_facet_columns([], _references, function) do
+    raise ArgumentError, "#{function} needs a column to facet by, and was given none"
   end
 
-  defp check_facet_columns(columns, references) do
+  defp check_facet_columns(columns, references, function) do
     case columns -- Enum.uniq(columns) do
       [] ->
         :ok
 
       [repeated | _others] ->
         raise ArgumentError,
-              "Plot.facet_wrap/3 facets by #{inspect_all(references)}, which names the column " <>
+              "#{function} facets by #{inspect_all(references)}, which names the column " <>
                 "#{inspect(repeated)} more than once"
     end
   end
