@@ -1038,16 +1038,26 @@ defmodule Giggly.Plot do
   Adds a layer of smooths: a curve fitted to each group's rows, for the trend through a cloud of
   points, drawn over its band, the confidence interval around it.
 
-  With `method: :lm`, the one method Giggly has, each curve is a straight line by least squares,
-  `y` fitted to `x`, each row weighted by its `:weight` where one is mapped, worked out at `n:`
-  evenly spaced places from the group's least `x` to its greatest, or across the whole x axis
-  with `fullrange: true`. Its band runs the line's standard error times the t distribution's
-  quantile at `level:` either side of it. A row missing `x` or `y`, or at an infinite one, is
-  left out, and so is one missing its weight or weighted 0; a group holding fewer than two
-  distinct `x`, or a weight below 0 or infinite, is drawn nothing, and one whose weighted rows
-  hold one `x` is drawn flat at their weighted mean. Where the line meets every row, as through
-  two, no band is drawn. A smooth given no method raises `ArgumentError` when the plot is drawn,
-  naming the method ggplot2 would choose, loess or gam, which Giggly does not have yet.
+  Each curve is worked out at `n:` evenly spaced places from the group's least `x` to its
+  greatest, or across the whole x axis with `fullrange: true`, and drawn over its band, its
+  standard error times the t distribution's quantile at `level:` either side of it. Each row is
+  weighted by its `:weight` where one is mapped; a row missing `x` or `y`, or at an infinite one,
+  or missing its weight, is left out, and a group holding fewer than two distinct `x`, or a weight
+  below 0 or infinite, is drawn nothing.
+
+  With `method: :lm` each curve is a straight line by least squares, `y` fitted to `x`; a row
+  weighted 0 is left out, a group whose weighted rows hold one `x` is drawn flat at their weighted
+  mean, and where the line meets every row, as through two, no band is drawn.
+
+  With `method: :loess`, each place's value is a quadratic fitted by least squares to the share
+  `span:` of the group's rows nearest it, nearer rows weighing more, so the curve follows the rows'
+  trend wherever it bends. It is drawn only across the group's rows, even with `fullrange: true`; a
+  row weighted 0 leaves the band out; and a group too small for its span to hold three distinct `x`
+  round each place, as one of five rows at the default span, is drawn nothing.
+
+  A smooth given no method fits loess where the largest group in any panel holds under 1,000 rows,
+  and otherwise raises `ArgumentError` when the plot is drawn: ggplot2 fits gam there, which Giggly
+  does not have yet.
 
   Smooths use `:x`, `:y`, `:weight`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype` and
   `:linewidth`, and need `:x` and `:y`; a `:weight` column must hold numbers. A curve's line is
@@ -3680,6 +3690,7 @@ defmodule Giggly.Plot do
         se: se,
         level: Keyword.fetch!(validated, :level),
         n: Keyword.fetch!(validated, :n),
+        span: Keyword.fetch!(validated, :span),
         fullrange: Keyword.fetch!(validated, :fullrange),
         orientation: Keyword.fetch!(validated, :orientation)
       },

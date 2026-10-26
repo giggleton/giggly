@@ -4409,14 +4409,21 @@ defmodule GigglyTest do
 
     # A smooth given no method is refused by its stat, which counts every row of the layer it is
     # handed: mpg's 234, which ggplot2 fits by loess.
-    test "a smooth given no method is refused when run, counting every row" do
-      plot =
-        Giggly.Datasets.mpg()
-        |> Plot.new(%{x: :displ, y: :hwy})
+    test "a smooth given no method fits loess under 1,000 rows, and is refused from there" do
+      plot = Plot.new(Giggly.Datasets.mpg(), %{x: :displ, y: :hwy})
+
+      unstated = Plot.geom_smooth(plot)
+      loess = Plot.geom_smooth(plot, method: :loess)
+
+      assert Giggly.layer_data(unstated) == Giggly.layer_data(loess)
+
+      diamonds =
+        Giggly.Datasets.diamonds()
+        |> Plot.new(%{x: :carat, y: :price})
         |> Plot.geom_smooth()
 
-      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
-      assert error.message =~ "234 rows"
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(diamonds) end
+      assert error.message =~ "53940 rows"
     end
   end
 
@@ -9290,6 +9297,58 @@ defmodule GigglyTest do
         |> Plot.facet_wrap(:p)
 
       assert golden?(plot, "density_dropped")
+    end
+
+    # Golden: test/golden/smooth_loess.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/smooth_loess.R, whose loess test/golden/giggly_loess.R fits as Giggly does. mpg's
+    # points under the smooth a layer given no method fits, loess. It moves with the local fits, the
+    # band's first trace, the fractional t quantile, or how a smooth is drawn.
+    test "a smooth given no method fits loess over a group of under 1,000 rows" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth()
+
+      assert golden?(plot, "smooth_loess")
+    end
+
+    # Golden: test/golden/smooth_loess_groups.svg, checked as test/golden/smooth_loess.svg is, made
+    # by test/golden/smooth_loess_groups.R. A loess for each drive, each band before its own line.
+    test "each group's loess is drawn whole before the next" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :drv})
+        |> Plot.geom_smooth(method: :loess)
+
+      assert golden?(plot, "smooth_loess_groups")
+    end
+
+    # Golden: test/golden/smooth_loess_fullrange.svg, checked as test/golden/smooth_loess.svg is,
+    # made by test/golden/smooth_loess_fullrange.R. Over an axis from 0 to 10 the places past the
+    # rows are missing, so the curve and its band stop at displ's 1.6 and 7. It moves with where a
+    # loess curve stops.
+    test "a loess across the full range stops at its rows" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :loess, fullrange: true)
+        |> Plot.xlim(0, 10)
+
+      assert golden?(plot, "smooth_loess_fullrange")
+    end
+
+    # Golden: test/golden/smooth_loess_span.svg, checked as test/golden/smooth_loess.svg is, made
+    # by test/golden/smooth_loess_span.R. A span of 0.3, without its band. It moves with the span.
+    test "a narrower span follows the rows more closely" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.geom_smooth(method: :loess, se: false, span: 0.3)
+
+      assert golden?(plot, "smooth_loess_span")
     end
   end
 

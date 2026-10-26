@@ -51,8 +51,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   width from its counted positions. Nothing checks this but review. **Aligning pulls its panels'
   rows** (design-log §4, the entry beginning "Smoothing and densities compute over the rows"): its
   output is as large as its input, as the identity's is, and interpolating each group at the
-  others' places has no frame operation. **Smoothing's fit is three passes of sums through the
-  frame**, its arithmetic the frame's `+ - * /`, pulling a row a group. **A density is four passes
+  others' places has no frame operation. **Smoothing's straight line is three passes of sums
+  through the frame**, its arithmetic the frame's `+ - * /`, pulling a row a group; **its loess
+  pulls each group's rows**, by the frame's `list` aggregate, since no engine could run it. **A
+  density is four passes
   through the frame**, its grid points `floor` in an expression, pulling a row a group and its
   totals at each grid point.
 - **A stat names the computed column each aesthetic takes by default, `default_mapping/1`**,
@@ -141,7 +143,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   every group holds one x and x where every group holds one y, else y, where R also warns. A width
   that is not a number is refused when the plot is run.
 - **Smoothing is ggplot2's `stat_smooth()` with `method = "lm"`, R's `lm(y ~ x, weights =
-  weight)` read through `predict()`** (design-log §4, the entries beginning "A linear smooth fits
+  weight)` read through `predict()`, or `method = "loess"`, below** (design-log §4, the entries
+  beginning "A linear smooth fits
   the slope" and "A smooth given no method is refused when the plot is run"): per panel and per
   group, `n` rows at R's `seq()` from the group's least x to its greatest, or across the unwidened
   extent of the panel's axis it runs along with `fullrange`, its y axis along y, where ggplot2
@@ -150,8 +153,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   of x; with `se`, `se` the residuals' variance times one over the weights' total plus that
   distance squared over x's sum of squares, square-rooted, and `ymin` and `ymax` `y` ∓ `se` times
   Giggly's t quantile at `level` (`Giggly.Stat.TDistribution`: Abramowitz and Stegun 26.7.3-4,
-  bisected, R's `qt()` within 1e-12 up to a level of 0.999, design-log §4, the entry beginning "The
-  t quantile keeps"); and `flipped_aes`, along y with x and y swapped. Its values are R's within
+  bisected, or for a fraction of degrees of freedom the incomplete beta function, R's `qt()` within
+  1e-12 up to a level of 0.999, design-log §4, the entry beginning "The t quantile keeps"); and
+  `flipped_aes`, along y with x and y swapped. Its values are R's within
   1e-12 of the largest magnitude the group's column holds, its x R's to the last digit. A row
   missing or infinite in x or y is left out; a group of fewer than two distinct x is fitted
   nothing. **Its weights are R's `lm()`'s**: a missing one leaves its row out, a negative or
@@ -160,9 +164,24 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   only zero weights is fitted nothing. Weighted rows at one x give a flat curve at their weighted
   mean with a degree of freedom more, as R drops a slope it cannot fit; otherwise the slope is
   fitted however little x varies. Of no degrees of freedom, `se` and the band are NaN. **A smooth
-  given no method (`:none`) is refused when the plot is run**, naming loess where the largest
-  group in any panel has under 1,000 rows, every row counted, and gam otherwise. A weight that is
-  not a number is refused when the plot is run.
+  given no method (`:none`) is fitted by loess where the largest group in any panel has under
+  1,000 rows**, every row counted, and refused from there, naming gam. A weight that is not a
+  number is refused when the plot is run.
+- **A loess smooth is R's `loess(y ~ x, weights = weight, span = span)` fitted directly at each
+  place, as `surface = "direct"`** (`Giggly.Stat.Loess`; design-log §4, the entries beginning
+  "loess is Giggly's own", "A loess band takes its first trace", "A loess curve stops at its rows"
+  and "A loess group whose neighbourhoods cannot hold a quadratic"), in plain Elixir on each
+  group's rows: at each place a quadratic fitted by weighted least squares to the ⌊n × span⌋
+  nearest rows, tricube-weighted by distance over the qth nearest's (past a span of 1 every row,
+  over the largest distance times the span's square root, as R takes it), times each row's
+  weight; with `se`, `se` the residuals' scale over the first trace δ₁ of (I - L)ᵀ(I - L) times
+  the operator's weights squared over each row's weight, square-rooted, and the band at the t
+  quantile with δ₁ degrees of freedom. Its values are R's direct loess within 1e-12 of the largest
+  magnitude a group's column holds, its band R's at δ₁; its places past the rows are missing. A
+  row missing its weight is left out, a row of weight 0 kept, making `se` NaN, as R's; a negative
+  or infinite weight, or a neighbourhood holding fewer than three distinct x weighed above 0, fits
+  its group nothing. Every curve and golden is checked against ggplot2 drawing R's loess so
+  (`test/golden/giggly_loess.R`).
 - **Densities are ggplot2's `stat_density()`, R's `density()`** (design-log §4, the entry beginning
   "A density takes ggplot2's options"): per panel and per group, along whichever of x and y is
   mapped, exactly one, flipped and flipped back; `n` places at R's `seq()` across the panel's axis

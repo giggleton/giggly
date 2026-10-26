@@ -8,12 +8,13 @@ defmodule Giggly.Stat.Smooth do
   # each its fitted `y`, and with `se` its standard error `se` and the band `ymin` to `ymax`, `y`
   # less and plus the t quantile holding `level` of the distribution times `se`; and `flipped_aes`.
   # Its method is a straight line by weighted least squares, R's `lm(y ~ x, weights = weight)`
-  # read through `predict()` as ggplot2's `predictdf()` reads it; a smooth given no method (`:none`)
-  # is refused when the plot is run, since ggplot2 would fit it by loess or gam, which Giggly does
-  # not have yet, the refusal naming which by the rows of the largest group in any panel, as
-  # ggplot2 chooses. Its orientation is the layer's (`:x`, or `:y` to fit x along y, the two swapped
-  # and swapped back, as ggplot2's `flip_data()` does), ggplot2's taking an unstated one as along
-  # x. Run it through `Giggly.Stat`.
+  # read through `predict()` as ggplot2's `predictdf()` reads it, or a loess curve, R's `loess(y ~
+  # x, weights = weight, span = span)` fitted directly at each place (`Giggly.Stat.Loess`). A smooth
+  # given no method (`:none`) is fitted by loess where the largest group in any panel has under
+  # 1,000 rows, every row counted, as ggplot2 chooses, and refused from there, where ggplot2 fits
+  # gam, which Giggly does not have yet. Its orientation is the layer's (`:x`, or `:y` to fit x
+  # along y, the two swapped and swapped back, as ggplot2's `flip_data()` does), ggplot2's taking an
+  # unstated one as along x. Run it through `Giggly.Stat`.
   #
   # It needs `:x` and `:y`, takes `:group` and `:weight`, which it consumes, and computes `y`,
   # `ymin`, `ymax` and `se`, `x`, `xmin` and `xmax` along y, which a mapping's after_stat can read.
@@ -29,15 +30,20 @@ defmodule Giggly.Stat.Smooth do
   # at their weighted mean, with a degree of freedom more, as R's `lm()` drops the slope it cannot
   # fit; where they hold more, the slope is fitted however little x varies, where R's `lm()` drops
   # it once x's spread is under a ten-millionth of its size (design-log §4, the entry beginning "A
-  # linear smooth fits the slope"). Of no degrees of freedom, the band and `se` are NaN. A group's
-  # constant columns are carried to its rows (`Giggly.Stat.Carry`), counted over the groups
-  # fitted, as ggplot2 reads only the groups its fit gives rows.
+  # linear smooth fits the slope"). Of no degrees of freedom, the band and `se` are NaN. Loess, as
+  # R's `loess()`, leaves out a row missing its weight and fails on an infinite one; a negative one
+  # fits its group nothing, where R fits 0, and a row of weight 0 stays among the rows, making the
+  # band NaN, as R's; a loess curve's places past its rows are missing, and a group whose
+  # neighbourhoods cannot hold a quadratic is fitted nothing (`Giggly.Stat.Loess`). A group's
+  # constant columns are carried to its rows (`Giggly.Stat.Carry`), counted over the groups given a
+  # curve, as ggplot2 reads only the groups its fit gives rows.
   #
   # Its fullrange reads the panel's axis it runs along, its y axis along y, where ggplot2's
   # `StatSmooth` reads `scales$x` though it fits along y (design-log §4, the entry beginning "A
   # full-range smooth spans").
   #
-  # The frame does what scales with the rows (`Giggly.DataFrame`), in three passes of weighted sums
+  # A straight line is worked out where the frame does what scales with the rows
+  # (`Giggly.DataFrame`), in three passes of weighted sums
   # over each group's rows, each summarised to a row a group (design-log §4, the entry beginning
   # "Smoothing and densities compute over the rows"): the weights' total and the weighted means of
   # x and y; the weighted sums of squares and of products of each row's x and y about them, whose
@@ -48,15 +54,18 @@ defmodule Giggly.Stat.Smooth do
   # squares, square-rooted, and its quantile Giggly's own (`Giggly.Stat.TDistribution`). Its
   # values are R's to within 1e-12 of the largest magnitude a group's column holds, its x R's to
   # the last digit (design-log §4, the entry beginning "A stat's values reached by another route").
+  # A loess curve pulls each group's rows instead, by the frame's `list` aggregate, since no engine
+  # could run it, and is held to R's direct loess as closely.
 
-  @enforce_keys [:method, :se, :level, :n, :fullrange, :orientation]
+  @enforce_keys [:method, :se, :level, :n, :span, :fullrange, :orientation]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          method: :none | :lm,
+          method: :none | :lm | :loess,
           se: boolean(),
           level: float(),
           n: pos_integer(),
+          span: float(),
           fullrange: boolean(),
           orientation: :x | :y
         }
@@ -87,7 +96,7 @@ defmodule Giggly.Stat.Smooth do
 
     alias Giggly.{Aesthetics, DataFrame}
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Stat.{Carry, Curve, TDistribution}
+    alias Giggly.Stat.{Carry, Curve, Loess, TDistribution}
 
     # The columns the stat writes, in ggplot2's order.
     @computed [:x, :y, :ymin, :ymax, :se, :flipped_aes]
@@ -101,35 +110,37 @@ defmodule Giggly.Stat.Smooth do
 
     @impl Giggly.Stat
     def compute_layer(stat, frame, axes) do
-      check_method(stat, frame)
+      method = method(stat, frame)
       flipped = stat.orientation == :y
 
       frame
       |> flip(flipped)
-      |> smooths(stat, axes, flipped)
+      |> smooths(stat, method, axes, flipped)
       |> flip(flipped)
     end
 
-    # A smooth given no method is fitted as ggplot2 fits one, by loess or gam, neither of which
-    # Giggly has yet, so it is refused, naming the one by the rows of the layer's largest group in
-    # any panel, every row counted, as ggplot2's `setup_params()` counts them.
-    defp check_method(%{method: :lm}, _frame), do: :ok
-
-    defp check_method(%{method: :none}, frame) do
+    # A smooth given no method is fitted as ggplot2 fits one: by loess where the layer's largest
+    # group in any panel has under 1,000 rows, every row counted, as ggplot2's `setup_params()`
+    # counts them, and by gam from there, which Giggly does not have yet, so that is refused.
+    defp method(%{method: :none}, frame) do
       largest =
         frame
         |> DataFrame.summarise([:panel, :group], rows: {:count, [:group]})
         |> DataFrame.pull(:rows)
         |> Enum.max(fn -> 0 end)
 
-      method = if largest < @loess_rows, do: "loess", else: "gam"
-
-      raise ArgumentError,
-            "a smooth given no method: is fitted as ggplot2 fits one, by loess where its " <>
-              "largest group in any panel has under 1,000 rows and by gam otherwise; this " <>
-              "layer's largest group has #{largest} rows, so ggplot2 would fit it by #{method}, " <>
-              "which Giggly does not have yet; give method: :lm for a straight line"
+      if largest < @loess_rows do
+        :loess
+      else
+        raise ArgumentError,
+              "a smooth given no method: is fitted as ggplot2 fits one, by gam where its " <>
+                "largest group in any panel has 1,000 rows or more; this layer's largest group " <>
+                "has #{largest} rows, and Giggly does not have gam yet; give method: :loess or " <>
+                ":lm"
+      end
     end
+
+    defp method(%{method: method}, _frame), do: method
 
     defp flip(frame, false), do: frame
 
@@ -142,7 +153,7 @@ defmodule Giggly.Stat.Smooth do
       DataFrame.select(frame, renames)
     end
 
-    defp smooths(frame, stat, axes, flipped) do
+    defp smooths(frame, stat, method, axes, flipped) do
       carried =
         frame
         |> DataFrame.names()
@@ -154,21 +165,43 @@ defmodule Giggly.Stat.Smooth do
         |> weighted()
         |> fitted_groups()
 
-      constant = Carry.constant_columns(fitted_rows, carried)
-      firsts = for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
-
-      groups =
-        DataFrame.summarise(
-          fitted_rows,
-          [:panel, :group],
-          [x_low: {:min, [:x]}, x_high: {:max, [:x]}] ++ firsts
+      extents =
+        DataFrame.summarise(fitted_rows, [:panel, :group],
+          x_low: {:min, [:x]},
+          x_high: {:max, [:x]}
         )
 
-      fits = fits(fitted_rows)
+      curves = curves(method, fitted_rows, extents, stat, axes)
+      kept_rows = kept_rows(fitted_rows, extents, curves)
+      constant = Carry.constant_columns(kept_rows, carried)
+      firsts = for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
+      groups = DataFrame.summarise(kept_rows, [:panel, :group], firsts)
 
-      groups
-      |> curves(fits, stat, axes)
-      |> output(groups, constant, stat.se, flipped)
+      output(curves, groups, constant, stat.se, flipped)
+    end
+
+    # The rows of the groups given a curve: every group lm fits, and those loess finds a quadratic
+    # for in every neighbourhood.
+    defp kept_rows(rows, extents, curves) do
+      if length(curves) == DataFrame.row_count(extents) do
+        rows
+      else
+        given = MapSet.new(curves, fn {key, _curve} -> key end)
+
+        kept =
+          extents
+          |> rows_by_group([])
+          |> Enum.map(fn {key, _extent} -> key in given end)
+
+        flags =
+          extents
+          |> DataFrame.select(panel: :panel, group: :group)
+          |> DataFrame.put(:kept, kept)
+
+        rows
+        |> DataFrame.join(flags, [:panel, :group])
+        |> DataFrame.filter(:kept)
+      end
     end
 
     # The rows with each one's weight, 1 where the layer maps none, as R's `lm()` weighs each row
@@ -312,28 +345,65 @@ defmodule Giggly.Stat.Smooth do
     end
 
     # Each fitted group's curve, in the groups' order: its x evenly spaced, and its fitted values,
-    # standard errors and band.
-    defp curves(groups, fits, stat, axes) do
-      groups
+    # standard errors and band, a straight line's for every group, a loess curve's for each whose
+    # every neighbourhood holds a quadratic. Loess pulls each group's rows, a row missing its weight
+    # left out, as R's `loess()` leaves it out.
+    defp curves(:lm, rows, extents, stat, axes) do
+      fits = fits(rows)
+
+      extents
       |> rows_by_group([:x_low, :x_high])
-      |> Enum.map(fn {{panel, _group} = key, extent} ->
-        line = Map.fetch!(fits, key)
-
-        along =
-          axes
-          |> Map.fetch!(panel)
-          |> Map.fetch!(stat.orientation)
-
-        {low, high} = extent(stat.fullrange, extent, along)
-
-        # Each place a double, as R's positions are, though the axis's ends be whole numbers.
-        positions =
-          low
-          |> Curve.places(high, stat.n)
-          |> Enum.map(fn position -> position / 1 end)
-
-        {key, curve(line, positions, stat)}
+      |> Enum.map(fn {key, extent} ->
+        {key, curve(Map.fetch!(fits, key), positions(key, extent, stat, axes), stat)}
       end)
+    end
+
+    defp curves(:loess, rows, extents, stat, axes) do
+      lists =
+        rows
+        |> DataFrame.filter({:is_finite, [:weight]})
+        |> DataFrame.summarise([:panel, :group],
+          xs: {:list, [:x]},
+          ys: {:list, [:y]},
+          weights: {:list, [:weight]}
+        )
+        |> rows_by_group([:xs, :ys, :weights])
+        |> Map.new()
+
+      extents
+      |> rows_by_group([:x_low, :x_high])
+      |> Enum.flat_map(fn {key, extent} ->
+        group = Map.fetch!(lists, key)
+        places = positions(key, extent, stat, axes)
+
+        case Loess.curve(
+               group.xs,
+               group.ys,
+               group.weights,
+               places,
+               stat.span,
+               stat.se,
+               stat.level
+             ) do
+          :none -> []
+          curve -> [{key, curve}]
+        end
+      end)
+    end
+
+    # The places a group's curve is worked out at: `n` evenly spaced along its extent, each a
+    # double, as R's positions are, though the axis's ends be whole numbers.
+    defp positions({panel, _group}, extent, stat, axes) do
+      along =
+        axes
+        |> Map.fetch!(panel)
+        |> Map.fetch!(stat.orientation)
+
+      {low, high} = extent(stat.fullrange, extent, along)
+
+      low
+      |> Curve.places(high, stat.n)
+      |> Enum.map(fn position -> position / 1 end)
     end
 
     # The positions the curve spans along the axis it runs along: the group's, or with `fullrange`

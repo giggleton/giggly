@@ -2561,6 +2561,7 @@ defmodule Giggly.PlotTest do
                    se: true,
                    level: 0.95,
                    n: 80,
+                   span: 0.75,
                    fullrange: false,
                    orientation: :x
                  },
@@ -2576,10 +2577,11 @@ defmodule Giggly.PlotTest do
 
     test "stat_smooth/3 records what geom_smooth/3 does, its options in the geom and the stat" do
       options = [
-        method: :lm,
+        method: :loess,
         se: false,
         level: 0.9,
         n: 5,
+        span: 1,
         fullrange: true,
         orientation: :y,
         lineend: :round,
@@ -2607,14 +2609,17 @@ defmodule Giggly.PlotTest do
                  mitre_limit: 2.0
                },
                stat: %Stat.Smooth{
-                 method: :lm,
+                 method: :loess,
                  se: false,
                  level: 0.9,
                  n: 5,
+                 span: 1.0,
                  fullrange: true,
                  orientation: :y
                }
              } = geom_layer
+
+      assert geom_layer.stat.span === 1.0
     end
 
     test "a smooth's look is set for every curve, its colour resolved and its alpha a float" do
@@ -2663,7 +2668,16 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@points, %{x: :x, y: :y})
 
       assert_raise NimbleOptions.ValidationError, ~r/method/, fn ->
-        Plot.geom_smooth(plot, method: :loess)
+        Plot.geom_smooth(plot, method: :gam)
+      end
+
+      for span <- [0, -0.5, "0.75"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a span, a number above 0/, fn ->
+            Plot.geom_smooth(plot, span: span)
+          end
+
+        assert error.message =~ "got: #{inspect(span)}"
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/:n option/, fn ->

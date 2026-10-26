@@ -955,29 +955,22 @@ defmodule Giggly.StatTest do
 
     # ggplot2 fits a smooth given no method by loess where the layer's largest group in any panel
     # has under 1,000 rows, every row counted, and by gam from 1,000.
-    test "a smooth given no method is refused, naming the method ggplot2 would choose" do
-      loess = unfitted([999])
+    test "a smooth given no method is fitted by loess under 1,000 rows, and refused at 1,000" do
+      for counts <- [[999], []] do
+        curve =
+          counts
+          |> unfitted()
+          |> fit(method: :none)
 
-      assert_raise ArgumentError,
-                   ~r/largest group has 999 rows, so ggplot2 would fit it by loess/,
-                   fn ->
-                     fit(loess, method: :none)
-                   end
+        assert DataFrame.row_count(curve) == 0
+      end
 
       gam = unfitted([999, 1000])
 
       assert_raise ArgumentError,
-                   ~r/largest group has 1000 rows, so ggplot2 would fit it by gam/,
+                   ~r/largest group has 1000 rows, and Giggly does not have gam yet/,
                    fn ->
                      fit(gam, [method: :none], [1, 2])
-                   end
-
-      empty = unfitted([])
-
-      assert_raise ArgumentError,
-                   ~r/largest group has 0 rows, so ggplot2 would fit it by loess/,
-                   fn ->
-                     fit(empty, method: :none)
                    end
     end
 
@@ -1075,6 +1068,260 @@ defmodule Giggly.StatTest do
       panel: panels,
       group: List.duplicate(-1, rows)
     )
+  end
+
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_smooth(n = 5)` over
+  # mtcars' `wt ~ disp` with a loess as Giggly fits it: R's `loess()` with `surface = "direct"` and
+  # `statistics = "exact"`, its band's t quantile at the first trace's degrees of freedom, and the
+  # places outside the rows missing (design-log §4, the entries beginning "A loess band takes its
+  # first trace" and "A loess curve stops at its rows"), printed to 17 significant digits; places
+  # R's to the last digit and every other value within 1e-12 of the largest magnitude R's column
+  # holds.
+  describe "compute_layer/3 for loess smooths" do
+    test "a quadratic fitted at each place to its nearest rows, its band at the first trace" do
+      curve = loess(mtcars_frame(), [], {71.1, 472})
+
+      assert DataFrame.names(curve) == [:x, :y, :ymin, :ymax, :se, :flipped_aes, :panel, :group]
+
+      assert DataFrame.pull(curve, :x) === [
+               71.099999999999994,
+               171.32499999999999,
+               271.54999999999995,
+               371.77499999999998,
+               472.0
+             ]
+
+      assert_near(curve, :y, [
+        1.6796697687665798,
+        3.1865026467219106,
+        3.6142429932775322,
+        3.9258708083818781,
+        5.4641384934428876
+      ])
+
+      assert_near(curve, :ymin, [
+        1.3452798677985913,
+        2.9489674976361431,
+        3.3613420884467557,
+        3.7173337710595353,
+        5.0289046513979248
+      ])
+
+      assert_near(curve, :ymax, [
+        2.0140596697345683,
+        3.4240377958076782,
+        3.8671438981083086,
+        4.1344078457042208,
+        5.8993723354878504
+      ])
+
+      assert_near(curve, :se, [
+        0.16295092796546329,
+        0.11575281686406523,
+        0.12324067505084572,
+        0.10162180032493635,
+        0.21209300352043206
+      ])
+    end
+
+    # Golden: with `span = 0.4`, the 12 nearest rows of 32; and `span = 1.5`, every row, the width
+    # the largest distance times √1.5, as R's loess takes it.
+    test "the span sets the share of rows each fit reads, and past 1 widens the reach" do
+      narrow = loess(mtcars_frame(), [span: 0.4], {71.1, 472})
+
+      assert_near(narrow, :y, [
+        1.9162029995519785,
+        3.232650985435388,
+        3.6767786621981235,
+        3.5967085420297771,
+        5.5746515091725213
+      ])
+
+      assert_near(narrow, :se, [
+        0.22770002501980083,
+        0.16572502742735717,
+        0.14787409602079607,
+        0.15931385151305291,
+        0.24074853898176249
+      ])
+
+      wide = loess(mtcars_frame(), [span: 1.5], {71.1, 472})
+
+      assert_near(wide, :y, [
+        1.9157517285686556,
+        2.9515361930009822,
+        3.5056681310647857,
+        4.1198391970715953,
+        5.1480653862653973
+      ])
+
+      assert_near(wide, :se, [
+        0.15696626798369465,
+        0.095584939420225057,
+        0.11638560425990495,
+        0.10881690786432428,
+        0.23614706446822561
+      ])
+    end
+
+    # Golden: `aes(disp, wt, weight = qsec)`.
+    test "each row is weighed by its weight too" do
+      frame = mtcars_frame(weight: Keyword.fetch!(Datasets.mtcars(), :qsec))
+
+      curve = loess(frame, [], {71.1, 472})
+
+      assert_near(curve, :y, [
+        1.6893830716960327,
+        3.2054401419893472,
+        3.6095923487491439,
+        3.9395604545665668,
+        5.4618704139824032
+      ])
+
+      assert_near(curve, :ymin, [
+        1.3670256031560393,
+        2.9740943504172237,
+        3.3585289514078429,
+        3.7254147831457667,
+        5.0288937174113295
+      ])
+
+      assert_near(curve, :se, [
+        0.15709313316764789,
+        0.11274078868970158,
+        0.1223496880363605,
+        0.10435872520698079,
+        0.21100074448713851
+      ])
+    end
+
+    # Golden: x 1 to 12, the first weighed 0, then the first's weight missing: a row of weight 0
+    # makes every standard error NaN, 0 over 0, as R's does; a row missing its weight is left out,
+    # so the place at x 1 is outside the rows, and missing.
+    test "a row of weight 0 makes the standard error NaN, and one missing its weight is left out" do
+      ys = [2.0, 4.0, 3.0, 6.0, 5.0, 8.0, 7.0, 9.0, 12.0, 10.0, 11.0, 13.0]
+
+      zero =
+        [x: Enum.map(1..12, &(&1 / 1)), y: ys, weight: [0 | List.duplicate(1, 11)]]
+        |> one_panel()
+        |> loess([], {1, 12})
+
+      assert_near(zero, :y, [
+        3.114118693744413,
+        4.7784908153375367,
+        7.4070442817956508,
+        10.378486064690311,
+        12.444914016012184
+      ])
+
+      assert DataFrame.pull(zero, :se) === [:nan, :nan, :nan, :nan, :nan]
+
+      missing =
+        [x: Enum.map(1..12, &(&1 / 1)), y: ys, weight: [nil | List.duplicate(1, 11)]]
+        |> one_panel()
+        |> loess([], {1, 12})
+
+      assert DataFrame.pull(missing, :x) === [1.0, 3.75, 6.5, 9.25, 12.0]
+
+      assert_near(missing, :y, [
+        nil,
+        4.7784908153375358,
+        7.1382137223339637,
+        10.471988843253348,
+        12.455883391533277
+      ])
+
+      assert_near(missing, :se, [
+        nil,
+        0.76878093182384477,
+        0.89421539277900242,
+        0.82597836310215145,
+        1.25243126980415
+      ])
+    end
+
+    # Golden: `fullrange = TRUE` with `xlim(0, 600)`.
+    test "across the full range, the places past the rows are missing" do
+      curve = loess(mtcars_frame(), [fullrange: true], {0, 600})
+
+      assert DataFrame.pull(curve, :x) === [0.0, 150.0, 300.0, 450.0, 600.0]
+
+      assert_near(curve, :y, [nil, 2.9401523529500309, 3.5653170164680414, 5.013475995009224, nil])
+
+      assert_near(curve, :se, [
+        nil,
+        0.10410270701274922,
+        0.1064124998385398,
+        0.1621873329819366,
+        nil
+      ])
+    end
+
+    test "without its band, a curve holds no standard error" do
+      curve = loess(mtcars_frame(), [se: false], {71.1, 472})
+
+      assert DataFrame.names(curve) == [:x, :y, :flipped_aes, :panel, :group]
+
+      assert_near(curve, :y, [
+        1.6796697687665798,
+        3.1865026467219106,
+        3.6142429932775322,
+        3.9258708083818781,
+        5.4641384934428876
+      ])
+    end
+
+    # R's loess warns and returns its pivoted solver's values for a neighbourhood that cannot hold a
+    # quadratic: 4 rows at a span of 0.75 (q = 3, two rows weighed above 0); a tie at the 4th nearest
+    # of 10 at a span of 0.4; and every 4th nearest at no distance. It fits a negative weight's
+    # neighbourhood 0 and fails on an infinite one.
+    test "a group whose neighbourhoods cannot hold a quadratic is fitted nothing, nor a bad weight" do
+      for {xs, options} <- [
+            {[1.0, 2.0, 3.0, 4.0], []},
+            {[0.0, 1.0, 2.0, 2.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0], [span: 0.4]},
+            {[1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 3.0, 4.0], [span: 0.5]}
+          ] do
+        ys = Enum.map(xs, fn x -> x * x end)
+
+        curve =
+          [x: xs, y: ys]
+          |> one_panel()
+          |> loess(options, {0, 10})
+
+        assert DataFrame.row_count(curve) == 0, "x #{inspect(xs)}"
+      end
+
+      for weight <- [-1, :infinity] do
+        curve =
+          [
+            x: Enum.map(1..8, &(&1 / 1)),
+            y: [2.0, 4.0, 3.0, 6.0, 5.0, 8.0, 7.0, 9.0],
+            weight: [weight | List.duplicate(1, 7)]
+          ]
+          |> one_panel()
+          |> loess([], {1, 8})
+
+        assert DataFrame.row_count(curve) == 0, "weight #{inspect(weight)}"
+      end
+    end
+
+    # A column varying within the group fitted nothing, constant within the one fitted: it is
+    # carried, as ggplot2 reads only the groups its fit gives rows.
+    test "a group's constant columns are carried, counted over the groups given a curve" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 4.0] ++ Enum.map(1..8, &(&1 / 1)),
+          y: [1.0, 3.0, 2.0, 4.0, 2.0, 5.0, 3.0, 6.0, 4.0, 7.0, 5.0, 8.0],
+          color: ["p", "q", "p", "q"] ++ List.duplicate("r", 8),
+          panel: List.duplicate(1, 12),
+          group: List.duplicate(1, 4) ++ List.duplicate(2, 8)
+        )
+
+      curve = loess(frame, [se: false], {1, 8})
+
+      assert DataFrame.pull(curve, :group) == List.duplicate(2, 5)
+      assert DataFrame.pull(curve, :color) == List.duplicate("r", 5)
+    end
   end
 
   # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_density()` with the
@@ -1861,7 +2108,15 @@ defmodule Giggly.StatTest do
   # A smooth by least squares with ggplot2's defaults but those given.
   defp smooth(options) do
     struct!(
-      %Stat.Smooth{method: :lm, se: true, level: 0.95, n: 80, fullrange: false, orientation: :x},
+      %Stat.Smooth{
+        method: :lm,
+        se: true,
+        level: 0.95,
+        n: 80,
+        span: 0.75,
+        fullrange: false,
+        orientation: :x
+      },
       options
     )
   end
@@ -1890,7 +2145,7 @@ defmodule Giggly.StatTest do
   defp assert_near(frame, name, expected),
     do: assert_near_values(name, DataFrame.pull(frame, name), expected)
 
-  # Values within 1e-12 of R's, of the largest magnitude R's hold, NaN where R's is.
+  # Values within 1e-12 of R's, of the largest magnitude R's hold, NaN or missing where R's is.
   defp assert_near_values(name, actual, expected) do
     largest =
       expected
@@ -1901,8 +2156,8 @@ defmodule Giggly.StatTest do
     assert length(actual) == length(expected)
 
     Enum.zip_with(actual, expected, fn
-      value, :nan ->
-        assert value == :nan, "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
+      value, missing when missing in [:nan, nil] ->
+        assert value == missing, "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
 
       value, wanted ->
         assert abs(value - wanted) <= 1.0e-12 * largest,
@@ -1940,6 +2195,23 @@ defmodule Giggly.StatTest do
   # mpg's highway mileage in one panel and one group.
   defp hwy_frame do
     DataFrame.new(x: column(:hwy), panel: List.duplicate(1, 234), group: List.duplicate(-1, 234))
+  end
+
+  # The table a loess smooth with ggplot2's defaults but `options`, `n: 5` among them, computes from
+  # `frame`, the panel's x axis spanning `limits`.
+  defp loess(frame, options, limits) do
+    stat = struct!(smooth(method: :loess, n: 5), options)
+    axis = %{limits: limits, discrete: false, transform: fn values -> values end}
+    Stat.compute_layer(stat, frame, %{1 => %{x: axis, y: axis}})
+  end
+
+  # mtcars' disp and wt, with the columns given, in one panel and one group.
+  defp mtcars_frame(columns \\ []) do
+    mtcars = Datasets.mtcars()
+
+    [x: Keyword.fetch!(mtcars, :disp), y: Keyword.fetch!(mtcars, :wt)]
+    |> Enum.concat(columns)
+    |> one_panel()
   end
 
   # A table of the columns given in one panel and one group.

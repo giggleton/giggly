@@ -143,6 +143,40 @@ defmodule Giggly.Stat.TDistributionTest do
 
     test "is NaN for no degrees of freedom, as R's qt() is" do
       assert TDistribution.central_quantile(0.95, 0) == :nan
+      assert TDistribution.central_quantile(0.95, 0.0) == :nan
+    end
+
+    # Golden: R 4.6.1's `qt(level / 2 + 0.5, df)` at fractional degrees of freedom, as a loess band
+    # reads them, printed to 17 significant digits; a sweep of 2,000 random ones from 0.3 to 100,000
+    # sat within 1.6e-13, each worked from the incomplete beta function.
+    test "is R's quantile within 1e-12 for fractional degrees of freedom" do
+      for {level, degrees_of_freedom, expected} <- [
+            {0.95, 2.37, 3.7189208397974554},
+            {0.95, 3.02, 3.1705564372379627},
+            {0.99, 7.6, 3.4073472798512054},
+            {0.95, 26.93, 2.052080099840897},
+            {0.5, 228.56, 0.6755646653583568},
+            {0.999, 993.93, 3.3003423897184203},
+            {0.8, 0.5, 10.270324410234281},
+            {0.95, 100_000.5, 1.9599877074159935}
+          ] do
+        quantile = TDistribution.central_quantile(level, degrees_of_freedom)
+
+        assert abs(quantile - expected) <= 1.0e-12 * expected,
+               "level #{level}, #{degrees_of_freedom} degrees of freedom: #{quantile}"
+      end
+    end
+
+    # The incomplete beta function's quantile at a whole number held as a float, beside the closed
+    # form's at that number, either side of t² against the degrees of freedom: each is held to R's
+    # within 1e-12, so they are to each other.
+    test "a whole number of degrees of freedom held as a float is the closed form's quantile" do
+      for {level, degrees_of_freedom} <- [{0.95, 26}, {0.5, 228}, {0.999, 98_105}, {0.2, 3}] do
+        whole = TDistribution.central_quantile(level, degrees_of_freedom)
+        fractional = TDistribution.central_quantile(level, degrees_of_freedom / 1)
+
+        assert abs(whole - fractional) <= 1.0e-12 * whole
+      end
     end
 
     # Golden: R 4.6.1's `-qt((1 - 0.999) / 2, 86377)`, where summing the series without Neumaier's

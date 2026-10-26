@@ -79,6 +79,30 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A loess band takes its first trace as its degrees of freedom, where R's exact statistics read
+  δ₁² / δ₂ (2026-10-25, Steve: "B").** The band is the curve ∓ t × se; δ₁ = trace((I - L)ᵀ(I - L))
+  costs n² and δ₂, the trace of its square, n³: 0.13 s at mpg's 234 rows, 2.2 s at 500 and 24 s at
+  999, the most rows a smooth given no method sends to loess. With δ₁ the curve and `se` stay R's
+  exact ones, and the band's edges sit within 2e-6 of the curve's range of R's exact band for mpg,
+  5e-5 for mtcars, 2.9e-3 for 8 rows: nearer than R's own default, which approximates both traces
+  by a Fortran table (2.5e-4 for mtcars, 0.14 for 8 rows). *Rejected: both traces exactly* — R's
+  exact band, at 24 s for a 999-row group. *Rejected: R's table (`ehg141`)* — a port.
+
+- **A loess curve stops at its rows: with `fullrange: true` its places past them are missing
+  (2026-10-25, Steve: "A").** R's default surface gives no value outside the rows' extent, so
+  ggplot2 draws the curve and band across the data alone; R's direct mode, whose fits Giggly's are,
+  extrapolates each place's quadratic (50.9 at displ 0 for mpg, past every car's hwy). Giggly takes
+  the direct fit inside the rows and the default's missing values outside. *Rejected:
+  extrapolating* — a curve R never draws by default.
+
+- **A loess group whose neighbourhoods cannot hold a quadratic is fitted nothing, nor one with a
+  negative weight (2026-10-25, Steve: "A").** A neighbourhood needs three distinct x weighed above
+  0: q = ⌊n × span⌋ of 3 or less, a tie at the qth distance, or a qth distance of 0 leaves fewer.
+  R warns and returns its pivoted solver's values there ("span too small", "reciprocal condition
+  number 0", the rows' own y), and fits a negative weight's neighbourhood 0, none of it a formula
+  Giggly could reproduce without a port. *Rejected: Giggly's own minimum-norm fit, and negative
+  weights as the formula takes them* — a curve where R draws one, but not R's curve.
+
 - **A density takes ggplot2's options, `bounds:` and all seven kernels among them, and a failing
   estimate leaves its panel empty, as R's does (2026-10-25, Steve: "A" for bounds, "A" for the
   kernels; checked against ggplot2 4.0.3 and R 4.6.1).** `geom_density/3` and `stat_density/3`
@@ -116,17 +140,23 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   against its spread about 0* — the drawing would stay R's, but R's flat line comes from its
   method, not the data.
 
-- **A smooth given no method is refused when the plot is run, naming the method ggplot2 would
-  choose (2026-10-25, Steve: "B").** ggplot2 picks loess where a layer's largest group in any panel
-  has under 1,000 rows and gam otherwise, as the plot is built, and a facet added after the layer
+- **A smooth given no method is fitted as ggplot2 chooses when the plot is run: by loess where its
+  largest group in any panel has under 1,000 rows, and refused from there, naming gam (2026-10-25,
+  Steve: "B").** ggplot2 picks loess or gam as the plot is built, and a facet added after the layer
   changes the answer (txhousing: gam whole, loess by city). So the stat counts every row as
-  `setup_params()` does and names one; steps 4 and 5 replace the refusal with the fit and keep the
-  count. *Rejected: refusing at the call* — the error would point at the line that wrote it, but
-  could only name both methods, and the choice moves to the run once loess lands.
+  `setup_params()` does; step 5 replaces the refusal with gam and keeps the count. *Rejected:
+  refusing at the call* — the error would point at the line that wrote it, but the choice is the
+  run's.
 
-- **The t quantile keeps the agreed closed form, held to R's within 1e-12 for levels up to 0.999
-  (2026-10-25, Steve: "A").** A&S 26.7.3-4 give the share within ±t, so near a level of 1 the
-  little outside it keeps fewer digits than R's `qt()`, which works from the tail: over 1 to
+- **The t quantile keeps the agreed closed form for whole degrees of freedom, and takes a fraction
+  from the incomplete beta function, held to R's within 1e-12 for levels up to 0.999 (2026-10-25,
+  Steve: "A", and "A" for fractions, loess's step).** A loess band's degrees of freedom are its
+  first trace, never whole: their share outside ±t is I_x(ν / 2, 1/2), from its continued fraction
+  where t² ≥ ν and its series of positive terms below, the beta function from Stirling's series,
+  within 1.6e-13 of R's `qt()` over 2,000 random cases from 0.3 to 100,000 degrees of freedom.
+  *Rejected: interpolating between whole degrees of freedom* — 3.6e-3 of the quantile at 3.4, a
+  small group's band; rounding them, 7%. A&S 26.7.3-4 give the share within ±t, so near a level
+  of 1 the little outside it keeps fewer digits than R's `qt()`, which works from the tail: over 1 to
   100,000 degrees of freedom the quantile is within 7e-14 of R's, relatively, for levels 0.1 to
   0.99, 4e-13 at 0.999 and 1.2e-10 at 0.999999; mpg's band is within 1e-13 of its column at
   0.99999 and 1.7e-12 at 0.999999, past the bar and far below a drawing's resolution. Near a level
@@ -159,8 +189,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **Nx is a core dependency, reached only through `Giggly.Tensor`, which takes and gives lists and
   pins every tensor to `Nx.BinaryBackend` in `f64` and every `defn` to `Nx.Defn.Evaluator`
-  (2026-10-25, Steve: "Core").** A density's FFT, loess's local fits and gam's linear algebra run
-  on Nx, which reads its default backend and `defn` options from the application environment and
+  (2026-10-25, Steve: "Core").** A density's FFT and gam's linear algebra run on Nx; loess runs in
+  plain Elixir (Steve: "A"), its 3 by 3 local fits 0.36 s at 999 rows against 12 s batched on the
+  binary backend, which decodes and re-encodes every number at every step and fuses nothing. Nx
+  reads its default backend and `defn` options from the application environment and
   the process dictionary on every call; so no other module builds a tensor, and a user's EXLA
   default cannot change a drawing. Nx starts its own application (a `:pg` scope for
   `Nx.Serving`), which Giggly never calls. `Nx.fft` takes `eps: 0`, since its default, 1e-10,
@@ -200,15 +232,16 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A stat's values reached by another route than R's are held to R's within a tolerance
   (2026-10-25, Steve).** Density (R's FFT), lm (the frame's sums against R's QR), the t quantile
-  and loess in R's direct mode are held to 1e-12 of the largest magnitude R's column holds in the
-  group, about a thousand times the gap measured (an FFT against a plain sum, 5-8e-16 of the
-  peak). gam is held to 1e-3 of the range of the group's y data, its standard errors to 1e-3
-  relative, since R's own optimiser, run tighter, moves its curve 2.4e-4 of its range and its
-  standard errors 4.5e-4 (diamonds); its goldens are checked through their layer data, as 1e-3 is
-  up to a third of a point. x columns, stat_align and stacking stay R's to the last digit.
-  *Rejected: a bar per value* — a density's tails and a curve near zero are round-off in R itself.
-  *Rejected: the range of a curve for gam* — it vanishes where a fit comes out flat. *Rejected:
-  porting R's FFT* — Giggly ports no R or C source.
+  and loess in R's direct mode, its band at the first trace's degrees of freedom (the entry
+  beginning "A loess band takes its first trace"), are held to 1e-12 of the largest magnitude R's
+  column holds in the group, about a thousand times the gap measured (an FFT against a plain sum,
+  5-8e-16 of the peak). gam is held to 1e-3 of the range of the group's y data, its standard
+  errors to 1e-3 relative, since R's own optimiser, run tighter, moves its curve 2.4e-4 of its
+  range and its standard errors 4.5e-4 (diamonds); its goldens are checked through their layer
+  data, as 1e-3 is up to a third of a point. x columns, stat_align and stacking stay R's to the
+  last digit. *Rejected: a bar per value* — a density's tails and a curve near zero are round-off
+  in R itself. *Rejected: the range of a curve for gam* — it vanishes where a fit comes out flat.
+  *Rejected: porting R's FFT* — Giggly ports no R or C source.
 
 - **A text's family is the theme's, inherited as any property, and every complete theme takes
   `base_family:` and `header_family:` (2026-10-24, Steve: "Let's get family working with the
@@ -2651,6 +2684,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-25 — Fit loess smooths: method: :loess and span:, each place's quadratic fitted directly
+  in plain Elixir, its band at the first trace and the t quantile at fractional degrees of freedom
+  (smoothing and densities, step 4); §4: "A loess band takes its first trace", "A loess curve stops
+  at its rows", "A loess group whose neighbourhoods cannot hold a quadratic", "A smooth given no
+  method", "The t quantile keeps", "Nx is a core dependency"
 - 2026-10-25 — Estimate densities: geom_density/3 and stat_density/3, binned through the frame and
   convolved by Nx through Giggly.Tensor (smoothing and densities, step 3); §4: "A density takes
   ggplot2's options"

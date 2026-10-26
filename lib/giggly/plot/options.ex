@@ -645,14 +645,15 @@ defmodule Giggly.Plot.Options do
                     [
                       data: @data_option,
                       method: [
-                        type: {:in, [:lm]},
+                        type: {:in, [:lm, :loess]},
                         doc:
                           "How each curve is fitted: `:lm`, a straight line by least squares, " <>
-                            "each row weighted by its `:weight` where one is mapped. Giggly has " <>
-                            "no other method yet, so it must be given: a smooth given none " <>
-                            "raises `ArgumentError` when the plot is drawn, naming the method " <>
-                            "ggplot2 would choose, loess where the largest group holds under " <>
-                            "1,000 rows and gam otherwise."
+                            "or `:loess`, at each place a quadratic fitted to the nearest rows, " <>
+                            "nearer ones weighing more, each row weighted too by its `:weight` " <>
+                            "where one is mapped. When not given, loess where the largest group " <>
+                            "in any panel holds under 1,000 rows; past that, ggplot2 fits gam, " <>
+                            "which Giggly does not have yet, so such a smooth raises " <>
+                            "`ArgumentError` when the plot is drawn."
                       ],
                       se: [
                         type: :boolean,
@@ -670,6 +671,14 @@ defmodule Giggly.Plot.Options do
                         type: :pos_integer,
                         default: 80,
                         doc: "How many evenly spaced places along x each curve is worked out at."
+                      ],
+                      span: [
+                        type: {:custom, __MODULE__, :validate_span, []},
+                        default: 0.75,
+                        doc:
+                          "How much of a group each loess fit reads, above 0: the share of its " <>
+                            "rows nearest each place, so a smaller span follows the rows more " <>
+                            "closely; only loess reads it."
                       ],
                       fullrange: [
                         type: :boolean,
@@ -2590,6 +2599,14 @@ defmodule Giggly.Plot.Options do
 
   def validate_level(level),
     do: {:error, "expected a number above 0 and below 1, got: #{inspect(level)}"}
+
+  # NimbleOptions' check of a smooth's `span:`: a number above 0, kept as a float.
+  @doc false
+  @spec validate_span(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_span(span) when is_number(span) and span > 0, do: {:ok, span / 1}
+
+  def validate_span(span),
+    do: {:error, "expected a span, a number above 0, got: #{inspect(span)}"}
 
   # NimbleOptions' check of a density's `bw:`: one of the rules by name, or a finite number above 0,
   # kept as a float, as R keeps a double.
