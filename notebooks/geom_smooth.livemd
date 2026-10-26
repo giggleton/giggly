@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,8 +30,23 @@ waiting for, so the page is also a list of what remains.
 to help the eye see a pattern among overlapping points. `stat_smooth()` takes the same arguments,
 for drawing the fit with another geom. Left to choose, it fits a local regression, R's `loess()`,
 when the largest group has fewer than 1,000 rows, and otherwise a generalised additive model,
-`mgcv::gam()`; `method` names any other modelling function, such as `lm()`. Giggly has none of
-this yet.
+`mgcv::gam()`; `method` names any other modelling function, such as `lm()`. Giggly has both,
+`Giggly.Plot.geom_smooth/3` and `Giggly.Plot.stat_smooth/3`, which fit a straight line by least
+squares, a loess or a gam (`method: :lm`, `:loess` or `:gam`), choosing as ggplot2 does when no
+method is given, and take `se:`, `level:`, `n:`, `span:`, `fullrange:` and `orientation:`. It has
+no `formula` option, no `method.args` option, no other modelling function, such as `glm()`, and no
+function as a method.
+
+Giggly's loess fits the curve at each of its points directly, as R's `loess(surface = "direct")`
+does; R's default fits at the corners of cells it divides the data into and joins those fits with
+cubic pieces, so a loess curve here sits a point or two from R's, more where the span is small,
+and each example says how far. Giggly's gam, from 1,000 rows, fixes a choice mgcv leaves to its
+linear algebra's rounding, so its curve can sit up to about a thousandth of the y axis's range
+from R's; no example here fits one. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell
+with `Kino.Image`. It binds `Giggly.Datasets.mpg/0`, ggplot2's `mpg`, to `mpg`, ggplot2's name for
+it.
 
 ## A smooth through the points
 
@@ -31,9 +57,16 @@ ggplot(mpg, aes(displ, hwy)) +
 ```
 
 `mpg` has fewer than 1,000 rows, so the smooth is a `loess()` fit, with a band for its 95%
-confidence interval.
+confidence interval. Giggly's curve sits up to 1.7 points from R's on this drawing, and its band's
+edges up to 2.9.
 
-Not in Giggly yet: `geom_smooth()`, and the local regression it fits, R's `loess()`.
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.geom_smooth()
+|> render.()
+```
 
 ## Fitting along the y axis
 
@@ -44,7 +77,16 @@ ggplot(mpg, aes(displ, hwy)) +
   geom_smooth(orientation = "y")
 ```
 
-Not in Giggly yet: `geom_smooth()` and its `orientation` option.
+The curve fits `displ` to `hwy`. Giggly's sits up to 1.7 points from R's, and its band's edges up
+to 5.7.
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.geom_smooth(orientation: :y)
+|> render.()
+```
 
 ## How wiggly the smooth is
 
@@ -57,7 +99,17 @@ ggplot(mpg, aes(displ, hwy)) +
   geom_smooth(span = 0.3)
 ```
 
-Not in Giggly yet: `geom_smooth()` and its `span` option.
+With a span this small, R's cells are small too, and its curve bends where Giggly's direct fit
+does not: Giggly's sits up to 15 points from R's, among the smallest engines, and its band's edges
+up to 18.
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.geom_smooth(span: 0.3)
+|> render.()
+```
 
 ## Other models
 
@@ -75,8 +127,17 @@ ggplot(mpg, aes(displ, hwy)) +
 `se = FALSE` leaves out the confidence band. The second fits a linear model to a B-spline of `x`
 from the `splines` package.
 
-Not in Giggly yet: `geom_smooth()` with its `method`, `formula` and `se` options, and the linear
-models R's `lm()` fits.
+Giggly draws the first plot, where R's `method = lm` is `method: :lm`.
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.geom_smooth(method: :lm, se: false)
+|> render.()
+```
+
+Not in Giggly yet: `geom_smooth()`'s `formula` option, here a B-spline from the `splines` package.
 
 ## A smooth for each group
 
@@ -91,8 +152,13 @@ ggplot(mpg, aes(displ, hwy, colour = class)) +
 
 Mapping `colour` to `class` makes a group of each class, and a line is fitted to each.
 
-Not in Giggly yet: `geom_smooth()` with its `se` and `method` options and the linear models R's
-`lm()` fits.
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+|> Plot.geom_point()
+|> Plot.geom_smooth(se: false, method: :lm)
+|> render.()
+```
 
 ## A smooth in each panel
 
@@ -103,8 +169,17 @@ ggplot(mpg, aes(displ, hwy)) +
   facet_wrap(~drv)
 ```
 
-Not in Giggly yet: `geom_smooth()` and its `span` option. Giggly has the panels, with
-`Giggly.Plot.facet_wrap/3`, where `facet_wrap(~drv)` is `facet_wrap(:drv)`.
+`facet_wrap(~drv)` is `Giggly.Plot.facet_wrap(plot, :drv)`. Giggly's curves sit up to 7.8 points
+from R's, in the panel of rear-wheel-drive cars, the fewest, and their bands' edges up to 13.
+
+```elixir
+mpg
+|> Plot.new(%{x: :displ, y: :hwy})
+|> Plot.geom_point()
+|> Plot.geom_smooth(span: 0.8)
+|> Plot.facet_wrap(:drv)
+|> render.()
+```
 
 ## Logistic regression
 
@@ -124,8 +199,8 @@ ggplot(rpart::kyphosis, aes(Age, Kyphosis)) +
   binomial_smooth()
 ```
 
-Not in Giggly yet: `geom_jitter()` and its `height` option, `geom_smooth()` with its `method` and
-`method.args` options and the logistic regression R's `glm()` fits, and the `kyphosis` dataset
+Not in Giggly yet: `geom_jitter()` and its `height` option, `geom_smooth()` with `method = "glm"`,
+the logistic regression R's `glm()` fits, and its `method.args` option, and the `kyphosis` dataset
 from the `rpart` package.
 
 ## Values between 0 and 1
@@ -147,6 +222,6 @@ ggplot(rpart::kyphosis, aes(Age, as.numeric(Kyphosis) - 1)) +
 regression to a natural spline of `x` from the `splines` package.
 
 Not in Giggly yet: a whole-column function in a mapping, here `as.numeric(Kyphosis)`, a factor's
-level codes, `geom_jitter()` and its `height` option, `geom_smooth()` with its `method`,
-`method.args` and `formula` options and the logistic regression R's `glm()` fits, and the `kyphosis`
-dataset from the `rpart` package.
+level codes, `geom_jitter()` and its `height` option, `geom_smooth()` with `method = "glm"`, the
+logistic regression R's `glm()` fits, and its `method.args` and `formula` options, and the
+`kyphosis` dataset from the `rpart` package.

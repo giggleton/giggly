@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,8 +29,16 @@ waiting for, so the page is also a list of what remains.
 `geom_density()` draws a kernel density estimate, a smoothed version of the histogram, which suits
 continuous data drawn from a smooth distribution; `stat_density()` computes it. Besides the
 density, the stat computes counts, the density times the number of rows, for stacking densities.
-Giggly has none of this yet. Every example uses ggplot2's `diamonds`, which Giggly has, as
-`Giggly.Datasets.diamonds/0`.
+Giggly has both, `Giggly.Plot.geom_density/3` and `Giggly.Plot.stat_density/3`, which take
+ggplot2's options as keyword options (`bw:`, `adjust:`, `kernel:`, `n:`, `trim:`, `bounds:` and
+`orientation:`), stack curves with `position: :stack`, and map what the stat computes, such as the
+count, with `{:after_stat, [:count]}`. It has no `position_fill()`, and of the bandwidth rules `bw`
+names, only R's `"nrd0"` and `"nrd"`, as `:nrd0` and `:nrd`, not `"ucv"`, `"bcv"` or `"SJ"`. A plot
+is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document.
+The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which
+draws a plot and shows it below the cell with `Kino.Image`. Every example uses ggplot2's
+`diamonds`, `Giggly.Datasets.diamonds/0`, which the setup cell binds to `diamonds`, ggplot2's name
+for it.
 
 ## A density curve
 
@@ -28,7 +47,12 @@ ggplot(diamonds, aes(carat)) +
   geom_density()
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+```elixir
+diamonds
+|> Plot.new(%{x: :carat})
+|> Plot.geom_density()
+|> render.()
+```
 
 ## Horizontal densities
 
@@ -38,7 +62,12 @@ ggplot(diamonds, aes(y = carat)) +
   geom_density()
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+```elixir
+diamonds
+|> Plot.new(%{y: :carat})
+|> Plot.geom_density()
+|> render.()
+```
 
 ## Rougher and smoother curves
 
@@ -49,8 +78,21 @@ ggplot(diamonds, aes(carat)) +
   geom_density(adjust = 5)
 ```
 
-`adjust` multiplies the bandwidth the density is smoothed over. Not in Giggly yet: `geom_density()`
-and its `adjust` option.
+`adjust` multiplies the bandwidth the density is smoothed over.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :carat})
+|> Plot.geom_density(adjust: 1 / 5)
+|> render.()
+```
+
+```elixir
+diamonds
+|> Plot.new(%{x: :carat})
+|> Plot.geom_density(adjust: 5)
+|> render.()
+```
 
 ## A curve for each cut
 
@@ -63,7 +105,23 @@ ggplot(diamonds, aes(depth, fill = cut, colour = cut)) +
   xlim(55, 70)
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+The limits drop the diamonds whose depth lies outside them before each curve is estimated.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :depth, colour: :cut})
+|> Plot.geom_density()
+|> Plot.xlim(55, 70)
+|> render.()
+```
+
+```elixir
+diamonds
+|> Plot.new(%{x: :depth, fill: :cut, colour: :cut})
+|> Plot.geom_density(alpha: 0.1)
+|> Plot.xlim(55, 70)
+|> render.()
+```
 
 ## Bounded data
 
@@ -76,7 +134,29 @@ ggplot(big_diamonds, aes(carat)) +
 ```
 
 The diamonds of a carat or more have no values below 1, which the red curve, knowing no bounds,
-smooths past. Not in Giggly yet: `geom_density()` and its `bounds` option.
+smooths past. The cell keeps the rows R's indexing keeps, each column's values where `carat` is 1
+or more, and writes R's `Inf` as `:infinity`.
+
+```elixir
+kept = Enum.map(Keyword.fetch!(diamonds, :carat), fn carat -> carat >= 1 end)
+
+big_diamonds =
+  Enum.map(diamonds, fn {name, values} ->
+    rows =
+      values
+      |> Enum.zip(kept)
+      |> Enum.filter(fn {_value, keep} -> keep end)
+      |> Enum.map(fn {value, _keep} -> value end)
+
+    {name, rows}
+  end)
+
+big_diamonds
+|> Plot.new(%{x: :carat})
+|> Plot.geom_density(colour: "red")
+|> Plot.geom_density(bounds: {1, :infinity}, colour: "blue")
+|> render.()
+```
 
 ## Stacked densities
 
@@ -92,7 +172,19 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "stack")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`.
+```elixir
+diamonds
+|> Plot.new(%{x: :carat, fill: :cut})
+|> Plot.geom_density(position: :stack)
+|> render.()
+```
+
+```elixir
+diamonds
+|> Plot.new(%{x: :carat, y: {:after_stat, [:count]}, fill: :cut})
+|> Plot.geom_density(position: :stack)
+|> render.()
+```
 
 ## Conditional densities
 
@@ -102,4 +194,4 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `geom_density()` and `stat_density()`, and `position_fill()`.
+Not in Giggly yet: `position_fill()`.

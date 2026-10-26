@@ -19,12 +19,16 @@ string given to a geom (`geom_line(stat = "density")`), as a ggproto object, or 
 Some geoms are paired with a stat of their own, as `geom_histogram()` is with `stat_bin()` and
 `geom_boxplot()` with `stat_boxplot()`, and most use `stat_identity()`, which leaves the data as it
 is. The variables a stat computes can be mapped with `after_stat()`. Of ggplot2's stats, Giggly
-computes four: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums their `weight`, as
+computes these: `Giggly.Plot.geom_bar/3` counts the rows at each `x`, or sums their `weight`, as
 `geom_bar()` and `stat_count()` do; `Giggly.Plot.geom_count/3` and `Giggly.Plot.stat_sum/3` count
 the rows at each position, as `stat_sum()` does; `Giggly.Plot.geom_histogram/3`,
 `Giggly.Plot.geom_freqpoly/3` and `Giggly.Plot.stat_bin/3` count them in bins, as `stat_bin()` does;
-and `Giggly.Plot.geom_boxplot/3` summarises each group in five numbers, as `stat_boxplot()` does.
-Its points, columns, paths, lines, rectangles and text draw the data as it is, as ggplot2's do with
-`stat_identity()`. A mapping reads what a stat computes, such as counting's `prop` or binning's
-`density`, with `{:after_stat, [:prop]}`. Not in Giggly yet: every other stat, `stat_boxplot()` as a
-function of its own, giving a layer its stat by name, and `layer()`.
+`Giggly.Plot.geom_boxplot/3` summarises each group in five numbers, as `stat_boxplot()` does;
+`Giggly.Plot.geom_area/3` aligns its groups at the same `x` values, as `stat_align()` does;
+`Giggly.Plot.geom_smooth/3` and `Giggly.Plot.stat_smooth/3` fit a curve to each group, as
+`stat_smooth()` does; and `Giggly.Plot.geom_density/3` and `Giggly.Plot.stat_density/3` estimate
+each group's density, as `stat_density()` does. Its points, columns, paths, lines, rectangles,
+ribbons and text draw the data as it is, as ggplot2's do with `stat_identity()`. A mapping reads
+what a stat computes, such as counting's `prop` or binning's `density`, with
+`{:after_stat, [:prop]}`. Not in Giggly yet: every other stat, `stat_boxplot()` and `stat_align()`
+as functions of their own, giving a layer its stat by name, and `layer()`.

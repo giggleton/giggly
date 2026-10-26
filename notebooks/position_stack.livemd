@@ -32,10 +32,12 @@ waiting for, so the page is also a list of what remains.
 show proportions. A stack runs in the reverse order of the `group` aesthetic, so its colours line
 up with the default legend, and positive values stack upward from zero while negative ones stack
 downward. `vjust` places an object that has a position rather than a size, such as a label,
-within its part of the stack, and `reverse` turns the order over. Giggly stacks bars: it is the
-default `position: :stack` of `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3` and
-`Giggly.Plot.geom_histogram/3`. It has none of the rest yet: no `position_fill()`, no options, and
-no stacking of other layers. A plot is described with `Giggly.Plot` and drawn with
+within its part of the stack, and `reverse` turns the order over. Giggly stacks bars and areas: it
+is the default `position: :stack` of `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3`,
+`Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_area/3`, and `Giggly.Plot.geom_density/3`
+stacks its curves with `position: :stack`. It has none of the rest yet: no `position_fill()`,
+neither of `position_stack()`'s options, `vjust` and `reverse`, and no `position` option for
+lines, points or text. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
 write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
 `Kino.Image`. It binds R's `mtcars` and ggplot2's `diamonds`, `Giggly.Datasets.mtcars/0` and
@@ -100,9 +102,21 @@ ggplot(series, aes(time, value)) +
   geom_area(aes(fill = type))
 ```
 
-R's `rpois()` draws the values at random, the same ones every time after `set.seed(1)`.
+R's `rpois()` draws the values at random, the same ones every time after `set.seed(1)`; the cell
+writes out the 16 it draws.
 
-Not in Giggly yet: `geom_area()`.
+```elixir
+series = %{
+  "time" => Enum.flat_map([1.0, 2.0, 3.0, 4.0], fn time -> List.duplicate(time, 4) end),
+  "type" => List.flatten(List.duplicate(["a", "b", "c", "d"], 4)),
+  "value" => [8, 10, 7, 11, 14, 12, 11, 9, 14, 11, 8, 2, 8, 10, 7, 12]
+}
+
+series
+|> Plot.new(%{x: :time, y: :value})
+|> Plot.geom_area(%{fill: :type})
+|> render.()
+```
 
 ## Setting the stacking order
 
@@ -119,7 +133,17 @@ ggplot(series, aes(time, value)) +
 ```
 
 `factor()`'s `levels` give `type2` its order, which `Giggly.Factor.new/2` gives a column in the
-table. Not in Giggly yet: `geom_area()`.
+table.
+
+```elixir
+series =
+  Map.put(series, "type2", Giggly.Factor.new(series["type"], levels: ["c", "b", "d", "a"]))
+
+series
+|> Plot.new(%{x: :time, y: :value})
+|> Plot.geom_area(%{fill: :type2})
+|> render.()
+```
 
 ## Ordering the legend
 
@@ -130,7 +154,13 @@ ggplot(series, aes(time, value)) +
   scale_fill_discrete(breaks = c('a', 'b', 'c', 'd'))
 ```
 
-Not in Giggly yet: `geom_area()`.
+```elixir
+series
+|> Plot.new(%{x: :time, y: :value})
+|> Plot.geom_area(%{fill: :type})
+|> Plot.scale_fill_discrete(breaks: ["a", "b", "c", "d"])
+|> render.()
+```
 
 ## Reversing the stack
 
@@ -143,7 +173,7 @@ ggplot(series, aes(time, value)) +
   theme(legend.position = "top")
 ```
 
-Not in Giggly yet: `geom_area()`, `position_stack()`'s `reverse` option and `coord_flip()`.
+Not in Giggly yet: `position_stack()`'s `reverse` option and `coord_flip()`.
 
 ## Stacking lines and points
 
@@ -169,7 +199,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_line(aes(group = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_area()` and `geom_line()`'s `position` option, here `position = "stack"`.
+Not in Giggly yet: `geom_line()`'s `position` option, here `position = "stack"`.
 
 ## Stacking labels
 
@@ -180,8 +210,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_area()`, and `geom_text()`'s `position` option, here `position =
-"stack"`.
+Not in Giggly yet: `geom_text()`'s `position` option, here `position = "stack"`.
 
 ## Centring labels
 
@@ -193,8 +222,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_area()`, `geom_text()`'s `position` option, and `position_stack()`'s
-`vjust` option.
+Not in Giggly yet: `geom_text()`'s `position` option, and `position_stack()`'s `vjust` option.
 
 ## Negative values
 

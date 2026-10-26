@@ -24,9 +24,11 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   place (design-log §4, the entry beginning "An example that sets ggplot2's active theme"). An
   argument ggplot2 does not recognise, and so draws as its default (`hjust = 'outside'`, centred),
   is left out of Giggly's cell, and the prose says so (the entry beginning "A notebook leaves out an
-  argument"). An example R refuses on purpose (`should_stop()`) that Giggly refuses too is shown by
-  a cell that runs Giggly's line in `try`/`rescue` and returns the message, so every cell still runs
-  and no verdict is written (the entry beginning "An example R refuses on purpose").
+  argument"); one ggplot2 reads and Giggly lacks waits, even where the example gives its default
+  (`formula = y ~ x`; the entry beginning "A verdict names an argument Giggly lacks"). An example R
+  refuses on purpose (`should_stop()`) that Giggly refuses too is shown by a cell that runs Giggly's
+  line in `try`/`rescue` and returns the message, so every cell still runs and no verdict is written
+  (the entry beginning "An example R refuses on purpose").
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
   words in every notebook** ("mapping a text's `size`", "a character as a shape", "`geom_jitter()`",
   "a whole-column function in a mapping", "the theme's `strip.placement` setting"), so when a
@@ -41,6 +43,10 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   function computes it** (`{&Kernel.//2, [:unemploy, :pop]}`), so its guide is titled by the call;
   a closure only beside `labs/2`, which titles it. The prose says where the title differs from R's
   (`unemploy / pop` for `unemploy/pop`), as the drawing otherwise matches.
+- **Where Giggly's drawing departs from R's by design, the prose says so and how far**: a loess
+  curve, fitted at each point where R's default interpolates, names its largest gap from R's
+  drawing and its band's, in points, as the notebook draws it (design-log §4, the entry beginning
+  "loess is Giggly's own").
 - **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
   CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
   `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`
@@ -54,8 +60,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   example writes out in R, the cell writes out too. Where an example draws random numbers in R, the
   notebook takes the rows R actually produced and says so, a sample of a table's rows as the row
   numbers R picks, each factor rebuilt with its levels, and where it computes values with base R
-  before plotting (`quantile()`), it writes out R's values and says so (design-log §4, the entries
-  beginning "A random sample of a table's rows" and "A value an example computes in base R").
+  before plotting (`quantile()`, or a table built from a time series such as `LakeHuron`), it
+  writes out R's values and says so (design-log §4, the entries beginning "A random sample of a
+  table's rows", "A value an example computes in base R" and "A base-R time series").
 - **A notebook installs Giggly by path** (`Path.join(__DIR__, "..")`) and Kino, and shows a plot
   with `Kino.Image.new(svg, :svg)`, through the setup cell's `render`, until a plot can show
   itself. A `livebook` escript built with an older Elixir than `mix.exs` requires cannot run

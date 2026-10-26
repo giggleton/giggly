@@ -177,7 +177,45 @@ p <- ggplot(df, aes(date, price)) +
 p
 ```
 
-Not in Giggly yet: `stat_smooth()`.
+The cell takes today's date from the clock, as `Sys.Date()` does, though `Date.utc_today/0` gives
+the date in UTC where R gives the local one, and writes out the 60 prices R draws after
+`set.seed(1)`. With 60 rows the smooth is a loess fit along the dates. Giggly fits a loess curve at
+each of its points directly, as R's `loess(surface = "direct")` does, where R's default joins fits
+made at fewer places, so its curve sits up to 5.2 points from R's here, and its band's edges up to
+5.4.
+
+```elixir
+today = Date.utc_today()
+
+df = %{
+  "date" => Enum.map(0..59, fn days -> Date.add(today, -days) end),
+  "price" => [
+    14.373546189257668, 15.183643324222082, 14.164371387589952, 16.595280802137793,
+    15.329507771815361, 14.179531615881984, 15.487429052428485, 15.738324705129218,
+    15.575781351653493, 14.694611612843644, 16.51178116845085, 15.389843236411432,
+    14.378759419458197, 12.785300112822501, 16.124930918143107, 14.955066390984769,
+    14.983809736901055, 15.9438362106853, 15.821221195098088, 15.593901321217508,
+    15.918977371608218, 15.782136300731068, 15.07456498336519, 13.010648304136627,
+    15.61982574789471, 14.943871260471, 14.84420449329467, 13.529247616100726, 14.521849944891379,
+    15.417941560199703, 1.1128759242594242, 0.6936033727601171, 1.0590657262597234,
+    1.1323946741875262, 1.6508704670704901, 1.4580167807172986, 1.8785452482756229,
+    2.3663106706459076, 1.8842469143681229, 2.875321330036968, 2.5390729378443213,
+    3.2394403501879427, 2.9466834891587497, 3.1337749307975176, 3.4763512450736016,
+    4.092198335845024, 4.264339470630512, 3.989989543473348, 4.577320698834956, 4.960617997217923,
+    4.6346594847738745, 5.112514678714797, 4.9999943688977515, 5.125352151878179,
+    5.7570871480274945, 5.402692255144939, 6.111121222469956, 5.721691921027378, 6.045488513959572,
+    6.14330437942408
+  ]
+}
+
+p =
+  df
+  |> Plot.new(%{x: :date, y: :price})
+  |> Plot.geom_line()
+  |> Plot.stat_smooth()
+
+render.(p)
+```
 
 ## Limits that drop data
 
@@ -186,9 +224,14 @@ Not in Giggly yet: `stat_smooth()`.
 p + lims(x= c(Sys.Date() - 30, NA), y = c(10, 20))
 ```
 
-The smooth is fitted only to the rows left inside the limits.
+The smooth is fitted only to the rows left inside the limits. R's `NA` is written `nil`. Giggly's
+curve sits up to 2.6 points from R's, and its band's edges up to 3.8.
 
-Not in Giggly yet: `stat_smooth()`.
+```elixir
+p
+|> Plot.lims(x: {Date.add(today, -30), nil}, y: {10, 20})
+|> render.()
+```
 
 ## Limits that zoom
 
@@ -199,6 +242,6 @@ Not in Giggly yet: `stat_smooth()`.
 p + coord_cartesian(xlim =c(Sys.Date() - 30, NA), ylim = c(10, 20))
 ```
 
-Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options, and `stat_smooth()`.
+Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options.
 Giggly's plots are in Cartesian coordinates, as ggplot2's are by default, but nothing sets their
 options.

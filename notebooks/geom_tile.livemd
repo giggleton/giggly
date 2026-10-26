@@ -189,4 +189,8 @@ cars +
   )
 ```
 
-Not in Giggly yet: `stat_density()` drawn with `geom_raster()`.
+`factor(cyl)` gives each density a `y` of its own, which ggplot2 keeps beside the curve it
+computes along `x`, so each row of cells is one number of cylinders.
+
+Not in Giggly yet: `stat_density()` given a discrete `y` beside `x`, which each curve keeps,
+giving a stat a geom by name, here `geom = "raster"`, and `geom_raster()`.

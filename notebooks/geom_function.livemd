@@ -34,7 +34,7 @@ ggplot(data.frame(x = rnorm(100)), aes(x)) +
 R draws the data at random from the standard normal distribution, and the curve is that
 distribution's density, `dnorm`.
 
-Not in Giggly yet: `geom_density()` and `geom_function()`.
+Not in Giggly yet: `geom_function()`.
 
 ## A function without data
 
@@ -137,4 +137,4 @@ geom_function(fun = dnorm, colour = "red", xlim=c(-7, 7))
 A layer's `xlim` sets the range the function is evaluated over, narrower or wider than the
 data's.
 
-Not in Giggly yet: `geom_density()`, and `geom_function()` and its `xlim` option.
+Not in Giggly yet: `geom_function()` and its `xlim` option.

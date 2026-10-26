@@ -32,11 +32,12 @@ what remains.
 be turned that way. Under it, the x scale and the `xlim` option act on the vertical axis, while the
 theme's settings for the x axis still act on the horizontal one, and facets keep their order. Giggly
 has no `coord_flip()` yet; its `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_histogram/3` and
-`Giggly.Plot.geom_boxplot/3` turn on their side when `y` is mapped rather than `x`, the swap the
-page prefers. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns
-an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
-`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds ggplot2's
-`diamonds`, `Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
+`Giggly.Plot.geom_boxplot/3` turn on their side when `y` is mapped rather than `x`, and
+`Giggly.Plot.geom_area/3` with `orientation: :y`, the swaps the page prefers. A plot is described
+with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds`,
+`Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
 
 ## Horizontal boxplots
 
@@ -107,7 +108,16 @@ ggplot(df, aes(b, a)) +
   geom_area(orientation = "y")
 ```
 
-Not in Giggly yet: `geom_area()` and its `orientation` option.
+`:math.pow/2` gives doubles, as R's `^` does.
+
+```elixir
+df = %{"a" => Enum.to_list(1..5), "b" => Enum.map(1..5, fn value -> :math.pow(value, 2) end)}
+
+df
+|> Plot.new(%{x: :b, y: :a})
+|> Plot.geom_area(orientation: :y)
+|> render.()
+```
 
 ## Flipping an area
 
@@ -118,4 +128,4 @@ ggplot(df, aes(a, b)) +
   coord_flip()
 ```
 
-Not in Giggly yet: `geom_area()` and `coord_flip()`.
+Not in Giggly yet: `coord_flip()`.

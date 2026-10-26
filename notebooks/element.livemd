@@ -142,5 +142,5 @@ ggplot(mpg, aes(displ, hwy)) +
   ))
 ```
 
-Not in Giggly yet: `geom_smooth()`, formulas fitted by `lm()`, and `element_geom()`, which here
-sets the colours, point size and line width the layers draw with.
+Not in Giggly yet: `geom_smooth()`'s `formula` option, here `y ~ x`, and `element_geom()`, which
+here sets the colours, point size and line width the layers draw with.

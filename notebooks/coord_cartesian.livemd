@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,7 +32,10 @@ magnifying glass, and leaves the data alone, where setting limits on a scale dro
 outside them. Its other options turn off the expansion around the data, reverse an axis, fix the
 aspect ratio and stop the panel clipping what is drawn. Every Giggly plot is drawn in Cartesian
 coordinates unless `Giggly.Plot.coord_radial/1` is added, but Giggly takes none of
-`coord_cartesian()`'s options yet.
+`coord_cartesian()`'s options yet. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
 
 ## The plot to zoom
 
@@ -35,7 +49,19 @@ p <- ggplot(mtcars, aes(disp, wt)) +
 p
 ```
 
-Not in Giggly yet: `geom_smooth()`, the smoothed line drawn over the points.
+`mtcars` has 32 rows, so the smooth is a loess fit. Giggly fits a loess curve at each of its
+points directly, as R's `loess(surface = "direct")` does, where R's default joins fits made at
+fewer places, so its curve sits up to 2.3 points from R's here, and its band's edges up to 7.1.
+
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :disp, y: :wt})
+  |> Plot.geom_point()
+  |> Plot.geom_smooth()
+
+render.(p)
+```
 
 ## Limits on a scale
 
@@ -44,7 +70,16 @@ Not in Giggly yet: `geom_smooth()`, the smoothed line drawn over the points.
 p + scale_x_continuous(limits = c(325, 500))
 ```
 
-Not in Giggly yet: `geom_smooth()`.
+The limits drop the 24 cars outside them, so the smooth is fitted to the 8 left. With so few rows
+the band differs too: R works out its width from a table approximating two of the fit's
+statistics, where Giggly works out the first of them exactly, so R's band is about a tenth wider.
+Giggly's curve sits up to 15 points from R's, and its band's edges up to 23.
+
+```elixir
+p
+|> Plot.scale_x_continuous(limits: {325, 500})
+|> render.()
+```
 
 ## Limits on the coordinate system
 
@@ -55,7 +90,7 @@ Not in Giggly yet: `geom_smooth()`.
 p + coord_cartesian(xlim = c(325, 500))
 ```
 
-Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `xlim` option.
+Not in Giggly yet: `coord_cartesian()`'s `xlim` option.
 
 ## Exact limits
 
@@ -65,7 +100,7 @@ Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `xlim` option.
 p + coord_cartesian(xlim = c(325, 500), expand = FALSE)
 ```
 
-Not in Giggly yet: `geom_smooth()`, and `coord_cartesian()`'s `xlim` and `expand` options.
+Not in Giggly yet: `coord_cartesian()`'s `xlim` and `expand` options.
 
 ## No expansion
 
@@ -75,7 +110,7 @@ Not in Giggly yet: `geom_smooth()`, and `coord_cartesian()`'s `xlim` and `expand
 p + coord_cartesian(expand = FALSE)
 ```
 
-Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `expand` option.
+Not in Giggly yet: `coord_cartesian()`'s `expand` option.
 
 ## A fixed aspect ratio
 
@@ -85,7 +120,7 @@ Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `expand` option.
 p + coord_cartesian(ratio = 100)
 ```
 
-Not in Giggly yet: `geom_smooth()` and `coord_cartesian()`'s `ratio` option.
+Not in Giggly yet: `coord_cartesian()`'s `ratio` option.
 
 ## A 2d histogram
 

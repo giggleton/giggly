@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -21,7 +32,10 @@ and replacing the plot's data takes `%+%`. A Giggly plot is built with a pipe in
 function in `Giggly.Plot` takes a plot and returns it with a layer added, as
 `Giggly.Plot.geom_point/3` does, or with its facet or coordinate system replaced, as
 `Giggly.Plot.facet_wrap/3` and `Giggly.Plot.coord_radial/1` do. The data is given once, to
-`Giggly.Plot.new/2`.
+`Giggly.Plot.new/2`. A plot is drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which
+draws a plot and shows it below the cell with `Kino.Image`. It binds `Giggly.Datasets.mpg/0`,
+ggplot2's `mpg`, to `mpg`, ggplot2's name for it.
 
 ## Adding a layer
 
@@ -32,7 +46,20 @@ base <-
 base + geom_smooth()
 ```
 
-Not in Giggly yet: `geom_smooth()`.
+`mpg` has fewer than 1,000 rows, so the smooth is a loess fit. Giggly fits a loess curve at each of
+its points directly, as R's `loess(surface = "direct")` does, where R's default joins fits made at
+fewer places, so its curve sits up to 1.7 points from R's here, and its band's edges up to 2.9.
+
+```elixir
+base =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy})
+  |> Plot.geom_point()
+
+base
+|> Plot.geom_smooth()
+|> render.()
+```
 
 ## Replacing the data
 
@@ -53,5 +80,5 @@ base + list(subset(mpg, fl == "p"), geom_smooth())
 ```
 
 A data frame in the list replaces the plot's data, as `%+%` does. Not in Giggly yet: replacing a
-plot's data, and `geom_smooth()`. Giggly adds components with a pipe rather than a list, so a
-function that pipes a plot through several of them returns it with all of them added.
+plot's data. Giggly adds components with a pipe rather than a list, so a function that pipes a
+plot through several of them returns it with all of them added.

@@ -79,6 +79,25 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A base-R time series an example turns into a table is written out as R gives it (2026-10-26,
+  Steve: "A", in the smoothing sweep).** geom_ribbon's examples plot `huron`, built from
+  `LakeHuron`, base R's 98 yearly levels of Lake Huron, a time series rather than a table; the cell
+  writes the levels out and builds the table as R's code does, as a value computed in base R is
+  (the entry beginning "A value an example computes in base R"). All four drawings match R's. A
+  table an example plots as it is (`faithful`, `Oxboys`) still waits on its dataset. *Rejected: a
+  `LakeHuron` dataset* — a library change with a waiver of its own, and a time series has no
+  columns of its own to copy. *Rejected: leaving the three examples waiting* — the page's own
+  geom would draw none of its examples, for want of base R, not plotting.
+
+- **A verdict names an argument Giggly lacks even where the example gives ggplot2's default
+  (2026-10-26, Steve: "B", in the smoothing sweep).** element's and theme's smooths pass `formula =
+  y ~ x`, the formula ggplot2 gives lm unasked, and R writes the same SVG with and without it;
+  Giggly's lm fits only `y ~ x` and takes no `formula:`. Their verdicts name "`geom_smooth()`'s
+  `formula` option, here `y ~ x`", so they wait for it as well as for `element_geom()`.
+  *Rejected: leaving the argument out of Giggly's cell, as one ggplot2 does not recognise is* (the
+  entry beginning "A notebook leaves out an argument") — the drawing would be R's, but the cell
+  would drop an argument ggplot2 reads.
+
 - **gam is Giggly's own: mgcv's `gam(y ~ s(x, bs = "cs"), method = "REML")` from Wood's published
   method, its rows summed by knot interval through the frame, its 10 by 10 algebra in plain Elixir
   and its search for λ its own (2026-10-25, Steve: "agree", then "A" for each; checked against
@@ -2722,6 +2741,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Draw the notebook examples ribbons, areas, smooths and densities unlock, and narrow
+  every verdict to what still waits (smoothing and densities, the notebook sweep); §4: "A base-R
+  time series an example turns into a table", "A verdict names an argument Giggly lacks even
+  where", "loess is Giggly's own"
 - 2026-10-25 — Fit gam smooths: method: :gam, and gam for a smooth given no method from 1,000
   rows, mgcv's REML spline summed by knot interval through the frame and solved in plain Elixir
   (smoothing and densities, step 5); §4: "gam is Giggly's own", "A gam's shrinkage", "A smooth
@@ -3018,6 +3041,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 
 ## 7. Deferred / open questions
 
+- **A density given a discrete `y` beside `x` is refused, where R keeps it (found 2026-10-26, the
+  smoothing sweep).** geom_tile's `ggplot(mtcars, aes(mpg, factor(cyl))) + stat_density(aes(fill =
+  after_stat(density)), geom = "raster")` estimates each cylinder count's density along `mpg`, and
+  R's stat carries each group's constant `y` beside its 512 rows, so the raster has a row of cells
+  per count. `Plot.stat_density/3` refuses both: "maps :x, :y, but takes only one of them". Only a
+  geom that reads that `y` (`geom_raster()`, `geom_tile()`) gives it a use, so it waits for one.
 - **Rows taken from a table by hand lose its factors' levels (found 2026-10-23, the ordering
   sweep).** A `Giggly.Factor` enumerates as its values, so a user who filters or samples
   `diamonds` with `Enum`, or reads it into Explorer, gets plain text, and `cut` sorts

@@ -87,7 +87,7 @@ p2 <- ggplot(data.frame(x = rcauchy(1000)), aes(x = x)) +
 p2 + guides(x = "axis_logticks")
 ```
 
-Not in Giggly yet: `geom_density()`, a pseudo-log transformation, and `guide_axis_logticks()`.
+Not in Giggly yet: a pseudo-log transformation, and `guide_axis_logticks()`.
 
 ## Ticks near zero
 
@@ -96,5 +96,5 @@ Not in Giggly yet: `geom_density()`, a pseudo-log transformation, and `guide_axi
 p2 + guides(x = guide_axis_logticks(negative.small = 1))
 ```
 
-Not in Giggly yet: `geom_density()`, a pseudo-log transformation, and `guide_axis_logticks()` with
-its `negative.small` option, the smallest absolute value that gets a tick.
+Not in Giggly yet: a pseudo-log transformation, and `guide_axis_logticks()` with its
+`negative.small` option, the smallest absolute value that gets a tick.

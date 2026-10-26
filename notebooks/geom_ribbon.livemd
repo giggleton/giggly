@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -18,7 +27,13 @@ and names what it is waiting for, so the page is also a list of what remains.
 For each `x`, `geom_ribbon()` draws a band from `ymin` to `ymax`. `geom_area()` is the band from 0
 up to `y`, and stacks groups on one another as stacked bars do, so it shows how the parts of a
 whole vary along `x`. Its stat, `stat_align()`, interpolates the groups to a common set of `x`
-values so that they stack. Giggly has none of this yet.
+values so that they stack. Giggly has `Giggly.Plot.geom_ribbon/3` and `Giggly.Plot.geom_area/3`,
+which aligns its groups as `stat_align()` does and stacks them unless given `position: :identity`;
+both take `orientation:` and `outline_type:`. It has no `stat_align()` to give another geom, and
+no `stat` option to turn an area's alignment off. A plot is described with `Giggly.Plot` and drawn
+with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so
+the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell
+with `Kino.Image`.
 
 ## A ribbon and an area
 
@@ -33,7 +48,38 @@ h + geom_ribbon(aes(ymin=0, ymax=level))
 h + geom_area(aes(y = level))
 ```
 
-Not in Giggly yet: `geom_ribbon()` and `geom_area()`, and the `LakeHuron` dataset.
+`LakeHuron` is a time series in base R rather than a table, so the cell writes out its 98 levels
+as R gives them and builds `huron` from them, as R's code does. A number in a mapping is a
+constant, as `ymin=0` is in R's.
+
+```elixir
+huron = %{
+  "year" => Enum.to_list(1875..1972),
+  "level" => [
+    580.38, 581.86, 580.97, 580.8, 579.79, 580.39, 580.42, 580.82, 581.4, 581.32, 581.44, 581.68,
+    581.17, 580.53, 580.01, 579.91, 579.14, 579.16, 579.55, 579.67, 578.44, 578.24, 579.1, 579.09,
+    579.35, 578.82, 579.32, 579.01, 579.0, 579.8, 579.83, 579.72, 579.89, 580.01, 579.37, 578.69,
+    578.19, 578.67, 579.55, 578.92, 578.09, 579.37, 580.13, 580.14, 579.51, 579.24, 578.66, 578.86,
+    578.05, 577.79, 576.75, 576.75, 577.82, 578.64, 580.58, 579.48, 577.38, 576.9, 576.94, 576.24,
+    576.84, 576.85, 576.9, 577.79, 578.18, 577.51, 577.23, 578.42, 579.61, 579.05, 579.26, 579.22,
+    579.38, 579.1, 577.95, 578.12, 579.75, 580.85, 580.41, 579.96, 579.61, 578.76, 578.18, 577.21,
+    577.13, 579.1, 578.25, 577.91, 576.89, 575.96, 576.8, 577.68, 578.38, 578.52, 579.74, 579.31,
+    579.89, 579.96
+  ]
+}
+
+h = Plot.new(huron, %{x: :year})
+
+h
+|> Plot.geom_ribbon(%{ymin: 0, ymax: :level})
+|> render.()
+```
+
+```elixir
+h
+|> Plot.geom_area(%{y: :level})
+|> render.()
+```
 
 ## A horizontal area
 
@@ -43,7 +89,11 @@ Not in Giggly yet: `geom_ribbon()` and `geom_area()`, and the `LakeHuron` datase
 h + geom_area(aes(x = level, y = year), orientation = "y")
 ```
 
-Not in Giggly yet: `geom_area()` and its `orientation` option, and the `LakeHuron` dataset.
+```elixir
+h
+|> Plot.geom_area(%{x: :level, y: :year}, orientation: :y)
+|> render.()
+```
 
 ## A band around a line
 
@@ -54,7 +104,18 @@ h +
   geom_line(aes(y = level))
 ```
 
-Not in Giggly yet: `geom_ribbon()` and the `LakeHuron` dataset.
+`level - 1` is written as a capture of the function that computes it, and the band's fill, R's
+`"grey70"`, as its hex, `"#B3B3B3"`, since CSS has no such name.
+
+```elixir
+h
+|> Plot.geom_ribbon(
+  %{ymin: {&Kernel.-/2, [:level, 1]}, ymax: {&Kernel.+/2, [:level, 1]}},
+  fill: "#B3B3B3"
+)
+|> Plot.geom_line(%{y: :level})
+|> render.()
+```
 
 ## Groups at different x values
 
@@ -74,7 +135,7 @@ a + geom_point(size = 8) + facet_grid(g ~ .)
 
 `facet_grid(g ~ .)` gives each group a row of its own.
 
-Not in Giggly yet: `geom_area()` and `facet_grid()`.
+Not in Giggly yet: `facet_grid()`.
 
 ## Aligned points
 
@@ -86,8 +147,8 @@ a + geom_point(stat = "align", position = "stack", size = 8)
 
 Points drawn with the areas' stat and position show the values `stat_align()` computes, stacked.
 
-Not in Giggly yet: `geom_area()`, `stat_align()`, and `geom_point()`'s `stat` and `position`
-options.
+Not in Giggly yet: `stat_align()` given to a geom as `stat = "align"`, and `geom_point()`'s
+`position` option, here `position = "stack"`.
 
 ## Areas without alignment
 
@@ -97,4 +158,4 @@ ggplot(df, aes(x, y, fill = g)) +
   geom_area(stat = "identity")
 ```
 
-Not in Giggly yet: `geom_area()` and its `stat` option.
+Not in Giggly yet: `geom_area()`'s `stat` option, here `stat = "identity"`.

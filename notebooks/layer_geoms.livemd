@@ -24,6 +24,9 @@ a layer with a function for each geom: `Giggly.Plot.geom_point/3`, `Giggly.Plot.
 `Giggly.Plot.geom_bar/3`, which counts with ggplot2's `stat_count()`, `Giggly.Plot.geom_col/3`,
 `Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_freqpoly/3`, which bin with `stat_bin()`,
 `Giggly.Plot.geom_boxplot/3`, `Giggly.Plot.geom_path/3`, `Giggly.Plot.geom_line/3`,
-`Giggly.Plot.geom_rect/3` and `Giggly.Plot.geom_text/3`; `Giggly.Plot.annotate/3` adds one drawn
-from values given in the call. Every other geom, giving a stat a geom by name, `layer()` and
-`ggproto()` are not in Giggly yet.
+`Giggly.Plot.geom_rect/3`, `Giggly.Plot.geom_text/3`, `Giggly.Plot.geom_ribbon/3`,
+`Giggly.Plot.geom_area/3`, which aligns its groups as `stat_align()` does,
+`Giggly.Plot.geom_smooth/3`, which fits with `stat_smooth()`, and `Giggly.Plot.geom_density/3`,
+which estimates with `stat_density()`; `Giggly.Plot.annotate/3` adds one drawn from values given in
+the call. Every other geom, giving a stat a geom by name, `layer()` and `ggproto()` are not in
+Giggly yet.

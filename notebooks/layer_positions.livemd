@@ -22,7 +22,9 @@ them where they are. Giggly has stacking and dodging, for bars and histograms:
 `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3` and `Giggly.Plot.geom_histogram/3` stack by
 default, or dodge with `position: :dodge`, as `position = "dodge"` does, or with `position: :dodge2`
 or `Giggly.Plot.position_dodge2/1`, as `position_dodge2()` does, which `Giggly.Plot.geom_boxplot/3`
-dodges its boxes with by default; and nudging, for text: `Giggly.Plot.geom_text/3` nudges every
-label by its `nudge_x:` and `nudge_y:` options, as ggplot2's `geom_text()` does. Not in Giggly yet:
-`position_fill()`, `position_jitter()`, `position_jitterdodge()` and `position_nudge()`, the options
-of `position_stack()` and `position_dodge()`, `position_dodge2()`'s `width` option, and `layer()`.
+dodges its boxes with by default; stacking, for areas and densities: `Giggly.Plot.geom_area/3`
+stacks by default, and `Giggly.Plot.geom_density/3` with `position: :stack`; and nudging, for text:
+`Giggly.Plot.geom_text/3` nudges every label by its `nudge_x:` and `nudge_y:` options, as ggplot2's
+`geom_text()` does. Not in Giggly yet: `position_fill()`, `position_jitter()`,
+`position_jitterdodge()` and `position_nudge()`, the options of `position_stack()` and
+`position_dodge()`, `position_dodge2()`'s `width` option, and `layer()`.

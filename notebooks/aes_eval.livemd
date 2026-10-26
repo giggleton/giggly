@@ -33,7 +33,8 @@ them, and `from_theme()` takes a colour from the theme's settings for geoms. Gig
 start and after the stat: a mapping value is a column, an expression or a constant evaluated from
 the layer's data, or `{:after_stat, [value]}`, a value evaluated from what its stat computes:
 counting (`Giggly.Plot.geom_bar/3`), summing (`Giggly.Plot.geom_count/3`), binning
-(`Giggly.Plot.geom_histogram/3`) or a box plot's summary (`Giggly.Plot.geom_boxplot/3`). It has no
+(`Giggly.Plot.geom_histogram/3`), a box plot's summary (`Giggly.Plot.geom_boxplot/3`), a density
+(`Giggly.Plot.geom_density/3`) or a smooth's fit (`Giggly.Plot.geom_smooth/3`). It has no
 `after_scale()`, `stage()` or `from_theme()`, and no whole-column function in a mapping, such as
 `max(count)`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
 returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
@@ -112,9 +113,8 @@ ggplot(mpg, aes(cty)) +
 Each group's density is scaled by its share of all the cars, so the stacked densities add up to
 the density of all of them, which the second layer draws.
 
-Not in Giggly yet: densities, `geom_density()` and its `bw` option, stacking them with `position =
-"stack"`, which Giggly does for bars only, `after_scale()`, and a whole-column function in a
-mapping, here `sum(n[!duplicated(group)])` inside `after_stat()`.
+Not in Giggly yet: `after_scale()`, and a whole-column function in a mapping, here
+`sum(n[!duplicated(group)])` inside `after_stat()`.
 
 ## A ridgeline
 
@@ -134,8 +134,8 @@ ggplot(mpg, aes(cty, colour = factor(cyl))) +
 Each group's density, scaled to a peak of 1, rises from a baseline at its group's number, so the
 curves sit one above another.
 
-Not in Giggly yet: ribbons, `geom_ribbon()` and its `outline.type` option, `stat_density()` given to
-a geom as `stat = "density"`, `after_scale()`, and `after_stat()` reading `group`.
+Not in Giggly yet: `stat_density()` given to a geom as `stat = "density"`, `after_scale()`, and
+`after_stat()` reading `group`.
 
 ## Labelling bars with their counts
 

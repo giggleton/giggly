@@ -443,8 +443,8 @@ p4 + geom_smooth(method = "lm", formula = y ~ x) +
   theme(geom = element_geom(accent = "tomato", paper = "orchid"))
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and `element_geom()`, here to set
-the accent and paper colours layers draw with.
+Not in Giggly yet: `geom_smooth()`'s `formula` option, here `y ~ x`, and `element_geom()`, here to
+set the accent and paper colours layers draw with.
 
 ## A default palette
 

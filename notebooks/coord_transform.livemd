@@ -110,7 +110,32 @@ ggplot(d, aes(carat, price)) +
   scale_y_log10()
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`.
+The cell keeps the rows `subset()` keeps, each column's values where `carat` is over 0.5. The
+scales transform the data before the stat, so the line is fitted to the logarithms and is straight
+on these axes.
+
+```elixir
+kept = Enum.map(Keyword.fetch!(diamonds, :carat), fn carat -> carat > 0.5 end)
+
+d =
+  Enum.map(diamonds, fn {name, values} ->
+    rows =
+      values
+      |> Enum.zip(kept)
+      |> Enum.filter(fn {_value, keep} -> keep end)
+      |> Enum.map(fn {value, _keep} -> value end)
+
+    {name, rows}
+  end)
+
+d
+|> Plot.new(%{x: :carat, y: :price})
+|> Plot.geom_point()
+|> Plot.geom_smooth(method: :lm)
+|> Plot.scale_x_log10()
+|> Plot.scale_y_log10()
+|> render.()
+```
 
 ## A fitted line in transformed coordinates
 
@@ -125,7 +150,7 @@ ggplot(d, aes(carat, price)) +
 # scale
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()` and `coord_transform()`.
+Not in Giggly yet: `coord_transform()`.
 
 ## Transforming back
 
@@ -140,8 +165,7 @@ ggplot(diamonds, aes(carat, price)) +
   coord_transform(x = scales::transform_exp(10), y = scales::transform_exp(10))
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`, and `coord_transform()` with
-transformations from the `scales` package.
+Not in Giggly yet: `coord_transform()` with transformations from the `scales` package.
 
 ## No transformation
 
@@ -152,7 +176,13 @@ ggplot(diamonds, aes(carat, price)) +
   geom_smooth(method = "lm")
 ```
 
-Not in Giggly yet: `geom_smooth()` with a line fitted by `lm()`.
+```elixir
+diamonds
+|> Plot.new(%{x: :carat, y: :price})
+|> Plot.geom_point()
+|> Plot.geom_smooth(method: :lm)
+|> render.()
+```
 
 ## A discrete axis
 

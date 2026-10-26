@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,7 +30,10 @@ These geoms add reference lines to a plot: vertical ones at an `xintercept`, hor
 `yintercept`, and diagonal ones given a `slope` and an `intercept`. Given as arguments, a line is
 the same in every panel; mapped from a data frame, the lines can differ from panel to panel. Unlike
 other geoms, they take nothing from the plot's mapping and do not change the plot's scales. Giggly
-has none of them yet.
+has none of them yet. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
+which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
+`Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
 
 ## Vertical and horizontal lines
 
@@ -61,7 +75,19 @@ rounds. Not in Giggly yet: models fitted by `lm()`, and `geom_abline()`.
 p + geom_smooth(method = "lm", se = FALSE)
 ```
 
-Not in Giggly yet: `geom_smooth()`.
+`p` is the first example's plot, `mtcars`' weights against their miles per gallon, which Giggly
+draws here. The smooth fits the same line as `lm(mpg ~ wt)`.
+
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+
+p
+|> Plot.geom_smooth(method: :lm, se: false)
+|> render.()
+```
 
 ## Lines that differ between facets
 
