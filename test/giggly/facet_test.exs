@@ -222,9 +222,9 @@ defmodule Giggly.FacetTest do
           layout_of(wrap(["gear"]), [plot_data, plot_data])
         end
 
+      assert error.message =~ ~s(facet_wrap by "gear")
       assert error.message =~ "the plot's data"
       assert error.message =~ "index 0"
-      assert error.message =~ ~s("gear")
     end
 
     test "a table with no rows makes no panel and draws in none", %{plot_data: plot_data} do
@@ -273,6 +273,17 @@ defmodule Giggly.FacetTest do
 
       assert {panel_values(["f"], [factor, text]), panel_values(["f"], [text, factor])} ===
                {[["a", "b", "c"]], [["a", "b", "c"]]}
+    end
+
+    # Golden: as above, `facet_wrap(~f)` over f `b, NA, a` with levels `c("b", "a")`: panels b, a
+    # and NA, the rows in panels 1, 3 and 2.
+    test "a factor's missing value makes a panel of its own, after its levels" do
+      frame = DataFrame.new([{"f", ["b", nil, "a"], {:category, levels: ["b", "a"]}}])
+      facet = wrap(["f"])
+      facet_layout = layout(facet, frame)
+
+      assert DataFrame.pull(facet_layout, "f") == ["b", "a", nil]
+      assert panels(facet, frame, facet_layout, "f") == {[1, 3, 2], ["b", nil, "a"]}
     end
 
     # Golden: as above, `facet_wrap(~f + g)` over f `b, b, a` with levels `c("b", "a")` and g
@@ -490,13 +501,14 @@ defmodule Giggly.FacetTest do
          %{plot_data: plot_data} do
       error =
         assert_raise ArgumentError, fn ->
-          layout_of(grid(["r", "zz"], ["c"]), [plot_data, plot_data])
+          layout_of(grid(["r", "zz"], ["c"]), [plot_data, plot_data, plot_data])
         end
 
       assert error.message =~ ~s(facet_grid by rows "r", "zz")
 
       assert error.message =~
-               ~s(the plot's data lacks "zz"; the layer at index 0's table lacks "zz")
+               ~s(the plot's data lacks "zz"; the layer at index 0's table lacks "zz"; ) <>
+                 ~s(the layer at index 1's table lacks "zz")
 
       error = assert_raise ArgumentError, fn -> layout(grid(["r"], ["zz"]), plot_data) end
       assert error.message =~ ~s(facet_grid by cols "zz")

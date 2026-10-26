@@ -3232,6 +3232,14 @@ defmodule Giggly.PlotTest do
       assert plot.facet == %Facet.Grid{rows: ["cyl", "wt"], cols: ["mpg"], scales: :free_x}
     end
 
+    test "each of the scales' settings is recorded as given" do
+      plot = Plot.new(@rows)
+
+      assert Enum.map([:fixed, :free_x, :free_y, :free], fn scales ->
+               Plot.facet_grid(plot, rows: :cyl, scales: scales).facet.scales
+             end) == [:fixed, :free_x, :free_y, :free]
+    end
+
     test "a side left out splits on no columns, and the scales are fixed unless given" do
       plot =
         @rows
