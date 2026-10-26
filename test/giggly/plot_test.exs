@@ -271,6 +271,33 @@ defmodule Giggly.PlotTest do
       assert error.message =~ "Plot.geom_point/3"
     end
 
+    test "points are jittered by name, with the defaults, or as told" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+      told = Plot.position_jitter(width: 0.1, seed: 3)
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
+               Plot.geom_point(plot, position: :jitter).reversed_layers
+
+      assert [%Plot.Layer{position: ^told}] =
+               Plot.geom_point(plot, position: told).reversed_layers
+    end
+
+    test "a position points do not take is refused by the option's validation, naming those they do" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for position <- [:stack, Plot.position_dodge2()] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_point(plot, position: position)
+          end
+
+        assert error.key == :position
+
+        assert error.message =~
+                 "expected :identity, :jitter or a position Plot.position_jitter/1 makes, got: "
+      end
+    end
+
     # ggplot2's points draw no label; its text does.
     test "an aesthetic points cannot use is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
@@ -849,7 +876,101 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_jitter/3" do
+    test "a jitter layer records the point geom, the identity stat and jittering" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.geom_jitter(%{x: :wt, y: :mpg}, colour: "red")
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Point{},
+                 stat: %Stat.Identity{},
+                 position: %Position.Jitter{width: :none, height: :none, seed: 0},
+                 data: :none,
+                 mapping: %{x: "wt", y: "mpg"},
+                 fixed: %{color: "#FF0000"},
+                 accepted: [:alpha, :color, :fill, :group, :shape, :size, :x, :y],
+                 annotation: false
+               }
+             ]
+    end
+
+    # ggplot2's `geom_jitter(width = 0.25)` is `position_jitter(width = 0.25)`, its height and seed
+    # their defaults.
+    test "a width and a height say how far the points move, each kept as a float" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: 1.0, height: :none, seed: 0}}] =
+               Plot.geom_jitter(plot, width: 1).reversed_layers
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: +0.0}}] =
+               Plot.geom_jitter(plot, height: 0).reversed_layers
+    end
+
+    test "a position says how the points move" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+      told = Plot.position_jitter(height: 0.1, seed: -4)
+
+      assert [%Plot.Layer{position: ^told}] =
+               Plot.geom_jitter(plot, position: told).reversed_layers
+    end
+
+    # ggplot2's `geom_jitter()` aborts: "Both `position` and `width`/`height` were supplied."
+    test "a position beside a width or a height is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for amounts <- [[width: 0.1], [height: 0.1], [width: 0.1, height: 0.1]] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.geom_jitter(plot, [position: Plot.position_jitter()] ++ amounts)
+          end
+
+        assert error.message =~ "Plot.geom_jitter/3"
+        assert error.message =~ "position: or width: and height:"
+      end
+    end
+
+    # ggplot2's `geom_jitter()` takes no seed, which only its position takes.
+    test "a negative distance, a position by name and a seed are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {options, key, message} <- [
+            {[width: -0.1], :width, "expected a distance, a number 0 or more, got: -0.1"},
+            {[height: "1"], :height, ~s(expected a distance, a number 0 or more, got: "1")},
+            {[position: :jitter], :position,
+             "expected a position Plot.position_jitter/1 makes, got: :jitter"},
+            {[seed: 1], [:seed], "unknown options [:seed]"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_jitter(plot, options) end
+
+        assert error.key == key
+        assert error.message =~ message
+      end
+    end
+
+    test "a column the data does not have is refused by the layer that maps it" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_jitter(plot, %{y: :mgp}) end
+      assert error.message =~ "Plot.geom_jitter/3"
+    end
+  end
+
   describe "geom_count/3 and stat_sum/3" do
+    test "a count layer takes no position" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for add <- [&Plot.geom_count/2, &Plot.stat_sum/2] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: :jitter) end
+
+        assert error.message =~ "unknown options [:position]"
+      end
+    end
+
     test "a count layer records the point geom, counting at each place and no position" do
       plot =
         @rows
@@ -3155,6 +3276,32 @@ defmodule Giggly.PlotTest do
     test "a padding is kept as a float, 0 and 1 included" do
       assert Enum.map([0, 1], fn padding -> Plot.position_dodge2(padding: padding).padding end) ===
                [0.0, 1.0]
+    end
+  end
+
+  describe "position_jitter/1" do
+    test "a distance not given is left to the data, and the seed is 0 unless given" do
+      assert Plot.position_jitter() === %Position.Jitter{width: :none, height: :none, seed: 0}
+
+      assert Plot.position_jitter(width: 0, height: 2, seed: 12) ===
+               %Position.Jitter{width: 0.0, height: 2.0, seed: 12}
+    end
+
+    # ggplot2 takes a negative distance and moves nothing by it, a seed of 1.5 as 1, and one
+    # written as text with a warning.
+    test "a negative distance and a seed that is not an integer are refused" do
+      for {options, key, message} <- [
+            {[width: -1], :width, "expected a distance, a number 0 or more, got: -1"},
+            {[height: -0.5], :height, "expected a distance, a number 0 or more, got: -0.5"},
+            {[seed: 1.5], :seed, "invalid value for :seed option: expected integer, got: 1.5"},
+            {[seed: nil], :seed, "expected integer, got: nil"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.position_jitter(options) end
+
+        assert error.key == key
+        assert error.message =~ message
+      end
     end
   end
 

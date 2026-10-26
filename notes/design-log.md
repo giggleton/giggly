@@ -79,6 +79,33 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`geom_jitter` is Phase 3's fourteenth increment, in three steps: the position and its API, the
+  frame's filter made public, the notebook sweep (2026-10-26, Steve; checked against ggplot2
+  4.0.3's source and R).** `geom_jitter/3` takes a point's options with `width:` and `height:`
+  or `position:`, refused together as R refuses them, and no `seed:`, as R's takes none;
+  `position_jitter/1` takes `width:`, `height:` (0 or more, where R moves nothing for a negative)
+  and `seed:`; `geom_point/3`'s `position:` is `:identity`, `:jitter` or that struct. An amount
+  not given is 0.4 of each panel's spacing, as R's. A plot given no seed draws from seed 0
+  (Steve: "A"): the same points on every render, and layers of the same rows jitter alike, the
+  point-and-label case R needs a seed for. *Rejected: the layer's index as the default seed* —
+  layers would differ as R's do, but adding a layer underneath would move every point. *Rejected:
+  `Nx.Random`* — jitter is noise, not an analysis result, and Nx would put `Giggly.Tensor` in
+  `Position`'s deps. *Deferred:* `position_jitterdodge()`, with `position_dodge/1`'s `width:`
+  for marks without edges (Steve); jitter on other geoms.
+
+- **A jitter's distances are Erlang's random numbers, and a drawing is checked by R drawing them
+  (2026-10-26, Steve, agreeing the proposal).** R's come from its own generator and seeding,
+  which only a port reproduces. Each row draws two numbers from `:rand`'s `exsss`, named so OTP's
+  default never moves a drawing, across then up whatever the amounts, each panel afresh from the
+  seed as R's is; R draws every across before any up and skips an amount of 0, an order no drawing
+  shows, while this one keeps a row's distances when the other amount or later rows change. A
+  golden's R script draws Giggly's distances through `geom_point(aes(nudge_x, nudge_y), position =
+  position_nudge())`, which writes the same SVG as R's own jitter given the same distances (tried
+  on two plots), so every element is R's; a test pins the distances to `exsss`. The notebooks say
+  the points land elsewhere than R's within the same bounds. *Rejected: comparing R's own jitter
+  drawing but its points* — nothing would check where the points land, and a continuous axis's
+  range differs with them.
+
 - **Tack's code is copied into `dev/`, not depended on (2026-10-26, Steve, as in Pica).** Tack's
   repository is private, so CI could not fetch the `tack` dependency. The gate runner, the rules
   check, the boundary scanner, the credo checks and their tests are copied byte for byte from
@@ -2767,6 +2794,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Jitter points: geom_jitter(), position_jitter() and geom_point()'s position:,
+  each panel's distances drawn from a fixed seed (geom_jitter, step 1); §4: "`geom_jitter` is
+  Phase 3's fourteenth increment", "A jitter's distances are Erlang's"
 - 2026-10-26 — Copy Tack's gate tooling into dev/ so CI needs no private repository; §4: "Tack's
   code is copied into `dev/`"
 - 2026-10-26 — Draw the notebook examples facet_grid unlocks, and narrow every verdict to what

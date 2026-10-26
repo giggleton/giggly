@@ -17,19 +17,22 @@ defprotocol Giggly.Position do
   # share an x, as `geom_col()` defaults `position = "stack"`. Dodging (`Giggly.Position.Dodge`)
   # sets them side by side, and dodging by clusters (`Giggly.Position.Dodge2`) does so for bars
   # whose spans overlap, whatever their groups and widths. Nudging (`Giggly.Position.Nudge`) moves
-  # every mark a set distance, as `geom_text()` defaults `position = "nudge"`.
+  # every mark a set distance, as `geom_text()` defaults `position = "nudge"`, and jittering
+  # (`Giggly.Position.Jitter`) a small random one, as `geom_jitter()` defaults `position =
+  # "jitter"`.
   #
   # A position may read aesthetics of its own, as nudging reads `nudge_x` and `nudge_y`; it declares
   # them with their defaults, as ggplot2's position declares its `default_aes`, and the assembly
   # puts them into every row before the position runs.
 
   # A position is handed a layer's table and returns one, reading and writing its columns through
-  # the data frame.
+  # the data frame, and asks `Giggly.Resolution` how finely its positions are spaced where its
+  # distances are a share of that.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
   use Boundary,
-    deps: [Giggly.Aesthetics, Giggly.DataFrame],
-    exports: [Dodge, Dodge2, Identity, Nudge, Stack]
+    deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
+    exports: [Dodge, Dodge2, Identity, Jitter, Nudge, Stack]
 
   alias Giggly.DataFrame
 

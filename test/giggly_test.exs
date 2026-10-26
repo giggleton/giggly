@@ -6892,6 +6892,54 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/boxplot_horizontal.svg")
     end
 
+    # Golden: test/golden/jitter_boxplot.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/jitter_boxplot.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. position_jitter()'s first example: mpg's
+    # points jittered over grey boxes by class. R draws Giggly's own distances, which it cannot
+    # reproduce, through `position_nudge()`, so this checks where they put the points and all the
+    # rest. It moves with what moves test/golden/boxplot.svg, and with jittering.
+    test "points jittered over boxes spread across each class" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot(colour: "#7F7F7F")
+        |> Plot.geom_jitter()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/jitter_boxplot.svg")
+    end
+
+    # Golden: test/golden/jitter.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/jitter.R, as test/golden/jitter_boxplot.svg is: every element matches it, the x
+    # axis drawn before the y, and every clip path. geom_jitter()'s first jittered example: mpg's
+    # points by cylinders, each axis widened to hold them. It moves with jittering and with how a
+    # continuous axis trains on the points.
+    test "jittered points widen the continuous axes they spread along" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cyl, y: :hwy})
+        |> Plot.geom_jitter()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/jitter.svg")
+    end
+
+    # Golden: test/golden/jitter_facet.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/jitter_facet.R, as test/golden/jitter.svg is: every element matches it, in
+    # order, and every clip path. mpg's points by cylinders in a panel for each drive train, each
+    # panel jittered from the seed afresh. It moves with what moves test/golden/jitter.svg, and
+    # with facet_wrap().
+    test "jittered points in panels" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :cyl, y: :hwy})
+        |> Plot.geom_jitter()
+        |> Plot.facet_wrap(:drv)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/jitter_facet.svg")
+    end
+
     # Golden: test/golden/horizontal_bar.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/horizontal_bar.R: every element matches it, the x axis drawn before the y
     # as in test/golden/point.svg, and every clip path. geom_bar()'s third example from ggplot2's

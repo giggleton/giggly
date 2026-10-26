@@ -18,5 +18,6 @@ design-log §4, the entry beginning "ggplot2's `resolution()` is a boundary of i
 - **It asks `Giggly.Scale.zero_range?/2` and copies no rule of the scales'**, the one dependency
   its boundary lists.
 - **Each caller counts from zero or not as its ggplot2 counterpart does**: a geom's own fallback
-  does not (`compute_data_size()`), and `stat_count()` does.
+  does not (`compute_data_size()`), nor does jittering (`compute_jitter()`), each panel's
+  positions apart, and `stat_count()` does.
 - **A missing or infinite position is left out**, as R's `sort()` drops a missing one.

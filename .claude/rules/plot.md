@@ -44,7 +44,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
   `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
   `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
-  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `labs/2`,
+  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `position_jitter/1`,
+  `labs/2`,
   `theme/2` and the complete theme functions (`theme_gray/2`, `theme_bw/2`, `theme_linedraw/2`,
   `theme_light/2`, `theme_dark/2`, `theme_minimal/2`, `theme_classic/2`, `theme_void/2`).**
   `computed_mapping/2`, `mapping_order/2` and the `layer_*` accessors (`layer_table/2` the table a
@@ -59,7 +60,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   keeps only as an alias is not a kind:** `geom_col/3` records `%Geom.Bar{}` with
   `%Stat.Identity{}` and `%Position.Stack{}`, as ggplot2's `GeomCol` is an empty `GeomBar`, and
   `geom_count/3` and `stat_sum/3` both `%Geom.Point{}` with `%Stat.Sum{}` and
-  `%Position.Identity{}`, and `geom_histogram/3` and `stat_bin/3` both `%Geom.Bar{}` with
+  `%Position.Identity{}`, and `geom_jitter/3` `%Geom.Point{}` with `%Stat.Identity{}` and
+  `%Position.Jitter{}`, as ggplot2's `geom_jitter()` draws `GeomPoint`, and `geom_histogram/3`
+  and `stat_bin/3` both `%Geom.Bar{}` with
   `%Stat.Bin{}` and their position, `:stack` unless `position:` says otherwise, and
   `geom_freqpoly/3` `%Geom.Path{}` with `%Stat.Bin{pad: true}` and `%Position.Identity{}`, as
   ggplot2's `geom_freqpoly()` pads whatever it is given, so it takes no `pad:` (design-log §4, the
@@ -242,7 +245,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`preserve:`, `padding:` 0 to 1, `reverse:`, and no `width:`, which no geom taking a position
   reads), and recorded as its kind's struct; its parameters never become the geom's options
   (design-log §4, the entries beginning "A layer chooses its position by an atom" and
-  "`Plot.position_dodge2/1` arrives").
+  "`Plot.position_dodge2/1` arrives"). **`geom_point/3`'s `position:` is `:identity`, its
+  default, `:jitter`, recorded with `position_jitter/1`'s defaults, or the struct
+  `position_jitter/1` builds** (`width:` and `height:`, each 0 or more, a float, `:none` when not
+  given, where R moves nothing for a negative one, and `seed:`, any integer, 0 when not given);
+  `geom_jitter/3`'s is that struct alone, its own `width:` and `height:` recorded as
+  `position_jitter/1`'s and refused beside `position:`, as ggplot2's `geom_jitter()` refuses
+  both, and it takes no `seed:`, as ggplot2's does not (design-log §4, the entry beginning
+  "`geom_jitter` is Phase 3's fourteenth"). The count functions take no position.
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth and
@@ -282,15 +292,18 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `nrow:`, `ncol:` and `scales:`; `facet_grid/2`'s `rows:`, `cols:` and `scales:`; the bar
   functions' `position:`, `fill:`, `width:` and `just:`,
   0 to 1; every geom function's
-  `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_count/3`'s and `stat_sum/3`'s `fill:`,
-  `shape:`, `size:` and `stroke:`; the line functions' `lineend:`, `linejoin:`, `linemitre:` and
+  `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_jitter/3`'s, `geom_count/3`'s and
+  `stat_sum/3`'s `fill:`, `shape:`, `size:` and `stroke:`; the point and jitter functions'
+  `position:`, and `geom_jitter/3`'s `width:` and `height:`; the line functions' `lineend:`,
+  `linejoin:`, `linemitre:` and
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, the scale functions, the guide
-  functions, `labs/2`, `theme/2` and the complete theme functions), so
+  functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
+  functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as
@@ -395,9 +408,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   more, `linemitre:` 1 or more, as grid refuses less, a text's or a point's `size:` and a point's
   `stroke:` 0 or more, the stroke `:none` too, `angle:` any
   number, `hjust:` and `vjust:` any number or one of ggplot2's words, and `nudge_x:` and
-  `nudge_y:` any number, through custom checks (`validate_alpha/1`, `validate_linewidth/1`,
-  `validate_linemitre/1`, `validate_size/1`, `validate_angle/1`, `validate_justification/1`,
-  `validate_nudge/1`, `validate_stroke/1`), which take an integer too and keep a float, as R
+  `nudge_y:` any number, and a jitter's `width:` and `height:` 0 or more, through custom checks
+  (`validate_alpha/1`, `validate_linewidth/1`, `validate_linemitre/1`, `validate_size/1`,
+  `validate_angle/1`, `validate_justification/1`, `validate_nudge/1`, `validate_stroke/1`,
+  `validate_jitter_amount/1`), which take an integer too and keep a float, as R
   keeps a number, and a shape's (`validate_shape/1`) and a line type's (`validate_linetype/1`),
   which take a name or a whole number, a line type a tuple of them too;
   `validate_color/1` hands a colour to `Giggly.ColorOperations`. A gradient's colours must be

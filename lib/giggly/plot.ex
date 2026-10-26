@@ -317,7 +317,8 @@ defmodule Giggly.Plot do
   end
 
   @doc """
-  Adds a layer of points, one per row, at `x` and `y`.
+  Adds a layer of points, one per row, at `x` and `y`, or each moved a small random distance from
+  there with `position: :jitter`, as `geom_jitter/3` moves them.
 
   Points use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:shape` and `:size`, and need
   `:x` and `:y`. A point's alpha applies to its colour and its fill alike; a colour or shape of
@@ -391,7 +392,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Point{},
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_point/3"),
       fixed: fixed(validated),
@@ -400,6 +401,58 @@ defmodule Giggly.Plot do
     }
 
     add_layer(plot, layer, "Plot.geom_point/3", required: Geom.Point.required_aesthetics())
+  end
+
+  @doc """
+  Adds a layer of points, as `geom_point/3` adds, each moved a small random distance across and up
+  from its place, so that points sharing a place stand apart: by up to 0.4 of the closest spacing
+  of each panel's positions either way, 0.4 on a discrete axis, whose levels are 1 apart, unless
+  `width:` and `height:` say how far. The axes widen to hold the points where they land.
+
+  The distances are drawn from a seed, so a plot draws the same points every time it is drawn, and
+  two layers of the same rows move them alike; `position: position_jitter(seed: seed)` draws
+  others. Each panel draws its distances afresh from the seed.
+
+  Points use the aesthetics `geom_point/3`'s use, and need `:x` and `:y`. Raises `ArgumentError`
+  when `position:` is given beside `width:` or `height:`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.jitter())}
+
+      iex> plot =
+      ...>   %{"cyl" => [4, 4, 6], "hwy" => [29, 29, 26]}
+      ...>   |> Giggly.Plot.new(%{x: :cyl, y: :hwy})
+      ...>   |> Giggly.Plot.geom_jitter(height: 0)
+      iex> frame = Giggly.layer_data(plot)
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [3.9846655701967295, 4.393111264959721, 5.71528099031685]
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [29.0, 29.0, 26.0]
+  """
+  @spec geom_jitter(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_jitter(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_jitter(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_jitter(plot, %{}, options)
+
+  def geom_jitter(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.jitter())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Point{},
+      stat: %Stat.Identity{},
+      position: jitter_position(validated, "Plot.geom_jitter/3"),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_jitter/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Point.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_jitter/3", required: Geom.Point.required_aesthetics())
   end
 
   @doc """
@@ -421,7 +474,7 @@ defmodule Giggly.Plot do
 
   ## Options
 
-  #{NimbleOptions.docs(Options.point())}
+  #{NimbleOptions.docs(Options.sum())}
 
       iex> plot =
       ...>   %{"cty" => [18, 18, 21], "hwy" => [29, 29, 29]}
@@ -1482,6 +1535,46 @@ defmodule Giggly.Plot do
   def position_dodge2(options \\ []) when is_list(options) do
     validated = NimbleOptions.validate!(options, Options.position_dodge2())
     struct!(Position.Dodge2, validated)
+  end
+
+  @doc """
+  A position for the `position:` of `geom_point/3` and `geom_jitter/3`, with options: each point
+  moved a small random distance across and up from its place, as `position: :jitter` moves it.
+
+  Each point moves by a distance drawn evenly from minus `width:` to `width:` across and from
+  minus `height:` to `height:` up, in the units of each axis; one not given is 0.4 of the closest
+  spacing of each panel's positions along that axis, 0.4 on a discrete axis, whose levels are 1
+  apart. The distances are drawn from `seed:`, each panel's afresh, so the same seed moves the
+  same rows the same way: a plot draws the same points every time it is drawn, and layers given
+  one position move rows alike. Every position the layer has along an axis moves by its row's
+  distance along it; a missing position stays missing, and an infinite one where it is.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.position_jitter())}
+
+      iex> jitter = Giggly.Plot.position_jitter(width: 0.1, height: 0.1, seed: 7)
+      iex> plot =
+      ...>   %{"am" => [0, 1], "vs" => [1, 0]}
+      ...>   |> Giggly.Plot.new(%{x: :am, y: :vs})
+      ...>   |> Giggly.Plot.geom_point(position: jitter)
+      ...>   |> Giggly.Plot.geom_point(position: jitter, colour: "red")
+      iex> plot |> Giggly.layer_data(0) |> Giggly.DataFrame.pull(:x)
+      [0.0673789719000282, 1.0819934130875033]
+      iex> plot |> Giggly.layer_data(1) |> Giggly.DataFrame.pull(:x)
+      [0.0673789719000282, 1.0819934130875033]
+  """
+  @spec position_jitter(keyword()) :: struct()
+  def position_jitter(options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, Options.position_jitter())
+
+    struct!(Position.Jitter,
+      width: Keyword.get(validated, :width, :none),
+      height: Keyword.get(validated, :height, :none),
+      seed: Keyword.fetch!(validated, :seed)
+    )
   end
 
   @doc """
@@ -3836,7 +3929,7 @@ defmodule Giggly.Plot do
   # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its
   # mistakes named as `function`'s.
   defp count_layer(plot, mapping, options, function) do
-    validated = layer_options(options, Options.point())
+    validated = layer_options(options, Options.sum())
     data = own_data(validated)
 
     layer = %Layer{
@@ -3944,6 +4037,28 @@ defmodule Giggly.Plot do
   defp position(:dodge), do: %Position.Dodge{}
   defp position(:dodge2), do: position_dodge2()
   defp position(%Position.Dodge2{} = position), do: position
+  defp position(:jitter), do: position_jitter()
+  defp position(%Position.Jitter{} = position), do: position
+
+  # A jitter layer's position: the one given, or one moving its points as `width:` and `height:`
+  # say, as ggplot2's `geom_jitter()` makes `position_jitter(width, height)`; it takes one way
+  # of saying how they move, as ggplot2's refuses both.
+  defp jitter_position(validated, function) do
+    amounts = Keyword.take(validated, [:width, :height])
+
+    case {Keyword.fetch(validated, :position), amounts} do
+      {:error, amounts} ->
+        position_jitter(amounts)
+
+      {{:ok, position}, []} ->
+        position
+
+      {{:ok, _position}, _amounts} ->
+        raise ArgumentError,
+              "#{function} takes position: or width: and height:, not both, since each says " <>
+                "how far the points move"
+    end
+  end
 
   # A box plot's position: the one given, or, where each box keeps a width of its own, dodging by
   # clusters at each box's own width, as ggplot2's `geom_boxplot()` makes any position named by a

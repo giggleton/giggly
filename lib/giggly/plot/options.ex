@@ -269,16 +269,69 @@ defmodule Giggly.Plot.Options do
     :width
   ]
 
+  # How every point of a layer looks, set by its options.
+  @point_look_options [
+    alpha: @alpha_option,
+    color: @point_color_option,
+    fill: @point_fill_option,
+    shape: @point_shape_option,
+    size: @point_size_option,
+    stroke: @point_stroke_option
+  ]
+
+  # How far a jittered point moves at most along one axis, an option of `geom_jitter/3` and
+  # `position_jitter/1`.
+  @jitter_amount_type {:custom, __MODULE__, :validate_jitter_amount, []}
+
+  @jitter_width_option [
+    type: @jitter_amount_type,
+    doc:
+      "How far each point moves at most to either side, in the units of the x axis, 0 or " <>
+        "more; 0.4 of the closest spacing of each panel's `x` positions when not given, 0.4 on " <>
+        "a discrete axis."
+  ]
+
+  @jitter_height_option [
+    type: @jitter_amount_type,
+    doc:
+      "How far each point moves at most up or down, in the units of the y axis, 0 or more; 0.4 " <>
+        "of the closest spacing of each panel's `y` positions when not given."
+  ]
+
   # `geom_point/3`'s options, validated at the call.
   @point_options NimbleOptions.new!(
-                   data: @data_option,
-                   alpha: @alpha_option,
-                   color: @point_color_option,
-                   fill: @point_fill_option,
-                   shape: @point_shape_option,
-                   size: @point_size_option,
-                   stroke: @point_stroke_option
+                   [
+                     data: @data_option,
+                     position: [
+                       type: {:custom, __MODULE__, :validate_point_position, []},
+                       default: :identity,
+                       doc:
+                         "Where the points are placed: at their positions (`:identity`), or " <>
+                           "each moved a small random distance (`:jitter`, or as " <>
+                           "`position_jitter/1` says)."
+                     ]
+                   ] ++ @point_look_options
                  )
+
+  # `geom_jitter/3`'s options, validated at the call: a point's, and how far its points move,
+  # given either as `width:` and `height:` or as a position.
+  @jitter_options NimbleOptions.new!(
+                    [
+                      data: @data_option,
+                      width: @jitter_width_option,
+                      height: @jitter_height_option,
+                      position: [
+                        type: {:custom, __MODULE__, :validate_jitter_position, []},
+                        doc:
+                          "How the points are moved, as `position_jitter/1` says; refused " <>
+                            "beside `width:` or `height:`. They move as `width:` and `height:` " <>
+                            "say when not given."
+                      ]
+                    ] ++ @point_look_options
+                  )
+
+  # `geom_count/3`'s and `stat_sum/3`'s options, validated at the call.
+  @sum_options NimbleOptions.new!([data: @data_option] ++ @point_look_options)
 
   # How every bar of a layer looks, set by its options.
   @bar_look_options [
@@ -2006,6 +2059,20 @@ defmodule Giggly.Plot.Options do
                                         )
                                     )
 
+  # `position_jitter/1`'s options.
+  @position_jitter_options NimbleOptions.new!(
+                             width: @jitter_width_option,
+                             height: @jitter_height_option,
+                             seed: [
+                               type: :integer,
+                               default: 0,
+                               doc:
+                                 "The seed the random distances are drawn from, any integer: " <>
+                                   "the same seed moves the same rows the same way, so another " <>
+                                   "seed draws other distances."
+                             ]
+                           )
+
   # `position_dodge2/1`'s options.
   @position_dodge2_options NimbleOptions.new!(
                              preserve: [
@@ -2368,6 +2435,14 @@ defmodule Giggly.Plot.Options do
   def point, do: @point_options
 
   @doc false
+  @spec jitter() :: NimbleOptions.t()
+  def jitter, do: @jitter_options
+
+  @doc false
+  @spec sum() :: NimbleOptions.t()
+  def sum, do: @sum_options
+
+  @doc false
   @spec bar() :: NimbleOptions.t()
   def bar, do: @bar_options
 
@@ -2530,6 +2605,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec position_dodge2() :: NimbleOptions.t()
   def position_dodge2, do: @position_dodge2_options
+
+  @doc false
+  @spec position_jitter() :: NimbleOptions.t()
+  def position_jitter, do: @position_jitter_options
 
   @doc false
   @spec guide_legend() :: NimbleOptions.t()
@@ -3034,6 +3113,39 @@ defmodule Giggly.Plot.Options do
      "expected :dodge2, :dodge or a position Plot.position_dodge2/1 makes, got: " <>
        inspect(position)}
   end
+
+  # NimbleOptions' check of a point layer's `position:`: one of the positions it takes by name, or
+  # a position `position_jitter/1` makes.
+  @doc false
+  @spec validate_point_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
+  def validate_point_position(position) when position in [:identity, :jitter],
+    do: {:ok, position}
+
+  def validate_point_position(%Position.Jitter{} = position), do: {:ok, position}
+
+  def validate_point_position(position) do
+    {:error,
+     "expected :identity, :jitter or a position Plot.position_jitter/1 makes, got: " <>
+       inspect(position)}
+  end
+
+  # NimbleOptions' check of `geom_jitter/3`'s `position:`: a position `position_jitter/1` makes.
+  @doc false
+  @spec validate_jitter_position(term()) :: {:ok, struct()} | {:error, String.t()}
+  def validate_jitter_position(%Position.Jitter{} = position), do: {:ok, position}
+
+  def validate_jitter_position(position),
+    do: {:error, "expected a position Plot.position_jitter/1 makes, got: #{inspect(position)}"}
+
+  # NimbleOptions' check of how far a jittered point moves at most along one axis: a distance in
+  # the axis's units, 0 or more, kept as a float.
+  @doc false
+  @spec validate_jitter_amount(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_jitter_amount(amount) when is_number(amount) and amount >= 0,
+    do: {:ok, amount / 1}
+
+  def validate_jitter_amount(amount),
+    do: {:error, "expected a distance, a number 0 or more, got: #{inspect(amount)}"}
 
   # NimbleOptions' check of `position_dodge2/1`'s `padding:`: the fraction of its share each bar
   # leaves as a gap, from 0 to 1, kept as a float.

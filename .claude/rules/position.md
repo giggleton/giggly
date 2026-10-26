@@ -62,6 +62,19 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   position, as in ggplot2 4.0: every column in the x family moves by its row's `nudge_x` and every
   one in the y family by its `nudge_y`, both 0 by default; a position comes out a double, as R's
   do, and a missing one stays missing.
+- **Jittering is ggplot2's `position_jitter()`, its seed fixed** (design-log §4, the entries
+  beginning "`geom_jitter` is Phase 3's fourteenth" and "A jitter's distances are Erlang's"):
+  every column of the x family moves by its row's distance across and every one of the y family
+  by its distance up, each drawn from minus to plus its amount, one not given 0.4 of the closest
+  spacing of each panel's positions along that axis (`Giggly.Resolution`, not counting from zero,
+  the one position listing it). Each panel draws afresh from the seed, as R sets its seed per
+  panel, two numbers a row, across then up, whatever the amounts, by `:rand`'s `exsss` named,
+  never OTP's default, a draw `u` becoming `-amount + 2 * amount * u`, as R's `runif()` scales
+  one; the moves are the frame's `+` (`DataFrame.mutate/2`), so a position comes out a double, a
+  missing one stays missing and an infinite one where it is. **It departs from R where R's
+  numbers cannot be had**: R's random numbers are never reproduced, so a golden is checked by R
+  drawing Giggly's distances through `position_nudge()`; and positions whose only gap is to an
+  infinity are 1 apart, where R's `resolution()` is infinite and sends them to infinity.
 - **A position reads a layer's orientation from its `flipped_aes` column**, written by the stat or
   the geom, and moves horizontal bars along y, flipped and flipped back, as ggplot2's positions
   read `flipped_aes`; without the column, bars are vertical. The positions that move bars share

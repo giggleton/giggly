@@ -154,6 +154,135 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  # R's jitter is drawn from R's own random numbers, which Giggly does not reproduce, so these pin
+  # the distances to Erlang's `exsss` numbers from the seed (`draws/2`), and R's own rules, each
+  # checked in ggplot2 4.0.3 with R 4.6.1: a distance is `-amount + 2 * amount * u`, as R's
+  # `runif()` scales a draw; each panel draws from the seed afresh, so panels with as many rows
+  # move them alike; an amount not given is 0.4 of each panel's closest spacing.
+  describe "compute_layer/2 for jittering" do
+    test "each row draws across then up from its panel's numbers, each panel's from the seed" do
+      frame =
+        DataFrame.new(
+          panel: [1, 2, 1, 2],
+          x: [1.0, 3.0, 2.0, 4.0],
+          y: [5.0, 6.0, 7.0, 8.0]
+        )
+
+      jittered = Position.compute_layer(%Position.Jitter{width: 0.4, height: 0.2, seed: 5}, frame)
+      [first_across, first_up, second_across, second_up] = draws(5, 4)
+
+      assert {DataFrame.pull(jittered, :x), DataFrame.pull(jittered, :y)} ===
+               {[
+                  1.0 + distance(first_across, 0.4),
+                  3.0 + distance(first_across, 0.4),
+                  2.0 + distance(second_across, 0.4),
+                  4.0 + distance(second_across, 0.4)
+                ],
+                [
+                  5.0 + distance(first_up, 0.2),
+                  6.0 + distance(first_up, 0.2),
+                  7.0 + distance(second_up, 0.2),
+                  8.0 + distance(second_up, 0.2)
+                ]}
+
+      assert DataFrame.names(jittered) === [:panel, :x, :y]
+    end
+
+    # R: x 1 and 3 in one panel move up to 0.8, x 1 and 1.5 in another up to 0.2; a discrete
+    # axis's levels 1 and 3, integers here as R's are `mapped_discrete`, up to 0.4.
+    test "an amount not given is 0.4 of the closest spacing of each panel's positions" do
+      apart =
+        DataFrame.new(
+          panel: [1, 1, 2, 2],
+          x: [1.0, 3.0, 1.0, 1.5],
+          y: [0.0, 0.0, 0.0, 0.0]
+        )
+
+      levels = DataFrame.new(panel: [1, 1], x: [1, 3], y: [0.0, 0.0])
+      position = %Position.Jitter{height: 0.0, seed: 1}
+      [first, _first_up, second, _second_up] = draws(1, 4)
+
+      jittered_apart = Position.compute_layer(position, apart)
+      jittered_levels = Position.compute_layer(position, levels)
+
+      assert DataFrame.pull(jittered_apart, :x) === [
+               1.0 + distance(first, 0.8),
+               3.0 + distance(second, 0.8),
+               1.0 + distance(first, 0.2),
+               1.5 + distance(second, 0.2)
+             ]
+
+      assert DataFrame.pull(jittered_levels, :x) ===
+               [1.0 + distance(first, 0.4), 3.0 + distance(second, 0.4)]
+    end
+
+    test "every position on an axis moves by its row's distance, a missing or infinite one stays" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1],
+          x: [1.0, nil, :infinity],
+          xmin: [0.5, 0.5, 0.5],
+          y: [2.0, 2.0, 2.0],
+          ymax: [3.0, :neg_infinity, nil],
+          size: [1.5, 1.5, 1.5]
+        )
+
+      jittered = Position.compute_layer(%Position.Jitter{width: 0.3, height: 0.1, seed: 2}, frame)
+      [across, up, second_across, second_up, third_across, third_up] = draws(2, 6)
+
+      assert Enum.map([:x, :xmin, :y, :ymax, :size], fn name -> DataFrame.pull(jittered, name) end) ===
+               [
+                 [1.0 + distance(across, 0.3), nil, :infinity],
+                 [
+                   0.5 + distance(across, 0.3),
+                   0.5 + distance(second_across, 0.3),
+                   0.5 + distance(third_across, 0.3)
+                 ],
+                 [
+                   2.0 + distance(up, 0.1),
+                   2.0 + distance(second_up, 0.1),
+                   2.0 + distance(third_up, 0.1)
+                 ],
+                 [3.0 + distance(up, 0.1), :neg_infinity, nil],
+                 [1.5, 1.5, 1.5]
+               ]
+    end
+
+    test "an amount of 0 moves nothing, and leaves the other axis's distances as they were" do
+      frame = DataFrame.new(panel: [1, 1], x: [1, 2], y: [3, 4])
+      still = Position.compute_layer(%Position.Jitter{width: 0.0, height: 0.5, seed: 9}, frame)
+      moved = Position.compute_layer(%Position.Jitter{width: 0.3, height: 0.5, seed: 9}, frame)
+
+      assert DataFrame.pull(still, :x) === [1.0, 2.0]
+      assert DataFrame.pull(still, :y) === DataFrame.pull(moved, :y)
+      assert DataFrame.pull(moved, :x) !== [1.0, 2.0]
+    end
+
+    # R's `resolution(c(1, 1, -Inf))` counts the gap to minus infinity, so its jitter is infinite
+    # and sends the finite points to an infinity; Giggly's spacing leaves an infinity out.
+    test "positions whose only gap is to an infinity are 1 apart, moving up to 0.4" do
+      frame = DataFrame.new(panel: [1, 1, 1], x: [1.0, 2.0, 3.0], y: [1.0, 1.0, :neg_infinity])
+      jittered = Position.compute_layer(%Position.Jitter{width: 0.0, seed: 4}, frame)
+      [_first_across, first_up, _second_across, second_up | _rest] = draws(4, 6)
+
+      assert DataFrame.pull(jittered, :y) ===
+               [1.0 + distance(first_up, 0.4), 1.0 + distance(second_up, 0.4), :neg_infinity]
+    end
+  end
+
+  # The first `count` numbers Erlang's `exsss` algorithm draws from `seed`, each from 0 to 1.
+  defp draws(seed, count) do
+    {numbers, _stream} =
+      Enum.map_reduce(1..count, :rand.seed_s(:exsss, seed), fn _draw, stream ->
+        :rand.uniform_s(stream)
+      end)
+
+    numbers
+  end
+
+  # A jitter's distance for the draw `draw` and the amount `amount`, as R's `runif()` scales it.
+  defp distance(draw, amount), do: -amount + 2 * amount * draw
+
   # Two groups of areas at x 1 and 2, in the order the area geom sets them up in, each band from 0
   # to its y.
   defp area_rows(heights) do
