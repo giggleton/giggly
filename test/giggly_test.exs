@@ -5370,19 +5370,81 @@ defmodule GigglyTest do
       end
     end
 
-    test "date-times in a time zone other than UTC are refused, naming the zone" do
+    # The standard library's time zone database knows UTC alone, and the core reads none from
+    # config, so a zone outside UTC needs the scale given one that knows it.
+    test "date-times in a zone the scale's database does not know are refused, saying how" do
       london =
         Enum.map(@stamped["at"], fn instant ->
           %{instant | time_zone: "Europe/London", zone_abbr: "GMT"}
         end)
 
+      refusal = fn mapping ->
+        plot =
+          %{@stamped | "at" => london}
+          |> Plot.new(mapping)
+          |> Plot.geom_point()
+
+        assert_raise(ArgumentError, fn -> Giggly.layer_data(plot) end).message
+      end
+
+      for {mapping, shown} <- [
+            {%{x: :at, y: :value},
+             [
+               ~s(index 0 maps :x to "at", date-times in "Europe/London"),
+               "Calendar.UTCOnlyTimeZoneDatabase does not know",
+               "Plot.scale_x_datetime(time_zone_database: Tz.TimeZoneDatabase)"
+             ]},
+            {%{x: :value, y: :at},
+             ["Plot.scale_y_datetime(time_zone_database: Tz.TimeZoneDatabase)"]}
+          ],
+          datum <- shown do
+        assert refusal.(mapping) =~ datum
+      end
+    end
+
+    # R has no naive date-time; a naive one names no instant, so none to show in a zone.
+    test "naive date-times under a scale given a time zone are refused, saying why" do
+      naive = %{@stamped | "at" => Enum.map(@stamped["at"], &DateTime.to_naive/1)}
+
       plot =
-        %{@stamped | "at" => london}
+        naive
         |> Plot.new(%{x: :at, y: :value})
         |> Plot.geom_point()
+        |> Plot.scale_x_datetime(timezone: "Etc/UTC")
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
-      assert error.message =~ ~s(index 0 maps :x to "at", date-times in "Europe/London")
+
+      for datum <- [
+            ~s(x scale is datetime in "Etc/UTC"),
+            ~s(index 0 maps :x to "at", a naive_datetime column),
+            "leave out timezone:"
+          ] do
+        assert error.message =~ datum
+      end
+    end
+
+    # ggplot(d, aes(at, value)) + geom_point() + scale_x_datetime(timezone = "UTC"), `at` in New
+    # York: the scale's zone outranks the column's, so the axis is UTC's, and the scale's database
+    # need know only its own zone, not the column's.
+    test "a zone given the scale outranks its column's, which its database need not know" do
+      new_york =
+        Enum.map(@stamped["at"], fn instant ->
+          DateTime.shift_zone!(instant, "America/New_York", Tz.TimeZoneDatabase)
+        end)
+
+      drawn = fn table, scaled ->
+        table
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+        |> scaled.()
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+      end
+
+      in_utc = fn plot -> Plot.scale_x_datetime(plot, timezone: "Etc/UTC") end
+
+      assert drawn.(%{@stamped | "at" => new_york}, in_utc) ==
+               drawn.(@stamped, fn plot -> plot end)
     end
 
     test "a date-time mapped to colour or shape is refused, its scale not having arrived" do
@@ -7533,6 +7595,49 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/scale_datetime_width.svg")
+    end
+
+    # Golden: test/golden/scale_datetime_zone.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_datetime_zone.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. A night's load in New York
+    # every 20 minutes across the change to daylight saving, the axis in the column's zone, its
+    # breaks every three hours from the local midnight by elapsed time, so after the skipped hour
+    # they fall at 04:00 and 07:00. It moves with what moves test/golden/datetime_line.svg, and
+    # with how a date-time scale lays breaks across a change of offset.
+    test "a column's time zone lays the axis's breaks and labels on its clock" do
+      svg =
+        ~U[2024-03-10 02:00:00Z]
+        |> readings(31, 20 * 60)
+        |> in_zone("America/New_York")
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Plot.scale_x_datetime(time_zone_database: Tz.TimeZoneDatabase)
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_datetime_zone.svg")
+    end
+
+    # Golden: test/golden/scale_datetime_timezone.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/scale_datetime_timezone.R: every element matches it, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. A UTC day's hourly
+    # load as points, shown in Kolkata's time, its breaks every six hours from Kolkata's midnight,
+    # at half past the hour in UTC, labelled by day and time there. It moves with what moves
+    # test/golden/scale_datetime_seconds.svg, and with a date-time scale's time zone.
+    test "a time zone given the scale lays its breaks and labels on that zone's clock" do
+      svg =
+        ~U[2024-03-10 00:00:00Z]
+        |> readings(25, 60 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_point()
+        |> Plot.scale_x_datetime(
+          timezone: "Asia/Kolkata",
+          time_zone_database: Tz.TimeZoneDatabase
+        )
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_datetime_timezone.svg")
     end
 
     # Golden: test/golden/scale_datetime_limits.svg, checked against ggplot2's drawing of the same
@@ -10092,6 +10197,14 @@ defmodule GigglyTest do
 
   defp to_seconds(%NaiveDateTime{} = start, seconds),
     do: NaiveDateTime.add(start, seconds, :second)
+
+  # The readings' date-times shifted into the time zone `zone`, the same instants on its clock.
+  defp in_zone(%{"at" => at} = readings, zone) do
+    shifted =
+      Enum.map(at, fn instant -> DateTime.shift_zone!(instant, zone, Tz.TimeZoneDatabase) end)
+
+    %{readings | "at" => shifted}
+  end
 
   # `count` readings `step` seconds apart from `start`, each the reading's index modulo 7 times 1.5
   # plus a tenth of the index, as the date-time goldens' R scripts make them (61 readings 20

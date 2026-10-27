@@ -1166,19 +1166,25 @@ defmodule Giggly.Assembly do
 
   defp family_of({_index, aesthetic, _value, _dtype, _kind}), do: Aesthetics.family(aesthetic)
 
-  # The scale given the zone of `column`, the first it places, or refused where its time zone
-  # database does not know that zone.
+  # The scale given the zone of `column`, the first it places, where the plot gave it none, or
+  # refused where its time zone database does not know that zone.
   defp zoned(scale, {_index, _aesthetic, _value, dtype, _kind} = column) do
     case Scale.settle_zone(scale, dtype) do
-      {:ok, settled} -> settled
-      {:error, zone} -> raise ArgumentError, unknown_zone_message(column, zone)
+      {:ok, settled} ->
+        settled
+
+      {:error, zone_and_database} ->
+        raise ArgumentError, unknown_zone_message(column, zone_and_database)
     end
   end
 
-  defp unknown_zone_message({index, aesthetic, value, _dtype, _kind}, zone) do
+  defp unknown_zone_message({index, aesthetic, value, _dtype, _kind} = column, {zone, database}) do
+    family = family_of(column)
+
     "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, date-times " <>
-      "in #{inspect(zone)}, but only date-times in UTC can be drawn yet; shift them to " <>
-      "\"Etc/UTC\" with DateTime.shift_zone/3"
+      "in #{inspect(zone)}, a time zone #{inspect(database)} does not know; give the " <>
+      "#{family} scale a time zone database that does, such as the tz package's, with " <>
+      "Plot.scale_#{family}_datetime(time_zone_database: Tz.TimeZoneDatabase)"
   end
 
   # The untrained scale of `aesthetic`, one other than position that a layer maps: the plot's own
@@ -1205,14 +1211,28 @@ defmodule Giggly.Assembly do
 
   defp untaken_message(scale, scale_name, {index, aesthetic, column, _dtype, column_kind}) do
     "the plot's #{scale_name} scale is #{scale_description(scale)}, but the layer at index " <>
-      "#{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column"
+      "#{index} maps #{inspect(aesthetic)} to #{inspect(column)}, a #{column_kind} column" <>
+      untaken_reason(scale, column_kind)
   end
 
-  # A scale's kind, and a continuous scale's transformation where it has one, which a refusal names
-  # since a continuous scale through the identity takes a date; written into the message as it is.
+  # Why a date-time scale given a time zone refuses naive date-times, which name no instant to show
+  # there.
+  defp untaken_reason(%Scale.Continuous{transform: {:datetime, zone, _database}}, :naive_datetime)
+       when is_binary(zone),
+       do: "; naive date-times are in no time zone, so leave out timezone: to draw them"
+
+  defp untaken_reason(_scale, _column_kind), do: ""
+
+  # A scale's kind, a continuous scale's transformation where it has one, which a refusal names
+  # since a continuous scale through the identity takes a date, and the zone a plot gave a
+  # date-time scale; written into the message as it is.
   defp scale_description(%Scale.Continuous{transform: transform})
        when is_atom(transform) and transform not in [:identity, :date],
        do: "continuous through #{transform}"
+
+  defp scale_description(%Scale.Continuous{transform: {:datetime, zone, _database}})
+       when is_binary(zone),
+       do: "datetime in #{inspect(zone)}"
 
   defp scale_description(scale), do: Scale.kind_of(scale)
 

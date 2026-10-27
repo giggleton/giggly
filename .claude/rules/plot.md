@@ -140,19 +140,21 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   is a `%Scale.Continuous{}` through `:date`**, its `date_breaks:` and `date_minor_breaks:`
   recorded as `{:width, step}` in `breaks` and `minor_breaks` and its `date_labels:` as
   `{:format, format}` in `labels`, each refused beside its plain twin, where R takes the `date_`
-  one. **A date-time scale is a `%Scale.Continuous{}` through `{:datetime, :default,
-  Calendar.UTCOnlyTimeZoneDatabase}`**, recorded as a date scale's options are, its steps taking
-  `:second`, `:minute` and `:hour` too, its limits, breaks and minor breaks `DateTime`s or
-  `NaiveDateTime`s, never both, as a naive one names no instant; the transformation is a value in
-  `Plot.Options` (`datetime_transform/0`), a test pinning it to `Scale.new(:datetime)`'s, since
-  `PlotRunsNothing` keeps `Scale.new/1` out of `Plot`. **`xlim/2`, `ylim/2` and `lims/2` give a
-  list of values a discrete scale's limits, and `xlim/3`, `ylim/3` and `lims/2` two dates a date
-  scale's and two date-times a date-time scale's**, sorted, never reversed, as R's
-  `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
-  the entry beginning "Discrete and date position scales"). **A colour, fill, alpha, shape, size,
-  line type or line width scale function records its palette from its options and every other
-  field from its schema's defaults, R's function defaults** (gray's missing value red, gradient2's
-  ends `muted()`), since
+  one. **A date-time scale is a `%Scale.Continuous{}` through `{:datetime, zone, database}`**,
+  `timezone:` and `time_zone_database:` given, else `:default`, for its first column to settle, and
+  `Calendar.UTCOnlyTimeZoneDatabase`; a zone given is checked at the call against the database
+  given, by `Plot` itself since it calls no scale function, and refused naming both. It is recorded
+  as a date scale's options are, its steps taking `:second`, `:minute` and `:hour` too, its limits,
+  breaks and minor breaks `DateTime`s or `NaiveDateTime`s, never both, as a naive one names no
+  instant; the default transformation is a value in `Plot.Options` (`datetime_transform/0`), a test
+  pinning it to `Scale.new(:datetime)`'s, since `PlotRunsNothing` keeps `Scale.new/1` out of `Plot`.
+  **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and `xlim/3`,
+  `ylim/3` and `lims/2` two dates a date scale's and two date-times a date-time scale's**, sorted,
+  never reversed, as R's `limits()` reverses numbers only; two strings are refused, naming the list
+  form (design-log §4, the entry beginning "Discrete and date position scales"). **A colour, fill,
+  alpha, shape, size, line type or line width scale function records its palette from its options
+  and every other field from its schema's defaults, R's function defaults** (gray's missing value
+  red, gradient2's ends `muted()`), since
   `PlotRunsNothing` keeps `Scale.new/2` out of `Plot`: the defaults a scale takes when given no
   palette live in `Plot.Options` as values, and a test pins the discrete and continuous functions' to
   `Scale.new/2`'s. gradient2 records its midpoint as the scale's rescaler, `{:mid, midpoint}`, and

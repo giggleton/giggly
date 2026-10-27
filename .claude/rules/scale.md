@@ -148,7 +148,7 @@ grid lines are placed by the coordinate system".
   `date_minor_breaks:` are a step"): a width's breaks are `DateBreaks.width/2` on the extent,
   those inside it kept, and a format's labels each date written by `Calendar.strftime/3` as it is.
   A date-time scale's are the same, `Plot.scale_x_datetime/2` recording them, its steps taking
-  `:second`, `:minute` and `:hour` too, its width's breaks `DateBreaks.datetime_width/2`'s and its
+  `:second`, `:minute` and `:hour` too, its width's breaks `DateBreaks.datetime_width/3`'s and its
   format writing each break as a `DateTime` or a `NaiveDateTime`; the transformation lays a width
   (`Transform.width/3`), only a date's and a date-time's having one.
 - **A discrete scale carries the options a plot gives it**, `name`, `limits`, `breaks`, `labels`
@@ -228,14 +228,16 @@ grid lines are placed by the coordinate system".
   `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`;
   `new(:datetime)` records `{:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}`, the name
   with its zone and the time zone database that reads it, as R's `transform_time(tz)` holds its
-  zone (design-log §4, the entry beginning "A time zone's database is passed on the scale"); a
-  plot's scale may name `:log10`, `:sqrt`, `:reverse` or `:reciprocal`. A
+  zone (design-log §4, the entry beginning "A time zone's database is passed on the scale"), a
+  plot's naming its zone and database; a plot's scale may name `:log10`, `:sqrt`, `:reverse` or
+  `:reciprocal`. A
   discrete scale has none, as in ggplot2, and `transform/2` returns its values as given.
-- **A date-time scale's zone is its first column's** (`settle_zone/2`), as ggplot2's takes the
-  first column's `tzone`: `:default` until the assembly settles it from that column's type, a
-  zone's name, or `:naive` for naive date-times; a zone its database does not know is
-  `{:error, zone}`, which the assembly refuses. A scale on an axis no column maps keeps
-  `:default`, written as UTC.
+- **A date-time scale's zone is the one a plot gave it, else its first column's**
+  (`settle_zone/2`), as ggplot2's takes the first column's `tzone` when given none: `:default`
+  until the assembly settles it from that column's type, a zone's name, or `:naive` for naive
+  date-times; a zone its database does not know is `{:error, {zone, database}}`, which the
+  assembly refuses; a plot's is checked when given. A scale on an axis no
+  column maps keeps `:default`, written as UTC.
 - **A time zone's database is always passed, never read from config.** Every `DateTime` function
   that works in a zone takes one, defaulting to `Calendar.get_time_zone_database/0`, which reads
   the application's config even for UTC; `GigglyCredo.Check.PassTimeZoneDatabase` fails the gate
@@ -289,7 +291,7 @@ grid lines are placed by the coordinate system".
   (`Transform.Datetime`, R's `transform_time()`): a date-time's whole microseconds divided once by
   a million, the double nearest the instant, a naive one's as though its clock were UTC's, a
   missing one `nil`; a plot's limits or breaks of the other kind raise, as a column's would be
-  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/1`,
+  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/2`,
   the date steps' table extended below a day: seconds, minutes and hours, each with R's format and
   unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; three
   branches of R's are left out, none changing a break inside the extent or its label: its added
@@ -300,11 +302,23 @@ grid lines are placed by the coordinate system".
   departs on none of R's tables is judged against the code on a dense sweep round its step's
   boundaries, and is equivalent only if it never departs there either. **A width's breaks are
   exactly R's `breaks_width()` for
-  date-times** (`DateBreaks.datetime_width/2`): seconds and minutes from the nearest multiple of the
+  date-times** (`DateBreaks.datetime_width/3`): seconds and minutes from the nearest multiple of the
   step since 1970-01-01, half to even, the rest from the start of the unit, rounded up by the
   step's most seconds, stepped by elapsed time but months and years, stepped on the calendar; its
   test pins R's for each unit and rounding. A break it did not choose is written as R's
   `format()` writes it: the date alone where every one is at midnight, else to the second.
+  **Breaks are laid, and labels written, on the clock of the scale's zone** (`DateBreaks`'s
+  `clock`: UTC's for `:default` and `:naive`, else the zone and its database), as R's are in its
+  `tz`: truncated to a minute or an hour, a time keeps its own offset from UTC, as R keeps its
+  daylight-saving flag; truncated to a day or longer, its wall-clock time is read again, a time a
+  change skips at the offset before it and one a change repeats as the earlier (design-log §4, the
+  entry beginning "A local time a change of offset skips or repeats"); a calendar step advances
+  the truncated wall-clock time, a width's the start's once read, as R's `seq()` advances each.
+  Its test pins R's breaks across the changes of New York, Kolkata, Lord Howe, Havana and
+  Asuncion, from 23,771 random and change-clustered extents in 19 zones and 7,599 widths, all
+  matched but where R's answer rests on glibc: a repeated midnight, or an hour repeated with one
+  daylight-saving flag, read at the offset R last used, and a skipped midnight of a change of
+  standard offset, which glibc reads after it for 17 of the 52 since 1970.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and

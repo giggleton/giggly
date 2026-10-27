@@ -847,11 +847,22 @@ defmodule Giggly.ScaleTest do
                 {:ok, naive}, {:ok, naive}, {:ok, date}}
     end
 
-    test "a zone the scale's time zone database does not know is refused, named" do
+    test "a zone the scale's time zone database does not know is refused, named with it" do
       unsettled = Scale.new(:datetime)
 
       assert Scale.settle_zone(unsettled, {:datetime, "Europe/London"}) ===
-               {:error, "Europe/London"}
+               {:error, {"Europe/London", Calendar.UTCOnlyTimeZoneDatabase}}
+    end
+
+    # scale_x_datetime(timezone = "Asia/Kolkata") keeps its zone whatever its column's tzone, and
+    # its database need know only that zone, not the column's.
+    test "a zone a plot gave is kept whatever the column's" do
+      given = %Scale.Continuous{
+        transform: {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}
+      }
+
+      assert {Scale.settle_zone(given, {:datetime, "America/New_York"}),
+              Scale.settle_zone(given, {:datetime, "Etc/UTC"})} === {{:ok, given}, {:ok, given}}
     end
   end
 

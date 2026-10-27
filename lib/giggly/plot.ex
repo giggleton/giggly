@@ -85,11 +85,11 @@ defmodule Giggly.Plot do
   discrete one for text, booleans and factors, a date one for dates, a date-time one for
   `DateTime`s and `NaiveDateTime`s. `scale_x_continuous/2`, `scale_x_discrete/2`,
   `scale_x_date/2` and `scale_x_datetime/2`, and their y twins, set an axis's title, limits,
-  breaks, labels and how far it reaches; `xlim/3`, `ylim/3` and `lims/2` set its limits alone, two
-  ends for a continuous, a date or a date-time axis and, with `xlim/2` and `ylim/2`, a list of
-  values for a discrete one. A value outside the limits is missing, so its mark is not drawn. A
-  continuous scale given a column of dates places each at its days since 1970-01-01, and one of
-  date-times each at its seconds since 1970-01-01 00:00 UTC.
+  breaks, labels and how far it reaches, and a date-time axis's time zone; `xlim/3`, `ylim/3` and
+  `lims/2` set its limits alone, two ends for a continuous, a date or a date-time axis and, with
+  `xlim/2` and `ylim/2`, a list of values for a discrete one. A value outside the limits is missing,
+  so its mark is not drawn. A continuous scale given a column of dates places each at its days since
+  1970-01-01, and one of date-times each at its seconds since 1970-01-01 00:00 UTC.
 
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
@@ -2016,12 +2016,16 @@ defmodule Giggly.Plot do
   a column holds one kind or the other, and an axis takes one kind. It marks them on clock and
   calendar boundaries: every few seconds, minutes or hours, every day, week, month or year, as
   suits its span, or every step of `date_breaks:`. Its labels are written as suits the breaks, or
-  in the format `date_labels:` gives. Breaks are laid and labels written in UTC, so a column of
-  date-times in another time zone is refused when the plot is run. A value outside the limits is
-  missing, so its mark is not drawn. The scale's name titles the axis whatever `labs/2` says.
-  Raises `ArgumentError` for an option given beside its `date_` twin, or a list of labels without
-  a list of breaks as long; a column on the axis that is not date-times is refused when the plot
-  is run.
+  in the format `date_labels:` gives. Breaks are laid and labels written on the clock of the
+  axis's time zone, `timezone:`, else its first column's, naive date-times on their own clock as
+  though it were UTC's. Where the zone's offset changes, as daylight saving begins or ends, steps
+  under a day keep their spacing and days, months and years keep their midnight. A zone other
+  than UTC needs `time_zone_database:` to name a database that knows it, such as the tz
+  package's. A value outside the limits is missing, so its mark is not drawn. The scale's name
+  titles the axis whatever `labs/2` says. Raises `ArgumentError` for an option given beside its
+  `date_` twin, a list of labels without a list of breaks as long, or a time zone the database
+  does not know; a column on the axis that is not date-times, or is in a zone the database does
+  not know, or naive beside `timezone:`, is refused when the plot is run.
 
   ## Options
 
@@ -2035,6 +2039,21 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.to_svg()
       ...>   |> IO.iodata_to_binary()
       iex> {svg =~ ">06:00</text>", svg =~ ">18:00</text>"}
+      {true, true}
+
+  The same day shown in Kolkata's time, five and a half hours ahead:
+
+      iex> svg =
+      ...>   %{"at" => [~U[2024-03-10 00:00:00Z], ~U[2024-03-10 23:00:00Z]], "load" => [0.3, 0.8]}
+      ...>   |> Giggly.Plot.new(%{x: :at, y: :load})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_x_datetime(
+      ...>     timezone: "Asia/Kolkata",
+      ...>     time_zone_database: Tz.TimeZoneDatabase
+      ...>   )
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">Mar 10 12:00</text>", svg =~ ">Mar 11 00:00</text>"}
       {true, true}
   """
   @spec scale_x_datetime(t(), keyword()) :: t()
@@ -4608,22 +4627,44 @@ defmodule Giggly.Plot do
 
   # The plot with a date scale for `aesthetic` from the options `function` was given, as
   # `time_scale/5` records one.
-  defp date_scale(plot, aesthetic, options, function),
-    do: time_scale(plot, aesthetic, {Options.date_scale(), :date}, options, function)
+  defp date_scale(plot, aesthetic, options, function) do
+    validated = NimbleOptions.validate!(options, Options.date_scale())
+    time_scale(plot, aesthetic, :date, validated, function)
+  end
 
   # The plot with a date-time scale for `aesthetic` from the options `function` was given, as
-  # `time_scale/5` records one, its zone left for its first column to settle.
+  # `time_scale/5` records one, through the date-time transformation in the time zone given, read
+  # by the time zone database given, which must know it; with no zone given, its zone is left for
+  # its first column to settle, and with no database, the standard library's reads it.
   defp datetime_scale(plot, aesthetic, options, function) do
-    schema_and_transform = {Options.datetime_scale(), Options.datetime_transform()}
-    time_scale(plot, aesthetic, schema_and_transform, options, function)
+    {:datetime, unsettled, standard} = Options.datetime_transform()
+    validated = NimbleOptions.validate!(options, Options.datetime_scale())
+    {zone, validated} = Keyword.pop(validated, :timezone, unsettled)
+    {database, validated} = Keyword.pop(validated, :time_zone_database, standard)
+    check_zone(zone, database, function)
+    time_scale(plot, aesthetic, {:datetime, zone, database}, validated, function)
+  end
+
+  # A time zone given a date-time scale, which its database must know: it can say what an instant
+  # is there.
+  defp check_zone(:default, _database, _function), do: :ok
+
+  defp check_zone(zone, database, function) do
+    known = DateTime.shift_zone(~U[1970-01-01 00:00:00Z], zone, database)
+
+    if not match?({:ok, _shifted}, known) do
+      raise ArgumentError,
+            "#{function} was given timezone: #{inspect(zone)}, a time zone " <>
+              "#{inspect(database)} does not know; give time_zone_database: one that does, " <>
+              "such as the tz package's Tz.TimeZoneDatabase"
+    end
   end
 
   # The plot with a scale through `transform` for `aesthetic`, from the options `function` was
-  # given, checked against `schema`: a width recorded as the breaks or minor breaks it lays and a
-  # format as the labels it writes. An option and its `date_` twin choose the same thing, so both
-  # are refused.
-  defp time_scale(plot, aesthetic, {schema, transform}, options, function) do
-    validated = NimbleOptions.validate!(options, schema)
+  # given, already checked against its function's schema: a width recorded as the breaks or minor
+  # breaks it lays and a format as the labels it writes. An option and its `date_` twin choose the
+  # same thing, so both are refused.
+  defp time_scale(plot, aesthetic, transform, validated, function) do
     Enum.each(Options.date_twins(), fn twins -> check_twins(validated, twins, function) end)
     check_scale_labels(validated, function)
 

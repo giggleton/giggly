@@ -952,12 +952,303 @@ defmodule Giggly.Scale.DateBreaksTest do
      ]}
   ]
 
-  describe "pretty_datetime/1 and label/2" do
+  # Golden: R's own `pretty()` of `as.POSIXct()` of each extent in a time zone, in seconds since
+  # 1970-01-01 00:00 UTC (R 4.6.1, tzdata 2026c), each break its seconds and the label
+  # `prettyDate()` gives it in the zone: in New York across the spring change, every step from an
+  # hour to a month, hours and minutes by elapsed time and days on the calendar, and through
+  # November's repeated hour; in Kolkata, half an hour off UTC; across Lord Howe's half-hour change,
+  # where an hour truncated keeps its offset; from a midnight Havana skips, read as the hour the
+  # change ends, and days stepping over it; and in Asuncion from a 1st whose midnight is skipped,
+  # its 15th at the hour the 1st was read at. The extents come from 23,771 of R's, random and
+  # clustered round 19 zones' changes, all of which this matches but where R's answer depends on
+  # the offset it last used, or glibc reads a skipped midnight of a change of standard offset after
+  # it (design-log §4, the entry beginning "A local time a change of offset skips or repeats"). It
+  # moves only if the port stops matching R, which is a bug.
+  @r_zoned_breaks [
+    # 1 hour across the spring change
+    {"America/New_York", {1_710_044_400.0, 1_710_060_600.0},
+     [
+       1_710_043_200.0,
+       1_710_046_800.0,
+       1_710_050_400.0,
+       1_710_054_000.0,
+       1_710_057_600.0,
+       1_710_061_200.0
+     ], ["23:00", "00:00", "01:00", "03:00", "04:00", "05:00"]},
+    # 3 hours across it
+    {"America/New_York", {1_710_032_400.0, 1_710_090_000.0},
+     [
+       1_710_025_200.0,
+       1_710_036_000.0,
+       1_710_046_800.0,
+       1_710_057_600.0,
+       1_710_068_400.0,
+       1_710_079_200.0,
+       1_710_090_000.0
+     ], ["18:00", "21:00", "00:00", "04:00", "07:00", "10:00", "13:00"]},
+    # 6 hours across it
+    {"America/New_York", {1_710_003_600.0, 1_710_118_800.0},
+     [
+       1_710_003_600.0,
+       1_710_025_200.0,
+       1_710_046_800.0,
+       1_710_068_400.0,
+       1_710_090_000.0,
+       1_710_111_600.0,
+       1_710_133_200.0
+     ],
+     [
+       "Mar 09 12:00",
+       "Mar 09 18:00",
+       "Mar 10 00:00",
+       "Mar 10 07:00",
+       "Mar 10 13:00",
+       "Mar 10 19:00",
+       "Mar 11 01:00"
+     ]},
+    # 12 hours across it
+    {"America/New_York", {1_709_899_200.0, 1_710_158_400.0},
+     [1_709_874_000.0, 1_709_960_400.0, 1_710_046_800.0, 1_710_129_600.0, 1_710_216_000.0],
+     ["Mar 08", "Mar 09", "Mar 10", "Mar 11", "Mar 12"]},
+    # days across it
+    {"America/New_York", {1_709_812_800.0, 1_710_244_800.0},
+     [
+       1_709_787_600.0,
+       1_709_874_000.0,
+       1_709_960_400.0,
+       1_710_046_800.0,
+       1_710_129_600.0,
+       1_710_216_000.0,
+       1_710_302_400.0
+     ], ["Mar 07", "Mar 08", "Mar 09", "Mar 10", "Mar 11", "Mar 12", "Mar 13"]},
+    # weeks across it
+    {"America/New_York", {1_709_294_400.0, 1_712_318_400.0},
+     [
+       1_708_923_600.0,
+       1_709_528_400.0,
+       1_710_133_200.0,
+       1_710_738_000.0,
+       1_711_342_800.0,
+       1_711_947_600.0,
+       1_712_552_400.0
+     ], ["Feb 26", "Mar 04", "Mar 11", "Mar 18", "Mar 25", "Apr 01", "Apr 08"]},
+    # months across it
+    {"America/New_York", {1_705_320_000.0, 1_718_020_800.0},
+     [
+       1_704_085_200.0,
+       1_706_763_600.0,
+       1_709_269_200.0,
+       1_711_944_000.0,
+       1_714_536_000.0,
+       1_717_214_400.0,
+       1_719_806_400.0
+     ], ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul"]},
+    # 15 minutes through the repeated hour
+    {"America/New_York", {1_730_612_400.0, 1_730_616_000.0},
+     [
+       1_730_611_800.0,
+       1_730_612_700.0,
+       1_730_613_600.0,
+       1_730_614_500.0,
+       1_730_615_400.0,
+       1_730_616_300.0
+     ], ["01:30", "01:45", "01:00", "01:15", "01:30", "01:45"]},
+    # 1 hour through it
+    {"America/New_York", {1_730_602_800.0, 1_730_624_400.0},
+     [
+       1_730_602_800.0,
+       1_730_606_400.0,
+       1_730_610_000.0,
+       1_730_613_600.0,
+       1_730_617_200.0,
+       1_730_620_800.0,
+       1_730_624_400.0
+     ], ["23:00", "00:00", "01:00", "01:00", "02:00", "03:00", "04:00"]},
+    # 1 hour at +05:30
+    {"Asia/Kolkata", {1_710_033_000.0, 1_710_049_200.0},
+     [
+       1_710_030_600.0,
+       1_710_034_200.0,
+       1_710_037_800.0,
+       1_710_041_400.0,
+       1_710_045_000.0,
+       1_710_048_600.0,
+       1_710_052_200.0
+     ], ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00"]},
+    # 6 hours from a local midnight
+    {"Asia/Kolkata", {1_710_014_400.0, 1_710_129_600.0},
+     [
+       1_710_009_000.0,
+       1_710_030_600.0,
+       1_710_052_200.0,
+       1_710_073_800.0,
+       1_710_095_400.0,
+       1_710_117_000.0,
+       1_710_138_600.0
+     ],
+     [
+       "Mar 10 00:00",
+       "Mar 10 06:00",
+       "Mar 10 12:00",
+       "Mar 10 18:00",
+       "Mar 11 00:00",
+       "Mar 11 06:00",
+       "Mar 11 12:00"
+     ]},
+    # 1 hour across a half-hour change
+    {"Australia/Lord_Howe", {1_728_141_000.0, 1_728_154_800.0},
+     [
+       1_728_138_600.0,
+       1_728_142_200.0,
+       1_728_145_800.0,
+       1_728_149_400.0,
+       1_728_153_000.0,
+       1_728_156_600.0
+     ], ["01:00", "02:30", "03:30", "04:30", "05:30", "06:30"]},
+    # 3 hours from a skipped midnight
+    {"America/Havana", {1_710_050_400.0, 1_710_111_600.0},
+     [
+       1_710_046_800.0,
+       1_710_057_600.0,
+       1_710_068_400.0,
+       1_710_079_200.0,
+       1_710_090_000.0,
+       1_710_100_800.0,
+       1_710_111_600.0
+     ], ["01:00", "04:00", "07:00", "10:00", "13:00", "16:00", "19:00"]},
+    # days across it
+    {"America/Havana", {1_709_812_800.0, 1_710_244_800.0},
+     [
+       1_709_787_600.0,
+       1_709_874_000.0,
+       1_709_960_400.0,
+       1_710_046_800.0,
+       1_710_129_600.0,
+       1_710_216_000.0,
+       1_710_302_400.0
+     ], ["Mar 07", "Mar 08", "Mar 09", "Mar 10", "Mar 11", "Mar 12", "Mar 13"]},
+    # days from it
+    {"America/Havana", {1_710_052_200.0, 1_710_468_000.0},
+     [
+       1_710_046_800.0,
+       1_710_129_600.0,
+       1_710_216_000.0,
+       1_710_302_400.0,
+       1_710_388_800.0,
+       1_710_475_200.0
+     ], ["Mar 10", "Mar 11", "Mar 12", "Mar 13", "Mar 14", "Mar 15"]},
+    # months from a skipped 1st
+    {"America/Asuncion", {1_697_371_200.0, 1_710_072_000.0},
+     [
+       1_696_132_800.0,
+       1_698_807_600.0,
+       1_701_399_600.0,
+       1_704_078_000.0,
+       1_706_756_400.0,
+       1_709_262_000.0,
+       1_711_944_000.0
+     ], ["Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr"]},
+    # half months across it
+    {"America/Asuncion", {1_695_211_200.0, 1_700_913_600.0},
+     [
+       1_694_750_400.0,
+       1_696_132_800.0,
+       1_697_342_400.0,
+       1_698_807_600.0,
+       1_700_017_200.0,
+       1_701_399_600.0
+     ], ["Sep 15", "Oct 01", "Oct 15", "Nov 01", "Nov 15", "Dec 01"]}
+  ]
+
+  # Golden: R's own `scales::breaks_width()` on `as.POSIXct()` of each extent in a time zone, in
+  # seconds since 1970-01-01 00:00 UTC (scales 1.4.0, R 4.6.1, tzdata 2026c): New York's hours
+  # through the repeated hour, each pass keeping its own; minutes rounded on UTC's seconds; days and
+  # weeks by elapsed time across the spring change; months and years on the calendar; hours at
+  # Kathmandu's +05:45; an hour truncated into Lord Howe's half-hour change, keeping its offset;
+  # days from a midnight Havana skips; and months from Asuncion's skipped 1st, every later 1st at
+  # the hour the first was read at. The extents come from 7,599 of R's, which this matches but
+  # where glibc reads a skipped midnight of a change of standard offset after it. It moves only if
+  # the port stops matching R, which is a bug.
+  @r_zoned_widths [
+    # hours through the repeated hour
+    {"America/New_York", {1_730_602_800.0, 1_730_624_400.0}, [hour: 1],
+     [
+       1_730_602_800.0,
+       1_730_606_400.0,
+       1_730_610_000.0,
+       1_730_613_600.0,
+       1_730_617_200.0,
+       1_730_620_800.0,
+       1_730_624_400.0,
+       1_730_628_000.0
+     ]},
+    # minutes rounded on UTC's seconds
+    {"America/New_York", {1_730_611_800.0, 1_730_615_400.0}, [minute: 15],
+     [
+       1_730_611_800.0,
+       1_730_612_700.0,
+       1_730_613_600.0,
+       1_730_614_500.0,
+       1_730_615_400.0,
+       1_730_616_300.0
+     ]},
+    # days by elapsed time across the spring change
+    {"America/New_York", {1_709_899_200.0, 1_710_244_800.0}, [day: 1],
+     [1_709_874_000.0, 1_709_960_400.0, 1_710_046_800.0, 1_710_133_200.0, 1_710_219_600.0]},
+    # weeks from a Monday's midnight
+    {"America/New_York", {1_708_430_400.0, 1_711_368_000.0}, [week: 1],
+     [
+       1_708_318_800.0,
+       1_708_923_600.0,
+       1_709_528_400.0,
+       1_710_133_200.0,
+       1_710_738_000.0,
+       1_711_342_800.0
+     ]},
+    # months on the calendar
+    {"America/New_York", {1_705_320_000.0, 1_715_342_400.0}, [month: 1],
+     [
+       1_704_085_200.0,
+       1_706_763_600.0,
+       1_709_269_200.0,
+       1_711_944_000.0,
+       1_714_536_000.0,
+       1_717_214_400.0
+     ]},
+    # years on the calendar
+    {"America/New_York", {1_655_294_400.0, 1_749_556_800.0}, [year: 1],
+     [1_641_013_200.0, 1_672_549_200.0, 1_704_085_200.0, 1_735_707_600.0, 1_767_243_600.0]},
+    # hours at +05:45
+    {"Asia/Kathmandu", {1_710_033_000.0, 1_710_049_200.0}, [hour: 1],
+     [
+       1_710_029_700.0,
+       1_710_033_300.0,
+       1_710_036_900.0,
+       1_710_040_500.0,
+       1_710_044_100.0,
+       1_710_047_700.0,
+       1_710_051_300.0
+     ]},
+    # an hour truncated into a half-hour change
+    {"Australia/Lord_Howe", {1_728_143_100.0, 1_728_151_200.0}, [hour: 1],
+     [1_728_140_400.0, 1_728_144_000.0, 1_728_147_600.0, 1_728_151_200.0, 1_728_154_800.0]},
+    # days from a skipped midnight
+    {"America/Havana", {1_710_052_200.0, 1_710_295_200.0}, [day: 1],
+     [1_710_046_800.0, 1_710_133_200.0, 1_710_219_600.0]},
+    # months from a skipped 1st, at the hour it ends
+    {"America/Asuncion", {1_697_371_200.0, 1_704_888_000.0}, [month: 1],
+     [1_696_132_800.0, 1_698_811_200.0, 1_701_403_200.0, 1_704_081_600.0]}
+  ]
+
+  # A time zone's clock, read by a database that knows every zone.
+  defp zoned(zone), do: {zone, Tz.TimeZoneDatabase}
+
+  describe "pretty_datetime/2 and label/2" do
     test "the breaks and their labels are R's for every step of prettyDate()" do
       epoch = ~N[1970-01-01 00:00:00]
 
       for {extent, seconds, labels} <- @r_datetime_breaks do
-        {times, format} = DateBreaks.pretty_datetime(extent)
+        {times, format} = DateBreaks.pretty_datetime(extent, :utc)
 
         assert {extent,
                 Enum.map(times, fn time -> NaiveDateTime.diff(time, epoch, :second) / 1 end),
@@ -970,7 +1261,7 @@ defmodule Giggly.Scale.DateBreaksTest do
       epoch = ~N[1970-01-01 00:00:00]
 
       for {{low, high} = extent, seconds, labels} <- @r_short_datetime_breaks do
-        {times, format} = DateBreaks.pretty_datetime(extent)
+        {times, format} = DateBreaks.pretty_datetime(extent, :utc)
 
         inside =
           times
@@ -984,10 +1275,45 @@ defmodule Giggly.Scale.DateBreaksTest do
     end
   end
 
-  describe "datetime_width/2" do
+  describe "pretty_datetime/2 and label/2 on a time zone's clock" do
+    test "the breaks and their labels are R's across a zone's changes of offset" do
+      for {zone, extent, seconds, labels} <- @r_zoned_breaks do
+        {times, format} = DateBreaks.pretty_datetime(extent, zoned(zone))
+
+        assert {zone, extent, Enum.map(times, fn time -> DateTime.to_unix(time) / 1 end),
+                Enum.map(times, fn time -> DateBreaks.label(time, format) end)} ===
+                 {zone, extent, seconds, labels}
+      end
+    end
+
+    # R reads a midnight that happens twice at the offset it last used, so one extent breaks two
+    # ways; Havana's clocks went back from 01:00 to 00:00 on 3 November 2024, and the earlier
+    # midnight is taken, as R takes it in a fresh session, having used none: R's breaks there.
+    test "a midnight that happens twice is the earlier one" do
+      {times, format} =
+        DateBreaks.pretty_datetime({1_730_613_600.0, 1_730_674_800.0}, zoned("America/Havana"))
+
+      assert {Enum.map(times, &DateTime.to_unix/1),
+              Enum.map(times, fn time -> DateBreaks.label(time, format) end)} ===
+               {[1_730_606_400, 1_730_628_000, 1_730_649_600, 1_730_671_200, 1_730_692_800],
+                ["Nov 03 00:00", "Nov 03 05:00", "Nov 03 11:00", "Nov 03 17:00", "Nov 03 23:00"]}
+    end
+  end
+
+  describe "datetime_width/3" do
     test "a break every step is R's breaks_width() for every unit" do
       for {extent, step, times} <- @r_datetime_widths do
-        assert {extent, step, DateBreaks.datetime_width(step, extent)} === {extent, step, times}
+        assert {extent, step, DateBreaks.datetime_width(step, extent, :utc)} ===
+                 {extent, step, times}
+      end
+    end
+
+    test "a break every step is R's breaks_width() across a zone's changes of offset" do
+      for {zone, extent, step, seconds} <- @r_zoned_widths do
+        times = DateBreaks.datetime_width(step, extent, zoned(zone))
+
+        assert {zone, extent, step, Enum.map(times, fn time -> DateTime.to_unix(time) / 1 end)} ===
+                 {zone, extent, step, seconds}
       end
     end
   end

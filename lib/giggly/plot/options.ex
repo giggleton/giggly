@@ -1532,6 +1532,24 @@ defmodule Giggly.Plot.Options do
                                 "A minor grid line every step, as `date_breaks:` lays breaks. " <>
                                   "Not with `minor_breaks:`."
                             ],
+                            timezone: [
+                              type: :string,
+                              doc:
+                                "The time zone the axis lays its breaks and writes its labels " <>
+                                  "in, such as `\"America/New_York\"`, which " <>
+                                  "`time_zone_database:` must know; the first date-time " <>
+                                  "column's when not given. Naive date-times are in no time " <>
+                                  "zone, so a column of them is refused beside it."
+                            ],
+                            time_zone_database: [
+                              type: :atom,
+                              doc:
+                                "The time zone database that reads the axis's time zone, a " <>
+                                  "module implementing `Calendar.TimeZoneDatabase`, such as " <>
+                                  "the tz package's `Tz.TimeZoneDatabase`; " <>
+                                  "`Calendar.UTCOnlyTimeZoneDatabase`, which knows UTC alone, " <>
+                                  "when not given, never the one the application configures."
+                            ],
                             expand: [
                               type: @scale_expand_type,
                               doc:
@@ -1542,9 +1560,9 @@ defmodule Giggly.Plot.Options do
                             ]
                           )
 
-  # The transformation a date-time scale records, its zone left for its first column to settle
-  # and read by the standard library's time zone database, which knows UTC alone: the value
-  # `Giggly.Scale.new(:datetime)` records, which a test pins.
+  # The transformation a date-time scale records when given no time zone or database, its zone
+  # left for its first column to settle and read by the standard library's time zone database,
+  # which knows UTC alone: the value `Giggly.Scale.new(:datetime)` records, which a test pins.
   @datetime_transform {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
 
   # The options of every scale function of an aesthetic other than position, whose guide is a

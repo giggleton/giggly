@@ -24,8 +24,9 @@ defmodule Giggly.Scale do
   #   * a date-time, `{:datetime, zone}`, and a naive one, `:naive_datetime`, get a date-time
   #     scale, a continuous scale of the seconds since 1970-01-01 00:00 through the date-time
   #     transformation, as `scale_type()` gives a `POSIXct` `"datetime"`, the two kinds apart, as
-  #     a naive date-time is no instant; the scale takes its zone from the first column it
-  #     places (`settle_zone/2`), as ggplot2's takes the first column's `tzone`. On an aesthetic
+  #     a naive date-time is no instant; the scale takes the zone a plot gave it, else that of the
+  #     first column it places (`settle_zone/2`), as ggplot2's takes the first column's `tzone`,
+  #     and lays its breaks on that zone's clock. On an aesthetic
   #     other than position they get none yet, and a continuous scale through the identity takes
   #     either at its seconds;
   #   * times, lists and `:term` get none yet.
@@ -270,12 +271,13 @@ defmodule Giggly.Scale do
 
   def takes?(scale, kind), do: kind_of(scale) == kind
 
-  # A date-time scale whose zone no column has settled given the zone of the first column it
-  # places, of type `dtype`, as ggplot2's date-time scale takes the first column's `tzone`: a
-  # naive one's `:naive`, a date-time's its zone, `{:error, zone}` where the scale's time zone
-  # database does not know it. Any other scale is returned as it is.
+  # A date-time scale whose zone neither a plot nor a column has settled given the zone of the
+  # first column it places, of type `dtype`, as ggplot2's date-time scale takes the first column's
+  # `tzone` when not given one: a naive one's `:naive`, a date-time's its zone, `{:error, {zone,
+  # database}}` where the scale's time zone database does not know it. Any other scale is returned
+  # as it is, a zone a plot gave kept whatever the column's.
   @doc false
-  @spec settle_zone(t(), atom() | tuple()) :: {:ok, t()} | {:error, String.t()}
+  @spec settle_zone(t(), atom() | tuple()) :: {:ok, t()} | {:error, {String.t(), module()}}
   def settle_zone(%Continuous{transform: {:datetime, :default, database}} = scale, dtype) do
     case dtype do
       :naive_datetime ->
@@ -284,7 +286,7 @@ defmodule Giggly.Scale do
       {:datetime, zone} ->
         if known_zone?(zone, database),
           do: {:ok, %{scale | transform: {:datetime, zone, database}}},
-          else: {:error, zone}
+          else: {:error, {zone, database}}
     end
   end
 

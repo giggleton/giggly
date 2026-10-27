@@ -123,11 +123,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   scale's (`Scale.kind_of/1`); every layer's columns in the axis's family
   are then put through the scale's transformation, trained on, and mapped to positions**, a
   continuous scale censoring those outside its limits. Which columns belong to an axis is
-  `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A date-time scale then takes
-  its zone from the axis's first column** (`Scale.settle_zone/2`), as ggplot2's takes the first
-  column's `tzone`, so later layers' date-times in other zones are placed by their instants; a
-  zone its time zone database does not know is refused when run, naming the layer, the aesthetic,
-  the column and the zone.
+  `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A date-time scale given no
+  zone then takes the axis's first column's** (`Scale.settle_zone/2`), as ggplot2's takes the
+  first column's `tzone`, so later layers' date-times in other zones are placed by their instants;
+  a zone its time zone database does not know is refused when run, naming the layer, the
+  aesthetic, the column, the zone and the database, and the `time_zone_database:` of the axis's
+  scale function that would fix it. A scale given a zone keeps it whatever its columns' and
+  refuses naive date-times, saying why.
 - **A layer's stat and position run by the structs the layer records**, read with
   `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/3` and
   `Position.compute_layer/2`; the assembly names no stat or position kind. **A stat is handed

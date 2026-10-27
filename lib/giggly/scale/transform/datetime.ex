@@ -8,16 +8,17 @@ defmodule Giggly.Scale.Transform.Datetime do
   # a scale of date-times records, ggplot2's `scale_x_datetime()`, with its time zone and the time
   # zone database that reads it, `{:datetime, zone, database}`, as R's `transform_time(tz)` holds
   # its zone: `:default` until a column settles it, `:naive` for naive date-times, else a zone's
-  # name, so far `"Etc/UTC"` alone. Use it through `Giggly.Scale.Transform`.
+  # name, which the database must know. Use it through `Giggly.Scale.Transform`.
   #
   # Its axis takes R's `pretty()` breaks for date-times (`Giggly.Scale.DateBreaks`), on clock and
-  # calendar boundaries, each labelled in the format of the step chosen for the whole axis; breaks
-  # it did not choose, given or laid by a width, are written as R's `format()` writes them, the
-  # date alone where every one is at midnight, else the date and the time to the second; and its
-  # minor breaks are R's regular ones on the seconds, midway between them
-  # (`Giggly.Scale.MinorBreaks`), as `transform_time()` keeps the default. A break turned back is
-  # a `DateTime` in the zone, or a `NaiveDateTime`, to the second where it is a whole second and
-  # else to the microsecond.
+  # calendar boundaries in its zone, UTC's for `:default`, and a naive date-time's own, as UTC's,
+  # each labelled in the format of the step chosen for the whole axis; breaks it did not choose,
+  # given or laid by a width, are written as R's `format()` writes them, the date alone where every
+  # one is at midnight, else the date and the time to the second; and its minor breaks are R's
+  # regular ones on the seconds, midway between them (`Giggly.Scale.MinorBreaks`), as
+  # `transform_time()` keeps the default. A break turned back is a `DateTime` in the zone, UTC for
+  # `:default`, or a `NaiveDateTime`, to the second where it is a whole second and else to the
+  # microsecond, so its label is written in the zone's wall-clock time.
 
   @behaviour Giggly.Scale.Transform
 
@@ -31,16 +32,16 @@ defmodule Giggly.Scale.Transform.Datetime do
     do: Enum.map(values, fn value -> placed(zone, value) end)
 
   @impl Giggly.Scale.Transform
-  def inverse({:datetime, zone, _database}, positions),
-    do: Enum.map(positions, fn position -> datetime(zone, position) end)
+  def inverse({:datetime, zone, database}, positions),
+    do: Enum.map(positions, fn position -> datetime({zone, database}, position) end)
 
   @impl Giggly.Scale.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Giggly.Scale.Transform
-  def breaks(_transformation, extent) do
-    {times, _format} = DateBreaks.pretty_datetime(extent)
-    Enum.map(times, &wall_seconds/1)
+  def breaks(transformation, extent) do
+    {times, _format} = DateBreaks.pretty_datetime(extent, clock(transformation))
+    Enum.map(times, &seconds/1)
   end
 
   @impl Giggly.Scale.Transform
@@ -54,7 +55,7 @@ defmodule Giggly.Scale.Transform.Datetime do
   end
 
   def format(transformation, breaks, extent) do
-    {_times, format} = DateBreaks.pretty_datetime(extent)
+    {_times, format} = DateBreaks.pretty_datetime(extent, clock(transformation))
 
     transformation
     |> inverse(breaks)
@@ -66,11 +67,16 @@ defmodule Giggly.Scale.Transform.Datetime do
   @doc false
   @spec width(Giggly.Scale.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
           [float()]
-  def width(_transformation, step, extent) do
+  def width(transformation, step, extent) do
     step
-    |> DateBreaks.datetime_width(extent)
-    |> Enum.map(&wall_seconds/1)
+    |> DateBreaks.datetime_width(extent, clock(transformation))
+    |> Enum.map(&seconds/1)
   end
+
+  # The clock a scale's breaks are laid on: UTC's for a naive scale, as a naive date-time is placed
+  # as though its clock were UTC's, and for one no column has settled; else its zone's.
+  defp clock({:datetime, zone, _database}) when zone in [:naive, :default], do: :utc
+  defp clock({:datetime, zone, database}), do: {zone, database}
 
   # A date-time's seconds since 1970-01-01 00:00 UTC, or a naive one's since the same wall-clock
   # time, a double as R's `POSIXct` stores it.
@@ -103,17 +109,27 @@ defmodule Giggly.Scale.Transform.Datetime do
             "date-time, which has no time zone; give it date-times in a time zone"
   end
 
-  # The date-time at `seconds`: a naive one on a naive scale, else one in UTC.
-  defp datetime(zone, seconds) do
+  # The date-time at `seconds`: a naive one on a naive scale, else one in the scale's zone, UTC
+  # where no column has settled it.
+  defp datetime(zone_and_database, seconds) do
     microseconds = round(seconds * @microseconds)
 
-    zone
+    zone_and_database
     |> at(microseconds)
     |> precise(microseconds)
   end
 
-  defp at(:naive, microseconds), do: NaiveDateTime.add(@epoch, microseconds, :microsecond)
-  defp at(_zone, microseconds), do: DateTime.from_unix!(microseconds, :microsecond)
+  defp at({:naive, _database}, microseconds),
+    do: NaiveDateTime.add(@epoch, microseconds, :microsecond)
+
+  defp at({:default, _database}, microseconds),
+    do: DateTime.from_unix!(microseconds, :microsecond)
+
+  defp at({zone, database}, microseconds) do
+    microseconds
+    |> DateTime.from_unix!(:microsecond)
+    |> DateTime.shift_zone!(zone, database)
+  end
 
   defp precise(datetime, microseconds) when rem(microseconds, @microseconds) == 0,
     do: %{datetime | microsecond: {0, 0}}
@@ -122,7 +138,4 @@ defmodule Giggly.Scale.Transform.Datetime do
 
   defp midnight?(%{hour: 0, minute: 0, second: 0, microsecond: {0, _precision}}), do: true
   defp midnight?(_datetime), do: false
-
-  # A wall-clock time's seconds since 1970-01-01 00:00 on the same clock, UTC's.
-  defp wall_seconds(%NaiveDateTime{} = time), do: NaiveDateTime.diff(time, @epoch, :second) / 1
 end

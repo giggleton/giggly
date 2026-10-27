@@ -19,4 +19,5 @@
   "nx": {:hex, :nx, "1.0.0", "83d586079cb37d11a4cf8c0edaf2eccafe88aa2369e35ebdb1c3d78c43c8eb33", [:mix], [{:complex, "~> 1.0", [hex: :complex, repo: "hexpm", optional: false]}, {:telemetry, "~> 0.4.0 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "e06c7587efff7a3dfc1e2c92705943e319db20070359e9850c3921aaf26d6998"},
   "table": {:hex, :table, "0.1.2", "87ad1125f5b70c5dea0307aa633194083eb5182ec537efc94e96af08937e14a8", [:mix], [], "hexpm", "7e99bc7efef806315c7e65640724bf165c3061cdc5d854060f74468367065029"},
   "telemetry": {:hex, :telemetry, "1.4.2", "a0cb522801dffb1c49fe6e30561badffc7b6d0e180db1300df759faa22062855", [:rebar3], [], "hexpm", "928f6495066506077862c0d1646609eed891a4326bee3126ba54b60af61febb1"},
+  "tz": {:hex, :tz, "0.28.4", "f5433914dcf8619d593979ec65bbe878158cad818bc2b53b44d9e4bda509753f", [:mix], [{:castore, "~> 0.1 or ~> 1.0", [hex: :castore, repo: "hexpm", optional: true]}, {:mint, "~> 1.6", [hex: :mint, repo: "hexpm", optional: true]}], "hexpm", "72fe8d526cf30fcc4e07cec4ceb583ba5f2d69c6334c9533419c836a6acd1c56"},
 }

@@ -48,7 +48,8 @@ defmodule Giggly.MixProject do
       {:table, "~> 0.1.2"},
       {:nimble_options, "~> 1.1"},
       {:color, "~> 0.13.0"},
-      {:nx, "~> 1.0"}
+      {:nx, "~> 1.0"},
+      {:tz, "~> 0.28", only: :test}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
     ]

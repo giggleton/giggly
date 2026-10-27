@@ -22,6 +22,9 @@ defmodule Giggly.Scale.TransformTest do
 
   defp column(dataset, name), do: Keyword.fetch!(dataset, name)
 
+  # A wall-clock time in New York, as R's as.POSIXct(..., tz = "America/New_York") reads it.
+  defp new_york(wall), do: DateTime.from_naive!(wall, "America/New_York", Tz.TimeZoneDatabase)
+
   # The labels of a trained scale's breaks on `extent`, in order.
   defp labels(scale, extent) do
     scale
@@ -368,6 +371,19 @@ defmodule Giggly.Scale.TransformTest do
                 ]}
     end
 
+    # ggplot(d, aes(at, y)) + geom_point() + scale_x_datetime(breaks = b), `at` 2024-03-09 15:17
+    # and 2024-03-11 04:40 in New York and `b` its midnights on 10 and 11 March: R writes the dates
+    # alone, each a midnight on the zone's clock, though neither is one in UTC
+    test "breaks it did not choose are written on the clock of the scale's zone" do
+      values = [new_york(~N[2024-03-09 15:17:00]), new_york(~N[2024-03-11 04:40:00])]
+      midnights = [new_york(~N[2024-03-10 00:00:00]), new_york(~N[2024-03-11 00:00:00])]
+
+      {_extent, breaks, _minor} =
+        axis({:datetime, "America/New_York", Tz.TimeZoneDatabase}, values, breaks: midnights)
+
+      assert breaks == [{1_710_046_800.0, "2024-03-10"}, {1_710_129_600.0, "2024-03-11"}]
+    end
+
     # as.POSIXct(1710060012.123456, tz = "UTC"), as R parses it, is 1710060012.123456: a
     # microsecond is kept, the double nearest the instant
     test "places a date-time at its seconds since 1970, a naive one alike, a missing one nowhere" do
@@ -381,6 +397,14 @@ defmodule Giggly.Scale.TransformTest do
                [~U[2024-03-10 08:40:12.123456Z], ~U[2024-03-10 08:40:12Z]]
 
       assert Transform.inverse(@naive, [1_710_060_012.0]) === [~N[2024-03-10 08:40:12]]
+
+      assert Transform.inverse({:datetime, "America/New_York", Tz.TimeZoneDatabase}, [
+               1_710_046_800.0,
+               1_710_090_000.5
+             ]) === [
+               new_york(~N[2024-03-10 00:00:00]),
+               new_york(~N[2024-03-10 13:00:00.500000])
+             ]
     end
 
     # A scale on an axis no column maps keeps its zone unsettled, and takes naive date-times, as
@@ -463,6 +487,23 @@ defmodule Giggly.Scale.TransformTest do
       extent = Scale.dimension(trained)
 
       assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
+    end
+
+    test "a labels function on a date-time axis is handed date-times in the scale's zone" do
+      # scale_x_datetime(labels = function(b) format(b, "%Y-%m-%d %H:%M %Z")) over 2024-03-09
+      # 15:17 and 2024-03-11 04:40 in New York: R hands it the breaks there, across its change
+      scale = %Continuous{
+        transform: {:datetime, "America/New_York", Tz.TimeZoneDatabase},
+        labels: fn datetimes ->
+          Enum.map(datetimes, fn datetime -> Calendar.strftime(datetime, "%Y-%m-%d %H:%M %Z") end)
+        end
+      }
+
+      values = [new_york(~N[2024-03-09 15:17:00]), new_york(~N[2024-03-11 04:40:00])]
+      trained = Scale.train(scale, Scale.transform(scale, values), :none)
+
+      assert labels(trained, Scale.dimension(trained)) ==
+               ["2024-03-10 00:00 EST", "2024-03-10 13:00 EDT", "2024-03-11 01:00 EDT"]
     end
 
     test "a labels function on a date-time axis is handed date-times, to the second" do
