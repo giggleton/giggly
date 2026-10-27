@@ -170,6 +170,7 @@ defmodule GigglyCredo.ChecksTest do
       for call <- [
             ~s{DateTime.new(date, time)},
             ~s{DateTime.new(date, time, "Etc/UTC")},
+            ~s{DateTime.new!(date, time)},
             ~s{DateTime.new!(date, time, "Etc/UTC")},
             ~s{DateTime.from_naive(naive, "Etc/UTC")},
             ~s{DateTime.from_naive!(naive, "Etc/UTC")},
@@ -205,6 +206,21 @@ defmodule GigglyCredo.ChecksTest do
 
         assert Enum.sort(found) ==
                  [{3, "DateTime.add"}, {4, "DateTime.shift_zone!"}, {7, "DateTime.now"}]
+      end)
+    end
+
+    # The piped call is replaced by its arguments for the walk to read on: what is piped into it,
+    # and each argument, are read as any other code is.
+    test "a call piped into a DateTime call, or one of its arguments, is still read" do
+      """
+      DateTime.shift_zone!(instant, "Etc/UTC") |> DateTime.to_unix()
+      later |> DateTime.diff(DateTime.now!("Etc/UTC"))
+      """
+      |> source()
+      |> run_check(PassTimeZoneDatabase)
+      |> assert_issues(fn issues ->
+        found = Enum.map(issues, fn issue -> {issue.line_no, issue.trigger} end)
+        assert Enum.sort(found) == [{3, "DateTime.shift_zone!"}, {4, "DateTime.now!"}]
       end)
     end
 

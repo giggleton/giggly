@@ -125,7 +125,7 @@ defmodule Giggly.Scale.Transform do
   @doc false
   @spec width(:date | {:datetime, term(), module()}, keyword(pos_integer()), {float(), float()}) ::
           [float()]
-  def width(:date, step, extent), do: Transform.Date.width(:date, step, extent)
+  def width(:date = name, step, extent), do: Transform.Date.width(name, step, extent)
 
   def width({:datetime, _zone, _database} = name, step, extent),
     do: Transform.Datetime.width(name, step, extent)

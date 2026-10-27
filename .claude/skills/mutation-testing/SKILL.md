@@ -86,7 +86,8 @@ the real build, so Giggly's build is copied in first and nothing is written to t
 ```bash
 base=<scratchpad>/muex-baseline && rm -rf "$base"
 MIX_ENV=test mix run --no-start -e \
-  'Muex.Sandbox.create_sandbox(hd(System.argv()), File.cwd!(), "test", ["test"], [".credo"])' "$base"
+  'Muex.Sandbox.create_sandbox(hd(System.argv()), File.cwd!(), "test", ["test"], [".credo", "dev"])' \
+  "$base"
 rm "$base/_build/test/lib/giggly" && cp -R _build/test/lib/giggly "$base/_build/test/lib/giggly"
 (cd "$base" && MIX_ENV=test mix test)
 ```
@@ -96,17 +97,19 @@ the sandbox mirrors, and `:cover` cannot see a module loaded with `Code.require_
 runner's check, over `lib/` as the runner names it, with `--coverage-guided`:
 
 ```bash
-mix muex --since HEAD~1 --no-optimize --no-filter --verbose --mirror .credo \
+mix muex --since HEAD~1 --no-optimize --no-filter --verbose --mirror .credo,dev \
   --format json --output <scratchpad>/muex.json --files .credo/checks/<check>.ex
-mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided --mirror .credo \
+mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided --mirror .credo,dev \
   --format json --output <scratchpad>/muex.json \
   --files "$(git diff --name-only --diff-filter=d HEAD~1 HEAD -- 'lib/*.ex' | paste -sd, -)"
 ```
 
-- **`--mirror .credo`** — a plain project's sandbox links only the top-level entries muex names, not
-  `.credo/`, and `test/credo_checks_test.exs` requires its checks from `.credo/checks/`, so without
-  it every one of its tests fails and each mutant they judge is reported killed (design-log §4,
-  "The mutation pass mirrors `.credo/`").
+- **`--mirror .credo,dev`** — a plain project's sandbox links only the top-level entries muex names,
+  not `.credo/`, and `test/credo_checks_test.exs` requires its checks from `.credo/checks/`, so
+  without it every one of its tests fails and each mutant they judge is reported killed (design-log
+  §4, "The mutation pass mirrors `.credo/`"); nor `dev/`, Tack's code, which `elixirc_paths` compiles
+  in test, so without it `test/tack/`'s tests fail the baseline. One flag, comma-separated, as
+  `--files` takes its list.
 - **One `--files`, comma-separated**: given `--files` twice, muex keeps only the last; it splits the
   value on commas, so a brace glob (`lib/{a,b}.ex`) crashes its loader. `--verbose` prints
   `Found <n> file(s)`: check it counts every file named.

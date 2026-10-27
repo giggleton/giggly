@@ -272,10 +272,11 @@ grid lines are placed by the coordinate system".
   R's `pretty()` for dates** (`Scale.DateBreaks`, grDevices' `prettyDate()`): five days or less is
   every day, widened by five less its length, rounded half to even; longer takes the calendar step,
   a day to a thousand years, that cuts the extent closest to five times, from its start truncated
-  to the step's unit (a Monday for weeks), or its neighbour where that comes closer, as R does.
+  to the step's unit (a Monday for weeks), or, where that step cuts it more than five times, the
+  next coarser one where that comes closer, as R does; R's finer neighbour for too few never comes
+  closer and is left out (design-log §4, the entry beginning "A date-time's breaks under a day").
   Each is labelled in its step's format, written as R's `format()` writes it, a year unpadded.
-  **A date never takes a step under a day**, which no date extent reaches, and reaching one
-  fails. Its minor breaks are the identity's
+  **A date never reaches a step under a day.** Its minor breaks are the identity's
   (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
   extended-breaks one is (below): its test pins R's own breaks for each case and for each random
   extent where a mutant departed. **A width's breaks are exactly R's `breaks_width()` for dates**
@@ -290,12 +291,15 @@ grid lines are placed by the coordinate system".
   missing one `nil`; a plot's limits or breaks of the other kind raise, as a column's would be
   refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/1`,
   the date steps' table extended below a day: seconds, minutes and hours, each with R's format and
-  unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; two
-  branches of R's are left out, neither changing a break inside the extent or its label: its added
-  ticks where a second cuts the extent once, which keeps its breaks here, and its trimming
-  (design-log §4, the entry beginning "A date-time's breaks under a day"). Its test pins R's
-  breaks for every step and format, and R's breaks inside each short extent; a surviving mutant
-  is judged against R as a date's are. **A width's breaks are exactly R's `breaks_width()` for
+  unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; three
+  branches of R's are left out, none changing a break inside the extent or its label: its added
+  ticks where a second cuts the extent once, which keeps its breaks here, its trimming, and its
+  finer neighbour (design-log §4, the entry beginning "A date-time's breaks under a day"). Its
+  test pins R's breaks for every step and format, R's breaks inside each short extent, and R's on
+  the first extent where each mutant of the step table departed; a nudge of a step's length that
+  departs on none of R's tables is judged against the code on a dense sweep round its step's
+  boundaries, and is equivalent only if it never departs there either. **A width's breaks are
+  exactly R's `breaks_width()` for
   date-times** (`DateBreaks.datetime_width/2`): seconds and minutes from the nearest multiple of the
   step since 1970-01-01, half to even, the rest from the start of the unit, rounded up by the
   step's most seconds, stepped by elapsed time but months and years, stepped on the calendar; its

@@ -3945,6 +3945,21 @@ defmodule Giggly.PlotTest do
              }
     end
 
+    test "a date-time scale function given no options records the default date-time scale" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_datetime()
+        |> Plot.scale_y_datetime()
+
+      transform = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{transform: transform},
+               y: %Scale.Continuous{transform: transform}
+             }
+    end
+
     test "a date-time scale's transformation is the one a scale of date-times gets by default" do
       assert Plot.Options.datetime_transform() === Scale.new(:datetime).transform
       assert Plot.Options.datetime_transform() === Scale.new(:naive_datetime).transform
@@ -3967,8 +3982,11 @@ defmodule Giggly.PlotTest do
 
       seconds = stepped.(second: 15)
       weeks = stepped.(week: 1)
+      longer = Enum.map([[day: 2], [month: 1], [year: 1]], fn step -> stepped.(step).breaks end)
 
       transform = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+
+      assert longer === [{:width, [day: 2]}, {:width, [month: 1]}, {:width, [year: 1]}]
 
       assert {plot.scales, seconds.breaks, weeks.breaks} === {
                %{
@@ -4002,9 +4020,12 @@ defmodule Giggly.PlotTest do
         assert error.message =~ "Plot.scale_x_datetime/2 is given both #{named}"
       end
 
-      assert_raise ArgumentError, ~r/scale_y_datetime.* 1 labels.* has none/, fn ->
-        Plot.scale_y_datetime(plot, labels: ["a"], date_breaks: [hour: 1])
-      end
+      unbroken =
+        assert_raise ArgumentError, fn ->
+          Plot.scale_y_datetime(plot, labels: ["a"], date_breaks: [hour: 1])
+        end
+
+      assert unbroken.message =~ ~r/^Plot\.scale_y_datetime\/2 .* 1 labels.* has none/
     end
 
     # A date-time's directives (%H, %z, %Z, %f) are written, a format Calendar.strftime/3 lacks,
@@ -4018,7 +4039,8 @@ defmodule Giggly.PlotTest do
       for {key, value, shown} <- [
             {:limits, {zoned, 3}, "got: {~U[2024-03-10 06:00:00Z], 3}"},
             {:limits, {~D[2024-03-10], nil}, "each a DateTime, a NaiveDateTime or nil"},
-            {:limits, {zoned, naive}, "got both in the limits"},
+            {:limits, {zoned, naive},
+             "got both in the limits {~U[2024-03-10 06:00:00Z], ~N[2024-03-10 06:00:00]}"},
             {:breaks, [zoned, naive], "got both in the list"},
             {:breaks, [zoned, ~D[2024-03-10]], "got: ~D[2024-03-10] in it"},
             {:breaks, zoned, "got: ~U[2024-03-10 06:00:00Z]"},
@@ -4030,7 +4052,7 @@ defmodule Giggly.PlotTest do
             {:date_breaks, [microsecond: 500], "got: [microsecond: 500]"},
             {:date_minor_breaks, "30 mins", ~s(got: "30 mins")},
             {:date_labels, "%W", ~s(got: "%W", which it cannot: #{strftime_refusal("%W")})},
-            {:date_labels, 4, "got: 4"}
+            {:date_labels, 4, "expected a format, a string, got: 4"}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->

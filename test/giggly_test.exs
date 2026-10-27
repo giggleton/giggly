@@ -2463,6 +2463,43 @@ defmodule GigglyTest do
       assert error.message =~ "index 1 puts its stat's :count into :y, a :float column"
       assert error.message =~ "is a date scale, so it takes dates"
     end
+
+    # ggplot2 4.0.3 in R 4.6.1 puts `y = after_stat(as.POSIXct("2020-01-01", tz = "UTC") + count)`
+    # over a date-time y axis at 1577836802 and 1577836801, its seconds; and reads `geom_bar()`'s
+    # counts there as seconds, warning "A <numeric> value was passed to a Datetime scale". R has no
+    # naive date-time; a naive axis takes naive ones alike.
+    test "a value on a date-time axis is put through its scale, and a number there is refused" do
+      at = [~U[2020-01-01 00:00:00Z], ~U[2020-01-01 00:00:00Z], ~U[2020-01-01 06:00:00Z]]
+      naive = Enum.map(at, &DateTime.to_naive/1)
+
+      for {column, start, takes} <- [
+            {at, ~U[2020-01-01 00:00:00Z], "is a date-time scale, so it takes date-times"},
+            {naive, ~N[2020-01-01 00:00:00], "naive date-times, so it takes naive date-times"}
+          ] do
+        later = fn count -> to_seconds(start, trunc(count)) end
+
+        points =
+          %{"at" => column, "class" => ["a", "b", "a"]}
+          |> Plot.new()
+          |> Plot.geom_point(%{x: :class, y: :at})
+
+        frame =
+          points
+          |> Plot.geom_bar(%{x: :class, y: {:after_stat, [{later, [:count]}]}})
+          |> Giggly.layer_data(1)
+
+        error =
+          assert_raise ArgumentError, fn ->
+            points
+            |> Plot.geom_bar(%{x: :class})
+            |> Giggly.layer_data(1)
+          end
+
+        assert DataFrame.pull(frame, :y) === [1_577_836_802.0, 1_577_836_801.0]
+        assert error.message =~ "index 1 puts its stat's :count into :y, a :float column"
+        assert error.message =~ takes
+      end
+    end
   end
 
   describe "layer_data/2, for geom_bar" do
@@ -5349,12 +5386,15 @@ defmodule GigglyTest do
     end
 
     test "a date-time mapped to colour or shape is refused, its scale not having arrived" do
-      for {aesthetic, refusal} <- [
-            {:color, ~s(a {:datetime, "Etc/UTC"} column, which no scale can place yet)},
-            {:shape, "but a shape scale is discrete"}
+      naive = %{@stamped | "at" => Enum.map(@stamped["at"], &DateTime.to_naive/1)}
+
+      for {table, aesthetic, refusal} <- [
+            {@stamped, :color, ~s(a {:datetime, "Etc/UTC"} column, which no scale can place yet)},
+            {@stamped, :shape, "but a shape scale is discrete"},
+            {naive, :shape, "a :naive_datetime column, but a shape scale is discrete"}
           ] do
         plot =
-          @stamped
+          table
           |> Plot.new(%{:x => :value, :y => :value, aesthetic => :at})
           |> Plot.geom_point()
 
@@ -10045,6 +10085,13 @@ defmodule GigglyTest do
     |> Plot.geom_col(options)
     |> Giggly.layer_data()
   end
+
+  # `start`, a date-time naive or in UTC, `seconds` later.
+  defp to_seconds(%DateTime{} = start, seconds),
+    do: DateTime.add(start, seconds, :second, Calendar.UTCOnlyTimeZoneDatabase)
+
+  defp to_seconds(%NaiveDateTime{} = start, seconds),
+    do: NaiveDateTime.add(start, seconds, :second)
 
   # `count` readings `step` seconds apart from `start`, each the reading's index modulo 7 times 1.5
   # plus a tenth of the index, as the date-time goldens' R scripts make them (61 readings 20

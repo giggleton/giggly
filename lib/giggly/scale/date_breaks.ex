@@ -16,8 +16,9 @@ defmodule Giggly.Scale.DateBreaks do
   # second to a thousand years, that cuts it closest to five times lays breaks from its start
   # truncated to the step's unit (a minute, an hour, a day, a week starting on Monday, a month, a
   # year, a decade, a century) to the first at or past its end, keeping the last before the
-  # extent and the first after it; the neighbouring step is taken instead when its breaks come
-  # closer to five intervals. Each step names its labels' format: `"%S"` for seconds up to 15,
+  # extent and the first after it; the next coarser step is taken instead when the chosen one
+  # cuts the extent more than five times and the coarser one's breaks come closer to five. Each
+  # step names its labels' format: `"%S"` for seconds up to 15,
   # `"%H:%M:%S"` for 30, `"%H:%M"` for minutes and for one and three hours, `"%b %d %H:%M"` for six
   # and twelve, `"%b %d"` for days, weeks and half months (the 1st and 15th), `"%b"` for months
   # within a year and `"%b %Y"` beyond, `"%Y-%m"` for six months, and `"%Y"` for years. R writes
@@ -26,14 +27,15 @@ defmodule Giggly.Scale.DateBreaks do
   # and weeks step by elapsed time and days, months and years on the calendar, as R's `seq()`
   # steps them.
   #
-  # Two of R's branches are left out, neither changing a break inside the extent: where even a
+  # Three of R's branches are left out, none changing a break inside the extent: where even a
   # second cuts the extent fewer than twice, R adds ticks beyond it until it does, and here its
   # breaks are kept as they are, so R's ticks inside are all here (every one of 2,000 random
-  # extents of one to two seconds); and where the chosen step cuts it more than five times, R
-  # trims breaks beyond the extent, which changes no break inside it or its label (every one of
-  # 9,000 extents under a second, where alone it fires). Its finer step for fewer than two
-  # intervals no step closest to five needs above a second, so reaching for one fails; and a date
-  # extent never takes a step under a day, which fails too.
+  # extents of one to two seconds); where the chosen step cuts it more than five times, R trims
+  # breaks beyond the extent, which changes no break inside it or its label (every one of 9,000
+  # extents under a second, where alone it fires); and where the chosen step cuts it fewer than
+  # five times, R tries the next finer step, which never came closer on 16,400 of R's extents,
+  # 6,300 of them clustered round the spans where two neighbouring steps are equally close to
+  # five, so the chosen step's breaks are kept. A date extent never reaches a step under a day.
 
   @epoch ~N[1970-01-01 00:00:00]
 
@@ -92,9 +94,6 @@ defmodule Giggly.Scale.DateBreaks do
 
   @last_step length(@steps) - 1
 
-  # The first step of a day or more, the finest a date's breaks take.
-  @day_step Enum.find_index(@steps, fn step -> step.seconds == @day end)
-
   # A width's units: the most seconds each holds, which `scales`' `ceiling_date()` and
   # `ceiling_time()` add before rounding down, the unit a date or date-time is truncated to, as
   # R's `cut()` truncates it, and how a sequence of it advances.
@@ -134,14 +133,9 @@ defmodule Giggly.Scale.DateBreaks do
     pretty_datetime(widened)
   end
 
-  def pretty_datetime(limits) do
-    {_chosen, times, format} = stepped(limits, span(limits))
-    {times, format}
-  end
+  def pretty_datetime(limits), do: stepped(limits, span(limits))
 
-  # A date's breaks are the breaks of a step of a day or more, as dates.
-  defp dates({chosen, times, format}) when chosen >= @day_step,
-    do: {Enum.map(times, &NaiveDateTime.to_date/1), format}
+  defp dates({times, format}), do: {Enum.map(times, &NaiveDateTime.to_date/1), format}
 
   # Every day the extent touches, widened by as many days as five less its length, rounded half to
   # even, half on the left and the odd day on the right, as R's short-range branch widens it.
@@ -153,24 +147,16 @@ defmodule Giggly.Scale.DateBreaks do
     {Enum.map(days, fn day -> Date.add(~D[1970-01-01], day) end), "%b %d"}
   end
 
-  # The chosen step's index, its breaks and their labels' format.
+  # The chosen step's breaks and their labels' format.
   defp stepped(limits, span) do
     first =
       Enum.min_by(0..@last_step, fn index ->
         abs(span / Enum.at(@steps, index).seconds - @wanted)
       end)
 
-    breaks = steps_of(first, limits)
-    cuts_twice(first, breaks)
-    {chosen, times} = choose(first, breaks, limits)
-    {chosen, times, format(Enum.at(@steps, chosen), span)}
+    {chosen, times} = choose(first, steps_of(first, limits), limits)
+    {times, format(Enum.at(@steps, chosen), span)}
   end
-
-  # The step closest to five intervals cuts an extent at least twice, a second's excepted, which
-  # may cut a short one once; R then adds ticks beyond the extent, and its breaks are kept as they
-  # are here.
-  defp cuts_twice(0, _breaks), do: :ok
-  defp cuts_twice(_index, [_start, _middle, _end | _rest]), do: :ok
 
   # A break every step of `step`, one of a day, a week, a month or a year and how many of it
   # (`[week: 2]`), on an axis showing `extent`, in days, as dates in ascending order, some outside
@@ -237,29 +223,20 @@ defmodule Giggly.Scale.DateBreaks do
   defp stride(:month, count), do: {:months, count}
   defp stride(:year, count), do: {:years, count}
 
-  # The step's breaks, or the neighbouring step's where they come closer to five intervals: a
-  # coarser one for too many, a finer one for too few, but for the finest step, a second, which
-  # keeps its own, as R's does.
+  # The step's breaks, or, where they cut the extent more than five times, the next coarser
+  # step's when they come closer to five intervals, as R's do.
   defp choose(index, breaks, limits) do
     excess = intervals(breaks) - @wanted
+    coarser = min(index + 1, @last_step)
 
-    case neighbour(index, excess) do
-      :none ->
-        {index, breaks}
-
-      neighbour ->
-        neighbour_breaks = steps_of(neighbour, limits)
-
-        if closer?(intervals(neighbour_breaks), excess),
-          do: {neighbour, neighbour_breaks},
-          else: {index, breaks}
+    with true <- excess > 0,
+         coarser_breaks = steps_of(coarser, limits),
+         true <- closer?(intervals(coarser_breaks), excess) do
+      {coarser, coarser_breaks}
+    else
+      false -> {index, breaks}
     end
   end
-
-  defp neighbour(_index, 0), do: :none
-  defp neighbour(index, excess) when excess > 0, do: min(index + 1, @last_step)
-  defp neighbour(0, _excess), do: :none
-  defp neighbour(index, _excess), do: index - 1
 
   # Whether a count of intervals is closer to five than an excess of `excess` is; one with fewer
   # than two never is, as R counts it as minus infinity.
@@ -313,8 +290,8 @@ defmodule Giggly.Scale.DateBreaks do
     |> truncated(unit)
   end
 
-  defp truncated(time, :minutes), do: %{time | second: 0, microsecond: {0, 0}}
-  defp truncated(time, :hours), do: %{time | minute: 0, second: 0, microsecond: {0, 0}}
+  defp truncated(time, :minutes), do: %{time | second: 0}
+  defp truncated(time, :hours), do: %{time | minute: 0, second: 0}
   defp truncated(time, :days), do: NaiveDateTime.beginning_of_day(time)
 
   defp truncated(time, :weeks) do

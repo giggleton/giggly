@@ -67,13 +67,11 @@ defmodule GigglyCredo.Check.PassTimeZoneDatabase do
          {:&, _, [{:/, _, [{{:., _, [{:__aliases__, _, [module]}, name]}, call, []}, arity]}]} =
            node,
          context
-       )
-       when is_integer(arity),
+       ),
        do: {node, found(context, module, name, arity, call)}
 
-  defp walk({{:., _, [{:__aliases__, _, [module]}, name]}, call, args} = node, context)
-       when is_list(args),
-       do: {node, found(context, module, name, length(args), call)}
+  defp walk({{:., _, [{:__aliases__, _, [module]}, name]}, call, args} = node, context),
+    do: {node, found(context, module, name, length(args), call)}
 
   defp walk(node, context), do: {node, context}
 

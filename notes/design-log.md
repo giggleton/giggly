@@ -99,10 +99,12 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   the rule the table already has, with R's widening of an extent under a second by 2.5 seconds
   either side; at the finest step, too few intervals keep its breaks, where R's loop adds ticks
   outside the extent (R's breaks inside matched on 1,999 of 1,999 extents of 1 to 2 seconds; its
-  trimming, firing only under a second, changed none of 9,000). *Rejected: extended breaks on the
-  range in seconds, minutes or hours*, R's time scale's: it matched R's date-time breaks on 29%
-  to 56% of random extents, counting six hours from 1970, not local midnight. *Rejected: porting
-  the tick loop*: no drawn break depends on it.
+  trimming, firing only under a second, changed none of 9,000). R's finer neighbour for too few,
+  which the mutation pass found never decides, is left out, dates' included: on 16,400 of R's
+  extents, 6,300 round the spans where two steps are equally close to five, it never came closer.
+  *Rejected: extended breaks on the range in seconds, minutes or hours*, R's time scale's: it
+  matched R's date-time breaks on 29% to 56% of random extents, counting six hours from 1970, not
+  local midnight. *Rejected: porting the tick loop*: no drawn break depends on it.
 
 - **A time zone's database is passed on the scale, `time_zone_database:` beside `timezone:`
   (2026-10-26, Steve).** The core reads no config, and every `DateTime` zone function would take

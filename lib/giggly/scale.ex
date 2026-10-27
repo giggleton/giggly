@@ -258,7 +258,7 @@ defmodule Giggly.Scale do
   def kind_of(%Continuous{}), do: :continuous
 
   # Whether `scale` takes a column that needs a scale of `kind` (`kind/1`): a scale of that kind
-  # does; a date-time scale no column has settled takes date-times, naive or not; and a continuous
+  # does; a date-time scale no column has settled takes naive date-times too; and a continuous
   # scale through the identity takes a date at its days since 1970-01-01 and a date-time at its
   # seconds, as R stores each and its continuous scale places one. Through another transformation
   # either is refused, where R fails.
@@ -266,9 +266,7 @@ defmodule Giggly.Scale do
   @spec takes?(t(), kind()) :: boolean()
   def takes?(%Continuous{transform: :identity}, kind) when kind in @time_kinds, do: true
 
-  def takes?(%Continuous{transform: {:datetime, :default, _database}}, kind)
-      when kind in [:datetime, :naive_datetime],
-      do: true
+  def takes?(%Continuous{transform: {:datetime, :default, _database}}, :naive_datetime), do: true
 
   def takes?(scale, kind), do: kind_of(scale) == kind
 

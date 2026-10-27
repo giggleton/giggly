@@ -214,6 +214,20 @@ defmodule Giggly.Scale.TransformTest do
                 ], [0.79056941504209488, 1.9086034037919899, 2.4873403825128104]}
     end
 
+    test "finds its breaks from zero, not below or above it, where the axis is near it" do
+      # data.frame(x = c(0, 1)) with scale_x_sqrt(): the breaks 0 to 1 in quarters, found from the
+      # domain's 0 where the widened axis reaches below it, and R's minor breaks less the breaks
+      assert axis(:sqrt, [0, 1]) ==
+               {{-0.05, 1.05},
+                [
+                  {0.0, "0.00"},
+                  {0.5, "0.25"},
+                  {0.70710678118654757, "0.50"},
+                  {0.8660254037844386, "0.75"},
+                  {1.0, "1.00"}
+                ], [0.25, 0.60355339059327373, 0.78656609248549314, 0.9330127018922193]}
+    end
+
     test "places a negative value nowhere" do
       # data.frame(y = c(-1, 4, 9)) with scale_y_sqrt(): layer_data()'s y is NA, 2, 3
       assert Scale.transform(%Continuous{transform: :sqrt}, [-1, 4, 9, :infinity]) ==
@@ -298,7 +312,7 @@ defmodule Giggly.Scale.TransformTest do
     test "marks R's pretty() breaks for date-times, labelled by their step, and minor breaks" do
       values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
 
-      assert axis(@utc, values) ==
+      assert axis(@utc, values) ===
                {{1_710_013_191.0, 1_710_062_229.0},
                 [
                   {1_710_018_000.0, "21:00"},
@@ -369,6 +383,15 @@ defmodule Giggly.Scale.TransformTest do
       assert Transform.inverse(@naive, [1_710_060_012.0]) === [~N[2024-03-10 08:40:12]]
     end
 
+    # A scale on an axis no column maps keeps its zone unsettled, and takes naive date-times, as
+    # its limits may be, as well as date-times in a zone.
+    test "a scale no column has settled places a date-time of either kind" do
+      unsettled = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+
+      assert Transform.transform(unsettled, [~N[2024-03-10 08:40:12], ~U[2024-03-10 08:40:12Z]]) ===
+               [1_710_060_012.0, 1_710_060_012.0]
+    end
+
     test "a scale of one kind refuses a date-time of the other" do
       naive =
         assert_raise ArgumentError, fn ->
@@ -403,6 +426,28 @@ defmodule Giggly.Scale.TransformTest do
       extent = Scale.dimension(trained)
 
       assert labels(trained, extent) == ["20.0", "30.0", "40.0"]
+    end
+
+    test "a labels function under reverse, sqrt and reciprocal is handed breaks in data units" do
+      # ggplot(mtcars, aes(wt, mpg)) + geom_point() under scale_x_reverse(labels = f),
+      # scale_x_sqrt(labels = f) and scale_x_continuous(transform = "reciprocal", labels = f): f
+      # is handed 2, 3, 4 and 5, then their squares' roots squared, then 2 to 6
+      handed = fn transform ->
+        scale = %Continuous{
+          transform: transform,
+          labels: fn breaks -> Enum.map(breaks, &Float.to_string/1) end
+        }
+
+        values = Scale.transform(scale, column(Datasets.mtcars(), :wt))
+        trained = Scale.train(scale, values, :none)
+        labels(trained, Scale.dimension(trained))
+      end
+
+      assert Enum.map([:reverse, :sqrt, :reciprocal], handed) == [
+               ["2.0", "3.0", "4.0", "5.0"],
+               ["2.0000000000000004", "2.9999999999999996", "4.0", "5.000000000000001"],
+               ["2.0", "3.0", "4.0", "5.0", "6.0"]
+             ]
     end
 
     test "a labels function on a date axis is handed dates" do
