@@ -102,12 +102,7 @@ later = Enum.map(Keyword.fetch!(economics, :date), fn date -> Date.after?(date, 
 
 recent =
   Enum.map(economics, fn {name, values} ->
-    kept =
-      values
-      |> Enum.zip(later)
-      |> Enum.filter(fn {_value, keep} -> keep end)
-      |> Enum.map(fn {value, _keep} -> value end)
-
+    kept = for {value, true} <- Enum.zip(values, later), do: value
     {name, kept}
   end)
 

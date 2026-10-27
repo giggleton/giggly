@@ -126,12 +126,7 @@ subset = fn keep? ->
   kept = Enum.map(Keyword.fetch!(mtcars, :cyl), keep?)
 
   Enum.map(mtcars, fn {name, values} ->
-    rows =
-      values
-      |> Enum.zip(kept)
-      |> Enum.filter(fn {_value, keep} -> keep end)
-      |> Enum.map(fn {value, _keep} -> value end)
-
+    rows = for {value, true} <- Enum.zip(values, kept), do: value
     {name, rows}
   end)
 end

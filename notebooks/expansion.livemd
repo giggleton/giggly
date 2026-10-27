@@ -76,11 +76,7 @@ than ggplot2's, each within the same 0.4 of its place; nothing else in the drawi
 (`geom_jitter()`'s notebook says more).
 
 ```elixir
-rows =
-  diamonds[:carat]
-  |> Enum.with_index()
-  |> Enum.filter(fn {carat, _row} -> carat > 2 end)
-  |> Enum.map(fn {_carat, row} -> row end)
+rows = for {carat, row} <- Enum.with_index(diamonds[:carat]), carat > 2, do: row
 
 biggest_diamonds =
   Enum.map(diamonds, fn {name, column} ->

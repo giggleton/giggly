@@ -119,12 +119,7 @@ kept = Enum.map(Keyword.fetch!(diamonds, :carat), fn carat -> carat > 0.5 end)
 
 d =
   Enum.map(diamonds, fn {name, values} ->
-    rows =
-      values
-      |> Enum.zip(kept)
-      |> Enum.filter(fn {_value, keep} -> keep end)
-      |> Enum.map(fn {value, _keep} -> value end)
-
+    rows = for {value, true} <- Enum.zip(values, kept), do: value
     {name, rows}
   end)
 
