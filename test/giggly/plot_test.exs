@@ -4210,6 +4210,7 @@ defmodule Giggly.PlotTest do
             {:breaks, ~T[06:00:00], "or :none, got: ~T[06:00:00]"},
             {:minor_breaks, [1.5], "got: 1.5 in it"},
             {:date_breaks, [day: 1], "got: [day: 1]"},
+            {:date_breaks, [week: 1], "one of :second, :minute and :hour"},
             {:date_breaks, [hour: 0], "got: [hour: 0]"},
             {:date_breaks, [minute: 1.5], "got: [minute: 1.5]"},
             {:date_breaks, [hour: 1, minute: 30], "got: [hour: 1, minute: 30]"},
@@ -4299,6 +4300,7 @@ defmodule Giggly.PlotTest do
             {fn -> Plot.xlim(plot, ~T[06:00:00], ~T[18:00:00]) end,
              "scale_x_time(plot, limits: {low, high}), got: {~T[06:00:00], ~T[18:00:00]}"},
             {fn -> Plot.lims(plot, y: {nil, ~T[18:00:00]}) end, "expected no times of day"},
+            {fn -> Plot.xlim(plot, ~T[06:00:00], nil) end, "expected no times of day"},
             {fn -> Plot.xlim(plot, []) end, "at least one value"},
             {fn -> Plot.lims(plot, y: ["a", "a"]) end, ~s(got: "a" more than once)}
           ] do

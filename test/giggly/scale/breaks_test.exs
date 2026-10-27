@@ -125,4 +125,35 @@ defmodule Giggly.Scale.BreaksTest do
   test "a best sequence whose span is rounding error beside its size is its first break alone" do
     assert Breaks.extended({1.0e15, 1.0e15 + 0.25}) === [1.0e15]
   end
+
+  # Golden: labeling::extended(low, high, 5), labeling 0.4.3 in R 4.6.1, on a range exactly 100
+  # epsilons wide and one exactly sqrt(.Machine$double.xmax) wide, which R searches, being neither
+  # narrower nor wider; at the second, squares past the largest double take R's coverage to minus
+  # infinity
+  test "a range 100 epsilons or the square root of the largest float wide is searched, as R does" do
+    assert Breaks.extended({0.0, 100 * 2.220446049250313e-16}) ===
+             [
+               0.0,
+               5.000000000000001e-15,
+               1.0000000000000002e-14,
+               1.5000000000000002e-14,
+               2.0000000000000003e-14
+             ]
+
+    assert Breaks.extended({0.0, 1.340_780_792_994_259_6e154}) === [
+             0.0,
+             5.0e153,
+             1.0e154,
+             1.5e154
+           ]
+  end
+
+  # Golden: labeling::extended(321908391.83131832, 321908391.83131838, 5), as above, from R's
+  # random ranges: steps of rounding error put a sequence's first and last breaks on one number,
+  # whose density R reaches as minus infinity, dividing by zero
+  test "a sequence of steps that leave its first and last breaks one number never wins" do
+    assert Breaks.extended({321_908_391.83131832, 321_908_391.83131838}) === [
+             321_908_391.83131832
+           ]
+  end
 end

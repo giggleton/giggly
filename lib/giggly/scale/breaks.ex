@@ -18,11 +18,14 @@ defmodule Giggly.Scale.Breaks do
   # or wider than the square root of the largest float (where Elixir's arithmetic would overflow
   # rather than reach infinity), gets the number of breaks wanted spaced evenly from end to end. And
   # a best sequence whose span is within that tolerance of its ends' size, as on a narrow range of
-  # large numbers, is its first break alone, as R's `seq()` returns it.
+  # large numbers, is its first break alone, as R's `seq()` returns it. Where R's scores reach
+  # minus infinity and Elixir's arithmetic raises instead, a sequence whose first and last breaks
+  # are one number, or a square past the largest double at the widest range searched, the score
+  # is the most negative double, so the sequence never wins and a bound there stops the search.
   #
   # R computes some intermediate steps in extended precision; here every step is a double, which
   # can differ only where a sum lands within rounding error of a whole multiple of the step. Over
-  # 813 ranges, random and degenerate, it gives exactly R's breaks.
+  # 3,505 ranges, random and degenerate, those boundaries included, it gives exactly R's breaks.
 
   # The number of breaks wanted: `scales::breaks_extended()`'s `n`.
   @wanted 5
@@ -43,6 +46,11 @@ defmodule Giggly.Scale.Breaks do
 
   # R's `sqrt(.Machine$double.xmax)`, beyond which `labeling` stops searching.
   @widest_searched 1.340_780_792_994_259_6e154
+
+  # The most negative double, standing in for R's minus infinity, which Elixir's floats cannot
+  # hold: a score R's arithmetic takes there, where Elixir's raises, never wins, and a bound there
+  # stops the search, as in R.
+  @minus_infinity -1.797_693_134_862_315_7e308
 
   # The breaks of the extended Wilkinson sequence that scores best over `{low, high}`, `low` below
   # `high`, in ascending order, its steps `nice_numbers` times a power of ten, `labeling`'s when
@@ -173,9 +181,13 @@ defmodule Giggly.Scale.Breaks do
     Enum.with_index(nice_numbers, fn number, index -> {number, index / last} end)
   end
 
+  # `.coverage()` and its bound, minus infinity where a square passes the largest double, on a
+  # range as wide as `labeling` searches, as R's reaches infinity there.
   defp coverage({low, high}, first, last) do
     range = high - low
     1 - 0.5 * ((high - last) ** 2 + (low - first) ** 2) / (0.1 * range) ** 2
+  rescue
+    ArithmeticError -> @minus_infinity
   end
 
   defp coverage_max({low, high}, span) do
@@ -187,7 +199,13 @@ defmodule Giggly.Scale.Breaks do
     else
       1
     end
+  rescue
+    ArithmeticError -> @minus_infinity
   end
+
+  # `.density()`, minus infinity for a sequence whose first and last breaks are one number, its
+  # step rounding error beside them, as R's division by zero gives.
+  defp density(_count, _range, first, last) when first == last, do: @minus_infinity
 
   defp density(count, {low, high}, first, last) do
     ratio = (count - 1) / (last - first)

@@ -590,13 +590,38 @@ defmodule Giggly.Scale.TransformTest do
                 ], ~w(00:00:10.00010 00:00:10.00012 00:00:10.00014 00:00:10.00016 00:00:10.00018)}
     end
 
-    # data 12 microseconds apart from 02:21:54.789662: every break falls on half a microsecond,
-    # which R rounds to the even one
+    # data a few microseconds apart, from R's random extents: breaks on half a microsecond, which R
+    # rounds to the even one, up from an odd one and down from an even, and breaks a rounding error
+    # below a whole microsecond, odd or even, and above one
     test "a break is rounded to the microsecond, half to even" do
-      {_breaks, labels} = inside({8514.789661449999, 8514.78967355})
+      assert Enum.map(
+               [
+                 {8514.789661449999, 8514.78967355},
+                 {84_162.636042950006, 84_162.636044049999},
+                 {79_034.876414900005, 79_034.876417100008}
+               ],
+               fn extent ->
+                 {_breaks, labels} = inside(extent)
+                 labels
+               end
+             ) == [
+               ~w(02:21:54.789662 02:21:54.789664 02:21:54.789668 02:21:54.789670 02:21:54.789674),
+               ~w(23:22:42.636043 23:22:42.636044 23:22:42.636044),
+               ~w(21:57:14.876415 21:57:14.876416 21:57:14.876417)
+             ]
+    end
 
-      assert labels ==
-               ~w(02:21:54.789662 02:21:54.789664 02:21:54.789668 02:21:54.789670 02:21:54.789674)
+    test "a break a microsecond before midnight is written negative" do
+      assert inside({-0.0000015, 0.0000025}) ==
+               {[-9.9999999999999995e-07, 0.0, 9.9999999999999995e-07, 2.0000000000000003e-06],
+                ~w(-00:00:00.000001 00:00:00.000000 00:00:00.000001 00:00:00.000002)}
+    end
+
+    # scale_x_time(date_breaks = "1 hour") over 22:12:00 and 22:48:00: no break falls inside, so
+    # R draws no break, label or minor grid line
+    test "a width laying no break inside the axis draws none" do
+      assert axis(:time, [~T[22:12:00], ~T[22:48:00]], breaks: {:width, [hour: 1]}) ===
+               {{79_812.0, 82_188.0}, [], []}
     end
 
     # scale_x_time(breaks = as_hms(c("06:00:00", "12:00:00", "18:30:00"))) over 00:00:00 and
@@ -666,9 +691,16 @@ defmodule Giggly.Scale.TransformTest do
                [85_800.5, 36_000.123456, nil]
     end
 
+    # scales::label_time("%H:%M:%OS3")(as_hms(-0.25)), as date_labels: writes it: 23:59:59.750
     test "turns a position back into the time of day, wrapped past midnight" do
-      assert Transform.inverse(:time, [86_400.0, -1.0, 36_000.25, 43_200.0]) ===
-               [~T[00:00:00], ~T[23:59:59], ~T[10:00:00.250000], ~T[12:00:00]]
+      assert Transform.inverse(:time, [86_400.0, -1.0, 36_000.25, 43_200.0, -0.25]) ===
+               [
+                 ~T[00:00:00],
+                 ~T[23:59:59],
+                 ~T[10:00:00.250000],
+                 ~T[12:00:00],
+                 ~T[23:59:59.750000]
+               ]
     end
   end
 
