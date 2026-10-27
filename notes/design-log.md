@@ -2911,6 +2911,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Narrow every notebook verdict and About sentence to what date-time scales leave
+  waiting (date-time scales, step 4, the notebook sweep); §4: "Date-time scales are Phase 3's
+  fifteenth increment"
 - 2026-10-27 — Times of day: scale_x_time() and scale_y_time(), a Time placed at its seconds
   since midnight, R's breaks_hms() and hms's labels (date-time scales, step 3); §4: "A time of
   day's labels"
