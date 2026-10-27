@@ -68,7 +68,7 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
   levels, the first table's and then those each later one adds; any other as a discrete scale
-  orders its levels, by the key the assembly hands the facet (`Scale.level_key/1`), so a factor
+  orders its levels, by the key the assembly hands the facet (`Scales.DataRange.level_key/1`), so a factor
   beside text in another table sorts as text; a missing value last, strings by bytes rather than
   R's locale. Only the combinations the tables make get a panel, so a level no row holds makes
   none. A factor in one table beside numbers in another, where R fails, sorts by the key.

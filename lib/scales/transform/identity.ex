@@ -1,39 +1,39 @@
-defmodule Giggly.Scale.Transform.Identity do
+defmodule Scales.Transform.Identity do
   @moduledoc false
 
   # The identity transformation, R's `transform_identity()`: every value as it is, a date at its
   # days since 1970-01-01, a date-time at its seconds (`Transform.Datetime.seconds/1`) and a time
   # at its seconds since midnight (`Transform.Time.seconds/1`), as R stores each and its
   # untransformed continuous scale places one. It is what a continuous scale records when nothing
-  # transforms its axis. Use it through `Giggly.Scale.Transform`.
+  # transforms its axis. Use it through `Scales.Transform`.
   #
   # Its axis takes R's default breaks for a transformation, extended Wilkinson
-  # (`Giggly.Scale.Breaks`), and its default minor breaks, midway between them
-  # (`Giggly.Scale.MinorBreaks`), and writes the breaks as plain decimals (`Giggly.Scale.Labels`).
+  # (`Scales.Breaks`), and its default minor breaks, midway between them
+  # (`Scales.MinorBreaks`), and writes the breaks as plain decimals (`Scales.Labels`).
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{Breaks, Labels, MinorBreaks, Transform}
+  alias Scales.{Breaks, Labels, MinorBreaks, Transform}
 
   @epoch ~D[1970-01-01]
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &placed/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse(_transformation, positions), do: positions
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(_transformation, extent), do: Breaks.extended(extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   # A number's label is its own, whatever the extent.
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(_transformation, breaks, _extent), do: Labels.numbers(breaks)
 
   defp placed(%Date{} = date), do: Date.diff(date, @epoch) / 1

@@ -893,20 +893,6 @@ defmodule Giggly.ScaleTest do
     end
   end
 
-  describe "rescale/3" do
-    test "a value moves linearly from one range to another, in R's order of operations" do
-      rescaled =
-        Enum.map([2, 4, 10, 6, 3.3], fn value -> Scale.rescale(value, {2, 10}, {0, 1}) end)
-
-      assert rescaled === [0.0, 0.25, 1.0, 0.5, 0.16249999999999998]
-    end
-
-    test "a range of zero width puts every value at the middle of the other" do
-      assert Scale.rescale(5, {5, 5}, {0, 1}) === 0.5
-      assert Scale.rescale(5, {5, 5}, {0.1, 1.0}) === 0.55
-    end
-  end
-
   describe "map/2 through a palette" do
     test "a continuous alpha is its place in the range rescaled onto 0.1 to 1, a missing one nil" do
       scale =
@@ -1747,6 +1733,15 @@ defmodule Giggly.ScaleTest do
       scale = palette_scale(hue(15.0, 375.0), [4.0, 6.0], breaks: [6])
 
       assert Scale.legend_breaks(scale) === [{6.0, "6"}]
+    end
+  end
+
+  describe "level_labels/1" do
+    # Golden: R 4.6.1's `levels(factor(...))` of the same values: `4`, `0.5`, `TRUE`, `1e+05`; a
+    # missing level is labelled `NA`, as ggplot2's legend labels it.
+    test "a level is written as R's as.character() writes it, and a missing one as NA" do
+      assert Scale.level_labels(["manual", :auto, true, 4.0, 0.5, 1.0e5, nil]) ===
+               ["manual", "auto", "TRUE", "4", "0.5", "1e+05", "NA"]
     end
   end
 end

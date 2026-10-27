@@ -1,7 +1,8 @@
-defmodule Giggly.Scale.Labels do
+defmodule Scales.Labels do
   @moduledoc false
 
-  # How an axis writes its breaks. Use it through `Giggly.Scale`.
+  # How an axis writes its numeric breaks. Use it through `Scales.Transform`, whose
+  # transformations write their breaks with it.
   #
   # Numbers are written as Elixir shows a float in IEx (`inspect/1`), in plain decimals, with what
   # an axis read at a glance needs on top: every label on an axis gets as many decimals as the most
@@ -10,12 +11,6 @@ defmodule Giggly.Scale.Labels do
   # which drops the rounding error that adding up steps leaves in the last digits (`0.3`, not
   # `0.30000000000000004`), and a negative zero is written `0`. This differs from ggplot2, whose
   # labels come from R's `format()` (`1e+05` where this writes `100000`).
-  #
-  # A discrete level is written as R's `as.character()` writes its value (`Giggly.AsCharacter`),
-  # as `factor()` labels its levels: `4` for a whole float, `TRUE` for `true`; a missing one
-  # (`nil`) as `NA`, as ggplot2 labels a missing level.
-
-  alias Giggly.AsCharacter
 
   @significant_digits 15
 
@@ -34,14 +29,6 @@ defmodule Giggly.Scale.Labels do
 
     Enum.map(rounded, fn value -> :erlang.float_to_binary(value, decimals: decimals) end)
   end
-
-  # The labels of discrete levels, in the order given.
-  @doc false
-  @spec levels(list()) :: [String.t()]
-  def levels(levels), do: Enum.map(levels, &level/1)
-
-  defp level(nil), do: "NA"
-  defp level(value), do: AsCharacter.text(value)
 
   # Rounds through the 15-significant-digit scientific form; a zero of either sign becomes 0.0.
   # `:erlang.float_to_binary/2` takes a negative `scientific:` precision without complaint and uses

@@ -1,9 +1,9 @@
-defmodule Giggly.FormatTest do
+defmodule Scales.FormatTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Format
+  alias Scales.Format
 
-  doctest Giggly.Format
+  doctest Scales.Format
 
   # Golden: every expected label below is R's own, from R 4.6.1 with scales 1.4.0 (the image
   # `giggly-r:ggplot2-4.0.3`), each from the call in the comment above it. They move only if
@@ -431,7 +431,7 @@ defmodule Giggly.FormatTest do
     end
   end
 
-  describe "a call Giggly.Format refuses" do
+  describe "a call Scales.Format refuses" do
     test "names breaks that are not a list of numbers" do
       for breaks <- [[1, nil], 5] do
         error = assert_raise ArgumentError, fn -> Format.comma(breaks) end

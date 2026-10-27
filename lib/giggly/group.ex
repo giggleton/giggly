@@ -26,7 +26,7 @@ defmodule Giggly.Group do
   # its levels' order, a missing value last, as R's `id()` orders a factor, so a factor's groups
   # follow its levels as its scale does; for any other column, by the key the caller gives for
   # each value. The assembly gives the order a discrete scale gives values with no levels of their
-  # own (`Giggly.Scale.level_key/1`), so group ids follow the order the same values take on an
+  # own (`Scales.DataRange.level_key/1`), so group ids follow the order the same values take on an
   # axis or a legend. Grouping itself knows nothing about scales.
 
   # Grouping reads and writes a frame; the order it numbers by is handed to it.

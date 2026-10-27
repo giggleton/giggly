@@ -1,16 +1,16 @@
 ---
 paths:
-  - "lib/giggly/format.ex"
-  - "lib/giggly/format/**"
-  - "test/giggly/format_test.exs"
+  - "lib/scales/format.ex"
+  - "lib/scales/format/**"
+  - "test/scales/format_test.exs"
 ---
 
 # Formatters
 
-`Giggly.Format` writes a scale's labels as scales 1.4.0's `label_comma()`, `label_percent()` and
-`label_currency()` do, and `Giggly.Format.Fixed` writes their numbers as R's `format()` does.
+`Scales.Format` writes a scale's labels as scales 1.4.0's `label_comma()`, `label_percent()` and
+`label_currency()` do, and `Scales.Format.Fixed` writes their numbers as R's `format()` does.
 Why list functions: design-log §4, the entry beginning "`labels:` takes a list"; why these
-names and options: the entry beginning "`Giggly.Format`'s".
+names and options: the entry beginning "`Scales.Format`'s".
 
 ## Rules
 

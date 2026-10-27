@@ -1,10 +1,10 @@
-defmodule Giggly.Scale.Breaks do
+defmodule Scales.Breaks do
   @moduledoc false
 
   # Where a continuous axis's breaks go: the extended Wilkinson algorithm of Talbot, Lin and
   # Hanrahan (2010), as R's `labeling::extended()` implements it and `scales::breaks_extended()`
   # calls it, with five breaks wanted, which is ggplot2's default for a continuous axis. Use it
-  # through `Giggly.Scale`.
+  # through `Scales.Transform`, whose transformations take their breaks from it.
   #
   # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
   # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers times a power of ten, early in

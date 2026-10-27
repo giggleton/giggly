@@ -1,4 +1,4 @@
-defmodule Giggly.Format do
+defmodule Scales.Format do
   @moduledoc """
   Labels for a scale's breaks: numbers with a mark between thousands (`comma/2`), percentages
   (`percent/2`) and amounts of money (`currency/2`).
@@ -52,21 +52,20 @@ defmodule Giggly.Format do
   #   rounding.
   # - The decimals are `-floor(log10(accuracy))`, from 0 to 20, and the numbers sharing a count
   #   are written together, as R's `format(scale * abs(x), nsmall = decimals, scientific =
-  #   FALSE)` writes them, by `Giggly.Format.Fixed`; then prefix, number and suffix, the sign
+  #   FALSE)` writes them, by `Scales.Format.Fixed`; then prefix, number and suffix, the sign
   #   outside them.
   # - `scale_cut` is `scales:::scale_cut`: steps are sorted by threshold; a step is looked up by
   #   its suffix as R indexes a named vector, the first step with it and never an empty suffix;
   #   a zero threshold never refines and divides by 1 below. R requires no zero step, but without
   #   one its lookup of the step below misaligns its vectors (`c(m = 60, h = 3600)` writes 5400
   #   as `5 400NA`), so one is required here (design-log §4, the entry beginning
-  #   "`Giggly.Format`'s").
+  #   "`Scales.Format`'s").
   #
-  # Its own boundary. Its options are checked by NimbleOptions, as every public option in Giggly
-  # is, so it lists that library, as the root's comment allows a domain with options of its own
-  # to, and nothing else. Nothing in Giggly calls it: it is a library a user hands to `labels:`.
-  use Boundary, deps: [NimbleOptions], exports: []
+  # Its options are checked by NimbleOptions, as every public option in Giggly is, which the
+  # `Scales` boundary lists for it. Nothing in Giggly calls it: it is a library a user hands to
+  # `labels:`.
 
-  alias Giggly.Format.Fixed
+  alias Scales.Format.Fixed
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
@@ -234,16 +233,16 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.comma([-100_000, 1_234_567.891, 0.125])
+      iex> Scales.Format.comma([-100_000, 1_234_567.891, 0.125])
       ["-100,000", "1,234,568", "0"]
 
-      iex> Giggly.Format.comma([0.5, 1, 1.25])
+      iex> Scales.Format.comma([0.5, 1, 1.25])
       ["0.50", "1.00", "1.25"]
 
-      iex> Giggly.Format.comma([0, 1250, 2500], accuracy: 0.1, scale: 0.001, suffix: "k")
+      iex> Scales.Format.comma([0, 1250, 2500], accuracy: 0.1, scale: 0.001, suffix: "k")
       ["0.0k", "1.2k", "2.5k"]
 
-      iex> Giggly.Format.comma([0, 1500, 1.0e6], scale_cut: Giggly.Format.cut_short_scale())
+      iex> Scales.Format.comma([0, 1500, 1.0e6], scale_cut: Scales.Format.cut_short_scale())
       ["0", "2K", "1M"]
   """
   @spec comma([number()], keyword()) :: [String.t()]
@@ -266,13 +265,13 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.percent([0, 0.25, 0.5, 0.75, 1])
+      iex> Scales.Format.percent([0, 0.25, 0.5, 0.75, 1])
       ["0%", "25%", "50%", "75%", "100%"]
 
-      iex> Giggly.Format.percent([0.1234, 0.5], accuracy: 0.1)
+      iex> Scales.Format.percent([0.1234, 0.5], accuracy: 0.1)
       ["12.3%", "50.0%"]
 
-      iex> Giggly.Format.percent([-0.5, 0.125, 12.345])
+      iex> Scales.Format.percent([-0.5, 0.125, 12.345])
       ["-50%", "12%", "1 234%"]
   """
   @spec percent([number()], keyword()) :: [String.t()]
@@ -297,16 +296,16 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.currency([0, 50, 100])
+      iex> Scales.Format.currency([0, 50, 100])
       ["$0", "$50", "$100"]
 
-      iex> Giggly.Format.currency([-13.5, 0, 13.5])
+      iex> Scales.Format.currency([-13.5, 0, 13.5])
       ["-$13.50", "$0.00", "$13.50"]
 
-      iex> Giggly.Format.currency([1234.5, 1], big_mark: ".", decimal_mark: ",", prefix: "", suffix: " €")
+      iex> Scales.Format.currency([1234.5, 1], big_mark: ".", decimal_mark: ",", prefix: "", suffix: " €")
       ["1.234,50 €", "1,00 €"]
 
-      iex> Giggly.Format.currency([0, 2.5e5, 5.0e5, 1.0e6], scale_cut: Giggly.Format.cut_short_scale())
+      iex> Scales.Format.currency([0, 2.5e5, 5.0e5, 1.0e6], scale_cut: Scales.Format.cut_short_scale())
       ["$0", "$250K", "$500K", "$1M"]
   """
   @spec currency([number()], keyword()) :: [String.t()]
@@ -332,10 +331,10 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.cut_short_scale()
+      iex> Scales.Format.cut_short_scale()
       [{"", 0}, {"K", 1000}, {"M", 1000000}, {"B", 1000000000}, {"T", 1000000000000}]
 
-      iex> Giggly.Format.comma([-2000, 0, 2000], scale_cut: Giggly.Format.cut_short_scale(space: true))
+      iex> Scales.Format.comma([-2000, 0, 2000], scale_cut: Scales.Format.cut_short_scale(space: true))
       ["-2 K", "0 ", "2 K"]
   """
   @spec cut_short_scale(keyword()) :: [step()]
@@ -351,7 +350,7 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.currency([0, 1.0e9, 2.0e12], scale_cut: Giggly.Format.cut_long_scale())
+      iex> Scales.Format.currency([0, 1.0e9, 2.0e12], scale_cut: Scales.Format.cut_long_scale())
       ["$0", "$1,000M", "$2B"]
   """
   @spec cut_long_scale(keyword()) :: [step()]
@@ -363,7 +362,7 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.comma([0.001, 1, 1500], scale_cut: Giggly.Format.cut_si("g"))
+      iex> Scales.Format.comma([0.001, 1, 1500], scale_cut: Scales.Format.cut_si("g"))
       ["1 mg", "1 g", "2 kg"]
   """
   @spec cut_si(String.t()) :: [step()]
@@ -390,7 +389,7 @@ defmodule Giggly.Format do
 
   ## Examples
 
-      iex> Giggly.Format.comma([0, 45, 90, 120, 5400], scale_cut: Giggly.Format.cut_time_scale())
+      iex> Scales.Format.comma([0, 45, 90, 120, 5400], scale_cut: Scales.Format.cut_time_scale())
       ["0", "45s", "90s", "2m", "90m"]
   """
   @spec cut_time_scale(keyword()) :: [step()]

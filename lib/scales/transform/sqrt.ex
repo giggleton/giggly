@@ -1,7 +1,7 @@
-defmodule Giggly.Scale.Transform.Sqrt do
+defmodule Scales.Transform.Sqrt do
   @moduledoc false
 
-  # The square root, R's `transform_sqrt()`. Use it through `Giggly.Scale.Transform`.
+  # The square root, R's `transform_sqrt()`. Use it through `Scales.Transform`.
   #
   # A number from zero up becomes its square root, a negative one missing, R's NaN; plus infinity
   # stays itself. Turned back, a position is squared; R's inverse makes one below zero missing,
@@ -10,20 +10,20 @@ defmodule Giggly.Scale.Transform.Sqrt do
   # extended Wilkinson's on the range in data units, its minor breaks R's regular ones in
   # square-root space, and its labels the breaks in data units, plain decimals.
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Labels, MinorBreaks}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &root/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &squared/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {0.0, :infinity}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(_transformation, {low, high}) do
     [low, high]
     |> Enum.map(&squared/1)
@@ -32,10 +32,10 @@ defmodule Giggly.Scale.Transform.Sqrt do
     |> Enum.map(&root/1)
   end
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&squared/1)

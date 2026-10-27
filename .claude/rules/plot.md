@@ -17,12 +17,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 
 - **A plot describes and runs nothing.** `Plot` builds the value; running it — assembling,
   inspecting, drawing — is the functions in `Giggly`. Its boundary lists `Giggly.Aesthetics`,
-  `Giggly.DataFrame`, `Giggly.ColorOperations`, which reads a colour an option sets,
+  `Giggly.DataFrame`, `Scales`, whose `ColorOperations` reads a colour an option sets and whose
+  `DataRange.key/1` it reads to refuse a discrete value named twice,
   `Giggly.Mapping`, whose checks resolve each mapping value at the call, the five families whose
   kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`, `Giggly.Position`, `Giggly.Stat`),
   `Giggly.Guide`, whose legend's struct `guide_legend/1` builds, `Giggly.Scale`, whose `Continuous`
-  and `Discrete` structs it writes and whose `Discrete.key/1` it reads to refuse a discrete value
-  named twice, `Giggly.ElementTree`, the theme's tree, which `theme/2` builds its schema from, and
+  and `Discrete` structs it writes, `Giggly.ElementTree`, the theme's tree, which `theme/2` builds its schema from, and
   `Giggly.Theme`, whose `choose/2` and `merge/2` it calls, and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute and
   draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root, which
@@ -285,7 +285,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   aesthetic, and a set width where the table has none, before the geom's setup, so it widens the
   axes as ggplot2 4.0's `GeomRect` fills its corners in, and a bar's edges are where R's are; a
   stat writing a width takes the set one as its own (counting's `%Stat.Count{width:}`).
-  **A colour is resolved at the call** (`Giggly.ColorOperations.parse/1`): the layer
+  **A colour is resolved at the call** (`Scales.ColorOperations.parse/1`): the layer
   holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
   raises naming the value. **A shape is resolved at the call too** (`validate_shape/1`): one of
   the names `Geom.Point.shapes/0` lists, or its number, 0 to 25, held as the name, or `:none`, so
@@ -430,7 +430,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `validate_jitter_amount/1`), which take an integer too and keep a float, as R
   keeps a number, and a shape's (`validate_shape/1`) and a line type's (`validate_linetype/1`),
   which take a name or a whole number, a line type a tuple of them too;
-  `validate_color/1` hands a colour to `Giggly.ColorOperations`. A gradient's colours must be
+  `validate_color/1` hands a colour to `Scales.ColorOperations`. A gradient's colours must be
   opaque (`validate_opaque_color/1`), since it blends colours alone; a grey's level and an alpha
   range's ends run from 0 to 1.
 - **An annotation (`annotate/3`, `annotation: true`) is a layer drawn from values given in the

@@ -1,12 +1,13 @@
 defmodule Giggly.GroupTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{DataFrame, Group, Scale}
+  alias Giggly.{DataFrame, Group}
+  alias Scales.DataRange
 
   # The `:group` column `add/2` gives `frame`, ordered as the assembly orders it.
   defp group_ids(frame) do
     frame
-    |> Group.add(&Scale.level_key/1)
+    |> Group.add(&DataRange.level_key/1)
     |> DataFrame.pull(:group)
   end
 

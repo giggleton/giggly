@@ -1,7 +1,7 @@
-defmodule Giggly.Scale.BreaksTest do
+defmodule Scales.BreaksTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Scale.Breaks
+  alias Scales.Breaks
 
   # Golden: R's own `labeling::extended(low, high, 5)` (labeling 0.4.3, R 4.6.1, run in Docker's
   # `r-base` image), each break printed to 17 significant digits. extended Wilkinson is a search

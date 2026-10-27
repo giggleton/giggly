@@ -1,10 +1,10 @@
-defmodule Giggly.Scale.MinorBreaks do
+defmodule Scales.MinorBreaks do
   @moduledoc false
 
   # Where a continuous axis's minor breaks go, between its breaks: R's
   # `scales::regular_minor_breaks()`, which a transformation carries as its `minor_breaks` and
   # ggplot2 calls asking for two intervals between neighbouring breaks. Use it through
-  # `Giggly.Scale`.
+  # `Scales.Transform`, whose transformations carry it.
   #
   # Each gap between neighbouring breaks, in the order the transformation gives them, gets a minor
   # break at its middle. Where the extent reaches past the breaks at an end, the breaks are first

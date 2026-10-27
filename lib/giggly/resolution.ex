@@ -15,11 +15,11 @@ defmodule Giggly.Resolution do
   # with none left the positions are 1 apart. A missing or infinite position is left out, as R's
   # `sort()` drops a missing one.
 
-  # ggplot2's arithmetic on plain positions, asking the scales only whether a range is zero wide,
-  # the one home of R's `zero_range()`.
-  use Boundary, deps: [Giggly.Scale], exports: []
+  # ggplot2's arithmetic on plain positions, asking R's scales half only whether a range is zero
+  # wide (`Scales.Bounds.zero_range?/2`), the one home of R's `zero_range()`.
+  use Boundary, deps: [Scales], exports: []
 
-  alias Giggly.Scale
+  alias Scales.Bounds
 
   # R's `sqrt(.Machine$double.eps)`.
   @tolerance :math.sqrt(2.220446049250313e-16)
@@ -37,7 +37,7 @@ defmodule Giggly.Resolution do
 
   defp zero_width?(numbers) do
     {low, high} = Enum.min_max(numbers)
-    Scale.zero_range?(low, high)
+    Bounds.zero_range?(low, high)
   end
 
   defp smallest_gap(numbers, zero) do

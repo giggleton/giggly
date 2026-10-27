@@ -1,14 +1,14 @@
-defmodule Giggly.Scale.Transform.Time do
+defmodule Scales.Transform.Time do
   @moduledoc false
 
   # The time-of-day transformation, R's `transform_hms()`: a time as its seconds since midnight, a
   # double, as R's `hms` stores one, its whole microseconds divided once by a million; a missing
   # one missing. It is what a scale of times records, ggplot2's `scale_x_time()`. Use it through
-  # `Giggly.Scale.Transform`, and never alias it down to its last segment, which is Elixir's
+  # `Scales.Transform`, and never alias it down to its last segment, which is Elixir's
   # `Time`.
   #
   # Its axis takes R's `breaks_hms()` breaks, `scales::breaks_timespan()` on seconds: extended
-  # breaks (`Giggly.Scale.Breaks`) with the nice numbers 1, 2, 1.5, 4 and 3, found on the extent in
+  # breaks (`Scales.Breaks`) with the nice numbers 1, 2, 1.5, 4 and 3, found on the extent in
   # seconds when it spans two minutes or less, in minutes up to two hours, in hours up to two days,
   # in days up to two weeks and in weeks beyond, so they fall on round seconds, minutes or hours.
   # Its labels are written as hms writes a time: hours, minutes and seconds, two digits each at
@@ -19,14 +19,14 @@ defmodule Giggly.Scale.Transform.Time do
   # decimals on every label where a break is a rounding error off a whole second
   # (`10:24:00.000000`), and spaces padding every label to the widest. Breaks given or laid by a
   # width are written alike. Its minor breaks are R's regular ones on the seconds, midway between
-  # them (`Giggly.Scale.MinorBreaks`), as `transform_hms()` keeps the default. A break turned back
+  # them (`Scales.MinorBreaks`), as `transform_hms()` keeps the default. A break turned back
   # is a `Time` wrapped past midnight, so `24:00:00` is `~T[00:00:00]`, as R's `format()` of a time
   # as a date-time writes it, to the second where it is a whole second and else to the
   # microsecond.
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{Breaks, MinorBreaks}
+  alias Scales.{Breaks, MinorBreaks}
 
   # `scales::breaks_timespan()`'s nice numbers, in order of preference.
   @nice_numbers [1, 2, 1.5, 4, 3]
@@ -37,18 +37,18 @@ defmodule Giggly.Scale.Transform.Time do
   @day 86_400
   @week 604_800
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &seconds/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &time/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   # The extent measured in the unit that suits its span, broken there, and measured in seconds
   # again, as `breaks_timespan()` divides and multiplies.
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(_transformation, {low, high}) do
     unit = unit(high - low)
 
@@ -57,10 +57,10 @@ defmodule Giggly.Scale.Transform.Time do
     |> Enum.map(fn break -> break * unit end)
   end
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(_transformation, breaks, _extent) do
     counts = Enum.map(breaks, &microseconds/1)
 
@@ -78,7 +78,7 @@ defmodule Giggly.Scale.Transform.Time do
   # of the step's seconds from the extent's start rounded down to one to its end rounded up, as
   # R's `round_any()` rounds them.
   @doc false
-  @spec width(Giggly.Scale.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
+  @spec width(Scales.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
           [float()]
   def width(_transformation, [{unit, count}], {low, high}) do
     size = count * step_seconds(unit)

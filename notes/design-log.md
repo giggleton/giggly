@@ -101,9 +101,12 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   covers only the changed lines. Functions pulled from `Giggly.Scale` go to `Scales.Bounds` (R's
   `bounds.R`: rescaling, `zero_range()`, censoring) and `Scales.DataRange` (R's
   `train_continuous()`, `train_discrete()`, the order of levels; Steve: "stuck with datarange
-  for now"). Manual palettes' name matching moves into `Giggly.Scale.Discrete`, and discrete
-  levels' labels into `Giggly.Scale`, their only callers, so no Giggly module shares a package
-  module's last segment. A second step documents the package as API. *Rejected:
+  for now"). Discrete levels' labels move into `Giggly.Scale`, their only caller, so no Giggly
+  module shares a package module's last segment. Manual palettes' name matching stays in
+  `Scales.Palette` with the check of too few values it shares, R's line running through it
+  (ggplot2's `manual_scale()` aborts, scales' `pal_manual()` warns), to move with that check when
+  the package's API settles (Steve: "A"). A second step documents the package as API. *Rejected:
+  moving the matching alone*: the check copied into Giggly. *Rejected:
   `Scales.Domain`*: in the function sense, the opposite of a range (Steve). *Rejected:
   `Scales.Range` and `Scales.Color`*: the one shadows Elixir's `Range` where aliased, the other
   cannot be grepped apart from the `color` library's `Color`. *Rejected: regrouping during the
@@ -123,7 +126,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   fill, alpha, size and line width, together; sub-second steps; `oob`, `position`, `sec.axis`;
   `label_date_short()`; `Duration` columns.
 
-- **A date-time's breaks under a day are `prettyDate()`'s steps, the table `Scale.DateBreaks`
+- **A date-time's breaks under a day are `prettyDate()`'s steps, the table `Scales.DateBreaks`
   holds for dates extended (2026-10-26, Steve).** Seconds (1, 2, 5, 10, 15, 30), minutes (the
   same) and hours (1, 3, 6, 12), each with R's label format and unit to truncate to, chosen by
   the rule the table already has, with R's widening of an extent under a second by 2.5 seconds
@@ -178,7 +181,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   "Leave it").** Past 10^22 a step and its breaks are rounded, and R's long-double `%%` keeps that
   rounding as a break's remainder, denying a sequence through zero its bonus where the remainder
   in doubles, exactly 0, grants it: on ranges over about 3e23 wide reaching zero, 95 of 1,500
-  depart, none narrower (`Scale.Breaks`' opening comment). *Rejected: the remainder computed
+  depart, none narrower (`Scales.Breaks`' opening comment). *Rejected: the remainder computed
   exactly in integers*, which matches R there but costs every candidate scored, for ranges no
   plot of ordinary data reaches.
 
@@ -784,7 +787,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   whether its first values had levels (2026-10-22, Steve, scoping Phase 3's tenth increment;
   checked in R).** Each training (one layer's column, on the panels the scale serves) brings the
   levels its rows hold, as R's `drop = TRUE`, or its plain values sorted, and adds those the scale
-  lacks, matched by `Discrete.key/1`: a factor's levels lead whichever layer brings them, so
+  lacks, matched by `Scales.DataRange.key/1`: a factor's levels lead whichever layer brings them, so
   factor (b, a) and text (c, a) train to b, a, c in either order. A scale whose first values had
   levels then adds each new value after the rest; one whose first were plain sorts everything at
   each plain training, so text, factor, text (d, 0) gives 0, a, b, c, d where factor first gives
@@ -1320,7 +1323,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   made API, built from closures. *Rejected: refusing high-to-low limits on a scale function*: the
   order means nothing once transformed (`scale_x_reverse` takes both).
 
-- **`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
+- **`Scales.Format`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**
   `currency`, since scales 1.4.0 supersedes `label_dollar()` with it, the output the same (the
   entry beginning "Giggly exposes no function" holds for scales too); the notebook draws
@@ -1365,7 +1368,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   data the assembly builds a scale from*: no grant, but every option in two shapes.
 
 - **`labels:` takes a list, a function handed every break drawn, or `:none`; Giggly's formatters
-  are list functions in `Giggly.Format` (2026-10-18, Steve).** A function sees every break at
+  are list functions in `Scales.Format` (2026-10-18, Steve).** A function sees every break at
   once, as R's do, so a formatter can give them shared decimals (R's `precision()`:
   `label_comma()` writes 0.5, 1 and 1.25 as `0.50`, `1.00`, `1.25`) and `currency` can drop
   cents only when every break is whole; it returns one label per break, or the run raises.
@@ -1373,7 +1376,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   matching R's `label_*()` output. A label list needs a breaks list of its length, checked at the call.
   *Rejected: a function called per break*: shorter to write, but no formatter could share
   decimals. *Rejected: formatters named by value* (`labels: :comma`, ggity's): a second
-  contract. *Rejected: `Giggly.Labels`*: it shares its last segment with `Giggly.Scale.Labels`,
+  contract. *Rejected: `Giggly.Labels`*: it shares its last segment with `Scales.Labels`,
   and it owns no table.
 
 - **"Absent" in a public option: `:none` removes, an option left out is the default, and a limit
@@ -1621,8 +1624,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A library's owner nests under the umbrella, and the root lists the library (2026-10-16,
   Steve).** boundary lets a sub-boundary list an outside library only when its parent does, so
-  `Giggly.DataFrame` lists `Table` and `Giggly.ColorOperations` lists `Color`, and the root lists
-  both libraries in place of their owners. The only module the root's list opens a library to is
+  `Giggly.DataFrame` lists `Table` and `Giggly.Tensor` lists `Nx`, and the root lists both
+  libraries in place of their owners; `Color` is the `Scales` package's, outside the umbrella
+  (the entry beginning "`scales`, a package of R's scales half"). The only module the root's list opens a library to is
   `Giggly`, the run functions; every domain is strict and calls only what it lists, so a domain
   reaching a library needs a widening the waiver gate brings to the user. Nesting drops two
   `top_level?:` exemptions and keeps the namespace and the boundary tree one shape, as boundary's
@@ -1661,7 +1665,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   makes from D65's chromaticity (0.31271, 0.32902) rather than the textbook 95.047 and 108.883, and
   each channel rounded half to even, it matches R on 50,400 HCL values, `pal_hue()` for 1 to 40
   levels, and all but one of 35,007 gradient samples, a colour below L* 8 where farver keeps
-  0.008856 and 7.787. `Giggly.ColorOperations` is its only caller; a gradient's interpolation in
+  0.008856 and 7.787. `Scales.ColorOperations` is its only caller; a gradient's interpolation in
   Lab is the scale's, as in R's scales. *Rejected: `color`'s own conversions*, 12 of 820 hue
   colours a byte out; *porting farver*; *`Giggly.Color`* (Steve: `Color.` could not be grepped
   apart from the library's) and *`Giggly.Colors`* (Steve).
@@ -1750,7 +1754,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   for continuous alpha, `seq(0.1, 1, length.out = n)` for discrete, the identity for a position.
   So `Scale.Continuous` and `Scale.Discrete`, public through `Giggly.panel_scales/2`, gain
   `palette`, `:identity` for the axes, and colour, size and shape will add palettes, not kinds. A
-  palette is a value (`{:rescale, {0.1, 1.0}}`), resolved by `Scale.Palette` as a transformation's
+  palette is a value (`{:rescale, {0.1, 1.0}}`), resolved by `Scales.Palette` as a transformation's
   name is, so a scale stays a value. *Rejected: separate structs for non-position scales*, a second
   pair training the same way. *Rejected: a module per aesthetic and kind*, ggity's
   `Scale.Alpha.Continuous`, whose closures and legends multiplied with each aesthetic.
@@ -1920,7 +1924,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Plot.facet_wrap(plot, facets, options)` with `facets` a column or a list of them, named at the
   call as a mapping names one, and `nrow:` and `ncol:` validated by NimbleOptions, which `Plot` will
   list; panels are the combinations of values present, ordered as a discrete scale orders its
-  levels by the key the assembly hands in (`Scale.level_key/1`, as for `Group.add/2`), `nil` its
+  levels by the key the assembly hands in (`Scales.DataRange.level_key/1`, as for `Group.add/2`), `nil` its
   own panel labelled `NA`, laid out by ggplot2's `wrap_dims()`. Too few cells for the panels
   raises when the plot is run, since counting the combinations is the facet's computation and the
   plot checks only what it knows. §7's question of how an option says "absent" does not arrive: a
@@ -2328,9 +2332,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   straight and crosses the panel, which is the coordinate system's call (ggplot2's polar
   `render_bg` draws circles and spokes), the grid would be keyed by an axis's side where ggplot2
   keys it by aesthetic, and the axis would carry minor breaks it never draws. The minor breaks
-  come from the scale: `Scale.Transform` gained `minor_breaks`, as R's transformation object
+  come from the scale: `Scales.Transform` gained `minor_breaks`, as R's transformation object
   carries it, and the identity's is a port of `scales::regular_minor_breaks()` asking for two
-  intervals per gap (`Scale.MinorBreaks`): one more step past an outermost break the extent
+  intervals per gap (`Scales.MinorBreaks`): one more step past an outermost break the extent
   reaches beyond, then each gap's middle, found as R's `seq()` finds it, the gap's start plus half
   its width, which differs from the two ends' mean in the last bit. `Scale.minor_breaks/3` takes
   the breaks `breaks/2` gave on the same extent, as ggplot2's view scale hands its breaks to
@@ -2421,7 +2425,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   that measures its labels with the glyph table ggplot2's own snapshots were measured with
   (2026-10-12, Steve).** `Scale.breaks(scale, extent)` returns an axis's breaks as `{position,
   label}` pairs on the extent it is handed. A continuous scale's are its transformation's (the
-  `Scale.Transform` behaviour gained `breaks` and `format`, as R's transformation object carries
+  `Scales.Transform` behaviour gained `breaks` and `format`, as R's transformation object carries
   them), kept inside the extent as ggplot2's view scale censors them; an untrained scale has none,
   and an extent of zero width has its low end alone, as `ScaleContinuous$get_breaks` returns. A
   discrete scale's are its levels at 1..n. The identity's breaks are extended Wilkinson, ported
@@ -2553,7 +2557,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   The assembly runs the stages where the fixed order puts them: each axis's scale is added after
   grouping, its columns are put through `Scale.transform/2`, trained on and mapped, and then each
   layer's stat (`Giggly.Stat`) and position (`Giggly.Position`) run. A transformation is a module
-  implementing `Giggly.Scale.Transform`, resolved from its name; a stat and a position are structs
+  implementing `Scales.Transform`, resolved from its name; a stat and a position are structs
   of their kinds (the entry beginning "Each facet, coordinate system, geom, stat and position is a
   struct"). Modules whose last segment repeats across namespaces are written through their
   namespace (`alias Giggly.Stat`, then `Stat.Identity`), never aliased to the tail: a second
@@ -2584,7 +2588,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   indexed by panel id. The assembly refuses, when the plot is run, an axis column no scale can
   place and one whose kind disagrees with the axis's first column, naming the layer by index, the
   aesthetic, the column and its type — where ggplot2 refuses too. `Group.add/2` numbers values by
-  an order key the assembly hands it, `Scale.level_key/1`, so group ids and axis positions come
+  an order key the assembly hands it, `Scales.DataRange.level_key/1`, so group ids and axis positions come
   from one rule while grouping names nothing about scales. *Rejected: refusing at the geom call,
   with `Plot` asking `Scale.kind/1`* (first built, then reversed by Steve) — the description would
   list `Scale`, and a list grants a whole boundary, so the plot could start running scales; what
@@ -2911,6 +2915,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Carve R's scales half out as the Scales package: breaks, transforms, palettes,
+  labels, formatters and colour operations moved by name, Scales.Bounds and Scales.DataRange
+  pulled from Giggly.Scale (scales package, the split, step 1); §4: "`scales`, a package of R's
+  scales half", "The split moves files under `Scales.` by name alone"
 - 2026-10-27 — Narrow every notebook verdict and About sentence to what date-time scales leave
   waiting (date-time scales, step 4, the notebook sweep); §4: "Date-time scales are Phase 3's
   fifteenth increment"

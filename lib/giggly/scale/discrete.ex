@@ -53,7 +53,7 @@ defmodule Giggly.Scale.Discrete do
 
   # Use it through `Giggly.Scale`.
 
-  alias Giggly.Scale.{Continuous, Palette}
+  alias Scales.{DataRange, Palette}
 
   # Every field's default is a position scale's before it has seen any data: no levels, the
   # identity palette, an axis, and every option the default, ggplot2's 0.6 of a level's room at
@@ -101,56 +101,13 @@ defmodule Giggly.Scale.Discrete do
         }
 
   # The scale with `values` merged into its levels, as R's `scales::discrete_range()` merges a
-  # range, `levels` the factor's levels they are values of, or `:none`; as `Giggly.Scale.train/3`
-  # describes. Values that are none merge nothing, as ggplot2 trains nothing on no rows.
+  # range (`Scales.DataRange.train_discrete/3`), `levels` the factor's levels they are values of,
+  # or `:none`; as `Giggly.Scale.train/3` describes.
   @doc false
   @spec train(t(), list(), list() | :none) :: t()
-  def train(%__MODULE__{} = scale, [], _levels), do: scale
-
-  def train(%__MODULE__{factor: :none} = scale, values, levels),
-    do: %{scale | levels: present_levels(values, levels), factor: levels != :none}
-
-  def train(%__MODULE__{levels: old, factor: factor} = scale, values, levels) do
-    merged =
-      merged(ordered_old(old, factor), factor, present_levels(values, levels), levels != :none)
-
-    %{scale | levels: merged}
-  end
-
-  # The levels `values` bring, as R's `clevels()` with `drop = TRUE` gives them: a factor's levels
-  # its values hold, in its levels' order, then the missing value if one is among them; or the
-  # distinct values sorted, the missing value last.
-  defp present_levels(values, :none) do
-    values
-    |> Enum.uniq_by(&key/1)
-    |> Enum.sort_by(&Giggly.Scale.level_key/1)
-  end
-
-  defp present_levels(values, levels) do
-    present = MapSet.new(values, &key/1)
-    held = Enum.filter(levels, fn level -> MapSet.member?(present, key(level)) end)
-    if MapSet.member?(present, nil), do: Enum.concat(held, [nil]), else: held
-  end
-
-  # The levels already held as `discrete_range()` reads them before merging: kept in order, the
-  # missing value moved last, where the first values were a factor's; else sorted.
-  defp ordered_old(old, true), do: Enum.reject(old, &is_nil/1) ++ Enum.filter(old, &is_nil/1)
-  defp ordered_old(old, false), do: Enum.sort_by(old, &Giggly.Scale.level_key/1)
-
-  # A factor's levels lead where the held levels' order is not a factor's, so the two swap.
-  defp merged(old, false, new, true), do: appended(new, true, old)
-  defp merged(old, old_factor, new, _new_factor), do: appended(old, old_factor, new)
-
-  # The levels not yet held follow those held, and the whole is sorted unless the leading levels
-  # are a factor's.
-  defp appended(old, old_factor, new) do
-    held = MapSet.new(old, &key/1)
-
-    case Enum.reject(new, fn level -> MapSet.member?(held, key(level)) end) do
-      [] -> old
-      added when old_factor -> old ++ added
-      added -> Enum.sort_by(old ++ added, &Giggly.Scale.level_key/1)
-    end
+  def train(%__MODULE__{levels: held, factor: factor} = scale, values, levels) do
+    {merged, factor} = DataRange.train_discrete({held, factor}, values, levels)
+    %{scale | levels: merged, factor: factor}
   end
 
   # The scale with its continuous range widened to cover the positions `values`, its levels left
@@ -158,7 +115,7 @@ defmodule Giggly.Scale.Discrete do
   @doc false
   @spec train_positions(t(), list()) :: t()
   def train_positions(%__MODULE__{continuous_range: range} = scale, values),
-    do: %{scale | continuous_range: Continuous.train_range(range, values)}
+    do: %{scale | continuous_range: DataRange.train_continuous(range, values)}
 
   # The values the scale shows, in order, as ggplot2's `get_limits()` gives them: its limits where
   # given, else its levels, or, for a manual palette's map, those of its levels the map has a
@@ -168,8 +125,11 @@ defmodule Giggly.Scale.Discrete do
   @spec limits(t()) :: list()
   def limits(%__MODULE__{limits: :default, levels: levels, palette: {:manual, colors}})
       when is_map(colors) do
-    named = MapSet.new(colors, fn {value, _color} -> key(value) end)
-    Enum.filter(levels, fn level -> is_nil(level) or MapSet.member?(named, key(level)) end)
+    named = MapSet.new(colors, fn {value, _color} -> DataRange.key(value) end)
+
+    Enum.filter(levels, fn level ->
+      is_nil(level) or MapSet.member?(named, DataRange.key(level))
+    end)
   end
 
   def limits(%__MODULE__{limits: :default, levels: levels}), do: levels
@@ -187,9 +147,9 @@ defmodule Giggly.Scale.Discrete do
       scale
       |> limits()
       |> Enum.with_index(1)
-      |> Map.new(fn {limit, position} -> {key(limit), position} end)
+      |> Map.new(fn {limit, position} -> {DataRange.key(limit), position} end)
 
-    Enum.map(values, fn value -> Map.get(position_by_key, key(value)) end)
+    Enum.map(values, fn value -> Map.get(position_by_key, DataRange.key(value)) end)
   end
 
   def map(%__MODULE__{palette: palette, na_value: na_value} = scale, values) do
@@ -201,33 +161,30 @@ defmodule Giggly.Scale.Discrete do
     value_by_key =
       present
       |> Enum.zip_with(palette_values(palette, present, na_value), fn limit, mapped ->
-        {key(limit), mapped}
+        {DataRange.key(limit), mapped}
       end)
       |> Map.new()
 
-    Enum.map(values, fn value -> Map.get(value_by_key, key(value), na_value) end)
+    Enum.map(values, fn value -> Map.get(value_by_key, DataRange.key(value), na_value) end)
   end
 
   # The palette's value for each of the present limits: a manual palette's map gives each the
   # value it holds for it, by value, or `na_value`, and so does a list named by breaks, each value
   # its break's; any other palette spreads them in order.
   defp palette_values({:manual, values}, present, na_value) when is_map(values) do
-    value_by_key = Map.new(values, fn {value, mapped} -> {key(value), mapped} end)
-    Palette.named(value_by_key, Enum.map(present, &key/1), na_value)
+    value_by_key = Map.new(values, fn {value, mapped} -> {DataRange.key(value), mapped} end)
+    Palette.named(value_by_key, Enum.map(present, &DataRange.key/1), na_value)
   end
 
   defp palette_values({:manual, values, breaks}, present, na_value) do
-    Palette.named_by_breaks(values, Enum.map(breaks, &key/1), Enum.map(present, &key/1), na_value)
+    Palette.named_by_breaks(
+      values,
+      Enum.map(breaks, &DataRange.key/1),
+      Enum.map(present, &DataRange.key/1),
+      na_value
+    )
   end
 
   defp palette_values(palette, present, _na_value),
     do: Palette.discrete(palette, length(present))
-
-  # The key a value is looked up by: a number as a float, so an integer and the float equal to it
-  # share one, and adding a zero turns a negative zero into the zero it equals; any other value as
-  # it is.
-  @doc false
-  @spec key(term()) :: term()
-  def key(value) when is_number(value), do: value + 0.0
-  def key(value), do: value
 end

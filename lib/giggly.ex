@@ -8,17 +8,17 @@ defmodule Giggly do
   """
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
-  # a sub-boundary beneath it. Like every boundary it is strict (`mix.exs`). It lists `Color`,
-  # `Nx` and `Table`, the outside libraries `Giggly.ColorOperations`, `Giggly.Tensor` and
-  # `Giggly.DataFrame` own, since a sub-boundary may list only what its parent does; nothing here
-  # calls any of them, and no other domain lists them. `panel_scales/2` reads the layout table
-  # through `Giggly.DataFrame`, which a parent may call without listing it. It lists
-  # `NimbleOptions`, which validates `to_svg/2`'s options and which a sub-boundary with options of
-  # its own lists in turn, as `Giggly.Format` does. It exports `Plot`, the description the run
-  # functions take; what a user of Giggly calls is the documented API (CLAUDE.md, Conventions),
-  # which reaches past boundary exports to `Datasets`, `Format`, `DataFrame`'s readers and the
-  # scales `panel_scales/2` returns.
-  use Boundary, deps: [Color, NimbleOptions, Nx, Table], exports: [Plot]
+  # a sub-boundary beneath it. Like every boundary it is strict (`mix.exs`). It lists `Nx` and
+  # `Table`, the outside libraries `Giggly.Tensor` and `Giggly.DataFrame` own, and `Scales`, R's
+  # scales half, which several domains call, since a sub-boundary may list only what its parent
+  # does; nothing here calls any of them, and no other domain lists `Nx` or `Table`.
+  # `panel_scales/2` reads the layout table through `Giggly.DataFrame`, which a parent may call
+  # without listing it. It lists `NimbleOptions`, which validates `to_svg/2`'s options and which a
+  # sub-boundary with options of its own lists in turn, as `Giggly.Plot` does. It exports `Plot`,
+  # the description the run functions take; what a user of Giggly calls is the documented API
+  # (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `Scales.Format`,
+  # `DataFrame`'s readers and the scales `panel_scales/2` returns.
+  use Boundary, deps: [NimbleOptions, Nx, Scales, Table], exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
 

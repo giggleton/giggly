@@ -1,13 +1,13 @@
 ---
 paths:
-  - "lib/giggly/color_operations.ex"
+  - "lib/scales/color_operations.ex"
   - "priv/palettes/**"
-  - "test/giggly/color_operations_test.exs"
+  - "test/scales/color_operations_test.exs"
 ---
 
 # Colour operations
 
-`Giggly.ColorOperations` reads a colour as a user writes one, makes the colours R's palettes make,
+`Scales.ColorOperations` reads a colour as a user writes one, makes the colours R's palettes make,
 mixes two as ggplot2's geoms mix their defaults, and is the one module that calls the `color`
 library. Why colours are CSS's and carried as hex
 strings: design-log §4, the entry beginning "Colours are CSS's names and hex forms"; why the
@@ -20,7 +20,7 @@ beginning "A library's owner nests".
 - **It is the `color` library's only caller.** Its boundary lists `Color` alone, which the root
   lists too, as boundary lets a sub-boundary list only what its parent does, and no other domain
   lists it, as `Giggly.DataFrame` owns `table` (`.claude/rules/dependencies.md`); a boundary that
-  needs a colour lists `Giggly.ColorOperations`, its sibling, as `Plot`, `Scale` and `Geom` do. A test
+  needs a colour lists `Scales.ColorOperations`, its sibling, as `Plot`, `Scale` and `Geom` do. A test
   never calls the library either: its expected colours come from CSS's table, or from R.
 - **A colour has one spelling**: uppercase `#RRGGBB`, or `#RRGGBBAA` when it carries an alpha of its
   own, an alpha of FF dropped as opaque; and `:none`, R's `NA`, which draws nothing. No struct: it
@@ -51,7 +51,7 @@ beginning "A library's owner nests".
   "fmm" splines through each palette's 256 colours in L*a*b*, their coefficients copied into
   `priv/palettes/viridis_splines.csv` as R holds them and read at compile time behind a
   `CorePurity` waiver of their own, never fitted here; the places spaced by R's `seq()`, which it
-  repeats since it cannot call `Scale.Palette`'s, each evaluated alone; converted back as
+  repeats since it cannot call `Scales.Palette`'s, each evaluated alone; converted back as
   grDevices' `convertColor()` converts, the library handed grDevices' white point (its own D65,
   (0.3137, 0.3291), by `c2to3()`) and the sRGB matrix inverted from it, not farver's; each channel
   rounded to five decimals as R's `round()` rounds, a tie to even, which `Float.round/2` does not

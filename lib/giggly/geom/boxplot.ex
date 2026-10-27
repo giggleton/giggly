@@ -102,10 +102,11 @@ defmodule Giggly.Geom.Boxplot do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Aesthetics, ColorOperations, Coord, DataFrame, Geom}
+    alias Giggly.{Aesthetics, Coord, DataFrame, Geom}
     alias Giggly.DataFrame.Arithmetic
     alias Giggly.Geom.{Mark, Point}
     alias Giggly.Scene.{Polygons, Polylines, Rectangles, Segments}
+    alias Scales.ColorOperations
 
     # How far a box's default colour is mixed from the theme's ink toward its paper, ggplot2's
     # `col_mix(ink, paper, 0.2)`.

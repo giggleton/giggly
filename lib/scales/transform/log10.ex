@@ -1,7 +1,7 @@
-defmodule Giggly.Scale.Transform.Log10 do
+defmodule Scales.Transform.Log10 do
   @moduledoc false
 
-  # The base-10 logarithm, R's `transform_log10()`. Use it through `Giggly.Scale.Transform`.
+  # The base-10 logarithm, R's `transform_log10()`. Use it through `Scales.Transform`.
   #
   # A positive number becomes its logarithm, zero minus infinity, as R's `log10(0)` is `-Inf`, and
   # a negative number missing, R's NaN; plus infinity stays itself. Its domain is R's, 1e-100 up,
@@ -14,11 +14,11 @@ defmodule Giggly.Scale.Transform.Log10 do
   # nearest the middle of a decade), until three fall inside; and where even nine multiples
   # leave fewer than three, extended Wilkinson breaks on the range itself. Its minor breaks are
   # R's regular ones in log space, and its labels the breaks in data units, plain decimals
-  # (`Giggly.Scale.Labels`).
+  # (`Scales.Labels`).
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Labels, MinorBreaks}
 
   # How many breaks R's `breaks_log()` asks for, and how many fewer it settles for.
   @wanted 5
@@ -27,27 +27,27 @@ defmodule Giggly.Scale.Transform.Log10 do
   # The multiples `log_sub_breaks()` adds to each power, the first always there.
   @multiples Enum.to_list(2..9)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &log10/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &power/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {-100.0, :infinity}
 
   # The breaks found on the extent in data units, then put back into log space.
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(_transformation, {low, high}) do
     {power(low), power(high)}
     |> log_breaks()
     |> Enum.map(&log10/1)
   end
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&power/1)

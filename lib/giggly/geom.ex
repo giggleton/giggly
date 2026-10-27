@@ -33,7 +33,7 @@ defprotocol Giggly.Geom do
   # a mark with no width given from the spacing of its positions (`Giggly.Resolution`), writes a
   # text's label as R's `as.character()` writes it (`Giggly.AsCharacter`), measures the text it
   # draws (`Giggly.Font`), which the scene draws at the width measured, and mixes its default
-  # colours from the theme's ink and paper (`Giggly.ColorOperations`).
+  # colours from the theme's ink and paper (`Scales.ColorOperations`).
   # It exports its kinds, whose structs a plot records and whose facts it checks a layer against,
   # and nothing they draw with: that is in their protocol implementations, which no boundary
   # exports.
@@ -41,12 +41,12 @@ defprotocol Giggly.Geom do
     deps: [
       Giggly.Aesthetics,
       Giggly.AsCharacter,
-      Giggly.ColorOperations,
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.Font,
       Giggly.Resolution,
-      Giggly.Scene
+      Giggly.Scene,
+      Scales
     ],
     exports: [Area, Bar, Boxplot, Density, Line, Path, Point, Rect, Ribbon, Smooth, Text]
 

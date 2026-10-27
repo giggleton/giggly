@@ -52,9 +52,9 @@ defmodule Giggly.Scale.Continuous do
       at each end, that multiple of the limits' width plus that constant.
   """
 
-  # Use it through `Giggly.Scale`; the transformation is resolved by `Giggly.Scale.Transform`.
+  # Use it through `Giggly.Scale`; the transformation is resolved by `Scales.Transform`.
 
-  alias Giggly.Scale.Transform
+  alias Scales.{Bounds, DataRange, Transform}
 
   # Every field's default is a position scale's before it has seen any data: the identity
   # transformation and palette, places between the limits' ends, an axis, and every option the
@@ -125,25 +125,14 @@ defmodule Giggly.Scale.Continuous do
   @doc false
   @spec train(t(), list()) :: t()
   def train(%__MODULE__{range: range} = scale, values) do
-    %{scale | range: train_range(range, values)}
+    %{scale | range: DataRange.train_continuous(range, values)}
   end
-
-  # A range, `:none` for none, widened to cover the finite numbers among `values`: R's
-  # `scales::train_continuous()`, which a discrete scale's continuous range trains by too.
-  @doc false
-  @spec train_range(:none | {number(), number()}, list()) :: :none | {number(), number()}
-  def train_range(range, values), do: Enum.reduce(values, range, &widen/2)
 
   # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
-  # (`oob = censor`, finite values only): an infinite end, `:infinity` or `:neg_infinity`, is kept,
-  # so a rectangle reaching the panel's edge still does, and NaN becomes `nil`, as ggplot2's
-  # position map gives `NA` for it.
+  # (`oob = censor`, `Scales.Bounds.censor/2`).
   @doc false
   @spec censor(t(), list()) :: list()
-  def censor(%__MODULE__{} = scale, values) do
-    {low, high} = limits(scale)
-    Enum.map(values, fn value -> censored(value, low, high) end)
-  end
+  def censor(%__MODULE__{} = scale, values), do: Bounds.censor(values, limits(scale))
 
   # The scale's limits in transformed space, as ggplot2 transforms a scale's limits when it makes
   # the scale: each end given put through the transformation, `nil` where the data decides, and
@@ -167,21 +156,4 @@ defmodule Giggly.Scale.Continuous do
 
   defp sorted(low, high) when is_number(low) and is_number(high) and low > high, do: {high, low}
   defp sorted(low, high), do: {low, high}
-
-  defp censored(value, low, _high) when is_number(value) and is_number(low) and value < low,
-    do: nil
-
-  defp censored(value, _low, high) when is_number(value) and is_number(high) and value > high,
-    do: nil
-
-  defp censored(:nan, _low, _high), do: nil
-  defp censored(value, _low, _high), do: value
-
-  # `nil` and Explorer's non-finite float atoms are not numbers, so only a number widens the range.
-  defp widen(value, :none) when is_number(value), do: {value, value}
-
-  defp widen(value, {low, high}) when is_number(value),
-    do: {min(low, value), max(high, value)}
-
-  defp widen(_not_a_finite_number, range), do: range
 end

@@ -1,4 +1,4 @@
-defmodule Giggly.Scale.Transform.Datetime do
+defmodule Scales.Transform.Datetime do
   @moduledoc false
 
   # The date-time transformation, R's `transform_time()`: a date-time as its seconds since
@@ -8,46 +8,46 @@ defmodule Giggly.Scale.Transform.Datetime do
   # a scale of date-times records, ggplot2's `scale_x_datetime()`, with its time zone and the time
   # zone database that reads it, `{:datetime, zone, database}`, as R's `transform_time(tz)` holds
   # its zone: `:default` until a column settles it, `:naive` for naive date-times, else a zone's
-  # name, which the database must know. Use it through `Giggly.Scale.Transform`.
+  # name, which the database must know. Use it through `Scales.Transform`.
   #
-  # Its axis takes R's `pretty()` breaks for date-times (`Giggly.Scale.DateBreaks`), on clock and
+  # Its axis takes R's `pretty()` breaks for date-times (`Scales.DateBreaks`), on clock and
   # calendar boundaries in its zone, UTC's for `:default`, and a naive date-time's own, as UTC's,
   # each labelled in the format of the step chosen for the whole axis; breaks it did not choose,
   # given or laid by a width, are written as R's `format()` writes them, the date alone where every
   # one is at midnight, else the date and the time to the second; and its minor breaks are R's
-  # regular ones on the seconds, midway between them (`Giggly.Scale.MinorBreaks`), as
+  # regular ones on the seconds, midway between them (`Scales.MinorBreaks`), as
   # `transform_time()` keeps the default. A break turned back is a `DateTime` in the zone, UTC for
   # `:default`, or a `NaiveDateTime`, to the second where it is a whole second and else to the
   # microsecond, so its label is written in the zone's wall-clock time.
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{DateBreaks, MinorBreaks}
+  alias Scales.{DateBreaks, MinorBreaks}
 
   @epoch ~N[1970-01-01 00:00:00]
   @microseconds 1_000_000
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform({:datetime, zone, _database}, values),
     do: Enum.map(values, fn value -> placed(zone, value) end)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse({:datetime, zone, database}, positions),
     do: Enum.map(positions, fn position -> datetime({zone, database}, position) end)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(transformation, extent) do
     {times, _format} = DateBreaks.pretty_datetime(extent, clock(transformation))
     Enum.map(times, &seconds/1)
   end
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(transformation, breaks, :given) do
     datetimes = inverse(transformation, breaks)
     format = if Enum.all?(datetimes, &midnight?/1), do: "%Y-%m-%d", else: "%Y-%m-%d %H:%M:%S"
@@ -62,10 +62,10 @@ defmodule Giggly.Scale.Transform.Datetime do
     |> Enum.map(fn datetime -> DateBreaks.label(datetime, format) end)
   end
 
-  # The breaks `step` lays on an axis showing `extent`, as `Giggly.Scale.Transform.width/3`
+  # The breaks `step` lays on an axis showing `extent`, as `Scales.Transform.width/3`
   # describes.
   @doc false
-  @spec width(Giggly.Scale.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
+  @spec width(Scales.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
           [float()]
   def width(transformation, step, extent) do
     step

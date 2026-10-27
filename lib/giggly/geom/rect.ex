@@ -108,9 +108,10 @@ defmodule Giggly.Geom.Rect do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{ColorOperations, Coord, DataFrame}
+    alias Giggly.{Coord, DataFrame}
     alias Giggly.Geom.{Mark, Rect}
     alias Giggly.Scene.Rectangles
+    alias Scales.ColorOperations
 
     # How far a rectangle's default fill is mixed from the theme's ink toward its paper, ggplot2's
     # `col_mix(ink, paper, 0.35)`.

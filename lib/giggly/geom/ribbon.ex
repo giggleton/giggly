@@ -394,8 +394,9 @@ defmodule Giggly.Geom.Ribbon do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{ColorOperations, DataFrame, Geom}
+    alias Giggly.{DataFrame, Geom}
     alias Giggly.Geom.{Rect, Ribbon}
+    alias Scales.ColorOperations
 
     # How far a ribbon's default fill is mixed from the theme's ink toward its paper, ggplot2's
     # `col_mix(ink, paper, 0.2)`.

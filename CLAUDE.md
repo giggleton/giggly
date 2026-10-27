@@ -54,9 +54,10 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **The assembly** (`Giggly.Assembly`, the stage order, the `group` column, the run functions in
   `Giggly`) — `.claude/rules/assembly.md`.
 - **The facet** (`Giggly.Facet`, the `panel` column, the layout table) — `.claude/rules/facet.md`.
-- **Scales** (`Giggly.Scale`, kinds, transformations, training, mapping, palettes) —
+- **Scales** (`Giggly.Scale`, ggplot2's half: kinds, defaults, training, mapping) —
   `.claude/rules/scale.md`.
-- **Colours** (`Giggly.ColorOperations`, reading a colour) — `.claude/rules/color_operations.md`.
+- **The scales package** (`Scales`, R's scales half: breaks, transforms, palettes, bounds, data
+  ranges) — `.claude/rules/scales.md`; its colours `color_operations.md`, formatters `format.md`.
 - **Stats** (`Giggly.Stat`, a layer's stat; `Giggly.Tensor`, Nx's door) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the protocol positions run through) — `.claude/rules/position.md`.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —
@@ -72,7 +73,6 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **The scene** (`Giggly.Scene`, the table of cells and its primitives) — `.claude/rules/scene.md`.
 - **The SVG backend** (`Giggly.SVG`, `Giggly.to_svg/2`, the goldens) — `.claude/rules/svg.md`.
 - **Datasets** (`Giggly.Datasets`, R's tables for examples and users) — `.claude/rules/datasets.md`.
-- **Formatters** (`Giggly.Format`, a scale's labels as R writes them) — `.claude/rules/format.md`.
 - **Notebooks** (`notebooks/`, Livebooks following ggplot2's reference pages) —
   `.claude/rules/notebooks.md`.
 

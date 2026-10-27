@@ -1,7 +1,8 @@
 defmodule Giggly.FacetTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{DataFrame, Facet, Scale}
+  alias Giggly.{DataFrame, Facet}
+  alias Scales.DataRange
 
   # A frame whose column "g" holds `count` distinct values, one row each.
   defp distinct_values(count), do: DataFrame.new([{"g", Enum.to_list(1..count//1)}])
@@ -19,10 +20,10 @@ defmodule Giggly.FacetTest do
     %Facet.Grid{rows: rows, cols: cols, scales: Keyword.get(options, :scales, :fixed)}
   end
 
-  defp layout(facet, frame), do: Facet.layout(facet, [frame], &Scale.level_key/1)
+  defp layout(facet, frame), do: Facet.layout(facet, [frame], &DataRange.level_key/1)
 
   # The layout over several tables: the plot's data first, then each layer's.
-  defp layout_of(facet, frames), do: Facet.layout(facet, frames, &Scale.level_key/1)
+  defp layout_of(facet, frames), do: Facet.layout(facet, frames, &DataRange.level_key/1)
 
   # Each row's panel once the facet has given a table its panels, and the value of `name` in each,
   # in row order.

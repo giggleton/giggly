@@ -3,7 +3,6 @@ paths:
   - "lib/giggly/scale.ex"
   - "lib/giggly/scale/**"
   - "test/giggly/scale_test.exs"
-  - "test/giggly/scale/**"
 ---
 
 # Scales
@@ -11,35 +10,19 @@ paths:
 `Giggly.Scale` decides what kind of scale a column needs, puts values through a scale's
 transformation, trains a scale over the values it is given, and maps values to their positions,
 or, for an aesthetic other than position, through the scale's palette to the aesthetic's values.
+It is ggplot2's half of a scale; R's scales half, the breaks, transformations, palettes, bounds and
+data ranges it works with, is the `Scales` package (`scales.md`).
 Why a palette is a field of the two scale kinds: design-log §4, the entry beginning "A scale's
 palette is a field".
 Why scales are values rather than one mutated object: design-log §4, the entry beginning "Scales
 are three values"; what increment 5 built and what waits for its first reader: the entry
 beginning "Position scales are chosen by column type"; why a continuous scale records the
-identity transformation: the entry beginning "A layer records its stat and position"; why breaks
-come from extended Wilkinson and labels are written the Elixir way: the entry beginning "Axes are
-drawn"; why minor breaks are R's regular ones, less the breaks: the entry beginning "The panel's
-grid lines are placed by the coordinate system".
+identity transformation: the entry beginning "A layer records its stat and position".
 
 ## Rules
 
 - **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
-  it one aesthetic's.** A palette is a value naming its function (`Scale.Palette`), never a
-  closure: `:identity` for a position, `{:rescale, {low, high}}` for a continuous aesthetic, R's
-  `pal_rescale()`, `{:gradient, colors}` for a continuous colour or fill, R's `pal_gradient_n()`,
-  `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high, length.out = n)` as
-  ggplot2's ordinal alpha takes it, and for a discrete colour or fill `{:hue, %{hue:, chroma:,
-  luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`,
-  `{:viridis, %{option:, begin:, end:, direction:, alpha:}}`, R's `pal_viridis()`
-  (`ColorOperations.viridis/2`), or `{:manual, values}`, a list or a map from value to colour,
-  shape or line type, R's manual
-  palette, or `{:manual, values, breaks}`, a list named by breaks; for size,
-  `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled, `{:abs_area, max}`,
-  R's `abs_area()`, the square root of the place's size rescaled onto 0 to `max`, and, discrete,
-  `{:area_sequence, {low, high}}`, ggplot2's ordinal `sqrt(seq(low^2, high^2))`, `low^2` as
-  `low * low`, as R's `^` squares; for shape, `{:shape, :solid}` or `{:shape, :open}`, R's
-  `pal_shape()`, six shapes by name; for line type, `:linetype`, R's `pal_linetype()`, 13 line
-  types as dash patterns. Each matched R to the last digit; its tests pin R's figures.
+  it one aesthetic's.** Its palette is a value of `Scales.Palette`'s (`scales.md`).
   `new/1` makes a position scale; `new/2` makes an aesthetic's with ggplot2's default palette for
   it (`alpha`: 0.1 to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
@@ -53,23 +36,8 @@ grid lines are placed by the coordinate system".
 - **A shape or line type scale is discrete alone** (`discrete_only?/1`), as R's
   `scale_shape_continuous()` and `scale_linetype_continuous()` abort, neither having an order:
   `new/2` makes none continuous, and the assembly refuses a continuous or a date column of the
-  aesthetic. **The shape palette gives the present levels R's
-  16, 17, 15, 3, 7 and 8, or open, 1, 2, 0, 3, 7 and 8, as their names** (`:circle_small`,
-  `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, the first three open
-  `:circle_open`, `:triangle_open`, `:square_open`), its test pinning each name to R's number
-  through the table points are drawn from; **a seventh level raises when the plot is run**,
-  naming the palette's six, the count and `Giggly.Plot.scale_shape_manual/2`, where R warns and
-  leaves the seventh on unshaped (design-log §4, the entry beginning "A discrete palette with
-  fewer shapes"). **The line type palette gives R's 13 in order, `"solid"` as `{}` and each hex
-  pattern as a tuple of its lengths, and a fourteenth level raises**, naming
-  `Giggly.Plot.scale_linetype_manual/2`, its test pinning `pal_linetype()`'s output.
-- **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient
-  is one palette"), which R's two- and three-colour gradients are too: its colours spaced evenly
-  from 0 to 1 by R's `seq()`, a place between two neighbours blended in CIE L*a*b*
-  (`Giggly.ColorOperations`), each channel interpolated as R's `approxfun()` does, and a place at
-  a colour taking that colour exactly, as `colour_ramp()` blends; one colour is every place's. It
-  matched R on every place sampled; its tests pin R's colours.
-- **A continuous value's place is R's `rescale()` (`Scale.rescale/3`) over the scale's limits**
+  aesthetic.
+- **A continuous value's place is R's `rescale()` (`Scales.Bounds.rescale/3`) over the scale's limits**
   (`limits/1`, R's `get_limits()`: each given end, else the trained range's), **in R's order of
   operations**, and limits of zero width put every value at the middle, so one value maps to the
   middle of its palette (0.55 for alpha); the rescale palette calls the same function. **A scale's
@@ -96,21 +64,9 @@ grid lines are placed by the coordinate system".
   `nil` for alpha, line type, line width and shape (R's `NA`) and grey50, `#7F7F7F`, for colour and
   fill. `na_value` is a field of both scale kinds, as ggplot2's scale carries it (design-log §4, the
   entry beginning "A discrete scale carries its missing value"); a position scale places `nil` as
-  its last level and reads none. The spread is R's `seq()`: its ends exact, each value between found
-  by steps from the first (the fourth of seven is 0.54999999999999993).
-- **The hue palette is exactly R's `pal_hue()`**: a range less than a degree short of the whole
-  circle, taken modulo 360 as R's `%%` takes it, leaves its last `360 / n` degrees off, any other
-  is spread end to end, the hues by the same `seq()`, each colour
-  `Giggly.ColorOperations.from_hcl/3`, reversed for a `direction` of -1; it matched R on every
-  range, chroma, luminance, direction and count sampled, and its tests pin R's colours for counts
-  whose last hue lands on 360 and past it and for ranges either side of the degree. R takes each
-  hue modulo 360 first, which changes no colour, cosine and sine repeating, so it is left out.
-- **The grey palette is exactly R's `pal_grey()`, `grey.colors()`**: the levels spaced evenly
-  once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
-  byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which in R 4.6.1 steps on
-  from the start as `seq()` does, so `seq()` it is.
+  its last level and reads none.
 - **A manual palette gives a list's colours, shapes or line types to the levels in order, and a
-  map's by value** (`Discrete.key/1`), a level the map lacks taking the `na_value`; a map with no
+  map's by value** (`Scales.DataRange.key/1`), a level the map lacks taking the `na_value`; a map with no
   given limits narrows the scale's limits to the levels it names, the missing value kept, as
   ggplot2's manual scale limits itself to its values' names. **A list named by breaks (`{:manual,
   values, breaks}`) gives each break's level the value at its place and leaves the limits the
@@ -130,10 +86,9 @@ grid lines are placed by the coordinate system".
 - **`Scale.Continuous` and `Scale.Discrete` are API, and the boundary exports both; the rest of
   the namespace is not.** `Giggly.panel_scales/2` returns them and `Giggly.Plot` writes them, so
   their fields are documented and changing one changes the API; their functions are `@doc false`,
-  used through `Giggly.Scale`, which is `@moduledoc false` like `Breaks`, `DateBreaks`, `Labels`,
-  `MinorBreaks`, `Palette` and `Transform`. The one exception is `Discrete.key/1`, the rule for
-  which values a discrete scale counts as one (a number as a float, so `2` and `2.0` are one),
-  which `Plot` reads as a fact of the kind to refuse a value named twice, and the assembly to
+  used through `Giggly.Scale`, which is `@moduledoc false`. The rule for which values a discrete
+  scale counts as one (a number as a float, so `2` and `2.0` are one) is
+  `Scales.DataRange.key/1`, which `Plot` reads to refuse a value named twice, and the assembly to
   match a legend's key against a layer's column, so the rule has one home.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
   `minor_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but `rescaler`,
@@ -160,7 +115,7 @@ grid lines are placed by the coordinate system".
   replace its levels, in their order, every reader (`map/2`, `breaks/2`, `dimension/1`,
   `legend_breaks/1`) going through them; a value not among them maps to `nil`, so its row is not
   drawn, `nil` among them places the missing value, and one the data lacks keeps its place. A
-  value is matched by `Discrete.key/1`, as the column holds it (design-log §4, the entry beginning
+  value is matched by `Scales.DataRange.key/1`, as the column holds it (design-log §4, the entry beginning
   "A discrete axis names its values"). **Its breaks are the given values among its limits, in the
   order given, at their limits' places**, each the limit as the scale holds it, so a break of `4`
   is a level of `4.0`, or every limit; **its labels** go with given breaks by
@@ -182,12 +137,10 @@ grid lines are placed by the coordinate system".
   break drawn at once, as R's are, and must return a string for each, or the run raises; `:none`
   gives no breaks (so no minor breaks), no minor breaks, or `{position, :none}` for each break,
   which the axis draws as ticks alone.
-- **A scale sees plain values, never a frame or a plot.** Its boundary lists
-  `Giggly.ColorOperations`, which gives the hue and viridis palettes their colours, as R's `scales`
-  lists farver,
-  and `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a column and hands its values here, so the namespace stays
-  extractable, as R's `scales` stands beside ggplot2. Anything that needs a frame belongs to the
-  caller.
+- **A scale sees plain values, never a frame or a plot.** Its boundary lists `Scales`, R's scales
+  half, which gives it its breaks, transformations, palettes, bounds and data ranges, and
+  `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a
+  column and hands its values here. Anything that needs a frame belongs to the caller.
 - **A scale knows no pixel.** It stops at positions in data space: a continuous value as its
   transformation leaves it, a discrete value at its level's position counting from 1. The unit panel is the coordinate
   system's.
@@ -209,24 +162,10 @@ grid lines are placed by the coordinate system".
   identity a date's, a date-time's or a time's, which the identity places at its days, its seconds
   since 1970-01-01 or its seconds since midnight, as R's untransformed continuous scale draws
   each; under any other transformation each is refused, where R fails.
-- **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
-  the non-finite floats skipped). **A discrete scale merges each training as R's
-  `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and
-  plain values"), handed a column at a time, with the levels of the factor its values are of or
-  `:none`: a factor brings the levels its values hold, in their order, the missing value after
-  them, as `drop = TRUE`; other values their distinct values sorted, `nil` last; values matched by
-  `Discrete.key/1`, so `4` and `4.0` are one; a factor's levels lead the rest, and the scale's
-  `factor` field, set by its first training, says whether new values follow the levels held or
-  everything is sorted again; no values train nothing. **Which a discrete scale is handed, levels
-  or positions, the caller says** by the function it calls, never by the values' type: `train/3`
+- **Which a discrete scale is handed, levels or positions, the caller says** by the function it calls, never by the values' type: `train/3`
   for a layer's own values, its levels, and `train_positions/2` for positions once the levels are
   mapped, which widen its continuous range alone. `discrete?/1` tells the two kinds apart for a
   caller that must, as a legend's key drawing does.
-- **Values with no levels of their own are ordered by `level_key/1` alone**, and the assembly
-  hands the same key to grouping, which orders their combinations by it, so group ids and axis
-  positions agree; a factor's values are ordered by its levels, which grouping reads from the
-  frame as the scale is handed them. The rule exists once, and grouping does not depend on scales
-  to use it.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
   `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`;
@@ -249,92 +188,6 @@ grid lines are placed by the coordinate system".
 - **A scale trains and maps in transformed space.** The assembly puts an axis's columns through
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
-- **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
-  there and handed to each of its callbacks, so the date-time one reads its zone; it carries what
-  R's object carries and a scale reads: the transformation, its inverse,
-  its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
-  `format`). **A label is made from the break and the extent** (`format/2`), since a date's
-  format is the step chosen for the whole axis; a number's ignores the extent and is written once
-  the breaks outside it are dropped. Breaks the transformation did not choose, given or laid by a
-  width, are handed `:given` instead of the extent, and a date writes them in full, `2026-09-21`,
-  as R's `format()` writes a date its pretty breaks did not name. **Breaks follow ggplot2's `get_breaks()`**: the extent
-  squished into the transformed domain (log10 from -100, sqrt from 0), turned back into data
-  units, broken there, and transformed back, **in the order that leaves them**, so reverse's and
-  reciprocal's descend, as R draws them; labels are written, and a labels function handed, the
-  breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
-  log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
-  `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
-- **log10's breaks are exactly R's `breaks_log()`, five wanted** (`Transform.Log10`), those
-  inside the extent: every power of ten, or every second, third and so on, the widest step
-  leaving three inside; else `log_sub_breaks()`'s multiples, evenest in log space first (3); else
-  extended breaks in data units. R's one break kept each side of the range is left out, since the
-  scale drops it. Its test pins R's own axis for each branch; a surviving mutant there is judged
-  against `breaks_log()` on hundreds of random extents, and the first where it departs joins the
-  tests, as extended Wilkinson's are judged (below). sqrt, reverse and reciprocal take extended
-  breaks on the data range, as R's `extended_breaks()` does.
-- **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
-  `transform_date()`): a date is a float of its days, a missing one `nil`; it trains, expands and
-  is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly
-  R's `pretty()` for dates** (`Scale.DateBreaks`, grDevices' `prettyDate()`): five days or less is
-  every day, widened by five less its length, rounded half to even; longer takes the calendar step,
-  a day to a thousand years, that cuts the extent closest to five times, from its start truncated
-  to the step's unit (a Monday for weeks), or, where that step cuts it more than five times, the
-  next coarser one where that comes closer, as R does; R's finer neighbour for too few never comes
-  closer and is left out (design-log §4, the entry beginning "A date-time's breaks under a day").
-  Each is labelled in its step's format, written as R's `format()` writes it, a year unpadded.
-  **A date never reaches a step under a day.** Its minor breaks are the identity's
-  (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
-  extended-breaks one is (below): its test pins R's own breaks for each case and for each random
-  extent where a mutant departed. **A width's breaks are exactly R's `breaks_width()` for dates**
-  (`DateBreaks.width/2`, `fullseq()`): from the extent's start rounded down to the step's unit —
-  a day count to the nearest multiple of the step's days since 1970-01-01, half to even, a week
-  to its Monday, a month to its 1st, a year to 1 January, whatever the count — to its end plus
-  the count of a unit's most days (1, 7, 31, 365) rounded down, every step; its test pins R's
-  own output for each unit and each rounding.
-- **A date-time scale works in seconds since 1970-01-01 00:00 UTC, as R's `POSIXct` stores one**
-  (`Transform.Datetime`, R's `transform_time()`): a date-time's whole microseconds divided once by
-  a million, the double nearest the instant, a naive one's as though its clock were UTC's, a
-  missing one `nil`; a plot's limits or breaks of the other kind raise, as a column's would be
-  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/2`,
-  the date steps' table extended below a day: seconds, minutes and hours, each with R's format and
-  unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; three
-  branches of R's are left out, none changing a break inside the extent or its label: its added
-  ticks where a second cuts the extent once, which keeps its breaks here, its trimming, and its
-  finer neighbour (design-log §4, the entry beginning "A date-time's breaks under a day"). Its
-  test pins R's breaks for every step and format, R's breaks inside each short extent, and R's on
-  the first extent where each mutant of the step table departed; a nudge of a step's length that
-  departs on none of R's tables is judged against the code on a dense sweep round its step's
-  boundaries, and is equivalent only if it never departs there either. **A width's breaks are
-  exactly R's `breaks_width()` for
-  date-times** (`DateBreaks.datetime_width/3`): seconds and minutes from the nearest multiple of the
-  step since 1970-01-01, half to even, the rest from the start of the unit, rounded up by the
-  step's most seconds, stepped by elapsed time but months and years, stepped on the calendar; its
-  test pins R's for each unit and rounding. A break it did not choose is written as R's
-  `format()` writes it: the date alone where every one is at midnight, else to the second.
-  **Breaks are laid, and labels written, on the clock of the scale's zone** (`DateBreaks`'s
-  `clock`: UTC's for `:default` and `:naive`, else the zone and its database), as R's are in its
-  `tz`: truncated to a minute or an hour, a time keeps its own offset from UTC, as R keeps its
-  daylight-saving flag; truncated to a day or longer, its wall-clock time is read again, a time a
-  change skips at the offset before it and one a change repeats as the earlier (design-log §4, the
-  entry beginning "A local time a change of offset skips or repeats"); a calendar step advances
-  the truncated wall-clock time, a width's the start's once read, as R's `seq()` advances each.
-  Its test pins R's breaks across the changes of New York, Kolkata, Lord Howe, Havana, Asuncion
-  and Apia, from 23,771 random and change-clustered extents in 19 zones and 7,599 widths, all
-  matched but where R's answer rests on glibc: a repeated midnight, or an hour repeated with one
-  daylight-saving flag, read at the offset R last used, and a skipped midnight of a change of
-  standard offset, which glibc reads after it for 17 of the 52 since 1970.
-- **A time scale works in seconds since midnight, as R's `hms` stores one** (`Transform.Time`,
-  R's `transform_hms()`): a time's whole microseconds divided once by a million, a missing one
-  `nil`. **Its breaks are exactly R's `breaks_hms()`**, extended breaks (`Breaks.extended/2`) with
-  the nice numbers 1, 2, 1.5, 4 and 3 on the extent in seconds, minutes, hours, days or weeks,
-  each unit up to twice its length; **its labels hms's, rounded to the microsecond half to even,
-  less two of hms's marks**: six zero decimals where a break is a rounding error off a whole
-  second, and spaces padding every label to the widest (design-log §4, the entry beginning "A
-  time of day's labels"). A width's breaks are R's `breaks_width()` for times, every multiple of
-  the step from the extent's start rounded down. A break turned back, for a labels function or a
-  format, is a `Time` wrapped past midnight. Its test pins R's breaks and labels at each unit's
-  switch, past midnight and before it, under a second and on a half microsecond; all of 4,900
-  random and switch-clustered extents and 3,000 widths matched R.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and
@@ -349,25 +202,8 @@ grid lines are placed by the coordinate system".
   minor breaks kept inside the extent, ends included (R's `discard()`), less the breaks
   themselves, which ggplot2's grid takes out of its minor lines and nothing here reads. A discrete
   scale has none, as in ggplot2.
-- **Every transformation's minor breaks are R's `scales::regular_minor_breaks()`**
-  (`Scale.MinorBreaks`), in transformed space, with two intervals per gap, on the breaks in the
-  transformation's order, the first gap's step added before and after them as R adds it, with
-  `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
-  then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
-  from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
-- **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
-  degenerate cases and the scores R takes to minus infinity included (`Scale.Breaks`), but on
-  ranges over about 3e23 wide reaching zero, where R's long-double modulus denies a rounded break
-  through zero the bonus for it (`Breaks`' opening comment). Its test
-  pins R's own output for a range of every winning nice number, skip, count and zero bonus, and
-  for each boundary, since a slip in one score shows only where that
-  score decides the winner; a row that stops matching is a bug in the port, and the table is
-  regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
-- **Labels are written the Elixir way, not R's** (`Scale.Labels`): `inspect`'s plain decimals,
-  rounded to 15 significant digits, as many decimals on every label as the most precise needs,
-  none when all are whole, negative zero as `0`, never scientific, no thousands separators, so a
-  log axis's `1e+05` is written `100000`. **A
-  discrete level is written as R's `as.character()` writes its value** (`Giggly.AsCharacter`),
+- **A discrete level is written as R's `as.character()` writes its value** (`level_labels/1`,
+  `Giggly.AsCharacter`),
   as `factor()` labels its levels: `4`, `0.5`, `1e+05`, `TRUE`; a missing level is `NA`. The
   scale lists `Giggly.AsCharacter` for it, and the text geom lists it too, so the rule has one
   home.
@@ -388,11 +224,12 @@ grid lines are placed by the coordinate system".
   a discrete scale's extent then reaches as far as its continuous range does, unwidened, as
   ggplot2's `expand_limits_discrete()` takes the range of both, and **a discrete scale with no
   limits widens its continuous range alone by its `expand`, or else 0 to 1**, as
-  `expand_limits_discrete_trans()` does for counts a stat puts on an axis no layer mapped. `zero_range?/2` is the one home of
-  R's `zero_range()`; `Giggly.Resolution` asks it.
+  `expand_limits_discrete_trans()` does for counts a stat puts on an axis no layer mapped.
+  `Scales.Bounds.zero_range?/2` is the one home of R's `zero_range()`; `Giggly.Resolution` asks
+  it.
   **An extent still zero wide once widened is returned as its middle, both ends equal** (a single
   value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every
   value on it at the panel's middle, and equal ends are how the coordinate system is told, so
-  `zero_range()` stays in this namespace alone. The coordinate system maps the extent onto the
+  the coordinate system never asks `zero_range()`. The coordinate system maps the extent onto the
   panel and adds nothing; the coordinate system's switch to turn expansion off arrives with its
   options.

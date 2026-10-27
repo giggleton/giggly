@@ -1,7 +1,7 @@
-defmodule Giggly.Scale.MinorBreaksTest do
+defmodule Scales.MinorBreaksTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Scale.MinorBreaks
+  alias Scales.MinorBreaks
 
   describe "regular/2" do
     test "a step is added below the first break when the extent reaches below it" do

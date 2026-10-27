@@ -1,8 +1,8 @@
-defmodule Giggly.Scale.Transform.Reciprocal do
+defmodule Scales.Transform.Reciprocal do
   @moduledoc false
 
   # The reciprocal, R's `transform_reciprocal()`: one over each value, both ways. Use it through
-  # `Giggly.Scale.Transform`.
+  # `Scales.Transform`.
   #
   # Zero becomes plus infinity, as R's `1/0` is `Inf`, and either infinity zero. Its domain is
   # every number, which R's transformed domain, zero wide, leaves unsquished. Its breaks are
@@ -10,20 +10,20 @@ defmodule Giggly.Scale.Transform.Reciprocal do
   # rise; its minor breaks are R's regular ones on the breaks in that order, and its labels the
   # breaks in data units, plain decimals.
 
-  @behaviour Giggly.Scale.Transform
+  @behaviour Scales.Transform
 
-  alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Labels, MinorBreaks}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &reciprocal/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &reciprocal/1)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def breaks(_transformation, {low, high}) do
     [low, high]
     |> Enum.map(&reciprocal/1)
@@ -33,10 +33,10 @@ defmodule Giggly.Scale.Transform.Reciprocal do
     |> Enum.map(&reciprocal/1)
   end
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
-  @impl Giggly.Scale.Transform
+  @impl Scales.Transform
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&reciprocal/1)

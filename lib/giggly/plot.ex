@@ -144,7 +144,6 @@ defmodule Giggly.Plot do
   use Boundary,
     deps: [
       Giggly.Aesthetics,
-      Giggly.ColorOperations,
       Giggly.Coord,
       Giggly.DataFrame,
       Giggly.ElementTree,
@@ -156,13 +155,13 @@ defmodule Giggly.Plot do
       Giggly.Scale,
       Giggly.Stat,
       Giggly.Theme,
-      NimbleOptions
+      NimbleOptions,
+      Scales
     ],
     exports: []
 
   alias Giggly.{
     Aesthetics,
-    ColorOperations,
     Coord,
     DataFrame,
     Facet,
@@ -176,6 +175,7 @@ defmodule Giggly.Plot do
   }
 
   alias Giggly.Plot.{Layer, Options}
+  alias Scales.ColorOperations
 
   @enforce_keys [
     :data,

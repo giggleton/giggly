@@ -1,4 +1,4 @@
-defmodule Giggly.Scale.Transform do
+defmodule Scales.Transform do
   @moduledoc false
 
   # The transformation a continuous scale puts its values through before it trains on them: R's
@@ -27,7 +27,7 @@ defmodule Giggly.Scale.Transform do
   # `format/2` is handed both, or `:given` for breaks it did not choose, which a date writes in
   # full.
 
-  alias Giggly.Scale.Transform
+  alias Scales.Transform
 
   @typedoc """
   A transformation as a continuous scale records it: its name, or the date-time transformation

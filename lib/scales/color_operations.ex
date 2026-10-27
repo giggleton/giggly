@@ -1,4 +1,4 @@
-defmodule Giggly.ColorOperations do
+defmodule Scales.ColorOperations do
   @moduledoc false
 
   # Colour operations: reading a colour as a user writes one, and the conversions R's palettes make
@@ -60,11 +60,8 @@ defmodule Giggly.ColorOperations do
   # Giggly's colour at 885 and R's internal product at 875. Giggly adds the three products left to
   # right, as the sum written out in R does.
 
-  # The library's one caller: it may call `Color` and nothing else, and only a boundary that lists
-  # it may call it. `Giggly` lists `Color` too, as boundary lets a sub-boundary list only what its
-  # parent does; no other domain lists it.
-  use Boundary, deps: [Color], exports: []
-
+  # The library's one caller: the `Scales` boundary lists `Color` for it, and nothing else in the
+  # package or in Giggly calls it.
   alias Color.Conversion.Lindbloom
   alias Color.CSS.Names
 
@@ -285,7 +282,7 @@ defmodule Giggly.ColorOperations do
 
   # `count` places from `from` to `to`, as R's `seq(from, to, length.out = count)` spaces them:
   # the first `from` and the last `to` exactly, each one between `from` plus its index times the
-  # step, in that order of operations, as `Giggly.Scale.Palette` spaces a palette's levels, which
+  # step, in that order of operations, as `Scales.Palette` spaces a palette's levels, which
   # this boundary cannot call; one place is `from`.
   defp places(_from, _to, 0), do: []
   defp places(from, _to, 1), do: [from]

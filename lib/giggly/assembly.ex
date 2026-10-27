@@ -101,7 +101,8 @@ defmodule Giggly.Assembly do
       Giggly.Position,
       Giggly.Scale,
       Giggly.Stat,
-      Giggly.Theme
+      Giggly.Theme,
+      Scales
     ],
     exports: []
 
@@ -120,6 +121,8 @@ defmodule Giggly.Assembly do
     Stat,
     Theme
   }
+
+  alias Scales.DataRange
 
   @enforce_keys [
     :layer_data,
@@ -261,14 +264,14 @@ defmodule Giggly.Assembly do
       ) do
     layers = Enum.reverse(reversed_layers)
     tables = Enum.map(layers, fn layer -> Plot.layer_table(plot, layer) end)
-    layout = Facet.layout(facet, [data | tables], &Scale.level_key/1)
+    layout = Facet.layout(facet, [data | tables], &DataRange.level_key/1)
 
     grouped_data =
       Enum.zip_with(layers, tables, fn layer, table ->
         facet
         |> Facet.assign_panels(table, layout)
         |> evaluate(plot, layer)
-        |> Group.add(&Scale.level_key/1)
+        |> Group.add(&DataRange.level_key/1)
       end)
 
     x_routes = routes(layout, :x)
@@ -706,7 +709,7 @@ defmodule Giggly.Assembly do
   # Whether a layer draws in each key, as ggplot2's `keep_key_data()` decides: in a continuous
   # scale's key always, whatever its break; in a discrete key, a factor's number among them, only
   # where one of the layer's columns of the aesthetics it maps holds the break, a value matched as
-  # the scale matches it (`Scale.Discrete.key/1`, so a limit of `4` is a column's `4.0`, as R
+  # the scale matches it (`Scales.DataRange.key/1`, so a limit of `4` is a column's `4.0`, as R
   # matches the two as text), `nil` among them, so a layer whose column lacks a level a second
   # layer's column gave the scale leaves that key to the second; in the `NA` key, also where one
   # of those columns holds a value no key shows, one outside the scale's limits or breaks, which
@@ -723,13 +726,13 @@ defmodule Giggly.Assembly do
         held =
           present
           |> Enum.flat_map(fn aesthetic -> DataFrame.pull(frame, aesthetic) end)
-          |> MapSet.new(&Scale.Discrete.key/1)
+          |> MapSet.new(&DataRange.key/1)
 
-        shown = MapSet.new(keys, fn key -> Scale.Discrete.key(key.value) end)
+        shown = MapSet.new(keys, fn key -> DataRange.key(key.value) end)
         unshown? = not MapSet.subset?(held, shown)
 
         Enum.map(keys, fn key ->
-          MapSet.member?(held, Scale.Discrete.key(key.value)) or
+          MapSet.member?(held, DataRange.key(key.value)) or
             (is_nil(key.value) and unshown?)
         end)
     end

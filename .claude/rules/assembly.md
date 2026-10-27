@@ -157,7 +157,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   a discrete position to numbers, after which it no longer looks discrete.
 - **The assembly gives grouping its order for values with no levels of their own.** `Group.add/2`
   numbers a category by its levels, read from the frame, as R's `id()` numbers a factor, and other
-  values by the key it is handed; the assembly hands it `Scale.level_key/1`, the order a discrete
+  values by the key it is handed; the assembly hands it `Scales.DataRange.level_key/1`, the order a discrete
   scale gives such values, so group ids follow axis and legend order while grouping names nothing
   about scales. It hands the facet the same key, so panels made from a column's values follow the
   same order.
@@ -234,7 +234,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   such layer says whether it draws in each key (`draws`), as ggplot2 4's `keep_key_data()` decides**, from its table once the positions are
   final and before the other aesthetics are mapped: a discrete key only where one of the layer's
   columns of the aesthetics it maps holds the key's break (`value`, the first aesthetic's, as
-  ggplot2's `.value`), matched as the scale matches values (`Scale.Discrete.key/1`, a limit of `4`
+  ggplot2's `.value`), matched as the scale matches values (`Scales.DataRange.key/1`, a limit of `4`
   a column's `4.0`, as R compares them as text), `nil` for the `NA` key, so two layers mapping one
   aesthetic to different columns each draw their own keys; the `NA` key also where one of those
   columns holds a value no key shows, outside the scale's limits or breaks, which the scale maps

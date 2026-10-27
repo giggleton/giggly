@@ -1,8 +1,9 @@
-defmodule Giggly.Scale.TransformTest do
+defmodule Scales.TransformTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Datasets, Scale}
-  alias Giggly.Scale.{Continuous, Transform}
+  alias Giggly.Scale.Continuous
+  alias Scales.Transform
 
   # Golden: every axis below is R's own, from R 4.6.1 with ggplot2 4.0.3 and scales 1.4.0 (the
   # image `giggly-r:ggplot2-4.0.3`): `ggplot_build()`'s panel params for the plot in the comment

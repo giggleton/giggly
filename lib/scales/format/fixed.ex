@@ -1,8 +1,8 @@
-defmodule Giggly.Format.Fixed do
+defmodule Scales.Format.Fixed do
   @moduledoc false
 
   # Numbers written in plain decimals as R's `format(x, nsmall = decimals, scientific = FALSE)`
-  # writes them, for `Giggly.Format`, which hands it each group of non-negative numbers that
+  # writes them, for `Scales.Format`, which hands it each group of non-negative numbers that
   # share a decimal count. It is R's `formatReal()` and `prettyNum()`, rule for rule:
   #
   # - The group takes the most decimals any of its numbers needs to show its first seven

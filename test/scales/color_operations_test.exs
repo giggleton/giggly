@@ -1,7 +1,7 @@
-defmodule Giggly.ColorOperationsTest do
+defmodule Scales.ColorOperationsTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.ColorOperations
+  alias Scales.ColorOperations
 
   # Golden: CSS Color Module Level 4's table of named colours and its four hex forms, never Giggly's
   # or the library's: `steelblue` is #4682B4, CSS's `gray` #808080 and `green` #008000 where R's are

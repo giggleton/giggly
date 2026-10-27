@@ -1,4 +1,4 @@
-defmodule Giggly.Scale.Palette do
+defmodule Scales.Palette do
   @moduledoc false
 
   # Palettes: the last step of a scale, which turns where a value sits among the data into the
@@ -12,7 +12,7 @@ defmodule Giggly.Scale.Palette do
   #   * `{:gradient, colors}`, a continuous colour scale's: a value's place in the limits, from 0
   #     to 1, along a gradient through `colors`, spaced evenly from 0 to 1, as R's
   #     `pal_gradient_n()` blends them through `colour_ramp()`, which its two- and three-colour
-  #     gradients are too: each colour's L*, a* and b* (`Giggly.ColorOperations`), the place's
+  #     gradients are too: each colour's L*, a* and b* (`Scales.ColorOperations`), the place's
   #     channels interpolated between the two colours either side as R's `approxfun()` does, a
   #     place at a colour taking that colour's exactly, and the blend turned back into a colour. One
   #     colour is every place's. ggplot2's default runs from `#132B43` to `#56B1F7`.
@@ -44,7 +44,7 @@ defmodule Giggly.Scale.Palette do
   #   * `{:viridis, %{option: option, begin: begin, end: end, direction: direction, alpha:
   #     alpha}}`, a discrete colour scale's: given the number of levels, that many colours of the
   #     viridis palette `option`, as R's `pal_viridis()` takes them from `viridisLite::viridis()`
-  #     (`Giggly.ColorOperations.viridis/2`), from `begin` to `end`, or `end` to `begin` for a
+  #     (`Scales.ColorOperations.viridis/2`), from `begin` to `end`, or `end` to `begin` for a
   #     `direction` of -1, with an alpha of `alpha`. ggplot2's default, an ordered factor's, is
   #     the palette `:viridis` from 0 to 1, opaque.
   #   * `{:shape, :solid | :open}`, a discrete shape scale's: given the number of levels, that many
@@ -69,7 +69,7 @@ defmodule Giggly.Scale.Palette do
   # Use it through `Giggly.Scale`.
 
   # A palette's colours come from the colour operations.
-  alias Giggly.ColorOperations
+  alias Scales.{Bounds, ColorOperations}
 
   @typedoc "A scale's palette."
   @type t ::
@@ -143,19 +143,19 @@ defmodule Giggly.Scale.Palette do
   @spec continuous({:rescale | :area, {number(), number()}}, number()) :: float()
   @spec continuous({:abs_area, number()}, number()) :: float()
   @spec continuous({:gradient, [String.t()]}, number()) :: String.t()
-  def continuous({:rescale, to}, place), do: Giggly.Scale.rescale(place, {0, 1}, to)
+  def continuous({:rescale, to}, place), do: Bounds.rescale(place, {0, 1}, to)
 
   def continuous({:area, to}, place) do
     place
     |> :math.sqrt()
-    |> Giggly.Scale.rescale({0, 1}, to)
+    |> Bounds.rescale({0, 1}, to)
   end
 
   def continuous({:abs_area, max}, place) do
     place
     |> abs()
     |> :math.sqrt()
-    |> Giggly.Scale.rescale({0, 1}, {0, max})
+    |> Bounds.rescale({0, 1}, {0, max})
   end
 
   def continuous({:gradient, [color]}, _place), do: color
@@ -293,7 +293,7 @@ defmodule Giggly.Scale.Palette do
   end
 
   # A manual palette's map's value for each of `keys`, the present levels' keys as the scale
-  # matches them (`Giggly.Scale.Discrete.key/1`), the map's keys turned so too, or `missing` for
+  # matches them (`Scales.DataRange.key/1`), the map's keys turned so too, or `missing` for
   # a level the map has no value for; a map of fewer values than levels raises, as the opening
   # comment says.
   @doc false

@@ -14,7 +14,8 @@ defmodule Giggly.Plot.Options do
   # nothing that runs a plot, which `GigglyCredo.Check.PlotRunsNothing` holds here as in
   # `Giggly.Plot`.
 
-  alias Giggly.{Aesthetics, ColorOperations, ElementTree, Geom, Guide, Position, Scale, Theme}
+  alias Giggly.{Aesthetics, ElementTree, Geom, Guide, Position, Theme}
+  alias Scales.{ColorOperations, DataRange}
 
   # `facet_wrap/3`'s options, validated at the call as every public function's are.
   @facet_wrap_options NimbleOptions.new!(
@@ -120,7 +121,7 @@ defmodule Giggly.Plot.Options do
   ]
 
   # A colour set for every mark of a layer, as ggplot2's `colour = "steelblue"` sets it, kept in the
-  # one spelling `Giggly.ColorOperations` gives it: uppercase hex, or `:none`.
+  # one spelling `Scales.ColorOperations` gives it: uppercase hex, or `:none`.
   @color_type {:custom, __MODULE__, :validate_color, []}
 
   # The colours an option that sets one takes.
@@ -1322,7 +1323,7 @@ defmodule Giggly.Plot.Options do
         "The breaks' labels: a list of strings, one for each of " <>
           "`breaks:`; a function handed every break drawn, a list of " <>
           "numbers in data units, that returns a string for each, as " <>
-          "`Giggly.Format`'s do; or `:none` for ticks with no labels."
+          "`Scales.Format`'s do; or `:none` for ticks with no labels."
     ],
     expand: [
       type: @scale_expand_type,
@@ -1691,7 +1692,7 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
         "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
-          "every break, a list of numbers, that returns a string for each, as `Giggly.Format`'s " <>
+          "every break, a list of numbers, that returns a string for each, as `Scales.Format`'s " <>
           "do; or `:none` for no labels."
     ]
   ]
@@ -3469,7 +3470,7 @@ defmodule Giggly.Plot.Options do
 
   # A list of a discrete axis's values, each a string, a number or an atom, `nil` and the booleans
   # among them, as a discrete column holds them, and none named twice, a number and the float
-  # equal to it being one value, as the scale matches them (`Scale.Discrete.key/1`).
+  # equal to it being one value, as the scale matches them (`Scales.DataRange.key/1`).
   defp discrete_values(values) do
     case Enum.reject(values, &discrete_value?/1) do
       [] ->
@@ -3482,7 +3483,7 @@ defmodule Giggly.Plot.Options do
   end
 
   defp distinct_values(values) do
-    case values -- Enum.uniq_by(values, &Scale.Discrete.key/1) do
+    case values -- Enum.uniq_by(values, &DataRange.key/1) do
       [] ->
         {:ok, values}
 

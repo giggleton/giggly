@@ -18,8 +18,8 @@ beginning "Each layer's defaults are filled in from the theme".
 ## Rules
 
 - **A geom never sees a panel's size, a pixel, a scale's range or a facet.** Its boundary lists
-  `Giggly.AsCharacter` for the text it writes and `Giggly.ColorOperations` to mix its default
-  colours, never a scale. It is handed one panel's rows, the
+  `Giggly.AsCharacter` for the text it writes and `Scales` to mix its default colours
+  (`Scales.ColorOperations`), never `Giggly.Scale`. It is handed one panel's rows, the
   plot's coordinate system and that panel's params, as ggplot2's `draw_panel()` is, places the rows
   with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
 - **A geom has a say during the build: `setup_data/3`** gives each row the extent it is drawn

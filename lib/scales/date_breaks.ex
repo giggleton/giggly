@@ -1,10 +1,10 @@
-defmodule Giggly.Scale.DateBreaks do
+defmodule Scales.DateBreaks do
   @moduledoc false
 
   # A date or date-time axis's breaks: R's `pretty()` for dates and date-times (grDevices'
   # `prettyDate()`), which ggplot2's date and date-time scales take through
   # `scales::breaks_pretty()`, about five breaks on calendar or clock boundaries and the format
-  # their labels are written in, used through `Giggly.Scale.Transform`; and a break every step of
+  # their labels are written in, used through `Scales.Transform`; and a break every step of
   # a width a plot gives (`width/2`, `datetime_width/3`), as R's `breaks_width()` lays them.
   #
   # A date extent is in days since 1970-01-01, as R stores a date, and is worked in seconds, as R

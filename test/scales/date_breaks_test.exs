@@ -1,7 +1,7 @@
-defmodule Giggly.Scale.DateBreaksTest do
+defmodule Scales.DateBreaksTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.Scale.DateBreaks
+  alias Scales.DateBreaks
 
   # Golden: R's own `scales::breaks_pretty()` on `as.Date()` of each extent, in days since
   # 1970-01-01 (scales 1.4.0, R 4.6.1), each break its days and the label `prettyDate()` gives it.
