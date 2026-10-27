@@ -21,7 +21,14 @@ defmodule Giggly.Scale do
   #     date transformation, as ggplot2's `scale_type()` gives a `Date` `"date"`; on an aesthetic
   #     other than position it gets none yet. A plot's continuous scale through the identity takes
   #     one too, placing each date at its days, as R stores a date (`takes?/2`);
-  #   * times, datetimes, lists and `:term` get none yet.
+  #   * a date-time, `{:datetime, zone}`, and a naive one, `:naive_datetime`, get a date-time
+  #     scale, a continuous scale of the seconds since 1970-01-01 00:00 through the date-time
+  #     transformation, as `scale_type()` gives a `POSIXct` `"datetime"`, the two kinds apart, as
+  #     a naive date-time is no instant; the scale takes its zone from the first column it
+  #     places (`settle_zone/2`), as ggplot2's takes the first column's `tzone`. On an aesthetic
+  #     other than position they get none yet, and a continuous scale through the identity takes
+  #     either at its seconds;
+  #   * times, lists and `:term` get none yet.
   #
   # ## Transformation
   #
@@ -50,9 +57,10 @@ defmodule Giggly.Scale do
   #
   # A continuous scale carries the options a plot gives it (`Giggly.Scale.Continuous`): its
   # limits replace its trained range end by end, its expansion widens them, and its breaks, minor
-  # breaks and labels replace its transformation's, or `:none` leaves them out. A date scale's
-  # breaks and minor breaks may be a width, `{:width, [week: 1]}`, a break every week, and its
-  # labels a format, `{:format, "%b %d"}`, each date written in it by `Calendar.strftime/3`.
+  # breaks and labels replace its transformation's, or `:none` leaves them out. A date or
+  # date-time scale's breaks and minor breaks may be a width, `{:width, [week: 1]}`, a break every
+  # week, or `[hour: 6]` on a date-time scale, and its labels a format, `{:format, "%b %d"}`,
+  # each break written in it by `Calendar.strftime/3`.
   #
   # A discrete scale carries them too (`Giggly.Scale.Discrete`): its limits replace its levels,
   # choosing the values it shows and their order, its breaks the values an axis marks among them,
@@ -96,7 +104,7 @@ defmodule Giggly.Scale do
     deps: [Giggly.AsCharacter, Giggly.ColorOperations],
     exports: [Continuous, Discrete]
 
-  alias Giggly.Scale.{Continuous, DateBreaks, Discrete, Labels, Palette, Transform}
+  alias Giggly.Scale.{Continuous, Discrete, Labels, Palette, Transform}
 
   @typedoc "A trained position scale."
   @type t :: Continuous.t() | Discrete.t()
@@ -105,7 +113,15 @@ defmodule Giggly.Scale do
   @type break :: {number(), String.t() | :none}
 
   @typedoc "Which kind of scale a column needs, or `:none` when no scale can place it yet."
-  @type kind :: :continuous | :discrete | :date | :none
+  @type kind :: :continuous | :discrete | :date | :datetime | :naive_datetime | :none
+
+  # The kinds of column whose scale is continuous through a transformation of their own, which an
+  # untransformed continuous scale takes too, and which no aesthetic other than position takes yet.
+  @time_kinds [:date, :datetime, :naive_datetime]
+
+  # The time zone database a date-time scale reads its zone with unless a plot gives it another:
+  # the standard library's, which knows UTC alone.
+  @time_zone_database Calendar.UTCOnlyTimeZoneDatabase
 
   # The aesthetics other than position that a scale maps, those of them that are colours, and those
   # whose every scale is discrete.
@@ -121,19 +137,27 @@ defmodule Giggly.Scale do
 
   # The kind of scale a column of type `dtype` (a `Giggly.DataFrame` type) needs.
   @doc false
-  @spec kind(atom() | {:list, term()}) :: kind()
+  @spec kind(atom() | tuple()) :: kind()
   def kind(dtype) when dtype in @continuous_dtypes, do: :continuous
   def kind(dtype) when dtype in @discrete_dtypes, do: :discrete
   def kind(:date), do: :date
+  def kind({:datetime, _zone}), do: :datetime
+  def kind(:naive_datetime), do: :naive_datetime
   def kind(dtype) when is_atom(dtype), do: :none
   def kind({:list, _values_dtype}), do: :none
 
   # The kind of scale a column of type `dtype` needs on `aesthetic`: on a position aesthetic, its
-  # `kind/1`; on another, the same but for a date, whose scale on any aesthetic but position
-  # (ggplot2's `scale_alpha_date()` and `scale_colour_date()`) has not arrived.
+  # `kind/1`; on another, the same but for a date or a date-time, whose scale on any aesthetic but
+  # position (ggplot2's `scale_alpha_date()` and `scale_colour_datetime()`) has not arrived.
   @doc false
-  @spec kind(atom() | {:list, term()}, atom()) :: kind()
-  def kind(:date, aesthetic) when aesthetic in @non_position_aesthetics, do: :none
+  @spec kind(atom() | tuple(), atom()) :: kind()
+  def kind(dtype, aesthetic) when aesthetic in @non_position_aesthetics do
+    case kind(dtype) do
+      kind when kind in @time_kinds -> :none
+      kind -> kind
+    end
+  end
+
   def kind(dtype, _aesthetic), do: kind(dtype)
 
   # ggplot2's default range for alpha, 0.1 to 1, which leaves every value visible.
@@ -168,11 +192,17 @@ defmodule Giggly.Scale do
 
   # An untrained position scale of the given kind, its palette the identity and its guide an axis,
   # as ggplot2's position scales are drawn by `guide_axis()`; a continuous one records the identity
-  # transformation, and a date scale, a continuous one, the date transformation.
+  # transformation, a date scale, a continuous one, the date transformation, and a date-time
+  # scale, naive or not, the date-time transformation, its zone left for its first column to
+  # settle (`settle_zone/2`) and read by the standard library's database.
   @doc false
-  @spec new(:continuous | :discrete | :date) :: t()
+  @spec new(:continuous | :discrete | :date | :datetime | :naive_datetime) :: t()
   def new(:continuous), do: %Continuous{}
   def new(:date), do: %Continuous{transform: :date}
+
+  def new(kind) when kind in [:datetime, :naive_datetime],
+    do: %Continuous{transform: {:datetime, :default, @time_zone_database}}
+
   def new(:discrete), do: %Discrete{}
 
   # An untrained scale of the given kind for `aesthetic`, one of `non_position_aesthetics/0`, with
@@ -217,21 +247,54 @@ defmodule Giggly.Scale do
   def new(:ordinal, aesthetic), do: new(:discrete, aesthetic)
 
   # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a date scale,
-  # or another continuous scale.
+  # a date-time scale, a naive one once its first column has settled it, or another continuous
+  # scale.
   @doc false
-  @spec kind_of(t()) :: :continuous | :discrete | :date
+  @spec kind_of(t()) :: :continuous | :discrete | :date | :datetime | :naive_datetime
   def kind_of(%Discrete{}), do: :discrete
   def kind_of(%Continuous{transform: :date}), do: :date
+  def kind_of(%Continuous{transform: {:datetime, :naive, _database}}), do: :naive_datetime
+  def kind_of(%Continuous{transform: {:datetime, _zone, _database}}), do: :datetime
   def kind_of(%Continuous{}), do: :continuous
 
   # Whether `scale` takes a column that needs a scale of `kind` (`kind/1`): a scale of that kind
-  # does, and so does a continuous scale through the identity a date's, placing each date at its
-  # days since 1970-01-01, as R stores a date and its continuous scale places one; through another
-  # transformation a date is refused, where R fails.
+  # does; a date-time scale no column has settled takes date-times, naive or not; and a continuous
+  # scale through the identity takes a date at its days since 1970-01-01 and a date-time at its
+  # seconds, as R stores each and its continuous scale places one. Through another transformation
+  # either is refused, where R fails.
   @doc false
   @spec takes?(t(), kind()) :: boolean()
-  def takes?(%Continuous{transform: :identity}, :date), do: true
+  def takes?(%Continuous{transform: :identity}, kind) when kind in @time_kinds, do: true
+
+  def takes?(%Continuous{transform: {:datetime, :default, _database}}, kind)
+      when kind in [:datetime, :naive_datetime],
+      do: true
+
   def takes?(scale, kind), do: kind_of(scale) == kind
+
+  # A date-time scale whose zone no column has settled given the zone of the first column it
+  # places, of type `dtype`, as ggplot2's date-time scale takes the first column's `tzone`: a
+  # naive one's `:naive`, a date-time's its zone, `{:error, zone}` where the scale's time zone
+  # database does not know it. Any other scale is returned as it is.
+  @doc false
+  @spec settle_zone(t(), atom() | tuple()) :: {:ok, t()} | {:error, String.t()}
+  def settle_zone(%Continuous{transform: {:datetime, :default, database}} = scale, dtype) do
+    case dtype do
+      :naive_datetime ->
+        {:ok, %{scale | transform: {:datetime, :naive, database}}}
+
+      {:datetime, zone} ->
+        if known_zone?(zone, database),
+          do: {:ok, %{scale | transform: {:datetime, zone, database}}},
+          else: {:error, zone}
+    end
+  end
+
+  def settle_zone(scale, _dtype), do: {:ok, scale}
+
+  # Whether `database` knows the time zone `zone`: whether it can say what an instant is there.
+  defp known_zone?(zone, database),
+    do: match?({:ok, _shifted}, DateTime.shift_zone(~U[1970-01-01 00:00:00Z], zone, database))
 
   # The aesthetics other than position that a scale maps, as ggplot2 adds a default scale for each
   # one a layer maps.
@@ -446,7 +509,7 @@ defmodule Giggly.Scale do
   def breaks(%Continuous{breaks: {:width, step}, transform: transform} = scale, extent) do
     positions =
       transform
-      |> Transform.transform(DateBreaks.width(step, extent))
+      |> Transform.width(step, extent)
       |> Enum.filter(fn position -> placed_inside?(position, extent) end)
 
     Enum.zip(positions, labels(scale, positions, :width, extent))
@@ -608,7 +671,7 @@ defmodule Giggly.Scale do
          _positions,
          extent
        ),
-       do: Transform.transform(transform, DateBreaks.width(step, extent))
+       do: Transform.width(transform, step, extent)
 
   defp candidate_minor_breaks(%Continuous{transform: transform}, positions, extent),
     do: Transform.minor_breaks(transform, positions, extent)

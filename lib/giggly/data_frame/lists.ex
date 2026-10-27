@@ -763,7 +763,7 @@ defmodule Giggly.DataFrame.Lists do
   defp sorted_levels(levels, :date), do: Enum.sort(levels, Date)
   defp sorted_levels(levels, :time), do: Enum.sort(levels, Time)
   defp sorted_levels(levels, :naive_datetime), do: Enum.sort(levels, NaiveDateTime)
-  defp sorted_levels(levels, :datetime), do: Enum.sort(levels, DateTime)
+  defp sorted_levels(levels, {:datetime, _zone}), do: Enum.sort(levels, DateTime)
   defp sorted_levels(levels, _dtype), do: Enum.sort(levels)
 
   # The values typed as a column holding them, and cast to that type.
@@ -840,7 +840,7 @@ defmodule Giggly.DataFrame.Lists do
   defp kind(%Date{}), do: :date
   defp kind(%Time{}), do: :time
   defp kind(%NaiveDateTime{}), do: :naive_datetime
-  defp kind(%DateTime{}), do: :datetime
+  defp kind(%DateTime{time_zone: zone}), do: {:datetime, zone}
   defp kind(_value), do: :term
 
   defp mixed_message(name, witness, value) do

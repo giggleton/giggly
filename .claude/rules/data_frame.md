@@ -122,8 +122,9 @@ column names become strings", "Column types belong to the frame" and "Every boun
   finding the mix means reading the values, which a guard cannot do.
 - **The frame owns its columns' types; callers ask `dtypes/1`.** A type is worked out once, when a
   column enters (`new/1`, `put/3`, `put/4`; `select/2` carries it), by Explorer's rules for a
-  series built from a list, written out in the moduledoc; `mutate/2` types a column by its
-  expression. What a type *means* to a plot (discrete
+  series built from a list, written out in the moduledoc, a `DateTime`'s carrying its zone,
+  `{:datetime, zone}`, as Explorer's does, so a column mixing zones is refused; `mutate/2` types a
+  column by its expression. What a type *means* to a plot (discrete
   or not, which scale) is the caller's, never the frame's.
 - **`:category` is the one type never worked out from values: `new/1` and `put/4` are told it**,
   a column given as `{name, values, :category}` or `{name, values, {:category, levels: levels,

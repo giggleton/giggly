@@ -35,7 +35,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_radial/1`), the scale functions
   (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
-  `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`, the colour scales
+  `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
+  `scale_x_datetime/2`, `scale_y_datetime/2`, the colour scales
   `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_gradient`, `_gradient2`,
   `_gradientn`, `_continuous` and `_viridis_c`, each with its `scale_fill_` twin,
   `scale_alpha_continuous/2`,
@@ -139,8 +140,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   is a `%Scale.Continuous{}` through `:date`**, its `date_breaks:` and `date_minor_breaks:`
   recorded as `{:width, step}` in `breaks` and `minor_breaks` and its `date_labels:` as
   `{:format, format}` in `labels`, each refused beside its plain twin, where R takes the `date_`
-  one. **`xlim/2`, `ylim/2` and `lims/2` give a list of values a discrete scale's limits, and
-  `xlim/3`, `ylim/3` and `lims/2` two dates a date scale's**, sorted, never reversed, as R's
+  one. **A date-time scale is a `%Scale.Continuous{}` through `{:datetime, :default,
+  Calendar.UTCOnlyTimeZoneDatabase}`**, recorded as a date scale's options are, its steps taking
+  `:second`, `:minute` and `:hour` too, its limits, breaks and minor breaks `DateTime`s or
+  `NaiveDateTime`s, never both, as a naive one names no instant; the transformation is a value in
+  `Plot.Options` (`datetime_transform/0`), a test pinning it to `Scale.new(:datetime)`'s, since
+  `PlotRunsNothing` keeps `Scale.new/1` out of `Plot`. **`xlim/2`, `ylim/2` and `lims/2` give a
+  list of values a discrete scale's limits, and `xlim/3`, `ylim/3` and `lims/2` two dates a date
+  scale's and two date-times a date-time scale's**, sorted, never reversed, as R's
   `limits()` reverses numbers only; two strings are refused, naming the list form (design-log §4,
   the entry beginning "Discrete and date position scales"). **A colour, fill, alpha, shape, size,
   line type or line width scale function records its palette from its options and every other
@@ -311,8 +318,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   date scale's list of labels needs a list of breaks as long, checked at the call, since its default
   breaks are known only when run; a discrete scale's is one for each break given, or else each limit
   given, checked at the call, and otherwise when run. `date_labels:` is checked at the call by
-  writing a date in it with `Calendar.strftime/3`, so a format it cannot write (`"%W"`) raises
-  there. A caller writes `:none` only to remove something (`colour: :none`, `labs(x: :none)`), and
+  writing a date in it with `Calendar.strftime/3`, or a date-time on a date-time scale, so a
+  format it cannot write (`"%W"`) raises there. A caller writes `:none` only to remove
+  something (`colour: :none`, `labs(x: :none)`), and
   `nil` only for a limit the data supplies (design-log §4, the entry beginning "Absent").
 - **The schemas, the checks NimbleOptions calls and the defaults the functions share live in
   `Giggly.Plot.Options`**, `@moduledoc false` and inside `Plot`'s boundary, so the API module

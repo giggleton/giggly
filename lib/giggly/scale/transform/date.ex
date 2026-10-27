@@ -20,26 +20,26 @@ defmodule Giggly.Scale.Transform.Date do
   @epoch ~D[1970-01-01]
 
   @impl Giggly.Scale.Transform
-  def transform(values), do: Enum.map(values, &days/1)
+  def transform(_transformation, values), do: Enum.map(values, &days/1)
 
   # A position's date, its whole days since 1970-01-01, as a date's label writes it.
   @impl Giggly.Scale.Transform
-  def inverse(positions), do: Enum.map(positions, &date/1)
+  def inverse(_transformation, positions), do: Enum.map(positions, &date/1)
 
   @impl Giggly.Scale.Transform
-  def domain, do: {:neg_infinity, :infinity}
+  def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Giggly.Scale.Transform
-  def breaks(extent) do
+  def breaks(_transformation, extent) do
     {dates, _format} = DateBreaks.pretty(extent)
     Enum.map(dates, &days/1)
   end
 
   @impl Giggly.Scale.Transform
-  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
+  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Giggly.Scale.Transform
-  def format(breaks, :given) do
+  def format(_transformation, breaks, :given) do
     Enum.map(breaks, fn day ->
       day
       |> date()
@@ -47,7 +47,7 @@ defmodule Giggly.Scale.Transform.Date do
     end)
   end
 
-  def format(breaks, extent) do
+  def format(_transformation, breaks, extent) do
     {_dates, format} = DateBreaks.pretty(extent)
 
     Enum.map(breaks, fn day ->
@@ -55,6 +55,17 @@ defmodule Giggly.Scale.Transform.Date do
       |> date()
       |> DateBreaks.label(format)
     end)
+  end
+
+  # The breaks `step` lays on an axis showing `extent`, as `Giggly.Scale.Transform.width/3`
+  # describes.
+  @doc false
+  @spec width(Giggly.Scale.Transform.name(), keyword(pos_integer()), {float(), float()}) ::
+          [float()]
+  def width(_transformation, step, extent) do
+    step
+    |> DateBreaks.width(extent)
+    |> Enum.map(&days/1)
   end
 
   defp date(day), do: Date.add(@epoch, trunc(day))

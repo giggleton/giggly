@@ -15,34 +15,36 @@ defmodule Giggly.Scale.Transform.Sqrt do
   alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
 
   @impl Giggly.Scale.Transform
-  def transform(values), do: Enum.map(values, &root/1)
+  def transform(_transformation, values), do: Enum.map(values, &root/1)
 
   @impl Giggly.Scale.Transform
-  def inverse(positions), do: Enum.map(positions, fn position -> position * position end)
+  def inverse(_transformation, positions), do: Enum.map(positions, &squared/1)
 
   @impl Giggly.Scale.Transform
-  def domain, do: {0.0, :infinity}
+  def domain(_transformation), do: {0.0, :infinity}
 
   @impl Giggly.Scale.Transform
-  def breaks({low, high}) do
+  def breaks(_transformation, {low, high}) do
     [low, high]
-    |> inverse()
+    |> Enum.map(&squared/1)
     |> Enum.min_max()
     |> Breaks.extended()
-    |> transform()
+    |> Enum.map(&root/1)
   end
 
   @impl Giggly.Scale.Transform
-  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
+  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Giggly.Scale.Transform
-  def format(breaks, _extent) do
+  def format(_transformation, breaks, _extent) do
     breaks
-    |> inverse()
+    |> Enum.map(&squared/1)
     |> Labels.numbers()
   end
 
   defp root(value) when is_number(value) and value >= 0, do: :math.sqrt(value)
   defp root(:infinity), do: :infinity
   defp root(_negative_or_missing), do: nil
+
+  defp squared(position), do: position * position
 end

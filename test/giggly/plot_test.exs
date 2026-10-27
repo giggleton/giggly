@@ -3913,6 +3913,140 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "scale_x_datetime/2 and scale_y_datetime/2" do
+    test "a date-time scale function records an untrained date-time scale, its zone unsettled" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_datetime(
+          name: "At",
+          limits: {~U[2024-03-10 06:00:00Z], nil},
+          breaks: [~U[2024-03-10 12:00:00Z]],
+          labels: ["noon"],
+          minor_breaks: :none,
+          expand: [mult: 0]
+        )
+        |> Plot.scale_y_datetime(limits: {nil, ~N[2024-03-10 18:00:00]})
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 transform: {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase},
+                 name: "At",
+                 limits: {~U[2024-03-10 06:00:00Z], nil},
+                 breaks: [~U[2024-03-10 12:00:00Z]],
+                 labels: ["noon"],
+                 minor_breaks: :none,
+                 expand: [mult: {0.0, 0.0}, add: {0.0, 0.0}]
+               },
+               y: %Scale.Continuous{
+                 transform: {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase},
+                 limits: {nil, ~N[2024-03-10 18:00:00]}
+               }
+             }
+    end
+
+    test "a date-time scale's transformation is the one a scale of date-times gets by default" do
+      assert Plot.Options.datetime_transform() === Scale.new(:datetime).transform
+      assert Plot.Options.datetime_transform() === Scale.new(:naive_datetime).transform
+    end
+
+    test "a step under a day, or longer, records a width, and a format the labels it writes" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_datetime(date_breaks: [hour: 6], date_minor_breaks: [minute: 30])
+        |> Plot.scale_y_datetime(date_labels: "%H:%M %Z", breaks: :none)
+
+      stepped = fn step ->
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_datetime(date_breaks: step)
+        |> Map.fetch!(:scales)
+        |> Map.fetch!(:x)
+      end
+
+      seconds = stepped.(second: 15)
+      weeks = stepped.(week: 1)
+
+      transform = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+
+      assert {plot.scales, seconds.breaks, weeks.breaks} === {
+               %{
+                 x: %Scale.Continuous{
+                   transform: transform,
+                   breaks: {:width, [hour: 6]},
+                   minor_breaks: {:width, [minute: 30]}
+                 },
+                 y: %Scale.Continuous{
+                   transform: transform,
+                   labels: {:format, "%H:%M %Z"},
+                   breaks: :none
+                 }
+               },
+               {:width, [second: 15]},
+               {:width, [week: 1]}
+             }
+    end
+
+    test "an option given beside its date_ twin is refused" do
+      plot = Plot.new(@rows)
+
+      for {options, named} <- [
+            {[breaks: [~U[2024-03-10 00:00:00Z]], date_breaks: [hour: 1]],
+             ":breaks and :date_breaks"},
+            {[labels: :none, date_labels: "%H"], ":labels and :date_labels"},
+            {[minor_breaks: :none, date_minor_breaks: [minute: 15]],
+             ":minor_breaks and :date_minor_breaks"}
+          ] do
+        error = assert_raise ArgumentError, fn -> Plot.scale_x_datetime(plot, options) end
+        assert error.message =~ "Plot.scale_x_datetime/2 is given both #{named}"
+      end
+
+      assert_raise ArgumentError, ~r/scale_y_datetime.* 1 labels.* has none/, fn ->
+        Plot.scale_y_datetime(plot, labels: ["a"], date_breaks: [hour: 1])
+      end
+    end
+
+    # A date-time's directives (%H, %z, %Z, %f) are written, a format Calendar.strftime/3 lacks,
+    # such as R's %W, is refused at the call with its own reason; a naive date-time names no
+    # instant, so it is refused beside one that does.
+    test "an option a date-time scale cannot take is refused, naming it and what was wrong" do
+      plot = Plot.new(@rows)
+      zoned = ~U[2024-03-10 06:00:00Z]
+      naive = ~N[2024-03-10 06:00:00]
+
+      for {key, value, shown} <- [
+            {:limits, {zoned, 3}, "got: {~U[2024-03-10 06:00:00Z], 3}"},
+            {:limits, {~D[2024-03-10], nil}, "each a DateTime, a NaiveDateTime or nil"},
+            {:limits, {zoned, naive}, "got both in the limits"},
+            {:breaks, [zoned, naive], "got both in the list"},
+            {:breaks, [zoned, ~D[2024-03-10]], "got: ~D[2024-03-10] in it"},
+            {:breaks, zoned, "got: ~U[2024-03-10 06:00:00Z]"},
+            {:minor_breaks, [1.5], "got: 1.5 in it"},
+            {:date_breaks, [hours: 1], "got: [hours: 1]"},
+            {:date_breaks, [hour: 0], "got: [hour: 0]"},
+            {:date_breaks, [second: 0.5], "got: [second: 0.5]"},
+            {:date_breaks, [hour: 1, minute: 30], "got: [hour: 1, minute: 30]"},
+            {:date_breaks, [microsecond: 500], "got: [microsecond: 500]"},
+            {:date_minor_breaks, "30 mins", ~s(got: "30 mins")},
+            {:date_labels, "%W", ~s(got: "%W", which it cannot: #{strftime_refusal("%W")})},
+            {:date_labels, 4, "got: 4"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_x_datetime(plot, [{key, value}])
+          end
+
+        assert {error.key, error.message =~ shown} == {key, true}
+      end
+
+      for format <- ["%H:%M:%S", "%z", "%Z", "%f"] do
+        assert Plot.scale_x_datetime(plot, date_labels: format).scales.x.labels ===
+                 {:format, format}
+      end
+    end
+  end
+
   describe "xlim/2, ylim/2 and lims/2 of a discrete axis's values, and xlim/3 of dates" do
     test "a list of values gives a discrete scale those limits" do
       plot = Plot.new(@rows)
@@ -3941,6 +4075,31 @@ defmodule Giggly.PlotTest do
                %Scale.Continuous{transform: :date, limits: {~D[2026-10-01], nil}}
 
       assert Plot.xlim(plot, nil, nil).scales.x === %Scale.Continuous{}
+    end
+
+    # ggplot2 4.0.3's `limits.POSIXct()` makes a date-time scale and sorts its ends.
+    test "two date-times give a date-time scale those limits, in either order, an end nil" do
+      plot = Plot.new(@rows)
+      transform = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+
+      assert Plot.xlim(plot, ~U[2024-03-10 12:00:00Z], ~U[2024-03-10 06:00:00Z]).scales.x ===
+               %Scale.Continuous{
+                 transform: transform,
+                 limits: {~U[2024-03-10 12:00:00Z], ~U[2024-03-10 06:00:00Z]}
+               }
+
+      assert Plot.ylim(plot, nil, ~N[2024-03-10 06:00:00]).scales.y ===
+               %Scale.Continuous{transform: transform, limits: {nil, ~N[2024-03-10 06:00:00]}}
+
+      assert Plot.lims(plot, x: {~N[2024-03-10 06:00:00], nil}).scales.x ===
+               %Scale.Continuous{transform: transform, limits: {~N[2024-03-10 06:00:00], nil}}
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.xlim(plot, ~U[2024-03-10 06:00:00Z], ~N[2024-03-10 12:00:00])
+        end
+
+      assert error.message =~ "got both in the limits"
     end
 
     # R's `xlim("I1", "IF")` takes any number of values as separate arguments; Elixir has no

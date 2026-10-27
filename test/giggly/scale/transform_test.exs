@@ -288,6 +288,103 @@ defmodule Giggly.Scale.TransformTest do
     end
   end
 
+  describe "datetime" do
+    @utc {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}
+    @naive {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}
+
+    # ggplot(u, aes(at, y)) + geom_point(), `at` 2024-03-09 20:17 and 2024-03-10 08:40 UTC: the
+    # axis's continuous range, its breaks every three hours, labelled by the time alone, and its
+    # minor breaks midway, less the breaks
+    test "marks R's pretty() breaks for date-times, labelled by their step, and minor breaks" do
+      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+
+      assert axis(@utc, values) ==
+               {{1_710_013_191.0, 1_710_062_229.0},
+                [
+                  {1_710_018_000.0, "21:00"},
+                  {1_710_028_800.0, "00:00"},
+                  {1_710_039_600.0, "03:00"},
+                  {1_710_050_400.0, "06:00"},
+                  {1_710_061_200.0, "09:00"}
+                ],
+                [
+                  1_710_023_400.0,
+                  1_710_034_200.0,
+                  1_710_045_000.0,
+                  1_710_055_800.0
+                ]}
+
+      naive = Enum.map(values, &DateTime.to_naive/1)
+      assert axis(@naive, naive) == axis(@utc, values)
+    end
+
+    # one point at 2024-03-10 08:40:12 UTC: the axis 0.05 seconds either side, R's pretty()
+    # widening it to whole seconds, and the one break inside labelled by its second
+    test "a single date-time's axis has the one break, labelled by its second" do
+      assert axis(@utc, [~U[2024-03-10 08:40:12Z]]) ==
+               {{1_710_060_011.95, 1_710_060_012.05}, [{1_710_060_012.0, "12"}], []}
+    end
+
+    # scale_x_datetime(breaks = ...): R's format() writes the date alone where every break is a
+    # midnight, else the date and the time to the second, a fraction of a second dropped
+    test "breaks it did not choose are written as R's format() writes them" do
+      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+      given = fn breaks -> axis(@utc, values, breaks: breaks) end
+
+      {_extent, breaks, _minor} = given.([~U[2024-03-10 00:00:00Z], ~U[2024-03-10 06:30:00Z]])
+      {_extent, midnights, _minor} = given.([~U[2024-03-09 00:00:00Z], ~U[2024-03-10 00:00:00Z]])
+
+      {_extent, fraction, _minor} =
+        given.([~U[2024-03-10 00:00:00.250000Z], ~U[2024-03-10 06:00:00Z]])
+
+      {_extent, width, _minor} = axis(@utc, values, breaks: {:width, [hour: 5]})
+
+      assert {breaks, midnights, fraction, width} ==
+               {[
+                  {1_710_028_800.0, "2024-03-10 00:00:00"},
+                  {1_710_052_200.0, "2024-03-10 06:30:00"}
+                ], [{1_710_028_800.0, "2024-03-10"}],
+                [
+                  {1_710_028_800.25, "2024-03-10 00:00:00"},
+                  {1_710_050_400.0, "2024-03-10 06:00:00"}
+                ],
+                [
+                  {1_710_028_800.0, "2024-03-10 00:00:00"},
+                  {1_710_046_800.0, "2024-03-10 05:00:00"}
+                ]}
+    end
+
+    # as.POSIXct(1710060012.123456, tz = "UTC"), as R parses it, is 1710060012.123456: a
+    # microsecond is kept, the double nearest the instant
+    test "places a date-time at its seconds since 1970, a naive one alike, a missing one nowhere" do
+      assert Transform.transform(@utc, [~U[2024-03-10 08:40:12.123456Z], nil]) ===
+               [1_710_060_012.123456, nil]
+
+      assert Transform.transform(@naive, [~N[2024-03-10 08:40:12.123456]]) ===
+               [1_710_060_012.123456]
+
+      assert Transform.inverse(@utc, [1_710_060_012.123456, 1_710_060_012.0]) ===
+               [~U[2024-03-10 08:40:12.123456Z], ~U[2024-03-10 08:40:12Z]]
+
+      assert Transform.inverse(@naive, [1_710_060_012.0]) === [~N[2024-03-10 08:40:12]]
+    end
+
+    test "a scale of one kind refuses a date-time of the other" do
+      naive =
+        assert_raise ArgumentError, fn ->
+          Transform.transform(@naive, [~U[2024-03-10 08:40:12Z]])
+        end
+
+      zoned =
+        assert_raise ArgumentError, fn ->
+          Transform.transform(@utc, [~N[2024-03-10 08:40:12]])
+        end
+
+      assert naive.message =~ "a scale of naive date-times cannot place ~U[2024-03-10 08:40:12Z]"
+      assert zoned.message =~ ~s(in "Etc/UTC" cannot place ~N[2024-03-10 08:40:12])
+    end
+  end
+
   describe "a transformed scale's labels and limits" do
     test "a labels function is handed the breaks in data units" do
       # hwy with scale_y_log10(labels = function(b) ...): the function is handed 20, 30 and 40
@@ -321,6 +418,30 @@ defmodule Giggly.Scale.TransformTest do
       extent = Scale.dimension(trained)
 
       assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
+    end
+
+    test "a labels function on a date-time axis is handed date-times, to the second" do
+      # scale_x_datetime(labels = function(b) ...) is handed POSIXct objects in the scale's zone
+      scale = %Continuous{
+        transform: {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase},
+        labels: fn datetimes -> Enum.map(datetimes, &inspect/1) end
+      }
+
+      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+      trained = Scale.train(scale, Scale.transform(scale, values), :none)
+      extent = Scale.dimension(trained)
+
+      assert labels(trained, extent) ==
+               Enum.map(
+                 [
+                   ~U[2024-03-09 21:00:00Z],
+                   ~U[2024-03-10 00:00:00Z],
+                   ~U[2024-03-10 03:00:00Z],
+                   ~U[2024-03-10 06:00:00Z],
+                   ~U[2024-03-10 09:00:00Z]
+                 ],
+                 &inspect/1
+               )
     end
 
     test "a limit outside the transformation's domain cannot be placed, at either end" do

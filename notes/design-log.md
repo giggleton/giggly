@@ -79,6 +79,42 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Date-time scales are Phase 3's fifteenth increment, in four steps: date-times in UTC and
+  naive, time zones, times of day, the notebooks (2026-10-26, Steve, agreeing the proposal;
+  checked against ggplot2 4.0.3, scales 1.4.0 and R).** A `DateTime` or `NaiveDateTime` column
+  gets a continuous scale of the seconds since 1970, R's `POSIXct`, a naive one placed as wall-clock
+  UTC; a `Time` column one of the seconds since midnight, R's `hms`. `scale_x_datetime/2` and
+  `scale_x_time/2` and their y twins take `scale_x_date/2`'s options, steps gaining `:hour`,
+  `:minute` and `:second`, the datetime ones `timezone:` and `time_zone_database:` too; `xlim/3`
+  takes two date-times, never two times, where R fails. An axis is one kind: a date beside a
+  date-time is refused, where R converts it. The notebooks draw nothing new: only `sec_axis`'s
+  two examples hold a date-time, and both wait on `sec_axis()` too. *Rejected: times of day
+  later*: one step, its breaks already in the tree. *Deferred:* date-times and dates on colour,
+  fill, alpha, size and line width, together; sub-second steps; `oob`, `position`, `sec.axis`;
+  `label_date_short()`; `Duration` columns.
+
+- **A date-time's breaks under a day are `prettyDate()`'s steps, the table `Scale.DateBreaks`
+  holds for dates extended (2026-10-26, Steve).** Seconds (1, 2, 5, 10, 15, 30), minutes (the
+  same) and hours (1, 3, 6, 12), each with R's label format and unit to truncate to, chosen by
+  the rule the table already has, with R's widening of an extent under a second by 2.5 seconds
+  either side; at the finest step, too few intervals keep its breaks, where R's loop adds ticks
+  outside the extent (R's breaks inside matched on 1,999 of 1,999 extents of 1 to 2 seconds; its
+  trimming, firing only under a second, changed none of 9,000). *Rejected: extended breaks on the
+  range in seconds, minutes or hours*, R's time scale's: it matched R's date-time breaks on 29%
+  to 56% of random extents, counting six hours from 1970, not local midnight. *Rejected: porting
+  the tick loop*: no drawn break depends on it.
+
+- **A time zone's database is passed on the scale, `time_zone_database:` beside `timezone:`
+  (2026-10-26, Steve).** The core reads no config, and every `DateTime` zone function would take
+  its database from config when not handed one, so the scale carries it, as R puts `timezone` on
+  the scale: `Calendar.UTCOnlyTimeZoneDatabase` unless given, a zone it does not know refused at
+  the call. The scale's zone is the given one, else its first column's, as R takes the first
+  `tzone`; a column outside UTC with no database is refused when run, saying how. A repo-local
+  credo check keeps every database-defaulting `DateTime` call out of `lib/`. *Rejected: on the run
+  functions*: each gains it, and one plot draws differently by what is passed. *Rejected: `tz` as a
+  runtime dependency*: every user takes Giggly's copy of the zone data. *Rejected: UTC only*:
+  zoned data must be shifted first and is labelled in UTC.
+
 - **A table is the user's to shape; Giggly takes a column's order from a `Giggly.Factor` and does
   no data wrangling (2026-10-26, Steve, settling how rows taken by hand lose a factor's levels).**
   Rows taken from `diamonds` with `Enum` or Explorer lose `cut`'s levels, as a factor enumerates
@@ -2559,18 +2595,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   stored as floats, as Explorer casts them (2026-10-18, Steve: so `4` and `4.0` make one facet
   panel, group and level, as in R); `:nan`, `:infinity` and `:neg_infinity` are floats; all-`nil` or
   empty is `:null`; binaries are `:string`; `Date`, `Time`, `NaiveDateTime` and `DateTime` have
-  their own types. Lists adds `:atom` and `:term` (pandas' and Polars' `object`), and stores each
-  column as `{dtype, values}`. A column mixing two types is refused, by `from_table/1` and beneath
-  it alike. What a type means to a plot is the plot's: `Giggly.Group` reads `:string`, `:boolean`
-  and `:atom` as discrete. *Rejected: deciding discreteness from the values in plotting code* (first
-  proposed for this increment) — what a column holds is the frame's to validate and report, and an
-  engine has the types natively. *Rejected: R's coercion, where numbers mixed with strings make a
-  character column* — Elixir has none, a silently categorical axis hides a messy column, and
-  Explorer's `DataFrame.new` refuses the same input. *Rejected: working types out on demand* — each
-  reader rescans, and a mixed column surfaces wherever it is first read. *Rejected: refusing values
-  with no named type* — an unused JSON or numeric column in a database result would refuse the whole
-  table. *Rejected: Explorer's widths (`{:s, 64}`)* — a list holds unbounded integers and has no
-  width to report.
+  their own types, a `DateTime`'s carrying its zone (2026-10-26), so a column mixing zones is
+  refused, as Explorer refuses it. Lists adds `:atom` and `:term` (pandas' and Polars' `object`),
+  and stores each column as `{dtype, values}`. A column mixing two types is refused, by
+  `from_table/1` and beneath it alike. What a type means to a plot is the plot's: `Giggly.Group`
+  reads `:string`, `:boolean` and `:atom` as discrete. *Rejected: deciding discreteness from the
+  values in plotting code* (first proposed for this increment) — what a column holds is the frame's
+  to validate and report, and an engine has the types natively. *Rejected: R's coercion, where
+  numbers mixed with strings make a character column* — Elixir has none, a silently categorical axis
+  hides a messy column, and Explorer's `DataFrame.new` refuses the same input. *Rejected: working
+  types out on demand* — each reader rescans, and a mixed column surfaces wherever it is first read.
+  *Rejected: refusing values with no named type* — an unused JSON or numeric column in a database
+  result would refuse the whole table. *Rejected: Explorer's widths (`{:s, 64}`)* — a list holds
+  unbounded integers and has no width to report.
 
 - **Group ids follow ggplot2's `add_group()` (2026-10-12, Steve).** Checked against
   `R/grouping.R` and `id()`/`id_var()` in `R/compat-plyr.R`. A mapped `group` is renumbered 1..k
@@ -2807,6 +2844,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-26 — Date-time axes: scale_x_datetime() and scale_y_datetime(), DateTime and
+  NaiveDateTime placed at their seconds, R's pretty() breaks under a day (date-time scales, step
+  1); §4: "Date-time scales are Phase 3's fifteenth increment", "A date-time's breaks under a
+  day", "A time zone's database is passed on the scale", "Column types belong to the frame"
 - 2026-10-26 — Draw the notebook examples geom_jitter unlocks, and narrow every verdict to what
   still waits (geom_jitter, step 2, the notebook sweep); §4: "`geom_jitter` is Phase 3's fourteenth
   increment", "A jitter's distances are Erlang's", "A table is the user's to shape"

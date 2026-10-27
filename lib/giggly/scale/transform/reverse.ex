@@ -14,30 +14,30 @@ defmodule Giggly.Scale.Transform.Reverse do
   alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
 
   @impl Giggly.Scale.Transform
-  def transform(values), do: Enum.map(values, &negated/1)
+  def transform(_transformation, values), do: Enum.map(values, &negated/1)
 
   @impl Giggly.Scale.Transform
-  def inverse(positions), do: Enum.map(positions, &negated/1)
+  def inverse(_transformation, positions), do: Enum.map(positions, &negated/1)
 
   @impl Giggly.Scale.Transform
-  def domain, do: {:neg_infinity, :infinity}
+  def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Giggly.Scale.Transform
-  def breaks({low, high}) do
+  def breaks(_transformation, {low, high}) do
     [low, high]
-    |> inverse()
+    |> Enum.map(&negated/1)
     |> Enum.min_max()
     |> Breaks.extended()
-    |> transform()
+    |> Enum.map(&negated/1)
   end
 
   @impl Giggly.Scale.Transform
-  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent, true)
+  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent, true)
 
   @impl Giggly.Scale.Transform
-  def format(breaks, _extent) do
+  def format(_transformation, breaks, _extent) do
     breaks
-    |> inverse()
+    |> Enum.map(&negated/1)
     |> Labels.numbers()
   end
 

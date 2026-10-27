@@ -926,7 +926,7 @@ defmodule Giggly.Assembly do
   end
 
   # The kind of column a value computed after the stat must be on an axis of `scale_kind`.
-  defp statistic_kind(:date), do: :date
+  defp statistic_kind(kind) when kind in [:date, :datetime, :naive_datetime], do: kind
   defp statistic_kind(_continuous_or_discrete), do: :continuous
 
   defp unplaced_statistic_message({_plot, _layer, index}, aesthetic, source, dtype, scale_kind) do
@@ -945,6 +945,10 @@ defmodule Giggly.Assembly do
 
   defp takes_message(:continuous), do: "is continuous, so it takes numbers"
   defp takes_message(:date), do: "is a date scale, so it takes dates"
+  defp takes_message(:datetime), do: "is a date-time scale, so it takes date-times"
+
+  defp takes_message(:naive_datetime),
+    do: "is a scale of naive date-times, so it takes naive date-times"
 
   defp takes_message(:discrete),
     do: "is discrete, and takes a value computed after the stat as a number, a position"
@@ -1131,24 +1135,50 @@ defmodule Giggly.Assembly do
   # transforming anything; on an axis no layer maps, the plot's scale whatever its kind, or a
   # continuous one, as ggplot2's is. A plot's scale that does not take the axis's columns is
   # refused when the plot is run, naming the first column on the axis, as ggplot2 refuses
-  # "Discrete value supplied to a continuous scale".
+  # "Discrete value supplied to a continuous scale". A date-time scale takes its zone from that
+  # first column (`Scale.settle_zone/2`), as ggplot2's takes the first column's `tzone`.
   defp position_scale(%Plot{scales: scales} = plot, layer_frames, family) do
-    case {Map.fetch(scales, family), axis_kind(plot, layer_frames, family)} do
-      {{:ok, scale}, :unmapped} -> scale
-      {{:ok, scale}, kind} -> checked_scale(scale, kind, plot, layer_frames, family)
-      {:error, :unmapped} -> Scale.new(:continuous)
-      {:error, kind} -> Scale.new(kind)
+    case {Map.fetch(scales, family), axis_columns(plot, layer_frames, family)} do
+      {{:ok, scale}, []} ->
+        scale
+
+      {{:ok, scale}, [first | _rest] = columns} ->
+        scale
+        |> checked_scale(columns)
+        |> zoned(first)
+
+      {:error, []} ->
+        Scale.new(:continuous)
+
+      {:error, [first | _rest] = columns} ->
+        columns
+        |> axis_kind()
+        |> Scale.new()
+        |> zoned(first)
     end
   end
 
-  defp checked_scale(scale, kind, plot, layer_frames, family) do
-    if Scale.takes?(scale, kind) do
-      scale
-    else
-      selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
-      [first_column | _rest] = mapped_columns(plot, layer_frames, selected?, :start)
-      raise ArgumentError, untaken_message(scale, family, first_column)
+  defp checked_scale(scale, [first_column | _rest] = columns) do
+    if Scale.takes?(scale, axis_kind(columns)),
+      do: scale,
+      else: raise(ArgumentError, untaken_message(scale, family_of(first_column), first_column))
+  end
+
+  defp family_of({_index, aesthetic, _value, _dtype, _kind}), do: Aesthetics.family(aesthetic)
+
+  # The scale given the zone of `column`, the first it places, or refused where its time zone
+  # database does not know that zone.
+  defp zoned(scale, {_index, _aesthetic, _value, dtype, _kind} = column) do
+    case Scale.settle_zone(scale, dtype) do
+      {:ok, settled} -> settled
+      {:error, zone} -> raise ArgumentError, unknown_zone_message(column, zone)
     end
+  end
+
+  defp unknown_zone_message({index, aesthetic, value, _dtype, _kind}, zone) do
+    "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, date-times " <>
+      "in #{inspect(zone)}, but only date-times in UTC can be drawn yet; shift them to " <>
+      "\"Etc/UTC\" with DateTime.shift_zone/3"
   end
 
   # The untrained scale of `aesthetic`, one other than position that a layer maps: the plot's own
@@ -1181,7 +1211,7 @@ defmodule Giggly.Assembly do
   # A scale's kind, and a continuous scale's transformation where it has one, which a refusal names
   # since a continuous scale through the identity takes a date; written into the message as it is.
   defp scale_description(%Scale.Continuous{transform: transform})
-       when transform not in [:identity, :date],
+       when is_atom(transform) and transform not in [:identity, :date],
        do: "continuous through #{transform}"
 
   defp scale_description(scale), do: Scale.kind_of(scale)
@@ -1191,17 +1221,15 @@ defmodule Giggly.Assembly do
   defp discreteness(:discrete), do: :discrete
   defp discreteness(_continuous), do: :continuous
 
-  # The kind of scale the axis's columns need: an axis has one scale, so every column on it must
-  # be a type some scale can place, and all of one kind, the first column deciding; `:unmapped`
-  # for an axis no layer maps before the stat.
-  defp axis_kind(plot, layer_frames, family) do
+  # Each column on the axis of `family` before the stat, none for an axis no layer maps.
+  defp axis_columns(plot, layer_frames, family) do
     selected? = fn aesthetic -> Aesthetics.family(aesthetic) == family end
-
-    case mapped_columns(plot, layer_frames, selected?, :start) do
-      [] -> :unmapped
-      columns -> checked_kind(columns, "an axis has one scale")
-    end
+    mapped_columns(plot, layer_frames, selected?, :start)
   end
+
+  # The kind of scale an axis's columns need: an axis has one scale, so every column on it must be
+  # a type some scale can place, and all of one kind, the first column deciding.
+  defp axis_kind(columns), do: checked_kind(columns, "an axis has one scale")
 
   # The first column of each aesthetic other than position that a layer maps, which decides the
   # kind of scale it needs: as an axis's, every column of it must be a type some scale can map,
@@ -1248,7 +1276,7 @@ defmodule Giggly.Assembly do
   # A column of an aesthetic whose every scale is discrete, refused unless its type is one a
   # discrete scale takes, or one no scale can place, which `checked_kind/2` refuses.
   defp check_discrete({index, aesthetic, value, dtype, _kind}) do
-    if Scale.kind(dtype) in [:continuous, :date] do
+    if Scale.kind(dtype) in [:continuous, :date, :datetime, :naive_datetime] do
       noun = Aesthetics.in_words(aesthetic)
 
       raise ArgumentError,

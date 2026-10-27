@@ -9,7 +9,7 @@ defmodule GigglyCredo.ChecksTest do
     Code.require_file(path)
   end
 
-  alias GigglyCredo.Check.{PlotRunsNothing, ZipMap}
+  alias GigglyCredo.Check.{PassTimeZoneDatabase, PlotRunsNothing, ZipMap}
 
   # Credo is a `runtime: false` dependency, so its services, which parse a source, start here.
   setup_all do
@@ -148,6 +148,79 @@ defmodule GigglyCredo.ChecksTest do
       """
       |> source()
       |> run_check(ZipMap)
+      |> refute_issues()
+    end
+  end
+
+  describe "PassTimeZoneDatabase" do
+    test "a DateTime call leaving out its database is reported at the call, naming its arity" do
+      """
+      instant = DateTime.from_unix!(0)
+      DateTime.shift_zone(instant, "Etc/UTC")
+      """
+      |> source()
+      |> run_check(PassTimeZoneDatabase)
+      |> assert_issue(fn issue ->
+        assert {issue.line_no, issue.column, issue.trigger} == {4, 1, "DateTime.shift_zone"}
+        assert issue.message =~ "`DateTime.shift_zone/2` takes its time zone database from config"
+      end)
+    end
+
+    test "each function and arity that defaults the database is reported" do
+      for call <- [
+            ~s{DateTime.new(date, time)},
+            ~s{DateTime.new(date, time, "Etc/UTC")},
+            ~s{DateTime.new!(date, time, "Etc/UTC")},
+            ~s{DateTime.from_naive(naive, "Etc/UTC")},
+            ~s{DateTime.from_naive!(naive, "Etc/UTC")},
+            ~s{DateTime.shift_zone!(instant, "Etc/UTC")},
+            ~s{DateTime.now("Etc/UTC")},
+            ~s{DateTime.now!("Etc/UTC")},
+            ~s{DateTime.add(instant, 1)},
+            ~s{DateTime.add(instant, 1, :hour)},
+            ~s{DateTime.shift(instant, hour: 1)},
+            ~s{Calendar.get_time_zone_database()}
+          ] do
+        issues =
+          call
+          |> source()
+          |> run_check(PassTimeZoneDatabase)
+
+        assert [_issue] = issues, call
+      end
+    end
+
+    test "a piped call is counted at the arity the pipe gives it, and a capture at its own" do
+      """
+      instant |> DateTime.add(1, :hour)
+      Enum.map(instants, &DateTime.shift_zone!(&1, "Etc/UTC"))
+      Enum.map(instants, &DateTime.shift(&1, [hour: 1], database))
+      zone |> DateTime.now!(database) |> DateTime.add(1, :hour, database)
+      fun = &DateTime.now/1
+      """
+      |> source()
+      |> run_check(PassTimeZoneDatabase)
+      |> assert_issues(fn issues ->
+        found = Enum.map(issues, fn issue -> {issue.line_no, issue.trigger} end)
+
+        assert Enum.sort(found) ==
+                 [{3, "DateTime.add"}, {4, "DateTime.shift_zone!"}, {7, "DateTime.now"}]
+      end)
+    end
+
+    test "a call passing the database, or a function that takes none, is not reported" do
+      """
+      DateTime.new(date, time, "Etc/UTC", database)
+      DateTime.from_naive(naive, zone, Calendar.UTCOnlyTimeZoneDatabase)
+      instant |> DateTime.shift_zone(zone, database)
+      DateTime.add(instant, 1, :hour, database)
+      DateTime.from_unix!(0)
+      DateTime.to_unix(instant, :microsecond)
+      NaiveDateTime.add(naive, 1, :second)
+      Calendar.strftime(instant, "%H")
+      """
+      |> source()
+      |> run_check(PassTimeZoneDatabase)
       |> refute_issues()
     end
   end

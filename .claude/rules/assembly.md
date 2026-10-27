@@ -57,7 +57,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   back in data units first, which waits for a stat whose documented variables are positions.
   **Each on an axis is checked against the axis's scale, chosen before the stat, and put through
   it** (`Scale.transform/2`, each row on its panel's scale): numbers on a continuous or a discrete
-  axis, dates on a date one, and anything else refused when run, naming the layer, the aesthetic,
+  axis, dates on a date one, date-times of its kind on a date-time one, and anything else
+  refused when run, naming the layer, the aesthetic,
   the value or the stat's column, and its type, where ggplot2 adds a scale for an axis nothing
   mapped before the stat, or warns at numbers on a date axis.
 - **Just before a layer's position runs, each aesthetic the position reads goes into every
@@ -122,7 +123,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   scale's (`Scale.kind_of/1`); every layer's columns in the axis's family
   are then put through the scale's transformation, trained on, and mapped to positions**, a
   continuous scale censoring those outside its limits. Which columns belong to an axis is
-  `Aesthetics.family/1`'s answer, never a name compared with `:x`.
+  `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A date-time scale then takes
+  its zone from the axis's first column** (`Scale.settle_zone/2`), as ggplot2's takes the first
+  column's `tzone`, so later layers' date-times in other zones are placed by their instants; a
+  zone its time zone database does not know is refused when run, naming the layer, the aesthetic,
+  the column and the zone.
 - **A layer's stat and position run by the structs the layer records**, read with
   `Plot.layer_stat/1` and `Plot.layer_position/1` and run through `Stat.compute_layer/3` and
   `Position.compute_layer/2`; the assembly names no stat or position kind. **A stat is handed

@@ -94,6 +94,36 @@ defmodule Giggly.DataFrameTest do
       assert error.message =~ ~s("n/a")
     end
 
+    # Explorer 0.13's `Series.from_list/1` of `~U[2024-01-15 12:00:00Z]` and the same instant in
+    # Europe/London raises "does not match the inferred dtype {:datetime, :microsecond,
+    # "Etc/UTC"}": a date-time's zone is part of its type.
+    test "date-times in two time zones are two types, so a column mixing them is refused" do
+      london = %DateTime{
+        year: 2024,
+        month: 1,
+        day: 15,
+        hour: 12,
+        minute: 0,
+        second: 0,
+        microsecond: {0, 0},
+        time_zone: "Europe/London",
+        zone_abbr: "GMT",
+        utc_offset: 0,
+        std_offset: 0
+      }
+
+      zoned = DataFrame.new(stamped: [london, nil])
+      assert DataFrame.dtypes(zoned) == %{stamped: {:datetime, "Europe/London"}}
+
+      error =
+        assert_raise ArgumentError, fn ->
+          DataFrame.new(stamped: [~U[2024-01-15 12:00:00Z], london])
+        end
+
+      assert error.message =~ "column :stamped "
+      assert error.message =~ "Europe/London"
+    end
+
     test "each column's type is worked out by Explorer's rules for a series built from a list" do
       frame =
         DataFrame.new(
@@ -123,7 +153,7 @@ defmodule Giggly.DataFrameTest do
                day: :date,
                clock: :time,
                logged: :naive_datetime,
-               stamped: :datetime,
+               stamped: {:datetime, "Etc/UTC"},
                missing: :null,
                payload: :term
              }
@@ -618,7 +648,7 @@ defmodule Giggly.DataFrameTest do
                day: :date,
                time: :time,
                naive: :naive_datetime,
-               instant: :datetime,
+               instant: {:datetime, "Etc/UTC"},
                kind: :string,
                gap: :null
              }

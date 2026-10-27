@@ -89,6 +89,16 @@ defmodule Giggly.ScaleTest do
       assert Enum.map([:integer, :float, :null, :date], fn dtype -> Scale.kind(dtype, :fill) end) ===
                [:continuous, :continuous, :continuous, :none]
     end
+
+    test "a date-time, naive or in a zone, has a scale on a position aesthetic and none yet else" do
+      dtypes = [{:datetime, "Etc/UTC"}, {:datetime, "Europe/London"}, :naive_datetime]
+
+      assert {Enum.map(dtypes, &Scale.kind/1),
+              Enum.map(dtypes, fn dtype -> Scale.kind(dtype, :xmin) end),
+              Enum.map(dtypes, fn dtype -> Scale.kind(dtype, :color) end)} ===
+               {[:datetime, :datetime, :naive_datetime], [:datetime, :datetime, :naive_datetime],
+                [:none, :none, :none]}
+    end
   end
 
   describe "train/3" do
@@ -534,11 +544,18 @@ defmodule Giggly.ScaleTest do
       assert Scale.censor(scale, [0.55, 2.45, 9.0]) === [0.55, 2.45, 9.0]
     end
 
-    test "a scale's kind is discrete, date or continuous" do
-      assert Enum.map([:discrete, :date, :continuous], fn kind ->
+    test "a scale's kind is discrete, date, date-time or continuous" do
+      assert Enum.map([:discrete, :date, :datetime, :naive_datetime, :continuous], fn kind ->
                Scale.kind_of(Scale.new(kind))
              end) ===
-               [:discrete, :date, :continuous]
+               [:discrete, :date, :datetime, :datetime, :continuous]
+    end
+
+    test "a date-time scale's kind is naive once a naive column has settled it" do
+      naive = %Scale.Continuous{transform: {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}}
+      utc = %Scale.Continuous{transform: {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}}
+
+      assert {Scale.kind_of(naive), Scale.kind_of(utc)} === {:naive_datetime, :datetime}
     end
   end
 
@@ -771,6 +788,31 @@ defmodule Giggly.ScaleTest do
              ) === [true, true, false, false, true, false, true, false, false, false]
     end
 
+    test "a date-time scale takes date-times of either kind until a column settles which" do
+      database = Calendar.UTCOnlyTimeZoneDatabase
+      unsettled = Scale.new(:datetime)
+      naive = %Scale.Continuous{transform: {:datetime, :naive, database}}
+      utc = %Scale.Continuous{transform: {:datetime, "Etc/UTC", database}}
+
+      assert Enum.map(
+               [
+                 {unsettled, :datetime},
+                 {unsettled, :naive_datetime},
+                 {unsettled, :date},
+                 {unsettled, :continuous},
+                 {naive, :naive_datetime},
+                 {naive, :datetime},
+                 {utc, :datetime},
+                 {utc, :naive_datetime},
+                 {Scale.new(:continuous), :datetime},
+                 {Scale.new(:continuous), :naive_datetime},
+                 {%Scale.Continuous{transform: :sqrt}, :datetime},
+                 {Scale.new(:date), :datetime}
+               ],
+               fn {scale, kind} -> Scale.takes?(scale, kind) end
+             ) === [true, true, false, false, true, false, true, false, true, true, false, false]
+    end
+
     # Golden: ggplot2 4.0.3's layer_data() x and panel x range, breaks and labels in R 4.6.1 for
     # points on 2024-01-01, 2024-01-11 and 2024-02-15 under scale_x_continuous().
     test "an untransformed continuous scale places a date at its days and labels them as numbers" do
@@ -788,6 +830,28 @@ defmodule Giggly.ScaleTest do
                   {19_760.0, "19760"},
                   {19_770.0, "19770"}
                 ]}
+    end
+  end
+
+  describe "settle_zone/2" do
+    test "a date-time scale takes its first column's zone, or naive, once and for all" do
+      database = Calendar.UTCOnlyTimeZoneDatabase
+      unsettled = Scale.new(:datetime)
+      naive = %Scale.Continuous{transform: {:datetime, :naive, database}}
+      date = Scale.new(:date)
+
+      assert {Scale.settle_zone(unsettled, {:datetime, "Etc/UTC"}),
+              Scale.settle_zone(unsettled, :naive_datetime),
+              Scale.settle_zone(naive, {:datetime, "Etc/UTC"}), Scale.settle_zone(date, :date)} ===
+               {{:ok, %Scale.Continuous{transform: {:datetime, "Etc/UTC", database}}},
+                {:ok, naive}, {:ok, naive}, {:ok, date}}
+    end
+
+    test "a zone the scale's time zone database does not know is refused, named" do
+      unsettled = Scale.new(:datetime)
+
+      assert Scale.settle_zone(unsettled, {:datetime, "Europe/London"}) ===
+               {:error, "Europe/London"}
     end
   end
 

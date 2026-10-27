@@ -28,29 +28,29 @@ defmodule Giggly.Scale.Transform.Log10 do
   @multiples Enum.to_list(2..9)
 
   @impl Giggly.Scale.Transform
-  def transform(values), do: Enum.map(values, &log10/1)
+  def transform(_transformation, values), do: Enum.map(values, &log10/1)
 
   @impl Giggly.Scale.Transform
-  def inverse(positions), do: Enum.map(positions, &power/1)
+  def inverse(_transformation, positions), do: Enum.map(positions, &power/1)
 
   @impl Giggly.Scale.Transform
-  def domain, do: {-100.0, :infinity}
+  def domain(_transformation), do: {-100.0, :infinity}
 
   # The breaks found on the extent in data units, then put back into log space.
   @impl Giggly.Scale.Transform
-  def breaks({low, high}) do
+  def breaks(_transformation, {low, high}) do
     {power(low), power(high)}
     |> log_breaks()
-    |> transform()
+    |> Enum.map(&log10/1)
   end
 
   @impl Giggly.Scale.Transform
-  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
+  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Giggly.Scale.Transform
-  def format(breaks, _extent) do
+  def format(_transformation, breaks, _extent) do
     breaks
-    |> inverse()
+    |> Enum.map(&power/1)
     |> Labels.numbers()
   end
 

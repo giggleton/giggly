@@ -255,6 +255,10 @@ plot_runs_nothing_roots =
             # Zip and map in one pass (`Enum.zip_with/2,3`), everywhere credo reads, as credo's own
             # `MapJoin` is scoped.
             {GigglyCredo.Check.ZipMap, []},
+            # The pipeline reads no config (CLAUDE.md, Approach & architecture), and a `DateTime`
+            # call that leaves out its time zone database reads it from config, which `CorePurity`
+            # cannot see, so the pure core, every file under `lib/`, passes one.
+            {GigglyCredo.Check.PassTimeZoneDatabase, [files: %{included: ["lib/"]}]},
             # A plot describes and runs nothing (`.claude/rules/plot.md`): `Giggly.Plot` builds the
             # kinds' structs and reads their facts, and calls no family's root nor any module that
             # draws a guide, which `boundary` cannot forbid while it lets `Plot` use the kinds.

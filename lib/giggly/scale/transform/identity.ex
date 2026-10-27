@@ -2,7 +2,8 @@ defmodule Giggly.Scale.Transform.Identity do
   @moduledoc false
 
   # The identity transformation, R's `transform_identity()`: every value as it is, a date at its
-  # days since 1970-01-01, as R stores a date and its untransformed continuous scale places one. It
+  # days since 1970-01-01 and a date-time at its seconds (`Transform.Datetime.seconds/1`), as R
+  # stores each and its untransformed continuous scale places one. It
   # is what a continuous scale records when nothing transforms its axis. Use it through
   # `Giggly.Scale.Transform`.
   #
@@ -12,29 +13,33 @@ defmodule Giggly.Scale.Transform.Identity do
 
   @behaviour Giggly.Scale.Transform
 
-  alias Giggly.Scale.{Breaks, Labels, MinorBreaks}
+  alias Giggly.Scale.{Breaks, Labels, MinorBreaks, Transform}
 
   @epoch ~D[1970-01-01]
 
   @impl Giggly.Scale.Transform
-  def transform(values), do: Enum.map(values, &placed/1)
+  def transform(_transformation, values), do: Enum.map(values, &placed/1)
 
   @impl Giggly.Scale.Transform
-  def inverse(positions), do: positions
+  def inverse(_transformation, positions), do: positions
 
   @impl Giggly.Scale.Transform
-  def domain, do: {:neg_infinity, :infinity}
+  def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Giggly.Scale.Transform
-  def breaks(extent), do: Breaks.extended(extent)
+  def breaks(_transformation, extent), do: Breaks.extended(extent)
 
   @impl Giggly.Scale.Transform
-  def minor_breaks(breaks, extent), do: MinorBreaks.regular(breaks, extent)
+  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   # A number's label is its own, whatever the extent.
   @impl Giggly.Scale.Transform
-  def format(breaks, _extent), do: Labels.numbers(breaks)
+  def format(_transformation, breaks, _extent), do: Labels.numbers(breaks)
 
   defp placed(%Date{} = date), do: Date.diff(date, @epoch) / 1
+
+  defp placed(%struct{} = datetime) when struct in [DateTime, NaiveDateTime],
+    do: Transform.Datetime.seconds(datetime)
+
   defp placed(value), do: value
 end

@@ -29,8 +29,10 @@ defmodule Giggly.DataFrame do
       `:infinity` and `:neg_infinity` are floats, as Explorer gives a non-finite float;
     * a column of only `nil`, or of no rows, is `:null`;
     * binaries are `:string`;
-    * `Date`, `Time`, `NaiveDateTime` and `DateTime` are `:date`, `:time`, `:naive_datetime` and
-      `:datetime`.
+    * `Date`, `Time` and `NaiveDateTime` are `:date`, `:time` and `:naive_datetime`, and a
+      `DateTime` is `{:datetime, time_zone}`, its time zone's name, as Explorer types one, so
+      date-times in two zones are two types (`"Etc/UTC"` and `"Europe/London"`) and a column
+      mixing them is refused.
 
   A column of lists is `{:list, type}`, the type its lists' values have, worked out as a column's
   is from all of them together, so `[[1, 2.0], []]` is `{:list, :float}`, its integers stored as
@@ -130,7 +132,7 @@ defmodule Giggly.DataFrame do
           | :date
           | :time
           | :naive_datetime
-          | :datetime
+          | {:datetime, String.t()}
           | :null
           | :term
           | :category

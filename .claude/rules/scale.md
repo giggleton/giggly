@@ -147,6 +147,10 @@ grid lines are placed by the coordinate system".
   `date_minor_breaks:` and `date_labels:` (design-log §4, the entry beginning "`date_breaks:` and
   `date_minor_breaks:` are a step"): a width's breaks are `DateBreaks.width/2` on the extent,
   those inside it kept, and a format's labels each date written by `Calendar.strftime/3` as it is.
+  A date-time scale's are the same, `Plot.scale_x_datetime/2` recording them, its steps taking
+  `:second`, `:minute` and `:hour` too, its width's breaks `DateBreaks.datetime_width/2`'s and its
+  format writing each break as a `DateTime` or a `NaiveDateTime`; the transformation lays a width
+  (`Transform.width/3`), only a date's and a date-time's having one.
 - **A discrete scale carries the options a plot gives it**, `name`, `limits`, `breaks`, `labels`
   and `expand`, each `:default` until given but `expand`, ggplot2's `[mult: {0, 0}, add: {0.6,
   0.6}]`; its field defaults are a position scale's, so `%Discrete{}` is `new(:discrete)`.
@@ -192,11 +196,15 @@ grid lines are placed by the coordinate system".
   whatever its values: a date's is a continuous scale through the date transformation, so
   dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
   date has no scale yet (`kind/2` gives `:none`), ggplot2's `scale_colour_date()`,
-  `scale_alpha_date()`, `scale_size_date()` and `scale_linewidth_date()`. **`takes?/2` is the one
-  rule for which kind of column a plot's scale takes**: its own kind, and a continuous scale through
-  the identity a date's, which the identity places at its days since 1970-01-01, as R's
-  untransformed continuous scale draws a date; under any other transformation a date is refused,
-  where R fails.
+  `scale_alpha_date()`, `scale_size_date()` and `scale_linewidth_date()`. **A date-time is
+  `:datetime` and a naive one `:naive_datetime`**, as `scale_type()` gives a `POSIXct`
+  `"datetime"`, two kinds since a naive date-time names no instant, both a continuous scale through
+  the date-time transformation (`new/1`), and on an aesthetic other than position none yet, as a
+  date's. **`takes?/2` is the one rule for which kind of column a plot's scale takes**: its own
+  kind, a date-time scale no column has settled either date-time kind, and a continuous scale
+  through the identity a date's or a date-time's, which the identity places at its days or its
+  seconds since 1970-01-01, as R's untransformed continuous scale draws each; under any other
+  transformation either is refused, where R fails.
 - **Training follows R's `scales`.** A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped). **A discrete scale merges each training as R's
   `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and
@@ -217,14 +225,27 @@ grid lines are placed by the coordinate system".
   to use it.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
-  `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`; a
+  `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`;
+  `new(:datetime)` records `{:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}`, the name
+  with its zone and the time zone database that reads it, as R's `transform_time(tz)` holds its
+  zone (design-log §4, the entry beginning "A time zone's database is passed on the scale"); a
   plot's scale may name `:log10`, `:sqrt`, `:reverse` or `:reciprocal`. A
   discrete scale has none, as in ggplot2, and `transform/2` returns its values as given.
+- **A date-time scale's zone is its first column's** (`settle_zone/2`), as ggplot2's takes the
+  first column's `tzone`: `:default` until the assembly settles it from that column's type, a
+  zone's name, or `:naive` for naive date-times; a zone its database does not know is
+  `{:error, zone}`, which the assembly refuses. A scale on an axis no column maps keeps
+  `:default`, written as UTC.
+- **A time zone's database is always passed, never read from config.** Every `DateTime` function
+  that works in a zone takes one, defaulting to `Calendar.get_time_zone_database/0`, which reads
+  the application's config even for UTC; `GigglyCredo.Check.PassTimeZoneDatabase` fails the gate
+  on any such call in `lib/` that leaves it out, where `CorePurity` cannot see the read.
 - **A scale trains and maps in transformed space.** The assembly puts an axis's columns through
   `transform/2` before training, so the range, and every view of it the coordinate system builds,
   is in transformed space.
 - **A transformation is a module implementing `Giggly.Scale.Transform`**, resolved from its name
-  there, and carries what R's object carries and a scale reads: the transformation, its inverse,
+  there and handed to each of its callbacks, so the date-time one reads its zone; it carries what
+  R's object carries and a scale reads: the transformation, its inverse,
   its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
   `format`). **A label is made from the break and the extent** (`format/2`), since a date's
   format is the step chosen for the whole axis; a number's ignores the extent and is written once
@@ -253,8 +274,8 @@ grid lines are placed by the coordinate system".
   a day to a thousand years, that cuts the extent closest to five times, from its start truncated
   to the step's unit (a Monday for weeks), or its neighbour where that comes closer, as R does.
   Each is labelled in its step's format, written as R's `format()` writes it, a year unpadded.
-  **What R does only for times is left out**, and reaching it fails: steps under a day, and the
-  widening, finer step and trimming no date extent needs. Its minor breaks are the identity's
+  **A date never takes a step under a day**, which no date extent reaches, and reaching one
+  fails. Its minor breaks are the identity's
   (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
   extended-breaks one is (below): its test pins R's own breaks for each case and for each random
   extent where a mutant departed. **A width's breaks are exactly R's `breaks_width()` for dates**
@@ -263,6 +284,23 @@ grid lines are placed by the coordinate system".
   to its Monday, a month to its 1st, a year to 1 January, whatever the count — to its end plus
   the count of a unit's most days (1, 7, 31, 365) rounded down, every step; its test pins R's
   own output for each unit and each rounding.
+- **A date-time scale works in seconds since 1970-01-01 00:00 UTC, as R's `POSIXct` stores one**
+  (`Transform.Datetime`, R's `transform_time()`): a date-time's whole microseconds divided once by
+  a million, the double nearest the instant, a naive one's as though its clock were UTC's, a
+  missing one `nil`; a plot's limits or breaks of the other kind raise, as a column's would be
+  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/1`,
+  the date steps' table extended below a day: seconds, minutes and hours, each with R's format and
+  unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; two
+  branches of R's are left out, neither changing a break inside the extent or its label: its added
+  ticks where a second cuts the extent once, which keeps its breaks here, and its trimming
+  (design-log §4, the entry beginning "A date-time's breaks under a day"). Its test pins R's
+  breaks for every step and format, and R's breaks inside each short extent; a surviving mutant
+  is judged against R as a date's are. **A width's breaks are exactly R's `breaks_width()` for
+  date-times** (`DateBreaks.datetime_width/2`): seconds and minutes from the nearest multiple of the
+  step since 1970-01-01, half to even, the rest from the start of the unit, rounded up by the
+  step's most seconds, stepped by elapsed time but months and years, stepped on the calendar; its
+  test pins R's for each unit and rounding. A break it did not choose is written as R's
+  `format()` writes it: the date alone where every one is at midnight, else to the second.
 - **`breaks/2` gives an axis's breaks as `{position, label}` pairs, on the extent it is handed**,
   never one of its own, so a coordinate limit can hand it another. A continuous scale's are its
   transformation's breaks inside the extent (ggplot2 censors the rest), none when untrained, and

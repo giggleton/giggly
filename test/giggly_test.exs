@@ -118,6 +118,12 @@ defmodule GigglyTest do
     23_120
   ]
 
+  # Two readings of a value at instants in UTC.
+  @stamped %{
+    "at" => [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]],
+    "value" => [1.0, 2.0]
+  }
+
   # The scale_date reference page's `df`: the 30 days to 2026-10-19, latest first, rather than to
   # the day it runs, and the prices R 4.6.1's runif(30) gives after set.seed(1).
   @last_month %{
@@ -5285,15 +5291,80 @@ defmodule GigglyTest do
              |> Plot.new(%{x: :class, y: :hwy})
              |> Plot.geom_point()
              |> Plot.scale_x_date(),
-             ~s(x scale is date, but the layer at index 0 maps :x to "class", a discrete column)}
+             ~s(x scale is date, but the layer at index 0 maps :x to "class", a discrete column)},
+            {dates
+             |> Plot.new(%{x: :date, y: :value})
+             |> Plot.geom_point()
+             |> Plot.scale_x_datetime(),
+             ~s(x scale is datetime, but the layer at index 0 maps :x to "date", a date column)},
+            {@stamped
+             |> Plot.new(%{x: :at, y: :value})
+             |> Plot.geom_point()
+             |> Plot.scale_x_date(),
+             ~s(x scale is date, but the layer at index 0 maps :x to "at", a datetime column)},
+            {@stamped
+             |> Plot.new(%{x: :at, y: :value})
+             |> Plot.geom_point()
+             |> Plot.scale_x_log10(),
+             ~s(x scale is continuous through log10, but the layer at index 0 maps :x to "at")}
           ] do
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ refusal
+      end
+    end
+
+    # R has no naive date-time; Explorer 0.13 refuses a series mixing naive and zoned ones, and a
+    # naive one names no instant to set beside one that does.
+    test "a naive date-time beside one in a time zone, or a date, on one axis is refused" do
+      local = %{"local" => [~N[2024-03-10 12:00:00]], "day" => [~D[2024-03-10]], "value" => [3.0]}
+
+      for {other, kind} <- [{:local, "a naive_datetime column"}, {:day, "a date column"}] do
+        plot =
+          @stamped
+          |> Plot.new(%{x: :at, y: :value})
+          |> Plot.geom_point()
+          |> Plot.geom_point(%{x: other}, data: local)
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        for shown <- [~s(index 1 maps :x to "#{other}", #{kind}), ~s("at", a datetime)] do
+          assert error.message =~ shown
+        end
+      end
+    end
+
+    test "date-times in a time zone other than UTC are refused, naming the zone" do
+      london =
+        Enum.map(@stamped["at"], fn instant ->
+          %{instant | time_zone: "Europe/London", zone_abbr: "GMT"}
+        end)
+
+      plot =
+        %{@stamped | "at" => london}
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+      assert error.message =~ ~s(index 0 maps :x to "at", date-times in "Europe/London")
+    end
+
+    test "a date-time mapped to colour or shape is refused, its scale not having arrived" do
+      for {aesthetic, refusal} <- [
+            {:color, ~s(a {:datetime, "Etc/UTC"} column, which no scale can place yet)},
+            {:shape, "but a shape scale is discrete"}
+          ] do
+        plot =
+          @stamped
+          |> Plot.new(%{:x => :value, :y => :value, aesthetic => :at})
+          |> Plot.geom_point()
+
         error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
         assert error.message =~ refusal
       end
     end
   end
 
-  describe "layer_data/2, under a discrete or a date scale" do
+  describe "layer_data/2, under a discrete, a date or a date-time scale" do
     # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data() of ggplot(s, aes(a)) + geom_bar() +
     # scale_x_discrete(limits = c("r", "p")), `s` holding a row each of "p", "q", "r" and NA: the
     # rows the limits leave out are not counted, and each bar stands at its value's place among
@@ -5338,6 +5409,60 @@ defmodule GigglyTest do
               Giggly.panel_scales(plot).x} ===
                {[[1.0, 1.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 1.0, 1.0]],
                 %Giggly.Scale.Discrete{continuous_range: {0.0, 1.0}}}
+    end
+
+    # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data()'s x for points at
+    # as.POSIXct(c(1710060012.123456, 1710000000, NA), tz = "UTC"), alone, under
+    # scale_x_continuous(limits = c(1710050000, NA)), and under
+    # xlim(as.POSIXct(c("2024-03-10 06:00", NA), tz = "UTC")): each at its seconds since
+    # 1970-01-01, the microseconds kept, as R's double holds them, and censored by the limits.
+    test "a date-time is placed at its seconds since 1970-01-01, a naive one at the same" do
+      at = [~U[2024-03-10 08:40:12.123456Z], ~U[2024-03-09 16:00:00Z], nil]
+      naive = Enum.map(at, fn instant -> instant && DateTime.to_naive(instant) end)
+
+      x = fn column, scaled ->
+        %{"at" => column, "value" => [1, 2, 3]}
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+        |> scaled.()
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:x)
+      end
+
+      alone = fn plot -> plot end
+      continuous = fn plot -> Plot.scale_x_continuous(plot, limits: {1_710_050_000, nil}) end
+      limited = fn plot -> Plot.xlim(plot, ~U[2024-03-10 06:00:00Z], nil) end
+
+      assert {x.(at, alone), x.(naive, alone), x.(at, continuous), x.(at, limited),
+              x.(naive, continuous)} ===
+               {[1_710_060_012.123456, 1_710_000_000.0, nil],
+                [1_710_060_012.123456, 1_710_000_000.0, nil], [1_710_060_012.123456, nil, nil],
+                [1_710_060_012.123456, nil, nil], [1_710_060_012.123456, nil, nil]}
+    end
+
+    test "an axis's date-time scale takes its zone from its first column, naive or in UTC" do
+      naive = %{@stamped | "at" => Enum.map(@stamped["at"], &DateTime.to_naive/1)}
+
+      scale = fn table, scaled ->
+        table
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+        |> scaled.()
+        |> Giggly.panel_scales()
+        |> Map.fetch!(:x)
+      end
+
+      alone = fn plot -> plot end
+      given = fn plot -> Plot.scale_x_datetime(plot, name: "At") end
+
+      assert Enum.map(
+               [scale.(@stamped, alone), scale.(naive, alone), scale.(naive, given)],
+               fn %Giggly.Scale.Continuous{transform: transform} -> transform end
+             ) === [
+               {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase},
+               {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase},
+               {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}
+             ]
     end
   end
 
@@ -7293,6 +7418,99 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/scale_date_limits.svg")
+    end
+
+    # Golden: test/golden/datetime_line.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/datetime_line.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. A day's load read every 20 minutes from
+    # 03:00 to 23:00 UTC, the x axis a date-time scale with breaks every six hours from midnight,
+    # labelled by day and time, and minor grid lines midway. It moves with what moves
+    # test/golden/date_line.svg, and with a date-time scale's breaks, labels or minor breaks.
+    test "a line over date-times has an axis of R's pretty date-times, labelled by their step" do
+      svg =
+        ~U[2024-03-10 03:00:00Z]
+        |> readings(61, 20 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/datetime_line.svg")
+    end
+
+    # A naive date-time is placed and labelled as though its clock were UTC's, as R draws a
+    # POSIXct in UTC, so test/golden/datetime_line.R's plot is drawn alike from either.
+    test "naive date-times draw the line their instants in UTC draw" do
+      day = readings(~U[2024-03-10 03:00:00Z], 61, 20 * 60)
+      naive = %{day | "at" => Enum.map(day["at"], &DateTime.to_naive/1)}
+
+      svg =
+        naive
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/datetime_line.svg")
+    end
+
+    # Golden: test/golden/scale_datetime_seconds.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/scale_datetime_seconds.R: every element matches it, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. Fifty-one readings
+    # a second apart as points, the axis's breaks every fifteen seconds, each labelled by its
+    # second. It moves with what moves test/golden/point.svg, and with a date-time scale's steps
+    # under a minute.
+    test "an axis of seconds has breaks every few seconds, labelled by the second" do
+      svg =
+        ~U[2024-03-10 12:00:00Z]
+        |> readings(51, 1)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_point()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_datetime_seconds.svg")
+    end
+
+    # Golden: test/golden/scale_datetime_width.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_datetime_width.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. A working day's load every 15
+    # minutes, a break every two hours from the start of the widened axis's first hour, labelled
+    # by hour and minute, and a minor grid line every half hour. It moves with what moves
+    # test/golden/datetime_line.svg, and with a date-time scale's width and format.
+    test "a date-time scale's breaks every two hours, labelled in a format, minor lines between" do
+      svg =
+        ~U[2024-03-10 08:00:00Z]
+        |> readings(37, 15 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Plot.scale_x_datetime(
+          date_breaks: [hour: 2],
+          date_labels: "%H:%M",
+          date_minor_breaks: [minute: 30]
+        )
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_datetime_width.svg")
+    end
+
+    # Golden: test/golden/scale_datetime_limits.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_datetime_limits.R: every element matches it, the x axis
+    # drawn before the y as in test/golden/point.svg, and every clip path. The day's readings from
+    # noon, the line through the morning not drawn, breaks every three hours. It moves with what
+    # moves test/golden/datetime_line.svg, and with a date-time scale's limits.
+    test "a date-time scale's limits cut the line outside them" do
+      svg =
+        ~U[2024-03-10 03:00:00Z]
+        |> readings(61, 20 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Plot.scale_x_datetime(limits: {~U[2024-03-10 12:00:00Z], nil})
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_datetime_limits.svg")
     end
 
     # Golden: test/golden/scale_continuous_dates.svg, checked against ggplot2's drawing of the same
@@ -9826,5 +10044,20 @@ defmodule GigglyTest do
     |> Plot.new(mapping)
     |> Plot.geom_col(options)
     |> Giggly.layer_data()
+  end
+
+  # `count` readings `step` seconds apart from `start`, each the reading's index modulo 7 times 1.5
+  # plus a tenth of the index, as the date-time goldens' R scripts make them (61 readings 20
+  # minutes apart from 03:00 UTC on 2024-03-10 are test/golden/datetime_line.R's).
+  defp readings(start, count, step) do
+    indexes = Enum.to_list(0..(count - 1))
+
+    %{
+      "at" =>
+        Enum.map(indexes, fn index ->
+          DateTime.add(start, index * step, :second, Calendar.UTCOnlyTimeZoneDatabase)
+        end),
+      "load" => Enum.map(indexes, fn index -> rem(index, 7) * 1.5 + index / 10 end)
+    }
   end
 end

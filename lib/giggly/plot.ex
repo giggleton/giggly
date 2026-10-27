@@ -82,12 +82,14 @@ defmodule Giggly.Plot do
   ## Scales
 
   Each axis gets a scale from the type of what is mapped to it: a continuous scale for numbers, a
-  discrete one for text, booleans and factors, a date one for dates. `scale_x_continuous/2`,
-  `scale_x_discrete/2` and `scale_x_date/2`, and their y twins, set an axis's title, limits,
+  discrete one for text, booleans and factors, a date one for dates, a date-time one for
+  `DateTime`s and `NaiveDateTime`s. `scale_x_continuous/2`, `scale_x_discrete/2`,
+  `scale_x_date/2` and `scale_x_datetime/2`, and their y twins, set an axis's title, limits,
   breaks, labels and how far it reaches; `xlim/3`, `ylim/3` and `lims/2` set its limits alone, two
-  ends for a continuous or a date axis and, with `xlim/2` and `ylim/2`, a list of values for a
-  discrete one. A value outside the limits is missing, so its mark is not drawn. A continuous scale
-  given a column of dates places each at its days since 1970-01-01.
+  ends for a continuous, a date or a date-time axis and, with `xlim/2` and `ylim/2`, a list of
+  values for a discrete one. A value outside the limits is missing, so its mark is not drawn. A
+  continuous scale given a column of dates places each at its days since 1970-01-01, and one of
+  date-times each at its seconds since 1970-01-01 00:00 UTC.
 
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
@@ -259,6 +261,9 @@ defmodule Giggly.Plot do
   @typedoc "A column of a table as written: its name as an atom or a string."
   @type column_reference :: atom() | String.t()
 
+  @typedoc "An end of an axis's limits: a number, a date or a date-time, or `nil` for the data's."
+  @type axis_end :: number() | Date.t() | DateTime.t() | NaiveDateTime.t() | nil
+
   @typedoc "A mapping as written: aesthetic to a column, an expression or a constant."
   @type mapping_argument :: %{optional(aesthetic()) => Mapping.value()}
 
@@ -283,6 +288,9 @@ defmodule Giggly.Plot do
   """
 
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
+
+  # A date-time, naive or not.
+  defguardp is_datetime(value) when is_struct(value, DateTime) or is_struct(value, NaiveDateTime)
 
   @doc """
   A plot of `data`, with `mapping` applying to every layer.
@@ -2001,6 +2009,60 @@ defmodule Giggly.Plot do
     do: date_scale(plot, :y, options, "Plot.scale_y_date/2")
 
   @doc """
+  Gives the plot a date-time x scale with the given options, replacing any x scale it had.
+
+  A date-time axis places each `DateTime` at its seconds since 1970-01-01 00:00 UTC, and each
+  `NaiveDateTime` at its seconds since the same time on its own clock, as though it were UTC's;
+  a column holds one kind or the other, and an axis takes one kind. It marks them on clock and
+  calendar boundaries: every few seconds, minutes or hours, every day, week, month or year, as
+  suits its span, or every step of `date_breaks:`. Its labels are written as suits the breaks, or
+  in the format `date_labels:` gives. Breaks are laid and labels written in UTC, so a column of
+  date-times in another time zone is refused when the plot is run. A value outside the limits is
+  missing, so its mark is not drawn. The scale's name titles the axis whatever `labs/2` says.
+  Raises `ArgumentError` for an option given beside its `date_` twin, or a list of labels without
+  a list of breaks as long; a column on the axis that is not date-times is refused when the plot
+  is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.datetime_scale())}
+
+      iex> svg =
+      ...>   %{"at" => [~U[2024-03-10 00:00:00Z], ~U[2024-03-10 23:00:00Z]], "load" => [0.3, 0.8]}
+      ...>   |> Giggly.Plot.new(%{x: :at, y: :load})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_x_datetime(date_labels: "%H:%M")
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">06:00</text>", svg =~ ">18:00</text>"}
+      {true, true}
+  """
+  @spec scale_x_datetime(t(), keyword()) :: t()
+  def scale_x_datetime(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: datetime_scale(plot, :x, options, "Plot.scale_x_datetime/2")
+
+  @doc """
+  Gives the plot a date-time y scale with the given options, replacing any y scale it had, as
+  `scale_x_datetime/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.datetime_scale())}
+
+      iex> frame =
+      ...>   %{"load" => [0.3, 0.8], "at" => [~U[2024-03-10 00:00:00Z], ~U[2024-03-10 12:00:00Z]]}
+      ...>   |> Giggly.Plot.new(%{x: :load, y: :at})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_datetime(limits: {~U[2024-03-10 06:00:00Z], nil})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [nil, 1710072000.0]
+  """
+  @spec scale_y_datetime(t(), keyword()) :: t()
+  def scale_y_datetime(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: datetime_scale(plot, :y, options, "Plot.scale_y_datetime/2")
+
+  @doc """
   Gives the plot a discrete colour scale of the colours given, replacing any colour scale it had.
 
   `values:` gives the colours, a list handed to the values in order, or a map from a value to its
@@ -3039,11 +3101,12 @@ defmodule Giggly.Plot do
 
   @doc """
   Gives the plot an x scale from `low` to `high`, replacing any x scale it had: a continuous scale
-  for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, or a date scale for dates,
-  as `scale_x_date(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
+  for numbers, as `scale_x_continuous(plot, limits: {low, high})` gives, a date scale for dates,
+  as `scale_x_date(plot, limits: {low, high})` gives, or a date-time scale for date-times, as
+  `scale_x_datetime(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
   given high to low run the axis from high to low, as `transform: :reverse` runs it, each value
-  placed at its negation; dates given so name the same axis as low to high. A discrete axis's
-  limits are a list of its values, which `xlim/2` takes.
+  placed at its negation; dates and date-times given so name the same axis as low to high. A
+  discrete axis's limits are a list of its values, which `xlim/2` takes.
 
       iex> plot =
       ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
@@ -3073,7 +3136,7 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:x)
       [nil, 19733.0]
   """
-  @spec xlim(t(), number() | Date.t() | nil, number() | Date.t() | nil) :: t()
+  @spec xlim(t(), axis_end(), axis_end()) :: t()
   def xlim(%__MODULE__{} = plot, low, high), do: lims(plot, x: {low, high})
 
   @doc """
@@ -3103,7 +3166,7 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:y)
       [nil, 21.0, 18.7]
   """
-  @spec ylim(t(), number() | Date.t() | nil, number() | Date.t() | nil) :: t()
+  @spec ylim(t(), axis_end(), axis_end()) :: t()
   def ylim(%__MODULE__{} = plot, low, high), do: lims(plot, y: {low, high})
 
   @doc """
@@ -3191,12 +3254,15 @@ defmodule Giggly.Plot do
   defp limited_scale(_color, _ends),
     do: {Options.continuous_color_scale(), &continuous_color_scale/1}
 
-  # The axis's scale limits give: a discrete one for a list of values; a date one for dates; else
-  # a continuous one.
+  # The axis's scale limits give: a discrete one for a list of values; a date one for dates; a
+  # date-time one for date-times; else a continuous one.
   defp axis_limits_scale(values) when is_list(values), do: %Scale.Discrete{limits: values}
 
   defp axis_limits_scale({low, high} = limits) when is_struct(low, Date) or is_struct(high, Date),
     do: %Scale.Continuous{limits: limits, transform: :date}
+
+  defp axis_limits_scale({low, high} = limits) when is_datetime(low) or is_datetime(high),
+    do: %Scale.Continuous{limits: limits, transform: Options.datetime_transform()}
 
   defp axis_limits_scale(limits),
     do: %Scale.Continuous{limits: limits, transform: limits_transform(limits)}
@@ -4540,11 +4606,24 @@ defmodule Giggly.Plot do
     put_scale(plot, aesthetic, struct!(Scale.Discrete, validated))
   end
 
-  # The plot with a date scale for `aesthetic` from the options `function` was given, a width
-  # recorded as the breaks or minor breaks it lays and a format as the labels it writes. An option
-  # and its `date_` twin choose the same thing, so both are refused.
-  defp date_scale(plot, aesthetic, options, function) do
-    validated = NimbleOptions.validate!(options, Options.date_scale())
+  # The plot with a date scale for `aesthetic` from the options `function` was given, as
+  # `time_scale/5` records one.
+  defp date_scale(plot, aesthetic, options, function),
+    do: time_scale(plot, aesthetic, {Options.date_scale(), :date}, options, function)
+
+  # The plot with a date-time scale for `aesthetic` from the options `function` was given, as
+  # `time_scale/5` records one, its zone left for its first column to settle.
+  defp datetime_scale(plot, aesthetic, options, function) do
+    schema_and_transform = {Options.datetime_scale(), Options.datetime_transform()}
+    time_scale(plot, aesthetic, schema_and_transform, options, function)
+  end
+
+  # The plot with a scale through `transform` for `aesthetic`, from the options `function` was
+  # given, checked against `schema`: a width recorded as the breaks or minor breaks it lays and a
+  # format as the labels it writes. An option and its `date_` twin choose the same thing, so both
+  # are refused.
+  defp time_scale(plot, aesthetic, {schema, transform}, options, function) do
+    validated = NimbleOptions.validate!(options, schema)
     Enum.each(Options.date_twins(), fn twins -> check_twins(validated, twins, function) end)
     check_scale_labels(validated, function)
 
@@ -4556,7 +4635,7 @@ defmodule Giggly.Plot do
         option -> option
       end)
 
-    put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, :date} | recorded]))
+    put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, transform} | recorded]))
   end
 
   defp put_scale(%__MODULE__{scales: scales} = plot, aesthetic, scale),
