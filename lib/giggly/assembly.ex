@@ -1215,10 +1215,12 @@ defmodule Giggly.Assembly do
       untaken_reason(scale, column_kind)
   end
 
-  # Why a date-time scale given a time zone refuses naive date-times, which name no instant to show
-  # there.
-  defp untaken_reason(%Scale.Continuous{transform: {:datetime, zone, _database}}, :naive_datetime)
-       when is_binary(zone),
+  # Why a date-time scale refuses naive date-times, which only one given a time zone does: they
+  # name no instant to show there.
+  defp untaken_reason(
+         %Scale.Continuous{transform: {:datetime, _zone, _database}},
+         :naive_datetime
+       ),
        do: "; naive date-times are in no time zone, so leave out timezone: to draw them"
 
   defp untaken_reason(_scale, _column_kind), do: ""

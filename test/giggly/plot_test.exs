@@ -4005,7 +4005,8 @@ defmodule Giggly.PlotTest do
              [
                ~s(Plot.scale_x_datetime/2 was given timezone: "Asia/Kolkata"),
                "Calendar.UTCOnlyTimeZoneDatabase does not know",
-               "time_zone_database:"
+               "time_zone_database:",
+               "Tz.TimeZoneDatabase"
              ]},
             {mars,
              [

@@ -407,6 +407,17 @@ defmodule Giggly.Scale.TransformTest do
              ]
     end
 
+    # A scale on an axis no column maps keeps its zone unsettled, and lays and writes its breaks
+    # as R's date-time scale given no zone does, in UTC.
+    test "a scale no column has settled draws its axis as one in UTC" do
+      unsettled = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
+      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+
+      assert axis(unsettled, values) === axis(@utc, values)
+
+      assert Transform.inverse(unsettled, [1_710_060_012.0]) === [~U[2024-03-10 08:40:12Z]]
+    end
+
     # A scale on an axis no column maps keeps its zone unsettled, and takes naive date-times, as
     # its limits may be, as well as date-times in a zone.
     test "a scale no column has settled places a date-time of either kind" do

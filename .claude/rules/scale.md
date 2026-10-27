@@ -314,8 +314,8 @@ grid lines are placed by the coordinate system".
   change skips at the offset before it and one a change repeats as the earlier (design-log §4, the
   entry beginning "A local time a change of offset skips or repeats"); a calendar step advances
   the truncated wall-clock time, a width's the start's once read, as R's `seq()` advances each.
-  Its test pins R's breaks across the changes of New York, Kolkata, Lord Howe, Havana and
-  Asuncion, from 23,771 random and change-clustered extents in 19 zones and 7,599 widths, all
+  Its test pins R's breaks across the changes of New York, Kolkata, Lord Howe, Havana, Asuncion
+  and Apia, from 23,771 random and change-clustered extents in 19 zones and 7,599 widths, all
   matched but where R's answer rests on glibc: a repeated midnight, or an hour repeated with one
   daylight-saving flag, read at the offset R last used, and a skipped midnight of a change of
   standard offset, which glibc reads after it for 17 of the 52 since 1970.

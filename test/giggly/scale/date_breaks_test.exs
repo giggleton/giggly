@@ -959,11 +959,15 @@ defmodule Giggly.Scale.DateBreaksTest do
   # November's repeated hour; in Kolkata, half an hour off UTC; across Lord Howe's half-hour change,
   # where an hour truncated keeps its offset; from a midnight Havana skips, read as the hour the
   # change ends, and days stepping over it; and in Asuncion from a 1st whose midnight is skipped,
-  # its 15th at the hour the 1st was read at. The extents come from 23,771 of R's, random and
-  # clustered round 19 zones' changes, all of which this matches but where R's answer depends on
-  # the offset it last used, or glibc reads a skipped midnight of a change of standard offset after
-  # it (design-log §4, the entry beginning "A local time a change of offset skips or repeats"). It
-  # moves only if the port stops matching R, which is a bug.
+  # its 15th at the hour the 1st was read at, and to an end exactly on the next 1st, which is at
+  # its midnight, where a 1st laid from that 15th would not be; and across the day Apia skipped,
+  # whose midnight, a change on daylight saving to another, is read at the offset before it, on
+  # 31 December's. The extents come from 23,771 of R's, random and clustered round 19 zones'
+  # changes, all of which this matches but where R's answer depends on the offset it last used, or
+  # glibc reads a skipped midnight of a change of standard offset after it, and from the first
+  # extents on which a mutation pass's survivors departed (design-log §4, the entry beginning "A
+  # local time a change of offset skips or repeats"). It moves only if the port stops matching R,
+  # which is a bug.
   @r_zoned_breaks [
     # 1 hour across the spring change
     {"America/New_York", {1_710_044_400.0, 1_710_060_600.0},
@@ -1157,7 +1161,21 @@ defmodule Giggly.Scale.DateBreaksTest do
        1_698_807_600.0,
        1_700_017_200.0,
        1_701_399_600.0
-     ], ["Sep 15", "Oct 01", "Oct 15", "Nov 01", "Nov 15", "Dec 01"]}
+     ], ["Sep 15", "Oct 01", "Oct 15", "Nov 01", "Nov 15", "Dec 01"]},
+    # half months from a 1st whose midnight is skipped to an end exactly on the next 1st
+    {"America/Asuncion", {1_504_753_200.0, 1_509_505_200.0},
+     [1_504_238_400.0, 1_505_448_000.0, 1_506_830_400.0, 1_508_040_000.0, 1_509_505_200.0],
+     ["Sep 01", "Sep 15", "Oct 01", "Oct 15", "Nov 01"]},
+    # days across the day Apia skipped, a change on daylight saving to another
+    {"Pacific/Apia", {1_325_109_600.0, 1_325_361_600.0},
+     [
+       1_325_066_400.0,
+       1_325_152_800.0,
+       1_325_239_200.0,
+       1_325_239_200.0,
+       1_325_325_600.0,
+       1_325_412_000.0
+     ], ["Dec 28", "Dec 29", "Dec 31", "Dec 31", "Jan 01", "Jan 02"]}
   ]
 
   # Golden: R's own `scales::breaks_width()` on `as.POSIXct()` of each extent in a time zone, in
