@@ -926,7 +926,7 @@ defmodule Giggly.Assembly do
   end
 
   # The kind of column a value computed after the stat must be on an axis of `scale_kind`.
-  defp statistic_kind(kind) when kind in [:date, :datetime, :naive_datetime], do: kind
+  defp statistic_kind(kind) when kind in [:date, :datetime, :naive_datetime, :time], do: kind
   defp statistic_kind(_continuous_or_discrete), do: :continuous
 
   defp unplaced_statistic_message({_plot, _layer, index}, aesthetic, source, dtype, scale_kind) do
@@ -949,6 +949,8 @@ defmodule Giggly.Assembly do
 
   defp takes_message(:naive_datetime),
     do: "is a scale of naive date-times, so it takes naive date-times"
+
+  defp takes_message(:time), do: "is a time scale, so it takes times of day"
 
   defp takes_message(:discrete),
     do: "is discrete, and takes a value computed after the stat as a number, a position"
@@ -1229,7 +1231,7 @@ defmodule Giggly.Assembly do
   # since a continuous scale through the identity takes a date, and the zone a plot gave a
   # date-time scale; written into the message as it is.
   defp scale_description(%Scale.Continuous{transform: transform})
-       when is_atom(transform) and transform not in [:identity, :date],
+       when is_atom(transform) and transform not in [:identity, :date, :time],
        do: "continuous through #{transform}"
 
   defp scale_description(%Scale.Continuous{transform: {:datetime, zone, _database}})
@@ -1298,7 +1300,7 @@ defmodule Giggly.Assembly do
   # A column of an aesthetic whose every scale is discrete, refused unless its type is one a
   # discrete scale takes, or one no scale can place, which `checked_kind/2` refuses.
   defp check_discrete({index, aesthetic, value, dtype, _kind}) do
-    if Scale.kind(dtype) in [:continuous, :date, :datetime, :naive_datetime] do
+    if Scale.kind(dtype) in [:continuous, :date, :datetime, :naive_datetime, :time] do
       noun = Aesthetics.in_words(aesthetic)
 
       raise ArgumentError,

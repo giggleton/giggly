@@ -130,6 +130,20 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   of a skipped midnight of a change of standard offset (17 of 52 after it) and of a double summer
   time (1 of 2); its search is undocumented, and porting it is out.
 
+- **A time of day's labels are hms's, less two of its marks, and a labels function is handed
+  `Time`s wrapped past midnight (2026-10-27, Steve: "Agree with your recommendations").** A break
+  is rounded to the microsecond and written as hms writes it, `24:00:00` and `-00:00:30`
+  included. *Rejected: hms's six zero decimals* where labeling's arithmetic leaves a break a
+  rounding error off a whole second (`10:24:00.000000`, on about 1 in 15 random hour-scale
+  axes): noise, not a time. *Rejected: hms's padding* to the widest label (`" 00:00:00"` beside
+  `-00:00:30`), console alignment, reached only through a fine width at midnight or a wide
+  expand. *Rejected: `Duration`s or seconds for a labels function*: `Calendar.strftime/3` writes
+  neither, and a `Time` is what `breaks:` and `limits:` take; `24:00:00` arrives as
+  `~T[00:00:00]`, as `date_labels:` and R's `format()` write it. Departures from R: `date_breaks:`
+  takes seconds, minutes and hours, where R's days and longer mark only midnights; a format
+  writing a date (`"%Y"`) is refused at the call, where R writes 1970-01-01; numbers on a time
+  axis are refused, where R places them as seconds.
+
 - **A table is the user's to shape; Giggly takes a column's order from a `Giggly.Factor` and does
   no data wrangling (2026-10-26, Steve, settling how rows taken by hand lose a factor's levels).**
   Rows taken from `diamonds` with `Enum` or Explorer lose `cut`'s levels, as a factor enumerates
@@ -2859,6 +2873,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Times of day: scale_x_time() and scale_y_time(), a Time placed at its seconds
+  since midnight, R's breaks_hms() and hms's labels (date-time scales, step 3); §4: "A time of
+  day's labels"
 - 2026-10-27 — Date-time axes in a time zone: timezone: and time_zone_database:, breaks laid and
   labels written on the zone's clock, skipped and repeated local times read as R reads them
   (date-time scales, step 2); §4: "A local time a change of offset skips or repeats", "A time

@@ -25,6 +25,16 @@ defmodule Giggly.Scale.TransformTest do
   # A wall-clock time in New York, as R's as.POSIXct(..., tz = "America/New_York") reads it.
   defp new_york(wall), do: DateTime.from_naive!(wall, "America/New_York", Tz.TimeZoneDatabase)
 
+  # The time-of-day transformation's breaks inside `extent` and their labels.
+  defp inside({low, high} = extent) do
+    breaks =
+      :time
+      |> Transform.breaks(extent)
+      |> Enum.filter(fn break -> break >= low and break <= high end)
+
+    {breaks, Transform.format(:time, breaks, extent)}
+  end
+
   # The labels of a trained scale's breaks on `extent`, in order.
   defp labels(scale, extent) do
     scale
@@ -443,6 +453,225 @@ defmodule Giggly.Scale.TransformTest do
     end
   end
 
+  describe "time" do
+    # R's own axes, from the image `giggly-r:ggplot2-4.0.3-hms` (hms 1.1.4): `ggplot_build()`'s
+    # panel params for ggplot(d, aes(t, y)) + geom_point() over `t`, the times in each test's name,
+    # and `scales:::breaks_hms()` on the extents given. R writes its labels with hms's `format()`,
+    # which pads every label with spaces to the widest and gives each six zero decimals where one
+    # break is a rounding error off a whole second; Giggly leaves both out (design-log §4, the
+    # entry beginning "A time of day's labels").
+
+    test "10:00:00 and 10:01:00: breaks every 20 seconds, found in seconds" do
+      assert axis(:time, [~T[10:00:00], ~T[10:01:00]]) ===
+               {{35_997.0, 36_063.0},
+                [
+                  {36_000.0, "10:00:00"},
+                  {36_020.0, "10:00:20"},
+                  {36_040.0, "10:00:40"},
+                  {36_060.0, "10:01:00"}
+                ], [36_010.0, 36_030.0, 36_050.0]}
+    end
+
+    test "22:10:00 and 23:50:00: breaks every half hour, found in minutes" do
+      assert axis(:time, [~T[22:10:00], ~T[23:50:00]]) ===
+               {{79_500.0, 86_100.0},
+                [{81_000.0, "22:30:00"}, {82_800.0, "23:00:00"}, {84_600.0, "23:30:00"}],
+                [80_100.0, 81_900.0, 83_700.0, 85_500.0]}
+    end
+
+    test "00:00:00 and 23:59:59: breaks every ten hours, found in hours, minor ones past midnight" do
+      assert axis(:time, [~T[00:00:00], ~T[23:59:59]]) ===
+               {{-4319.95, 90_718.95},
+                [{0.0, "00:00:00"}, {36_000.0, "10:00:00"}, {72_000.0, "20:00:00"}],
+                [18_000.0, 54_000.0, 90_000.0]}
+    end
+
+    # R writes every label here with six zero decimals, `10:24:00.000000`: its breaks are 24
+    # minutes apart, a rounding error off their whole seconds (36000.000000000007)
+    test "09:51:00 and 11:52:30: breaks a rounding error off whole seconds are written without it" do
+      assert axis(:time, [~T[09:51:00], ~T[11:52:30]]) ===
+               {{35_095.5, 43_114.5},
+                [
+                  {36_000.000000000007, "10:00:00"},
+                  {37_440.000000000007, "10:24:00"},
+                  {38_880.0, "10:48:00"},
+                  {40_320.000000000007, "11:12:00"},
+                  {41_760.000000000007, "11:36:00"}
+                ],
+                [
+                  35_280.000000000007,
+                  36_720.000000000007,
+                  38_160.0,
+                  39_600.0,
+                  41_040.000000000007,
+                  42_480.000000000007
+                ]}
+    end
+
+    test "12:00:00 alone: the axis 0.05 seconds either side, labelled to the hundredth" do
+      assert axis(:time, [~T[12:00:00]]) ===
+               {{43_199.95, 43_200.05},
+                [
+                  {43_199.950000000004, "11:59:59.95"},
+                  {43_199.97, "11:59:59.97"},
+                  {43_199.990000000005, "11:59:59.99"},
+                  {43_200.01, "12:00:00.01"},
+                  {43_200.030000000006, "12:00:00.03"},
+                  {43_200.05, "12:00:00.05"}
+                ],
+                [
+                  43_199.960000000006,
+                  43_199.98,
+                  43_200.0,
+                  43_200.020000000004,
+                  43_200.04000000001
+                ]}
+    end
+
+    test "breaks are found in seconds up to two minutes, in minutes beyond" do
+      assert Transform.breaks(:time, {36_000.0, 36_120.0}) ==
+               [36_000.0, 36_030.0, 36_060.0, 36_090.0, 36_120.0]
+
+      assert Transform.breaks(:time, {36_000.0, 36_120.001}) ==
+               [36_000.0, 36_024.0, 36_048.0, 36_072.0, 36_096.0, 36_120.0]
+    end
+
+    test "breaks are found in minutes up to two hours, in hours beyond" do
+      assert Transform.breaks(:time, {36_000.0, 43_200.0}) ==
+               [36_000.0, 37_800.0, 39_600.0, 41_400.0, 43_200.0]
+
+      assert Transform.breaks(:time, {36_000.0, 43_200.001}) ==
+               [36_000.0, 37_440.0, 38_880.0, 40_320.0, 41_760.0, 43_200.0]
+    end
+
+    # extents only a wide expand: reaches, labelled with hours past 99 unpadded, where R writes
+    # " 00:00:00" and " 96:00:00"
+    test "breaks are found in hours up to two days, in days up to two weeks, in weeks beyond" do
+      hours = {-8640.0, 164_160.0}
+      days = {-8640.05, 164_160.95}
+      weeks = {-60_480.05, 1_149_120.95}
+
+      assert Enum.map([hours, days, weeks], fn extent -> inside(extent) end) == [
+               {[0.0, 36_000.0, 72_000.0, 108_000.0, 144_000.0],
+                ~w(00:00:00 10:00:00 20:00:00 30:00:00 40:00:00)},
+               {[0.0, 34_560.0, 69_120.0, 103_680.00000000001, 138_240.0],
+                ~w(00:00:00 09:36:00 19:12:00 28:48:00 38:24:00)},
+               {[0.0, 241_920.0, 483_840.0, 725_760.0000000001, 967_680.0],
+                ~w(00:00:00 67:12:00 134:24:00 201:36:00 268:48:00)}
+             ]
+
+      assert inside({-60_480.0, 1_149_120.0}) ==
+               {[0.0, 345_600.0, 691_200.0, 1_036_800.0],
+                ~w(00:00:00 96:00:00 192:00:00 288:00:00)}
+    end
+
+    test "a break past midnight counts on its hours, one before it is negative, neither padded" do
+      assert inside({86_000.0, 87_000.0}) ==
+               {[86_040.0, 86_280.0, 86_520.0, 86_760.0, 87_000.0],
+                ~w(23:54:00 23:58:00 24:02:00 24:06:00 24:10:00)}
+
+      assert inside({-600.0, 300.0}) ==
+               {[-480.0, -240.0, 0.0, 240.0], ~w(-00:08:00 -00:04:00 00:00:00 00:04:00)}
+    end
+
+    test "every label takes as many decimals of a second as the most precise break needs" do
+      assert inside({10.0, 10.25}) ==
+               {[10.0, 10.04, 10.08, 10.12, 10.16, 10.2, 10.24],
+                ~w(00:00:10.00 00:00:10.04 00:00:10.08 00:00:10.12 00:00:10.16 00:00:10.20
+                   00:00:10.24)}
+
+      assert inside({10.0001, 10.0002}) ==
+               {[
+                  10.000100000000002,
+                  10.000120000000001,
+                  10.000140000000002,
+                  10.000160000000001,
+                  10.000180000000002
+                ], ~w(00:00:10.00010 00:00:10.00012 00:00:10.00014 00:00:10.00016 00:00:10.00018)}
+    end
+
+    # data 12 microseconds apart from 02:21:54.789662: every break falls on half a microsecond,
+    # which R rounds to the even one
+    test "a break is rounded to the microsecond, half to even" do
+      {_breaks, labels} = inside({8514.789661449999, 8514.78967355})
+
+      assert labels ==
+               ~w(02:21:54.789662 02:21:54.789664 02:21:54.789668 02:21:54.789670 02:21:54.789674)
+    end
+
+    # scale_x_time(breaks = as_hms(c("06:00:00", "12:00:00", "18:30:00"))) over 00:00:00 and
+    # 23:59:59: written as R writes its own, minor breaks midway between them
+    test "breaks it did not choose are written alike" do
+      assert axis(:time, [~T[00:00:00], ~T[23:59:59]],
+               breaks: [~T[06:00:00], ~T[12:00:00], ~T[18:30:00]]
+             ) ===
+               {{-4319.95, 90_718.95},
+                [{21_600.0, "06:00:00"}, {43_200.0, "12:00:00"}, {66_600.0, "18:30:00"}],
+                [0.0, 10_800.0, 32_400.0, 54_900.0, 77_400.0, 88_200.0]}
+    end
+
+    # scale_x_time(date_breaks = "6 hours", date_labels = "%H:%M") over 00:00:00 and 23:59:59:
+    # R's format() wraps the last, 24:00:00, round midnight
+    test "a width's breaks in a format, wrapped round midnight" do
+      assert axis(:time, [~T[00:00:00], ~T[23:59:59]],
+               breaks: {:width, [hour: 6]},
+               labels: {:format, "%H:%M"}
+             ) ===
+               {{-4319.95, 90_718.95},
+                [
+                  {0.0, "00:00"},
+                  {21_600.0, "06:00"},
+                  {43_200.0, "12:00"},
+                  {64_800.0, "18:00"},
+                  {86_400.0, "00:00"}
+                ], [10_800.0, 32_400.0, 54_000.0, 75_600.0]}
+    end
+
+    # scale_x_time(date_breaks = "10 secs", date_minor_breaks = "5 secs",
+    # expand = expansion(mult = 0.5)) over 00:00:00 and 00:00:30, where R pads " 00:00:00"
+    test "a width laid below midnight, and minor breaks every step of another" do
+      assert axis(:time, [~T[00:00:00], ~T[00:00:30]],
+               breaks: {:width, [second: 10]},
+               minor_breaks: {:width, [second: 5]},
+               expand: [mult: {0.5, 0.5}, add: {0, 0}]
+             ) ===
+               {{-15.0, 45.0},
+                [
+                  {-10.0, "-00:00:10"},
+                  {0.0, "00:00:00"},
+                  {10.0, "00:00:10"},
+                  {20.0, "00:00:20"},
+                  {30.0, "00:00:30"},
+                  {40.0, "00:00:40"}
+                ], [-15.0, -5.0, 5.0, 15.0, 25.0, 35.0, 45.0]}
+    end
+
+    # scales::breaks_width(...)(as_hms(c(low, high))): every multiple of the step from the start
+    # rounded down to one to the end rounded up
+    test "a width lays every multiple of its step from the extent's start rounded down" do
+      assert Transform.width(:time, [hour: 1], {82_000.0, 85_000.0}) ==
+               [79_200.0, 82_800.0, 86_400.0]
+
+      assert Transform.width(:time, [minute: 7], {150.0, 3450.0}) ==
+               [0.0, 420.0, 840.0, 1260.0, 1680.0, 2100.0, 2520.0, 2940.0, 3360.0, 3780.0]
+
+      assert Transform.width(:time, [second: 10], {-16.5, 46.5}) ==
+               [-20.0, -10.0, 0.0, 10.0, 20.0, 30.0, 40.0, 50.0]
+
+      assert Transform.width(:time, [second: 1], {0.5, 2.5}) == [0.0, 1.0, 2.0, 3.0]
+    end
+
+    test "places a time at its seconds since midnight, a missing one nowhere" do
+      assert Transform.transform(:time, [~T[23:50:00.5], ~T[10:00:00.123456], nil]) ===
+               [85_800.5, 36_000.123456, nil]
+    end
+
+    test "turns a position back into the time of day, wrapped past midnight" do
+      assert Transform.inverse(:time, [86_400.0, -1.0, 36_000.25, 43_200.0]) ===
+               [~T[00:00:00], ~T[23:59:59], ~T[10:00:00.250000], ~T[12:00:00]]
+    end
+  end
+
   describe "a transformed scale's labels and limits" do
     test "a labels function is handed the breaks in data units" do
       # hwy with scale_y_log10(labels = function(b) ...): the function is handed 20, 30 and 40
@@ -539,6 +768,21 @@ defmodule Giggly.Scale.TransformTest do
                  ],
                  &inspect/1
                )
+    end
+
+    test "a labels function on a time axis is handed times of day, wrapped past midnight" do
+      # scale_x_time(date_breaks = "6 hours", labels = function(b) ...) over 00:00:00 and 23:59:59:
+      # R hands it hms values, the last 24:00:00, which a Time cannot hold
+      scale = %Continuous{
+        transform: :time,
+        breaks: {:width, [hour: 6]},
+        labels: fn times -> Enum.map(times, &inspect/1) end
+      }
+
+      trained = Scale.train(scale, Scale.transform(scale, [~T[00:00:00], ~T[23:59:59]]), :none)
+
+      assert labels(trained, Scale.dimension(trained)) ==
+               ~w(~T[00:00:00] ~T[06:00:00] ~T[12:00:00] ~T[18:00:00] ~T[00:00:00])
     end
 
     test "a limit outside the transformation's domain cannot be placed, at either end" do

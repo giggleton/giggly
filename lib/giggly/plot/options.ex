@@ -1560,6 +1560,78 @@ defmodule Giggly.Plot.Options do
                             ]
                           )
 
+  # The time scale functions' options; an option not given keeps a time scale's default. A `date_`
+  # option and its plain twin choose the same thing, so only one may be given.
+  @time_step_type {:custom, __MODULE__, :validate_time_step, []}
+  @time_scale_options NimbleOptions.new!(
+                        name: @scale_name_spec,
+                        limits: [
+                          type: {:custom, __MODULE__, :validate_time_limits, []},
+                          doc:
+                            "`{low, high}`: the times of day the axis spans whatever the data, " <>
+                              "`nil` for an end the data decides; either order names the same " <>
+                              "axis. A value outside them is missing, so its mark is not drawn."
+                        ],
+                        breaks: [
+                          type: {:custom, __MODULE__, :validate_times, []},
+                          doc:
+                            "The times of day the axis marks with a tick, a label and a grid " <>
+                              "line, a list, or `:none` for none; chosen from the limits when " <>
+                              "neither this nor `date_breaks:` is given. A break is drawn " <>
+                              "wherever it falls inside the widened axis."
+                        ],
+                        date_breaks: [
+                          type: @time_step_type,
+                          doc:
+                            "A break every step, `[minute: 30]`: one of `:second`, `:minute` " <>
+                              "and `:hour` and how many of it, laid from the widened axis's " <>
+                              "start, rounded down to a multiple of the step since midnight, " <>
+                              "to its end. Not with `breaks:`."
+                        ],
+                        labels: [
+                          type: {:custom, __MODULE__, :validate_scale_labels, []},
+                          doc:
+                            "The breaks' labels: a list of strings, one for each of " <>
+                              "`breaks:`; a function handed every break drawn, a list of " <>
+                              "times of day, wrapped past midnight, so a break at the end of " <>
+                              "the day is `~T[00:00:00]`, that returns a string for each; or " <>
+                              "`:none` for ticks with no labels. Not with `date_labels:`. When " <>
+                              "neither is given, each break is written in hours, minutes and " <>
+                              "seconds, with as many decimals of a second as the most precise " <>
+                              "needs, the hours counting on past midnight and a break before " <>
+                              "it negative (`10:30:00`, `24:00:00`, `-00:00:30`)."
+                        ],
+                        date_labels: [
+                          type: {:custom, __MODULE__, :validate_time_format, []},
+                          doc:
+                            "The format every break's label is written in, as " <>
+                              "`Calendar.strftime/3` writes a time of day, such as " <>
+                              "`\"%H:%M\"`, a break past midnight wrapped round it, so the end " <>
+                              "of the day is written as its start. Not with `labels:`."
+                        ],
+                        minor_breaks: [
+                          type: {:custom, __MODULE__, :validate_times, []},
+                          doc:
+                            "The times of day the panel draws a minor grid line at, a list, or " <>
+                              "`:none` for none; midway between the breaks when neither this " <>
+                              "nor `date_minor_breaks:` is given."
+                        ],
+                        date_minor_breaks: [
+                          type: @time_step_type,
+                          doc:
+                            "A minor grid line every step, as `date_breaks:` lays breaks. Not " <>
+                              "with `minor_breaks:`."
+                        ],
+                        expand: [
+                          type: @scale_expand_type,
+                          doc:
+                            "How far the axis reaches beyond its limits, `[mult: m, add: a]`: " <>
+                              "at each end, that multiple of the limits' width plus that " <>
+                              "constant, in seconds, each a number or `{low, high}` for the two " <>
+                              "ends; `[mult: 0.05]` when not given."
+                        ]
+                      )
+
   # The transformation a date-time scale records when given no time zone or database, its zone
   # left for its first column to settle and read by the standard library's time zone database,
   # which knows UTC alone: the value `Giggly.Scale.new(:datetime)` records, which a test pins.
@@ -2519,6 +2591,8 @@ defmodule Giggly.Plot.Options do
   # An end of a date scale's limits: a date, or `nil` for one the data decides.
   defguardp is_date_limit(limit) when is_struct(limit, Date) or is_nil(limit)
 
+  defguardp is_time_limit(limit) when is_struct(limit, Time) or is_nil(limit)
+
   # A date-time, naive or not.
   defguardp is_datetime(value) when is_struct(value, DateTime) or is_struct(value, NaiveDateTime)
 
@@ -2619,6 +2693,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec datetime_scale() :: NimbleOptions.t()
   def datetime_scale, do: @datetime_scale_options
+
+  @doc false
+  @spec time_scale() :: NimbleOptions.t()
+  def time_scale, do: @time_scale_options
 
   @doc false
   @spec manual_scale() :: NimbleOptions.t()
@@ -2765,7 +2843,7 @@ defmodule Giggly.Plot.Options do
   @spec annotation_geoms() :: [atom()]
   def annotation_geoms, do: @annotation_geoms
 
-  # A date or date-time scale's options that choose what their plain twins choose.
+  # A date, date-time or time scale's options that choose what their plain twins choose.
   @doc false
   @spec date_twins() :: keyword(atom())
   def date_twins, do: @date_twins
@@ -3607,9 +3685,73 @@ defmodule Giggly.Plot.Options do
   def validate_datetime_format(format),
     do: {:error, "expected a format, a string, got: #{inspect(format)}"}
 
+  # NimbleOptions' check of a time scale's limits: `{low, high}`, each a time of day or `nil` for an
+  # end the data decides, in either order, which the scale sorts once transformed.
+  @doc false
+  @spec validate_time_limits(term()) ::
+          {:ok, {Time.t() | nil, Time.t() | nil}} | {:error, String.t()}
+  def validate_time_limits({low, high} = limits) when is_time_limit(low) and is_time_limit(high),
+    do: {:ok, limits}
+
+  def validate_time_limits(limits) do
+    {:error,
+     "expected {low, high}, each a time of day or nil for an end the data decides, got: " <>
+       inspect(limits)}
+  end
+
+  # NimbleOptions' check of a time scale's breaks or minor breaks: a list of times of day, or
+  # `:none` for none.
+  @doc false
+  @spec validate_times(term()) :: {:ok, [Time.t()] | :none} | {:error, String.t()}
+  def validate_times(:none), do: {:ok, :none}
+
+  def validate_times(times) when is_list(times) do
+    case Enum.reject(times, fn time -> is_struct(time, Time) end) do
+      [] -> {:ok, times}
+      [other | _rest] -> {:error, "expected a list of times of day, got: #{inspect(other)} in it"}
+    end
+  end
+
+  def validate_times(times),
+    do: {:error, "expected a list of times of day or :none, got: #{inspect(times)}"}
+
+  # NimbleOptions' check of a time scale's step between breaks: one of a second, a minute and an
+  # hour and how many of it, a positive whole number.
+  @doc false
+  @spec validate_time_step(term()) ::
+          {:ok, [{:second | :minute | :hour, pos_integer()}]} | {:error, String.t()}
+  def validate_time_step([{unit, count}] = step)
+      when unit in [:second, :minute, :hour] and is_integer(count) and count > 0,
+      do: {:ok, step}
+
+  def validate_time_step(step) do
+    {:error,
+     "expected one of :second, :minute and :hour and how many of it, a positive whole number, " <>
+       "such as [minute: 30], got: #{inspect(step)}"}
+  end
+
+  # NimbleOptions' check of a time scale's label format: a string `Calendar.strftime/3` writes a
+  # time of day in, tried on one, so a format it cannot write, such as one with a date's parts,
+  # raises at the call rather than when the plot is run.
+  @doc false
+  @spec validate_time_format(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def validate_time_format(format) when is_binary(format) do
+    Calendar.strftime(~T[00:00:00], format)
+    {:ok, format}
+  rescue
+    exception ->
+      {:error,
+       "expected a format Calendar.strftime/3 can write a time of day in, got: " <>
+         "#{inspect(format)}, which it cannot: #{Exception.message(exception)}"}
+  end
+
+  def validate_time_format(format),
+    do: {:error, "expected a format, a string, got: #{inspect(format)}"}
+
   # NimbleOptions' check of an axis's limits as `lims/2` takes them: a list of a discrete axis's
   # values, `{low, high}` of dates or `nil` for a date axis, of date-times of one kind or `nil` for
-  # a date-time one, or else of numbers or `nil` for a continuous one.
+  # a date-time one, or else of numbers or `nil` for a continuous one. Times of day are refused,
+  # as ggplot2's `xlim()` fails on two `hms` values; a time scale's `limits:` takes them.
   @doc false
   @spec validate_axis_limits(term()) :: {:ok, list() | tuple()} | {:error, String.t()}
   def validate_axis_limits(values) when is_list(values), do: validate_discrete_limits(values)
@@ -3620,6 +3762,13 @@ defmodule Giggly.Plot.Options do
 
   def validate_axis_limits({low, high} = limits) when is_datetime(low) or is_datetime(high),
     do: validate_datetime_limits(limits)
+
+  def validate_axis_limits({low, high} = limits)
+      when is_struct(low, Time) or is_struct(high, Time) do
+    {:error,
+     "expected no times of day, which a time scale's limits: take, as in " <>
+       "scale_x_time(plot, limits: {low, high}), got: #{inspect(limits)}"}
+  end
 
   def validate_axis_limits(limits) do
     case validate_limits(limits) do

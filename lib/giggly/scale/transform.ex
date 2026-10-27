@@ -14,11 +14,12 @@ defmodule Giggly.Scale.Transform do
   # `transform = "identity"`; the date transformation (`Transform.Date`), which a scale of dates
   # records; the date-time transformation (`Transform.Datetime`), which a scale of date-times
   # records with its time zone and the database that reads it, `{:datetime, zone, database}`, as
-  # R's `transform_time(tz)` holds its zone; and log10, square root, reverse and reciprocal
-  # (`Transform.Log10`, `Transform.Sqrt`, `Transform.Reverse`, `Transform.Reciprocal`), which a
-  # plot's scale names. Every callback is handed the transformation as the scale records it, so
-  # one that holds more than its name reads it, as R's object's functions close over theirs. Each
-  # finds its
+  # R's `transform_time(tz)` holds its zone; the time-of-day transformation (`Transform.Time`),
+  # which a scale of times records, as ggplot2's `scale_x_time()` records `transform_hms()`; and
+  # log10, square root, reverse and reciprocal (`Transform.Log10`, `Transform.Sqrt`,
+  # `Transform.Reverse`, `Transform.Reciprocal`), which a plot's scale names. Every callback is
+  # handed the transformation as the scale records it, so one that holds more than its name reads
+  # it, as R's object's functions close over theirs. Each finds its
   # breaks as ggplot2's `get_breaks()` does, on the extent turned back into data units, and returns
   # them transformed, in the order that leaves them, so a reversing transformation's descend; its
   # labels are written from the breaks turned back. A default break's label may depend on the
@@ -37,6 +38,7 @@ defmodule Giggly.Scale.Transform do
           :identity
           | :date
           | {:datetime, String.t() | :default | :naive, module()}
+          | :time
           | :log10
           | :sqrt
           | :reverse
@@ -119,20 +121,26 @@ defmodule Giggly.Scale.Transform do
   @spec format(name(), [float()], {float(), float()} | :given) :: [String.t()]
   def format(name, breaks, extent), do: module(name).format(name, breaks, extent)
 
-  # The breaks a step lays, `[week: 1]`, on an axis showing `extent` under the date or date-time
-  # transformation `name`, in transformed space, some outside it: only those two have steps, which
-  # a plot's date and date-time scales record as a width.
+  # The breaks a step lays, `[week: 1]`, on an axis showing `extent` under the date, date-time or
+  # time-of-day transformation `name`, in transformed space, some outside it: only those three
+  # have steps, which a plot's date, date-time and time scales record as a width.
   @doc false
-  @spec width(:date | {:datetime, term(), module()}, keyword(pos_integer()), {float(), float()}) ::
-          [float()]
+  @spec width(
+          :date | {:datetime, term(), module()} | :time,
+          keyword(pos_integer()),
+          {float(), float()}
+        ) :: [float()]
   def width(:date = name, step, extent), do: Transform.Date.width(name, step, extent)
 
   def width({:datetime, _zone, _database} = name, step, extent),
     do: Transform.Datetime.width(name, step, extent)
 
+  def width(:time = name, step, extent), do: Transform.Time.width(name, step, extent)
+
   defp module(:identity), do: Transform.Identity
   defp module(:date), do: Transform.Date
   defp module({:datetime, _zone, _database}), do: Transform.Datetime
+  defp module(:time), do: Transform.Time
   defp module(:log10), do: Transform.Log10
   defp module(:sqrt), do: Transform.Sqrt
   defp module(:reverse), do: Transform.Reverse

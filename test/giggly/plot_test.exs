@@ -4130,6 +4130,107 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "scale_x_time/2 and scale_y_time/2" do
+    test "a time scale function records an untrained time scale with the options given" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_time(
+          name: "At",
+          limits: {~T[06:00:00], nil},
+          breaks: [~T[12:00:00]],
+          labels: ["noon"],
+          minor_breaks: :none,
+          expand: [mult: 0]
+        )
+        |> Plot.scale_y_time()
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 transform: :time,
+                 name: "At",
+                 limits: {~T[06:00:00], nil},
+                 breaks: [~T[12:00:00]],
+                 labels: ["noon"],
+                 minor_breaks: :none,
+                 expand: [mult: {0.0, 0.0}, add: {0.0, 0.0}]
+               },
+               y: Scale.new(:time)
+             }
+    end
+
+    test "a step of seconds, minutes or hours records a width, and a format the labels it writes" do
+      plot =
+        @rows
+        |> Plot.new()
+        |> Plot.scale_x_time(date_breaks: [hour: 6], date_minor_breaks: [minute: 30])
+        |> Plot.scale_y_time(date_labels: "%I:%M %p", date_breaks: [second: 15])
+
+      assert plot.scales === %{
+               x: %Scale.Continuous{
+                 transform: :time,
+                 breaks: {:width, [hour: 6]},
+                 minor_breaks: {:width, [minute: 30]}
+               },
+               y: %Scale.Continuous{
+                 transform: :time,
+                 breaks: {:width, [second: 15]},
+                 labels: {:format, "%I:%M %p"}
+               }
+             }
+    end
+
+    test "an option given beside its date_ twin is refused" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.scale_x_time(plot, labels: :none, date_labels: "%H")
+        end
+
+      unbroken =
+        assert_raise ArgumentError, fn ->
+          Plot.scale_y_time(plot, labels: ["a"], date_breaks: [hour: 1])
+        end
+
+      assert error.message =~ "Plot.scale_x_time/2 is given both :labels and :date_labels"
+      assert unbroken.message =~ ~r/^Plot\.scale_y_time\/2 .* 1 labels.* has none/
+    end
+
+    # ggplot2 takes "1 day" and longer on a time axis, which can mark only 00:00:00 and 24:00:00
+    # there, as [hour: 24] does; a time of day has no date, so a format writing one is refused at
+    # the call, where R writes 1970-01-01.
+    test "an option a time scale cannot take is refused, naming it and what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {key, value, shown} <- [
+            {:limits, {~T[06:00:00], 3}, "got: {~T[06:00:00], 3}"},
+            {:limits, {~N[2024-03-10 06:00:00], nil}, "each a time of day or nil"},
+            {:breaks, [~T[06:00:00], ~U[2024-03-10 06:00:00Z]], "got: ~U[2024-03-10 06:00:00Z]"},
+            {:breaks, ~T[06:00:00], "or :none, got: ~T[06:00:00]"},
+            {:minor_breaks, [1.5], "got: 1.5 in it"},
+            {:date_breaks, [day: 1], "got: [day: 1]"},
+            {:date_breaks, [hour: 0], "got: [hour: 0]"},
+            {:date_breaks, [minute: 1.5], "got: [minute: 1.5]"},
+            {:date_breaks, [hour: 1, minute: 30], "got: [hour: 1, minute: 30]"},
+            {:date_minor_breaks, "30 mins", ~s(got: "30 mins")},
+            {:date_labels, "%Y-%m-%d", ~s(got: "%Y-%m-%d", which it cannot: key :year not found)},
+            {:date_labels, 4, "expected a format, a string, got: 4"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_x_time(plot, [{key, value}])
+          end
+
+        assert {error.key, error.message =~ shown} == {key, true}
+      end
+
+      for format <- ["%H:%M:%S", "%I %p", "%f"] do
+        assert Plot.scale_x_time(plot, date_labels: format).scales.x.labels === {:format, format}
+      end
+    end
+  end
+
   describe "xlim/2, ylim/2 and lims/2 of a discrete axis's values, and xlim/3 of dates" do
     test "a list of values gives a discrete scale those limits" do
       plot = Plot.new(@rows)
@@ -4187,13 +4288,17 @@ defmodule Giggly.PlotTest do
 
     # R's `xlim("I1", "IF")` takes any number of values as separate arguments; Elixir has no
     # such call, so a discrete axis's limits are one list, and two strings are refused naming it.
-    test "two strings, a date beside a number, or no values are refused" do
+    # ggplot2 4.0.3's `xlim()` fails on two `hms` values ("no applicable method for 'limits'").
+    test "two strings, a date beside a number, two times or no values are refused" do
       plot = Plot.new(@rows)
 
       for {limit, shown} <- [
             {fn -> Plot.xlim(plot, "I1", "IF") end,
              ~s(or a list of a discrete axis's values, got: {"I1", "IF"})},
             {fn -> Plot.ylim(plot, ~D[2026-10-01], 4) end, "each a date or nil"},
+            {fn -> Plot.xlim(plot, ~T[06:00:00], ~T[18:00:00]) end,
+             "scale_x_time(plot, limits: {low, high}), got: {~T[06:00:00], ~T[18:00:00]}"},
+            {fn -> Plot.lims(plot, y: {nil, ~T[18:00:00]}) end, "expected no times of day"},
             {fn -> Plot.xlim(plot, []) end, "at least one value"},
             {fn -> Plot.lims(plot, y: ["a", "a"]) end, ~s(got: "a" more than once)}
           ] do

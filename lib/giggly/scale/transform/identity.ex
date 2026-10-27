@@ -2,10 +2,10 @@ defmodule Giggly.Scale.Transform.Identity do
   @moduledoc false
 
   # The identity transformation, R's `transform_identity()`: every value as it is, a date at its
-  # days since 1970-01-01 and a date-time at its seconds (`Transform.Datetime.seconds/1`), as R
-  # stores each and its untransformed continuous scale places one. It
-  # is what a continuous scale records when nothing transforms its axis. Use it through
-  # `Giggly.Scale.Transform`.
+  # days since 1970-01-01, a date-time at its seconds (`Transform.Datetime.seconds/1`) and a time
+  # at its seconds since midnight (`Transform.Time.seconds/1`), as R stores each and its
+  # untransformed continuous scale places one. It is what a continuous scale records when nothing
+  # transforms its axis. Use it through `Giggly.Scale.Transform`.
   #
   # Its axis takes R's default breaks for a transformation, extended Wilkinson
   # (`Giggly.Scale.Breaks`), and its default minor breaks, midway between them
@@ -40,6 +40,8 @@ defmodule Giggly.Scale.Transform.Identity do
 
   defp placed(%struct{} = datetime) when struct in [DateTime, NaiveDateTime],
     do: Transform.Datetime.seconds(datetime)
+
+  defp placed(%Time{} = time), do: Transform.Time.seconds(time)
 
   defp placed(value), do: value
 end

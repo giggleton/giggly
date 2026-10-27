@@ -67,7 +67,7 @@ defmodule Giggly.ScaleTest do
                :discrete,
                :discrete,
                :date,
-               :none,
+               :time,
                :none,
                :none
              ]
@@ -98,6 +98,11 @@ defmodule Giggly.ScaleTest do
               Enum.map(dtypes, fn dtype -> Scale.kind(dtype, :color) end)} ===
                {[:datetime, :datetime, :naive_datetime], [:datetime, :datetime, :naive_datetime],
                 [:none, :none, :none]}
+    end
+
+    test "a time has a scale on a position aesthetic and none yet else" do
+      assert {Scale.kind(:time, :y), Scale.kind(:time, :xend), Scale.kind(:time, :fill),
+              Scale.kind(:time, :alpha)} === {:time, :time, :none, :none}
     end
   end
 
@@ -544,11 +549,18 @@ defmodule Giggly.ScaleTest do
       assert Scale.censor(scale, [0.55, 2.45, 9.0]) === [0.55, 2.45, 9.0]
     end
 
-    test "a scale's kind is discrete, date, date-time or continuous" do
-      assert Enum.map([:discrete, :date, :datetime, :naive_datetime, :continuous], fn kind ->
-               Scale.kind_of(Scale.new(kind))
-             end) ===
-               [:discrete, :date, :datetime, :datetime, :continuous]
+    test "a scale's kind is discrete, date, date-time, time or continuous" do
+      assert Enum.map(
+               [:discrete, :date, :datetime, :naive_datetime, :time, :continuous],
+               fn kind ->
+                 Scale.kind_of(Scale.new(kind))
+               end
+             ) ===
+               [:discrete, :date, :datetime, :datetime, :time, :continuous]
+    end
+
+    test "a time scale is continuous through the time-of-day transformation" do
+      assert Scale.new(:time) === %Scale.Continuous{transform: :time}
     end
 
     test "a date-time scale's kind is naive once a naive column has settled it" do
@@ -811,6 +823,21 @@ defmodule Giggly.ScaleTest do
                ],
                fn {scale, kind} -> Scale.takes?(scale, kind) end
              ) === [true, true, false, false, true, false, true, false, true, true, false, false]
+    end
+
+    test "a time scale takes times alone, and an untransformed continuous scale takes them too" do
+      assert Enum.map(
+               [
+                 {Scale.new(:time), :time},
+                 {Scale.new(:time), :datetime},
+                 {Scale.new(:time), :continuous},
+                 {Scale.new(:datetime), :time},
+                 {Scale.new(:date), :time},
+                 {Scale.new(:continuous), :time},
+                 {%Scale.Continuous{transform: :log10}, :time}
+               ],
+               fn {scale, kind} -> Scale.takes?(scale, kind) end
+             ) === [true, false, false, false, false, true, false]
     end
 
     # Golden: ggplot2 4.0.3's layer_data() x and panel x range, breaks and labels in R 4.6.1 for

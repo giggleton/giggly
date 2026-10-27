@@ -83,13 +83,15 @@ defmodule Giggly.Plot do
 
   Each axis gets a scale from the type of what is mapped to it: a continuous scale for numbers, a
   discrete one for text, booleans and factors, a date one for dates, a date-time one for
-  `DateTime`s and `NaiveDateTime`s. `scale_x_continuous/2`, `scale_x_discrete/2`,
-  `scale_x_date/2` and `scale_x_datetime/2`, and their y twins, set an axis's title, limits,
-  breaks, labels and how far it reaches, and a date-time axis's time zone; `xlim/3`, `ylim/3` and
-  `lims/2` set its limits alone, two ends for a continuous, a date or a date-time axis and, with
-  `xlim/2` and `ylim/2`, a list of values for a discrete one. A value outside the limits is missing,
-  so its mark is not drawn. A continuous scale given a column of dates places each at its days since
-  1970-01-01, and one of date-times each at its seconds since 1970-01-01 00:00 UTC.
+  `DateTime`s and `NaiveDateTime`s, and a time one for `Time`s. `scale_x_continuous/2`,
+  `scale_x_discrete/2`, `scale_x_date/2`, `scale_x_datetime/2` and `scale_x_time/2`, and their y
+  twins, set an axis's title, limits, breaks, labels and how far it reaches, and a date-time
+  axis's time zone; `xlim/3`, `ylim/3` and `lims/2` set its limits alone, two ends for a
+  continuous, a date or a date-time axis and, with `xlim/2` and `ylim/2`, a list of values for a
+  discrete one; a time axis's are its scale's `limits:`. A value outside the limits is missing, so
+  its mark is not drawn. A continuous scale given a column of dates places each at its days since
+  1970-01-01, one of date-times each at its seconds since 1970-01-01 00:00 UTC, and one of times
+  each at its seconds since midnight.
 
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
@@ -2082,6 +2084,69 @@ defmodule Giggly.Plot do
     do: datetime_scale(plot, :y, options, "Plot.scale_y_datetime/2")
 
   @doc """
+  Gives the plot a time x scale with the given options, replacing any x scale it had.
+
+  A time axis places each `Time` at its seconds since midnight and marks it on round seconds,
+  minutes or hours, as suits its span, or every step of `date_breaks:`. Its labels give hours,
+  minutes and seconds (`10:30:00`), the hours counting on past midnight where the axis reaches
+  beyond it (`24:00:00`), or are written in the format `date_labels:` gives, wrapped round
+  midnight. A value outside the limits is missing, so its mark is not drawn. The scale's name
+  titles the axis whatever `labs/2` says. Raises `ArgumentError` for an option given beside its
+  `date_` twin, or a list of labels without a list of breaks as long; a column on the axis that is
+  not times is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.time_scale())}
+
+      iex> svg =
+      ...>   %{"at" => [~T[06:10:00], ~T[21:40:00]], "load" => [0.3, 0.8]}
+      ...>   |> Giggly.Plot.new(%{x: :at, y: :load})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_x_time()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ ">06:00:00</text>", svg =~ ">22:00:00</text>"}
+      {true, true}
+
+  A break every six hours of a whole day, its last at midnight again:
+
+      iex> svg =
+      ...>   %{"at" => [~T[00:00:00], ~T[23:59:59]], "load" => [0.3, 0.8]}
+      ...>   |> Giggly.Plot.new(%{x: :at, y: :load})
+      ...>   |> Giggly.Plot.geom_line()
+      ...>   |> Giggly.Plot.scale_x_time(date_breaks: [hour: 6], date_labels: "%H:%M")
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> svg |> String.split(">00:00</text>") |> length()
+      3
+  """
+  @spec scale_x_time(t(), keyword()) :: t()
+  def scale_x_time(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: time_of_day_scale(plot, :x, options, "Plot.scale_x_time/2")
+
+  @doc """
+  Gives the plot a time y scale with the given options, replacing any y scale it had, as
+  `scale_x_time/2` gives an x scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.time_scale())}
+
+      iex> frame =
+      ...>   %{"load" => [0.3, 0.8], "at" => [~T[05:00:00], ~T[12:00:00]]}
+      ...>   |> Giggly.Plot.new(%{x: :load, y: :at})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_y_time(limits: {~T[06:00:00], nil})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [nil, 43200.0]
+  """
+  @spec scale_y_time(t(), keyword()) :: t()
+  def scale_y_time(%__MODULE__{} = plot, options \\ []) when is_list(options),
+    do: time_of_day_scale(plot, :y, options, "Plot.scale_y_time/2")
+
+  @doc """
   Gives the plot a discrete colour scale of the colours given, replacing any colour scale it had.
 
   `values:` gives the colours, a list handed to the values in order, or a map from a value to its
@@ -3125,7 +3190,8 @@ defmodule Giggly.Plot do
   `scale_x_datetime(plot, limits: {low, high})` gives; `nil` leaves an end to the data. Numbers
   given high to low run the axis from high to low, as `transform: :reverse` runs it, each value
   placed at its negation; dates and date-times given so name the same axis as low to high. A
-  discrete axis's limits are a list of its values, which `xlim/2` takes.
+  discrete axis's limits are a list of its values, which `xlim/2` takes. Two times of day are
+  refused: `scale_x_time(plot, limits: {low, high})` takes them.
 
       iex> plot =
       ...>   %{"wt" => [1.5, 2.6, 3.4], "mpg" => [30.4, 21.0, 18.7]}
@@ -4643,6 +4709,13 @@ defmodule Giggly.Plot do
     {database, validated} = Keyword.pop(validated, :time_zone_database, standard)
     check_zone(zone, database, function)
     time_scale(plot, aesthetic, {:datetime, zone, database}, validated, function)
+  end
+
+  # The plot with a time scale for `aesthetic` from the options `function` was given, as
+  # `time_scale/5` records one, through the time-of-day transformation.
+  defp time_of_day_scale(plot, aesthetic, options, function) do
+    validated = NimbleOptions.validate!(options, Options.time_scale())
+    time_scale(plot, aesthetic, :time, validated, function)
   end
 
   # A time zone given a date-time scale, which its database must know: it can say what an instant

@@ -7,11 +7,12 @@ defmodule Giggly.Scale.Breaks do
   # through `Giggly.Scale`.
   #
   # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
-  # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers 1, 5, 2, 2.5, 4 and 3 times a power
-  # of ten, early in that list, and zero among the breaks), coverage (the sequence spans the range
-  # without overshooting it far), density (close to the number of breaks wanted) and legibility
-  # (which `labeling` scores as 1 for every sequence). The breaks may fall outside the range; the
-  # caller decides what to keep.
+  # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers times a power of ten, early in
+  # their list, and zero among the breaks), coverage (the sequence spans the range without
+  # overshooting it far), density (close to the number of breaks wanted) and legibility (which
+  # `labeling` scores as 1 for every sequence). The nice numbers are `labeling`'s, 1, 5, 2, 2.5, 4
+  # and 3, unless a caller gives others, as `scales::breaks_timespan()` gives 1, 2, 1.5, 4 and 3.
+  # The breaks may fall outside the range; the caller decides what to keep.
   #
   # Three ranges are handled as R handles them. One narrower than 100 times the machine epsilon,
   # or wider than the square root of the largest float (where Elixir's arithmetic would overflow
@@ -44,25 +45,30 @@ defmodule Giggly.Scale.Breaks do
   @widest_searched 1.340_780_792_994_259_6e154
 
   # The breaks of the extended Wilkinson sequence that scores best over `{low, high}`, `low` below
-  # `high`, in ascending order: on an ordinary range a nice number of nice steps (`{9.225, 35.075}`
-  # gives 10 to 35 by 5), and on the degenerate ranges what the comment above describes.
+  # `high`, in ascending order, its steps `nice_numbers` times a power of ten, `labeling`'s when
+  # not given: on an ordinary range a nice number of nice steps (`{9.225, 35.075}` gives 10 to 35
+  # by 5), and on the degenerate ranges what the comment above describes.
   @doc false
-  @spec extended({float(), float()}) :: [float()]
-  def extended({low, high}) when high - low < @epsilon or high - low > @widest_searched,
-    do: spaced_evenly(low, high)
+  @spec extended({float(), float()}, [number()]) :: [float()]
+  def extended(range, nice_numbers \\ @nice_numbers)
 
-  def extended(range) do
-    %{first: first, last: last, step: step} = search(range, 1, %{score: -2})
+  def extended({low, high}, _nice_numbers)
+      when high - low < @epsilon or high - low > @widest_searched,
+      do: spaced_evenly(low, high)
+
+  def extended(range, nice_numbers) do
+    preferred = preferences(nice_numbers)
+    %{first: first, last: last, step: step} = search(range, 1, preferred, %{score: -2})
     sequence(first, last, step)
   end
 
   # The outer loop, over `j`, the number of steps a nice number is skipped by: it stops when no
   # nice number at this `j` could beat the best sequence so far even with perfect coverage and
   # density.
-  defp search(range, skip, best) do
-    case search_nice_numbers(range, skip, @nice_numbers, best) do
+  defp search(range, skip, preferred, best) do
+    case search_nice_numbers(range, skip, preferred, best) do
       {:halt, best} -> best
-      {:cont, best} -> search(range, skip + 1, best)
+      {:cont, best} -> search(range, skip + 1, preferred, best)
     end
   end
 
@@ -87,7 +93,8 @@ defmodule Giggly.Scale.Breaks do
     if bound(simplicity_bound, 1, density_bound) < best_score do
       best
     else
-      delta = (high - low) / (count + 1) / skip / nice
+      {number, _preference} = nice
+      delta = (high - low) / (count + 1) / skip / number
       power = ceil(:math.log10(delta))
       candidate = {skip, nice, simplicity_bound, count, density_bound}
       best = search_powers(range, candidate, power, best)
@@ -98,9 +105,9 @@ defmodule Giggly.Scale.Breaks do
   # Over `z`, the power of ten the nice number is scaled by, until the step overshoots the range
   # by too much to cover it well.
   defp search_powers(range, candidate, power, best) do
-    {skip, nice, simplicity_bound, count, density_bound} = candidate
+    {skip, {number, _preference}, simplicity_bound, count, density_bound} = candidate
     %{score: best_score} = best
-    step = skip * nice * :math.pow(10, power)
+    step = skip * number * :math.pow(10, power)
     coverage_bound = coverage_max(range, step * (count - 1))
 
     if bound(simplicity_bound, coverage_bound, density_bound) < best_score do
@@ -147,7 +154,7 @@ defmodule Giggly.Scale.Breaks do
 
   # `.simplicity()`: earlier nice numbers and fewer skips score higher, and a sequence through zero
   # scores 1 more.
-  defp simplicity(nice, skip, first, last, step) do
+  defp simplicity({_number, preference}, skip, first, last, step) do
     remainder = modulo(first, step)
 
     through_zero =
@@ -155,15 +162,15 @@ defmodule Giggly.Scale.Breaks do
         do: 1,
         else: 0
 
-    1 - preference(nice) - skip + through_zero
+    1 - preference - skip + through_zero
   end
 
-  defp simplicity_max(nice, skip), do: 1 - preference(nice) - skip + 1
+  defp simplicity_max({_number, preference}, skip), do: 1 - preference - skip + 1
 
-  # A nice number's place in the list, from 0 for the first to 1 for the last.
-  defp preference(nice) do
-    index = Enum.find_index(@nice_numbers, fn candidate -> candidate == nice end)
-    index / (length(@nice_numbers) - 1)
+  # Each nice number with its place in the list, from 0 for the first to 1 for the last.
+  defp preferences(nice_numbers) do
+    last = length(nice_numbers) - 1
+    Enum.with_index(nice_numbers, fn number, index -> {number, index / last} end)
   end
 
   defp coverage({low, high}, first, last) do

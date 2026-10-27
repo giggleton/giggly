@@ -57,10 +57,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   back in data units first, which waits for a stat whose documented variables are positions.
   **Each on an axis is checked against the axis's scale, chosen before the stat, and put through
   it** (`Scale.transform/2`, each row on its panel's scale): numbers on a continuous or a discrete
-  axis, dates on a date one, date-times of its kind on a date-time one, and anything else
-  refused when run, naming the layer, the aesthetic,
+  axis, dates on a date one, date-times of its kind on a date-time one, times on a time one, and
+  anything else refused when run, naming the layer, the aesthetic,
   the value or the stat's column, and its type, where ggplot2 adds a scale for an axis nothing
-  mapped before the stat, or warns at numbers on a date axis.
+  mapped before the stat, warns at numbers on a date axis, and places numbers on a time axis as
+  seconds.
 - **Just before a layer's position runs, each aesthetic the position reads goes into every
   row**: the value the layer sets, or else the position's default
   (`Position.default_aesthetics/1`), as ggplot2's `Position$use_defaults()`, so every text layer's

@@ -195,18 +195,18 @@ defmodule GigglyTest do
     end
 
     test "a column no scale can place yet is refused, naming the layer, the column and its type" do
-      rows = %{"time" => [~T[09:00:00], ~T[17:30:00]], "mpg" => [21.0, 22.8]}
+      rows = %{"laps" => [[61.2, 60.8], [59.9]], "mpg" => [21.0, 22.8]}
 
       plot =
         rows
-        |> Plot.new(%{x: :time, y: :mpg})
+        |> Plot.new(%{x: :laps, y: :mpg})
         |> Plot.geom_point()
 
       error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
       assert error.message =~ "index 0"
       assert error.message =~ ":x"
-      assert error.message =~ ~s("time")
-      assert error.message =~ ":time"
+      assert error.message =~ ~s("laps")
+      assert error.message =~ "{:list, :float}"
     end
 
     test "a date mapped to alpha is refused, its scale not having arrived" do
@@ -5447,6 +5447,100 @@ defmodule GigglyTest do
                drawn.(@stamped, fn plot -> plot end)
     end
 
+    # Golden: R 4.6.1 with ggplot2 4.0.3 and hms 1.1.4, layer_data()'s x for points at
+    # as_hms(c("22:10:00", "23:50:00.5", NA)) alone, under scale_x_continuous(limits = c(80000,
+    # NA)) and under scale_x_time(limits = as_hms(c("23:00:00", NA))): each at its seconds since
+    # midnight, the half second kept, and censored by the limits.
+    test "a time is placed at its seconds since midnight, by a time scale or a continuous one" do
+      x = fn scaled ->
+        %{"at" => [~T[22:10:00], ~T[23:50:00.5], nil], "value" => [1, 2, 3]}
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+        |> scaled.()
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:x)
+      end
+
+      assert {x.(fn plot -> plot end),
+              x.(fn plot -> Plot.scale_x_continuous(plot, limits: {80_000, nil}) end),
+              x.(fn plot -> Plot.scale_x_time(plot, limits: {~T[23:00:00], nil}) end)} ===
+               {[79_800.0, 85_800.5, nil], [nil, 85_800.5, nil], [nil, 85_800.5, nil]}
+    end
+
+    # R places a POSIXct beside an hms on one axis at its seconds since 1970 as though they were
+    # a time of day's, and fails under a date-time or date scale or log10.
+    test "a time beside a date-time on one axis, or under another kind of scale, is refused" do
+      times = %{"at" => [~T[22:10:00], ~T[23:50:00]], "value" => [1, 2]}
+
+      points =
+        times
+        |> Plot.new(%{x: :at, y: :value})
+        |> Plot.geom_point()
+
+      for {plot, refusal} <- [
+            {Plot.geom_point(points, %{x: :at}, data: @stamped),
+             ~s(index 1 maps :x to "at", a datetime column, but the layer at index 0 maps :x ) <>
+               ~s(to "at", a time one; an axis has one scale)},
+            {Plot.scale_x_datetime(points),
+             ~s(x scale is datetime, but the layer at index 0 maps :x to "at", a time column)},
+            {Plot.scale_x_log10(points),
+             ~s(x scale is continuous through log10, but the layer at index 0 maps :x to "at")},
+            {times
+             |> Plot.new(%{x: :value, y: :value})
+             |> Plot.geom_point()
+             |> Plot.scale_y_time(),
+             ~s(y scale is time, but the layer at index 0 maps :y to "value", a continuous)}
+          ] do
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ refusal
+      end
+    end
+
+    # ggplot2 4.0.3 puts `y = after_stat(hms::as_hms(count))` over a time y axis at 2 and 1, its
+    # seconds since midnight; it places `geom_bar()`'s counts there as seconds, which Giggly
+    # refuses, a number beside times being two kinds on one axis.
+    test "a value on a time axis is put through its scale, and a number there is refused" do
+      points =
+        %{"at" => [~T[00:00:00], ~T[00:00:00], ~T[06:00:00]], "class" => ["a", "b", "a"]}
+        |> Plot.new()
+        |> Plot.geom_point(%{x: :class, y: :at})
+
+      later = fn count -> Time.add(~T[00:00:00], trunc(count)) end
+
+      frame =
+        points
+        |> Plot.geom_bar(%{x: :class, y: {:after_stat, [{later, [:count]}]}})
+        |> Giggly.layer_data(1)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          points
+          |> Plot.geom_bar(%{x: :class})
+          |> Giggly.layer_data(1)
+        end
+
+      assert DataFrame.pull(frame, :y) === [2.0, 1.0]
+      assert error.message =~ "index 1 puts its stat's :count into :y, a :float column"
+      assert error.message =~ "is a time scale, so it takes times of day"
+    end
+
+    test "a time mapped to colour or shape is refused, its scale not having arrived" do
+      times = %{"at" => [~T[22:10:00], ~T[23:50:00]], "value" => [1, 2]}
+
+      for {aesthetic, refusal} <- [
+            {:color, "a :time column, which no scale can place yet"},
+            {:shape, "a :time column, but a shape scale is discrete"}
+          ] do
+        plot =
+          times
+          |> Plot.new(%{:x => :value, :y => :value, aesthetic => :at})
+          |> Plot.geom_point()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+        assert error.message =~ refusal
+      end
+    end
+
     test "a date-time mapped to colour or shape is refused, its scale not having arrived" do
       naive = %{@stamped | "at" => Enum.map(@stamped["at"], &DateTime.to_naive/1)}
 
@@ -5466,7 +5560,7 @@ defmodule GigglyTest do
     end
   end
 
-  describe "layer_data/2, under a discrete, a date or a date-time scale" do
+  describe "layer_data/2, under a discrete, a date, a date-time or a time scale" do
     # Golden: R 4.6.1 with ggplot2 4.0.3, layer_data() of ggplot(s, aes(a)) + geom_bar() +
     # scale_x_discrete(limits = c("r", "p")), `s` holding a row each of "p", "q", "r" and NA: the
     # rows the limits leave out are not counted, and each bar stands at its value's place among
@@ -7595,6 +7689,47 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/scale_datetime_width.svg")
+    end
+
+    # Golden: test/golden/scale_time.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/scale_time.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. A day's load read every 20 minutes from 03:20 to
+    # 23:20 as times of day, the axis's breaks every four hours, found in hours, the last past
+    # midnight written 24:00:00. It moves with what moves test/golden/datetime_line.svg, and with a
+    # time scale's breaks, labels or minor breaks.
+    test "a line over times of day has an axis of R's breaks_hms(), written as hms writes them" do
+      svg =
+        ~T[03:20:00]
+        |> times_of_day(61, 20 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_time.svg")
+    end
+
+    # Golden: test/golden/scale_time_width.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_time_width.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. A late evening's load every 5
+    # minutes from 22:00, a break every half hour, labelled by hour and minute, the last at
+    # midnight written 00:00, and a minor grid line every ten minutes. It moves with what moves
+    # test/golden/scale_time.svg, and with a time scale's width and format.
+    test "a time scale's breaks every half hour, labelled in a format wrapped round midnight" do
+      svg =
+        ~T[22:00:00]
+        |> times_of_day(24, 5 * 60)
+        |> Plot.new(%{x: :at, y: :load})
+        |> Plot.geom_line()
+        |> Plot.scale_x_time(
+          date_breaks: [minute: 30],
+          date_labels: "%H:%M",
+          date_minor_breaks: [minute: 10]
+        )
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_time_width.svg")
     end
 
     # Golden: test/golden/scale_datetime_zone.svg, checked against ggplot2's drawing of the same
@@ -10204,6 +10339,17 @@ defmodule GigglyTest do
       Enum.map(at, fn instant -> DateTime.shift_zone!(instant, zone, Tz.TimeZoneDatabase) end)
 
     %{readings | "at" => shifted}
+  end
+
+  # `count` readings `step` seconds apart from the time of day `start`, their loads `readings/3`'s,
+  # as test/golden/scale_time.R makes them.
+  defp times_of_day(start, count, step) do
+    %{"load" => load} = readings(~U[1970-01-01 00:00:00Z], count, step)
+
+    %{
+      "at" => Enum.map(0..(count - 1), fn index -> Time.add(start, index * step) end),
+      "load" => load
+    }
   end
 
   # `count` readings `step` seconds apart from `start`, each the reading's index modulo 7 times 1.5
