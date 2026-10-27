@@ -356,7 +356,9 @@ grid lines are placed by the coordinate system".
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
 - **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
-  degenerate cases and the scores R takes to minus infinity included (`Scale.Breaks`). Its test
+  degenerate cases and the scores R takes to minus infinity included (`Scale.Breaks`), but on
+  ranges over about 3e23 wide reaching zero, where R's long-double modulus denies a rounded break
+  through zero the bonus for it (`Breaks`' opening comment). Its test
   pins R's own output for a range of every winning nice number, skip, count and zero bonus, and
   for each boundary, since a slip in one score shows only where that
   score decides the winner; a row that stops matching is a bug in the port, and the table is

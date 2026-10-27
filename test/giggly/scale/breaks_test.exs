@@ -151,6 +151,14 @@ defmodule Giggly.Scale.BreaksTest do
   # Golden: labeling::extended(321908391.83131832, 321908391.83131838, 5), as above, from R's
   # random ranges: steps of rounding error put a sequence's first and last breaks on one number,
   # whose density R reaches as minus infinity, dividing by zero
+  # Golden: labeling::extended(2.0118520021534377e154, 2.6864075978932322e154, 5), as above: a
+  # sequence reaching far past the range squares a distance past the largest double, taking R's
+  # coverage of it to minus infinity while the bound stays finite
+  test "a sequence whose coverage squares past the largest double never wins" do
+    assert Breaks.extended({2.011_852_002_153_437_7e154, 2.686_407_597_893_232_2e154}) ===
+             [2.0e154, 2.2e154, 2.4e154, 2.600_000_000_000_000_2e154]
+  end
+
   test "a sequence of steps that leave its first and last breaks one number never wins" do
     assert Breaks.extended({321_908_391.83131832, 321_908_391.83131838}) === [
              321_908_391.83131832

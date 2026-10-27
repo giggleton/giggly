@@ -144,6 +144,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   writing a date (`"%Y"`) is refused at the call, where R writes 1970-01-01; numbers on a time
   axis are refused, where R places them as seconds.
 
+- **Extended breaks keep their remainder in doubles where R's is long double (2026-10-27, Steve:
+  "Leave it").** Past 10^22 a step and its breaks are rounded, and R's long-double `%%` keeps that
+  rounding as a break's remainder, denying a sequence through zero its bonus where the remainder
+  in doubles, exactly 0, grants it: on ranges over about 3e23 wide reaching zero, 95 of 1,500
+  depart, none narrower (`Scale.Breaks`' opening comment). *Rejected: the remainder computed
+  exactly in integers*, which matches R there but costs every candidate scored, for ranges no
+  plot of ordinary data reaches.
+
 - **A table is the user's to shape; Giggly takes a column's order from a `Giggly.Factor` and does
   no data wrangling (2026-10-26, Steve, settling how rows taken by hand lose a factor's levels).**
   Rows taken from `diamonds` with `Enum` or Explorer lose `cut`'s levels, as a factor enumerates

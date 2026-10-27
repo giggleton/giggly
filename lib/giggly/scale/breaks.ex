@@ -26,6 +26,10 @@ defmodule Giggly.Scale.Breaks do
   # R computes some intermediate steps in extended precision; here every step is a double, which
   # can differ only where a sum lands within rounding error of a whole multiple of the step. Over
   # 3,505 ranges, random and degenerate, those boundaries included, it gives exactly R's breaks.
+  # Its modulus is one: past 10^22 a step and its breaks are rounded, and R's long-double
+  # remainder of a break through zero is that rounding, which denies it the bonus for zero that
+  # the remainder in doubles, exactly 0, grants; so on ranges over about 3e23 wide reaching zero,
+  # about one in six, Giggly's breaks may pass through zero where R's do not.
 
   # The number of breaks wanted: `scales::breaks_extended()`'s `n`.
   @wanted 5
