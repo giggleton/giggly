@@ -79,6 +79,36 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`scales`, a package of R's scales half, is carved inside Giggly first, then lifted into a
+  repo of its own for any charting tool (2026-10-27, Steve; checked against ggplot2 4.0.3 and
+  scales 1.4.0).** The aim is scales near complete, so Giggly's growth stops touching it. The
+  package holds what R's scales does: breaks, labels, transforms, palettes, out-of-range values,
+  rescaling, training a range or levels, colour operations. Giggly keeps ggplot2's scale: a
+  column's kind, each aesthetic's defaults, mapping, legend breaks, binned scales, guides, axes,
+  and `AsCharacter`, base R's `as.character()`. Every scale kind is ggplot2's (`ScaleContinuous`,
+  `ScaleDiscrete`, `ScaleBinned`); R's scales holds none and changes rarely. Its checklist is
+  scales 1.4.0's exports. The split is the program's first increment, so the build-out's
+  functions are designed once, as the package's API. *Rejected: the whole `Giggly.Scale`
+  boundary*: ggplot2's rules and binned scales would sit in the package. *Rejected: a new repo
+  now*: two repos and commits per increment while names still move. *Rejected: building first,
+  splitting at the end*: the build-out moved and mutation-tested twice. *Rejected:
+  `giggly_scales`*: it reads as Giggly's.
+
+- **The split moves files under `Scales.` by name alone; regrouping them by R's families waits
+  for the package's API (2026-10-27, Steve).** `Giggly.Scale`'s breaks, date and minor breaks,
+  transforms, palettes and labels, `Giggly.Format` and `Giggly.ColorOperations` become
+  `Scales.*`, their contents unchanged but names, so git sees renames and the mutation pass
+  covers only the changed lines. Functions pulled from `Giggly.Scale` go to `Scales.Bounds` (R's
+  `bounds.R`: rescaling, `zero_range()`, censoring) and `Scales.DataRange` (R's
+  `train_continuous()`, `train_discrete()`, the order of levels; Steve: "stuck with datarange
+  for now"). Manual palettes' name matching moves into `Giggly.Scale.Discrete`, and discrete
+  levels' labels into `Giggly.Scale`, their only callers, so no Giggly module shares a package
+  module's last segment. A second step documents the package as API. *Rejected:
+  `Scales.Domain`*: in the function sense, the opposite of a range (Steve). *Rejected:
+  `Scales.Range` and `Scales.Color`*: the one shadows Elixir's `Range` where aliased, the other
+  cannot be grepped apart from the `color` library's `Color`. *Rejected: regrouping during the
+  move*: new files, the whole half mutation-tested again.
+
 - **Date-time scales are Phase 3's fifteenth increment, in four steps: date-times in UTC and
   naive, time zones, times of day, the notebooks (2026-10-26, Steve, agreeing the proposal;
   checked against ggplot2 4.0.3, scales 1.4.0 and R).** A `DateTime` or `NaiveDateTime` column
