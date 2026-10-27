@@ -68,12 +68,8 @@ defmodule Scales.DataRange do
   # are a factor's.
   defp appended(old, old_factor, new) do
     held = MapSet.new(old, &key/1)
-
-    case Enum.reject(new, fn level -> MapSet.member?(held, key(level)) end) do
-      [] -> old
-      added when old_factor -> old ++ added
-      added -> Enum.sort_by(old ++ added, &level_key/1)
-    end
+    added = Enum.reject(new, fn level -> MapSet.member?(held, key(level)) end)
+    if old_factor, do: old ++ added, else: Enum.sort_by(old ++ added, &level_key/1)
   end
 
   # The key that orders discrete values with no levels of their own: `nil` after every present
