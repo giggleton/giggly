@@ -2941,6 +2941,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Document the Scales root as API: its families, the conventions they share and a
+  worked example, its exports narrowed to what Giggly calls (scales package, the split, step 2,
+  the root); §4: "The scales package's API is what a user holds"
 - 2026-10-27 — Split the transformations' tests by subject: the package's call Scales.Transform
   alone on R's axes, a scale's options through it move to Giggly's, and a date position turns
   back rounded down as R's (scales package, the split, step 2, transformations' tests); §4: "The

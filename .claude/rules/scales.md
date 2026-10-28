@@ -3,6 +3,7 @@ paths:
   - "lib/scales.ex"
   - "lib/scales/**"
   - "test/scales/**"
+  - "test/scales_test.exs"
 ---
 
 # The scales package
@@ -23,9 +24,16 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **The package depends on nothing in Giggly.** Its boundary lists `Color` and `NimbleOptions`
   alone and exports what Giggly's code calls, so a call back into Giggly fails the build, as it
   would from another repository; Giggly's domains reach it through the root, which lists it.
-  **Nor do its tests**: `test/scales` leaves with the package, so it calls only `Scales` and pins
-  R's figures there, alone running every line of `lib/scales`; a test of a Giggly scale through the
-  package is Giggly's, in `test/giggly`.
+  **Nor do its tests**: `test/scales` and `test/scales_test.exs` leave with the package, so they
+  call only `Scales` and pin R's figures there, alone running every line of `lib/scales`; a test
+  of a Giggly scale through the package is Giggly's, in `test/giggly`.
+- **A module is API when a user holds its inputs or Giggly calls it** (design-log §4, the entry
+  beginning "The scales package's API is what a user holds"): the root and each of R's families,
+  their functions R's names less the family's prefix, each `@doc` naming R's function and saying
+  where it departs, options keyword lists of R's arguments checked by NimbleOptions; the root
+  documents the conventions they share, once. `Scales.DateBreaks` (days or seconds and a clock),
+  `Scales.Labels.Fixed` and the `Scales.Transform.*` modules stay internal, reached through
+  `Scales.Transform` and `Scales.Labels`.
 - **A palette is a value naming its function (`Scales.Palette`), never a closure, and each is
   R's**: continuous, `:identity`, R's `pal_identity()`, `{:rescale, {low, high}}`, R's
   `pal_rescale()`, `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled,
