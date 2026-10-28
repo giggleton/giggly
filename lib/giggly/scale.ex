@@ -359,8 +359,8 @@ defmodule Giggly.Scale do
   # Each value's position on the scale's axis: a continuous value unchanged, or `nil` outside the
   # scale's limits, a discrete one at its level's position counting from 1. For an aesthetic other
   # than position, each value through the scale's palette: a continuous one's place in the scale's
-  # limits (`limits/1`), from 0 to 1, by its `rescaler` (`place/3`), put through the palette, and
-  # the scale's `na_value` for a missing value, one that is not a finite number, one outside the
+  # limits (`limits/1`), from 0 to 1, by its `rescaler` (`rescaled/3`), put through the palette,
+  # and the scale's `na_value` for a missing value, one that is not a finite number, one outside the
   # limits, which ggplot2 censors and maps to its `na.value`, or one whose place R makes NaN; a
   # discrete one as `Giggly.Scale.Discrete` maps it.
   @doc false
@@ -372,36 +372,37 @@ defmodule Giggly.Scale do
   def map(%Continuous{palette: palette, na_value: na_value} = scale, values) do
     bounds = limits(scale)
 
-    Enum.map(values, fn value ->
-      place = if placed_inside?(value, bounds), do: place(value, bounds, scale.rescaler)
+    values
+    |> Enum.map(fn value -> if placed_inside?(value, bounds), do: value end)
+    |> rescaled(bounds, scale.rescaler)
+    |> Enum.map(fn place ->
       if is_number(place), do: Palette.continuous(palette, place), else: na_value
     end)
   end
 
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
 
-  # A value's place in `bounds` by the scale's rescaler: R's `rescale()`, from 0 to 1; about a
-  # midpoint, R's `rescale_mid()`, `(value - midpoint) / extent + 0.5`, `extent` twice the further
-  # end's distance from it, in that order of operations, so the further end is at 0 or 1 and the
-  # midpoint at the middle; bounds of zero width put every value at the middle either way. Or R's
-  # `rescale_max()`, the value over the high end, so 0 is at 0 and one value at 1, whatever the
-  # low end: over a high end of 0, a value of 0 is R's NaN, `nil`, which maps to the missing value,
-  # and any other an infinity, which R cannot draw, so it raises.
-  defp place(value, bounds, :rescale), do: Bounds.rescale(value, bounds, {0, 1})
+  # Each value's place in `bounds` by the scale's rescaler (`Scales.Bounds`), a `nil` left `nil`:
+  # R's `rescale()`, from 0 to 1; about a midpoint, R's `rescale_mid()`, so the further end is at 0
+  # or 1 and the midpoint at the middle; or R's `rescale_max()`, the value over the high end, so 0
+  # is at 0 and one value at 1, whatever the low end. Over a high end of 0, a value of 0 is R's
+  # NaN, `nil`, which maps to the missing value, and any other an infinity, which R cannot draw, so
+  # it raises. Without bounds every value is `nil`, and stays so.
+  defp rescaled(values, :none, _rescaler), do: values
+  defp rescaled(values, bounds, :rescale), do: Bounds.rescale(values, bounds, {0, 1})
 
-  defp place(value, {low, high}, {:mid, midpoint}) do
-    if Bounds.zero_range?(low, high) do
-      0.5
-    else
-      extent = 2 * max(abs(low - midpoint), abs(high - midpoint))
-      (value - midpoint) / extent + 0.5
-    end
+  defp rescaled(values, bounds, {:mid, midpoint}),
+    do: Bounds.rescale_mid(values, bounds, {0, 1}, midpoint)
+
+  defp rescaled(values, bounds, :max) do
+    values
+    |> Bounds.rescale_max(bounds, {0, 1})
+    |> Enum.zip_with(values, fn place, value -> finite_place(place, value) end)
   end
 
-  defp place(value, {_low, high}, :max) when high != 0, do: value / high
-  defp place(value, _bounds, :max) when value == 0, do: nil
+  defp finite_place(place, _value) when is_number(place) or is_nil(place), do: place
 
-  defp place(value, _bounds, :max) do
+  defp finite_place(_infinite, value) do
     raise ArgumentError,
           "a scale placing each value at its share of its limits' high end cannot place " <>
             "#{inspect(value)} when that end is 0: its place would be infinite, which R cannot " <>
@@ -631,14 +632,11 @@ defmodule Giggly.Scale do
   end
 
   # Each of `values`' place in a continuous scale's limits (`limits/1`), from 0 at their low end
-  # to 1 at their high (`rescale/3`), as ggplot2's colour bar places its ticks and its colours,
-  # whatever the scale's rescaler.
+  # to 1 at their high (`Scales.Bounds.rescale/3`), as ggplot2's colour bar places its ticks and
+  # its colours, whatever the scale's rescaler.
   @doc false
   @spec places(Continuous.t(), [number()]) :: [float()]
-  def places(%Continuous{} = scale, values) do
-    bounds = limits(scale)
-    Enum.map(values, fn value -> Bounds.rescale(value, bounds, {0, 1}) end)
-  end
+  def places(%Continuous{} = scale, values), do: Bounds.rescale(values, limits(scale), {0, 1})
 
   # The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
   # `breaks/2` gives on that extent: ggplot2's `get_breaks_minor()` as its view scale calls it,
@@ -702,9 +700,9 @@ defmodule Giggly.Scale do
   defp default_breaks(%Continuous{}, :none, _extent), do: []
 
   defp default_breaks(%Continuous{transform: transform}, _limits, extent) do
-    {low, high} = squished = Transform.squish(transform, extent)
+    {low, _high} = squished = Transform.squish(transform, extent)
 
-    if Bounds.zero_range?(low, high) do
+    if Bounds.zero_range?(squished) do
       [low]
     else
       transform
@@ -772,14 +770,14 @@ defmodule Giggly.Scale do
 
   # Widens each end by a multiple of the width plus a constant, `expansion` giving each end's: R's
   # `expand_range4()`, which widens limits of zero width as though their width were 1.
-  defp expand({low, high}, mult: {mult_low, mult_high}, add: {add_low, add_high}) do
-    width = if Bounds.zero_range?(low, high), do: 1, else: high - low
+  defp expand({low, high} = extent, mult: {mult_low, mult_high}, add: {add_low, add_high}) do
+    width = if Bounds.zero_range?(extent), do: 1, else: high - low
     {low - (width * mult_low + add_low), high + (width * mult_high + add_high)}
   end
 
   # An extent R's `zero_range()` still calls zero wide, as its middle with both ends equal.
   defp collapse_zero_width({low, high} = extent) do
-    if Bounds.zero_range?(low, high) do
+    if Bounds.zero_range?(extent) do
       middle = (low + high) / 2
       {middle, middle}
     else

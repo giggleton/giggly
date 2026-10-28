@@ -16,7 +16,7 @@ defmodule Giggly.Resolution do
   # `sort()` drops a missing one.
 
   # ggplot2's arithmetic on plain positions, asking R's scales half only whether a range is zero
-  # wide (`Scales.Bounds.zero_range?/2`), the one home of R's `zero_range()`.
+  # wide (`Scales.Bounds.zero_range?/1`), the one home of R's `zero_range()`.
   use Boundary, deps: [Scales], exports: []
 
   alias Scales.Bounds
@@ -36,8 +36,9 @@ defmodule Giggly.Resolution do
   end
 
   defp zero_width?(numbers) do
-    {low, high} = Enum.min_max(numbers)
-    Bounds.zero_range?(low, high)
+    numbers
+    |> Enum.min_max()
+    |> Bounds.zero_range?()
   end
 
   defp smallest_gap(numbers, zero) do

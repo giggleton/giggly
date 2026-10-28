@@ -143,19 +143,19 @@ defmodule Scales.Palette do
   @spec continuous({:rescale | :area, {number(), number()}}, number()) :: float()
   @spec continuous({:abs_area, number()}, number()) :: float()
   @spec continuous({:gradient, [String.t()]}, number()) :: String.t()
-  def continuous({:rescale, to}, place), do: Bounds.rescale(place, {0, 1}, to)
+  def continuous({:rescale, to}, place), do: from_unit(place, to)
 
   def continuous({:area, to}, place) do
     place
     |> :math.sqrt()
-    |> Bounds.rescale({0, 1}, to)
+    |> from_unit(to)
   end
 
   def continuous({:abs_area, max}, place) do
     place
     |> abs()
     |> :math.sqrt()
-    |> Bounds.rescale({0, 1}, {0, max})
+    |> from_unit({0, max})
   end
 
   def continuous({:gradient, [color]}, _place), do: color
@@ -344,6 +344,12 @@ defmodule Scales.Palette do
     step = (high - low) / (count - 1)
     between = Enum.map(1..(count - 2), fn index -> low + index * step end)
     Enum.concat([[low], between, [high]])
+  end
+
+  # A place from 0 to 1 moved onto `to`, as R's `rescale(x, to, from = c(0, 1))`.
+  defp from_unit(place, to) do
+    [rescaled] = Bounds.rescale([place], {0, 1}, to)
+    rescaled
   end
 
   # A grey of `level`, 0 black to 1 white, as R's `gray()` writes it.

@@ -79,6 +79,35 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The scales package's API is what a user holds the inputs to or Giggly calls, named for R's
+  families (2026-10-27, Steve, the split's step 2; checked against scales 1.4.0).** API: the root,
+  `Breaks`, `MinorBreaks`, `Labels` (`Format` merged in, since scales 1.1.0 renamed `*_format`
+  to `label_*`), `Transform`, `Palette`, `Bounds`, `DataRange`, `ColorOperations`, Giggly's
+  helpers among them. Internal: `Labels.Fixed`, the `Transform.*` modules behind a name, and
+  `DateBreaks`, which takes days or seconds and a clock, R's representation, through `Transform`.
+  A function is R's name less its family's prefix (`Breaks.extended`), its doc naming R's, but
+  Elixir's words where R's differ (`:time` a time of day); options are R's arguments spelled out;
+  a range is `{low, high}`; a function takes a list where R takes a vector, `nil` as `NA`.
+  `DataRange` stays, for R's `Range` classes. The root holds the shared conventions once and a
+  worked example. *Rejected: `DateBreaks` as API now*: a signature the breaks increment may break.
+  *Rejected: `Format` beside `Labels`*: R's dropped word, two places to look. *Rejected: R's whole
+  names*: `Breaks.breaks_extended` stutters. *Rejected: one value for `rescale` and continuous
+  palettes*: no room for R's `from` default. *Rejected: `Scales.Training`*: it names the activity.
+
+- **The package gives R's values and Giggly refuses; each test figure has one home (2026-10-27,
+  Steve, the split's step 2).** The package's manual (list), shape and line-type palettes give
+  R's values, `nil` past their end, as R gives `NA` and warns; ggplot2's matching by name and by
+  breaks, every refusal of too few values, and the ordinal palettes (`scale_alpha_ordinal()`'s
+  and `scale_size_ordinal()`'s, no `pal_*`) move to `Giggly.Scale.Discrete`. R's `rescale_mid()`
+  and `rescale_max()` move from `Giggly.Scale` to `Scales.Bounds`, which gives R's infinities and
+  NaN; Giggly raises at an infinity. The package's figures are pinned in `test/scales` alone,
+  Giggly's tests keeping Giggly's decisions, and the package's tests alone run all of
+  `lib/scales`; whether they alone kill its mutants waits for the extraction. *Rejected: the
+  package raising past its end*: the check run twice, and not R's answer. *Rejected: the ordinal
+  palettes kept in the package*: not scales'. *Rejected: package tests beside Giggly's copies*
+  (Steve: "So you want to test the scales package in two places one of which is not the
+  package").
+
 - **`scales`, a package of R's scales half, is carved inside Giggly first, then lifted into a
   repo of its own for any charting tool (2026-10-27, Steve; checked against ggplot2 4.0.3 and
   scales 1.4.0).** The aim is scales near complete, so Giggly's growth stops touching it. The
@@ -2915,6 +2944,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Document Scales.Bounds as API: rescale on lists as R's, checking both ranges, and
+  R's rescale_mid and rescale_max moved in from Giggly.Scale (scales package, the split, step 2,
+  bounds); §4: "The scales package's API is what a user holds", "The package gives R's values and
+  Giggly refuses"
 - 2026-10-27 — Carve R's scales half out as the Scales package: breaks, transforms, palettes,
   labels, formatters and colour operations moved by name, Scales.Bounds and Scales.DataRange
   pulled from Giggly.Scale (scales package, the split, step 1); §4: "`scales`, a package of R's

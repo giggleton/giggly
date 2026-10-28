@@ -43,8 +43,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   middle of its palette (0.55 for alpha); the rescale palette calls the same function. **A scale's
   `rescaler` says how a value is placed, as ggplot2's scale holds its rescaler** (design-log §4,
   the entry beginning "A scale's `rescaler`"): `:rescale`, by `rescale()`; `{:mid, midpoint}`, by
-  R's `rescale_mid()`, `(value - midpoint) / extent + 0.5`, `extent` twice the further limit's
-  distance from it, as gradient2's does; or `:max`, by R's `rescale_max()`, the value over the
+  R's `rescale_mid()` (`Scales.Bounds.rescale_mid/4`), as gradient2's does; or `:max`, by R's
+  `rescale_max()` (`Scales.Bounds.rescale_max/3`), the value over the
   limits' high end, as `scale_size_area()`'s does, so 0 is at 0 and one value at 1, a high end of
   0 placing 0 at `nil`, R's NaN, and raising for any other value, which R makes an infinity it
   cannot draw. The rescaler is the scale's, not the palette's, since a palette takes a place and
@@ -225,7 +225,7 @@ identity transformation: the entry beginning "A layer records its stat and posit
   ggplot2's `expand_limits_discrete()` takes the range of both, and **a discrete scale with no
   limits widens its continuous range alone by its `expand`, or else 0 to 1**, as
   `expand_limits_discrete_trans()` does for counts a stat puts on an axis no layer mapped.
-  `Scales.Bounds.zero_range?/2` is the one home of R's `zero_range()`; `Giggly.Resolution` asks
+  `Scales.Bounds.zero_range?/1` is the one home of R's `zero_range()`; `Giggly.Resolution` asks
   it.
   **An extent still zero wide once widened is returned as its middle, both ends equal** (a single
   value from about 4.5e11 up): ggplot2 keeps such an extent and `scales::rescale()` draws every

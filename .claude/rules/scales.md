@@ -68,6 +68,12 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
   byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which in R 4.6.1 steps on
   from the start as `seq()` does, so `seq()` it is.
+- **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
+  digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
+  `NA`: either range zero wide by `zero_range()` puts every value at the middle of `to`, which R
+  checks and the formula alone would not; over a high end of 0, `rescale_max()` gives R's IEEE
+  answer, an infinity of the signs' product, a negative zero's sign counting, or NaN as `nil`. Its
+  tests pin R's figures; Giggly's rescalers call these, and Giggly raises at an infinity.
 - **Training follows R's `scales`** (`Scales.DataRange`). A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped). **A discrete scale merges each training as R's
   `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and

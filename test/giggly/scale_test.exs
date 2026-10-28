@@ -1418,14 +1418,6 @@ defmodule Giggly.ScaleTest do
                {["#832424", "#FFFFFF", "#A197CC"], ["#B26D65", "#E0DBEE", "#3A3A98"]}
     end
 
-    test "limits of zero width put every value at the middle, about a midpoint too" do
-      three = ["#832424", "#FFFFFF", "#3A3A98"]
-      centred = gradient_through(three, [3, 3], rescaler: {:mid, 0.0})
-      plain = gradient_through(three, [3, 3])
-
-      assert {Scale.map(centred, [3]), Scale.map(plain, [3])} === {["#FFFFFF"], ["#FFFFFF"]}
-    end
-
     test "a scale of missing values alone maps them all to the missing value" do
       scale = gradient_through(@default_gradient, [nil])
 

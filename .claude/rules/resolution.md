@@ -15,7 +15,7 @@ design-log §4, the entry beginning "ggplot2's `resolution()` is a boundary of i
 - **It is R's `resolution()`, rule for rule, each checked against R**: integer positions and a
   range R's `zero_range()` calls zero wide are 1 apart; gaps within R's tolerance are rounding
   error; with none left the positions are 1 apart.
-- **It asks `Scales.Bounds.zero_range?/2` and copies no rule of the scales'**, the one dependency
+- **It asks `Scales.Bounds.zero_range?/1` and copies no rule of the scales'**, the one dependency
   its boundary lists.
 - **Each caller counts from zero or not as its ggplot2 counterpart does**: a geom's own fallback
   does not (`compute_data_size()`), nor does jittering (`compute_jitter()`), each panel's
