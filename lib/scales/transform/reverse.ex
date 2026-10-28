@@ -11,7 +11,7 @@ defmodule Scales.Transform.Reverse do
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Format, MinorBreaks}
 
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &negated/1)
@@ -38,7 +38,7 @@ defmodule Scales.Transform.Reverse do
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&negated/1)
-    |> Labels.numbers()
+    |> Format.plain()
   end
 
   defp negated(value) when is_number(value), do: -value

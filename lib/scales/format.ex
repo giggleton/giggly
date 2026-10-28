@@ -1,15 +1,16 @@
 defmodule Scales.Format do
   @moduledoc """
-  Labels for a scale's breaks: numbers with a mark between thousands (`comma/2`), percentages
-  (`percent/2`) and amounts of money (`currency/2`).
+  Labels for a scale's breaks: numbers written plainly (`plain/1`), with a mark between thousands
+  (`comma/2`), as percentages (`percent/2`) and as amounts of money (`currency/2`).
 
-  Each formatter is handed every break an axis draws and returns a label for each, in order, so
-  the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`, `1.00` and
-  `1.25`. Give one to a scale's `labels:`, inside a function when it takes options:
+  Each labeller is handed every break an axis or a legend draws and returns a label for each, in
+  order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
+  `1.00` and `1.25`. One that takes options is handed on inside a function:
 
-      plot
-      |> Plot.scale_y_continuous(labels: &Format.percent/1)
-      |> Plot.scale_x_continuous(labels: fn breaks -> Format.comma(breaks, accuracy: 0.1) end)
+      fn breaks -> Scales.Format.comma(breaks, accuracy: 0.1) end
+
+  `plain/1` writes numbers as Elixir shows them, with what an axis read at a glance needs on top;
+  the others write them as R's scales does, each a label to the character.
 
   ## How a label is written
 
@@ -61,9 +62,7 @@ defmodule Scales.Format do
   #   as `5 400NA`), so one is required here (design-log §4, the entry beginning
   #   "`Scales.Format`'s").
   #
-  # Its options are checked by NimbleOptions, as every public option in Giggly is, which the
-  # `Scales` boundary lists for it. Nothing in Giggly calls it: it is a library a user hands to
-  # `labels:`.
+  # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
   alias Scales.Format.Fixed
 
@@ -72,6 +71,9 @@ defmodule Scales.Format do
 
   # The largest decimal count R's `number()` asks for.
   @max_decimals 20
+
+  # The significant digits `plain/1` rounds each break to.
+  @significant_digits 15
 
   # `sqrt(.Machine$double.eps)`: gaps below it are rounding error, so the accuracy is 1.
   @smallest_gap :math.sqrt(2.220446049250313e-16)
@@ -225,7 +227,7 @@ defmodule Scales.Format do
   ]
 
   @doc """
-  Labels numbers with a comma between each three digits of the whole part.
+  Labels numbers with a comma between each three digits of the whole part, R's `label_comma()`.
 
   ## Options
 
@@ -255,7 +257,8 @@ defmodule Scales.Format do
   end
 
   @doc """
-  Labels proportions as percentages: each is multiplied by 100 and written with a `%`.
+  Labels proportions as percentages, R's `label_percent()`: each is multiplied by 100 and written
+  with a `%`.
 
   Thousands are marked with a space (`1 234%`).
 
@@ -284,7 +287,8 @@ defmodule Scales.Format do
   end
 
   @doc """
-  Labels amounts of money, in dollars unless `prefix:` and `suffix:` say otherwise.
+  Labels amounts of money, R's `label_currency()`, in dollars unless `prefix:` and `suffix:` say
+  otherwise.
 
   Without `accuracy:` or `scale_cut:`, labels show cents when some amount is not whole and none
   is larger than `largest_with_fractional:`, and whole amounts otherwise. When both marks would
@@ -322,8 +326,8 @@ defmodule Scales.Format do
   end
 
   @doc """
-  The short scale's steps for `scale_cut:`: thousands `K`, millions `M`, billions `B` (1e9) and
-  trillions `T` (1e12).
+  The short scale's steps for `scale_cut:`, R's `cut_short_scale()`: thousands `K`, millions `M`,
+  billions `B` (1e9) and trillions `T` (1e12).
 
   ## Options
 
@@ -341,8 +345,8 @@ defmodule Scales.Format do
   def cut_short_scale(options \\ []), do: spaced(@short_scale, options)
 
   @doc """
-  The long scale's steps for `scale_cut:`: thousands `K`, millions `M`, billions `B` (1e12) and
-  trillions `T` (1e18).
+  The long scale's steps for `scale_cut:`, R's `cut_long_scale()`: thousands `K`, millions `M`,
+  billions `B` (1e12) and trillions `T` (1e18).
 
   ## Options
 
@@ -357,8 +361,9 @@ defmodule Scales.Format do
   def cut_long_scale(options \\ []), do: spaced(@long_scale, options)
 
   @doc """
-  The SI prefixes' steps for `scale_cut:`, from yocto (1e-24) to yotta (1e24), each written with
-  a space and `unit` after it (`" kg"`), and `unit` alone below a yocto and from 1 to 1000.
+  The SI prefixes' steps for `scale_cut:`, R's `cut_si()`, from yocto (1e-24) to yotta (1e24),
+  each written with a space and `unit` after it (`" kg"`), and `unit` alone below a yocto and
+  from 1 to 1000.
 
   ## Examples
 
@@ -380,8 +385,9 @@ defmodule Scales.Format do
   end
 
   @doc """
-  Steps of time for `scale_cut:`, for labels in seconds: nanoseconds `ns`, microseconds `μs`,
-  milliseconds `ms`, seconds `s`, minutes `m`, hours `h`, days `d` and weeks `w`.
+  Steps of time for `scale_cut:`, R's `cut_time_scale()`, for labels in seconds: nanoseconds `ns`,
+  microseconds `μs`, milliseconds `ms`, seconds `s`, minutes `m`, hours `h`, days `d` and weeks
+  `w`.
 
   ## Options
 
@@ -394,6 +400,73 @@ defmodule Scales.Format do
   """
   @spec cut_time_scale(keyword()) :: [step()]
   def cut_time_scale(options \\ []), do: spaced(@time_scale, options)
+
+  @doc """
+  Labels numbers plainly, as Elixir shows a float, with what an axis read at a glance needs on
+  top: every label gets as many decimals as the most precise one needs, none when every break is
+  whole, never scientific notation and no thousands separators. Each break is first rounded to 15
+  significant digits, which drops the rounding error that adding up steps leaves in the last
+  digits (`0.3`, not `0.30000000000000004`), and a negative zero is written `0`. R's default
+  labels come from `format()` instead, which writes `1e+05` where this writes `100000`.
+
+  ## Examples
+
+      iex> Scales.Format.plain([0.0, 2.5, 5.0])
+      ["0.0", "2.5", "5.0"]
+
+      iex> Scales.Format.plain([0.0, 250_000.0])
+      ["0", "250000"]
+  """
+  @spec plain([float()]) :: [String.t()]
+  def plain(breaks) do
+    rounded = Enum.map(breaks, &round_significant/1)
+
+    decimals =
+      rounded
+      |> Enum.map(&decimals_needed/1)
+      |> Enum.max(fn -> 0 end)
+
+    Enum.map(rounded, fn value -> :erlang.float_to_binary(value, decimals: decimals) end)
+  end
+
+  # Rounds through the 15-significant-digit scientific form; a zero of either sign becomes 0.0.
+  # `:erlang.float_to_binary/2` takes a negative `scientific:` precision without complaint and uses
+  # its default of six decimals, where a negative `decimals:` raises, so the example with a break
+  # needing all fifteen digits is what pins the precision. Rounding error can reach the 16th
+  # significant digit, as in some breaks R's `labeling::extended()` returns, and rounding to 15
+  # digits drops it there too; a break that needs all 15 digits keeps them.
+  defp round_significant(value) when value == 0, do: 0.0
+
+  defp round_significant(value) do
+    value
+    |> :erlang.float_to_binary(scientific: @significant_digits - 1)
+    |> String.to_float()
+  end
+
+  # How many decimals the shortest form that reads back as `value` has, counted from its
+  # significand and exponent (`2.5e4` needs none, `-1.0e-5` five).
+  defp decimals_needed(value) do
+    {significand, exponent} =
+      value
+      |> :erlang.float_to_binary([:short])
+      |> split_exponent()
+
+    [_whole, fraction] = String.split(significand, ".")
+
+    fraction_digits =
+      fraction
+      |> String.trim_trailing("0")
+      |> String.length()
+
+    max(fraction_digits - exponent, 0)
+  end
+
+  defp split_exponent(short) do
+    case String.split(short, "e") do
+      [significand, exponent] -> {significand, String.to_integer(exponent)}
+      [significand] -> {significand, 0}
+    end
+  end
 
   # NimbleOptions' check of `accuracy:` and `scale:`: a positive number.
   @doc false

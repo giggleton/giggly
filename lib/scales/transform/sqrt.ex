@@ -12,7 +12,7 @@ defmodule Scales.Transform.Sqrt do
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Format, MinorBreaks}
 
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &root/1)
@@ -39,7 +39,7 @@ defmodule Scales.Transform.Sqrt do
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&squared/1)
-    |> Labels.numbers()
+    |> Format.plain()
   end
 
   defp root(value) when is_number(value) and value >= 0, do: :math.sqrt(value)

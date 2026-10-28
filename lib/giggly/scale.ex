@@ -568,7 +568,7 @@ defmodule Giggly.Scale do
   defp discrete_candidates(%Discrete{breaks: given}, _limits), do: given
 
   # The labels of a discrete scale's breaks `values`, which are the candidates at `indexes` among
-  # `count` (its given breaks, or its limits): written as `Scales.Labels` writes a level by
+  # `count` (its given breaks, or its limits): written as `level_labels/1` writes a level by
   # default; `:none` for each where it has none; its list's labels at those indexes, a list one for
   # each candidate, or the plot cannot be drawn; its map's label for each value it holds, the
   # default for the rest; or what its function returns for the values.

@@ -2940,6 +2940,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Move plain number labels into Scales.Format as plain/1, documenting it for any
+  charting tool (scales package, the split, step 2, labels, part one); §4: "The scales package's
+  API is what a user holds"
 - 2026-10-27 — Document Scales.DataRange as API, its training rules pinned by the package's own
   tests (scales package, the split, step 2, data ranges); §4: "The package gives R's values and
   Giggly refuses"

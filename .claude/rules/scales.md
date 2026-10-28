@@ -184,7 +184,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   for each boundary, since a slip in one score shows only where that
   score decides the winner; a row that stops matching is a bug in the port, and the table is
   regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
-- **Labels are written the Elixir way, not R's** (`Scales.Labels`): `inspect`'s plain decimals,
-  rounded to 15 significant digits, as many decimals on every label as the most precise needs,
-  none when all are whole, negative zero as `0`, never scientific, no thousands separators, so a
-  log axis's `1e+05` is written `100000`.
+- **Labels are written the Elixir way, not R's** (`Scales.Format.plain/1`): `inspect`'s plain
+  decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
+  needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,
+  so a log axis's `1e+05` is written `100000`.
