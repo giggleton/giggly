@@ -1,5 +1,14 @@
 defmodule Scales.ColorOperations do
-  @moduledoc false
+  @moduledoc """
+  Colours as a user writes them and as R's palettes make them: a colour read as CSS reads one
+  (`parse/1`); one made from a hue, chroma and luminance (`from_hcl/3`) or from CIE L*a*b*
+  (`from_lab/1`), and a colour's L*a*b* (`to_lab/1`), each exactly as R's farver makes it; two
+  mixed (`mix/3`), R's `col_mix()`; and the viridis palettes' colours (`viridis/2`), R's
+  `viridisLite::viridis()`.
+
+  A colour is uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of its own, an alpha of `FF`
+  dropped as opaque, so a colour has one spelling; or `:none`, R's `NA`, no colour.
+  """
 
   # Colour operations: reading a colour as a user writes one, and the conversions R's palettes make
   # between colour spaces. It is the one module that calls the `color` library, so the library and
@@ -163,8 +172,24 @@ defmodule Scales.ColorOperations do
   # A CSS colour name: ASCII letters alone.
   @name_letters ~r/\A[a-z]+\z/
 
-  # The colour `colour` writes, in its one spelling, or `:error` when it is not a CSS colour.
-  @doc false
+  @doc """
+  The colour `color` names, in its one spelling, or `:error` where CSS names none: a CSS colour
+  name in any case; a hex colour in one of CSS's four forms, `#RGB`, `#RGBA`, `#RRGGBB` and
+  `#RRGGBBAA`, its digits in either case; `transparent`, CSS's black with no alpha; or `:none`.
+  R's own names that CSS lacks (`grey50`), CSS's functions (`rgb()`) and hex without its `#` are
+  refused.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.parse("SteelBlue")
+      {:ok, "#4682B4"}
+
+      iex> Scales.ColorOperations.parse("#abc")
+      {:ok, "#AABBCC"}
+
+      iex> Scales.ColorOperations.parse("grey50")
+      :error
+  """
   @spec parse(term()) :: {:ok, t()} | :error
   def parse(:none), do: {:ok, :none}
 
@@ -188,9 +213,15 @@ defmodule Scales.ColorOperations do
     if String.match?(name, @name_letters) and Names.known?(name), do: spelled(name), else: :error
   end
 
-  # The colour, uppercase `#RRGGBB`, that farver encodes from `hue` in degrees, `chroma` and
-  # `luminance`, as the opening comment says.
-  @doc false
+  @doc """
+  The colour, uppercase `#RRGGBB`, that R's farver encodes from `hue` in degrees, `chroma` and
+  `luminance`, CIE LCh(uv), as R's `pal_hue()` makes its colours.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.from_hcl(15.0, 100.0, 65.0)
+      "#F8766D"
+  """
   @spec from_hcl(number(), number(), number()) :: String.t()
   def from_hcl(hue, chroma, luminance)
       when is_number(hue) and is_number(chroma) and is_number(luminance) do
@@ -200,8 +231,14 @@ defmodule Scales.ColorOperations do
     |> from_xyz()
   end
 
-  # The CIE L*a*b* of `colour`, an opaque `#RRGGBB`, as the opening comment says.
-  @doc false
+  @doc """
+  The CIE L*a*b* of an opaque `#RRGGBB` colour, as R's farver decodes it.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.to_lab("#4682B4")
+      {52.46551718768575, -4.073239774469551, -32.18862480122369}
+  """
   @spec to_lab(String.t()) :: {float(), float(), float()}
   def to_lab(<<"#", digits::binary-size(6)>>) do
     {:ok, <<red, green, blue>>} = Base.decode16(digits)
@@ -213,9 +250,15 @@ defmodule Scales.ColorOperations do
     |> Lindbloom.xyz_to_lab(@white_point)
   end
 
-  # The colour, uppercase `#RRGGBB`, that farver encodes from `lab`, its L*, a* and b*, as the
-  # opening comment says.
-  @doc false
+  @doc """
+  The colour, uppercase `#RRGGBB`, that R's farver encodes from CIE L*, a* and b*, as R's
+  gradients blend their colours in L*a*b*.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.from_lab({52.4664, -4.0763, -32.1991})
+      "#4682B4"
+  """
   @spec from_lab({number(), number(), number()}) :: String.t()
   def from_lab({_lightness, _a, _b} = lab) do
     lab
@@ -223,9 +266,16 @@ defmodule Scales.ColorOperations do
     |> from_xyz()
   end
 
-  # The colour `amount` of the way from `from` to `to`, each a colour in its one spelling, as the
-  # opening comment says: 0 is `from` and 1 is `to`.
-  @doc false
+  @doc """
+  The colour `amount` of the way from `from` to `to`, each in its one spelling, R's `col_mix()`:
+  each of red, green, blue and alpha that share of the way from the one to the other, rounded to
+  a byte; 0 is `from` and 1 is `to`.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.mix("#000000", "#FFFFFF", 0.5)
+      "#808080"
+  """
   @spec mix(String.t(), String.t(), number()) :: String.t()
   def mix(<<"#", _from_digits::binary>> = from, <<"#", _to_digits::binary>> = to, amount)
       when is_number(amount) and amount >= 0 and amount <= 1 do
@@ -250,15 +300,27 @@ defmodule Scales.ColorOperations do
     {[red, green, blue], alpha / 255}
   end
 
-  # viridisLite's palettes by name, in the order of its options A to H.
-  @doc false
+  @doc """
+  viridisLite's palettes by name, in the order of its options A to H.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.viridis_options()
+      [:magma, :inferno, :plasma, :viridis, :cividis, :rocket, :mako, :turbo]
+  """
   @spec viridis_options() :: [atom(), ...]
   def viridis_options, do: @viridis_options
 
-  # `count` colours of the viridis palette `option`, one of `viridis_options/0`, as R's
-  # `viridis()` makes them, as the opening comment says: from `begin` to `end`, each from 0 to 1,
-  # in that order for a `direction` of 1 and the other for -1, with an alpha from 0 to 1.
-  @doc false
+  @doc """
+  `count` colours of the viridis palette `option`, one of `viridis_options/0`, as R's
+  `viridisLite::viridis()` makes them: spaced from `begin` to `end`, each from 0 to 1, in that
+  order for a `direction` of 1 and the other for -1, with an alpha from 0 to 1.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.viridis(3, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0})
+      ["#440154", "#21908C", "#FDE725"]
+  """
   @spec viridis(non_neg_integer(), %{
           option: atom(),
           begin: number(),

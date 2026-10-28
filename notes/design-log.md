@@ -2940,6 +2940,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Document Scales.Breaks, MinorBreaks, Transform and ColorOperations as API, breaks'
+  nice numbers and minor breaks' reverse as options (scales package, the split, step 2, breaks,
+  transformations and colours); §4: "The scales package's API is what a user holds"
 - 2026-10-27 — Rename Scales.Format to Scales.Labels, R's label_* family, its rules file to
   labels.md (scales package, the split, step 2, labels, part two); §4: "The scales package's API
   is what a user holds"

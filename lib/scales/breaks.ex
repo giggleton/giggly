@@ -1,10 +1,12 @@
 defmodule Scales.Breaks do
-  @moduledoc false
+  @moduledoc """
+  Where a continuous axis's breaks go, given its limits: evenly spaced numbers, nice to read, that
+  cover them (`extended/2`). The breaks may fall outside the limits; which to keep is the caller's.
+  """
 
-  # Where a continuous axis's breaks go: the extended Wilkinson algorithm of Talbot, Lin and
-  # Hanrahan (2010), as R's `labeling::extended()` implements it and `scales::breaks_extended()`
-  # calls it, with five breaks wanted, which is ggplot2's default for a continuous axis. Use it
-  # through `Scales.Transform`, whose transformations take their breaks from it.
+  # The extended Wilkinson algorithm of Talbot, Lin and Hanrahan (2010), as R's
+  # `labeling::extended()` implements it and `scales::breaks_extended()` calls it, with five
+  # breaks wanted, which is ggplot2's default for a continuous axis.
   #
   # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
   # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers times a power of ten, early in
@@ -56,19 +58,73 @@ defmodule Scales.Breaks do
   # stops the search, as in R.
   @minus_infinity -1.797_693_134_862_315_7e308
 
-  # The breaks of the extended Wilkinson sequence that scores best over `{low, high}`, `low` below
-  # `high`, in ascending order, its steps `nice_numbers` times a power of ten, `labeling`'s when
-  # not given: on an ordinary range a nice number of nice steps (`{9.225, 35.075}` gives 10 to 35
-  # by 5), and on the degenerate ranges what the comment above describes.
+  @extended_options NimbleOptions.new!(
+                      nice_numbers: [
+                        type: {:custom, __MODULE__, :validate_nice_numbers, []},
+                        default: @nice_numbers,
+                        doc:
+                          "The steps a sequence may take, each times a power of ten, in order " <>
+                            "of preference, `labeling::extended()`'s `Q`."
+                      ]
+                    )
+
+  @doc """
+  The breaks of the extended Wilkinson sequence that scores best over the limits `{low, high}`,
+  `low` below `high`, in ascending order, R's `breaks_extended()`, five breaks wanted.
+
+  It searches for the evenly spaced sequence that scores best on simplicity (a step from the nice
+  numbers times a power of ten, early in their list, and zero among the breaks), coverage (the
+  sequence spans the limits without overshooting them far), density (close to five breaks) and
+  legibility, weighted as R weights them. Limits narrower than 100 times the machine epsilon, or
+  wider than the square root of the largest float, get five breaks spaced evenly from end to end.
+
+  ## Options
+
+  #{NimbleOptions.docs(@extended_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.extended({9.225, 35.075})
+      [10.0, 15.0, 20.0, 25.0, 30.0, 35.0]
+
+      iex> Scales.Breaks.extended({0.0, 10.0})
+      [0.0, 2.5, 5.0, 7.5, 10.0]
+
+      iex> Scales.Breaks.extended({0.0, 10.0}, nice_numbers: [1, 2, 1.5, 4, 3])
+      [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+  """
+  @spec extended({float(), float()}, keyword()) :: [float()]
+  def extended(limits, options \\ []) do
+    %{nice_numbers: nice_numbers} =
+      options
+      |> NimbleOptions.validate!(@extended_options)
+      |> Map.new()
+
+    extended_breaks(limits, nice_numbers)
+  end
+
+  # NimbleOptions' check of `nice_numbers:`: a list of positive numbers, at least one, since the
+  # search stops only on a nice number that cannot win.
   @doc false
-  @spec extended({float(), float()}, [number()]) :: [float()]
-  def extended(range, nice_numbers \\ @nice_numbers)
+  @spec validate_nice_numbers(term()) :: {:ok, [number(), ...]} | {:error, String.t()}
+  def validate_nice_numbers([_first | _rest] = numbers) do
+    if Enum.all?(numbers, fn number -> is_number(number) and number > 0 end),
+      do: {:ok, numbers},
+      else: nice_numbers_error(numbers)
+  end
 
-  def extended({low, high}, _nice_numbers)
-      when high - low < @epsilon or high - low > @widest_searched,
-      do: spaced_evenly(low, high)
+  def validate_nice_numbers(numbers), do: nice_numbers_error(numbers)
 
-  def extended(range, nice_numbers) do
+  defp nice_numbers_error(numbers),
+    do: {:error, "expected a list of positive numbers, at least one, got: #{inspect(numbers)}"}
+
+  # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the
+  # opening comment describes.
+  defp extended_breaks({low, high}, _nice_numbers)
+       when high - low < @epsilon or high - low > @widest_searched,
+       do: spaced_evenly(low, high)
+
+  defp extended_breaks(range, nice_numbers) do
     preferred = preferences(nice_numbers)
     %{first: first, last: last, step: step} = search(range, 1, preferred, %{score: -2})
     sequence(first, last, step)

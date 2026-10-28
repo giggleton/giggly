@@ -27,8 +27,8 @@ defmodule Scales.Palette do
     * `{:gray, {start, finish}}`, R's `pal_grey()`: greys from the level `start` to `finish`, 0
       black and 1 white, spaced evenly once raised to the power 2.2.
     * `{:viridis, %{option: option, begin: begin, end: end, direction: direction, alpha:
-      alpha}}`, R's `pal_viridis()`: colours of a viridis palette, as viridisLite's
-      `viridis()` makes them.
+      alpha}}`, R's `pal_viridis()`: colours of a viridis palette, as
+      `Scales.ColorOperations.viridis/2` gives them.
     * `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`: six shapes by name, solid
       (`:circle_small`, `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, R's 16, 17,
       15, 3, 7 and 8) or open (`:circle_open`, `:triangle_open`, `:square_open` and the same last
@@ -40,7 +40,8 @@ defmodule Scales.Palette do
   A discrete palette asked for more levels than it holds gives `nil` for each past its end, as R
   gives `NA` (and warns). No levels give none, where R's hue palette refuses them.
 
-  Colours are written uppercase, `#RRGGBB`, or `#RRGGBBAA` with an alpha of their own.
+  Colours are uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of their own, as
+  `Scales.ColorOperations` writes them.
   """
 
   # Each palette matched R to the last digit; the tests pin R's figures. The gradient blends as

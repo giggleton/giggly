@@ -3,6 +3,10 @@ defmodule Scales.BreaksTest do
 
   alias Scales.Breaks
 
+  # The examples' breaks are R 4.6.1's `labeling::extended(9.225, 35.075, 5)`,
+  # `extended(0, 10, 5)` and the same with `Q = c(1, 2, 1.5, 4, 3)`.
+  doctest Scales.Breaks
+
   # Golden: R's own `labeling::extended(low, high, 5)` (labeling 0.4.3, R 4.6.1, run in Docker's
   # `r-base` image), each break printed to 17 significant digits. extended Wilkinson is a search
   # scored on simplicity, coverage and density, so a slip in one score changes the winner only for
@@ -163,5 +167,14 @@ defmodule Scales.BreaksTest do
     assert Breaks.extended({321_908_391.83131832, 321_908_391.83131838}) === [
              321_908_391.83131832
            ]
+  end
+
+  # The search stops only on a nice number that cannot win, so none would never stop.
+  test "the nice numbers are positive numbers, at least one, and anything else is refused" do
+    for numbers <- [[], [0], [1, -2], [:five]] do
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Breaks.extended({0.0, 10.0}, nice_numbers: numbers)
+      end
+    end
   end
 end

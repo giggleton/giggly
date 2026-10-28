@@ -32,7 +32,8 @@ defmodule Scales.Transform.Reverse do
   end
 
   @impl Scales.Transform
-  def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent, true)
+  def minor_breaks(_transformation, breaks, extent),
+    do: MinorBreaks.regular(breaks, extent, reverse: true)
 
   @impl Scales.Transform
   def format(_transformation, breaks, _extent) do

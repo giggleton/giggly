@@ -3,7 +3,11 @@ defmodule Scales.MinorBreaksTest do
 
   alias Scales.MinorBreaks
 
-  describe "regular/2" do
+  # The reversed example is R 4.6.1's `regular_minor_breaks(reverse = TRUE)(c(30, 20, 10), c(5,
+  # 35), 2)`, scales 1.4.0.
+  doctest Scales.MinorBreaks
+
+  describe "regular/3" do
     test "a step is added below the first break when the extent reaches below it" do
       assert MinorBreaks.regular([0.0, 5.0, 10.0], {-1.0, 10.0}) ===
                [-5.0, -2.5, 0.0, 2.5, 5.0, 7.5, 10.0]
@@ -21,6 +25,12 @@ defmodule Scales.MinorBreaksTest do
 
     test "fewer than two breaks have no gap between them, and so no minor breaks" do
       assert MinorBreaks.regular([3.0], {2.0, 4.0}) === []
+    end
+
+    test "reverse is true or false, and anything else is refused" do
+      assert_raise NimbleOptions.ValidationError, fn ->
+        MinorBreaks.regular([0.0, 5.0], {0.0, 5.0}, reverse: :yes)
+      end
     end
   end
 end

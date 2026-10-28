@@ -1,5 +1,22 @@
 defmodule Scales.Transform do
-  @moduledoc false
+  @moduledoc """
+  The transformation a continuous scale puts its values through before it trains on them, named
+  by a value (`t:name/0`): values into transformed space (`transform/2`) and back
+  (`inverse/2`), and an axis's default breaks (`breaks/2`), minor breaks (`minor_breaks/3`) and
+  labels (`format/3`) there, as R's transformation objects carry them.
+
+  Breaks are found as on an axis showing an extent in transformed space: the extent is squished
+  into the transformation's domain (`squish/2`), turned back into data units and broken there,
+  and the breaks transformed back, in the order that leaves them, so a reversing transformation's
+  descend. Some may fall outside the extent; which to keep is the caller's. Labels are written
+  from the breaks turned back, `10^x` under log10; a date's depend on the step chosen for the
+  whole axis, so `format/3` is handed the extent too. A date, date-time or time transformation
+  also lays breaks a calendar or clock step apart (`width/3`).
+
+  A value the transformation cannot place, below log10's or the square root's domain, becomes
+  `nil`, as R's `NaN` is missing; a value placed at an infinity is `:infinity` or
+  `:neg_infinity`, and a missing one stays `nil`.
+  """
 
   # The transformation a continuous scale puts its values through before it trains on them: R's
   # `scales` transformation objects (`new_transform()`), which ggplot2's continuous scales hold as
@@ -30,9 +47,13 @@ defmodule Scales.Transform do
   alias Scales.Transform
 
   @typedoc """
-  A transformation as a continuous scale records it: its name, or the date-time transformation
-  with its time zone, `:default` until a column settles it and `:naive` for naive date-times, and
-  the time zone database that reads the zone.
+  A transformation, by name: `:identity`, R's `transform_identity()`; `:log10`, `:sqrt`,
+  `:reverse` (each value negated) and `:reciprocal`, R's `transform_log10()` and its kin; `:date`,
+  a `Date` as its days since 1970-01-01, R's `transform_date()`; `{:datetime, zone, database}`, a
+  `DateTime` or `NaiveDateTime` as its seconds since 1970-01-01 00:00 UTC, its breaks laid on
+  the clock of `zone`, read by the time zone database `database`, R's `transform_time(tz)`, the
+  zone `:default` until a column settles it and `:naive` for naive date-times; and `:time`, a
+  `Time` as its seconds since midnight, R's `transform_hms()`.
   """
   @type name ::
           :identity
@@ -84,47 +105,110 @@ defmodule Scales.Transform do
               extent :: {float(), float()} | :given
             ) :: [String.t()]
 
-  # The values put through the transformation named `name`.
-  @doc false
+  @doc """
+  The values put through the transformation `name`.
+
+  ## Examples
+
+      iex> Scales.Transform.transform(:log10, [1, 10, 100, 0, -1, nil])
+      [0.0, 1.0, 2.0, :neg_infinity, nil, nil]
+
+      iex> Scales.Transform.transform(:date, [~D[1970-01-11], nil])
+      [10.0, nil]
+  """
   @spec transform(name(), list()) :: list()
   def transform(name, values), do: module(name).transform(name, values)
 
-  # Positions turned back into data units by the transformation named `name`.
-  @doc false
+  @doc """
+  Positions in transformed space turned back into data units by the transformation `name`.
+
+  ## Examples
+
+      iex> Scales.Transform.inverse(:log10, [0.0, 1.0, 2.0])
+      [1.0, 10.0, 100.0]
+  """
   @spec inverse(name(), [number()]) :: list()
   def inverse(name, positions), do: module(name).inverse(name, positions)
 
-  # `extent` squished into the domain of the transformation named `name`, as ggplot2's
-  # `get_breaks()` squishes its limits with `oob_squish()` before finding breaks: each end below
-  # the domain moved up to it. No domain has an upper end yet.
-  @doc false
+  # As ggplot2's `get_breaks()` squishes its limits with `oob_squish()` before finding breaks. No
+  # domain has an upper end yet.
+  @doc """
+  The extent `{low, high}`, in transformed space, squished into the domain of the transformation
+  `name`: each end below the domain moved up to it, as R's `oob_squish()` moves it, so log10's
+  breaks are not sought below `-100`.
+
+  ## Examples
+
+      iex> Scales.Transform.squish(:log10, {-200.0, 2.0})
+      {-100.0, 2.0}
+  """
   @spec squish(name(), {float(), float()}) :: {float(), float()}
   def squish(name, {low, high}) do
     {domain_low, :infinity} = module(name).domain(name)
     {squished(low, domain_low), squished(high, domain_low)}
   end
 
-  # The default breaks of an axis showing `extent` under the transformation named `name`.
-  @doc false
+  @doc """
+  The default breaks, in transformed space, of an axis showing `extent` under the transformation
+  `name`, in the order the transformation leaves them: extended breaks (`Scales.Breaks`) on the
+  extent in data units, powers of ten under log10, and calendar dates under the date
+  transformation, as R's `pretty()` finds them.
+
+  ## Examples
+
+      iex> Scales.Transform.breaks(:identity, {9.225, 35.075})
+      [10.0, 15.0, 20.0, 25.0, 30.0, 35.0]
+
+      iex> Scales.Transform.breaks(:log10, {0.0, 3.0})
+      [0.0, 1.0, 2.0, 3.0]
+  """
   @spec breaks(name(), {float(), float()}) :: [float()]
   def breaks(name, extent), do: module(name).breaks(name, extent)
 
-  # The default minor breaks between `breaks` on an axis showing `extent` under the transformation
-  # named `name`.
-  @doc false
+  @doc """
+  The default minor breaks between `breaks` on an axis showing `extent` under the transformation
+  `name`, in transformed space: `Scales.MinorBreaks.regular/3`'s, reversed for `:reverse`.
+
+  ## Examples
+
+      iex> Scales.Transform.minor_breaks(:identity, [10.0, 20.0, 30.0], {5.0, 35.0})
+      [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+  """
   @spec minor_breaks(name(), [float()], {float(), float()}) :: [float()]
   def minor_breaks(name, breaks, extent), do: module(name).minor_breaks(name, breaks, extent)
 
-  # The default labels of `breaks` under the transformation named `name`: its own breaks on an axis
-  # showing `extent`, or, for `:given`, breaks it did not choose.
-  @doc false
+  @doc """
+  The default labels of `breaks`, in transformed space, under the transformation `name`: its own
+  breaks on an axis showing `extent`, or, for `:given`, breaks it did not choose. A number's are
+  `Scales.Labels.plain/1`'s, written from the breaks turned back; a date's in the format of the
+  step its breaks were chosen at, and a given date written in full.
+
+  ## Examples
+
+      iex> Scales.Transform.format(:log10, [0.0, 1.0, 2.0], {0.0, 2.0})
+      ["1", "10", "100"]
+
+      iex> extent = {19723.0, 19783.0}
+      iex> Scales.Transform.format(:date, Scales.Transform.breaks(:date, extent), extent)
+      ["Jan 01", "Jan 15", "Feb 01", "Feb 15", "Mar 01"]
+
+      iex> Scales.Transform.format(:date, [19723.0], :given)
+      ["2024-01-01"]
+  """
   @spec format(name(), [float()], {float(), float()} | :given) :: [String.t()]
   def format(name, breaks, extent), do: module(name).format(name, breaks, extent)
 
-  # The breaks a step lays, `[week: 1]`, on an axis showing `extent` under the date, date-time or
-  # time-of-day transformation `name`, in transformed space, some outside it: only those three
-  # have steps, which a plot's date, date-time and time scales record as a width.
-  @doc false
+  @doc """
+  The breaks a step lays, written as `Date.shift/2` takes one (`[week: 2]`), on an axis showing
+  `extent` under the date, date-time or time transformation `name`, in transformed space, some
+  outside it, as R's `breaks_width()` lays them: from the extent's start rounded down to the
+  step's unit (a week to its Monday), every step. Only those three transformations have steps.
+
+  ## Examples
+
+      iex> Scales.Transform.width(:date, [week: 2], {19723.0, 19750.0})
+      [19723.0, 19737.0, 19751.0]
+  """
   @spec width(
           :date | {:datetime, term(), module()} | :time,
           keyword(pos_integer()),

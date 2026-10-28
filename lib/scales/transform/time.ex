@@ -53,7 +53,7 @@ defmodule Scales.Transform.Time do
     unit = unit(high - low)
 
     {low / unit, high / unit}
-    |> Breaks.extended(@nice_numbers)
+    |> Breaks.extended(nice_numbers: @nice_numbers)
     |> Enum.map(fn break -> break * unit end)
   end
 

@@ -1,6 +1,8 @@
 defmodule Scales.TransformTest do
   use ExUnit.Case, async: true
 
+  doctest Scales.Transform
+
   alias Giggly.{Datasets, Scale}
   alias Giggly.Scale.Continuous
   alias Scales.Transform

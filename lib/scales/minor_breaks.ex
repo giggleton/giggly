@@ -1,31 +1,60 @@
 defmodule Scales.MinorBreaks do
-  @moduledoc false
+  @moduledoc """
+  Where a continuous axis's minor breaks go, between its breaks (`regular/3`).
+  """
 
-  # Where a continuous axis's minor breaks go, between its breaks: R's
-  # `scales::regular_minor_breaks()`, which a transformation carries as its `minor_breaks` and
-  # ggplot2 calls asking for two intervals between neighbouring breaks. Use it through
-  # `Scales.Transform`, whose transformations carry it.
-  #
-  # Each gap between neighbouring breaks, in the order the transformation gives them, gets a minor
-  # break at its middle. Where the extent reaches past the breaks at an end, the breaks are first
-  # extended by one more step there, the first gap's, so that minor breaks can fall between the
-  # outermost break and the edge of the axis. Which end is which follows the breaks' order: a
-  # reversed transformation's breaks descend, and R's `reverse = TRUE` adds the step above the
-  # first break and below the last. The result holds the breaks themselves and the added steps too,
-  # as R's does; which to keep is the caller's.
+  # R's `scales::regular_minor_breaks()`, which a transformation carries as its `minor_breaks` and
+  # ggplot2 calls asking for two intervals between neighbouring breaks.
 
-  # The minor breaks between `breaks` on an axis showing `{low, high}`, in R's order, with the
-  # breaks and any added step among them: each gap's middle, found as R's `seq()` finds it, the
-  # gap's start plus half its width. Fewer than two breaks have no gap, and so no minor breaks.
-  @doc false
-  @spec regular([float()], {float(), float()}, boolean()) :: [float()]
-  def regular(breaks, extent, reverse \\ false)
+  @regular_options NimbleOptions.new!(
+                     reverse: [
+                       type: :boolean,
+                       default: false,
+                       doc:
+                         "Whether the breaks run from high to low, as a reversing " <>
+                           "transformation's do, so the step added before the first break goes " <>
+                           "above it and the one after the last below it."
+                     ]
+                   )
 
-  def regular([first, second | _later] = breaks, extent, reverse) do
+  @doc """
+  The minor breaks between `breaks` on an axis showing the limits `{low, high}`, R's
+  `regular_minor_breaks()`: each gap between neighbouring breaks, in the order given, gets a minor
+  break at its middle, the gap's start plus half its width, as R's `seq()` finds it. Where the
+  limits reach past the breaks at an end, the breaks are first extended by one more step there,
+  the first gap's, so minor breaks can fall between the outermost break and the edge of the axis.
+
+  The result holds the breaks themselves and the added steps too, as R's does, and may reach past
+  the limits; which to keep is the caller's. Fewer than two breaks have no gap, and so no minor
+  breaks.
+
+  ## Options
+
+  #{NimbleOptions.docs(@regular_options)}
+
+  ## Examples
+
+      iex> Scales.MinorBreaks.regular([10.0, 20.0, 30.0], {5.0, 35.0})
+      [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]
+
+      iex> Scales.MinorBreaks.regular([30.0, 20.0, 10.0], {5.0, 35.0}, reverse: true)
+      [40.0, 35.0, 30.0, 25.0, 20.0, 15.0, 10.0, 5.0, 0.0]
+  """
+  @spec regular([float()], {float(), float()}, keyword()) :: [float()]
+  def regular(breaks, limits, options \\ []) do
+    %{reverse: reverse} =
+      options
+      |> NimbleOptions.validate!(@regular_options)
+      |> Map.new()
+
+    regular_breaks(breaks, limits, reverse)
+  end
+
+  defp regular_breaks([first, second | _later] = breaks, limits, reverse) do
     step = second - first
 
     breaks
-    |> extended(step, extent, reverse)
+    |> extended(step, limits, reverse)
     |> Enum.chunk_every(2, 1)
     |> Enum.flat_map(fn
       [from, to] -> [from, from + (to - from) / 2]
@@ -33,7 +62,7 @@ defmodule Scales.MinorBreaks do
     end)
   end
 
-  def regular(_breaks, _extent, _reverse), do: []
+  defp regular_breaks(_breaks, _limits, _reverse), do: []
 
   # R adds the step before the first break, then asks of the breaks as they then stand whether to
   # add one after the last.

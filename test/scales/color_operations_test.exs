@@ -1,6 +1,8 @@
 defmodule Scales.ColorOperationsTest do
   use ExUnit.Case, async: true
 
+  doctest Scales.ColorOperations
+
   alias Scales.ColorOperations
 
   # Golden: CSS Color Module Level 4's table of named colours and its four hex forms, never Giggly's
