@@ -32,17 +32,6 @@ defmodule Giggly.ScaleTest do
     |> Scale.train(values, :none)
   end
 
-  # The levels of `scale` once trained on each `{values, levels}` in turn, `levels` the factor's
-  # the values are of, or `:none`.
-  defp levels_after(steps, scale \\ Scale.new(:discrete)) do
-    trained =
-      Enum.reduce(steps, scale, fn {values, levels}, training ->
-        Scale.train(training, values, levels)
-      end)
-
-    trained.levels
-  end
-
   describe "kind/1 and kind/2" do
     test "a column's type decides its scale's kind, and a type with no scale yet gets none" do
       dtypes = [
@@ -107,8 +96,10 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # The training rules are `Scales.DataRange`'s, which its tests pin to R's; these check the scale
+  # records what it trains.
   describe "train/3" do
-    test "a continuous range spans the finite numbers only, across trainings" do
+    test "a continuous scale records the range its trainings span" do
       scale =
         :continuous
         |> Scale.new()
@@ -124,7 +115,7 @@ defmodule Giggly.ScaleTest do
              }
     end
 
-    test "discrete levels are the distinct values sorted, nil last, across trainings" do
+    test "a discrete scale records the levels its trainings bring, and whether a factor led" do
       scale =
         :discrete
         |> Scale.new()
@@ -139,75 +130,6 @@ defmodule Giggly.ScaleTest do
                na_value: nil,
                guide: :axis
              }
-    end
-
-    # Golden: R 4.6.1's `levels(factor(c(10, 9, 100, NA)))` is `9 10 100`, `NA` kept last by
-    # ggplot2's legend.
-    test "a discrete scale takes numbers as levels, in order of value, nil last" do
-      assert trained(:discrete, [10, 9, nil, 100, 9]).levels === [9, 10, 100, nil]
-    end
-
-    # Golden, each a layer's `x` in turn, `layer_scales()` in R 4.6.1 with ggplot2 4.0.3 and scales
-    # 1.4.0: a factor's levels lead, whichever layer brings them, as `discrete_range()` swaps them.
-    test "a factor's levels lead the values without levels, in either order" do
-      factor = {["b", "a"], ["b", "a"]}
-      text = {["c", "a"], :none}
-
-      assert {levels_after([factor, text]), levels_after([text, factor])} ===
-               {["b", "a", "c"], ["b", "a", "c"]}
-    end
-
-    # Golden: as above; the scale remembers whether its first values were a factor's.
-    test "past two trainings, a scale whose first values were a factor's keeps their order" do
-      factor = {["b", "a"], ["b", "a"]}
-      text = {["c", "a"], :none}
-      more_text = {["d", "0"], :none}
-
-      assert {levels_after([factor, text, more_text]), levels_after([text, factor, more_text])} ===
-               {["b", "a", "c", "0", "d"], ["0", "a", "b", "c", "d"]}
-    end
-
-    # Golden: as above, for factors with levels `c("b", "a")` and `c("z", "a")`, and for levels
-    # `c("c", "b", "a")` over the values `b` and `a`, which drop `c`, as `drop = TRUE` does.
-    test "two factors' levels follow each other, and a level no value holds is dropped" do
-      assert {levels_after([{["b", "a"], ["b", "a"]}, {["z", "a"], ["z", "a"]}]),
-              levels_after([{["b", "a"], ["c", "b", "a"]}])} === {["b", "a", "z"], ["b", "a"]}
-    end
-
-    # Golden: as above, the factor's values `b`, `NA` and `a` beside the text `c` and `a`, and its
-    # values `b` and `a` beside the text `c` and `NA`.
-    test "a missing value follows a factor's levels, and the values after it follow it" do
-      factor_missing = {["b", nil, "a"], ["b", "a"]}
-      text = {["c", "a"], :none}
-      factor = {["b", "a"], ["b", "a"]}
-      text_missing = {["c", nil], :none}
-
-      assert {levels_after([factor_missing, text]), levels_after([text, factor_missing]),
-              levels_after([factor, text_missing]), levels_after([text_missing, factor])} ===
-               {["b", "a", nil, "c"], ["b", "a", nil, "c"], ["b", "a", "c", nil],
-                ["b", "a", "c", nil]}
-    end
-
-    # Golden: as above, the factor's values `b`, `NA` and `a`, then the text `c` and `a`, then `d`:
-    # each training reads the levels held as a factor's, which moves the missing value last.
-    test "where the first values were a factor's, the missing value moves last before each merge" do
-      steps = [{["b", nil, "a"], ["b", "a"]}, {["c", "a"], :none}, {["d"], :none}]
-
-      assert levels_after(steps) === ["b", "a", "c", nil, "d"]
-    end
-
-    # Golden: as above, a first layer with no rows, a factor's, then the text `c` and `a`, then
-    # `d` and `0`, sorts them, on an axis and a colour scale alike: no rows train nothing.
-    test "values that are none train nothing, so a factor with no rows sets nothing" do
-      steps = [{[], ["z"]}, {["c", "a"], :none}, {["d", "0"], :none}]
-
-      assert {levels_after(steps), levels_after(steps, Scale.new(:discrete, :color))} ===
-               {["0", "a", "c", "d"], ["0", "a", "c", "d"]}
-    end
-
-    # R writes a factor's levels as text, so its `4` and `4.0` are one level, "4".
-    test "two factors' levels equal as numbers are one level" do
-      assert levels_after([{[4], [4]}, {[4.0, 6.0], [4.0, 6.0]}]) === [4, 6.0]
     end
   end
 
