@@ -169,16 +169,13 @@ defmodule Scales.Bounds do
   defp maximum_place(value, high, to_high),
     do: infinity(sign(value) * sign(high) * sign(to_high))
 
-  # A number's sign, a float's read from its sign bit, so `-0.0` is negative, as IEEE divides by
-  # it. The bit is read before any comparison: OTP 29's compiler turns a float that guards have
-  # shown equal to 0 into `0.0`, losing a negative zero's sign.
-  defp sign(number) when is_float(number) do
+  # A number's sign, read from its sign bit as a double, so `-0.0` is negative, as IEEE divides by
+  # it. No comparison comes before it: OTP 29's compiler turns a float that guards have shown
+  # equal to 0 into `0.0`, losing a negative zero's sign.
+  defp sign(number) do
     <<sign_bit::1, _rest::63>> = <<number::float>>
     1 - 2 * sign_bit
   end
-
-  defp sign(number) when number < 0, do: -1
-  defp sign(_number), do: 1
 
   defp infinity(1), do: :infinity
   defp infinity(-1), do: :neg_infinity

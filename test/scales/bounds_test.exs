@@ -30,6 +30,11 @@ defmodule Scales.BoundsTest do
       assert Bounds.rescale([0, 5, 10, nil], {0, 10}, {1.0, 1.0 + 1.0e-15}) ===
                [1.0000000000000004, 1.0000000000000004, 1.0000000000000004, nil]
     end
+
+    # Where every value goes to the middle, none is read, so only the check refuses one.
+    test "a value that is neither a number nor nil is refused, even onto a range's middle" do
+      assert_raise FunctionClauseError, fn -> Bounds.rescale([:infinity], {3, 3}, {0, 1}) end
+    end
   end
 
   describe "rescale_mid/4" do
