@@ -22,7 +22,7 @@ defmodule Scales.Transform.Date do
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &days/1)
 
-  # A position's date, its whole days since 1970-01-01, as a date's label writes it.
+  # A position's date, the day it falls on, rounded down, as R's `format()` writes a date.
   @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &date/1)
 
@@ -68,7 +68,7 @@ defmodule Scales.Transform.Date do
     |> Enum.map(&days/1)
   end
 
-  defp date(day), do: Date.add(@epoch, trunc(day))
+  defp date(day), do: Date.add(@epoch, floor(day))
 
   # A date's days since 1970-01-01, a double as R stores it.
   defp days(nil), do: nil

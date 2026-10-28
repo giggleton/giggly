@@ -23,6 +23,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **The package depends on nothing in Giggly.** Its boundary lists `Color` and `NimbleOptions`
   alone and exports what Giggly's code calls, so a call back into Giggly fails the build, as it
   would from another repository; Giggly's domains reach it through the root, which lists it.
+  **Nor do its tests**: `test/scales` leaves with the package, so it calls only `Scales` and pins
+  R's figures there, alone running every line of `lib/scales`; a test of a Giggly scale through the
+  package is Giggly's, in `test/giggly`.
 - **A palette is a value naming its function (`Scales.Palette`), never a closure, and each is
   R's**: continuous, `:identity`, R's `pal_identity()`, `{:rescale, {low, high}}`, R's
   `pal_rescale()`, `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled,
@@ -108,7 +111,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   tests, as extended Wilkinson's are judged (below). sqrt, reverse and reciprocal take extended
   breaks on the data range, as R's `extended_breaks()` does.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
-  `transform_date()`): a date is a float of its days, a missing one `nil`; it trains, expands and
+  `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
+  back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
   is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly
   R's `pretty()` for dates** (`Scales.DateBreaks`, grDevices' `prettyDate()`): five days or less is
   every day, widened by five less its length, rounded half to even; longer takes the calendar step,

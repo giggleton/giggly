@@ -101,8 +101,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and `scale_size_ordinal()`'s, no `pal_*`) move to `Giggly.Scale.Discrete`. R's `rescale_mid()`
   and `rescale_max()` move from `Giggly.Scale` to `Scales.Bounds`, which gives R's infinities and
   NaN; Giggly raises at an infinity. The package's figures are pinned in `test/scales` alone,
-  Giggly's tests keeping Giggly's decisions, and the package's tests alone run all of
-  `lib/scales`; whether they alone kill its mutants waits for the extraction. *Rejected: the
+  which calls nothing in Giggly, Giggly's tests keeping Giggly's decisions, and the package's
+  tests alone run all of `lib/scales`; whether they alone kill its mutants waits for the
+  extraction. *Rejected: the
   package raising past its end*: the check run twice, and not R's answer. *Rejected: the ordinal
   palettes kept in the package*: not scales'. *Rejected: package tests beside Giggly's copies*
   (Steve: "So you want to test the scales package in two places one of which is not the
@@ -2940,6 +2941,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Split the transformations' tests by subject: the package's call Scales.Transform
+  alone on R's axes, a scale's options through it move to Giggly's, and a date position turns
+  back rounded down as R's (scales package, the split, step 2, transformations' tests); §4: "The
+  package gives R's values and Giggly refuses"
 - 2026-10-27 — Document Scales.Breaks, MinorBreaks, Transform and ColorOperations as API, breaks'
   nice numbers and minor breaks' reverse as options (scales package, the split, step 2, breaks,
   transformations and colours); §4: "The scales package's API is what a user holds"

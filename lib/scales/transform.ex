@@ -188,9 +188,9 @@ defmodule Scales.Transform do
       iex> Scales.Transform.format(:log10, [0.0, 1.0, 2.0], {0.0, 2.0})
       ["1", "10", "100"]
 
-      iex> extent = {19723.0, 19783.0}
+      iex> extent = {19723.0, 19726.0}
       iex> Scales.Transform.format(:date, Scales.Transform.breaks(:date, extent), extent)
-      ["Jan 01", "Jan 15", "Feb 01", "Feb 15", "Mar 01"]
+      ["Dec 31", "Jan 01", "Jan 02", "Jan 03", "Jan 04", "Jan 05"]
 
       iex> Scales.Transform.format(:date, [19723.0], :given)
       ["2024-01-01"]

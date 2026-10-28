@@ -1,7 +1,7 @@
 defmodule Giggly.ScaleTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Geom, Scale}
+  alias Giggly.{Datasets, Geom, Scale}
   alias Scales.Palette
 
   # A new discrete alpha scale trained once on `values`.
@@ -1417,6 +1417,270 @@ defmodule Giggly.ScaleTest do
     test "a level is written as R's as.character() writes it, and a missing one as NA" do
       assert Scale.level_labels(["manual", :auto, true, 4.0, 0.5, 1.0e5, nil]) ===
                ["manual", "auto", "TRUE", "4", "0.5", "1e+05", "NA"]
+    end
+  end
+
+  # An axis of `values` on a continuous scale through `transform`: its extent, its breaks and its
+  # minor breaks, as the assembly finds them.
+  defp axis(transform, values, options) do
+    scale = struct!(Scale.Continuous, [{:transform, transform} | options])
+    trained = Scale.train(scale, Scale.transform(scale, values), :none)
+    extent = Scale.dimension(trained)
+    breaks = Scale.breaks(trained, extent)
+    {extent, breaks, Scale.minor_breaks(trained, breaks, extent)}
+  end
+
+  defp column(dataset, name), do: Keyword.fetch!(dataset, name)
+
+  # A wall-clock time in New York, as R's as.POSIXct(..., tz = "America/New_York") reads it.
+  defp new_york(wall), do: DateTime.from_naive!(wall, "America/New_York", Tz.TimeZoneDatabase)
+
+  # The labels of a trained scale's breaks on `extent`, in order.
+  defp labels(scale, extent) do
+    scale
+    |> Scale.breaks(extent)
+    |> Enum.map(fn {_position, label} -> label end)
+  end
+
+  # Golden: every axis below is R's own, from R 4.6.1 with ggplot2 4.0.3 and scales 1.4.0 (the
+  # image `giggly-r:ggplot2-4.0.3`, and its `-hms` sibling for times): `ggplot_build()`'s panel
+  # params for the plot in the comment above each, their continuous range, breaks inside it,
+  # labels, and minor breaks less the breaks. The transformations' own breaks and labels are
+  # `Scales.Transform`'s, which its tests pin; these are a scale's domain and options through
+  # them.
+  describe "a transformed scale's options" do
+    test "finds its breaks from 1e-100 up, R's domain" do
+      # data.frame(y = c(1e-120, 1e-80)) with scale_y_log10(): the extent from -122 is squished
+      # to -100 before its breaks are found
+      {extent, breaks, _minor} = axis(:log10, [1.0e-120, 1.0e-80], [])
+
+      assert {extent, Enum.map(breaks, fn {position, _label} -> position end)} ==
+               {{-122.0, -78.0}, [-100.0, -95.0, -90.0, -85.0, -80.0]}
+    end
+
+    test "takes limits, breaks and minor breaks in data units" do
+      # hwy with scale_y_log10(limits = c(10, 100)); y = c(1, 10, 100) with breaks = c(0, 10, 100),
+      # 0 outside the domain, and minor_breaks = c(5, 50)
+      assert axis(:log10, column(Datasets.mpg(), :hwy), limits: {10, 100}) ==
+               {{0.95, 2.05}, [{1.0, "10"}, {1.4771212547196624, "30"}, {2.0, "100"}],
+                [1.2385606273598313, 1.7385606273598313]}
+
+      {_extent, breaks, minor} =
+        axis(:log10, [1, 10, 100], breaks: [0, 10, 100], minor_breaks: [5, 50])
+
+      assert breaks == [{1.0, "10"}, {2.0, "100"}]
+      assert minor == [0.69897000433601886, 1.6989700043360187]
+    end
+
+    test "sorts its limits once negated, and leaves an end to the data unsorted" do
+      # ggplot(mtcars, aes(mpg, wt)) + geom_point() + xlim(20, 15); data.frame(y = c(1, 10, 100))
+      # with scale_y_reverse(limits = c(50, NA)), whose 100 is censored
+      assert axis(:reverse, column(Datasets.mtcars(), :mpg), limits: {20, 15}) ==
+               {{-20.25, -14.75},
+                [
+                  {-15.0, "15"},
+                  {-16.0, "16"},
+                  {-17.0, "17"},
+                  {-18.0, "18"},
+                  {-19.0, "19"},
+                  {-20.0, "20"}
+                ], [-15.5, -16.5, -17.5, -18.5, -19.5]}
+
+      scale = %Scale.Continuous{transform: :reverse, limits: {50, nil}}
+      trained = Scale.train(scale, Scale.transform(scale, [1, 10, 100]), :none)
+      extent = Scale.dimension(trained)
+
+      assert extent == {-52.45, 1.4500000000000002}
+      assert labels(trained, extent) == ~w(0 10 20 30 40 50)
+      assert Scale.map(trained, Scale.transform(scale, [1, 10, 100])) == [-1, -10, nil]
+    end
+
+    # scale_x_time(date_breaks = "1 hour") over 22:12:00 and 22:48:00: no break falls inside, so
+    # R draws no break, label or minor grid line
+    test "a width laying no break inside the axis draws none" do
+      assert axis(:time, [~T[22:12:00], ~T[22:48:00]], breaks: {:width, [hour: 1]}) ===
+               {{79_812.0, 82_188.0}, [], []}
+    end
+
+    # scale_x_time(date_breaks = "6 hours", date_labels = "%H:%M") over 00:00:00 and 23:59:59:
+    # R's format() wraps the last, 24:00:00, round midnight
+    test "a width's breaks in a format, wrapped round midnight" do
+      assert axis(:time, [~T[00:00:00], ~T[23:59:59]],
+               breaks: {:width, [hour: 6]},
+               labels: {:format, "%H:%M"}
+             ) ===
+               {{-4319.95, 90_718.95},
+                [
+                  {0.0, "00:00"},
+                  {21_600.0, "06:00"},
+                  {43_200.0, "12:00"},
+                  {64_800.0, "18:00"},
+                  {86_400.0, "00:00"}
+                ], [10_800.0, 32_400.0, 54_000.0, 75_600.0]}
+    end
+
+    # scale_x_time(date_breaks = "10 secs", date_minor_breaks = "5 secs",
+    # expand = expansion(mult = 0.5)) over 00:00:00 and 00:00:30, where R pads " 00:00:00"
+    test "a width laid below midnight, and minor breaks every step of another" do
+      assert axis(:time, [~T[00:00:00], ~T[00:00:30]],
+               breaks: {:width, [second: 10]},
+               minor_breaks: {:width, [second: 5]},
+               expand: [mult: {0.5, 0.5}, add: {0, 0}]
+             ) ===
+               {{-15.0, 45.0},
+                [
+                  {-10.0, "-00:00:10"},
+                  {0.0, "00:00:00"},
+                  {10.0, "00:00:10"},
+                  {20.0, "00:00:20"},
+                  {30.0, "00:00:30"},
+                  {40.0, "00:00:40"}
+                ], [-15.0, -5.0, 5.0, 15.0, 25.0, 35.0, 45.0]}
+    end
+  end
+
+  describe "a transformed scale's labels and limits" do
+    test "a labels function is handed the breaks in data units" do
+      # hwy with scale_y_log10(labels = function(b) ...): the function is handed 20, 30 and 40
+      scale = %Scale.Continuous{
+        transform: :log10,
+        labels: fn breaks ->
+          Enum.map(breaks, fn data ->
+            data
+            |> Float.round(9)
+            |> inspect()
+          end)
+        end
+      }
+
+      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
+      extent = Scale.dimension(trained)
+
+      assert labels(trained, extent) == ["20.0", "30.0", "40.0"]
+    end
+
+    test "a labels function under reverse, sqrt and reciprocal is handed breaks in data units" do
+      # ggplot(mtcars, aes(wt, mpg)) + geom_point() under scale_x_reverse(labels = f),
+      # scale_x_sqrt(labels = f) and scale_x_continuous(transform = "reciprocal", labels = f): f
+      # is handed 2, 3, 4 and 5, then their squares' roots squared, then 2 to 6
+      handed = fn transform ->
+        scale = %Scale.Continuous{
+          transform: transform,
+          labels: fn breaks -> Enum.map(breaks, &Float.to_string/1) end
+        }
+
+        values = Scale.transform(scale, column(Datasets.mtcars(), :wt))
+        trained = Scale.train(scale, values, :none)
+        labels(trained, Scale.dimension(trained))
+      end
+
+      assert Enum.map([:reverse, :sqrt, :reciprocal], handed) == [
+               ["2.0", "3.0", "4.0", "5.0"],
+               ["2.0000000000000004", "2.9999999999999996", "4.0", "5.000000000000001"],
+               ["2.0", "3.0", "4.0", "5.0", "6.0"]
+             ]
+    end
+
+    test "a labels function on a date axis is handed dates" do
+      # scale_x_date(labels = function(dates) ...) is handed Date objects
+      scale = %Scale.Continuous{
+        transform: :date,
+        labels: fn dates -> Enum.map(dates, &Date.to_iso8601/1) end
+      }
+
+      trained =
+        Scale.train(scale, Scale.transform(scale, [~D[2020-01-01], ~D[2020-01-03]]), :none)
+
+      extent = Scale.dimension(trained)
+
+      assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
+    end
+
+    test "a labels function on a date-time axis is handed date-times in the scale's zone" do
+      # scale_x_datetime(labels = function(b) format(b, "%Y-%m-%d %H:%M %Z")) over 2024-03-09
+      # 15:17 and 2024-03-11 04:40 in New York: R hands it the breaks there, across its change
+      scale = %Scale.Continuous{
+        transform: {:datetime, "America/New_York", Tz.TimeZoneDatabase},
+        labels: fn datetimes ->
+          Enum.map(datetimes, fn datetime -> Calendar.strftime(datetime, "%Y-%m-%d %H:%M %Z") end)
+        end
+      }
+
+      values = [new_york(~N[2024-03-09 15:17:00]), new_york(~N[2024-03-11 04:40:00])]
+      trained = Scale.train(scale, Scale.transform(scale, values), :none)
+
+      assert labels(trained, Scale.dimension(trained)) ==
+               ["2024-03-10 00:00 EST", "2024-03-10 13:00 EDT", "2024-03-11 01:00 EDT"]
+    end
+
+    test "a labels function on a date-time axis is handed date-times, to the second" do
+      # scale_x_datetime(labels = function(b) ...) is handed POSIXct objects in the scale's zone
+      scale = %Scale.Continuous{
+        transform: {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase},
+        labels: fn datetimes -> Enum.map(datetimes, &inspect/1) end
+      }
+
+      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+      trained = Scale.train(scale, Scale.transform(scale, values), :none)
+      extent = Scale.dimension(trained)
+
+      assert labels(trained, extent) ==
+               Enum.map(
+                 [
+                   ~U[2024-03-09 21:00:00Z],
+                   ~U[2024-03-10 00:00:00Z],
+                   ~U[2024-03-10 03:00:00Z],
+                   ~U[2024-03-10 06:00:00Z],
+                   ~U[2024-03-10 09:00:00Z]
+                 ],
+                 &inspect/1
+               )
+    end
+
+    test "a labels function on a time axis is handed times of day, wrapped past midnight" do
+      # scale_x_time(date_breaks = "6 hours", labels = function(b) ...) over 00:00:00 and 23:59:59:
+      # R hands it hms values, the last 24:00:00, which a Time cannot hold
+      scale = %Scale.Continuous{
+        transform: :time,
+        breaks: {:width, [hour: 6]},
+        labels: fn times -> Enum.map(times, &inspect/1) end
+      }
+
+      trained = Scale.train(scale, Scale.transform(scale, [~T[00:00:00], ~T[23:59:59]]), :none)
+
+      assert labels(trained, Scale.dimension(trained)) ==
+               ~w(~T[00:00:00] ~T[06:00:00] ~T[12:00:00] ~T[18:00:00] ~T[00:00:00])
+    end
+
+    test "a limit outside the transformation's domain cannot be placed, at either end" do
+      # scale_y_log10(limits = c(0, 100)) fails in R: 'from' must be a finite number
+      for limits <- [{0, 100}, {100, 0}] do
+        scale = %Scale.Continuous{transform: :log10, limits: limits, range: {0.0, 2.0}}
+
+        error = assert_raise ArgumentError, fn -> Scale.dimension(scale) end
+        assert error.message =~ inspect(limits)
+        assert error.message =~ "log10"
+      end
+    end
+
+    test "limits are sorted once transformed, so either order names the same axis" do
+      # ggplot(mtcars, aes(mpg, wt)) + geom_point() + scale_x_continuous(limits = c(20, 15)):
+      # 14.75 to 20.25; under scale_x_reverse(), c(15, 20) and c(20, 15) both -20.25 to -14.75
+      mpg = column(Datasets.mtcars(), :mpg)
+      {identity_extent, _breaks, _minor} = axis(:identity, mpg, limits: {20, 15})
+      {reverse_extent, _breaks, _minor} = axis(:reverse, mpg, limits: {15, 20})
+
+      assert {identity_extent, reverse_extent} == {{14.75, 20.25}, {-20.25, -14.75}}
+    end
+
+    test "a labels function's refusal shows the breaks in data units" do
+      scale = %Scale.Continuous{transform: :log10, labels: fn _breaks -> ["one"] end}
+      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
+
+      error =
+        assert_raise ArgumentError, fn -> Scale.breaks(trained, Scale.dimension(trained)) end
+
+      assert error.message =~ "[20.0"
     end
   end
 end

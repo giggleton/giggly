@@ -3,76 +3,125 @@ defmodule Scales.TransformTest do
 
   doctest Scales.Transform
 
-  alias Giggly.{Datasets, Scale}
-  alias Giggly.Scale.Continuous
   alias Scales.Transform
 
   # Golden: every axis below is R's own, from R 4.6.1 with ggplot2 4.0.3 and scales 1.4.0 (the
   # image `giggly-r:ggplot2-4.0.3`): `ggplot_build()`'s panel params for the plot in the comment
-  # above each, their continuous range, breaks inside it, labels, and minor breaks less the breaks
-  # (which ggplot2's grid leaves out). They move only if ggplot2's transformations do. R writes a
-  # log axis's labels from 1e5 up in scientific notation; Giggly writes them in plain decimals.
+  # above each, its continuous range the extent given here, and on it the breaks inside it, their
+  # labels, and the minor breaks less the breaks (which ggplot2's grid leaves out). They move only
+  # if R's transformations do. R writes a log axis's labels from 1e5 up in scientific notation;
+  # the package writes them in plain decimals.
 
-  # An axis of `values` on a continuous scale through `transform`: its extent, its breaks and its
-  # minor breaks, as the assembly finds them.
-  defp axis(transform, values, options \\ []) do
-    scale = struct!(Continuous, [{:transform, transform} | options])
-    trained = Scale.train(scale, Scale.transform(scale, values), :none)
-    extent = Scale.dimension(trained)
-    breaks = Scale.breaks(trained, extent)
-    {extent, breaks, Scale.minor_breaks(trained, breaks, extent)}
+  # What an axis showing `extent` draws from `transformation`'s defaults, as ggplot2's view scale
+  # keeps them: the breaks found on the extent squished into the domain, those inside the extent,
+  # each with its label, and the minor breaks between them inside the extent, less the breaks.
+  defp axis(transformation, extent) do
+    squished = Transform.squish(transformation, extent)
+
+    breaks =
+      transformation
+      |> Transform.breaks(squished)
+      |> inside(extent)
+
+    labels = Transform.format(transformation, breaks, extent)
+
+    minor =
+      transformation
+      |> Transform.minor_breaks(breaks, extent)
+      |> inside(extent)
+      |> Enum.reject(fn position -> position in breaks end)
+
+    {Enum.zip(breaks, labels), minor}
   end
 
-  defp column(dataset, name), do: Keyword.fetch!(dataset, name)
-
-  # A wall-clock time in New York, as R's as.POSIXct(..., tz = "America/New_York") reads it.
-  defp new_york(wall), do: DateTime.from_naive!(wall, "America/New_York", Tz.TimeZoneDatabase)
+  # Those of `positions` inside `{low, high}`, its ends included.
+  defp inside(positions, {low, high}),
+    do: Enum.filter(positions, fn position -> position >= low and position <= high end)
 
   # The time-of-day transformation's breaks inside `extent` and their labels.
-  defp inside({low, high} = extent) do
+  defp time_breaks(extent) do
     breaks =
       :time
       |> Transform.breaks(extent)
-      |> Enum.filter(fn break -> break >= low and break <= high end)
+      |> inside(extent)
 
     {breaks, Transform.format(:time, breaks, extent)}
   end
 
-  # The labels of a trained scale's breaks on `extent`, in order.
-  defp labels(scale, extent) do
-    scale
-    |> Scale.breaks(extent)
-    |> Enum.map(fn {_position, label} -> label end)
+  # A wall-clock time in New York, as R's as.POSIXct(..., tz = "America/New_York") reads it.
+  defp new_york(wall), do: DateTime.from_naive!(wall, "America/New_York", Tz.TimeZoneDatabase)
+
+  describe "identity" do
+    # as.numeric() of each, as R's untransformed continuous scale places it
+    test "places a number as it is, a date at its days, a date-time and a time at their seconds" do
+      values = [
+        2.5,
+        nil,
+        ~D[1970-01-11],
+        ~U[1970-01-01 00:01:00Z],
+        ~N[1970-01-01 00:00:30],
+        ~T[01:00:00]
+      ]
+
+      assert Transform.transform(:identity, values) === [2.5, nil, 10.0, 60.0, 30.0, 3600.0]
+    end
+
+    test "turns a position back as it is, reaches without end, and labels its breaks plainly" do
+      assert {Transform.inverse(:identity, [1.5]), Transform.squish(:identity, {-1.0e300, 1.0}),
+              Transform.format(:identity, [10.0, 20.0], {5.0, 25.0})} ===
+               {[1.5], {-1.0e300, 1.0}, ["10", "20"]}
+    end
+  end
+
+  describe "date" do
+    # ggplot(data.frame(d = as.Date(c("2024-01-01", "2024-03-01")), y = 1:2), aes(d, y)) +
+    #   geom_point()
+    test "marks R's pretty() breaks for dates, labelled by their step, and minor breaks" do
+      assert axis(:date, {19_720.0, 19_786.0}) === {
+               [
+                 {19_723.0, "Jan 01"},
+                 {19_737.0, "Jan 15"},
+                 {19_754.0, "Feb 01"},
+                 {19_768.0, "Feb 15"},
+                 {19_783.0, "Mar 01"}
+               ],
+               [19_730.0, 19_745.5, 19_761.0, 19_775.5]
+             }
+    end
+
+    # R 4.6.1's transform_date()$inverse(c(19723, 19723.75, -0.5, -1.5)), written by format():
+    # "2024-01-01" "2024-01-01" "1969-12-31" "1969-12-30"
+    test "turns a position back into the day it falls on, rounded down, and reaches without end" do
+      assert {Transform.inverse(:date, [19_723.0, 19_723.75, -0.5, -1.5]),
+              Transform.squish(:date, {-1.0e6, 1.0})} ===
+               {[~D[2024-01-01], ~D[2024-01-01], ~D[1969-12-31], ~D[1969-12-30]], {-1.0e6, 1.0}}
+    end
   end
 
   describe "log10" do
     test "marks the powers of ten, every one or every second, that leave three inside" do
       # ggplot(data.frame(x = 1:2, y = c(1, 1e6)), aes(x, y)) + geom_point() + scale_y_log10();
       # y = c(5, 20000), where every second power leaves two and every power four
-      assert axis(:log10, [1, 1.0e6]) ==
-               {{-0.30000000000000004, 6.3}, [{1.0, "10"}, {3.0, "1000"}, {5.0, "100000"}],
-                [0.0, 2.0, 4.0, 6.0]}
+      assert axis(:log10, {-0.30000000000000004, 6.3}) ==
+               {[{1.0, "10"}, {3.0, "1000"}, {5.0, "100000"}], [0.0, 2.0, 4.0, 6.0]}
 
-      assert axis(:log10, [5, 20_000]) ==
-               {{0.51886700476962067, 4.4811329952303796},
-                [{1.0, "10"}, {2.0, "100"}, {3.0, "1000"}, {4.0, "10000"}], [1.5, 2.5, 3.5]}
+      assert axis(:log10, {0.51886700476962067, 4.4811329952303796}) ==
+               {[{1.0, "10"}, {2.0, "100"}, {3.0, "1000"}, {4.0, "10000"}], [1.5, 2.5, 3.5]}
     end
 
     test "adds multiples of each power, evenest first, when too few powers fall inside" do
       # mpg's hwy, ggplot(mpg, aes(displ, hwy)) + geom_point() + scale_y_log10(); y = c(2, 8);
       # y = c(1.5, 30); diamonds' price on x
-      assert axis(:log10, column(Datasets.mpg(), :hwy)) ==
-               {{1.0509676745256968, 1.6716662480081155},
-                [
+      assert axis(:log10, {1.0509676745256968, 1.6716662480081155}) ==
+               {[
                   {1.3010299956639813, "20"},
                   {1.4771212547196624, "30"},
                   {1.6020599913279625, "40"}
                 ],
                 [1.1249387366083001, 1.2129843661361406, 1.3890756251918219, 1.5395906230238126]}
 
-      assert axis(:log10, [2, 8]) ==
-               {{0.27092699609758308, 0.93319298655834171},
-                [
+      assert axis(:log10, {0.27092699609758308, 0.93319298655834171}) ==
+               {[
                   {0.3010299956639812, "2"},
                   {0.47712125471966244, "3"},
                   {0.69897000433601886, "5"}
@@ -84,14 +133,12 @@ defmodule Scales.TransformTest do
                   0.87506126339170009
                 ]}
 
-      assert axis(:log10, [1.5, 30]) ==
-               {{0.11103975927248218, 1.5421727545028614},
-                [{0.47712125471966244, "3"}, {1.0, "10"}, {1.4771212547196624, "30"}],
+      assert axis(:log10, {0.11103975927248218, 1.5421727545028614}) ==
+               {[{0.47712125471966244, "3"}, {1.0, "10"}, {1.4771212547196624, "30"}],
                 [0.21568188207949363, 0.7385606273598313, 1.2385606273598313]}
 
-      assert axis(:log10, column(Datasets.diamonds(), :price)) ==
-               {{2.4251440379594578, 4.3627624043460393},
-                [
+      assert axis(:log10, {2.4251440379594578, 4.3627624043460393}) ==
+               {[
                   {2.4771212547196626, "300"},
                   {3.0, "1000"},
                   {3.4771212547196626, "3000"},
@@ -102,9 +149,8 @@ defmodule Scales.TransformTest do
 
     test "falls back to extended breaks in data units when even nine multiples leave too few" do
       # y = c(100, 101) and y = c(2, 3)
-      assert axis(:log10, [100, 101]) ==
-               {{1.9997839313108678, 2.0045374424717748},
-                [
+      assert axis(:log10, {1.9997839313108678, 2.0045374424717748}) ==
+               {[
                   {2.0, "100.00"},
                   {2.0010843812922201, "100.25"},
                   {2.0021660617565078, "100.50"},
@@ -113,7 +159,7 @@ defmodule Scales.TransformTest do
                 ],
                 [2.0005421906461098, 2.001625221524364, 2.0027055582848274, 2.0037832142978949]}
 
-      {_extent, breaks, _minor} = axis(:log10, [2, 3])
+      {breaks, _minor} = axis(:log10, {0.29222543271119716, 0.48592581767244647})
 
       assert breaks == [
                {0.3010299956639812, "2.00"},
@@ -143,48 +189,19 @@ defmodule Scales.TransformTest do
              [6.9030899869919438, 6.9542425094393252, 7.0]},
             {{1.0, 3.0}, [1.0, 2.0, 3.0]}
           ] do
-        {low, high} = extent
-
         inside =
           :log10
           |> Transform.breaks(extent)
-          |> Enum.filter(fn position -> position >= low and position <= high end)
+          |> inside(extent)
 
         assert inside == expected
       end
     end
 
-    test "finds its breaks from 1e-100 up, R's domain" do
-      # data.frame(y = c(1e-120, 1e-80)) with scale_y_log10(): the extent from -122 is squished
-      # to -100 before its breaks are found
-      {extent, breaks, _minor} = axis(:log10, [1.0e-120, 1.0e-80])
-
-      assert extent == {-122.0, -78.0}
-
-      assert Enum.map(breaks, fn {position, _label} -> position end) ==
-               [-100.0, -95.0, -90.0, -85.0, -80.0]
-    end
-
-    test "takes limits, breaks and minor breaks in data units" do
-      # hwy with scale_y_log10(limits = c(10, 100)); y = c(1, 10, 100) with breaks = c(0, 10, 100),
-      # 0 outside the domain, and minor_breaks = c(5, 50)
-      assert axis(:log10, column(Datasets.mpg(), :hwy), limits: {10, 100}) ==
-               {{0.95, 2.05}, [{1.0, "10"}, {1.4771212547196624, "30"}, {2.0, "100"}],
-                [1.2385606273598313, 1.7385606273598313]}
-
-      {_extent, breaks, minor} =
-        axis(:log10, [1, 10, 100], breaks: [0, 10, 100], minor_breaks: [5, 50])
-
-      assert breaks == [{1.0, "10"}, {2.0, "100"}]
-      assert minor == [0.69897000433601886, 1.6989700043360187]
-    end
-
     test "places zero at minus infinity and a negative value nowhere" do
       # data.frame(y = c(0, 10, 100)) with scale_y_log10(): layer_data()'s y is -Inf, 1, 2;
       # log10(-1) is NaN, missing
-      scale = %Continuous{transform: :log10}
-
-      assert Scale.transform(scale, [0, -1, 10, :infinity, nil]) ==
+      assert Transform.transform(:log10, [0, -1, 10, :infinity, nil]) ==
                [:neg_infinity, nil, 1.0, :infinity, nil]
     end
   end
@@ -192,18 +209,16 @@ defmodule Scales.TransformTest do
   describe "sqrt" do
     test "marks extended breaks in data units, minor breaks midway in square-root space" do
       # ggplot(mpg, aes(displ, hwy)) + geom_point() + scale_y_sqrt(); with limits = c(16, 36)
-      assert axis(:sqrt, column(Datasets.mpg(), :hwy)) ==
-               {{3.3056442168591023, 6.7917069789894517},
-                [
+      assert axis(:sqrt, {3.3056442168591023, 6.7917069789894517}) ==
+               {[
                   {4.4721359549995796, "20"},
                   {5.4772255750516612, "30"},
                   {6.324555320336759, "40"}
                 ],
                 [3.467046334947498, 3.9695911449735388, 4.9746807650256208, 5.9008904476942101]}
 
-      assert axis(:sqrt, column(Datasets.mpg(), :hwy), limits: {16, 36}) ==
-               {{3.9, 6.1},
-                [
+      assert axis(:sqrt, {3.9, 6.1}) ==
+               {[
                   {4.4721359549995796, "20"},
                   {5.0, "25"},
                   {5.4772255750516612, "30"},
@@ -220,9 +235,8 @@ defmodule Scales.TransformTest do
 
     test "finds its breaks from zero where the widened axis reaches below it" do
       # data.frame(y = c(0, 4, 9)) with scale_y_sqrt()
-      assert axis(:sqrt, [0, 4, 9]) ==
-               {{-0.15000000000000002, 3.15},
-                [
+      assert axis(:sqrt, {-0.15000000000000002, 3.15}) ==
+               {[
                   {0.0, "0.0"},
                   {1.5811388300841898, "2.5"},
                   {2.2360679774997898, "5.0"},
@@ -233,9 +247,8 @@ defmodule Scales.TransformTest do
     test "finds its breaks from zero, not below or above it, where the axis is near it" do
       # data.frame(x = c(0, 1)) with scale_x_sqrt(): the breaks 0 to 1 in quarters, found from the
       # domain's 0 where the widened axis reaches below it, and R's minor breaks less the breaks
-      assert axis(:sqrt, [0, 1]) ==
-               {{-0.05, 1.05},
-                [
+      assert axis(:sqrt, {-0.05, 1.05}) ==
+               {[
                   {0.0, "0.00"},
                   {0.5, "0.25"},
                   {0.70710678118654757, "0.50"},
@@ -246,45 +259,28 @@ defmodule Scales.TransformTest do
 
     test "places a negative value nowhere" do
       # data.frame(y = c(-1, 4, 9)) with scale_y_sqrt(): layer_data()'s y is NA, 2, 3
-      assert Scale.transform(%Continuous{transform: :sqrt}, [-1, 4, 9, :infinity]) ==
-               [nil, 2.0, 3.0, :infinity]
+      assert Transform.transform(:sqrt, [-1, 4, 9, :infinity]) == [nil, 2.0, 3.0, :infinity]
+    end
+
+    test "turns a position back by squaring it" do
+      assert Transform.inverse(:sqrt, [3.0, 0.5]) === [9.0, 0.25]
     end
   end
 
   describe "reverse" do
     test "runs high to low, its breaks descending and its minor breaks R's reversed ones" do
       # ggplot(mpg, aes(displ, hwy)) + geom_point() + scale_y_reverse()
-      assert axis(:reverse, column(Datasets.mpg(), :hwy)) ==
-               {{-45.6, -10.4}, [{-20.0, "20"}, {-30.0, "30"}, {-40.0, "40"}],
-                [-15.0, -25.0, -35.0, -45.0]}
-    end
-
-    test "sorts its limits once negated, and leaves an end to the data unsorted" do
-      # ggplot(mtcars, aes(mpg, wt)) + geom_point() + xlim(20, 15); data.frame(y = c(1, 10, 100))
-      # with scale_y_reverse(limits = c(50, NA)), whose 100 is censored
-      assert axis(:reverse, column(Datasets.mtcars(), :mpg), limits: {20, 15}) ==
-               {{-20.25, -14.75},
-                [
-                  {-15.0, "15"},
-                  {-16.0, "16"},
-                  {-17.0, "17"},
-                  {-18.0, "18"},
-                  {-19.0, "19"},
-                  {-20.0, "20"}
-                ], [-15.5, -16.5, -17.5, -18.5, -19.5]}
-
-      scale = %Continuous{transform: :reverse, limits: {50, nil}}
-      trained = Scale.train(scale, Scale.transform(scale, [1, 10, 100]), :none)
-      extent = Scale.dimension(trained)
-
-      assert extent == {-52.45, 1.4500000000000002}
-      assert labels(trained, extent) == ~w(0 10 20 30 40 50)
-      assert Scale.map(trained, Scale.transform(scale, [1, 10, 100])) == [-1, -10, nil]
+      assert axis(:reverse, {-45.6, -10.4}) ==
+               {[{-20.0, "20"}, {-30.0, "30"}, {-40.0, "40"}], [-15.0, -25.0, -35.0, -45.0]}
     end
 
     test "swaps the infinities" do
-      assert Scale.transform(%Continuous{transform: :reverse}, [:infinity, :neg_infinity, 2, nil]) ==
+      assert Transform.transform(:reverse, [:infinity, :neg_infinity, 2, nil]) ==
                [:neg_infinity, :infinity, -2, nil]
+    end
+
+    test "turns a position back by negating it" do
+      assert Transform.inverse(:reverse, [-20.0, :infinity]) === [20.0, :neg_infinity]
     end
   end
 
@@ -292,9 +288,8 @@ defmodule Scales.TransformTest do
     test "places breaks falling as they rise, its minor breaks R's on them in that order" do
       # ggplot(mpg, aes(displ, hwy)) + geom_point() +
       #   scale_y_continuous(transform = scales::transform_reciprocal())
-      assert axis(:reciprocal, column(Datasets.mpg(), :hwy)) ==
-               {{0.019696969696969699, 0.086363636363636365},
-                [{0.05, "20"}, {1 / 30, "30"}, {0.025, "40"}, {0.02, "50"}],
+      assert axis(:reciprocal, {0.019696969696969699, 0.086363636363636365}) ==
+               {[{0.05, "20"}, {1 / 30, "30"}, {0.025, "40"}, {0.02, "50"}],
                 [
                   0.06666666666666668,
                   0.058333333333333341,
@@ -304,33 +299,36 @@ defmodule Scales.TransformTest do
                 ]}
     end
 
-    test "places zero at plus infinity and either infinity at zero" do
-      assert Scale.transform(%Continuous{transform: :reciprocal}, [0, 4, :infinity, :neg_infinity]) ==
-               [:infinity, 0.25, 0.0, 0.0]
+    test "places zero at plus infinity, either infinity at zero, and a missing value nowhere" do
+      assert Transform.transform(:reciprocal, [0, 4, :infinity, :neg_infinity, nil]) ==
+               [:infinity, 0.25, 0.0, 0.0, nil]
+    end
+
+    test "turns a position back as it placed it" do
+      assert Transform.inverse(:reciprocal, [0.25, 0.0, :infinity]) === [4.0, :infinity, 0.0]
     end
 
     test "finds its breaks on the data's finite end where the extent reaches zero" do
       # data.frame(y = c(Inf, 4)) with scale_y_continuous(transform =
       # scales::transform_reciprocal(), expand = c(0, 0)): R's extended breaks on the one finite
       # end, 4, give it five times
-      assert axis(:reciprocal, [:infinity, 4], expand: [mult: {0, 0}, add: {0, 0}]) ==
-               {{0.0, 0.25}, List.duplicate({0.25, "4"}, 5), []}
+      assert axis(:reciprocal, {0.0, 0.25}) == {List.duplicate({0.25, "4"}, 5), []}
     end
   end
 
   describe "datetime" do
     @utc {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}
     @naive {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}
+    @new_york {:datetime, "America/New_York", Tz.TimeZoneDatabase}
 
-    # ggplot(u, aes(at, y)) + geom_point(), `at` 2024-03-09 20:17 and 2024-03-10 08:40 UTC: the
-    # axis's continuous range, its breaks every three hours, labelled by the time alone, and its
-    # minor breaks midway, less the breaks
+    # ggplot(u, aes(at, y)) + geom_point(), `at` 2024-03-09 20:17 and 2024-03-10 08:40 UTC: its
+    # breaks every three hours, labelled by the time alone, and its minor breaks midway, less the
+    # breaks
     test "marks R's pretty() breaks for date-times, labelled by their step, and minor breaks" do
-      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+      extent = {1_710_013_191.0, 1_710_062_229.0}
 
-      assert axis(@utc, values) ===
-               {{1_710_013_191.0, 1_710_062_229.0},
-                [
+      assert axis(@utc, extent) ===
+               {[
                   {1_710_018_000.0, "21:00"},
                   {1_710_028_800.0, "00:00"},
                   {1_710_039_600.0, "03:00"},
@@ -344,57 +342,43 @@ defmodule Scales.TransformTest do
                   1_710_055_800.0
                 ]}
 
-      naive = Enum.map(values, &DateTime.to_naive/1)
-      assert axis(@naive, naive) == axis(@utc, values)
+      assert axis(@naive, extent) == axis(@utc, extent)
     end
 
     # one point at 2024-03-10 08:40:12 UTC: the axis 0.05 seconds either side, R's pretty()
     # widening it to whole seconds, and the one break inside labelled by its second
     test "a single date-time's axis has the one break, labelled by its second" do
-      assert axis(@utc, [~U[2024-03-10 08:40:12Z]]) ==
-               {{1_710_060_011.95, 1_710_060_012.05}, [{1_710_060_012.0, "12"}], []}
+      assert axis(@utc, {1_710_060_011.95, 1_710_060_012.05}) ==
+               {[{1_710_060_012.0, "12"}], []}
     end
 
-    # scale_x_datetime(breaks = ...): R's format() writes the date alone where every break is a
-    # midnight, else the date and the time to the second, a fraction of a second dropped
+    # scale_x_datetime(breaks = ...) on the axis above: R's format() writes the date alone where
+    # every break is a midnight, else the date and the time to the second, a fraction of a second
+    # dropped; and a width of five hours, its breaks inside the axis written alike
     test "breaks it did not choose are written as R's format() writes them" do
-      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
-      given = fn breaks -> axis(@utc, values, breaks: breaks) end
+      extent = {1_710_013_191.0, 1_710_062_229.0}
 
-      {_extent, breaks, _minor} = given.([~U[2024-03-10 00:00:00Z], ~U[2024-03-10 06:30:00Z]])
-      {_extent, midnights, _minor} = given.([~U[2024-03-09 00:00:00Z], ~U[2024-03-10 00:00:00Z]])
+      width =
+        @utc
+        |> Transform.width([hour: 5], extent)
+        |> inside(extent)
 
-      {_extent, fraction, _minor} =
-        given.([~U[2024-03-10 00:00:00.250000Z], ~U[2024-03-10 06:00:00Z]])
-
-      {_extent, width, _minor} = axis(@utc, values, breaks: {:width, [hour: 5]})
-
-      assert {breaks, midnights, fraction, width} ==
-               {[
-                  {1_710_028_800.0, "2024-03-10 00:00:00"},
-                  {1_710_052_200.0, "2024-03-10 06:30:00"}
-                ], [{1_710_028_800.0, "2024-03-10"}],
-                [
-                  {1_710_028_800.25, "2024-03-10 00:00:00"},
-                  {1_710_050_400.0, "2024-03-10 06:00:00"}
-                ],
-                [
-                  {1_710_028_800.0, "2024-03-10 00:00:00"},
-                  {1_710_046_800.0, "2024-03-10 05:00:00"}
-                ]}
+      assert {Transform.format(@utc, [1_710_028_800.0, 1_710_052_200.0], :given),
+              Transform.format(@utc, [1_710_028_800.0], :given),
+              Transform.format(@utc, [1_710_028_800.25, 1_710_050_400.0], :given), width,
+              Transform.format(@utc, width, :given)} ==
+               {["2024-03-10 00:00:00", "2024-03-10 06:30:00"], ["2024-03-10"],
+                ["2024-03-10 00:00:00", "2024-03-10 06:00:00"],
+                [1_710_028_800.0, 1_710_046_800.0],
+                ["2024-03-10 00:00:00", "2024-03-10 05:00:00"]}
     end
 
     # ggplot(d, aes(at, y)) + geom_point() + scale_x_datetime(breaks = b), `at` 2024-03-09 15:17
     # and 2024-03-11 04:40 in New York and `b` its midnights on 10 and 11 March: R writes the dates
     # alone, each a midnight on the zone's clock, though neither is one in UTC
     test "breaks it did not choose are written on the clock of the scale's zone" do
-      values = [new_york(~N[2024-03-09 15:17:00]), new_york(~N[2024-03-11 04:40:00])]
-      midnights = [new_york(~N[2024-03-10 00:00:00]), new_york(~N[2024-03-11 00:00:00])]
-
-      {_extent, breaks, _minor} =
-        axis({:datetime, "America/New_York", Tz.TimeZoneDatabase}, values, breaks: midnights)
-
-      assert breaks == [{1_710_046_800.0, "2024-03-10"}, {1_710_129_600.0, "2024-03-11"}]
+      assert Transform.format(@new_york, [1_710_046_800.0, 1_710_129_600.0], :given) ==
+               ["2024-03-10", "2024-03-11"]
     end
 
     # as.POSIXct(1710060012.123456, tz = "UTC"), as R parses it, is 1710060012.123456: a
@@ -411,36 +395,33 @@ defmodule Scales.TransformTest do
 
       assert Transform.inverse(@naive, [1_710_060_012.0]) === [~N[2024-03-10 08:40:12]]
 
-      assert Transform.inverse({:datetime, "America/New_York", Tz.TimeZoneDatabase}, [
-               1_710_046_800.0,
-               1_710_090_000.5
-             ]) === [
+      assert Transform.inverse(@new_york, [1_710_046_800.0, 1_710_090_000.5]) === [
                new_york(~N[2024-03-10 00:00:00]),
                new_york(~N[2024-03-10 13:00:00.500000])
              ]
     end
 
-    # A scale on an axis no column maps keeps its zone unsettled, and lays and writes its breaks
-    # as R's date-time scale given no zone does, in UTC.
-    test "a scale no column has settled draws its axis as one in UTC" do
+    # A transformation whose zone no column has settled lays and writes its breaks as R's
+    # date-time scale given no zone does, in UTC.
+    test "a zone no column has settled draws its axis as one in UTC" do
       unsettled = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
-      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
+      extent = {1_710_013_191.0, 1_710_062_229.0}
 
-      assert axis(unsettled, values) === axis(@utc, values)
+      assert axis(unsettled, extent) === axis(@utc, extent)
 
       assert Transform.inverse(unsettled, [1_710_060_012.0]) === [~U[2024-03-10 08:40:12Z]]
     end
 
-    # A scale on an axis no column maps keeps its zone unsettled, and takes naive date-times, as
-    # its limits may be, as well as date-times in a zone.
-    test "a scale no column has settled places a date-time of either kind" do
+    # A transformation whose zone no column has settled takes naive date-times, as a scale's
+    # limits may be, as well as date-times in a zone.
+    test "a zone no column has settled places a date-time of either kind" do
       unsettled = {:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}
 
       assert Transform.transform(unsettled, [~N[2024-03-10 08:40:12], ~U[2024-03-10 08:40:12Z]]) ===
                [1_710_060_012.0, 1_710_060_012.0]
     end
 
-    test "a scale of one kind refuses a date-time of the other" do
+    test "a transformation of one kind refuses a date-time of the other" do
       naive =
         assert_raise ArgumentError, fn ->
           Transform.transform(@naive, [~U[2024-03-10 08:40:12Z]])
@@ -461,13 +442,12 @@ defmodule Scales.TransformTest do
     # panel params for ggplot(d, aes(t, y)) + geom_point() over `t`, the times in each test's name,
     # and `scales:::breaks_hms()` on the extents given. R writes its labels with hms's `format()`,
     # which pads every label with spaces to the widest and gives each six zero decimals where one
-    # break is a rounding error off a whole second; Giggly leaves both out (design-log §4, the
-    # entry beginning "A time of day's labels").
+    # break is a rounding error off a whole second; the package leaves both out (design-log §4,
+    # the entry beginning "A time of day's labels").
 
     test "10:00:00 and 10:01:00: breaks every 20 seconds, found in seconds" do
-      assert axis(:time, [~T[10:00:00], ~T[10:01:00]]) ===
-               {{35_997.0, 36_063.0},
-                [
+      assert axis(:time, {35_997.0, 36_063.0}) ===
+               {[
                   {36_000.0, "10:00:00"},
                   {36_020.0, "10:00:20"},
                   {36_040.0, "10:00:40"},
@@ -476,25 +456,22 @@ defmodule Scales.TransformTest do
     end
 
     test "22:10:00 and 23:50:00: breaks every half hour, found in minutes" do
-      assert axis(:time, [~T[22:10:00], ~T[23:50:00]]) ===
-               {{79_500.0, 86_100.0},
-                [{81_000.0, "22:30:00"}, {82_800.0, "23:00:00"}, {84_600.0, "23:30:00"}],
+      assert axis(:time, {79_500.0, 86_100.0}) ===
+               {[{81_000.0, "22:30:00"}, {82_800.0, "23:00:00"}, {84_600.0, "23:30:00"}],
                 [80_100.0, 81_900.0, 83_700.0, 85_500.0]}
     end
 
     test "00:00:00 and 23:59:59: breaks every ten hours, found in hours, minor ones past midnight" do
-      assert axis(:time, [~T[00:00:00], ~T[23:59:59]]) ===
-               {{-4319.95, 90_718.95},
-                [{0.0, "00:00:00"}, {36_000.0, "10:00:00"}, {72_000.0, "20:00:00"}],
+      assert axis(:time, {-4319.95, 90_718.95}) ===
+               {[{0.0, "00:00:00"}, {36_000.0, "10:00:00"}, {72_000.0, "20:00:00"}],
                 [18_000.0, 54_000.0, 90_000.0]}
     end
 
     # R writes every label here with six zero decimals, `10:24:00.000000`: its breaks are 24
     # minutes apart, a rounding error off their whole seconds (36000.000000000007)
     test "09:51:00 and 11:52:30: breaks a rounding error off whole seconds are written without it" do
-      assert axis(:time, [~T[09:51:00], ~T[11:52:30]]) ===
-               {{35_095.5, 43_114.5},
-                [
+      assert axis(:time, {35_095.5, 43_114.5}) ===
+               {[
                   {36_000.000000000007, "10:00:00"},
                   {37_440.000000000007, "10:24:00"},
                   {38_880.0, "10:48:00"},
@@ -512,9 +489,8 @@ defmodule Scales.TransformTest do
     end
 
     test "12:00:00 alone: the axis 0.05 seconds either side, labelled to the hundredth" do
-      assert axis(:time, [~T[12:00:00]]) ===
-               {{43_199.95, 43_200.05},
-                [
+      assert axis(:time, {43_199.95, 43_200.05}) ===
+               {[
                   {43_199.950000000004, "11:59:59.95"},
                   {43_199.97, "11:59:59.97"},
                   {43_199.990000000005, "11:59:59.99"},
@@ -554,7 +530,7 @@ defmodule Scales.TransformTest do
       days = {-8640.05, 164_160.95}
       weeks = {-60_480.05, 1_149_120.95}
 
-      assert Enum.map([hours, days, weeks], fn extent -> inside(extent) end) == [
+      assert Enum.map([hours, days, weeks], fn extent -> time_breaks(extent) end) == [
                {[0.0, 36_000.0, 72_000.0, 108_000.0, 144_000.0],
                 ~w(00:00:00 10:00:00 20:00:00 30:00:00 40:00:00)},
                {[0.0, 34_560.0, 69_120.0, 103_680.00000000001, 138_240.0],
@@ -563,27 +539,27 @@ defmodule Scales.TransformTest do
                 ~w(00:00:00 67:12:00 134:24:00 201:36:00 268:48:00)}
              ]
 
-      assert inside({-60_480.0, 1_149_120.0}) ==
+      assert time_breaks({-60_480.0, 1_149_120.0}) ==
                {[0.0, 345_600.0, 691_200.0, 1_036_800.0],
                 ~w(00:00:00 96:00:00 192:00:00 288:00:00)}
     end
 
     test "a break past midnight counts on its hours, one before it is negative, neither padded" do
-      assert inside({86_000.0, 87_000.0}) ==
+      assert time_breaks({86_000.0, 87_000.0}) ==
                {[86_040.0, 86_280.0, 86_520.0, 86_760.0, 87_000.0],
                 ~w(23:54:00 23:58:00 24:02:00 24:06:00 24:10:00)}
 
-      assert inside({-600.0, 300.0}) ==
+      assert time_breaks({-600.0, 300.0}) ==
                {[-480.0, -240.0, 0.0, 240.0], ~w(-00:08:00 -00:04:00 00:00:00 00:04:00)}
     end
 
     test "every label takes as many decimals of a second as the most precise break needs" do
-      assert inside({10.0, 10.25}) ==
+      assert time_breaks({10.0, 10.25}) ==
                {[10.0, 10.04, 10.08, 10.12, 10.16, 10.2, 10.24],
                 ~w(00:00:10.00 00:00:10.04 00:00:10.08 00:00:10.12 00:00:10.16 00:00:10.20
                    00:00:10.24)}
 
-      assert inside({10.0001, 10.0002}) ==
+      assert time_breaks({10.0001, 10.0002}) ==
                {[
                   10.000100000000002,
                   10.000120000000001,
@@ -604,7 +580,7 @@ defmodule Scales.TransformTest do
                  {79_034.876414900005, 79_034.876417100008}
                ],
                fn extent ->
-                 {_breaks, labels} = inside(extent)
+                 {_breaks, labels} = time_breaks(extent)
                  labels
                end
              ) == [
@@ -614,64 +590,31 @@ defmodule Scales.TransformTest do
              ]
     end
 
+    test "no breaks have no labels" do
+      assert Transform.format(:time, [], {0.0, 1.0}) === []
+    end
+
     test "a break a microsecond before midnight is written negative" do
-      assert inside({-0.0000015, 0.0000025}) ==
+      assert time_breaks({-0.0000015, 0.0000025}) ==
                {[-9.9999999999999995e-07, 0.0, 9.9999999999999995e-07, 2.0000000000000003e-06],
                 ~w(-00:00:00.000001 00:00:00.000000 00:00:00.000001 00:00:00.000002)}
     end
 
-    # scale_x_time(date_breaks = "1 hour") over 22:12:00 and 22:48:00: no break falls inside, so
-    # R draws no break, label or minor grid line
-    test "a width laying no break inside the axis draws none" do
-      assert axis(:time, [~T[22:12:00], ~T[22:48:00]], breaks: {:width, [hour: 1]}) ===
-               {{79_812.0, 82_188.0}, [], []}
-    end
-
     # scale_x_time(breaks = as_hms(c("06:00:00", "12:00:00", "18:30:00"))) over 00:00:00 and
     # 23:59:59: written as R writes its own, minor breaks midway between them
-    test "breaks it did not choose are written alike" do
-      assert axis(:time, [~T[00:00:00], ~T[23:59:59]],
-               breaks: [~T[06:00:00], ~T[12:00:00], ~T[18:30:00]]
-             ) ===
-               {{-4319.95, 90_718.95},
-                [{21_600.0, "06:00:00"}, {43_200.0, "12:00:00"}, {66_600.0, "18:30:00"}],
+    test "breaks it did not choose are written alike, minor breaks midway between them" do
+      extent = {-4319.95, 90_718.95}
+      given = [21_600.0, 43_200.0, 66_600.0]
+
+      minor =
+        :time
+        |> Transform.minor_breaks(given, extent)
+        |> inside(extent)
+        |> Enum.reject(fn position -> position in given end)
+
+      assert {Transform.format(:time, given, :given), minor} ===
+               {["06:00:00", "12:00:00", "18:30:00"],
                 [0.0, 10_800.0, 32_400.0, 54_900.0, 77_400.0, 88_200.0]}
-    end
-
-    # scale_x_time(date_breaks = "6 hours", date_labels = "%H:%M") over 00:00:00 and 23:59:59:
-    # R's format() wraps the last, 24:00:00, round midnight
-    test "a width's breaks in a format, wrapped round midnight" do
-      assert axis(:time, [~T[00:00:00], ~T[23:59:59]],
-               breaks: {:width, [hour: 6]},
-               labels: {:format, "%H:%M"}
-             ) ===
-               {{-4319.95, 90_718.95},
-                [
-                  {0.0, "00:00"},
-                  {21_600.0, "06:00"},
-                  {43_200.0, "12:00"},
-                  {64_800.0, "18:00"},
-                  {86_400.0, "00:00"}
-                ], [10_800.0, 32_400.0, 54_000.0, 75_600.0]}
-    end
-
-    # scale_x_time(date_breaks = "10 secs", date_minor_breaks = "5 secs",
-    # expand = expansion(mult = 0.5)) over 00:00:00 and 00:00:30, where R pads " 00:00:00"
-    test "a width laid below midnight, and minor breaks every step of another" do
-      assert axis(:time, [~T[00:00:00], ~T[00:00:30]],
-               breaks: {:width, [second: 10]},
-               minor_breaks: {:width, [second: 5]},
-               expand: [mult: {0.5, 0.5}, add: {0, 0}]
-             ) ===
-               {{-15.0, 45.0},
-                [
-                  {-10.0, "-00:00:10"},
-                  {0.0, "00:00:00"},
-                  {10.0, "00:00:10"},
-                  {20.0, "00:00:20"},
-                  {30.0, "00:00:30"},
-                  {40.0, "00:00:40"}
-                ], [-15.0, -5.0, 5.0, 15.0, 25.0, 35.0, 45.0]}
     end
 
     # scales::breaks_width(...)(as_hms(c(low, high))): every multiple of the step from the start
@@ -704,151 +647,6 @@ defmodule Scales.TransformTest do
                  ~T[12:00:00],
                  ~T[23:59:59.750000]
                ]
-    end
-  end
-
-  describe "a transformed scale's labels and limits" do
-    test "a labels function is handed the breaks in data units" do
-      # hwy with scale_y_log10(labels = function(b) ...): the function is handed 20, 30 and 40
-      scale = %Continuous{
-        transform: :log10,
-        labels: fn breaks ->
-          Enum.map(breaks, fn data ->
-            data
-            |> Float.round(9)
-            |> inspect()
-          end)
-        end
-      }
-
-      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
-      extent = Scale.dimension(trained)
-
-      assert labels(trained, extent) == ["20.0", "30.0", "40.0"]
-    end
-
-    test "a labels function under reverse, sqrt and reciprocal is handed breaks in data units" do
-      # ggplot(mtcars, aes(wt, mpg)) + geom_point() under scale_x_reverse(labels = f),
-      # scale_x_sqrt(labels = f) and scale_x_continuous(transform = "reciprocal", labels = f): f
-      # is handed 2, 3, 4 and 5, then their squares' roots squared, then 2 to 6
-      handed = fn transform ->
-        scale = %Continuous{
-          transform: transform,
-          labels: fn breaks -> Enum.map(breaks, &Float.to_string/1) end
-        }
-
-        values = Scale.transform(scale, column(Datasets.mtcars(), :wt))
-        trained = Scale.train(scale, values, :none)
-        labels(trained, Scale.dimension(trained))
-      end
-
-      assert Enum.map([:reverse, :sqrt, :reciprocal], handed) == [
-               ["2.0", "3.0", "4.0", "5.0"],
-               ["2.0000000000000004", "2.9999999999999996", "4.0", "5.000000000000001"],
-               ["2.0", "3.0", "4.0", "5.0", "6.0"]
-             ]
-    end
-
-    test "a labels function on a date axis is handed dates" do
-      # scale_x_date(labels = function(dates) ...) is handed Date objects
-      scale = %Continuous{
-        transform: :date,
-        labels: fn dates -> Enum.map(dates, &Date.to_iso8601/1) end
-      }
-
-      trained =
-        Scale.train(scale, Scale.transform(scale, [~D[2020-01-01], ~D[2020-01-03]]), :none)
-
-      extent = Scale.dimension(trained)
-
-      assert labels(trained, extent) == ~w(2020-01-01 2020-01-02 2020-01-03)
-    end
-
-    test "a labels function on a date-time axis is handed date-times in the scale's zone" do
-      # scale_x_datetime(labels = function(b) format(b, "%Y-%m-%d %H:%M %Z")) over 2024-03-09
-      # 15:17 and 2024-03-11 04:40 in New York: R hands it the breaks there, across its change
-      scale = %Continuous{
-        transform: {:datetime, "America/New_York", Tz.TimeZoneDatabase},
-        labels: fn datetimes ->
-          Enum.map(datetimes, fn datetime -> Calendar.strftime(datetime, "%Y-%m-%d %H:%M %Z") end)
-        end
-      }
-
-      values = [new_york(~N[2024-03-09 15:17:00]), new_york(~N[2024-03-11 04:40:00])]
-      trained = Scale.train(scale, Scale.transform(scale, values), :none)
-
-      assert labels(trained, Scale.dimension(trained)) ==
-               ["2024-03-10 00:00 EST", "2024-03-10 13:00 EDT", "2024-03-11 01:00 EDT"]
-    end
-
-    test "a labels function on a date-time axis is handed date-times, to the second" do
-      # scale_x_datetime(labels = function(b) ...) is handed POSIXct objects in the scale's zone
-      scale = %Continuous{
-        transform: {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase},
-        labels: fn datetimes -> Enum.map(datetimes, &inspect/1) end
-      }
-
-      values = [~U[2024-03-09 20:17:00Z], ~U[2024-03-10 08:40:00Z]]
-      trained = Scale.train(scale, Scale.transform(scale, values), :none)
-      extent = Scale.dimension(trained)
-
-      assert labels(trained, extent) ==
-               Enum.map(
-                 [
-                   ~U[2024-03-09 21:00:00Z],
-                   ~U[2024-03-10 00:00:00Z],
-                   ~U[2024-03-10 03:00:00Z],
-                   ~U[2024-03-10 06:00:00Z],
-                   ~U[2024-03-10 09:00:00Z]
-                 ],
-                 &inspect/1
-               )
-    end
-
-    test "a labels function on a time axis is handed times of day, wrapped past midnight" do
-      # scale_x_time(date_breaks = "6 hours", labels = function(b) ...) over 00:00:00 and 23:59:59:
-      # R hands it hms values, the last 24:00:00, which a Time cannot hold
-      scale = %Continuous{
-        transform: :time,
-        breaks: {:width, [hour: 6]},
-        labels: fn times -> Enum.map(times, &inspect/1) end
-      }
-
-      trained = Scale.train(scale, Scale.transform(scale, [~T[00:00:00], ~T[23:59:59]]), :none)
-
-      assert labels(trained, Scale.dimension(trained)) ==
-               ~w(~T[00:00:00] ~T[06:00:00] ~T[12:00:00] ~T[18:00:00] ~T[00:00:00])
-    end
-
-    test "a limit outside the transformation's domain cannot be placed, at either end" do
-      # scale_y_log10(limits = c(0, 100)) fails in R: 'from' must be a finite number
-      for limits <- [{0, 100}, {100, 0}] do
-        scale = %Continuous{transform: :log10, limits: limits, range: {0.0, 2.0}}
-
-        error = assert_raise ArgumentError, fn -> Scale.dimension(scale) end
-        assert error.message =~ inspect(limits)
-        assert error.message =~ "log10"
-      end
-    end
-
-    test "limits are sorted once transformed, so either order names the same axis" do
-      # ggplot(mtcars, aes(mpg, wt)) + geom_point() + scale_x_continuous(limits = c(20, 15)):
-      # 14.75 to 20.25; under scale_x_reverse(), c(15, 20) and c(20, 15) both -20.25 to -14.75
-      mpg = column(Datasets.mtcars(), :mpg)
-      {identity_extent, _breaks, _minor} = axis(:identity, mpg, limits: {20, 15})
-      {reverse_extent, _breaks, _minor} = axis(:reverse, mpg, limits: {15, 20})
-
-      assert {identity_extent, reverse_extent} == {{14.75, 20.25}, {-20.25, -14.75}}
-    end
-
-    test "a labels function's refusal shows the breaks in data units" do
-      scale = %Continuous{transform: :log10, labels: fn _breaks -> ["one"] end}
-      trained = Scale.train(scale, Scale.transform(scale, column(Datasets.mpg(), :hwy)), :none)
-
-      error =
-        assert_raise ArgumentError, fn -> Scale.breaks(trained, Scale.dimension(trained)) end
-
-      assert error.message =~ "[20.0"
     end
   end
 end
