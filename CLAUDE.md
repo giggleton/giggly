@@ -57,7 +57,7 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **Scales** (`Giggly.Scale`, ggplot2's half: kinds, defaults, training, mapping) —
   `.claude/rules/scale.md`.
 - **The scales package** (`Scales`, R's scales half: breaks, transforms, palettes, bounds, data
-  ranges) — `.claude/rules/scales.md`; its colours `color_operations.md`, formatters `format.md`.
+  ranges) — `.claude/rules/scales.md`; its colours `color_operations.md`, labels `labels.md`.
 - **Stats** (`Giggly.Stat`, a layer's stat; `Giggly.Tensor`, Nx's door) — `.claude/rules/stat.md`.
 - **Positions** (`Giggly.Position`, the protocol positions run through) — `.claude/rules/position.md`.
 - **The coordinate system** (`Giggly.Coord`, panel params, the only route to the unit panel) —

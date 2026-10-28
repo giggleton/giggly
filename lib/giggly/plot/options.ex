@@ -1323,7 +1323,7 @@ defmodule Giggly.Plot.Options do
         "The breaks' labels: a list of strings, one for each of " <>
           "`breaks:`; a function handed every break drawn, a list of " <>
           "numbers in data units, that returns a string for each, as " <>
-          "`Scales.Format`'s do; or `:none` for ticks with no labels."
+          "`Scales.Labels`'s do; or `:none` for ticks with no labels."
     ],
     expand: [
       type: @scale_expand_type,
@@ -1692,7 +1692,7 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
         "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
-          "every break, a list of numbers, that returns a string for each, as `Scales.Format`'s " <>
+          "every break, a list of numbers, that returns a string for each, as `Scales.Labels`'s " <>
           "do; or `:none` for no labels."
     ]
   ]

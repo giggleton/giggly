@@ -14,11 +14,11 @@ defmodule Scales.Transform.Log10 do
   # nearest the middle of a decade), until three fall inside; and where even nine multiples
   # leave fewer than three, extended Wilkinson breaks on the range itself. Its minor breaks are
   # R's regular ones in log space, and its labels the breaks in data units, plain decimals
-  # (`Scales.Format.plain/1`).
+  # (`Scales.Labels.plain/1`).
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Format, MinorBreaks}
+  alias Scales.{Breaks, Labels, MinorBreaks}
 
   # How many breaks R's `breaks_log()` asks for, and how many fewer it settles for.
   @wanted 5
@@ -51,7 +51,7 @@ defmodule Scales.Transform.Log10 do
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&power/1)
-    |> Format.plain()
+    |> Labels.plain()
   end
 
   defp log10(value) when is_number(value) and value > 0, do: :math.log10(value)

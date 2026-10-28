@@ -16,7 +16,7 @@ defmodule Giggly do
   # without listing it. It lists `NimbleOptions`, which validates `to_svg/2`'s options and which a
   # sub-boundary with options of its own lists in turn, as `Giggly.Plot` does. It exports `Plot`,
   # the description the run functions take; what a user of Giggly calls is the documented API
-  # (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `Scales.Format`,
+  # (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `Scales.Labels`,
   # `DataFrame`'s readers and the scales `panel_scales/2` returns.
   use Boundary, deps: [NimbleOptions, Nx, Scales, Table], exports: [Plot]
 

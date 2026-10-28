@@ -12,7 +12,7 @@ defmodule Scales.Transform.Reciprocal do
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Format, MinorBreaks}
+  alias Scales.{Breaks, Labels, MinorBreaks}
 
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &reciprocal/1)
@@ -40,7 +40,7 @@ defmodule Scales.Transform.Reciprocal do
   def format(_transformation, breaks, _extent) do
     breaks
     |> Enum.map(&reciprocal/1)
-    |> Format.plain()
+    |> Labels.plain()
   end
 
   defp reciprocal(value) when is_number(value) and value == 0, do: :infinity

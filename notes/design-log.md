@@ -1348,7 +1348,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   made API, built from closures. *Rejected: refusing high-to-low limits on a scale function*: the
   order means nothing once transformed (`scale_x_reverse` takes both).
 
-- **`Scales.Format`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
+- **`Scales.Labels`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**
   `currency`, since scales 1.4.0 supersedes `label_dollar()` with it, the output the same (the
   entry beginning "Giggly exposes no function" holds for scales too); the notebook draws
@@ -1393,7 +1393,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   data the assembly builds a scale from*: no grant, but every option in two shapes.
 
 - **`labels:` takes a list, a function handed every break drawn, or `:none`; Giggly's formatters
-  are list functions in `Scales.Format` (2026-10-18, Steve).** A function sees every break at
+  are list functions in `Scales.Labels` (2026-10-18, Steve).** A function sees every break at
   once, as R's do, so a formatter can give them shared decimals (R's `precision()`:
   `label_comma()` writes 0.5, 1 and 1.25 as `0.50`, `1.00`, `1.25`) and `currency` can drop
   cents only when every break is whole; it returns one label per break, or the run raises.
@@ -2940,6 +2940,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Rename Scales.Format to Scales.Labels, R's label_* family, its rules file to
+  labels.md (scales package, the split, step 2, labels, part two); §4: "The scales package's API
+  is what a user holds"
 - 2026-10-27 — Move plain number labels into Scales.Format as plain/1, documenting it for any
   charting tool (scales package, the split, step 2, labels, part one); §4: "The scales package's
   API is what a user holds"

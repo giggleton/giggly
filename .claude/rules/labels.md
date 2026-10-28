@@ -1,18 +1,18 @@
 ---
 paths:
-  - "lib/scales/format.ex"
-  - "lib/scales/format/**"
-  - "test/scales/format_test.exs"
+  - "lib/scales/labels.ex"
+  - "lib/scales/labels/**"
+  - "test/scales/labels_test.exs"
 ---
 
-# Formatters
+# Labels
 
-`Scales.Format` writes a scale's labels as scales 1.4.0's `label_comma()`, `label_percent()` and
-`label_currency()` do, `Scales.Format.Fixed` writing their numbers as R's `format()` does; and
+`Scales.Labels` writes a scale's labels as scales 1.4.0's `label_comma()`, `label_percent()` and
+`label_currency()` do, `Scales.Labels.Fixed` writing their numbers as R's `format()` does; and
 plainly, the Elixir way (`plain/1`, `scales.md`), the default labels of a number's
 transformations.
 Why list functions: design-log §4, the entry beginning "`labels:` takes a list"; why these
-names and options: the entry beginning "`Scales.Format`'s".
+names and options: the entry beginning "`Scales.Labels`'s".
 
 ## Rules
 

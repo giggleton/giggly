@@ -10,7 +10,7 @@ paths:
 `Scales` is R's scales half of a plot's scales, the package that leaves this repository once
 complete: breaks, labels, transformations, palettes, values against a range's bounds
 (`Scales.Bounds`), the range of the data a scale trains on (`Scales.DataRange`), and colour
-operations (`color_operations.md`) and formatters (`format.md`), each with a rules file of its own.
+operations (`color_operations.md`) and labels (`labels.md`), each with a rules file of its own.
 Giggly's half, a scale's kind, defaults, training and mapping, is `Giggly.Scale` (`scale.md`).
 Why the split falls on R's line and the package is carved here first: design-log §4, the entry
 beginning "`scales`, a package of R's scales half"; why its files were moved by name alone: the
@@ -184,7 +184,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   for each boundary, since a slip in one score shows only where that
   score decides the winner; a row that stops matching is a bug in the port, and the table is
   regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
-- **Labels are written the Elixir way, not R's** (`Scales.Format.plain/1`): `inspect`'s plain
+- **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,
   so a log axis's `1e+05` is written `100000`.

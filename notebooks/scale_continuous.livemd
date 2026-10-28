@@ -31,7 +31,7 @@ its ggplot2 code and names what it is waiting for, so the page is also a list of
 `y`. Setting one by hand changes its title, limits, breaks or labels, or transforms it; the log10,
 square root and reverse scales are shortcuts for common transformations. Giggly has each of these
 functions, `Giggly.Plot.scale_x_continuous/2` and the rest, with their titles, limits, breaks, minor
-breaks, labels, expansion and transformations, and formatters for labels in `Scales.Format`; it has
+breaks, labels, expansion and transformations, and formatters for labels in `Scales.Labels`; it has
 no `sec.axis` option (`sec_axis()`), and no transformation of your own (`scales::new_transform()`).
 A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
 document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
@@ -180,7 +180,7 @@ p2 + scale_x_continuous(labels = scales::label_comma())
 ```
 
 The cell writes out the `x` R drew, each number to the last digit R holds, and works out `y` as
-R's `seq()` does, each step a ninth. Giggly's formatters are `Scales.Format`'s, each handed every
+R's `seq()` does, each step a ninth. Giggly's formatters are `Scales.Labels`'s, each handed every
 break so that the labels share their decimals, as the scales package's are: `percent/2`,
 `currency/2`, which writes what `label_dollar()` writes at its defaults, and `comma/2`. The first
 two plots' x axis, left to its default labels, reads `0` and `100000` where R writes `0e+00` and
@@ -202,19 +202,19 @@ p2 =
   |> Plot.geom_point()
 
 p2
-|> Plot.scale_y_continuous(labels: &Scales.Format.percent/1)
+|> Plot.scale_y_continuous(labels: &Scales.Labels.percent/1)
 |> render.()
 ```
 
 ```elixir
 p2
-|> Plot.scale_y_continuous(labels: &Scales.Format.currency/1)
+|> Plot.scale_y_continuous(labels: &Scales.Labels.currency/1)
 |> render.()
 ```
 
 ```elixir
 p2
-|> Plot.scale_x_continuous(labels: &Scales.Format.comma/1)
+|> Plot.scale_x_continuous(labels: &Scales.Labels.comma/1)
 |> render.()
 ```
 

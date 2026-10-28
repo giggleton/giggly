@@ -9,11 +9,11 @@ defmodule Scales.Transform.Identity do
   #
   # Its axis takes R's default breaks for a transformation, extended Wilkinson
   # (`Scales.Breaks`), and its default minor breaks, midway between them
-  # (`Scales.MinorBreaks`), and writes the breaks as plain decimals (`Scales.Format.plain/1`).
+  # (`Scales.MinorBreaks`), and writes the breaks as plain decimals (`Scales.Labels.plain/1`).
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Format, MinorBreaks, Transform}
+  alias Scales.{Breaks, Labels, MinorBreaks, Transform}
 
   @epoch ~D[1970-01-01]
 
@@ -34,7 +34,7 @@ defmodule Scales.Transform.Identity do
 
   # A number's label is its own, whatever the extent.
   @impl Scales.Transform
-  def format(_transformation, breaks, _extent), do: Format.plain(breaks)
+  def format(_transformation, breaks, _extent), do: Labels.plain(breaks)
 
   defp placed(%Date{} = date), do: Date.diff(date, @epoch) / 1
 
