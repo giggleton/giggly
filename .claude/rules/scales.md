@@ -23,32 +23,28 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **The package depends on nothing in Giggly.** Its boundary lists `Color` and `NimbleOptions`
   alone and exports what Giggly's code calls, so a call back into Giggly fails the build, as it
   would from another repository; Giggly's domains reach it through the root, which lists it.
-- **A palette is a value naming its function (`Scales.Palette`), never a
-  closure**: `:identity` for a position, `{:rescale, {low, high}}` for a continuous aesthetic, R's
-  `pal_rescale()`, `{:gradient, colors}` for a continuous colour or fill, R's `pal_gradient_n()`,
-  `{:sequence, {low, high}}` for a discrete one, R's `seq(low, high, length.out = n)` as
-  ggplot2's ordinal alpha takes it, and for a discrete colour or fill `{:hue, %{hue:, chroma:,
+- **A palette is a value naming its function (`Scales.Palette`), never a closure, and each is
+  R's**: continuous, `:identity`, R's `pal_identity()`, `{:rescale, {low, high}}`, R's
+  `pal_rescale()`, `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled,
+  `{:abs_area, max}`, R's `abs_area()`, the square root of the place's size rescaled onto 0 to
+  `max`, and `{:gradient, colors}`, R's `pal_gradient_n()`; discrete, `{:hue, %{hue:, chroma:,
   luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`,
   `{:viridis, %{option:, begin:, end:, direction:, alpha:}}`, R's `pal_viridis()`
-  (`ColorOperations.viridis/2`), or `{:manual, values}`, a list or a map from value to colour,
-  shape or line type, R's manual
-  palette, or `{:manual, values, breaks}`, a list named by breaks; for size,
-  `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled, `{:abs_area, max}`,
-  R's `abs_area()`, the square root of the place's size rescaled onto 0 to `max`, and, discrete,
-  `{:area_sequence, {low, high}}`, ggplot2's ordinal `sqrt(seq(low^2, high^2))`, `low^2` as
-  `low * low`, as R's `^` squares; for shape, `{:shape, :solid}` or `{:shape, :open}`, R's
-  `pal_shape()`, six shapes by name; for line type, `:linetype`, R's `pal_linetype()`, 13 line
-  types as dash patterns. Each matched R to the last digit; its tests pin R's figures.
-- **The shape palette gives the present levels R's
-  16, 17, 15, 3, 7 and 8, or open, 1, 2, 0, 3, 7 and 8, as their names** (`:circle_small`,
-  `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, the first three open
-  `:circle_open`, `:triangle_open`, `:square_open`), its test pinning each name to R's number
-  through the table points are drawn from; **a seventh level raises when the plot is run**,
-  naming the palette's six, the count and `Giggly.Plot.scale_shape_manual/2`, where R warns and
-  leaves the seventh on unshaped (design-log §4, the entry beginning "A discrete palette with
-  fewer shapes"). **The line type palette gives R's 13 in order, `"solid"` as `{}` and each hex
-  pattern as a tuple of its lengths, and a fourteenth level raises**, naming
-  `Giggly.Plot.scale_linetype_manual/2`, its test pinning `pal_linetype()`'s output.
+  (`ColorOperations.viridis/2`), `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`, six
+  shapes by name, `:linetype`, R's `pal_linetype()`, 13 line types as dash patterns, and
+  `{:manual, values}`, R's `pal_manual()`, a list. A `nil` place gives `nil`. Each matched R to the
+  last digit; its tests pin R's figures. ggplot2's palettes, the ordinal sequences and a manual
+  palette matched by name or by breaks, are Giggly's (`scale.md`).
+- **A discrete palette past its end gives `nil`, as R gives `NA`, and raises nothing**: R also
+  warns, which a pure library cannot, and refusing is the caller's, so no message of the package
+  names one (Giggly's scale raises, `scale.md`). No levels give none, where R's hue palette
+  refuses them.
+- **The shape palette gives R's 16, 17, 15, 3, 7 and 8, or open, 1, 2, 0, 3, 7 and 8, as their
+  names** (`:circle_small`, `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, the
+  first three open `:circle_open`, `:triangle_open`, `:square_open`), Giggly's scale test pinning
+  each name to R's number through the table points are drawn from. **The line type palette gives
+  R's 13 in order, `"solid"` as `{}` and each hex pattern as a tuple of its lengths**, its test
+  pinning `pal_linetype()`'s output.
 - **A discrete palette's spread is R's `seq()`** (`Palette.spread/2`): its ends exact, each value between found
   by steps from the first (the fourth of seven is 0.54999999999999993).
 - **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient

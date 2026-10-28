@@ -168,23 +168,89 @@ defmodule Giggly.Scale.Discrete do
     Enum.map(values, fn value -> Map.get(value_by_key, DataRange.key(value), na_value) end)
   end
 
-  # The palette's value for each of the present limits: a manual palette's map gives each the
-  # value it holds for it, by value, or `na_value`, and so does a list named by breaks, each value
-  # its break's; any other palette spreads them in order.
+  # The palette's value for each of the present limits, which ggplot2's palettes give and refuse
+  # where R's scales does neither: a sequence spreads them evenly from `low` to `high`, as
+  # `scale_alpha_ordinal()`'s `seq(low, high, length.out = n)`, and an area sequence spreads their
+  # squares, as `scale_size_ordinal()`'s `sqrt(seq(low^2, high^2, length.out = n))`, `low^2` as R's
+  # `^` squares, `low * low`; a manual palette's map gives each the value it holds for it, by value,
+  # or `na_value`, and so does a list named by breaks, each value its break's, a value beyond the
+  # last break naming none, as ggplot2's `manual_scale()` names values; any other palette is R's
+  # (`Scales.Palette.discrete/2`). Too few values for the limits raise, as ggplot2's manual scale
+  # fails whatever its values' names; and a shape or line type palette with more levels than it
+  # holds, which R's palettes give `NA` with a warning and leave undrawn, raises naming the scale
+  # that takes more. A scale whose every value is missing has no levels to ask for, and ggplot2
+  # then maps every value to its `na.value` without asking its palette.
+  defp palette_values({:sequence, range}, present, _na_value),
+    do: Palette.spread(range, length(present))
+
+  defp palette_values({:area_sequence, {low, high}}, present, _na_value) do
+    {low * low, high * high}
+    |> Palette.spread(length(present))
+    |> Enum.map(&:math.sqrt/1)
+  end
+
   defp palette_values({:manual, values}, present, na_value) when is_map(values) do
+    enough!(values, present)
     value_by_key = Map.new(values, fn {value, mapped} -> {DataRange.key(value), mapped} end)
-    Palette.named(value_by_key, Enum.map(present, &DataRange.key/1), na_value)
+    Enum.map(present, fn limit -> Map.get(value_by_key, DataRange.key(limit), na_value) end)
   end
 
   defp palette_values({:manual, values, breaks}, present, na_value) do
-    Palette.named_by_breaks(
-      values,
-      Enum.map(breaks, &DataRange.key/1),
-      Enum.map(present, &DataRange.key/1),
-      na_value
+    enough!(values, present)
+
+    value_by_key =
+      breaks
+      |> Enum.zip_with(values, fn limit, value -> {DataRange.key(limit), value} end)
+      |> Map.new()
+
+    Enum.map(present, fn limit -> Map.get(value_by_key, DataRange.key(limit), na_value) end)
+  end
+
+  defp palette_values({:manual, values} = palette, present, _na_value) do
+    enough!(values, present)
+    Palette.discrete(palette, length(present))
+  end
+
+  defp palette_values({:shape, _fill} = palette, present, _na_value),
+    do: drawable!(palette, present, {"shape", "shapes"}, "Giggly.Plot.scale_shape_manual/2")
+
+  defp palette_values(:linetype, present, _na_value) do
+    drawable!(
+      :linetype,
+      present,
+      {"line type", "line types"},
+      "Giggly.Plot.scale_linetype_manual/2"
     )
   end
 
   defp palette_values(palette, present, _na_value),
     do: Palette.discrete(palette, length(present))
+
+  defp enough!(values, present) when is_map(values) and length(present) <= map_size(values),
+    do: :ok
+
+  defp enough!(values, present) when is_list(values) and length(present) <= length(values),
+    do: :ok
+
+  defp enough!(values, present) do
+    raise ArgumentError,
+          "a manual scale needs a value for each of its #{length(present)} levels, " <>
+            "but has #{Enum.count(values)}: #{inspect(values)}"
+  end
+
+  # The palette's values for the present limits, refused where it holds fewer than they need, as
+  # R's palette gives `nil` past its end.
+  defp drawable!(palette, present, {kind, kinds}, manual_scale) do
+    count = length(present)
+    values = Palette.discrete(palette, count)
+    held = Enum.count(values, fn value -> not is_nil(value) end)
+
+    if held < count do
+      raise ArgumentError,
+            "a #{kind} scale's palette has #{held} #{kinds}, too few for its #{count} values, " <>
+              "since more are hard to tell apart; #{manual_scale} gives a #{kind} for each"
+    end
+
+    values
+  end
 end

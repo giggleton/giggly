@@ -375,9 +375,8 @@ defmodule Giggly.Scale do
     values
     |> Enum.map(fn value -> if placed_inside?(value, bounds), do: value end)
     |> rescaled(bounds, scale.rescaler)
-    |> Enum.map(fn place ->
-      if is_number(place), do: Palette.continuous(palette, place), else: na_value
-    end)
+    |> then(fn places -> Palette.continuous(palette, places) end)
+    |> Enum.map(fn mapped -> if is_nil(mapped), do: na_value, else: mapped end)
   end
 
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)

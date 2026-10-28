@@ -22,7 +22,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
 ## Rules
 
 - **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
-  it one aesthetic's.** Its palette is a value of `Scales.Palette`'s (`scales.md`).
+  it one aesthetic's.** Its palette is a value of `Scales.Palette`'s (`scales.md`), or one of
+  ggplot2's own a discrete scale holds (below).
   `new/1` makes a position scale; `new/2` makes an aesthetic's with ggplot2's default palette for
   it (`alpha`: 0.1 to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
@@ -72,7 +73,16 @@ identity transformation: the entry beginning "A layer records its stat and posit
   values, breaks}`) gives each break's level the value at its place and leaves the limits the
   levels**, as `manual_scale()` names values by breaks after choosing its limits. Any kind with
   fewer values than limits raises when the plot is run, named or not, as R fails ("Insufficient
-  values in manual scale").
+  values in manual scale"). This matching and refusing is ggplot2's, so it is
+  `Giggly.Scale.Discrete`'s, as are ggplot2's ordinal palettes: `{:sequence, {low, high}}`,
+  `scale_alpha_ordinal()`'s `seq(low, high, length.out = n)`, and `{:area_sequence, {low,
+  high}}`, `scale_size_ordinal()`'s `sqrt(seq(low^2, high^2, length.out = n))`, `low^2` as
+  `low * low`, as R's `^` squares, both on `Scales.Palette.spread/2`; every other palette is R's
+  (`scales.md`). **A shape scale's seventh level, or a line type scale's fourteenth, raises when
+  the plot is run**, naming the palette's count, the levels' and `Giggly.Plot.scale_shape_manual/2`
+  or `scale_linetype_manual/2`, where R's palette gives `NA` with a warning and leaves it undrawn
+  (design-log §4, the entry beginning "A discrete palette with fewer shapes"); the package's
+  palette gives `nil` there, which the scale refuses.
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
   protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha, line type, line

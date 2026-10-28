@@ -131,12 +131,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `bounds.R`: rescaling, `zero_range()`, censoring) and `Scales.DataRange` (R's
   `train_continuous()`, `train_discrete()`, the order of levels; Steve: "stuck with datarange
   for now"). Discrete levels' labels move into `Giggly.Scale`, their only caller, so no Giggly
-  module shares a package module's last segment. Manual palettes' name matching stays in
-  `Scales.Palette` with the check of too few values it shares, R's line running through it
-  (ggplot2's `manual_scale()` aborts, scales' `pal_manual()` warns), to move with that check when
-  the package's API settles (Steve: "A"). A second step documents the package as API. *Rejected:
-  moving the matching alone*: the check copied into Giggly. *Rejected:
-  `Scales.Domain`*: in the function sense, the opposite of a range (Steve). *Rejected:
+  module shares a package module's last segment. A second step documents the package as API.
+  *Rejected: `Scales.Domain`*: in the function sense, the opposite of a range (Steve). *Rejected:
   `Scales.Range` and `Scales.Color`*: the one shadows Elixir's `Range` where aliased, the other
   cannot be grepped apart from the `color` library's `Color`. *Rejected: regrouping during the
   move*: new files, the whole half mutation-tested again.
@@ -2944,6 +2940,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-27 — Document Scales.Palette as API: R's palettes on lists, nil past a discrete one's
+  end, and ggplot2's ordinal palettes, manual matching and refusals moved to Giggly.Scale.Discrete
+  (scales package, the split, step 2, palettes); §4: "The package gives R's values and Giggly
+  refuses"
 - 2026-10-27 — Document Scales.Bounds as API: rescale on lists as R's, checking both ranges, and
   R's rescale_mid and rescale_max moved in from Giggly.Scale (scales package, the split, step 2,
   bounds); §4: "The scales package's API is what a user holds", "The package gives R's values and

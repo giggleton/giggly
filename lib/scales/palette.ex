@@ -1,89 +1,72 @@
 defmodule Scales.Palette do
-  @moduledoc false
+  @moduledoc """
+  Palettes: what turns a value's place among the data into a value of its aesthetic, a colour, a
+  size, a shape or a line type. A palette is a value naming its function, so it compares and
+  prints. A continuous palette is handed places, 0 to 1 over the data's range (`continuous/2`); a
+  discrete one the number of levels it must tell apart (`discrete/2`).
 
-  # Palettes: the last step of a scale, which turns where a value sits among the data into the
-  # value of its aesthetic, as R's `scales` palettes do. A palette is a value naming the function,
-  # never a closure, so a scale stays a value that compares and prints.
-  #
-  #   * `:identity`, a position's: the value is left where the scale puts it, as ggplot2's position
-  #     scales' palette is the identity, and the coordinate system places it.
-  #   * `{:rescale, {low, high}}`, a continuous scale's: a value's place in the scale's limits,
-  #     from 0 to 1, rescaled onto `low` to `high`, as R's `pal_rescale()` does with `rescale()`.
-  #   * `{:gradient, colors}`, a continuous colour scale's: a value's place in the limits, from 0
-  #     to 1, along a gradient through `colors`, spaced evenly from 0 to 1, as R's
-  #     `pal_gradient_n()` blends them through `colour_ramp()`, which its two- and three-colour
-  #     gradients are too: each colour's L*, a* and b* (`Scales.ColorOperations`), the place's
-  #     channels interpolated between the two colours either side as R's `approxfun()` does, a
-  #     place at a colour taking that colour's exactly, and the blend turned back into a colour. One
-  #     colour is every place's. ggplot2's default runs from `#132B43` to `#56B1F7`.
-  #   * `{:area, {low, high}}`, a continuous size scale's: a value's place in the limits, from 0 to
-  #     1, its square root rescaled onto `low` to `high`, as R's `pal_area()` does, so a point's
-  #     area, not its width, grows with the value. ggplot2's default runs from 1 to 6.
-  #   * `{:abs_area, max}`, the size scale's that puts 0 at size 0: the square root of a place's
-  #     size rescaled onto 0 to `max`, as R's `abs_area()` does. Its scale places a value at its
-  #     share of the limits' high end, which may be below 0, hence the size.
-  #   * `{:sequence, {low, high}}`, a discrete scale's: given the number of levels, that many
-  #     values from `low` to `high`, evenly spaced, as ggplot2's ordinal alpha scale takes R's
-  #     `seq(low, high, length.out = n)`.
-  #   * `{:area_sequence, {low, high}}`, a discrete size scale's: given the number of levels, that
-  #     many sizes from `low` to `high` whose squares are evenly spaced, so their areas are, as
-  #     ggplot2's ordinal size scale takes R's `sqrt(seq(low^2, high^2, length.out = n))`, `low^2`
-  #     as R's `^` computes a square, `low * low`. ggplot2's default runs from 2 to 6.
-  #   * `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}`,
-  #     a discrete colour scale's: given the number of levels, that many colours of one chroma and
-  #     luminance, their hues spaced evenly from `low` to `high`, as R's `pal_hue()` gives them,
-  #     handed out in reverse for a `direction` of -1. A range spanning the whole circle, less than
-  #     a degree short of it or past it, leaves its last share off, since its end is its start.
-  #     ggplot2's default is hues from 15 round to 375, chroma 100 and luminance 65.
-  #   * `{:gray, {start, finish}}`, a discrete colour scale's: given the number of levels, that
-  #     many greys from the level `start` to `finish`, 0 black and 1 white, as R's `pal_grey()`
-  #     takes them from `grey.colors()`: the levels spaced evenly once raised to the power 2.2,
-  #     each brought back by the power `1 / 2.2` and written as R's `gray()` writes it, its byte
-  #     `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which steps on from the
-  #     start as `seq()` does, so they are spaced as `seq()` spaces them.
-  #   * `{:viridis, %{option: option, begin: begin, end: end, direction: direction, alpha:
-  #     alpha}}`, a discrete colour scale's: given the number of levels, that many colours of the
-  #     viridis palette `option`, as R's `pal_viridis()` takes them from `viridisLite::viridis()`
-  #     (`Scales.ColorOperations.viridis/2`), from `begin` to `end`, or `end` to `begin` for a
-  #     `direction` of -1, with an alpha of `alpha`. ggplot2's default, an ordered factor's, is
-  #     the palette `:viridis` from 0 to 1, opaque.
-  #   * `{:shape, :solid | :open}`, a discrete shape scale's: given the number of levels, that many
-  #     of six shapes, by name, as R's `pal_shape()` gives them: solid, R's 16, 17, 15, 3, 7 and 8,
-  #     or open, its 1, 2, 0, 3, 7 and 8. More than six levels cannot be drawn: R warns and leaves
-  #     the seventh on unshaped, so its points vanish, and Giggly, which cannot warn, raises,
-  #     naming the manual scale that takes more.
-  #   * `:linetype`, a discrete line type scale's: given the number of levels, that many of 13 line
-  #     types, each as its dash pattern, as R's `pal_linetype()` gives them: `"solid"`, held as
-  #     `{}`, then the patterns R writes in hex digits, `"22"` to `"F1"`, as tuples of their lengths.
-  #     More than 13 levels cannot be drawn: R warns and leaves the fourteenth on with no line type,
-  #     so its lines vanish, and Giggly, which cannot warn, raises, naming the manual scale that
-  #     takes more.
-  #   * `{:manual, values}`, a discrete colour, shape or line type scale's, `values` a list: its
-  #     first values, one for each level in level order, as R's manual palette gives them. A manual
-  #     palette may instead be a map from a value to its colour, shape or line type, each level
-  #     taking its own by value (`named/3`), or `{:manual, values, breaks}`, a list each of whose
-  #     values is the break's at its place, as R's manual scale names a list by its breaks, a level
-  #     no break names taking none (`named_by_breaks/4`). Either way, more levels than values cannot
-  #     be drawn, as R's manual scale fails whatever its values' names.
-  #
-  # Use it through `Giggly.Scale`.
+  ## Continuous palettes
 
-  # A palette's colours come from the colour operations.
+    * `:identity`, R's `pal_identity()`: each place as it is.
+    * `{:rescale, {low, high}}`, R's `pal_rescale()`: each place moved onto `low` to `high`.
+    * `{:area, {low, high}}`, R's `pal_area()`: each place's square root moved onto `low` to
+      `high`, so an area drawn at that size grows with the place.
+    * `{:abs_area, max}`, R's `abs_area()`: the square root of each place's size moved onto 0 to
+      `max`; a place may lie below 0 or past 1.
+    * `{:gradient, colors}`, R's `pal_gradient_n()`, which R's two- and three-colour gradients are
+      too: the colour that far along a gradient through `colors`, spaced evenly from 0 to 1, each
+      place between two blended in CIE L*a*b*; a place at a colour takes it exactly, and one
+      colour is every place's.
+
+  ## Discrete palettes
+
+    * `{:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}`,
+      R's `pal_hue()`: colours of one chroma and luminance, their hues spaced evenly from `low` to
+      `high`, handed out in reverse for a `direction` of -1. A range within a degree of the whole
+      circle leaves its last share off, since its end is its start.
+    * `{:gray, {start, finish}}`, R's `pal_grey()`: greys from the level `start` to `finish`, 0
+      black and 1 white, spaced evenly once raised to the power 2.2.
+    * `{:viridis, %{option: option, begin: begin, end: end, direction: direction, alpha:
+      alpha}}`, R's `pal_viridis()`: colours of a viridis palette, as viridisLite's
+      `viridis()` makes them.
+    * `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`: six shapes by name, solid
+      (`:circle_small`, `:triangle`, `:square`, `:plus`, `:square_cross`, `:asterisk`, R's 16, 17,
+      15, 3, 7 and 8) or open (`:circle_open`, `:triangle_open`, `:square_open` and the same last
+      three, R's 1, 2, 0, 3, 7 and 8).
+    * `:linetype`, R's `pal_linetype()`: 13 line types, each as its dash pattern, a tuple of
+      lengths, `{}` for a solid line.
+    * `{:manual, values}`, R's `pal_manual()`: `values` in order.
+
+  A discrete palette asked for more levels than it holds gives `nil` for each past its end, as R
+  gives `NA` (and warns). No levels give none, where R's hue palette refuses them.
+
+  Colours are written uppercase, `#RRGGBB`, or `#RRGGBBAA` with an alpha of their own.
+  """
+
+  # Each palette matched R to the last digit; the tests pin R's figures. The gradient blends as
+  # `colour_ramp()` does: each colour's L*, a* and b* (`Scales.ColorOperations`), a place's
+  # channels interpolated between the colours either side as R's `approxfun()` does, and the blend
+  # turned back into a colour.
+
   alias Scales.{Bounds, ColorOperations}
 
-  @typedoc "A scale's palette."
-  @type t ::
+  @typedoc "A continuous palette."
+  @type continuous ::
           :identity
           | {:rescale, {number(), number()}}
-          | {:gradient, [String.t()]}
-          | {:sequence, {number(), number()}}
-          | {:hue,
-             %{
-               hue: {number(), number()},
-               chroma: number(),
-               luminance: number(),
-               direction: 1 | -1
-             }}
+          | {:area, {number(), number()}}
+          | {:abs_area, number()}
+          | {:gradient, [String.t(), ...]}
+
+  @typedoc "A discrete palette."
+  @type discrete ::
+          {:hue,
+           %{
+             hue: {number(), number()},
+             chroma: number(),
+             luminance: number(),
+             direction: 1 | -1
+           }}
           | {:gray, {number(), number()}}
           | {:viridis,
              %{
@@ -95,14 +78,10 @@ defmodule Scales.Palette do
              }}
           | {:shape, :solid | :open}
           | :linetype
-          | {:manual, [manual_value()] | %{term() => manual_value()}}
-          | {:manual, [manual_value()], [term()]}
-          | {:area, {number(), number()}}
-          | {:abs_area, number()}
-          | {:area_sequence, {number(), number()}}
+          | {:manual, list()}
 
-  @typedoc "A manual palette's value: a colour, a shape's name, or a line type's dash pattern."
-  @type manual_value :: ColorOperations.t() | atom() | tuple()
+  @typedoc "A palette."
+  @type t :: continuous() | discrete()
 
   # R's gamma for `grey.colors()`.
   @gray_gamma 2.2
@@ -133,36 +112,51 @@ defmodule Scales.Palette do
     {15, 1}
   ]
 
-  # A continuous palette's value for a place from 0 to 1 in the scale's limits: for a rescale, R's
-  # `rescale(x, to = range, from = c(0, 1))`, as `pal_rescale()` computes it; for an area, the
-  # place's square root rescaled so, as `pal_area()` computes it; for an absolute area, the square
-  # root of the place's size rescaled onto 0 to the maximum, as `abs_area()` computes it, a place
-  # being any number its scale's rescaler gives; for a gradient, the colour that far along it, as
-  # the opening comment says.
-  @doc false
-  @spec continuous({:rescale | :area, {number(), number()}}, number()) :: float()
-  @spec continuous({:abs_area, number()}, number()) :: float()
-  @spec continuous({:gradient, [String.t()]}, number()) :: String.t()
-  def continuous({:rescale, to}, place), do: from_unit(place, to)
+  @doc """
+  Each place's value under a continuous palette, a place running from 0 to 1 over the data's
+  range; a `nil` place gives `nil`.
 
-  def continuous({:area, to}, place) do
-    place
-    |> :math.sqrt()
-    |> from_unit(to)
+  ## Examples
+
+      iex> Scales.Palette.continuous({:rescale, {2, 5}}, [0, 0.3, 1, nil])
+      [2.0, 2.9, 5.0, nil]
+
+      iex> Scales.Palette.continuous({:area, {1.0, 6.0}}, [0.2, 1])
+      [3.23606797749979, 6.0]
+
+      iex> Scales.Palette.continuous({:gradient, ["#132B43", "#56B1F7"]}, [0, 0.5, 1])
+      ["#132B43", "#336A98", "#56B1F7"]
+  """
+  @spec continuous(continuous(), [number() | nil]) :: [number() | String.t() | nil]
+  def continuous(:identity, places), do: places
+  def continuous({:rescale, to}, places), do: Bounds.rescale(places, {0, 1}, to)
+
+  def continuous({:area, to}, places) do
+    places
+    |> each_place(&:math.sqrt/1)
+    |> Bounds.rescale({0, 1}, to)
   end
 
-  def continuous({:abs_area, max}, place) do
-    place
-    |> abs()
-    |> :math.sqrt()
-    |> from_unit({0, max})
+  # R's `rescale(sqrt(abs(x)), c(0, max), c(0, 1))`.
+  def continuous({:abs_area, max}, places) do
+    places
+    |> each_place(fn place ->
+      place
+      |> abs()
+      |> :math.sqrt()
+    end)
+    |> Bounds.rescale({0, 1}, {0, max})
   end
 
-  def continuous({:gradient, [color]}, _place), do: color
+  def continuous({:gradient, [color]}, places), do: each_place(places, fn _place -> color end)
 
-  def continuous({:gradient, colors}, place) do
+  def continuous({:gradient, colors}, places) do
     knots = spread({0.0, 1.0}, length(colors))
+    each_place(places, fn place -> gradient_color(knots, colors, place) end)
+  end
 
+  # The colour at `place` along the gradient, as the opening comment says.
+  defp gradient_color(knots, colors, place) do
     lab =
       case Enum.find_index(knots, fn knot -> knot == place end) do
         nil ->
@@ -205,10 +199,6 @@ defmodule Scales.Palette do
     |> Tuple.to_list()
   end
 
-  # A discrete palette's values for `count` levels, in level order.
-  #
-  # A sequence's are R's `seq(low, high, length.out = count)` (`spread/2`).
-  #
   # A hue palette's are `pal_hue()`'s: the circle's last `360 / count` degrees left off where the
   # range, taken modulo 360 as R's `%%` takes it, is less than a degree, since its end is then its
   # start; the hues spread over the range by `spread/2`; each colour made by
@@ -217,30 +207,23 @@ defmodule Scales.Palette do
   # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
   # every range, chroma, luminance and count its test pins.
   #
-  # A grey palette's are `grey.colors()`'s, a viridis palette's `viridisLite::viridis()`'s, a shape
-  # or line type palette's its first shapes or line types, and a manual one's its first values, as
-  # the opening comment says; a shape or line type palette for more levels than it holds, or a
-  # manual palette of too few values, raises.
-  #
-  # An area sequence's are the square roots of `spread/2` from `low * low` to `high * high`.
-  #
-  # A scale whose every value is missing has no levels to ask for, and ggplot2 then maps every
-  # value to its NA value without asking its palette, so no levels give none.
-  @doc false
-  @spec discrete({:sequence | :area_sequence, {number(), number()}}, non_neg_integer()) ::
-          [number()]
-  @spec discrete({:hue | :gray | :viridis, term()}, non_neg_integer()) :: [ColorOperations.t()]
-  @spec discrete({:shape, :solid | :open}, non_neg_integer()) :: [atom()]
-  @spec discrete(:linetype, non_neg_integer()) :: [tuple()]
-  @spec discrete({:manual, list()}, non_neg_integer()) :: [manual_value()]
-  def discrete({:sequence, range}, count), do: spread(range, count)
+  # A grey palette's are `grey.colors()`'s: the levels spaced by `spread/2` once raised to the
+  # power 2.2, each brought back by `1 / 2.2` and written as R's `gray()` writes it, the byte `255 *
+  # level + 0.5` truncated. R spaces them with `seq.int()`, which steps on from the start as
+  # `seq()` does.
+  @doc """
+  The values of a discrete palette for `count` levels, in level order.
 
-  def discrete({:area_sequence, {low, high}}, count) do
-    {low * low, high * high}
-    |> spread(count)
-    |> Enum.map(&:math.sqrt/1)
-  end
+  ## Examples
 
+      iex> hue = %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}
+      iex> Scales.Palette.discrete({:hue, hue}, 3)
+      ["#F8766D", "#00BA38", "#619CFF"]
+
+      iex> Scales.Palette.discrete({:manual, ["#FF0000", "#0000FF"]}, 3)
+      ["#FF0000", "#0000FF", nil]
+  """
+  @spec discrete(discrete(), non_neg_integer()) :: list()
   def discrete({:hue, _parameters}, 0), do: []
 
   def discrete({:hue, %{hue: {low, high}} = parameters}, count) when count > 0 do
@@ -262,79 +245,23 @@ defmodule Scales.Palette do
   end
 
   def discrete({:viridis, parameters}, count), do: ColorOperations.viridis(count, parameters)
+  def discrete({:shape, fill}, count), do: padded(Map.fetch!(@shapes, fill), count)
+  def discrete(:linetype, count), do: padded(@line_types, count)
+  def discrete({:manual, values}, count) when is_list(values), do: padded(values, count)
 
-  def discrete({:shape, fill}, count) do
-    shapes = Map.fetch!(@shapes, fill)
+  @doc """
+  `count` numbers spread evenly from `low` to `high`, R's `seq(low, high, length.out = count)`:
+  the ends exact, each number between them `low` plus its index times the step, in R's order of
+  operations, so the fourth of seven from 0.1 to 1 is `0.54999999999999993`, not `0.55`.
 
-    if count > length(shapes) do
-      raise ArgumentError,
-            "a shape scale's palette has #{length(shapes)} shapes, too few for its #{count} " <>
-              "values, since more are hard to tell apart; Giggly.Plot.scale_shape_manual/2 " <>
-              "gives a shape for each"
-    end
+  ## Examples
 
-    Enum.take(shapes, count)
-  end
+      iex> Scales.Palette.spread({0.0, 1.0}, 5)
+      [0.0, 0.25, 0.5, 0.75, 1.0]
 
-  def discrete(:linetype, count) do
-    if count > length(@line_types) do
-      raise ArgumentError,
-            "a line type scale's palette has #{length(@line_types)} line types, too few for its " <>
-              "#{count} values, since more are hard to tell apart; " <>
-              "Giggly.Plot.scale_linetype_manual/2 gives a line type for each"
-    end
-
-    Enum.take(@line_types, count)
-  end
-
-  def discrete({:manual, values}, count) when is_list(values) do
-    check_enough(values, count)
-    Enum.take(values, count)
-  end
-
-  # A manual palette's map's value for each of `keys`, the present levels' keys as the scale
-  # matches them (`Scales.DataRange.key/1`), the map's keys turned so too, or `missing` for
-  # a level the map has no value for; a map of fewer values than levels raises, as the opening
-  # comment says.
-  @doc false
-  @spec named(%{term() => term()}, [term()], term()) :: [term()]
-  def named(value_by_key, keys, missing) do
-    check_enough(value_by_key, length(keys))
-    Enum.map(keys, fn key -> Map.get(value_by_key, key, missing) end)
-  end
-
-  # A manual palette's list named by breaks: for each of `keys`, the present levels' keys as the
-  # scale matches them, the value at the place of the break whose key, in `break_keys`, it is, or
-  # `missing` for a level no break names, a value beyond the last break naming none; a list of
-  # fewer values than levels raises, as R counts every value of a manual scale, named or not.
-  @doc false
-  @spec named_by_breaks(list(), [term()], [term()], term()) :: [term()]
-  def named_by_breaks(values, break_keys, keys, missing) do
-    check_enough(values, length(keys))
-
-    value_by_key =
-      break_keys
-      |> Enum.zip(values)
-      |> Map.new()
-
-    Enum.map(keys, fn key -> Map.get(value_by_key, key, missing) end)
-  end
-
-  defp check_enough(values, count) when is_list(values) and count <= length(values), do: :ok
-  defp check_enough(values, count) when is_map(values) and count <= map_size(values), do: :ok
-
-  defp check_enough(values, count) do
-    raise ArgumentError,
-          "a manual scale needs a value for each of its #{count} levels, " <>
-            "but has #{Enum.count(values)}: #{inspect(values)}"
-  end
-
-  # `count` values from `low` to `high`, evenly spaced, as R's `seq(low, high, length.out =
-  # count)` spaces them: none for no levels, the first `low` and the last `high` exactly, and each
-  # one between `low` plus its index times the step, in that order of operations, as R's
-  # `seq.default()` computes it, so the fourth of seven from 0.1 to 1 is 0.54999999999999993, not
-  # 0.55; one for one level, `low`.
-  @doc false
+      iex> Scales.Palette.spread({2, 6}, 1)
+      [2]
+  """
   @spec spread({number(), number()}, non_neg_integer()) :: [number()]
   def spread({_low, _high}, 0), do: []
   def spread({low, _high}, 1), do: [low]
@@ -346,10 +273,20 @@ defmodule Scales.Palette do
     Enum.concat([[low], between, [high]])
   end
 
-  # A place from 0 to 1 moved onto `to`, as R's `rescale(x, to, from = c(0, 1))`.
-  defp from_unit(place, to) do
-    [rescaled] = Bounds.rescale([place], {0, 1}, to)
-    rescaled
+  # Each place through `function`, a `nil` left `nil`, as R's arithmetic leaves `NA`.
+  defp each_place(places, function) do
+    Enum.map(places, fn
+      nil -> nil
+      place when is_number(place) -> function.(place)
+    end)
+  end
+
+  # The first `count` of `values`, `nil` for each past their end, as R's `values[seq_len(n)]`
+  # gives `NA`.
+  defp padded(values, count) do
+    values
+    |> Stream.concat(Stream.repeatedly(fn -> nil end))
+    |> Enum.take(count)
   end
 
   # A grey of `level`, 0 black to 1 white, as R's `gray()` writes it.

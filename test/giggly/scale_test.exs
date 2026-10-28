@@ -2,6 +2,7 @@ defmodule Giggly.ScaleTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Geom, Scale}
+  alias Scales.Palette
 
   # A new discrete alpha scale trained once on `values`.
   defp discrete_alpha(values) do
@@ -904,15 +905,6 @@ defmodule Giggly.ScaleTest do
                [0.1, 0.325, nil, 1.0, 0.55, 0.24625, nil]
     end
 
-    test "a continuous alpha of one value is the middle of the palette" do
-      scale =
-        :continuous
-        |> Scale.new(:alpha)
-        |> Scale.train([7, 7], :none)
-
-      assert Scale.map(scale, [7, 7]) === [0.55, 0.55]
-    end
-
     test "a discrete alpha spreads its present levels evenly from 0.1 to 1, a missing one nil" do
       scale =
         :discrete
@@ -920,35 +912,6 @@ defmodule Giggly.ScaleTest do
         |> Scale.train(["b", "a", nil, "c", "a"], :none)
 
       assert Scale.map(scale, ["b", "a", nil, "c", "a"]) === [0.55, 0.1, nil, 1.0, 0.1]
-    end
-
-    test "the spread is R's seq(), its middle values found by steps from the first" do
-      levels = ~w(a b c d e f g)
-
-      scale =
-        :discrete
-        |> Scale.new(:alpha)
-        |> Scale.train(levels, :none)
-
-      assert Scale.map(scale, levels) ===
-               [
-                 0.1,
-                 0.25,
-                 0.4,
-                 0.54999999999999993,
-                 0.69999999999999996,
-                 0.84999999999999998,
-                 1.0
-               ]
-    end
-
-    test "one level is the palette's start, two its ends, none at all leave only nil" do
-      one = discrete_alpha(["a", "a"])
-      two = discrete_alpha(["a", "b"])
-      none = discrete_alpha([nil])
-
-      assert {Scale.map(one, ["a"]), Scale.map(two, ["a", "b"]), Scale.map(none, [nil])} ===
-               {[0.1], [0.1, 1.0], [nil]}
     end
 
     # A position scale's first training is reset before its second, so nothing a plot draws reads
@@ -997,9 +960,8 @@ defmodule Giggly.ScaleTest do
     end
   end
 
-  # Golden: scales 1.4.0's `pal_hue()(n)` in R 4.6.1, through farver 2.1.2; the palette matched
-  # R's for every count from 1 to 40. A count of 24 ends on a hue of exactly 360, and 40 on 366,
-  # which R takes modulo 360 first. ggplot2's discrete colour scale maps `NA` to grey50.
+  # ggplot2's discrete colour scale records `pal_hue()`'s defaults and maps `NA` to grey50; the
+  # palette's colours are `Scales.Palette`'s, which its tests pin to R's.
   describe "map/2 through the hue palette" do
     test "a colour or fill scale records pal_hue()'s hues, chroma and luminance, NA grey50, a legend" do
       expected = %Scale.Discrete{
@@ -1015,59 +977,9 @@ defmodule Giggly.ScaleTest do
 
     test "each present level takes its hue in level order, and a missing value grey50" do
       scale = hue_scale(["r", "4", nil, "f"])
+      [four, f, r] = Palette.discrete(scale.palette, 3)
 
-      assert Scale.map(scale, ["f", nil, "4", "r", "4"]) ===
-               ["#00BA38", "#7F7F7F", "#F8766D", "#619CFF", "#F8766D"]
-    end
-
-    test "the hues are spaced round the circle, its last share left off, as pal_hue() spaces them" do
-      colours = fn count ->
-        levels =
-          Enum.map(1..count, fn index ->
-            index
-            |> Integer.to_string()
-            |> String.pad_leading(2, "0")
-          end)
-
-        levels
-        |> hue_scale()
-        |> Scale.map(levels)
-      end
-
-      assert {colours.(1), colours.(2), colours.(7)} ===
-               {["#F8766D"], ["#F8766D", "#00BFC4"],
-                ["#F8766D", "#C49A00", "#53B400", "#00C094", "#00B6EB", "#A58AFF", "#FB61D7"]}
-
-      assert colours.(24) === [
-               "#F8766D",
-               "#ED813E",
-               "#DE8C00",
-               "#CD9600",
-               "#B79F00",
-               "#9DA700",
-               "#7CAE00",
-               "#49B500",
-               "#00BA38",
-               "#00BE67",
-               "#00C08B",
-               "#00C1A9",
-               "#00BFC4",
-               "#00BBDC",
-               "#00B4F0",
-               "#00A9FF",
-               "#619CFF",
-               "#9F8CFF",
-               "#C77CFF",
-               "#E36EF6",
-               "#F564E3",
-               "#FF61CC",
-               "#FF64B0",
-               "#FF6C91"
-             ]
-
-      forty = colours.(40)
-
-      assert Enum.take(forty, -3) === ["#FF65AA", "#FF6A98", "#FD7083"]
+      assert Scale.map(scale, ["f", nil, "4", "r", "4"]) === [f, "#7F7F7F", four, r, four]
     end
 
     test "a scale of missing values alone maps them all to grey50" do
@@ -1096,21 +1008,15 @@ defmodule Giggly.ScaleTest do
 
     test "each value is its place in the range along the gradient, blended in Lab, a missing one grey50" do
       scale = gradient_scale([1, 2.5, nil, 4])
+      [low, middle, high] = Palette.continuous(scale.palette, [0, 0.5, 1])
 
-      assert Scale.map(scale, [1, 2.5, nil, 4, :nan]) ===
-               ["#132B43", "#336A98", "#7F7F7F", "#56B1F7", "#7F7F7F"]
-    end
-
-    test "places between the ends are blended as R's approxfun blends L*, a* and b*" do
-      scale = gradient_scale([0, 1])
-
-      assert Scale.map(scale, [0.25, 0.75]) === ["#22496C", "#448DC6"]
-    end
-
-    test "a scale of one value maps it to the middle of the gradient" do
-      scale = gradient_scale([3, 3])
-
-      assert Scale.map(scale, [3]) === ["#336A98"]
+      assert Scale.map(scale, [1, 2.5, nil, 4, :nan]) === [
+               low,
+               middle,
+               "#7F7F7F",
+               high,
+               "#7F7F7F"
+             ]
     end
   end
 
@@ -1216,85 +1122,6 @@ defmodule Giggly.ScaleTest do
   defp hue(low, high, chroma \\ 100.0, luminance \\ 65.0, direction \\ 1),
     do: {:hue, %{hue: {low, high}, chroma: chroma, luminance: luminance, direction: direction}}
 
-  # What a discrete colour scale of `palette` trained on `levels` maps them to.
-  defp mapped_levels(palette, levels) do
-    palette
-    |> palette_scale(levels)
-    |> Scale.map(levels)
-  end
-
-  # Golden: scales 1.4.0's `pal_hue(h, c, l, direction = )(n)` in R 4.6.1, through farver 2.1.2;
-  # the palette matched R's on 2,160 ranges, chromas, luminances, directions and counts. A range
-  # less than a degree short of the circle, modulo 360 as R's `%%` takes it, leaves its last
-  # share off: 10 to 370.5 does, 10 to 371 does not, and 375 to 15 does.
-  describe "map/2 through a hue palette of its own" do
-    test "a range is spread end to end unless it is within a degree of the whole circle" do
-      three = ~w(a b c)
-      quarter = hue(0.0, 90.0)
-      half_a_degree_past = hue(10.0, 370.5)
-      a_degree_past = hue(10.0, 371.0)
-      circle_back = hue(375.0, 15.0)
-      backward = hue(200.0, 100.0)
-
-      assert {mapped_levels(quarter, ~w(a b c d)), mapped_levels(half_a_degree_past, three),
-              mapped_levels(a_degree_past, three), mapped_levels(circle_back, three),
-              mapped_levels(backward, three)} ===
-               {["#FF6C91", "#ED813E", "#CD9600", "#9DA700"], ["#FB737A", "#00B820", "#43A0FF"],
-                ["#FB737A", "#00C0BD", "#FA7377"], ["#F8766D", "#00BA38", "#619CFF"],
-                ["#00BECD", "#00BE67", "#88AC00"]}
-    end
-
-    test "a direction of -1 hands the colours out in reverse, and chroma and luminance set them" do
-      levels = ~w(a b c)
-      reversed = hue(15.0, 375.0, 100.0, 65.0, -1)
-      muted = hue(15.0, 375.0, 30.0, 70.0)
-
-      assert {mapped_levels(reversed, levels), mapped_levels(muted, levels)} ===
-               {["#619CFF", "#00BA38", "#F8766D"], ["#CEA09E", "#8BB594", "#9FABCC"]}
-    end
-  end
-
-  # Golden: scales 1.4.0's `pal_grey(start, end)(n)`, grDevices' `grey.colors()`, in R 4.6.1;
-  # the palette matched R's for every count from 1 to 40 on seven ranges.
-  describe "map/2 through the grey palette" do
-    test "the greys run from start to end, spaced evenly once raised to the power 2.2" do
-      colours = fn range, levels -> mapped_levels({:gray, range}, levels) end
-
-      assert {colours.({0.2, 0.8}, ~w(a)), colours.({0.2, 0.8}, ~w(a b)),
-              colours.({0.2, 0.8}, ~w(a b c d e)), colours.({0.2, 0.0}, ~w(a b c d)),
-              colours.({1.0, 0.0}, ~w(a b c))} ===
-               {["#333333"], ["#333333", "#CCCCCC"],
-                ["#333333", "#737373", "#989898", "#B4B4B4", "#CCCCCC"],
-                ["#333333", "#2A2A2A", "#1F1F1F", "#000000"], ["#FFFFFF", "#BABABA", "#000000"]}
-    end
-
-    test "a missing value takes the scale's missing value, and no levels give no greys" do
-      gray = {:gray, {0.2, 0.8}}
-
-      assert {mapped_levels(gray, ["a", nil]), mapped_levels(gray, [nil])} ===
-               {["#333333", "#7F7F7F"], ["#7F7F7F"]}
-    end
-  end
-
-  # Golden: scales 1.4.0's `pal_viridis(alpha, begin, end, direction, option)(n)`,
-  # `viridisLite::viridis()` 0.4.3, in R 4.6.1, its opaque alpha FF dropped.
-  describe "map/2 through the viridis palette" do
-    test "the levels take viridis's colours, from begin to end, in the palette and alpha given" do
-      viridis = fn options ->
-        {:viridis,
-         Map.merge(%{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}, options)}
-      end
-
-      assert {mapped_levels(viridis.(%{}), ~w(a b c)),
-              mapped_levels(
-                viridis.(%{option: :magma, begin: 0.2, direction: -1, alpha: 0.5}),
-                ~w(a b c)
-              ), mapped_levels(viridis.(%{option: :plasma, end: 0.8}), ~w(a b c d))} ===
-               {["#440154", "#21908C", "#FDE725"], ["#FCFDBF80", "#DE496880", "#3B0F7080"],
-                ["#0D0887", "#8405A7", "#D35171", "#FCA636"]}
-    end
-  end
-
   # Golden: ggplot2 4.0.3's `scale_colour_manual()` in R 4.6.1, `layer_data()` and
   # `get_guide_data()` over mtcars's `factor(cyl)` and small tables: an unnamed list takes the
   # levels in order, a named one colours by name and shows only the levels it names, `NA` among
@@ -1360,34 +1187,6 @@ defmodule Giggly.ScaleTest do
       assert_raise ArgumentError, ~r/needs a value for each of its 3 levels, but has 2/, fn ->
         Scale.map(scale, [4])
       end
-    end
-  end
-
-  # Golden: scales 1.4.0's `colour_ramp()` in R 4.6.1, through farver 2.1.2: Giggly's gradient
-  # matched R's on all 30,054 places sampled through six sets of colours, among them R's
-  # `terrain.colors(10)` and ggplot2's gradient2 default, `muted("red")`, white and
-  # `muted("blue")`. A place at a colour takes that colour exactly.
-  describe "map/2 through a gradient of many colours" do
-    @terrain ~w(#00A600 #2DB600 #63C600 #A0D600 #E6E600 #E8C32E #EBB25E #EDB48E #F0C9C0 #F2F2F2)
-
-    test "the colours are spaced evenly, a place between two blended, one at a colour exactly" do
-      scale = gradient_through(@terrain, [0, 1])
-
-      assert Scale.map(scale, [0, 0.25, 0.5, 1, 0.1111111111111111, 0.44444444444444442]) ===
-               ["#00A600", "#74CA00", "#E7D520", "#F2F2F2", "#2DB600", "#E6E600"]
-    end
-
-    test "three colours blend through the middle one" do
-      scale = gradient_through(["#832424", "#FFFFFF", "#3A3A98"], [0, 1])
-
-      assert Scale.map(scale, [0, 0.25, 0.5, 0.75, 1]) ===
-               ["#832424", "#C89089", "#FFFFFF", "#A197CC", "#3A3A98"]
-    end
-
-    test "one colour is every value's" do
-      scale = gradient_through(["#4682B4"], [0, 10])
-
-      assert Scale.map(scale, [0, 3, 10, nil]) === ["#4682B4", "#4682B4", "#4682B4", "#7F7F7F"]
     end
   end
 
@@ -1459,16 +1258,6 @@ defmodule Giggly.ScaleTest do
                [3.438152923066113, 3.1613335557555877, 4.3365850792131049, 3.3591043582407853]
     end
 
-    test "a size by area from 0 takes a value below 0 by its distance, and one value at the top" do
-      signed = area_scale([-2, -1, 1, 4])
-      negative = area_scale([-4, -2, -1])
-      single = area_scale([3, 3])
-
-      assert {Scale.map(signed, [-2, -1, 1, 4]), Scale.map(negative, [-4, -2, -1]),
-              Scale.map(single, [3])} ===
-               {[4.2426406871192857, 3.0, 3.0, 6.0], [12.0, 8.4852813742385713, 6.0], [6.0]}
-    end
-
     test "a size by area from 0 censors outside its limits, and takes its missing value's size" do
       values = [1, 2, nil, 10]
       wide = area_scale(values, limits: {0.0, 20.0})
@@ -1491,18 +1280,6 @@ defmodule Giggly.ScaleTest do
 
       error = assert_raise ArgumentError, fn -> Scale.map(below, [-1]) end
       assert error.message =~ "cannot place -1 when that end is 0"
-    end
-
-    test "one value is at the middle of a size's range, as any continuous aesthetic's" do
-      continuous =
-        :continuous
-        |> Scale.new(:size)
-        |> Scale.train([3, 3], :none)
-
-      radius = Scale.train(%Scale.Continuous{palette: {:rescale, {1.0, 6.0}}}, [3, 3], :none)
-
-      assert {Scale.map(continuous, [3]), Scale.map(radius, [3])} ===
-               {[4.5355339059327378], [3.5]}
     end
 
     test "a discrete size spreads its levels' areas evenly from 2 to 6, or over its range" do
@@ -1591,12 +1368,11 @@ defmodule Giggly.ScaleTest do
     end
   end
 
-  # Golden: scales 1.4.0's `pal_linetype()(13)` in R 4.6.1, `"solid"`, `"22"`, `"42"`, `"44"`,
-  # `"13"`, `"1343"`, `"73"`, `"2262"`, `"12223242"`, `"F282"`, `"F4448444"`, `"224282F2"` and
-  # `"F1"`, each held as its dash pattern, a hex digit its length; and ggplot2 4.0.3's
-  # `layer_data()` for a line width mapped from 2, 4.5, 3 and 7, and from three levels.
+  # A discrete line type takes `Scales.Palette`'s line types, which its tests pin to R's
+  # `pal_linetype()`. Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for a line width mapped
+  # from 2, 4.5, 3 and 7, and from three levels.
   describe "map/2 of a line type or line width scale" do
-    test "a discrete line type gives its levels R's 13 line types in order, nil none" do
+    test "a discrete line type gives its levels the palette's 13 line types in order, nil none" do
       levels = ~w(a b c d e f g h i j k l m)
 
       scale =
@@ -1604,22 +1380,7 @@ defmodule Giggly.ScaleTest do
         |> Scale.new(:linetype)
         |> Scale.train(levels, :none)
 
-      assert Scale.map(scale, [nil | levels]) === [
-               nil,
-               {},
-               {2, 2},
-               {4, 2},
-               {4, 4},
-               {1, 3},
-               {1, 3, 4, 3},
-               {7, 3},
-               {2, 2, 6, 2},
-               {1, 2, 2, 2, 3, 2, 4, 2},
-               {15, 2, 8, 2},
-               {15, 4, 4, 4, 8, 4, 4, 4},
-               {2, 2, 4, 2, 8, 2, 15, 2},
-               {15, 1}
-             ]
+      assert Scale.map(scale, [nil | levels]) === [nil | Palette.discrete(:linetype, 13)]
     end
 
     test "a fourteenth level cannot be drawn, and the scale that takes more is named" do
