@@ -59,6 +59,13 @@ defmodule Scales.PaletteTest do
       assert Palette.continuous({:gradient, ["#4682B4"]}, [0, 0.3, 1, nil]) ===
                ["#4682B4", "#4682B4", "#4682B4", nil]
     end
+
+    # One colour reads no place, so only the check refuses one.
+    test "a place that is neither a number nor nil is refused, even by one colour" do
+      assert_raise FunctionClauseError, fn ->
+        Palette.continuous({:gradient, ["#4682B4"]}, [:infinity])
+      end
+    end
   end
 
   # Golden: scales 1.4.0's `pal_hue(h, c, l, direction = )(n)` in R 4.6.1, through farver 2.1.2;
@@ -187,6 +194,15 @@ defmodule Scales.PaletteTest do
     test "a manual palette gives its first values, one for each level" do
       assert Palette.discrete({:manual, ["#FF0000", "#0000FF", "#00FF00"]}, 2) ===
                ["#FF0000", "#0000FF"]
+    end
+
+    # R's `pal_manual()` takes a vector, whose names it drops; matching values by name is a
+    # scale's, not the palette's.
+    # The map is built as the test runs: a literal the guard refuses fails the type checker.
+    test "a manual palette's values are a list, and a map is refused" do
+      named = Map.new([{"a", "#FF0000"}])
+
+      assert_raise FunctionClauseError, fn -> Palette.discrete({:manual, named}, 1) end
     end
   end
 
