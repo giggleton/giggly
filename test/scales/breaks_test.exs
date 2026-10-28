@@ -172,9 +172,12 @@ defmodule Scales.BreaksTest do
   # The search stops only on a nice number that cannot win, so none would never stop.
   test "the nice numbers are positive numbers, at least one, and anything else is refused" do
     for numbers <- [[], [0], [1, -2], [:five]] do
-      assert_raise NimbleOptions.ValidationError, fn ->
-        Breaks.extended({0.0, 10.0}, nice_numbers: numbers)
-      end
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Breaks.extended({0.0, 10.0}, nice_numbers: numbers)
+        end
+
+      assert error.message =~ "got: #{inspect(numbers)}"
     end
   end
 end
