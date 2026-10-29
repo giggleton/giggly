@@ -1,7 +1,7 @@
 ---
 paths:
   - "lib/scales/color_operations.ex"
-  - "priv/palettes/**"
+  - "priv/palettes/viridis_splines.csv"
   - "test/scales/color_operations_test.exs"
 ---
 

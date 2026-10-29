@@ -2,6 +2,7 @@
 paths:
   - "lib/scales.ex"
   - "lib/scales/**"
+  - "priv/palettes/brewer.csv"
   - "test/scales/**"
   - "test/scales_test.exs"
 ---
@@ -42,9 +43,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`,
   `{:viridis, %{option:, begin:, end:, direction:, alpha:}}`, R's `pal_viridis()`
   (`ColorOperations.viridis/2`), `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`, six
-  shapes by name, `:linetype`, R's `pal_linetype()`, 13 line types as dash patterns, and
-  `{:manual, values}`, R's `pal_manual()`, a list. A `nil` place gives `nil`. Each matched R to the
-  last digit; its tests pin R's figures. ggplot2's palettes, the ordinal sequences and a manual
+  shapes by name, `:linetype`, R's `pal_linetype()`, 13 line types as dash patterns,
+  `{:manual, values}`, R's `pal_manual()`, a list, and `{:brewer, %{palette:, direction:}}`, R's
+  `pal_brewer()`. A `nil` place gives `nil`. Each matched R to the last digit; its tests pin R's
+  figures. ggplot2's palettes, the ordinal sequences and a manual
   palette matched by name or by breaks, are Giggly's (`scale.md`).
 - **A discrete palette past its end gives `nil`, as R gives `NA`, and raises nothing**: R also
   warns, which a pure library cannot, and refusing is the caller's, so no message of the package
@@ -56,6 +58,14 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   each name to R's number through the table points are drawn from. **The line type palette gives
   R's 13 in order, `"solid"` as `{}` and each hex pattern as a tuple of its lengths**, its test
   pinning `pal_linetype()`'s output.
+- **A brewer palette is exactly R's `pal_brewer()`, its colours RColorBrewer's own sets**, copied
+  by the R script in `priv/palettes/brewer.csv`'s header and read at compile time behind a
+  `CorePurity` waiver of their own, never typed or derived: a set for each count from 3 to the
+  palette's largest, fewer than 3 the start of the set of 3, past the largest `nil`, reversed for
+  a `direction` of -1 after that padding, so the `nil`s come first, as R's `NA`s do. A palette is
+  named as R spells it, and `brewer_palettes/1` gives each type's names in the order R numbers
+  them; a name R does not spell so is refused, where R warns and gives Greens. The file carries
+  ColorBrewer's copyright and Apache 2.0 notice, and the moduledoc its acknowledgment.
 - **A discrete palette's spread is R's `seq()`** (`Palette.spread/2`): its ends exact, each value between found
   by steps from the first (the fourth of seven is 0.54999999999999993).
 - **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient

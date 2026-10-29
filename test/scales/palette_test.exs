@@ -206,6 +206,125 @@ defmodule Scales.PaletteTest do
     end
   end
 
+  # Golden: scales 1.4.0's `pal_brewer()` in R 4.6.1, with RColorBrewer 1.1-3; past a palette's
+  # largest set R gives `NA` and warns.
+  describe "discrete/2 of a brewer palette" do
+    test "each count from 3 to the largest takes the palette's own set" do
+      assert {brewer("Blues", 3), brewer("Blues", 9), brewer("RdBu", 5)} ===
+               {["#DEEBF7", "#9ECAE1", "#3182BD"],
+                [
+                  "#F7FBFF",
+                  "#DEEBF7",
+                  "#C6DBEF",
+                  "#9ECAE1",
+                  "#6BAED6",
+                  "#4292C6",
+                  "#2171B5",
+                  "#08519C",
+                  "#08306B"
+                ], ["#CA0020", "#F4A582", "#F7F7F7", "#92C5DE", "#0571B0"]}
+    end
+
+    test "fewer than 3 levels take the start of the set of 3, and none take none" do
+      assert {brewer("Blues", 2), brewer("Blues", 1), brewer("Blues", 0)} ===
+               {["#DEEBF7", "#9ECAE1"], ["#DEEBF7"], []}
+    end
+
+    test "past the largest set each level is nil" do
+      assert brewer("Paired", 13) === [
+               "#A6CEE3",
+               "#1F78B4",
+               "#B2DF8A",
+               "#33A02C",
+               "#FB9A99",
+               "#E31A1C",
+               "#FDBF6F",
+               "#FF7F00",
+               "#CAB2D6",
+               "#6A3D9A",
+               "#FFFF99",
+               "#B15928",
+               nil
+             ]
+    end
+
+    test "a direction of -1 reverses the set once it is padded, so the nils come first" do
+      assert {brewer("Blues", 4, -1), brewer("Blues", 10, -1)} ===
+               {["#2171B5", "#6BAED6", "#BDD7E7", "#EFF3FF"],
+                [
+                  nil,
+                  "#08306B",
+                  "#08519C",
+                  "#2171B5",
+                  "#4292C6",
+                  "#6BAED6",
+                  "#9ECAE1",
+                  "#C6DBEF",
+                  "#DEEBF7",
+                  "#F7FBFF"
+                ]}
+    end
+
+    # R's `pal_brewer(palette = "set1")` warns and gives Greens.
+    test "a name R does not spell so is refused" do
+      assert_raise FunctionClauseError, fn -> brewer("set1", 3) end
+    end
+  end
+
+  # Golden: scales 1.4.0's `scales:::brewer`, the names `pal_brewer(type, palette)` numbers, and
+  # `pal_brewer("qual", 5)(3)` and `pal_brewer("div", 2)(3)` in R 4.6.1.
+  describe "brewer_palettes/1" do
+    test "each type's names are in R's order, so a number picks R's palette" do
+      assert {Palette.brewer_palettes(:seq), Palette.brewer_palettes(:div)} ===
+               {[
+                  "Blues",
+                  "BuGn",
+                  "BuPu",
+                  "GnBu",
+                  "Greens",
+                  "Greys",
+                  "Oranges",
+                  "OrRd",
+                  "PuBu",
+                  "PuBuGn",
+                  "PuRd",
+                  "Purples",
+                  "RdPu",
+                  "Reds",
+                  "YlGn",
+                  "YlGnBu",
+                  "YlOrBr",
+                  "YlOrRd"
+                ],
+                [
+                  "BrBG",
+                  "PiYG",
+                  "PRGn",
+                  "PuOr",
+                  "RdBu",
+                  "RdGy",
+                  "RdYlBu",
+                  "RdYlGn",
+                  "Spectral"
+                ]}
+
+      qualitative = Palette.brewer_palettes(:qual)
+      diverging = Palette.brewer_palettes(:div)
+      fifth_qualitative = Enum.at(qualitative, 4)
+      second_diverging = Enum.at(diverging, 1)
+
+      assert {brewer(fifth_qualitative, 3), brewer(second_diverging, 3)} ===
+               {["#B3E2CD", "#FDCDAC", "#CBD5E8"], ["#E9A3C9", "#F7F7F7", "#A1D76A"]}
+    end
+
+    # The type is built as the test runs: a literal the guard refuses fails the type checker.
+    test "a type R does not have is refused" do
+      type = Enum.at([:sequential], 0)
+
+      assert_raise FunctionClauseError, fn -> Palette.brewer_palettes(type) end
+    end
+  end
+
   # Golden: R 4.6.1's `seq(0.1, 1, length.out = n)` for n of 7, 2, 1 and 0.
   describe "spread/2" do
     test "the spread is R's seq(), its middle values found by steps from the first" do
@@ -232,4 +351,8 @@ defmodule Scales.PaletteTest do
     parameters = Enum.into(options, %{hue: range, chroma: 100.0, luminance: 65.0, direction: 1})
     Palette.discrete({:hue, parameters}, count)
   end
+
+  # `count` colours of R's `pal_brewer(palette = name, direction = direction)`.
+  defp brewer(name, count, direction \\ 1),
+    do: Palette.discrete({:brewer, %{palette: name, direction: direction}}, count)
 end

@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A brewer palette is RColorBrewer's sets, named as R spells them; dichromat is left out
+  (2026-10-28, Steve, increment 1's scope; checked against scales 1.4.0, RColorBrewer 1.1-3 and
+  dichromat 2.0-1).** `{:brewer, %{palette: "Set1", direction: 1}}` gives R's `pal_brewer()`:
+  each palette has a hand-picked set per count, so the 265 sets are copied by R's own script into
+  `priv/palettes/brewer.csv` with ColorBrewer's Apache 2.0 notice (no Hex package has them). Names
+  are strings as ColorBrewer coined them and every library spells them (`"BrBG"`), matched
+  exactly as R matches, `brewer_palettes/1` listing each type's in R's order for a number.
+  *Rejected: snake-case atoms (`:br_bg`)*, viridis's form, since they invent spellings a user
+  translates from every reference. *Rejected: R-case atoms (`:BrBG`)*: unidiomatic. *Rejected:
+  `pal_dichromat()`*: its 17 schemes are the GPL-2 dichromat package's, which scales only
+  suggests; nothing in the books or notebooks uses it, and its maintainer points users elsewhere.
+
 - **The scales package's API is what a user holds the inputs to or Giggly calls, named for R's
   families (2026-10-27, Steve, the split's step 2; checked against scales 1.4.0).** API: the root,
   `Breaks`, `MinorBreaks`, `Labels` (`Format` merged in, since scales 1.1.0 renamed `*_format`
@@ -2941,6 +2953,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-28 — Add the brewer palette: RColorBrewer's sets, named as R spells them, dichromat
+  left out (palettes and colours, step 1); §4: "A brewer palette is RColorBrewer's sets"
 - 2026-10-27 — Document the Scales root as API: its families, the conventions they share and a
   worked example, its exports narrowed to what Giggly calls (scales package, the split, step 2,
   the root); §4: "The scales package's API is what a user holds"

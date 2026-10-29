@@ -36,12 +36,25 @@ defmodule Scales.Palette do
     * `:linetype`, R's `pal_linetype()`: 13 line types, each as its dash pattern, a tuple of
       lengths, `{}` for a solid line.
     * `{:manual, values}`, R's `pal_manual()`: `values` in order.
+    * `{:brewer, %{palette: palette, direction: direction}}`, R's `pal_brewer()`: the colours of
+      one of ColorBrewer's palettes, named as R spells it (`brewer_palettes/1` lists them), which
+      has a set of its own for each count from 3 to its largest. Fewer than 3 levels take the
+      start of its set of 3, and a `direction` of -1 hands the colours out in reverse once the
+      `nil`s past its largest set are added, so those come first, as R's do. A name it does not
+      know is refused, where R warns and gives Greens.
 
   A discrete palette asked for more levels than it holds gives `nil` for each past its end, as R
   gives `NA` (and warns). No levels give none, where R's hue palette refuses them.
 
   Colours are uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of their own, as
   `Scales.ColorOperations` writes them.
+
+  ## ColorBrewer
+
+  This product includes color specifications and designs developed by Cynthia Brewer
+  (http://colorbrewer.org/). They are Copyright (c) 2002 Cynthia Brewer, Mark Harrower, and The
+  Pennsylvania State University, licensed under the Apache License, Version 2.0, as R's
+  RColorBrewer carries them.
   """
 
   # Each palette matched R to the last digit; the tests pin R's figures. The gradient blends as
@@ -80,6 +93,10 @@ defmodule Scales.Palette do
           | {:shape, :solid | :open}
           | :linetype
           | {:manual, list()}
+          | {:brewer, %{palette: String.t(), direction: 1 | -1}}
+
+  @typedoc "A ColorBrewer palette's type: sequential, diverging or qualitative."
+  @type brewer_type :: :seq | :div | :qual
 
   @typedoc "A palette."
   @type t :: continuous() | discrete()
@@ -112,6 +129,47 @@ defmodule Scales.Palette do
     {2, 2, 4, 2, 8, 2, 15, 2},
     {15, 1}
   ]
+
+  @brewer_path Application.app_dir(:giggly, "priv/palettes/brewer.csv")
+  @external_resource @brewer_path
+
+  # why: RColorBrewer's sets are read once, at compile time; no IO happens when a palette is used
+  # instead of: the colours as literals in this module — rejected because they are R's output,
+  #   kept as the file R writes so they can be regenerated and diffed against their source apart
+  #   from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @brewer_text File.read!(@brewer_path)
+
+  # The file's rows, each a palette's name, its type, a count and that count's set of colours, in
+  # the file's order: by type, each type's palettes as R's `pal_brewer()` numbers them, each
+  # palette's sets from 3 colours up; its comment lines and header skipped.
+  @brewer_rows @brewer_text
+               |> String.split("\n", trim: true)
+               |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
+               |> Enum.drop(1)
+               |> Enum.map(fn line ->
+                 [name, type, count, colors] = String.split(line, ",")
+                 types = %{"seq" => :seq, "div" => :div, "qual" => :qual}
+                 {name, Map.fetch!(types, type), String.to_integer(count), String.split(colors)}
+               end)
+
+  # Each set's colours by its palette's name and count.
+  @brewer_sets Map.new(@brewer_rows, fn {name, _type, count, colors} ->
+                 {{name, count}, colors}
+               end)
+
+  # Each palette's largest count, its last set's.
+  @brewer_largest Map.new(@brewer_rows, fn {name, _type, count, _colors} -> {name, count} end)
+
+  # Each type's palettes' names, in the order R numbers them.
+  @brewer_palettes @brewer_rows
+                   |> Enum.group_by(
+                     fn {_name, type, _count, _colors} -> type end,
+                     fn {name, _type, _count, _colors} -> name end
+                   )
+                   |> Map.new(fn {type, names} -> {type, Enum.dedup(names)} end)
+
+  @brewer_names Map.keys(@brewer_largest)
 
   @doc """
   Each place's value under a continuous palette, a place running from 0 to 1 over the data's
@@ -249,6 +307,36 @@ defmodule Scales.Palette do
   def discrete({:shape, fill}, count), do: padded(Map.fetch!(@shapes, fill), count)
   def discrete(:linetype, count), do: padded(@line_types, count)
   def discrete({:manual, values}, count) when is_list(values), do: padded(values, count)
+
+  # A brewer palette's are `pal_brewer()`'s: the palette's set for `count`, or its set of 3 for
+  # fewer, or its largest for more, padded with `nil` past its end and then directed, as R pads
+  # before it reverses.
+  def discrete({:brewer, %{palette: name, direction: direction}}, count)
+      when name in @brewer_names do
+    set_count =
+      count
+      |> max(3)
+      |> min(Map.fetch!(@brewer_largest, name))
+
+    @brewer_sets
+    |> Map.fetch!({name, set_count})
+    |> padded(count)
+    |> directed(direction)
+  end
+
+  @doc """
+  The names of ColorBrewer's palettes of `type`, sequential (`:seq`), diverging (`:div`) or
+  qualitative (`:qual`), as R spells them, in the order R's `pal_brewer()` numbers them, so its
+  `pal_brewer("qual", 5)` is `"Pastel2"`.
+
+  ## Examples
+
+      iex> Scales.Palette.brewer_palettes(:qual)
+      ["Accent", "Dark2", "Paired", "Pastel1", "Pastel2", "Set1", "Set2", "Set3"]
+  """
+  @spec brewer_palettes(brewer_type()) :: [String.t(), ...]
+  def brewer_palettes(type) when type in [:seq, :div, :qual],
+    do: Map.fetch!(@brewer_palettes, type)
 
   @doc """
   `count` numbers spread evenly from `low` to `high`, R's `seq(low, high, length.out = count)`:
