@@ -3066,6 +3066,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — The commit gate judges the checkout a command runs in, not the main checkout its
+  hook starts in
 - 2026-10-29 — Add geom_segment(): a straight line per row, or a path under radial coordinates,
   and annotate(:segment) (geom_segment, step 1); §4: "`geom_segment()` draws a straight line"
 - 2026-10-29 — Add the colour steps guide, guide_coloursteps() at its defaults, for binned and

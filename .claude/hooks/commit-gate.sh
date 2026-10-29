@@ -55,9 +55,26 @@
 #
 # Requires `jq` and `git` on PATH.
 
+command="${1:-check}"
+hooks_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# The hook entry points judge the checkout the command runs in, named by the tool-call JSON's
+# `cwd`, not the directory the hook was started in: a session working in a git worktree runs its
+# commands there while its hooks start in the main checkout, so reading git from the hook's own
+# directory judged another tree, its diff, its marks and its HEAD.
+input=""
+case "$command" in
+  check | post-commit)
+    input="$(cat)"
+    command_cwd="$(printf '%s' "$input" | jq -r '.cwd // empty')"
+    if [ -n "$command_cwd" ]; then
+      cd "$command_cwd" || exit 1
+    fi
+    ;;
+esac
+
 marks_dir="$(git rev-parse --git-dir)/claude-skill-marks"
 mutation_marks_dir="$(git rev-parse --git-common-dir)/claude-skill-marks/mutation"
-hooks_dir="$(dirname "${BASH_SOURCE[0]}")"
 rules_dir=".claude/rules"
 
 # Every changed path (staged, unstaged, untracked), rename targets resolved.
@@ -167,8 +184,6 @@ mark_status() {
   fi
 }
 
-command="${1:-check}"
-
 case "$command" in
   mark)
     kind="${2:?usage: commit-gate.sh mark review|docs|mutation}"
@@ -188,7 +203,6 @@ case "$command" in
     ;;
 
   check)
-    input="$(cat)"
     tool_command="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
 
     # Only gate actual commits; a compound command like `git add -A && git commit` still
@@ -239,7 +253,6 @@ $gated"
     ;;
 
   post-commit)
-    input="$(cat)"
     tool_command="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
 
     case "$tool_command" in
