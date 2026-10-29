@@ -104,6 +104,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   could be given with no arrow. *Rejected: a typed map on the primitives*: the compiler cannot
   check its keys.
 
+- **Minor breaks a number or a width to each gap are R's `loop_breaks()`, the width's typed as
+  `Breaks.width/3` is, the number's on numbers alone (2026-10-29, Steve: "A", increment 2's step
+  3; checked against scales 1.4.0).** `MinorBreaks.n/3`, `width/4` and `log/2` are R's
+  `minor_breaks_n()`, `minor_breaks_width()` and `minor_breaks_log()`, taking the limits and the
+  breaks as ggplot2 hands a two-argument function, their values in R's order, a value laid twice
+  kept once, 0 and -0 one value as R's `unique()` keeps them. R's `unlist()` drops a date's class,
+  so on a date or date-time axis R gives bare days or seconds, which ggplot2 then refuses; here
+  `width/4` gives what `Breaks.width/3` gives, `Date`s for dates, and `n/3` refuses dates, as a
+  fraction of a day is no date. `width/4`'s `offset:` defaults to 0, where R has no default.
+  *Rejected: both on numbers alone*: R's route works on no date axis, but a width's dates cost
+  nothing and serve another tool. *Rejected: `minor_breaks_log()`'s `detail` attribute*: it
+  waits for `guide_axis_logticks()`.
+
 - **Breaks for a log, exponential or timespan axis are R's, whole, and extended breaks take
   labeling's `only.loose` and `w` (2026-10-29, Steve, increment 2's step 2; checked against scales
   1.4.0).** `Breaks.log/2`, `exp/2` and `timespan/2` are R's `breaks_log()`, `breaks_exp()` and
@@ -3139,6 +3152,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add MinorBreaks.n, MinorBreaks.width and MinorBreaks.log, R's minor_breaks_n(),
+  minor_breaks_width() and minor_breaks_log() (breaks, step 3); §4: "Minor breaks a number or a
+  width"
 - 2026-10-29 — Draw the notebook examples geom_segment() and arrow: unlock, and narrow every
   verdict to what still waits (geom_segment, step 3, the notebook sweep)
 - 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),

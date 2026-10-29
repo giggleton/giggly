@@ -223,6 +223,18 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
+- **A number or a width of minor breaks to each gap is exactly R's `minor_breaks_n()` and
+  `minor_breaks_width()`** (`MinorBreaks.n/3`, `width/4`; design-log §4, the entry beginning
+  "Minor breaks a number or a width"): R's `loop_breaks()`, the low limit to the first break, each
+  pair of neighbours in the order given, the last break to the high limit, a value kept the first
+  time it is laid, 0 and -0 one; a number's gaps spread as `Palette.spread/2`, on numbers alone; a
+  width's laid by `Breaks.width/3`, on whatever it takes, `offset:` 0 unless given. No breaks are
+  refused, where R fails. **A logarithmic axis's are exactly R's `minor_breaks_log()`**
+  (`MinorBreaks.log/2`): R's values in R's order, the multiples 2 to 9 but 5 standing for R's
+  `setdiff()`, which removes only the powers and their fives; limits both 0 refused, where R
+  fails; the `detail` attribute left out. Their tests pin R's figures; all of 4,000 numeric, 2,000
+  date, 1,712 date-time and 4,014 log cases matched R, and 1,495 times but where R's `hms` runs
+  past midnight.
 - **A number of breaks wanted, `n:`, reaches extended breaks alone** (`Breaks.extended/2`,
   `Transform.breaks/3`), as R's `transformation$breaks(limits, n)`: the identity, sqrt, reverse
   and reciprocal pass it on; log10, date, date-time and time refuse it, their own counts waiting
