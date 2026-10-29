@@ -7,8 +7,8 @@ defmodule Scales.Transform.Log10 do
   # a negative number missing, R's NaN; plus infinity stays itself. Its domain is R's, 1e-100 up,
   # so an axis reaching below 10^-100 finds its breaks from there.
   #
-  # Its breaks are R's `breaks_log()`, five wanted (`Scales.Breaks.log/2`), found on the extent
-  # turned back into data units and put back into log space. Its minor breaks are R's regular
+  # Its breaks are R's `breaks_log()`, five wanted unless a caller says (`Scales.Breaks.log/2`),
+  # found on the extent turned back into data units and put back into log space. Its minor breaks are R's regular
   # ones in log space, and its labels the breaks in data units, plain decimals
   # (`Scales.Labels.plain/1`).
 
@@ -27,9 +27,9 @@ defmodule Scales.Transform.Log10 do
 
   # The breaks found on the extent in data units, then put back into log space.
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}, []) do
+  def breaks(_transformation, {low, high}, options) do
     {power(low), power(high)}
-    |> Breaks.log()
+    |> Breaks.log(options)
     |> Enum.map(&log10/1)
   end
 
@@ -37,7 +37,7 @@ defmodule Scales.Transform.Log10 do
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Scales.Transform
-  def format(_transformation, breaks, _extent) do
+  def format(_transformation, breaks, _extent, _options) do
     breaks
     |> Enum.map(&power/1)
     |> Labels.plain()

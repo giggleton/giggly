@@ -1,8 +1,9 @@
 defmodule Scales.Breaks do
   @moduledoc """
   Where a continuous axis's breaks go, given its limits: evenly spaced numbers, nice to read, that
-  cover them (`extended/2`), or every multiple of a width (`fullseq/3`), moved by an offset
-  (`width/3`), between numbers, dates, date-times or times of day; powers of a base and their
+  cover them (`extended/2`), round steps that cover them (`pretty/2`), or every multiple of a
+  width (`fullseq/3`), moved by an offset (`width/3`), between numbers, dates, date-times or
+  times of day; powers of a base and their
   multiples for a logarithmic axis (`log/2`), whole numbers for an axis of exponentials
   (`exp/2`), and whole seconds, minutes, hours, days or weeks for spans of time (`timespan/2`).
   The breaks may fall outside the limits; which to keep is the caller's.
@@ -42,7 +43,7 @@ defmodule Scales.Breaks do
   # the remainder in doubles, exactly 0, grants; so on ranges over about 3e23 wide reaching zero,
   # about one in six, Giggly's breaks may pass through zero where R's do not.
 
-  alias Scales.{Bounds, DateBreaks, Transform}
+  alias Scales.{Bounds, DateBreaks, Palette, Transform}
 
   # The number of breaks wanted unless a caller says: `scales::breaks_extended()`'s `n`.
   @wanted 5
@@ -165,6 +166,27 @@ defmodule Scales.Breaks do
                    ],
                    time_zone_database: @time_zone_database_spec
                  )
+
+  @pretty_options NimbleOptions.new!(
+                    n: [
+                      type: :non_neg_integer,
+                      default: @wanted,
+                      doc:
+                        "The number of intervals wanted, R's `n`; the breaks found may cut " <>
+                          "the limits a few more or fewer times."
+                    ],
+                    time_zone_database: @time_zone_database_spec
+                  )
+
+  # The nice numbers, each a step's multiple of a power of ten, and the most of that power a width
+  # over the intervals wanted is rounded to it from: R's own switches, found by bisecting its
+  # `pretty()` at three powers of ten, since its documentation leaves them out.
+  @nice_fractions [{1, 1.4}, {2, 2.8}, {5, 7}]
+
+  # The largest limits `pretty/2` breaks, and the smallest step: beyond them its arithmetic
+  # would pass the largest double or reach the subnormal ones.
+  @largest_pretty 1.0e307
+  @smallest_double 2.2250738585072014e-308
 
   # The units a date's step may take, and the clock's a time of day's, which a date-time's take
   # too, with the seconds each of the clock's holds.
@@ -460,6 +482,126 @@ defmodule Scales.Breaks do
     limits
     |> sequenced(width, validated)
     |> offset(limits, validated)
+  end
+
+  @doc """
+  About `n:` intervals of round values covering the limits `{low, high}`, in either order, R's
+  `breaks_pretty()`, its `pretty()`.
+
+  On numbers each step is 1, 2, 5 or 10 times a power of ten: the limits' width over the number
+  wanted, rounded to the nearest of those, and the breaks every multiple of it from the low limit
+  rounded down to one to the high limit rounded up. On dates and date-times they are R's calendar
+  and clock steps, from a second to a thousand years, the one that cuts the limits closest to
+  `n:` times, a `DateTime` broken on its zone's clock, read by `time_zone_database:`; on times of
+  day the numbers' breaks on their seconds since midnight, as R breaks an `hms`, each a `Time`,
+  wrapped past midnight. Limits that are one value, as R's `zero_range()` judges them, give the
+  first alone.
+
+  R's documentation describes its numbers' steps but for the rule that rounds the width over the
+  number wanted, which it leaves out; this rounds it to the nearest nice number as Heckbert's
+  nice numbers do (Graphics Gems, 1990), but up from R's own switches, measured from its output:
+  above 1.4, 2.8 and 7 times its power of ten.
+
+  ## Options
+
+  #{NimbleOptions.docs(@pretty_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.pretty({1.0, 15.0})
+      [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0, 16.0]
+
+      iex> Scales.Breaks.pretty({1.0, 20.0}, n: 2)
+      [0.0, 10.0, 20.0]
+
+      iex> Scales.Breaks.pretty({~D[2020-01-01], ~D[2022-01-01]})
+      [~D[2020-01-01], ~D[2020-07-01], ~D[2021-01-01], ~D[2021-07-01], ~D[2022-01-01]]
+
+      iex> Scales.Breaks.pretty({~T[00:00:00], ~T[01:00:00]})
+      [~T[00:00:00], ~T[00:16:40], ~T[00:33:20], ~T[00:50:00], ~T[01:06:40]]
+  """
+  @spec pretty({value(), value()}, keyword()) :: [value()]
+  def pretty(limits, options \\ []) do
+    validated = NimbleOptions.validate!(options, @pretty_options)
+    pretty_breaks(limits, validated)
+  end
+
+  defp pretty_breaks({low, high} = limits, options) when is_number(low) and is_number(high) do
+    if abs(low) > @largest_pretty or abs(high) > @largest_pretty do
+      raise ArgumentError,
+            "expected limits no larger than #{@largest_pretty}, beyond which the breaks " <>
+              "would pass the largest float, got: #{inspect(limits)}"
+    end
+
+    if Bounds.zero_range?(limits),
+      do: [low / 1],
+      else: nice_breaks(Enum.min_max([low / 1, high / 1]), Keyword.fetch!(options, :n))
+  end
+
+  defp pretty_breaks({first, _last} = limits, options) do
+    name = transformation(limits, options)
+    wanted = Keyword.fetch!(options, :n)
+
+    positions =
+      name
+      |> Transform.transform(Tuple.to_list(limits))
+      |> Enum.min_max()
+
+    cond do
+      Bounds.zero_range?(positions) -> [first]
+      name == :time -> Transform.inverse(:time, nice_breaks(positions, wanted))
+      true -> Transform.inverse(name, Transform.breaks(name, positions, n: wanted))
+    end
+  end
+
+  # The multiples of the nice step nearest the width over the intervals wanted, one wanted for
+  # none, as R takes it, from the low limit rounded down to one to the high limit rounded up,
+  # spread from the first to the last as R's `seq()` spreads them, the multiple zero exactly 0.
+  defp nice_breaks({low, high} = limits, wanted) do
+    cell = (high - low) / max(wanted, 1)
+
+    if cell < @smallest_double do
+      raise ArgumentError,
+            "expected limits at least the smallest normal float apart for each interval " <>
+              "wanted, got: #{inspect(limits)} and #{wanted} wanted"
+    end
+
+    power = :math.pow(10.0, Float.floor(:math.log10(cell)))
+    step = nice_fraction(cell / power) * power
+    first = multiple_below(low, step)
+    last = multiple_above(high, step)
+
+    {first * step, last * step}
+    |> Palette.spread(last - first + 1)
+    |> Enum.zip_with(first..last//1, fn break, multiple ->
+      if multiple == 0, do: 0.0, else: break
+    end)
+  end
+
+  # The multiple of `step` at or below `value`, and at or above it, judged by the multiple itself,
+  # since the quotient's rounding can put a value on a multiple a hair to its other side.
+  defp multiple_below(value, step) do
+    multiple = trunc(Float.floor(value / step))
+
+    cond do
+      (multiple + 1) * step <= value -> multiple + 1
+      multiple * step > value -> multiple - 1
+      true -> multiple
+    end
+  end
+
+  defp multiple_above(value, step) do
+    multiple = trunc(Float.ceil(value / step))
+
+    cond do
+      (multiple - 1) * step >= value -> multiple - 1
+      multiple * step < value -> multiple + 1
+      true -> multiple
+    end
+  end
+
+  defp nice_fraction(fraction) do
+    Enum.find_value(@nice_fractions, 10, fn {nice, most} -> if fraction <= most, do: nice end)
   end
 
   defp sequenced({low, high}, size, options)

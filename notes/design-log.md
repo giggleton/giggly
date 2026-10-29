@@ -79,6 +79,21 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`n:` reaches every transformation's own breaks but time's, labels follow it, and numbers'
+  `pretty()` rounds at R's measured switches (2026-10-29, Steve, increment 2's step 4: "A", "A",
+  "A", "Agree", then "A"; checked against scales 1.4.0).** `Transform.breaks/3`'s `n:` reaches
+  `Breaks.log/2` under log10 and R's date `pretty()` under dates and date-times, from 0 as R
+  takes it, and `Transform.format/4` takes it too, as R's breaks carry their labels as names.
+  The date steps gain R's trimming and added ticks, so `Breaks.pretty/2`, R's `breaks_pretty()`
+  typed, is R's outside the extent too; times are numeric `pretty()` on seconds, as R breaks an
+  `hms`, given back as `Time`s. R documents numbers' steps but the rounding to 1, 2, 5 or 10, so
+  it rounds up from just above 1.4, 2.8 and 7, R's switches found by bisecting its output.
+  *Rejected: time passing `n:` to `timespan`*: R's `transform_hms()` takes no number.
+  *Rejected: Heckbert's 1.5, 3 and 7*: 91.4% of 7,191 ranges matched R, against 97.5%, twice
+  R's breaks on the rest. *Rejected: breaks returning their labels*: every caller's shape
+  changes. *Rejected: R's tolerance at the ends*: only its C holds it, and its breaks there are
+  not round. *Rejected: `pretty()`'s biases and shrinking*: they set the rule R leaves out.
+
 - **`geom_segment()` draws a straight line per row, or a path where the coordinate system curves
   lines, asking `Coord.linear?/1` (2026-10-29, Steve's scope: "yes", `arrow()` its step 2;
   checked against ggplot2 4.0.3).** As `GeomSegment`: `x`, `y` and one of `xend`/`yend`, the other
@@ -161,8 +176,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `%Scale.Binned{}` with R's defaults and `n_breaks`, `nice_breaks`, `right` and `show_limits`.
   Nice breaks for `n_breaks` go through `Transform.breaks/3`'s `n:`, R's
   `transformation$breaks(limits, n)` (Steve: "B"): the identity, sqrt, reverse and reciprocal pass
-  it to extended breaks; log10 and the date and time transformations refuse it until the breaks
-  increment. Counts and `nice_breaks: false` reach R's one-break and no-break widening branches,
+  it to extended breaks, and log10's, dates' and date-times' count theirs (the entry beginning
+  "`n:` reaches"). Counts and `nice_breaks: false` reach R's one-break and no-break widening branches,
   built as R's. `show_limits` adds a key at each end of the bar unless a break is there. Refused
   at the call: `n_breaks: 1` with nice breaks, where R fails; `show_limits` beside a list of
   labels, where R warns and ignores it; a colour bar. *Rejected: `Scales` exporting `Breaks`*: a
@@ -365,15 +380,13 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **A date-time's breaks under a day are `prettyDate()`'s steps, the table `Scales.DateBreaks`
   holds for dates extended (2026-10-26, Steve).** Seconds (1, 2, 5, 10, 15, 30), minutes (the
   same) and hours (1, 3, 6, 12), each with R's label format and unit to truncate to, chosen by
-  the rule the table already has, with R's widening of an extent under a second by 2.5 seconds
-  either side; at the finest step, too few intervals keep its breaks, where R's loop adds ticks
-  outside the extent (R's breaks inside matched on 1,999 of 1,999 extents of 1 to 2 seconds; its
-  trimming, firing only under a second, changed none of 9,000). R's finer neighbour for too few,
-  which the mutation pass found never decides, is left out, dates' included: on 16,400 of R's
-  extents, 6,300 round the spans where two steps are equally close to five, it never came closer.
+  the rule the table already has, with R's widening of an extent under a second, its added ticks
+  and its trimming. R's searches for a finer step, which the mutation pass found never decide,
+  are left out, dates' included: on 16,400 of R's extents, 6,300 round the spans where two steps
+  are equally close to five, and 20,000 with `n` from 2 to 20, they never came closer.
   *Rejected: extended breaks on the range in seconds, minutes or hours*, R's time scale's: it
   matched R's date-time breaks on 29% to 56% of random extents, counting six hours from 1970, not
-  local midnight. *Rejected: porting the tick loop*: no drawn break depends on it.
+  local midnight.
 
 - **A time zone's database is passed on the scale, `time_zone_database:` beside `timezone:`
   (2026-10-26, Steve).** The core reads no config, and every `DateTime` zone function would take
@@ -3152,6 +3165,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add Breaks.pretty, R's breaks_pretty(), and n: through log10, dates and
+  date-times, their labels following it (breaks, step 4); §4: "`n:` reaches", "A date-time's
+  breaks under a day"
 - 2026-10-29 — Add MinorBreaks.n, MinorBreaks.width and MinorBreaks.log, R's minor_breaks_n(),
   minor_breaks_width() and minor_breaks_log() (breaks, step 3); §4: "Minor breaks a number or a
   width"

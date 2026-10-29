@@ -47,7 +47,7 @@ defmodule Scales.Transform.Time do
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Scales.Transform
-  def format(_transformation, breaks, _extent) do
+  def format(_transformation, breaks, _extent, _options) do
     counts = Enum.map(breaks, &microseconds/1)
 
     decimals =

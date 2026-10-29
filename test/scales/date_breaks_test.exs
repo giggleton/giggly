@@ -1363,4 +1363,111 @@ defmodule Scales.DateBreaksTest do
       end
     end
   end
+
+  # Golden: R 4.6.1's `pretty()` of date-times in UTC, `n` intervals wanted, each break in seconds
+  # since 1970-01-01 and its label (`attr(, "labels")`): each row is the branch of `prettyDate()`
+  # it names, all of which change with `n`. A row moves only if R does.
+  @r_wanted_breaks [
+    # under a second, widened by n / 2, then one too many: one beyond each end, the excess's
+    # half rounded to even, so the right one goes
+    {{10.3, 10.6}, 4, [8.0, 9.0, 10.0, 11.0, 12.0], ["08", "09", "10", "11", "12"]},
+    # three beyond the low end and two beyond the high, one too many: 3/5 rounds to the left
+    {{1_578_539_174.0, 1_578_539_174.184}, 5,
+     [
+       1_578_539_172.0,
+       1_578_539_173.0,
+       1_578_539_174.0,
+       1_578_539_175.0,
+       1_578_539_176.0,
+       1_578_539_177.0
+     ], ["12", "13", "14", "15", "16", "17"]},
+    # a second's breaks too few for 10 / 2: a second added on the right, then the left
+    {{1_577_836_800.0, 1_577_836_803.0}, 10,
+     [
+       1_577_836_799.0,
+       1_577_836_800.0,
+       1_577_836_801.0,
+       1_577_836_802.0,
+       1_577_836_803.0,
+       1_577_836_804.0
+     ], ["59", "00", "01", "02", "03", "04"]},
+    {{1_577_836_800.0, 1_577_836_801.0}, 6,
+     [1_577_836_799.0, 1_577_836_800.0, 1_577_836_801.0, 1_577_836_802.0],
+     ["59", "00", "01", "02"]},
+    # widened by 10 / 2 seconds, and by at most 30 for 100 wanted
+    {{100.2, 100.4}, 10, Enum.map(95..105, fn second -> second / 1 end),
+     ["35", "36", "37", "38", "39", "40", "41", "42", "43", "44", "45"]},
+    {{100.2, 100.4}, 100, Enum.map(70..131, fn second -> second / 1 end),
+     Enum.map(70..131, fn second ->
+       second
+       |> rem(60)
+       |> Integer.to_string()
+       |> String.pad_leading(2, "0")
+     end)},
+    # one instant, widened by a second for none wanted, whose closest step is a thousand years
+    {{100.0, 100.0}, 0, [-2_208_988_800.0, 29_348_006_400.0], ["1900", "2900"]},
+    {{100.0, 100.0}, 5, [97.0, 98.0, 99.0, 100.0, 101.0, 102.0],
+     ["37", "38", "39", "40", "41", "42"]}
+  ]
+
+  describe "pretty_datetime/3 and pretty/2 with a number wanted" do
+    test "the breaks and their labels are R's for each branch the number changes" do
+      epoch = ~N[1970-01-01 00:00:00]
+
+      for {extent, wanted, seconds, labels} <- @r_wanted_breaks do
+        {times, format} = DateBreaks.pretty_datetime(extent, :utc, wanted)
+
+        assert {extent, wanted,
+                Enum.map(times, fn time -> NaiveDateTime.diff(time, epoch, :second) / 1 end),
+                Enum.map(times, fn time -> DateBreaks.label(time, format) end)} ===
+                 {extent, wanted, seconds, labels}
+      end
+    end
+
+    # R's `pretty(n = 30)` over 30 and 90 hours: every hour, and every three, labelled with the
+    # day, as R labels both steps beyond a day.
+    test "one and three hours beyond a day are labelled with the day, as R labels them" do
+      start = 1_577_836_800.0
+
+      for {hours, step, last} <- [{30, 1, "Jan 02 06:00"}, {90, 3, "Jan 04 18:00"}] do
+        {times, format} = DateBreaks.pretty_datetime({start, start + hours * 3600}, :utc, 30)
+        labels = Enum.map(times, fn time -> DateBreaks.label(time, format) end)
+
+        assert {hours, Enum.count(times), Enum.take(labels, 2), List.last(labels)} ==
+                 {hours, 31, ["Jan 01 00:00", "Jan 01 0#{step}:00"], last}
+      end
+    end
+
+    # R's `pretty()` of dates: ten wanted over eight days is every day, widened by a day either
+    # side; one wanted under a day is its day and the next; none wanted over five months is the
+    # thousand years' step.
+    test "a date's breaks are R's for a number wanted" do
+      epoch = ~D[1970-01-01]
+
+      for {extent, wanted, days, labels} <- [
+            {{18_262.0, 18_270.0}, 10, Enum.to_list(18_261..18_271),
+             [
+               "Dec 31",
+               "Jan 01",
+               "Jan 02",
+               "Jan 03",
+               "Jan 04",
+               "Jan 05",
+               "Jan 06",
+               "Jan 07",
+               "Jan 08",
+               "Jan 09",
+               "Jan 10"
+             ]},
+            {{18_262.0, 18_262.4}, 1, [18_262, 18_263], ["Jan 01", "Jan 02"]},
+            {{18_262.0, 18_414.0}, 0, [10_957, 376_200], ["2000", "3000"]}
+          ] do
+        {dates, format} = DateBreaks.pretty(extent, wanted)
+
+        assert {extent, Enum.map(dates, fn date -> Date.diff(date, epoch) end),
+                Enum.map(dates, fn date -> DateBreaks.label(date, format) end)} ==
+                 {extent, days, labels}
+      end
+    end
+  end
 end

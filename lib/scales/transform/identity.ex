@@ -34,7 +34,7 @@ defmodule Scales.Transform.Identity do
 
   # A number's label is its own, whatever the extent.
   @impl Scales.Transform
-  def format(_transformation, breaks, _extent), do: Labels.plain(breaks)
+  def format(_transformation, breaks, _extent, _options), do: Labels.plain(breaks)
 
   defp placed(%Date{} = date), do: Date.diff(date, @epoch) / 1
 

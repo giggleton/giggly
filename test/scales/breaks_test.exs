@@ -810,4 +810,118 @@ defmodule Scales.BreaksTest do
     assert error.message =~ "pad: widens a sequence of numbers alone"
     assert error.message =~ "{~D[2026-01-01], ~D[2026-02-01]}"
   end
+
+  # Golden: R 4.6.1's `scales::breaks_pretty(n)(limits)`, scales 1.4.0 (the image
+  # `giggly-r:ggplot2-4.0.3`), each break printed to 17 significant digits; a row moves only if
+  # R does, since one that stops matching is a bug: at each of R's switches between steps and just
+  # past it, a width over the number wanted of exactly 1.4, 2.8 and 7 keeping the smaller; limits
+  # whose quotient by the step falls a hair to the far side of a multiple, at either end; breaks
+  # between the ends spread as R's `seq()` spreads them, not multiples of the step (0.3 where 3 *
+  # 0.1 is 0.30000000000000004); the multiple zero exactly 0 where the spread misses it; limits high
+  # to low; and none wanted, one and two.
+  @r_pretty [
+    {{0, 7}, 5, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]},
+    {{0, 7.2}, 5, [0.0, 2.0, 4.0, 6.0, 8.0]},
+    {{0, 14}, 5, [0.0, 2.0, 4.0, 6.0, 8.0, 10.0, 12.0, 14.0]},
+    {{0, 14.5}, 5, [0.0, 5.0, 10.0, 15.0]},
+    {{0, 35}, 5, [0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0]},
+    {{0, 36}, 5, [0.0, 10.0, 20.0, 30.0, 40.0]},
+    {{994, 2399.6}, 5, [500.0, 1000.0, 1500.0, 2000.0, 2500.0]},
+    {{-0.035, -0.020000000000000004}, 5, [-0.035, -0.030000000000000002, -0.025, -0.02]},
+    {{-4.94e-4, -5.0e-4}, 5,
+     [-5.0e-4, -4.99e-4, -4.98e-4, -4.97e-4, -4.96e-4, -4.95e-4, -4.94e-4]},
+    {{0.2671, 0.4941}, 3, [0.2, 0.3, 0.4, 0.5]},
+    {{0.1, 0.9}, 5, [0.0, 0.2, 0.4, 0.6000000000000001, 0.8, 1.0]},
+    {{-0.3, 0.3}, 5,
+     [
+       -0.30000000000000004,
+       -0.2,
+       -0.1,
+       0.0,
+       0.10000000000000003,
+       0.20000000000000007,
+       0.30000000000000004
+     ]},
+    {{0.07219, -0.02}, 2, [-0.05, 0.0, 0.05000000000000002, 0.1]},
+    {{7.2, 0}, 5, [0.0, 2.0, 4.0, 6.0, 8.0]},
+    {{0.3, 9.7}, 0, [0.0, 10.0]},
+    {{0.3, 9.7}, 1, [0.0, 10.0]},
+    {{0.3, 9.7}, 2, [0.0, 5.0, 10.0]}
+  ]
+
+  describe "pretty/2" do
+    test "numbers' breaks are R's" do
+      for {limits, wanted, breaks} <- @r_pretty do
+        assert {limits, wanted, Breaks.pretty(limits, n: wanted)} === {limits, wanted, breaks}
+      end
+    end
+
+    test "limits that are one value give the first, as R's breaks_pretty() gives it" do
+      assert {Breaks.pretty({5, 5}), Breaks.pretty({~D[2020-01-01], ~D[2020-01-01]})} ===
+               {[5.0], [~D[2020-01-01]]}
+    end
+
+    # R's `breaks_pretty(20)` over 2020 and 2021 is every month; on New York's clock from noon on
+    # 9 March 2024 to 6 pm the next day, every hour, 2 am skipped.
+    test "dates' and date-times' breaks are R's pretty() for them, on the zone's clock" do
+      zone = "America/New_York"
+      database = Tz.TimeZoneDatabase
+      months = Breaks.pretty({~D[2020-01-01], ~D[2022-01-01]}, n: 20)
+
+      hours =
+        Breaks.pretty(
+          {DateTime.new!(~D[2024-03-09], ~T[12:00:00], zone, database),
+           DateTime.new!(~D[2024-03-10], ~T[18:00:00], zone, database)},
+          n: 20,
+          time_zone_database: database
+        )
+
+      around_two = Enum.slice(hours, 12, 3)
+
+      assert {Enum.count(months), Enum.take(months, 2), Enum.count(hours),
+              Enum.map(around_two, &DateTime.to_naive/1)} ==
+               {25, [~D[2020-01-01], ~D[2020-02-01]], 30,
+                [~N[2024-03-10 00:00:00], ~N[2024-03-10 01:00:00], ~N[2024-03-10 03:00:00]]}
+    end
+
+    # R's `breaks_pretty()` of an `hms` from 23:00 to 23:59:59 is the seconds 82000 to 87000,
+    # the last past midnight.
+    test "times' breaks are numbers' on their seconds, wrapped past midnight" do
+      assert Breaks.pretty({~T[23:00:00], ~T[23:59:59]}) ==
+               [
+                 ~T[22:46:40],
+                 ~T[23:03:20],
+                 ~T[23:20:00],
+                 ~T[23:36:40],
+                 ~T[23:53:20],
+                 ~T[00:10:00]
+               ]
+    end
+
+    # R's `breaks_pretty(1)(c(0, 1e307))` is 0 and 1e307: the largest limits are broken.
+    test "limits beyond 1e307, and less than the smallest normal float apart, are refused" do
+      large = assert_raise(ArgumentError, fn -> Breaks.pretty({0.0, 1.1e307}) end)
+      low = assert_raise(ArgumentError, fn -> Breaks.pretty({-1.1e307, 0.0}) end)
+      narrow = assert_raise(ArgumentError, fn -> Breaks.pretty({0.0, 1.0e-310}) end)
+      wide = Breaks.pretty({0.0, 1.0e307}, n: 1)
+
+      assert {large.message =~ "no larger than 1.0e307", low.message =~ "{-1.1e307, 0.0}",
+              narrow.message =~ "smallest normal float", wide} ==
+               {true, true, true, [0.0, 1.0e307]}
+    end
+
+    test "limits of two kinds are refused" do
+      # Built as the test runs: a literal the guard refuses fails the type checker.
+      mixed = List.to_tuple([~D[2020-01-01], ~T[10:00:00]])
+      assert_raise FunctionClauseError, fn -> Breaks.pretty(mixed) end
+    end
+
+    test "a number wanted is a whole number from 0" do
+      for wanted <- [-1, 2.5] do
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Breaks.pretty({0.0, 1.0}, n: wanted)
+        end
+      end
+    end
+  end
 end

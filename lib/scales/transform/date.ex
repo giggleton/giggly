@@ -7,10 +7,11 @@ defmodule Scales.Transform.Date do
   # segment, which is Elixir's `Date`.
   #
   # Its axis takes R's `pretty()` breaks for dates (`Scales.DateBreaks`), on calendar
-  # boundaries, each labelled in the format of the step chosen for the whole axis, which is why
-  # its labels need the extent; breaks it did not choose, given or laid by a width, are written in
-  # full, `2026-09-21`, as R's `format()` writes a date with no format; and its minor breaks are
-  # R's regular ones on the days, midway between them (`Scales.MinorBreaks`), as
+  # boundaries, five intervals wanted unless a caller says, each labelled in the format of the
+  # step chosen for the whole axis, which is why its labels need the extent and the number;
+  # breaks it did not choose, given or laid by a width, are written in full, `2026-09-21`, as
+  # R's `format()` writes a date with no format; and its minor breaks are R's regular ones on
+  # the days, midway between them (`Scales.MinorBreaks`), as
   # `transform_date()` keeps the default.
 
   @behaviour Scales.Transform
@@ -30,8 +31,8 @@ defmodule Scales.Transform.Date do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, extent, []) do
-    {dates, _format} = DateBreaks.pretty(extent)
+  def breaks(_transformation, extent, options) do
+    {dates, _format} = DateBreaks.pretty(extent, wanted(options))
     Enum.map(dates, &days/1)
   end
 
@@ -39,7 +40,7 @@ defmodule Scales.Transform.Date do
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Scales.Transform
-  def format(_transformation, breaks, :given) do
+  def format(_transformation, breaks, :given, _options) do
     Enum.map(breaks, fn day ->
       day
       |> date()
@@ -47,8 +48,8 @@ defmodule Scales.Transform.Date do
     end)
   end
 
-  def format(_transformation, breaks, extent) do
-    {_dates, format} = DateBreaks.pretty(extent)
+  def format(_transformation, breaks, extent, options) do
+    {_dates, format} = DateBreaks.pretty(extent, wanted(options))
 
     Enum.map(breaks, fn day ->
       day
@@ -69,6 +70,9 @@ defmodule Scales.Transform.Date do
   end
 
   defp date(day), do: Date.add(@epoch, floor(day))
+
+  # R's `pretty()` default: five intervals.
+  defp wanted(options), do: Keyword.get(options, :n, 5)
 
   # A date's days since 1970-01-01, a double as R stores it.
   defp days(nil), do: nil

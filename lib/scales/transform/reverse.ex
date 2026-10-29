@@ -36,7 +36,7 @@ defmodule Scales.Transform.Reverse do
     do: MinorBreaks.regular(breaks, extent, reverse: true)
 
   @impl Scales.Transform
-  def format(_transformation, breaks, _extent) do
+  def format(_transformation, breaks, _extent, _options) do
     breaks
     |> Enum.map(&negated/1)
     |> Labels.plain()

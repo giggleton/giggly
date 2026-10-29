@@ -12,7 +12,8 @@ defmodule Scales.Transform.Datetime do
   #
   # Its axis takes R's `pretty()` breaks for date-times (`Scales.DateBreaks`), on clock and
   # calendar boundaries in its zone, UTC's for `:default`, and a naive date-time's own, as UTC's,
-  # each labelled in the format of the step chosen for the whole axis; breaks it did not choose,
+  # five intervals wanted unless a caller says, each labelled in the format of the step chosen for
+  # the whole axis; breaks it did not choose,
   # given or laid by a width, are written as R's `format()` writes them, the date alone where every
   # one is at midnight, else the date and the time to the second; and its minor breaks are R's
   # regular ones on the seconds, midway between them (`Scales.MinorBreaks`), as
@@ -39,8 +40,8 @@ defmodule Scales.Transform.Datetime do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(transformation, extent, []) do
-    {times, _format} = DateBreaks.pretty_datetime(extent, clock(transformation))
+  def breaks(transformation, extent, options) do
+    {times, _format} = DateBreaks.pretty_datetime(extent, clock(transformation), wanted(options))
     Enum.map(times, &seconds/1)
   end
 
@@ -48,14 +49,15 @@ defmodule Scales.Transform.Datetime do
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
 
   @impl Scales.Transform
-  def format(transformation, breaks, :given) do
+  def format(transformation, breaks, :given, _options) do
     datetimes = inverse(transformation, breaks)
     format = if Enum.all?(datetimes, &midnight?/1), do: "%Y-%m-%d", else: "%Y-%m-%d %H:%M:%S"
     Enum.map(datetimes, fn datetime -> DateBreaks.label(datetime, format) end)
   end
 
-  def format(transformation, breaks, extent) do
-    {_times, format} = DateBreaks.pretty_datetime(extent, clock(transformation))
+  def format(transformation, breaks, extent, options) do
+    {_times, format} =
+      DateBreaks.pretty_datetime(extent, clock(transformation), wanted(options))
 
     transformation
     |> inverse(breaks)
@@ -77,6 +79,9 @@ defmodule Scales.Transform.Datetime do
   # as though its clock were UTC's, and for one no column has settled; else its zone's.
   defp clock({:datetime, zone, _database}) when zone in [:naive, :default], do: :utc
   defp clock({:datetime, zone, database}), do: {zone, database}
+
+  # R's `pretty()` default: five intervals.
+  defp wanted(options), do: Keyword.get(options, :n, 5)
 
   # A date-time's seconds since 1970-01-01 00:00 UTC, or a naive one's since the same wall-clock
   # time, a double as R's `POSIXct` stores it.

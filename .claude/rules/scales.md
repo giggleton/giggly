@@ -149,22 +149,25 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
   log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
   `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
-- **log10's breaks are `Breaks.log/2`'s, five wanted in base 10** (`Transform.Log10`), on the
-  extent turned back into data units, put back into log space; its test pins R's own axis, labels
-  and minor breaks, for each of `breaks_log()`'s branches, and compares its breaks with
-  `Breaks.log/2`'s, whose test pins R's figures. sqrt, reverse and reciprocal take extended
-  breaks on the data range, as R's `extended_breaks()` does.
+- **log10's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in base 10**
+  (`Transform.Log10`), on the extent turned back into data units, put back into log space; its
+  test pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and
+  compares its breaks with `Breaks.log/2`'s, whose test pins R's figures. sqrt, reverse and
+  reciprocal take extended breaks on the data range, as R's `extended_breaks()` does.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
   back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
   is placed as any continuous scale, a single date 0.05 days either side. **Its breaks are exactly
-  R's `pretty()` for dates** (`Scales.DateBreaks`, grDevices' `prettyDate()`): five days or less is
-  every day, widened by five less its length, rounded half to even; longer takes the calendar step,
-  a day to a thousand years, that cuts the extent closest to five times, from its start truncated
-  to the step's unit (a Monday for weeks), or, where that step cuts it more than five times, the
-  next coarser one where that comes closer, as R does; R's finer neighbour for too few never comes
-  closer and is left out (design-log §4, the entry beginning "A date-time's breaks under a day").
-  Each is labelled in its step's format, written as R's `format()` writes it, a year unpadded.
+  R's `pretty()` for dates** (`Scales.DateBreaks`, grDevices' `prettyDate()`), `n` intervals
+  wanted, five unless `n:` says: `n` days or less is every day, widened by `n` less its length,
+  rounded half to even; longer takes the calendar step, a day to a thousand years, that cuts the
+  extent closest to `n` times, from its start truncated to the step's unit (a Monday for weeks);
+  where that step cuts it more than `n` times, as many of its breaks beyond the extent as the
+  excess are dropped, shared between its ends as R shares them, and where they still do, the next
+  coarser step is taken where that comes closer, as R does; R's searches for a finer step never
+  come closer and are left out (design-log §4, the entries beginning "A date-time's breaks under a
+  day" and "`n:` reaches"). Each is labelled in its step's format, written as R's `format()` writes
+  it, a year unpadded, the labels of breaks found with `n:` given the same `n:`.
   **A date never reaches a step under a day.** Its minor breaks are the identity's
   (`MinorBreaks.regular/2`) on the days. A surviving mutant there is judged against R as an
   extended-breaks one is (below): its test pins R's own breaks for each case and for each random
@@ -178,17 +181,18 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   (`Transform.Datetime`, R's `transform_time()`): a date-time's whole microseconds divided once by
   a million, the double nearest the instant, a naive one's as though its clock were UTC's, a
   missing one `nil`; a plot's limits or breaks of the other kind raise, as a column's would be
-  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/2`,
+  refused. **Its breaks are exactly R's `pretty()` for date-times** (`DateBreaks.pretty_datetime/3`,
   the date steps' table extended below a day: seconds, minutes and hours, each with R's format and
-  unit to truncate to), an extent under a second widened to whole seconds 2.5 either side; three
-  branches of R's are left out, none changing a break inside the extent or its label: its added
-  ticks where a second cuts the extent once, which keeps its breaks here, its trimming, and its
-  finer neighbour (design-log §4, the entry beginning "A date-time's breaks under a day"). Its
-  test pins R's breaks for every step and format, R's breaks inside each short extent, and R's on
-  the first extent where each mutant of the step table departed; a nudge of a step's length that
-  departs on none of R's tables is judged against the code on a dense sweep round its step's
-  boundaries, and is equivalent only if it never departs there either. **A width's breaks are
-  exactly R's `breaks_width()` for
+  unit to truncate to, one and three hours labelled with the day beyond a day), an extent under a
+  second widened to whole seconds `n / 2` either side, at least one for an instant and at most 30;
+  where a second cuts the extent fewer than `n %/% 2` times, a second added on the right, then the
+  left, until it does, as R adds them (design-log §4, the entry beginning "A date-time's breaks
+  under a day"). All of 2,910 date and 9,000 date-time extents in three zones, with `n` from 0 to
+  20, matched R, every break and label. Its test pins R's breaks for every step and format, R's
+  breaks inside each short extent, and R's on the first extent where each mutant of the step table
+  departed; a nudge of a step's length that departs on none of R's tables is judged against the code
+  on a dense sweep round its step's boundaries, and is equivalent only if it never departs there
+  either. **A width's breaks are exactly R's `breaks_width()` for
   date-times** (`DateBreaks.datetime_width/3`): seconds and minutes from the nearest multiple of the
   step since 1970-01-01, half to even, the rest from the start of the unit, rounded up by the
   step's most seconds, stepped by elapsed time but months and years, stepped on the calendar; its
@@ -235,11 +239,13 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   fails; the `detail` attribute left out. Their tests pin R's figures; all of 4,000 numeric, 2,000
   date, 1,712 date-time and 4,014 log cases matched R, and 1,495 times but where R's `hms` runs
   past midnight.
-- **A number of breaks wanted, `n:`, reaches extended breaks alone** (`Breaks.extended/2`,
-  `Transform.breaks/3`), as R's `transformation$breaks(limits, n)`: the identity, sqrt, reverse
-  and reciprocal pass it on; log10, date, date-time and time refuse it, their own counts waiting
-  for the breaks increment; it is a whole number from 2, as R's search finds nothing for one and
-  never ends for none.
+- **A number of breaks wanted, `n:`, reaches every transformation's own breaks but time's**
+  (`Transform.breaks/3`, `format/4`; design-log §4, the entry beginning "`n:` reaches"), as R's
+  `transformation$breaks(limits, n)`: extended breaks' under the identity, sqrt, reverse and
+  reciprocal, a whole number from 2, as R's search finds nothing for one and never ends for none;
+  `Breaks.log/2`'s under log10, from 1; R's `pretty()` under the date and date-time
+  transformations, from 0, as R takes it, and their labels found with the same `n:`, as R's
+  breaks carry theirs as names. Time refuses it, as R's `transform_hms()` takes no number.
 - **A width's breaks are exactly R's `fullseq()` and `breaks_width()`, on numbers, dates,
   date-times and times** (`Breaks.fullseq/3`, `Breaks.width/3`; design-log §4, the entry
   beginning "Breaks a width apart"): numbers from the low limit rounded down to a multiple of the
@@ -284,6 +290,18 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `breaks_timespan()`** (`Breaks.timespan/2`), seconds where R gives a `difftime`, the units
   `:second` to `:week` as the package's steps name them. Their tests pin R's figures, each branch
   and each unit's switch; all of 2,000 exponential and 3,000 timespan cases matched R.
+- **Round steps' breaks are R's `breaks_pretty()`** (`Breaks.pretty/2`; design-log §4, the entry
+  beginning "`n:` reaches"): on numbers, the width over the number wanted, one for none, rounded
+  to 1, 2, 5 or 10 times its power of ten, up from just above R's switches, 1.4, 2.8 and 7,
+  measured from R's output since R documents every step but that one; every multiple from the
+  low limit's down to the high one's up, each judged by the multiple itself, spread as R's
+  `seq()` spreads them, the multiple zero exactly 0. Dates and date-times are their
+  transformation's, typed; times numbers' on their seconds, wrapped past midnight; a zero-wide
+  range its first limit. Refused: limits past 1e307 and a width per interval under the smallest
+  normal float, where R answers or warns. All of 1,500 whole-number ranges, 2,946 of 2,992 round
+  and 2,567 of 2,699 random ones matched R, the rest at an end, where R counts a limit within a
+  ten-billionth of a step of a multiple as on it, as only its C says. Its tests pin R's figures
+  at each switch and each rounding.
 - **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,

@@ -651,33 +651,66 @@ defmodule Scales.TransformTest do
              ]
     end
 
-    test "log10, date, date-time and time count no breaks, and refuse a number wanted" do
-      datetime = {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}
+    # Golden: R 4.6.1's scales 1.4.0: `log10(transform_log10()$breaks(c(1, 1000), n = 10))`;
+    # `transform_date()$breaks()` of 2020-01-01 12:00 to 2022-01-01 12:00 with `n = 20` and
+    # without, and `transform_time("UTC")$breaks()` of 2020-01-01 00:00 to 09:00 with `n = 3`, each
+    # break's label its name, which ggplot2's labels take.
+    test "log10, dates and date-times find about that many of their own breaks, so labelled" do
+      utc = {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}
+      days = {18_262.5, 18_993.5}
+      hours = {1_577_836_800.0, 1_577_869_200.0}
+      monthly = Transform.breaks(:date, days, n: 20)
+      three_hourly = Transform.breaks(utc, hours, n: 3)
+      monthly_labels = Transform.format(:date, monthly, days, n: 20)
 
-      messages =
-        Enum.map([:log10, :date, datetime, :time], fn name ->
-          assert_raise(ArgumentError, fn -> Transform.breaks(name, {0.0, 3.0}, n: 3) end).message
-        end)
-
-      assert messages ==
-               Enum.map(
-                 [
-                   ":log10",
-                   ":date",
-                   ~s({:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}),
-                   ":time"
-                 ],
-                 fn name ->
-                   "the #{name} transformation counts no breaks, so it takes no [:n]; the " <>
-                     "transformations that do are :identity, :sqrt, :reverse, :reciprocal"
-                 end
-               )
+      assert {Transform.breaks(:log10, {0.0, 3.0}, n: 10), Enum.count(monthly),
+              Enum.take(monthly_labels, 3),
+              Transform.format(:date, Transform.breaks(:date, days), days), three_hourly,
+              Transform.format(utc, three_hourly, hours, n: 3)} ===
+               {[
+                  0.0,
+                  0.47712125471966244,
+                  0.6989700043360189,
+                  1.0,
+                  1.4771212547196624,
+                  1.6989700043360187,
+                  2.0,
+                  2.4771212547196626,
+                  2.6989700043360187,
+                  3.0,
+                  3.4771212547196626
+                ], 26, ["Jan 2020", "Feb 2020", "Mar 2020"],
+                ["2020-01", "2020-07", "2021-01", "2021-07", "2022-01", "2022-07"],
+                [1_577_836_800.0, 1_577_847_600.0, 1_577_858_400.0, 1_577_869_200.0],
+                ["00:00", "03:00", "06:00", "09:00"]}
     end
 
-    test "a number wanted is a whole number from 2, and an option breaks/3 lacks is refused" do
-      count_error =
+    # R's `transform_hms()$breaks(c(0, 3600), n = 10)` fails: "unused argument (n = 10)".
+    test "time counts no breaks, as R's takes no number, for breaks or their labels" do
+      breaks = assert_raise(ArgumentError, fn -> Transform.breaks(:time, {0.0, 3.0}, n: 3) end)
+
+      labels =
+        assert_raise(ArgumentError, fn -> Transform.format(:time, [0.0], {0.0, 3.0}, n: 3) end)
+
+      assert {breaks.message =~ ":time", breaks.message =~ "Scales.Breaks.timespan/2",
+              labels.message == breaks.message, Transform.format(:time, [0.0], {0.0, 3.0}, [])} ==
+               {true, true, true, ["00:00:00"]}
+    end
+
+    test "a number wanted is a whole number, one below a breaks function's least refused there" do
+      negative =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.breaks(:date, {0.0, 10.0}, n: -1)
+        end
+
+      extended =
         assert_raise NimbleOptions.ValidationError, fn ->
           Transform.breaks(:identity, {0.0, 1.0}, n: 1)
+        end
+
+      log =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.breaks(:log10, {0.0, 1.0}, n: 0)
         end
 
       option_error =
@@ -685,8 +718,9 @@ defmodule Scales.TransformTest do
           Transform.breaks(:identity, {0.0, 1.0}, nice_numbers: [1])
         end
 
-      assert {count_error.message =~ "2 or more, got: 1", option_error.message =~ "nice_numbers"} ==
-               {true, true}
+      assert {negative.message =~ "non negative integer", extended.message =~ "2 or more, got: 1",
+              log.message =~ "positive integer", option_error.message =~ "nice_numbers"} ==
+               {true, true, true, true}
     end
   end
 end

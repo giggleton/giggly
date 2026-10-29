@@ -46,16 +46,14 @@ defmodule Scales.Transform do
 
   alias Scales.Transform
 
-  # The transformations whose breaks are extended breaks on the extent in data units, so they take
-  # a number of breaks wanted, as R's `support_nbreaks()` finds of their breaks functions.
-  @counted [:identity, :sqrt, :reverse, :reciprocal]
-
   @breaks_options NimbleOptions.new!(
                     n: [
-                      type: {:custom, Scales.Breaks, :validate_wanted, []},
+                      type: :non_neg_integer,
                       doc:
-                        "The number of breaks wanted, 2 or more, for a transformation whose " <>
-                          "breaks are extended breaks; five when not given."
+                        "The number of breaks wanted, five when not given, for every " <>
+                          "transformation but `:time`: from 2 for the identity, square root, " <>
+                          "reverse and reciprocal, from 1 for log10, and from 0 for dates and " <>
+                          "date-times, as R's own breaks take it."
                     ]
                   )
 
@@ -96,8 +94,8 @@ defmodule Scales.Transform do
   @callback domain(transformation :: name()) :: {domain_low(), :infinity}
 
   # The breaks of an axis showing `extent`, in transformed space, in the transformation's order;
-  # some may fall outside it. `options` are `breaks/3`'s, validated, and `[]` for a transformation
-  # that counts no breaks.
+  # some may fall outside it. `options` are `breaks/3`'s, validated, and always `[]` for the time
+  # transformation, which counts no breaks.
   @doc false
   @callback breaks(transformation :: name(), extent :: {float(), float()}, options :: keyword()) ::
               [float()]
@@ -112,12 +110,14 @@ defmodule Scales.Transform do
             ) :: [float()]
 
   # Each break's label, in the order given: the transformation's own breaks on an axis showing
-  # `extent`, or, for `:given`, breaks a plot gave or a width laid.
+  # `extent`, found with `options`, `breaks/3`'s, validated, or, for `:given`, breaks a plot gave
+  # or a width laid.
   @doc false
   @callback format(
               transformation :: name(),
               breaks :: [float()],
-              extent :: {float(), float()} | :given
+              extent :: {float(), float()} | :given,
+              options :: keyword()
             ) :: [String.t()]
 
   @doc """
@@ -166,12 +166,14 @@ defmodule Scales.Transform do
   @doc """
   The default breaks, in transformed space, of an axis showing `extent` under the transformation
   `name`, in the order the transformation leaves them: extended breaks (`Scales.Breaks`) on the
-  extent in data units, powers of ten under log10, and calendar dates under the date
-  transformation, as R's `pretty()` finds them.
+  extent in data units, powers of ten under log10, calendar dates under the date
+  transformation and clock times under the date-time one, as R's `pretty()` finds them, and
+  spans of time under the time one, as `Scales.Breaks.timespan/2` finds them.
 
-  `n:` asks the identity, square root, reverse and reciprocal transformations, whose breaks are
-  extended breaks, for that many, as `Scales.Breaks.extended/2` takes it; the others count no
-  breaks and raise `ArgumentError` for it.
+  `n:` asks for that many: of `Scales.Breaks.extended/2` under the identity, square root, reverse
+  and reciprocal transformations, of `Scales.Breaks.log/2` under log10, and of R's `pretty()`
+  under the date and date-time ones. The time transformation counts no breaks, as R's takes no
+  number, and raises `ArgumentError` for it; `Scales.Breaks.timespan/2` takes one.
 
   ## Options
 
@@ -187,23 +189,32 @@ defmodule Scales.Transform do
 
       iex> Scales.Transform.breaks(:log10, {0.0, 3.0})
       [0.0, 1.0, 2.0, 3.0]
+
+      iex> Scales.Transform.breaks(:log10, {0.0, 6.0}, n: 2)
+      [0.0, 4.0]
   """
   @spec breaks(name(), {float(), float()}, keyword()) :: [float()]
   def breaks(name, extent, options \\ []) do
-    validated = NimbleOptions.validate!(options, @breaks_options)
-    counted_breaks(name, extent, validated)
+    validated = counted!(name, options)
+    module(name).breaks(name, extent, validated)
   end
 
-  defp counted_breaks(name, extent, []), do: module(name).breaks(name, extent, [])
+  # The options validated, but for the time transformation, which counts no breaks, as R's
+  # `transform_hms()` takes no number.
+  defp counted!(name, options) do
+    case NimbleOptions.validate!(options, @breaks_options) do
+      [] ->
+        []
 
-  defp counted_breaks(name, extent, options) when name in @counted,
-    do: module(name).breaks(name, extent, options)
+      validated when name == :time ->
+        raise ArgumentError,
+              "the :time transformation counts no breaks, so it takes no " <>
+                "#{inspect(Keyword.keys(validated))}; Scales.Breaks.timespan/2 takes a number " <>
+                "of breaks between seconds"
 
-  defp counted_breaks(name, _extent, options) do
-    raise ArgumentError,
-          "the #{inspect(name)} transformation counts no breaks, so it takes no " <>
-            "#{inspect(Keyword.keys(options))}; the transformations that do are " <>
-            "#{Enum.map_join(@counted, ", ", &inspect/1)}"
+      validated ->
+        validated
+    end
   end
 
   @doc """
@@ -220,9 +231,14 @@ defmodule Scales.Transform do
 
   @doc """
   The default labels of `breaks`, in transformed space, under the transformation `name`: its own
-  breaks on an axis showing `extent`, or, for `:given`, breaks it did not choose. A number's are
-  `Scales.Labels.plain/1`'s, written from the breaks turned back; a date's in the format of the
-  step its breaks were chosen at, and a given date written in full.
+  breaks on an axis showing `extent`, found with `options`, `breaks/3`'s, or, for `:given`, breaks
+  it did not choose. A number's are `Scales.Labels.plain/1`'s, written from the breaks turned
+  back; a date's in the format of the step its breaks were chosen at, so a date's or date-time's
+  breaks found with `n:` are labelled when given the same `n:`, and a given date written in full.
+
+  ## Options
+
+  `breaks/3`'s.
 
   ## Examples
 
@@ -235,9 +251,17 @@ defmodule Scales.Transform do
 
       iex> Scales.Transform.format(:date, [19723.0], :given)
       ["2024-01-01"]
+
+      iex> extent = {18262.0, 18993.0}
+      iex> breaks = Scales.Transform.breaks(:date, extent, n: 20)
+      iex> :date |> Scales.Transform.format(breaks, extent, n: 20) |> Enum.take(3)
+      ["Jan 2020", "Feb 2020", "Mar 2020"]
   """
-  @spec format(name(), [float()], {float(), float()} | :given) :: [String.t()]
-  def format(name, breaks, extent), do: module(name).format(name, breaks, extent)
+  @spec format(name(), [float()], {float(), float()} | :given, keyword()) :: [String.t()]
+  def format(name, breaks, extent, options \\ []) do
+    validated = counted!(name, options)
+    module(name).format(name, breaks, extent, validated)
+  end
 
   @doc """
   The breaks a step lays, written as `Date.shift/2` takes one (`[week: 2]`), on an axis showing

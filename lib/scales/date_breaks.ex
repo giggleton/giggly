@@ -3,7 +3,8 @@ defmodule Scales.DateBreaks do
 
   # A date or date-time axis's breaks: R's `pretty()` for dates and date-times (grDevices'
   # `prettyDate()`), which ggplot2's date and date-time scales take through
-  # `scales::breaks_pretty()`, about five breaks on calendar or clock boundaries and the format
+  # `scales::breaks_pretty()`, about `n` intervals, five unless a caller says, on calendar or
+  # clock boundaries, and the format
   # their labels are written in, used through `Scales.Transform`; a break every step of a width a
   # plot gives (`width/2`, `datetime_width/3`), as R's `breaks_width()` lays them; and a break moved
   # by an offset (`offset/2`, `offset/3`), as R's `offset_by()` moves it, for
@@ -13,20 +14,23 @@ defmodule Scales.DateBreaks do
   # turns a date into a time at midnight GMT; a date-time extent is in seconds since 1970-01-01
   # 00:00 UTC. Breaks are laid on a clock (`t:clock/0`): UTC's, which a date's and a naive
   # date-time's are too, or a time zone's, read by a time zone database. An extent
-  # of dates of five days or less is every day it touches, widened by as many days as five less
-  # its length, rounded half to even, labelled `"%b %d"`; an extent of date-times under a second is
-  # widened to whole seconds two and a half seconds beyond each end. Otherwise the step, from a
-  # second to a thousand years, that cuts it closest to five times lays breaks from its start
-  # truncated to the step's unit (a minute, an hour, a day, a week starting on Monday, a month, a
-  # year, a decade, a century) to the first at or past its end, keeping the last before the
-  # extent and the first after it; the next coarser step is taken instead when the chosen one
-  # cuts the extent more than five times and the coarser one's breaks come closer to five. Each
-  # step names its labels' format: `"%S"` for seconds up to 15,
-  # `"%H:%M:%S"` for 30, `"%H:%M"` for minutes and for one and three hours, `"%b %d %H:%M"` for six
-  # and twelve, `"%b %d"` for days, weeks and half months (the 1st and 15th), `"%b"` for months
-  # within a year and `"%b %Y"` beyond, `"%Y-%m"` for six months, and `"%Y"` for years. R writes
-  # one and three hours `"%b %d %H:%M"` beyond a day, which neither step is taken for (none past
-  # 18 hours on 20,000 random extents of 3 to 48), so that is left out. Seconds, minutes, hours
+  # of dates of `n` days or less is every day it touches, widened by as many days as `n` less
+  # its length, rounded half to even, labelled `"%b %d"`; an extent under a second is widened to
+  # whole seconds `n / 2` seconds beyond each end, at least one for an instant and at most 30.
+  # Otherwise the step, from a second to a thousand years, that cuts it closest to `n` times lays
+  # breaks from its start truncated to the step's unit (a minute, an hour, a day, a week starting
+  # on Monday, a month, a year, a decade, a century) to the first at or past its end, keeping the
+  # last before the extent and the first after it. Where a second's breaks cut it fewer than
+  # `n %/% 2` times, R's fewest, a second is added on the right, then the left, and so on, until
+  # they do; where the chosen step's cut the extent more than `n` times, as many of those beyond
+  # its ends as the excess are dropped, shared between the ends as the breaks beyond each are, the
+  # left's rounded half to even, or all of them where that is fewer; and where they still cut it
+  # more, the next coarser step is taken instead when its breaks come closer to `n`, unless they
+  # are fewer than R's fewest. Each step names its labels' format: `"%S"` for seconds up to 15,
+  # `"%H:%M:%S"` for 30, `"%H:%M"` for minutes, and for one and three hours within a day, which
+  # are `"%b %d %H:%M"` beyond, as six and twelve are, `"%b %d"` for days, weeks and half months
+  # (the 1st and 15th), `"%b"` for months within a year and `"%b %Y"` beyond, `"%Y-%m"` for six
+  # months, and `"%Y"` for years. Seconds, minutes, hours
   # and weeks step by elapsed time and days, months and years on the calendar, as R's `seq()`
   # steps them, so across a change of a zone's offset hourly breaks keep their spacing and daily
   # ones their midnight.
@@ -44,15 +48,13 @@ defmodule Scales.DateBreaks do
   # wall-clock time of its start once read, as R's `seq()` reads a `POSIXct` start, so a month
   # whose midnight a change skips moves every later month's break to the hour it ends.
   #
-  # Three of R's branches are left out, none changing a break inside the extent: where even a
-  # second cuts the extent fewer than twice, R adds ticks beyond it until it does, and here its
-  # breaks are kept as they are, so R's ticks inside are all here (every one of 2,000 random
-  # extents of one to two seconds); where the chosen step cuts it more than five times, R trims
-  # breaks beyond the extent, which changes no break inside it or its label (every one of 9,000
-  # extents under a second, where alone it fires); and where the chosen step cuts it fewer than
-  # five times, R tries the next finer step, which never came closer on 16,400 of R's extents,
-  # 6,300 of them clustered round the spans where two neighbouring steps are equally close to
-  # five, so the chosen step's breaks are kept. A date extent never reaches a step under a day.
+  # Two of R's branches, each a search for a finer step, are left out: where a step coarser than a
+  # second cuts the extent fewer than `n %/% 2` times, R takes the next finer until one does, which
+  # never ran on 20,000 random extents with `n` from 2 to 20; and where the chosen step cuts it
+  # fewer than `n` times, R tries the next finer, which never came closer on those or on 16,400
+  # extents with five wanted, 6,300 of them clustered round the spans where two neighbouring steps
+  # are equally close to five, so the chosen step's breaks are kept. A date extent never reaches a
+  # step under a day.
 
   @epoch ~N[1970-01-01 00:00:00]
 
@@ -63,16 +65,16 @@ defmodule Scales.DateBreaks do
   @year @day * 365.25
   @month @year / 12
 
-  # `pretty()`'s defaults: about five intervals, and no fewer than two.
+  # `pretty()`'s default: about five intervals.
   @wanted 5
-  @fewest 2
 
-  # How far `prettyDate()` widens an extent under a second beyond each end: half of five seconds.
-  @short_widening @wanted / 2
+  # The most `prettyDate()` widens an extent under a second beyond each end: half a minute.
+  @widest_widening 30
 
   # Each step: its length in seconds, how a sequence of it advances (by elapsed seconds, calendar
   # days, half months, months or years), the unit its first break is truncated to, and its labels'
-  # format, `:month` for one that depends on whether the extent spans a year.
+  # format, `:hour` for one that depends on whether the extent spans more than a day and `:month`
+  # for one that depends on whether it spans a year.
   @steps [
     %{seconds: 1, by: {:seconds, 1}, start: :minutes, format: "%S"},
     %{seconds: 2, by: {:seconds, 2}, start: :minutes, format: "%S"},
@@ -86,8 +88,8 @@ defmodule Scales.DateBreaks do
     %{seconds: 10 * @minute, by: {:seconds, 10 * @minute}, start: :hours, format: "%H:%M"},
     %{seconds: 15 * @minute, by: {:seconds, 15 * @minute}, start: :hours, format: "%H:%M"},
     %{seconds: 30 * @minute, by: {:seconds, 30 * @minute}, start: :hours, format: "%H:%M"},
-    %{seconds: 1 * @hour, by: {:seconds, 1 * @hour}, start: :hours, format: "%H:%M"},
-    %{seconds: 3 * @hour, by: {:seconds, 3 * @hour}, start: :days, format: "%H:%M"},
+    %{seconds: 1 * @hour, by: {:seconds, 1 * @hour}, start: :hours, format: :hour},
+    %{seconds: 3 * @hour, by: {:seconds, 3 * @hour}, start: :days, format: :hour},
     %{seconds: 6 * @hour, by: {:seconds, 6 * @hour}, start: :days, format: "%b %d %H:%M"},
     %{seconds: 12 * @hour, by: {:seconds, 12 * @hour}, start: :days, format: "%b %d %H:%M"},
     %{seconds: 1 * @day, by: {:days, 1}, start: :days, format: "%b %d"},
@@ -134,55 +136,67 @@ defmodule Scales.DateBreaks do
   """
   @type clock :: :utc | {String.t(), module()}
 
-  # The breaks of an axis showing `extent`, in days, as dates in ascending order, some of them
-  # outside it, and the format their labels are written in.
+  # The breaks of an axis showing `extent`, in days, `wanted` intervals wanted, as dates in
+  # ascending order, some of them outside it, and the format their labels are written in.
   @doc false
-  @spec pretty({number(), number()}) :: {[Date.t()], String.t()}
-  def pretty({low, high}) do
+  @spec pretty({number(), number()}, non_neg_integer()) :: {[Date.t()], String.t()}
+  def pretty({low, high}, wanted \\ @wanted) do
     # R's `as.POSIXct()` of a date: its days times the seconds in a day.
     limits = {low * @day, high * @day}
 
-    case span(limits) do
-      span when span <= @wanted * @day -> every_day(limits, span)
-      span -> dates(stepped(limits, span, :utc))
-    end
+    if span(limits) <= wanted * @day,
+      do: every_day(limits, wanted),
+      else: dates(pretty_datetime(limits, :utc, wanted))
   end
 
   # The breaks of an axis showing `extent`, in seconds since 1970-01-01 00:00 UTC, laid on
-  # `clock`, in ascending order, some of them outside it, and the format their labels are written
-  # in: each a `NaiveDateTime` on UTC's clock, or a `DateTime` in the clock's zone. An extent
-  # under a second is first widened to the whole seconds two and a half seconds beyond each end,
-  # as R's `prettyDate()` widens it.
+  # `clock`, `wanted` intervals wanted, in ascending order, some of them outside it, and the format
+  # their labels are written in: each a `NaiveDateTime` on UTC's clock, or a `DateTime` in the
+  # clock's zone.
   @doc false
-  @spec pretty_datetime({number(), number()}, clock()) ::
+  @spec pretty_datetime({number(), number()}, clock(), non_neg_integer()) ::
           {[NaiveDateTime.t() | DateTime.t()], String.t()}
-  def pretty_datetime({low, high}, clock) when high - low < 1 do
-    widened = {Float.floor(low - @short_widening), Float.ceil(high + @short_widening)}
-    pretty_datetime(widened, clock)
-  end
-
-  def pretty_datetime(limits, clock), do: stepped(limits, span(limits), clock)
+  def pretty_datetime(limits, clock, wanted \\ @wanted),
+    do: stepped(limits, widened(limits, wanted), clock, wanted)
 
   defp dates({times, format}), do: {Enum.map(times, &NaiveDateTime.to_date/1), format}
 
-  # Every day the extent touches, widened by as many days as five less its length, rounded half to
-  # even, half on the left and the odd day on the right, as R's short-range branch widens it.
-  defp every_day({low, high}, span) do
-    widening = round_half_even(@wanted - span / @day)
+  # An extent under a second widened to the whole seconds half the intervals wanted beyond each
+  # end, at least one where it is one instant and at most half a minute, as R's `prettyDate()`
+  # widens it.
+  defp widened({low, high}, wanted) when high - low < 1 do
+    least = if high == low, do: 1, else: 0
+    widening = min(@widest_widening, max(least, wanted / 2))
+    {Float.floor(low - widening), Float.ceil(high + widening)}
+  end
+
+  defp widened(limits, _wanted), do: limits
+
+  # Every day the extent touches, widened by as many days as the intervals wanted less its
+  # length, rounded half to even, half on the left and the odd day on the right, as R's
+  # short-range branch widens it; never fewer than R's fewest, which it therefore never widens
+  # further.
+  defp every_day({low, high} = limits, wanted) do
+    widening = round_half_even(wanted - span(limits) / @day)
     left = div(widening, 2)
     right = left + rem(widening, 2)
     days = (floor_day(low) - left)..(floor_day(high) + right)//1
     {Enum.map(days, fn day -> Date.add(~D[1970-01-01], day) end), "%b %d"}
   end
 
-  # The chosen step's breaks on the clock and their labels' format.
-  defp stepped(limits, span, clock) do
+  # The chosen step's breaks on the clock, laid over the extent as widened, and their labels'
+  # format.
+  defp stepped(limits, widened, clock, wanted) do
+    span = span(widened)
+
     first =
       Enum.min_by(0..@last_step, fn index ->
-        abs(span / Enum.at(@steps, index).seconds - @wanted)
+        abs(span / Enum.at(@steps, index).seconds - wanted)
       end)
 
-    {chosen, instants} = choose(first, steps_of(first, limits, clock), limits, clock)
+    problem = %{limits: limits, widened: widened, clock: clock, wanted: wanted}
+    breaks = steps_of(first, widened, clock)
+    {chosen, instants} = choose(first, ticked(first, breaks, wanted, :right), problem)
     times = Enum.map(instants, fn instant -> on_clock(instant, clock) end)
     {times, format(Enum.at(@steps, chosen), span)}
   end
@@ -325,24 +339,80 @@ defmodule Scales.DateBreaks do
   defp stride(:month, count), do: {:months, count}
   defp stride(:year, count), do: {:years, count}
 
-  # The step's breaks, or, where they cut the extent more than five times, the next coarser
-  # step's when they come closer to five intervals, as R's do.
-  defp choose(index, breaks, limits, clock) do
-    excess = intervals(breaks) - @wanted
-    coarser = min(index + 1, @last_step)
+  # A second's breaks with a second more on the right, then one on the left, and so on, until they
+  # cut the extent at least R's fewest times, the intervals wanted halved and rounded down, as R
+  # adds them; a coarser step's are kept as they are, since R's search for a finer one there never
+  # ran on 20,000 random extents.
+  defp ticked(0 = index, breaks, wanted, side) do
+    if intervals(breaks) < fewest(wanted) do
+      added =
+        case side do
+          :right -> Enum.concat(breaks, [List.last(breaks) + 1])
+          :left -> [hd(breaks) - 1 | breaks]
+        end
 
-    with true <- excess > 0,
-         coarser_breaks = steps_of(coarser, limits, clock),
-         true <- closer?(intervals(coarser_breaks), excess) do
-      {coarser, coarser_breaks}
+      ticked(index, added, wanted, other(side))
     else
-      false -> {index, breaks}
+      breaks
     end
   end
 
-  # Whether a count of intervals is closer to five than an excess of `excess` is; one with fewer
-  # than two never is, as R counts it as minus infinity.
-  defp closer?(count, excess), do: count >= @fewest and abs(count - @wanted) < abs(excess)
+  defp ticked(_index, breaks, _wanted, _side), do: breaks
+
+  defp other(:right), do: :left
+  defp other(:left), do: :right
+
+  # The step's breaks, those beyond the extent trimmed where they cut it more than the intervals
+  # wanted, or, where they still cut it more, the next coarser step's when they come closer to the
+  # number wanted, as R's do.
+  defp choose(index, breaks, %{widened: widened, clock: clock, wanted: wanted} = problem) do
+    trimmed = trimmed(breaks, problem)
+    excess = intervals(trimmed) - wanted
+    coarser = min(index + 1, @last_step)
+
+    with true <- excess > 0,
+         coarser_breaks = steps_of(coarser, widened, clock),
+         true <- closer?(intervals(coarser_breaks), excess, wanted) do
+      {coarser, coarser_breaks}
+    else
+      false -> {index, trimmed}
+    end
+  end
+
+  # Breaks cutting the extent, before it was widened, more than the intervals wanted, less as many
+  # beyond it as they cut it too often, or every one beyond it where that is fewer: the excess
+  # shared between the two ends as the breaks beyond each are, rounded half to even on the left,
+  # as R trims them.
+  defp trimmed(breaks, %{limits: {low, high}, wanted: wanted}) do
+    excess = intervals(breaks) - wanted
+    left = Enum.count(breaks, fn break -> break <= low end) - 1
+    right = Enum.count(breaks, fn break -> break >= high end) - 1
+
+    {dropped_left, dropped_right} =
+      cond do
+        excess <= 0 or (left <= 0 and right <= 0) -> {0, 0}
+        excess < left + right -> shared(excess, left, left + right)
+        true -> {left, right}
+      end
+
+    breaks
+    |> Enum.drop(dropped_left)
+    |> Enum.drop(-dropped_right)
+  end
+
+  defp shared(excess, left, beyond) do
+    dropped_left = round_half_even(excess * left / beyond)
+    {dropped_left, excess - dropped_left}
+  end
+
+  # Whether a count of intervals is closer to the number wanted than an excess of `excess` is; one
+  # with fewer than R's fewest never is, as R counts it as minus infinity.
+  defp closer?(count, excess, wanted),
+    do: count >= fewest(wanted) and abs(count - wanted) < abs(excess)
+
+  # R's `min.n`: the fewest intervals a date-time's breaks may cut the extent, half the number
+  # wanted, rounded down.
+  defp fewest(wanted), do: div(wanted, 2)
 
   # The step's breaks over the extent, as instants, R's `calcSteps()`: from its start truncated to
   # the step's unit to the end, keeping the last at or before the start and the first at or after
@@ -501,6 +571,8 @@ defmodule Scales.DateBreaks do
     |> then(fn unpadded -> Calendar.strftime(date, unpadded) end)
   end
 
+  defp format(%{format: :hour}, span) when span <= @day, do: "%H:%M"
+  defp format(%{format: :hour}, _span), do: "%b %d %H:%M"
   defp format(%{format: :month}, span) when span < @year, do: "%b"
   defp format(%{format: :month}, _span), do: "%b %Y"
   defp format(%{format: format}, _span), do: format
