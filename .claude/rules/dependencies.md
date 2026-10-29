@@ -186,7 +186,8 @@ semver or the changelog).
   paths before hashing an approval, and passes a `defimpl`'s own `classify_to:`;
   `elixir-code-review` scopes its review against the local `main`; `commit-gate.sh` adds the
   mutation rule and the `post-commit` entry point, which `settings.json` registers as a
-  PostToolUse hook; `docs-sync` routes a milestone to one §6 line and mechanism to module
+  PostToolUse hook, and judges the checkout its command runs in, the hook input's `cwd`, since a
+  worktree session's hooks start in the main checkout; `docs-sync` routes a milestone to one §6 line and mechanism to module
   documentation. The code Giggly runs from Tack — `mix tack.quality`, `mix tack.rules_check`, the
   credo checks, the boundary scanner — is copied into `dev/` (the rule above), so Tack is not a
   dependency.

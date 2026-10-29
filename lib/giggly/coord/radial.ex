@@ -215,6 +215,9 @@ defmodule Giggly.Coord.Radial do
     end
 
     @impl Giggly.Coord
+    def linear?(_coord), do: false
+
+    @impl Giggly.Coord
     def clip(%{clip: clip}), do: clip
 
     @impl Giggly.Coord

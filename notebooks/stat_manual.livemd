@@ -94,8 +94,7 @@ p + stat_manual(
 `transform()` gives each row an `xend` and a `yend` at its group's mean, so a segment runs from
 each point to the centre of its group.
 
-Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, and segments,
-`geom_segment()`, besides what `p` waits for.
+Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, besides what `p` waits for.
 
 ## Centroids with dplyr
 
@@ -130,8 +129,8 @@ verbs, besides what `p` waits for.
   )
 ```
 
-Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, the `dplyr` package's verbs,
-and `geom_segment()`, besides what `p` waits for.
+Not in Giggly yet: `stat_manual()` and its `fun` and `args` options, and the `dplyr` package's
+verbs, besides what `p` waits for.
 
 ## A hull with dplyr
 

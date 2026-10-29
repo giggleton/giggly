@@ -30,7 +30,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   (`formula = y ~ x`; the entry beginning "A verdict names an argument Giggly lacks"). An example R
   refuses on purpose (`should_stop()`) that Giggly refuses too is shown by a cell that runs Giggly's
   line in `try`/`rescue` and returns the message, so every cell still runs and no verdict is written
-  (the entry beginning "An example R refuses on purpose").
+  (the entry beginning "An example R refuses on purpose"). A base R graphics call beside the
+  example's `ggplot()` (`plot(type = "h")`), outside ggplot2, is not drawn and names no verdict;
+  the prose says Giggly draws the `ggplot()` call.
 - **"Not in Giggly yet:" names each missing piece by its ggplot2 function or argument, in the same
   words in every notebook** ("mapping a text's `size`", "a character as a shape", "`geom_jitter()`",
   "a whole-column function in a mapping", "the theme's `strip.placement` setting"), so when a

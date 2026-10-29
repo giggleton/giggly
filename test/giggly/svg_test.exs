@@ -4,6 +4,7 @@ defmodule Giggly.SVGTest do
   alias Giggly.{Font, Scene, SVG}
 
   alias Giggly.Scene.{
+    Arrow,
     Cell,
     Circles,
     Gradient,
@@ -307,10 +308,101 @@ defmodule Giggly.SVGTest do
         opacity: [1.0],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       assert draw(whole([line])) =~ "<polyline points='360.00,432.00 363.00,436.00 '"
+    end
+
+    # Golden: grid's own arrowheads in R 4.6.1, drawn through vdiffr 1.0.9 at grid's defaults, 30
+    # degrees and 0.25 inches (18 points), on lines at whole points: `grid.segments()` with a
+    # closed head filled white, and `grid.lines()` with closed heads at both ends. Each head right
+    # after its line, its first end's before its last's, a polygon in its line's stroke with its
+    # own fill. It moves only with how grid draws an arrow or svglite writes one.
+    test "a line's closed heads follow it, each arm 18 points at 30 degrees from the line" do
+      segments = %Segments{
+        starts: [at(100, 476)],
+        ends: [at(400, 276)],
+        offsets: :none,
+        stroke_width: 1.07,
+        dashes: :none,
+        color: ["#F8766D"],
+        opacity: [1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0,
+        arrows: [arrow(type: :closed, fill: "#FFFFFF", fill_opacity: 1.0)]
+      }
+
+      polylines = %Polylines{
+        lines: [[at(100, 176), at(300, 76), at(500, 176)]],
+        offsets: :none,
+        stroke_width: 1.07,
+        dashes: :none,
+        color: ["#F8766D"],
+        opacity: [1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0,
+        arrows: [arrow(ends: :both, type: :closed, fill: "#F8766D", fill_opacity: 1.0)]
+      }
+
+      stroke = "style='stroke-width: 1.07; stroke: #F8766D; stroke-linecap: butt;"
+
+      assert draw(whole([segments])) =~
+               "<line x1='100.00' y1='476.00' x2='400.00' y2='276.00' " <>
+                 stroke <>
+                 "' />\n<polygon points='392.02,292.14 400.00,276.00 382.04,277.16 ' " <>
+                 stroke <> " fill: #FFFFFF;' />\n</svg>"
+
+      assert draw(whole([polylines])) =~
+               "<polyline points='100.00,176.00 300.00,76.00 500.00,176.00 ' " <>
+                 stroke <>
+                 " fill: none;' />\n<polygon points='109.92,160.98 100.00,176.00 117.97,177.08 ' " <>
+                 stroke <>
+                 " fill: #F8766D;' />\n<polygon points='482.03,177.08 500.00,176.00 490.08,160.98 ' " <>
+                 stroke <> " fill: #F8766D;' />\n</svg>"
+    end
+
+    # Golden: grid's own `grid.segments()` in R 4.6.1, dashed and 4.27 points wide, drawn through
+    # vdiffr 1.0.9 with an open head at its first end and one of no length at its last: an open head
+    # a polyline in its line's stroke, dashes included, and one of no length three points at its
+    # tip; a line given no head has none.
+    test "an open head is drawn in its line's stroke, dashes and all, and a short one a point" do
+      segments = %Segments{
+        starts: [at(100, 376), at(300, 526)],
+        ends: [at(250, 526), at(600, 376)],
+        offsets: :none,
+        stroke_width: 4.27,
+        dashes: [22.77, 22.77],
+        color: ["#000000", "#000000"],
+        opacity: [1.0, 1.0],
+        line_end: :butt,
+        line_join: :round,
+        mitre_limit: 10.0,
+        arrows: [arrow(ends: :first), arrow(ends: :last, length: 0.0)]
+      }
+
+      style =
+        "style='stroke-width: 4.27; stroke: #000000; stroke-dasharray: 22.77,22.77; " <>
+          "stroke-linecap: butt;"
+
+      assert draw(whole([segments])) =~
+               "<polyline points='117.39,380.66 100.00,376.00 104.66,393.39 ' " <>
+                 style <>
+                 " fill: none;' />\n<line x1='300.00' y1='526.00' x2='600.00' y2='376.00' " <>
+                 style <>
+                 "' />\n<polyline points='600.00,376.00 600.00,376.00 600.00,376.00 ' " <>
+                 style <> " fill: none;' />\n</svg>"
+
+      plain = %{segments | arrows: [:none, :none]}
+
+      assert draw(whole([plain])) =~
+               "y2='526.00' " <>
+                 style <>
+                 "' />\n<line x1='300.00' y1='526.00' x2='600.00' y2='376.00' " <>
+                 style <> "' />\n</svg>"
     end
 
     test "a rectangle is hung from its top left corner, its look as ggplot2's GeomRect draws it" do
@@ -429,7 +521,8 @@ defmodule Giggly.SVGTest do
         opacity: [1.0, 1.0],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       segments = %Segments{
@@ -442,7 +535,8 @@ defmodule Giggly.SVGTest do
         opacity: [1.0, 1.0],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       drawn = draw(whole([circles, rectangles, polylines, segments]))
@@ -729,7 +823,8 @@ defmodule Giggly.SVGTest do
           opacity: [1.0],
           line_end: line_end,
           line_join: line_join,
-          mitre_limit: mitre_limit
+          mitre_limit: mitre_limit,
+          arrows: :none
         }
 
         [style] =
@@ -771,7 +866,8 @@ defmodule Giggly.SVGTest do
         opacity: [0.1, 1.0],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       assert Regex.scan(~r/<polyline [^>]*?style='([^']*)'/, draw(whole([polylines])),
@@ -800,7 +896,8 @@ defmodule Giggly.SVGTest do
             stroke_width: 1.07,
             dashes: [5.6906, 17.0718],
             color: ["#FF0000"],
-            opacity: [0.5]
+            opacity: [0.5],
+            arrows: :none
           ] ++ line
         )
 
@@ -814,7 +911,8 @@ defmodule Giggly.SVGTest do
             stroke_width: 1.07,
             dashes: [1.4226, 4.2679, 5.6906, 4.2679],
             color: ["#000000"],
-            opacity: [1.0]
+            opacity: [1.0],
+            arrows: :none
           ] ++ line
         )
 
@@ -938,7 +1036,8 @@ defmodule Giggly.SVGTest do
         opacity: [0.1],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       drawn = draw(whole([segments]))
@@ -966,7 +1065,8 @@ defmodule Giggly.SVGTest do
         opacity: [1.0, 1.0, 1.0],
         line_end: :butt,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       circles = %Circles{
@@ -1142,7 +1242,8 @@ defmodule Giggly.SVGTest do
         opacity: [1.0],
         line_end: :round,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
 
       drawn = draw(whole([segments]))
@@ -1185,6 +1286,19 @@ defmodule Giggly.SVGTest do
       cells: cells
     }
   end
+
+  # An arrowhead at grid's defaults, 30 degrees either side of its line and 0.25 inches (18 points)
+  # long, open and unfilled, with `changes` made to it.
+  defp arrow(changes) do
+    struct!(
+      %Arrow{angle: 30.0, length: 18.0, ends: :last, type: :open, fill: :none, fill_opacity: 0.0},
+      changes
+    )
+  end
+
+  # A place in a whole drawing of vdiffr's size, 720 by 576 points, given in its points from the
+  # top left, as a share of the drawing from the bottom left.
+  defp at(x_points, y_points), do: {x_points / 720, 1 - y_points / 576}
 
   # One cell filling the drawing, holding `primitives`.
   defp whole(primitives) do

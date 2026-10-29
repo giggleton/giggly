@@ -4,7 +4,7 @@ defmodule Giggly.Geom.Line do
   # Lines, ggplot2's `GeomLine`, which `geom_line()` draws with: a path through each group's rows
   # in order of their `x`, or of their `y` when its `orientation` is `:y`, a line running up the
   # panel. It is ggplot2's `GeomPath` with its rows put in order first, so it is drawn as a path
-  # (`Giggly.Geom.Path`), with the same ends, corners and mitre limit. Use it through
+  # (`Giggly.Geom.Path`), with the same ends, corners, mitre limit and arrowheads. Use it through
   # `Giggly.Geom`.
   #
   # Lines use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need `:x`
@@ -18,14 +18,15 @@ defmodule Giggly.Geom.Line do
   # layer's to give; ggplot2 would also take it from a stat that names one, and no stat a line
   # takes yet does.
 
-  @enforce_keys [:orientation, :line_end, :line_join, :mitre_limit]
+  @enforce_keys [:orientation, :line_end, :line_join, :mitre_limit, :arrow]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           orientation: :x | :y,
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),
-          mitre_limit: float()
+          mitre_limit: float(),
+          arrow: Giggly.Geom.arrow() | :none
         }
 
   # The aesthetics a layer of lines can use, from its own mapping or the plot's.
@@ -96,7 +97,8 @@ defmodule Giggly.Geom.Line do
       %Geom.Path{
         line_end: geom.line_end,
         line_join: geom.line_join,
-        mitre_limit: geom.mitre_limit
+        mitre_limit: geom.mitre_limit,
+        arrow: geom.arrow
       }
     end
   end

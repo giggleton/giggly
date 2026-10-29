@@ -177,12 +177,14 @@ defmodule Giggly.Geom.Smooth do
       |> Geom.key_size(key)
     end
 
-    # The path a smooth's line is drawn as, with its ends and corners.
+    # The path a smooth's line is drawn as, with its ends and corners and no arrowhead, as
+    # `GeomSmooth` hands `GeomPath` none.
     defp path(geom) do
       %Geom.Path{
         line_end: geom.line_end,
         line_join: geom.line_join,
-        mitre_limit: geom.mitre_limit
+        mitre_limit: geom.mitre_limit,
+        arrow: :none
       }
     end
   end

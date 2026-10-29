@@ -23,8 +23,14 @@ defmodule Giggly.Geom.Mark do
   # line type, a missing one read as blank (`line_types/1`), as ggplot2 draws a missing line type.
   # svglite writes each length times the line's width in line-width units, or 1 where the line is
   # narrower, as a length in points (`dashes/2`).
+  #
+  # A line's arrowhead (`head/3`) is the layer's `arrow:` for that line, its closed triangle filled
+  # with the arrow's fill, or the line's colour where the arrow says `:color`, as ggplot2's
+  # `arrow.fill` defaults to the colour, at the line's alpha, as ggplot2 applies `alpha()` to the
+  # fill as to the line.
 
   alias Giggly.DataFrame
+  alias Giggly.Scene.Arrow
 
   # ggplot2's `.pt` (font points per millimetre), and the line-width units and points in an inch.
   @font_points_per_millimetre 72.27 / 25.4
@@ -131,4 +137,24 @@ defmodule Giggly.Geom.Mark do
   def hex(:none), do: :none
   def hex(<<"#", _digits::binary-size(6)>> = color), do: color
   def hex(<<"#", digits::binary-size(6), _alpha::binary-size(2)>>), do: "#" <> digits
+
+  # A line's arrowhead from its layer's `arrow`, for a line of `color` at `alpha`, or `:none` where
+  # the layer gives none.
+  @doc false
+  @spec head(Giggly.Geom.arrow() | :none, String.t() | :none, number() | nil | :nan) ::
+          Arrow.t() | :none
+  def head(:none, _color, _alpha), do: :none
+
+  def head(arrow, color, alpha) do
+    fill = if arrow.fill == :color, do: color, else: arrow.fill
+
+    %Arrow{
+      angle: arrow.angle,
+      length: arrow.length,
+      ends: arrow.ends,
+      type: arrow.type,
+      fill: hex(fill),
+      fill_opacity: opacity(fill, alpha)
+    }
+  end
 end

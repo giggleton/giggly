@@ -91,7 +91,8 @@ defmodule Giggly.Guide.Grid do
         opacity: List.duplicate(look.opacity, length(lines)),
         line_end: look.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end

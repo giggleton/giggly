@@ -110,6 +110,12 @@ size has a weight".
   only what svglite writes: `stroke-linecap` when its ends are not round, `stroke-linejoin` when its
   corners are not round (`miter`, `bevel`), and `stroke-miterlimit` only for mitred corners whose
   limit is not 10.
+- **A line's arrowheads are written right after it, as svglite writes grid's**: its first end's
+  and then its last's, each three points, an arm's end, the tip and the other arm's end, each arm
+  the head's length in points at its angle either side of the line from its tip back to the point
+  before, the arm turned back from the line first, in the line's whole stroke, dashes, ends and
+  corners; an open head a polyline (`fill: none`), a closed one a polygon in its own fill. A head
+  of no length is written all the same, three points at its tip.
 - **A polyline is never filled**, as grid's never is: its `style` says `fill: none`, which
   svglite leaves to a stylesheet Giggly does not write, since a stylesheet in an inlined SVG
   styles the whole page; without it SVG would fill a closed line, a radial grid's circle, black.

@@ -45,6 +45,7 @@ defmodule Giggly.SVG do
   alias Giggly.Scene
 
   alias Giggly.Scene.{
+    Arrow,
     Cell,
     Circles,
     Gradient,
@@ -401,35 +402,41 @@ defmodule Giggly.SVG do
     end)
   end
 
-  # Each line as svglite writes a polyline, its stroke its colour at its opacity, then its dashes.
+  # Each line as svglite writes a polyline, its stroke its colour at its opacity, then its dashes,
+  # and then its arrowheads.
   defp primitive(%Polylines{} = polylines, box) do
     lines = placed_lines(polylines.lines, polylines.offsets, box)
     dashes = dash_style(polylines.dashes)
     style = line_style(polylines.line_end, polylines.line_join, polylines.mitre_limit)
+    columns = [lines, polylines.color, polylines.opacity, line_arrows(polylines.arrows, lines)]
 
-    Enum.zip_with([lines, polylines.color, polylines.opacity], fn [line, color, opacity] ->
+    Enum.zip_with(columns, fn [line, color, opacity, arrow] ->
+      stroke = stroke(polylines.stroke_width, color, opacity, dashes, style)
+
       [
         "<polyline points='",
         points(line),
-        "' style='stroke-width: ",
-        significant(polylines.stroke_width),
-        ";",
-        stroke_style(color, opacity),
-        dashes,
-        style,
-        " fill: none;' />\n"
+        "' style='",
+        stroke,
+        " fill: none;' />\n",
+        heads(arrow, line, stroke)
       ]
     end)
   end
 
   # Each segment as svglite writes a line, from its start to its end, each moved by its offset,
-  # its stroke its colour at its opacity, then its dashes.
+  # its stroke its colour at its opacity, then its dashes, and then its arrowheads.
   defp primitive(%Segments{} = segments, box) do
     dashes = dash_style(segments.dashes)
     style = line_style(segments.line_end, segments.line_join, segments.mitre_limit)
-    columns = [placed_segments(segments, box), segments.color, segments.opacity]
+    placed = placed_segments(segments, box)
+    columns = [placed, segments.color, segments.opacity, line_arrows(segments.arrows, placed)]
 
-    Enum.zip_with(columns, fn [{{x_start, y_start}, {x_finish, y_finish}}, color, opacity] ->
+    Enum.zip_with(columns, fn [{start, finish}, color, opacity, arrow] ->
+      {x_start, y_start} = start
+      {x_finish, y_finish} = finish
+      stroke = stroke(segments.stroke_width, color, opacity, dashes, style)
+
       [
         "<line x1='",
         number(x_start),
@@ -439,13 +446,10 @@ defmodule Giggly.SVG do
         number(x_finish),
         "' y2='",
         number(y_finish),
-        "' style='stroke-width: ",
-        significant(segments.stroke_width),
-        ";",
-        stroke_style(color, opacity),
-        dashes,
-        style,
-        "' />\n"
+        "' style='",
+        stroke,
+        "' />\n",
+        heads(arrow, [start, finish], stroke)
       ]
     end)
   end
@@ -750,6 +754,65 @@ defmodule Giggly.SVG do
       end
     )
   end
+
+  # A line's stroke as svglite writes it: its width, its colour at its opacity, its dashes, and its
+  # ends and corners.
+  defp stroke(width, color, opacity, dashes, style),
+    do: ["stroke-width: ", significant(width), ";", stroke_style(color, opacity), dashes, style]
+
+  # Each line's arrowhead, or `:none` for each where the lines carry none.
+  defp line_arrows(:none, lines), do: Enum.map(lines, fn _line -> :none end)
+  defp line_arrows(arrows, _lines), do: arrows
+
+  # A line's arrowheads, as svglite writes the heads grid draws in the line's own stroke: its
+  # first end's and then its last's, each the arms alone, a polyline, or closed, a polygon filled
+  # with its fill at its opacity.
+  defp heads(:none, _line, _stroke), do: []
+
+  defp heads(%Arrow{} = arrow, line, stroke) do
+    [first, second | _rest] = line
+    [last, before_last | _rest] = Enum.reverse(line)
+
+    ends =
+      case arrow.ends do
+        :first -> [{first, second}]
+        :last -> [{last, before_last}]
+        :both -> [{first, second}, {last, before_last}]
+      end
+
+    Enum.map(ends, fn {tip, from} -> head(arrow, head_points(arrow, tip, from), stroke) end)
+  end
+
+  defp head(%Arrow{type: :open}, positions, stroke),
+    do: ["<polyline points='", points(positions), "' style='", stroke, " fill: none;' />\n"]
+
+  defp head(%Arrow{type: :closed} = arrow, positions, stroke) do
+    [
+      "<polygon points='",
+      points(positions),
+      "' style='",
+      stroke,
+      fill_style(arrow.fill, arrow.fill_opacity),
+      "' />\n"
+    ]
+  end
+
+  # A head's three points, in the drawing's points: an arm's end, the tip, and the other arm's
+  # end, each arm `length` long at `angle` either side of the line from the tip back to the point
+  # before it, turned the way grid turns them in a drawing whose y runs down.
+  defp head_points(arrow, {tip_x, tip_y} = tip, {from_x, from_y}) do
+    back = :math.atan2(from_y - tip_y, from_x - tip_x)
+    spread = arrow.angle * :math.pi() / 180
+
+    [
+      arm_end(tip, arrow.length, back - spread),
+      tip,
+      arm_end(tip, arrow.length, back + spread)
+    ]
+  end
+
+  defp arm_end({tip_x, tip_y}, length, direction),
+    do: {tip_x + length * :math.cos(direction), tip_y + length * :math.sin(direction)}
 
   # Each rectangle's top left corner in the drawing, its width and its height: its width and
   # height the cell's share of its extent, or the distance between its corners once each is moved

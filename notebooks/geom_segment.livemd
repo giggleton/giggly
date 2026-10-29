@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -17,7 +26,11 @@ waiting for, so the page is also a list of what remains.
 
 `geom_segment()` draws a straight line for each row, from (`x`, `y`) to (`xend`, `yend`), and
 `geom_curve()` draws a curved one; to join points across rows, ggplot2 has `geom_path()`, which
-Giggly has too (`Giggly.Plot.geom_path/3`). Giggly has neither of these yet.
+Giggly has too (`Giggly.Plot.geom_path/3`). Giggly has `Giggly.Plot.geom_segment/3`, whose `arrow:`
+puts an arrowhead on each segment, and no `geom_curve()`. A plot is described with `Giggly.Plot`
+and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases
+`Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows
+it below the cell with `Kino.Image`.
 
 ## A curve and a segment
 
@@ -34,7 +47,7 @@ b +
 Both layers draw a one-row table of their own, `df`, over the points of `mtcars`, and mapping
 `colour` to a constant names each layer in the legend.
 
-Not in Giggly yet: `geom_curve()` and `geom_segment()`, and mapping `xend` and `yend`.
+Not in Giggly yet: `geom_curve()`.
 
 ## Curvature and arrows
 
@@ -51,8 +64,8 @@ b + geom_curve(
 A negative `curvature` bends the curve to the left, a positive one to the right, and 0 draws a
 straight line; the default is 0.5.
 
-Not in Giggly yet: `geom_curve()` with its `curvature` and `arrow` options, `arrow()`, and mapping
-`xend` and `yend`.
+Not in Giggly yet: `geom_curve()` with its `curvature` and `arrow` options, and an `arrow()` length
+in `"npc"`, a share of the panel.
 
 ## Seal movements
 
@@ -69,8 +82,8 @@ ggplot2's `seals` is a vector field of seals' movements: at each point of a grid
 latitudes, the change in longitude and latitude. `annotation_borders("state")` draws the outlines
 of the US states from the `maps` package.
 
-Not in Giggly yet: `geom_segment()` and its `arrow` option, mapping `xend` and `yend`,
-`annotation_borders()` and the map data from the `maps` package it draws, and the `seals` dataset.
+Not in Giggly yet: map data from the `maps` package, `annotation_borders()`, and the `seals`
+dataset.
 
 ## Line ends and joins
 
@@ -94,9 +107,8 @@ ggplot(df2, aes(x = 1, y = y, xend = 2, yend = y, label = paste(lineend, linejoi
 R's `expand.grid()` makes a row for each combination of line end and line join, and each row's
 segment is drawn with its own line end and join, and labelled with their names.
 
-Not in Giggly yet: `geom_segment()` with its `lineend`, `linejoin` and `arrow` options, and mapping
-`xend` and `yend`. ggplot2 knows no `hjust` called `'outside'` and centres these labels, as Giggly
-does by default.
+Not in Giggly yet: a `lineend` and a `linejoin` for each row of `geom_segment()`. ggplot2 knows no
+`hjust` called `'outside'` and centres these labels, as Giggly does by default.
 
 ## Spikes, as base R draws them
 
@@ -113,6 +125,18 @@ ggplot(counts, aes(x, Freq)) +
 
 R's `rpois()` draws 100 random counts from a Poisson distribution with mean 5, and `table()`
 counts how often each occurs. Base R's `plot(type = "h")` draws a vertical line from 0 up to each
-frequency, and the `ggplot()` call draws the same with segments.
+frequency, and the `ggplot()` call draws the same with segments. `plot()` is base R's own
+graphics, outside ggplot2; Giggly draws the `ggplot()` call. The cell writes out the counts R draws
+after `set.seed(1)`, and maps `yend` to the number 0, so each spike runs down to the axis.
 
-Not in Giggly yet: `geom_segment()` and its `lineend` option, and mapping `xend` and `yend`.
+```elixir
+counts = %{
+  "x" => [1, 2, 3, 4, 5, 6, 7, 8, 9, 11],
+  "Freq" => [2, 7, 12, 22, 15, 16, 15, 7, 3, 1]
+}
+
+counts
+|> Plot.new(%{x: :x, y: :Freq})
+|> Plot.geom_segment(%{xend: :x, yend: 0}, linewidth: 10, lineend: :butt)
+|> render.()
+```

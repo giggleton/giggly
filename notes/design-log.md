@@ -79,6 +79,31 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`geom_segment()` draws a straight line per row, or a path where the coordinate system curves
+  lines, asking `Coord.linear?/1` (2026-10-29, Steve's scope: "yes", `arrow()` its step 2;
+  checked against ggplot2 4.0.3).** As `GeomSegment`: `x`, `y` and one of `xend`/`yend`, the other
+  copied from `x` or `y` as the panel is drawn, so `layer_data()` holds only what was mapped, as
+  R's does; `lineend:` and `linejoin:`, no `linemitre:`; a row missing a position, width or line
+  type dropped; a colour of `NA` a `<line>` with no stroke, as svglite writes it. The protocol
+  gains `linear?/1`, ggplot2's `is_linear()`. *Rejected: counting each row's munched points*: a
+  piece munch leaves whole would be a `<line>` where R writes a `<polyline>`. *Rejected: matching
+  `%Coord.Radial{}`*: a geom special-casing a coordinate system. *Rejected: `geom_curve()`*: its
+  shape is grid's `curveGrob()` X-spline, specified only by R's source. *Rejected:
+  `geom_spoke()`*: `angle` and `radius`, unscaled aesthetics, are a question of their own.
+
+- **An arrowhead is an option of a line, `arrow:` on the line layers, its fill inside it, its
+  shape the backend's (2026-10-29, Steve: no `Plot.arrow/1`, "Agree with both", "Agree with you on
+  both"; checked against ggplot2 4.0.3 and grid).** ggplot2's `arrow =` is a line parameter beside
+  `lineend`, and `element_line(arrow =)` a property of a theme line; grid's `arrow()` only builds
+  the value. So `arrow:` takes `true` or a keyword list, `fill:` (`arrow.fill`) inside it, on
+  `geom_segment/3`, `geom_path/3`, `geom_line/3`, `geom_freqpoly/3` and their annotations. The
+  scene carries a `Scene.Arrow` per line; the SVG writer works out its points, since its shape
+  turns on the panel's size in points. R's oddities are copied: a radial segment's fill dropped,
+  a varying path's zero-length heads. *Rejected: `Plot.arrow/1` building a struct*: R needs a
+  constructor, Giggly's options take keyword lists. *Rejected: a separate `arrow_fill:`*: a fill
+  could be given with no arrow. *Rejected: a typed map on the primitives*: the compiler cannot
+  check its keys.
+
 - **Breaks for a log, exponential or timespan axis are R's, whole, and extended breaks take
   labeling's `only.loose` and `w` (2026-10-29, Steve, increment 2's step 2; checked against scales
   1.4.0).** `Breaks.log/2`, `exp/2` and `timespan/2` are R's `breaks_log()`, `breaks_exp()` and
@@ -3114,6 +3139,15 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Draw the notebook examples geom_segment() and arrow: unlock, and narrow every
+  verdict to what still waits (geom_segment, step 3, the notebook sweep)
+- 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),
+  geom_freqpoly() and their annotations (geom_segment, step 2); §4: "An arrowhead is an option of
+  a line"
+- 2026-10-29 — The commit gate judges the checkout a command runs in, not the main checkout its
+  hook starts in
+- 2026-10-29 — Add geom_segment(): a straight line per row, or a path under radial coordinates,
+  and annotate(:segment) (geom_segment, step 1); §4: "`geom_segment()` draws a straight line"
 - 2026-10-29 — Add Breaks.log, Breaks.exp and Breaks.timespan, R's breaks_log(), breaks_exp()
   and breaks_timespan(), and only_loose and weights on Breaks.extended (breaks, step 2); §4:
   "Breaks for a log, exponential or timespan axis", "The standalone colour mappers"

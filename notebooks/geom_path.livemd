@@ -178,9 +178,22 @@ c + geom_line(
 ```
 
 `arrow()` comes from R's `grid` package and describes the arrowhead: its angle, which ends get one
-and whether it is open or closed.
+and whether it is open or closed. `arrow: true` draws an arrowhead with `arrow()`'s defaults, and a
+keyword list sets its options, the ends and the type as atoms.
 
-Not in Giggly yet: `geom_line()`'s `arrow` option.
+```elixir
+c = Plot.new(economics, %{x: :date, y: :pop})
+
+c
+|> Plot.geom_line(arrow: true)
+|> render.()
+```
+
+```elixir
+c
+|> Plot.geom_line(arrow: [angle: 15, ends: :both, type: :closed])
+|> render.()
+```
 
 ## Line ends and joins
 

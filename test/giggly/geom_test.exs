@@ -2,10 +2,17 @@ defmodule Giggly.GeomTest do
   use ExUnit.Case, async: true
 
   alias Giggly.{Coord, DataFrame, Font, Geom, Theme}
-  alias Giggly.Scene.{Circles, Polygons, Polylines, Rectangles, Segments, Text}
+  alias Giggly.Scene.{Arrow, Circles, Polygons, Polylines, Rectangles, Segments, Text}
 
-  @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
-  @line %Geom.Line{orientation: :x, line_end: :butt, line_join: :round, mitre_limit: 10.0}
+  @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0, arrow: :none}
+  @line %Geom.Line{
+    orientation: :x,
+    line_end: :butt,
+    line_join: :round,
+    mitre_limit: 10.0,
+    arrow: :none
+  }
+  @segment %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none}
 
   @ribbon %Geom.Ribbon{
     orientation: :none,
@@ -60,6 +67,13 @@ defmodule Giggly.GeomTest do
       end)
 
     Geom.draw_panel(geom, filled, coord, panel_params)
+  end
+
+  # `geom` with an arrowhead at grid's defaults, 18 points long, closed and filled with its line's
+  # colour, with `changes` made to it.
+  defp arrowed(geom, changes) do
+    arrow = %{angle: 30.0, length: 18.0, ends: :last, type: :closed, fill: :color}
+    %{geom | arrow: Map.merge(arrow, Map.new(changes))}
   end
 
   # A key's glyph and the room it needs, `key` laid over the geom's defaults, as rendering hands a
@@ -1341,7 +1355,7 @@ defmodule Giggly.GeomTest do
     test "every line is as wide as the layer sets, and ended, joined and mitred as the geom says",
          %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 2.0], y: [1.0, 2.0], group: [1, 1], linewidth: [2.0, 2.0])
-      geom = %Geom.Path{line_end: :round, line_join: :mitre, mitre_limit: 4.0}
+      geom = %Geom.Path{line_end: :round, line_join: :mitre, mitre_limit: 4.0, arrow: :none}
 
       assert [%Polylines{} = polylines] = draw_panel(geom, frame, coord, params)
 
@@ -1429,6 +1443,276 @@ defmodule Giggly.GeomTest do
 
       assert draw_panel(@line, frame, coord, params) ===
                draw_panel(@path, frame, coord, params)
+    end
+  end
+
+  describe "arrowheads" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    # Golden: ggplot2 4.0.3's `geom_path(aes(alpha = a, group = g), arrow = arrow(ends = e))` over
+    # these rows through vdiffr 1.0.9, for each end (test/golden/path_arrow_varying.svg for
+    # "both"): `repair_segment_arrow()` keeps a lone segment's head, the first's and the last's at
+    # the line's own ends, and draws every other with no length, three points at its tip.
+    test "a path drawn as segments has heads only at each line's own ends",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0, 2.0, 3.0, 0.0, 4.0],
+          y: [0.0, 1.0, 2.0, 3.0, 4.0, 4.0],
+          group: [1, 1, 1, 1, 2, 2],
+          alpha: [0.1, 0.2, 0.3, 0.4, 1.0, 1.0]
+        )
+
+      heads =
+        for ends <- [:last, :first, :both] do
+          assert [%Segments{arrows: arrows}] =
+                   draw_panel(arrowed(@path, ends: ends), frame, coord, params)
+
+          Enum.map(arrows, fn head -> {head.ends, head.length} end)
+        end
+
+      assert heads === [
+               [{:last, 0.0}, {:last, 0.0}, {:last, 18.0}, {:last, 18.0}],
+               [{:first, 18.0}, {:first, 0.0}, {:first, 0.0}, {:first, 18.0}],
+               [{:first, 18.0}, {:both, 0.0}, {:last, 18.0}, {:both, 18.0}]
+             ]
+
+      assert [%Segments{arrows: arrows}] = draw_panel(arrowed(@path, []), frame, coord, params)
+
+      assert Enum.map(arrows, fn head -> {head.fill, head.fill_opacity} end) ===
+               [{"#000000", 0.1}, {"#000000", 0.2}, {"#000000", 0.3}, {"#000000", 1.0}]
+    end
+
+    # As grid draws a polyline broken by `NA`s (test/golden/path_arrow_missing.svg): its heads at
+    # its own first and last points, so a lone first piece takes its head with it.
+    test "a broken line has its first end's head on its first piece and its last's on its last",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0, 2.0, 3.0, 4.0, 3.0, 2.0, 1.0],
+          y: [0.0, 1.0, nil, 2.0, 3.0, nil, 4.0, 4.0],
+          group: [1, 1, 1, 1, 1, 1, 1, 1]
+        )
+
+      heads =
+        for ends <- [:both, :last, :first] do
+          assert [%Polylines{lines: [_first, _middle, _last], arrows: arrows}] =
+                   draw_panel(arrowed(@path, ends: ends), frame, coord, params)
+
+          Enum.map(arrows, fn
+            :none -> :none
+            head -> head.ends
+          end)
+        end
+
+      assert heads === [[:first, :none, :last], [:none, :none, :last], [:first, :none, :none]]
+
+      lone_first =
+        DataFrame.new(x: [0.0, 1.0, 2.0, 3.0], y: [0.0, nil, 1.0, 2.0], group: [1, 1, 1, 1])
+
+      assert [%Polylines{arrows: :none}] =
+               draw_panel(arrowed(@path, ends: :first), lone_first, coord, params)
+    end
+
+    # As ggplot2 4.0.3's `GeomSegment` and `GeomPath` fill a head: `alpha(arrow.fill %||% colour,
+    # alpha)` (test/golden/segment_arrow.svg).
+    test "a segment's head is filled with the arrow's fill, or its colour, at its alpha",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [1.0, 1.0],
+          xend: [2.0, 3.0],
+          yend: [2.0, 2.0],
+          group: [-1, -1],
+          color: ["#FF0000", "#0000FF80"],
+          alpha: [0.5, nil]
+        )
+
+      fills =
+        for fill <- [:color, "#00FF00"] do
+          assert [%Segments{arrows: arrows}] =
+                   draw_panel(arrowed(@segment, fill: fill), frame, coord, params)
+
+          Enum.map(arrows, fn head -> {head.fill, Float.round(head.fill_opacity, 3)} end)
+        end
+
+      assert fills === [
+               [{"#FF0000", 0.5}, {"#0000FF", 0.502}],
+               [{"#00FF00", 0.5}, {"#00FF00", 1.0}]
+             ]
+    end
+
+    # ggplot2 4.0.3's `GeomSegment` hands `GeomPath$draw_panel()` its `arrow` and not its
+    # `arrow.fill` (test/golden/segment_arrow_radial.svg).
+    test "a segment drawn as a path under radial coordinates leaves the arrow's fill behind" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0], y: [2.0], xend: [3.0], yend: [3.0], group: [-1])
+
+      assert [%Polylines{arrows: [%Arrow{fill: "#000000", ends: :last, length: 18.0}]}] =
+               draw_panel(arrowed(@segment, fill: "#FFFFFF"), frame, coord, params)
+    end
+
+    # Golden: ggplot2 4.0.3's `geom_segment(aes(colour = g), arrow = arrow(type = "closed"),
+    # arrow.fill = "white")` through vdiffr 1.0.9, at grid's 30 degrees and 0.25 inches: each key
+    # carries the arrow, filled, at its alpha, and is 19.49 points wide and 18.00 tall, the head's
+    # room, `draw_key_path()`'s glyph size, whatever the line's width.
+    test "a path's key carries its arrowhead and needs the head's room" do
+      geom = arrowed(@path, fill: "#FFFFFF")
+
+      assert [%Segments{arrows: [%Arrow{fill: "#FFFFFF", fill_opacity: 0.5}]}] =
+               draw_key(geom, %{color: "#FF0000", alpha: 0.5})
+
+      assert rounded_size(key_size(geom, %{linewidth: 8.0})) === {19.49, 18.0}
+      assert rounded_size(key_size(geom, %{linewidth: nil})) === {19.49, 18.0}
+      assert [%Segments{arrows: :none}] = draw_key(@path, %{})
+    end
+  end
+
+  describe "draw_panel/4 for segments" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    test "each row is a straight line from its start to its end, in row order",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 4.0],
+          y: [0.0, 4.0],
+          xend: [2.0, 1.0],
+          yend: [4.0, 3.0],
+          group: [-1, -1],
+          color: ["#FF0000", "#0000FF"]
+        )
+
+      assert [%Segments{} = segments] = draw_panel(@segment, frame, coord, params)
+      assert segments.starts === [{0.0, 0.0}, {1.0, 1.0}]
+      assert segments.ends === [{0.5, 1.0}, {0.25, 0.75}]
+      assert segments.color === ["#FF0000", "#0000FF"]
+      assert segments.arrows === :none
+
+      assert {segments.line_end, segments.line_join, segments.mitre_limit} ===
+               {:butt, :round, 10.0}
+    end
+
+    test "a row missing a position, its width or its line type is not drawn, and an infinite end " <>
+           "reaches the panel's edge",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 1.0, 1.0, 1.0, 1.0, 2.0],
+          y: [1.0, 1.0, :nan, 1.0, 1.0, 2.0],
+          xend: [:infinity, nil, 2.0, 2.0, 2.0, 3.0],
+          yend: [2.0, 2.0, 2.0, 2.0, 2.0, 3.0],
+          group: [-1, -1, -1, -1, -1, -1],
+          linewidth: [0.5, 0.5, 0.5, nil, 0.5, 0.5],
+          linetype: [{}, {}, {}, {}, nil, {}]
+        )
+
+      assert [%Segments{starts: starts, ends: ends}] = draw_panel(@segment, frame, coord, params)
+      assert starts === [{0.25, 0.25}, {0.5, 0.5}]
+      assert ends === [{1.0, 0.5}, {0.75, 0.75}]
+    end
+
+    # Golden: ggplot2 4.0.3 and vdiffr 1.0.9 draw a segment whose colour is `NA` as a `<line>` with
+    # `stroke: none`, and one in the line type `"blank"` not at all.
+    test "a colour of :none is a line of no stroke, and a blank line type draws none",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0],
+          y: [0.0, 1.0],
+          xend: [1.0, 2.0],
+          yend: [1.0, 2.0],
+          group: [-1, -1],
+          color: ["#FF0000", nil]
+        )
+
+      blank = DataFrame.put(frame, :linetype, [:none, :none])
+
+      assert [%Segments{color: colors, opacity: opacities}] =
+               draw_panel(@segment, frame, coord, params)
+
+      assert colors === ["#FF0000", :none]
+      assert opacities === [1.0, 0.0]
+      assert draw_panel(@segment, blank, coord, params) === []
+    end
+
+    test "each run of segments alike in width and line type is one primitive, in row order",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0, 2.0, 3.0],
+          y: [0.0, 0.0, 0.0, 0.0],
+          xend: [1.0, 2.0, 3.0, 4.0],
+          yend: [4.0, 4.0, 4.0, 4.0],
+          group: [-1, -1, -1, -1],
+          linewidth: [0.5, 0.5, 2.0, 2.0],
+          linetype: [{}, {}, {}, {4, 4}]
+        )
+
+      primitives = draw_panel(@segment, frame, coord, params)
+
+      assert Enum.map(primitives, fn segments -> length(segments.starts) end) == [2, 1, 1]
+
+      assert Enum.map(primitives, fn segments -> segments.stroke_width end) ===
+               [@default_width, @two_millimetres, @two_millimetres]
+
+      assert [:none, :none, [_dash, _gap]] =
+               Enum.map(primitives, fn segments -> segments.dashes end)
+    end
+
+    test "a layer mapping only xend ends each segment at its own y, and only yend at its own x",
+         %{coord: coord, params: params} do
+      across = DataFrame.new(x: [1.0], y: [1.0], xend: [3.0], group: [-1])
+      up = DataFrame.new(x: [1.0], y: [1.0], yend: [3.0], group: [-1])
+
+      assert [%Segments{ends: [{0.75, 0.25}]}] = draw_panel(@segment, across, coord, params)
+      assert [%Segments{ends: [{0.25, 0.75}]}] = draw_panel(@segment, up, coord, params)
+    end
+
+    test "under radial coordinates each row is a path of its two ends, following the circle, " <>
+           "with the segments' line ends and round corners" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      geom = %Geom.Segment{line_end: :square, line_join: :mitre, arrow: :none}
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [2.0, 2.0],
+          xend: [3.0, nil],
+          yend: [2.0, 3.0],
+          group: [-1, -1]
+        )
+
+      placed = Coord.transform(coord, DataFrame.new(x: [1.0, 3.0], y: [2.0, 2.0]), params)
+
+      ends =
+        placed
+        |> DataFrame.pull(:x)
+        |> Enum.zip_with(DataFrame.pull(placed, :y), fn x, y -> {x, y} end)
+
+      assert [%Polylines{lines: [line]} = polylines] = draw_panel(geom, frame, coord, params)
+      assert [List.first(line), List.last(line)] === ends
+      assert [_start, _step, _more | _rest] = line
+
+      assert {polylines.line_end, polylines.line_join, polylines.mitre_limit} ===
+               {:square, :round, 10.0}
     end
   end
 
@@ -1758,7 +2042,7 @@ defmodule Giggly.GeomTest do
     # ggplot2's `draw_key_path()`: a segment from a tenth of the key's width to nine tenths, at
     # mid-height, ended as the layer's lines are, its corners grid's default.
     test "a path's key is a line across the middle of the key, as wide as the layer sets" do
-      geom = %Geom.Path{line_end: :square, line_join: :mitre, mitre_limit: 4.0}
+      geom = %Geom.Path{line_end: :square, line_join: :mitre, mitre_limit: 4.0, arrow: :none}
 
       assert [%Segments{} = key] =
                draw_key(geom, %{alpha: 0.4, linewidth: 2.0})
@@ -1778,6 +2062,16 @@ defmodule Giggly.GeomTest do
 
       assert rounded(dashes) === [19.92, 8.54]
       assert draw_key(@path, %{linetype: :none}) === []
+    end
+
+    # ggplot2's `GeomSegment` draws its key with `draw_key_path()`, ended as its segments are.
+    test "a segment's key and its room are a path's, ended as the segments are" do
+      segment = %Geom.Segment{line_end: :square, line_join: :mitre, arrow: :none}
+      path = %Geom.Path{line_end: :square, line_join: :round, mitre_limit: 10.0, arrow: :none}
+      key = %{alpha: 0.4, linewidth: 2.0}
+
+      assert draw_key(segment, key) === draw_key(path, key)
+      assert key_size(segment, key) === key_size(path, key)
     end
 
     # Golden: ggplot2 4.0.3's legends through vdiffr 1.0.9 for a missing line type or width: a

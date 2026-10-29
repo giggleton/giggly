@@ -24,8 +24,9 @@ defprotocol Giggly.Geom do
   # (`Giggly.Geom.Boxplot`), which draw their outliers as points, ribbons (`Giggly.Geom.Ribbon`)
   # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
   # `GeomArea` is a `GeomRibbon`, densities (`Giggly.Geom.Density`), which draw as areas with a
-  # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, and smooths
-  # (`Giggly.Geom.Smooth`), each group a ribbon under a line, as ggplot2's `GeomSmooth` draws one.
+  # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, segments
+  # (`Giggly.Geom.Segment`), a straight line for each row, and smooths (`Giggly.Geom.Smooth`), each
+  # group a ribbon under a line, as ggplot2's `GeomSmooth` draws one.
   # A geom drawing lines places its rows with `Giggly.Coord.munch/3`, which cuts them to follow the
   # panel's curves.
 
@@ -48,7 +49,7 @@ defprotocol Giggly.Geom do
       Giggly.Scene,
       Scales
     ],
-    exports: [Area, Bar, Boxplot, Density, Line, Path, Point, Rect, Ribbon, Smooth, Text]
+    exports: [Area, Bar, Boxplot, Density, Line, Path, Point, Rect, Ribbon, Segment, Smooth, Text]
 
   alias Giggly.{Coord, DataFrame, Scene}
 
@@ -61,6 +62,20 @@ defprotocol Giggly.Geom do
   text's family and size and its points' size and shape.
   """
   @type element :: %{required(atom()) => term()}
+
+  @typedoc """
+  An arrowhead a layer puts on each of its lines, as its `arrow:` option gives one: the angle of
+  each arm from the line, in degrees, each arm's length, in points, which ends get one, whether it
+  is the arms alone or a triangle, and a triangle's fill, a colour, `:none`, or `:color`, the
+  line's own.
+  """
+  @type arrow :: %{
+          angle: float(),
+          length: float(),
+          ends: :first | :last | :both,
+          type: :open | :closed,
+          fill: String.t() | :none | :color
+        }
 
   # The aesthetics `geom` draws with, each with the value it takes where the layer neither maps nor
   # sets it, worked out from `element`, the layers' defaults the plot's complete theme gives:

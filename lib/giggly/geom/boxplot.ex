@@ -445,7 +445,8 @@ defmodule Giggly.Geom.Boxplot do
             opacity: List.duplicate(opacity, count),
             line_end: line_end,
             line_join: line_join,
-            mitre_limit: @mitre_limit
+            mitre_limit: @mitre_limit,
+            arrows: :none
           }
         ]
       end
@@ -564,7 +565,8 @@ defmodule Giggly.Geom.Boxplot do
             opacity: List.duplicate(opacity, count),
             line_end: :butt,
             line_join: :mitre,
-            mitre_limit: @mitre_limit
+            mitre_limit: @mitre_limit,
+            arrows: :none
           }
         ]
       else

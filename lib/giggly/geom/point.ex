@@ -314,7 +314,8 @@ defmodule Giggly.Geom.Point do
         opacity: opacities(marks, :outline),
         line_end: @line_end,
         line_join: @line_join,
-        mitre_limit: @mitre_limit
+        mitre_limit: @mitre_limit,
+        arrows: :none
       }
     end
 

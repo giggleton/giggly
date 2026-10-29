@@ -29,9 +29,8 @@ what remains.
 The position aesthetics say where a geom draws. `x` and `y` place points, and the positions along a
 line or path; `xend` and `yend` say where a segment or curve ends; `xmin`, `xmax`, `ymin` and `ymax`
 give the edges of ranges and rectangles. Giggly maps `x` and `y` to columns, for points, bars,
-paths, lines and text, and `xmin`, `xmax`, `ymin` and `ymax` for rectangles; it maps no `xend` or
-`yend`, and has no ranges or segments. A
-plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+paths, lines and text, `xmin`, `xmax`, `ymin` and `ymax` for rectangles, and `xend` and `yend` for
+segments; it has no ranges. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
 document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
 `render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
 `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
@@ -73,9 +72,12 @@ p
 ```
 
 ```elixir
-mtcars
-|> Plot.new(%{x: :wt, y: :mpg})
-|> Plot.geom_point()
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+
+p
 |> render.()
 ```
 
@@ -89,9 +91,7 @@ p + annotate(
 R's `"dark grey"` is a name CSS lacks, so the cell writes its hex, `"#A9A9A9"`.
 
 ```elixir
-mtcars
-|> Plot.new(%{x: :wt, y: :mpg})
-|> Plot.geom_point()
+p
 |> Plot.annotate(:rect, xmin: 2, xmax: 3.5, ymin: 2, ymax: 25, fill: "#A9A9A9", alpha: 0.5)
 |> render.()
 ```
@@ -114,12 +114,34 @@ p + geom_segment(
 )
 ```
 
-Not in Giggly yet: `geom_segment()` and its `arrow` option, and mapping `xend` and `yend`.
+`p` is still the plot of `mtcars` from the rectangle example. A mapping gives each position as a
+number, so every one of the 32 cars gets the same segment, and each segment and its arrowhead is
+drawn 32 times over, in ggplot2 as in Giggly; ggplot2 warns of it and suggests `annotate()`.
+`arrow:` takes a keyword list of the arrowhead's options, its `length:` an amount and its unit.
+
+```elixir
+p
+|> Plot.geom_segment(%{x: 2, y: 15, xend: 2, yend: 25}, arrow: [length: {0.5, :cm}])
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_segment(%{x: 2, y: 15, xend: 3, yend: 15}, arrow: [length: {0.5, :cm}])
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_segment(%{x: 5, y: 30, xend: 3.5, yend: 25}, arrow: [length: {0.5, :cm}])
+|> render.()
+```
 
 ## Spikes, as base R draws them
 
 R's `rpois()` draws 100 random counts and `table()` tallies how often each occurs. `plot()` is
-base R's own graphics, outside ggplot2, drawing the tallies as spikes for comparison.
+base R's own graphics, outside ggplot2, drawing the tallies as spikes for comparison; Giggly
+draws the `ggplot()` call.
 
 ```r
 # You can also use geom_segment() to recreate plot(type = "h")
@@ -134,5 +156,17 @@ ggplot(counts, aes(x = x, y = Freq)) +
 ```
 
 The `size` given to `geom_segment()` is its line's width, which ggplot2 now calls `linewidth`.
+The cell writes out the counts R draws after `set.seed(1)`, and maps `yend` to the number 0, so
+each spike runs down to the axis.
 
-Not in Giggly yet: `geom_segment()`, and mapping `xend` and `yend`.
+```elixir
+counts = %{
+  "x" => [1, 2, 3, 4, 5, 6, 7, 8, 9, 11],
+  "Freq" => [2, 7, 12, 22, 15, 16, 15, 7, 3, 1]
+}
+
+counts
+|> Plot.new(%{x: :x, y: :Freq})
+|> Plot.geom_segment(%{yend: 0, xend: :x}, linewidth: 10)
+|> render.()
+```
