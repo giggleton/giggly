@@ -102,21 +102,26 @@ defmodule Giggly.Scale do
   # line type, line width, shape and size. Each names the guide that draws it, as ggplot2's scales
   # do: a colour bar for a continuous colour or fill, a legend for the rest, whose breaks and labels
   # are the scale's on its limits.
+  #
+  # A plot's colour or fill scale may be binned (`Giggly.Scale.Binned`), ggplot2's third kind,
+  # which no column's type chooses: it trains as a continuous scale does, squishes each value into
+  # its limits, widened from the data's range where none are given, and cuts it into bins at its
+  # breaks, each bin one colour.
 
   # Values in, values out: a scale depends on nothing but R's scales half, `Scales`, as ggplot2
   # depends on R's `scales`, and R's `as.character()`, which writes a discrete level. It exports
-  # the two kinds' structs, which `Giggly.Plot` writes with a user's options and
-  # `Giggly.panel_scales/2` returns.
+  # the three kinds' structs, which `Giggly.Plot` writes with a user's options and
+  # `Giggly.panel_scales/2` returns, a binned one for colour and fill alone.
   use Boundary,
     deps: [Giggly.AsCharacter, Scales],
-    exports: [Continuous, Discrete]
+    exports: [Binned, Continuous, Discrete]
 
   alias Giggly.AsCharacter
-  alias Giggly.Scale.{Continuous, Discrete}
+  alias Giggly.Scale.{Binned, Continuous, Discrete}
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
-  @typedoc "A trained position scale."
-  @type t :: Continuous.t() | Discrete.t()
+  @typedoc "A scale: a continuous, a discrete or a binned one."
+  @type t :: Continuous.t() | Discrete.t() | Binned.t()
 
   @typedoc "A break on an axis: its position and its label, `:none` where the axis has no labels."
   @type break :: {number(), String.t() | :none}
@@ -256,12 +261,14 @@ defmodule Giggly.Scale do
 
   def new(:ordinal, aesthetic), do: new(:discrete, aesthetic)
 
-  # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a date scale,
-  # a date-time scale, a naive one once its first column has settled it, a time scale, or another
-  # continuous scale.
+  # The kind a scale is, as `kind/1` names the kind a column needs: a discrete scale, a binned one,
+  # a date scale, a date-time scale, a naive one once its first column has settled it, a time
+  # scale, or another continuous scale.
   @doc false
-  @spec kind_of(t()) :: :continuous | :discrete | :date | :datetime | :naive_datetime | :time
+  @spec kind_of(t()) ::
+          :continuous | :discrete | :binned | :date | :datetime | :naive_datetime | :time
   def kind_of(%Discrete{}), do: :discrete
+  def kind_of(%Binned{}), do: :binned
   def kind_of(%Continuous{transform: :date}), do: :date
   def kind_of(%Continuous{transform: :time}), do: :time
   def kind_of(%Continuous{transform: {:datetime, :naive, _database}}), do: :naive_datetime
@@ -272,9 +279,12 @@ defmodule Giggly.Scale do
   # does; a date-time scale no column has settled takes naive date-times too; and a continuous
   # scale through the identity takes a date at its days since 1970-01-01, a date-time at its
   # seconds and a time at its seconds since midnight, as R stores each and its continuous scale
-  # places one. Through another transformation each is refused, where R fails.
+  # places one. Through another transformation each is refused, where R fails. A binned scale
+  # takes numbers alone, as ggplot2's refuses anything else ("Binned scales only support continuous
+  # data").
   @doc false
   @spec takes?(t(), kind()) :: boolean()
+  def takes?(%Binned{}, kind), do: kind == :continuous
   def takes?(%Continuous{transform: :identity}, kind) when kind in @time_kinds, do: true
 
   def takes?(%Continuous{transform: {:datetime, :default, _database}}, :naive_datetime), do: true
@@ -334,12 +344,14 @@ defmodule Giggly.Scale do
   @spec train(t(), list(), list() | :none) :: t()
   def train(%Continuous{} = scale, values, :none), do: Continuous.train(scale, values)
   def train(%Discrete{} = scale, values, levels), do: Discrete.train(scale, values, levels)
+  def train(%Binned{} = scale, values, :none), do: Binned.train(scale, values)
 
   # Whether `scale` is discrete, its legend's keys its levels, rather than continuous.
   @doc false
   @spec discrete?(t()) :: boolean()
   def discrete?(%Discrete{}), do: true
   def discrete?(%Continuous{}), do: false
+  def discrete?(%Binned{}), do: false
 
   # The scale widened to cover positions, such as a bar's edges once its levels are mapped: a
   # continuous scale's range, as `train/3` widens it, and a discrete scale's continuous range, its
@@ -363,7 +375,8 @@ defmodule Giggly.Scale do
   # limits (`limits/1`), from 0 to 1, by its `rescaler` (`rescaled/3`), put through the palette,
   # and the scale's `na_value` for a missing value, one that is not a finite number, one outside the
   # limits, which ggplot2 censors and maps to its `na.value`, or one whose place R makes NaN; a
-  # discrete one as `Giggly.Scale.Discrete` maps it.
+  # discrete one as `Giggly.Scale.Discrete` maps it; a binned one to its bin's colour, as
+  # `Giggly.Scale.Binned` maps it.
   @doc false
   @spec map(t(), list()) :: list()
   def map(%Continuous{palette: :identity} = scale, values), do: Continuous.censor(scale, values)
@@ -381,6 +394,7 @@ defmodule Giggly.Scale do
   end
 
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
+  def map(%Binned{} = scale, values), do: Binned.map(scale, values)
 
   # Each value's place in `bounds` by the scale's rescaler (`Scales.Bounds`), a `nil` left `nil`:
   # R's `rescale()`, from 0 to 1; about a midpoint, R's `rescale_mid()`, so the further end is at 0
@@ -607,7 +621,8 @@ defmodule Giggly.Scale do
   # continuous scale's are its breaks, given or its transformation's, inside its limits, taken as
   # floats as R's limits are doubles, one at the low end of limits of zero width, and none before
   # the scale has limits; a discrete scale's are its breaks among its limits, `nil` labelled `NA`,
-  # as ggplot2's legend keeps `NA`; `:none` gives none.
+  # as ggplot2's legend keeps `NA`; a binned scale's are its breaks (`Giggly.Scale.Binned`),
+  # labelled by `binned_labels/3`; `:none` gives none.
   @doc false
   @spec legend_breaks(t()) :: [{term(), String.t() | :none}]
   def legend_breaks(%Continuous{} = scale) do
@@ -618,6 +633,42 @@ defmodule Giggly.Scale do
   end
 
   def legend_breaks(%Discrete{} = scale), do: discrete_breaks(scale, Discrete.limits(scale))
+
+  def legend_breaks(%Binned{} = scale) do
+    {values, indexes} =
+      scale
+      |> Binned.breaks()
+      |> Enum.unzip()
+
+    Enum.zip(values, binned_labels(scale, values, indexes))
+  end
+
+  # The labels of a binned scale's breaks `values`, which are those at `indexes` among the breaks
+  # they were chosen from: written as a continuous scale writes a number by default; `:none` for
+  # each where it has none; its list's labels at those indexes, a list one for each of its given
+  # breaks, or of its default ones, or the plot cannot be drawn, as R fails; or what its function
+  # returns for the values.
+  defp binned_labels(%Binned{labels: :default}, values, _indexes),
+    do: Transform.format(:identity, values, :given)
+
+  defp binned_labels(%Binned{labels: :none}, values, _indexes),
+    do: List.duplicate(:none, length(values))
+
+  defp binned_labels(%Binned{labels: given, breaks: breaks}, values, indexes)
+       when is_list(given) do
+    count = if is_list(breaks), do: length(breaks), else: length(values)
+
+    if length(given) != count do
+      raise ArgumentError,
+            "a binned scale's #{length(given)} labels must be one for each of its " <>
+              "#{count} breaks, got: #{inspect(given)}"
+    end
+
+    Enum.map(indexes, fn index -> Enum.at(given, index) end)
+  end
+
+  defp binned_labels(%Binned{labels: labeller}, values, _indexes) when is_function(labeller, 1),
+    do: labelled(labeller, values)
 
   # `count` values spread evenly over a continuous scale's limits (`limits/1`), from their low end
   # to their high, as R's `seq(low, high, length.out = count)` spreads them

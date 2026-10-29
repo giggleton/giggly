@@ -21,9 +21,10 @@ identity transformation: the entry beginning "A layer records its stat and posit
 
 ## Rules
 
-- **A scale is a continuous or a discrete scale, whatever the aesthetic; its palette is what makes
-  it one aesthetic's.** Its palette is any value of `Scales.Palette`'s (`scales.md`), one of the
-  other kind converted when mapped, or one of ggplot2's own a discrete scale holds (below).
+- **A scale is a continuous or a discrete scale, whatever the aesthetic, or for colour and fill a
+  binned one (below); its palette is what makes it one aesthetic's.** Its palette is any value
+  of `Scales.Palette`'s (`scales.md`), one of the other kind converted when mapped, or one of
+  ggplot2's own a discrete scale holds (below).
   `new/1` makes a position scale; `new/2` makes an aesthetic's with ggplot2's default palette for
   it (`alpha`: 0.1 to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
@@ -94,13 +95,25 @@ identity transformation: the entry beginning "A layer records its stat and posit
   continuous scale**: values spread evenly over its limits by R's `seq()`, as `extract_decor()`
   takes them, and each value's place in the limits, 0 to 1, whatever the rescaler, as the gradient
   form places its ticks and colours.
-- **`Scale.Continuous` and `Scale.Discrete` are API, and the boundary exports both; the rest of
-  the namespace is not.** `Giggly.panel_scales/2` returns them and `Giggly.Plot` writes them, so
-  their fields are documented and changing one changes the API; their functions are `@doc false`,
+- **`Scale.Continuous`, `Scale.Discrete` and `Scale.Binned` are API, and the boundary exports
+  the three; the rest of the namespace is not.** `Giggly.panel_scales/2` returns the first two
+  and `Giggly.Plot` writes them, so their fields are documented and changing one changes the
+  API; their functions are `@doc false`,
   used through `Giggly.Scale`, which is `@moduledoc false`. The rule for which values a discrete
   scale counts as one (a number as a float, so `2` and `2.0` are one) is
   `Scales.DataRange.key/1`, which `Plot` reads to refuse a value named twice, and the assembly to
   match a legend's key against a layer's column, so the rule has one home.
+- **A binned scale is ggplot2's third kind, `ScaleBinned`, which no column's type chooses**
+  (`Scale.Binned`; design-log §4, the entry beginning "A binned scale's breaks and limits"): it
+  trains as a continuous scale and takes numbers alone (`takes?/2`); **its breaks and widened
+  limits are worked out from its range and options each time they are read, never stored**, and
+  it maps on the widened limits whatever the guide, where R's limits depend on whether a guide
+  read them first. Each value is squished into the limits (`Scales.Bounds.squish/2`), placed by
+  its rescaler and cut at the breaks' places, R's `cut(include.lowest = TRUE, right)`; a bin is
+  coloured by `{:binned, palette}`'s colours for the bins' count, too few raising, or by a
+  continuous palette at its middle. Given breaks outside the limits are left out with their
+  labels, a labels list is one for each given or default break or the run raises, and a missing
+  value is never coloured. Its tests pin R's breaks, limits and colours.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
   `minor_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but `rescaler`,
   `:rescale`, `limits` `{nil, nil}` and
@@ -175,8 +188,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   each; under any other transformation each is refused, where R fails.
 - **Which a discrete scale is handed, levels or positions, the caller says** by the function it calls, never by the values' type: `train/3`
   for a layer's own values, its levels, and `train_positions/2` for positions once the levels are
-  mapped, which widen its continuous range alone. `discrete?/1` tells the two kinds apart for a
-  caller that must, as a legend's key drawing does.
+  mapped, which widen its continuous range alone. `discrete?/1` tells a discrete scale from the
+  others for a caller that must, as a legend's key drawing does.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to
   `transform = "identity"`, so an untransformed axis says so; `new(:date)` records `:date`;

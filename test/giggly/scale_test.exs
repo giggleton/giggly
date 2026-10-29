@@ -1429,6 +1429,178 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # A binned scale with `options` trained once on `values`.
+  defp binned(values, options \\ []) do
+    Scale.Binned
+    |> struct!(options)
+    |> Scale.train(values, :none)
+  end
+
+  defp break_values(scale) do
+    scale
+    |> Scale.legend_breaks()
+    |> Enum.map(fn {value, _label} -> value end)
+  end
+
+  # Golden: ggplot2 4.0.3's `scale_colour_steps()`, `_steps2()` and `_fermenter()` in R 4.6.1,
+  # each scale's `get_breaks()` and `get_limits()` once built and its `layer_data()` colours, R's
+  # own figures, but where Giggly leaves given breaks outside the limits out and colours no
+  # missing value.
+  describe "a binned scale" do
+    @blues {:binned, {:brewer, %{palette: "Blues", direction: -1}}}
+
+    test "with no limits given, they widen so the end bins are as wide as their neighbours" do
+      hp = binned([52, 150, 335])
+      tens = binned([0, 3, 10])
+
+      assert {break_values(hp), Scale.Binned.limits(hp), Scale.map(hp, [52, 150, 335])} ===
+               {[100.0, 150.0, 200.0, 250.0, 300.0], {50.0, 350.0},
+                ["#183550", "#22496C", "#50A5E7"]}
+
+      assert {break_values(tens), Scale.Binned.limits(tens), Scale.map(tens, [0, 3, 10])} ===
+               {[2.5, 5.0, 7.5], {0.0, 10.0}, ["#1B3A57", "#2A5A82", "#4D9FDE"]}
+    end
+
+    test "a range of one value widens 0.05 either side, its ends its breaks" do
+      scale = binned([5, 5])
+
+      assert {Scale.legend_breaks(scale), Scale.Binned.limits(scale), Scale.map(scale, [5])} ===
+               {[{4.95, "4.95"}, {5.05, "5.05"}], {4.95, 5.05}, ["#336A98"]}
+    end
+
+    test "given limits are not widened, keep their breaks at either end, and squish values in" do
+      both = binned([0, 5, 10], limits: {8, 2})
+      high = binned([52, 150, 335], limits: {nil, 400})
+
+      assert {break_values(both), Scale.Binned.limits(both), Scale.map(both, [0, 5, 10])} ===
+               {[2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], {2.0, 8.0},
+                ["#183550", "#2D5F89", "#50A5E7"]}
+
+      assert {break_values(high), Scale.Binned.limits(high), Scale.map(high, [52, 150, 335])} ===
+               {[100.0, 200.0, 300.0, 400.0], {52.0, 400.0}, ["#17334E", "#244D71", "#4C9CDB"]}
+    end
+
+    test "a value on a break is in the bin below it, or with right: false above, the top in the last" do
+      below = binned([52, 200, 335])
+      above = binned([52, 200, 335], right: false)
+      top = binned([52, 200, 335, 400], right: false)
+
+      assert {Scale.map(below, [200]), Scale.map(above, [200]), Scale.map(top, [335, 400])} ===
+               {["#2D5F89"], ["#3875A7"], ["#4D9FDE", "#4D9FDE"]}
+    end
+
+    test "given breaks are cut at inside the limits, those outside left out with their labels" do
+      inside = binned([52, 150, 335], breaks: [100, 200])
+
+      beyond =
+        binned([52, 150, 335], breaks: [0, 100, 200, 300, 400, 500], labels: ~w(a b c d e f))
+
+      assert Scale.map(inside, [52, 150, 335]) === ["#183551", "#29567D", "#458EC9"]
+
+      assert {Scale.legend_breaks(beyond), Scale.Binned.limits(beyond),
+              Scale.map(beyond, [52, 150, 335])} ===
+               {[{100.0, "b"}, {200.0, "c"}, {300.0, "d"}], {52.0, 335.0},
+                ["#183551", "#29567D", "#51A8EB"]}
+    end
+
+    test "no breaks inside the limits make one bin, which colours every value but a missing one" do
+      none = binned([52, 150, 335], breaks: :none)
+      outside = binned([52, 150, 335], breaks: [1000])
+      single = binned([5, 5], breaks: :none)
+      single_left = binned([5, 5], breaks: :none, right: false)
+
+      assert {Scale.legend_breaks(none), Scale.map(none, [52, 335]), Scale.map(outside, [150])} ===
+               {[], ["#336A98", "#336A98"], ["#336A98"]}
+
+      assert {Scale.map(single, [5, nil]), Scale.map(single_left, [5])} ===
+               {["#336A98", "#7F7F7F"], ["#336A98"]}
+    end
+
+    test "a missing value or one not finite takes the missing value, every one before limits" do
+      scale = binned([52, 335])
+      untrained = binned([nil, nil])
+
+      assert Scale.map(scale, [nil, :infinity, :neg_infinity, :nan, 335]) ===
+               ["#7F7F7F", "#7F7F7F", "#7F7F7F", "#7F7F7F", "#50A5E7"]
+
+      assert {Scale.legend_breaks(untrained), Scale.Binned.limits(untrained),
+              Scale.map(untrained, [nil])} === {[], :none, ["#7F7F7F"]}
+    end
+
+    test "a midpoint places the values and the breaks by their distance from it" do
+      steps2 = {:gradient, ["#832424", "#FFFFFF", "#3A3A98"]}
+      centred = binned([-3, 7], palette: steps2, rescaler: {:mid, 0})
+      off_centre = binned([-3, 7], palette: steps2, rescaler: {:mid, 2})
+
+      assert {Scale.map(centred, [-3, -1, 0, 2, 7]), Scale.map(off_centre, [-3, -1, 0, 2, 7])} ===
+               {["#C89089", "#EED9D6", "#EED9D6", "#E0DBEE", "#6057A9"],
+                ["#9D4C46", "#CC9891", "#CC9891", "#F4E7E5", "#8C82C1"]}
+    end
+
+    test "a discrete palette gives its colours for the bins' count, and too few raise" do
+      scale = binned([52, 150, 335], palette: @blues)
+      twelve = binned([0, 13], palette: @blues, breaks: Enum.to_list(1..12))
+
+      assert Scale.map(scale, [52, 150, 335]) === ["#08519C", "#3182BD", "#EFF3FF"]
+
+      error = assert_raise ArgumentError, fn -> Scale.map(twelve, [0]) end
+      assert error.message =~ "9 colours, too few for its 13 bins"
+    end
+
+    test "a negative zero and a zero are one edge, as R counts them" do
+      palette = {:brewer, %{palette: "Blues", direction: 1}}
+      scale = binned([-0.0, 10.0], palette: {:binned, palette}, breaks: [0.0, 5.0])
+
+      [_first, second] = Palette.discrete(palette, 2)
+
+      assert Scale.map(scale, [10.0]) === [second]
+    end
+
+    test "a bin whose middle a continuous palette has no colour for takes the missing value" do
+      palette = {:gradient, ["#132B43", "#56B1F7"], [0.5, 1.0]}
+      scale = binned([52, 150, 335], palette: palette)
+
+      assert Scale.map(scale, [52, 150, 335]) ===
+               ["#7F7F7F", "#7F7F7F" | Palette.continuous(palette, [275 / 300])]
+    end
+
+    test "its labels are written plainly, given in a list, from a function, or left out" do
+      listed = binned([52, 335], labels: ~w(a b c d e))
+      short = binned([52, 335], labels: ~w(a b c))
+      none = binned([0, 10], labels: :none)
+
+      written =
+        binned([0, 10],
+          labels: fn breaks -> Enum.map(breaks, fn break -> "#{break}!" end) end
+        )
+
+      plain = binned([0, 10])
+
+      assert {Scale.legend_breaks(plain), Scale.legend_breaks(none), Scale.legend_breaks(written)} ===
+               {[{2.5, "2.5"}, {5.0, "5.0"}, {7.5, "7.5"}],
+                [{2.5, :none}, {5.0, :none}, {7.5, :none}],
+                [{2.5, "2.5!"}, {5.0, "5.0!"}, {7.5, "7.5!"}]}
+
+      labels =
+        listed
+        |> Scale.legend_breaks()
+        |> Enum.map(fn {_value, label} -> label end)
+
+      assert labels === ~w(a b c d e)
+
+      error = assert_raise ArgumentError, fn -> Scale.legend_breaks(short) end
+      assert error.message =~ "3 labels must be one for each of its 5 breaks"
+    end
+
+    test "it is its own kind, not discrete, and takes numbers alone" do
+      scale = %Scale.Binned{}
+
+      assert {Scale.kind_of(scale), Scale.discrete?(scale),
+              Enum.map([:continuous, :discrete, :date], fn kind -> Scale.takes?(scale, kind) end)} ===
+               {:binned, false, [true, false, false]}
+    end
+  end
+
   describe "level_labels/1" do
     # Golden: R 4.6.1's `levels(factor(...))` of the same values: `4`, `0.5`, `TRUE`, `1e+05`; a
     # missing level is labelled `NA`, as ggplot2's legend labels it.

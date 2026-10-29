@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A binned scale's breaks and limits are worked out from its range when read, and it maps on
+  the widened limits whatever the guide (2026-10-29, Steve, increment 1's step 7; checked against
+  ggplot2 4.0.3).** `%Scale.Binned{}` is a third kind, ggplot2's `ScaleBinned` (Steve: "A"), for
+  colour and fill: trained as a continuous scale, each value squished into its limits, cut at its
+  breaks (`right`), a bin's colour `{:binned, palette}`'s for the bins' count (`pal_binned()`) or
+  a continuous palette's at its middle. R's `get_breaks()` writes the widened limits into the
+  scale when first called, so with `guide = "none"` it maps on the unwidened range; Giggly always
+  maps on the widened ones (Steve: "A"). Given breaks outside the limits are left out (Steve:
+  "B"), where R cuts at them and draws a value on the limit as missing. A missing value is never
+  coloured, where R's one bin colours it; too few palette colours raise, as a discrete scale's.
+  *Rejected: a binning field on `%Scale.Continuous{}`*: every continuous reader would check it.
+  *Rejected: R's guide-dependent limits*: `map/2` would read the guide. *Rejected: refusing
+  breaks outside the limits*: round breaks such as 0 to 500 are common.
+
 - **A squished value is R's `oob_squish()`, finite numbers only, and an end is a number or
   `nil` (2026-10-29, Steve, increment 1's step 6; checked against scales 1.4.0).** `squish/2`
   takes a list and a range as `censor/2` does: a finite number below the low end is moved up to
@@ -3027,6 +3041,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add Scale.Binned, a third kind of scale: trained as a continuous one, squished,
+  cut at breaks worked out on read (palettes and colours, step 7); §4: "A binned scale's breaks
+  and limits"
 - 2026-10-29 — Add Bounds.squish/2, R's oob_squish() on finite numbers, an infinite end refused
   by it and by censor/2 (palettes and colours, step 6); §4: "A squished value is R's"
 - 2026-10-28 — Add the brewer and distiller scales, palette: a name or a list, gradientn's
