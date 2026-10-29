@@ -569,6 +569,56 @@ defmodule Giggly.Plot.Options do
                      ] ++ @segment_line_style_options
                    )
 
+  # The sides a rug may be drawn along.
+  @rug_sides [:top, :right, :bottom, :left]
+
+  # The units a rug's length may be given in: a share of the panel, or an arrowhead's.
+  @rug_length_units [:npc | @arrow_units]
+
+  # How a layer's rugs are drawn: along which sides, how long, and how their ends are cut, ggplot2's
+  # `sides`, `length` and `lineend`.
+  @rug_drawing_options [
+    sides: [
+      type: {:custom, __MODULE__, :validate_rug_sides, []},
+      default: [:bottom, :left],
+      doc:
+        "The sides of the panel the rugs are drawn along, a list of `:top`, `:right`, " <>
+          "`:bottom` and `:left`, each given once: an `x` along the bottom and top, a `y` along " <>
+          "the left and right."
+    ],
+    length: [
+      type: {:custom, __MODULE__, :validate_rug_length, []},
+      default: {0.03, :npc},
+      doc:
+        "How long each line is, `{amount, unit}`: a share of the panel (`:npc`), or a length " <>
+          "in `:pt`, `:cm`, `:mm` or `:in`."
+    ],
+    lineend: Keyword.fetch!(@line_style_options, :lineend)
+  ]
+
+  # How every line of a rug layer looks, set by its options.
+  @rug_look_options [
+    alpha: @alpha_option,
+    color: @line_color_option,
+    linewidth: @linewidth_option,
+    linetype: @linetype_option
+  ]
+
+  # `geom_rug/3`'s options, validated at the call.
+  @rug_options NimbleOptions.new!(
+                 [
+                   data: @data_option,
+                   position: [
+                     type: {:custom, __MODULE__, :validate_point_position, []},
+                     default: :identity,
+                     doc:
+                       "Where the rugs are placed: at their positions (`:identity`), or each " <>
+                         "moved a small random distance (`:jitter`, or as `position_jitter/1` " <>
+                         "says), which needs both `:x` and `:y`."
+                   ]
+                 ] ++ @rug_look_options ++ @rug_drawing_options
+               )
+
   # How every band of a ribbon or area layer looks, set by its options.
   @band_look_options [
     alpha: [
@@ -1324,7 +1374,15 @@ defmodule Giggly.Plot.Options do
                         linetype: @annotation_linetype,
                         arrow: @arrow_option
                       ] ++ @segment_line_style_options
-  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :text, :rect]
+  @rug_annotation [
+                    x: @annotation_position,
+                    y: @annotation_position,
+                    alpha: @annotation_alpha,
+                    color: @annotation_color,
+                    linewidth: @annotation_linewidth,
+                    linetype: @annotation_linetype
+                  ] ++ @rug_drawing_options
+  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :rect]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
     col: NimbleOptions.new!(@bar_annotation),
@@ -1332,6 +1390,7 @@ defmodule Giggly.Plot.Options do
     path: NimbleOptions.new!(@path_annotation),
     line: NimbleOptions.new!([orientation: @orientation_option] ++ @path_annotation),
     segment: NimbleOptions.new!(@segment_annotation),
+    rug: NimbleOptions.new!(@rug_annotation),
     text:
       NimbleOptions.new!(
         [
@@ -2952,6 +3011,10 @@ defmodule Giggly.Plot.Options do
   def segment, do: @segment_options
 
   @doc false
+  @spec rug() :: NimbleOptions.t()
+  def rug, do: @rug_options
+
+  @doc false
   @spec freqpoly() :: NimbleOptions.t()
   def freqpoly, do: @freqpoly_options
 
@@ -4567,6 +4630,41 @@ defmodule Giggly.Plot.Options do
   def validate_arrow_length(length) do
     {:error,
      "expected {amount, unit}, an amount with a unit of #{inspect(@arrow_units)}, " <>
+       "got: #{inspect(length)}"}
+  end
+
+  # NimbleOptions' check of a rug's `sides:`: a list of the panel's sides, each given once, as
+  # ggplot2 draws a side its `sides` names twice once; none draws no rug, as R's `""` draws none.
+  @doc false
+  @spec validate_rug_sides(term()) :: {:ok, [atom()]} | {:error, String.t()}
+  def validate_rug_sides(sides) when is_list(sides) do
+    if Enum.all?(sides, fn side -> side in @rug_sides end) and Enum.uniq(sides) == sides,
+      do: {:ok, sides},
+      else: rug_sides_error(sides)
+  end
+
+  def validate_rug_sides(sides), do: rug_sides_error(sides)
+
+  defp rug_sides_error(sides) do
+    {:error,
+     "expected a list of the sides #{inspect(@rug_sides)}, each given once, got: " <>
+       inspect(sides)}
+  end
+
+  # NimbleOptions' check of a rug's `length:`: any amount, as grid draws a negative one's lines
+  # out from the edge, a share of the panel kept as a float and any other worked out in points as
+  # the theme works one out.
+  @doc false
+  @spec validate_rug_length(term()) :: {:ok, {float(), :npc | :points}} | {:error, String.t()}
+  def validate_rug_length({amount, :npc}) when is_number(amount), do: {:ok, {amount / 1, :npc}}
+
+  def validate_rug_length({amount, unit} = length)
+      when is_number(amount) and unit in @arrow_units,
+      do: {:ok, {Theme.points(length), :points}}
+
+  def validate_rug_length(length) do
+    {:error,
+     "expected {amount, unit}, an amount with a unit of #{inspect(@rug_length_units)}, " <>
        "got: #{inspect(length)}"}
   end
 

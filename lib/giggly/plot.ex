@@ -1042,6 +1042,76 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of rugs: a short line at the panel's edge for each row, at its `x` along the
+  bottom and at its `y` along the left, so the margins show how each axis's values are spread,
+  beside a scatter plot of the same rows. Every row is drawn, so rugs suit small tables.
+
+  Rugs use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need one
+  of `:x` and `:y`; a side whose axis is not mapped draws nothing. `sides:` says which sides are
+  drawn, in any order. Each line runs in from the panel's edge as far as `length:` says, by
+  default 3% of the panel, which the 5% of room the axes leave at each end keeps clear of the
+  data. A row missing its place draws no line along that axis's sides, and an infinite one is at
+  the panel's corner. Where the rugs run along both axes, a row repeated in every column is drawn
+  once on each side, as ggplot2 draws it. Each line takes its own row's colour, alpha, width and
+  line type; a colour of `:none` draws none, and so does the line type `:blank`. Under
+  `coord_radial/1` the lines are straight all the same, along the panel's square edges at each
+  row's place, and a rug needs both `:x` and `:y` there.
+
+  With `position: :jitter` each row moves as `geom_jitter/3` moves the points of the same rows,
+  so a rug beside them marks each point; it needs both `:x` and `:y`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.rug())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_rug(sides: [:bottom, :right], length: {2, :mm})
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :y)}
+      {[2.62, 2.875], [21.0, 22.8]}
+
+  Rows repeated in every column are drawn once on each side where the rugs run along both axes,
+  so these three rows draw two lines along the bottom and two along the left:
+
+      iex> svg =
+      ...>   %{"x" => [1.0, 1.0, 2.0], "y" => [5.0, 5.0, 6.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_rug()
+      ...>   |> Giggly.Plot.theme_void()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> ~r/<line / |> Regex.scan(svg) |> length()
+      4
+  """
+  @spec geom_rug(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_rug(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_rug(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_rug(plot, %{}, options)
+
+  def geom_rug(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.rug())
+    data = own_data(validated)
+    position = position(Keyword.fetch!(validated, :position))
+
+    layer = %Layer{
+      geom: rug_geom(validated),
+      stat: %Stat.Identity{},
+      position: position,
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_rug/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Rug.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_rug/3", rug_requirements(position))
+  end
+
+  @doc """
   Adds a layer of ribbons: the band between each group's `ymin` and `ymax` along its `x`, for a
   range around a line, or between its `xmin` and `xmax` up its `y`.
 
@@ -1494,7 +1564,7 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:text` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
@@ -1506,8 +1576,8 @@ defmodule Giggly.Plot do
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
   a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
-  segment's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash
-  pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
+  segment's, a rug's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a
+  dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
   along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
   that makes more than one panel, an annotation given such a list raises when the plot is run.
 
@@ -1521,6 +1591,8 @@ defmodule Giggly.Plot do
       and `linemitre:`, and `:line` those and `orientation:`;
     * `:segment`: `x:`, `y:`, `xend:`, `yend:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`,
       `lineend:` and `linejoin:`;
+    * `:rug`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `sides:`, `length:` and
+      `lineend:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
@@ -1587,8 +1659,8 @@ defmodule Giggly.Plot do
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :text or " <>
-            ":rect, got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text " <>
+            "or :rect, got: #{inspect(geom)}"
   end
 
   @doc """
@@ -4857,6 +4929,26 @@ defmodule Giggly.Plot do
     }
   end
 
+  defp rug_geom(validated) do
+    %Geom.Rug{
+      sides: Keyword.fetch!(validated, :sides),
+      length: Keyword.fetch!(validated, :length),
+      line_end: Keyword.fetch!(validated, :lineend)
+    }
+  end
+
+  # What a rug layer needs: one of its positions, or, jittered, both, which jittering moves.
+  defp rug_requirements(%Position.Jitter{}) do
+    [
+      required: [:x, :y],
+      unmet:
+        "neither its mapping nor the plot's maps it, and its rugs are jittered, which moves " <>
+          "each row across and up, as ggplot2's position_jitter() needs both"
+    ]
+  end
+
+  defp rug_requirements(_position), do: [required: Geom.Rug.required_aesthetics()]
+
   defp text_geom(validated),
     do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
 
@@ -4879,6 +4971,10 @@ defmodule Giggly.Plot do
   defp annotation_geom(:segment, validated) do
     geom = segment_geom(validated)
     {geom, Geom.Segment.accepted_aesthetics(), Geom.Segment.required_aesthetics()}
+  end
+
+  defp annotation_geom(:rug, validated) do
+    {rug_geom(validated), Geom.Rug.accepted_aesthetics(), Geom.Rug.required_aesthetics()}
   end
 
   defp annotation_geom(:text, validated),

@@ -1,7 +1,7 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Facet, Geom, Guide, Plot, Position, Scale, Stat}
+  alias Giggly.{Coord, DataFrame, Facet, Geom, Guide, Plot, Position, Scale, Stat, Theme}
 
   doctest Giggly.Plot
 
@@ -2154,6 +2154,150 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_rug/3" do
+    # ggplot2 4.0.3's `geom_rug()`: `sides = "bl"`, `length = unit(0.03, "npc")`, `lineend =
+    # "butt"`, and the identity stat and position.
+    test "a rug layer records its geom with ggplot2's sides, length and line ends by default" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_rug(%{colour: :cyl})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Rug{sides: [:bottom, :left], length: {0.03, :npc}, line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{color: "cyl"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :y],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "the options choose the sides, the length and the line ends, and set every line's look" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_rug(
+          sides: [:top, :right],
+          length: {1, :npc},
+          lineend: :round,
+          colour: "red",
+          linewidth: 2,
+          linetype: :dashed,
+          alpha: 1
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Rug{sides: [:top, :right], length: {1.0, :npc}, line_end: :round},
+                 fixed: %{color: "#FF0000", linewidth: 2.0, linetype: {4, 4}, alpha: 1.0}
+               }
+             ] = plot.reversed_layers
+    end
+
+    # Any amount, as grid draws a negative one's lines out from the edge; the theme's tests pin
+    # how a unit is worked out in points.
+    test "a length in a unit is recorded in points, worked out as the theme works one out" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for length <- [{12, :pt}, {0.5, :cm}, {-2, :mm}, {1, :in}] do
+        assert [%Plot.Layer{geom: %Geom.Rug{length: {points, :points}}}] =
+                 Plot.geom_rug(plot, length: length).reversed_layers
+
+        assert points === Theme.points(length)
+      end
+    end
+
+    test "sides that are not a list of the panel's four, each given once, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for sides <- [[:bottom, :bottom], [:north], :bottom, "bl"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_rug(plot, sides: sides) end
+
+        assert error.message =~
+                 "[:top, :right, :bottom, :left], each given once, got: " <>
+                   inspect(sides)
+      end
+
+      assert [%Plot.Layer{geom: %Geom.Rug{sides: []}}] =
+               Plot.geom_rug(plot, sides: []).reversed_layers
+    end
+
+    # ggplot2 4.0.3 refuses `geom_rug(length = 0.01)`: "`length` must be a <unit> object".
+    test "a length that is not an amount in a share of the panel or a unit is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for length <- [0.03, {0.03, :lines}, {"1", :npc}, {"1", :cm}, [0.03, :npc]] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_rug(plot, length: length)
+          end
+
+        assert error.message =~
+                 "an amount with a unit of [:npc, :pt, :cm, :mm, :in], got: " <>
+                   inspect(length)
+      end
+    end
+
+    # ggplot2 4.0.3's `GeomRug` needs neither, and draws nothing with neither.
+    test "a rug needs one of x and y" do
+      unmapped = Plot.new(@rows)
+      error = assert_raise ArgumentError, fn -> Plot.geom_rug(unmapped) end
+      assert error.message =~ "Plot.geom_rug/3 needs one of :x, :y, but neither its mapping"
+
+      for mapping <- [%{x: :wt}, %{y: :mpg}] do
+        plot = Plot.new(@rows, mapping)
+        assert [%Plot.Layer{}] = Plot.geom_rug(plot).reversed_layers
+      end
+    end
+
+    # ggplot2 4.0.3: `geom_rug(position = "jitter")` of `aes(x)` alone fails as the plot is built,
+    # "`position_jitter()` requires the following missing aesthetics: y".
+    test "a jittered rug needs both x and y, saying it is jittered" do
+      across = Plot.new(@rows, %{x: :wt})
+      both = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for position <- [:jitter, Plot.position_jitter(seed: 3)] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_rug(across, position: position) end
+        assert error.message =~ "Plot.geom_rug/3 needs :y, but neither its mapping"
+        assert error.message =~ "its rugs are jittered"
+      end
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
+               Plot.geom_rug(both, position: :jitter).reversed_layers
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_rug(both, position: :dodge)
+        end
+
+      assert error.key == :position
+    end
+
+    test "a mapping a rug cannot use, or an option it does not take, is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for mapping <- [%{xend: :wt}, %{fill: :cyl}, %{y: :nope}] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_rug(plot, mapping) end
+        assert String.starts_with?(error.message, "Plot.geom_rug/3 ")
+      end
+
+      for {option, value} <- [linejoin: :mitre, fill: "red", outside: true, arrow: true] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_rug(plot, [{option, value}])
+          end
+
+        assert error.key in [option, [option]]
+      end
+    end
+  end
+
   describe "geom_text/3" do
     @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
 
@@ -3213,7 +3357,7 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :curve, x: 1, y: 1) end
 
       assert error.message =~
-               ":point, :col, :bar, :path, :line, :segment, :text or :rect, got: :curve"
+               ":point, :col, :bar, :path, :line, :segment, :rug, :text or :rect, got: :curve"
     end
 
     # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
@@ -3378,6 +3522,33 @@ defmodule Giggly.PlotTest do
       assert_raise NimbleOptions.ValidationError, fn ->
         Plot.annotate(plot, :segment, x: 1, y: 0, xend: 3, linemitre: 4)
       end
+    end
+
+    # ggplot2 4.0.3: `annotate("rug", y = c(1.5, 3.5), sides = "r", linewidth = c(1, 2))` draws a
+    # line on the right for each, each as wide as its own.
+    test "a rug annotation takes its positions, its sides and length, and a width per annotation" do
+      [layer] =
+        @rows
+        |> Plot.new()
+        |> Plot.annotate(:rug,
+          y: [1.5, 3.5],
+          sides: [:right],
+          length: {2, :in},
+          linewidth: [1, 2]
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Rug{sides: [:right], length: {144.0, :points}, line_end: :butt},
+               mapping: %{y: "y"},
+               fixed: %{linewidth: [1.0, 2.0]},
+               annotation: true
+             } = layer
+
+      plot = Plot.new(@rows)
+      error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :rug, sides: [:top]) end
+
+      assert error.message =~ "Plot.annotate/3 needs one of :x, :y, but :rug is given no value"
     end
 
     # ggplot2 4.0.3: `layer_data(ggplot() + annotate("col", x = 1, y = 3, width = c(0.5, 0.8)))`

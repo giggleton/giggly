@@ -4269,6 +4269,44 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_rug" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(df, aes(x, y)) + geom_rug()`
+    # over x 1, NA, 3, 4 and y 10, 20, NA, 40: every row kept, with a path's defaults, which the
+    # geom leaves out as it draws.
+    test "a rug's table keeps every row as mapped, with a path's defaults" do
+      frame =
+        %{"x" => [1, nil, 3, 4], "y" => [10, 20, nil, 40]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug()
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) ==
+               [:x, :y, :panel, :group, :color, :linewidth, :linetype, :alpha]
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1, nil, 3, 4], [10, 20, nil, 40]}
+    end
+
+    test "a jittered rug moves each row as geom_jitter/3 moves the points of the same rows" do
+      plot = Plot.new(%{"x" => [1, 1, 2, 2], "y" => [3, 3, 4, 4]}, %{x: :x, y: :y})
+
+      points =
+        plot
+        |> Plot.geom_jitter()
+        |> Giggly.layer_data()
+
+      rugs =
+        plot
+        |> Plot.geom_rug(position: :jitter)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(rugs, :x), DataFrame.pull(rugs, :y)} ===
+               {DataFrame.pull(points, :x), DataFrame.pull(points, :y)}
+
+      refute DataFrame.pull(rugs, :x) == [1.0, 1.0, 2.0, 2.0]
+    end
+  end
+
   describe "layer_data/2, for geom_area" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(crossing, aes(x, y, fill = g))
     # + geom_area()`, `a` at y 1 and `b` from -1 to 1 at x 1 and 3, printed to 17 significant
@@ -9913,6 +9951,85 @@ defmodule GigglyTest do
         |> Plot.coord_radial()
 
       assert golden?(plot, "segment_arrow_radial")
+    end
+
+    # Golden: test/golden/rug.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/rug.R: every element and clip path matches, the x axis drawn before the y as in
+    # test/golden/point.svg. The first example on ggplot2's geom_rug reference page: mtcars'
+    # points and a rug along the bottom and the left. It moves with how a rug is drawn.
+    test "a rug along the bottom and the left marks each point's x and y" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug()
+
+      assert golden?(plot, "rug")
+    end
+
+    # Golden: test/golden/rug_sides.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_sides.R: every element and clip path matches, the x axis drawn before the
+    # y as in test/golden/point.svg. All four sides in ggplot2's order whatever the order given, in
+    # each row's colour with round ends, keyed as a path; an annotated rug in no legend. It moves
+    # with how a rug is drawn and with a path's key.
+    test "rugs along every side, in their rows' colours, keyed as a path" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4], "g" => ~w(a b a b)}
+        |> Plot.new(%{x: :x, y: :y, color: :g})
+        |> Plot.geom_rug(sides: [:left, :bottom, :right, :top], linewidth: 1, lineend: :round)
+        |> Plot.annotate(:rug,
+          y: [1.5, 3.5],
+          sides: [:right],
+          colour: "steelblue",
+          length: {0.1, :npc}
+        )
+
+      assert golden?(plot, "rug_sides")
+    end
+
+    # Golden: test/golden/rug_length.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_length.R: every element and clip path matches, the x axis drawn before
+    # the y as in test/golden/point.svg. Lines 12 TeX points long along the top and right and 5% of
+    # the panel along the bottom and left, dashed; a row missing its x draws only its y's line,
+    # one missing its y only its x's, and an infinite x is at the panel's corner.
+    test "a rug's length in points or a share of the panel, and its rows missing a place" do
+      plot =
+        %{"x" => [1, nil, 3, :infinity, 2], "y" => [10, 20, nil, 40, 30]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug(sides: [:top, :right], length: {12, :pt}, colour: "red")
+        |> Plot.geom_rug(length: {0.05, :npc}, linetype: :dashed)
+
+      assert golden?(plot, "rug_length")
+    end
+
+    # Golden: test/golden/rug_repeated.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/rug_repeated.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Along the bottom and left a row repeated in every
+    # column is drawn once, and the row missing its x comes last along the left; along the top
+    # alone each is drawn, darkening where they pile up. It moves with how a rug keeps its rows.
+    test "a rug along both axes draws a repeated row once, and along one every time" do
+      plot =
+        %{"x" => [1, nil, 1, 2, 1], "y" => [5, 7, 5, 6, 5]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug(alpha: 0.3, linewidth: 2)
+        |> Plot.geom_rug(sides: [:top], alpha: 0.3, linewidth: 2)
+
+      assert golden?(plot, "rug_repeated")
+    end
+
+    # Golden: test/golden/rug_radial.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_radial.R: every element matches, in order, and every clip path but
+    # svglite's around the whole drawing. Straight lines from the panel's square edges, each at
+    # its point's place on the circle. It moves with what moves test/golden/radial.svg.
+    test "a rug in radial coordinates is straight lines at each point's place" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_rug()
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "rug_radial")
     end
 
     # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made

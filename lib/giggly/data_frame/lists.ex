@@ -165,6 +165,20 @@ defmodule Giggly.DataFrame.Lists do
     %{frame | columns: sliced, row_count: length(indices)}
   end
 
+  # Each row's values keyed as levels are, so `-0.0` and `0.0` are one value; `nil` and `:nan`
+  # are each their own.
+  @impl DataFrame
+  def distinct(%__MODULE__{} = frame) do
+    kept =
+      frame
+      |> keys(names(frame))
+      |> Enum.with_index()
+      |> Enum.uniq_by(fn {key, _index} -> Enum.map(key, &as_level/1) end)
+      |> Enum.map(fn {_key, index} -> index end)
+
+    slice(frame, kept)
+  end
+
   @impl DataFrame
   def filter(%__MODULE__{} = frame, expression) do
     {dtype, kept} = evaluated(frame, expression)

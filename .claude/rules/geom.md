@@ -198,6 +198,14 @@ beginning "Each layer's defaults are filled in from the theme".
   `GeomSegment` hands `GeomPath` no `arrow.fill`; a smooth's line has none. **A key with an arrow
   carries it and needs the head's room**, `cos(angle) * length * 1.25` wide and `sin(angle) *
   length * 2` tall, whatever its line's width, as `draw_key_path()` sizes its glyph.
+- **A rug (`Geom.Rug`) is drawn as ggplot2's `GeomRug` draws one** (design-log §4, the entry
+  beginning "`geom_rug()` draws ggplot2's rugs"): its rows are `handle_na()`'s, along both axes
+  the rows with an `x` and then those with a `y`, each row repeated in every column once
+  (`DataFrame.distinct/1`), and along one every row; its sides in R's order, bottom, top, left,
+  right, whatever the order given, each a straight line per row with a place, from the panel's
+  edge in, under any coordinate system, a share of the panel a place in the cell and a length in
+  points an offset. A row missing its width or line type draws no line, and a colour of `:none`
+  is a line of no stroke; its key is a path's, with the rug's ends.
 - **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
   rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
   rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). **Each

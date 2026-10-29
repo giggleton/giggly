@@ -582,6 +582,36 @@ defmodule Giggly.DataFrameTest do
     end
   end
 
+  describe "distinct/1" do
+    test "a row a later one repeats in every column is kept once, where it first appears" do
+      frame = DataFrame.new(x: [3.0, 1.0, 3.0, 3.0, 1.0], label: ["a", "b", "a", "c", "b"])
+
+      distinct = DataFrame.distinct(frame)
+
+      assert DataFrame.pull(distinct, :x) === [3.0, 1.0, 3.0]
+      assert DataFrame.pull(distinct, :label) == ["a", "b", "c"]
+      assert DataFrame.names(distinct) == [:x, :label]
+      assert DataFrame.dtypes(distinct) == %{x: :float, label: :string}
+    end
+
+    # Explorer 0.13's `distinct/2` and vctrs' `vec_unique()` give the same rows for these.
+    test "missing values are one, NaNs are one, and a zero's sign is not told apart" do
+      frame = DataFrame.new(x: [3.0, 1.0, -0.0, 0.0, nil, nil, :nan, :nan, 2.0])
+
+      distinct = DataFrame.distinct(frame)
+
+      assert DataFrame.pull(distinct, :x) === [3.0, 1.0, -0.0, nil, :nan, 2.0]
+    end
+
+    test "of two zeros the first is kept as it is" do
+      frame = DataFrame.new(x: [0.0, -0.0])
+
+      distinct = DataFrame.distinct(frame)
+
+      assert DataFrame.pull(distinct, :x) === [0.0]
+    end
+  end
+
   describe "filter/2" do
     test "the rows where the expression is true are kept in order, each column keeping its type" do
       frame =

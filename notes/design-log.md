@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`geom_rug()` draws ggplot2's rugs, repeated rows and all, but needs one of `x` and `y`
+  (2026-10-29, Steve: "A", "A", "A", walked one at a time; checked against ggplot2 4.0.3).** As
+  `GeomRug`: `sides:` a list of `:top`, `:right`, `:bottom` and `:left`, not R's `"trbl"` string;
+  `length:` `{amount, unit}`, `:npc` beside an arrowhead's units, an absolute one drawn as an
+  offset in points; `lineend:`; `position:` as a point's, a jitter needing both positions, as
+  `position_jitter()` does. Along both axes a row repeated in every column is drawn once, as
+  `handle_na()`'s `vec_set_union()` drops it, through a new frame operation,
+  `DataFrame.distinct/1`. Radial coordinates refuse a frame lacking `x` or `y`, as R's fail.
+  `outside:` comes with `coord_cartesian/1` taking `clip:` alone (step 2). *Rejected: drawing
+  every row*: a departure R's drawings would not match. *Rejected: requiring nothing, as R does*:
+  a rug of neither axis draws nothing, unwarned. *Rejected: the refusal in the geom, asking
+  `linear?/1`*: `coord_transform()` curves lines yet places each axis alone. *Left out*:
+  `coord_flip()`'s swapped sides, compound and `"lines"` units, other positions.
+
 - **`geom_segment()` draws a straight line per row, or a path where the coordinate system curves
   lines, asking `Coord.linear?/1` (2026-10-29, Steve's scope: "yes", `arrow()` its step 2;
   checked against ggplot2 4.0.3).** As `GeomSegment`: `x`, `y` and one of `xend`/`yend`, the other
@@ -3139,6 +3153,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add geom_rug(): a line at the panel's edge for each row's x and y, and
+  annotate(:rug), drawing a repeated row once as ggplot2 does through DataFrame.distinct/1
+  (geom_rug, step 1); §4: "`geom_rug()` draws ggplot2's rugs"
 - 2026-10-29 — Draw the notebook examples geom_segment() and arrow: unlock, and narrow every
   verdict to what still waits (geom_segment, step 3, the notebook sweep)
 - 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),

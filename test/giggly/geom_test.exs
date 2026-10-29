@@ -13,6 +13,7 @@ defmodule Giggly.GeomTest do
     arrow: :none
   }
   @segment %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none}
+  @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, line_end: :butt}
 
   @ribbon %Geom.Ribbon{
     orientation: :none,
@@ -1713,6 +1714,154 @@ defmodule Giggly.GeomTest do
 
       assert {polylines.line_end, polylines.line_join, polylines.mitre_limit} ===
                {:square, :round, 10.0}
+    end
+  end
+
+  describe "draw_panel/4 for rugs" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    test "each side is a line per row from its edge in, drawn in ggplot2's order whatever the " <>
+           "order given",
+         %{coord: coord, params: params} do
+      geom = %{@rug | sides: [:right, :left, :top, :bottom]}
+      frame = DataFrame.new(x: [1.0, 3.0], y: [1.0, 2.0], color: ["#FF0000", "#0000FF"])
+
+      assert [bottom, top, left, right] = draw_panel(geom, frame, coord, params)
+
+      assert {bottom.starts, bottom.ends} ===
+               {[{0.25, 0.0}, {0.75, 0.0}], [{0.25, 0.25}, {0.75, 0.25}]}
+
+      assert {top.starts, top.ends} === {[{0.25, 1.0}, {0.75, 1.0}], [{0.25, 0.75}, {0.75, 0.75}]}
+      assert {left.starts, left.ends} === {[{0.0, 0.25}, {0.0, 0.5}], [{0.25, 0.25}, {0.25, 0.5}]}
+
+      assert {right.starts, right.ends} ===
+               {[{1.0, 0.25}, {1.0, 0.5}], [{0.75, 0.25}, {0.75, 0.5}]}
+
+      assert bottom.color === ["#FF0000", "#0000FF"]
+
+      assert {bottom.offsets, bottom.arrows, bottom.line_end, bottom.line_join} ===
+               {:none, :none, :butt, :round}
+
+      assert bottom.mitre_limit === 10.0
+    end
+
+    test "a length in points leaves each line's inner end at the edge, moved in by that many",
+         %{coord: coord, params: params} do
+      geom = %{@rug | sides: [:bottom, :top, :left, :right], length: {12.0, :points}}
+      frame = DataFrame.new(x: [1.0], y: [2.0])
+
+      assert [bottom, top, left, right] = draw_panel(geom, frame, coord, params)
+      assert {bottom.starts, bottom.ends} === {[{0.25, 0.0}], [{0.25, 0.0}]}
+      assert {right.starts, right.ends} === {[{1.0, 0.5}], [{1.0, 0.5}]}
+      assert bottom.offsets === [{{0.0, 0.0}, {0.0, 12.0}}]
+      assert top.offsets === [{{0.0, 0.0}, {0.0, -12.0}}]
+      assert left.offsets === [{{0.0, 0.0}, {12.0, 0.0}}]
+      assert right.offsets === [{{0.0, 0.0}, {-12.0, 0.0}}]
+    end
+
+    # As ggplot2 4.0.3's `GeomRug$handle_na()` keeps them: `vctrs::vec_set_union()` of the rows
+    # with an `x` and those with a `y`, so the row repeating the first is drawn once, the one
+    # missing its `x` comes last along the left, and along one axis every row is drawn.
+    test "along both axes, the rows with an x and then those with a y, each repeated row once",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(x: [1.0, nil, 1.0, 2.0, 3.0], y: [1.0, 0.5, 1.0, 2.0, nil])
+
+      assert [bottom, left] = draw_panel(@rug, frame, coord, params)
+      assert Enum.map(bottom.starts, fn {x, _y} -> x end) === [0.25, 0.5, 0.75]
+      assert Enum.map(left.starts, fn {_x, y} -> y end) === [0.25, 0.5, 0.125]
+
+      assert [bottom_alone] = draw_panel(%{@rug | sides: [:bottom]}, frame, coord, params)
+      assert Enum.map(bottom_alone.starts, fn {x, _y} -> x end) === [0.25, 0.25, 0.5, 0.75]
+    end
+
+    test "rows differing in any column are each drawn along both axes",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [1.0, 1.0], y: [1.0, 1.0], color: ["#FF0000", "#0000FF"])
+
+      assert [%Segments{color: ["#FF0000", "#0000FF"]}, %Segments{color: ["#FF0000", "#0000FF"]}] =
+               draw_panel(@rug, frame, coord, params)
+    end
+
+    # As ggplot2 4.0.3 keeps every row for a side whose axis the layer does not map, so the row
+    # repeating the first is drawn once along the bottom, and a rug of x alone draws nothing on
+    # the left.
+    test "an axis the layer does not map draws nothing along its sides, its rows all joining " <>
+           "the other's",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [1.0, 1.0, 2.0, nil])
+
+      assert [%Segments{starts: starts}] = draw_panel(@rug, frame, coord, params)
+      assert starts === [{0.25, 0.0}, {0.5, 0.0}]
+
+      assert draw_panel(%{@rug | sides: [:left]}, frame, coord, params) === []
+      assert draw_panel(%{@rug | sides: []}, frame, coord, params) === []
+    end
+
+    # Golden: ggplot2 4.0.3 and vdiffr 1.0.9 draw no line for a rug whose width or line type is
+    # `NA`, and one whose colour is `NA` as a `<line>` with `stroke: none`.
+    test "a row missing its width or line type, or blank, draws no line, and a colour of :none " <>
+           "a line of no stroke",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 4.0, :infinity],
+          color: ["#FF0000", "#FF0000", "#FF0000", "#FF0000", nil],
+          linewidth: [nil, 0.5, 0.5, 0.5, 0.5],
+          linetype: [{}, nil, {}, {}, {}]
+        )
+
+      blank = DataFrame.put(frame, :linetype, List.duplicate(:none, 5))
+
+      assert [%Segments{starts: starts, color: colors, opacity: opacities}] =
+               draw_panel(@rug, frame, coord, params)
+
+      assert starts === [{0.75, 0.0}, {1.0, 0.0}, {1.0, 0.0}]
+      assert colors === ["#FF0000", "#FF0000", :none]
+      assert opacities === [1.0, 1.0, 0.0]
+      assert draw_panel(@rug, blank, coord, params) === []
+    end
+
+    test "each run of a side's lines alike in width and line type is one primitive",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [1.0, 2.0, 3.0], linewidth: [0.5, 0.5, 2.0])
+      geom = %{@rug | sides: [:bottom, :top]}
+
+      primitives = draw_panel(geom, frame, coord, params)
+
+      assert Enum.map(primitives, fn segments -> length(segments.starts) end) == [2, 1, 2, 1]
+
+      assert Enum.map(primitives, fn segments -> segments.stroke_width end) ===
+               [@default_width, @two_millimetres, @default_width, @two_millimetres]
+    end
+
+    test "under radial coordinates the lines are straight from the square edges, at each row's " <>
+           "place" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = DataFrame.new(x: [1.0, 3.0], y: [2.0, 3.0])
+      placed = Coord.transform(coord, frame, params)
+
+      assert [bottom, left] = draw_panel(@rug, frame, coord, params)
+
+      assert Enum.map(bottom.starts, fn {x, _y} -> x end) === DataFrame.pull(placed, :x)
+      assert Enum.map(left.ends, fn {x, _y} -> x end) === [0.25, 0.25]
+    end
+
+    test "its key is a path's with the rug's line ends" do
+      geom = %{@rug | line_end: :round}
+      path = %{@path | line_end: :round}
+
+      assert draw_key(geom, %{}) === draw_key(path, %{})
+      assert key_size(geom, %{}) === key_size(path, %{})
+      assert Geom.default_aesthetics(geom, @element) === Geom.default_aesthetics(path, @element)
     end
   end
 

@@ -233,6 +233,10 @@ defmodule Giggly.DataFrame do
   @doc false
   @callback slice(t(), [non_neg_integer()]) :: t()
 
+  # Each row once, as `distinct/1` describes.
+  @doc false
+  @callback distinct(t()) :: t()
+
   # The rows an expression is true in, as `filter/2` describes.
   @doc false
   @callback filter(t(), expression()) :: t()
@@ -441,6 +445,15 @@ defmodule Giggly.DataFrame do
   @spec slice(t(), [non_neg_integer()]) :: t()
   def slice(%implementation{} = frame, indices) when is_list(indices),
     do: implementation.slice(frame, indices)
+
+  # The frame's rows with each row a later one repeats left out, in the order they first appear,
+  # as vctrs' `vec_unique()` and Explorer's `distinct/2` keep them, as a rug's geom drops the
+  # rows its sides share: two rows are one where every column holds equal values, a missing value
+  # equal to a missing one and NaN to NaN, never to each other, and `-0.0` to `0.0`, the first
+  # kept as it is. Every column and each column's type are kept.
+  @doc false
+  @spec distinct(t()) :: t()
+  def distinct(%implementation{} = frame), do: implementation.distinct(frame)
 
   # The frame's rows in which `expression` is true, in their order, every column keeping its type,
   # as dplyr's `filter()` and SQL's `WHERE` keep them: a row where it is false or missing is left

@@ -62,6 +62,8 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   **Radial `transform/3` places `x` and `y` only**, as ggplot2's does, **and fails on any other
   x-family or y-family column**: a range cannot be placed without its pair, so a geom drawing
   one turns it into a path first, as ggplot2's geoms do under coordinates that are not linear.
+  **It refuses a frame lacking `x` or `y` with an `ArgumentError` naming it**, a rug of one axis,
+  as ggplot2's fails on one, since a row is placed by both together.
 - **An infinite position goes to its extent's end and a missing one stays missing**, as ggplot2's
   `squish_infinite()` and `rescale()` leave them: the panel's edge, or radially the angle's start
   or the circle's centre or edge, a row missing either radial position missing both; dropping a

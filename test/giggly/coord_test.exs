@@ -81,6 +81,21 @@ defmodule Giggly.CoordTest do
 
       assert_raise MatchError, fn -> Coord.transform(@radial, frame, params) end
     end
+
+    # ggplot2 4.0.3's `coord_radial()` fails on a rug of `x` alone or `y` alone: "replacement has
+    # 0 rows, data has 3".
+    test "radial coordinates refuse a frame lacking x or y, naming the one it lacks" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+
+      for {frame, lacking} <- [
+            {DataFrame.new(x: [1.0]), ":y"},
+            {DataFrame.new(y: [15.0]), ":x"},
+            {DataFrame.new(group: [1]), ":x or :y"}
+          ] do
+        error = assert_raise ArgumentError, fn -> Coord.transform(@radial, frame, params) end
+        assert error.message =~ "a layer drawn in it maps no #{lacking};"
+      end
+    end
   end
 
   describe "munch/3" do

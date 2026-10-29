@@ -25,8 +25,9 @@ defprotocol Giggly.Geom do
   # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
   # `GeomArea` is a `GeomRibbon`, densities (`Giggly.Geom.Density`), which draw as areas with a
   # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, segments
-  # (`Giggly.Geom.Segment`), a straight line for each row, and smooths (`Giggly.Geom.Smooth`), each
-  # group a ribbon under a line, as ggplot2's `GeomSmooth` draws one.
+  # (`Giggly.Geom.Segment`), a straight line for each row, rugs (`Giggly.Geom.Rug`), a short line
+  # at the panel's edge for each row's place, and smooths (`Giggly.Geom.Smooth`), each group a
+  # ribbon under a line, as ggplot2's `GeomSmooth` draws one.
   # A geom drawing lines places its rows with `Giggly.Coord.munch/3`, which cuts them to follow the
   # panel's curves.
 
@@ -49,7 +50,21 @@ defprotocol Giggly.Geom do
       Giggly.Scene,
       Scales
     ],
-    exports: [Area, Bar, Boxplot, Density, Line, Path, Point, Rect, Ribbon, Segment, Smooth, Text]
+    exports: [
+      Area,
+      Bar,
+      Boxplot,
+      Density,
+      Line,
+      Path,
+      Point,
+      Rect,
+      Ribbon,
+      Rug,
+      Segment,
+      Smooth,
+      Text
+    ]
 
   alias Giggly.{Coord, DataFrame, Scene}
 
