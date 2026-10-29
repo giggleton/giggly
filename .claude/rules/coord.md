@@ -76,6 +76,10 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   `coord_cartesian(clip = "on")`'s default, and radial ones to `:off`, `coord_radial()`'s, values
   a test can assert on the plot. The assembly asks once and carries the answer to rendering,
   which marks each panel's cell, so rendering never lists this namespace.
+- **`linear?/1` says whether a straight line in the data stays straight in the panel**, ggplot2's
+  `is_linear()`: `true` for cartesian coordinates, `false` for radial ones, so a geom drawing a
+  straight line from row to row (a segment) places its ends with `transform/3` alone or else draws
+  a path through `munch/3`, and never matches a coordinate system's kind.
 - **`aspect/2` gives the shape a panel keeps, its height over its width**, from the first
   panel's params, as ggplot2 asks `coord$aspect()`: `:none` for cartesian coordinates, 1 for a
   full circle. The assembly asks once and carries it to rendering, as it carries `clip`.

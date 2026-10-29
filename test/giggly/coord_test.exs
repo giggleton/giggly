@@ -366,6 +366,16 @@ defmodule Giggly.CoordTest do
     end
   end
 
+  describe "linear?/1" do
+    test "cartesian coordinates keep a straight line straight, as ggplot2's `is_linear()` says" do
+      assert Coord.linear?(@cartesian) === true
+    end
+
+    test "radial coordinates curve a straight line, as ggplot2's `is_linear()` says" do
+      assert Coord.linear?(@radial) === false
+    end
+  end
+
   describe "aspect/2" do
     test "a cartesian panel takes whatever shape the drawing leaves it" do
       params = Coord.panel_params(@cartesian, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})

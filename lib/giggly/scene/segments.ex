@@ -2,8 +2,9 @@ defmodule Giggly.Scene.Segments do
   @moduledoc false
 
   # Straight lines, each from its start to its end, given as `{x, y}` in the cell's units, all of
-  # one `stroke_width` (in points), each in its `color`, `#RRGGBB`, as opaque as its `opacity`, from
-  # 0 to 1, their ends, corners and mitre limit drawn as `Giggly.Scene.Polylines` draws a line's:
+  # one `stroke_width` (in points), each in its `color`, `#RRGGBB`, or `:none`, drawn with no
+  # stroke, as svglite writes a segment of R's `NA`, as opaque as its `opacity`, from 0 to 1, their
+  # ends, corners and mitre limit drawn as `Giggly.Scene.Polylines` draws a line's:
   # grid's `segmentsGrob()`, which ggplot2's `GeomPath` draws a layer's lines with when their look
   # varies along them, one segment from each point to the next, in the colour of the point it
   # starts from, and `draw_key_path()` a line's legend key with; and R's graphics engine the strokes
@@ -33,7 +34,7 @@ defmodule Giggly.Scene.Segments do
           offsets: :none | [{{float(), float()}, {float(), float()}}],
           stroke_width: float(),
           dashes: Giggly.Scene.Polylines.dashes(),
-          color: [String.t()],
+          color: [String.t() | :none],
           opacity: [float()],
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),

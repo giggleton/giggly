@@ -176,6 +176,14 @@ beginning "Each layer's defaults are filled in from the theme".
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws
   and keys as a `Geom.Path` with its parameters, as ggplot2's `GeomLine` is a `GeomPath`. Its
   orientation is the layer's; one a stat names arrives with the first such stat.
+- **A segment (`Geom.Segment`) is drawn as ggplot2's `GeomSegment` draws one, straight or as a
+  path by what `Coord.linear?/1` says, never by matching the coordinate system's kind** (design-log
+  §4, the entry beginning "`geom_segment()` draws a straight line"): a straight line per row, in
+  row order, where straight lines stay straight, else each row a two-row path drawn by
+  `Geom.Path` with the segments' ends and round corners. **An end the layer leaves out is copied
+  from `x` or `y` as the panel is drawn, never in `setup_data/3`**, so the layer's table holds what
+  was mapped, as ggplot2's `layer_data()` does. A colour of `:none` is a line of no stroke, as
+  svglite writes R's `NA`; its key is a path's.
 - **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
   rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
   rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). **Each

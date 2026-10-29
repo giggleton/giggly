@@ -12,9 +12,10 @@ defprotocol Giggly.Coord do
   # which first cuts them into steps that follow the panel's curves; each axis is drawn from
   # `axes/2`, which places the breaks the same way and says where each axis is drawn and in whose
   # look; the panel's grid and background are drawn from `grid/2`, which runs a line through the
-  # panel at each break and minor break and gives the background's shape; `clip/1` says whether
-  # what is drawn in a panel is cut off at its edges; and `aspect/2` whether a panel keeps a shape
-  # of its own. A geom never sees a scale's range, and the params are opaque to everything but the
+  # panel at each break and minor break and gives the background's shape; `linear?/1` says
+  # whether a straight line stays straight, so a geom drawing one knows whether it must munch it;
+  # `clip/1` says whether what is drawn in a panel is cut off at its edges; and `aspect/2` whether
+  # a panel keeps a shape of its own. A geom never sees a scale's range, and the params are opaque to everything but the
   # coordinate system that built them, so a coordinate system that places positions differently
   # changes no geom.
   #
@@ -145,6 +146,14 @@ defprotocol Giggly.Coord do
   @doc false
   @spec grid(t(), panel_params()) :: grid()
   def grid(coord, panel_params)
+
+  # Whether a straight line in the data stays straight in the panel under `coord`, ggplot2's
+  # `coord$is_linear()`: a geom drawing a straight line from row to row may then place its ends with
+  # `transform/3` alone, and must otherwise draw it as a path `munch/3` cuts to follow the panel's
+  # curves.
+  @doc false
+  @spec linear?(t()) :: boolean()
+  def linear?(coord)
 
   # Whether what is drawn in each panel under `coord` is cut off at its edges, ggplot2's `clip`: a
   # point at an infinite position, placed on the panel's edge, shows only its inner half when it

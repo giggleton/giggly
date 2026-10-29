@@ -972,6 +972,56 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of segments: a straight line for each row, from its `x` and `y` to its `xend` and
+  `yend`, for a line joining two points the data names apart, such as a span of time or a spike
+  down to an axis.
+
+  Segments use `:x`, `:y`, `:xend`, `:yend`, `:group`, `:alpha`, `:color`, `:linetype` and
+  `:linewidth`, and need `:x`, `:y` and one of `:xend` and `:yend`: a segment given only `:xend`
+  ends at its own `y`, and one given only `:yend` at its own `x`. A row missing a position, its
+  width or its line type draws no segment, and an infinite position reaches the panel's edge. Each
+  segment takes its own row's colour, alpha, width and line type; a colour of `:none` draws none,
+  and so does the line type `:blank`. Under `coord_radial/1` a segment follows the panel's curves,
+  as a path from its start to its end does.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.segment())}
+
+      iex> frame =
+      ...>   %{"start" => [1.0, 2.0], "finish" => [3.0, 5.0], "row" => [1.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :start, xend: :finish, y: :row})
+      ...>   |> Giggly.Plot.geom_segment(lineend: :round)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :xend)}
+      {[1.0, 2.0], [3.0, 5.0]}
+  """
+  @spec geom_segment(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_segment(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_segment(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_segment(plot, %{}, options)
+
+  def geom_segment(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.segment())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: segment_geom(validated),
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_segment/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Segment.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_segment/3", required: Geom.Segment.required_aesthetics())
+  end
+
+  @doc """
   Adds a layer of ribbons: the band between each group's `ymin` and `ymax` along its `x`, for a
   range around a line, or between its `xmin` and `xmax` up its `y`.
 
@@ -1424,7 +1474,7 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:text` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:text` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
@@ -1435,11 +1485,11 @@ defmodule Giggly.Plot do
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
-  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's or
-  a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash pattern among
-  them a tuple, and a path's or a line's `linewidth:`, a line whose width changes along it drawn a
-  segment from each annotation to the next; the rest take one value. Under a facet that makes more than one
-  panel, an annotation given such a list raises when the plot is run.
+  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
+  segment's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash
+  pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
+  along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
+  that makes more than one panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
   and `position:`, and `geom_text/3`'s nudging:
@@ -1449,6 +1499,8 @@ defmodule Giggly.Plot do
       `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`, `width:` and `just:`;
     * `:path`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `lineend:`, `linejoin:`
       and `linemitre:`, and `:line` those and `orientation:`;
+    * `:segment`: `x:`, `y:`, `xend:`, `yend:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`,
+      `lineend:` and `linejoin:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
@@ -1515,8 +1567,8 @@ defmodule Giggly.Plot do
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :text or :rect, " <>
-            "got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :text or " <>
+            ":rect, got: #{inspect(geom)}"
   end
 
   @doc """
@@ -4393,6 +4445,13 @@ defmodule Giggly.Plot do
     }
   end
 
+  defp segment_geom(validated) do
+    %Geom.Segment{
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.fetch!(validated, :linejoin)
+    }
+  end
+
   defp text_geom(validated),
     do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
 
@@ -4411,6 +4470,11 @@ defmodule Giggly.Plot do
 
   defp annotation_geom(:line, validated),
     do: {line_geom(validated), Geom.Line.accepted_aesthetics(), Geom.Line.required_aesthetics()}
+
+  defp annotation_geom(:segment, validated) do
+    geom = segment_geom(validated)
+    {geom, Geom.Segment.accepted_aesthetics(), Geom.Segment.required_aesthetics()}
+  end
 
   defp annotation_geom(:text, validated),
     do: {text_geom(validated), Geom.Text.accepted_aesthetics(), Geom.Text.required_aesthetics()}

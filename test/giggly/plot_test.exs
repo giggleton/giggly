@@ -1969,6 +1969,67 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_segment/3" do
+    test "a segment layer records its geom with ggplot2's ends and corners by default" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_segment(%{xend: :wt, colour: :cyl})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Segment{line_end: :butt, line_join: :round},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{xend: "wt", color: "cyl"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :xend, :y, :yend],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "the options choose the geom's ends and corners and set every segment's look" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, yend: :mpg})
+        |> Plot.geom_segment(
+          lineend: :square,
+          linejoin: :mitre,
+          colour: "red",
+          linewidth: 2,
+          linetype: :dashed,
+          alpha: 1
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Segment{line_end: :square, line_join: :mitre},
+                 fixed: %{color: "#FF0000", linewidth: 2.0, linetype: {4, 4}, alpha: 1.0}
+               }
+             ] = plot.reversed_layers
+    end
+
+    # ggplot2 4.0.3's `GeomSegment` requires `c("x", "y", "xend|yend")` and its `draw_panel()`
+    # takes no `linemitre`.
+    test "a segment needs one of xend and yend, and takes no mitre limit or fill" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_segment(plot) end
+      assert error.message =~ "Plot.geom_segment/3 needs one of :xend, :yend"
+
+      for {option, value} <- [linemitre: 4, fill: "red", lineend: :flat] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_segment(plot, [{option, value}])
+          end
+
+        assert error.key in [option, [option]]
+      end
+    end
+  end
+
   describe "geom_text/3" do
     @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
 
@@ -3019,8 +3080,10 @@ defmodule Giggly.PlotTest do
     test "a geom it does not draw with is refused, naming the geoms it does" do
       plot = Plot.new(@rows)
 
-      error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :segment, x: 1, y: 1) end
-      assert error.message =~ ":point, :col, :bar, :path, :line, :text or :rect, got: :segment"
+      error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :curve, x: 1, y: 1) end
+
+      assert error.message =~
+               ":point, :col, :bar, :path, :line, :segment, :text or :rect, got: :curve"
     end
 
     # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
@@ -3162,6 +3225,28 @@ defmodule Giggly.PlotTest do
           end
 
         assert error.message =~ "#{inspect(option)} 2 values"
+      end
+    end
+
+    # ggplot2 4.0.3: `annotate("segment", x = 1:2, y = 0, xend = 3, yend = 1, linetype =
+    # c("dashed", "dotted"))` draws two segments, each in its own line type, where a path's line
+    # type cannot change along it.
+    test "a segment annotation takes a line type per annotation, and no mitre limit" do
+      plot = Plot.new(@rows)
+
+      [layer] =
+        plot
+        |> Plot.annotate(:segment, x: [1, 2], y: 0, xend: 3, yend: 1, linetype: [:dashed, 3])
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Segment{line_end: :butt, line_join: :round},
+               mapping: %{x: "x", y: "y", xend: "xend", yend: "yend"},
+               fixed: %{linetype: [{4, 4}, {1, 3}]}
+             } = layer
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.annotate(plot, :segment, x: 1, y: 0, xend: 3, linemitre: 4)
       end
     end
 

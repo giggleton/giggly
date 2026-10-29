@@ -6,6 +6,7 @@ defmodule Giggly.GeomTest do
 
   @path %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0}
   @line %Geom.Line{orientation: :x, line_end: :butt, line_join: :round, mitre_limit: 10.0}
+  @segment %Geom.Segment{line_end: :butt, line_join: :round}
 
   @ribbon %Geom.Ribbon{
     orientation: :none,
@@ -1432,6 +1433,142 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for segments" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    test "each row is a straight line from its start to its end, in row order",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 4.0],
+          y: [0.0, 4.0],
+          xend: [2.0, 1.0],
+          yend: [4.0, 3.0],
+          group: [-1, -1],
+          color: ["#FF0000", "#0000FF"]
+        )
+
+      assert [%Segments{} = segments] = draw_panel(@segment, frame, coord, params)
+      assert segments.starts === [{0.0, 0.0}, {1.0, 1.0}]
+      assert segments.ends === [{0.5, 1.0}, {0.25, 0.75}]
+      assert segments.color === ["#FF0000", "#0000FF"]
+
+      assert {segments.line_end, segments.line_join, segments.mitre_limit} ===
+               {:butt, :round, 10.0}
+    end
+
+    test "a row missing a position, its width or its line type is not drawn, and an infinite end " <>
+           "reaches the panel's edge",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 1.0, 1.0, 1.0, 1.0, 2.0],
+          y: [1.0, 1.0, :nan, 1.0, 1.0, 2.0],
+          xend: [:infinity, nil, 2.0, 2.0, 2.0, 3.0],
+          yend: [2.0, 2.0, 2.0, 2.0, 2.0, 3.0],
+          group: [-1, -1, -1, -1, -1, -1],
+          linewidth: [0.5, 0.5, 0.5, nil, 0.5, 0.5],
+          linetype: [{}, {}, {}, {}, nil, {}]
+        )
+
+      assert [%Segments{starts: starts, ends: ends}] = draw_panel(@segment, frame, coord, params)
+      assert starts === [{0.25, 0.25}, {0.5, 0.5}]
+      assert ends === [{1.0, 0.5}, {0.75, 0.75}]
+    end
+
+    # Golden: ggplot2 4.0.3 and vdiffr 1.0.9 draw a segment whose colour is `NA` as a `<line>` with
+    # `stroke: none`, and one in the line type `"blank"` not at all.
+    test "a colour of :none is a line of no stroke, and a blank line type draws none",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0],
+          y: [0.0, 1.0],
+          xend: [1.0, 2.0],
+          yend: [1.0, 2.0],
+          group: [-1, -1],
+          color: ["#FF0000", nil]
+        )
+
+      blank = DataFrame.put(frame, :linetype, [:none, :none])
+
+      assert [%Segments{color: colors, opacity: opacities}] =
+               draw_panel(@segment, frame, coord, params)
+
+      assert colors === ["#FF0000", :none]
+      assert opacities === [1.0, 0.0]
+      assert draw_panel(@segment, blank, coord, params) === []
+    end
+
+    test "each run of segments alike in width and line type is one primitive, in row order",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.0, 1.0, 2.0, 3.0],
+          y: [0.0, 0.0, 0.0, 0.0],
+          xend: [1.0, 2.0, 3.0, 4.0],
+          yend: [4.0, 4.0, 4.0, 4.0],
+          group: [-1, -1, -1, -1],
+          linewidth: [0.5, 0.5, 2.0, 2.0],
+          linetype: [{}, {}, {}, {4, 4}]
+        )
+
+      primitives = draw_panel(@segment, frame, coord, params)
+
+      assert Enum.map(primitives, fn segments -> length(segments.starts) end) == [2, 1, 1]
+
+      assert Enum.map(primitives, fn segments -> segments.stroke_width end) ===
+               [@default_width, @two_millimetres, @two_millimetres]
+
+      assert [:none, :none, [_dash, _gap]] =
+               Enum.map(primitives, fn segments -> segments.dashes end)
+    end
+
+    test "a layer mapping only xend ends each segment at its own y, and only yend at its own x",
+         %{coord: coord, params: params} do
+      across = DataFrame.new(x: [1.0], y: [1.0], xend: [3.0], group: [-1])
+      up = DataFrame.new(x: [1.0], y: [1.0], yend: [3.0], group: [-1])
+
+      assert [%Segments{ends: [{0.75, 0.25}]}] = draw_panel(@segment, across, coord, params)
+      assert [%Segments{ends: [{0.25, 0.75}]}] = draw_panel(@segment, up, coord, params)
+    end
+
+    test "under radial coordinates each row is a path of its two ends, following the circle, " <>
+           "with the segments' line ends and round corners" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      geom = %Geom.Segment{line_end: :square, line_join: :mitre}
+
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [2.0, 2.0],
+          xend: [3.0, nil],
+          yend: [2.0, 3.0],
+          group: [-1, -1]
+        )
+
+      placed = Coord.transform(coord, DataFrame.new(x: [1.0, 3.0], y: [2.0, 2.0]), params)
+
+      ends =
+        placed
+        |> DataFrame.pull(:x)
+        |> Enum.zip_with(DataFrame.pull(placed, :y), fn x, y -> {x, y} end)
+
+      assert [%Polylines{lines: [line]} = polylines] = draw_panel(geom, frame, coord, params)
+      assert [List.first(line), List.last(line)] === ends
+      assert [_start, _step, _more | _rest] = line
+      assert {polylines.line_end, polylines.line_join} === {:square, :round}
+    end
+  end
+
   describe "draw_panel/4 for text" do
     setup do
       coord = %Coord.Cartesian{}
@@ -1778,6 +1915,16 @@ defmodule Giggly.GeomTest do
 
       assert rounded(dashes) === [19.92, 8.54]
       assert draw_key(@path, %{linetype: :none}) === []
+    end
+
+    # ggplot2's `GeomSegment` draws its key with `draw_key_path()`, ended as its segments are.
+    test "a segment's key and its room are a path's, ended as the segments are" do
+      segment = %Geom.Segment{line_end: :square, line_join: :mitre}
+      path = %Geom.Path{line_end: :square, line_join: :round, mitre_limit: 10.0}
+      key = %{alpha: 0.4, linewidth: 2.0}
+
+      assert draw_key(segment, key) === draw_key(path, key)
+      assert key_size(segment, key) === key_size(path, key)
     end
 
     # Golden: ggplot2 4.0.3's legends through vdiffr 1.0.9 for a missing line type or width: a

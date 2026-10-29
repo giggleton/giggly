@@ -68,11 +68,13 @@ theme puts them".
   beside its opacity**, never with an alpha of its own: a placed rectangle's border's
   `color_opacity` is its colour's own alpha, since ggplot2 never gives a border the row's; a
   shape's `fill` and `color` may be `:none`, R's `NA`, which draws none, and so may a polyline's
-  `color`, written with no stroke, as svglite writes a ribbon's outline of no colour.
+  or a segment's `color`, written with no stroke, as svglite writes a ribbon's outline or a
+  segment of no colour.
 - **A line carries grid's `lineend`, `linejoin` and `linemitre`**: `Polylines` (grid's
   `polylineGrob()`, a line through points, one per tick, grid line or group), `Segments`
-  (`segmentsGrob()`, one straight piece per segment, for a line whose look varies along it, a
-  path's legend key, a point's plus or cross and a box plot's whiskers, staples and median),
+  (`segmentsGrob()`, one straight piece per segment, for a segment layer's rows, a line whose
+  look varies along it, a path's legend key, a point's plus or cross and a box plot's whiskers,
+  staples and median),
   placed `Rectangles` and `Polygons` say how their ends (`:butt`, `:round`, `:square`) and corners
   (`:round`, `:mitre`, `:bevel`) are drawn and their mitre limit; the guides' lines are
   the theme's, `theme_gray()`'s butt and round, a bar's border `GeomRect`'s and a box's

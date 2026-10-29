@@ -503,6 +503,21 @@ defmodule Giggly.Plot.Options do
                   ] ++ @line_style_options
                 )
 
+  # How a layer's segments are drawn at their ends and corners: a line's but `linemitre`, which
+  # ggplot2's segments do not take, drawing at grid's limit.
+  @segment_line_style_options Keyword.take(@line_style_options, [:lineend, :linejoin])
+
+  # `geom_segment/3`'s options, validated at the call.
+  @segment_options NimbleOptions.new!(
+                     [
+                       data: @data_option,
+                       alpha: @alpha_option,
+                       color: @line_color_option,
+                       linewidth: @linewidth_option,
+                       linetype: @linetype_option
+                     ] ++ @segment_line_style_options
+                   )
+
   # How every band of a ribbon or area layer looks, set by its options.
   @band_look_options [
     alpha: [
@@ -1245,13 +1260,24 @@ defmodule Giggly.Plot.Options do
                      linewidth: @annotation_linewidth,
                      linetype: @linetype_option
                    ] ++ @line_style_options
-  @annotation_geoms [:point, :col, :bar, :path, :line, :text, :rect]
+  @segment_annotation [
+                        x: @annotation_position,
+                        y: @annotation_position,
+                        xend: @annotation_position,
+                        yend: @annotation_position,
+                        alpha: @annotation_alpha,
+                        color: @annotation_color,
+                        linewidth: @annotation_linewidth,
+                        linetype: @annotation_linetype
+                      ] ++ @segment_line_style_options
+  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :text, :rect]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
     col: NimbleOptions.new!(@bar_annotation),
     bar: NimbleOptions.new!(@bar_annotation),
     path: NimbleOptions.new!(@path_annotation),
     line: NimbleOptions.new!([orientation: @orientation_option] ++ @path_annotation),
+    segment: NimbleOptions.new!(@segment_annotation),
     text:
       NimbleOptions.new!(
         [
@@ -2735,6 +2761,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec line() :: NimbleOptions.t()
   def line, do: @line_options
+
+  @doc false
+  @spec segment() :: NimbleOptions.t()
+  def segment, do: @segment_options
 
   @doc false
   @spec freqpoly() :: NimbleOptions.t()
