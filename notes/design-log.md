@@ -3079,6 +3079,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Draw the notebook examples geom_segment() and arrow: unlock, and narrow every
+  verdict to what still waits (geom_segment, step 3, the notebook sweep)
 - 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),
   geom_freqpoly() and their annotations (geom_segment, step 2); §4: "An arrowhead is an option of
   a line"

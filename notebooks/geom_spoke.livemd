@@ -18,7 +18,8 @@ what remains.
 `geom_spoke()` is `geom_segment()` described by a direction and a distance: each row's segment
 starts at its `x` and `y` and runs `radius` in the direction `angle`, in radians, measured
 anticlockwise from east. It suits data that records a direction and a distance, such as movement
-or wind. Giggly has none of this yet.
+or wind. Giggly has `Giggly.Plot.geom_segment/3`, and no `geom_spoke()`; it maps no `angle` or
+`radius`.
 
 ## A spoke at each point
 
