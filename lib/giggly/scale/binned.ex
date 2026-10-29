@@ -14,7 +14,8 @@ defmodule Giggly.Scale.Binned do
       twice the further end's, so the midpoint is at the middle and the further end at 0 or 1.
     * `na_value`: what a missing value, or one not a finite number, maps to: grey, `"#7F7F7F"`,
       or `:none`, no colour.
-    * `guide`: the guide that draws it: `:legend`, or `:none` for none.
+    * `guide`: the guide that draws it: `:colorsteps`, a bar of one block of colour for each
+      bin; `:legend`, a key for each break; or `:none` for none.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
     * `limits`: `{low, high}`, the values it spans whatever the data, `nil` at an end the data
@@ -55,13 +56,13 @@ defmodule Giggly.Scale.Binned do
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
   # Every field's default is `scale_colour_binned()`'s before it has seen any data: the gradient
-  # from `#132B43` to `#56B1F7`, places between the limits' ends, grey50 for a missing value, a
-  # legend, and every option the default, a value on a break in the bin below it.
+  # from `#132B43` to `#56B1F7`, places between the limits' ends, grey50 for a missing value,
+  # colour steps, and every option the default, a value on a break in the bin below it.
   defstruct range: :none,
             palette: {:gradient, ["#132B43", "#56B1F7"]},
             rescaler: :rescale,
             na_value: "#7F7F7F",
-            guide: :legend,
+            guide: :colorsteps,
             name: :default,
             limits: {nil, nil},
             breaks: :default,
@@ -73,7 +74,7 @@ defmodule Giggly.Scale.Binned do
           palette: {:binned, Palette.t()} | Palette.t(),
           rescaler: :rescale | {:mid, number()},
           na_value: String.t() | :none,
-          guide: :legend | :none,
+          guide: :colorsteps | :legend | :none,
           name: :default | :none | String.t(),
           limits: {number() | nil, number() | nil},
           breaks: :default | :none | [number()],

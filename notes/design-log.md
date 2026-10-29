@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Colour steps place their breaks by R's count, on binned and continuous scales alike
+  (2026-10-29, Steve, increment 1's step 8; checked against ggplot2 4.0.3).** `:colorsteps` is
+  `guide_coloursteps()` at its defaults, the binned scale's default guide: one rectangle per bin,
+  all as long (`even.steps`), each the colour the scale maps its middle to, laid out as the colour
+  bar (`Guide.Bar`, shared), no ticks unless the theme sets `legend.ticks`. A break's place is its
+  count among the breaks in the order given over the bins' count, one lower where the scale's
+  first break sits on a limit, so breaks given out of order land on other breaks' edges (Steve:
+  "B") and a first break given outside the limits shifts the rest up one edge (Steve: "B"), as R
+  draws them. It reads a continuous scale too (Steve: "B"), whose default breaks on a limit are
+  left out; a guide left with no keys is dropped; on a discrete scale, or a colour bar on a binned
+  one, the run raises. *Rejected: each break on its own edge*: correct, but not R's drawing.
+  *Rejected: binned scales alone*: R accepts `guide = "coloursteps"` on any continuous colour.
+
 - **A binned scale's breaks and limits are worked out from its range when read, and it maps on
   the widened limits whatever the guide (2026-10-29, Steve, increment 1's step 7; checked against
   ggplot2 4.0.3).** `%Scale.Binned{}` is a third kind, ggplot2's `ScaleBinned` (Steve: "A"), for
@@ -3041,6 +3054,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add the colour steps guide, guide_coloursteps() at its defaults, for binned and
+  continuous colour scales (palettes and colours, step 8); §4: "Colour steps place their breaks
+  by R's count"
 - 2026-10-29 — Add Scale.Binned, a third kind of scale: trained as a continuous one, squished,
   cut at breaks worked out on read (palettes and colours, step 7); §4: "A binned scale's breaks
   and limits"

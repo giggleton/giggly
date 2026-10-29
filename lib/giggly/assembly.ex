@@ -187,15 +187,16 @@ defmodule Giggly.Assembly do
   name, an expression's text, a constant's aesthetic name as a fallback), `:none` for none;
   a key for each of its scales' breaks, the break's label, the break
   itself, as the first aesthetic's data holds it (ggplot2's `.value`), the value each aesthetic
-  maps it to, and, for a colour bar, its place up the bar, 0 to 1; a colour bar's colours, each
-  its place up the bar and its colour (`decor`); and each layer that maps one of its aesthetics,
+  maps it to, and, for a colour bar or colour steps, its place up the bar, 0 to 1; a colour bar's
+  colours, each its place up the bar and its colour, or colour steps' bins, each its place up the
+  bar from and to and its colour (`decor`); and each layer that maps one of its aesthetics,
   in the order the layers were added, with those it maps, its geom drawing its glyph with the
   key's values of those aesthetics and the aesthetics the layer sets, as ggplot2's legend draws a
   key for each such layer, its `aes_params` among the key's data, its geom's defaults under the
   plot's complete theme, which the key's values and what the layer sets lie over, as ggplot2 fills
   a key's data from the layer's `default_aes`, whether its marks are horizontal (`flipped`), as
   ggplot2 hands `draw_key` the layer's `flipped_aes`, and whether it draws in each key, in key
-  order; a colour bar has none.
+  order; a colour bar and colour steps have none.
   """
   @type legend :: %{
           required(:guide) => struct(),
@@ -219,7 +220,7 @@ defmodule Giggly.Assembly do
               draws: [boolean()]
             }
           ],
-          optional(:decor) => [{float(), String.t()}]
+          optional(:decor) => [{float(), String.t()}] | [{float(), float(), String.t() | :none}]
         }
 
   # Assembles `plot`, running the stages in order.
@@ -527,7 +528,8 @@ defmodule Giggly.Assembly do
   # each key's labels and the first's breaks and gathers its values; then each drawn by the geom of
   # every layer that maps one of its aesthetics, with those it maps, as a layer shows in a legend
   # whose aesthetic it maps, in the keys its data holds. A scale with no breaks, one trained on
-  # nothing, gives none. ggplot2 orders legends by their hash, which no reader can predict; Giggly
+  # nothing, gives none, and so do colour steps whose bar leaves out every key, as ggplot2 drops a
+  # guide with no keys. ggplot2 orders legends by their hash, which no reader can predict; Giggly
   # orders them by name, and a legend merged from several stands where its first would. Each layer
   # comes with its table, its positions final and its other aesthetics not yet mapped, as ggplot2's
   # guides read each layer's data before the scales map it.
@@ -559,6 +561,7 @@ defmodule Giggly.Assembly do
       end
 
     scale_legends
+    |> Enum.reject(fn legend -> legend.keys == [] end)
     |> Enum.reduce([], &merged/2)
     |> Enum.reverse()
     |> Enum.filter(fn legend ->
@@ -609,9 +612,9 @@ defmodule Giggly.Assembly do
   # The guide that reads `aesthetic`'s scale back, `guide` the one `guides/2` set for it or else
   # the one the scale names, as ggplot2 takes `guides()` over a scale's `guide`: `:none`, or a
   # struct of its kind, as `Plot` turns a position's name into one, a colour bar sampling its
-  # colours at 15 values, as ggplot2's gradient form does (`nbin`). A colour bar for a discrete
-  # scale, which only `guides/2` can give, the scale functions refusing one, raises, where ggplot2
-  # warns and draws none.
+  # colours at 15 values, as ggplot2's gradient form does (`nbin`). A colour bar or colour steps
+  # for a discrete scale, or a colour bar for a binned one, which only `guides/2` can give, the
+  # scale functions refusing them, raises, where ggplot2 warns and draws none or a broken guide.
   defp guide(:none, _scale, _aesthetic), do: :none
   defp guide(:legend, _scale, _aesthetic), do: %Guide.Legend{}
   defp guide(%Guide.Legend{} = legend, _scale, _aesthetic), do: legend
@@ -622,6 +625,20 @@ defmodule Giggly.Assembly do
           "Plot.guides/2 gives #{aesthetic} a colour bar, which shows a continuous scale, and " <>
             "#{aesthetic}'s scale is discrete; give it :legend"
   end
+
+  defp guide(:colorbar, %Scale.Binned{}, aesthetic) do
+    raise ArgumentError,
+          "Plot.guides/2 gives #{aesthetic} a colour bar, which shows a continuous scale, and " <>
+            "#{aesthetic}'s scale is binned; give it :colorsteps"
+  end
+
+  defp guide(:colorsteps, %Scale.Discrete{}, aesthetic) do
+    raise ArgumentError,
+          "Plot.guides/2 gives #{aesthetic} colour steps, which show a binned or continuous " <>
+            "scale, and #{aesthetic}'s scale is discrete; give it :legend"
+  end
+
+  defp guide(:colorsteps, _scale, _aesthetic), do: %Guide.Colorsteps{}
 
   # The legend's keys in the order its guide reads them: last break first for a legend reversed,
   # the missing value's key among them, as ggplot2's `extract_params()` turns its key table upside
@@ -647,6 +664,23 @@ defmodule Giggly.Assembly do
     |> Map.put(:decor, Enum.zip(sample_places, Scale.map(scale, samples)))
   end
 
+  # For colour steps, each key's place up the bar, its count among the breaks over the bins', the
+  # keys the bar leaves out dropped, and the bins (`decor`), each its place up the bar from and to
+  # and its colour, as ggplot2's `GuideColoursteps` works them out with even steps
+  # (`Giggly.Scale.steps/2`).
+  defp with_guide_data(%{guide: %Guide.Colorsteps{}, keys: keys} = legend, scale) do
+    {places, bins} = Scale.steps(scale, Enum.map(keys, fn key -> key.value end))
+
+    placed_keys =
+      keys
+      |> Enum.zip_with(places, fn key, place -> Map.put(key, :place, place) end)
+      |> Enum.reject(fn key -> is_nil(key.place) end)
+
+    legend
+    |> Map.put(:keys, placed_keys)
+    |> Map.put(:decor, bins)
+  end
+
   defp with_guide_data(legend, _scale), do: legend
 
   defp labels(legend), do: Enum.map(legend.keys, fn key -> key.label end)
@@ -668,6 +702,7 @@ defmodule Giggly.Assembly do
   # it draws in each key; none for a colour bar, which draws no layer's glyph, as ggplot2's colour
   # bar keeps none.
   defp key_layers(%{guide: %Guide.Colorbar{}}, _scales, _plot, _layers), do: []
+  defp key_layers(%{guide: %Guide.Colorsteps{}}, _scales, _plot, _layers), do: []
 
   defp key_layers(legend, scales, plot, {layers_and_data, element}) do
     discrete =

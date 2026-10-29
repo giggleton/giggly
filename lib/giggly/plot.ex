@@ -68,15 +68,16 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
       ["#56B1F7", "#132B43", "#7F7F7F"]
 
-  A legend or colour bar is drawn for each mapped aesthetic, stacked down the right of the panels
-  unless the theme puts them elsewhere (`theme/2`'s `legend_position:`), in the order of the
-  aesthetics' names (`alpha`, `color`, `fill`, `shape`, `size`). Two with the same title and
-  labels, such as a colour and a fill mapped to one column, are drawn as one.
+  A legend, colour bar or colour steps are drawn for each mapped aesthetic, stacked down the right
+  of the panels unless the theme puts them elsewhere (`theme/2`'s `legend_position:`), in the
+  order of the aesthetics' names (`alpha`, `color`, `fill`, `shape`, `size`). Two with the same
+  title and labels, such as a colour and a fill mapped to one column, are drawn as one.
 
   ## Guides
 
   A guide reads a scale back: a legend, a key for each break, or, for a continuous colour or fill,
-  a colour bar. Each scale function's `guide:` chooses its scale's, `:legend`, `:colorbar`,
+  a colour bar, or colour steps, a bar of one block of colour for each bin between its breaks.
+  Each scale function's `guide:` chooses its scale's, `:legend`, `:colorbar`, `:colorsteps`,
   `:none` for none, or a legend `guide_legend/1` makes, whose keys may run in reverse; `guides/2`
   chooses them by aesthetic over whatever the scales say.
 
@@ -212,10 +213,10 @@ defmodule Giggly.Plot do
   @type scales :: %{optional(aesthetic()) => struct()}
 
   @typedoc """
-  The guide that reads an aesthetic's scale back: `:legend`, `:colorbar`, `:none` for none, or a
-  legend `guide_legend/1` makes.
+  The guide that reads an aesthetic's scale back: `:legend`, `:colorbar`, `:colorsteps`, `:none`
+  for none, or a legend `guide_legend/1` makes.
   """
-  @type guide :: :none | :legend | :colorbar | struct()
+  @type guide :: :none | :legend | :colorbar | :colorsteps | struct()
 
   @typedoc "The guides `guides/2` sets, by aesthetic, each winning over its scale's own."
   @type guides :: %{optional(aesthetic()) => guide()}
@@ -2896,8 +2897,9 @@ defmodule Giggly.Plot do
   Each value is drawn as opaque as it is far from the first of `range:` to the second through the
   limits; its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, an
-  opacity outside 0 to 1 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels
-  without a list of breaks as long; a column that is not numbers is refused when the plot is run.
+  opacity outside 0 to 1 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError` for a
+  list of labels without a list of breaks as long; a column that is not numbers is refused when the
+  plot is run.
 
   ## Options
 
@@ -2929,8 +2931,8 @@ defmodule Giggly.Plot do
   The values' opacities are spaced evenly from the first of `range:` to the second, in order; its
   guide is a legend unless `guide:` says otherwise. Raises `NimbleOptions.ValidationError` for an
   option it does not take or a value it cannot use, an opacity outside 0 to 1 or a `guide:` of
-  `:colorbar`, and `ArgumentError` for a list of labels not one for each break or limit given; a
-  column of numbers is refused when the plot is run.
+  `:colorbar` or `:colorsteps`, and `ArgumentError` for a list of labels not one for each break or
+  limit given; a column of numbers is refused when the plot is run.
 
   ## Options
 
@@ -2963,9 +2965,9 @@ defmodule Giggly.Plot do
   area: its size's square is as far between theirs as the value is through the limits, so a
   point's area grows with the value. Its guide is a legend unless `guide:` says otherwise. A value
   outside the limits, or missing, is not drawn. Raises `NimbleOptions.ValidationError` for an
-  option it does not take or a value it cannot use, a size below 0 or a `guide:` of `:colorbar`,
-  and `ArgumentError` for a list of labels without a list of breaks as long; a column that is not
-  numbers is refused when the plot is run.
+  option it does not take or a value it cannot use, a size below 0 or a `guide:` of `:colorbar` or
+  `:colorsteps`, and `ArgumentError` for a list of labels without a list of breaks as long; a column
+  that is not numbers is refused when the plot is run.
 
   ## Options
 
@@ -2999,9 +3001,9 @@ defmodule Giggly.Plot do
   proportion to the value, and the high end is drawn at `max_size:`. A value below 0 is drawn as
   large as its distance from 0. Its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a size
-  below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels without a list of
-  breaks as long; a column that is not numbers, and a value below limits whose high end is 0,
-  which would be drawn infinitely large, are refused when the plot is run.
+  below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError` for a list of labels
+  without a list of breaks as long; a column that is not numbers, and a value below limits whose
+  high end is 0, which would be drawn infinitely large, are refused when the plot is run.
 
   ## Options
 
@@ -3034,9 +3036,9 @@ defmodule Giggly.Plot do
   far between them as the value is through the limits, so a point's width, not its area, grows
   with the value. Its guide is a legend unless `guide:` says otherwise. A value outside the limits,
   or missing, is not drawn. Raises `NimbleOptions.ValidationError` for an option it does not take
-  or a value it cannot use, a size below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a
-  list of labels without a list of breaks as long; a column that is not numbers is refused when
-  the plot is run.
+  or a value it cannot use, a size below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and
+  `ArgumentError` for a list of labels without a list of breaks as long; a column that is not
+  numbers is refused when the plot is run.
 
   ## Options
 
@@ -3068,9 +3070,9 @@ defmodule Giggly.Plot do
   The values are drawn at sizes from the first of `range:` to the second, in millimetres, in
   order, their squares, and so a point's area, evenly spaced. Its guide is a legend unless `guide:`
   says otherwise. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
-  it cannot use, a size below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of
-  labels not one for each break or limit given; a column of numbers is refused when the plot is
-  run.
+  it cannot use, a size below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError`
+  for a list of labels not one for each break or limit given; a column of numbers is refused when
+  the plot is run.
 
   ## Options
 
@@ -3104,9 +3106,9 @@ defmodule Giggly.Plot do
   first three open, `:circle_open`, `:triangle_open` and `:square_open`. Shapes have no order, so a
   shape scale is always discrete. Its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a
-  `guide:` of `:colorbar` among them, and `ArgumentError` for a list of labels not one for each
-  break or limit given; a continuous column, or more than six values, is refused when the plot is
-  run, and `scale_shape_manual/2` gives as many shapes as a scale has values.
+  `guide:` of `:colorbar` or `:colorsteps` among them, and `ArgumentError` for a list of labels not
+  one for each break or limit given; a continuous column, or more than six values, is refused when
+  the plot is run, and `scale_shape_manual/2` gives as many shapes as a scale has values.
 
   ## Options
 
@@ -3139,9 +3141,9 @@ defmodule Giggly.Plot do
   handed to the values in order, or a map from a value to its shape. The legend shows a key for
   each value the scale shows, labelled. Raises `NimbleOptions.ValidationError` for an option it
   does not take or a value it cannot use, a shape no point is drawn in or a `guide:` of
-  `:colorbar` among them, and `ArgumentError` for a list of labels not one for each break or limit
-  given; a continuous column, or more values than a list has shapes, is refused when the plot is
-  run.
+  `:colorbar` or `:colorsteps` among them, and `ArgumentError` for a list of labels not one for each
+  break or limit given; a continuous column, or more values than a list has shapes, is refused when
+  the plot is run.
 
   ## Options
 
@@ -3176,9 +3178,9 @@ defmodule Giggly.Plot do
   `{2, 2, 4, 2, 8, 2, 15, 2}` and `{15, 1}`. Line types have no order, so a line type scale is
   always discrete. Its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a
-  `guide:` of `:colorbar` among them, and `ArgumentError` for a list of labels not one for each
-  break or limit given; a continuous column, or more than 13 values, is refused when the plot is
-  run, and `scale_linetype_manual/2` gives as many line types as a scale has values.
+  `guide:` of `:colorbar` or `:colorsteps` among them, and `ArgumentError` for a list of labels not
+  one for each break or limit given; a continuous column, or more than 13 values, is refused when
+  the plot is run, and `scale_linetype_manual/2` gives as many line types as a scale has values.
 
   ## Options
 
@@ -3212,9 +3214,9 @@ defmodule Giggly.Plot do
   `geom_line/3`'s `linetype:` takes one: a list handed to the values in order, or a map from a
   value to its line type. The legend shows a key for each value the scale shows, labelled. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a line
-  type no line is drawn in or a `guide:` of `:colorbar` among them, and `ArgumentError` for a list
-  of labels not one for each break or limit given; a continuous column, or more values than a list
-  has line types, is refused when the plot is run.
+  type no line is drawn in or a `guide:` of `:colorbar` or `:colorsteps` among them, and
+  `ArgumentError` for a list of labels not one for each break or limit given; a continuous column,
+  or more values than a list has line types, is refused when the plot is run.
 
   ## Options
 
@@ -3248,9 +3250,9 @@ defmodule Giggly.Plot do
   along it is drawn a segment from each row to the next, each as wide as the row it starts from.
   Its guide is a legend unless `guide:` says otherwise. A value outside the limits, or missing,
   draws no line. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
-  it cannot use, a width below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of
-  labels without a list of breaks as long; a column that is not numbers is refused when the plot
-  is run.
+  it cannot use, a width below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError`
+  for a list of labels without a list of breaks as long; a column that is not numbers is refused
+  when the plot is run.
 
   ## Options
 
@@ -3282,8 +3284,8 @@ defmodule Giggly.Plot do
   The values' lines are drawn at widths spaced evenly from the first of `range:` to the second, in
   millimetres, in order. Its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a width
-  below 0 or a `guide:` of `:colorbar`, and `ArgumentError` for a list of labels not one for each
-  break or limit given; a column of numbers is refused when the plot is run.
+  below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError` for a list of labels
+  not one for each break or limit given; a column of numbers is refused when the plot is run.
 
   ## Options
 
@@ -3524,13 +3526,16 @@ defmodule Giggly.Plot do
 
   @doc """
   Sets the guide that reads each aesthetic's scale back: `:legend`, a key for each break;
-  `:colorbar`, a bar a continuous colour or fill scale's colours run up; a legend
-  `guide_legend/1` makes; or `:none` for none.
+  `:colorbar`, a bar a continuous colour or fill scale's colours run up; `:colorsteps`, a bar of
+  one block of colour for each bin between a colour or fill scale's breaks, all as long whatever
+  the bins' widths, each break's label at its edge; a legend `guide_legend/1` makes; or `:none`
+  for none.
 
   A guide set here wins over the one its scale's `guide:` chooses, before or after the scale is
-  given. Each call sets only the guides it is given, keeping the rest. A colour bar for alpha,
-  shape or size raises here, and one for a colour or fill scale that is discrete raises when the
-  plot is run. A guide for an aesthetic no layer maps reads nothing.
+  given. Each call sets only the guides it is given, keeping the rest. A colour bar or colour
+  steps for alpha, shape or size raise here; either for a colour or fill scale that is discrete,
+  or a colour bar for a binned one, raises when the plot is run. A guide for an aesthetic no layer
+  maps reads nothing.
 
   ## Options
 

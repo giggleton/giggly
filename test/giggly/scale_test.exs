@@ -1469,7 +1469,7 @@ defmodule Giggly.ScaleTest do
                palette: {:gradient, ["#132B43", "#56B1F7"]},
                rescaler: :rescale,
                na_value: "#7F7F7F",
-               guide: :legend,
+               guide: :colorsteps,
                name: :default,
                limits: {nil, nil},
                breaks: :default,
@@ -1622,6 +1622,128 @@ defmodule Giggly.ScaleTest do
       assert {Scale.kind_of(scale), Scale.discrete?(scale),
               Enum.map([:continuous, :discrete, :date], fn kind -> Scale.takes?(scale, kind) end)} ===
                {:binned, false, [true, false, false]}
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `get_guide_data()` and the guide's params in R 4.6.1, mtcars' `colour
+  # = hp` (52 to 335) read back by `guide_coloursteps()`, made by session 27474d8e's scratchpad
+  # `r/steps.R` and `r/cont.R`: each key's `.value` and each bin's `min`, `max` and `colour`.
+  describe "steps/2" do
+    @gradient ["#132B43", "#56B1F7"]
+
+    # What colour steps draw of `scale`, its legend's breaks handed in.
+    defp steps(scale), do: Scale.steps(scale, break_values(scale))
+
+    defp step_places(scale) do
+      {places, _bins} = steps(scale)
+      places
+    end
+
+    defp step_bins(scale) do
+      {_places, bins} = steps(scale)
+      bins
+    end
+
+    test "the bar is cut at the limits and breaks into bins of equal length, each its middle's colour" do
+      binned = binned([52, 150, 335])
+      continuous = gradient_through(@gradient, [52, 150, 335])
+
+      assert {steps(binned), step_bins(continuous)} ===
+               {{[
+                   0.16666666666666666,
+                   0.3333333333333333,
+                   0.5,
+                   0.6666666666666666,
+                   0.8333333333333334
+                 ],
+                 [
+                   {0.0, 0.16666666666666666, "#183550"},
+                   {0.16666666666666666, 0.3333333333333333, "#22496C"},
+                   {0.3333333333333333, 0.5, "#2D5F89"},
+                   {0.5, 0.6666666666666666, "#3875A7"},
+                   {0.6666666666666666, 0.8333333333333334, "#448DC6"},
+                   {0.8333333333333334, 1.0, "#50A5E7"}
+                 ]},
+                [
+                  {0.0, 0.16666666666666666, "#183551"},
+                  {0.16666666666666666, 0.3333333333333333, "#234A6D"},
+                  {0.3333333333333333, 0.5, "#2E618C"},
+                  {0.5, 0.6666666666666666, "#3A79AC"},
+                  {0.6666666666666666, 0.8333333333333334, "#4792CE"},
+                  {0.8333333333333334, 1.0, "#51A8EB"}
+                ]}
+    end
+
+    test "a continuous scale's default breaks on a limit are left out, a binned scale's kept" do
+      continuous = gradient_through(@gradient, [52, 150, 335], limits: {100.0, 300.0})
+      binned = binned([52, 150, 335], limits: {50, 350})
+
+      assert {steps(continuous), step_places(binned)} ===
+               {{[nil, 0.25, 0.5, 0.75, nil],
+                 [
+                   {0.0, 0.25, "#1B3A57"},
+                   {0.25, 0.5, "#2A5A82"},
+                   {0.5, 0.75, "#3B7BAF"},
+                   {0.75, 1.0, "#4D9FDE"}
+                 ]},
+                [
+                  0.0,
+                  0.16666666666666666,
+                  0.3333333333333333,
+                  0.5,
+                  0.6666666666666666,
+                  0.8333333333333334,
+                  1.0
+                ]}
+    end
+
+    test "a first break given on a limit moves every break one step down the bar" do
+      binned = binned([52, 150, 335], limits: {100, 350}, breaks: [100, 200, 300])
+
+      continuous =
+        gradient_through(@gradient, [52, 150, 335],
+          limits: {100.0, 300.0},
+          breaks: [100.0, 200.0, 300.0]
+        )
+
+      assert {step_places(binned), step_places(continuous)} ===
+               {[0.0, 0.3333333333333333, 0.6666666666666666], [0.0, 0.5, 1.0]}
+    end
+
+    # R counts the breaks in the order given, so each label lands on another break's edge.
+    test "breaks given out of order are placed in the order given, as R places them" do
+      binned = binned([52, 150, 335], breaks: [300, 100, 200])
+      continuous = gradient_through(@gradient, [52, 150, 335], breaks: [300.0, 100.0, 200.0])
+
+      assert {steps(binned), step_places(continuous)} ===
+               {{[0.25, 0.5, 0.75],
+                 [
+                   {0.0, 0.25, "#183551"},
+                   {0.25, 0.5, "#29567D"},
+                   {0.5, 0.75, "#4086BD"},
+                   {0.75, 1.0, "#51A8EB"}
+                 ]}, [0.25, 0.5, 0.75]}
+    end
+
+    # R's step down reads the first break given, so one outside the limits stops it, and the last
+    # break is counted past the bar's end.
+    test "a first break given outside the limits keeps the rest from stepping down" do
+      binned = binned([52, 150, 335], limits: {52, 335}, breaks: [40, 52, 200, 335])
+
+      continuous =
+        gradient_through(@gradient, [52, 150, 335], breaks: [40.0, 52.0, 200.0, 335.0])
+
+      assert {steps(binned), step_places(continuous)} ===
+               {{[0.5, 1.0, nil], [{0.0, 0.5, "#234B6E"}, {0.5, 1.0, "#458EC9"}]},
+                [0.5, 1.0, nil]}
+    end
+
+    test "a single value's binned bar is one bin between its two breaks, its continuous bar none" do
+      binned = binned([5])
+      continuous = gradient_through(@gradient, [5])
+
+      assert {steps(binned), steps(continuous)} ===
+               {{[0.0, 1.0], [{0.0, 1.0, "#336A98"}]}, {[nil], []}}
     end
   end
 

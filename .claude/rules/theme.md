@@ -84,7 +84,8 @@ theme's families reaches: the entry beginning "A text's family is the theme's".
   bar's ticks are
   `guide_colourbar()`'s white 0.5 / .pt mm only where the settings leave `legend_ticks` unset
   (`replace_null()`), so a colour given every line never reaches them, made as a setting is, so they
-  skip a removed `line`.
+  skip a removed `line`; colour steps' (`legend_steps_ticks`) are removed there instead, as
+  `guide_coloursteps()` defaults them to `element_blank()`.
 - **A complete theme is a function in `Giggly.Theme` that builds its tree of partial elements
   from its base sizes**, as ggplot2's are functions (`theme_gray()`), never a module implementing
   a behaviour: themes differ only in their values, where facets and coordinate systems differ in

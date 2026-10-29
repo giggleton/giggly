@@ -1713,8 +1713,9 @@ defmodule Giggly.Plot.Options do
     type: {:custom, __MODULE__, :validate_guide, [:continuous]},
     default: :colorbar,
     doc:
-      "What reads the scale back: `:colorbar`, a bar the colours run up; `:legend`, a key for " <>
-        "each break; " <> @guide_doc_tail
+      "What reads the scale back: `:colorbar`, a bar the colours run up; `:colorsteps`, a bar " <>
+        "of one block of colour between each break and the next; `:legend`, a key for each " <>
+        "break; " <> @guide_doc_tail
   ]
 
   @alpha_guide_spec [
@@ -2358,20 +2359,23 @@ defmodule Giggly.Plot.Options do
                         )
 
   # `guides/2`'s options: the guide of each aesthetic other than position, checked by
-  # `validate_guide/2`; a colour bar for a colour or fill scale that turns out discrete is refused
-  # when the plot is run, since which kind of scale it gets may be known only then.
+  # `validate_guide/2`; a colour bar or colour steps for a colour or fill scale that turns out
+  # discrete, or a colour bar for a binned one, is refused when the plot is run, since which kind of
+  # scale it gets may be known only then.
   @guides_options NimbleOptions.new!(
                     color: [
                       type: {:custom, __MODULE__, :validate_guide, [:continuous]},
                       doc:
                         "The colour scale's guide (`colour:` too), as `scale_color_continuous/2`'s " <>
-                          "`guide:` takes it; a colour bar for a continuous scale alone."
+                          "`guide:` takes it; a colour bar for a continuous scale alone, colour " <>
+                          "steps for a binned or continuous one."
                     ],
                     fill: [
                       type: {:custom, __MODULE__, :validate_guide, [:continuous]},
                       doc:
                         "The fill scale's guide, as `scale_fill_continuous/2`'s `guide:` takes " <>
-                          "it; a colour bar for a continuous scale alone."
+                          "it; a colour bar for a continuous scale alone, colour steps for a " <>
+                          "binned or continuous one."
                     ],
                     alpha: [
                       type: {:custom, __MODULE__, :validate_guide, [:alpha]},
@@ -4147,10 +4151,10 @@ defmodule Giggly.Plot.Options do
     do: {:error, "expected a label, a string or :none, got: #{inspect(label)}"}
 
   # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
-  # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` for a
-  # continuous colour or fill scale alone, as a colour bar shows a continuous scale's colours, so a
-  # discrete scale's is refused, and an alpha, a shape, a size, a line type or a line width
-  # scale's whatever its kind.
+  # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` or
+  # `:colorsteps` for a continuous colour or fill scale alone, as each shows a continuous scale's
+  # colours, so a discrete scale's is refused, and an alpha, a shape, a size, a line type or a line
+  # width scale's whatever its kind.
   @doc false
   @spec validate_guide(
           term(),
@@ -4159,20 +4163,30 @@ defmodule Giggly.Plot.Options do
           {:ok, Giggly.Plot.guide()} | {:error, String.t()}
   def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
   def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
-  def validate_guide(:colorbar, :continuous), do: {:ok, :colorbar}
+  def validate_guide(guide, :continuous) when guide in [:colorbar, :colorsteps], do: {:ok, guide}
 
   def validate_guide(:colorbar, :discrete),
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}
+
+  def validate_guide(:colorsteps, :discrete),
+    do:
+      {:error,
+       "colour steps show a binned or continuous scale, and this one is discrete; give :legend"}
 
   def validate_guide(:colorbar, aesthetic),
     do:
       {:error,
        "a colour bar shows colour or fill, never #{Aesthetics.in_words(aesthetic)}; give :legend"}
 
+  def validate_guide(:colorsteps, aesthetic),
+    do:
+      {:error,
+       "colour steps show colour or fill, never #{Aesthetics.in_words(aesthetic)}; give :legend"}
+
   def validate_guide(guide, _kind) do
     {:error,
-     "expected :legend, :colorbar, :none or a legend Plot.guide_legend/1 makes, got: " <>
-       inspect(guide)}
+     "expected :legend, :colorbar, :colorsteps, :none or a legend Plot.guide_legend/1 makes, " <>
+       "got: " <> inspect(guide)}
   end
 
   # NimbleOptions' check of an `hjust:` or `vjust:` option: a number, kept as a float, as R keeps one

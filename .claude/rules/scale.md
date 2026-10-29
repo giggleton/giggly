@@ -87,14 +87,20 @@ identity transformation: the entry beginning "A layer records its stat and posit
   palette gives `nil` there, which the scale refuses.
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
-  protocol), `:colorbar` for a continuous colour or fill, and `:legend` for alpha, line type, line
-  width, shape, size and a discrete colour or fill, by default; a plot's scale may name `:none`, a
-  legend for a continuous colour or fill, or carry the legend's struct `Plot.guide_legend/1` builds,
+  protocol), `:colorbar` for a continuous colour or fill, `:colorsteps` for a binned one, and
+  `:legend` for alpha, line type, line width, shape, size and a discrete colour or fill, by
+  default; a plot's scale may name `:none`, a legend or colour steps for a continuous colour or
+  fill, or carry the legend's struct `Plot.guide_legend/1` builds,
   typed `struct()`. The assembly turns a name into the kind; a scale never reads its guide, so the
   boundary lists no guide. **`samples/2` and `places/2` give what a colour bar draws from a
   continuous scale**: values spread evenly over its limits by R's `seq()`, as `extract_decor()`
   takes them, and each value's place in the limits, 0 to 1, whatever the rescaler, as the gradient
-  form places its ticks and colours.
+  form places its ticks and colours. **`steps/2` gives what colour steps draw from a continuous or
+  binned scale**, as `GuideColoursteps` works it out with even steps: bins of equal length between
+  the limits and breaks sorted, each coloured as the scale maps its middle, and each break's place
+  by R's count of the breaks in the order given, one lower where the scale's first break is on a
+  limit, `nil` past the bar's end; a continuous scale's default breaks on a limit `nil` too, as R
+  leaves them out. Its tests pin R's places and colours, out-of-order breaks among them.
 - **`Scale.Continuous`, `Scale.Discrete` and `Scale.Binned` are API, and the boundary exports
   the three; the rest of the namespace is not.** `Giggly.panel_scales/2` returns the first two
   and `Giggly.Plot` writes them, so their fields are documented and changing one changes the

@@ -100,8 +100,8 @@ defmodule Giggly.Scale do
   # `rescaler` says, and one outside them is censored, as ggplot2's `oob = censor`; a missing or
   # censored value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha,
   # line type, line width, shape and size. Each names the guide that draws it, as ggplot2's scales
-  # do: a colour bar for a continuous colour or fill, a legend for the rest, whose breaks and labels
-  # are the scale's on its limits.
+  # do: a colour bar for a continuous colour or fill, colour steps for a binned one, a legend for the
+  # rest, whose breaks and labels are the scale's on its limits.
   #
   # A plot's colour or fill scale may be binned (`Giggly.Scale.Binned`), ggplot2's third kind,
   # which no column's type chooses: it trains as a continuous scale does, squishes each value into
@@ -688,6 +688,99 @@ defmodule Giggly.Scale do
   @doc false
   @spec places(Continuous.t(), [number()]) :: [float()]
   def places(%Continuous{} = scale, values), do: Bounds.rescale(values, limits(scale), {0, 1})
+
+  # What a colour steps guide draws of a continuous or binned scale whose legend shows the breaks
+  # `values`, in order, as ggplot2's `GuideColoursteps` works it out with even steps: each break's
+  # place up the bar, 0 to 1, or `nil` where the bar leaves it out, and each bin, its place from
+  # and to and its colour. The bar is cut at the limits and the breaks, sorted and each once, into
+  # bins all as long, each coloured as the scale maps its middle. A break's place is its count
+  # among the breaks shown, in their order, over the bins' count, not its own edge's, as R counts
+  # them, one lower where the scale's first break falls on a limit: breaks given out of order, or
+  # after a first given outside the limits, are placed where R places them, and one counted past
+  # the bar's end is left out. A continuous scale's default breaks on a limit are left out, as R
+  # leaves them out of a scale that has not written its breaks back, as a binned one has.
+  @doc false
+  @spec steps(Continuous.t() | Binned.t(), [float()]) ::
+          {[float() | nil], [{float(), float(), String.t() | :none}]}
+  def steps(scale, values) do
+    {low, high} = limits = step_limits(scale)
+    shown = Enum.map(values, fn value -> if step_shown?(scale, value, limits), do: value end)
+
+    edges =
+      shown
+      |> Enum.reject(&is_nil/1)
+      |> then(fn kept -> [low, high | kept] end)
+      |> Enum.sort()
+      |> Enum.dedup_by(fn edge -> edge + 0.0 end)
+
+    bar = {0, length(edges) - 1}
+    lowered = if stepped_down?(scale, values, limits), do: 1, else: 0
+
+    {counts, _next} =
+      Enum.map_reduce(shown, 1, fn
+        nil, count -> {nil, count}
+        _value, count -> {count - lowered, count + 1}
+      end)
+
+    places =
+      counts
+      |> Bounds.rescale(bar, {0, 1})
+      |> Enum.map(fn place -> if is_number(place) and place <= 1, do: place end)
+
+    {places, bins(scale, edges, bar)}
+  end
+
+  # The bins between consecutive `edges`, each its place along the bar from and to and the colour
+  # the scale maps its middle to, R's `breaks[-1] - diff(breaks) / 2`.
+  defp bins(scale, edges, {_first, last} = bar) do
+    middles =
+      edges
+      |> Enum.chunk_every(2, 1, :discard)
+      |> Enum.map(fn [from, to] -> to - (to - from) / 2 end)
+
+    places =
+      0..last//1
+      |> Enum.to_list()
+      |> Bounds.rescale(bar, {0, 1})
+
+    Enum.zip_with(
+      [Enum.drop(places, -1), Enum.drop(places, 1), map(scale, middles)],
+      fn [from, to, color] -> {from, to, color} end
+    )
+  end
+
+  # The scale's limits as floats, a binned scale's widened.
+  defp step_limits(%Continuous{} = scale) do
+    {low, high} = limits(scale)
+    {low / 1, high / 1}
+  end
+
+  defp step_limits(%Binned{} = scale), do: Binned.limits(scale)
+
+  # Whether a colour steps guide shows a break of the scale's: a continuous scale's default break
+  # only off its limits, any other.
+  defp step_shown?(%Continuous{breaks: :default}, value, {low, high}),
+    do: value != low and value != high
+
+  defp step_shown?(_scale, _value, _limits), do: true
+
+  # Whether the scale's first break, `values`' first or its first given, is on a limit, R's
+  # `breaks[1] %in% limits`; never for a continuous scale's default breaks, which R has left out
+  # there.
+  defp stepped_down?(%Continuous{breaks: :default}, _values, _limits), do: false
+
+  defp stepped_down?(%Continuous{breaks: [first | _given], transform: transform}, _values, limits) do
+    [position] = Transform.transform(transform, [first])
+    on_limit?(position, limits)
+  end
+
+  defp stepped_down?(%Binned{breaks: :default}, [first | _values], limits),
+    do: on_limit?(first, limits)
+
+  defp stepped_down?(%Binned{breaks: [first | _given]}, _values, limits),
+    do: on_limit?(first / 1, limits)
+
+  defp on_limit?(value, {low, high}), do: value == low or value == high
 
   # The minor breaks an axis showing `extent` of the scale draws between `breaks`, the breaks
   # `breaks/2` gives on that extent: ggplot2's `get_breaks_minor()` as its view scale calls it,

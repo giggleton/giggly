@@ -2,7 +2,8 @@ defmodule Giggly.Guide.Parts do
   @moduledoc false
 
   # The parts the guides of aesthetics other than position build their tables from, alike in a
-  # legend (`Giggly.Guide.Legend`) and a colour bar (`Giggly.Guide.Colorbar`), as ggplot2's
+  # legend (`Giggly.Guide.Legend`) and the bar a colour bar and colour steps share
+  # (`Giggly.Guide.Bar`), as ggplot2's
   # `GuideColourbar` lays itself out through `GuideLegend`'s measuring and arranging: the
   # background over the whole table, the title above or left of the keys with the room a title
   # bigger than them leaves, a label in its cell, how wide the labels are and how far from the

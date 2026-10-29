@@ -156,6 +156,7 @@ defmodule Giggly.Theme do
     :legend_text_right,
     :legend_text_bottom,
     :legend_ticks,
+    :legend_steps_ticks,
     :legend_ticks_length,
     :legend_spacing_x,
     :legend_spacing_y,
@@ -352,7 +353,8 @@ defmodule Giggly.Theme do
   legend's background, the margin inside it, each key's background, width and height, the space
   between its keys, its title above its keys or left of them, its labels right of its keys or below
   a colour bar, each with its margin facing the keys widened by the keys' spacing, a colour bar's
-  ticks and how far each reaches into the bar; the space between one legend and the next beside
+  ticks, a colour steps guide's, and how far each reaches into the bar; the space between one
+  legend and the next beside
   it or below it; where the legends go (`legend_position`), the point of the panels an inside box
   goes at (`legend_position_inside`), which way each legend's keys run (`legend_direction`),
   which point of the box is placed there on each side (`legend_justification_top` and the rest,
@@ -409,6 +411,7 @@ defmodule Giggly.Theme do
           legend_text_right: text(),
           legend_text_bottom: text(),
           legend_ticks: line(),
+          legend_steps_ticks: line(),
           legend_ticks_length: float(),
           legend_spacing_x: float(),
           legend_spacing_y: float(),
@@ -534,7 +537,8 @@ defmodule Giggly.Theme do
   @ink_toward_paper_92 "#EBEBEB"
 
   # A colour bar's ticks when the theme sets none: `guide_colourbar()`'s own default, white and
-  # 0.5 / .pt millimetres wide, made as a setting is, so it skips a removed `line`.
+  # 0.5 / .pt millimetres wide, made as a setting is, so it skips a removed `line`. A colour steps
+  # guide's are none when the theme sets none, `guide_coloursteps()`'s `element_blank()`.
   @colorbar_ticks %{
     color: @paper,
     linewidth: 0.5 / @font_points_per_millimetre,
@@ -663,6 +667,7 @@ defmodule Giggly.Theme do
     gap = distance(theme, :legend_key_spacing)
     text_margin = text_margin(calculated(theme, :text))
     legend_ticks_theme = Map.put_new(theme, :legend_ticks, @colorbar_ticks)
+    legend_steps_ticks_theme = Map.put_new(theme, :legend_ticks, :none)
     legend_spacing_theme = Map.put_new(theme, :legend_spacing, @legend_spacing)
     inside = justification(theme, :legend_justification_inside)
 
@@ -715,6 +720,7 @@ defmodule Giggly.Theme do
       legend_text_bottom:
         text(beside_keys(theme, {text_margin, :top, gap}, {0.5, 1}), :legend_text),
       legend_ticks: line(legend_ticks_theme, :legend_ticks),
+      legend_steps_ticks: line(legend_steps_ticks_theme, :legend_ticks),
       legend_ticks_length: distance(theme, :legend_ticks_length),
       legend_spacing_x: distance(legend_spacing_theme, :legend_spacing_x),
       legend_spacing_y: distance(legend_spacing_theme, :legend_spacing_y),

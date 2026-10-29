@@ -403,6 +403,89 @@ defmodule Giggly.GuideTest do
     end
   end
 
+  # Golden: the colour steps ggplot2 4.0.3 draws through vdiffr 1.0.9 (R 4.6.1) for mtcars'
+  # `colour = hp`, test/golden/colorsteps.R's and colorsteps_top.R's: running up, on the binned
+  # scale, its background 48.40 by 112.69 points, six rectangles 17.28 wide and 14.40 tall up the
+  # bar, no border and no ticks; running across, on the continuous scale with `legend.ticks =
+  # element_line(colour = "black")`, its background 115.07 by 41.60, the rectangles 14.40 wide, a
+  # black tick 1.07 wide across the bottom and then the top at each break.
+  describe "draw/3 for colour steps" do
+    @step_places [
+      0.16666666666666666,
+      0.3333333333333333,
+      0.5,
+      0.6666666666666666,
+      0.8333333333333334
+    ]
+
+    defp step_keys do
+      Enum.zip_with(~w(100 150 200 250 300), @step_places, fn label, place ->
+        %{label: label, place: place, glyphs: [], sizes: []}
+      end)
+    end
+
+    defp step_decor(colors) do
+      edges = Enum.concat([[0.0], @step_places, [1.0]])
+
+      Enum.zip_with([Enum.drop(edges, -1), Enum.drop(edges, 1), colors], fn [from, to, color] ->
+        {from, to, color}
+      end)
+    end
+
+    test "colour steps are a bin's rectangle each up a bar five keys long, with no ticks" do
+      colors = ~w(#183550 #22496C #2D5F89 #3875A7 #448DC6 #50A5E7)
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorsteps{},
+          %{title: "hp", keys: step_keys(), decor: step_decor(colors), direction: :vertical},
+          Theme.complete(%{complete: :none, settings: %{}})
+        )
+
+      scene_height = height(scene)
+      [_background, _title, bar, labels] = scene.cells
+      [%Giggly.Scene.Rectangles{} = bins] = bar.primitives
+      [%Giggly.Scene.Text{y: label_places, labels: label_texts}] = labels.primitives
+
+      lengths =
+        Enum.zip_with(bins.ymin, bins.ymax, fn from, to -> Float.round((to - from) * 86.4, 2) end)
+
+      assert {Float.round(width, 2), Float.round(scene_height, 2), bins.xmin, bins.xmax, lengths,
+              bins.fill, bins.color} ===
+               {48.4, 112.69, List.duplicate(0.0, 6), List.duplicate(1.0, 6),
+                List.duplicate(14.4, 6), colors, List.duplicate(:none, 6)}
+
+      assert {label_places, label_texts} === {@step_places, ~w(100 150 200 250 300)}
+    end
+
+    # Where the ticks go is `Giggly.Guide.Bar`'s, which the colour bar's tests pin; here, that
+    # colour steps draw the theme's ticks at their keys.
+    test "colour steps running across draw the ticks the theme sets at their keys" do
+      colors = ~w(#183551 #234A6D #2E618C #3A79AC #4792CE #51A8EB)
+      theme = Theme.complete(%{complete: :none, settings: %{legend_ticks: %{color: "#000000"}}})
+
+      {width, scene} =
+        Guide.draw(
+          %Guide.Colorsteps{},
+          %{title: "hp", keys: step_keys(), decor: step_decor(colors), direction: :horizontal},
+          theme
+        )
+
+      scene_height = height(scene)
+      [_background, _title, bar, _labels] = scene.cells
+      [%Giggly.Scene.Rectangles{} = bins, ticks] = bar.primitives
+      tick_places = Enum.map(ticks.lines, fn [{place, _inside}, _outside] -> place end)
+
+      assert {Float.round(width, 2), Float.round(scene_height, 2), bins.ymin, bins.ymax,
+              bins.xmin, bins.fill} ===
+               {115.07, 41.6, List.duplicate(0.0, 6), List.duplicate(1.0, 6),
+                [0.0 | @step_places], colors}
+
+      assert {tick_places, Enum.uniq(ticks.color), Float.round(ticks.stroke_width, 2)} ===
+               {@step_places ++ @step_places, ["#000000"], 1.07}
+    end
+  end
+
   # Golden: the legends' backgrounds ggplot2 4.0.3 draws above the panels through vdiffr 1.0.9
   # (R 4.6.1): mpg's `colour = hwy` as a colour bar in its gradient form, 122.41 by 41.60 points,
   # its bar 86.40 by 17.28 inside the 5.48-point margin, so the title's column 25.05 wide and the

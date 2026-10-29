@@ -15,7 +15,9 @@ defprotocol Giggly.Guide do
   #
   # A scale records its guide by name, as ggplot2's scale carries `guide`, and the assembly turns
   # the name into a struct of its kind: a legend (`Giggly.Guide.Legend`), `guide_legend()`, or a
-  # colour bar (`Giggly.Guide.Colorbar`), `guide_colourbar()`; a legend with options is built by
+  # colour bar (`Giggly.Guide.Colorbar`), `guide_colourbar()`, or colour steps
+  # (`Giggly.Guide.Colorsteps`), `guide_coloursteps()`, the two laid out as one bar
+  # (`Giggly.Guide.Bar`); a legend with options is built by
   # `Giggly.Plot.guide_legend/1` and recorded as its struct, which the assembly takes as it is,
   # and `Plot.guides/2` names one by aesthetic over the scale's. A kind is one module holding its
   # struct, whose fields are its parameters, and its drawing, in a `defimpl Giggly.Guide` whose
@@ -36,7 +38,7 @@ defprotocol Giggly.Guide do
   # may call its drawing modules too, which `GigglyCredo.Check.PlotRunsNothing` forbids.
   use Boundary,
     deps: [Giggly.Coord, Giggly.Font, Giggly.Scene, Giggly.Theme],
-    exports: [Axis, Box, Colorbar, Grid, Legend, Strip, Title]
+    exports: [Axis, Box, Colorbar, Colorsteps, Grid, Legend, Strip, Title]
 
   alias Giggly.{Scene, Theme}
 

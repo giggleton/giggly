@@ -199,9 +199,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_linewidth_discrete/2`, as R's `scale_linewidth_continuous()` refuses `na.value`, and no
   `transform:`. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
   `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
-  its default, the others' `:legend`; a colour bar for a discrete scale, or for any aesthetic but
-  colour and fill, is refused at the call, where R warns and draws none (design-log §4, the entry
-  beginning "A guide is chosen").
+  its default, or `:colorsteps`, the others' `:legend`; a colour bar or colour steps for a
+  discrete scale, or for any aesthetic but colour and fill, are refused at the call, where R warns
+  and draws none or a broken guide (design-log §4, the entry beginning "A guide is chosen").
   A manual scale's list beside a list of `breaks:` is recorded with them, `{:manual, values,
   breaks}`, each value the break's at its place, as R's `manual_scale()` names them, which leaves
   the scale's limits its levels, so too few values raise. **`lims/2` takes `color:` (`colour:`,
@@ -401,9 +401,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot records the guides `guides/2` sets (`guides`), each by canonical aesthetic**, `%{}`
   until a call sets one, a call replacing only the guides it gives, as `labs/2` does: `color`,
   `fill`, `alpha`, `shape`, `size`, `linetype` and `linewidth` alone, each as a scale's `guide:`
-  takes it, a colour bar for any but colour and fill refused at the call; whether a colour or fill
-  scale it gives a colour bar is continuous is known only when the plot is run, so the assembly
-  refuses one that is not. Which aesthetic a layer maps is not checked. The axes take no guide yet:
+  takes it, a colour bar or colour steps for any but colour and fill refused at the call; what kind
+  of scale a colour or fill it gives either is known only when the plot is run, so the assembly
+  refuses a discrete one, and a colour bar for a binned one. Which aesthetic a layer maps is not
+  checked. The axes take no guide yet:
   they wait for `guide_axis()`'s options.
 - **Each table is read once, by the call that gives it**: the plot's by `new/2`, a layer's own by
   its function's `data:`, any `Table.Reader`, read after the options are validated, as ggplot2's

@@ -116,6 +116,21 @@ defmodule Giggly.ThemeTest do
                 }}
     end
 
+    # ggplot2's colour steps guide defaults its ticks to `element_blank()` where the theme leaves
+    # `legend.ticks` unset, and draws the ticks a theme sets as a colour bar does.
+    test "colour steps have no ticks unless the theme sets them" do
+      assert {complete(%{line: %{color: "#FF0000"}}).legend_steps_ticks,
+              complete(%{legend_ticks: %{color: "#000000"}}).legend_steps_ticks} ===
+               {:none,
+                %{
+                  color: "#000000",
+                  opacity: 1.0,
+                  line_width: 1.0669783464566929,
+                  line_end: :butt,
+                  dashes: :none
+                }}
+    end
+
     # Golden: ggplot2 4.0.3 draws a colour bar's ticks black and 2.13 points wide for
     # `legend.ticks = element_line(linewidth = 1)`, the colour every line inherits.
     test "a colour bar's ticks the theme sets without a colour take the lines' ink" do

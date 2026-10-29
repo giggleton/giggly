@@ -210,15 +210,20 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   one's breaks among its limits, each from the scale's options), labelled as its `labels` give, at
   the value it maps to, drawn by that kind of guide, the struct the plot holds or the one the
   assembly builds from a name (`%Guide.Legend{}` for `:legend`, `%Guide.Colorbar{bins: 15}` for
-  `:colorbar`), as `Plot` builds a position's. **A colour bar for a discrete scale raises**, naming
-  the aesthetic, where ggplot2 warns and draws none; only `guides/2` can give one, the scale
-  functions refusing it. **A reversed legend hands its keys over last first**, the missing value's
-  among them, before legends merge, so two read alike only in the same order, as ggplot2's
+  `:colorbar`, `%Guide.Colorsteps{}` for `:colorsteps`), as `Plot` builds a position's. **A colour
+  bar or colour steps for a discrete scale, or a colour bar for a binned one, raises**, naming the
+  aesthetic, where ggplot2 warns and draws none or a broken guide; only `guides/2` can give one,
+  the scale functions refusing it. **A reversed legend hands its keys over last first**, the
+  missing value's among them, before legends merge, so two read alike only in the same order, as
+  ggplot2's
   `extract_params()` turns its key upside down. **A colour bar's
   keys carry their place up the bar** (`Scale.places/2`, 0 to 1 over the limits, the gradient
   form's), **and the colour bar its colours** (`decor`, `bins` values over the limits from
   `Scale.samples/2`, each its place and colour, `extract_decor()`), worked out here from the scale,
-  never by the guide; it draws no layer, so it has none. **Legends come in the order of their aesthetics' names, and one with
+  never by the guide; it draws no layer, so it has none. **Colour steps' keys carry their place
+  and their bins' places and colours** (`Scale.steps/2`), a key the bar leaves out dropped, and
+  colour steps left with no keys are no legend, as ggplot2 drops a guide with none; they draw no
+  layer either. **Legends come in the order of their aesthetics' names, and one with
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The
   guide protocol sits at"); ggplot2 orders by that hash, so a golden's R script sets

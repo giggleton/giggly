@@ -7,8 +7,9 @@ paths:
 # Guides
 
 `Giggly.Guide` is the protocol the guides of aesthetics other than position are drawn through, a
-legend (`Guide.Legend`, ggplot2's `guide_legend()`) and a colour bar (`Guide.Colorbar`,
-`guide_colourbar()` in its gradient form); its namespace also draws the axes
+legend (`Guide.Legend`, ggplot2's `guide_legend()`), a colour bar (`Guide.Colorbar`,
+`guide_colourbar()` in its gradient form) and colour steps (`Guide.Colorsteps`,
+`guide_coloursteps()`); its namespace also draws the axes
 beside a panel and their titles (`Guide.Axis`, ggplot2's `guide_axis()`), the axis around a radial
 panel's circle (`Guide.AxisTheta`, `guide_axis_theta()`), the panel's background and grid lines
 (`Guide.Grid`, `guide_grid()`), the strips that label a facet's panels (`Guide.Strip`, which
@@ -27,16 +28,19 @@ panel's grid lines are placed by the coordinate system".
   its keys running the way rendering hands it (`direction`, `:vertical` or `:horizontal`).
   **A kind is one module**, its struct, whose fields are its parameters, and its drawing, in a
   `defimpl Giggly.Guide` whose first line classifies it into this boundary. A scale names its guide
-  (`:axis` for a position, `:legend`, `:colorbar`, `:none`) or holds a legend's struct, which
-  `Plot.guide_legend/1` builds, and `Plot.guides/2` names one by aesthetic over it; the assembly
+  (`:axis` for a position, `:legend`, `:colorbar`, `:colorsteps`, `:none`) or holds a legend's
+  struct, which `Plot.guide_legend/1` builds, and `Plot.guides/2` names one by aesthetic over it;
+  the assembly
   builds the kind's struct from a name. **A guide never sees a scale or calls a geom**: the
   assembly works out its keys from the scale, and rendering has each layer's geom draw its glyphs
   in them. The boundary exports the modules rendering draws with (`Axis`, `Box`, `Grid`, `Strip`,
   `Title`) and the kinds, whose structs the assembly and `Plot` build, never a kind's drawing;
-  `Plot` may build a kind's struct and call nothing that draws (`PlotRunsNothing`). The parts both
+  `Plot` may build a kind's struct and call nothing that draws (`PlotRunsNothing`). The parts the
   kinds' tables are built from (the background, the title and its room, a label's cell) are
   `Guide.Parts`, as ggplot2's colour bar lays itself out through its legend's layout, and so is the
-  rule every text a guide draws is placed by.
+  rule every text a guide draws is placed by; the bar the colour bar and colour steps share is
+  `Guide.Bar`, as `guide_coloursteps()` inherits `guide_colourbar()`'s, each kind handing it what
+  fills the bar and its ticks' look.
 - **Every text a guide draws is placed and measured by one rule in `Guide.Parts`, ggplot2's
   `titleGrob()`** (design-log §4, the entry beginning "Text's face, angle, justification and line
   height are the theme's"): drawn in its look's family and face, turned its `angle` and justified
@@ -136,8 +140,9 @@ panel's grid lines are placed by the coordinate system".
   `guide_axis_theta()`'s options and merging its first and last labels when they meet (`expand =
   FALSE`), `guide_legend()`'s options but `reverse` (`title`, `order`, `position`,
   `direction`, `nrow`, `ncol`, `override.aes`, `theme`), the keys filled a row at a time
-  (`legend.byrow`), titles and labels on other sides of the keys, and `guide_colourbar()`'s
-  options: `nbin`, `reverse`, and its raster and rectangles displays.
+  (`legend.byrow`), titles and labels on other sides of the keys, `guide_colourbar()`'s
+  options: `nbin`, `reverse`, and its raster and rectangles displays, and `guide_coloursteps()`'s:
+  `even.steps`, `show.limits`, `reverse`, `alpha`.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays one out at its defaults**: the legend
   margin inside the edge; **the keys in a grid filled a column at a time**, one column for each
@@ -188,3 +193,9 @@ panel's grid lines are placed by the coordinate system".
   and hung), measured together as one grob; the title above or left of the bar as a legend's, its
   room split alike; and with no labels the ticks alone, the room laid out as a legend's. It draws no
   layer's glyph.
+- **Colour steps are drawn as ggplot2's `guide_coloursteps()` at its defaults**
+  (`Guide.Colorsteps`; design-log §4, the entry beginning "Colour steps place their breaks"): the
+  colour bar's bar and layout, filled with a `Scene.Rectangles` of one rectangle for each of the
+  bins the assembly worked out, from and to its place along the bar, in its colour, with no border,
+  and ticks in the theme's colour steps ticks (`legend_steps_ticks`), none unless the theme sets
+  `legend.ticks`. It draws no layer's glyph.

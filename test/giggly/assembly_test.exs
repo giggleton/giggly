@@ -1,7 +1,7 @@
 defmodule Giggly.AssemblyTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Assembly, Geom, Guide, Plot}
+  alias Giggly.{Assembly, Geom, Guide, Plot, Scale}
 
   # Golden throughout: ggplot2 4.0.3's `get_guide_data()` for the same plot in R 4.6.1, printed to
   # 17 significant digits, and the defaults its legends' keys are filled with, as each layer's
@@ -713,6 +713,74 @@ defmodule Giggly.AssemblyTest do
       assert error.message ==
                "Plot.guides/2 gives color a colour bar, which shows a continuous scale, and " <>
                  "color's scale is discrete; give it :legend"
+    end
+
+    # A plot's binned scale, put in its scales as no scale function yet gives one.
+    defp binned_colour(scale) do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+        |> Plot.geom_point()
+
+      %{plot | scales: Map.put(plot.scales, :color, scale)}
+    end
+
+    # The places and bins are `Giggly.Scale.steps/2`'s, which its tests pin against R; here, that
+    # the assembly hands them to colour steps from the trained scale, with no layers.
+    test "a binned colour's guide is colour steps, its keys placed up the bar and its bins coloured" do
+      assembled =
+        %Scale.Binned{palette: {:binned, {:brewer, %{palette: "Blues", direction: -1}}}}
+        |> binned_colour()
+        |> Assembly.run()
+
+      [legend] = assembled.legends
+      values = Enum.map(legend.keys, fn key -> key.value end)
+      {places, bins} = Scale.steps(assembled.non_position_scales.color, values)
+
+      assert {legend.guide, legend.title, legend.layers,
+              Enum.map(legend.keys, fn key -> key.place end), legend.decor} ===
+               {%Guide.Colorsteps{}, "hp", [], places, bins}
+    end
+
+    # Golden: R 4.6.1's `get_guide_data()` for `scale_colour_gradient(guide = "coloursteps")`
+    # (session 27474d8e's scratchpad `r/cont.R`): over limits 100 to 300 the breaks on them are
+    # left out; one value's one break sits on both limits, and R draws no guide.
+    test "colour steps a continuous scale names leave out the keys the bar does, and none draw none" do
+      steps = fn values, options ->
+        %{"x" => values, "y" => values, "z" => values}
+        |> Plot.new(%{x: :x, y: :y, colour: :z})
+        |> Plot.geom_point()
+        |> Plot.scale_color_gradient([guide: :colorsteps] ++ options)
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+        |> Enum.map(fn legend ->
+          {legend.guide, Enum.map(legend.keys, fn key -> key.label end)}
+        end)
+      end
+
+      assert {steps.([52, 150, 335], limits: {100, 300}), steps.([5, 5], [])} ===
+               {[{%Guide.Colorsteps{}, ["150", "200", "250"]}], []}
+    end
+
+    test "colour steps guides/2 gives a discrete scale, or a colour bar a binned one, are refused" do
+      steps =
+        %{x: :x, y: :y, colour: :g}
+        |> guided()
+        |> Plot.guides(color: :colorsteps)
+
+      bar =
+        %Scale.Binned{}
+        |> binned_colour()
+        |> Plot.guides(color: :colorbar)
+
+      steps_error = assert_raise ArgumentError, fn -> Assembly.run(steps) end
+      bar_error = assert_raise ArgumentError, fn -> Assembly.run(bar) end
+
+      assert {steps_error.message, bar_error.message} ==
+               {"Plot.guides/2 gives color colour steps, which show a binned or continuous " <>
+                  "scale, and color's scale is discrete; give it :legend",
+                "Plot.guides/2 gives color a colour bar, which shows a continuous scale, and " <>
+                  "color's scale is binned; give it :colorsteps"}
     end
 
     test "legends reversed alike merge, and one reversed beside one not stays apart" do

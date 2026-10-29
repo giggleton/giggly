@@ -5228,7 +5228,11 @@ defmodule Giggly.PlotTest do
       reversed = Plot.guide_legend(reverse: true)
 
       for {function, options, kind} <- @guided_scale_functions,
-          guide <- [:none, :legend, reversed | if(kind == :continuous, do: [:colorbar], else: [])] do
+          guide <- [
+            :none,
+            :legend,
+            reversed | if(kind == :continuous, do: [:colorbar, :colorsteps], else: [])
+          ] do
         [scale] = Map.values(function.(plot, [{:guide, guide} | options]).scales)
         assert scale.guide === guide
       end
@@ -5236,23 +5240,28 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3 warns "`guide_colourbar()` needs continuous scales." for a discrete colour
     # scale, and "`guide_colourbar()` cannot be used for alpha." for either alpha scale, and for
-    # shape, size, linetype and linewidth, and draws no guide.
-    test "a colour bar is refused for a discrete scale, and for any aesthetic but colour, saying why" do
+    # shape, size, linetype and linewidth, and draws no guide; `guide_coloursteps()` draws a
+    # discrete scale's guide broken, and takes colour and fill alone (`available_aes`).
+    test "a colour bar or steps are refused for a discrete scale, and for any aesthetic but colour" do
       plot = Plot.new(@rows)
 
-      for {function, options, kind} <- @guided_scale_functions, kind != :continuous do
+      for {function, options, kind} <- @guided_scale_functions,
+          kind != :continuous,
+          {guide, shows} <- [colorbar: "a colour bar shows", colorsteps: "colour steps show"] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            function.(plot, [{:guide, :colorbar} | options])
+            function.(plot, [{:guide, guide} | options])
           end
 
         assert error.message =~
                  if(kind == :discrete,
-                   do: "a colour bar shows a continuous scale, and this one is discrete",
+                   do: "continuous scale, and this one is discrete; give :legend",
                    else:
-                     "a colour bar shows colour or fill, never #{Map.fetch!(@guided_nouns, kind)}; " <>
+                     "#{shows} colour or fill, never #{Map.fetch!(@guided_nouns, kind)}; " <>
                        "give :legend"
                  )
+
+        assert error.message =~ shows
       end
     end
 
@@ -5265,8 +5274,8 @@ defmodule Giggly.PlotTest do
         end
 
       assert error.message =~
-               "expected :legend, :colorbar, :none or a legend Plot.guide_legend/1 makes, " <>
-                 "got: :legnd"
+               "expected :legend, :colorbar, :colorsteps, :none or a legend " <>
+                 "Plot.guide_legend/1 makes, got: :legnd"
     end
 
     test "guide_legend/1 makes a legend, its keys reversed when asked" do
@@ -5289,16 +5298,17 @@ defmodule Giggly.PlotTest do
                {%{}, %{color: :none, fill: :colorbar, alpha: %Guide.Legend{reverse: true}}}
     end
 
-    test "guides/2 refuses a colour bar but for colour or fill, and an aesthetic it chooses no guide for" do
+    test "guides/2 refuses a colour bar or steps but for colour or fill, and an aesthetic with no guide" do
       plot = Plot.new(@rows)
 
-      for {aesthetic, noun} <- @guided_nouns do
+      for {aesthetic, noun} <- @guided_nouns,
+          {guide, shows} <- [colorbar: "a colour bar shows", colorsteps: "colour steps show"] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            Plot.guides(plot, [{aesthetic, :colorbar}])
+            Plot.guides(plot, [{aesthetic, guide}])
           end
 
-        assert error.message =~ "a colour bar shows colour or fill, never #{noun}"
+        assert error.message =~ "#{shows} colour or fill, never #{noun}"
       end
 
       assert Plot.guides(plot, size: :none, shape: :legend, linetype: :none, linewidth: :legend).guides ===
