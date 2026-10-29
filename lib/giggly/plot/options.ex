@@ -4365,13 +4365,13 @@ defmodule Giggly.Plot.Options do
 
   # NimbleOptions' check of an `arrow:` option: `true`, an arrowhead at its defaults, or a keyword
   # list of its options, an option given twice refused as `Aesthetics.canonicalize/1` refuses one;
-  # kept as a map, its angle and length floats, its length in points worked out as the theme works
-  # one out, and its fill resolved.
+  # kept as a map, its angle a float, its length in points worked out as the theme works one out,
+  # and its fill resolved.
   @doc false
   @spec validate_arrow(term()) :: {:ok, map()} | {:error, String.t()}
   def validate_arrow(true), do: validate_arrow([])
 
-  def validate_arrow(options) when is_list(options) do
+  def validate_arrow(options) do
     if Keyword.keyword?(options) do
       validated =
         options
@@ -4383,11 +4383,10 @@ defmodule Giggly.Plot.Options do
         {:error, %NimbleOptions.ValidationError{message: message}} -> {:error, message}
       end
     else
-      arrow_error(options)
+      {:error,
+       "expected true or a keyword list of an arrowhead's options, got: #{inspect(options)}"}
     end
   end
-
-  def validate_arrow(arrow), do: arrow_error(arrow)
 
   # An arrowhead's validated options as a map, its length in points.
   defp in_points(arrow) do
@@ -4396,17 +4395,13 @@ defmodule Giggly.Plot.Options do
     |> Map.update!(:length, &Theme.points/1)
   end
 
-  defp arrow_error(arrow),
-    do:
-      {:error,
-       "expected true or a keyword list of an arrowhead's options, got: #{inspect(arrow)}"}
-
-  # NimbleOptions' check of an arrowhead's `length:`: any amount in one of its units, kept as a
-  # float, as grid draws a negative one's arms past its tip.
+  # NimbleOptions' check of an arrowhead's `length:`: any amount in one of its units, as grid
+  # draws a negative one's arms past its tip; `validate_arrow/1` works it out in points.
   @doc false
-  @spec validate_arrow_length(term()) :: {:ok, {float(), atom()}} | {:error, String.t()}
-  def validate_arrow_length({amount, unit}) when is_number(amount) and unit in @arrow_units,
-    do: {:ok, {amount / 1, unit}}
+  @spec validate_arrow_length(term()) :: {:ok, {number(), atom()}} | {:error, String.t()}
+  def validate_arrow_length({amount, unit} = length)
+      when is_number(amount) and unit in @arrow_units,
+      do: {:ok, length}
 
   def validate_arrow_length(length) do
     {:error,

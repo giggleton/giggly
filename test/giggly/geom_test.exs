@@ -1603,6 +1603,7 @@ defmodule Giggly.GeomTest do
       assert segments.starts === [{0.0, 0.0}, {1.0, 1.0}]
       assert segments.ends === [{0.5, 1.0}, {0.25, 0.75}]
       assert segments.color === ["#FF0000", "#0000FF"]
+      assert segments.arrows === :none
 
       assert {segments.line_end, segments.line_join, segments.mitre_limit} ===
                {:butt, :round, 10.0}

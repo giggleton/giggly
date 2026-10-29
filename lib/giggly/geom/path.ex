@@ -175,7 +175,7 @@ defmodule Giggly.Geom.Path do
     # Each group a line, in its first row's colour, alpha, width and line type, broken where a
     # position is missing, as grid breaks a polyline; a piece of one point draws nothing. A line
     # broken in pieces has its first end's head on its first piece and its last end's on its last,
-    # as grid draws a polyline's arrow at the line's own ends (`piece_head/4`). Each run of lines
+    # as grid draws a polyline's arrow at the line's own ends (`piece_head/3`). Each run of lines
     # alike in width and line type is one primitive, and a blank run draws nothing.
     defp draw_polylines(geom, rows) do
       rows
@@ -216,14 +216,13 @@ defmodule Giggly.Geom.Path do
 
     # The head of the piece at `index` of a line broken in `count` pieces: the line's own where it
     # is whole; else its first end's on its first piece, its last end's on its last, and none
-    # between.
-    defp piece_head(:none, _index, _count), do: :none
+    # between; none at all for a line with none.
     defp piece_head(head, _index, 1), do: head
     defp piece_head(head, 0, _count), do: head_at(head, :first)
     defp piece_head(head, index, count) when index == count - 1, do: head_at(head, :last)
     defp piece_head(_head, _index, _count), do: :none
 
-    # `head` at `finish` alone, where it has one there.
+    # `head` at `finish` alone, where it has one there; `:none` otherwise, and for no head.
     defp head_at(%{ends: ends} = head, finish) when ends in [finish, :both],
       do: %{head | ends: finish}
 

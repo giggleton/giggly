@@ -2113,6 +2113,20 @@ defmodule Giggly.PlotTest do
         assert error.key == :arrow
       end
 
+      not_options =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_segment(plot, arrow: :closed)
+        end
+
+      no_unit =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_segment(plot, arrow: [length: {1, :npc}])
+        end
+
+      assert not_options.message =~ ":closed"
+      assert no_unit.message =~ "{1, :npc}"
+      assert no_unit.message =~ "[:pt, :cm, :mm, :in]"
+
       error =
         assert_raise ArgumentError, fn ->
           Plot.geom_path(plot, arrow: [angle: 10, angle: 20])
