@@ -1461,6 +1461,29 @@ defmodule Giggly.ScaleTest do
                {[2.5, 5.0, 7.5], {0.0, 10.0}, ["#1B3A57", "#2A5A82", "#4D9FDE"]}
     end
 
+    test "its defaults are scale_colour_binned()'s, and training on no values keeps them" do
+      untrained = Scale.train(%Scale.Binned{}, [], :none)
+
+      assert Map.from_struct(untrained) === %{
+               range: :none,
+               palette: {:gradient, ["#132B43", "#56B1F7"]},
+               rescaler: :rescale,
+               na_value: "#7F7F7F",
+               guide: :legend,
+               name: :default,
+               limits: {nil, nil},
+               breaks: :default,
+               labels: :default,
+               right: true
+             }
+    end
+
+    test "edges far closer than 1 apart are bins of their own" do
+      scale = binned([0.0, 4.0e-17])
+
+      assert Scale.map(scale, [0.0, 1.0e-17, 4.0e-17]) === ["#1B3A57", "#1B3A57", "#4D9FDE"]
+    end
+
     test "a range of one value widens 0.05 either side, its ends its breaks" do
       scale = binned([5, 5])
 
@@ -1590,6 +1613,7 @@ defmodule Giggly.ScaleTest do
 
       error = assert_raise ArgumentError, fn -> Scale.legend_breaks(short) end
       assert error.message =~ "3 labels must be one for each of its 5 breaks"
+      assert error.message =~ ~s(got: ["a", "b", "c"])
     end
 
     test "it is its own kind, not discrete, and takes numbers alone" do
