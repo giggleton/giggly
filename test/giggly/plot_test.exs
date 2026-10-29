@@ -2011,6 +2011,16 @@ defmodule Giggly.PlotTest do
              ] = plot.reversed_layers
     end
 
+    test "a mapping a segment cannot use, or a column the data lacks, is refused naming " <>
+           "geom_segment/3" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for mapping <- [%{xend: :wt, fill: :cyl}, %{xend: :nope}] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_segment(plot, mapping) end
+        assert String.starts_with?(error.message, "Plot.geom_segment/3 ")
+      end
+    end
+
     # ggplot2 4.0.3's `GeomSegment` requires `c("x", "y", "xend|yend")` and its `draw_panel()`
     # takes no `linemitre`.
     test "a segment needs one of xend and yend, and takes no mitre limit or fill" do

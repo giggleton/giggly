@@ -1565,7 +1565,9 @@ defmodule Giggly.GeomTest do
       assert [%Polylines{lines: [line]} = polylines] = draw_panel(geom, frame, coord, params)
       assert [List.first(line), List.last(line)] === ends
       assert [_start, _step, _more | _rest] = line
-      assert {polylines.line_end, polylines.line_join} === {:square, :round}
+
+      assert {polylines.line_end, polylines.line_join, polylines.mitre_limit} ===
+               {:square, :round, 10.0}
     end
   end
 

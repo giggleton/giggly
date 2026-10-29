@@ -175,7 +175,7 @@ defmodule Giggly.Geom.Segment do
 
     # Each row as a path of two rows, its start and then its end, in a group of its own numbered
     # by its place, as `GeomSegment` stacks its starts and ends and orders them by group; every
-    # other column is the row's.
+    # other column is the row's but `xend` and `yend`, which radial coordinates cannot place.
     defp pieces(frame) do
       count = DataFrame.row_count(frame)
       doubled = Enum.flat_map(0..(count - 1)//1, fn index -> [index, index] end)
@@ -183,14 +183,14 @@ defmodule Giggly.Geom.Segment do
       others =
         frame
         |> DataFrame.names()
-        |> Enum.reject(fn name -> name in [:x, :y, :xend, :yend, :group] end)
+        |> Enum.reject(fn name -> name in [:xend, :yend] end)
 
       frame
       |> DataFrame.slice(doubled)
       |> DataFrame.select(Enum.map(others, fn name -> {name, name} end))
       |> DataFrame.put(:x, interleaved(frame, :x, :xend))
       |> DataFrame.put(:y, interleaved(frame, :y, :yend))
-      |> DataFrame.put(:group, Enum.map(doubled, fn index -> index + 1 end))
+      |> DataFrame.put(:group, doubled)
     end
 
     # Each row's `start` and then its `finish`.
