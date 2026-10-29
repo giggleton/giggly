@@ -33,6 +33,8 @@ defmodule Scales do
       mapped through it.
     * Elixir's words stand where R's differ: `:time` is a time of day (R's `hms`), `{:datetime,
       ...}` a date-time (R's `POSIXct`), and grey is `gray`.
+    * A step on a calendar or a clock is written as `Date.shift/2` takes one, `[month: 1]`, where
+      R writes `"1 month"`.
 
   ## An example
 

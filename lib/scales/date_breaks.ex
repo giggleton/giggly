@@ -4,8 +4,9 @@ defmodule Scales.DateBreaks do
   # A date or date-time axis's breaks: R's `pretty()` for dates and date-times (grDevices'
   # `prettyDate()`), which ggplot2's date and date-time scales take through
   # `scales::breaks_pretty()`, about five breaks on calendar or clock boundaries and the format
-  # their labels are written in, used through `Scales.Transform`; and a break every step of
-  # a width a plot gives (`width/2`, `datetime_width/3`), as R's `breaks_width()` lays them.
+  # their labels are written in, used through `Scales.Transform`; a break every step of a width a
+  # plot gives (`width/2`, `datetime_width/3`), as R's `breaks_width()` lays them; and a break moved
+  # by an offset (`offset/3`), as R's `offset_by()` moves it, for `Scales.Breaks.width/3`.
   #
   # A date extent is in days since 1970-01-01, as R stores a date, and is worked in seconds, as R
   # turns a date into a time at midnight GMT; a date-time extent is in seconds since 1970-01-01
@@ -122,6 +123,9 @@ defmodule Scales.DateBreaks do
     year: 365 * @day
   }
   @truncations %{hour: :hours, day: :days, week: :weeks, month: :months, year: :years}
+
+  # The seconds an offset of each unit of elapsed time moves a time.
+  @unit_seconds %{second: 1, minute: @minute, hour: @hour, day: @day, week: 7 * @day}
 
   @typedoc """
   The clock breaks are laid on: `:utc`, UTC's wall clock, which a date's and a naive date-time's
@@ -251,6 +255,54 @@ defmodule Scales.DateBreaks do
 
   defp time_rounded_down(time, unit, _size, clock),
     do: truncated_instant(time, Map.fetch!(@truncations, unit), clock)
+
+  # The date-time `time` moved by each step of `offset` in turn (`[hour: 1, month: 1]`), as R's
+  # `offset_by()` moves a `POSIXct` by each of a vector of offsets, a step `seq()`'s second value
+  # from it: seconds, minutes, hours, days and weeks by elapsed time; months and years on its
+  # wall-clock time, a day past the month's end carried into the next, as R normalises one (31
+  # January and a month is 3 March), and read again on the clock (`instant/2`), a time a change
+  # skips at the offset before it and one it repeats as the earlier. A `NaiveDateTime` is on UTC's
+  # clock, a `DateTime` on its zone's.
+  @doc false
+  @spec offset(NaiveDateTime.t() | DateTime.t(), keyword(integer()), clock()) ::
+          NaiveDateTime.t() | DateTime.t()
+  def offset(time, offset, clock) do
+    Enum.reduce(offset, time, fn {unit, count}, moved -> offset_by(moved, unit, count, clock) end)
+  end
+
+  defp offset_by(%NaiveDateTime{} = time, unit, count, _clock) when unit in [:month, :year],
+    do: months_on(time, months(unit, count))
+
+  defp offset_by(%DateTime{} = time, unit, count, clock) when unit in [:month, :year] do
+    time
+    |> DateTime.to_naive()
+    |> months_on(months(unit, count))
+    |> instant(clock)
+    |> on_clock(clock)
+  end
+
+  defp offset_by(%NaiveDateTime{} = time, unit, count, _clock),
+    do: NaiveDateTime.add(time, count * Map.fetch!(@unit_seconds, unit), :second)
+
+  defp offset_by(%DateTime{} = time, unit, count, {_zone, database}),
+    do: DateTime.add(time, count * Map.fetch!(@unit_seconds, unit), :second, database)
+
+  defp months(:month, count), do: count
+  defp months(:year, count), do: 12 * count
+
+  # The wall-clock time `months` months on, its day counted on from the new month's 1st.
+  defp months_on(wall, months) do
+    index = wall.year * 12 + wall.month - 1 + months
+
+    first = %{
+      wall
+      | year: Integer.floor_div(index, 12),
+        month: Integer.mod(index, 12) + 1,
+        day: 1
+    }
+
+    NaiveDateTime.add(first, (wall.day - 1) * @day, :second)
+  end
 
   # A width's start: its instant and the wall-clock time it reads on the clock, which a calendar
   # step advances, as R's `seq()` advances a `POSIXct` start.

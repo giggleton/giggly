@@ -232,6 +232,16 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   and reciprocal pass it on; log10, date, date-time and time refuse it, their own counts waiting
   for the breaks increment; it is a whole number from 2, as R's search finds nothing for one and
   never ends for none.
+- **A width's breaks are exactly R's `fullseq()` and `breaks_width()`, on numbers, dates,
+  date-times and times** (`Breaks.fullseq/3`, `Breaks.width/3`; design-log §4, the entry
+  beginning "Breaks a width apart"): numbers from the low limit rounded down to a multiple of the
+  size to the high one rounded up, stepped as R's `seq()` steps, the limits in either order, one
+  number half a size either side and never padded; dates, date-times and times their
+  transformation's width (above), a step of one unit. An offset is a number, or steps moving each
+  break in turn, a month past its end carried into the next as R normalises one, a date-time's
+  month read again on its zone's clock as a width's start is, the breaks left unsorted as R leaves
+  them; a time of day wraps past midnight. Its tests pin R's figures; all of 3,000 numeric, 2,000
+  date and 935 New York cases matched R.
 - **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted unless
   `n:` says, its three
   degenerate cases and the scores R takes to minus infinity included (`Scales.Breaks`), but on

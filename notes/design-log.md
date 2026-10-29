@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Breaks a width apart take numbers, dates, date-times and times, a step as `Date.shift/2`
+  writes one (2026-10-29, Steve, increment 2's step 1; checked against scales 1.4.0).**
+  `Breaks.fullseq/3` and `Breaks.width/3` are R's `fullseq()` and `breaks_width()`, chosen by the
+  limits' type as R's generics are by class (Steve: "A"), so a breaks function on a date scale,
+  handed `Date`s as R hands them, can call them, and another charting tool has date breaks too. A
+  step is `[month: 1]` where R takes `"1 month"`, one unit for a width; an offset is a number, or
+  a list of steps moving each break in turn, as R moves it by each of a vector; a month past its
+  end is carried into the next, as R normalises one, so the breaks keep R's order, unsorted.
+  `pad:` beside dates is refused, where R ignores it; a time of day wraps past midnight, where
+  R's `hms` runs on. *Rejected: numbers alone*: dates' breaks stay behind `date_breaks:`, out of
+  reach of a breaks function and of other tools. *Rejected: R's `"1 month"`*: the entry
+  beginning "`date_breaks:` and `date_minor_breaks:` are a step".
+
 - **An example handing a scale a palette function is drawn with the palette's name (2026-10-29,
   Steve: "A", increment 1's notebook sweep).** scale_colour_discrete's
   `palette = scales::pal_brewer(palette = "Dark2")` is `palette: "Dark2"`: `palette:` takes a name
@@ -3080,6 +3093,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add Breaks.fullseq and Breaks.width, R's fullseq() and breaks_width() on numbers,
+  dates, date-times and times, with offsets (breaks, step 1); §4: "Breaks a width apart"
 - 2026-10-29 — Draw the notebook examples increment 1 unlocks, the brewer and steps scales and a
   named palette, and narrow every verdict to what still waits (palettes and colours, step 10, the
   notebook sweep); §4: "An example handing a scale a palette function"

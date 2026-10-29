@@ -1,7 +1,9 @@
 defmodule Scales.Breaks do
   @moduledoc """
   Where a continuous axis's breaks go, given its limits: evenly spaced numbers, nice to read, that
-  cover them (`extended/2`). The breaks may fall outside the limits; which to keep is the caller's.
+  cover them (`extended/2`), or every multiple of a width (`fullseq/3`), moved by an offset
+  (`width/3`), between numbers, dates, date-times or times of day. The breaks may fall outside the
+  limits; which to keep is the caller's.
   """
 
   # The extended Wilkinson algorithm of Talbot, Lin and Hanrahan (2010), as R's
@@ -33,6 +35,8 @@ defmodule Scales.Breaks do
   # remainder of a break through zero is that rounding, which denies it the bonus for zero that
   # the remainder in doubles, exactly 0, grants; so on ranges over about 3e23 wide reaching zero,
   # about one in six, Giggly's breaks may pass through zero where R's do not.
+
+  alias Scales.{Bounds, DateBreaks, Transform}
 
   # The number of breaks wanted unless a caller says: `scales::breaks_extended()`'s `n`.
   @wanted 5
@@ -75,6 +79,51 @@ defmodule Scales.Breaks do
                             "of preference, `labeling::extended()`'s `Q`."
                       ]
                     )
+
+  @time_zone_database_spec [
+    type: :atom,
+    default: Calendar.UTCOnlyTimeZoneDatabase,
+    doc:
+      "The time zone database that reads a `DateTime`'s zone, such as `Tz.TimeZoneDatabase`; " <>
+        "Elixir's own, which knows UTC alone, when not given."
+  ]
+
+  @fullseq_options NimbleOptions.new!(
+                     pad: [
+                       type: :boolean,
+                       default: false,
+                       doc:
+                         "Whether a sequence of numbers gains a step before it and one after, " <>
+                           "R's `pad`; refused for dates, date-times and times."
+                     ],
+                     time_zone_database: @time_zone_database_spec
+                   )
+
+  @width_options NimbleOptions.new!(
+                   offset: [
+                     type: {:or, [:integer, :float, :keyword_list]},
+                     doc:
+                       "How far each break is moved: a number for numbers, 0 when not given; " <>
+                         "a list of steps for dates, date-times and times, each a unit and a " <>
+                         "whole count, negative to move back (`[month: 1, day: 8]`)."
+                   ],
+                   time_zone_database: @time_zone_database_spec
+                 )
+
+  # The units a date's step may take, and the clock's a time of day's, which a date-time's take
+  # too, with the seconds each of the clock's holds.
+  @date_units [:day, :week, :month, :year]
+  @clock_units [:second, :minute, :hour]
+  @clock_seconds %{second: 1, minute: 60, hour: 3600}
+
+  @typedoc "A value broken: a number, or a date, date-time or time of day."
+  @type value :: number() | Date.t() | NaiveDateTime.t() | DateTime.t() | Time.t()
+
+  @typedoc """
+  A step on a calendar or a clock, as `Date.shift/2` writes one: units and their counts
+  (`[month: 1]`).
+  """
+  @type step :: keyword(integer())
 
   @doc """
   The breaks of the extended Wilkinson sequence that scores best over the limits `{low, high}`,
@@ -138,6 +187,205 @@ defmodule Scales.Breaks do
 
   defp nice_numbers_error(numbers),
     do: {:error, "expected a list of positive numbers, at least one, got: #{inspect(numbers)}"}
+
+  @doc """
+  Every multiple of `size` from the low limit rounded down to one to the high limit rounded up,
+  R's `fullseq()`, the limits in either order.
+
+  On numbers `size` is a positive number; limits that are one number, as R's `zero_range()` judges
+  them, give that number half a `size` either side. On dates, date-times and times it is a step of
+  one unit, as `Date.shift/2` writes one (`[month: 1]`), where R takes `"1 month"`, and the
+  sequence is `Date`s, date-times or `Time`s laid as R lays them: from the low limit rounded down
+  to the step's unit (a week to its Monday, a month to its 1st, seconds and minutes to the nearest
+  multiple of the step since 1970-01-01 00:00 UTC, or since midnight for a time) to the high one
+  rounded up, a date's units a day, a week, a month or a year, a time's a second, a minute or an
+  hour, a date-time's any of the seven. A `DateTime` is broken on its zone's clock, read by
+  `time_zone_database:`; months and years step on the calendar, the rest by elapsed time, as R's
+  `seq()` steps them.
+
+  ## Options
+
+  #{NimbleOptions.docs(@fullseq_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.fullseq({1.6, 7.0}, 2)
+      [0.0, 2.0, 4.0, 6.0, 8.0]
+
+      iex> Scales.Breaks.fullseq({1.6, 7.0}, 2, pad: true)
+      [-2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+
+      iex> Scales.Breaks.fullseq({~D[2026-01-10], ~D[2026-04-20]}, month: 1)
+      [~D[2026-01-01], ~D[2026-02-01], ~D[2026-03-01], ~D[2026-04-01], ~D[2026-05-01]]
+  """
+  @spec fullseq({value(), value()}, number() | step(), keyword()) :: [value()]
+  def fullseq(limits, size, options \\ []) do
+    validated = NimbleOptions.validate!(options, @fullseq_options)
+    sequenced(limits, size, validated)
+  end
+
+  @doc """
+  Breaks `width` apart, R's `breaks_width()`: `fullseq/3`'s sequence over the limits, each moved
+  by `offset:`.
+
+  On numbers the offset is a number added to each. On dates, date-times and times it is a list of
+  steps (`[month: 1, day: 8]`), each moving every break in turn, as R moves them by each of a
+  vector of offsets: seconds, minutes, hours, days and weeks by elapsed time, months and years on
+  the calendar, a day past the end of a month carried into the next, as R carries it, so 31
+  January and a month is 3 March. The breaks stay in the order the offset leaves them, unsorted
+  where it moves two onto one day, as R's are. A time of day wraps past midnight, where R's `hms`
+  runs on past 24 hours.
+
+  ## Options
+
+  #{NimbleOptions.docs(@width_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.width({1.6, 7.0}, 1, offset: 0.5)
+      [1.5, 2.5, 3.5, 4.5, 5.5, 6.5, 7.5]
+
+      iex> Scales.Breaks.width({~D[2026-01-10], ~D[2026-04-20]}, [month: 1], offset: [day: 8])
+      [~D[2026-01-09], ~D[2026-02-09], ~D[2026-03-09], ~D[2026-04-09], ~D[2026-05-09]]
+  """
+  @spec width({value(), value()}, number() | step(), keyword()) :: [value()]
+  def width(limits, width, options \\ []) do
+    validated = NimbleOptions.validate!(options, @width_options)
+
+    limits
+    |> sequenced(width, validated)
+    |> offset(limits, validated)
+  end
+
+  defp sequenced({low, high}, size, options)
+       when is_number(low) and is_number(high) and is_number(size) and size > 0 do
+    [low, high] = Enum.sort([low / 1, high / 1])
+
+    if Bounds.zero_range?({low, high}) do
+      [low - size / 2, high + size / 2]
+    else
+      sequence =
+        sequence(:math.floor(low / size) * size, :math.ceil(high / size) * size, size / 1)
+
+      if Keyword.get(options, :pad, false), do: padded(sequence, size), else: sequence
+    end
+  end
+
+  defp sequenced({_low, _high} = limits, step, options) do
+    name = transformation(limits, options)
+    check_step!(step, name)
+
+    if Keyword.get(options, :pad, false) do
+      raise ArgumentError,
+            "pad: widens a sequence of numbers alone, as R's `fullseq()` reads it; " <>
+              "got limits #{inspect(limits)}"
+    end
+
+    values = Tuple.to_list(limits)
+
+    positions =
+      name
+      |> Transform.transform(values)
+      |> Enum.sort()
+
+    stepped = Transform.width(name, step, List.to_tuple(positions))
+    Transform.inverse(name, stepped)
+  end
+
+  # R's `fullseq(pad = TRUE)`: a step more before the sequence and after it.
+  defp padded(sequence, size) do
+    Enum.concat([[hd(sequence) - size], sequence, [List.last(sequence) + size]])
+  end
+
+  # The transformation that places the limits: dates, naive date-times on UTC's clock, date-times
+  # in the zone they share, read by `time_zone_database:`, or times of day.
+  defp transformation({%Date{}, %Date{}}, _options), do: :date
+  defp transformation({%Time{}, %Time{}}, _options), do: :time
+
+  defp transformation({%NaiveDateTime{}, %NaiveDateTime{}}, options),
+    do: {:datetime, :naive, Keyword.fetch!(options, :time_zone_database)}
+
+  defp transformation({%DateTime{time_zone: zone}, %DateTime{time_zone: zone}}, options) do
+    database = Keyword.fetch!(options, :time_zone_database)
+
+    if zone != "Etc/UTC" and database == Calendar.UTCOnlyTimeZoneDatabase do
+      raise ArgumentError,
+            "date-times in #{inspect(zone)} need a time zone database that knows it; give " <>
+              "one as time_zone_database:"
+    end
+
+    {:datetime, zone, database}
+  end
+
+  defp check_step!([{unit, count}], name) when is_integer(count) and count > 0 do
+    unless unit in units(name), do: raise(ArgumentError, step_message([{unit, count}], name))
+  end
+
+  defp check_step!(step, name), do: raise(ArgumentError, step_message(step, name))
+
+  defp step_message(step, name) do
+    "expected a step of one unit and a positive whole count, the unit one of " <>
+      "#{inspect(units(name))} for #{kind(name)}, got: #{inspect(step)}"
+  end
+
+  defp units(:date), do: @date_units
+  defp units(:time), do: @clock_units
+  defp units({:datetime, _zone, _database}), do: Enum.concat(@clock_units, @date_units)
+
+  defp kind(:date), do: "dates"
+  defp kind(:time), do: "times"
+  defp kind({:datetime, _zone, _database}), do: "date-times"
+
+  # Each break moved by the offset: a number added, or each of a list of steps in turn.
+  defp offset(breaks, {low, _high}, options) when is_number(low) do
+    case Keyword.get(options, :offset, 0) do
+      offset when is_number(offset) ->
+        Enum.map(breaks, fn break -> break + offset end)
+
+      offset ->
+        raise ArgumentError,
+              "expected a number as the offset of breaks between numbers, got: #{inspect(offset)}"
+    end
+  end
+
+  defp offset(breaks, limits, options) do
+    name = transformation(limits, options)
+    offset = Keyword.get(options, :offset, [])
+    check_offset!(offset, name)
+    Enum.map(breaks, fn break -> moved(break, offset, name) end)
+  end
+
+  defp check_offset!(offset, name) do
+    valid =
+      Keyword.keyword?(offset) and
+        Enum.all?(offset, fn {unit, count} -> unit in units(name) and is_integer(count) end)
+
+    unless valid do
+      raise ArgumentError,
+            "expected the offset of breaks between #{kind(name)} as a list of steps, each a " <>
+              "unit of #{inspect(units(name))} and a whole count, got: #{inspect(offset)}"
+    end
+  end
+
+  defp moved(%Date{} = date, offset, :date) do
+    date
+    |> NaiveDateTime.new!(~T[00:00:00])
+    |> DateBreaks.offset(offset, :utc)
+    |> NaiveDateTime.to_date()
+  end
+
+  defp moved(%Time{} = time, offset, :time) do
+    seconds =
+      Enum.sum_by(offset, fn {unit, count} -> count * Map.fetch!(@clock_seconds, unit) end)
+
+    Time.add(time, seconds, :second)
+  end
+
+  defp moved(datetime, offset, {:datetime, :naive, _database}),
+    do: DateBreaks.offset(datetime, offset, :utc)
+
+  defp moved(datetime, offset, {:datetime, zone, database}),
+    do: DateBreaks.offset(datetime, offset, {zone, database})
 
   # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the
   # opening comment describes.

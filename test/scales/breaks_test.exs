@@ -227,4 +227,239 @@ defmodule Scales.BreaksTest do
       assert error.message =~ "got: #{inspect(numbers)}"
     end
   end
+
+  # Golden: R 4.6.1's scales 1.4.0 `fullseq()` and `breaks_width()`, each value printed to 17
+  # significant digits (the giggly-r:ggplot2-4.0.3 image; this session's scratchpad
+  # `step1/width.R`). All of 3,000 random numeric ranges, sizes, pads and offsets, 2,000 random
+  # date widths with up to three offsets each, and 935 New York date-time widths across its
+  # changes of offset matched R (`step1/sweep.R`, `step1/compare.exs`). The figures of this test
+  # and the width tests below are R's but where a test says it departs (a time of day wrapping);
+  # they move only if the package stops matching R, which is a bug.
+  test "a sequence of numbers steps from the low limit rounded down, each step R's seq() takes" do
+    assert Breaks.fullseq({0.1, 0.7}, 0.1) === [
+             0.1,
+             0.2,
+             0.30000000000000004,
+             0.4,
+             0.5,
+             0.6,
+             0.7000000000000001
+           ]
+
+    assert Breaks.fullseq({0.3, 0.9}, 0.3) === [0.3, 0.6, 0.8999999999999999]
+  end
+
+  test "limits high to low give the sequence of limits low to high" do
+    assert Breaks.fullseq({7, 1.6}, 2) === [0.0, 2.0, 4.0, 6.0, 8.0]
+    assert Breaks.fullseq({4.1, -3.2}, 2) === [-4.0, -2.0, 0.0, 2.0, 4.0, 6.0]
+  end
+
+  test "padding adds a step before the sequence and one after it" do
+    assert Breaks.fullseq({1.6, 7.0}, 2, pad: true) === [-2.0, 0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+  end
+
+  # R returns before padding, so a zero-wide range is never padded.
+  test "limits that are one number give it half a size either side, padded or not" do
+    assert Breaks.fullseq({5, 5}, 2) === [4.0, 6.0]
+    assert Breaks.fullseq({5, 5}, 2, pad: true) === [4.0, 6.0]
+  end
+
+  test "an offset moves every break of a width, back for a negative one" do
+    forward = Breaks.width({326, 18_823}, 800, offset: 200)
+    back = Breaks.width({326, 18_823}, 800, offset: -200)
+    unmoved = Breaks.width({326, 18_823}, 800)
+
+    assert Enum.take(forward, 3) === [200.0, 1000.0, 1800.0]
+    assert Enum.take(back, 3) === [-200.0, 600.0, 1400.0]
+    assert List.last(unmoved) === 19_200.0
+  end
+
+  test "a size that is not a positive number is refused" do
+    for size <- [0, -2, :two] do
+      assert_raise FunctionClauseError, fn -> Breaks.fullseq({1.0, 7.0}, size) end
+    end
+  end
+
+  test "a width's offset between numbers is a number, and a step is refused" do
+    error = assert_raise ArgumentError, fn -> Breaks.width({1.0, 7.0}, 1, offset: [day: 1]) end
+    assert error.message =~ "expected a number as the offset of breaks between numbers"
+  end
+
+  test "a month offset carries a day past the month's end into the next, unsorted as R leaves it" do
+    assert Breaks.width({~D[2026-01-29], ~D[2026-02-02]}, [day: 1], offset: [month: 1]) == [
+             ~D[2026-03-01],
+             ~D[2026-03-02],
+             ~D[2026-03-03],
+             ~D[2026-03-01],
+             ~D[2026-03-02],
+             ~D[2026-03-03]
+           ]
+
+    assert Breaks.width({~D[2026-03-28], ~D[2026-04-02]}, [week: 1], offset: [month: -1]) ==
+             [~D[2026-02-23], ~D[2026-03-02], ~D[2026-03-06]]
+  end
+
+  test "a year offset carries 29 February into 1 March" do
+    assert Breaks.width({~D[2028-02-28], ~D[2028-03-01]}, [day: 1], offset: [year: 1]) ==
+             [~D[2029-02-28], ~D[2029-03-01], ~D[2029-03-01], ~D[2029-03-02]]
+  end
+
+  test "each step of an offset moves the breaks in turn, in the order given" do
+    assert Breaks.width({~D[2026-01-05], ~D[2026-02-20]}, [week: 2], offset: [month: 1, day: 1]) ==
+             [~D[2026-02-06], ~D[2026-02-20], ~D[2026-03-03], ~D[2026-03-17], ~D[2026-04-03]]
+  end
+
+  test "dates the same day give the step's unit either side of it" do
+    assert Breaks.fullseq({~D[2026-03-04], ~D[2026-03-04]}, month: 1) ==
+             [~D[2026-03-01], ~D[2026-04-01]]
+  end
+
+  test "naive date-times step on UTC's clock, an hour by elapsed time and a month on the calendar" do
+    assert Breaks.width(
+             {~N[2026-01-31 10:07:00], ~N[2026-01-31 11:02:00]},
+             [minute: 15],
+             offset: [hour: 1, month: 1]
+           ) == [
+             ~N[2026-03-03 11:00:00],
+             ~N[2026-03-03 11:15:00],
+             ~N[2026-03-03 11:30:00],
+             ~N[2026-03-03 11:45:00],
+             ~N[2026-03-03 12:00:00],
+             ~N[2026-03-03 12:15:00]
+           ]
+  end
+
+  defp new_york(naive) do
+    DateTime.from_naive!(naive, "America/New_York", Tz.TimeZoneDatabase)
+  end
+
+  defp walls(datetimes) do
+    Enum.map(datetimes, fn datetime -> {DateTime.to_naive(datetime), datetime.zone_abbr} end)
+  end
+
+  test "a date-time in a zone steps on its clock, six hours across a change by elapsed time" do
+    breaks =
+      Breaks.width(
+        {new_york(~N[2026-03-07 20:10:00]), new_york(~N[2026-03-09 05:00:00])},
+        [hour: 6],
+        offset: [minute: 30],
+        time_zone_database: Tz.TimeZoneDatabase
+      )
+
+    assert walls(breaks) == [
+             {~N[2026-03-07 20:30:00], "EST"},
+             {~N[2026-03-08 03:30:00], "EDT"},
+             {~N[2026-03-08 09:30:00], "EDT"},
+             {~N[2026-03-08 15:30:00], "EDT"},
+             {~N[2026-03-08 21:30:00], "EDT"},
+             {~N[2026-03-09 03:30:00], "EDT"},
+             {~N[2026-03-09 09:30:00], "EDT"}
+           ]
+  end
+
+  test "a month offset onto a skipped time reads it at the offset before the change" do
+    breaks =
+      Breaks.width(
+        {new_york(~N[2026-02-08 02:10:00]), new_york(~N[2026-02-08 02:50:00])},
+        [minute: 30],
+        offset: [month: 1],
+        time_zone_database: Tz.TimeZoneDatabase
+      )
+
+    assert walls(breaks) == [
+             {~N[2026-03-08 03:00:00], "EDT"},
+             {~N[2026-03-08 03:30:00], "EDT"},
+             {~N[2026-03-08 03:00:00], "EDT"},
+             {~N[2026-03-08 03:30:00], "EDT"}
+           ]
+  end
+
+  test "a month offset onto a repeated time takes the earlier" do
+    breaks =
+      Breaks.width(
+        {new_york(~N[2026-10-01 01:10:00]), new_york(~N[2026-10-01 01:50:00])},
+        [minute: 30],
+        offset: [month: 1],
+        time_zone_database: Tz.TimeZoneDatabase
+      )
+
+    assert walls(breaks) == [
+             {~N[2026-11-01 01:00:00], "EDT"},
+             {~N[2026-11-01 01:30:00], "EDT"},
+             {~N[2026-11-01 02:00:00], "EST"},
+             {~N[2026-11-01 02:30:00], "EST"}
+           ]
+  end
+
+  # R rounds the high limit up by adding a step and rounding to the nearest, so 10:40 reaches 11:00.
+  test "date-times in UTC need no database and stay date-times" do
+    assert Breaks.fullseq({~U[2026-01-31 10:07:00Z], ~U[2026-01-31 10:40:00Z]}, minute: 15) == [
+             ~U[2026-01-31 10:00:00Z],
+             ~U[2026-01-31 10:15:00Z],
+             ~U[2026-01-31 10:30:00Z],
+             ~U[2026-01-31 10:45:00Z],
+             ~U[2026-01-31 11:00:00Z]
+           ]
+  end
+
+  test "date-times in another zone without a database that knows it are refused" do
+    error =
+      assert_raise ArgumentError, fn ->
+        Breaks.fullseq({new_york(~N[2026-01-31 10:00:00]), new_york(~N[2026-01-31 12:00:00])},
+          hour: 1
+        )
+      end
+
+    assert error.message =~ "need a time zone database that knows it"
+  end
+
+  # R's hms gives 4200 to 15000 seconds; a time of day wraps where R's runs on past 24 hours.
+  test "times of day step from the low limit rounded down, and wrap past midnight" do
+    assert Breaks.width({~T[01:12:00], ~T[03:42:00]}, [minute: 30], offset: [minute: 10]) == [
+             ~T[01:10:00],
+             ~T[01:40:00],
+             ~T[02:10:00],
+             ~T[02:40:00],
+             ~T[03:10:00],
+             ~T[03:40:00],
+             ~T[04:10:00]
+           ]
+
+    assert Breaks.fullseq({~T[23:10:00], ~T[23:50:00]}, minute: 30) ==
+             [~T[23:00:00], ~T[23:30:00], ~T[00:00:00]]
+  end
+
+  test "a step of more than one unit, or a unit its values cannot take, is refused" do
+    for {limits, step} <- [
+          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 1, day: 2]},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [hour: 6]},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 0]},
+          {{~T[01:00:00], ~T[02:00:00]}, [day: 1]}
+        ] do
+      error = assert_raise ArgumentError, fn -> Breaks.fullseq(limits, step) end
+      assert error.message =~ "expected a step of one unit and a positive whole count"
+      assert error.message =~ inspect(step)
+    end
+  end
+
+  test "an offset of dates, date-times or times is a list of steps they can take" do
+    for {limits, step, offset} <- [
+          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], 8},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], [hour: 1]},
+          {{~T[01:00:00], ~T[02:00:00]}, [minute: 30], [month: 1]},
+          {{~N[2026-01-01 00:00:00], ~N[2026-01-02 00:00:00]}, [day: 1], [day: 1.5]}
+        ] do
+      error = assert_raise ArgumentError, fn -> Breaks.width(limits, step, offset: offset) end
+      assert error.message =~ "as a list of steps"
+    end
+  end
+
+  test "padding is refused for dates, date-times and times" do
+    error =
+      assert_raise ArgumentError, fn ->
+        Breaks.fullseq({~D[2026-01-01], ~D[2026-02-01]}, [month: 1], pad: true)
+      end
+
+    assert error.message =~ "pad: widens a sequence of numbers alone"
+  end
 end
