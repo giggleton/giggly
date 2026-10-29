@@ -41,7 +41,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_x_datetime/2`, `scale_y_datetime/2`, `scale_x_time/2`, `scale_y_time/2`, the colour
   scales
   `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_brewer`, `_gradient`,
-  `_gradient2`, `_gradientn`, `_continuous`, `_viridis_c` and `_distiller`, each with its
+  `_gradient2`, `_gradientn`, `_continuous`, `_viridis_c` and `_distiller`, and the binned
+  `_binned`, `_steps`, `_steps2`, `_stepsn`, `_viridis_b` and `_fermenter`, each with its
   `scale_fill_` twin,
   `scale_alpha_continuous/2`,
   `scale_alpha_discrete/2`, the size scales `scale_size_continuous/2`, `scale_size_area/2`,
@@ -182,7 +183,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `direction:`; the brewer records `{:brewer, ...}`, its missing value `:none`, the distiller
   the gradient through the palette's seven colours, `:qual` taken. `values:` on gradientn and the
   distiller is numbers, two different, `nil` refused (`validate_gradient_values/1`), recorded
-  `{:gradient, colors, values}`. **`palette:` on the discrete and continuous colour scales is a
+  `{:gradient, colors, values}`. **A binned scale function records a `%Scale.Binned{}`**
+  (design-log §4, the entry beginning "A binned scale function takes R's options"): `n_breaks:`
+  (5), `nice_breaks:`, `right:` and `show_limits:` beside the continuous legend options, no
+  `expand:` or `transform:`; binned's `palette:` a name or a list as `{:binned, ...}`, else the
+  default gradient; steps, steps2 (`{:mid, midpoint}`) and stepsn the gradients theirs name;
+  viridis_b `{:binned, {:viridis, ...}}` with `alpha:`, no `values:`, which R never reads;
+  fermenter `{:binned, {:brewer, ...}}`, direction -1, as the distiller checks it; each grey50
+  and colour steps. `n_breaks: 1` with nice breaks and no breaks given, and `show_limits: true`
+  beside a list of labels, raise at the call, where R fails and where it warns and ignores.
+  **`palette:` on the discrete and continuous colour scales is a
   name, `Scales.Palette.named/1`'s palette, or a list** (`validate_discrete_palette/1`,
   `validate_continuous_palette/1`), a manual palette or a gradient. **A size scale function
   takes the options R's
@@ -202,7 +212,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_linewidth_discrete/2`, as R's `scale_linewidth_continuous()` refuses `na.value`, and no
   `transform:`. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
   `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
-  its default, or `:colorsteps`, the others' `:legend`; a colour bar or colour steps for a
+  its default, or `:colorsteps`, on a binned one `:colorsteps`, its default, its colour bar
+  refused, the others' `:legend`; a colour bar or colour steps for a
   discrete scale, or for any aesthetic but colour and fill, are refused at the call, where R warns
   and draws none or a broken guide (design-log §4, the entry beginning "A guide is chosen").
   A manual scale's list beside a list of `breaks:` is recorded with them, `{:manual, values,

@@ -21,7 +21,9 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   functions, checked against R; a plot Giggly could only imitate (`qplot()`, a computed column
   standing in for `cut_width(carat, 0.25)`) waits. An example that sets ggplot2's active theme
   (`set_theme()`, `update_theme()`) is drawn with the plot's own theme, which Giggly offers in its
-  place (design-log §4, the entry beginning "An example that sets ggplot2's active theme"). An
+  place (design-log §4, the entry beginning "An example that sets ggplot2's active theme"); one
+  handing a scale a palette function (`scales::pal_brewer(palette = "Dark2")`) is drawn with the
+  palette's name (the entry beginning "An example handing a scale a palette function"). An
   argument ggplot2 does not recognise, and so draws as its default (`hjust = 'outside'`, centred),
   is left out of Giggly's cell, and the prose says so (the entry beginning "A notebook leaves out an
   argument"); one ggplot2 reads and Giggly lacks waits, even where the example gives its default

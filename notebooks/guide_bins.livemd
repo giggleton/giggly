@@ -18,9 +18,9 @@ what remains.
 `guide_bins()` is the legend of a binned scale: a version of `guide_legend()` that puts its ticks
 between the keys, at the bins' edges, and draws a small axis to show the binning. It serves any
 aesthetic but position, though colour and fill default to `guide_coloursteps()`, and it merges
-aesthetics mapped the same way into one legend. Giggly has none of it yet: it has no binned scales,
-and draws a legend for each of alpha, colour and fill and a colour bar for a continuous colour or
-fill, none of them binned.
+aesthetics mapped the same way into one legend. Giggly has none of it yet: it bins colour and fill
+alone, with `Giggly.Plot.scale_color_binned/2` and its kin, read back by colour steps or a legend,
+and has no binned scales for other aesthetics (`scale_size_binned()`).
 
 ## The standard look
 
@@ -83,5 +83,5 @@ ggplot(mtcars) +
   scale_colour_binned(guide = "bins")
 ```
 
-Not in Giggly yet: `scale_size_binned()`, `scale_colour_binned()`, and `guide_bins()`, which merges
-the two into one legend.
+Not in Giggly yet: `scale_size_binned()`, and `guide_bins()`, which merges the two into one
+legend.

@@ -715,22 +715,19 @@ defmodule Giggly.AssemblyTest do
                  "color's scale is discrete; give it :legend"
     end
 
-    # A plot's binned scale, put in its scales as no scale function yet gives one.
-    defp binned_colour(scale) do
-      plot =
-        Giggly.Datasets.mtcars()
-        |> Plot.new(%{x: :wt, y: :mpg, colour: :hp})
-        |> Plot.geom_point()
-
-      %{plot | scales: Map.put(plot.scales, :color, scale)}
+    # mtcars' weight against miles per gallon coloured by horsepower, 52 to 335.
+    defp horsepower do
+      Giggly.Datasets.mtcars()
+      |> Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      |> Plot.geom_point()
     end
 
     # The places and bins are `Giggly.Scale.steps/2`'s, which its tests pin against R; here, that
     # the assembly hands them to colour steps from the trained scale, with no layers.
     test "a binned colour's guide is colour steps, its keys placed up the bar and its bins coloured" do
       assembled =
-        %Scale.Binned{palette: {:binned, {:brewer, %{palette: "Blues", direction: -1}}}}
-        |> binned_colour()
+        horsepower()
+        |> Plot.scale_color_fermenter()
         |> Assembly.run()
 
       [legend] = assembled.legends
@@ -762,6 +759,52 @@ defmodule Giggly.AssemblyTest do
                {[{%Guide.Colorsteps{}, ["150", "200", "250"]}], []}
     end
 
+    # Golden: R 4.6.1's `get_guide_data()` for `scale_colour_binned(show.limits = TRUE)` on 52 to
+    # 335 (this session's scratchpad `r/cases.R`): a key at each end of the bar labelled by the
+    # limits, left out where a break is already there, given breaks 0, 100 and 200 over limits 0
+    # to 400 keeping the break's; one value's breaks are its limits, so it adds none; a legend
+    # shows no limits.
+    test "colour steps of a scale showing its limits add a key at each end of the bar" do
+      keys = fn plot ->
+        [legend] = Assembly.run(plot).legends
+        Enum.map(legend.keys, fn key -> {key.label, key.place} end)
+      end
+
+      shown = Plot.scale_color_binned(horsepower(), show_limits: true)
+
+      on_limit =
+        Plot.scale_color_binned(horsepower(),
+          show_limits: true,
+          breaks: [0, 100, 200],
+          limits: {0, 400}
+        )
+
+      one =
+        %{"x" => [1], "y" => [1], "z" => [5]}
+        |> Plot.new(%{x: :x, y: :y, colour: :z})
+        |> Plot.geom_point()
+        |> Plot.scale_color_binned(show_limits: true)
+
+      legend = Plot.scale_color_binned(horsepower(), show_limits: true, guide: :legend)
+
+      assert {keys.(shown), keys.(on_limit), keys.(one)} ===
+               {[
+                  {"50", 0.0},
+                  {"100", 1 / 6},
+                  {"150", 1 / 3},
+                  {"200", 0.5},
+                  {"250", 2 / 3},
+                  {"300", 0.8333333333333334},
+                  {"350", 1.0}
+                ], [{"0", 0.0}, {"100", 1 / 3}, {"200", 2 / 3}, {"400", 1.0}],
+                [{"4.95", 0.0}, {"5.05", 1.0}]}
+
+      [legend_legend] = Assembly.run(legend).legends
+
+      assert Enum.map(legend_legend.keys, fn key -> key.label end) ==
+               ["100", "150", "200", "250", "300"]
+    end
+
     test "colour steps guides/2 gives a discrete scale, or a colour bar a binned one, are refused" do
       steps =
         %{x: :x, y: :y, colour: :g}
@@ -769,8 +812,8 @@ defmodule Giggly.AssemblyTest do
         |> Plot.guides(color: :colorsteps)
 
       bar =
-        %Scale.Binned{}
-        |> binned_colour()
+        horsepower()
+        |> Plot.scale_color_binned()
         |> Plot.guides(color: :colorbar)
 
       steps_error = assert_raise ArgumentError, fn -> Assembly.run(steps) end

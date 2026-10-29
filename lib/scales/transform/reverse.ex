@@ -23,11 +23,11 @@ defmodule Scales.Transform.Reverse do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}) do
+  def breaks(_transformation, {low, high}, options) do
     [low, high]
     |> Enum.map(&negated/1)
     |> Enum.min_max()
-    |> Breaks.extended()
+    |> Breaks.extended(options)
     |> Enum.map(&negated/1)
   end
 

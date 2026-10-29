@@ -30,7 +30,7 @@ defmodule Scales.Transform.Date do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, extent) do
+  def breaks(_transformation, extent, []) do
     {dates, _format} = DateBreaks.pretty(extent)
     Enum.map(dates, &days/1)
   end

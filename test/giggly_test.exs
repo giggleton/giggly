@@ -8920,17 +8920,16 @@ defmodule GigglyTest do
 
     # Golden: test/golden/colorsteps.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/colorsteps.R: every element and clip path matches vdiffr's, which draws the
-    # bins' rectangles. The binned scale is put in the plot's scales, as no scale function yet
-    # gives one. It moves with what moves test/golden/point.svg and how colour steps are laid out.
+    # bins' rectangles. It moves with what moves test/golden/point.svg and how colour steps are
+    # laid out.
     test "a binned colour's colour steps are a bin's rectangle each up the bar, its breaks at their edges" do
       plot =
         Giggly.Datasets.mtcars()
         |> Plot.new(%{x: :wt, y: :mpg, colour: :hp})
         |> Plot.geom_point()
+        |> Plot.scale_color_binned()
 
-      binned = %{plot | scales: Map.put(plot.scales, :color, %Giggly.Scale.Binned{})}
-
-      assert golden?(binned, "colorsteps")
+      assert golden?(plot, "colorsteps")
     end
 
     # Golden: test/golden/colorsteps_top.svg, checked against ggplot2's drawing of the same plot,

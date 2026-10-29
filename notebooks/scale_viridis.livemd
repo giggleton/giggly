@@ -34,10 +34,11 @@ blindness. `scale_colour_viridis_d()` maps a discrete column, `scale_colour_viri
 continuous one, and `scale_colour_viridis_b()` a continuous one cut into bins; `option` picks the
 palette, viridis by default, and the `fill` versions do the same for fill. Giggly has
 `Giggly.Plot.scale_color_viridis_d/2`, `Giggly.Plot.scale_fill_viridis_d/2`,
-`Giggly.Plot.scale_color_viridis_c/2` and `Giggly.Plot.scale_fill_viridis_c/2`, with ggplot2's
+`Giggly.Plot.scale_color_viridis_c/2`, `Giggly.Plot.scale_fill_viridis_c/2`,
+`Giggly.Plot.scale_color_viridis_b/2` and `Giggly.Plot.scale_fill_viridis_b/2`, with ggplot2's
 options, `option:` naming a palette by an atom (`:plasma`), `begin:`, `end:` and `direction:`, and
-`alpha:` on the discrete ones, and colours an ordered factor with viridis by default, as ggplot2
-does; it has no binned scales. A plot is described with `Giggly.Plot` and drawn with
+`alpha:` on the discrete and binned ones, and colours an ordered factor with viridis by default, as
+ggplot2 does. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
 cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
 `Kino.Image`. It binds ggplot2's `diamonds` and `txhousing`, `Giggly.Datasets.diamonds/0` and
@@ -282,4 +283,4 @@ Not in Giggly yet: the `faithfuld` dataset and tiles (`geom_tile()`).
 v + scale_fill_viridis_b()
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_viridis_b()`.
+Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.

@@ -2964,6 +2964,388 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Gives the plot a binned colour scale, replacing any colour scale it had: the values are cut into
+  bins at its breaks and every value in a bin takes one colour, by default the colour at the
+  bin's middle of a gradient from `#132B43` to `#56B1F7`, or a colour each of `palette:`, a
+  palette's name or a list, given to the bins in order.
+
+  Values outside the limits take the colour of the nearer end bin; with neither limits nor
+  breaks given, the limits are the data's range widened so the end bins are as wide as their
+  neighbours. Its guide is colour steps, a bar of one block of colour for each bin, unless
+  `guide:` names another.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels without a list of breaks as long, `show_limits: true`
+  beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is not numbers is
+  refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.binned_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_binned()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#265075", "#193753", "#4FA2E3"]
+  """
+  @spec scale_color_binned(t(), keyword()) :: t()
+  def scale_color_binned(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      Options.binned_scale(),
+      "Plot.scale_color_binned/2",
+      &binned_palette_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, replacing any fill scale it had, as `scale_color_binned/2`
+  gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.binned_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_binned(palette: "Blues")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#EFF3FF", "#BDD7E7", "#2171B5"]
+  """
+  @spec scale_fill_binned(t(), keyword()) :: t()
+  def scale_fill_binned(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      Options.binned_scale(),
+      "Plot.scale_fill_binned/2",
+      &binned_palette_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned colour scale, a gradient from `low:` to `high:` cut into steps, replacing
+  any colour scale it had.
+
+  The values are cut into bins at its breaks, as `scale_color_binned/2` cuts them, and every value
+  in a bin takes the colour of the gradient at the bin's middle, blended in CIE L*a*b*.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels without a list of breaks as long, `show_limits: true`
+  beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is not numbers is
+  refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.steps_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_steps(low: "white", high: "black")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#ABABAB", "#E2E2E2", "#1B1B1B"]
+  """
+  @spec scale_color_steps(t(), keyword()) :: t()
+  def scale_color_steps(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      Options.steps_scale(),
+      "Plot.scale_color_steps/2",
+      &steps_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, a gradient cut into steps, replacing any fill scale it had, as
+  `scale_color_steps/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.steps_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_steps(n_breaks: 3)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#22496C", "#22496C", "#448DC6"]
+  """
+  @spec scale_fill_steps(t(), keyword()) :: t()
+  def scale_fill_steps(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      Options.steps_scale(),
+      "Plot.scale_fill_steps/2",
+      &steps_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned colour scale diverging from `mid:` at `midpoint:`, toward `low:` below
+  it and `high:` above, cut into steps, replacing any colour scale it had.
+
+  The values are cut into bins at its breaks, as `scale_color_binned/2` cuts them, and every value
+  in a bin takes the colour `scale_color_gradient2/2` gives the bin's middle.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels without a list of breaks as long, `show_limits: true`
+  beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is not numbers is
+  refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.steps2_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_steps2(midpoint: 120)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#EED9D6", "#C89089", "#6057A9"]
+  """
+  @spec scale_color_steps2(t(), keyword()) :: t()
+  def scale_color_steps2(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      Options.steps2_scale(),
+      "Plot.scale_color_steps2/2",
+      &steps2_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, diverging from `mid:` at `midpoint:`, cut into steps, replacing any fill scale it had, as
+  `scale_color_steps2/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.steps2_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_steps2(midpoint: 4)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#CD9993", "#FBF5F5", "#685FAE"]
+  """
+  @spec scale_fill_steps2(t(), keyword()) :: t()
+  def scale_fill_steps2(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      Options.steps2_scale(),
+      "Plot.scale_fill_steps2/2",
+      &steps2_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned colour scale, a gradient through the colours of `colors:` cut into steps,
+  replacing any colour scale it had.
+
+  The values are cut into bins at its breaks, as `scale_color_binned/2` cuts them, and every value
+  in a bin takes the colour `scale_color_gradientn/2` gives the bin's middle.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels without a list of breaks as long, `show_limits: true`
+  beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is not numbers is
+  refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.stepsn_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_stepsn(colors: ["red", "yellow", "blue"])
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#FFB500", "#FF5F00", "#8A44DE"]
+  """
+  @spec scale_color_stepsn(t(), keyword()) :: t()
+  def scale_color_stepsn(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      Options.stepsn_scale(),
+      "Plot.scale_color_stepsn/2",
+      &stepsn_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, a gradient through `colors:` cut into steps, replacing any fill scale it had, as
+  `scale_color_stepsn/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.stepsn_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_stepsn(
+      ...>     colors: ["#FEE0D2", "#FC9272", "#DE2D26"],
+      ...>     nice_breaks: false
+      ...>   )
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#FFD3C1", "#FE9F81", "#E44332"]
+  """
+  @spec scale_fill_stepsn(t(), keyword()) :: t()
+  def scale_fill_stepsn(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      Options.stepsn_scale(),
+      "Plot.scale_fill_stepsn/2",
+      &stepsn_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned colour scale from a viridis palette, replacing any colour scale it had.
+
+  The values are cut into bins at its breaks, as `scale_color_binned/2` cuts them, and the bins
+  take the colours `scale_color_viridis_d/2` would give as many values, in order, from `begin:`
+  to `end:` of the palette `option:`.
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use,
+  and `ArgumentError` for a list of labels without a list of breaks as long, `show_limits: true`
+  beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is not numbers is
+  refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.binned_viridis_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_viridis_b()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#3B528B", "#440154", "#FDE725"]
+  """
+  @spec scale_color_viridis_b(t(), keyword()) :: t()
+  def scale_color_viridis_b(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :color,
+      options,
+      Options.binned_viridis_scale(),
+      "Plot.scale_color_viridis_b/2",
+      &binned_viridis_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, from a viridis palette, replacing any fill scale it had, as
+  `scale_color_viridis_b/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.binned_viridis_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_viridis_b(option: :plasma)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#0D0887", "#9C179E", "#F0F921"]
+  """
+  @spec scale_fill_viridis_b(t(), keyword()) :: t()
+  def scale_fill_viridis_b(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    legend_scale(
+      plot,
+      :fill,
+      options,
+      Options.binned_viridis_scale(),
+      "Plot.scale_fill_viridis_b/2",
+      &binned_viridis_scale/1
+    )
+  end
+
+  @doc """
+  Gives the plot a binned colour scale from a ColorBrewer palette, replacing any colour scale it
+  had.
+
+  The values are cut into bins at its breaks, as `scale_color_binned/2` cuts them, and the bins
+  take the colours of the palette `palette:`'s set for as many, by name or by its number among
+  the palettes of `type:`, from its last at the lowest bin to its first at the highest, or the
+  other way for `direction: 1`. Raises `NimbleOptions.ValidationError` for an option it does not
+  take, a name ColorBrewer does not spell so or a number below 1, and `ArgumentError` for a
+  number past the last of its type's, a list of labels without a list of breaks as long,
+  `show_limits: true` beside a list of labels, or `n_breaks: 1` for nice breaks; a column that is
+  not numbers, or more bins than the palette's largest set has colours, is refused when the plot
+  is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.fermenter_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [110, 93, 175]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_fermenter()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#3182BD", "#08519C", "#EFF3FF"]
+  """
+  @spec scale_color_fermenter(t(), keyword()) :: t()
+  def scale_color_fermenter(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_color_fermenter/2"
+
+    legend_scale(plot, :color, options, Options.fermenter_scale(), function, fn validated ->
+      fermenter_scale(validated, function)
+    end)
+  end
+
+  @doc """
+  Gives the plot a binned fill scale, from a ColorBrewer palette, replacing any fill scale it had, as
+  `scale_color_fermenter/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.fermenter_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_fermenter(palette: "YlGn")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#238443", "#78C679", "#FFFFCC"]
+  """
+  @spec scale_fill_fermenter(t(), keyword()) :: t()
+  def scale_fill_fermenter(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_fill_fermenter/2"
+
+    legend_scale(plot, :fill, options, Options.fermenter_scale(), function, fn validated ->
+      fermenter_scale(validated, function)
+    end)
+  end
+
+  @doc """
   Gives the plot a continuous alpha scale, replacing any alpha scale it had.
 
   Each value is drawn as opaque as it is far from the first of `range:` to the second through the
@@ -4989,6 +5371,32 @@ defmodule Giggly.Plot do
   defp check_labels(%Scale.Discrete{}, validated, function),
     do: check_discrete_labels(validated, function)
 
+  # A binned scale's labels are checked as a continuous scale's are; beside a list of them it
+  # shows no limits, as R ignores `show.limits` there with a warning, and nice breaks need two or
+  # more wanted, as R's search finds none for one and fails.
+  defp check_labels(%Scale.Binned{} = scale, validated, function) do
+    check_scale_labels(validated, function)
+    check_shown_limits(scale, function)
+    check_wanted_breaks(scale, Keyword.has_key?(validated, :breaks), function)
+  end
+
+  defp check_shown_limits(%Scale.Binned{show_limits: true, labels: labels}, function)
+       when is_list(labels) do
+    raise ArgumentError,
+          "#{function} is given show_limits: true beside a list of labels, which labels the " <>
+            "breaks alone; add the limits to breaks: and labels:, or give labels: a function"
+  end
+
+  defp check_shown_limits(_scale, _function), do: :ok
+
+  defp check_wanted_breaks(%Scale.Binned{nice_breaks: true, n_breaks: 1}, false, function) do
+    raise ArgumentError,
+          "#{function} is given n_breaks: 1, and nice breaks need 2 or more wanted; give " <>
+            "nice_breaks: false for one break at the middle of the limits"
+  end
+
+  defp check_wanted_breaks(_scale, _breaks_given, _function), do: :ok
+
   # A discrete scale, its palette `palette`, the rest of its fields, its guide among them,
   # `options`.
   defp discrete_legend(palette, options),
@@ -5090,6 +5498,62 @@ defmodule Giggly.Plot do
               "#{function} is given palette: #{number}, but ColorBrewer's #{inspect(type)} " <>
                 "palettes number #{length(names)}: #{Enum.join(names, ", ")}"
     end
+  end
+
+  # A binned colour scale, its palette `palette`, the rest of its fields `options`.
+  defp binned_legend(palette, options),
+    do: struct!(Scale.Binned, [{:palette, palette} | options])
+
+  # A binned colour scale of its palette, one colour each for the bins, as ggplot2's
+  # `pal_binned()` takes it, or the default gradient at each bin's middle.
+  defp binned_palette_scale(validated) do
+    case Keyword.pop(validated, :palette) do
+      {nil, options} ->
+        binned_legend({:gradient, Keyword.values(Options.gradient_defaults())}, options)
+
+      {palette, options} ->
+        binned_legend({:binned, palette}, options)
+    end
+  end
+
+  defp steps_scale(validated) do
+    {colors, options} = Keyword.split(validated, [:low, :high])
+    binned_legend({:gradient, [colors[:low], colors[:high]]}, options)
+  end
+
+  # A diverging binned scale, each value placed by its distance from the midpoint, ggplot2's
+  # `rescale_mid()`.
+  defp steps2_scale(validated) do
+    {colors, options} = Keyword.split(validated, [:low, :mid, :high])
+    {midpoint, options} = Keyword.pop!(options, :midpoint)
+
+    binned_legend(
+      {:gradient, [colors[:low], colors[:mid], colors[:high]]},
+      [{:rescaler, {:mid, midpoint}} | options]
+    )
+  end
+
+  defp stepsn_scale(validated) do
+    {colors, options} = Keyword.pop!(validated, :colors)
+
+    case Keyword.pop(options, :values) do
+      {nil, options} -> binned_legend({:gradient, colors}, options)
+      {values, options} -> binned_legend({:gradient, colors, values}, options)
+    end
+  end
+
+  # A binned colour scale of a viridis palette's colours for as many bins as there are, as
+  # ggplot2's `scale_colour_viridis_b()` takes `pal_binned(pal_viridis())`.
+  defp binned_viridis_scale(validated) do
+    {viridis, options} = Keyword.split(validated, Keyword.keys(Options.viridis_defaults()))
+    binned_legend({:binned, {:viridis, Map.new(viridis)}}, options)
+  end
+
+  # A binned colour scale of a brewer palette's set for as many bins as there are, as ggplot2's
+  # `scale_colour_fermenter()` takes `pal_binned(pal_brewer())`.
+  defp fermenter_scale(validated, function) do
+    {brewer, options} = brewer_palette(validated, function)
+    binned_legend({:binned, brewer}, options)
   end
 
   defp gradient_scale(validated), do: gradient_through(validated, [:low, :high])

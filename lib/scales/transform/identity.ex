@@ -27,7 +27,7 @@ defmodule Scales.Transform.Identity do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, extent), do: Breaks.extended(extent)
+  def breaks(_transformation, extent, options), do: Breaks.extended(extent, options)
 
   @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)

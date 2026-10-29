@@ -104,6 +104,58 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   could be given with no arrow. *Rejected: a typed map on the primitives*: the compiler cannot
   check its keys.
 
+- **Breaks for a log, exponential or timespan axis are R's, whole, and extended breaks take
+  labeling's `only.loose` and `w` (2026-10-29, Steve, increment 2's step 2; checked against scales
+  1.4.0).** `Breaks.log/2`, `exp/2` and `timespan/2` are R's `breaks_log()`, `breaks_exp()` and
+  `breaks_timespan()`, R's breaks whole, the power or multiple either side of the limits
+  included, as `extended/2` gives breaks outside them; log10's and the time scale's breaks call
+  them. `exp/2` takes every option of `extended/2`, its fallback, as R passes `...`; `timespan/2`
+  counts its limits in `:second` to `:week`, the package's step units, and gives seconds as
+  numbers. A power is `:math.pow/2`'s, the double nearest it, where R's x86 long-double power is
+  a bit off on 1.2 cubed and 1.1 to the fourth. Refused where R fails or never ends: limits of 0
+  or below, a base of 1 or below, weights not positive for simplicity, coverage or density, one
+  nice number. *Rejected: R's power*: only a port of glibc's `powl` reproduces its last bit.
+  *Rejected: Giggly's own unit names (`:secs`)*: the package names a step's units once.
+
+- **Breaks a width apart take numbers, dates, date-times and times, a step as `Date.shift/2`
+  writes one (2026-10-29, Steve, increment 2's step 1; checked against scales 1.4.0).**
+  `Breaks.fullseq/3` and `Breaks.width/3` are R's `fullseq()` and `breaks_width()`, chosen by the
+  limits' type as R's generics are by class (Steve: "A"), so a breaks function on a date scale,
+  handed `Date`s as R hands them, can call them, and another charting tool has date breaks too. A
+  step is `[month: 1]` where R takes `"1 month"`, one unit for a width; an offset is a number, or
+  a list of steps moving each break in turn, as R moves it by each of a vector; a month past its
+  end is carried into the next, as R normalises one, so the breaks keep R's order, unsorted.
+  `pad:` beside dates is refused, where R ignores it; a time of day wraps past midnight, where
+  R's `hms` runs on. *Rejected: numbers alone*: dates' breaks stay behind `date_breaks:`, out of
+  reach of a breaks function and of other tools. *Rejected: R's `"1 month"`*: the entry
+  beginning "`date_breaks:` and `date_minor_breaks:` are a step".
+
+- **An example handing a scale a palette function is drawn with the palette's name (2026-10-29,
+  Steve: "A", increment 1's notebook sweep).** scale_colour_discrete's
+  `palette = scales::pal_brewer(palette = "Dark2")` is `palette: "Dark2"`: `palette:` takes a name
+  or a list, palette values there rejected (the entry beginning "A brewer or distiller scale
+  takes R's options"), so the name is the counterpart Giggly offers, as the plot's own theme is
+  for an active one, and ggplot2 looks the name up as the same palette; the drawing is R's. The
+  prose says a palette is named where ggplot2 is handed one. A verdict naming a palette function
+  the package has as a value (`scales::pal_grey()`) drops it, keeping what still waits. This
+  answers §7's "How a notebook treats an example of a function Giggly will not offer" for palette
+  functions. *Rejected: a verdict waiting on palette values on `palette:`* — one that never
+  comes true.
+
+- **A binned scale function takes R's options, and asks for a count of nice breaks through the
+  transformation (2026-10-29, Steve, increment 1's step 9; checked against ggplot2 4.0.3).**
+  `scale_*_binned`, `_steps`, `_steps2`, `_stepsn`, `_viridis_b` and `_fermenter` record a
+  `%Scale.Binned{}` with R's defaults and `n_breaks`, `nice_breaks`, `right` and `show_limits`.
+  Nice breaks for `n_breaks` go through `Transform.breaks/3`'s `n:`, R's
+  `transformation$breaks(limits, n)` (Steve: "B"): the identity, sqrt, reverse and reciprocal pass
+  it to extended breaks; log10 and the date and time transformations refuse it until the breaks
+  increment. Counts and `nice_breaks: false` reach R's one-break and no-break widening branches,
+  built as R's. `show_limits` adds a key at each end of the bar unless a break is there. Refused
+  at the call: `n_breaks: 1` with nice breaks, where R fails; `show_limits` beside a list of
+  labels, where R warns and ignores it; a colour bar. *Rejected: `Scales` exporting `Breaks`*: a
+  widening, and a second road to the algorithm that continuous scales' `n_breaks:` would not
+  take. *Rejected: viridis_b's `values:`*: R never reads it.
+
 - **Colour steps place their breaks by R's count, on binned and continuous scales alike
   (2026-10-29, Steve, increment 1's step 8; checked against ggplot2 4.0.3).** `:colorsteps` is
   `guide_coloursteps()` at its defaults, the binned scale's default guide: one rectangle per bin,
@@ -203,6 +255,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   nothing in the books or notebooks. A colour, for a manual palette's guessed type, is a string
   `ColorOperations.parse/1` reads, so `"transparent"` is one and `"grey50"` is not, the reverse of
   R's test, which reads R's own colour names.
+
+- **The standalone colour mappers are left out (2026-10-28, Steve: "D", increment 1's scope).**
+  R's `col_numeric()`, `col_bin()`, `col_factor()` and `col_quantile()` map values straight to
+  colours, outside any scale. The first two are a trained range, a rescaling and a palette, three
+  calls the package has; the others need breaks and quantiles of their own; nothing in the books
+  or the notebooks calls one. Steve: "Why do this if giggly isn't going to use it". *Rejected: the
+  four in `Scales.ColorOperations`*: a second road to what a scale does, with no user in the
+  evidence.
 
 - **A brewer palette is RColorBrewer's sets, named as R spells them; dichromat is left out
   (2026-10-28, Steve, increment 1's scope; checked against scales 1.4.0, RColorBrewer 1.1-3 and
@@ -3088,6 +3148,17 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   hook starts in
 - 2026-10-29 — Add geom_segment(): a straight line per row, or a path under radial coordinates,
   and annotate(:segment) (geom_segment, step 1); §4: "`geom_segment()` draws a straight line"
+- 2026-10-29 — Add Breaks.log, Breaks.exp and Breaks.timespan, R's breaks_log(), breaks_exp()
+  and breaks_timespan(), and only_loose and weights on Breaks.extended (breaks, step 2); §4:
+  "Breaks for a log, exponential or timespan axis", "The standalone colour mappers"
+- 2026-10-29 — Add Breaks.fullseq and Breaks.width, R's fullseq() and breaks_width() on numbers,
+  dates, date-times and times, with offsets (breaks, step 1); §4: "Breaks a width apart"
+- 2026-10-29 — Draw the notebook examples increment 1 unlocks, the brewer and steps scales and a
+  named palette, and narrow every verdict to what still waits (palettes and colours, step 10, the
+  notebook sweep); §4: "An example handing a scale a palette function"
+- 2026-10-29 — Add the binned colour scale functions, binned, steps, steps2, stepsn, viridis_b
+  and fermenter, with n_breaks, nice_breaks and show_limits (palettes and colours, step 9); §4:
+  "A binned scale function takes R's options"
 - 2026-10-29 — Add the colour steps guide, guide_coloursteps() at its defaults, for binned and
   continuous colour scales (palettes and colours, step 8); §4: "Colour steps place their breaks
   by R's count"
@@ -3484,7 +3555,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
   Settled when the first such example could otherwise be drawn. The active theme's functions,
   which Giggly rejects as global state, are answered (§4, the entry beginning "An example that
-  sets ggplot2's active theme").
+  sets ggplot2's active theme"), and so are palette functions handed to a scale (the entry
+  beginning "An example handing a scale a palette function").
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are
