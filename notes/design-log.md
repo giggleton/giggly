@@ -79,6 +79,28 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A palette of one kind is converted inside the other kind's function (2026-10-28, Steve,
+  increment 1's scope and step 2; checked against scales 1.4.0).** `continuous/2` takes a discrete
+  palette as R's `as_continuous_pal()` does, colours as a gradient through its `nlevels/1`, numbers
+  joined by straight lines; `discrete/2` samples a continuous one at R's `seq(0, 1, length.out =
+  n)`. A scale holds the palette as given. *Rejected: separate conversion functions*: a hue scale
+  would hold 255 colours, or a new `{:sampled, ...}` value would join the palettes. A manual
+  palette's type is R's guess, `nil` where R names a storage type (`"character"`). *Rejected:
+  guessing Giggly's own forms* (shape atoms `:shape`, tuples `:linetype`): beyond R, and no reader
+  of the type tells them apart. `:identity` and `{:abs_area, max}`, untyped in R, which hands them
+  back unchanged (3 levels give the one number 3), are refused by `discrete/2`. *Rejected:
+  sampling them as the others*: an answer R never gives.
+
+- **A palette's name is one of scales' own 45, in any case (2026-10-28, Steve, increment 1's
+  scope; checked against scales 1.4.0).** `named/1` is R's `get_palette()` for the names scales
+  registers itself, lowercased as R lowercases: the 35 brewer palettes, the 8 viridis options,
+  `"grey"` and `"hue"`, each with R's defaults; any other raises listing them, a documented
+  departure, since R's registry also holds grDevices' (138 names in all, `"Okabe-Ito"` among
+  them). *Rejected: `palette.colors()`'s 14 and `hcl.colors()`'s 79*: R's own GPL tables, used by
+  nothing in the books or notebooks. A colour, for a manual palette's guessed type, is what
+  `ColorOperations.parse/1` reads, so `"transparent"` is one and `"grey50"` is not, the reverse of
+  R's test, which reads R's own colour names.
+
 - **A brewer palette is RColorBrewer's sets, named as R spells them; dichromat is left out
   (2026-10-28, Steve, increment 1's scope; checked against scales 1.4.0, RColorBrewer 1.1-3 and
   dichromat 2.0-1).** `{:brewer, %{palette: "Set1", direction: 1}}` gives R's `pal_brewer()`:
@@ -2953,6 +2975,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-28 — Give palettes R's type, levels and names, each kind converted to the other
+  (palettes and colours, step 2); §4: "A palette of one kind is converted", "A palette's name is
+  one of scales' own 45"
 - 2026-10-28 — Add the brewer palette: RColorBrewer's sets, named as R spells them, dichromat
   left out (palettes and colours, step 1); §4: "A brewer palette is RColorBrewer's sets"
 - 2026-10-27 — Document the Scales root as API: its families, the conventions they share and a

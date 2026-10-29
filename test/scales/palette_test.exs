@@ -325,6 +325,262 @@ defmodule Scales.PaletteTest do
     end
   end
 
+  # Golden: scales 1.4.0's `palette_type()` and `palette_nlevels()` in R 4.6.1: `pal_identity()`
+  # and `abs_area(6)` `NA` and `NA`, `pal_rescale()` and `pal_area()` `"numeric"` and `NA`,
+  # `pal_gradient_n()` `"colour"` and `NA`, `pal_hue()`, `pal_grey()` and `pal_viridis()` `"colour"`
+  # and 255, `pal_shape()` `"shape"` and 6, `pal_linetype()` `"linetype"` and 13, `pal_brewer()`
+  # `"colour"` and 9 for Set1, 12 for Paired, 11 for Spectral and 8 for Accent; `pal_manual()`
+  # `"numeric"` for numbers, `"colour"` for colours, lowercase hex, an alpha and no values,
+  # `"character"` for other strings or a colour beside `NA`, `"logical"` for `TRUE` and `FALSE`, and
+  # its values' count.
+  describe "type/1 and nlevels/1" do
+    test "each palette's type and levels are R's" do
+      palettes = [
+        :identity,
+        {:abs_area, 6.0},
+        {:rescale, {0.1, 1.0}},
+        {:area, {1.0, 6.0}},
+        {:gradient, ["#132B43", "#56B1F7"]},
+        {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}},
+        {:gray, {0.2, 0.8}},
+        {:viridis, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}},
+        {:shape, :solid},
+        {:shape, :open},
+        :linetype,
+        {:brewer, %{palette: "Set1", direction: 1}},
+        {:brewer, %{palette: "Paired", direction: -1}},
+        {:brewer, %{palette: "Spectral", direction: 1}},
+        {:brewer, %{palette: "Accent", direction: 1}}
+      ]
+
+      assert Enum.map(palettes, fn palette ->
+               {Palette.type(palette), Palette.nlevels(palette)}
+             end) ===
+               [
+                 {nil, nil},
+                 {nil, nil},
+                 {:numeric, nil},
+                 {:numeric, nil},
+                 {:color, nil},
+                 {:color, 255},
+                 {:color, 255},
+                 {:color, 255},
+                 {:shape, 6},
+                 {:shape, 6},
+                 {:linetype, 13},
+                 {:color, 9},
+                 {:color, 12},
+                 {:color, 11},
+                 {:color, 8}
+               ]
+    end
+
+    test "a manual palette's type is guessed from its values, and its levels are its values" do
+      manuals = [
+        [1, 2.5, 9],
+        ["#ff0000", "SteelBlue", "#FF000080"],
+        [],
+        ["a", "b"],
+        ["#FF0000", nil],
+        [true, false],
+        [:circle_small, :triangle],
+        ["#FF0000", 1]
+      ]
+
+      assert Enum.map(manuals, fn values ->
+               {Palette.type({:manual, values}), Palette.nlevels({:manual, values})}
+             end) ===
+               [
+                 {:numeric, 3},
+                 {:color, 3},
+                 {:color, 0},
+                 {nil, 2},
+                 {nil, 2},
+                 {nil, 2},
+                 {nil, 2},
+                 {nil, 2}
+               ]
+    end
+
+    # R's colour test is hex or one of its own names, so it reads these two the other way round.
+    test "a colour is what ColorOperations reads, so grey50 is not one and transparent is" do
+      assert {Palette.type({:manual, ["grey50"]}), Palette.type({:manual, ["transparent"]})} ===
+               {nil, :color}
+    end
+
+    # Each refused value is built as the test runs: a literal the guard refuses fails the type
+    # checker.
+    test "a value that is no palette is refused" do
+      named = Map.new([{"a", "#FF0000"}])
+      fill = Enum.at([:hollow], 0)
+      brewer = {:brewer, %{palette: Enum.at(["set1"], 0), direction: 1}}
+
+      assert_raise FunctionClauseError, fn -> Palette.type({:manual, named}) end
+      assert_raise FunctionClauseError, fn -> Palette.nlevels({:manual, named}) end
+      assert_raise FunctionClauseError, fn -> Palette.type({:shape, fill}) end
+      assert_raise FunctionClauseError, fn -> Palette.nlevels({:shape, fill}) end
+      assert_raise FunctionClauseError, fn -> Palette.nlevels(brewer) end
+    end
+  end
+
+  # Golden: scales 1.4.0's `scales:::get_palette()` in R 4.6.1: `"SET1"`, `"Magma"`, `"GREY"`,
+  # `"Hue"`, `"blues"`, `"ylorrd"` and `"brbg"` give the palettes below, `get_palette("rdbu")` has
+  # 11 levels, and `"gray"` fails ("Unknown palette: gray"); R also knows `"Okabe-Ito"`, one of
+  # grDevices' palettes, left out.
+  describe "named/1" do
+    test "scales' own names give R's palettes with R's defaults, in any case" do
+      assert Enum.map(~w(SET1 Magma GREY Hue blues ylorrd brbg), &Palette.named/1) === [
+               {:brewer, %{palette: "Set1", direction: 1}},
+               {:viridis, %{option: :magma, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}},
+               {:gray, {0.2, 0.8}},
+               {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}},
+               {:brewer, %{palette: "Blues", direction: 1}},
+               {:brewer, %{palette: "YlOrRd", direction: 1}},
+               {:brewer, %{palette: "BrBG", direction: 1}}
+             ]
+    end
+
+    test "the names are scales' 45, each brewer palette and viridis option its own, in any case" do
+      brewer_names = Enum.flat_map([:seq, :div, :qual], &Palette.brewer_palettes/1)
+      options = ColorOperations.viridis_options()
+
+      names =
+        brewer_names
+        |> Enum.concat(Enum.map(options, &Atom.to_string/1))
+        |> Enum.concat(["grey", "hue"])
+
+      named =
+        Enum.map(names, fn name ->
+          name
+          |> String.upcase()
+          |> Palette.named()
+        end)
+
+      brewer = Enum.map(brewer_names, fn name -> {:brewer, %{palette: name, direction: 1}} end)
+
+      viridis =
+        Enum.map(options, fn option ->
+          {:viridis, %{option: option, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}}
+        end)
+
+      assert {length(names), Enum.take(named, length(brewer) + length(viridis))} ===
+               {45, Enum.concat(brewer, viridis)}
+    end
+
+    test "a name scales does not know raises, naming it and those it knows" do
+      for name <- ["gray", "Okabe-Ito", " set1", ""] do
+        error = assert_raise ArgumentError, fn -> Palette.named(name) end
+
+        assert error.message =~ "palette #{inspect(name)};"
+        assert error.message =~ ~s("Blues", "BuGn")
+        assert error.message =~ ~s("Set3", "magma")
+        assert error.message =~ ~s("turbo", "grey", "hue")
+      end
+    end
+
+    # The name is built as the test runs: a literal the guard refuses fails the type checker.
+    test "a name that is not a string is refused" do
+      name = Enum.at([:set1], 0)
+
+      assert_raise FunctionClauseError, fn -> Palette.named(name) end
+    end
+  end
+
+  # Golden: scales 1.4.0's `as_continuous_pal()` in R 4.6.1, each palette's colours through
+  # farver 2.1.2 and its numbers through `approxfun()`: a discrete colour palette's `nlevels`
+  # colours as a gradient, so hue at 1 is its 255th hue, `#F97571`, not its first; numbers joined
+  # by straight lines, `NA` outside 0 to 1; one number fails ("need at least two non-NA values to
+  # interpolate"), and shapes, line types and other strings fail ("Don't know how to convert a
+  # discrete ... palette to a continuous palette.").
+  describe "continuous/2 of a discrete palette" do
+    test "a colour palette is a gradient through its nlevels colours" do
+      hue = {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
+      reversed_hue = {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: -1}}
+      magma = {:viridis, %{option: :magma, begin: 0.2, end: 1.0, direction: -1, alpha: 1.0}}
+
+      assert {Palette.continuous(hue, [0, 0.1, 0.25, 0.5, 0.77, 1, nil]),
+              Palette.continuous(reversed_hue, [0, 0.3, 1]),
+              Palette.continuous({:gray, {0.2, 0.8}}, [0, 0.3, 0.5, 1]),
+              Palette.continuous(magma, [0, 0.3, 1])} ===
+               {["#F8766D", "#D88F00", "#7DAE00", "#00BFC3", "#D476FE", "#F97571", nil],
+                ["#F97571", "#9190FF", "#F8766D"], ["#333333", "#7C7C7C", "#989898", "#CCCCCC"],
+                ["#FCFDBF", "#FC8C63", "#3B0F70"]}
+    end
+
+    test "a brewer palette is a gradient through its largest set, in its direction" do
+      assert {brewer_ramp("Set1", 1, [0, 0.3, 0.5, 1]), brewer_ramp("Blues", -1, [0, 0.3, 1]),
+              brewer_ramp("Paired", 1, [0, 0.3, 1])} ===
+               {["#E41A1C", "#7B8D72", "#FF7F00", "#999999"], ["#08306B", "#307EBC", "#F7FBFF"],
+                ["#A6CEE3", "#80A34F", "#B15928"]}
+    end
+
+    test "a manual palette's colours, written any way they are read, are a gradient" do
+      assert {Palette.continuous({:manual, ["red", "#0000ff", "#00FF00"]}, [
+                0,
+                0.25,
+                0.5,
+                0.6,
+                1,
+                nil
+              ]), Palette.continuous({:manual, ["red"]}, [0, 0.5])} ===
+               {["#FF0000", "#CA0088", "#0000FF", "#644FDC", "#00FF00", nil],
+                ["#FF0000", "#FF0000"]}
+    end
+
+    test "a manual palette's numbers are joined by straight lines, nil outside them" do
+      assert Palette.continuous({:manual, [1, 5, 9]}, [0, 0.25, 0.5, 0.9, 1, nil, -0.1, 1.1]) ===
+               [1, 3.0, 5, 8.1999999999999993, 9, nil, nil, nil]
+    end
+
+    # Each refused palette is built as the test runs: a literal the guard refuses fails the type
+    # checker.
+    test "shapes, line types, other values, one number and no colours are refused" do
+      refused =
+        Enum.concat([
+          [{:shape, :solid}, :linetype],
+          Enum.map([["a", "b"], [:circle_small], [4], []], fn values -> {:manual, values} end)
+        ])
+
+      for palette <- refused do
+        assert_raise FunctionClauseError, fn -> Palette.continuous(palette, [0.5]) end
+      end
+    end
+  end
+
+  # Golden: scales 1.4.0's `as_discrete_pal()` in R 4.6.1: `pal_rescale(c(1, 6))` for 4 levels and
+  # 1, `pal_rescale()` for 7, `pal_area()` for 3, the gradient for 7 and none; R hands
+  # `pal_identity()` and `abs_area(6)` back as they are, so for 3 levels they give 3 and
+  # 10.392304845413264.
+  describe "discrete/2 of a continuous palette" do
+    test "the palette is handed the levels' places, spaced evenly from 0 to 1" do
+      assert {Palette.discrete({:rescale, {1, 6}}, 4), Palette.discrete({:rescale, {1, 6}}, 1),
+              Palette.discrete({:rescale, {0.1, 1.0}}, 7), Palette.discrete({:area, {1, 6}}, 3)} ===
+               {[1.0, 2.6666666666666665, 4.333333333333333, 6.0], [1.0],
+                [
+                  0.10000000000000001,
+                  0.25,
+                  0.40000000000000002,
+                  0.55000000000000004,
+                  0.69999999999999996,
+                  0.84999999999999998,
+                  1.0
+                ], [1.0, 4.5355339059327378, 6.0]}
+    end
+
+    test "a gradient's colours are sampled, and no levels give none" do
+      gradient = {:gradient, ["#132B43", "#56B1F7"]}
+
+      assert {Palette.discrete(gradient, 7), Palette.discrete(gradient, 0)} ===
+               {["#132B43", "#1D3F5E", "#28547A", "#336A98", "#3E81B7", "#4A99D6", "#56B1F7"], []}
+    end
+
+    test "the identity and an absolute area, which R gives no type, are refused" do
+      for palette <- [:identity, {:abs_area, 6.0}] do
+        assert_raise FunctionClauseError, fn -> Palette.discrete(palette, 3) end
+      end
+    end
+  end
+
   # Golden: R 4.6.1's `seq(0.1, 1, length.out = n)` for n of 7, 2, 1 and 0.
   describe "spread/2" do
     test "the spread is R's seq(), its middle values found by steps from the first" do
@@ -355,4 +611,9 @@ defmodule Scales.PaletteTest do
   # `count` colours of R's `pal_brewer(palette = name, direction = direction)`.
   defp brewer(name, count, direction \\ 1),
     do: Palette.discrete({:brewer, %{palette: name, direction: direction}}, count)
+
+  # The colours at `places` of R's `as_continuous_pal(pal_brewer(palette = name, direction =
+  # direction))`.
+  defp brewer_ramp(name, direction, places),
+    do: Palette.continuous({:brewer, %{palette: name, direction: direction}}, places)
 end

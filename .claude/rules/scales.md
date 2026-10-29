@@ -66,6 +66,19 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   named as R spells it, and `brewer_palettes/1` gives each type's names in the order R numbers
   them; a name R does not spell so is refused, where R warns and gives Greens. The file carries
   ColorBrewer's copyright and Apache 2.0 notice, and the moduledoc its acknowledgment.
+- **A palette's type, levels and name are R's** (`Palette.type/1`, `nlevels/1`, `named/1`; R's
+  `palette_type()`, `palette_nlevels()`, `get_palette()`): `nil` where R gives `NA`, a manual
+  palette's type guessed as `pal_manual()` guesses it, `nil` where R names a storage type, a
+  colour being what `ColorOperations.parse/1` reads. **A name is one of scales' own, in any
+  case**, each with R's defaults; grDevices' names are refused, the message listing scales'
+  (design-log §4, the entry beginning "A palette's name is one of scales' own").
+- **A palette of one kind is converted inside the other kind's function** (design-log §4, the
+  entry beginning "A palette of one kind is converted"): `continuous/2` takes a discrete palette
+  as R's `as_continuous_pal()` does, a gradient through its `nlevels/1` colours or its numbers
+  joined by straight lines, `nil` outside them; `discrete/2` samples a continuous one at R's
+  `seq()`. What R cannot convert is refused, and so are `:identity` and `{:abs_area, max}`, which
+  R hands back unconverted. Its tests pin R's values at places that tell `nlevels/1` apart (hue's
+  last colour is its 255th hue).
 - **A discrete palette's spread is R's `seq()`** (`Palette.spread/2`): its ends exact, each value between found
   by steps from the first (the fourth of seven is 0.54999999999999993).
 - **A gradient is exactly R's `pal_gradient_n()`** (design-log §4, the entry beginning "A gradient

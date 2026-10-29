@@ -46,6 +46,17 @@ defmodule Scales.Palette do
   A discrete palette asked for more levels than it holds gives `nil` for each past its end, as R
   gives `NA` (and warns). No levels give none, where R's hue palette refuses them.
 
+  ## A palette of the other kind
+
+  Each function takes a palette of the other kind too, as R's `as_continuous_pal()` and
+  `as_discrete_pal()` convert one. `continuous/2` hands a discrete palette of colours on as a
+  gradient through its `nlevels/1` colours, and one of numbers as those numbers joined by
+  straight lines, spaced evenly from 0 to 1; a place outside them gives `nil`, and a palette of
+  shapes, line types or other values is refused. `discrete/2` hands a continuous palette the
+  levels' places, spaced evenly from 0 to 1 by `spread/2`. `:identity` and `{:abs_area, max}`,
+  which R gives no type, are not converted: R hands them back as they are, so asked for 3 levels
+  they give the one number 3, and here they are refused.
+
   Colours are uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of their own, as
   `Scales.ColorOperations` writes them.
 
@@ -101,8 +112,14 @@ defmodule Scales.Palette do
   @typedoc "A palette."
   @type t :: continuous() | discrete()
 
+  @typedoc "What a palette's values are: colours, numbers, shapes or line types."
+  @type value_type :: :color | :numeric | :shape | :linetype
+
   # R's gamma for `grey.colors()`.
   @gray_gamma 2.2
+
+  # The levels R's hue, grey and viridis palettes say they tell apart.
+  @many_levels 255
 
   # `pal_shape()`'s shapes, R's 16, 17, 15, 3, 7 and 8, solid, or 1, 2, 0, 3, 7 and 8, open, by the
   # names a point is drawn in.
@@ -171,9 +188,35 @@ defmodule Scales.Palette do
 
   @brewer_names Map.keys(@brewer_largest)
 
+  # scales' own names, each lowercased as R's `get_palette()` lowercases the name it is given, and
+  # the palette R registers under it, with R's defaults: each brewer palette, each viridis option,
+  # `pal_grey()` and `pal_hue()`.
+  @brewer_named Map.new(@brewer_names, fn name ->
+                  {String.downcase(name), {:brewer, %{palette: name, direction: 1}}}
+                end)
+
+  @viridis_named Map.new(ColorOperations.viridis_options(), fn option ->
+                   parameters = %{option: option, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}
+                   {Atom.to_string(option), {:viridis, parameters}}
+                 end)
+
+  @named @brewer_named
+         |> Map.merge(@viridis_named)
+         |> Map.merge(%{
+           "grey" => {:gray, {0.2, 0.8}},
+           "hue" => {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
+         })
+
+  # The names as a refusal lists them, brewer's by type in R's order.
+  @known_names [:seq, :div, :qual]
+               |> Enum.flat_map(fn type -> Map.fetch!(@brewer_palettes, type) end)
+               |> Enum.concat(Enum.map(ColorOperations.viridis_options(), &Atom.to_string/1))
+               |> Enum.concat(["grey", "hue"])
+               |> Enum.map_join(", ", &inspect/1)
+
   @doc """
   Each place's value under a continuous palette, a place running from 0 to 1 over the data's
-  range; a `nil` place gives `nil`.
+  range; a `nil` place gives `nil`. A discrete palette is converted first, as the moduledoc says.
 
   ## Examples
 
@@ -185,8 +228,11 @@ defmodule Scales.Palette do
 
       iex> Scales.Palette.continuous({:gradient, ["#132B43", "#56B1F7"]}, [0, 0.5, 1])
       ["#132B43", "#336A98", "#56B1F7"]
+
+      iex> Scales.Palette.continuous({:manual, [1.0, 5.0, 9.0]}, [0.25, 1.5])
+      [3.0, nil]
   """
-  @spec continuous(continuous(), [number() | nil]) :: [number() | String.t() | nil]
+  @spec continuous(t(), [number() | nil]) :: [number() | String.t() | nil]
   def continuous(:identity, places), do: places
   def continuous({:rescale, to}, places), do: Bounds.rescale(places, {0, 1}, to)
 
@@ -214,6 +260,48 @@ defmodule Scales.Palette do
     each_place(places, fn place -> gradient_color(knots, colors, place) end)
   end
 
+  # A discrete palette is converted as R's `as_continuous_pal()` converts one: its `nlevels/1`
+  # values, a gradient through them where they are colours, else joined by straight lines.
+  def continuous({kind, _parameters} = palette, places)
+      when kind in [:hue, :gray, :viridis, :brewer] do
+    colors = discrete(palette, nlevels(palette))
+    continuous({:gradient, colors}, places)
+  end
+
+  def continuous({:manual, values}, places) when is_list(values),
+    do: manual_continuous(guessed_type(values), values, places)
+
+  # A manual palette's colours may be written any way `ColorOperations.parse/1` reads, so each is
+  # spelled as the gradient reads it first.
+  defp manual_continuous(:color, [_color | _more] = colors, places) do
+    spelled =
+      Enum.map(colors, fn color ->
+        {:ok, spelling} = ColorOperations.parse(color)
+        spelling
+      end)
+
+    continuous({:gradient, spelled}, places)
+  end
+
+  defp manual_continuous(:numeric, [_first, _second | _more] = numbers, places) do
+    knotted =
+      {0.0, 1.0}
+      |> spread(length(numbers))
+      |> Enum.zip(numbers)
+
+    each_place(places, fn place -> joined(knotted, place) end)
+  end
+
+  # The number at `place` on the straight lines through the knots and their numbers, as R's
+  # `approxfun()` interpolates: a knot's own number at a knot, `nil` outside them.
+  defp joined(knotted, place) do
+    case {List.keyfind(knotted, place, 0), neighbours(knotted, place)} do
+      {{_knot, number}, _neighbours} -> number
+      {nil, nil} -> nil
+      {nil, {{low_knot, low}, {high_knot, high}}} -> along(low, high, low_knot, high_knot, place)
+    end
+  end
+
   # The colour at `place` along the gradient, as the opening comment says.
   defp gradient_color(knots, colors, place) do
     lab =
@@ -231,25 +319,33 @@ defmodule Scales.Palette do
   end
 
   # The L*a*b* `place` of the way between the two colours either side of it, each a knot and its
-  # colour, as R's `approxfun()` interpolates: `low + (high - low) * ((place - low_knot) /
-  # (high_knot - low_knot))`, channel by channel, in that order of operations.
+  # colour, channel by channel along the straight line between them.
   defp blend(knotted, place) do
-    [{low_knot, low_color}, {high_knot, high_color}] =
-      knotted
-      |> Enum.chunk_every(2, 1, :discard)
-      |> Enum.find(fn [{low_knot, _low}, {high_knot, _high}] ->
-        place > low_knot and place < high_knot
-      end)
-
-    fraction = (place - low_knot) / (high_knot - low_knot)
+    {{low_knot, low_color}, {high_knot, high_color}} = neighbours(knotted, place)
 
     low_color
     |> lab_channels()
     |> Enum.zip_with(lab_channels(high_color), fn low_channel, high_channel ->
-      low_channel + (high_channel - low_channel) * fraction
+      along(low_channel, high_channel, low_knot, high_knot, place)
     end)
     |> List.to_tuple()
   end
+
+  # The two knots, each with its value, that `place` falls strictly between, or `nil` where it
+  # falls between none.
+  defp neighbours(knotted, place) do
+    knotted
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.find_value(fn [{low_knot, _low} = low, {high_knot, _high} = high] ->
+      if place > low_knot and place < high_knot, do: {low, high}
+    end)
+  end
+
+  # The value `place` of the way from `low` at `low_knot` to `high` at `high_knot`, as R's
+  # `approxfun()` interpolates: `low + (high - low) * ((place - low_knot) / (high_knot -
+  # low_knot))`, in that order of operations.
+  defp along(low, high, low_knot, high_knot, place),
+    do: low + (high - low) * ((place - low_knot) / (high_knot - low_knot))
 
   # A colour's L*, a* and b*, as a list.
   defp lab_channels(color) do
@@ -271,7 +367,8 @@ defmodule Scales.Palette do
   # level + 0.5` truncated. R spaces them with `seq.int()`, which steps on from the start as
   # `seq()` does.
   @doc """
-  The values of a discrete palette for `count` levels, in level order.
+  The values of a discrete palette for `count` levels, in level order. A continuous palette is
+  converted first, as the moduledoc says.
 
   ## Examples
 
@@ -281,8 +378,11 @@ defmodule Scales.Palette do
 
       iex> Scales.Palette.discrete({:manual, ["#FF0000", "#0000FF"]}, 3)
       ["#FF0000", "#0000FF", nil]
+
+      iex> Scales.Palette.discrete({:rescale, {1, 6}}, 3)
+      [1.0, 3.5, 6.0]
   """
-  @spec discrete(discrete(), non_neg_integer()) :: list()
+  @spec discrete(t(), non_neg_integer()) :: list()
   def discrete({:hue, _parameters}, 0), do: []
 
   def discrete({:hue, %{hue: {low, high}} = parameters}, count) when count > 0 do
@@ -322,6 +422,114 @@ defmodule Scales.Palette do
     |> Map.fetch!({name, set_count})
     |> padded(count)
     |> directed(direction)
+  end
+
+  # A continuous palette is converted as R's `as_discrete_pal()` converts one: handed the levels'
+  # places, R's `seq(0, 1, length.out = count)`.
+  def discrete({kind, _parameters} = palette, count) when kind in [:rescale, :area, :gradient],
+    do: continuous(palette, spread({0.0, 1.0}, count))
+
+  @doc """
+  What a palette's values are, R's `palette_type()`: `:color`, `:numeric`, `:shape` or
+  `:linetype`, or `nil` for `:identity` and `{:abs_area, max}`, which R gives no type.
+
+  A manual palette's is guessed from its values, as R's `pal_manual()` guesses it: `:color` where
+  every value is a colour `Scales.ColorOperations.parse/1` reads, as no values are, `:numeric`
+  where every one is a number, else `nil`, where R names how its values are stored
+  (`"character"`). R reads a colour as hex or one of its own colour names, so `"grey50"` is a
+  colour there and `"transparent"` is not; here they are the other way round.
+
+  ## Examples
+
+      iex> Scales.Palette.type({:brewer, %{palette: "Set1", direction: 1}})
+      :color
+
+      iex> Scales.Palette.type({:manual, [1, 5, 9]})
+      :numeric
+
+      iex> Scales.Palette.type({:manual, [:circle_small, :triangle]})
+      nil
+  """
+  @spec type(t()) :: value_type() | nil
+  def type(:identity), do: nil
+  def type({:abs_area, _max}), do: nil
+  def type({kind, _range}) when kind in [:rescale, :area], do: :numeric
+
+  def type({kind, _parameters}) when kind in [:gradient, :hue, :gray, :viridis, :brewer],
+    do: :color
+
+  def type({:shape, fill}) when is_map_key(@shapes, fill), do: :shape
+  def type(:linetype), do: :linetype
+  def type({:manual, values}) when is_list(values), do: guessed_type(values)
+
+  # R's `guess_pal_type()`, which asks for numbers first; no values are colours here, as R's
+  # empty vector of strings is.
+  defp guessed_type(values) do
+    cond do
+      Enum.all?(values, &color?/1) -> :color
+      Enum.all?(values, &is_number/1) -> :numeric
+      true -> nil
+    end
+  end
+
+  defp color?(value) when is_binary(value), do: ColorOperations.parse(value) != :error
+  defp color?(_value), do: false
+
+  @doc """
+  How many levels a discrete palette tells apart, R's `palette_nlevels()`: 6 shapes, 13 line
+  types, a manual palette's values, a brewer palette's largest set, and 255 for a hue, grey or
+  viridis palette, as R says; `nil` for a continuous palette. A discrete palette converted to a
+  continuous one is a gradient through this many of its values.
+
+  ## Examples
+
+      iex> Scales.Palette.nlevels({:brewer, %{palette: "Paired", direction: 1}})
+      12
+
+      iex> Scales.Palette.nlevels({:gradient, ["#132B43", "#56B1F7"]})
+      nil
+  """
+  @spec nlevels(t()) :: non_neg_integer() | nil
+  def nlevels({:shape, fill}) when is_map_key(@shapes, fill),
+    do: length(Map.fetch!(@shapes, fill))
+
+  def nlevels(:linetype), do: length(@line_types)
+  def nlevels({:manual, values}) when is_list(values), do: length(values)
+
+  def nlevels({:brewer, %{palette: name}}) when name in @brewer_names,
+    do: Map.fetch!(@brewer_largest, name)
+
+  def nlevels({kind, _parameters}) when kind in [:hue, :gray, :viridis], do: @many_levels
+  def nlevels(:identity), do: nil
+  def nlevels({kind, _parameters}) when kind in [:rescale, :area, :abs_area, :gradient], do: nil
+
+  @doc """
+  The palette scales names `name`, R's `get_palette()` for scales' own names, in any case: each
+  ColorBrewer palette as `pal_brewer()` gives it (`brewer_palettes/1`), each viridis option as
+  `pal_viridis()` does (`Scales.ColorOperations.viridis_options/0`), `"grey"`, `pal_grey()`, and
+  `"hue"`, `pal_hue()`, each with R's defaults. Any other name raises `ArgumentError` listing
+  these; R also knows grDevices' palettes by name (`"Okabe-Ito"`, `"Blues 3"`), which are left
+  out.
+
+  ## Examples
+
+      iex> Scales.Palette.named("set1")
+      {:brewer, %{palette: "Set1", direction: 1}}
+
+      iex> Scales.Palette.named("Grey")
+      {:gray, {0.2, 0.8}}
+  """
+  @spec named(String.t()) :: t()
+  def named(name) when is_binary(name) do
+    case Map.fetch(@named, String.downcase(name)) do
+      {:ok, palette} ->
+        palette
+
+      :error ->
+        raise ArgumentError,
+              "scales names no palette #{inspect(name)}; its names, in any case, are " <>
+                @known_names
+    end
   end
 
   @doc """
