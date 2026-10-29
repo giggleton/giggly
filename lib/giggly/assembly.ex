@@ -664,16 +664,17 @@ defmodule Giggly.Assembly do
     |> Map.put(:decor, Enum.zip(sample_places, Scale.map(scale, samples)))
   end
 
-  # For colour steps, each key's place up the bar, its count among the breaks over the bins', the
-  # keys the bar leaves out dropped, and the bins (`decor`), each its place up the bar from and to
-  # and its colour, as ggplot2's `GuideColoursteps` works them out with even steps
-  # (`Giggly.Scale.steps/2`).
+  # For colour steps, each key's place up the bar, its count among the breaks over the bins', with
+  # a key at each end for a scale that shows its limits, the keys the bar leaves out dropped, and
+  # the bins (`decor`), each its place up the bar from and to and its colour, as ggplot2's
+  # `GuideColoursteps` works them out with even steps (`Giggly.Scale.steps/2`).
   defp with_guide_data(%{guide: %Guide.Colorsteps{}, keys: keys} = legend, scale) do
     {places, bins} = Scale.steps(scale, Enum.map(keys, fn key -> key.value end))
 
     placed_keys =
       keys
       |> Enum.zip_with(places, fn key, place -> Map.put(key, :place, place) end)
+      |> with_limit_keys(legend, scale, places)
       |> Enum.reject(fn key -> is_nil(key.place) end)
 
     legend
@@ -682,6 +683,34 @@ defmodule Giggly.Assembly do
   end
 
   defp with_guide_data(legend, _scale), do: legend
+
+  # The keys with one at each end of the bar for each limit the scale shows (`Scale.shown_limits/1`),
+  # labelled as it labels them, the low one left out where the first break's key is already at the
+  # bar's start and the high one where the last's is at its end, as ggplot2's `extract_params()`
+  # compares them before it leaves out keys past the bar's end.
+  defp with_limit_keys(keys, %{aesthetics: [aesthetic]}, scale, places) do
+    case Scale.shown_limits(scale) do
+      [] ->
+        keys
+
+      [{low, low_label}, {high, high_label}] ->
+        [low_value, high_value] = Scale.map(scale, [low, high])
+        low_key = %{label: low_label, value: low, values: %{aesthetic => low_value}, place: 0.0}
+
+        high_key = %{
+          label: high_label,
+          value: high,
+          values: %{aesthetic => high_value},
+          place: 1.0
+        }
+
+        Enum.concat([
+          if(List.first(places) == 0.0, do: [], else: [low_key]),
+          keys,
+          if(List.last(places) == 1.0, do: [], else: [high_key])
+        ])
+    end
+  end
 
   defp labels(legend), do: Enum.map(legend.keys, fn key -> key.label end)
 

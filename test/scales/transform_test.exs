@@ -649,4 +649,66 @@ defmodule Scales.TransformTest do
                ]
     end
   end
+
+  describe "breaks wanted" do
+    # Golden: R 4.6.1's scales 1.4.0, each transformation's `breaks(inverse(extent), n = 3)` put
+    # back through it, as ggplot2's `get_breaks()` asks it for `n.breaks`.
+    test "the identity, square root, reverse and reciprocal find that many extended breaks" do
+      counted =
+        Enum.map(
+          [
+            identity: {1.0, 10.0},
+            sqrt: {1.0, 10.0},
+            reverse: {-10.0, -1.0},
+            reciprocal: {0.1, 1.0}
+          ],
+          fn {name, extent} -> {name, Transform.breaks(name, extent, n: 3)} end
+        )
+
+      assert counted === [
+               identity: [0.0, 5.0, 10.0],
+               sqrt: [0.0, 7.0710678118654755, 10.0],
+               reverse: [-0.0, -5.0, -10.0],
+               reciprocal: [:infinity, 0.2, 0.1]
+             ]
+    end
+
+    test "log10, date, date-time and time count no breaks, and refuse a number wanted" do
+      datetime = {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}
+
+      messages =
+        Enum.map([:log10, :date, datetime, :time], fn name ->
+          assert_raise(ArgumentError, fn -> Transform.breaks(name, {0.0, 3.0}, n: 3) end).message
+        end)
+
+      assert messages ==
+               Enum.map(
+                 [
+                   ":log10",
+                   ":date",
+                   ~s({:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}),
+                   ":time"
+                 ],
+                 fn name ->
+                   "the #{name} transformation counts no breaks, so it takes no [:n]; the " <>
+                     "transformations that do are :identity, :sqrt, :reverse, :reciprocal"
+                 end
+               )
+    end
+
+    test "a number wanted is a whole number from 2, and an option breaks/3 lacks is refused" do
+      count_error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.breaks(:identity, {0.0, 1.0}, n: 1)
+        end
+
+      option_error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.breaks(:identity, {0.0, 1.0}, nice_numbers: [1])
+        end
+
+      assert {count_error.message =~ "2 or more, got: 1", option_error.message =~ "nice_numbers"} ==
+               {true, true}
+    end
+  end
 end

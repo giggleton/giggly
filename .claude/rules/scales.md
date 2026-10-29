@@ -227,14 +227,21 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
-- **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted, its three
+- **A number of breaks wanted, `n:`, reaches extended breaks alone** (`Breaks.extended/2`,
+  `Transform.breaks/3`), as R's `transformation$breaks(limits, n)`: the identity, sqrt, reverse
+  and reciprocal pass it on; log10, date, date-time and time refuse it, their own counts waiting
+  for the breaks increment; it is a whole number from 2, as R's search finds nothing for one and
+  never ends for none.
+- **The identity's breaks are exactly R's `labeling::extended()` breaks**, five wanted unless
+  `n:` says, its three
   degenerate cases and the scores R takes to minus infinity included (`Scales.Breaks`), but on
   ranges over about 3e23 wide reaching zero, where R's long-double modulus denies a rounded break
   through zero the bonus for it (`Breaks`' opening comment). Its test
   pins R's own output for a range of every winning nice number, skip, count and zero bonus, and
   for each boundary, since a slip in one score shows only where that
-  score decides the winner; a row that stops matching is a bug in the port, and the table is
-  regenerated only by running R (labeling 0.4.3 in Docker's `r-base` image).
+  score decides the winner, and for other counts on ranges where the count decides; a row that
+  stops matching is a bug in the port, and the table is regenerated only by running R (labeling
+  0.4.3 in Docker's `r-base` image).
 - **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,

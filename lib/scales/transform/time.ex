@@ -49,7 +49,7 @@ defmodule Scales.Transform.Time do
   # The extent measured in the unit that suits its span, broken there, and measured in seconds
   # again, as `breaks_timespan()` divides and multiplies.
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}) do
+  def breaks(_transformation, {low, high}, []) do
     unit = unit(high - low)
 
     {low / unit, high / unit}

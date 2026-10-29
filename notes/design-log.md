@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A binned scale function takes R's options, and asks for a count of nice breaks through the
+  transformation (2026-10-29, Steve, increment 1's step 9; checked against ggplot2 4.0.3).**
+  `scale_*_binned`, `_steps`, `_steps2`, `_stepsn`, `_viridis_b` and `_fermenter` record a
+  `%Scale.Binned{}` with R's defaults and `n_breaks`, `nice_breaks`, `right` and `show_limits`.
+  Nice breaks for `n_breaks` go through `Transform.breaks/3`'s `n:`, R's
+  `transformation$breaks(limits, n)` (Steve: "B"): the identity, sqrt, reverse and reciprocal pass
+  it to extended breaks; log10 and the date and time transformations refuse it until the breaks
+  increment. Counts and `nice_breaks: false` reach R's one-break and no-break widening branches,
+  built as R's. `show_limits` adds a key at each end of the bar unless a break is there. Refused
+  at the call: `n_breaks: 1` with nice breaks, where R fails; `show_limits` beside a list of
+  labels, where R warns and ignores it; a colour bar. *Rejected: `Scales` exporting `Breaks`*: a
+  widening, and a second road to the algorithm that continuous scales' `n_breaks:` would not
+  take. *Rejected: viridis_b's `values:`*: R never reads it.
+
 - **Colour steps place their breaks by R's count, on binned and continuous scales alike
   (2026-10-29, Steve, increment 1's step 8; checked against ggplot2 4.0.3).** `:colorsteps` is
   `guide_coloursteps()` at its defaults, the binned scale's default guide: one rectangle per bin,
@@ -3054,6 +3068,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add the binned colour scale functions, binned, steps, steps2, stepsn, viridis_b
+  and fermenter, with n_breaks, nice_breaks and show_limits (palettes and colours, step 9); §4:
+  "A binned scale function takes R's options"
 - 2026-10-29 — Add the colour steps guide, guide_coloursteps() at its defaults, for binned and
   continuous colour scales (palettes and colours, step 8); §4: "Colour steps place their breaks
   by R's count"

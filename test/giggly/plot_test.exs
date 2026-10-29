@@ -4818,6 +4818,160 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  # Golden: the defaults of ggplot2 4.0.3's binned colour scale functions, read in R 4.6.1:
+  # `scale_colour_binned()`'s gradient from "#132B43" to "#56B1F7" at each bin's middle, or
+  # `pal_binned(as_discrete_pal(palette))` for a palette given; `_steps()` the same gradient,
+  # `_steps2()` the diverging one through `rescale_mid()` at 0, `_stepsn()` `pal_gradient_n()`
+  # through its colours, `_viridis_b()` `pal_binned(pal_viridis())` and `_fermenter()`
+  # `pal_binned(pal_brewer("seq", 1, -1))`, Blues reversed; each colour steps, grey50 for a
+  # missing value, and `binned_scale()`'s `n.breaks` (five nice breaks), `nice.breaks = TRUE`,
+  # `right = TRUE` and `show.limits = FALSE`.
+  describe "the binned colour scale functions" do
+    test "each records an untrained binned scale of its palette, colour steps and grey50" do
+      plot = Plot.new(@rows)
+      gradient = %Scale.Binned{}
+
+      steps2 = %Scale.Binned{
+        palette: {:gradient, ["#832424", "#FFFFFF", "#3A3A98"]},
+        rescaler: {:mid, 0.0}
+      }
+
+      viridis =
+        {:binned, {:viridis, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}}}
+
+      assert {Plot.scale_color_binned(plot).scales.color,
+              Plot.scale_fill_binned(plot).scales.fill, Plot.scale_color_steps(plot).scales.color,
+              Plot.scale_fill_steps(plot).scales.fill, Plot.scale_color_steps2(plot).scales.color,
+              Plot.scale_fill_steps2(plot).scales.fill} ===
+               {gradient, gradient, gradient, gradient, steps2, steps2}
+
+      assert {Plot.scale_color_stepsn(plot, colors: ["red", "blue"]).scales.color,
+              Plot.scale_fill_viridis_b(plot).scales.fill,
+              Plot.scale_color_fermenter(plot).scales.color} ===
+               {%Scale.Binned{palette: {:gradient, ["#FF0000", "#0000FF"]}},
+                %Scale.Binned{palette: viridis},
+                %Scale.Binned{palette: {:binned, {:brewer, %{palette: "Blues", direction: -1}}}}}
+    end
+
+    test "each records its palette's options and the binned scale's" do
+      plot = Plot.new(@rows)
+
+      binned_options = [
+        name: "Power",
+        limits: {400, 0},
+        breaks: [100, 200],
+        labels: ["a", "b"],
+        n_breaks: 3,
+        nice_breaks: false,
+        right: false,
+        na_value: "red",
+        guide: :legend
+      ]
+
+      recorded =
+        Plot.scale_fill_steps2(plot, [low: "black", mid: "grey", midpoint: 150] ++ binned_options).scales.fill
+
+      assert recorded ===
+               %Scale.Binned{
+                 palette: {:gradient, ["#000000", "#808080", "#3A3A98"]},
+                 rescaler: {:mid, 150.0},
+                 name: "Power",
+                 limits: {400.0, 0.0},
+                 breaks: [100.0, 200.0],
+                 labels: ["a", "b"],
+                 n_breaks: 3,
+                 nice_breaks: false,
+                 right: false,
+                 na_value: "#FF0000",
+                 guide: :legend
+               }
+
+      palette = fn function, options ->
+        [scale] = Map.values(function.(plot, options).scales)
+        scale
+      end
+
+      assert {palette.(&Plot.scale_color_binned/2, palette: "blues").palette,
+              palette.(&Plot.scale_fill_binned/2, palette: ["red", "blue"]).palette,
+              palette.(&Plot.scale_color_steps/2, low: "white", high: "black").palette,
+              palette.(&Plot.scale_fill_stepsn/2, colors: ["red", "blue"], values: [1, 0]).palette,
+              palette.(&Plot.scale_color_viridis_b/2,
+                option: :magma,
+                begin: 0.2,
+                end: 0.8,
+                direction: -1,
+                alpha: 0.5
+              ).palette,
+              palette.(&Plot.scale_fill_fermenter/2, type: :qual, palette: 2, direction: 1).palette,
+              palette.(&Plot.scale_color_binned/2, show_limits: true).show_limits} ===
+               {{:binned, Scales.Palette.named("Blues")},
+                {:binned, {:manual, ["#FF0000", "#0000FF"]}}, {:gradient, ["#FFFFFF", "#000000"]},
+                {:gradient, ["#FF0000", "#0000FF"], [1.0, 0.0]},
+                {:binned,
+                 {:viridis, %{option: :magma, begin: 0.2, end: 0.8, direction: -1, alpha: 0.5}}},
+                {:binned, {:brewer, %{palette: "Dark2", direction: 1}}}, true}
+    end
+
+    # R 4.6.1: `scale_colour_binned(n.breaks = 1)` fails once built ("'from' must be of length
+    # 1"), as `labeling::extended()` finds no sequence for one break, but takes it beside
+    # `nice.breaks = FALSE` or given breaks, which leave it unread; `show.limits = TRUE` beside a
+    # character vector of labels warns and is ignored.
+    test "one nice break wanted, or shown limits beside a list of labels, are refused at the call" do
+      plot = Plot.new(@rows)
+
+      for {call, shown} <- [
+            {fn -> Plot.scale_color_binned(plot, n_breaks: 1) end,
+             "Plot.scale_color_binned/2 is given n_breaks: 1, and nice breaks need 2 or more " <>
+               "wanted; give nice_breaks: false for one break at the middle of the limits"},
+            {fn ->
+               Plot.scale_fill_fermenter(plot,
+                 show_limits: true,
+                 breaks: [100, 200],
+                 labels: ["a", "b"]
+               )
+             end,
+             "Plot.scale_fill_fermenter/2 is given show_limits: true beside a list of labels, " <>
+               "which labels the breaks alone; add the limits to breaks: and labels:, or give " <>
+               "labels: a function"},
+            {fn -> Plot.scale_color_steps(plot, labels: ["a", "b"]) end,
+             "Plot.scale_color_steps/2 is given 2 labels, which need breaks: a list of 2 breaks " <>
+               "to label, and it has none"}
+          ] do
+        error = assert_raise ArgumentError, call
+        assert error.message == shown
+      end
+
+      assert {Plot.scale_color_binned(plot, n_breaks: 1, nice_breaks: false).scales.color.n_breaks,
+              Plot.scale_color_binned(plot, n_breaks: 1, breaks: [1]).scales.color.n_breaks} ===
+               {1, 1}
+    end
+
+    # R's `scale_colour_viridis_b()` lists `values` and `space` but never reads them.
+    test "an option a binned scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_color_binned/2, [n_breaks: 0], "positive integer, got: 0"},
+            {&Plot.scale_fill_steps/2, [n_breaks: 2.5], "positive integer, got: 2.5"},
+            {&Plot.scale_color_stepsn/2, [colors: ["red"], nice_breaks: 1], "got: 1"},
+            {&Plot.scale_fill_steps2/2, [show_limits: :yes], "got: :yes"},
+            {&Plot.scale_color_steps/2, [right: nil], "got: nil"},
+            {&Plot.scale_color_viridis_b/2, [values: [0, 1]], "unknown options [:values]"},
+            {&Plot.scale_fill_binned/2, [palette: "red"], ~s(scales names no palette "red")},
+            {&Plot.scale_color_fermenter/2, [palette: "set1"], ~s(got: "set1")},
+            {&Plot.scale_fill_stepsn/2, [], "required :colors option not found"},
+            {&Plot.scale_color_binned/2, [expand: [mult: 0]], "unknown options [:expand]"},
+            {&Plot.scale_color_steps2/2, [transform: :log10], "unknown options [:transform]"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+
+      error = assert_raise ArgumentError, fn -> Plot.scale_fill_fermenter(plot, palette: 19) end
+      assert error.message =~ "Plot.scale_fill_fermenter/2 is given palette: 19"
+    end
+  end
+
   describe "the size scale functions" do
     test "each records an untrained scale of its palette and a legend, its missing value none" do
       plot = Plot.new(@rows)
@@ -5178,7 +5332,8 @@ defmodule Giggly.PlotTest do
 
   describe "a scale's guide:, guide_legend/1 and guides/2" do
     # Each colour, fill and alpha scale function, with the options it needs, and whether its scale
-    # is a continuous colour or fill scale, the one kind a colour bar shows.
+    # is a continuous colour or fill scale, the one kind a colour bar shows, or a binned one, which
+    # colour steps show.
     @guided_scale_functions [
       {&Plot.scale_color_manual/2, [values: ["red"]], :discrete},
       {&Plot.scale_fill_manual/2, [values: ["red"]], :discrete},
@@ -5201,6 +5356,18 @@ defmodule Giggly.PlotTest do
       {&Plot.scale_fill_continuous/2, [], :continuous},
       {&Plot.scale_color_viridis_c/2, [], :continuous},
       {&Plot.scale_fill_viridis_c/2, [], :continuous},
+      {&Plot.scale_color_binned/2, [], :binned},
+      {&Plot.scale_fill_binned/2, [], :binned},
+      {&Plot.scale_color_steps/2, [], :binned},
+      {&Plot.scale_fill_steps/2, [], :binned},
+      {&Plot.scale_color_steps2/2, [], :binned},
+      {&Plot.scale_fill_steps2/2, [], :binned},
+      {&Plot.scale_color_stepsn/2, [colors: ["red"]], :binned},
+      {&Plot.scale_fill_stepsn/2, [colors: ["red"]], :binned},
+      {&Plot.scale_color_viridis_b/2, [], :binned},
+      {&Plot.scale_fill_viridis_b/2, [], :binned},
+      {&Plot.scale_color_fermenter/2, [], :binned},
+      {&Plot.scale_fill_fermenter/2, [], :binned},
       {&Plot.scale_alpha_continuous/2, [], :alpha},
       {&Plot.scale_size_continuous/2, [], :size},
       {&Plot.scale_size_area/2, [], :size},
@@ -5231,7 +5398,8 @@ defmodule Giggly.PlotTest do
           guide <- [
             :none,
             :legend,
-            reversed | if(kind == :continuous, do: [:colorbar, :colorsteps], else: [])
+            reversed
+            | Map.get(%{continuous: [:colorbar, :colorsteps], binned: [:colorsteps]}, kind, [])
           ] do
         [scale] = Map.values(function.(plot, [{:guide, guide} | options]).scales)
         assert scale.guide === guide
@@ -5246,7 +5414,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for {function, options, kind} <- @guided_scale_functions,
-          kind != :continuous,
+          kind not in [:continuous, :binned],
           {guide, shows} <- [colorbar: "a colour bar shows", colorsteps: "colour steps show"] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
@@ -5262,6 +5430,22 @@ defmodule Giggly.PlotTest do
                  )
 
         assert error.message =~ shows
+      end
+    end
+
+    # ggplot2 4.0.3 draws `guide_colourbar()` for a binned scale, a bar of its bins' colours
+    # blended where they meet.
+    test "a colour bar is refused for a binned scale, naming colour steps" do
+      plot = Plot.new(@rows)
+
+      for {function, options, :binned} <- @guided_scale_functions do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            function.(plot, [{:guide, :colorbar} | options])
+          end
+
+        assert error.message =~
+                 "a colour bar shows a continuous scale, and this one is binned; give :colorsteps"
       end
     end
 

@@ -4,7 +4,7 @@ defmodule Scales.BreaksTest do
   alias Scales.Breaks
 
   # The examples' breaks are R 4.6.1's `labeling::extended(9.225, 35.075, 5)`,
-  # `extended(0, 10, 5)` and the same with `Q = c(1, 2, 1.5, 4, 3)`.
+  # `extended(0, 10, 5)`, the same with `Q = c(1, 2, 1.5, 4, 3)`, and `extended(52, 335, 2)`.
   doctest Scales.Breaks
 
   # Golden: R's own `labeling::extended(low, high, 5)` (labeling 0.4.3, R 4.6.1, run in Docker's
@@ -167,6 +167,53 @@ defmodule Scales.BreaksTest do
     assert Breaks.extended({321_908_391.83131832, 321_908_391.83131838}) === [
              321_908_391.83131832
            ]
+  end
+
+  # Golden: R's own `labeling::extended(low, high, m)` (labeling 0.4.3, R 4.6.1), each break
+  # printed to 17 significant digits, for 684 ranges, random and degenerate, and m from 2 to 15
+  # (this session's scratchpad `r/ext.R`), all of which match: a random range for each of five
+  # counts where five wanted would give other breaks, so the count steers the density score and
+  # its bound, and the narrow, the zero-wide and the too-wide ranges, whose breaks are the count
+  # spaced evenly. It moves only if the port stops matching R, which is a bug.
+  @r_counted_breaks [
+    {{1.6329492840570092, 5.139685381437919}, 2, [2.0, 5.0]},
+    {{-4.079952342473251, 40.15559576881623}, 3, [0.0, 20.0, 40.0]},
+    {{21.813925948942064, 32.471167877330366}, 8, [22.0, 24.0, 26.0, 28.0, 30.0, 32.0]},
+    {{1048.463745628539, 5099.781556777183}, 12,
+     [1000.0, 1500.0, 2000.0, 2500.0, 3000.0, 3500.0, 4000.0, 4500.0, 5000.0]},
+    {{-8.044567559905397, 37.496904388516484}, 15,
+     [-10.0, -5.0, 0.0, 5.0, 10.0, 15.0, 20.0, 25.0, 30.0, 35.0, 40.0]},
+    {{5.0, 5.0}, 2, [5.0, 5.0]},
+    {{1.0, 1.000000000000001}, 3, [1.0, 1.0000000000000004, 1.000000000000001]},
+    {{1.0e300, 1.5e300}, 7,
+     [
+       1.0e300,
+       1.083_333_333_333_333_4e300,
+       1.166_666_666_666_666_7e300,
+       1.25e300,
+       1.333_333_333_333_333_4e300,
+       1.416_666_666_666_666_6e300,
+       1.5e300
+     ]}
+  ]
+
+  test "breaks for another number wanted are R's labeling::extended() breaks for that count" do
+    for {extent, wanted, r_breaks} <- @r_counted_breaks do
+      assert {extent, wanted, Breaks.extended(extent, n: wanted)} == {extent, wanted, r_breaks}
+    end
+  end
+
+  # R's search finds no sequence for one break wanted and fails, and for none never ends.
+  test "the number of breaks wanted is a whole number from 2, and anything else is refused" do
+    for wanted <- [1, 0, -3, 2.5, :five] do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Breaks.extended({0.0, 10.0}, n: wanted)
+        end
+
+      assert error.message =~
+               "expected a whole number of breaks, 2 or more, got: #{inspect(wanted)}"
+    end
   end
 
   # The search stops only on a nice number that cannot win, so none would never stop.

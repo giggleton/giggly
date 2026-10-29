@@ -2,7 +2,7 @@ defmodule Scales.Transform do
   @moduledoc """
   The transformation a continuous scale puts its values through before it trains on them, named
   by a value (`t:name/0`): values into transformed space (`transform/2`) and back
-  (`inverse/2`), and an axis's default breaks (`breaks/2`), minor breaks (`minor_breaks/3`) and
+  (`inverse/2`), and an axis's default breaks (`breaks/3`), minor breaks (`minor_breaks/3`) and
   labels (`format/3`) there, as R's transformation objects carry them.
 
   Breaks are found as on an axis showing an extent in transformed space: the extent is squished
@@ -46,6 +46,19 @@ defmodule Scales.Transform do
 
   alias Scales.Transform
 
+  # The transformations whose breaks are extended breaks on the extent in data units, so they take
+  # a number of breaks wanted, as R's `support_nbreaks()` finds of their breaks functions.
+  @counted [:identity, :sqrt, :reverse, :reciprocal]
+
+  @breaks_options NimbleOptions.new!(
+                    n: [
+                      type: {:custom, Scales.Breaks, :validate_wanted, []},
+                      doc:
+                        "The number of breaks wanted, 2 or more, for a transformation whose " <>
+                          "breaks are extended breaks; five when not given."
+                    ]
+                  )
+
   @typedoc """
   A transformation, by name: `:identity`, R's `transform_identity()`; `:log10`, `:sqrt`,
   `:reverse` (each value negated) and `:reciprocal`, R's `transform_log10()` and its kin; `:date`,
@@ -83,9 +96,11 @@ defmodule Scales.Transform do
   @callback domain(transformation :: name()) :: {domain_low(), :infinity}
 
   # The breaks of an axis showing `extent`, in transformed space, in the transformation's order;
-  # some may fall outside it.
+  # some may fall outside it. `options` are `breaks/3`'s, validated, and `[]` for a transformation
+  # that counts no breaks.
   @doc false
-  @callback breaks(transformation :: name(), extent :: {float(), float()}) :: [float()]
+  @callback breaks(transformation :: name(), extent :: {float(), float()}, options :: keyword()) ::
+              [float()]
 
   # The minor breaks between `breaks` on an axis showing `extent`; the breaks themselves may be
   # among them, and some may fall outside the extent.
@@ -154,16 +169,42 @@ defmodule Scales.Transform do
   extent in data units, powers of ten under log10, and calendar dates under the date
   transformation, as R's `pretty()` finds them.
 
+  `n:` asks the identity, square root, reverse and reciprocal transformations, whose breaks are
+  extended breaks, for that many, as `Scales.Breaks.extended/2` takes it; the others count no
+  breaks and raise `ArgumentError` for it.
+
+  ## Options
+
+  #{NimbleOptions.docs(@breaks_options)}
+
   ## Examples
 
       iex> Scales.Transform.breaks(:identity, {9.225, 35.075})
       [10.0, 15.0, 20.0, 25.0, 30.0, 35.0]
 
+      iex> Scales.Transform.breaks(:identity, {9.225, 35.075}, n: 10)
+      [10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 27.5, 30.0, 32.5, 35.0]
+
       iex> Scales.Transform.breaks(:log10, {0.0, 3.0})
       [0.0, 1.0, 2.0, 3.0]
   """
-  @spec breaks(name(), {float(), float()}) :: [float()]
-  def breaks(name, extent), do: module(name).breaks(name, extent)
+  @spec breaks(name(), {float(), float()}, keyword()) :: [float()]
+  def breaks(name, extent, options \\ []) do
+    validated = NimbleOptions.validate!(options, @breaks_options)
+    counted_breaks(name, extent, validated)
+  end
+
+  defp counted_breaks(name, extent, []), do: module(name).breaks(name, extent, [])
+
+  defp counted_breaks(name, extent, options) when name in @counted,
+    do: module(name).breaks(name, extent, options)
+
+  defp counted_breaks(name, _extent, options) do
+    raise ArgumentError,
+          "the #{inspect(name)} transformation counts no breaks, so it takes no " <>
+            "#{inspect(Keyword.keys(options))}; the transformations that do are " <>
+            "#{Enum.map_join(@counted, ", ", &inspect/1)}"
+  end
 
   @doc """
   The default minor breaks between `breaks` on an axis showing `extent` under the transformation

@@ -39,7 +39,7 @@ defmodule Scales.Transform.Datetime do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(transformation, extent) do
+  def breaks(transformation, extent, []) do
     {times, _format} = DateBreaks.pretty_datetime(extent, clock(transformation))
     Enum.map(times, &seconds/1)
   end

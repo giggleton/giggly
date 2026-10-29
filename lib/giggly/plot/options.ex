@@ -1855,14 +1855,17 @@ defmodule Giggly.Plot.Options do
     ]
   ]
 
+  # A viridis palette's opacity, which the scales giving its colours one by one take.
+  @viridis_alpha_spec [
+    type: {:custom, __MODULE__, :validate_alpha, []},
+    default: @viridis_defaults[:alpha],
+    doc: "The colours' opacity, from 0 to 1."
+  ]
+
   @discrete_viridis_scale_options NimbleOptions.new!(
                                     @viridis_option_specs ++
                                       [
-                                        alpha: [
-                                          type: {:custom, __MODULE__, :validate_alpha, []},
-                                          default: @viridis_defaults[:alpha],
-                                          doc: "The colours' opacity, from 0 to 1."
-                                        ],
+                                        alpha: @viridis_alpha_spec,
                                         na_value:
                                           Keyword.put(@color_na_value_spec, :default, :none)
                                       ] ++ @discrete_color_legend_option_specs
@@ -1889,48 +1892,54 @@ defmodule Giggly.Plot.Options do
                                   ] ++ @discrete_color_legend_option_specs
                                 )
 
+  # A two-colour gradient's ends, which a gradient scale and a steps scale take.
+  @gradient_end_specs [
+    low: [
+      type: @opaque_color_type,
+      default: @gradient_defaults[:low],
+      doc: "The colour at the low end of the limits."
+    ],
+    high: [
+      type: @opaque_color_type,
+      default: @gradient_defaults[:high],
+      doc: "The colour at the high end of the limits."
+    ]
+  ]
+
+  # A diverging gradient's colours and midpoint, which a gradient2 scale and a steps2 scale take.
+  @diverging_gradient_specs [
+    low: [
+      type: @opaque_color_type,
+      default: "#832424",
+      doc: "The colour the low side runs to, a dark red when not given."
+    ],
+    mid: [
+      type: @opaque_color_type,
+      default: "#FFFFFF",
+      doc: "The colour at the midpoint, white when not given."
+    ],
+    high: [
+      type: @opaque_color_type,
+      default: "#3A3A98",
+      doc: "The colour the high side runs to, a dark blue when not given."
+    ],
+    midpoint: [
+      type: {:custom, __MODULE__, :validate_number, []},
+      default: 0.0,
+      doc: "The value the middle colour stands at."
+    ]
+  ]
+
   @gradient_scale_options NimbleOptions.new!(
-                            [
-                              low: [
-                                type: @opaque_color_type,
-                                default: @gradient_defaults[:low],
-                                doc: "The colour at the low end of the limits."
-                              ],
-                              high: [
-                                type: @opaque_color_type,
-                                default: @gradient_defaults[:high],
-                                doc: "The colour at the high end of the limits."
-                              ],
-                              na_value: @color_na_value_spec
-                            ] ++ @continuous_color_legend_option_specs
+                            @gradient_end_specs ++
+                              [na_value: @color_na_value_spec] ++
+                              @continuous_color_legend_option_specs
                           )
 
   @gradient2_scale_options NimbleOptions.new!(
-                             [
-                               low: [
-                                 type: @opaque_color_type,
-                                 default: "#832424",
-                                 doc:
-                                   "The colour the low side runs to, a dark red when not given."
-                               ],
-                               mid: [
-                                 type: @opaque_color_type,
-                                 default: "#FFFFFF",
-                                 doc: "The colour at the midpoint, white when not given."
-                               ],
-                               high: [
-                                 type: @opaque_color_type,
-                                 default: "#3A3A98",
-                                 doc:
-                                   "The colour the high side runs to, a dark blue when not given."
-                               ],
-                               midpoint: [
-                                 type: {:custom, __MODULE__, :validate_number, []},
-                                 default: 0.0,
-                                 doc: "The value the middle colour stands at."
-                               ],
-                               na_value: @color_na_value_spec
-                             ] ++ @continuous_color_legend_option_specs
+                             @diverging_gradient_specs ++
+                               [na_value: @color_na_value_spec] ++
+                               @continuous_color_legend_option_specs
                            )
 
   # A gradient's `values:`, which move a value's place in the limits before its colour is taken.
@@ -1943,18 +1952,22 @@ defmodule Giggly.Plot.Options do
         "last place takes `na_value:`. The colours are spaced evenly when not given."
   ]
 
+  # A gradient's colours, placed by `values:`, which a gradientn scale and a stepsn scale take.
+  @gradient_colors_specs [
+    colors: [
+      type: {:custom, __MODULE__, :validate_gradient_colors, []},
+      required: true,
+      doc:
+        "The colours, a list, spaced evenly from the low end of the limits to the high unless " <>
+          "`values:` places them."
+    ],
+    values: @gradient_values_spec
+  ]
+
   @gradientn_scale_options NimbleOptions.new!(
-                             [
-                               colors: [
-                                 type: {:custom, __MODULE__, :validate_gradient_colors, []},
-                                 required: true,
-                                 doc:
-                                   "The colours, a list, spaced evenly from the low end of the " <>
-                                     "limits to the high unless `values:` places them."
-                               ],
-                               values: @gradient_values_spec,
-                               na_value: @color_na_value_spec
-                             ] ++ @continuous_color_legend_option_specs
+                             @gradient_colors_specs ++
+                               [na_value: @color_na_value_spec] ++
+                               @continuous_color_legend_option_specs
                            )
 
   @continuous_color_scale_options NimbleOptions.new!(
@@ -2022,6 +2035,124 @@ defmodule Giggly.Plot.Options do
                                  values: @gradient_values_spec,
                                  na_value: @color_na_value_spec
                                ] ++ @continuous_color_legend_option_specs
+                           )
+
+  # A binned scale's `guide:`, colour steps unless given.
+  @binned_guide_spec [
+    type: {:custom, __MODULE__, :validate_guide, [:binned]},
+    default: :colorsteps,
+    doc:
+      "What reads the scale back: `:colorsteps`, a bar of one block of colour for each bin; " <>
+        "`:legend`, a key for each break; " <> @guide_doc_tail
+  ]
+
+  # The options of every binned colour or fill scale function, ggplot2's `binned_scale()`'s that a
+  # colour scale reads; an option not given keeps `Giggly.Scale.Binned`'s default, which those
+  # with one record as a value.
+  @binned_legend_option_specs [
+    name: @legend_name_spec,
+    limits: [
+      type: @limits_type,
+      doc:
+        "`{low, high}`: the values the bins span whatever the data, `nil` for an end the data " <>
+          "decides; either order names the same scale. A value outside them takes the colour of " <>
+          "the bin at the nearer end. The data's range, widened so the end bins are as wide as " <>
+          "their neighbours, when neither this nor `breaks:` is given."
+    ],
+    breaks: [
+      type: {:custom, __MODULE__, :validate_breaks, []},
+      doc:
+        "The values the bins are cut at, a list of numbers, those outside the limits left out, " <>
+          "or `:none` for one bin and no guide; chosen from the limits as `n_breaks:` and " <>
+          "`nice_breaks:` say when not given."
+    ],
+    labels: [
+      type: {:custom, __MODULE__, :validate_scale_labels, []},
+      doc:
+        "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
+          "every break, a list of numbers, that returns a string for each, as `Scales.Labels`'s " <>
+          "do, and handed the limits too where `show_limits:` shows them; or `:none` for no " <>
+          "labels."
+    ],
+    n_breaks: [
+      type: :pos_integer,
+      default: 5,
+      doc:
+        "How many breaks are wanted when `breaks:` is not given: 2 or more for nice breaks, " <>
+          "which may number a few more or fewer, 1 or more otherwise."
+    ],
+    nice_breaks: [
+      type: :boolean,
+      default: true,
+      doc:
+        "Whether breaks not given are round numbers, chosen as a continuous scale's are, or " <>
+          "`n_breaks:` spaced evenly between the ends of the limits."
+    ],
+    right: [
+      type: :boolean,
+      default: true,
+      doc: "Where a value on a break falls: `true` in the bin below it, `false` in the bin above."
+    ],
+    show_limits: [
+      type: :boolean,
+      default: false,
+      doc:
+        "Whether colour steps label the ends of the bar with the limits, unless a break is " <>
+          "already there; not beside a list of `labels:`, which labels the breaks alone."
+    ],
+    guide: @binned_guide_spec
+  ]
+
+  @binned_scale_options NimbleOptions.new!(
+                          [
+                            palette: [
+                              type: {:custom, __MODULE__, :validate_discrete_palette, []},
+                              doc:
+                                "A palette's name, one of scales' in any case " <>
+                                  "(`Scales.Palette.named/1`), such as `\"Blues\"` or " <>
+                                  "`\"viridis\"`, its colours for as many bins as there are " <>
+                                  "given to them in order, or a list of colours, given to the " <>
+                                  "bins in order, at least one for each; a gradient from " <>
+                                  "`#132B43` to `#56B1F7`, each bin the colour at its middle, " <>
+                                  "when not given."
+                            ],
+                            na_value: @color_na_value_spec
+                          ] ++ @binned_legend_option_specs
+                        )
+
+  @steps_scale_options NimbleOptions.new!(
+                         @gradient_end_specs ++
+                           [na_value: @color_na_value_spec] ++ @binned_legend_option_specs
+                       )
+
+  @steps2_scale_options NimbleOptions.new!(
+                          @diverging_gradient_specs ++
+                            [na_value: @color_na_value_spec] ++ @binned_legend_option_specs
+                        )
+
+  @stepsn_scale_options NimbleOptions.new!(
+                          @gradient_colors_specs ++
+                            [na_value: @color_na_value_spec] ++ @binned_legend_option_specs
+                        )
+
+  @binned_viridis_scale_options NimbleOptions.new!(
+                                  @viridis_option_specs ++
+                                    [alpha: @viridis_alpha_spec, na_value: @color_na_value_spec] ++
+                                    @binned_legend_option_specs
+                                )
+
+  @fermenter_scale_options NimbleOptions.new!(
+                             @brewer_option_specs ++
+                               [
+                                 direction: [
+                                   type: {:in, [1, -1]},
+                                   default: -1,
+                                   doc:
+                                     "-1 to give the palette's colours to the bins from its last " <>
+                                       "at the lowest to its first at the highest, 1 the other way."
+                                 ],
+                                 na_value: @color_na_value_spec
+                               ] ++ @binned_legend_option_specs
                            )
 
   @alpha_range_spec [
@@ -2823,6 +2954,30 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec distiller_scale() :: NimbleOptions.t()
   def distiller_scale, do: @distiller_scale_options
+
+  @doc false
+  @spec binned_scale() :: NimbleOptions.t()
+  def binned_scale, do: @binned_scale_options
+
+  @doc false
+  @spec steps_scale() :: NimbleOptions.t()
+  def steps_scale, do: @steps_scale_options
+
+  @doc false
+  @spec steps2_scale() :: NimbleOptions.t()
+  def steps2_scale, do: @steps2_scale_options
+
+  @doc false
+  @spec stepsn_scale() :: NimbleOptions.t()
+  def stepsn_scale, do: @stepsn_scale_options
+
+  @doc false
+  @spec binned_viridis_scale() :: NimbleOptions.t()
+  def binned_viridis_scale, do: @binned_viridis_scale_options
+
+  @doc false
+  @spec fermenter_scale() :: NimbleOptions.t()
+  def fermenter_scale, do: @fermenter_scale_options
 
   @doc false
   @spec continuous_alpha_scale() :: NimbleOptions.t()
@@ -4153,17 +4308,23 @@ defmodule Giggly.Plot.Options do
   # NimbleOptions' check of a guide, a scale's `guide:` or one of `guides/2`'s, for a scale of
   # `kind`: `:legend`, `:none` or a legend `guide_legend/1` made, for any; `:colorbar` or
   # `:colorsteps` for a continuous colour or fill scale alone, as each shows a continuous scale's
-  # colours, so a discrete scale's is refused, and an alpha, a shape, a size, a line type or a line
-  # width scale's whatever its kind.
+  # colours, and `:colorsteps` for a binned one, whose colour bar is refused, so a discrete scale's
+  # is refused, and an alpha, a shape, a size, a line type or a line width scale's whatever its
+  # kind.
   @doc false
   @spec validate_guide(
           term(),
-          :continuous | :discrete | :alpha | :shape | :size | :linetype | :linewidth
+          :continuous | :binned | :discrete | :alpha | :shape | :size | :linetype | :linewidth
         ) ::
           {:ok, Giggly.Plot.guide()} | {:error, String.t()}
   def validate_guide(%Guide.Legend{} = guide, _kind), do: {:ok, guide}
   def validate_guide(guide, _kind) when guide in [:legend, :none], do: {:ok, guide}
   def validate_guide(guide, :continuous) when guide in [:colorbar, :colorsteps], do: {:ok, guide}
+  def validate_guide(:colorsteps, :binned), do: {:ok, :colorsteps}
+
+  def validate_guide(:colorbar, :binned),
+    do:
+      {:error, "a colour bar shows a continuous scale, and this one is binned; give :colorsteps"}
 
   def validate_guide(:colorbar, :discrete),
     do: {:error, "a colour bar shows a continuous scale, and this one is discrete; give :legend"}

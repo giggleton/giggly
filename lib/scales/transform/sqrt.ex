@@ -24,11 +24,11 @@ defmodule Scales.Transform.Sqrt do
   def domain(_transformation), do: {0.0, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}) do
+  def breaks(_transformation, {low, high}, options) do
     [low, high]
     |> Enum.map(&squared/1)
     |> Enum.min_max()
-    |> Breaks.extended()
+    |> Breaks.extended(options)
     |> Enum.map(&root/1)
   end
 

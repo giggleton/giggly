@@ -222,7 +222,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   `Scale.samples/2`, each its place and colour, `extract_decor()`), worked out here from the scale,
   never by the guide; it draws no layer, so it has none. **Colour steps' keys carry their place
   and their bins' places and colours** (`Scale.steps/2`), a key the bar leaves out dropped, and
-  colour steps left with no keys are no legend, as ggplot2 drops a guide with none; they draw no
+  **a binned scale showing its limits adds a key at each end** (`Scale.shown_limits/1`), at 0
+  and 1, left out where a break's key already sits there, as `extract_params()` compares them
+  before it drops keys past the bar; colour steps left with no keys are no legend, as ggplot2 drops a guide with none; they draw no
   layer either. **Legends come in the order of their aesthetics' names, and one with
   the kind of guide, title and labels of an earlier merges into it**, its aesthetics after the earlier's and each key holding every aesthetic's value, as
   ggplot2 merges guides whose title and labels hash alike (design-log §4, the entry beginning "The

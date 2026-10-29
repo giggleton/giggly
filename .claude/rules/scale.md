@@ -119,7 +119,15 @@ identity transformation: the entry beginning "A layer records its stat and posit
   coloured by `{:binned, palette}`'s colours for the bins' count, too few raising, or by a
   continuous palette at its middle. Given breaks outside the limits are left out with their
   labels, a labels list is one for each given or default break or the run raises, and a missing
-  value is never coloured. Its tests pin R's breaks, limits and colours.
+  value is never coloured. **Default breaks are `n_breaks` wanted (5)**: nice ones, the
+  identity's extended breaks with `n:`, or, with `nice_breaks: false`, `n_breaks` spaced evenly
+  by R's `seq()` less its ends; with no limits given, two or more inside the range widen it so
+  the end bins match their neighbours, one widens it to that break less and plus its distance to
+  the further end, and none leave it, its ends its breaks, a zero-wide range first widened 0.05
+  either side, R's `get_breaks()` branch by branch, its arithmetic included.
+  **`shown_limits/1` gives the limits a scale with `show_limits` labels the bar's ends with**,
+  written by its labels as its breaks are, `[]` when not shown, raising beside a list of labels,
+  which R ignores with a warning. Its tests pin R's breaks, limits, colours and labels.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
   `minor_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but `rescaler`,
   `:rescale`, `limits` `{nil, nil}` and

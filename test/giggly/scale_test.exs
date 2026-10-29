@@ -1474,8 +1474,99 @@ defmodule Giggly.ScaleTest do
                limits: {nil, nil},
                breaks: :default,
                labels: :default,
-               right: true
+               n_breaks: 5,
+               nice_breaks: true,
+               right: true,
+               show_limits: false
              }
+    end
+
+    # R's `scale_colour_binned(n.breaks = n)` on 52 to 335: three nice breaks wanted give four,
+    # ten give ten 30 apart, and two give one inside the range, the limits then that break less
+    # and plus its distance to the further end; on 0 to 1, two give its ends, so the range is not
+    # widened and its ends are its breaks.
+    test "n_breaks nice breaks are wanted, the limits widened on those the count gives" do
+      three = binned([52, 150, 335], n_breaks: 3)
+      ten = binned([52, 150, 335], n_breaks: 10)
+      one_inside = binned([52, 150, 335], n_breaks: 2)
+      none_inside = binned([0, 0.5, 1], n_breaks: 2)
+
+      assert {break_values(three), Scale.Binned.limits(three), Scale.map(three, [52, 150, 335])} ===
+               {[100.0, 200.0, 300.0], {0.0, 400.0}, ["#1B3A57", "#2A5A82", "#4D9FDE"]}
+
+      assert {break_values(ten), Scale.Binned.limits(ten)} ===
+               {[60.0, 90.0, 120.0, 150.0, 180.0, 210.0, 240.0, 270.0, 300.0, 330.0],
+                {30.0, 360.0}}
+
+      assert {break_values(one_inside), Scale.Binned.limits(one_inside),
+              Scale.map(one_inside, [52, 335])} ===
+               {[300.0], {52.0, 548.0}, ["#22496C", "#448DC6"]}
+
+      assert {Scale.legend_breaks(none_inside), Scale.Binned.limits(none_inside),
+              Scale.map(none_inside, [0, 0.5, 1])} ===
+               {[{0.0, "0"}, {1.0, "1"}], {0.0, 1.0}, ["#336A98", "#336A98", "#336A98"]}
+    end
+
+    # R's `scale_colour_binned(nice.breaks = FALSE)` on 52 to 335: R's `seq()` less its ends, the
+    # limits widened by the step on either side, which R's arithmetic leaves a hair below 52 for
+    # two breaks; one break is the middle, the limits about it the range; given limits are kept.
+    test "without nice breaks, n_breaks are spaced evenly between the ends of the limits" do
+      five = binned([52, 150, 335], nice_breaks: false)
+      two = binned([52, 150, 335], nice_breaks: false, n_breaks: 2)
+      one = binned([52, 150, 335], nice_breaks: false, n_breaks: 1)
+      limited = binned([52, 150, 335], nice_breaks: false, limits: {0, 400})
+
+      assert {break_values(five), Scale.Binned.limits(five), Scale.map(five, [52, 150, 335])} ===
+               {[
+                  99.16666666666666,
+                  146.33333333333331,
+                  193.5,
+                  240.66666666666666,
+                  287.8333333333333
+                ], {52.0, 335.0}, ["#183550", "#2D5F89", "#50A5E7"]}
+
+      assert {break_values(two), Scale.Binned.limits(two)} ===
+               {[146.33333333333331, 240.66666666666666], {51.99999999999997, 335.0}}
+
+      assert {break_values(one), Scale.Binned.limits(one), Scale.map(one, [52, 230, 335])} ===
+               {[193.5], {52.0, 335.0}, ["#22496C", "#448DC6", "#448DC6"]}
+
+      assert {break_values(limited), Scale.Binned.limits(limited)} ===
+               {[
+                  66.66666666666667,
+                  133.33333333333334,
+                  200.0,
+                  266.6666666666667,
+                  333.33333333333337
+                ], {0.0, 400.0}}
+    end
+
+    # R's guide data for `scale_colour_binned(show.limits = TRUE)`: the limits labelled by the
+    # scale's labels, written together, by a function, or not at all; beside a list of labels R
+    # ignores `show.limits` with a warning.
+    test "shown limits are the limits labelled as the scale labels them, and none unless shown" do
+      shown = fn options ->
+        [52, 150, 335]
+        |> binned(options)
+        |> Scale.shown_limits()
+      end
+
+      written = fn values -> Enum.map(values, fn value -> "<#{round(value)}>" end) end
+
+      assert {shown.([]), shown.(show_limits: true), shown.(show_limits: true, labels: written),
+              shown.(show_limits: true, labels: :none),
+              shown.(show_limits: true, nice_breaks: false, n_breaks: 2)} ===
+               {[], [{50.0, "50"}, {350.0, "350"}], [{50.0, "<50>"}, {350.0, "<350>"}],
+                [{50.0, :none}, {350.0, :none}], [{51.99999999999997, "52"}, {335.0, "335"}]}
+
+      error =
+        assert_raise ArgumentError, fn ->
+          shown.(show_limits: true, breaks: [100, 200], labels: ["a", "b"])
+        end
+
+      assert error.message ==
+               "a binned scale shows its limits beside labels written by default or by a " <>
+                 ~s(function, and its labels are a list, which labels its breaks alone, got: ["a", "b"])
     end
 
     test "edges far closer than 1 apart are bins of their own" do

@@ -6,7 +6,8 @@ defmodule Scales.Breaks do
 
   # The extended Wilkinson algorithm of Talbot, Lin and Hanrahan (2010), as R's
   # `labeling::extended()` implements it and `scales::breaks_extended()` calls it, with five
-  # breaks wanted, which is ggplot2's default for a continuous axis.
+  # breaks wanted unless a caller asks for another number, five being ggplot2's default for a
+  # continuous axis.
   #
   # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
   # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers times a power of ten, early in
@@ -33,7 +34,7 @@ defmodule Scales.Breaks do
   # the remainder in doubles, exactly 0, grants; so on ranges over about 3e23 wide reaching zero,
   # about one in six, Giggly's breaks may pass through zero where R's do not.
 
-  # The number of breaks wanted: `scales::breaks_extended()`'s `n`.
+  # The number of breaks wanted unless a caller says: `scales::breaks_extended()`'s `n`.
   @wanted 5
 
   # `labeling::extended()`'s defaults: the nice numbers, in order of preference, and the weights of
@@ -59,6 +60,13 @@ defmodule Scales.Breaks do
   @minus_infinity -1.797_693_134_862_315_7e308
 
   @extended_options NimbleOptions.new!(
+                      n: [
+                        type: {:custom, __MODULE__, :validate_wanted, []},
+                        default: @wanted,
+                        doc:
+                          "The number of breaks wanted, 2 or more, `labeling::extended()`'s " <>
+                            "`m`; the breaks found may number a few more or fewer."
+                      ],
                       nice_numbers: [
                         type: {:custom, __MODULE__, :validate_nice_numbers, []},
                         default: @nice_numbers,
@@ -70,13 +78,14 @@ defmodule Scales.Breaks do
 
   @doc """
   The breaks of the extended Wilkinson sequence that scores best over the limits `{low, high}`,
-  `low` below `high`, in ascending order, R's `breaks_extended()`, five breaks wanted.
+  `low` below `high`, in ascending order, R's `breaks_extended()`, `n:` breaks wanted.
 
   It searches for the evenly spaced sequence that scores best on simplicity (a step from the nice
   numbers times a power of ten, early in their list, and zero among the breaks), coverage (the
-  sequence spans the limits without overshooting them far), density (close to five breaks) and
-  legibility, weighted as R weights them. Limits narrower than 100 times the machine epsilon, or
-  wider than the square root of the largest float, get five breaks spaced evenly from end to end.
+  sequence spans the limits without overshooting them far), density (close to the number of breaks
+  wanted) and legibility, weighted as R weights them. Limits narrower than 100 times the machine
+  epsilon, or wider than the square root of the largest float, get the number wanted spaced evenly
+  from end to end.
 
   ## Options
 
@@ -92,16 +101,28 @@ defmodule Scales.Breaks do
 
       iex> Scales.Breaks.extended({0.0, 10.0}, nice_numbers: [1, 2, 1.5, 4, 3])
       [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+
+      iex> Scales.Breaks.extended({52.0, 335.0}, n: 2)
+      [0.0, 300.0]
   """
   @spec extended({float(), float()}, keyword()) :: [float()]
   def extended(limits, options \\ []) do
-    %{nice_numbers: nice_numbers} =
+    %{n: wanted, nice_numbers: nice_numbers} =
       options
       |> NimbleOptions.validate!(@extended_options)
       |> Map.new()
 
-    extended_breaks(limits, nice_numbers)
+    extended_breaks(limits, wanted, nice_numbers)
   end
+
+  # NimbleOptions' check of `n:`: a whole number from 2, since R's search finds no sequence for
+  # one break wanted and fails, and never ends for none.
+  @doc false
+  @spec validate_wanted(term()) :: {:ok, pos_integer()} | {:error, String.t()}
+  def validate_wanted(wanted) when is_integer(wanted) and wanted >= 2, do: {:ok, wanted}
+
+  def validate_wanted(other),
+    do: {:error, "expected a whole number of breaks, 2 or more, got: #{inspect(other)}"}
 
   # NimbleOptions' check of `nice_numbers:`: a list of positive numbers, at least one, since the
   # search stops only on a nice number that cannot win.
@@ -120,43 +141,46 @@ defmodule Scales.Breaks do
 
   # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the
   # opening comment describes.
-  defp extended_breaks({low, high}, _nice_numbers)
+  defp extended_breaks({low, high}, wanted, _nice_numbers)
        when high - low < @epsilon or high - low > @widest_searched,
-       do: spaced_evenly(low, high)
+       do: spaced_evenly(low, high, wanted)
 
-  defp extended_breaks(range, nice_numbers) do
+  defp extended_breaks(range, wanted, nice_numbers) do
     preferred = preferences(nice_numbers)
-    %{first: first, last: last, step: step} = search(range, 1, preferred, %{score: -2})
+    best = search({range, wanted}, 1, preferred, %{score: -2})
+    %{first: first, last: last, step: step} = best
     sequence(first, last, step)
   end
 
   # The outer loop, over `j`, the number of steps a nice number is skipped by: it stops when no
   # nice number at this `j` could beat the best sequence so far even with perfect coverage and
   # density.
-  defp search(range, skip, preferred, best) do
-    case search_nice_numbers(range, skip, preferred, best) do
+  # The search runs over the range and the number of breaks wanted, `problem`.
+  defp search(problem, skip, preferred, best) do
+    case search_nice_numbers(problem, skip, preferred, best) do
       {:halt, best} -> best
-      {:cont, best} -> search(range, skip + 1, preferred, best)
+      {:cont, best} -> search(problem, skip + 1, preferred, best)
     end
   end
 
-  defp search_nice_numbers(_range, _skip, [], best), do: {:cont, best}
+  defp search_nice_numbers(_problem, _skip, [], best), do: {:cont, best}
 
-  defp search_nice_numbers(range, skip, [nice | rest], %{score: best_score} = best) do
+  defp search_nice_numbers(problem, skip, [nice | rest], %{score: best_score} = best) do
     simplicity_bound = simplicity_max(nice, skip)
 
     if bound(simplicity_bound, 1, 1) < best_score do
       {:halt, best}
     else
-      best = search_counts(range, skip, nice, simplicity_bound, 2, best)
-      search_nice_numbers(range, skip, rest, best)
+      best = search_counts(problem, skip, nice, simplicity_bound, 2, best)
+      search_nice_numbers(problem, skip, rest, best)
     end
   end
 
   # Over `k`, the number of breaks, until no count this large could win on density.
-  defp search_counts({low, high} = range, skip, nice, simplicity_bound, count, best) do
+  defp search_counts(problem, skip, nice, simplicity_bound, count, best) do
+    {{low, high}, wanted} = problem
     %{score: best_score} = best
-    density_bound = density_max(count)
+    density_bound = density_max(count, wanted)
 
     if bound(simplicity_bound, 1, density_bound) < best_score do
       best
@@ -165,14 +189,14 @@ defmodule Scales.Breaks do
       delta = (high - low) / (count + 1) / skip / number
       power = ceil(:math.log10(delta))
       candidate = {skip, nice, simplicity_bound, count, density_bound}
-      best = search_powers(range, candidate, power, best)
-      search_counts(range, skip, nice, simplicity_bound, count + 1, best)
+      best = search_powers(problem, candidate, power, best)
+      search_counts(problem, skip, nice, simplicity_bound, count + 1, best)
     end
   end
 
   # Over `z`, the power of ten the nice number is scaled by, until the step overshoots the range
   # by too much to cover it well.
-  defp search_powers(range, candidate, power, best) do
+  defp search_powers({range, _wanted} = problem, candidate, power, best) do
     {skip, {number, _preference}, simplicity_bound, count, density_bound} = candidate
     %{score: best_score} = best
     step = skip * number * :math.pow(10, power)
@@ -185,10 +209,10 @@ defmodule Scales.Breaks do
         range
         |> starts(step, skip, count)
         |> Enum.reduce(best, fn start, best_so_far ->
-          consider(range, candidate, step, start, best_so_far)
+          consider(problem, candidate, step, start, best_so_far)
         end)
 
-      search_powers(range, candidate, power + 1, best)
+      search_powers(problem, candidate, power + 1, best)
     end
   end
 
@@ -200,7 +224,7 @@ defmodule Scales.Breaks do
     if first > last, do: [], else: Enum.to_list(first..last//1)
   end
 
-  defp consider(range, candidate, step, start, best) do
+  defp consider({range, wanted}, candidate, step, start, best) do
     {skip, nice, _simplicity_bound, count, _density_bound} = candidate
     %{score: best_score} = best
     first = start * (step / skip)
@@ -209,7 +233,7 @@ defmodule Scales.Breaks do
     score =
       @simplicity_weight * simplicity(nice, skip, first, last, step) +
         @coverage_weight * coverage(range, first, last) +
-        @density_weight * density(count, range, first, last) +
+        @density_weight * density(count, wanted, range, first, last) +
         @legibility_weight * @legibility
 
     if score > best_score, do: %{score: score, first: first, last: last, step: step}, else: best
@@ -265,16 +289,16 @@ defmodule Scales.Breaks do
 
   # `.density()`, minus infinity for a sequence whose first and last breaks are one number, its
   # step rounding error beside them, as R's division by zero gives.
-  defp density(_count, _range, first, last) when first == last, do: @minus_infinity
+  defp density(_count, _wanted, _range, first, last) when first == last, do: @minus_infinity
 
-  defp density(count, {low, high}, first, last) do
+  defp density(count, wanted, {low, high}, first, last) do
     ratio = (count - 1) / (last - first)
-    target = (@wanted - 1) / (max(last, high) - min(low, first))
+    target = (wanted - 1) / (max(last, high) - min(low, first))
     2 - max(ratio / target, target / ratio)
   end
 
-  defp density_max(count) when count >= @wanted, do: 2 - (count - 1) / (@wanted - 1)
-  defp density_max(_count), do: 1
+  defp density_max(count, wanted) when count >= wanted, do: 2 - (count - 1) / (wanted - 1)
+  defp density_max(_count, _wanted), do: 1
 
   # R's `%%` on doubles: the remainder with the sign of the divisor.
   defp modulo(dividend, divisor), do: dividend - :math.floor(dividend / divisor) * divisor
@@ -290,10 +314,10 @@ defmodule Scales.Breaks do
     end
   end
 
-  # R's `seq(from, to, length.out = n)`: `n` values from end to end, the ends exact.
-  defp spaced_evenly(low, high) do
-    width = (high - low) / (@wanted - 1)
-    inner = Enum.map(1..(@wanted - 2)//1, fn index -> low + index * width end)
+  # R's `seq(from, to, length.out = wanted)`: `wanted` values from end to end, the ends exact.
+  defp spaced_evenly(low, high, wanted) do
+    width = (high - low) / (wanted - 1)
+    inner = Enum.map(1..(wanted - 2)//1, fn index -> low + index * width end)
     Enum.concat([[low], inner, [high]])
   end
 end

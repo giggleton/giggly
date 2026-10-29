@@ -24,12 +24,12 @@ defmodule Scales.Transform.Reciprocal do
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}) do
+  def breaks(_transformation, {low, high}, options) do
     [low, high]
     |> Enum.map(&reciprocal/1)
     |> Enum.filter(&is_number/1)
     |> Enum.min_max()
-    |> Breaks.extended()
+    |> Breaks.extended(options)
     |> Enum.map(&reciprocal/1)
   end
 

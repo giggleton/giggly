@@ -22,18 +22,28 @@ defmodule Giggly.Scale.Binned do
       decides. A value outside them takes the colour of the bin at the nearer end. With neither
       end given and its breaks the default, the limits are the data's range widened so the end
       bins are as wide as their neighbours: from the lowest break inside the range less the step
-      to the next, to the highest plus the step from the one before; a range of one value is
-      widened by 0.05 either side, and its two ends are its breaks.
+      to the next, to the highest plus the step from the one before; with one break inside, so
+      it is the middle, from it less its distance to the further end of the range to it plus the
+      same; with none inside, not widened, its ends its breaks, and a range of one value widened
+      by 0.05 either side first.
     * `breaks`: the values its bins are cut at, beside the limits: a list, those inside the
-      limits kept, in the order given; `:none` for one bin; or `:default` for about five, chosen
-      as a continuous scale's are, on the limits, those at either end of the data's range left out
-      where the limits are widened.
+      limits kept, in the order given; `:none` for one bin; or `:default` for about `n_breaks`,
+      chosen as `nice_breaks` says on the limits, those at either end of the data's range left
+      out where the limits are widened.
+    * `n_breaks`: how many default breaks are wanted, 5 unless given; nice breaks may number a
+      few more or fewer.
+    * `nice_breaks`: `true` for default breaks chosen to be round numbers, as a continuous
+      scale's are, `n_breaks` of them wanted, 2 or more; `false` for `n_breaks` breaks spaced
+      evenly between the ends of the limits, 1 or more.
     * `labels`: a label for each break: a list, one for each of its given breaks, or of its
       default ones, a break left out taking its label with it; a function handed every break
       kept, that returns their labels; `:none` for none; or `:default`, each written as a
       continuous scale writes a number.
     * `right`: where a value on a break falls: `true` in the bin below it, `false` in the bin
       above; the lowest value is in the lowest bin, and the highest in the highest.
+    * `show_limits`: `true` to have colour steps label the ends of the bar with the limits,
+      written by its `labels` as its breaks are, unless a break is already there; `false` for
+      the breaks alone. A legend shows the breaks alone either way.
   """
 
   # Use it through `Giggly.Scale`: ggplot2's `ScaleBinned` for colour and fill.
@@ -57,7 +67,8 @@ defmodule Giggly.Scale.Binned do
 
   # Every field's default is `scale_colour_binned()`'s before it has seen any data: the gradient
   # from `#132B43` to `#56B1F7`, places between the limits' ends, grey50 for a missing value,
-  # colour steps, and every option the default, a value on a break in the bin below it.
+  # colour steps, and every option the default, five nice breaks wanted, a value on a break in the
+  # bin below it, and the limits not shown.
   defstruct range: :none,
             palette: {:gradient, ["#132B43", "#56B1F7"]},
             rescaler: :rescale,
@@ -67,7 +78,10 @@ defmodule Giggly.Scale.Binned do
             limits: {nil, nil},
             breaks: :default,
             labels: :default,
-            right: true
+            n_breaks: 5,
+            nice_breaks: true,
+            right: true,
+            show_limits: false
 
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
@@ -79,7 +93,10 @@ defmodule Giggly.Scale.Binned do
           limits: {number() | nil, number() | nil},
           breaks: :default | :none | [number()],
           labels: :default | :none | [String.t()] | ([float()] -> [String.t()]),
-          right: boolean()
+          n_breaks: pos_integer(),
+          nice_breaks: boolean(),
+          right: boolean(),
+          show_limits: boolean()
         }
 
   # The scale widened to cover the finite numbers in `values`, as a continuous scale's is.
@@ -174,12 +191,13 @@ defmodule Giggly.Scale.Binned do
     {breaks, limits}
   end
 
-  defp resolved(%__MODULE__{breaks: :default, limits: {nil, nil}}, limits), do: widened(limits)
+  defp resolved(%__MODULE__{breaks: :default, limits: {nil, nil}} = scale, limits),
+    do: widened(scale, limits)
 
-  defp resolved(%__MODULE__{breaks: :default}, limits) do
+  defp resolved(%__MODULE__{breaks: :default} = scale, limits) do
     breaks =
-      limits
-      |> default_breaks()
+      scale
+      |> default_breaks(limits)
       |> indexed_inside(limits)
 
     {breaks, limits}
@@ -194,29 +212,46 @@ defmodule Giggly.Scale.Binned do
   defp given_limits(%__MODULE__{limits: {low, high}, range: {range_low, range_high}}),
     do: {(low || range_low) / 1, (high || range_high) / 1}
 
-  # The identity's breaks on the limits sorted, as R sorts them before breaking them.
-  defp default_breaks({low, high}),
-    do: Transform.breaks(:identity, {min(low, high), max(low, high)})
+  # The default breaks on the limits sorted, as R sorts them before breaking them: nice ones, the
+  # identity's with `n_breaks` wanted, or `n_breaks` spaced evenly between the ends, R's
+  # `seq(low, high, length.out = n_breaks + 2)` less its first and last.
+  defp default_breaks(%__MODULE__{nice_breaks: true, n_breaks: wanted}, {low, high}),
+    do: Transform.breaks(:identity, {min(low, high), max(low, high)}, n: wanted)
 
-  # The default breaks strictly inside the trained range, and the range widened so the end bins
-  # are as wide as their neighbours, R's `get_breaks()` with no limits given; a range of one value,
-  # whose breaks all fall on it, widened by 0.05 either side, its ends its breaks. Extended breaks
-  # leave two or more strictly inside any range wider than that, so R's branch for one is not here.
-  defp widened({low, high} = range) do
+  defp default_breaks(%__MODULE__{nice_breaks: false, n_breaks: wanted}, {low, high}) do
+    {min(low, high), max(low, high)}
+    |> Palette.spread(wanted + 2)
+    |> Enum.slice(1..wanted//1)
+  end
+
+  # The default breaks strictly inside the trained range, and the range widened, R's
+  # `get_breaks()` with no limits given: with two or more breaks, so the end bins are as wide as
+  # their neighbours; with one, to that break less and plus its distance to the further end; with
+  # none, not widened but for a range of one value, whose breaks all fall on it, widened by 0.05
+  # either side, and its ends its breaks.
+  defp widened(scale, {low, high} = range) do
     inner =
-      range
-      |> default_breaks()
+      scale
+      |> default_breaks(range)
       |> Enum.filter(fn break -> break > low and break < high end)
 
-    case {inner, Bounds.zero_range?(range)} do
-      {[first, second | _more], _zero_range} ->
+    case inner do
+      [first, second | _more] ->
         [last, before_last | _fewer] = Enum.reverse(inner)
         {indexed(inner), {first + (first - second), last + (last - before_last)}}
 
-      {[], true} ->
-        {widened_low, widened_high} = widened = {low - 0.05, high + 0.05}
+      [break] ->
+        bin = max(break - low, high - break)
+        {indexed(inner), {break - bin, break + bin}}
+
+      [] ->
+        {widened_low, widened_high} = widened = widened_ends(range)
         {indexed([widened_low, widened_high]), widened}
     end
+  end
+
+  defp widened_ends({low, high} = range) do
+    if Bounds.zero_range?(range), do: {low - 0.05, high + 0.05}, else: range
   end
 
   defp indexed_inside(breaks, {low, high}) do

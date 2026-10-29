@@ -142,7 +142,7 @@ panel's grid lines are placed by the coordinate system".
   `direction`, `nrow`, `ncol`, `override.aes`, `theme`), the keys filled a row at a time
   (`legend.byrow`), titles and labels on other sides of the keys, `guide_colourbar()`'s
   options: `nbin`, `reverse`, and its raster and rectangles displays, and `guide_coloursteps()`'s:
-  `even.steps`, `show.limits`, `reverse`, `alpha`.
+  `even.steps`, `show.limits` (the scale's `show_limits` is read), `reverse`, `alpha`.
 - **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays one out at its defaults**: the legend
   margin inside the edge; **the keys in a grid filled a column at a time**, one column for each
@@ -197,5 +197,6 @@ panel's grid lines are placed by the coordinate system".
   (`Guide.Colorsteps`; design-log §4, the entry beginning "Colour steps place their breaks"): the
   colour bar's bar and layout, filled with a `Scene.Rectangles` of one rectangle for each of the
   bins the assembly worked out, from and to its place along the bar, in its colour, with no border,
-  and ticks in the theme's colour steps ticks (`legend_steps_ticks`), none unless the theme sets
+  a binned scale's shown limits labelled at the bar's ends as any key, and ticks in the theme's
+  colour steps ticks (`legend_steps_ticks`), none unless the theme sets
   `legend.ticks`. It draws no layer's glyph.

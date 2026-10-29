@@ -670,6 +670,26 @@ defmodule Giggly.Scale do
   defp binned_labels(%Binned{labels: labeller}, values, _indexes) when is_function(labeller, 1),
     do: labelled(labeller, values)
 
+  # The limits colour steps label the ends of a binned scale's bar with, where it shows them, each
+  # with its label, as R's `show.limits` adds them: written as its breaks are, by default together,
+  # by its function handed the two, or `:none`; none where it does not show them. Beside a list of
+  # labels, which labels its breaks alone, it raises, where R ignores `show.limits` with a warning.
+  @doc false
+  @spec shown_limits(t()) :: [{float(), String.t() | :none}]
+  def shown_limits(%Binned{show_limits: true, labels: given}) when is_list(given) do
+    raise ArgumentError,
+          "a binned scale shows its limits beside labels written by default or by a function, " <>
+            "and its labels are a list, which labels its breaks alone, got: #{inspect(given)}"
+  end
+
+  def shown_limits(%Binned{show_limits: true} = scale) do
+    {low, high} = Binned.limits(scale)
+    limits = [low, high]
+    Enum.zip(limits, binned_labels(scale, limits, []))
+  end
+
+  def shown_limits(_scale), do: []
+
   # `count` values spread evenly over a continuous scale's limits (`limits/1`), from their low end
   # to their high, as R's `seq(low, high, length.out = count)` spreads them
   # (`Scales.Palette`): the values ggplot2's colour bar takes its colours at

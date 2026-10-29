@@ -38,7 +38,7 @@ defmodule Scales.Transform.Log10 do
 
   # The breaks found on the extent in data units, then put back into log space.
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}) do
+  def breaks(_transformation, {low, high}, []) do
     {power(low), power(high)}
     |> log_breaks()
     |> Enum.map(&log10/1)
