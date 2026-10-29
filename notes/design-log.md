@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **An example handing a scale a palette function is drawn with the palette's name (2026-10-29,
+  Steve: "A", increment 1's notebook sweep).** scale_colour_discrete's
+  `palette = scales::pal_brewer(palette = "Dark2")` is `palette: "Dark2"`: `palette:` takes a name
+  or a list, palette values there rejected (the entry beginning "A brewer or distiller scale
+  takes R's options"), so the name is the counterpart Giggly offers, as the plot's own theme is
+  for an active one, and ggplot2 looks the name up as the same palette; the drawing is R's. The
+  prose says a palette is named where ggplot2 is handed one. A verdict naming a palette function
+  the package has as a value (`scales::pal_grey()`) drops it, keeping what still waits. This
+  answers §7's "How a notebook treats an example of a function Giggly will not offer" for palette
+  functions. *Rejected: a verdict waiting on palette values on `palette:`* — one that never
+  comes true.
+
 - **A binned scale function takes R's options, and asks for a count of nice breaks through the
   transformation (2026-10-29, Steve, increment 1's step 9; checked against ggplot2 4.0.3).**
   `scale_*_binned`, `_steps`, `_steps2`, `_stepsn`, `_viridis_b` and `_fermenter` record a
@@ -3068,6 +3080,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Draw the notebook examples increment 1 unlocks, the brewer and steps scales and a
+  named palette, and narrow every verdict to what still waits (palettes and colours, step 10, the
+  notebook sweep); §4: "An example handing a scale a palette function"
 - 2026-10-29 — Add the binned colour scale functions, binned, steps, steps2, stepsn, viridis_b
   and fermenter, with n_breaks, nice_breaks and show_limits (palettes and colours, step 9); §4:
   "A binned scale function takes R's options"
@@ -3467,7 +3482,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
   Settled when the first such example could otherwise be drawn. The active theme's functions,
   which Giggly rejects as global state, are answered (§4, the entry beginning "An example that
-  sets ggplot2's active theme").
+  sets ggplot2's active theme"), and so are palette functions handed to a scale (the entry
+  beginning "An example handing a scale a palette function").
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

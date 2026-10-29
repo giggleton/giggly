@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mpg = Giggly.Datasets.mpg()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,9 +31,12 @@ column of discrete values is mapped to `colour` or `fill`, giving each value its
 palette. Their default palette is a setting of the theme. Giggly draws a discrete column mapped to
 `colour` or `fill` as `scale_colour_discrete()` does by default, in hues evenly spaced round the
 colour wheel with a legend, and has `Giggly.Plot.scale_color_discrete/2` and
-`Giggly.Plot.scale_fill_discrete/2`, whose `palette:` is a list of colours, but no palette given as
-a function, such as `scales::pal_brewer()`, and takes no palette from the theme
-(`palette.colour.discrete`).
+`Giggly.Plot.scale_fill_discrete/2`, whose `palette:` is a palette's name, as the scales package
+names them, or a list of colours, and takes no palette from the theme (`palette.colour.discrete`).
+A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds ggplot2's
+`mpg`, `Giggly.Datasets.mpg/0`, to `mpg`.
 
 ## A palette given to the scale
 
@@ -37,7 +51,19 @@ p <- ggplot(mpg, aes(displ, hwy, colour = class)) +
 p + scale_colour_discrete(palette = scales::pal_brewer(palette = "Dark2"))
 ```
 
-Not in Giggly yet: `scales::pal_brewer()`.
+Giggly names the palette, `"Dark2"`, where ggplot2 is handed the palette `scales::pal_brewer()`
+makes; ggplot2 looks a name up as the same palette.
+
+```elixir
+p =
+  mpg
+  |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+  |> Plot.geom_point()
+
+p
+|> Plot.scale_color_discrete(palette: "Dark2")
+|> render.()
+```
 
 ## A palette from the theme
 
@@ -46,7 +72,7 @@ Not in Giggly yet: `scales::pal_brewer()`.
 p + theme(palette.colour.discrete = scales::pal_grey())
 ```
 
-Not in Giggly yet: the theme's `palette.colour.discrete` setting and `scales::pal_grey()`.
+Not in Giggly yet: the theme's `palette.colour.discrete` setting.
 
 ## A default for every plot
 
@@ -61,7 +87,7 @@ old <- update_theme(palette.colour.discrete = scales::pal_viridis())
 p
 ```
 
-Not in Giggly yet: the theme's `palette.colour.discrete` setting and `scales::pal_viridis()`.
+Not in Giggly yet: the theme's `palette.colour.discrete` setting.
 
 ## Restoring the theme
 

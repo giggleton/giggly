@@ -29,9 +29,12 @@ its ggplot2 code and names what it is waiting for, so the page is also a list of
 
 The brewer scales colour discrete values with ColorBrewer's sequential, diverging and qualitative
 palettes, which were designed for maps. The distiller scales blend a palette smoothly for continuous
-values, and the fermenter scales cut continuous values into bins, one colour each. Giggly has none
-of them yet: it has no ColorBrewer palettes, and colours a discrete column with hues, greys, viridis
-or colours given by hand and a continuous one along a gradient. A plot is described with
+values, and the fermenter scales cut continuous values into bins, one colour each. Giggly has all
+six, `Giggly.Plot.scale_color_brewer/2`, `Giggly.Plot.scale_fill_brewer/2`,
+`Giggly.Plot.scale_color_distiller/2`, `Giggly.Plot.scale_fill_distiller/2`,
+`Giggly.Plot.scale_color_fermenter/2` and `Giggly.Plot.scale_fill_fermenter/2`, with ggplot2's
+options: `palette:` names a palette as ColorBrewer spells it (`"Greens"`) or gives its number among
+the palettes of `type:`, and `direction:` reverses it. A plot is described with
 `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds`,
@@ -50,7 +53,7 @@ dsamp <- diamonds[sample(nrow(diamonds), 1000), ]
 d + scale_colour_brewer()
 ```
 
-Giggly draws the first plot, whose default scale for an ordered factor is viridis. R's `sample()`
+Giggly draws both; the first takes the default scale for an ordered factor, viridis. R's `sample()`
 picks the rows at random, the same ones every time after `set.seed(596)`. The cell writes out the
 1,000 row numbers it picks, counted from 1 as R counts rows, and takes those rows of every column,
 as `diamonds[rows, ]` does. A `Giggly.Factor` enumerates as its values alone, so `cut`, `color` and
@@ -140,13 +143,19 @@ dsamp =
     end
   end)
 
-dsamp
-|> Plot.new(%{x: :carat, y: :price})
-|> Plot.geom_point(%{colour: :clarity})
-|> render.()
+d =
+  dsamp
+  |> Plot.new(%{x: :carat, y: :price})
+  |> Plot.geom_point(%{colour: :clarity})
+
+render.(d)
 ```
 
-Not in Giggly yet: `scale_colour_brewer()`.
+```elixir
+d
+|> Plot.scale_color_brewer()
+|> render.()
+```
 
 ## Titling the legend
 
@@ -155,8 +164,13 @@ Not in Giggly yet: `scale_colour_brewer()`.
 d + scale_colour_brewer("Diamond\nclarity")
 ```
 
-Not in Giggly yet: `scale_colour_brewer()`, whose first argument titles the legend, here over two
-lines.
+`name:` titles the legend, and `\n` breaks the title over two lines.
+
+```elixir
+d
+|> Plot.scale_color_brewer(name: "Diamond\nclarity")
+|> render.()
+```
 
 ## Choosing a palette
 
@@ -166,7 +180,17 @@ d + scale_colour_brewer(palette = "Greens")
 d + scale_colour_brewer(palette = "Set1")
 ```
 
-Not in Giggly yet: `scale_colour_brewer()` and its `palette` option.
+```elixir
+d
+|> Plot.scale_color_brewer(palette: "Greens")
+|> render.()
+```
+
+```elixir
+d
+|> Plot.scale_color_brewer(palette: "Set1")
+|> render.()
+```
 
 ## Fill colours
 
@@ -178,7 +202,16 @@ p <- ggplot(diamonds, aes(x = price, fill = cut)) +
 p + scale_fill_brewer()
 ```
 
-Not in Giggly yet: `scale_fill_brewer()`.
+```elixir
+p =
+  diamonds
+  |> Plot.new(%{x: :price, fill: :cut})
+  |> Plot.geom_histogram(position: :dodge, binwidth: 1000)
+
+p
+|> Plot.scale_fill_brewer()
+|> render.()
+```
 
 ## Reversing the palette
 
@@ -187,7 +220,11 @@ Not in Giggly yet: `scale_fill_brewer()`.
 p + scale_fill_brewer(direction = -1)
 ```
 
-Not in Giggly yet: `scale_fill_brewer()` and its `direction` option.
+```elixir
+p
+|> Plot.scale_fill_brewer(direction: -1)
+|> render.()
+```
 
 ## A dark background
 
@@ -198,7 +235,12 @@ p +
   theme_dark()
 ```
 
-Not in Giggly yet: `scale_fill_brewer()` and its `direction` option.
+```elixir
+p
+|> Plot.scale_fill_brewer(direction: -1)
+|> Plot.theme_dark()
+|> render.()
+```
 
 ## Continuous colours
 
@@ -211,8 +253,7 @@ v + scale_fill_distiller()
 v + scale_fill_distiller(palette = "Spectral")
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_distiller()` and its
-`palette` option.
+Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
 
 ## Reversing a distiller palette
 
@@ -222,8 +263,7 @@ Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_disti
 v + scale_fill_distiller(palette = "Spectral", direction = 1)
 ```
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_distiller()` and its
-`palette` and `direction` options.
+Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
 
 ## Binned colours
 
@@ -234,4 +274,4 @@ v + scale_fill_fermenter()
 
 The comment's "blender" means the fermenter scales.
 
-Not in Giggly yet: the `faithfuld` dataset, `geom_tile()`, and `scale_fill_fermenter()`.
+Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.

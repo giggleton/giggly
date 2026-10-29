@@ -236,5 +236,5 @@ p =
 render.(p)
 ```
 
-Not in Giggly yet: the `presidential` dataset, removing the plot's `x` and `y` from a layer's
-mapping, R's `aes(NULL, NULL)`, and colours made transparent by `alpha()`.
+Not in Giggly yet: the `presidential` dataset, and removing the plot's `x` and `y` from a layer's
+mapping, R's `aes(NULL, NULL)`.

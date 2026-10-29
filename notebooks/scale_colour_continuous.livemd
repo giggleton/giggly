@@ -32,8 +32,9 @@ when a column of numbers is mapped to `colour` or `fill`, blending smoothly thro
 `scale_colour_binned()` and `scale_fill_binned()` cut the numbers into bins and give each bin one
 colour. Their default palette is a setting of the theme. Giggly has
 `Giggly.Plot.scale_color_continuous/2` and `Giggly.Plot.scale_fill_continuous/2`, along the gradient
-from `#132B43` to `#56B1F7` by default or through the colours `palette:` gives, but no binned scales
-(`scale_colour_binned()`), and takes no palette from the theme (`palette.colour.continuous`). A plot
+from `#132B43` to `#56B1F7` by default or through the colours `palette:` gives, and
+`Giggly.Plot.scale_color_binned/2` and `Giggly.Plot.scale_fill_binned/2`, which bin it, but takes no
+palette from the theme (`palette.colour.continuous`). A plot
 is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
 setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
 a plot and shows it below the cell with `Kino.Image`. The data in these examples is
@@ -96,7 +97,7 @@ p + scale_colour_binned() +
   theme(palette.colour.continuous = c("#EFEDF5", "#BCBDDC", "#756BB1"))
 ```
 
-Not in Giggly yet: `scale_colour_binned()` and the theme's `palette.colour.continuous` setting.
+Not in Giggly yet: the theme's `palette.colour.continuous` setting.
 
 ## Restoring the theme
 
