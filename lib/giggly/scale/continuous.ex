@@ -19,9 +19,12 @@ defmodule Giggly.Scale.Continuous do
       aesthetic such as alpha or line width, each place, from 0 to 1, rescaled onto `low` to
       `high`; and
       `{:gradient, colors}` for colour and fill, the colour that far along a gradient through
-      `colors`, spaced evenly, blended in L*a*b*; and for size, `{:area, {low, high}}`, each
+      `colors`, spaced evenly, blended in L*a*b*, or `{:gradient, colors, values}`, spaced at
+      `values`; and for size, `{:area, {low, high}}`, each
       place's square root rescaled onto `low` to `high`, so a value's area grows with it, or
-      `{:abs_area, max}`, the square root of the place's size rescaled onto 0 to `max`.
+      `{:abs_area, max}`, the square root of the place's size rescaled onto 0 to `max`; or any
+      other of `Scales.Palette`'s, such as `{:brewer, %{palette: "Blues", direction: 1}}`, a
+      discrete one taken as a gradient through its colours.
     * `rescaler`: how a value's place in the limits is found: `:rescale`, its distance from the
       low end over the limits' width; `{:mid, midpoint}`, its distance from the midpoint over twice
       the further end's, so the midpoint is at the middle and the further end at 0 or 1; or `:max`,
@@ -54,7 +57,7 @@ defmodule Giggly.Scale.Continuous do
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Scales.Transform`.
 
-  alias Scales.{Bounds, DataRange, Transform}
+  alias Scales.{Bounds, DataRange, Palette, Transform}
 
   # Every field's default is a position scale's before it has seen any data: the identity
   # transformation and palette, places between the limits' ends, an axis, and every option the
@@ -94,12 +97,7 @@ defmodule Giggly.Scale.Continuous do
             | :sqrt
             | :reverse
             | :reciprocal,
-          palette:
-            :identity
-            | {:rescale, {number(), number()}}
-            | {:gradient, [String.t()]}
-            | {:area, {number(), number()}}
-            | {:abs_area, number()},
+          palette: Palette.t(),
           rescaler: :rescale | {:mid, number()} | :max,
           na_value: nil | number() | String.t() | :none,
           guide: :axis | :legend | :colorbar | :none | struct(),

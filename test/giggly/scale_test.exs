@@ -1112,6 +1112,24 @@ defmodule Giggly.ScaleTest do
     end
   end
 
+  # A brewer palette's colours are `Scales.Palette`'s, which its tests pin to R's. Golden: ggplot2
+  # 4.0.3's `scale_colour_brewer(palette = "Set1")` in R 4.6.1 gives a tenth level `NA` with a
+  # warning and leaves it undrawn; nine levels are its largest set.
+  describe "map/2 through a brewer palette" do
+    test "its levels take the palette's colours, and a tenth past Set1's nine cannot be drawn" do
+      brewer = {:brewer, %{palette: "Set1", direction: 1}}
+      nine = palette_scale(brewer, ~w(a b c d e f g h i))
+      ten = palette_scale(brewer, ~w(a b c d e f g h i j))
+
+      colors = Palette.discrete(brewer, 9)
+      assert Scale.map(nine, ~w(a i)) === [List.first(colors), List.last(colors)]
+
+      error = assert_raise ArgumentError, fn -> Scale.map(ten, ["a"]) end
+      assert error.message =~ "9 colours, too few for its 10 values"
+      assert error.message =~ "Giggly.Plot.scale_color_manual/2 or scale_fill_manual/2"
+    end
+  end
+
   # Golden: ggplot2 4.0.3's `scale_colour_continuous(limits = c(0, 10))` and
   # `scale_colour_gradient2()`'s `layer_data()` in R 4.6.1: a value outside the limits is censored
   # to grey50, and gradient2 places each value by `rescale_mid()`.

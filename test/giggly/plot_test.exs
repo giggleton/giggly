@@ -4673,6 +4673,151 @@ defmodule Giggly.PlotTest do
   # `rescale_max()`, `scale_radius()`'s 1 to 6, and the discrete scale's `sqrt(seq(4, 36))`, each a
   # legend; `scale_size_continuous(na.value = 1)` and `scale_radius(na.value = 1)` fail, "unused
   # argument".
+  # Golden: the defaults of ggplot2 4.0.3's `scale_colour_brewer()` and `scale_colour_distiller()`,
+  # read with `args()` in R 4.6.1: type "seq" and palette 1, Blues; the brewer's direction 1 and
+  # missing colour `discrete_scale()`'s `NA`; the distiller's direction -1, missing colour grey50
+  # and colour bar, its gradient through `pal_brewer()(7)`. `pal_brewer()` numbers each type's
+  # palettes as `Scales.Palette.brewer_palettes/1` lists them, and its colours are the package's,
+  # which its tests pin to R's.
+  describe "the brewer and distiller scale functions" do
+    test "each records an untrained scale of its palette, its guide and its missing value" do
+      plot = Plot.new(@rows)
+      blues = {:brewer, %{palette: "Blues", direction: 1}}
+      discrete = %Scale.Discrete{palette: blues, guide: :legend, na_value: :none}
+      reversed = Scales.Palette.discrete({:brewer, %{palette: "Blues", direction: -1}}, 7)
+
+      continuous = %Scale.Continuous{
+        palette: {:gradient, reversed},
+        guide: :colorbar,
+        na_value: "#7F7F7F"
+      }
+
+      assert {Plot.scale_color_brewer(plot).scales.color,
+              Plot.scale_fill_brewer(plot).scales.fill,
+              Plot.scale_color_distiller(plot).scales.color,
+              Plot.scale_fill_distiller(plot).scales.fill} ===
+               {discrete, discrete, continuous, continuous}
+    end
+
+    # As ggplot2 4.0.3's `pal_brewer()` reads a number among `type`'s palettes and a name alone in
+    # R 4.6.1: `type = "div", palette = "Set1"` gives Set1; `scale_colour_distiller()` warns of a
+    # qualitative palette and takes it.
+    test "a palette is named, or numbered among its type's, which a name leaves unread" do
+      plot = Plot.new(@rows)
+      brewer = fn options -> Plot.scale_fill_brewer(plot, options).scales.fill.palette end
+
+      assert {brewer.(type: :qual, palette: 2), brewer.(type: :div, palette: 9),
+              brewer.(palette: 18),
+              brewer.(type: :div, palette: "Set1", direction: -1, na_value: "red")} ===
+               {{:brewer, %{palette: "Dark2", direction: 1}},
+                {:brewer, %{palette: "Spectral", direction: 1}},
+                {:brewer, %{palette: "YlOrRd", direction: 1}},
+                {:brewer, %{palette: "Set1", direction: -1}}}
+
+      distilled =
+        Plot.scale_color_distiller(plot,
+          type: :qual,
+          palette: 8,
+          direction: 1,
+          values: [0, 0.5, 1],
+          na_value: :none
+        ).scales.color
+
+      set3 = Scales.Palette.discrete({:brewer, %{palette: "Set3", direction: 1}}, 7)
+
+      assert {distilled.palette, distilled.na_value} ===
+               {{:gradient, set3, [0.0, 0.5, 1.0]}, :none}
+    end
+
+    test "a number past the last of its type's palettes is refused at the call, naming the function" do
+      plot = Plot.new(@rows)
+
+      for {call, shown} <- [
+            {fn -> Plot.scale_color_brewer(plot, type: :qual, palette: 9) end,
+             "Plot.scale_color_brewer/2 is given palette: 9, but ColorBrewer's :qual palettes " <>
+               "number 8: Accent, Dark2, Paired, Pastel1, Pastel2, Set1, Set2, Set3"},
+            {fn -> Plot.scale_fill_brewer(plot, palette: 19) end,
+             "Plot.scale_fill_brewer/2 is given palette: 19, but ColorBrewer's :seq palettes " <>
+               "number 18"},
+            {fn -> Plot.scale_color_distiller(plot, type: :div, palette: 10) end,
+             "Plot.scale_color_distiller/2 is given palette: 10, but ColorBrewer's :div"},
+            {fn -> Plot.scale_fill_distiller(plot, palette: 19) end,
+             "Plot.scale_fill_distiller/2 is given palette: 19"}
+          ] do
+        error = assert_raise ArgumentError, call
+        assert error.message =~ shown
+      end
+    end
+
+    # R's `palette = "set1"` warns and gives Greens, `palette = 1.5` is palette 1, `values =
+    # c(0, NA, 1)` drops the `NA`, and too few values fail once the plot is built.
+    test "an option a brewer or distiller scale cannot take is refused, naming what was wrong" do
+      plot = Plot.new(@rows)
+
+      for {function, options, shown} <- [
+            {&Plot.scale_color_brewer/2, [palette: "set1"],
+             ~s(a ColorBrewer palette's name, one of ["Blues", "BuGn")},
+            {&Plot.scale_color_brewer/2, [palette: "set1"], ~s(counting from 1, got: "set1")},
+            {&Plot.scale_fill_brewer/2, [palette: 0], "got: 0"},
+            {&Plot.scale_color_distiller/2, [palette: 1.5], "got: 1.5"},
+            {&Plot.scale_fill_distiller/2, [palette: :Set1], "got: :Set1"},
+            {&Plot.scale_color_brewer/2, [type: :sequential],
+             "expected one of [:seq, :div, :qual], got: :sequential"},
+            {&Plot.scale_fill_brewer/2, [direction: 0], "expected one of [1, -1], got: 0"},
+            {&Plot.scale_color_distiller/2, [direction: 0], "expected one of [1, -1], got: 0"},
+            {&Plot.scale_color_brewer/2, [values: [0, 1]], "unknown options [:values]"},
+            {&Plot.scale_fill_distiller/2, [values: [0, nil, 1]],
+             "expected a list of numbers, got: [0, nil, 1]"},
+            {&Plot.scale_color_distiller/2, [values: []], "a list of numbers, got: []"},
+            {&Plot.scale_color_distiller/2, [values: 0.5], "a list of numbers, got: 0.5"},
+            {&Plot.scale_color_gradientn/2, [colors: ["red"], values: ["a", "b"]],
+             ~s(got: ["a", "b"])},
+            {&Plot.scale_fill_gradientn/2, [colors: ["red"], values: [0.5]],
+             "at least two different places, since the colours are blended between them, " <>
+               "got: [0.5]"},
+            {&Plot.scale_color_gradientn/2, [colors: ["red"], values: [0.5, 0.5]],
+             "got: [0.5, 0.5]"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+
+    # As ggplot2 4.0.3's `scale_colour_discrete(palette = "set1")` and
+    # `scale_colour_continuous(palette = "Blues")` take scales' palette by name, in any case, in R
+    # 4.6.1, and `palette = "red"` fails there ("Unknown palette: red"), a list of one is colours
+    # here.
+    test "palette: names a palette scales knows, in any case, or lists colours" do
+      plot = Plot.new(@rows)
+      color = fn function, options -> function.(plot, options).scales.color.palette end
+      fill = fn function, options -> function.(plot, options).scales.fill.palette end
+
+      named = &Scales.Palette.named/1
+
+      assert {color.(&Plot.scale_color_discrete/2, palette: "set1"),
+              fill.(&Plot.scale_fill_discrete/2, palette: "Viridis"),
+              color.(&Plot.scale_color_discrete/2, palette: ["red"]),
+              color.(&Plot.scale_color_continuous/2, palette: "Blues"),
+              fill.(&Plot.scale_fill_continuous/2, palette: "GREY"),
+              fill.(&Plot.scale_fill_gradientn/2, colors: ["red", "blue"], values: [1, 0])} ===
+               {named.("Set1"), named.("viridis"), {:manual, ["#FF0000"]}, named.("Blues"),
+                named.("grey"), {:gradient, ["#FF0000", "#0000FF"], [1.0, 0.0]}}
+
+      for {function, options, shown} <- [
+            {&Plot.scale_color_discrete/2, [palette: "red"], ~s(scales names no palette "red")},
+            {&Plot.scale_fill_continuous/2, [palette: "Okabe-Ito"],
+             ~s(no palette "Okabe-Ito"; its names, in any case, are "Blues")},
+            {&Plot.scale_color_discrete/2, [palette: :Set1],
+             "a palette's name or a list of at least one colour, got: :Set1"},
+            {&Plot.scale_fill_continuous/2, [palette: []],
+             "a palette's name or a list of at least one colour, got: []"}
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
+        assert error.message =~ shown
+      end
+    end
+  end
+
   describe "the size scale functions" do
     test "each records an untrained scale of its palette and a legend, its missing value none" do
       plot = Plot.new(@rows)

@@ -92,8 +92,9 @@ defmodule Giggly.Scale do
   # scale of either and aborts for a continuous column. Line width's maps a continuous column onto
   # widths from 1 to 6, `scale_linewidth_continuous()`, and spreads a discrete one from 2 to 6,
   # `scale_linewidth_ordinal()`, which `scale_linewidth_discrete()` uses with a warning Giggly
-  # leaves out. A plot's scale may carry another palette: manual, grey, another hue range or
-  # gradient, open shapes. A continuous value's place runs over the scale's limits, or about its
+  # leaves out. A plot's scale may carry another palette: manual, grey, brewer, another hue range
+  # or gradient, open shapes, any of `Scales.Palette`'s, one of the other kind converted when
+  # mapped. A continuous value's place runs over the scale's limits, or about its
   # midpoint (R's
   # `rescale_mid()`), or at its share of their high end (R's `rescale_max()`), as the scale's
   # `rescaler` says, and one outside them is censored, as ggplot2's `oob = censor`; a missing or

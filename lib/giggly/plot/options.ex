@@ -15,7 +15,7 @@ defmodule Giggly.Plot.Options do
   # `Giggly.Plot`.
 
   alias Giggly.{Aesthetics, ElementTree, Geom, Guide, Position, Theme}
-  alias Scales.{ColorOperations, DataRange}
+  alias Scales.{ColorOperations, DataRange, Palette}
 
   # `facet_wrap/3`'s options, validated at the call as every public function's are.
   @facet_wrap_options NimbleOptions.new!(
@@ -1752,6 +1752,13 @@ defmodule Giggly.Plot.Options do
   # `scale_colour_viridis_c()` takes `pal_viridis()(6)`.
   @viridis_gradient_colors 6
 
+  # How many colours of a brewer palette a distiller's gradient runs through, as ggplot2's
+  # `scale_colour_distiller()` takes `pal_brewer()(7)`.
+  @distiller_colors 7
+
+  # ColorBrewer's palettes' names, every type's, as R spells them.
+  @brewer_names Enum.flat_map([:seq, :div, :qual], &Palette.brewer_palettes/1)
+
   # An alpha scale's default range, which leaves every value visible.
   @alpha_range_default {0.1, 1.0}
 
@@ -1869,11 +1876,13 @@ defmodule Giggly.Plot.Options do
   @discrete_color_scale_options NimbleOptions.new!(
                                   [
                                     palette: [
-                                      type: {:custom, __MODULE__, :validate_palette_colors, []},
+                                      type: {:custom, __MODULE__, :validate_discrete_palette, []},
                                       doc:
-                                        "A list of colours, given to the values in order; " <>
-                                          "hues spaced evenly round the colour wheel when not " <>
-                                          "given."
+                                        "A palette's name, one of scales' in any case " <>
+                                          "(`Scales.Palette.named/1`), such as `\"Set1\"` or " <>
+                                          "`\"viridis\"`, or a list of colours, its colours " <>
+                                          "given to the values in order; hues spaced evenly " <>
+                                          "round the colour wheel when not given."
                                     ],
                                     na_value: @color_na_value_spec
                                   ] ++ @discrete_color_legend_option_specs
@@ -1923,6 +1932,16 @@ defmodule Giggly.Plot.Options do
                              ] ++ @continuous_color_legend_option_specs
                            )
 
+  # A gradient's `values:`, which move a value's place in the limits before its colour is taken.
+  @gradient_values_spec [
+    type: {:custom, __MODULE__, :validate_gradient_values, []},
+    doc:
+      "Where the colours sit: places from 0, the low end of the limits, to 1, the high, one " <>
+        "for each colour, so each colour sits at its place and those between are blended; of " <>
+        "another count, the colours are spread over them evenly. A value beyond the first or " <>
+        "last place takes `na_value:`. The colours are spaced evenly when not given."
+  ]
+
   @gradientn_scale_options NimbleOptions.new!(
                              [
                                colors: [
@@ -1930,8 +1949,9 @@ defmodule Giggly.Plot.Options do
                                  required: true,
                                  doc:
                                    "The colours, a list, spaced evenly from the low end of the " <>
-                                     "limits to the high."
+                                     "limits to the high unless `values:` places them."
                                ],
+                               values: @gradient_values_spec,
                                na_value: @color_na_value_spec
                              ] ++ @continuous_color_legend_option_specs
                            )
@@ -1940,15 +1960,68 @@ defmodule Giggly.Plot.Options do
                                     [
                                       palette: [
                                         type:
-                                          {:custom, __MODULE__, :validate_gradient_colors, []},
+                                          {:custom, __MODULE__, :validate_continuous_palette, []},
                                         doc:
-                                          "A list of colours, spaced evenly from the low end " <>
+                                          "A palette's name, one of scales' in any case " <>
+                                            "(`Scales.Palette.named/1`), such as `\"Blues\"` " <>
+                                            "or `\"viridis\"`, its colours blended in order, or " <>
+                                            "a list of colours, spaced evenly from the low end " <>
                                             "of the limits to the high; a gradient from " <>
                                             "`#132B43` to `#56B1F7` when not given."
                                       ],
                                       na_value: @color_na_value_spec
                                     ] ++ @continuous_color_legend_option_specs
                                   )
+
+  # The options every brewer scale takes, R's `pal_brewer()`'s: the palette, by name or by its
+  # number among its type's.
+  @brewer_option_specs [
+    type: [
+      type: {:in, [:seq, :div, :qual]},
+      default: :seq,
+      doc:
+        "The palettes a number in `palette:` counts among: `:seq`, sequential; `:div`, " <>
+          "diverging; or `:qual`, qualitative. A name is not counted, so this is not read " <>
+          "beside one."
+    ],
+    palette: [
+      type: {:custom, __MODULE__, :validate_brewer_palette, []},
+      default: 1,
+      doc:
+        "The ColorBrewer palette: its name, spelled as `Scales.Palette.brewer_palettes/1` " <>
+          "spells it, or its number among the palettes of `type:`, counting from 1."
+    ]
+  ]
+
+  @brewer_scale_options NimbleOptions.new!(
+                          @brewer_option_specs ++
+                            [
+                              direction: [
+                                type: {:in, [1, -1]},
+                                default: 1,
+                                doc:
+                                  "1 to give the palette's colours to the values in order, -1 " <>
+                                    "in reverse."
+                              ],
+                              na_value: Keyword.put(@color_na_value_spec, :default, :none)
+                            ] ++ @discrete_color_legend_option_specs
+                        )
+
+  @distiller_scale_options NimbleOptions.new!(
+                             @brewer_option_specs ++
+                               [
+                                 direction: [
+                                   type: {:in, [1, -1]},
+                                   default: -1,
+                                   doc:
+                                     "-1 to blend the palette's colours from its last at the " <>
+                                       "low end of the limits to its first at the high, 1 the " <>
+                                       "other way."
+                                 ],
+                                 values: @gradient_values_spec,
+                                 na_value: @color_na_value_spec
+                               ] ++ @continuous_color_legend_option_specs
+                           )
 
   @alpha_range_spec [
     type: {:custom, __MODULE__, :validate_alpha_range, []},
@@ -2740,6 +2813,14 @@ defmodule Giggly.Plot.Options do
   def continuous_color_scale, do: @continuous_color_scale_options
 
   @doc false
+  @spec brewer_scale() :: NimbleOptions.t()
+  def brewer_scale, do: @brewer_scale_options
+
+  @doc false
+  @spec distiller_scale() :: NimbleOptions.t()
+  def distiller_scale, do: @distiller_scale_options
+
+  @doc false
   @spec continuous_alpha_scale() :: NimbleOptions.t()
   def continuous_alpha_scale, do: @continuous_alpha_scale_options
 
@@ -2873,6 +2954,11 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec viridis_gradient_colors() :: pos_integer()
   def viridis_gradient_colors, do: @viridis_gradient_colors
+
+  # How many colours of a brewer palette a distiller's gradient runs through.
+  @doc false
+  @spec distiller_colors() :: pos_integer()
+  def distiller_colors, do: @distiller_colors
 
   # The theme's elements whose settings are a line's, a rectangle's or a text's properties, by kind.
   @doc false
@@ -3907,6 +3993,83 @@ defmodule Giggly.Plot.Options do
 
   def validate_gradient_colors(other),
     do: {:error, "expected a list of at least one colour, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of a gradient's `values:`: a list of numbers, at least two of them
+  # different, since a place is moved along the straight lines between them, kept as floats. R also
+  # drops an `NA`, which is refused here, as no value written by hand is missing.
+  @doc false
+  @spec validate_gradient_values(term()) :: {:ok, [float(), ...]} | {:error, String.t()}
+  def validate_gradient_values([_first | _rest] = values) do
+    if Enum.all?(values, &is_number/1) do
+      floats = Enum.map(values, fn value -> value / 1 end)
+
+      if Enum.min(floats) < Enum.max(floats),
+        do: {:ok, floats},
+        else:
+          {:error,
+           "expected at least two different places, since the colours are blended between " <>
+             "them, got: #{inspect(values)}"}
+    else
+      values_error(values)
+    end
+  end
+
+  def validate_gradient_values(other), do: values_error(other)
+
+  defp values_error(values), do: {:error, "expected a list of numbers, got: #{inspect(values)}"}
+
+  # NimbleOptions' check of a brewer scale's `palette:`: a ColorBrewer palette's name, exactly as
+  # R's `pal_brewer()` takes it, or a number counting from 1 among its type's, which the scale
+  # function looks up, since it alone reads `type:` too.
+  @doc false
+  @spec validate_brewer_palette(term()) ::
+          {:ok, String.t() | pos_integer()} | {:error, String.t()}
+  def validate_brewer_palette(name) when name in @brewer_names, do: {:ok, name}
+  def validate_brewer_palette(number) when is_integer(number) and number > 0, do: {:ok, number}
+
+  def validate_brewer_palette(other),
+    do:
+      {:error,
+       "expected a ColorBrewer palette's name, one of #{inspect(@brewer_names)}, or its number " <>
+         "among its type's, counting from 1, got: #{inspect(other)}"}
+
+  # NimbleOptions' check of a discrete colour scale's `palette:`: a name scales knows, as its
+  # palette (`Scales.Palette.named/1`), or a list of colours (`validate_palette_colors/1`), as a
+  # manual palette of them.
+  @doc false
+  @spec validate_discrete_palette(term()) :: {:ok, Palette.t()} | {:error, String.t()}
+  def validate_discrete_palette(name) when is_binary(name), do: named_palette(name)
+
+  def validate_discrete_palette([_first | _rest] = colors) do
+    with {:ok, parsed} <- validate_palette_colors(colors), do: {:ok, {:manual, parsed}}
+  end
+
+  def validate_discrete_palette(other), do: palette_error(other)
+
+  # NimbleOptions' check of a continuous colour scale's `palette:`: a name scales knows, as its
+  # palette (`Scales.Palette.named/1`), or a list of colours (`validate_gradient_colors/1`), as a
+  # gradient through them.
+  @doc false
+  @spec validate_continuous_palette(term()) :: {:ok, Palette.t()} | {:error, String.t()}
+  def validate_continuous_palette(name) when is_binary(name), do: named_palette(name)
+
+  def validate_continuous_palette([_first | _rest] = colors) do
+    with {:ok, parsed} <- validate_gradient_colors(colors), do: {:ok, {:gradient, parsed}}
+  end
+
+  def validate_continuous_palette(other), do: palette_error(other)
+
+  defp palette_error(palette),
+    do:
+      {:error,
+       "expected a palette's name or a list of at least one colour, got: #{inspect(palette)}"}
+
+  # The palette scales names `name`, or its refusal's message, which lists the names.
+  defp named_palette(name) do
+    {:ok, Palette.named(name)}
+  rescue
+    error in ArgumentError -> {:error, Exception.message(error)}
+  end
 
   # NimbleOptions' check of a discrete palette's colours: a list of at least one, each a colour or
   # `:none` (`validate_color/1`).

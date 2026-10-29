@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A brewer or distiller scale takes R's options and refuses at the call what R fails on or
+  reads loosely (2026-10-28, Steve, increment 1's step 5; checked against ggplot2 4.0.3).** Each
+  default is R's: Blues, the brewer's missing colour `:none` (`discrete_scale()`'s `NA`), the
+  distiller's direction -1, grey50 and a gradient through `pal_brewer()(7)`. `palette:` is a name
+  spelled as R spells it or a number among `type:`'s, looked up at the call, `type:` unread beside
+  a name; a number past the type's last raises, where R fails, and a fraction, which R truncates,
+  is refused. A qualitative distiller is taken without R's warning. `values:` (gradientn,
+  distiller) is numbers, two of them different, checked at the call where R fails when built;
+  `nil` is refused (Steve: "A"). A brewer palette run past its end raises when run, as a shape's.
+  `palette:` on the discrete and continuous colour scales is a name scales knows, in any case, or
+  a list, so `["red"]` is one colour, where R reads it as a name and fails. *Rejected: `nil` in
+  `values:` dropped, as R drops `NA`*: no value written by hand is missing.
+
 - **A colour helper takes one colour and gives R's answer, out-of-range arguments capped as
   farver caps them (2026-10-28, Steve, increment 1's step 4; checked against scales 1.4.0 and
   farver 2.1.2).** `alpha/2`, `muted/2`, `with_hcl/2`, `lighter/2`, `darker/2`, `saturate/2` and
@@ -3001,6 +3014,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-28 — Add the brewer and distiller scales, palette: a name or a list, gradientn's
+  values (palettes and colours, step 5); §4: "A brewer or distiller scale takes R's options"
 - 2026-10-28 — Add R's colour helpers, one colour a call, out-of-range arguments capped as farver
   caps them (palettes and colours, step 4); §4: "A colour helper takes one colour"
 - 2026-10-28 — Give the gradient R's values and alpha, transparent R's white, nil outside it

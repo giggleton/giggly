@@ -38,8 +38,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
   `scale_x_datetime/2`, `scale_y_datetime/2`, `scale_x_time/2`, `scale_y_time/2`, the colour
   scales
-  `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_gradient`, `_gradient2`,
-  `_gradientn`, `_continuous` and `_viridis_c`, each with its `scale_fill_` twin,
+  `scale_color_manual/2`, `_hue`, `_gray`, `_discrete`, `_viridis_d`, `_brewer`, `_gradient`,
+  `_gradient2`, `_gradientn`, `_continuous`, `_viridis_c` and `_distiller`, each with its
+  `scale_fill_` twin,
   `scale_alpha_continuous/2`,
   `scale_alpha_discrete/2`, the size scales `scale_size_continuous/2`, `scale_size_area/2`,
   `scale_radius/2` and `scale_size_discrete/2`, the shape scales `scale_shape_discrete/2` and
@@ -170,7 +171,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `:none`, R's `NA`, the scale an ordered factor gets by default (`Scale.new(:ordinal, ...)`, a
   test pinning the two equal); `scale_color_viridis_c/2` records the gradient through the
   palette's six colours, as R's scale holds `pal_gradient_n()` of them, and takes no `alpha:`
-  (design-log §4, the entry beginning "`scale_*_viridis_c/2` takes no"). **A size scale function
+  (design-log §4, the entry beginning "`scale_*_viridis_c/2` takes no"). **A brewer or
+  distiller scale function takes R's options** (design-log §4, the entry beginning "A brewer or
+  distiller scale takes R's options"): `type:` (`:seq`, `:div`, `:qual`), `palette:`, a name
+  `Scales.Palette.brewer_palettes/1` spells or a number from 1 (`validate_brewer_palette/1`),
+  recorded as the name, a number past its type's last raising, `type:` unread beside a name, and
+  `direction:`; the brewer records `{:brewer, ...}`, its missing value `:none`, the distiller
+  the gradient through the palette's seven colours, `:qual` taken. `values:` on gradientn and the
+  distiller is numbers, two different, `nil` refused (`validate_gradient_values/1`), recorded
+  `{:gradient, colors, values}`. **`palette:` on the discrete and continuous colour scales is a
+  name, `Scales.Palette.named/1`'s palette, or a list** (`validate_discrete_palette/1`,
+  `validate_continuous_palette/1`), a manual palette or a gradient. **A size scale function
   takes the options R's
   does**: `na_value:` only on `scale_size_area/2` and `scale_size_discrete/2`, as R's
   `scale_size_continuous()` and `scale_radius()` refuse `na.value`, and no `transform:` (design-log

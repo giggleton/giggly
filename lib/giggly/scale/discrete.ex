@@ -26,7 +26,9 @@ defmodule Giggly.Scale.Discrete do
       spread evenly; for shape, `{:shape, :solid}` or `{:shape, :open}`, six shapes by name in
       order, solid or open, or `{:manual, shapes}`, a list's or a map's, as a colour's; and for
       line type, `:linetype`, 13 line types in order, each as its dash pattern, `{}` for a solid
-      line, or `{:manual, line_types}`, as a colour's.
+      line, or `{:manual, line_types}`, as a colour's; or any other of `Scales.Palette`'s, such as
+      `{:brewer, %{palette: "Set1", direction: 1}}`, a ColorBrewer palette's colours in order, a
+      continuous one's taken at places spread evenly over it.
     * `na_value`: what a missing value, or one not among the limits, maps to: `nil` for alpha, line
       type, line width, shape and size, grey, `"#7F7F7F"`, for colour and fill, `:none`, no colour,
       shape or line, or the shape, line type or width a plot's scale gives. A missing value takes
@@ -75,22 +77,11 @@ defmodule Giggly.Scale.Discrete do
           factor: :none | boolean(),
           continuous_range: :none | {number(), number()},
           palette:
-            :identity
+            Palette.t()
             | {:sequence, {number(), number()}}
-            | {:hue,
-               %{
-                 hue: {number(), number()},
-                 chroma: number(),
-                 luminance: number(),
-                 direction: 1 | -1
-               }}
-            | {:gray, {number(), number()}}
-            | {:manual,
-               [String.t() | atom() | tuple()] | %{term() => String.t() | atom() | tuple()}}
+            | {:manual, %{term() => String.t() | atom() | tuple()}}
             | {:manual, [String.t() | atom() | tuple()], [term()]}
-            | {:area_sequence, {number(), number()}}
-            | {:shape, :solid | :open}
-            | :linetype,
+            | {:area_sequence, {number(), number()}},
           na_value: nil | number() | String.t() | atom() | tuple(),
           guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),
@@ -176,10 +167,10 @@ defmodule Giggly.Scale.Discrete do
   # or `na_value`, and so does a list named by breaks, each value its break's, a value beyond the
   # last break naming none, as ggplot2's `manual_scale()` names values; any other palette is R's
   # (`Scales.Palette.discrete/2`). Too few values for the limits raise, as ggplot2's manual scale
-  # fails whatever its values' names; and a shape or line type palette with more levels than it
-  # holds, which R's palettes give `NA` with a warning and leave undrawn, raises naming the scale
-  # that takes more. A scale whose every value is missing has no levels to ask for, and ggplot2
-  # then maps every value to its `na.value` without asking its palette.
+  # fails whatever its values' names; and a shape, line type or brewer palette with more levels
+  # than it holds, which R's palettes give `NA` with a warning and leave undrawn, raises naming the
+  # scale that takes more. A scale whose every value is missing has no levels to ask for, and
+  # ggplot2 then maps every value to its `na.value` without asking its palette.
   defp palette_values({:sequence, range}, present, _na_value),
     do: Palette.spread(range, length(present))
 
@@ -213,6 +204,15 @@ defmodule Giggly.Scale.Discrete do
 
   defp palette_values({:shape, _fill} = palette, present, _na_value),
     do: drawable!(palette, present, {"shape", "shapes"}, "Giggly.Plot.scale_shape_manual/2")
+
+  defp palette_values({:brewer, _parameters} = palette, present, _na_value) do
+    drawable!(
+      palette,
+      present,
+      {"colour", "colours"},
+      "Giggly.Plot.scale_color_manual/2 or scale_fill_manual/2"
+    )
+  end
 
   defp palette_values(:linetype, present, _na_value) do
     drawable!(

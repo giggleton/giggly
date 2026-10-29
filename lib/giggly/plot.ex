@@ -98,16 +98,18 @@ defmodule Giggly.Plot do
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
   value's colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2`
   greys, `scale_color_discrete/2` either, and `scale_color_viridis_d/2` takes colours from a
-  viridis palette, as an ordered factor gets by default; `scale_color_gradient/2`,
-  `scale_color_gradient2/2`, `scale_color_gradientn/2` and `scale_color_continuous/2` blend a
-  gradient through two, three or any number of colours, and `scale_color_viridis_c/2` through a
-  viridis palette; each has a `scale_fill_` twin, and `scale_alpha_continuous/2` and
-  `scale_alpha_discrete/2` set opacities. `scale_size_continuous/2` and `scale_size_area/2` size
-  points by area, the second from 0, `scale_radius/2` by width, and `scale_size_discrete/2` a
-  discrete column's values in order. `scale_shape_discrete/2` gives a discrete column's values six
-  shapes, solid or open, and `scale_shape_manual/2` names each value's shape; shapes have no order,
-  so a continuous column cannot be mapped to `:shape`. `lims/2` sets their limits alone. A value
-  outside a colour scale's limits takes its `na_value:`, as a missing one does.
+  viridis palette, as an ordered factor gets by default, and `scale_color_brewer/2` from a
+  ColorBrewer palette; `scale_color_gradient/2`, `scale_color_gradient2/2`,
+  `scale_color_gradientn/2` and `scale_color_continuous/2` blend a gradient through two, three or
+  any number of colours, `scale_color_viridis_c/2` through a viridis palette and
+  `scale_color_distiller/2` through a ColorBrewer palette; each has a `scale_fill_` twin, and
+  `scale_alpha_continuous/2` and `scale_alpha_discrete/2` set opacities. `scale_size_continuous/2`
+  and `scale_size_area/2` size points by area, the second from 0, `scale_radius/2` by width, and
+  `scale_size_discrete/2` a discrete column's values in order. `scale_shape_discrete/2` gives a
+  discrete column's values six shapes, solid or open, and `scale_shape_manual/2` names each value's
+  shape; shapes have no order, so a continuous column cannot be mapped to `:shape`. `lims/2` sets
+  their limits alone. A value outside a colour scale's limits takes its `na_value:`, as a missing
+  one does.
 
   ## Labels
 
@@ -176,7 +178,7 @@ defmodule Giggly.Plot do
   }
 
   alias Giggly.Plot.{Layer, Options}
-  alias Scales.ColorOperations
+  alias Scales.{ColorOperations, Palette}
 
   @enforce_keys [
     :data,
@@ -2394,12 +2396,13 @@ defmodule Giggly.Plot do
 
   @doc """
   Gives the plot a discrete colour scale, replacing any colour scale it had: hues spaced evenly
-  round the colour wheel, as a discrete column gets by default, or the colours of `palette:`, in
-  order.
+  round the colour wheel, as a discrete column gets by default, or the colours of `palette:`, a
+  palette's name or a list, in order.
 
-  Raises `NimbleOptions.ValidationError` for an option it does not take or a colour CSS does not
-  define, and `ArgumentError` for a list of labels not one for each break or limit given; a column
-  of numbers, or more values than the palette has colours, is refused when the plot is run.
+  Raises `NimbleOptions.ValidationError` for an option it does not take, a palette's name scales
+  does not know or a colour CSS does not define, and `ArgumentError` for a list of labels not one
+  for each break or limit given; a column of numbers, or more values than a list or a ColorBrewer
+  palette has colours, is refused when the plot is run.
 
   ## Options
 
@@ -2584,10 +2587,11 @@ defmodule Giggly.Plot do
   any colour scale it had.
 
   The colours are spaced evenly over the limits, the first at the low end and the last at the high,
-  and blended in CIE L*a*b* between neighbours; its guide is a colour bar unless `guide:` names
-  another. Raises `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does
-  not define or one with an alpha of its own, and `ArgumentError` for a list of labels without a
-  list of breaks as long; a column that is not numbers is refused when the plot is run.
+  unless `values:` places them, and blended in CIE L*a*b* between neighbours; its guide is a colour
+  bar unless `guide:` names another. Raises `NimbleOptions.ValidationError` for an option it does
+  not take, a colour CSS does not define or one with an alpha of its own, and `ArgumentError` for
+  a list of labels without a list of breaks as long; a column that is not numbers is refused when
+  the plot is run.
 
   ## Options
 
@@ -2644,11 +2648,12 @@ defmodule Giggly.Plot do
   @doc """
   Gives the plot a continuous colour scale, replacing any colour scale it had: a gradient from
   `#132B43` to `#56B1F7`, as a column of numbers gets by default, or through the colours of
-  `palette:`, spaced evenly over the limits.
+  `palette:`, a palette's name or a list, spaced evenly over the limits.
 
-  Raises `NimbleOptions.ValidationError` for an option it does not take, a colour CSS does not
-  define or one with an alpha of its own, and `ArgumentError` for a list of labels without a list
-  of breaks as long; a column that is not numbers is refused when the plot is run.
+  Raises `NimbleOptions.ValidationError` for an option it does not take, a palette's name scales
+  does not know, a colour CSS does not define or one with an alpha of its own, and `ArgumentError`
+  for a list of labels without a list of breaks as long; a column that is not numbers is refused
+  when the plot is run.
 
   ## Options
 
@@ -2763,6 +2768,126 @@ defmodule Giggly.Plot do
       "Plot.scale_fill_viridis_c/2",
       &continuous_viridis_scale/1
     )
+  end
+
+  @doc """
+  Gives the plot a discrete colour scale from a ColorBrewer palette, replacing any colour scale it
+  had.
+
+  The palette is `palette:`, by name or by its number among the palettes of `type:`, its colours
+  given to the values in order, or in reverse for `direction: -1`; each palette has a set of
+  colours for each count from 3 to its largest, chosen to be told apart, sequential palettes for
+  ordered values, diverging for values either side of a middle and qualitative for values with no
+  order. A missing value takes no colour unless `na_value:` gives one. Raises
+  `NimbleOptions.ValidationError` for an option it does not take, a name ColorBrewer does not
+  spell so or a number below 1, and `ArgumentError` for a number past the last of its type's or a
+  list of labels not one for each break or limit given; a column of numbers, or more values than
+  the palette's largest set has colours, is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.brewer_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "cyl" => ["6", "4", "8"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_brewer(palette: "Set1")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#377EB8", "#E41A1C", "#4DAF4A"]
+  """
+  @spec scale_color_brewer(t(), keyword()) :: t()
+  def scale_color_brewer(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_color_brewer/2"
+
+    legend_scale(plot, :color, options, Options.brewer_scale(), function, fn validated ->
+      brewer_scale(validated, function)
+    end)
+  end
+
+  @doc """
+  Gives the plot a discrete fill scale from a ColorBrewer palette, replacing any fill scale it had,
+  as `scale_color_brewer/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.brewer_scale())}
+
+      iex> plot =
+      ...>   %{"drv" => ["f", "r", "4"], "hwy" => [28, 19, 20]}
+      ...>   |> Giggly.Plot.new(%{x: :drv, y: :hwy, fill: :drv})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_brewer(type: :qual, palette: 2)
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#D95F02", "#7570B3", "#1B9E77"]
+  """
+  @spec scale_fill_brewer(t(), keyword()) :: t()
+  def scale_fill_brewer(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_fill_brewer/2"
+
+    legend_scale(plot, :fill, options, Options.brewer_scale(), function, fn validated ->
+      brewer_scale(validated, function)
+    end)
+  end
+
+  @doc """
+  Gives the plot a continuous colour scale, a gradient through a ColorBrewer palette, replacing any
+  colour scale it had.
+
+  The gradient runs through seven colours of the palette `palette:`, by name or by its number
+  among the palettes of `type:`, spaced evenly over the limits unless `values:` places them, from
+  its last at the low end to its first at the high, or the other way for `direction: 1`, blended
+  in CIE L*a*b* between neighbours, as `scale_color_gradientn/2` blends its colours; its guide is a
+  colour bar unless `guide:` names another. A qualitative palette is taken too, though its colours
+  have no order to blend along. Raises `NimbleOptions.ValidationError` for an option it does not
+  take, a name ColorBrewer does not spell so or a number below 1, and `ArgumentError` for a number
+  past the last of its type's or a list of labels without a list of breaks as long; a column that
+  is not numbers is refused when the plot is run.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.distiller_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, colour: :hp})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.scale_color_distiller()
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:color)
+      ["#084594", "#6BAED6", "#EFF3FF"]
+  """
+  @spec scale_color_distiller(t(), keyword()) :: t()
+  def scale_color_distiller(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_color_distiller/2"
+
+    legend_scale(plot, :color, options, Options.distiller_scale(), function, fn validated ->
+      distiller_scale(validated, function)
+    end)
+  end
+
+  @doc """
+  Gives the plot a continuous fill scale, a gradient through a ColorBrewer palette, replacing any
+  fill scale it had, as `scale_color_distiller/2` gives a colour scale.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.distiller_scale())}
+
+      iex> plot =
+      ...>   %{"wt" => [2.62, 2.32, 3.44], "mpg" => [21.0, 22.8, 18.7], "hp" => [0, 5, 10]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, fill: :hp})
+      ...>   |> Giggly.Plot.geom_col()
+      ...>   |> Giggly.Plot.scale_fill_distiller(palette: "YlGn")
+      iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:fill)
+      ["#005A32", "#78C679", "#FFFFCC"]
+  """
+  @spec scale_fill_distiller(t(), keyword()) :: t()
+  def scale_fill_distiller(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    function = "Plot.scale_fill_distiller/2"
+
+    legend_scale(plot, :fill, options, Options.distiller_scale(), function, fn validated ->
+      distiller_scale(validated, function)
+    end)
   end
 
   @doc """
@@ -4827,11 +4952,51 @@ defmodule Giggly.Plot do
     )
   end
 
-  # A discrete colour scale of its palette's colours, or of the default hues.
+  # A discrete colour scale of its palette, or of the default hues.
   defp discrete_color_scale(validated) do
-    case Keyword.pop(validated, :palette) do
-      {nil, options} -> discrete_legend({:hue, Map.new(Options.hue_defaults())}, options)
-      {colors, options} -> discrete_legend({:manual, colors}, options)
+    {palette, options} =
+      Keyword.pop_lazy(validated, :palette, fn -> {:hue, Map.new(Options.hue_defaults())} end)
+
+    discrete_legend(palette, options)
+  end
+
+  # A discrete colour scale of a brewer palette, R's `pal_brewer()`, its palette looked up by
+  # `function`'s `type:` where it is given by number.
+  defp brewer_scale(validated, function) do
+    {brewer, options} = brewer_palette(validated, function)
+    discrete_legend(brewer, options)
+  end
+
+  # A continuous colour scale, a gradient through a brewer palette's colours, as ggplot2's
+  # `scale_colour_distiller()` takes `pal_gradient_n()` through `pal_brewer()(7)`.
+  defp distiller_scale(validated, function) do
+    {brewer, options} = brewer_palette(validated, function)
+    colors = Palette.discrete(brewer, Options.distiller_colors())
+    gradient_with_values(colors, options)
+  end
+
+  # The brewer palette of the options `validated`, and the rest of them.
+  defp brewer_palette(validated, function) do
+    {brewer, options} = Keyword.split(validated, [:type, :palette, :direction])
+    name = brewer_name(brewer[:palette], brewer[:type], function)
+    {{:brewer, %{palette: name, direction: brewer[:direction]}}, options}
+  end
+
+  # A brewer palette's name: the one given, or the one numbered `number` among `type`'s, as R's
+  # `pal_brewer()` numbers them; a number past the last raises, where R fails.
+  defp brewer_name(name, _type, _function) when is_binary(name), do: name
+
+  defp brewer_name(number, type, function) do
+    names = Palette.brewer_palettes(type)
+
+    case Enum.fetch(names, number - 1) do
+      {:ok, name} ->
+        name
+
+      :error ->
+        raise ArgumentError,
+              "#{function} is given palette: #{number}, but ColorBrewer's #{inspect(type)} " <>
+                "palettes number #{length(names)}: #{Enum.join(names, ", ")}"
     end
   end
 
@@ -4853,15 +5018,26 @@ defmodule Giggly.Plot do
 
   defp gradientn_scale(validated) do
     {colors, options} = Keyword.pop!(validated, :colors)
-    continuous_legend({:gradient, colors}, options)
+    gradient_with_values(colors, options)
   end
 
-  # A continuous colour scale through its palette's colours, or the default gradient.
-  defp continuous_color_scale(validated) do
-    {colors, options} =
-      Keyword.pop(validated, :palette, Keyword.values(Options.gradient_defaults()))
+  # A continuous colour scale, a gradient through `colors`, placed by the options' `values` where
+  # they give them.
+  defp gradient_with_values(colors, options) do
+    case Keyword.pop(options, :values) do
+      {nil, options} -> continuous_legend({:gradient, colors}, options)
+      {values, options} -> continuous_legend({:gradient, colors, values}, options)
+    end
+  end
 
-    continuous_legend({:gradient, colors}, options)
+  # A continuous colour scale of its palette, or the default gradient.
+  defp continuous_color_scale(validated) do
+    {palette, options} =
+      Keyword.pop_lazy(validated, :palette, fn ->
+        {:gradient, Keyword.values(Options.gradient_defaults())}
+      end)
+
+    continuous_legend(palette, options)
   end
 
   defp continuous_alpha_scale(validated) do
