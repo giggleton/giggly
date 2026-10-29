@@ -235,14 +235,16 @@ defmodule Scales.BreaksTest do
 
   # Golden: R's own labeling::extended(low, high, 5, only.loose = TRUE), as above: the breaks the
   # search keeps reach both limits, where the best sequence on its own falls inside one or both
-  # (the test above gives those for the first four ranges).
+  # (the test above gives those for the first four ranges); a sequence starting or ending on a
+  # limit reaches it.
   test "breaks that must reach the limits are the best sequence that does, as R's only.loose" do
     for {range, r_breaks} <- [
           {{0.4, 6.5}, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]},
           {{2.2, 8.3}, [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]},
           {{1.5, 7.5}, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]},
           {{3.8, 9.1}, [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]},
-          {{1.1, 9.2}, [0.0, 2.5, 5.0, 7.5, 10.0]}
+          {{1.1, 9.2}, [0.0, 2.5, 5.0, 7.5, 10.0]},
+          {{0.0, 10.0}, [0.0, 2.5, 5.0, 7.5, 10.0]}
         ] do
       assert {range, Breaks.extended(range, only_loose: true)} == {range, r_breaks}
     end
@@ -264,13 +266,45 @@ defmodule Scales.BreaksTest do
   end
 
   # Golden: labeling::extended(low, high, 5, w = weights), as above: weighting simplicity or
-  # coverage more chooses other breaks than the defaults, 0, 2.5, 5, 7.5 and 10, on each range.
+  # coverage more chooses other breaks than the defaults, 0, 2.5, 5, 7.5 and 10, on each range;
+  # and, from the 4,000 random weights above, a coverage weight above 1, under which the search
+  # must stop as coverage's bound falls with steps outgrowing the range, before that bound times
+  # the weight passes the largest double.
   test "the weights of the four scores are R's w" do
     assert Breaks.extended({0.3, 9.7}, weights: [1, 0.2, 0.5, 0.05]) ==
              [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
 
     assert Breaks.extended({1.1, 9.2}, weights: [0.25, 1, 0.5, 0.05]) ==
              [1.0, 3.0, 5.0, 7.0, 9.0]
+
+    assert Breaks.extended({3.0, 6.0},
+             n: 3,
+             only_loose: true,
+             weights: [1.589, 1.669, 0.379, 0.797]
+           ) == [3.0, 4.0, 5.0, 6.0]
+  end
+
+  # Golden: labeling::extended(-0.01787, 0.080338, 3, only.loose = TRUE), from the 3,000 ranges
+  # above on the default weights: two sequences there score alike but for rounding, and adding
+  # legibility's weight, 0.05, to each leaves the one R chooses 5e-17 ahead (`step2/tie2.R`); a
+  # weight of 1.05 or -0.95 ties them, and the other, found first, wins.
+  test "the default legibility weight is R's 0.05, which settles a near tie as R's does" do
+    assert Breaks.extended({-0.01787, 0.080338}, n: 3, only_loose: true) == [-0.03, 0.03, 0.09]
+  end
+
+  # Golden: labeling::extended(0.3, 9.7, 5, w = c(0.25, 0.2, 0.5, legibility)): legibility scores
+  # every sequence alike, so its weight moves every score by as much and here chooses the
+  # defaults' breaks, until R finds none below a weight of -2.7796 (this session's
+  # `step2/mutation.R`), where the best scores -2.
+  test "the legibility weight chooses the defaults' breaks while the best scores above -2" do
+    for legibility <- [5, -2.75] do
+      assert Breaks.extended({0.3, 9.7}, weights: [0.25, 0.2, 0.5, legibility]) ==
+               [0.0, 2.5, 5.0, 7.5, 10.0]
+    end
+
+    assert_raise ArgumentError, fn ->
+      Breaks.extended({0.3, 9.7}, weights: [0.25, 0.2, 0.5, -2.8])
+    end
   end
 
   # R's labeling::extended(0.3, 9.7, 5, w = c(0.25, 0.2, 0.5, -10)) fails, "'from' must be of
@@ -291,6 +325,7 @@ defmodule Scales.BreaksTest do
           [0, 0.2, 0.5, 0.05],
           [0.25, 0.0, 0.5, 0.05],
           [0.25, 0.2, -0.5, 0.05],
+          [0.25, 0.2, 0, 0.05],
           [0.25, 0.2, 0.5],
           [0.25, 0.2, 0.5, 0.05, 1],
           [0.25, 0.2, 0.5, :none],
@@ -314,7 +349,9 @@ defmodule Scales.BreaksTest do
   # shortest-written limits taking each of R's branches, every power or every few, a smaller step
   # than the first tried, multiples of the powers, kept with one more each side, the powers alone
   # for a base of 2 or less, extended breaks, and one power; and the limits where a slip in the
-  # port first departed from R, as the log10 transformation's test chose them.
+  # port first departed from R, as the log10 transformation's test chose them; and 2 to the 29th,
+  # whose logarithm in base 2 is 29 exactly, as R's `log2()` takes it, where a ratio of natural
+  # logarithms lands a bit above.
   @r_log_breaks [
     {{700.0, 8.0e6}, 5, 10, [100.0, 1000.0, 10_000.0, 100_000.0, 1_000_000.0, 10_000_000.0]},
     {{8.0, 6.0}, 1, 10, [1.0]},
@@ -346,7 +383,8 @@ defmodule Scales.BreaksTest do
      [850.0, 900.0, 950.0, 1000.0, 1050.0, 1100.0]},
     {{7_615_976.3697186578, 16_647_593.767485669}, 5, 10,
      [7_000_000.0, 8_000_000.0, 9_000_000.0, 10_000_000.0, 20_000_000.0]},
-    {{10.0, 1000.0}, 5, 10, [10.0, 100.0, 1000.0]}
+    {{10.0, 1000.0}, 5, 10, [10.0, 100.0, 1000.0]},
+    {{1.0, 536_870_912.0}, 5, 2, [1.0, 64.0, 4096.0, 262_144.0, 16_777_216.0]}
   ]
 
   test "breaks for a logarithmic axis are R's breaks_log() on each of its branches" do
@@ -394,10 +432,11 @@ defmodule Scales.BreaksTest do
 
   # Golden: scales 1.4.0's `breaks_exp(n)(c(low, high))` and with `only.loose`, `Q` and `w`, as
   # above; all of 2,000 random limits, counts, nice numbers and only.loose matched R
-  # (`step2/sweep.R`).
+  # (`step2/sweep.R`). Whole-number limits give the same breaks as their floats.
   test "breaks for an axis of exponentials are R's breaks_exp()" do
     for {limits, options, r_breaks} <- [
           {{0.0, 100.0}, [n: 4], [100.0, 99.0, 98.0, 0.0]},
+          {{0, 10}, [], [10.0, 9.0, 8.0, 7.0, 0.0]},
           {{100.0, 0.0}, [], [100.0, 99.0, 98.0, 97.0, 0.0]},
           {{0.0, 3.5}, [], [3.0, 2.0, 1.0, 0.0]},
           {{0.0, 3.0}, [n: 2], [3.0, 0.0]},
@@ -418,7 +457,8 @@ defmodule Scales.BreaksTest do
   # seconds; all of 3,000 random limits in each unit and count matched R (`step2/sweep.R`), and all
   # of 4,900 a time scale's breaks were checked against before. Each unit counts the limits, and
   # each switch, two minutes, two hours, two days and two weeks, finds its breaks in the unit below
-  # at the switch and the unit above past it.
+  # at the switch and the unit above past it; and limits a little either side of each switch,
+  # counted in its own unit, find their breaks in the unit below and the unit above.
   test "breaks for spans of time are R's breaks_timespan(), in seconds" do
     for {limits, options, r_breaks} <- [
           {{0.0, 10.0}, [], [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]},
@@ -442,7 +482,19 @@ defmodule Scales.BreaksTest do
           {{0.0, 100.0}, [n: 3], [0.0, 100.0]},
           {{0.0, 30.0}, [unit: :hour, n: 9],
            [0.0, 14_400.0, 28_800.0, 43_200.0, 57_600.0, 72_000.0, 86_400.0, 100_800.0, 115_200.0]},
-          {{5.0, 5.0}, [], [5.0, 5.0, 5.0, 5.0, 5.0]}
+          {{5.0, 5.0}, [], [5.0, 5.0, 5.0, 5.0, 5.0]},
+          {{0.0, 1.9999}, [unit: :minute], [0.0, 30.0, 60.0, 90.0, 120.0]},
+          {{0.0, 2.0001}, [unit: :minute], [0.0, 24.0, 48.0, 72.000000000000014, 96.0, 120.0]},
+          {{0.0, 1.9999}, [unit: :hour], [0.0, 1800.0, 3600.0, 5400.0, 7200.0]},
+          {{0.0, 2.0001}, [unit: :hour],
+           [0.0, 1440.0, 2880.0, 4320.0000000000009, 5760.0, 7200.0]},
+          {{0.0, 1.99999}, [unit: :day],
+           [0.0, 36_000.0, 72_000.0, 108_000.0, 144_000.0, 180_000.0]},
+          {{0.0, 2.00001}, [unit: :day],
+           [0.0, 34_560.0, 69_120.0, 103_680.00000000001, 138_240.0, 172_800.0]},
+          {{0.0, 1.999999}, [unit: :week], [0.0, 345_600.0, 691_200.0, 1_036_800.0, 1_382_400.0]},
+          {{0.0, 2.000001}, [unit: :week],
+           [0.0, 241_920.0, 483_840.0, 725_760.00000000012, 967_680.0, 1_209_600.0]}
         ] do
       assert {limits, options, Breaks.timespan(limits, options)} == {limits, options, r_breaks}
     end

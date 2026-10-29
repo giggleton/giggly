@@ -336,7 +336,8 @@ defmodule Scales.Breaks do
     [low, high] = Enum.sort([max(low / 1, 0.0), max(high / 1, 0.0)])
     top = Float.floor(high)
 
-    if top >= 3 and high - low >= 3 do
+    # Limits 3 apart from 0 or above take `top` to 3 or more, which R checks as well.
+    if high - low >= 3 do
       count = min(trunc(top), validated.n - 1)
 
       1..count
@@ -680,7 +681,8 @@ defmodule Scales.Breaks do
     |> Enum.min()
   end
 
-  # The sorted breaks inside the limits, with one more either side where there is one.
+  # The sorted breaks inside the limits, with one more either side where there is one: a slice
+  # stops at the list's end, so only its start needs bounding.
   defp trimmed(breaks, {log_low, log_high}, base) do
     low = power(base, log_low)
     high = power(base, log_high)
@@ -692,7 +694,7 @@ defmodule Scales.Breaks do
       |> Enum.find_index(fn break -> break <= high end)
       |> then(fn from_end -> length(breaks) - 1 - from_end end)
 
-    Enum.slice(breaks, max(first - 1, 0)..min(last + 1, length(breaks) - 1))
+    Enum.slice(breaks, max(first - 1, 0)..(last + 1))
   end
 
   defp inside_count(breaks, {log_low, log_high}, base) do

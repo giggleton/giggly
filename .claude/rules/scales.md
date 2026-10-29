@@ -245,7 +245,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   through zero the bonus for it (`Breaks`' opening comment). **`only_loose:` and `weights:` are
   labeling's `only.loose` and `w`**, a square in a score R's product, `x * x`, never `x ** 2`,
   whose `:math.pow/2` can land a bit away and turn a tie: of two sequences scoring alike the
-  first found wins, as in R. A search that finds no sequence above labeling's starting score of
+  first found wins, as in R. A score is summed as R sums it, legibility's weight included, though
+  it adds alike to every sequence: two sequences a rounding apart turn on it (the default 0.05
+  decides one). A search that finds no sequence above labeling's starting score of
   -2, which only weights other than the defaults bring about, raises, as R fails; the weights'
   first three are positive and the nice numbers two or more, where R's search never ends or
   fails. All of 4,000 random ranges, counts, weights, nice numbers and `only.loose`, and 3,000
