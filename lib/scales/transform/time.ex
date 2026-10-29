@@ -7,10 +7,8 @@ defmodule Scales.Transform.Time do
   # `Scales.Transform`, and never alias it down to its last segment, which is Elixir's
   # `Time`.
   #
-  # Its axis takes R's `breaks_hms()` breaks, `scales::breaks_timespan()` on seconds: extended
-  # breaks (`Scales.Breaks`) with the nice numbers 1, 2, 1.5, 4 and 3, found on the extent in
-  # seconds when it spans two minutes or less, in minutes up to two hours, in hours up to two days,
-  # in days up to two weeks and in weeks beyond, so they fall on round seconds, minutes or hours.
+  # Its axis takes R's `breaks_hms()` breaks, `scales::breaks_timespan()` on seconds
+  # (`Scales.Breaks.timespan/2`), five wanted, so they fall on round seconds, minutes or hours.
   # Its labels are written as hms writes a time: hours, minutes and seconds, two digits each at
   # least, the hours counting on past 24 and a time before midnight negative (`24:30:00`,
   # `-00:00:30`), with as many decimals of a second as the most precise break needs, up to six,
@@ -28,14 +26,10 @@ defmodule Scales.Transform.Time do
 
   alias Scales.{Breaks, MinorBreaks}
 
-  # `scales::breaks_timespan()`'s nice numbers, in order of preference.
-  @nice_numbers [1, 2, 1.5, 4, 3]
-
   @microseconds 1_000_000
   @minute 60
   @hour 3600
   @day 86_400
-  @week 604_800
 
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &seconds/1)
@@ -46,16 +40,8 @@ defmodule Scales.Transform.Time do
   @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
 
-  # The extent measured in the unit that suits its span, broken there, and measured in seconds
-  # again, as `breaks_timespan()` divides and multiplies.
   @impl Scales.Transform
-  def breaks(_transformation, {low, high}, []) do
-    unit = unit(high - low)
-
-    {low / unit, high / unit}
-    |> Breaks.extended(nice_numbers: @nice_numbers)
-    |> Enum.map(fn break -> break * unit end)
-  end
+  def breaks(_transformation, extent, []), do: Breaks.timespan(extent)
 
   @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)
@@ -91,15 +77,6 @@ defmodule Scales.Transform.Time do
   defp step_seconds(:second), do: 1
   defp step_seconds(:minute), do: @minute
   defp step_seconds(:hour), do: @hour
-
-  # The unit, in seconds, the extent's breaks are found in: seconds over two minutes or less,
-  # minutes over two hours or less, hours over two days or less, days over two weeks or less, else
-  # weeks.
-  defp unit(span) when span <= 2 * @minute, do: 1
-  defp unit(span) when span <= 2 * @hour, do: @minute
-  defp unit(span) when span <= 2 * @day, do: @hour
-  defp unit(span) when span <= 2 * @week, do: @day
-  defp unit(_span), do: @week
 
   # A time's seconds since midnight, a double as R's `hms` stores it.
   @doc false

@@ -2,8 +2,10 @@ defmodule Scales.Breaks do
   @moduledoc """
   Where a continuous axis's breaks go, given its limits: evenly spaced numbers, nice to read, that
   cover them (`extended/2`), or every multiple of a width (`fullseq/3`), moved by an offset
-  (`width/3`), between numbers, dates, date-times or times of day. The breaks may fall outside the
-  limits; which to keep is the caller's.
+  (`width/3`), between numbers, dates, date-times or times of day; powers of a base and their
+  multiples for a logarithmic axis (`log/2`), whole numbers for an axis of exponentials
+  (`exp/2`), and whole seconds, minutes, hours, days or weeks for spans of time (`timespan/2`).
+  The breaks may fall outside the limits; which to keep is the caller's.
   """
 
   # The extended Wilkinson algorithm of Talbot, Lin and Hanrahan (2010), as R's
@@ -12,12 +14,16 @@ defmodule Scales.Breaks do
   # continuous axis.
   #
   # It searches for the evenly spaced sequence that scores best on four counts, weighted 0.25,
-  # 0.2, 0.5 and 0.05: simplicity (a step from the nice numbers times a power of ten, early in
-  # their list, and zero among the breaks), coverage (the sequence spans the range without
-  # overshooting it far), density (close to the number of breaks wanted) and legibility (which
-  # `labeling` scores as 1 for every sequence). The nice numbers are `labeling`'s, 1, 5, 2, 2.5, 4
-  # and 3, unless a caller gives others, as `scales::breaks_timespan()` gives 1, 2, 1.5, 4 and 3.
-  # The breaks may fall outside the range; the caller decides what to keep.
+  # 0.2, 0.5 and 0.05 unless a caller gives other weights: simplicity (a step from the nice
+  # numbers times a power of ten, early in their list, and zero among the breaks), coverage (the
+  # sequence spans the range without overshooting it far), density (close to the number of breaks
+  # wanted) and legibility (which `labeling` scores as 1 for every sequence). The nice numbers are
+  # `labeling`'s, 1, 5, 2, 2.5, 4 and 3, unless a caller gives others, as
+  # `scales::breaks_timespan()` gives 1, 2, 1.5, 4 and 3. The breaks may fall outside the range;
+  # the caller decides what to keep. A sequence wins only by scoring above -2, where `labeling`
+  # starts, and, where the caller asks for breaks that reach the limits, only by reaching both;
+  # where none does, which only weights other than the defaults bring about, R fails, and so does
+  # this.
   #
   # Three ranges are handled as R handles them. One narrower than 100 times the machine epsilon,
   # or wider than the square root of the largest float (where Elixir's arithmetic would overflow
@@ -44,10 +50,10 @@ defmodule Scales.Breaks do
   # `labeling::extended()`'s defaults: the nice numbers, in order of preference, and the weights of
   # simplicity, coverage, density and legibility.
   @nice_numbers [1, 5, 2, 2.5, 4, 3]
-  @simplicity_weight 0.25
-  @coverage_weight 0.2
-  @density_weight 0.5
-  @legibility_weight 0.05
+  @weights [0.25, 0.2, 0.5, 0.05]
+
+  # The score `labeling` starts its search from: a sequence must beat it to be chosen.
+  @starting_score -2
 
   # `labeling`'s legibility score, the same for every sequence.
   @legibility 1
@@ -77,6 +83,56 @@ defmodule Scales.Breaks do
                         doc:
                           "The steps a sequence may take, each times a power of ten, in order " <>
                             "of preference, `labeling::extended()`'s `Q`."
+                      ],
+                      only_loose: [
+                        type: :boolean,
+                        default: false,
+                        doc:
+                          "Whether the breaks must reach the limits, the first at or below the " <>
+                            "low one and the last at or above the high one, " <>
+                            "`labeling::extended()`'s `only.loose`."
+                      ],
+                      weights: [
+                        type: {:custom, __MODULE__, :validate_weights, []},
+                        default: @weights,
+                        doc:
+                          "The weights of simplicity, coverage, density and legibility, four " <>
+                            "numbers, the first three positive, `labeling::extended()`'s `w`."
+                      ]
+                    )
+
+  @log_options NimbleOptions.new!(
+                 n: [
+                   type: :pos_integer,
+                   default: @wanted,
+                   doc:
+                     "The number of breaks wanted, R's `n`: a step is enough when it leaves " <>
+                       "that many less two inside the limits."
+                 ],
+                 base: [
+                   type: {:custom, __MODULE__, :validate_base, []},
+                   default: 10,
+                   doc: "The logarithm's base, a number above 1, R's `base`."
+                 ]
+               )
+
+  # `scales::breaks_timespan()`'s nice numbers, in order of preference, and the seconds in each
+  # unit a span of time may be counted in.
+  @timespan_nice_numbers [1, 2, 1.5, 4, 3]
+  @unit_seconds %{second: 1, minute: 60, hour: 3600, day: 86_400, week: 604_800}
+
+  @timespan_options NimbleOptions.new!(
+                      unit: [
+                        type: {:in, Map.keys(@unit_seconds)},
+                        default: :second,
+                        doc:
+                          "The unit the limits are counted in, one of `:second`, `:minute`, " <>
+                            "`:hour`, `:day` and `:week`, R's `unit`; the breaks are seconds."
+                      ],
+                      n: [
+                        type: {:custom, __MODULE__, :validate_wanted, []},
+                        default: @wanted,
+                        doc: "The number of breaks wanted, 2 or more, R's `n`."
                       ]
                     )
 
@@ -156,12 +212,10 @@ defmodule Scales.Breaks do
   """
   @spec extended({float(), float()}, keyword()) :: [float()]
   def extended(limits, options \\ []) do
-    %{n: wanted, nice_numbers: nice_numbers} =
-      options
-      |> NimbleOptions.validate!(@extended_options)
-      |> Map.new()
-
-    extended_breaks(limits, wanted, nice_numbers)
+    options
+    |> NimbleOptions.validate!(@extended_options)
+    |> Map.new()
+    |> then(fn problem -> extended_breaks(limits, problem) end)
   end
 
   # NimbleOptions' check of `n:`: a whole number from 2, since R's search finds no sequence for
@@ -173,11 +227,12 @@ defmodule Scales.Breaks do
   def validate_wanted(other),
     do: {:error, "expected a whole number of breaks, 2 or more, got: #{inspect(other)}"}
 
-  # NimbleOptions' check of `nice_numbers:`: a list of positive numbers, at least one, since the
-  # search stops only on a nice number that cannot win.
+  # NimbleOptions' check of `nice_numbers:`: a list of positive numbers, at least two, since the
+  # search stops only on a nice number that cannot win, and a nice number's preference is its
+  # place in the list over the list's length less one, which R takes to NaN for one and fails.
   @doc false
   @spec validate_nice_numbers(term()) :: {:ok, [number(), ...]} | {:error, String.t()}
-  def validate_nice_numbers([_first | _rest] = numbers) do
+  def validate_nice_numbers([_first, _second | _rest] = numbers) do
     if Enum.all?(numbers, fn number -> is_number(number) and number > 0 end),
       do: {:ok, numbers},
       else: nice_numbers_error(numbers)
@@ -186,7 +241,156 @@ defmodule Scales.Breaks do
   def validate_nice_numbers(numbers), do: nice_numbers_error(numbers)
 
   defp nice_numbers_error(numbers),
-    do: {:error, "expected a list of positive numbers, at least one, got: #{inspect(numbers)}"}
+    do: {:error, "expected a list of positive numbers, at least two, got: #{inspect(numbers)}"}
+
+  # NimbleOptions' check of `weights:`: four numbers, the first three positive, since the search
+  # ends only where simplicity falls with the skip, coverage with the power and density with the
+  # count, and R's never ends where one of them is weighted 0.
+  @doc false
+  @spec validate_weights(term()) :: {:ok, [number()]} | {:error, String.t()}
+  def validate_weights([simplicity, coverage, density, legibility] = weights)
+      when is_number(simplicity) and simplicity > 0 and is_number(coverage) and coverage > 0 and
+             is_number(density) and density > 0 and is_number(legibility),
+      do: {:ok, weights}
+
+  def validate_weights(weights) do
+    {:error,
+     "expected four weights, of simplicity, coverage, density and legibility, the first " <>
+       "three positive, got: #{inspect(weights)}"}
+  end
+
+  # NimbleOptions' check of `base:`: a number above 1, since below it a logarithm falls as its
+  # value rises and R's search fails on most limits, and at 1 R gives the one break 1.
+  @doc false
+  @spec validate_base(term()) :: {:ok, number()} | {:error, String.t()}
+  def validate_base(base) when is_number(base) and base > 1, do: {:ok, base}
+  def validate_base(base), do: {:error, "expected a number above 1, got: #{inspect(base)}"}
+
+  @doc """
+  Breaks for a logarithmic axis over the limits `{low, high}`, positive numbers in either order,
+  R's `breaks_log()`.
+
+  It takes every power of `base:` from the low limit's logarithm rounded down to the high one's
+  rounded up, or every second, third and so on, the widest step that leaves `n:` breaks less two
+  inside the limits. Where every power leaves too few, it adds multiples of each power, one
+  multiple at a time, each the whole number below the base that keeps the steps evenest on the
+  logarithm (3 first for base 10), until enough fall inside, and keeps those inside with one more
+  either side; and where even every whole multiple leaves too few, `extended/2`'s breaks on the
+  limits, `n:` wanted. A base of 2 or less adds no multiples: its powers are the breaks, however
+  few fall inside. Limits whose logarithms lie between the same two whole numbers but round to
+  one give that power alone.
+
+  ## Options
+
+  #{NimbleOptions.docs(@log_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.log({1.0, 1.0e5})
+      [1.0, 100.0, 1.0e4]
+
+      iex> Scales.Breaks.log({2000.0, 9000.0})
+      [2000.0, 3000.0, 5000.0, 7000.0, 10000.0]
+
+      iex> Scales.Breaks.log({3.0, 5.0}, base: 2)
+      [2.0, 4.0, 8.0]
+  """
+  @spec log({number(), number()}, keyword()) :: [float()]
+  def log(limits, options \\ []) do
+    %{n: wanted, base: base} =
+      options
+      |> NimbleOptions.validate!(@log_options)
+      |> Map.new()
+
+    log_breaks(limits, wanted, base)
+  end
+
+  @doc """
+  Breaks for an axis of exponentials over the limits `{low, high}`, in either order, R's
+  `breaks_exp()`.
+
+  Each limit below 0 is taken as 0. Where the high limit reaches 3 and the limits are 3 or more
+  apart, the breaks are the high limit rounded down and the whole numbers below it, `n:` less one
+  of them at most, then 0, in that order, high to low, as R gives them; otherwise they are
+  `extended/2`'s breaks on the limits, which every option here reaches.
+
+  ## Options
+
+  #{NimbleOptions.docs(@extended_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.exp({0.0, 100.0}, n: 4)
+      [100.0, 99.0, 98.0, 0.0]
+
+      iex> Scales.Breaks.exp({100.0, 102.0})
+      [100.0, 100.5, 101.0, 101.5, 102.0]
+  """
+  @spec exp({number(), number()}, keyword()) :: [float()]
+  def exp({low, high}, options \\ []) when is_number(low) and is_number(high) do
+    validated =
+      options
+      |> NimbleOptions.validate!(@extended_options)
+      |> Map.new()
+
+    [low, high] = Enum.sort([max(low / 1, 0.0), max(high / 1, 0.0)])
+    top = Float.floor(high)
+
+    if top >= 3 and high - low >= 3 do
+      count = min(trunc(top), validated.n - 1)
+
+      1..count
+      |> Enum.map(fn below -> top - below + 1 end)
+      |> Enum.concat([0.0])
+    else
+      extended_breaks({low, high}, validated)
+    end
+  end
+
+  @doc """
+  Breaks for an axis of spans of time over the limits `{low, high}`, in either order, counted in
+  `unit:`, in seconds, R's `breaks_timespan()`.
+
+  The limits are measured in the unit that suits their span: seconds over two minutes or less,
+  minutes over two hours or less, hours over two days or less, days over two weeks or less, else
+  weeks; there they take `extended/2`'s breaks with the nice numbers 1, 2, 1.5, 4 and 3, `n:`
+  wanted, which are then measured in seconds, so they fall on whole seconds, minutes, hours, days
+  or weeks. R gives them as a `difftime` of seconds; here they are numbers.
+
+  ## Options
+
+  #{NimbleOptions.docs(@timespan_options)}
+
+  ## Examples
+
+      iex> Scales.Breaks.timespan({0.0, 100.0}, unit: :minute)
+      [0.0, 1200.0, 2400.0, 3600.0, 4800.0, 6000.0]
+
+      iex> Scales.Breaks.timespan({0.0, 100.0}, n: 3)
+      [0.0, 100.0]
+  """
+  @spec timespan({number(), number()}, keyword()) :: [float()]
+  def timespan({low, high}, options \\ []) when is_number(low) and is_number(high) do
+    %{unit: unit, n: wanted} =
+      options
+      |> NimbleOptions.validate!(@timespan_options)
+      |> Map.new()
+
+    seconds = Map.fetch!(@unit_seconds, unit)
+    [low, high] = Enum.sort([low / 1 * seconds, high / 1 * seconds])
+    scale = timespan_scale(high - low)
+
+    {low / scale, high / scale}
+    |> extended(n: wanted, nice_numbers: @timespan_nice_numbers)
+    |> Enum.map(fn break -> break * scale end)
+  end
+
+  # The seconds in the unit a span of `span` seconds is broken in.
+  defp timespan_scale(span) when span <= 2 * 60, do: 1
+  defp timespan_scale(span) when span <= 2 * 3600, do: 60
+  defp timespan_scale(span) when span <= 2 * 86_400, do: 3600
+  defp timespan_scale(span) when span <= 2 * 604_800, do: 86_400
+  defp timespan_scale(_span), do: 604_800
 
   @doc """
   Every multiple of `size` from the low limit rounded down to one to the high limit rounded up,
@@ -387,23 +591,150 @@ defmodule Scales.Breaks do
   defp moved(datetime, offset, {:datetime, _zone, database}),
     do: DateBreaks.offset(datetime, offset, database)
 
+  # R's `breaks_log()` on positive limits: the powers that leave enough inside, else
+  # `log_sub_breaks()`'s multiples of them. R's own check is that both limits are finite; on one of
+  # 0 or below it fails.
+  defp log_breaks({low, high}, wanted, base)
+       when is_number(low) and low > 0 and is_number(high) and high > 0 do
+    [low, high] = Enum.sort([low, high])
+    range = {logarithm(low, base), logarithm(high, base)}
+    {log_low, log_high} = range
+    exponents = {Float.floor(log_low), Float.ceil(log_high)}
+
+    case exponents do
+      {first, first} ->
+        [power(base, first)]
+
+      {first, last} ->
+        every_power(exponents, floor((last - first) / wanted) + 1, {range, wanted, base})
+    end
+  end
+
+  defp log_breaks(limits, _wanted, _base) do
+    raise ArgumentError,
+          "expected limits of two positive numbers, as a logarithm takes, got: #{inspect(limits)}"
+  end
+
+  # Every `step`th power over the exponents, or a smaller step's, while it leaves too few inside
+  # the limits; with a step of one too few, the multiples in between.
+  defp every_power({first, last} = exponents, step, {range, wanted, base} = problem) do
+    breaks = powers(first, last, step, base)
+
+    cond do
+      inside_count(breaks, range, base) >= wanted - 2 -> breaks
+      step > 1 -> every_power(exponents, step - 1, problem)
+      true -> sub_breaks(exponents, problem)
+    end
+  end
+
+  # R's `base^seq(first, last, by = step)`, whole numbers apart.
+  defp powers(first, last, step, base) do
+    count = trunc((last - first) / step)
+    Enum.map(0..count, fn index -> power(base, first + index * step) end)
+  end
+
+  # R's `log_sub_breaks()`: for a base of 2 or less every power; else multiples added to each
+  # power, one at a time, until enough fall inside the limits, sorted and those inside kept with
+  # one more either side; or, failing that, extended breaks on the limits.
+  defp sub_breaks({first, last}, {_range, _wanted, base}) when base <= 2,
+    do: powers(first, last, 1, base)
+
+  defp sub_breaks(exponents, {range, wanted, base} = problem) do
+    {log_low, log_high} = range
+
+    # The whole numbers from 2 below the base, as R's `seq_len(base)` counts to it rounded down.
+    candidates = Enum.filter(2..trunc(base)//1, fn candidate -> candidate < base end)
+
+    case add_multiples([1], candidates, exponents, problem) do
+      {:enough, breaks} ->
+        breaks
+        |> Enum.sort()
+        |> trimmed(range, base)
+
+      :too_few ->
+        extended({power(base, log_low), power(base, log_high)}, n: wanted)
+    end
+  end
+
+  defp add_multiples(_steps, [], _exponents, _problem), do: :too_few
+
+  defp add_multiples(steps, candidates, {first, last} = exponents, problem) do
+    {range, wanted, base} = problem
+    best = Enum.max_by(candidates, fn candidate -> evenness([candidate | steps], base) end)
+    added = Enum.concat(steps, [best])
+    every = powers(first, last, 1, base)
+    breaks = for multiple <- added, power <- every, do: power * multiple
+
+    if inside_count(breaks, range, base) >= wanted - 2,
+      do: {:enough, breaks},
+      else: add_multiples(added, List.delete(candidates, best), exponents, problem)
+  end
+
+  # The smallest gap on the logarithm between the multiples and the base, R's `delta()`.
+  defp evenness(multiples, base) do
+    [base | multiples]
+    |> Enum.sort()
+    |> Enum.map(fn multiple -> logarithm(multiple, base) end)
+    |> Enum.chunk_every(2, 1, :discard)
+    |> Enum.map(fn [lower, upper] -> upper - lower end)
+    |> Enum.min()
+  end
+
+  # The sorted breaks inside the limits, with one more either side where there is one.
+  defp trimmed(breaks, {log_low, log_high}, base) do
+    low = power(base, log_low)
+    high = power(base, log_high)
+    first = Enum.find_index(breaks, fn break -> low <= break end)
+
+    last =
+      breaks
+      |> Enum.reverse()
+      |> Enum.find_index(fn break -> break <= high end)
+      |> then(fn from_end -> length(breaks) - 1 - from_end end)
+
+    Enum.slice(breaks, max(first - 1, 0)..min(last + 1, length(breaks) - 1))
+  end
+
+  defp inside_count(breaks, {log_low, log_high}, base) do
+    low = power(base, log_low)
+    high = power(base, log_high)
+    Enum.count(breaks, fn break -> low <= break and break <= high end)
+  end
+
+  # R's `log(x, base)`: base 10's and base 2's own functions, else the ratio of natural logarithms.
+  defp logarithm(value, base) when base == 10, do: :math.log10(value)
+  defp logarithm(value, base) when base == 2, do: :math.log2(value)
+  defp logarithm(value, base), do: :math.log(value) / :math.log(base)
+
+  defp power(base, exponent), do: :math.pow(base / 1, exponent)
+
   # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the
   # opening comment describes.
-  defp extended_breaks({low, high}, wanted, _nice_numbers)
+  defp extended_breaks({low, high}, %{n: wanted})
        when high - low < @epsilon or high - low > @widest_searched,
        do: spaced_evenly(low, high, wanted)
 
-  defp extended_breaks(range, wanted, nice_numbers) do
+  defp extended_breaks(range, options) do
+    %{nice_numbers: nice_numbers, weights: weights} = options
     preferred = preferences(nice_numbers)
-    best = search({range, wanted}, 1, preferred, %{score: -2})
-    %{first: first, last: last, step: step} = best
-    sequence(first, last, step)
+    problem = Map.merge(options, %{range: range, weights: List.to_tuple(weights)})
+
+    case search(problem, 1, preferred, %{score: @starting_score}) do
+      %{first: first, last: last, step: step} ->
+        sequence(first, last, step)
+
+      _none ->
+        raise ArgumentError,
+              "no sequence of breaks over #{inspect(range)} scores above #{@starting_score}, " <>
+                "where labeling::extended() starts, under the weights #{inspect(weights)}"
+    end
   end
 
   # The outer loop, over `j`, the number of steps a nice number is skipped by: it stops when no
   # nice number at this `j` could beat the best sequence so far even with perfect coverage and
   # density.
-  # The search runs over the range and the number of breaks wanted, `problem`.
+  # The search runs over `problem`: the range, the number of breaks wanted (`n`), the weights and
+  # whether the breaks must reach the limits.
   defp search(problem, skip, preferred, best) do
     case search_nice_numbers(problem, skip, preferred, best) do
       {:halt, best} -> best
@@ -416,7 +747,7 @@ defmodule Scales.Breaks do
   defp search_nice_numbers(problem, skip, [nice | rest], %{score: best_score} = best) do
     simplicity_bound = simplicity_max(nice, skip)
 
-    if bound(simplicity_bound, 1, 1) < best_score do
+    if bound(problem, simplicity_bound, 1, 1) < best_score do
       {:halt, best}
     else
       best = search_counts(problem, skip, nice, simplicity_bound, 2, best)
@@ -426,11 +757,11 @@ defmodule Scales.Breaks do
 
   # Over `k`, the number of breaks, until no count this large could win on density.
   defp search_counts(problem, skip, nice, simplicity_bound, count, best) do
-    {{low, high}, wanted} = problem
+    %{range: {low, high}, n: wanted} = problem
     %{score: best_score} = best
     density_bound = density_max(count, wanted)
 
-    if bound(simplicity_bound, 1, density_bound) < best_score do
+    if bound(problem, simplicity_bound, 1, density_bound) < best_score do
       best
     else
       {number, _preference} = nice
@@ -444,13 +775,13 @@ defmodule Scales.Breaks do
 
   # Over `z`, the power of ten the nice number is scaled by, until the step overshoots the range
   # by too much to cover it well.
-  defp search_powers({range, _wanted} = problem, candidate, power, best) do
+  defp search_powers(%{range: range} = problem, candidate, power, best) do
     {skip, {number, _preference}, simplicity_bound, count, density_bound} = candidate
     %{score: best_score} = best
     step = skip * number * :math.pow(10, power)
     coverage_bound = coverage_max(range, step * (count - 1))
 
-    if bound(simplicity_bound, coverage_bound, density_bound) < best_score do
+    if bound(problem, simplicity_bound, coverage_bound, density_bound) < best_score do
       best
     else
       best =
@@ -472,24 +803,34 @@ defmodule Scales.Breaks do
     if first > last, do: [], else: Enum.to_list(first..last//1)
   end
 
-  defp consider({range, wanted}, candidate, step, start, best) do
+  defp consider(problem, candidate, step, start, best) do
+    %{range: range, n: wanted, weights: weights} = problem
+    {simplicity_weight, coverage_weight, density_weight, legibility_weight} = weights
     {skip, nice, _simplicity_bound, count, _density_bound} = candidate
     %{score: best_score} = best
     first = start * (step / skip)
     last = first + step * (count - 1)
 
     score =
-      @simplicity_weight * simplicity(nice, skip, first, last, step) +
-        @coverage_weight * coverage(range, first, last) +
-        @density_weight * density(count, wanted, range, first, last) +
-        @legibility_weight * @legibility
+      simplicity_weight * simplicity(nice, skip, first, last, step) +
+        coverage_weight * coverage(range, first, last) +
+        density_weight * density(count, wanted, range, first, last) +
+        legibility_weight * @legibility
 
-    if score > best_score, do: %{score: score, first: first, last: last, step: step}, else: best
+    if score > best_score and reaches?(problem, first, last),
+      do: %{score: score, first: first, last: last, step: step},
+      else: best
   end
 
-  defp bound(simplicity, coverage, density) do
-    @simplicity_weight * simplicity + @coverage_weight * coverage + @density_weight * density +
-      @legibility_weight
+  # Whether a sequence may win: any may, unless the breaks must reach the limits.
+  defp reaches?(%{only_loose: false}, _first, _last), do: true
+  defp reaches?(%{range: {low, high}}, first, last), do: first <= low and last >= high
+
+  defp bound(%{weights: weights}, simplicity, coverage, density) do
+    {simplicity_weight, coverage_weight, density_weight, legibility_weight} = weights
+
+    simplicity_weight * simplicity + coverage_weight * coverage + density_weight * density +
+      legibility_weight
   end
 
   # `.simplicity()`: earlier nice numbers and fewer skips score higher, and a sequence through zero
@@ -517,7 +858,7 @@ defmodule Scales.Breaks do
   # range as wide as `labeling` searches, as R's reaches infinity there.
   defp coverage({low, high}, first, last) do
     range = high - low
-    1 - 0.5 * ((high - last) ** 2 + (low - first) ** 2) / (0.1 * range) ** 2
+    1 - 0.5 * (square(high - last) + square(low - first)) / square(0.1 * range)
   rescue
     ArithmeticError -> @minus_infinity
   end
@@ -527,13 +868,17 @@ defmodule Scales.Breaks do
 
     if span > range do
       half = (span - range) / 2
-      1 - 0.5 * (half ** 2 + half ** 2) / (0.1 * range) ** 2
+      1 - 0.5 * (square(half) + square(half)) / square(0.1 * range)
     else
       1
     end
   rescue
     ArithmeticError -> @minus_infinity
   end
+
+  # A number times itself, as R squares one, rounded once; `** 2`, through `:math.pow/2`, can land
+  # a bit away, which turns a tie between two sequences' scores.
+  defp square(number), do: number * number
 
   # `.density()`, minus infinity for a sequence whose first and last breaks are one number, its
   # step rounding error beside them, as R's division by zero gives.

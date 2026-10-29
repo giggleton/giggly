@@ -3,7 +3,7 @@ defmodule Scales.TransformTest do
 
   doctest Scales.Transform
 
-  alias Scales.Transform
+  alias Scales.{Breaks, Transform}
 
   # Golden: every axis below is R's own, from R 4.6.1 with ggplot2 4.0.3 and scales 1.4.0 (the
   # image `giggly-r:ggplot2-4.0.3`): `ggplot_build()`'s panel params for the plot in the comment
@@ -170,31 +170,17 @@ defmodule Scales.TransformTest do
              ]
     end
 
-    # Golden: scales 1.4.0's `breaks_log()(10^extent)`, those inside the extent, in log space, on
-    # extents chosen from 600 random ones (seed 20261019) as the first where a slip in R's port
-    # departs from R: the first step's size, how many breaks are enough, how evenness is measured,
-    # the multiples tried, the fallback, and how many powers a step leaves; and an extent ending
-    # exactly on powers of ten, which count as inside.
-    test "breaks inside the extent are R's breaks_log() wherever a slip would show" do
-      for {extent, expected} <- [
-            {{3.7012828388251364, 15.141030670586783}, [6.0, 9.0, 12.0, 15.0]},
-            {{-1.989977743010968, 6.0139288976533276}, [0.0, 2.0, 4.0, 6.0]},
-            {{-0.74079247051849961, -0.0016752352783626634},
-             [-0.69897000433601875, -0.52287874528033751, -0.3010299956639812]},
-            {{-2.67495376477018, -2.5310531331511439},
-             [-2.6575773191777938, -2.6197887582883941, -2.5850266520291818, -2.5528419686577806]},
-            {{2.9382192031480372, 3.0423576763965769},
-             [2.9542425094393248, 2.9777236052888476, 3.0, 3.0211892990699383, 3.0413926851582249]},
-            {{6.8817255878821015, 7.2213514697328911},
-             [6.9030899869919438, 6.9542425094393252, 7.0]},
-            {{1.0, 3.0}, [1.0, 2.0, 3.0]}
-          ] do
-        inside =
-          :log10
-          |> Transform.breaks(extent)
-          |> inside(extent)
+    # The breaks themselves are `Breaks.log/2`'s, whose test pins R's: here, the extent is turned
+    # back into data units, five breaks wanted in base 10, and each put back into log space, those
+    # outside the extent left for the scale to drop.
+    test "breaks are breaks_log()'s on the extent in data units, put back into log space" do
+      for {low, high} = extent <- [{3.7012828388251364, 15.141030670586783}, {-0.74, -0.0017}] do
+        expected =
+          {:math.pow(10.0, low), :math.pow(10.0, high)}
+          |> Breaks.log(n: 5, base: 10)
+          |> Enum.map(&:math.log10/1)
 
-        assert inside == expected
+        assert Transform.breaks(:log10, extent) == expected
       end
     end
 
@@ -507,20 +493,12 @@ defmodule Scales.TransformTest do
                 ]}
     end
 
-    test "breaks are found in seconds up to two minutes, in minutes beyond" do
-      assert Transform.breaks(:time, {36_000.0, 36_120.0}) ==
-               [36_000.0, 36_030.0, 36_060.0, 36_090.0, 36_120.0]
-
-      assert Transform.breaks(:time, {36_000.0, 36_120.001}) ==
-               [36_000.0, 36_024.0, 36_048.0, 36_072.0, 36_096.0, 36_120.0]
-    end
-
-    test "breaks are found in minutes up to two hours, in hours beyond" do
-      assert Transform.breaks(:time, {36_000.0, 43_200.0}) ==
-               [36_000.0, 37_800.0, 39_600.0, 41_400.0, 43_200.0]
-
-      assert Transform.breaks(:time, {36_000.0, 43_200.001}) ==
-               [36_000.0, 37_440.0, 38_880.0, 40_320.0, 41_760.0, 43_200.0]
+    # The breaks themselves are `Breaks.timespan/2`'s, whose test pins R's at each unit's switch:
+    # here, the extent's seconds, five wanted.
+    test "breaks are breaks_timespan()'s on the extent's seconds" do
+      for extent <- [{36_000.0, 36_120.001}, {36_000.0, 43_200.0}] do
+        assert Transform.breaks(:time, extent) == Breaks.timespan(extent, unit: :second, n: 5)
+      end
     end
 
     # extents only a wide expand: reaches, labelled with hours past 99 unpadded, where R writes

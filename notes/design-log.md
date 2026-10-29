@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Breaks for a log, exponential or timespan axis are R's, whole, and extended breaks take
+  labeling's `only.loose` and `w` (2026-10-29, Steve, increment 2's step 2; checked against scales
+  1.4.0).** `Breaks.log/2`, `exp/2` and `timespan/2` are R's `breaks_log()`, `breaks_exp()` and
+  `breaks_timespan()`, R's breaks whole, the power or multiple either side of the limits
+  included, as `extended/2` gives breaks outside them; log10's and the time scale's breaks call
+  them. `exp/2` takes every option of `extended/2`, its fallback, as R passes `...`; `timespan/2`
+  counts its limits in `:second` to `:week`, the package's step units, and gives seconds as
+  numbers. A power is `:math.pow/2`'s, the double nearest it, where R's x86 long-double power is
+  a bit off on 1.2 cubed and 1.1 to the fourth. Refused where R fails or never ends: limits of 0
+  or below, a base of 1 or below, weights not positive for simplicity, coverage or density, one
+  nice number. *Rejected: R's power*: only a port of glibc's `powl` reproduces its last bit.
+  *Rejected: Giggly's own unit names (`:secs`)*: the package names a step's units once.
+
 - **Breaks a width apart take numbers, dates, date-times and times, a step as `Date.shift/2`
   writes one (2026-10-29, Steve, increment 2's step 1; checked against scales 1.4.0).**
   `Breaks.fullseq/3` and `Breaks.width/3` are R's `fullseq()` and `breaks_width()`, chosen by the
@@ -217,6 +230,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   nothing in the books or notebooks. A colour, for a manual palette's guessed type, is a string
   `ColorOperations.parse/1` reads, so `"transparent"` is one and `"grey50"` is not, the reverse of
   R's test, which reads R's own colour names.
+
+- **The standalone colour mappers are left out (2026-10-28, Steve: "D", increment 1's scope).**
+  R's `col_numeric()`, `col_bin()`, `col_factor()` and `col_quantile()` map values straight to
+  colours, outside any scale. The first two are a trained range, a rescaling and a palette, three
+  calls the package has; the others need breaks and quantiles of their own; nothing in the books
+  or the notebooks calls one. Steve: "Why do this if giggly isn't going to use it". *Rejected: the
+  four in `Scales.ColorOperations`*: a second road to what a scale does, with no user in the
+  evidence.
 
 - **A brewer palette is RColorBrewer's sets, named as R spells them; dichromat is left out
   (2026-10-28, Steve, increment 1's scope; checked against scales 1.4.0, RColorBrewer 1.1-3 and
@@ -3093,6 +3114,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add Breaks.log, Breaks.exp and Breaks.timespan, R's breaks_log(), breaks_exp()
+  and breaks_timespan(), and only_loose and weights on Breaks.extended (breaks, step 2); §4:
+  "Breaks for a log, exponential or timespan axis", "The standalone colour mappers"
 - 2026-10-29 — Add Breaks.fullseq and Breaks.width, R's fullseq() and breaks_width() on numbers,
   dates, date-times and times, with offsets (breaks, step 1); §4: "Breaks a width apart"
 - 2026-10-29 — Draw the notebook examples increment 1 unlocks, the brewer and steps scales and a

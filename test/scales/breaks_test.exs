@@ -4,7 +4,11 @@ defmodule Scales.BreaksTest do
   alias Scales.Breaks
 
   # The examples' breaks are R 4.6.1's `labeling::extended(9.225, 35.075, 5)`,
-  # `extended(0, 10, 5)`, the same with `Q = c(1, 2, 1.5, 4, 3)`, and `extended(52, 335, 2)`.
+  # `extended(0, 10, 5)`, the same with `Q = c(1, 2, 1.5, 4, 3)`, and `extended(52, 335, 2)`;
+  # scales 1.4.0's `breaks_log()(c(1, 1e5))`, `breaks_log()(c(2000, 9000))`,
+  # `breaks_log(base = 2)(c(3, 5))`, `breaks_exp(n = 4)(c(0, 100))`, `breaks_exp()(c(100, 102))`,
+  # `breaks_timespan("mins")(c(0, 100))` and `breaks_timespan(n = 3)(c(0, 100))`; and the rest
+  # R's `fullseq()` and `breaks_width()`.
   doctest Scales.Breaks
 
   # Golden: R's own `labeling::extended(low, high, 5)` (labeling 0.4.3, R 4.6.1, run in Docker's
@@ -216,15 +220,239 @@ defmodule Scales.BreaksTest do
     end
   end
 
-  # The search stops only on a nice number that cannot win, so none would never stop.
-  test "the nice numbers are positive numbers, at least one, and anything else is refused" do
-    for numbers <- [[], [0], [1, -2], [:five]] do
+  # The search stops only on a nice number that cannot win, so none would never stop; one has no
+  # place in a list, which R's labeling::extended(0, 10, 5, Q = 1) reaches as NaN and fails on.
+  test "the nice numbers are positive numbers, at least two, and anything else is refused" do
+    for numbers <- [[], [2], [0, 1], [1, -2], [:five, 1]] do
       error =
         assert_raise NimbleOptions.ValidationError, fn ->
           Breaks.extended({0.0, 10.0}, nice_numbers: numbers)
         end
 
       assert error.message =~ "got: #{inspect(numbers)}"
+    end
+  end
+
+  # Golden: R's own labeling::extended(low, high, 5, only.loose = TRUE), as above: the breaks the
+  # search keeps reach both limits, where the best sequence on its own falls inside one or both
+  # (the test above gives those for the first four ranges).
+  test "breaks that must reach the limits are the best sequence that does, as R's only.loose" do
+    for {range, r_breaks} <- [
+          {{0.4, 6.5}, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]},
+          {{2.2, 8.3}, [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]},
+          {{1.5, 7.5}, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]},
+          {{3.8, 9.1}, [3.5, 4.5, 5.5, 6.5, 7.5, 8.5, 9.5]},
+          {{1.1, 9.2}, [0.0, 2.5, 5.0, 7.5, 10.0]}
+        ] do
+      assert {range, Breaks.extended(range, only_loose: true)} == {range, r_breaks}
+    end
+  end
+
+  # Golden: labeling::extended(-2.668842, 0.131158, 3, only.loose = TRUE), as above, from 3,000
+  # random ranges: two sequences, steps 0.8 and 1.6, score exactly alike, and the first found, the
+  # smaller skip, wins; a square taken as `:math.pow/2` takes it lands a bit away from R's product
+  # and hands the second the win.
+  test "of two sequences scoring alike the first found wins, each square R's own product" do
+    assert Breaks.extended({-2.6688420000000002, 0.13115799999999966}, n: 3, only_loose: true) ==
+             [
+               -2.8000000000000003,
+               -2.0,
+               -1.2000000000000002,
+               -0.3999999999999999,
+               0.3999999999999999
+             ]
+  end
+
+  # Golden: labeling::extended(low, high, 5, w = weights), as above: weighting simplicity or
+  # coverage more chooses other breaks than the defaults, 0, 2.5, 5, 7.5 and 10, on each range.
+  test "the weights of the four scores are R's w" do
+    assert Breaks.extended({0.3, 9.7}, weights: [1, 0.2, 0.5, 0.05]) ==
+             [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]
+
+    assert Breaks.extended({1.1, 9.2}, weights: [0.25, 1, 0.5, 0.05]) ==
+             [1.0, 3.0, 5.0, 7.0, 9.0]
+  end
+
+  # R's labeling::extended(0.3, 9.7, 5, w = c(0.25, 0.2, 0.5, -10)) fails, "'from' must be of
+  # length 1": a legibility weight that low takes every score below -2, where its search starts.
+  test "weights that leave every sequence scoring below -2 find none, and raise as R fails" do
+    error =
+      assert_raise ArgumentError, fn ->
+        Breaks.extended({0.3, 9.7}, weights: [0.25, 0.2, 0.5, -10])
+      end
+
+    assert error.message =~ "no sequence of breaks over {0.3, 9.7} scores above -2"
+    assert error.message =~ "[0.25, 0.2, 0.5, -10]"
+  end
+
+  # R's search never ends with simplicity, coverage or density weighted 0 or below.
+  test "the weights are four numbers, the first three positive, and anything else is refused" do
+    for weights <- [
+          [0, 0.2, 0.5, 0.05],
+          [0.25, 0.0, 0.5, 0.05],
+          [0.25, 0.2, -0.5, 0.05],
+          [0.25, 0.2, 0.5],
+          [0.25, 0.2, 0.5, 0.05, 1],
+          [0.25, 0.2, 0.5, :none],
+          [:one, 0.2, 0.5, 0.05],
+          :default
+        ] do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Breaks.extended({0.0, 10.0}, weights: weights)
+        end
+
+      assert error.message =~
+               "expected four weights, of simplicity, coverage, density and legibility, the " <>
+                 "first three positive, got: #{inspect(weights)}"
+    end
+  end
+
+  # Golden: R 4.6.1's scales 1.4.0 `breaks_log(n, base)(c(low, high))` (the giggly-r:ggplot2-4.0.3
+  # image), each break printed to 17 significant digits, from 4,000 random limits (this session's
+  # scratchpad `step2/sweep.R`), all of which match but 63 in base 1.2 (below): for each base the
+  # shortest-written limits taking each of R's branches, every power or every few, a smaller step
+  # than the first tried, multiples of the powers, kept with one more each side, the powers alone
+  # for a base of 2 or less, extended breaks, and one power; and the limits where a slip in the
+  # port first departed from R, as the log10 transformation's test chose them.
+  @r_log_breaks [
+    {{700.0, 8.0e6}, 5, 10, [100.0, 1000.0, 10_000.0, 100_000.0, 1_000_000.0, 10_000_000.0]},
+    {{8.0, 6.0}, 1, 10, [1.0]},
+    {{6.0, 3.0}, 5, 10, [2.0, 3.0, 4.0, 5.0, 7.0]},
+    {{2.0, 2.0}, 5, 10, [2.0, 2.0, 2.0, 2.0, 2.0]},
+    {{10.0, 10.0}, 5, 10, [10.0]},
+    {{9.0, 16.0}, 1, 2, [8.0]},
+    {{10.0, 1.125}, 4, 2, [1.0, 2.0, 4.0, 8.0, 16.0]},
+    {{3.0, 3.0}, 5, 2, [2.0, 4.0]},
+    {{10.0, 8.0}, 7, 1.5, [7.59375, 11.390625]},
+    {{1.1851851851851851, 7.59375}, 5, 1.5, [1.0, 1.5, 2.25, 3.375, 5.0625, 7.59375]},
+    {{1.4715177646857693, 2.9430355293715387}, 4, :math.exp(1),
+     [1.0, 2.0, 2.718281828459045, 5.43656365691809]},
+    {{10.0, 6.0}, 6, :math.exp(1), [6.0, 7.0, 8.0, 9.0, 10.0]},
+    {{2.0, 1.03}, 3, 3, [1.0, 2.0, 3.0]},
+    {{25.0, 7.0}, 5, 5, [5.0, 10.0, 15.0, 25.0, 50.0]},
+    {{771.75, 441.0}, 5, 10.5, [441.0, 551.25, 661.5, 771.75, 882.0]},
+    {{63.0, 6.0}, 2, 10.5, [1.0, 110.25]},
+    {{1.0, 8.0}, 6, 16, [1.0, 2.0, 4.0, 8.0, 16.0]},
+    {{5026.6985194453346, 1_383_664_092_143_159.8}, 5, 10,
+     [1000.0, 1_000_000.0, 1_000_000_000.0, 1_000_000_000_000.0, 1_000_000_000_000_000.0]},
+    {{0.0102334543596924, 1_032_592.3367269166}, 5, 10,
+     [0.01, 1.0, 100.0, 10_000.0, 1_000_000.0]},
+    {{0.18163834220367195, 0.99615005832268066}, 5, 10,
+     [0.1, 0.2, 0.30000000000000004, 0.5, 1.0]},
+    {{0.0021137140550216722, 0.0029440614246860489}, 5, 10,
+     [0.0022, 0.0024000000000000002, 0.0026000000000000003, 0.0028000000000000004, 0.003]},
+    {{867.39957125837964, 1102.4468893403894}, 5, 10,
+     [850.0, 900.0, 950.0, 1000.0, 1050.0, 1100.0]},
+    {{7_615_976.3697186578, 16_647_593.767485669}, 5, 10,
+     [7_000_000.0, 8_000_000.0, 9_000_000.0, 10_000_000.0, 20_000_000.0]},
+    {{10.0, 1000.0}, 5, 10, [10.0, 100.0, 1000.0]}
+  ]
+
+  test "breaks for a logarithmic axis are R's breaks_log() on each of its branches" do
+    for {limits, wanted, base, r_breaks} <- @r_log_breaks do
+      assert {limits, wanted, base, Breaks.log(limits, n: wanted, base: base)} ==
+               {limits, wanted, base, r_breaks}
+    end
+  end
+
+  # Golden: breaks_log(base = 1.2)(c(1.77, 1.934)), as above: R raises 1.2 to the third power as
+  # 1.728, a bit above the double nearest the power, 1.7279999999999998, which `:math.pow/2` gives;
+  # of 7,000 powers of twelve bases R raised, that one and 1.1 to the fourth alone differ.
+  test "a power of a base is the double nearest it, where R's x86 power can land a bit away" do
+    assert Breaks.log({1.77, 1.934}, base: 1.2) == [1.7279999999999998, 2.0736]
+  end
+
+  # R's breaks_log(n = 0) fails, "missing value where TRUE/FALSE needed".
+  test "the number of breaks wanted on a logarithmic axis is a positive whole number" do
+    for wanted <- [0, -1, 2.5] do
+      assert_raise NimbleOptions.ValidationError, fn -> Breaks.log({3.0, 500.0}, n: wanted) end
+    end
+  end
+
+  # R's breaks_log(base = 1) gives 1 on any limits, and below 1 fails on most: a logarithm there
+  # falls as its value rises.
+  test "a logarithm's base is a number above 1, and anything else is refused" do
+    for base <- [1, 0.5, 0, -10, :ten] do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Breaks.log({3.0, 500.0}, base: base) end
+
+      assert error.message =~ "expected a number above 1, got: #{inspect(base)}"
+    end
+  end
+
+  # R's breaks_log()(c(0, 5)) fails, "'from' must be a finite number", and on a negative limit
+  # takes its logarithm to NaN and fails.
+  test "limits of a logarithmic axis are positive numbers, and anything else is refused" do
+    for limits <- [{0.0, 5.0}, {-1.0, 5.0}, {3.0, 0}, {nil, 5.0}] do
+      error = assert_raise ArgumentError, fn -> Breaks.log(limits) end
+
+      assert error.message =~ "expected limits of two positive numbers"
+      assert error.message =~ inspect(limits)
+    end
+  end
+
+  # Golden: scales 1.4.0's `breaks_exp(n)(c(low, high))` and with `only.loose`, `Q` and `w`, as
+  # above; all of 2,000 random limits, counts, nice numbers and only.loose matched R
+  # (`step2/sweep.R`).
+  test "breaks for an axis of exponentials are R's breaks_exp()" do
+    for {limits, options, r_breaks} <- [
+          {{0.0, 100.0}, [n: 4], [100.0, 99.0, 98.0, 0.0]},
+          {{100.0, 0.0}, [], [100.0, 99.0, 98.0, 97.0, 0.0]},
+          {{0.0, 3.5}, [], [3.0, 2.0, 1.0, 0.0]},
+          {{0.0, 3.0}, [n: 2], [3.0, 0.0]},
+          {{1.5, 4.5}, [], [4.0, 3.0, 2.0, 1.0, 0.0]},
+          {{-5.0, 3.0}, [], [3.0, 2.0, 1.0, 0.0]},
+          {{1.5, 4.4}, [], [1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5]},
+          {{-0.5, 2.99}, [], [0.0, 1.0, 2.0, 3.0]},
+          {{-5.0, -1.0}, [], [0.0, 0.0, 0.0, 0.0, 0.0]},
+          {{0.3, 2.2}, [], [0.0, 0.5, 1.0, 1.5, 2.0]},
+          {{0.3, 2.2}, [only_loose: true], [0.25, 0.75, 1.25, 1.75, 2.25]},
+          {{0.3, 2.2}, [nice_numbers: [1, 2]], [0.0, 1.0, 2.0]}
+        ] do
+      assert {limits, options, Breaks.exp(limits, options)} == {limits, options, r_breaks}
+    end
+  end
+
+  # Golden: scales 1.4.0's `breaks_timespan(unit, n)(c(low, high))`, as above, its difftime's
+  # seconds; all of 3,000 random limits in each unit and count matched R (`step2/sweep.R`), and all
+  # of 4,900 a time scale's breaks were checked against before. Each unit counts the limits, and
+  # each switch, two minutes, two hours, two days and two weeks, finds its breaks in the unit below
+  # at the switch and the unit above past it.
+  test "breaks for spans of time are R's breaks_timespan(), in seconds" do
+    for {limits, options, r_breaks} <- [
+          {{0.0, 10.0}, [], [0.0, 2.0, 4.0, 6.0, 8.0, 10.0]},
+          {{0.0, 10.0}, [unit: :minute], [0.0, 120.0, 240.0, 360.0, 480.0, 600.0]},
+          {{0.0, 10.0}, [unit: :hour], [0.0, 7200.0, 14_400.0, 21_600.0, 28_800.0, 36_000.0]},
+          {{0.0, 10.0}, [unit: :day],
+           [0.0, 172_800.0, 345_600.0, 518_400.0, 691_200.0, 864_000.0]},
+          {{0.0, 10.0}, [unit: :week],
+           [0.0, 1_209_600.0, 2_419_200.0, 3_628_800.0, 4_838_400.0, 6_048_000.0]},
+          {{0.0, 120.0}, [], [0.0, 30.0, 60.0, 90.0, 120.0]},
+          {{0.0, 120.001}, [], [0.0, 24.0, 48.0, 72.000000000000014, 96.0, 120.0]},
+          {{0.0, 7200.0}, [], [0.0, 1800.0, 3600.0, 5400.0, 7200.0]},
+          {{0.0, 7200.001}, [], [0.0, 1440.0, 2880.0, 4320.0000000000009, 5760.0, 7200.0]},
+          {{0.0, 172_800.0}, [], [0.0, 36_000.0, 72_000.0, 108_000.0, 144_000.0, 180_000.0]},
+          {{0.0, 172_800.001}, [],
+           [0.0, 34_560.0, 69_120.0, 103_680.00000000001, 138_240.0, 172_800.0]},
+          {{0.0, 1_209_600.0}, [], [0.0, 345_600.0, 691_200.0, 1_036_800.0, 1_382_400.0]},
+          {{0.0, 1_209_600.001}, [],
+           [0.0, 241_920.0, 483_840.0, 725_760.00000000012, 967_680.0, 1_209_600.0]},
+          {{2.0, 0.0}, [unit: :minute], [0.0, 30.0, 60.0, 90.0, 120.0]},
+          {{0.0, 100.0}, [n: 3], [0.0, 100.0]},
+          {{0.0, 30.0}, [unit: :hour, n: 9],
+           [0.0, 14_400.0, 28_800.0, 43_200.0, 57_600.0, 72_000.0, 86_400.0, 100_800.0, 115_200.0]},
+          {{5.0, 5.0}, [], [5.0, 5.0, 5.0, 5.0, 5.0]}
+        ] do
+      assert {limits, options, Breaks.timespan(limits, options)} == {limits, options, r_breaks}
+    end
+  end
+
+  test "a span of time's unit is one of the five R counts in, and anything else is refused" do
+    for unit <- [:month, :secs, "second"] do
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Breaks.timespan({0.0, 10.0}, unit: unit)
+      end
     end
   end
 

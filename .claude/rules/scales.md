@@ -149,13 +149,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
   log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
   `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
-- **log10's breaks are exactly R's `breaks_log()`, five wanted** (`Transform.Log10`), those
-  inside the extent: every power of ten, or every second, third and so on, the widest step
-  leaving three inside; else `log_sub_breaks()`'s multiples, evenest in log space first (3); else
-  extended breaks in data units. R's one break kept each side of the range is left out, since the
-  scale drops it. Its test pins R's own axis for each branch; a surviving mutant there is judged
-  against `breaks_log()` on hundreds of random extents, and the first where it departs joins the
-  tests, as extended Wilkinson's are judged (below). sqrt, reverse and reciprocal take extended
+- **log10's breaks are `Breaks.log/2`'s, five wanted in base 10** (`Transform.Log10`), on the
+  extent turned back into data units, put back into log space; its test pins R's own axis, labels
+  and minor breaks, for each of `breaks_log()`'s branches, and compares its breaks with
+  `Breaks.log/2`'s, whose test pins R's figures. sqrt, reverse and reciprocal take extended
   breaks on the data range, as R's `extended_breaks()` does.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
@@ -211,15 +208,14 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   standard offset, which glibc reads after it for 17 of the 52 since 1970.
 - **A time scale works in seconds since midnight, as R's `hms` stores one** (`Transform.Time`,
   R's `transform_hms()`): a time's whole microseconds divided once by a million, a missing one
-  `nil`. **Its breaks are exactly R's `breaks_hms()`**, extended breaks (`Breaks.extended/2`) with
-  the nice numbers 1, 2, 1.5, 4 and 3 on the extent in seconds, minutes, hours, days or weeks,
-  each unit up to twice its length; **its labels hms's, rounded to the microsecond half to even,
+  `nil`. **Its breaks are exactly R's `breaks_hms()`**, `Breaks.timespan/2` on the extent's
+  seconds, five wanted; **its labels hms's, rounded to the microsecond half to even,
   less two of hms's marks**: six zero decimals where a break is a rounding error off a whole
   second, and spaces padding every label to the widest (design-log §4, the entry beginning "A
   time of day's labels"). A width's breaks are R's `breaks_width()` for times, every multiple of
   the step from the extent's start rounded down. A break turned back, for a labels function or a
-  format, is a `Time` wrapped past midnight. Its test pins R's breaks and labels at each unit's
-  switch, past midnight and before it, under a second and on a half microsecond; all of 4,900
+  format, is a `Time` wrapped past midnight. Its test pins R's breaks and labels at the hours',
+  days' and weeks' switches, past midnight and before it, under a second and on a half microsecond; all of 4,900
   random and switch-clustered extents and 3,000 widths matched R.
 - **Every transformation's minor breaks are R's `scales::regular_minor_breaks()`**
   (`Scales.MinorBreaks`), in transformed space, with two intervals per gap, on the breaks in the
@@ -246,12 +242,34 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `n:` says, its three
   degenerate cases and the scores R takes to minus infinity included (`Scales.Breaks`), but on
   ranges over about 3e23 wide reaching zero, where R's long-double modulus denies a rounded break
-  through zero the bonus for it (`Breaks`' opening comment). Its test
+  through zero the bonus for it (`Breaks`' opening comment). **`only_loose:` and `weights:` are
+  labeling's `only.loose` and `w`**, a square in a score R's product, `x * x`, never `x ** 2`,
+  whose `:math.pow/2` can land a bit away and turn a tie: of two sequences scoring alike the
+  first found wins, as in R. A search that finds no sequence above labeling's starting score of
+  -2, which only weights other than the defaults bring about, raises, as R fails; the weights'
+  first three are positive and the nice numbers two or more, where R's search never ends or
+  fails. All of 4,000 random ranges, counts, weights, nice numbers and `only.loose`, and 3,000
+  more `only.loose` on the default weights, matched R. Its test
   pins R's own output for a range of every winning nice number, skip, count and zero bonus, and
   for each boundary, since a slip in one score shows only where that
   score decides the winner, and for other counts on ranges where the count decides; a row that
   stops matching is a bug in the port, and the table is regenerated only by running R (labeling
   0.4.3 in Docker's `r-base` image).
+- **A logarithmic axis's breaks are exactly R's `breaks_log()` and `log_sub_breaks()`**
+  (`Breaks.log/2`; design-log §4, the entry beginning "Breaks for a log, exponential or timespan
+  axis"), in any base above 1: R's breaks whole, the extra power or multiple either side of the
+  limits included, the multiples evenest on the logarithm first, a base of 2 or less its powers
+  alone, else `Breaks.extended/2` on the limits; a logarithm in base 10 and 2 is their own
+  function, else the ratio of natural ones, as R takes it. A power is the double nearest it,
+  `:math.pow/2`, where R's x86 long-double power lands a bit away on a few (1.2 cubed, 1.1 to the
+  fourth: 2 of 7,000); all of 4,000 random limits, counts and twelve bases matched R but 63 in
+  base 1.2, each by that bit. Limits of 0 or below are refused, where R fails; a base of 1 or
+  below too, where R gives 1, or fails on most limits. **An exponential axis's breaks are R's
+  `breaks_exp()`** (`Breaks.exp/2`), in R's order, high to low then 0, its fallback
+  `Breaks.extended/2` with every option `extended/2` takes, R's `...`; **a span of time's are R's
+  `breaks_timespan()`** (`Breaks.timespan/2`), seconds where R gives a `difftime`, the units
+  `:second` to `:week` as the package's steps name them. Their tests pin R's figures, each branch
+  and each unit's switch; all of 2,000 exponential and 3,000 timespan cases matched R.
 - **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,
