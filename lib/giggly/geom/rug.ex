@@ -15,11 +15,11 @@ defmodule Giggly.Geom.Rug do
   #
   # A rug is drawn as ggplot2's `GeomRug` draws one. Its rows are those its sides can draw, as
   # `GeomRug$handle_na()` keeps them: along the bottom or top, the rows with an `x`, and along the
-  # left or right, those with a `y`, a missing position being `nil` or the float `:nan`, and every
-  # row where the layer has no such column; where it draws along both axes, the rows with an `x`
-  # and then those with a `y`, a row repeated in every column kept once, where it first appears,
-  # as `vctrs::vec_set_union()` joins them (`Giggly.DataFrame.distinct/1`), so translucent lines
-  # repeating a row darken along one axis's sides alone. The rows are placed through the
+  # left or right, those with a `y`, a missing position being `nil` or the float `:nan`; where it
+  # draws along both axes, the rows with an `x` and then those with a `y`, a row repeated in every
+  # column kept once, where it first appears, as `vctrs::vec_set_union()` joins them
+  # (`Giggly.DataFrame.distinct/1`), so translucent lines repeating a row darken along one axis's
+  # sides alone. The rows are placed through the
   # coordinate system (`Giggly.Coord.transform/3`), an infinite position at the panel's edge, and
   # the sides drawn in ggplot2's order, bottom, top, left, right, whatever the order given: each a
   # straight line per row with a place on its axis, from the panel's edge inward, in its row's
@@ -143,7 +143,9 @@ defmodule Giggly.Geom.Rug do
 
     defp drawable(frame, _axes), do: frame
 
-    # The indices of the rows with a place on `axis`, or of every row where the layer has none.
+    # The indices of the rows with a place on `axis`, or none where the layer has no such column:
+    # ggplot2 then joins every row, but those it adds either repeat a row with a place on the
+    # other axis or have none, and the missing axis's sides draw nothing, so they draw nothing.
     defp present(frame, axis) do
       if axis in DataFrame.names(frame) do
         frame
@@ -152,7 +154,7 @@ defmodule Giggly.Geom.Rug do
         |> Enum.reject(fn {place, _index} -> missing?(place) end)
         |> Enum.map(fn {_place, index} -> index end)
       else
-        Enum.to_list(0..(DataFrame.row_count(frame) - 1)//1)
+        []
       end
     end
 

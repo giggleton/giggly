@@ -1782,6 +1782,16 @@ defmodule Giggly.GeomTest do
       assert Enum.map(bottom_alone.starts, fn {x, _y} -> x end) === [0.25, 0.25, 0.5, 0.75]
     end
 
+    test "along every side, as along two, each repeated row is drawn once",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [1.0, 1.0, 2.0], y: [1.0, 1.0, 2.0])
+      geom = %{@rug | sides: [:bottom, :top, :left, :right]}
+
+      sides = draw_panel(geom, frame, coord, params)
+
+      assert Enum.map(sides, fn side -> length(side.starts) end) == [2, 2, 2, 2]
+    end
+
     test "rows differing in any column are each drawn along both axes",
          %{coord: coord, params: params} do
       frame = DataFrame.new(x: [1.0, 1.0], y: [1.0, 1.0], color: ["#FF0000", "#0000FF"])
@@ -1807,18 +1817,18 @@ defmodule Giggly.GeomTest do
 
     # Golden: ggplot2 4.0.3 and vdiffr 1.0.9 draw no line for a rug whose width or line type is
     # `NA`, and one whose colour is `NA` as a `<line>` with `stroke: none`.
-    test "a row missing its width or line type, or blank, draws no line, and a colour of :none " <>
-           "a line of no stroke",
+    test "a row missing its place, width or line type, or blank, draws no line, and a colour of " <>
+           ":none a line of no stroke",
          %{coord: coord, params: params} do
       frame =
         DataFrame.new(
-          x: [1.0, 2.0, 3.0, 4.0, :infinity],
-          color: ["#FF0000", "#FF0000", "#FF0000", "#FF0000", nil],
-          linewidth: [nil, 0.5, 0.5, 0.5, 0.5],
-          linetype: [{}, nil, {}, {}, {}]
+          x: [1.0, 2.0, 3.0, 4.0, :infinity, :nan],
+          color: ["#FF0000", "#FF0000", "#FF0000", "#FF0000", nil, "#FF0000"],
+          linewidth: [nil, 0.5, 0.5, 0.5, 0.5, 0.5],
+          linetype: [{}, nil, {}, {}, {}, {}]
         )
 
-      blank = DataFrame.put(frame, :linetype, List.duplicate(:none, 5))
+      blank = DataFrame.put(frame, :linetype, List.duplicate(:none, 6))
 
       assert [%Segments{starts: starts, color: colors, opacity: opacities}] =
                draw_panel(@rug, frame, coord, params)

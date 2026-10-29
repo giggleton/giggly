@@ -2279,6 +2279,17 @@ defmodule Giggly.PlotTest do
       assert error.key == :position
     end
 
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_rug(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_rug, 3}
+      end
+    end
+
     test "a mapping a rug cannot use, or an option it does not take, is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
@@ -6377,4 +6388,9 @@ defmodule Giggly.PlotTest do
       end
     end
   end
+
+  # `value` with its type hidden from the compiler, so a test can hand a function a value its
+  # guards refuse.
+  @spec untyped(term()) :: term()
+  defp untyped(value), do: value
 end
