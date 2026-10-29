@@ -5268,14 +5268,14 @@ defmodule Giggly.PlotTest do
     test "a guide that is not one is refused, naming what a guide can be" do
       plot = Plot.new(@rows)
 
-      error =
-        assert_raise NimbleOptions.ValidationError, fn ->
-          Plot.scale_color_hue(plot, guide: :legnd)
-        end
+      for function <- [&Plot.scale_color_hue/2, &Plot.scale_color_gradient/2] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> function.(plot, guide: :legnd) end
 
-      assert error.message =~
-               "expected :legend, :colorbar, :colorsteps, :none or a legend " <>
-                 "Plot.guide_legend/1 makes, got: :legnd"
+        assert error.message =~
+                 "expected :legend, :colorbar, :colorsteps, :none or a legend " <>
+                   "Plot.guide_legend/1 makes, got: :legnd"
+      end
     end
 
     test "guide_legend/1 makes a legend, its keys reversed when asked" do

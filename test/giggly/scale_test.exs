@@ -1627,7 +1627,8 @@ defmodule Giggly.ScaleTest do
 
   # Golden: ggplot2 4.0.3's `get_guide_data()` and the guide's params in R 4.6.1, mtcars' `colour
   # = hp` (52 to 335) read back by `guide_coloursteps()`, made by session 27474d8e's scratchpad
-  # `r/steps.R` and `r/cont.R`: each key's `.value` and each bin's `min`, `max` and `colour`.
+  # `r/steps.R`, `r/cont.R` and `r/pass.R`: each key's `.value` and each bin's `min`, `max` and
+  # `colour`.
   describe "steps/2" do
     @gradient ["#132B43", "#56B1F7"]
 
@@ -1708,6 +1709,32 @@ defmodule Giggly.ScaleTest do
 
       assert {step_places(binned), step_places(continuous)} ===
                {[0.0, 0.3333333333333333, 0.6666666666666666], [0.0, 0.5, 1.0]}
+    end
+
+    test "a first break given on the high limit moves every break one step down too" do
+      binned = binned([52, 150, 335], limits: {100, 300}, breaks: [300, 200])
+
+      continuous =
+        gradient_through(@gradient, [52, 150, 335],
+          limits: {100.0, 300.0},
+          breaks: [300.0, 200.0]
+        )
+
+      assert {steps(binned), step_places(continuous)} ===
+               {{[0.0, 0.5], [{0.0, 0.5, "#22496C"}, {0.5, 1.0, "#448DC6"}]}, [0.0, 0.5]}
+    end
+
+    test "edges far closer than 1 apart are bins of their own" do
+      scale = binned([0.0, 4.0e-17])
+
+      assert steps(scale) ===
+               {[0.25, 0.5, 0.75],
+                [
+                  {0.0, 0.25, "#1B3A57"},
+                  {0.25, 0.5, "#2A5A82"},
+                  {0.5, 0.75, "#3B7BAF"},
+                  {0.75, 1.0, "#4D9FDE"}
+                ]}
     end
 
     # R counts the breaks in the order given, so each label lands on another break's edge.

@@ -730,8 +730,9 @@ defmodule Giggly.Scale do
     {places, bins(scale, edges, bar)}
   end
 
-  # The bins between consecutive `edges`, each its place along the bar from and to and the colour
-  # the scale maps its middle to, R's `breaks[-1] - diff(breaks) / 2`.
+  # The bins between consecutive `edges`, each its place along the bar from and to, each edge's
+  # place and the next's, and the colour the scale maps its middle to, R's `breaks[-1] -
+  # diff(breaks) / 2`.
   defp bins(scale, edges, {_first, last} = bar) do
     middles =
       edges
@@ -744,16 +745,13 @@ defmodule Giggly.Scale do
       |> Bounds.rescale(bar, {0, 1})
 
     Enum.zip_with(
-      [Enum.drop(places, -1), Enum.drop(places, 1), map(scale, middles)],
+      [places, Enum.drop(places, 1), map(scale, middles)],
       fn [from, to, color] -> {from, to, color} end
     )
   end
 
-  # The scale's limits as floats, a binned scale's widened.
-  defp step_limits(%Continuous{} = scale) do
-    {low, high} = limits(scale)
-    {low / 1, high / 1}
-  end
+  # The scale's limits, a binned scale's widened.
+  defp step_limits(%Continuous{} = scale), do: limits(scale)
 
   defp step_limits(%Binned{} = scale), do: Binned.limits(scale)
 
@@ -778,7 +776,7 @@ defmodule Giggly.Scale do
     do: on_limit?(first, limits)
 
   defp stepped_down?(%Binned{breaks: [first | _given]}, _values, limits),
-    do: on_limit?(first / 1, limits)
+    do: on_limit?(first, limits)
 
   defp on_limit?(value, {low, high}), do: value == low or value == high
 
