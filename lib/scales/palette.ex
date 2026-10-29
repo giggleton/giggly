@@ -434,9 +434,9 @@ defmodule Scales.Palette do
   `:linetype`, or `nil` for `:identity` and `{:abs_area, max}`, which R gives no type.
 
   A manual palette's is guessed from its values, as R's `pal_manual()` guesses it: `:color` where
-  every value is a colour `Scales.ColorOperations.parse/1` reads, as no values are, `:numeric`
-  where every one is a number, else `nil`, where R names how its values are stored
-  (`"character"`). R reads a colour as hex or one of its own colour names, so `"grey50"` is a
+  every value is a string `Scales.ColorOperations.parse/1` reads, as no values are, so not
+  `:none`, `:numeric` where every one is a number, else `nil`, where R names how its values are
+  stored (`"character"`). R reads a colour as hex or one of its own colour names, so `"grey50"` is a
   colour there and `"transparent"` is not; here they are the other way round.
 
   ## Examples

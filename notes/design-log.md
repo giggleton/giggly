@@ -97,7 +97,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `"grey"` and `"hue"`, each with R's defaults; any other raises listing them, a documented
   departure, since R's registry also holds grDevices' (138 names in all, `"Okabe-Ito"` among
   them). *Rejected: `palette.colors()`'s 14 and `hcl.colors()`'s 79*: R's own GPL tables, used by
-  nothing in the books or notebooks. A colour, for a manual palette's guessed type, is what
+  nothing in the books or notebooks. A colour, for a manual palette's guessed type, is a string
   `ColorOperations.parse/1` reads, so `"transparent"` is one and `"grey50"` is not, the reverse of
   R's test, which reads R's own colour names.
 

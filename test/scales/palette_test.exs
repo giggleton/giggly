@@ -331,8 +331,8 @@ defmodule Scales.PaletteTest do
   # and 255, `pal_shape()` `"shape"` and 6, `pal_linetype()` `"linetype"` and 13, `pal_brewer()`
   # `"colour"` and 9 for Set1, 12 for Paired, 11 for Spectral and 8 for Accent; `pal_manual()`
   # `"numeric"` for numbers, `"colour"` for colours, lowercase hex, an alpha and no values,
-  # `"character"` for other strings or a colour beside `NA`, `"logical"` for `TRUE` and `FALSE`, and
-  # its values' count.
+  # `"character"` for other strings or a colour beside `NA` (here `nil` or `:none`, no colour),
+  # `"logical"` for `TRUE` and `FALSE`, and its values' count.
   describe "type/1 and nlevels/1" do
     test "each palette's type and levels are R's" do
       palettes = [
@@ -382,6 +382,7 @@ defmodule Scales.PaletteTest do
         [],
         ["a", "b"],
         ["#FF0000", nil],
+        ["#FF0000", :none],
         [true, false],
         [:circle_small, :triangle],
         ["#FF0000", 1]
@@ -394,6 +395,7 @@ defmodule Scales.PaletteTest do
                  {:numeric, 3},
                  {:color, 3},
                  {:color, 0},
+                 {nil, 2},
                  {nil, 2},
                  {nil, 2},
                  {nil, 2},
