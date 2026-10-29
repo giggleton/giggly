@@ -5477,7 +5477,7 @@ defmodule Giggly.PlotTest do
 
       assert plot.theme.settings === %{
                axis_text: %{color: "#FF000080"},
-               panel_background: %{fill: "#00000000"}
+               panel_background: %{fill: "#FFFFFF00"}
              }
     end
 

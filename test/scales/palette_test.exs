@@ -32,7 +32,10 @@ defmodule Scales.PaletteTest do
   # Golden: scales 1.4.0's `pal_gradient_n()` and `colour_ramp()` in R 4.6.1, through farver
   # 2.1.2: the gradient matched R's on all 30,054 places sampled through six sets of colours, among
   # them R's `terrain.colors(10)` and ggplot2's gradient2 default, `muted("red")`, white and
-  # `muted("blue")`. A place at a colour takes that colour exactly.
+  # `muted("blue")`, and on all 48,605 places of 3,000 random gradients of one to five colours, an
+  # alpha, `"transparent"` or `NA` among 2,243 of them, `values` given to 1,834, unsorted, tied or
+  # missing, places inside, outside and on them. A place at a colour takes that colour exactly; R
+  # hands one colour back as it is written, so `NA` alone is `NA` for every place, here `:none`.
   describe "continuous/2 of a gradient" do
     @terrain ~w(#00A600 #2DB600 #63C600 #A0D600 #E6E600 #E8C32E #EBB25E #EDB48E #F0C9C0 #F2F2F2)
 
@@ -64,6 +67,265 @@ defmodule Scales.PaletteTest do
     test "a place that is neither a number nor nil is refused, even by one colour" do
       assert_raise FunctionClauseError, fn ->
         Palette.continuous({:gradient, ["#4682B4"]}, [:infinity])
+      end
+    end
+
+    test "a place outside 0 to 1 gives nil, as R gives NA, but one colour's is that colour" do
+      assert {Palette.continuous({:gradient, ["#132B43", "#56B1F7"]}, [-0.1, 1.1]),
+              Palette.continuous({:gradient, ["#832424", "#FFFFFF", "#3A3A98"]}, [-0.1, 1.1]),
+              Palette.continuous({:gradient, ["#4682B4"]}, [-0.1, 1.1])} ===
+               {[nil, nil], [nil, nil], ["#4682B4", "#4682B4"]}
+    end
+
+    @places [0, 0.1, 0.25, 0.4, 0.5, 0.6, 0.75, 0.9, 1, nil]
+
+    test "an alpha is blended along a straight line, and an opaque one is written without it" do
+      assert Enum.map(
+               [
+                 ["#FF000080", "#0000FF"],
+                 ["#FF000080", "#0000FF20"],
+                 ["#FF000000", "#0000FF"],
+                 ["#832424", "#FFFFFF40", "#3A3A98"]
+               ],
+               fn colors -> Palette.continuous({:gradient, colors}, @places) end
+             ) === [
+               [
+                 "#FF000080",
+                 "#F6002A8D",
+                 "#E80050A0",
+                 "#D70072B3",
+                 "#CA0088C0",
+                 "#BA009FCC",
+                 "#9A00C3DF",
+                 "#6800E7F2",
+                 "#0000FF",
+                 nil
+               ],
+               [
+                 "#FF000080",
+                 "#F6002A76",
+                 "#E8005068",
+                 "#D700725A",
+                 "#CA008850",
+                 "#BA009F46",
+                 "#9A00C338",
+                 "#6800E72A",
+                 "#0000FF20",
+                 nil
+               ],
+               [
+                 "#FF000000",
+                 "#F6002A1A",
+                 "#E8005040",
+                 "#D7007266",
+                 "#CA008880",
+                 "#BA009F99",
+                 "#9A00C3BF",
+                 "#6800E7E6",
+                 "#0000FF",
+                 nil
+               ],
+               [
+                 "#832424",
+                 "#A0514AD9",
+                 "#C89089A0",
+                 "#EAD2CE66",
+                 "#FFFFFF40",
+                 "#D9D4EB66",
+                 "#A197CCA0",
+                 "#675DADD9",
+                 "#3A3A98",
+                 nil
+               ]
+             ]
+    end
+
+    test "an alpha's byte half way between two rounds to the even one, as farver's" do
+      assert Enum.map(
+               [
+                 ["#FF000000", "#FF000001"],
+                 ["#FF000001", "#FF000002"],
+                 ["#FF000002", "#FF000003"]
+               ],
+               fn colors -> Palette.continuous({:gradient, colors}, [0.5]) end
+             ) === [["#FF000000"], ["#FF000002"], ["#FF000002"]]
+    end
+
+    test "one colour with an alpha is every place's" do
+      assert Palette.continuous({:gradient, ["#FF000080"]}, [0, 0.5, 1, nil]) ===
+               ["#FF000080", "#FF000080", "#FF000080", nil]
+    end
+
+    test "transparent and :none, R's NA, are blended from white with no alpha, as R reads them" do
+      {:ok, transparent} = ColorOperations.parse("transparent")
+
+      expected =
+        [
+          "#FFFFFF00",
+          "#F2E7FF1A",
+          "#DCC4FF40",
+          "#C4A2FF66",
+          "#B38BFF80",
+          "#A074FF99",
+          "#7E52FFBF",
+          "#502BFFE6",
+          "#0000FF",
+          nil
+        ]
+
+      assert {Palette.continuous({:gradient, [transparent, "#0000FF"]}, @places),
+              Palette.continuous({:gradient, [:none, "#0000FF"]}, @places),
+              Palette.continuous({:gradient, ["#FF0000", :none, "#0000FF"]}, [0.25, 0.5, 0.9])} ===
+               {expected, expected, ["#FF9E8180", "#FFFFFF00", "#7145FFCC"]}
+    end
+
+    test "one colour of :none, R's NA, is every place's" do
+      assert Palette.continuous({:gradient, [:none]}, [0, 0.5, nil]) === [:none, :none, nil]
+    end
+  end
+
+  # Golden: scales 1.4.0's `pal_gradient_n(colours, values)` in R 4.6.1, through farver 2.1.2:
+  # each place moved along `approxfun(values, seq(0, 1, length.out = length(values)))`, which
+  # sorts the values, drops an `NA`, and takes equal values at their places' mean with a warning
+  # ("collapsing to unique 'x' values"); fewer than two values left fail ("need at least two
+  # non-NA values to interpolate").
+  describe "continuous/2 of a gradient with values" do
+    @three ["#832424", "#FFFFFF", "#3A3A98"]
+
+    test "each place is moved first along the values, and one outside them gives nil" do
+      assert {Palette.continuous({:gradient, ["#132B43", "#56B1F7"], [0, 0.25]}, @places),
+              Palette.continuous({:gradient, ["#132B43", "#56B1F7"], [0.2, 0.8]}, @places)} ===
+               {["#132B43", "#2C5D86", "#56B1F7", nil, nil, nil, nil, nil, nil, nil],
+                [nil, nil, "#183550", "#28547A", "#336A98", "#3E81B7", "#50A5E7", nil, nil, nil]}
+    end
+
+    test "a middle value moves the middle colour, and values may reach past 0 to 1" do
+      assert Enum.map([[0, 0.2, 1], [0, 0.8, 1], [-0.5, 0.5, 1.5]], fn values ->
+               Palette.continuous({:gradient, @three, values}, @places)
+             end) === [
+               [
+                 "#832424",
+                 "#C89089",
+                 "#F3F1F9",
+                 "#D0CAE5",
+                 "#B8B0D9",
+                 "#A197CC",
+                 "#7D72B8",
+                 "#5750A5",
+                 "#3A3A98",
+                 nil
+               ],
+               [
+                 "#832424",
+                 "#96413B",
+                 "#B06861",
+                 "#C89089",
+                 "#D7ABA6",
+                 "#E5C7C3",
+                 "#F9F1F0",
+                 "#A197CC",
+                 "#3A3A98",
+                 nil
+               ],
+               [
+                 "#C89089",
+                 "#D4A6A0",
+                 "#E5C7C3",
+                 "#F5E8E6",
+                 "#FFFFFF",
+                 "#ECE9F5",
+                 "#D0CAE5",
+                 "#B4ABD6",
+                 "#A197CC",
+                 nil
+               ]
+             ]
+    end
+
+    test "the values need not be one per colour" do
+      assert {Palette.continuous({:gradient, @three, [0, 0.3, 0.7, 1]}, @places),
+              Palette.continuous({:gradient, @three, [0, 1]}, @places)} ===
+               {[
+                  "#832424",
+                  "#A3554F",
+                  "#CF9C96",
+                  "#EED9D6",
+                  "#FFFFFF",
+                  "#E0DBEE",
+                  "#ABA2D1",
+                  "#6B62AF",
+                  "#3A3A98",
+                  nil
+                ],
+                [
+                  "#832424",
+                  "#A0514A",
+                  "#C89089",
+                  "#EAD2CE",
+                  "#FFFFFF",
+                  "#D9D4EB",
+                  "#A197CC",
+                  "#675DAD",
+                  "#3A3A98",
+                  nil
+                ]}
+    end
+
+    test "unsorted values are sorted with their places, so they run the gradient backwards" do
+      assert Palette.continuous({:gradient, @three, [1, 0.2, 0]}, @places) ===
+               [
+                 "#3A3A98",
+                 "#A197CC",
+                 "#F9F1F0",
+                 "#E5C7C3",
+                 "#D7ABA6",
+                 "#C89089",
+                 "#B06861",
+                 "#96413B",
+                 "#832424",
+                 nil
+               ]
+    end
+
+    test "equal values are one, at their places' mean, a negative zero equal to zero" do
+      assert Enum.map([[0, 0, 1], [0, 1, 1], [0, 0, 0, 1], [-0.0, 0, 1]], fn values ->
+               Palette.continuous({:gradient, @three, values}, [0, 0.1, 0.5, 1])
+             end) === [
+               ["#C89089", "#DAB0AB", "#D0CAE5", "#3A3A98"],
+               ["#832424", "#994640", "#E5C7C3", "#A197CC"],
+               ["#DCB4AF", "#EAD2CE", "#C0B8DD", "#3A3A98"],
+               ["#C89089", "#DAB0AB", "#D0CAE5", "#3A3A98"]
+             ]
+    end
+
+    test "a nil value is dropped with its place" do
+      assert Palette.continuous({:gradient, @three, [0, nil, 1]}, @places) ===
+               Palette.continuous({:gradient, @three}, @places)
+    end
+
+    test "one colour is its colour inside the values and nil outside them" do
+      assert Palette.continuous({:gradient, ["#4682B4"], [0.2, 0.8]}, [0, 0.5, 1, nil]) ===
+               [nil, "#4682B4", nil, nil]
+    end
+
+    test "an alpha blends at the place the values move it to" do
+      assert {Palette.continuous({:gradient, ["#FF000080", "#0000FF"], [0, 0.25]}, [0, 0.1, 0.25]),
+              Palette.continuous(
+                {:gradient, ["#FF000080", "#00FF00", "#0000FF20"], [1, 0.5, 0]},
+                [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]
+              )} ===
+               {["#FF000080", "#D70072B3", "#0000FF"],
+                ~w(#0000FF20 #644FDC4D #7D93A690 #00FF00 #C9AB00C0 #ED6A0099 #FF000080)}
+    end
+
+    test "fewer than two values left once nils are dropped and equal ones joined raise" do
+      for values <- [[0], [nil, 0.5], [0, 0]] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Palette.continuous({:gradient, @three, values}, [0.5])
+          end
+
+        assert error.message =~ inspect(values)
       end
     end
   end
@@ -341,6 +603,7 @@ defmodule Scales.PaletteTest do
         {:rescale, {0.1, 1.0}},
         {:area, {1.0, 6.0}},
         {:gradient, ["#132B43", "#56B1F7"]},
+        {:gradient, ["#132B43", "#56B1F7"], [0, 0.25]},
         {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}},
         {:gray, {0.2, 0.8}},
         {:viridis, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 1.0}},
@@ -361,6 +624,7 @@ defmodule Scales.PaletteTest do
                  {nil, nil},
                  {:numeric, nil},
                  {:numeric, nil},
+                 {:color, nil},
                  {:color, nil},
                  {:color, 255},
                  {:color, 255},
@@ -493,7 +757,7 @@ defmodule Scales.PaletteTest do
   # colours as a gradient, so hue at 1 is its 255th hue, `#F97571`, not its first; numbers joined
   # by straight lines, `NA` outside 0 to 1; one number fails ("need at least two non-NA values to
   # interpolate"), and shapes, line types and other strings fail ("Don't know how to convert a
-  # discrete ... palette to a continuous palette.").
+  # discrete ... palette to a continuous palette."); `pal_viridis(alpha = 0.5)` keeps its alpha.
   describe "continuous/2 of a discrete palette" do
     test "a colour palette is a gradient through its nlevels colours" do
       hue = {:hue, %{hue: {15.0, 375.0}, chroma: 100.0, luminance: 65.0, direction: 1}}
@@ -507,6 +771,12 @@ defmodule Scales.PaletteTest do
                {["#F8766D", "#D88F00", "#7DAE00", "#00BFC3", "#D476FE", "#F97571", nil],
                 ["#F97571", "#9190FF", "#F8766D"], ["#333333", "#7C7C7C", "#989898", "#CCCCCC"],
                 ["#FCFDBF", "#FC8C63", "#3B0F70"]}
+    end
+
+    test "a palette with an alpha is a gradient through its colours and their alpha" do
+      viridis = {:viridis, %{option: :viridis, begin: 0.0, end: 1.0, direction: 1, alpha: 0.5}}
+
+      assert Palette.continuous(viridis, [0, 0.3, 1]) === ["#44015480", "#355F8D80", "#FDE72580"]
     end
 
     test "a brewer palette is a gradient through its largest set, in its direction" do
@@ -574,6 +844,11 @@ defmodule Scales.PaletteTest do
 
       assert {Palette.discrete(gradient, 7), Palette.discrete(gradient, 0)} ===
                {["#132B43", "#1D3F5E", "#28547A", "#336A98", "#3E81B7", "#4A99D6", "#56B1F7"], []}
+    end
+
+    test "a gradient with values is sampled after its values move the places" do
+      assert Palette.discrete({:gradient, ["#132B43", "#56B1F7"], [0, 0.25]}, 3) ===
+               ["#132B43", nil, nil]
     end
 
     test "the identity and an absolute area, which R gives no type, are refused" do

@@ -42,8 +42,9 @@ defmodule Giggly.Plot do
   ## Colours
 
   A colour is a CSS colour name, such as `"steelblue"`, a hex colour, such as `"#4682B4"`, or
-  `"#4682B480"` with an alpha of its own, or `"transparent"`; `:none` draws nothing. A name CSS
-  does not define raises. An alpha, set or mapped, replaces a colour's own.
+  `"#4682B480"` with an alpha of its own, or `"transparent"`, white with no alpha as R's is, where
+  CSS's is black; `:none` draws nothing. A name CSS does not define raises. An alpha, set or
+  mapped, replaces a colour's own, so `"transparent"` at an alpha of 0.5 draws half-white.
 
   A discrete column mapped to `:color` (or `:colour`) or `:fill` gives each of its values a hue,
   evenly spaced round the colour wheel, so three values are `#F8766D`, `#00BA38` and `#619CFF`; a

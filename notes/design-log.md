@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A gradient's values move a place as R's `approxfun()` does, its alpha blends, and
+  `"transparent"` is R's white (2026-10-28, Steve, increment 1's step 3; checked against scales
+  1.4.0 and farver 2.1.2).** `{:gradient, colors, values}`, R's `pal_gradient_n(colours, values)`:
+  a place moved along straight lines through the values, each at its `seq()` place, then blended;
+  outside them, or outside 0 to 1, `nil`. The values are R's exactly (Steve: "A"): sorted, so
+  unsorted ones reverse the gradient, a `nil` dropped, equal ones at their places' mean, any
+  count, fewer than two raising. *Rejected: the package refusing all but increasing values*: it
+  refuses answers R gives, and refusing is Giggly's (`values:`, step 5). The alpha is a fourth
+  channel, its byte rounded half to even. `"transparent"`, and `:none` in a gradient, are R's
+  `#FFFFFF00` (Steve: "B"). *Rejected: CSS's black*: through a partial alpha it shows, a muddy
+  grey mid-gradient, a look neither R nor CSS gives, since CSS blends gradients premultiplied.
+
 - **A palette of one kind is converted inside the other kind's function (2026-10-28, Steve,
   increment 1's scope and step 2; checked against scales 1.4.0).** `continuous/2` takes a discrete
   palette as R's `as_continuous_pal()` does, colours as a gradient through its `nlevels/1`, numbers
@@ -1716,7 +1728,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   bar's border is never given the row's, as `GeomRect` draws it. *Rejected: R's 657 names*
   (recommended), whose `gray`, `green`, `maroon` and `purple` are not CSS's; *CSS's plus R's
   extras*, a vocabulary of neither; *a struct*, a public type in every column and scale for what a
-  string carries. R's `transparent` is white and CSS's black, which shows under a set alpha.
+  string carries. `transparent` is R's white, not CSS's black (the entry beginning "A gradient's
+  values move a place").
 
 - **R's exact colours come from the `color` package's conversions, handed farver's constants
   (2026-10-16, Steve: no hand-rolled colour maths).** Both of ggplot2's default palettes go
@@ -2975,6 +2988,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-28 — Give the gradient R's values and alpha, transparent R's white, nil outside it
+  (palettes and colours, step 3); §4: "A gradient's values move a place"
 - 2026-10-28 — Give palettes R's type, levels and names, each kind converted to the other
   (palettes and colours, step 2); §4: "A palette of one kind is converted", "A palette's name is
   one of scales' own 45"

@@ -15,8 +15,15 @@ defmodule Scales.Palette do
       `max`; a place may lie below 0 or past 1.
     * `{:gradient, colors}`, R's `pal_gradient_n()`, which R's two- and three-colour gradients are
       too: the colour that far along a gradient through `colors`, spaced evenly from 0 to 1, each
-      place between two blended in CIE L*a*b*; a place at a colour takes it exactly, and one
-      colour is every place's.
+      place between two blended in CIE L*a*b* and its alpha along a straight line; a place at a
+      colour takes it exactly, one outside 0 to 1 gives `nil`, and one colour is every place's.
+      `:none` among the colours is R's `NA`, white with no alpha, as `"transparent"` is.
+    * `{:gradient, colors, values}`, R's `pal_gradient_n(colours, values)`: each place moved first
+      along the straight lines through `values`, each value at its own place spread evenly from 0
+      to 1, then taken along the gradient; a place outside the values gives `nil`. The values are
+      taken as R's `approxfun()` takes them: sorted, so unsorted ones run the gradient backwards; a
+      `nil` dropped; equal values one, at their places' mean; as many as you like, not one per
+      colour. Fewer than two left raise `ArgumentError`. R also warns of equal values.
 
   ## Discrete palettes
 
@@ -69,9 +76,13 @@ defmodule Scales.Palette do
   """
 
   # Each palette matched R to the last digit; the tests pin R's figures. The gradient blends as
-  # `colour_ramp()` does: each colour's L*, a* and b* (`Scales.ColorOperations`), a place's
+  # `colour_ramp()` does: each colour's L*, a*, b* and alpha (`Scales.ColorOperations`), a place's
   # channels interpolated between the colours either side as R's `approxfun()` does, and the blend
-  # turned back into a colour.
+  # turned back into a colour, its alpha's byte rounded as farver rounds it and dropped when
+  # opaque. R interpolates the alpha only where some colour has one; the others' is 1 throughout,
+  # which writes no alpha, so it is interpolated always. Values move a place first as R's
+  # `approxfun(values, seq(0, 1, length.out = length(values)))` does; equal values take their
+  # places' mean, which R takes in long double and here in double.
 
   alias Scales.{Bounds, ColorOperations}
 
@@ -81,7 +92,8 @@ defmodule Scales.Palette do
           | {:rescale, {number(), number()}}
           | {:area, {number(), number()}}
           | {:abs_area, number()}
-          | {:gradient, [String.t(), ...]}
+          | {:gradient, [ColorOperations.t(), ...]}
+          | {:gradient, [ColorOperations.t(), ...], [number() | nil, ...]}
 
   @typedoc "A discrete palette."
   @type discrete ::
@@ -229,6 +241,12 @@ defmodule Scales.Palette do
       iex> Scales.Palette.continuous({:gradient, ["#132B43", "#56B1F7"]}, [0, 0.5, 1])
       ["#132B43", "#336A98", "#56B1F7"]
 
+      iex> Scales.Palette.continuous({:gradient, ["#132B43", "#56B1F7"], [0, 0.25]}, [0.1, 0.5])
+      ["#2C5D86", nil]
+
+      iex> Scales.Palette.continuous({:gradient, ["#FF000080", "#0000FF"]}, [0.5, 1.5])
+      ["#CA0088C0", nil]
+
       iex> Scales.Palette.continuous({:manual, [1.0, 5.0, 9.0]}, [0.25, 1.5])
       [3.0, nil]
   """
@@ -256,8 +274,22 @@ defmodule Scales.Palette do
   def continuous({:gradient, [color]}, places), do: each_place(places, fn _place -> color end)
 
   def continuous({:gradient, colors}, places) do
-    knots = spread({0.0, 1.0}, length(colors))
-    each_place(places, fn place -> gradient_color(knots, colors, place) end)
+    knotted =
+      {0.0, 1.0}
+      |> spread(length(colors))
+      |> Enum.zip_with(colors, fn knot, color -> {knot, color_channels(color)} end)
+
+    each_place(places, fn place ->
+      knotted
+      |> joined(place)
+      |> encoded()
+    end)
+  end
+
+  def continuous({:gradient, colors, values}, places) do
+    knotted = value_knots(values)
+    moved = each_place(places, fn place -> joined(knotted, place) end)
+    continuous({:gradient, colors}, moved)
   end
 
   # A discrete palette is converted as R's `as_continuous_pal()` converts one: its `nlevels/1`
@@ -292,44 +324,60 @@ defmodule Scales.Palette do
     each_place(places, fn place -> joined(knotted, place) end)
   end
 
-  # The number at `place` on the straight lines through the knots and their numbers, as R's
-  # `approxfun()` interpolates: a knot's own number at a knot, `nil` outside them.
-  defp joined(knotted, place) do
-    case {List.keyfind(knotted, place, 0), neighbours(knotted, place)} do
-      {{_knot, number}, _neighbours} -> number
-      {nil, nil} -> nil
-      {nil, {{low_knot, low}, {high_knot, high}}} -> along(low, high, low_knot, high_knot, place)
+  # The values, each with its place spread evenly from 0 to 1, as R's `approxfun()` takes them: a
+  # `nil` dropped, the rest sorted, and equal values one, at their places' mean; fewer than two
+  # left are refused, as R refuses them.
+  defp value_knots(values) do
+    knotted =
+      values
+      |> Enum.zip(spread({0.0, 1.0}, length(values)))
+      |> Enum.reject(fn {value, _place} -> is_nil(value) end)
+      |> Enum.sort_by(fn {value, _place} -> value end)
+      |> Enum.reduce([], fn
+        {value, place}, [{tied, places} | knotted] when value == tied ->
+          [{tied, [place | places]} | knotted]
+
+        {value, place}, knotted ->
+          [{value, [place]} | knotted]
+      end)
+      |> Enum.reverse()
+      |> Enum.map(fn {value, places} -> {value, Enum.sum(places) / length(places)} end)
+
+    case knotted do
+      [_first, _second | _more] ->
+        knotted
+
+      _fewer ->
+        raise ArgumentError,
+              "a gradient's values need two that differ and are not nil, got: #{inspect(values)}"
     end
   end
 
-  # The colour at `place` along the gradient, as the opening comment says.
-  defp gradient_color(knots, colors, place) do
-    lab =
-      case Enum.find_index(knots, fn knot -> knot == place end) do
-        nil ->
-          blend(Enum.zip(knots, colors), place)
+  # The value at `place` on the straight lines through the knots and their values, each a number
+  # or a list of channels, as R's `approxfun()` interpolates: a knot's own value at a knot, `nil`
+  # outside them.
+  defp joined(knotted, place) do
+    case {List.keyfind(knotted, place, 0), neighbours(knotted, place)} do
+      {{_knot, value}, _neighbours} ->
+        value
 
-        index ->
-          colors
-          |> Enum.at(index)
-          |> ColorOperations.to_lab()
-      end
+      {nil, nil} ->
+        nil
 
-    ColorOperations.from_lab(lab)
+      {nil, {{low_knot, low}, {high_knot, high}}} ->
+        between(low, high, low_knot, high_knot, place)
+    end
   end
 
-  # The L*a*b* `place` of the way between the two colours either side of it, each a knot and its
-  # colour, channel by channel along the straight line between them.
-  defp blend(knotted, place) do
-    {{low_knot, low_color}, {high_knot, high_color}} = neighbours(knotted, place)
-
-    low_color
-    |> lab_channels()
-    |> Enum.zip_with(lab_channels(high_color), fn low_channel, high_channel ->
+  # The value `place` of the way between two knots' values, a list channel by channel.
+  defp between(low, high, low_knot, high_knot, place) when is_list(low) do
+    Enum.zip_with(low, high, fn low_channel, high_channel ->
       along(low_channel, high_channel, low_knot, high_knot, place)
     end)
-    |> List.to_tuple()
   end
+
+  defp between(low, high, low_knot, high_knot, place),
+    do: along(low, high, low_knot, high_knot, place)
 
   # The two knots, each with its value, that `place` falls strictly between, or `nil` where it
   # falls between none.
@@ -347,12 +395,21 @@ defmodule Scales.Palette do
   defp along(low, high, low_knot, high_knot, place),
     do: low + (high - low) * ((place - low_knot) / (high_knot - low_knot))
 
-  # A colour's L*, a* and b*, as a list.
-  defp lab_channels(color) do
-    color
-    |> ColorOperations.to_lab()
-    |> Tuple.to_list()
+  # A colour's L*, a*, b* and alpha, as a list; `:none` is R's `NA`, which R blends as white with
+  # no alpha.
+  defp color_channels(:none), do: color_channels("#FFFFFF00")
+
+  defp color_channels(color) do
+    {lightness, green_red, blue_yellow} = ColorOperations.to_lab(color)
+    [lightness, green_red, blue_yellow, ColorOperations.opacity(color)]
   end
+
+  # The colour of a place's blended channels, as the opening comment says; `nil` outside the
+  # gradient.
+  defp encoded(nil), do: nil
+
+  defp encoded([lightness, green_red, blue_yellow, alpha]),
+    do: ColorOperations.from_lab({lightness, green_red, blue_yellow}, alpha)
 
   # A hue palette's are `pal_hue()`'s: the circle's last `360 / count` degrees left off where the
   # range, taken modulo 360 as R's `%%` takes it, is less than a degree, since its end is then its
@@ -429,6 +486,9 @@ defmodule Scales.Palette do
   def discrete({kind, _parameters} = palette, count) when kind in [:rescale, :area, :gradient],
     do: continuous(palette, spread({0.0, 1.0}, count))
 
+  def discrete({:gradient, _colors, _values} = palette, count),
+    do: continuous(palette, spread({0.0, 1.0}, count))
+
   @doc """
   What a palette's values are, R's `palette_type()`: `:color`, `:numeric`, `:shape` or
   `:linetype`, or `nil` for `:identity` and `{:abs_area, max}`, which R gives no type.
@@ -461,6 +521,7 @@ defmodule Scales.Palette do
   def type({:shape, fill}) when is_map_key(@shapes, fill), do: :shape
   def type(:linetype), do: :linetype
   def type({:manual, values}) when is_list(values), do: guessed_type(values)
+  def type({:gradient, _colors, _values}), do: :color
 
   # R's `guess_pal_type()`, which asks for numbers first; no values are colours here, as R's
   # empty vector of strings is.
@@ -502,6 +563,7 @@ defmodule Scales.Palette do
   def nlevels({kind, _parameters}) when kind in [:hue, :gray, :viridis], do: @many_levels
   def nlevels(:identity), do: nil
   def nlevels({kind, _parameters}) when kind in [:rescale, :area, :abs_area, :gradient], do: nil
+  def nlevels({:gradient, _colors, _values}), do: nil
 
   @doc """
   The palette scales names `name`, R's `get_palette()` for scales' own names, in any case: each

@@ -39,8 +39,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   R's**: continuous, `:identity`, R's `pal_identity()`, `{:rescale, {low, high}}`, R's
   `pal_rescale()`, `{:area, {low, high}}`, R's `pal_area()`, the place's square root rescaled,
   `{:abs_area, max}`, R's `abs_area()`, the square root of the place's size rescaled onto 0 to
-  `max`, and `{:gradient, colors}`, R's `pal_gradient_n()`; discrete, `{:hue, %{hue:, chroma:,
-  luminance:, direction:}}`, R's `pal_hue()`, `{:gray, {start, finish}}`, R's `pal_grey()`,
+  `max`, and `{:gradient, colors}` or `{:gradient, colors, values}`, R's `pal_gradient_n()`;
+  discrete, `{:hue, %{hue:, chroma:, luminance:, direction:}}`, R's `pal_hue()`,
+  `{:gray, {start, finish}}`, R's `pal_grey()`,
   `{:viridis, %{option:, begin:, end:, direction:, alpha:}}`, R's `pal_viridis()`
   (`ColorOperations.viridis/2`), `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`, six
   shapes by name, `:linetype`, R's `pal_linetype()`, 13 line types as dash patterns,
@@ -86,7 +87,14 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   from 0 to 1 by R's `seq()`, a place between two neighbours blended in CIE L*a*b*
   (`Scales.ColorOperations`), each channel interpolated as R's `approxfun()` does, and a place at
   a colour taking that colour exactly, as `colour_ramp()` blends; one colour is every place's. It
-  matched R on every place sampled; its tests pin R's colours.
+  matched R on every place sampled; its tests pin R's colours. **Its alpha is a fourth channel**
+  (design-log §4, the entry beginning "A gradient's values move a place"), interpolated always,
+  since an opaque one stays 1 and writes none, its byte rounded half to even; `:none` and
+  `"transparent"` are R's white with no alpha. A place outside 0 to 1 gives `nil`, as R's `NA`,
+  but one colour's. **`values` move a place first, exactly as R's `approxfun()` takes them**:
+  each value at its place by R's `seq()`, a `nil` dropped, sorted, equal ones at their places'
+  mean, any count; outside them `nil`; fewer than two left raise. R's warning on equal values is
+  not given. All of 3,000 random gradients matched R, alphas, `NA`s and values among them.
 - **The hue palette is exactly R's `pal_hue()`**: a range less than a degree short of the whole
   circle, taken modulo 360 as R's `%%` takes it, leaves its last `360 / n` degrees off, any other
   is spread end to end, the hues by the same `seq()`, each colour

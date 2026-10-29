@@ -7,8 +7,9 @@ defmodule Scales.ColorOperationsTest do
 
   # Golden: CSS Color Module Level 4's table of named colours and its four hex forms, never Giggly's
   # or the library's: `steelblue` is #4682B4, CSS's `gray` #808080 and `green` #008000 where R's are
-  # #BEBEBE and #00FF00, and `transparent` black with no alpha where R's is white. It moves only
-  # with what `parse/1` takes, never with the library's table, which may hold more than CSS's.
+  # #BEBEBE and #00FF00; but `transparent` is R's, white with no alpha, where CSS's is black. It
+  # moves only with what `parse/1` takes, never with the library's table, which may hold more than
+  # CSS's.
   describe "parse/1" do
     test "a CSS colour name is its hex, in any case, as CSS matches a keyword" do
       assert ColorOperations.parse("steelblue") === {:ok, "#4682B4"}
@@ -32,9 +33,9 @@ defmodule Scales.ColorOperationsTest do
       assert ColorOperations.parse("#ABCDEF00") === {:ok, "#ABCDEF00"}
     end
 
-    test "transparent is CSS's, black with no alpha, in any case" do
-      assert ColorOperations.parse("transparent") === {:ok, "#00000000"}
-      assert ColorOperations.parse("Transparent") === {:ok, "#00000000"}
+    test "transparent is R's, white with no alpha, in any case" do
+      assert ColorOperations.parse("transparent") === {:ok, "#FFFFFF00"}
+      assert ColorOperations.parse("Transparent") === {:ok, "#FFFFFF00"}
     end
 
     test ":none, R's NA, is kept as none" do
@@ -99,7 +100,7 @@ defmodule Scales.ColorOperationsTest do
   # Golden: farver 2.1.2's `decode_colour(to = "lab")` in R 4.6.1, printed to 17 digits, and the
   # colours it encodes back; the composition matched every one of 5,001 samples of ggplot2's
   # default gradient. It moves only with farver's constants or the library's conversions.
-  describe "to_lab/1 and from_lab/1" do
+  describe "to_lab/1, from_lab/2 and opacity/1" do
     test "a colour's L*a*b* is farver's" do
       {lightness, a, b} = ColorOperations.to_lab("#132B43")
       assert_in_delta lightness, 16.850779893314083, 1.0e-12
@@ -117,6 +118,44 @@ defmodule Scales.ColorOperationsTest do
         assert colour
                |> ColorOperations.to_lab()
                |> ColorOperations.from_lab() === colour
+      end
+    end
+
+    # Golden: farver 2.1.2's `decode_colour(alpha = TRUE, to = "lab")` and `encode_colour(lab,
+    # alpha, from = "lab")`, which writes an opaque alpha FF, dropped here.
+    test "a colour's alpha is not part of its L*a*b*, and is read apart, its byte over 255" do
+      assert ColorOperations.to_lab("#4682B480") === ColorOperations.to_lab("#4682B4")
+      assert ColorOperations.opacity("#4682B480") === 128 / 255
+      assert ColorOperations.opacity("#FFFFFF00") === 0.0
+      assert ColorOperations.opacity("#4682B4") === 1.0
+    end
+
+    test "an alpha is appended as farver writes it, rounded half to even, opaque dropped" do
+      lab = {52.4664, -4.0763, -32.1991}
+
+      assert Enum.map([0, 0.25, 0.5, 1, 1.5 / 255, 2.5 / 255, 254.5 / 255], fn alpha ->
+               ColorOperations.from_lab(lab, alpha)
+             end) ===
+               [
+                 "#4682B400",
+                 "#4682B440",
+                 "#4682B480",
+                 "#4682B4",
+                 "#4682B402",
+                 "#4682B402",
+                 "#4682B4FE"
+               ]
+    end
+
+    # Each refused value is built as the test runs: a literal the guard refuses fails the type
+    # checker.
+    test "no colour has no alpha, and an alpha that is not a number is refused" do
+      none = Enum.at([:none], 0)
+
+      assert_raise FunctionClauseError, fn -> ColorOperations.opacity(none) end
+
+      assert_raise FunctionClauseError, fn ->
+        ColorOperations.from_lab({52.4664, -4.0763, -32.1991}, none)
       end
     end
   end

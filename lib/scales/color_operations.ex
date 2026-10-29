@@ -2,9 +2,9 @@ defmodule Scales.ColorOperations do
   @moduledoc """
   Colours as a user writes them and as R's palettes make them: a colour read as CSS reads one
   (`parse/1`); one made from a hue, chroma and luminance (`from_hcl/3`) or from CIE L*a*b*
-  (`from_lab/1`), and a colour's L*a*b* (`to_lab/1`), each exactly as R's farver makes it; two
-  mixed (`mix/3`), R's `col_mix()`; and the viridis palettes' colours (`viridis/2`), R's
-  `viridisLite::viridis()`.
+  (`from_lab/2`), and a colour's L*a*b* (`to_lab/1`) and alpha (`opacity/1`), each exactly as R's
+  farver makes it; two mixed (`mix/3`), R's `col_mix()`; and the viridis palettes' colours
+  (`viridis/2`), R's `viridisLite::viridis()`.
 
   A colour is uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of its own, an alpha of `FF`
   dropped as opaque, so a colour has one spelling; or `:none`, R's `NA`, no colour.
@@ -21,8 +21,8 @@ defmodule Scales.ColorOperations do
   # `parse/1` reads a colour as CSS reads one: a CSS colour name, in any case, as CSS matches its
   # keywords, from the library's table of them (`Color.CSS.Names`) less the two names it adds that
   # CSS does not define; a hex colour in one of CSS's four forms, `#RGB`, `#RGBA`, `#RRGGBB` and
-  # `#RRGGBBAA`, its digits in either case; `transparent`, CSS's black with no alpha, where R's is
-  # white; or `:none`. A name CSS does not define, such as R's `grey50`, is refused, and so is
+  # `#RRGGBBAA`, its digits in either case; `transparent`, R's white with no alpha, where CSS's is
+  # black; or `:none`. A name CSS does not define, such as R's `grey50`, is refused, and so is
   # anything else, CSS's functions (`rgb()`) and the spellings the library forgives (a hex colour
   # without its `#`, a name with spaces) among them.
   #
@@ -31,9 +31,10 @@ defmodule Scales.ColorOperations do
   # to sRGB through farver's matrix, each channel companded, times 255, rounded half to even and
   # clamped to a byte, as farver writes one. `to_lab/1` is a colour's CIE L*a*b* as farver decodes
   # it (`decode_colour(to = "lab")`), each byte over 255 expanded from sRGB's companding, to XYZ
-  # through farver's matrix the other way, to Lab against its white point; and `from_lab/1` the
+  # through farver's matrix the other way, to Lab against its white point; and `from_lab/2` the
   # colour farver encodes from L*a*b*, to XYZ and then as `from_hcl/3` goes on, as R's gradients
-  # (`scales::colour_ramp()`) blend their colours in Lab. The conversions are the library's
+  # (`scales::colour_ramp()`) blend their colours in Lab, an alpha's byte appended as `mix/3`
+  # writes it. The conversions are the library's
   # (`Color.Conversion.Lindbloom`), handed farver's constants: its white point, made from D65's
   # chromaticity in its own arithmetic rather than the textbook 95.047 and 108.883, and its sRGB
   # matrices. With them it gives R's colours exactly but where L* is below 8, where farver's
@@ -175,7 +176,8 @@ defmodule Scales.ColorOperations do
   @doc """
   The colour `color` names, in its one spelling, or `:error` where CSS names none: a CSS colour
   name in any case; a hex colour in one of CSS's four forms, `#RGB`, `#RGBA`, `#RRGGBB` and
-  `#RRGGBBAA`, its digits in either case; `transparent`, CSS's black with no alpha; or `:none`.
+  `#RRGGBBAA`, its digits in either case; `transparent`, R's white with no alpha, `#FFFFFF00`,
+  where CSS's is black; or `:none`.
   R's own names that CSS lacks (`grey50`), CSS's functions (`rgb()`) and hex without its `#` are
   refused.
 
@@ -205,8 +207,8 @@ defmodule Scales.ColorOperations do
 
   def parse(_other), do: :error
 
-  # CSS's `transparent` is black with no alpha.
-  defp keyword("transparent"), do: {:ok, "#00000000"}
+  # R's `transparent` is white with no alpha, as a gradient blends from it.
+  defp keyword("transparent"), do: {:ok, "#FFFFFF00"}
   defp keyword(name) when name in @not_css, do: :error
 
   defp keyword(name) do
@@ -232,7 +234,8 @@ defmodule Scales.ColorOperations do
   end
 
   @doc """
-  The CIE L*a*b* of an opaque `#RRGGBB` colour, as R's farver decodes it.
+  The CIE L*a*b* of a `#RRGGBB` or `#RRGGBBAA` colour, as R's farver decodes it; an alpha is not
+  part of it (`opacity/1`).
 
   ## Examples
 
@@ -240,6 +243,8 @@ defmodule Scales.ColorOperations do
       {52.46551718768575, -4.073239774469551, -32.18862480122369}
   """
   @spec to_lab(String.t()) :: {float(), float(), float()}
+  def to_lab(<<"#", digits::binary-size(6), _alpha::binary-size(2)>>), do: to_lab("#" <> digits)
+
   def to_lab(<<"#", digits::binary-size(6)>>) do
     {:ok, <<red, green, blue>>} = Base.decode16(digits)
 
@@ -251,19 +256,44 @@ defmodule Scales.ColorOperations do
   end
 
   @doc """
-  The colour, uppercase `#RRGGBB`, that R's farver encodes from CIE L*, a* and b*, as R's
-  gradients blend their colours in L*a*b*.
+  The colour that R's farver encodes from CIE L*, a* and b* and an `alpha` from 0 to 1, as R's
+  gradients blend their colours in L*a*b*: uppercase `#RRGGBB`, its alpha's byte appended unless
+  it is opaque, `alpha` times 255 rounded half to even.
 
   ## Examples
 
       iex> Scales.ColorOperations.from_lab({52.4664, -4.0763, -32.1991})
       "#4682B4"
+
+      iex> Scales.ColorOperations.from_lab({52.4664, -4.0763, -32.1991}, 0.5)
+      "#4682B480"
   """
-  @spec from_lab({number(), number(), number()}) :: String.t()
-  def from_lab({_lightness, _a, _b} = lab) do
-    lab
-    |> Lindbloom.lab_to_xyz(@white_point)
-    |> from_xyz()
+  @spec from_lab({number(), number(), number()}, number()) :: String.t()
+  def from_lab({_lightness, _a, _b} = lab, alpha \\ 1) when is_number(alpha) do
+    color =
+      lab
+      |> Lindbloom.lab_to_xyz(@white_point)
+      |> from_xyz()
+
+    color <> farver_alpha_digits(alpha)
+  end
+
+  @doc """
+  A colour's own alpha, from 0 to 1, its byte over 255 as R's farver decodes it; 1 for a colour
+  without one.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.opacity("#4682B4")
+      1.0
+
+      iex> Scales.ColorOperations.opacity("#FFFFFF00")
+      0.0
+  """
+  @spec opacity(String.t()) :: float()
+  def opacity(<<"#", _digits::binary>> = color) do
+    {_channels, alpha} = channels(color)
+    alpha
   end
 
   @doc """
@@ -287,8 +317,17 @@ defmodule Scales.ColorOperations do
         hex_pair(rounded_byte(from_channel * (1 - amount) + to_channel * amount))
       end)
 
-    alpha = rounded_byte((from_alpha * (1 - amount) + to_alpha * amount) * 255)
-    Enum.join(["#" | digits]) <> if(alpha == 255, do: "", else: hex_pair(alpha))
+    alpha = from_alpha * (1 - amount) + to_alpha * amount
+    Enum.join(["#" | digits]) <> farver_alpha_digits(alpha)
+  end
+
+  # The digits an alpha from 0 to 1 adds to a colour as farver writes it, its byte times 255
+  # rounded half to even, none when it is opaque.
+  defp farver_alpha_digits(alpha) do
+    case rounded_byte(alpha * 255) do
+      255 -> ""
+      byte -> hex_pair(byte)
+    end
   end
 
   # A colour's red, green and blue as bytes, and its alpha from 0 to 1, as farver decodes them,

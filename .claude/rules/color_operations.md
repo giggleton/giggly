@@ -27,13 +27,15 @@ beginning "A library's owner nests".
   sits in a frame column, a layer's `fixed` and the scene as any string does.
 - **`parse/1` takes what CSS takes, and refuses the rest**: a CSS colour name in any case, from the
   library's table less the chroma-key names it adds; CSS's four hex forms, their digits checked here,
-  since the library reads a pair with `Integer.parse/2`, which takes a sign; `transparent`, CSS's
-  black with no alpha; and `:none`. A name CSS does not define (R's `grey50`), a spelling the library
-  forgives (a name with spaces, hex without its `#`) and CSS's functions (`rgb()`) are `:error`, and
-  `Plot` raises naming the value.
+  since the library reads a pair with `Integer.parse/2`, which takes a sign; `transparent`, R's
+  white with no alpha, `#FFFFFF00`, where CSS's is black, so a gradient blends from it as R's does
+  (design-log §4, the entry beginning "A gradient's values move a place"); and `:none`. A name
+  CSS does not define (R's `grey50`), a spelling the library forgives (a name with spaces, hex
+  without its `#`) and CSS's functions (`rgb()`) are `:error`, and `Plot` raises naming the value.
 - **A palette's colour is exactly farver's, from the library's conversions handed farver's
-  constants** (`from_hcl/3`, `encode_colour(from = "hcl")`; `to_lab/1` and `from_lab/1`, its
-  `decode_colour(to = "lab")` and `encode_colour(from = "lab")`): its white point made from D65's
+  constants** (`from_hcl/3`, `encode_colour(from = "hcl")`; `to_lab/1`, `opacity/1` and
+  `from_lab/2`, its `decode_colour(alpha = TRUE, to = "lab")` and `encode_colour(alpha, from =
+  "lab")`, an opaque alpha's `FF` dropped): its white point made from D65's
   chromaticity in farver's arithmetic, its sRGB matrices both ways, and a channel rounded as
   farver's `double2int()` rounds, by adding and taking away 1.5 times 2^52, a half to the even
   byte, then clamped. The hue colours matched R on every colour of a grid of 50,400, and the Lab
