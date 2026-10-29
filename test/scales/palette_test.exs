@@ -822,7 +822,8 @@ defmodule Scales.PaletteTest do
   # Golden: scales 1.4.0's `as_discrete_pal()` in R 4.6.1: `pal_rescale(c(1, 6))` for 4 levels and
   # 1, `pal_rescale()` for 7, `pal_area()` for 3, the gradient for 7 and none; R hands
   # `pal_identity()` and `abs_area(6)` back as they are, so for 3 levels they give 3 and
-  # 10.392304845413264.
+  # 10.392304845413264; `pal_gradient_n(c("#132B43", "#56B1F7"), c(0, 0.5))` for 3, its levels
+  # at 0, 0.5 and 1.
   describe "discrete/2 of a continuous palette" do
     test "the palette is handed the levels' places, spaced evenly from 0 to 1" do
       assert {Palette.discrete({:rescale, {1, 6}}, 4), Palette.discrete({:rescale, {1, 6}}, 1),
@@ -847,8 +848,8 @@ defmodule Scales.PaletteTest do
     end
 
     test "a gradient with values is sampled after its values move the places" do
-      assert Palette.discrete({:gradient, ["#132B43", "#56B1F7"], [0, 0.25]}, 3) ===
-               ["#132B43", nil, nil]
+      assert Palette.discrete({:gradient, ["#132B43", "#56B1F7"], [0, 0.5]}, 3) ===
+               ["#132B43", "#56B1F7", nil]
     end
 
     test "the identity and an absolute area, which R gives no type, are refused" do
