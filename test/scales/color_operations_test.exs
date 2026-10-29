@@ -258,6 +258,7 @@ defmodule Scales.ColorOperationsTest do
 
       assert_raise FunctionClauseError, fn -> ColorOperations.alpha("#4682B4", text) end
       assert_raise FunctionClauseError, fn -> ColorOperations.alpha(name, 0.5) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.alpha(name, nil) end
       assert_raise FunctionClauseError, fn -> ColorOperations.alpha(:none, text) end
     end
   end
@@ -299,10 +300,12 @@ defmodule Scales.ColorOperationsTest do
     end
 
     # farver decodes black's hue as 180 degrees, so a chroma given it is teal; at 0 degrees it is
-    # crimson. White's chroma is a rounding error, its hue 21.8 degrees.
+    # crimson. Its chroma is 0, so a luminance alone gives a grey. White's chroma is a rounding
+    # error, its hue 21.8 degrees.
     test "black's hue is 180 degrees and white's farver's rounding error, as farver decodes them" do
       assert ColorOperations.with_hcl("#000000", chroma: 70, luminance: 30) === "#005F4F"
       assert ColorOperations.with_hcl("#000000", hue: 0, chroma: 70, luminance: 30) === "#88193D"
+      assert ColorOperations.with_hcl("#000000", luminance: 50) === "#777777"
       assert ColorOperations.muted("#FFFFFF") === "#7F2B00"
       assert ColorOperations.muted("#FFFFFF00") === "#7F2B00"
     end
@@ -450,6 +453,7 @@ defmodule Scales.ColorOperationsTest do
       assert_raise FunctionClauseError, fn -> ColorOperations.shift("#4682B4", text) end
       assert_raise FunctionClauseError, fn -> ColorOperations.shift(:none, text) end
       assert_raise FunctionClauseError, fn -> ColorOperations.shift(name, 10) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.shift(name, nil) end
     end
   end
 
