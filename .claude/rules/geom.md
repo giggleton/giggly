@@ -184,6 +184,20 @@ beginning "Each layer's defaults are filled in from the theme".
   from `x` or `y` as the panel is drawn, never in `setup_data/3`**, so the layer's table holds what
   was mapped, as ggplot2's `layer_data()` does. A colour of `:none` is a line of no stroke, as
   svglite writes R's `NA`; its key is a path's.
+- **A line's arrowhead is the layer's `arrow` on each line it draws, made by `Mark.head/3`**:
+  closed, it is filled with the arrow's fill, or the line's colour for `:color`, at the line's
+  alpha, as ggplot2 applies `alpha()` to `arrow.fill`. A geom says which ends each line's head
+  is at and how long it is, never its shape, which turns on the panel's size in points (the
+  backend's). **A path's heads sit at each line's own ends, as ggplot2's draw them** (design-log
+  §4, the entry beginning "An arrowhead is an option of a line"): a polyline broken by missing
+  positions has its first end's head on the piece starting at the group's first row and its
+  last's on the piece ending at its last, so a lone point there takes its head with it; a line
+  drawn as segments has each head as `repair_segment_arrow()` repairs it, a lone segment keeping
+  the line's, the first and last theirs at the line's own ends, every other of no length. **A
+  segment under coordinates that curve leaves the arrow's fill behind**, filled in its colour, as
+  `GeomSegment` hands `GeomPath` no `arrow.fill`; a smooth's line has none. **A key with an arrow
+  carries it and needs the head's room**, `cos(angle) * length * 1.25` wide and `sin(angle) *
+  length * 2` tall, whatever its line's width, as `draw_key_path()` sizes its glyph.
 - **A rectangle (`Geom.Rect`) is drawn as ggplot2's `GeomRect` draws one, and a bar is drawn as a
   rectangle**, its key too, as ggplot2's `GeomBar` draws with its parent `GeomRect`: so the
   rectangle owns the drawing and `Geom.Bar` only works out a bar's edges (`setup_data/3`). **Each

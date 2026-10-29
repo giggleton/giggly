@@ -91,6 +91,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   shape is grid's `curveGrob()` X-spline, specified only by R's source. *Rejected:
   `geom_spoke()`*: `angle` and `radius`, unscaled aesthetics, are a question of their own.
 
+- **An arrowhead is an option of a line, `arrow:` on the line layers, its fill inside it, its
+  shape the backend's (2026-10-29, Steve: no `Plot.arrow/1`, "Agree with both", "Agree with you on
+  both"; checked against ggplot2 4.0.3 and grid).** ggplot2's `arrow =` is a line parameter beside
+  `lineend`, and `element_line(arrow =)` a property of a theme line; grid's `arrow()` only builds
+  the value. So `arrow:` takes `true` or a keyword list, `fill:` (`arrow.fill`) inside it, on
+  `geom_segment/3`, `geom_path/3`, `geom_line/3`, `geom_freqpoly/3` and their annotations. The
+  scene carries a `Scene.Arrow` per line; the SVG writer works out its points, since its shape
+  turns on the panel's size in points. R's oddities are copied: a radial segment's fill dropped,
+  a varying path's zero-length heads. *Rejected: `Plot.arrow/1` building a struct*: R needs a
+  constructor, Giggly's options take keyword lists. *Rejected: a separate `arrow_fill:`*: a fill
+  could be given with no arrow. *Rejected: a typed map on the primitives*: the compiler cannot
+  check its keys.
+
 - **Colour steps place their breaks by R's count, on binned and continuous scales alike
   (2026-10-29, Steve, increment 1's step 8; checked against ggplot2 4.0.3).** `:colorsteps` is
   `guide_coloursteps()` at its defaults, the binned scale's default guide: one rectangle per bin,
@@ -3066,6 +3079,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),
+  geom_freqpoly() and their annotations (geom_segment, step 2); §4: "An arrowhead is an option of
+  a line"
 - 2026-10-29 — The commit gate judges the checkout a command runs in, not the main checkout its
   hook starts in
 - 2026-10-29 — Add geom_segment(): a straight line per row, or a path under radial coordinates,

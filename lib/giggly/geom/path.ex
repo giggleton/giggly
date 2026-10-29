@@ -36,13 +36,14 @@ defmodule Giggly.Geom.Path do
   # are drawn in group order, each run of lines alike in width and line type one primitive, and the
   # segments in row order, each run alike in width one.
 
-  @enforce_keys [:line_end, :line_join, :mitre_limit]
+  @enforce_keys [:line_end, :line_join, :mitre_limit, :arrow]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),
-          mitre_limit: float()
+          mitre_limit: float(),
+          arrow: Giggly.Geom.arrow() | :none
         }
 
   # The aesthetics a layer of paths can use, from its own mapping or the plot's.
@@ -130,6 +131,8 @@ defmodule Giggly.Geom.Path do
           []
 
         {color, line_width, line_type} ->
+          alpha = Map.fetch!(key, :alpha)
+
           [
             %Segments{
               starts: [@key_start],
@@ -138,19 +141,23 @@ defmodule Giggly.Geom.Path do
               stroke_width: Mark.stroke_width(line_width),
               dashes: Mark.dashes(line_type, line_width),
               color: [Mark.hex(color)],
-              opacity: [Mark.opacity(color, Map.fetch!(key, :alpha))],
+              opacity: [Mark.opacity(color, alpha)],
               line_end: geom.line_end,
               line_join: :round,
-              mitre_limit: 10.0
+              mitre_limit: 10.0,
+              arrows: arrows([Mark.head(geom.arrow, color, alpha)])
             }
           ]
       end
     end
 
     # The room a key's line needs, its width in millimetres either way, as ggplot2's
-    # `set_key_size()` reads a path's key, which has no `size`; a missing width needs none.
+    # `set_key_size()` reads a path's key, which has no `size`; a missing width needs none. A key
+    # with an arrowhead needs the head's room instead, whatever its width, as `draw_key_path()`
+    # gives its glyph a size: as wide as an arm reaches along the line, over the eight tenths of
+    # the key the line spans, and as tall as both arms reach across it.
     @impl Giggly.Geom
-    def key_size(_geom, key) do
+    def key_size(%{arrow: :none}, key) do
       side =
         case Map.fetch!(key, :linewidth) do
           nil -> 0.0
@@ -160,64 +167,133 @@ defmodule Giggly.Geom.Path do
       {side, side}
     end
 
+    def key_size(%{arrow: arrow}, _key) do
+      angle = arrow.angle * :math.pi() / 180
+      {:math.cos(angle) * arrow.length * 1.25, :math.sin(angle) * arrow.length * 2}
+    end
+
     # Each group a line, in its first row's colour, alpha, width and line type, broken where a
-    # position is missing, as grid breaks a polyline; a piece of one point draws nothing. Each run
-    # of lines alike in width and line type is one primitive, and a blank run draws nothing.
+    # position is missing, as grid breaks a polyline; a piece of one point draws nothing. A line
+    # broken in pieces has its first end's head on its first piece and its last end's on its last,
+    # as grid draws a polyline's arrow at the line's own ends (`piece_head/4`). Each run of lines
+    # alike in width and line type is one primitive, and a blank run draws nothing.
     defp draw_polylines(geom, rows) do
       rows
       |> Enum.chunk_by(fn row -> row.group end)
       |> Enum.flat_map(fn [first | _rest] = group_rows ->
-        group_rows
-        |> Enum.chunk_by(fn row -> placed?(row) end)
+        head = Mark.head(geom.arrow, first.color, first.alpha)
+        pieces = Enum.chunk_by(group_rows, fn row -> placed?(row) end)
+        count = length(pieces)
+
+        pieces
+        |> Enum.with_index()
         |> Enum.filter(fn
-          [first_row, _second_row | _rest] -> placed?(first_row)
-          [_lone_row] -> false
+          {[first_row, _second_row | _rest], _index} -> placed?(first_row)
+          {[_lone_row], _index} -> false
         end)
-        |> Enum.map(fn piece -> {Enum.map(piece, &position/1), first} end)
+        |> Enum.map(fn {piece, index} ->
+          {Enum.map(piece, &position/1), first, piece_head(head, index, count)}
+        end)
       end)
-      |> Enum.chunk_by(fn {_line, look} -> {look.linewidth, look.linetype} end)
-      |> Enum.reject(fn [{_line, look} | _rest] -> look.linetype == :none end)
-      |> Enum.map(fn [{_line, look} | _rest] = lines ->
+      |> Enum.chunk_by(fn {_line, look, _head} -> {look.linewidth, look.linetype} end)
+      |> Enum.reject(fn [{_line, look, _head} | _rest] -> look.linetype == :none end)
+      |> Enum.map(fn [{_line, look, _head} | _rest] = lines ->
         %Polylines{
-          lines: Enum.map(lines, fn {line, _look} -> line end),
+          lines: Enum.map(lines, fn {line, _look, _head} -> line end),
           offsets: :none,
           stroke_width: Mark.stroke_width(look.linewidth),
           dashes: Mark.dashes(look.linetype, look.linewidth),
-          color: Enum.map(lines, fn {_line, row} -> Mark.hex(row.color) end),
-          opacity: Enum.map(lines, fn {_line, row} -> Mark.opacity(row.color, row.alpha) end),
+          color: Enum.map(lines, fn {_line, row, _head} -> Mark.hex(row.color) end),
+          opacity:
+            Enum.map(lines, fn {_line, row, _head} -> Mark.opacity(row.color, row.alpha) end),
           line_end: geom.line_end,
           line_join: geom.line_join,
-          mitre_limit: geom.mitre_limit
+          mitre_limit: geom.mitre_limit,
+          arrows: arrows(Enum.map(lines, fn {_line, _look, head} -> head end))
         }
       end)
     end
 
+    # The head of the piece at `index` of a line broken in `count` pieces: the line's own where it
+    # is whole; else its first end's on its first piece, its last end's on its last, and none
+    # between.
+    defp piece_head(:none, _index, _count), do: :none
+    defp piece_head(head, _index, 1), do: head
+    defp piece_head(head, 0, _count), do: head_at(head, :first)
+    defp piece_head(head, index, count) when index == count - 1, do: head_at(head, :last)
+    defp piece_head(_head, _index, _count), do: :none
+
+    # `head` at `finish` alone, where it has one there.
+    defp head_at(%{ends: ends} = head, finish) when ends in [finish, :both],
+      do: %{head | ends: finish}
+
+    defp head_at(_head, _finish), do: :none
+
+    # Heads for each line, or `:none` where no line has one.
+    defp arrows(heads) do
+      if Enum.all?(heads, fn head -> head == :none end), do: :none, else: heads
+    end
+
     # A segment from each row to the next of its group, in the colour, alpha and width of the row it
     # starts from, solid, the one line type a line whose look varies along it is drawn in; a segment
-    # touching a missing position, or starting from a row missing its width, is not drawn. Each run
-    # of segments alike in width is one primitive.
+    # touching a missing position, or starting from a row missing its width, is not drawn. Each
+    # segment's head is its group's as `segment_head/3` repairs it, in its start's colour and alpha.
+    # Each run of segments alike in width is one primitive.
     defp draw_segments(geom, rows) do
       rows
-      |> Enum.chunk_every(2, 1, :discard)
-      |> Enum.filter(fn [from, to] ->
-        from.group == to.group and placed?(from) and placed?(to) and is_number(from.linewidth)
+      |> Enum.chunk_by(fn row -> row.group end)
+      |> Enum.flat_map(fn group_rows ->
+        pairs = Enum.chunk_every(group_rows, 2, 1, :discard)
+        count = length(pairs)
+
+        pairs
+        |> Enum.with_index()
+        |> Enum.map(fn {[from, to], index} ->
+          {from, to, segment_head(Mark.head(geom.arrow, from.color, from.alpha), index, count)}
+        end)
       end)
-      |> Enum.chunk_by(fn [from, _to] -> from.linewidth end)
-      |> Enum.map(fn [[first, _to] | _rest] = segments ->
+      |> Enum.filter(fn {from, to, _head} ->
+        placed?(from) and placed?(to) and is_number(from.linewidth)
+      end)
+      |> Enum.chunk_by(fn {from, _to, _head} -> from.linewidth end)
+      |> Enum.map(fn [{first, _to, _head} | _rest] = segments ->
         %Segments{
-          starts: Enum.map(segments, fn [from, _to] -> position(from) end),
-          ends: Enum.map(segments, fn [_from, to] -> position(to) end),
+          starts: Enum.map(segments, fn {from, _to, _head} -> position(from) end),
+          ends: Enum.map(segments, fn {_from, to, _head} -> position(to) end),
           offsets: :none,
           stroke_width: Mark.stroke_width(first.linewidth),
           dashes: :none,
-          color: Enum.map(segments, fn [from, _to] -> Mark.hex(from.color) end),
-          opacity: Enum.map(segments, fn [from, _to] -> Mark.opacity(from.color, from.alpha) end),
+          color: Enum.map(segments, fn {from, _to, _head} -> Mark.hex(from.color) end),
+          opacity:
+            Enum.map(segments, fn {from, _to, _head} -> Mark.opacity(from.color, from.alpha) end),
           line_end: geom.line_end,
           line_join: geom.line_join,
-          mitre_limit: geom.mitre_limit
+          mitre_limit: geom.mitre_limit,
+          arrows: arrows(Enum.map(segments, fn {_from, _to, head} -> head end))
         }
       end)
     end
+
+    # The head of the segment at `index` of a group's `count`, as ggplot2's
+    # `repair_segment_arrow()` gives one, so heads sit only at the line's own ends: a lone
+    # segment keeps the line's; the first keeps a head at its first end, a head at both ends kept
+    # there alone, and the last at its last; every other head, the middle segments' and a first
+    # or last one's at the end the line has none, is drawn with no length, three points at its
+    # tip, as grid draws one.
+    defp segment_head(:none, _index, _count), do: :none
+    defp segment_head(head, _index, 1), do: head
+    defp segment_head(head, 0, _count), do: end_head(head, :first, :last)
+
+    defp segment_head(head, index, count) when index == count - 1,
+      do: end_head(head, :last, :first)
+
+    defp segment_head(head, _index, _count), do: %{head | length: 0.0}
+
+    # A first or last segment's head: kept at `own` alone where the line has one there, and of no
+    # length where the line's is at the `other` end alone.
+    defp end_head(%{ends: :both} = head, own, _other), do: %{head | ends: own}
+    defp end_head(%{ends: other} = head, _own, other), do: %{head | length: 0.0}
+    defp end_head(head, _own, _other), do: head
 
     # The rows of each group from its first with both positions to its last, as ggplot2's
     # `keep_mid_true()` keeps them, a group's rows in their order wherever they are in the frame.

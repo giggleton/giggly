@@ -232,6 +232,54 @@ defmodule Giggly.Plot.Options do
     ]
   ]
 
+  # The units an arrowhead's length may be given in: the theme's but lines of text, which grid
+  # measures by the font of the line drawn.
+  @arrow_units [:pt, :cm, :mm, :in]
+
+  # An arrowhead's own options, ggplot2's `arrow()` and `arrow.fill`, checked inside `arrow:`.
+  @arrow_schema NimbleOptions.new!(
+                  angle: [
+                    type: {:custom, __MODULE__, :validate_angle, []},
+                    default: 30.0,
+                    doc: "The angle of each arm from the line, in degrees."
+                  ],
+                  length: [
+                    type: {:custom, __MODULE__, :validate_arrow_length, []},
+                    default: {0.25, :in},
+                    doc:
+                      "How long each arm is, `{amount, unit}` with a unit of " <>
+                        "#{inspect(@arrow_units)}."
+                  ],
+                  ends: [
+                    type: {:in, [:last, :first, :both]},
+                    default: :last,
+                    doc: "Which ends of a line get a head."
+                  ],
+                  type: [
+                    type: {:in, [:open, :closed]},
+                    default: :open,
+                    doc: "The arms alone (`:open`), or a triangle (`:closed`)."
+                  ],
+                  fill: [
+                    type: {:custom, __MODULE__, :validate_arrow_fill, []},
+                    default: :color,
+                    doc:
+                      "The fill of a closed head: a CSS colour, `:none` for none, or `:color`, " <>
+                        "the line's own."
+                  ]
+                )
+
+  # A layer's arrowheads on its lines, ggplot2's `arrow` and `arrow.fill`.
+  @arrow_option [
+    type: {:custom, __MODULE__, :validate_arrow, []},
+    doc:
+      "An arrowhead on each line: `true` for the defaults, or a keyword list of its options, " <>
+        "`angle:` (30), `length:` (`{0.25, :in}`, in `:pt`, `:cm`, `:mm` or `:in`), `ends:` " <>
+        "(`:last`, `:first` or `:both`), `type:` (`:open` or `:closed`) and `fill:`, a closed " <>
+        "head's, a colour, `:none`, or `:color`, the line's colour and the default; none when " <>
+        "not given."
+  ]
+
   @text_color_option [
     type: @color_type,
     doc:
@@ -478,7 +526,8 @@ defmodule Giggly.Plot.Options do
                     alpha: @alpha_option,
                     color: @line_color_option,
                     linewidth: @linewidth_option,
-                    linetype: @linetype_option
+                    linetype: @linetype_option,
+                    arrow: @arrow_option
                   ] ++ @line_style_options
                 )
 
@@ -499,7 +548,8 @@ defmodule Giggly.Plot.Options do
                     alpha: @alpha_option,
                     color: @line_color_option,
                     linewidth: @linewidth_option,
-                    linetype: @linetype_option
+                    linetype: @linetype_option,
+                    arrow: @arrow_option
                   ] ++ @line_style_options
                 )
 
@@ -514,7 +564,8 @@ defmodule Giggly.Plot.Options do
                        alpha: @alpha_option,
                        color: @line_color_option,
                        linewidth: @linewidth_option,
-                       linetype: @linetype_option
+                       linetype: @linetype_option,
+                       arrow: @arrow_option
                      ] ++ @segment_line_style_options
                    )
 
@@ -830,7 +881,8 @@ defmodule Giggly.Plot.Options do
                           alpha: @alpha_option,
                           color: @line_color_option,
                           linewidth: @linewidth_option,
-                          linetype: @linetype_option
+                          linetype: @linetype_option,
+                          arrow: @arrow_option
                         ] ++ @line_style_options
                     )
 
@@ -1258,7 +1310,8 @@ defmodule Giggly.Plot.Options do
                      alpha: @annotation_alpha,
                      color: @annotation_color,
                      linewidth: @annotation_linewidth,
-                     linetype: @linetype_option
+                     linetype: @linetype_option,
+                     arrow: @arrow_option
                    ] ++ @line_style_options
   @segment_annotation [
                         x: @annotation_position,
@@ -1268,7 +1321,8 @@ defmodule Giggly.Plot.Options do
                         alpha: @annotation_alpha,
                         color: @annotation_color,
                         linewidth: @annotation_linewidth,
-                        linetype: @annotation_linetype
+                        linetype: @annotation_linetype,
+                        arrow: @arrow_option
                       ] ++ @segment_line_style_options
   @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :text, :rect]
   @annotation_options %{
@@ -4308,6 +4362,64 @@ defmodule Giggly.Plot.Options do
 
   def validate_linemitre(limit),
     do: {:error, "expected a number of line widths, 1 or more, got: #{inspect(limit)}"}
+
+  # NimbleOptions' check of an `arrow:` option: `true`, an arrowhead at its defaults, or a keyword
+  # list of its options, an option given twice refused as `Aesthetics.canonicalize/1` refuses one;
+  # kept as a map, its angle and length floats, its length in points worked out as the theme works
+  # one out, and its fill resolved.
+  @doc false
+  @spec validate_arrow(term()) :: {:ok, map()} | {:error, String.t()}
+  def validate_arrow(true), do: validate_arrow([])
+
+  def validate_arrow(options) when is_list(options) do
+    if Keyword.keyword?(options) do
+      validated =
+        options
+        |> Aesthetics.canonicalize()
+        |> NimbleOptions.validate(@arrow_schema)
+
+      case validated do
+        {:ok, arrow} -> {:ok, in_points(arrow)}
+        {:error, %NimbleOptions.ValidationError{message: message}} -> {:error, message}
+      end
+    else
+      arrow_error(options)
+    end
+  end
+
+  def validate_arrow(arrow), do: arrow_error(arrow)
+
+  # An arrowhead's validated options as a map, its length in points.
+  defp in_points(arrow) do
+    arrow
+    |> Map.new()
+    |> Map.update!(:length, &Theme.points/1)
+  end
+
+  defp arrow_error(arrow),
+    do:
+      {:error,
+       "expected true or a keyword list of an arrowhead's options, got: #{inspect(arrow)}"}
+
+  # NimbleOptions' check of an arrowhead's `length:`: any amount in one of its units, kept as a
+  # float, as grid draws a negative one's arms past its tip.
+  @doc false
+  @spec validate_arrow_length(term()) :: {:ok, {float(), atom()}} | {:error, String.t()}
+  def validate_arrow_length({amount, unit}) when is_number(amount) and unit in @arrow_units,
+    do: {:ok, {amount / 1, unit}}
+
+  def validate_arrow_length(length) do
+    {:error,
+     "expected {amount, unit}, an amount with a unit of #{inspect(@arrow_units)}, " <>
+       "got: #{inspect(length)}"}
+  end
+
+  # NimbleOptions' check of a closed arrowhead's `fill:`: `:color`, the line's own, or a colour,
+  # resolved as `validate_color/1` resolves one.
+  @doc false
+  @spec validate_arrow_fill(term()) :: {:ok, String.t() | :none | :color} | {:error, String.t()}
+  def validate_arrow_fill(:color), do: {:ok, :color}
+  def validate_arrow_fill(fill), do: validate_color(fill)
 
   # NimbleOptions' check of a `binwidth:` option: a number above 0, kept as a float, as R keeps a
   # double.

@@ -4,8 +4,8 @@ defmodule Giggly.Geom.Segment do
   # Segments, ggplot2's `GeomSegment`, which `geom_segment()` draws with: a straight line for each
   # row, from its `x` and `y` to its `xend` and `yend`. Its parameters are how a line's ends are
   # drawn (`line_end`, ggplot2's `lineend`) and how it turns a corner (`line_join`, `linejoin`), at
-  # grid's mitre limit, 10, since ggplot2's segments take no `linemitre`. Use it through
-  # `Giggly.Geom`.
+  # grid's mitre limit, 10, since ggplot2's segments take no `linemitre`, and its arrowheads
+  # (`arrow`, ggplot2's `arrow` and `arrow.fill`). Use it through `Giggly.Geom`.
   #
   # Segments use `:x`, `:y`, `:xend`, `:yend`, `:group`, `:alpha`, `:color`, `:linetype` and
   # `:linewidth`, and need `:x`, `:y` and one of `:xend` and `:yend`, ggplot2's `"xend|yend"`; a
@@ -25,18 +25,23 @@ defmodule Giggly.Geom.Segment do
   # svglite writes one. Under one whose lines curve, each row becomes a path of two rows, its start
   # and its end, in a group of its own, drawn as `Giggly.Geom.Path` draws one with the segments'
   # line ends and grid's round corners, as `GeomSegment` hands its rows to `GeomPath$draw_panel()`
-  # with its `lineend` alone, so each follows the panel's curves.
+  # with its `lineend` alone, so each follows the panel's curves. Each segment has the layer's
+  # arrowhead, if it gives one, its triangle filled with the arrow's fill, or the segment's colour,
+  # at the segment's alpha; where the segments are drawn as paths the arrow's fill is left behind,
+  # as `GeomSegment` hands `GeomPath` its `arrow` without its `arrow.fill`, so a closed head is
+  # filled with its line's colour whatever the fill (`test/golden/segment_arrow_radial.svg`).
   #
   # A segment the layer neither maps nor sets a look for looks as a path does, ggplot2's
   # `GeomSegment$default_aes` being `GeomPath$default_aes`, and its legend key is a path's,
   # `draw_key_path()`, with the segments' line ends.
 
-  @enforce_keys [:line_end, :line_join]
+  @enforce_keys [:line_end, :line_join, :arrow]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           line_end: Giggly.Scene.Polylines.line_end(),
-          line_join: Giggly.Scene.Polylines.line_join()
+          line_join: Giggly.Scene.Polylines.line_join(),
+          arrow: Giggly.Geom.arrow() | :none
         }
 
   # The aesthetics a layer of segments can use, from its own mapping or the plot's.
@@ -86,6 +91,7 @@ defmodule Giggly.Geom.Segment do
       else
         geom
         |> path()
+        |> without_fill()
         |> Geom.draw_panel(pieces(complete), coord, panel_params)
       end
     end
@@ -106,8 +112,19 @@ defmodule Giggly.Geom.Segment do
 
     # The path a segment's two ends are drawn as, and its legend key, with the segments' line ends
     # and grid's round corners, as `GeomSegment` hands `GeomPath$draw_panel()` its `lineend` alone.
-    defp path(geom),
-      do: %Geom.Path{line_end: geom.line_end, line_join: :round, mitre_limit: @mitre_limit}
+    defp path(geom) do
+      %Geom.Path{
+        line_end: geom.line_end,
+        line_join: :round,
+        mitre_limit: @mitre_limit,
+        arrow: geom.arrow
+      }
+    end
+
+    # The path with its arrowheads filled in each line's colour, as `GeomSegment` hands
+    # `GeomPath$draw_panel()` its `arrow` and not its `arrow.fill`.
+    defp without_fill(%{arrow: :none} = path), do: path
+    defp without_fill(path), do: %{path | arrow: %{path.arrow | fill: :color}}
 
     # The frame with an `xend` and a `yend`, either the layer leaves out copied from its `x` or
     # `y`.
@@ -138,8 +155,9 @@ defmodule Giggly.Geom.Segment do
     defp missing?(value), do: value in [nil, :nan]
 
     # Each row a straight line from its start to its end, in its colour at its alpha, width and line
-    # type, in row order, each run alike in width and line type one primitive; a blank line type
-    # draws none, and a colour of `:none` a line of no stroke, as svglite writes one.
+    # type, with its arrowhead, in row order, each run alike in width and line type one primitive;
+    # a blank line type draws none, and a colour of `:none` a line of no stroke, as svglite writes
+    # one.
     defp draw_segments(geom, placed) do
       colors = Mark.colors(placed, :color)
 
@@ -152,6 +170,7 @@ defmodule Giggly.Geom.Segment do
           end: {xend, yend},
           color: color,
           opacity: Mark.opacity(color, alpha),
+          head: Mark.head(geom.arrow, color, alpha),
           line: {line_width, line_type}
         }
       end)
@@ -168,10 +187,15 @@ defmodule Giggly.Geom.Segment do
           opacity: Enum.map(segments, fn segment -> segment.opacity end),
           line_end: geom.line_end,
           line_join: geom.line_join,
-          mitre_limit: @mitre_limit
+          mitre_limit: @mitre_limit,
+          arrows: arrows(geom, segments)
         }
       end)
     end
+
+    # Each segment's head, or `:none` where the layer gives none.
+    defp arrows(%{arrow: :none}, _segments), do: :none
+    defp arrows(_geom, segments), do: Enum.map(segments, fn segment -> segment.head end)
 
     # Each row as a path of two rows, its start and then its end, in a group of its own numbered
     # by its place, as `GeomSegment` stacks its starts and ends and orders them by group; every

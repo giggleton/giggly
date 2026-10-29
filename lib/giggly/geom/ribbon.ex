@@ -368,7 +368,8 @@ defmodule Giggly.Geom.Ribbon do
             opacity: Enum.map(lines, fn _line -> Mark.own_opacity(line_color) end),
             line_end: geom.line_end,
             line_join: drawn_join(geom.line_join),
-            mitre_limit: geom.mitre_limit
+            mitre_limit: geom.mitre_limit,
+            arrows: :none
           }
         ]
     end

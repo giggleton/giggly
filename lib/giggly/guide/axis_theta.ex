@@ -96,7 +96,8 @@ defmodule Giggly.Guide.AxisTheta do
         opacity: [look.opacity],
         line_end: look.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end
@@ -120,7 +121,8 @@ defmodule Giggly.Guide.AxisTheta do
         opacity: List.duplicate(ticks_look.opacity, length(breaks)),
         line_end: ticks_look.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end

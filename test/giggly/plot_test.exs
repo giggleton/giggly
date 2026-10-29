@@ -1240,7 +1240,12 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0},
+                 geom: %Geom.Path{
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0,
+                   arrow: :none
+                 },
                  stat: %Stat.Bin{
                    bins: 30,
                    binwidth: :none,
@@ -1306,7 +1311,12 @@ defmodule Giggly.PlotTest do
                drop: :all
              }
 
-      assert layer.geom === %Geom.Path{line_end: :round, line_join: :mitre, mitre_limit: 2.0}
+      assert layer.geom === %Geom.Path{
+               line_end: :round,
+               line_join: :mitre,
+               mitre_limit: 2.0,
+               arrow: :none
+             }
 
       assert layer.fixed === %{
                color: "#FF0000",
@@ -1736,7 +1746,12 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Path{line_end: :butt, line_join: :round, mitre_limit: 10.0},
+                 geom: %Geom.Path{
+                   line_end: :butt,
+                   line_join: :round,
+                   mitre_limit: 10.0,
+                   arrow: :none
+                 },
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
                  data: :none,
@@ -1790,7 +1805,7 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       for join <- [:round, :mitre, :bevel] do
-        assert [%Plot.Layer{geom: %Geom.Path{line_join: ^join}}] =
+        assert [%Plot.Layer{geom: %Geom.Path{line_join: ^join, arrow: :none}}] =
                  Plot.geom_path(plot, linejoin: join).reversed_layers
       end
     end
@@ -1978,7 +1993,7 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Segment{line_end: :butt, line_join: :round},
+                 geom: %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none},
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
                  data: :none,
@@ -2005,7 +2020,7 @@ defmodule Giggly.PlotTest do
 
       assert [
                %Plot.Layer{
-                 geom: %Geom.Segment{line_end: :square, line_join: :mitre},
+                 geom: %Geom.Segment{line_end: :square, line_join: :mitre, arrow: :none},
                  fixed: %{color: "#FF0000", linewidth: 2.0, linetype: {4, 4}, alpha: 1.0}
                }
              ] = plot.reversed_layers
@@ -2019,6 +2034,91 @@ defmodule Giggly.PlotTest do
         error = assert_raise ArgumentError, fn -> Plot.geom_segment(plot, mapping) end
         assert String.starts_with?(error.message, "Plot.geom_segment/3 ")
       end
+    end
+
+    # grid's `arrow()` defaults: 30 degrees, 0.25 inches, the last end, open; ggplot2's
+    # `arrow.fill` the line's colour.
+    test "arrow: true records an arrowhead at grid's defaults, its length in points, on every " <>
+           "line layer and annotation" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, xend: :wt})
+      binned = Plot.new(@rows, %{x: :wt})
+      defaults = %{angle: 30.0, length: 18.0, ends: :last, type: :open, fill: :color}
+
+      layers = [
+        Plot.geom_segment(plot, arrow: true),
+        Plot.geom_path(plot, arrow: true),
+        Plot.geom_line(plot, arrow: true),
+        Plot.geom_freqpoly(binned, arrow: true),
+        Plot.annotate(plot, :segment, x: 1, y: 1, xend: 2, yend: 2, arrow: true),
+        Plot.annotate(plot, :path, x: [1, 2], y: [1, 2], arrow: true),
+        Plot.annotate(plot, :line, x: [1, 2], y: [1, 2], arrow: true)
+      ]
+
+      for layered <- layers do
+        assert [%Plot.Layer{geom: %{arrow: ^defaults}, fixed: fixed}] = layered.reversed_layers
+        refute Map.has_key?(fixed, :arrow)
+      end
+
+      assert [%Plot.Layer{geom: %Geom.Segment{arrow: :none}}] =
+               Plot.geom_segment(plot).reversed_layers
+    end
+
+    # A length is worked out in points as grid works one out, through inches: TeX's points over
+    # 72.27, centimetres over 2.54, millimetres over 10 and then 2.54.
+    test "an arrowhead's options are recorded as given, its length in points and its fill " <>
+           "resolved" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, xend: :wt})
+
+      lengths =
+        for {length, fill, kept} <- [
+              {{5, :cm}, "white", "#FFFFFF"},
+              {{72.27, :pt}, :none, :none},
+              {{-2, :mm}, :color, :color}
+            ] do
+          options = [angle: 15, length: length, ends: :both, type: :closed, fill: fill]
+
+          assert [%Plot.Layer{geom: %Geom.Segment{arrow: arrow}}] =
+                   Plot.geom_segment(plot, arrow: options).reversed_layers
+
+          assert Map.delete(arrow, :length) ===
+                   %{angle: 15.0, ends: :both, type: :closed, fill: kept}
+
+          arrow.length
+        end
+
+      assert lengths === [5 / 2.54 * 72, 72.27 / 72.27 * 72, -2 / 10 / 2.54 * 72]
+    end
+
+    test "an arrowhead that is not true or a keyword list of its options is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, xend: :wt})
+
+      for arrow <- [
+            false,
+            :closed,
+            [:closed],
+            [length: 0.25],
+            [length: {1, :npc}],
+            [length: {"1", :cm}],
+            [angle: "30"],
+            [ends: :middle],
+            [type: :filled],
+            [fill: "nope"],
+            [width: 2]
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_segment(plot, arrow: arrow)
+          end
+
+        assert error.key == :arrow
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_path(plot, arrow: [angle: 10, angle: 20])
+        end
+
+      assert error.message =~ "given twice"
     end
 
     # ggplot2 4.0.3's `GeomSegment` requires `c("x", "y", "xend|yend")` and its `draw_panel()`
@@ -3081,8 +3181,14 @@ defmodule Giggly.PlotTest do
                %Geom.Point{},
                %Geom.Bar{just: 0.5},
                %Geom.Bar{just: 0.5},
-               %Geom.Path{line_end: :round, line_join: :round, mitre_limit: 10.0},
-               %Geom.Line{orientation: :y, line_end: :butt, line_join: :round, mitre_limit: 10.0},
+               %Geom.Path{line_end: :round, line_join: :round, mitre_limit: 10.0, arrow: :none},
+               %Geom.Line{
+                 orientation: :y,
+                 line_end: :butt,
+                 line_join: :round,
+                 mitre_limit: 10.0,
+                 arrow: :none
+               },
                %Geom.Rect{}
              ]
     end
@@ -3250,7 +3356,7 @@ defmodule Giggly.PlotTest do
         |> Map.fetch!(:reversed_layers)
 
       assert %Plot.Layer{
-               geom: %Geom.Segment{line_end: :butt, line_join: :round},
+               geom: %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none},
                mapping: %{x: "x", y: "y", xend: "xend", yend: "yend"},
                fixed: %{linetype: [{4, 4}, {1, 3}]}
              } = layer

@@ -895,14 +895,17 @@ defmodule Giggly.Theme do
   # A length in points, worked out as grid works it out, through inches in grid's order of
   # operations: TeX's points over 72.27, centimetres over 2.54, millimetres over 10 and then 2.54,
   # and lines of text as that many font sizes times the line height over 72; then times 72. A sum
-  # already in points is as it is.
-  defp points({amount, :points}), do: amount
-  defp points({amount, :pt}), do: amount / 72.27 * 72
-  defp points({amount, :cm}), do: amount / 2.54 * 72
-  defp points({amount, :mm}), do: amount / 10 / 2.54 * 72
-  defp points({amount, :in}), do: amount * 72.0
+  # already in points is as it is. Not API: `Giggly.Plot` works out an arrowhead's length with it
+  # too, so a length in a unit has one arithmetic.
+  @doc false
+  @spec points({number(), unit() | :points}) :: float()
+  def points({amount, :points}), do: amount
+  def points({amount, :pt}), do: amount / 72.27 * 72
+  def points({amount, :cm}), do: amount / 2.54 * 72
+  def points({amount, :mm}), do: amount / 10 / 2.54 * 72
+  def points({amount, :in}), do: amount * 72.0
 
-  defp points({amount, :lines}),
+  def points({amount, :lines}),
     do: amount * @grid_font_size * @grid_line_height / 72 * 72
 
   # Each kind of element `name` of `theme` worked out, in the scene's units.

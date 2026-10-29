@@ -12,7 +12,8 @@ defmodule Giggly.Scene.Segments do
   # across and up from their places, one `{{across, up}, {across, up}}` for each segment, its
   # start's and its end's, as `Giggly.Scene.Polylines` moves a line's points: a point's strokes are
   # drawn round its place at a size in points. `:none` moves none. `dashes` dashes every segment as
-  # `Giggly.Scene.Polylines` dashes a line.
+  # `Giggly.Scene.Polylines` dashes a line. `arrows` gives each segment its arrowhead
+  # (`Giggly.Scene.Arrow`) or `:none`, drawn right after it, or is `:none` for no heads at all.
 
   @enforce_keys [
     :starts,
@@ -24,7 +25,8 @@ defmodule Giggly.Scene.Segments do
     :opacity,
     :line_end,
     :line_join,
-    :mitre_limit
+    :mitre_limit,
+    :arrows
   ]
   defstruct @enforce_keys
 
@@ -38,6 +40,7 @@ defmodule Giggly.Scene.Segments do
           opacity: [float()],
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),
-          mitre_limit: float()
+          mitre_limit: float(),
+          arrows: :none | [Giggly.Scene.Arrow.t() | :none]
         }
 end

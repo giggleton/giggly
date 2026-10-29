@@ -16,7 +16,8 @@ defmodule Giggly.Scene.Polylines do
   # tick reaching out from a circle whose size in points is known only when the scene is laid out.
   # `:none` moves no point. `dashes` is how every line is dashed: the lengths of its dashes and of
   # the gaps between them, in turn, in points, as grid's `lty` draws a line type, or `:none` for a
-  # solid line.
+  # solid line. `arrows` gives each line its arrowhead (`Giggly.Scene.Arrow`) or `:none`, drawn
+  # right after it, as grid draws a polyline's `arrow`, or is `:none` for no heads at all.
 
   @enforce_keys [
     :lines,
@@ -27,7 +28,8 @@ defmodule Giggly.Scene.Polylines do
     :opacity,
     :line_end,
     :line_join,
-    :mitre_limit
+    :mitre_limit,
+    :arrows
   ]
   defstruct @enforce_keys
 
@@ -49,6 +51,7 @@ defmodule Giggly.Scene.Polylines do
           opacity: [float()],
           line_end: line_end(),
           line_join: line_join(),
-          mitre_limit: float()
+          mitre_limit: float(),
+          arrows: :none | [Giggly.Scene.Arrow.t() | :none]
         }
 end

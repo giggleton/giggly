@@ -214,7 +214,8 @@ defmodule Giggly.Guide.Axis do
         opacity: [look.opacity],
         line_end: look.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end
@@ -238,7 +239,8 @@ defmodule Giggly.Guide.Axis do
         opacity: List.duplicate(ticks.opacity, length(places)),
         line_end: ticks.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end
@@ -260,7 +262,8 @@ defmodule Giggly.Guide.Axis do
         opacity: List.duplicate(ticks.opacity, length(places)),
         line_end: ticks.line_end,
         line_join: :round,
-        mitre_limit: 10.0
+        mitre_limit: 10.0,
+        arrows: :none
       }
     ]
   end

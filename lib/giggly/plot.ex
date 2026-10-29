@@ -878,6 +878,10 @@ defmodule Giggly.Plot do
   changes raises `ArgumentError`. A colour of `:none` draws no line, and so does the line type
   `:blank`.
 
+  `arrow:` puts an arrowhead at a line's ends, in the line's colour, width and line type, its arms
+  the same length however the panel is sized; a line broken by a missing position has its heads at
+  the line's own first and last rows, and one drawn as segments only at those ends too.
+
   ## Options
 
   #{NimbleOptions.docs(Options.path())}
@@ -984,6 +988,11 @@ defmodule Giggly.Plot do
   and so does the line type `:blank`. Under `coord_radial/1` a segment follows the panel's curves,
   as a path from its start to its end does.
 
+  `arrow:` puts an arrowhead on each segment, in its colour, width and line type, a closed one
+  filled with its colour or the arrow's `fill:` at its alpha; under `coord_radial/1` a closed head
+  is filled with its segment's colour whatever the `fill:`.
+
+
   ## Options
 
   #{NimbleOptions.docs(Options.segment())}
@@ -995,6 +1004,17 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.layer_data()
       iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :xend)}
       {[1.0, 2.0], [3.0, 5.0]}
+
+  A closed head filled white:
+
+      iex> svg =
+      ...>   %{"x" => [1.0], "y" => [1.0], "xend" => [2.0], "yend" => [3.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, xend: :xend, yend: :yend})
+      ...>   |> Giggly.Plot.geom_segment(arrow: [type: :closed, fill: "white"])
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> svg =~ "fill: #FFFFFF;"
+      true
   """
   @spec geom_segment(t(), mapping_argument() | keyword(), keyword()) :: t()
   def geom_segment(plot, mapping_or_options \\ %{}, options \\ [])
@@ -4432,7 +4452,8 @@ defmodule Giggly.Plot do
     %Geom.Path{
       line_end: Keyword.fetch!(validated, :lineend),
       line_join: Keyword.fetch!(validated, :linejoin),
-      mitre_limit: Keyword.fetch!(validated, :linemitre)
+      mitre_limit: Keyword.fetch!(validated, :linemitre),
+      arrow: Keyword.get(validated, :arrow, :none)
     }
   end
 
@@ -4441,14 +4462,16 @@ defmodule Giggly.Plot do
       orientation: Keyword.fetch!(validated, :orientation),
       line_end: Keyword.fetch!(validated, :lineend),
       line_join: Keyword.fetch!(validated, :linejoin),
-      mitre_limit: Keyword.fetch!(validated, :linemitre)
+      mitre_limit: Keyword.fetch!(validated, :linemitre),
+      arrow: Keyword.get(validated, :arrow, :none)
     }
   end
 
   defp segment_geom(validated) do
     %Geom.Segment{
       line_end: Keyword.fetch!(validated, :lineend),
-      line_join: Keyword.fetch!(validated, :linejoin)
+      line_join: Keyword.fetch!(validated, :linejoin),
+      arrow: Keyword.get(validated, :arrow, :none)
     }
   end
 

@@ -23,7 +23,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   kinds it builds (`Giggly.Coord`, `Giggly.Facet`, `Giggly.Geom`, `Giggly.Position`, `Giggly.Stat`),
   `Giggly.Guide`, whose legend's struct `guide_legend/1` builds, `Giggly.Scale`, whose `Continuous`
   and `Discrete` structs it writes, `Giggly.ElementTree`, the theme's tree, which `theme/2` builds its schema from, and
-  `Giggly.Theme`, whose `choose/2` and `merge/2` it calls, and exports nothing beyond `Plot`.
+  `Giggly.Theme`, whose `choose/2` and `merge/2` it calls and whose `points/1` works out an
+  arrowhead's length, and exports nothing beyond `Plot`.
   **`GigglyCredo.Check.PlotRunsNothing` keeps those families' roots, the protocols that compute and
   draw, every `Giggly.Guide` module holding no struct, which draw, and `Giggly.Scale`'s root, which
   trains and maps, out of its files** — no call, no module passed as a value, no `import` — which
@@ -315,7 +316,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`,
   `0.5`), a segment taking no `linemitre:`, as ggplot2's does not, and so is a ribbon's and an
   area's `outline_type:` (`:both` and `:upper`) and
-  `orientation:` (`:none`, the range's, and `:x`).
+  `orientation:` (`:none`, the range's, and `:x`). **So is `arrow:`, an arrowhead on a layer's
+  lines, an option of the line layer functions (`geom_segment/3`, `geom_path/3`, `geom_line/3`,
+  `geom_freqpoly/3`) and their annotations, never a value of its own** (design-log §4, the entry
+  beginning "An arrowhead is an option of a line"): `true` for grid's defaults or a keyword list
+  of `angle:` (30), `length:` (`{0.25, :in}`, in `:pt`, `:cm`, `:mm` or `:in`, any amount),
+  `ends:` (`:last`, `:first`, `:both`), `type:` (`:open`, `:closed`) and `fill:`, ggplot2's
+  `arrow.fill` held inside it, a colour, `:none`, or `:color`, the line's own and the default,
+  each given once (`validate_arrow/1`); recorded as a map, its angle a float, its length in points
+  and its fill resolved, `:none` when not given.
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
   `nrow:`, `ncol:` and `scales:`; `facet_grid/2`'s `rows:`, `cols:` and `scales:`; the bar
   functions' `position:`, `fill:`, `width:` and `just:`,

@@ -63,6 +63,20 @@ defprotocol Giggly.Geom do
   """
   @type element :: %{required(atom()) => term()}
 
+  @typedoc """
+  An arrowhead a layer puts on each of its lines, as its `arrow:` option gives one: the angle of
+  each arm from the line, in degrees, each arm's length, in points, which ends get one, whether it
+  is the arms alone or a triangle, and a triangle's fill, a colour, `:none`, or `:color`, the
+  line's own.
+  """
+  @type arrow :: %{
+          angle: float(),
+          length: float(),
+          ends: :first | :last | :both,
+          type: :open | :closed,
+          fill: String.t() | :none | :color
+        }
+
   # The aesthetics `geom` draws with, each with the value it takes where the layer neither maps nor
   # sets it, worked out from `element`, the layers' defaults the plot's complete theme gives:
   # ggplot2's `default_aes`, its `from_theme()` values read from the theme's `element_geom()`, in

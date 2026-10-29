@@ -19,8 +19,9 @@ theme puts them".
 ## Rules
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
-  rendering builds and a backend reads (`Cell`, `Circles`, `Gradient`, `Polygons`, `Polylines`,
-  `Rect`, `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a theme.
+  rendering builds and a backend reads (`Arrow`, `Cell`, `Circles`, `Gradient`, `Polygons`,
+  `Polylines`, `Rect`, `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a
+  theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
   what the fixed sizes leave of the drawing, which a panel takes (grid's `"null"` unit): the
@@ -78,9 +79,12 @@ theme puts them".
   placed `Rectangles` and `Polygons` say how their ends (`:butt`, `:round`, `:square`) and corners
   (`:round`, `:mitre`, `:bevel`) are drawn and their mitre limit; the guides' lines are
   the theme's, `theme_gray()`'s butt and round, a bar's border `GeomRect`'s and a box's
-  `GeomCrossbar`'s, butt and mitred, and a point's lines grid's own, round. **Each also carries its
-  `dashes`**, the lengths of its dashes and gaps in turn, in points, or `:none` for a solid line,
-  one for the primitive as its `stroke_width` is: worked out by the geom or the theme, so the
+  `GeomCrossbar`'s, butt and mitred, and a point's lines grid's own, round. **`Polylines` and
+  `Segments` carry each line's arrowhead (`arrows`, an `Arrow` or `:none` per line, or `:none` for
+  none at all)**, as grid's `arrow` belongs to a line: its angle, its length in points, its ends,
+  open or closed, and its fill and fill opacity; its shape is the backend's to work out. **Each
+  also carries its `dashes`**, the lengths of its dashes and gaps in turn, in points, or `:none`
+  for a solid line, one for the primitive as its `stroke_width` is: worked out by the geom or the theme, so the
   backend measures nothing.
 - **A cell spans a range of rows and a range of columns, counting from 1, and cells are drawn in
   the order listed.** Most span one of each; the plot's background spans the whole table (gtable's

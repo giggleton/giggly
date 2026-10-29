@@ -27,7 +27,18 @@ defmodule Giggly.Scene do
   # backend reads.
   use Boundary,
     deps: [],
-    exports: [Cell, Circles, Gradient, Polygons, Polylines, Rect, Rectangles, Segments, Text]
+    exports: [
+      Arrow,
+      Cell,
+      Circles,
+      Gradient,
+      Polygons,
+      Polylines,
+      Rect,
+      Rectangles,
+      Segments,
+      Text
+    ]
 
   alias Giggly.Scene.Cell
 

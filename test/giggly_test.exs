@@ -9866,6 +9866,107 @@ defmodule GigglyTest do
       assert golden?(plot, "segment_annotate")
     end
 
+    # Golden: test/golden/segment_arrow.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/segment_arrow.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Each head a polygon right after its line, in its
+    # stroke at its alpha, filled white at that alpha, and the keys the arrow too, grown to its
+    # room. It moves with how a head is drawn and with a path's key.
+    test "closed heads at both ends of each segment, filled, and drawn in the keys" do
+      plot =
+        %{"x" => [1, 2], "y" => [1, 3], "xend" => [2, 3], "yend" => [2, 1], "g" => ~w(a b)}
+        |> Plot.new(%{x: :x, y: :y, xend: :xend, yend: :yend, color: :g})
+        |> Plot.geom_segment(
+          alpha: 0.5,
+          arrow: [angle: 15, length: {0.5, :cm}, ends: :both, type: :closed, fill: "white"]
+        )
+
+      assert golden?(plot, "segment_arrow")
+    end
+
+    # Golden: test/golden/segment_arrow_style.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/segment_arrow_style.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. A head takes its line's dashes, width,
+    # ends and corners, and a closed one with no fill is unfilled.
+    test "a head is drawn in its line's whole style" do
+      plot =
+        %{"x" => [1, 2], "y" => [1, 3], "xend" => [2, 3], "yend" => [2, 1]}
+        |> Plot.new(%{x: :x, y: :y, xend: :xend, yend: :yend})
+        |> Plot.geom_segment(linetype: :dashed, linewidth: 2, arrow: [ends: :first])
+        |> Plot.geom_segment(%{y: {&Kernel.+/2, [:y, 1]}, yend: {&Kernel.+/2, [:yend, 1]}},
+          linejoin: :mitre,
+          lineend: :round,
+          arrow: [type: :closed, fill: :none]
+        )
+
+      assert golden?(plot, "segment_arrow_style")
+    end
+
+    # Golden: test/golden/segment_arrow_radial.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/segment_arrow_radial.R: every element matches, in order, and every
+    # clip path but svglite's around the whole drawing. Each head at the end of its munched line,
+    # filled with the line's colour, not the white asked for, as ggplot2's `GeomSegment` hands
+    # `GeomPath` its arrow without its fill.
+    test "segments in radial coordinates carry their heads but not their fill" do
+      plot =
+        %{"x" => [1, 2], "y" => [1, 3], "xend" => [2, 3], "yend" => [2, 1]}
+        |> Plot.new(%{x: :x, y: :y, xend: :xend, yend: :yend})
+        |> Plot.geom_segment(arrow: [type: :closed, fill: "white"])
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "segment_arrow_radial")
+    end
+
+    # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/path_arrow.R: every element and clip path matches, the x axis drawn before the
+    # y as in test/golden/point.svg. Each group's heads at its own ends, in its colour.
+    test "each path has its heads at its own ends" do
+      plot =
+        %{"x" => [1, 2, 3, 1, 2, 3], "y" => [1, 2, 1, 2, 3, 2], "g" => ~w(a a a b b b)}
+        |> Plot.new(%{x: :x, y: :y, color: :g})
+        |> Plot.geom_path(arrow: [type: :closed, ends: :both])
+
+      assert golden?(plot, "path_arrow")
+    end
+
+    # Golden: test/golden/path_arrow_varying.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/path_arrow_varying.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. A line drawn as segments has heads at
+    # its own ends, and every other head of no length, as ggplot2 repairs a segment's arrow.
+    test "a path whose look varies has heads only at its own ends" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 2, 3, 4], "c" => ~w(a a b b)}
+        |> Plot.new(%{x: :x, y: :y, color: :c, group: 1})
+        |> Plot.geom_path(arrow: [ends: :both])
+
+      assert golden?(plot, "path_arrow_varying")
+    end
+
+    # Golden: test/golden/path_arrow_missing.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/path_arrow_missing.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. A broken line's heads are at its own
+    # first and last points, here lone pieces, so none is drawn.
+    test "a path broken at both ends by missing positions draws no head" do
+      plot =
+        %{"x" => Enum.to_list(1..7), "y" => [1, nil, 2, 3, 2, nil, 1]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_path(arrow: [ends: :both])
+
+      assert golden?(plot, "path_arrow_missing")
+    end
+
+    # Golden: test/golden/line_arrow.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/line_arrow.R: every element and clip path matches, the x axis drawn before the
+    # y as in test/golden/point.svg. ggplot2's geom_path() reference example of closed heads at
+    # both ends of a line.
+    test "a line of economics' population with closed heads at both ends" do
+      plot =
+        Giggly.Datasets.economics()
+        |> Plot.new(%{x: :date, y: :pop})
+        |> Plot.geom_line(arrow: [angle: 15, ends: :both, type: :closed])
+
+      assert golden?(plot, "line_arrow")
+    end
+
     # Golden: test/golden/area.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/area.R: every element and clip path matches, the x axis drawn before the y as in
     # test/golden/point.svg. geom_area()'s default look over one group. It moves with a ribbon's
