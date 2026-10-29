@@ -260,8 +260,8 @@ defmodule Scales.BreaksTest do
 
   # R returns before padding, so a zero-wide range is never padded.
   test "limits that are one number give it half a size either side, padded or not" do
-    assert Breaks.fullseq({5, 5}, 2) === [4.0, 6.0]
-    assert Breaks.fullseq({5, 5}, 2, pad: true) === [4.0, 6.0]
+    assert Breaks.fullseq({5, 5}, 4) === [3.0, 7.0]
+    assert Breaks.fullseq({5, 5}, 4, pad: true) === [3.0, 7.0]
   end
 
   test "an offset moves every break of a width, back for a negative one" do
@@ -283,6 +283,7 @@ defmodule Scales.BreaksTest do
   test "a width's offset between numbers is a number, and a step is refused" do
     error = assert_raise ArgumentError, fn -> Breaks.width({1.0, 7.0}, 1, offset: [day: 1]) end
     assert error.message =~ "expected a number as the offset of breaks between numbers"
+    assert error.message =~ "got: [day: 1]"
   end
 
   test "a month offset carries a day past the month's end into the next, unsorted as R leaves it" do
@@ -309,6 +310,16 @@ defmodule Scales.BreaksTest do
              [~D[2026-02-06], ~D[2026-02-20], ~D[2026-03-03], ~D[2026-03-17], ~D[2026-04-03]]
   end
 
+  test "a width with no offset is its sequence, the limits in either order" do
+    assert Breaks.width({~D[2026-04-20], ~D[2026-01-10]}, month: 1) == [
+             ~D[2026-01-01],
+             ~D[2026-02-01],
+             ~D[2026-03-01],
+             ~D[2026-04-01],
+             ~D[2026-05-01]
+           ]
+  end
+
   test "dates the same day give the step's unit either side of it" do
     assert Breaks.fullseq({~D[2026-03-04], ~D[2026-03-04]}, month: 1) ==
              [~D[2026-03-01], ~D[2026-04-01]]
@@ -326,6 +337,19 @@ defmodule Scales.BreaksTest do
              ~N[2026-03-03 11:45:00],
              ~N[2026-03-03 12:00:00],
              ~N[2026-03-03 12:15:00]
+           ]
+  end
+
+  test "naive date-times move a week and a second by elapsed time" do
+    assert Breaks.width(
+             {~N[2026-01-31 10:00:00], ~N[2026-02-02 10:00:00]},
+             [day: 1],
+             offset: [week: 1, second: 1]
+           ) == [
+             ~N[2026-02-07 00:00:01],
+             ~N[2026-02-08 00:00:01],
+             ~N[2026-02-09 00:00:01],
+             ~N[2026-02-10 00:00:01]
            ]
   end
 
@@ -392,6 +416,23 @@ defmodule Scales.BreaksTest do
   end
 
   # R rounds the high limit up by adding a step and rounding to the nearest, so 10:40 reaches 11:00.
+  test "a year offset in a zone carries 29 February into 1 March on its clock" do
+    breaks =
+      Breaks.width(
+        {new_york(~N[2028-02-28 10:00:00]), new_york(~N[2028-03-01 10:00:00])},
+        [day: 1],
+        offset: [year: 1],
+        time_zone_database: Tz.TimeZoneDatabase
+      )
+
+    assert walls(breaks) == [
+             {~N[2029-02-28 00:00:00], "EST"},
+             {~N[2029-03-01 00:00:00], "EST"},
+             {~N[2029-03-01 00:00:00], "EST"},
+             {~N[2029-03-02 00:00:00], "EST"}
+           ]
+  end
+
   test "date-times in UTC need no database and stay date-times" do
     assert Breaks.fullseq({~U[2026-01-31 10:07:00Z], ~U[2026-01-31 10:40:00Z]}, minute: 15) == [
              ~U[2026-01-31 10:00:00Z],
@@ -411,6 +452,7 @@ defmodule Scales.BreaksTest do
       end
 
     assert error.message =~ "need a time zone database that knows it"
+    assert error.message =~ ~s("America/New_York")
   end
 
   # R's hms gives 4200 to 15000 seconds; a time of day wraps where R's runs on past 24 hours.
@@ -429,28 +471,53 @@ defmodule Scales.BreaksTest do
              [~T[23:00:00], ~T[23:30:00], ~T[00:00:00]]
   end
 
+  # R's hms gives 7230 to 18030 seconds.
+  test "times of day move an hour and seconds" do
+    assert Breaks.width({~T[01:12:00], ~T[03:42:00]}, [minute: 30], offset: [hour: 1, second: 30]) ==
+             [
+               ~T[02:00:30],
+               ~T[02:30:30],
+               ~T[03:00:30],
+               ~T[03:30:30],
+               ~T[04:00:30],
+               ~T[04:30:30],
+               ~T[05:00:30]
+             ]
+  end
+
   test "a step of more than one unit, or a unit its values cannot take, is refused" do
-    for {limits, step} <- [
-          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 1, day: 2]},
-          {{~D[2026-01-01], ~D[2026-02-01]}, [hour: 6]},
-          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 0]},
-          {{~T[01:00:00], ~T[02:00:00]}, [day: 1]}
+    dates = "[:day, :week, :month, :year] for dates"
+
+    for {limits, step, units} <- [
+          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 1, day: 2], dates},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [hour: 6], dates},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [month: 0], dates},
+          {{~T[01:00:00], ~T[02:00:00]}, [day: 1], "[:second, :minute, :hour] for times"},
+          {{~N[2026-01-01 00:00:00], ~N[2026-01-02 00:00:00]}, [fortnight: 1],
+           "[:second, :minute, :hour, :day, :week, :month, :year] for date-times"}
         ] do
       error = assert_raise ArgumentError, fn -> Breaks.fullseq(limits, step) end
       assert error.message =~ "expected a step of one unit and a positive whole count"
+      assert error.message =~ units
       assert error.message =~ inspect(step)
     end
   end
 
   test "an offset of dates, date-times or times is a list of steps they can take" do
-    for {limits, step, offset} <- [
-          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], 8},
-          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], [hour: 1]},
-          {{~T[01:00:00], ~T[02:00:00]}, [minute: 30], [month: 1]},
-          {{~N[2026-01-01 00:00:00], ~N[2026-01-02 00:00:00]}, [day: 1], [day: 1.5]}
+    dates = "between dates as a list of steps, each a unit of [:day, :week, :month, :year]"
+
+    for {limits, step, offset, kind} <- [
+          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], 8, dates},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], [hour: 1], dates},
+          {{~D[2026-01-01], ~D[2026-02-01]}, [day: 1], [day: 1, hour: 1], dates},
+          {{~T[01:00:00], ~T[02:00:00]}, [minute: 30], [month: 1],
+           "between times as a list of steps, each a unit of [:second, :minute, :hour]"},
+          {{~N[2026-01-01 00:00:00], ~N[2026-01-02 00:00:00]}, [day: 1], [day: 1.5],
+           "between date-times as a list of steps"}
         ] do
       error = assert_raise ArgumentError, fn -> Breaks.width(limits, step, offset: offset) end
-      assert error.message =~ "as a list of steps"
+      assert error.message =~ kind
+      assert error.message =~ "got: #{inspect(offset)}"
     end
   end
 
@@ -461,5 +528,6 @@ defmodule Scales.BreaksTest do
       end
 
     assert error.message =~ "pad: widens a sequence of numbers alone"
+    assert error.message =~ "{~D[2026-01-01], ~D[2026-02-01]}"
   end
 end

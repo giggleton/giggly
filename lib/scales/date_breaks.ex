@@ -6,7 +6,8 @@ defmodule Scales.DateBreaks do
   # `scales::breaks_pretty()`, about five breaks on calendar or clock boundaries and the format
   # their labels are written in, used through `Scales.Transform`; a break every step of a width a
   # plot gives (`width/2`, `datetime_width/3`), as R's `breaks_width()` lays them; and a break moved
-  # by an offset (`offset/3`), as R's `offset_by()` moves it, for `Scales.Breaks.width/3`.
+  # by an offset (`offset/2`, `offset/3`), as R's `offset_by()` moves it, for
+  # `Scales.Breaks.width/3`.
   #
   # A date extent is in days since 1970-01-01, as R stores a date, and is worked in seconds, as R
   # turns a date into a time at midnight GMT; a date-time extent is in seconds since 1970-01-01
@@ -260,20 +261,31 @@ defmodule Scales.DateBreaks do
   # `offset_by()` moves a `POSIXct` by each of a vector of offsets, a step `seq()`'s second value
   # from it: seconds, minutes, hours, days and weeks by elapsed time; months and years on its
   # wall-clock time, a day past the month's end carried into the next, as R normalises one (31
-  # January and a month is 3 March), and read again on the clock (`instant/2`), a time a change
-  # skips at the offset before it and one it repeats as the earlier. A `NaiveDateTime` is on UTC's
-  # clock, a `DateTime` on its zone's.
+  # January and a month is 3 March). A `NaiveDateTime` is on UTC's clock, where wall-clock and
+  # elapsed time agree; a `DateTime` (`offset/3`) is on its zone's, read by `database`, a month's
+  # wall-clock time read again there (`instant/2`), a time a change skips at the offset before it
+  # and one it repeats as the earlier.
   @doc false
-  @spec offset(NaiveDateTime.t() | DateTime.t(), keyword(integer()), clock()) ::
-          NaiveDateTime.t() | DateTime.t()
-  def offset(time, offset, clock) do
-    Enum.reduce(offset, time, fn {unit, count}, moved -> offset_by(moved, unit, count, clock) end)
+  @spec offset(NaiveDateTime.t(), keyword(integer())) :: NaiveDateTime.t()
+  def offset(%NaiveDateTime{} = time, offset) do
+    Enum.reduce(offset, time, fn {unit, count}, moved -> wall_offset(moved, unit, count) end)
   end
 
-  defp offset_by(%NaiveDateTime{} = time, unit, count, _clock) when unit in [:month, :year],
+  @doc false
+  @spec offset(DateTime.t(), keyword(integer()), module()) :: DateTime.t()
+  def offset(%DateTime{time_zone: zone} = time, offset, database) do
+    Enum.reduce(offset, time, fn {unit, count}, moved ->
+      zoned_offset(moved, unit, count, {zone, database})
+    end)
+  end
+
+  defp wall_offset(time, unit, count) when unit in [:month, :year],
     do: months_on(time, months(unit, count))
 
-  defp offset_by(%DateTime{} = time, unit, count, clock) when unit in [:month, :year] do
+  defp wall_offset(time, unit, count),
+    do: NaiveDateTime.add(time, count * Map.fetch!(@unit_seconds, unit), :second)
+
+  defp zoned_offset(time, unit, count, clock) when unit in [:month, :year] do
     time
     |> DateTime.to_naive()
     |> months_on(months(unit, count))
@@ -281,10 +293,7 @@ defmodule Scales.DateBreaks do
     |> on_clock(clock)
   end
 
-  defp offset_by(%NaiveDateTime{} = time, unit, count, _clock),
-    do: NaiveDateTime.add(time, count * Map.fetch!(@unit_seconds, unit), :second)
-
-  defp offset_by(%DateTime{} = time, unit, count, {_zone, database}),
+  defp zoned_offset(time, unit, count, {_zone, database}),
     do: DateTime.add(time, count * Map.fetch!(@unit_seconds, unit), :second, database)
 
   defp months(:month, count), do: count

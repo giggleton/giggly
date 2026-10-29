@@ -370,7 +370,7 @@ defmodule Scales.Breaks do
   defp moved(%Date{} = date, offset, :date) do
     date
     |> NaiveDateTime.new!(~T[00:00:00])
-    |> DateBreaks.offset(offset, :utc)
+    |> DateBreaks.offset(offset)
     |> NaiveDateTime.to_date()
   end
 
@@ -382,10 +382,10 @@ defmodule Scales.Breaks do
   end
 
   defp moved(datetime, offset, {:datetime, :naive, _database}),
-    do: DateBreaks.offset(datetime, offset, :utc)
+    do: DateBreaks.offset(datetime, offset)
 
-  defp moved(datetime, offset, {:datetime, zone, database}),
-    do: DateBreaks.offset(datetime, offset, {zone, database})
+  defp moved(datetime, offset, {:datetime, _zone, database}),
+    do: DateBreaks.offset(datetime, offset, database)
 
   # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the
   # opening comment describes.
