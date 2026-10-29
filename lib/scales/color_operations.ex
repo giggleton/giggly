@@ -3,11 +3,14 @@ defmodule Scales.ColorOperations do
   Colours as a user writes them and as R's palettes make them: a colour read as CSS reads one
   (`parse/1`); one made from a hue, chroma and luminance (`from_hcl/3`) or from CIE L*a*b*
   (`from_lab/2`), and a colour's L*a*b* (`to_lab/1`) and alpha (`opacity/1`), each exactly as R's
-  farver makes it; two mixed (`mix/3`), R's `col_mix()`; and the viridis palettes' colours
-  (`viridis/2`), R's `viridisLite::viridis()`.
+  farver makes it; two mixed (`mix/3`), R's `col_mix()`; one changed, R's colour helpers: its
+  alpha set (`alpha/2`), its hue, chroma or luminance set (`with_hcl/2`, `muted/2`), made
+  lighter, darker or more saturated (`lighter/2`, `darker/2`, `saturate/2`) or its hue turned
+  (`shift/2`); and the viridis palettes' colours (`viridis/2`), R's `viridisLite::viridis()`.
 
   A colour is uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of its own, an alpha of `FF`
-  dropped as opaque, so a colour has one spelling; or `:none`, R's `NA`, no colour.
+  dropped as opaque, so a colour has one spelling; or `:none`, R's `NA`, no colour. A helper
+  takes one colour, as `mix/3` takes two, and gives no colour back for none, as R gives `NA`.
   """
 
   # Colour operations: reading a colour as a user writes one, and the conversions R's palettes make
@@ -46,6 +49,29 @@ defmodule Scales.ColorOperations do
   # them, bytes, and its alpha, its byte over 255, each a share of the way from the one to the
   # other, `from * (1 - amount) + to * amount`; then each channel, and the alpha times 255, rounded
   # to a byte as farver writes one, a half to the even byte, the alpha dropped when it is opaque.
+  #
+  # The helpers are R's `alpha()`, `col2hcl()` (`with_hcl/2`), `muted()`, `col_lighter()`,
+  # `col_darker()`, `col_saturate()` and `col_shift()`, one colour a call; each matched R on every
+  # colour of a grid of 10,336 colours, a cube, the greys and random colours with and without an
+  # alpha, and of tens of thousands of random arguments, but where said below. A colour's hue,
+  # chroma and luminance are farver's decoding, its XYZ to Luv in polar form, black's hue 180
+  # degrees as farver's arithmetic gives it; set, or turned modulo 360 as R's `%%` turns it, and
+  # encoded by `from_hcl/3`, which takes each into farver's bounds first as farver caps them. R's
+  # `col2hcl()`, so `muted()`, encodes no alpha unless one is given, and `with_hcl/2` drops the
+  # colour's own as R does; `col_shift()` and the HSL helpers keep it. An alpha is written as
+  # `mix/3` writes it, its byte clamped, so an alpha outside 0 to 1 is the nearer end, as R's is.
+  # farver checks whether an alpha is opaque after scaling it by 255, so R writes one colour whose
+  # alpha's byte is 1 opaque and several `01`; the byte is written here, R's answer for several.
+  #
+  # `lighter/2`, `darker/2` and `saturate/2` add to the colour's HSL lightness or saturation, on
+  # farver's scale of 0 to 100, taken into 0 to 100, as farver's `add_to_channel()` does. The HSL
+  # is the library's (`Color.HSL`), taken onto farver's scales, degrees and percents, and back.
+  # farver works the hue out as `60 * h' mod 360` and the saturation as `C / (1 - |2L - 1|)`, the
+  # library as fractions of a turn and `C / (2 - max - min)`, which agree to the last bit or so; a
+  # channel landing exactly between two bytes is then rounded the other way, one to three channels
+  # a byte from R's in 65 to 116 of 10,395 calls at the default amount of 10, whose steps of
+  # 25.5 bytes make such ties common, and in about one of a thousand at random amounts (Steve,
+  # 2026-10-28, the library over the textbook formula written out here).
   #
   # `viridis/2` is R's `viridisLite::viridis(n, alpha, begin, end, direction, option)`: `count`
   # places spaced from `begin` to `end` by R's `seq()`, the two swapped for a `direction` of -1;
@@ -173,6 +199,41 @@ defmodule Scales.ColorOperations do
   # A CSS colour name: ASCII letters alone.
   @name_letters ~r/\A[a-z]+\z/
 
+  # The amount R's `col_lighter()`, `col_darker()`, `col_saturate()` and `col_shift()` take by
+  # default.
+  @default_amount 10
+
+  # The options of `with_hcl/2`, R's `col2hcl()`'s `h`, `c`, `l` and `alpha`, and `muted/2`'s,
+  # R's `muted()`'s `l` and `c` and their defaults. They are checked by NimbleOptions, which the
+  # `Scales` boundary lists.
+  @hcl_options [
+    hue: [
+      type: {:or, [:integer, :float]},
+      doc: "The hue in degrees; one outside 0 to 360 is the nearer end."
+    ],
+    chroma: [type: {:or, [:integer, :float]}, doc: "The chroma, from 0, grey; one below 0 is 0."],
+    luminance: [
+      type: {:or, [:integer, :float]},
+      doc: "The luminance, from 0, black, to 100, white; one outside them is the nearer."
+    ]
+  ]
+
+  @with_hcl_schema @hcl_options
+                   |> Enum.concat(
+                     alpha: [
+                       type: {:or, [:integer, :float, nil]},
+                       doc:
+                         "An alpha from 0 to 1, as `alpha/2` takes it; `nil`, or none given, " <>
+                           "writes the colour opaque."
+                     ]
+                   )
+                   |> NimbleOptions.new!()
+
+  @muted_schema NimbleOptions.new!(
+                  luminance: Keyword.put(@hcl_options[:luminance], :default, 30),
+                  chroma: Keyword.put(@hcl_options[:chroma], :default, 70)
+                )
+
   @doc """
   The colour `color` names, in its one spelling, or `:error` where CSS names none: a CSS colour
   name in any case; a hex colour in one of CSS's four forms, `#RGB`, `#RGBA`, `#RRGGBB` and
@@ -217,20 +278,32 @@ defmodule Scales.ColorOperations do
 
   @doc """
   The colour, uppercase `#RRGGBB`, that R's farver encodes from `hue` in degrees, `chroma` and
-  `luminance`, CIE LCh(uv), as R's `pal_hue()` makes its colours.
+  `luminance`, CIE LCh(uv), as R's `pal_hue()` makes its colours: each first taken into farver's
+  bounds as farver caps it, a hue outside 0 to 360 and a luminance outside 0 to 100 at the nearer
+  end, a chroma below 0 at 0.
 
   ## Examples
 
       iex> Scales.ColorOperations.from_hcl(15.0, 100.0, 65.0)
       "#F8766D"
+
+      iex> Scales.ColorOperations.from_hcl(15.0, -40.0, 65.0)
+      "#9E9E9E"
   """
   @spec from_hcl(number(), number(), number()) :: String.t()
   def from_hcl(hue, chroma, luminance)
       when is_number(hue) and is_number(chroma) and is_number(luminance) do
-    {luminance, chroma, hue}
+    {bounded(luminance, 100), max(chroma, 0), bounded(hue, 360)}
     |> Lindbloom.lchuv_to_luv()
     |> Lindbloom.luv_to_xyz(@white_point)
     |> from_xyz()
+  end
+
+  # `value` taken into 0 to `top`, at the nearer end outside it, as farver caps a channel.
+  defp bounded(value, top) do
+    value
+    |> max(0)
+    |> min(top)
   end
 
   @doc """
@@ -245,14 +318,21 @@ defmodule Scales.ColorOperations do
   @spec to_lab(String.t()) :: {float(), float(), float()}
   def to_lab(<<"#", digits::binary-size(6), _alpha::binary-size(2)>>), do: to_lab("#" <> digits)
 
-  def to_lab(<<"#", digits::binary-size(6)>>) do
+  def to_lab(<<"#", _digits::binary-size(6)>> = color) do
+    color
+    |> to_xyz()
+    |> Lindbloom.xyz_to_lab(@white_point)
+  end
+
+  # A colour's XYZ on farver's scale, Y of 100 for white, as farver decodes it: each byte over 255
+  # expanded from sRGB's companding, through its matrix; an alpha is not part of it.
+  defp to_xyz(<<"#", digits::binary-size(6), _alpha::binary>>) do
     {:ok, <<red, green, blue>>} = Base.decode16(digits)
 
     [red, green, blue]
     |> Enum.map(fn channel -> Lindbloom.srgb_inverse_compand(channel / 255) * 100 end)
     |> List.to_tuple()
     |> Lindbloom.rgb_to_xyz(@from_srgb)
-    |> Lindbloom.xyz_to_lab(@white_point)
   end
 
   @doc """
@@ -320,6 +400,210 @@ defmodule Scales.ColorOperations do
     alpha = from_alpha * (1 - amount) + to_alpha * amount
     Enum.join(["#" | digits]) <> farver_alpha_digits(alpha)
   end
+
+  @doc """
+  The colour with its alpha set to `alpha`, from 0 to 1, R's `alpha()`: one below 0 is 0 and one
+  above 1 is 1, as farver writes the byte; `nil`, R's `NA`, keeps the colour's own; no colour
+  stays none. An alpha whose byte is 1 is written `01`, as R writes it for several colours, where
+  R writes one colour opaque.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.alpha("#4682B4", 0.5)
+      "#4682B480"
+
+      iex> Scales.ColorOperations.alpha("#4682B480", nil)
+      "#4682B480"
+  """
+  @spec alpha(t(), number() | nil) :: t()
+  def alpha(:none, alpha) when is_nil(alpha) or is_number(alpha), do: :none
+  def alpha(<<"#", _digits::binary>> = color, nil), do: color
+
+  def alpha(<<"#", digits::binary-size(6), _alpha::binary>>, alpha) when is_number(alpha),
+    do: "#" <> digits <> farver_alpha_digits(alpha)
+
+  @doc """
+  The colour of the same hue at another chroma and luminance, R's `muted()`: `with_hcl/2` with
+  the chroma and luminance given, its own alpha dropped, as R drops it; no colour stays none.
+
+  ## Options
+
+  #{NimbleOptions.docs(@muted_schema)}
+
+  ## Examples
+
+      iex> Scales.ColorOperations.muted("#FF0000")
+      "#832424"
+
+      iex> Scales.ColorOperations.muted("#4682B480", luminance: 60, chroma: 40)
+      "#7094BA"
+  """
+  @spec muted(t(), keyword()) :: t()
+  def muted(color, options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, @muted_schema)
+    with_hcl(color, validated)
+  end
+
+  @doc """
+  The colour with its hue, chroma or luminance set, R's `col2hcl()`: the colour's own, as farver
+  decodes it, where an option is not given; each taken into farver's bounds as `from_hcl/3`
+  says. The colour's own alpha is dropped, as R drops it, unless `alpha:` sets one, from 0 to 1,
+  as `alpha/2` does; no colour stays none.
+
+  Black's hue is 180 degrees, as farver decodes it.
+
+  ## Options
+
+  #{NimbleOptions.docs(@with_hcl_schema)}
+
+  ## Examples
+
+      iex> Scales.ColorOperations.with_hcl("#4682B4", hue: 320)
+      "#B162A0"
+
+      iex> Scales.ColorOperations.with_hcl("#4682B480", [])
+      "#4682B4"
+
+      iex> Scales.ColorOperations.with_hcl("#4682B4", luminance: 120)
+      "#D4FFFF"
+  """
+  @spec with_hcl(t(), keyword()) :: t()
+  def with_hcl(color, options) when is_list(options) do
+    validated = NimbleOptions.validate!(options, @with_hcl_schema)
+    hcl_set(color, validated)
+  end
+
+  defp hcl_set(:none, _options), do: :none
+
+  defp hcl_set(<<"#", _digits::binary>> = color, options) do
+    {hue, chroma, luminance} = to_hcl(color)
+
+    set =
+      from_hcl(
+        Keyword.get(options, :hue, hue),
+        Keyword.get(options, :chroma, chroma),
+        Keyword.get(options, :luminance, luminance)
+      )
+
+    case Keyword.get(options, :alpha) do
+      nil -> set
+      alpha -> set <> farver_alpha_digits(alpha)
+    end
+  end
+
+  @doc """
+  The colour `amount` lighter, R's `col_lighter()`: its HSL lightness, from 0 to 100, raised by
+  `amount` and taken into 0 to 100, its alpha kept; no colour stays none. The library's HSL,
+  which R's farver works out in another order, lands a byte away from R's where a channel falls
+  exactly between two, as the module's opening comment says.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.lighter("#4682B4")
+      "#699BC4"
+
+      iex> Scales.ColorOperations.lighter("#4682B480", 200)
+      "#FFFFFF80"
+  """
+  @spec lighter(t(), number()) :: t()
+  def lighter(color, amount \\ @default_amount) when is_number(amount),
+    do: added_to_hsl(color, :l, amount)
+
+  @doc """
+  The colour `amount` darker, R's `col_darker()`: `lighter/2` by minus `amount`.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.darker("#4682B4")
+      "#38678F"
+  """
+  @spec darker(t(), number()) :: t()
+  def darker(color, amount \\ @default_amount) when is_number(amount),
+    do: added_to_hsl(color, :l, -amount)
+
+  @doc """
+  The colour `amount` more saturated, R's `col_saturate()`: its HSL saturation, from 0 to 100,
+  raised by `amount` and taken into 0 to 100, its alpha kept; no colour stays none. A byte may
+  land away from R's as `lighter/2` says.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.saturate("#4682B4")
+      "#3983C1"
+
+      iex> Scales.ColorOperations.saturate("#4682B4", -200)
+      "#7D7D7D"
+  """
+  @spec saturate(t(), number()) :: t()
+  def saturate(color, amount \\ @default_amount) when is_number(amount),
+    do: added_to_hsl(color, :s, amount)
+
+  # The colour with `amount` added to an HSL channel: the library's HSL taken onto farver's scales,
+  # the hue in degrees and the saturation and lightness 0 to 100, `amount` added to the one, and
+  # back, which lands on R's byte at more ties than the library's fractions alone; each channel a
+  # byte as farver writes one, the colour's own alpha kept.
+  defp added_to_hsl(:none, _channel, _amount), do: :none
+
+  defp added_to_hsl(<<"#", _digits::binary>> = color, channel, amount) do
+    {[red, green, blue], _alpha} = channels(color)
+    {:ok, hsl} = Color.HSL.from_srgb(%Color.SRGB{r: red / 255, g: green / 255, b: blue / 255})
+    farver = %{h: hsl.h * 360, s: hsl.s * 100, l: hsl.l * 100}
+    added = Map.update!(farver, channel, fn value -> bounded(value + amount, 100) end)
+    back = %Color.HSL{h: added.h / 360, s: added.s / 100, l: added.l / 100}
+    {:ok, srgb} = Color.HSL.to_srgb(back)
+
+    [srgb.r, srgb.g, srgb.b]
+    |> Enum.map_join(fn intensity -> hex_pair(rounded_byte(intensity * 255)) end)
+    |> then(fn digits -> "#" <> digits <> own_alpha_digits(color) end)
+  end
+
+  @doc """
+  The colour with its hue turned `amount` degrees round the circle, R's `col_shift()`: its hue,
+  as farver decodes it, plus `amount`, taken modulo 360 as R's `%%` takes it, its chroma,
+  luminance and alpha kept; `nil`, R's `NA`, gives none, and no colour stays none.
+
+  ## Examples
+
+      iex> Scales.ColorOperations.shift("#4682B4")
+      "#5E7DB7"
+
+      iex> Scales.ColorOperations.shift("#4682B4", -30)
+      "#008CA2"
+  """
+  @spec shift(t(), number() | nil) :: t()
+  def shift(color, amount \\ @default_amount)
+  def shift(:none, amount) when is_nil(amount) or is_number(amount), do: :none
+  def shift(<<"#", _digits::binary>>, nil), do: :none
+
+  def shift(<<"#", _digits::binary>> = color, amount) when is_number(amount) do
+    {hue, chroma, luminance} = to_hcl(color)
+    shifted = modulo(hue + amount, 360)
+    from_hcl(shifted, chroma, luminance) <> own_alpha_digits(color)
+  end
+
+  # A colour's hue in degrees, chroma and luminance, CIE LCh(uv), as farver decodes them: its XYZ
+  # to Luv against farver's white point, in polar form. farver takes black's chromaticity as 0
+  # less the white's, times its luminance of 0, so its u and v are negative zeros and its hue
+  # their angle, 180 degrees; the library's Luv of black is positive zeros, at 0 degrees.
+  defp to_hcl(<<"#000000", _alpha::binary>>), do: {180.0, 0.0, 0.0}
+
+  defp to_hcl(color) do
+    {luminance, chroma, hue} =
+      color
+      |> to_xyz()
+      |> Lindbloom.xyz_to_luv(@white_point)
+      |> Lindbloom.luv_to_lchuv()
+
+    {hue, chroma, luminance}
+  end
+
+  # `value` modulo `divisor`, its sign the divisor's, as R's `%%` takes it, as `Scales.Palette`
+  # takes it too, which this module cannot call.
+  defp modulo(value, divisor), do: value - Float.floor(value / divisor) * divisor
+
+  # A colour's own alpha digits, none when it has none.
+  defp own_alpha_digits(<<"#", _digits::binary-size(6)>>), do: ""
+  defp own_alpha_digits(<<"#", _digits::binary-size(6), alpha::binary-size(2)>>), do: alpha
 
   # The digits an alpha from 0 to 1 adds to a colour as farver writes it, its byte times 255
   # rounded half to even, none when it is opaque.

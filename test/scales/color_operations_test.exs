@@ -95,6 +95,16 @@ defmodule Scales.ColorOperationsTest do
       assert ColorOperations.from_hcl(0, 0, 0) === "#000000"
       assert ColorOperations.from_hcl(0, 0, 100) === "#FFFFFF"
     end
+
+    # A hue past 360 is capped, not turned round: 400 is 360's colour, not 40's, and -40 is 0's,
+    # not 320's.
+    test "each is taken into farver's bounds first, a hue and a luminance at the nearer end" do
+      assert Enum.map([400, 360, -40, 0], fn hue -> ColorOperations.from_hcl(hue, 100, 65) end) ===
+               ["#FF6C91", "#FF6C91", "#FF6C91", "#FF6C91"]
+
+      assert {ColorOperations.from_hcl(15, -40, 65), ColorOperations.from_hcl(15, 100, 120),
+              ColorOperations.from_hcl(15, 100, -5)} === {"#9E9E9E", "#FFD9D0", "#000000"}
+    end
   end
 
   # Golden: farver 2.1.2's `decode_colour(to = "lab")` in R 4.6.1, printed to 17 digits, and the
@@ -198,6 +208,248 @@ defmodule Scales.ColorOperationsTest do
     test "an amount outside 0 to 1 is refused" do
       assert_raise FunctionClauseError, fn -> ColorOperations.mix("#000000", "#FFFFFF", 1.5) end
       assert_raise FunctionClauseError, fn -> ColorOperations.mix("#000000", "#FFFFFF", -0.1) end
+    end
+  end
+
+  # Golden for the helpers: scales 1.4.0's `alpha()`, `col2hcl()`, `muted()`, `col_lighter()`,
+  # `col_darker()`, `col_saturate()` and `col_shift()` in R 4.6.1, through farver 2.1.2, an opaque
+  # alpha's FF dropped. Each matched R on every colour of a grid of 10,336, a cube, the greys and
+  # random colours with and without an alpha, and of tens of thousands of random arguments, but
+  # where a test below says. They move only with farver's constants and rounding or the library's
+  # conversions.
+  describe "alpha/2" do
+    test "the colour's alpha is set, its own replaced, an opaque one dropped" do
+      assert Enum.map(
+               [{"#4682B4", 0.5}, {"#4682B480", 0.25}, {"#4682B4", 0}, {"#4682B480", 1}],
+               fn
+                 {color, alpha} -> ColorOperations.alpha(color, alpha)
+               end
+             ) === ["#4682B480", "#4682B440", "#4682B400", "#4682B4"]
+    end
+
+    test "an alpha half way between two bytes rounds to the even one, as farver's" do
+      assert Enum.map([0.5, 1.5, 2.5], fn half -> ColorOperations.alpha("#4682B4", half / 255) end) ===
+               ["#4682B400", "#4682B402", "#4682B402"]
+    end
+
+    test "an alpha outside 0 to 1 is the nearer end, as farver clamps its byte" do
+      assert {ColorOperations.alpha("#4682B4", 1.5), ColorOperations.alpha("#4682B480", -0.5)} ===
+               {"#4682B4", "#4682B400"}
+    end
+
+    # R writes one colour whose alpha's byte is 1 opaque, `alpha("#4682B4", 1/255)`, since farver
+    # checks for opaque after scaling it; `01` is its answer for several colours.
+    test "an alpha whose byte is 1 is written, as R writes it for several colours" do
+      assert ColorOperations.alpha("#4682B4", 1 / 255) === "#4682B401"
+    end
+
+    test "no alpha, R's NA, keeps the colour's own, and no colour stays none" do
+      assert {ColorOperations.alpha("#4682B480", nil), ColorOperations.alpha("#4682B4", nil)} ===
+               {"#4682B480", "#4682B4"}
+
+      assert {ColorOperations.alpha(:none, 0.5), ColorOperations.alpha(:none, nil)} ===
+               {:none, :none}
+    end
+
+    # Each refused value is built as the test runs: a literal the guard refuses fails the type
+    # checker.
+    test "an alpha that is not a number, or a colour not in its one spelling, is refused" do
+      [text, name] = Enum.take(["0.5", "red"], 2)
+
+      assert_raise FunctionClauseError, fn -> ColorOperations.alpha("#4682B4", text) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.alpha(name, 0.5) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.alpha(:none, text) end
+    end
+  end
+
+  describe "with_hcl/2 and muted/2" do
+    test "each of hue, chroma and luminance given is set, the others the colour's own" do
+      assert Enum.map([[hue: 320], [chroma: 20], [luminance: 70]], fn options ->
+               ColorOperations.with_hcl("#4682B4", options)
+             end) === ["#B162A0", "#6F7F92", "#7CB0E2"]
+    end
+
+    test "the colour's own alpha is dropped unless one is given, nil writing none" do
+      assert ColorOperations.with_hcl("#4682B480", []) === "#4682B4"
+      assert ColorOperations.with_hcl("#4682B480", alpha: nil) === "#4682B4"
+
+      assert ColorOperations.with_hcl("#4682B480",
+               hue: 100,
+               chroma: 30,
+               luminance: 40,
+               alpha: 0.5
+             ) ===
+               "#57633480"
+
+      assert ColorOperations.with_hcl("#4682B4", alpha: 1.5) === "#4682B4"
+    end
+
+    test "a hue, chroma or luminance outside farver's bounds is taken as from_hcl/3 takes it" do
+      assert Enum.map(
+               [
+                 [hue: 400],
+                 [hue: -40],
+                 [hue: 0],
+                 [chroma: -30],
+                 [luminance: 120],
+                 [luminance: -10]
+               ],
+               fn options -> ColorOperations.with_hcl("#4682B4", options) end
+             ) === ["#B76476", "#B76476", "#B76476", "#7D7D7D", "#D4FFFF", "#000000"]
+    end
+
+    # farver decodes black's hue as 180 degrees, so a chroma given it is teal; at 0 degrees it is
+    # crimson. White's chroma is a rounding error, its hue 21.8 degrees.
+    test "black's hue is 180 degrees and white's farver's rounding error, as farver decodes them" do
+      assert ColorOperations.with_hcl("#000000", chroma: 70, luminance: 30) === "#005F4F"
+      assert ColorOperations.with_hcl("#000000", hue: 0, chroma: 70, luminance: 30) === "#88193D"
+      assert ColorOperations.muted("#FFFFFF") === "#7F2B00"
+      assert ColorOperations.muted("#FFFFFF00") === "#7F2B00"
+    end
+
+    test "muted is luminance 30 and chroma 70 by default, the colour's alpha dropped" do
+      assert Enum.map(["#4682B4", "#FF0000", "#4682B480"], &ColorOperations.muted/1) ===
+               ["#004F91", "#832424", "#004F91"]
+
+      assert ColorOperations.muted("#4682B4", luminance: 60, chroma: 40) === "#7094BA"
+    end
+
+    test "no colour stays none" do
+      assert {ColorOperations.with_hcl(:none, hue: 10), ColorOperations.muted(:none)} ===
+               {:none, :none}
+    end
+
+    test "an option that is not a number, or not one of theirs, is refused" do
+      assert_raise NimbleOptions.ValidationError, fn ->
+        ColorOperations.with_hcl("#4682B4", hue: "10")
+      end
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        ColorOperations.with_hcl(:none, alpha: "0.5")
+      end
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        ColorOperations.muted("#4682B4", hue: 10)
+      end
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        ColorOperations.muted("#4682B4", luminance: :dark)
+      end
+    end
+  end
+
+  describe "lighter/2, darker/2 and saturate/2" do
+    test "the lightness or saturation is raised by 10 by default, or by the amount" do
+      assert [
+               ColorOperations.lighter("#4682B4"),
+               ColorOperations.darker("#4682B4"),
+               ColorOperations.saturate("#4682B4"),
+               ColorOperations.saturate("#4682B4", -10),
+               ColorOperations.lighter("#4682B4", -10),
+               ColorOperations.darker("#4682B4", -10)
+             ] === ["#699BC4", "#38678F", "#3983C1", "#5281A8", "#38678F", "#699BC4"]
+    end
+
+    test "a lightness or saturation past 0 or 100 is taken at the nearer end" do
+      assert {ColorOperations.lighter("#4682B4", 200), ColorOperations.darker("#4682B4", 200),
+              ColorOperations.lighter("#808080", 80), ColorOperations.saturate("#4682B4", 200),
+              ColorOperations.saturate("#4682B4", -200)} ===
+               {"#FFFFFF", "#000000", "#FFFFFF", "#0088FA", "#7D7D7D"}
+    end
+
+    test "the colour's own alpha is kept" do
+      assert {ColorOperations.lighter("#4682B480"), ColorOperations.darker("#FFFFFF00"),
+              ColorOperations.saturate("#4682B480", -10)} ===
+               {"#699BC480", "#E6E6E600", "#5281A880"}
+    end
+
+    # A grey's hue and saturation are 0, so saturating it reddens it.
+    test "a grey is saturated toward red" do
+      assert ColorOperations.saturate("#808080") === "#8D7373"
+    end
+
+    # #808080's lightness and 10 are 153.5 bytes, rounded up to the even 154; #7F7F7F's are 152.5,
+    # rounded down to 152.
+    test "a channel half way between two bytes rounds to the even one, as farver's" do
+      assert {ColorOperations.lighter("#808080"), ColorOperations.lighter("#7F7F7F"),
+              ColorOperations.lighter("#808080", 0.5)} === {"#9A9A9A", "#989898", "#818181"}
+    end
+
+    # Departure: R gives #332B00. Green is exactly 42.5 bytes, and farver's hue a bit above 50
+    # degrees rounds it up; the library's HSL lands on 42, even, as exact arithmetic does.
+    test "a channel R's HSL rounds the other way at a tie is the library's" do
+      assert ColorOperations.darker("#665500") === "#332A00"
+    end
+
+    test "no colour stays none" do
+      assert Enum.map(
+               [
+                 &ColorOperations.lighter/1,
+                 &ColorOperations.darker/1,
+                 &ColorOperations.saturate/1
+               ],
+               fn helper -> helper.(:none) end
+             ) === [:none, :none, :none]
+    end
+
+    # R's `col_lighter(x, NA)` fails in farver. Each refused value is built as the test runs: a
+    # literal the guard refuses fails the type checker.
+    test "an amount that is not a number, or a colour not in its one spelling, is refused" do
+      [missing, name] = Enum.take([nil, "red"], 2)
+
+      for helper <- [
+            &ColorOperations.lighter/2,
+            &ColorOperations.darker/2,
+            &ColorOperations.saturate/2
+          ] do
+        assert_raise FunctionClauseError, fn -> helper.("#4682B4", missing) end
+        assert_raise FunctionClauseError, fn -> helper.(:none, missing) end
+        assert_raise FunctionClauseError, fn -> helper.(name, 10) end
+      end
+    end
+  end
+
+  describe "shift/2" do
+    test "the hue is turned 10 degrees by default, or by the amount, modulo 360" do
+      assert Enum.map([10, 40, 400, -30, -300, 130, 490], fn amount ->
+               ColorOperations.shift("#4682B4", amount)
+             end) === [
+               "#5E7DB7",
+               "#906FB6",
+               "#906FB6",
+               "#008CA2",
+               "#A566AC",
+               "#B46867",
+               "#B46867"
+             ]
+
+      assert ColorOperations.shift("#4682B4") === "#5E7DB7"
+    end
+
+    # `#4682B401` shifted alone is opaque in R, its answer for several colours `01`.
+    test "the colour's own alpha is kept, a byte of 1 among them" do
+      assert {ColorOperations.shift("#4682B480"), ColorOperations.shift("#4682B401", 0)} ===
+               {"#5E7DB780", "#4682B401"}
+    end
+
+    test "black and white have no chroma to turn" do
+      assert {ColorOperations.shift("#000000", 90), ColorOperations.shift("#FFFFFF", 0)} ===
+               {"#000000", "#FFFFFF"}
+    end
+
+    test "no amount, R's NA, gives no colour, and no colour stays none" do
+      assert {ColorOperations.shift("#4682B4", nil), ColorOperations.shift(:none),
+              ColorOperations.shift(:none, nil)} === {:none, :none, :none}
+    end
+
+    # Each refused value is built as the test runs: a literal the guard refuses fails the type
+    # checker.
+    test "an amount that is not a number, or a colour not in its one spelling, is refused" do
+      [text, name] = Enum.take(["10", "red"], 2)
+
+      assert_raise FunctionClauseError, fn -> ColorOperations.shift("#4682B4", text) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.shift(:none, text) end
+      assert_raise FunctionClauseError, fn -> ColorOperations.shift(name, 10) end
     end
   end
 

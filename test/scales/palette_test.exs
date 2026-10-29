@@ -390,6 +390,19 @@ defmodule Scales.PaletteTest do
                {["#619CFF", "#00BA38", "#F8766D"], ["#CEA09E", "#8BB594", "#9FABCC"]}
     end
 
+    # farver caps a hue at 0 and 360, so a negative one is the colour of its value modulo 360 only
+    # because R takes it first: -120 is 240 degrees, not 0.
+    test "a hue below 0 is taken modulo 360 first, as R takes it" do
+      assert hues({-120.0, 240.0}, 4) === ["#00A9FF", "#FF61CC", "#CD9600", "#00BE67"]
+    end
+
+    test "a chroma below 0 and a luminance outside 0 to 100 are farver's nearer bounds" do
+      assert {hues({15.0, 375.0}, 3, luminance: 120.0), hues({15.0, 375.0}, 3, chroma: -40.0),
+              hues({15.0, 375.0}, 3, luminance: -5.0)} ===
+               {["#FFD9D0", "#7BFFA9", "#CFFDFF"], ["#9E9E9E", "#9E9E9E", "#9E9E9E"],
+                ["#000000", "#000000", "#000000"]}
+    end
+
     # R's `pal_hue()(0)` fails ("Must request at least one colour from a hue palette."), where
     # `pal_grey()(0)` gives none.
     test "no levels give no colours" do

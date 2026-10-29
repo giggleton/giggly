@@ -8,8 +8,8 @@ paths:
 # Colour operations
 
 `Scales.ColorOperations` reads a colour as a user writes one, makes the colours R's palettes make,
-mixes two as ggplot2's geoms mix their defaults, and is the one module that calls the `color`
-library. Why colours are CSS's and carried as hex
+mixes two as ggplot2's geoms mix their defaults, changes one as R's colour helpers do, and is
+the one module that calls the `color` library. Why colours are CSS's and carried as hex
 strings: design-log §4, the entry beginning "Colours are CSS's names and hex forms"; why the
 library is handed R's constants, and why the module is not called `Color`: the entry beginning
 "R's exact colours come from the `color` package"; why it nests under the umbrella: the entry
@@ -42,13 +42,28 @@ beginning "A library's owner nests".
   ones every sample of ggplot2's default gradient; below L* 8 farver's conversion from Lab keeps
   the rounded 0.008856 and 7.787 and the library the exact fractions, one colour in 35,007 of seven
   R gradients, a gradient no default reaches. Its tests pin R's colours; a conversion added for
-  another palette is checked against R the same way before it is trusted.
+  another palette is checked against R the same way before it is trusted. **`from_hcl/3` takes a
+  hue, chroma and luminance into farver's bounds first**, as farver caps them: a hue outside 0 to
+  360 and a luminance outside 0 to 100 at the nearer end, a chroma below 0 at 0.
 - **A mix of two colours is exactly scales' `col_mix()`** (`mix/3`), as ggplot2's geoms mix their
   default colours from the theme's ink and paper: farver's decoding, each channel a byte and the
   alpha its byte over 255, `from * (1 - amount) + to * amount`, then each channel and the alpha
   times 255 rounded as farver's `double2int()` rounds, a half to the even byte, and clamped. The
   `color` library's own sRGB mix is not R's (it gives `#807F80` where R gives `#808080` for half
   black, half white). It matched R on all of 3,012 random pairs and amounts, ties included.
+- **The colour helpers are exactly R's, one colour a call** (`alpha/2`, `with_hcl/2`, `muted/2`,
+  `lighter/2`, `darker/2`, `saturate/2`, `shift/2`; R's `alpha()`, `col2hcl()`, `muted()`,
+  `col_lighter()`, `col_darker()`, `col_saturate()`, `col_shift()`; design-log §4, the entry
+  beginning "A colour helper takes one colour"): `:none` gives `:none`; an alpha's byte clamped,
+  `nil` keeping the colour's own, a byte of 1 written `01`; `with_hcl/2` and `muted/2` dropping
+  the colour's alpha unless given one, the others keeping it; any number taken, capped as farver
+  caps it, `shift/2` wrapping by R's `%%`. A colour's hue, chroma and luminance are farver's
+  decoding through the library's Luv, black's hue 180 degrees, as farver's negative zeros give it.
+  They matched R on every colour of a grid of 10,336 and of tens of thousands of random arguments,
+  but **the HSL helpers' HSL is the library's** (`Color.HSL`), a byte off R's in one to three
+  channels where a channel lands exactly between two, which farver's own arithmetic rounds the
+  other way: up to 1.1% of colours at the default amount, about 0.1% at random ones. Their tests
+  pin R's colours, the departure among them.
 - **A viridis palette's colours are exactly R's `viridisLite::viridis()`** (`viridis/2`): R's own
   "fmm" splines through each palette's 256 colours in L*a*b*, their coefficients copied into
   `priv/palettes/viridis_splines.csv` as R holds them and read at compile time behind a

@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A colour helper takes one colour and gives R's answer, out-of-range arguments capped as
+  farver caps them (2026-10-28, Steve, increment 1's step 4; checked against scales 1.4.0 and
+  farver 2.1.2).** `alpha/2`, `muted/2`, `with_hcl/2`, `lighter/2`, `darker/2`, `saturate/2` and
+  `shift/2`, one colour a call as `mix/3` takes it (Steve: "A"). Each is R's, Steve "A" to each:
+  `:none` gives `:none`; an alpha of `nil` keeps the colour's own, one outside 0 to 1 is clamped;
+  `muted` and `with_hcl` drop the colour's alpha unless given one; a hue, chroma or luminance is
+  capped, the hue too, where `shift` wraps it. `from_hcl/3` caps, so the hue palette, which
+  departed beyond R's bounds, now takes each hue modulo 360 first as R does. An alpha byte of 1 is
+  `01` (Steve: "B"), R's answer for several colours; R writes one alone opaque. *Rejected: lists
+  as R's vectors*: `mix/3` and its geom callers would change to match. *Rejected: refusing what R
+  caps*: refusing is Giggly's. *Rejected: the textbook HSL formula written out* (Steve: "B"): the
+  library's `Color.HSL` is a byte off R at exact ties, about 1% of colours at the default amount.
+
 - **A gradient's values move a place as R's `approxfun()` does, its alpha blends, and
   `"transparent"` is R's white (2026-10-28, Steve, increment 1's step 3; checked against scales
   1.4.0 and farver 2.1.2).** `{:gradient, colors, values}`, R's `pal_gradient_n(colours, values)`:
@@ -2988,6 +3001,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-28 — Add R's colour helpers, one colour a call, out-of-range arguments capped as farver
+  caps them (palettes and colours, step 4); §4: "A colour helper takes one colour"
 - 2026-10-28 — Give the gradient R's values and alpha, transparent R's white, nil outside it
   (palettes and colours, step 3); §4: "A gradient's values move a place"
 - 2026-10-28 — Give palettes R's type, levels and names, each kind converted to the other

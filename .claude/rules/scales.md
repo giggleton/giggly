@@ -100,8 +100,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   is spread end to end, the hues by the same `seq()`, each colour
   `Scales.ColorOperations.from_hcl/3`, reversed for a `direction` of -1; it matched R on every
   range, chroma, luminance, direction and count sampled, and its tests pin R's colours for counts
-  whose last hue lands on 360 and past it and for ranges either side of the degree. R takes each
-  hue modulo 360 first, which changes no colour, cosine and sine repeating, so it is left out.
+  whose last hue lands on 360 and past it and for ranges either side of the degree. Each hue is
+  taken modulo 360 first, as R takes it, since `from_hcl/3` caps a hue at 0 and 360 as farver
+  does; a chroma below 0 and a luminance outside 0 to 100 are farver's nearer bounds.
 - **The grey palette is exactly R's `pal_grey()`, `grey.colors()`**: the levels spaced evenly
   once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
   byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which in R 4.6.1 steps on

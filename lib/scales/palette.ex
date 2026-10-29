@@ -414,10 +414,9 @@ defmodule Scales.Palette do
   # A hue palette's are `pal_hue()`'s: the circle's last `360 / count` degrees left off where the
   # range, taken modulo 360 as R's `%%` takes it, is less than a degree, since its end is then its
   # start; the hues spread over the range by `spread/2`; each colour made by
-  # `ColorOperations.from_hcl/3`, as `pal_hue()` has farver encode it; and the colours reversed for
-  # a direction of -1. R takes each hue modulo 360 first; a hue is turned through its cosine and
-  # sine, which repeat every 360 degrees, so the colours are the same without it, as they are for
-  # every range, chroma, luminance and count its test pins.
+  # `ColorOperations.from_hcl/3`, as `pal_hue()` has farver encode it, each hue taken modulo 360
+  # first, as R takes it, since farver caps a hue past 360 at 360; and the colours reversed for a
+  # direction of -1.
   #
   # A grey palette's are `grey.colors()`'s: the levels spaced by `spread/2` once raised to the
   # power 2.2, each brought back by `1 / 2.2` and written as R's `gray()` writes it, the byte `255 *
@@ -448,7 +447,11 @@ defmodule Scales.Palette do
 
     {low, high}
     |> spread(count)
-    |> Enum.map(fn hue -> ColorOperations.from_hcl(hue, chroma, luminance) end)
+    |> Enum.map(fn hue ->
+      hue
+      |> modulo(360)
+      |> ColorOperations.from_hcl(chroma, luminance)
+    end)
     |> directed(direction)
   end
 

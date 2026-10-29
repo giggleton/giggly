@@ -29,6 +29,8 @@ defmodule Scales do
       colour, R's `NA`.
     * A function takes a list where R takes a vector, and its options as a keyword list of R's
       arguments, spelled out, checked as it is called: a bad one raises.
+    * A colour operation takes one colour, where R takes a vector of them: a list of colours is
+      mapped through it.
     * Elixir's words stand where R's differ: `:time` is a time of day (R's `hms`), `{:datetime,
       ...}` a date-time (R's `POSIXct`), and grey is `gray`.
 
