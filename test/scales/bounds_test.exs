@@ -5,8 +5,9 @@ defmodule Scales.BoundsTest do
 
   doctest Scales.Bounds
 
-  # Golden: R 4.6.1's `scales::rescale()`, `rescale_mid()`, `rescale_max()` and `oob_censor()`
-  # (scales 1.4.0) on each case, R's figures to the last digit, `NA` and `NaN` as `nil`.
+  # Golden: R 4.6.1's `scales::rescale()`, `rescale_mid()`, `rescale_max()`, `oob_censor()` and
+  # `oob_squish()` (scales 1.4.0) on each case, R's figures to the last digit, `NA` as `nil` and
+  # `NaN` as `nil` or `:nan`, as each function says.
   describe "rescale/3" do
     test "a value moves linearly from one range to another, in R's order of operations" do
       assert Bounds.rescale([2, 4, 10, 6, 3.3], {2, 10}, {0, 1}) ===
@@ -94,6 +95,61 @@ defmodule Scales.BoundsTest do
     test "an end of nil censors nothing on its side" do
       assert {Bounds.censor([1, 10], {nil, 8}), Bounds.censor([1, 10], {2, nil})} ===
                {[1, nil], [nil, 10]}
+    end
+
+    # R's `oob_censor(c(2, 8), c(2, -Inf))` is `NA NA`; the package takes no infinite end.
+    # The end is built as the test runs: a literal the guard refuses fails the type checker.
+    test "an end that is neither a number nor nil is refused" do
+      infinity = Enum.at([:neg_infinity], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.censor([2, 8], {2, infinity}) end
+      assert_raise FunctionClauseError, fn -> Bounds.censor([2, 8], {infinity, 8}) end
+    end
+  end
+
+  describe "squish/2" do
+    # R's `oob_squish(c(1, 5, 10, NA, Inf, -Inf, NaN, 2, 8), c(2, 8))` is `2 5 8 NA Inf -Inf NaN 2
+    # 8`: only finite numbers move, a value at an end not moved, so 2.0 stays a float.
+    test "a finite number outside the range moves onto the nearer end, the rest kept" do
+      assert Bounds.squish([1, 5, 10, nil, :infinity, :neg_infinity, :nan, 2.0, 8.0], {2, 8}) ===
+               [2, 5, 8, nil, :infinity, :neg_infinity, :nan, 2.0, 8.0]
+    end
+
+    # R's `oob_squish(c(1, 5, 10, Inf), c(5, 5))` is `5 5 5 Inf`.
+    test "a range zero wide puts every finite number at it" do
+      assert Bounds.squish([1, 5, 10, :infinity], {5, 5}) === [5, 5, 5, :infinity]
+    end
+
+    # R's `oob_squish(c(1, 5, 10, NA, Inf), c(8, 2))` is `2 2 2 NA Inf`: 1 and 5 are moved up to 8
+    # first, then down to 2 with 10.
+    test "a range given high to low puts every finite number at its high end" do
+      assert Bounds.squish([1, 5, 10, nil, :infinity], {8, 2}) === [2, 2, 2, nil, :infinity]
+    end
+
+    # R's `oob_squish(c(1, 5, 10), c(NA, 8))` is `1 5 8`, and with `c(2, NA)` `2 5 10`.
+    test "an end of nil squishes nothing on its side" do
+      assert {Bounds.squish([1, 5, 10], {nil, 8}), Bounds.squish([1, 5, 10], {2, nil})} ===
+               {[1, 5, 8], [2, 5, 10]}
+    end
+
+    # R's `1 / oob_squish(c(-1, 0), c(-0, 1))` is `-Inf Inf`: -1 takes the end's sign, and 0, not
+    # below it, keeps its own.
+    test "a value moved takes the end as given, a negative zero's sign included" do
+      assert Bounds.squish([-1, 0.0], {-0.0, 1}) === [-0.0, 0.0]
+    end
+
+    # R's `is.finite()` is false on values that are not numbers, so none is moved.
+    test "values that are not numbers are kept" do
+      assert Bounds.squish(["a", :b, nil], {2, 8}) === ["a", :b, nil]
+    end
+
+    # R's `oob_squish(c(2, 8), c(2, -Inf))` is `-Inf -Inf`; the package takes no infinite end.
+    # The end is built as the test runs: a literal the guard refuses fails the type checker.
+    test "an end that is neither a number nor nil is refused" do
+      infinity = Enum.at([:neg_infinity], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.squish([2, 8], {2, infinity}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish([2, 8], {infinity, 8}) end
     end
   end
 end

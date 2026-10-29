@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A squished value is R's `oob_squish()`, finite numbers only, and an end is a number or
+  `nil` (2026-10-29, Steve, increment 1's step 6; checked against scales 1.4.0).** `squish/2`
+  takes a list and a range as `censor/2` does: a finite number below the low end is moved up to
+  it, then one above the high end down to it, in R's order, so a range given high to low puts
+  every number at its high end and a zero-wide one every number at it; a moved value takes the
+  end as given, a negative zero's sign included. `nil`, the infinities, values that are not
+  numbers and `:nan` are kept, NaN as R keeps it (Steve: "A"), and a `nil` end squishes nothing
+  on its side, as R's `NA` end does. An end that is an infinity is refused, by `censor/2` too
+  (Steve: "A"), which ignored one where R's `oob_censor(x, c(2, -Inf))` censors every number;
+  infinite ends wait for increment 4's out-of-range values. *Rejected: NaN made `nil`, as
+  `censor/2` makes it*: not R's answer, and a plot draws both as missing. *Rejected: infinite
+  ends taken now*: nothing in Giggly hands one, as `limits:` takes a number or `nil`.
+
 - **A brewer or distiller scale takes R's options and refuses at the call what R fails on or
   reads loosely (2026-10-28, Steve, increment 1's step 5; checked against ggplot2 4.0.3).** Each
   default is R's: Blues, the brewer's missing colour `:none` (`discrete_scale()`'s `NA`), the
@@ -3014,6 +3027,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Add Bounds.squish/2, R's oob_squish() on finite numbers, an infinite end refused
+  by it and by censor/2 (palettes and colours, step 6); §4: "A squished value is R's"
 - 2026-10-28 — Add the brewer and distiller scales, palette: a name or a list, gradientn's
   values (palettes and colours, step 5); §4: "A brewer or distiller scale takes R's options"
 - 2026-10-28 — Add R's colour helpers, one colour a call, out-of-range arguments capped as farver

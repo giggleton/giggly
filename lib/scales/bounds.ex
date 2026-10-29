@@ -2,7 +2,7 @@ defmodule Scales.Bounds do
   @moduledoc """
   Values against the bounds of a range: values moved from one range to another (`rescale/3`,
   `rescale_mid/4`, `rescale_max/3`), whether a range is zero wide (`zero_range?/1`), and values
-  outside a range censored (`censor/2`).
+  outside a range censored (`censor/2`) or squished onto its ends (`squish/2`).
 
   The rescaling functions take numbers and `nil`, a missing value, which stays `nil`, and give
   R's answer to the last digit, in R's order of operations.
@@ -13,6 +13,9 @@ defmodule Scales.Bounds do
 
   # R's `zero_range()` tolerance: 1000 times the double-precision machine epsilon.
   @zero_range_tolerance 1000 * 2.220446049250313e-16
+
+  # An end of the range `censor/2` and `squish/2` take: a number, or `nil` for none on its side.
+  defguardp is_end(value) when is_number(value) or is_nil(value)
 
   @typedoc "A range, its low end and its high end."
   @type range :: {number(), number()}
@@ -122,7 +125,7 @@ defmodule Scales.Bounds do
 
   Only finite numbers are censored: `:infinity` and `:neg_infinity` are kept, as are values that
   are not numbers, but for `:nan`, which becomes `nil`. An end of `nil` censors nothing on its
-  side.
+  side; an end is a number or `nil`.
 
   ## Examples
 
@@ -133,7 +136,7 @@ defmodule Scales.Bounds do
       [1, 5, nil]
   """
   @spec censor(list(), {number() | nil, number() | nil}) :: list()
-  def censor(values, {low, high}),
+  def censor(values, {low, high}) when is_end(low) and is_end(high),
     do: Enum.map(values, fn value -> censored(value, low, high) end)
 
   defp censored(value, low, _high) when is_number(value) and is_number(low) and value < low,
@@ -144,6 +147,41 @@ defmodule Scales.Bounds do
 
   defp censored(:nan, _low, _high), do: nil
   defp censored(value, _low, _high), do: value
+
+  @doc """
+  Each value, moved onto the nearer end of `{low, high}` where it is a number outside it, R's
+  `oob_squish()`.
+
+  Only finite numbers are squished: `:infinity`, `:neg_infinity`, `:nan` and values that are not
+  numbers are kept, and `nil` stays `nil`. An end of `nil` squishes nothing on its side; an end is
+  a number or `nil`. A value below `low` is moved up to it first and one then above `high` down to
+  it, as R moves them, so a range given high to low puts every number at `high`.
+
+  ## Examples
+
+      iex> Scales.Bounds.squish([1, 5, 10, nil, :infinity, :nan], {2, 8})
+      [2, 5, 8, nil, :infinity, :nan]
+
+      iex> Scales.Bounds.squish([1, 5, 10], {nil, 8})
+      [1, 5, 8]
+
+      iex> Scales.Bounds.squish([1, 5, 10], {8, 2})
+      [2, 2, 2]
+  """
+  @spec squish(list(), {number() | nil, number() | nil}) :: list()
+  def squish(values, {low, high}) when is_end(low) and is_end(high) do
+    Enum.map(values, fn value ->
+      value
+      |> raised(low)
+      |> lowered(high)
+    end)
+  end
+
+  defp raised(value, low) when is_number(value) and is_number(low) and value < low, do: low
+  defp raised(value, _low), do: value
+
+  defp lowered(value, high) when is_number(value) and is_number(high) and value > high, do: high
+  defp lowered(value, _high), do: value
 
   # Every number at the middle of `to`, R's `mean(to)`, a `nil` left `nil`.
   defp middled(values, {to_low, to_high}) do

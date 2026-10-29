@@ -113,6 +113,13 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   checks and the formula alone would not; over a high end of 0, `rescale_max()` gives R's IEEE
   answer, an infinity of the signs' product, a negative zero's sign counting, or NaN as `nil`. Its
   tests pin R's figures; Giggly's rescalers call these, and Giggly raises at an infinity.
+- **Censoring and squishing are R's `oob_censor()` and `oob_squish()` on finite numbers**
+  (`Scales.Bounds`; design-log §4, the entry beginning "A squished value is R's"): a number outside
+  the range `nil`, or moved onto its ends in R's order, low first, so a range high to low squishes
+  every number to its high end; the infinities, `nil` and what is not a number kept; `:nan` kept
+  by `squish/2`, `nil` from `censor/2`, as ggplot2's position scale maps it. An end is a number
+  or `nil`, which moves nothing on its side; an infinite end is refused. Their tests pin R's
+  figures.
 - **Training follows R's `scales`** (`Scales.DataRange`). A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped). **A discrete scale merges each training as R's
   `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and
