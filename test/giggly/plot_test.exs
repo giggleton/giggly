@@ -4845,12 +4845,14 @@ defmodule Giggly.PlotTest do
               Plot.scale_fill_steps2(plot).scales.fill} ===
                {gradient, gradient, gradient, gradient, steps2, steps2}
 
+      fermenter = %Scale.Binned{palette: {:binned, {:brewer, %{palette: "Blues", direction: -1}}}}
+
       assert {Plot.scale_color_stepsn(plot, colors: ["red", "blue"]).scales.color,
               Plot.scale_fill_viridis_b(plot).scales.fill,
-              Plot.scale_color_fermenter(plot).scales.color} ===
+              Plot.scale_color_fermenter(plot).scales.color,
+              Plot.scale_fill_fermenter(plot).scales.fill} ===
                {%Scale.Binned{palette: {:gradient, ["#FF0000", "#0000FF"]}},
-                %Scale.Binned{palette: viridis},
-                %Scale.Binned{palette: {:binned, {:brewer, %{palette: "Blues", direction: -1}}}}}
+                %Scale.Binned{palette: viridis}, fermenter, fermenter}
     end
 
     test "each records its palette's options and the binned scale's" do
@@ -4959,7 +4961,6 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_color_viridis_b/2, [values: [0, 1]], "unknown options [:values]"},
             {&Plot.scale_fill_binned/2, [palette: "red"], ~s(scales names no palette "red")},
             {&Plot.scale_color_fermenter/2, [palette: "set1"], ~s(got: "set1")},
-            {&Plot.scale_fill_stepsn/2, [], "required :colors option not found"},
             {&Plot.scale_color_binned/2, [expand: [mult: 0]], "unknown options [:expand]"},
             {&Plot.scale_color_steps2/2, [transform: :log10], "unknown options [:transform]"}
           ] do
@@ -4969,6 +4970,37 @@ defmodule Giggly.PlotTest do
 
       error = assert_raise ArgumentError, fn -> Plot.scale_fill_fermenter(plot, palette: 19) end
       assert error.message =~ "Plot.scale_fill_fermenter/2 is given palette: 19"
+
+      for call <- [
+            fn -> Plot.scale_color_stepsn(plot) end,
+            fn -> Plot.scale_fill_stepsn(plot) end
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, call
+        assert error.message =~ "required :colors option not found"
+      end
+    end
+
+    test "a mistake found at the call names the function given it" do
+      plot = Plot.new(@rows)
+
+      for {function, options} <- [
+            {&Plot.scale_color_binned/2, []},
+            {&Plot.scale_fill_binned/2, []},
+            {&Plot.scale_color_steps/2, []},
+            {&Plot.scale_fill_steps/2, []},
+            {&Plot.scale_color_steps2/2, []},
+            {&Plot.scale_fill_steps2/2, []},
+            {&Plot.scale_color_stepsn/2, [colors: ["red"]]},
+            {&Plot.scale_fill_stepsn/2, [colors: ["red"]]},
+            {&Plot.scale_color_viridis_b/2, []},
+            {&Plot.scale_fill_viridis_b/2, []},
+            {&Plot.scale_color_fermenter/2, []},
+            {&Plot.scale_fill_fermenter/2, []}
+          ] do
+        error = assert_raise ArgumentError, fn -> function.(plot, [labels: ["a"]] ++ options) end
+        {:name, name} = Function.info(function, :name)
+        assert error.message =~ ~r/^Plot\.#{name}\/2 is given 1 labels/
+      end
     end
   end
 

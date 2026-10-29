@@ -1483,12 +1483,14 @@ defmodule Giggly.ScaleTest do
 
     # R's `scale_colour_binned(n.breaks = n)` on 52 to 335: three nice breaks wanted give four,
     # ten give ten 30 apart, and two give one inside the range, the limits then that break less
-    # and plus its distance to the further end; on 0 to 1, two give its ends, so the range is not
-    # widened and its ends are its breaks.
+    # and plus its distance to the further end, the low end's there and the high end's on 280 to
+    # 560; on 0 to 1, two give its ends, so the range is not widened and its ends are its
+    # breaks.
     test "n_breaks nice breaks are wanted, the limits widened on those the count gives" do
       three = binned([52, 150, 335], n_breaks: 3)
       ten = binned([52, 150, 335], n_breaks: 10)
       one_inside = binned([52, 150, 335], n_breaks: 2)
+      near_low = binned([280, 560], n_breaks: 2)
       none_inside = binned([0, 0.5, 1], n_breaks: 2)
 
       assert {break_values(three), Scale.Binned.limits(three), Scale.map(three, [52, 150, 335])} ===
@@ -1501,6 +1503,8 @@ defmodule Giggly.ScaleTest do
       assert {break_values(one_inside), Scale.Binned.limits(one_inside),
               Scale.map(one_inside, [52, 335])} ===
                {[300.0], {52.0, 548.0}, ["#22496C", "#448DC6"]}
+
+      assert {break_values(near_low), Scale.Binned.limits(near_low)} === {[300.0], {40.0, 560.0}}
 
       assert {Scale.legend_breaks(none_inside), Scale.Binned.limits(none_inside),
               Scale.map(none_inside, [0, 0.5, 1])} ===

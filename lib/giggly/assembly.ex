@@ -685,24 +685,18 @@ defmodule Giggly.Assembly do
   defp with_guide_data(legend, _scale), do: legend
 
   # The keys with one at each end of the bar for each limit the scale shows (`Scale.shown_limits/1`),
-  # labelled as it labels them, the low one left out where the first break's key is already at the
-  # bar's start and the high one where the last's is at its end, as ggplot2's `extract_params()`
-  # compares them before it leaves out keys past the bar's end.
+  # labelled as it labels them, mapped to nothing, as R gives them `NA`, the low one left out where
+  # the first break's key is already at the bar's start and the high one where the last's is at its
+  # end, as ggplot2's `extract_params()` compares them before it leaves out keys past the bar's
+  # end.
   defp with_limit_keys(keys, %{aesthetics: [aesthetic]}, scale, places) do
     case Scale.shown_limits(scale) do
       [] ->
         keys
 
       [{low, low_label}, {high, high_label}] ->
-        [low_value, high_value] = Scale.map(scale, [low, high])
-        low_key = %{label: low_label, value: low, values: %{aesthetic => low_value}, place: 0.0}
-
-        high_key = %{
-          label: high_label,
-          value: high,
-          values: %{aesthetic => high_value},
-          place: 1.0
-        }
+        low_key = %{label: low_label, value: low, values: %{aesthetic => nil}, place: 0.0}
+        high_key = %{label: high_label, value: high, values: %{aesthetic => nil}, place: 1.0}
 
         Enum.concat([
           if(List.first(places) == 0.0, do: [], else: [low_key]),
