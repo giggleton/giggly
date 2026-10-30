@@ -684,12 +684,12 @@ defmodule Giggly.GeomTest do
     end
 
     test "a hexagon's key is a polygon's with the layer's ends and corners" do
-      key = %{fill: "#FF0000", linewidth: 1.0}
+      key = %{fill: "#FF0000", linewidth: 2.0}
 
       assert [%Rectangles{line_end: :butt, line_join: :mitre, fill: ["#FF0000"]}] =
                draw_key(@hex, key)
 
-      assert key_size(@hex, key) == {2 * 72 / 25.4, 2 * 72 / 25.4}
+      assert key_size(@hex, key) == {4 * 72 / 25.4, 4 * 72 / 25.4}
       assert key_size(@hex, %{linewidth: nil}) == {0.0, 0.0}
     end
   end

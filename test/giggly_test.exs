@@ -4714,7 +4714,7 @@ defmodule GigglyTest do
     # first panel holds one x: on free scales that panel's x axis has no extent, so its hexagons
     # have no width and ggplot2's binning fails there ("Computation failed in `stat_binhex()`"),
     # drawing nothing; on fixed scales the axis is the plot's, and the panel's two rows fall in
-    # one hexagon.
+    # one hexagon. Over rows whose first panel holds one y, its y axis fails alike.
     test "a panel whose axis has no extent is binned nothing" do
       rows = %{"x" => [1, 1, 2, 3, 5], "y" => [1, 2, 3, 4, 6], "p" => ~w(a a b b b)}
 
@@ -4738,6 +4738,28 @@ defmodule GigglyTest do
 
       assert DataFrame.pull(fixed, :panel) == [1, 2, 2, 2]
       assert DataFrame.pull(fixed, :count) == [2.0, 1.0, 1.0, 1.0]
+
+      flat =
+        %{"x" => [1, 2, 2, 3, 5], "y" => [1, 1, 3, 4, 6], "p" => ~w(a a b b b)}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Plot.facet_wrap(:p, scales: :free)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(flat, :panel) == [2, 2, 2]
+      assert DataFrame.pull(flat, :y) == [2.999999, 4.2990371056766580, 5.598075211353316]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(bins = 2)` over two rows of one x: the only panel's x
+    # axis has no extent, so the layer is binned nothing at all.
+    test "a layer whose every panel is binned nothing has no rows" do
+      frame =
+        %{"x" => [1, 1], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
     end
 
     # Golden: `layer_data()` for `geom_hex(binwidth = c(1.1, 1)) + facet_wrap(~p, scales =
@@ -4754,6 +4776,43 @@ defmodule GigglyTest do
 
       assert DataFrame.pull(frame, :panel) == [2, 2]
       assert DataFrame.pull(frame, :x) == [1.0999990000000002, 1.6499990000000002]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(colour = g), binwidth = c(1.1, 1))` with group a's x
+    # at 7.7e11, whose hexagons would not span its rows, and group b's at 1 and 2: ggplot2's
+    # binning fails for the panel, so group b is binned nothing too.
+    test "a panel one of whose groups' hexagons would not span its rows is binned nothing" do
+      frame =
+        %{"x" => [7.7e11, 7.7e11 + 5, 1, 2], "y" => [1, 2, 1, 2], "g" => ~w(a a b b)}
+        |> Plot.new(%{x: :x, y: :y, color: :g})
+        |> Plot.geom_hex(binwidth: {1.1, 1})
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
+    end
+
+    # Golden: `layer_data()` for `geom_hex(binwidth = 1)` over x at 7.7e11 and 7.7e11 + 5, whole
+    # numbers of widths, where the millionth beyond is lost to rounding: the hexagons reach just
+    # to the rows, which hexbin takes; over two rows at 7.7e11 they reach no width at all, which
+    # it refuses.
+    test "hexagons reaching just to their rows bin them, and hexagons of no extent bin nothing" do
+      reaching =
+        %{"x" => [7.7e11, 7.7e11 + 5], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(reaching, :x) == [770_000_000_000.0, 770_000_000_005.5]
+      assert DataFrame.pull(reaching, :y) == [0.99999899999999997, 1.8660244037844387]
+      assert DataFrame.pull(reaching, :density) == [0.5, 0.5]
+
+      collapsed =
+        %{"x" => [7.7e11, 7.7e11], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(collapsed, :count) == []
     end
 
     # Golden: `layer_data()` for `geom_hex(aes(weight = w), binwidth = 1)` with weights 1 and
@@ -4796,6 +4855,18 @@ defmodule GigglyTest do
 
       assert DataFrame.pull(not_a_number, :density) ==
                [0.22222222222222221, 0.33333333333333331, 0.44444444444444442]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(weight = w), binwidth = 1)` with `w` missing in every
+    # row: each hexagon's weights sum to `NA`, so every one is left out.
+    test "a weight missing in every row bins nothing" do
+      frame =
+        %{"x" => [1, 2, 3], "y" => [1, 2, 3], "w" => [nil, nil, nil]}
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
     end
 
     # Golden: `layer_data()` for `geom_hex(binwidth = 1)` over rows missing an x, at an infinite

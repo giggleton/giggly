@@ -360,8 +360,6 @@ defmodule Giggly.Stat.BinHex do
       end)
     end
 
-    defp totals([]), do: %{}
-
     defp totals(hexagons) do
       totals =
         [

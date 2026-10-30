@@ -3051,17 +3051,26 @@ defmodule Giggly.PlotTest do
       [pair] = Plot.stat_bin_hex(plot, bins: {10, 20}).reversed_layers
       assert pair.stat.bins == {10, 20}
 
+      [one] = Plot.geom_hex(plot, bins: 1).reversed_layers
+      assert one.stat.bins == {1, 1}
+
+      [ones] = Plot.geom_hex(plot, bins: {1, 1}).reversed_layers
+      assert ones.stat.bins == {1, 1}
+
       [width] = Plot.geom_hex(plot, binwidth: 2).reversed_layers
       assert width.stat.binwidth === {2.0, 2.0}
 
       [widths] = Plot.geom_hex(plot, binwidth: {0.1, 500}).reversed_layers
       assert widths.stat.binwidth === {0.1, 500.0}
+
+      [whole] = Plot.geom_hex(plot, binwidth: {2, 500}).reversed_layers
+      assert whole.stat.binwidth === {2.0, 500.0}
     end
 
     test "bins or bin widths not offered are refused" do
       plot = Plot.new(@hex_values, %{x: :x, y: :y})
 
-      for bins <- [0, -1, 2.5, {10, 0}, {10}, {10, 20, 30}, [10, 20], "10"] do
+      for bins <- [0, -1, 2.5, {0, 10}, {2.5, 10}, {10, 0}, {10}, {10, 20, 30}, [10, 20], "10"] do
         error =
           assert_raise NimbleOptions.ValidationError, ~r/a number of bins/, fn ->
             Plot.geom_hex(plot, bins: bins)
@@ -3070,7 +3079,7 @@ defmodule Giggly.PlotTest do
         assert error.message =~ "got: #{inspect(bins)}"
       end
 
-      for width <- [0, -0.5, {1, 0}, {1, -1}, {1, 2, 3}, [1, 2], "1"] do
+      for width <- [0, -0.5, {0, 1}, {"1", 1}, {1, 0}, {1, -1}, {1, 2, 3}, [1, 2], "1"] do
         error =
           assert_raise NimbleOptions.ValidationError, ~r/a bin width/, fn ->
             Plot.stat_bin_hex(plot, binwidth: width)
@@ -3106,19 +3115,30 @@ defmodule Giggly.PlotTest do
                  linetype: {4, 4}
                }
              } = layer
+
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for join <- [:round, :mitre] do
+        [joined] = Plot.geom_hex(plot, linejoin: join).reversed_layers
+        assert joined.geom.line_join == join
+      end
     end
 
     test "a layer missing x or y, a position, or an option not offered is refused" do
-      for {mapping, missing} <- [{%{x: :x}, ":y"}, {%{y: :y}, ":x"}] do
+      for {function, name} <- [
+            {&Plot.geom_hex/1, "geom_hex"},
+            {&Plot.stat_bin_hex/1, "stat_bin_hex"}
+          ],
+          {mapping, missing} <- [{%{x: :x}, ":y"}, {%{y: :y}, ":x"}] do
         error =
           assert_raise ArgumentError, fn ->
             @hex_values
             |> Plot.new(mapping)
-            |> Plot.geom_hex()
+            |> function.()
           end
 
         assert error.message ==
-                 "Plot.geom_hex/3 needs #{missing}, but neither its mapping nor the plot's maps it"
+                 "Plot.#{name}/3 needs #{missing}, but neither its mapping nor the plot's maps it"
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
@@ -3151,6 +3171,20 @@ defmodule Giggly.PlotTest do
 
       assert_raise ArgumentError, ~r/weight/, fn ->
         Plot.stat_bin_hex(plot, %{weight: {:after_stat, [:count]}})
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for function <- [:geom_hex, :stat_bin_hex],
+          {mapping, options} <- [{untyped(:x), []}, {%{}, untyped(:bins)}] do
+        error =
+          assert_raise FunctionClauseError, fn ->
+            apply(Plot, function, [plot, mapping, options])
+          end
+
+        assert {error.module, error.function, error.arity} == {Plot, function, 3}
       end
     end
   end

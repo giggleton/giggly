@@ -6,10 +6,11 @@ defmodule Giggly.Geom.Hex do
   # corners (`line_join`) and how far a pointed corner reaches (`mitre_limit`), ggplot2's
   # `lineend`, `linejoin` and `linemitre`. Use it through `Giggly.Geom`.
   #
-  # Hexagons use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`,
-  # and need `:x` and `:y`; each is as wide and high as its group's first row's `width` and
-  # `height`, which hexagonal binning (`Giggly.Stat.BinHex`) gives every row, so a hexagon is
-  # drawn only after it.
+  # Hexagons use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`;
+  # what they cannot be drawn without, `:x` and `:y`, the stat before them needs, so a layer is
+  # checked against the stat's requirements. Each is as wide and high as its group's first row's
+  # `width` and `height`, which hexagonal binning (`Giggly.Stat.BinHex`) gives every row, so a
+  # hexagon is drawn only after it.
   #
   # A hexagon is drawn as ggplot2's `GeomHex` draws one: its six corners, as hexbin's
   # `hexcoords()` sets them round its centre, half its width across and its height over √3 and
@@ -42,11 +43,6 @@ defmodule Giggly.Geom.Hex do
   @spec accepted_aesthetics() :: [atom()]
   def accepted_aesthetics,
     do: [:alpha, :color, :fill, :group, :linetype, :linewidth, :x, :y]
-
-  # The aesthetics a layer of hexagons cannot be drawn without, each mapped or set.
-  @doc false
-  @spec required_aesthetics() :: [atom()]
-  def required_aesthetics, do: [:x, :y]
 
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
