@@ -2155,8 +2155,8 @@ defmodule Giggly.PlotTest do
   end
 
   describe "geom_rug/3" do
-    # ggplot2 4.0.3's `geom_rug()`: `sides = "bl"`, `length = unit(0.03, "npc")`, `lineend =
-    # "butt"`, and the identity stat and position.
+    # ggplot2 4.0.3's `geom_rug()`: `sides = "bl"`, `length = unit(0.03, "npc")`, `outside =
+    # FALSE`, `lineend = "butt"`, and the identity stat and position.
     test "a rug layer records its geom with ggplot2's sides, length and line ends by default" do
       plot =
         @rows
@@ -2165,7 +2165,12 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Rug{sides: [:bottom, :left], length: {0.03, :npc}, line_end: :butt},
+                 geom: %Geom.Rug{
+                   sides: [:bottom, :left],
+                   length: {0.03, :npc},
+                   outside: false,
+                   line_end: :butt
+                 },
                  stat: %Stat.Identity{},
                  position: %Position.Identity{},
                  data: :none,
@@ -2177,13 +2182,14 @@ defmodule Giggly.PlotTest do
              ]
     end
 
-    test "the options choose the sides, the length and the line ends, and set every line's look" do
+    test "the options choose the sides, the length, the way out and the line ends, and set looks" do
       plot =
         @rows
         |> Plot.new(%{x: :wt, y: :mpg})
         |> Plot.geom_rug(
           sides: [:top, :right],
           length: {1, :npc},
+          outside: true,
           lineend: :round,
           colour: "red",
           linewidth: 2,
@@ -2193,7 +2199,12 @@ defmodule Giggly.PlotTest do
 
       assert [
                %Plot.Layer{
-                 geom: %Geom.Rug{sides: [:top, :right], length: {1.0, :npc}, line_end: :round},
+                 geom: %Geom.Rug{
+                   sides: [:top, :right],
+                   length: {1.0, :npc},
+                   outside: true,
+                   line_end: :round
+                 },
                  fixed: %{color: "#FF0000", linewidth: 2.0, linetype: {4, 4}, alpha: 1.0}
                }
              ] = plot.reversed_layers
@@ -2298,7 +2309,7 @@ defmodule Giggly.PlotTest do
         assert String.starts_with?(error.message, "Plot.geom_rug/3 ")
       end
 
-      for {option, value} <- [linejoin: :mitre, fill: "red", outside: true, arrow: true] do
+      for {option, value} <- [linejoin: :mitre, fill: "red", outside: 1, arrow: true] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Plot.geom_rug(plot, [{option, value}])
@@ -3535,9 +3546,9 @@ defmodule Giggly.PlotTest do
       end
     end
 
-    # ggplot2 4.0.3: `annotate("rug", y = c(1.5, 3.5), sides = "r", linewidth = c(1, 2))` draws a
-    # line on the right for each, each as wide as its own.
-    test "a rug annotation takes its positions, its sides and length, and a width per annotation" do
+    # ggplot2 4.0.3: `annotate("rug", y = c(1.5, 3.5), sides = "r", outside = TRUE, linewidth =
+    # c(1, 2))` draws a line out from the right for each, each as wide as its own.
+    test "a rug annotation takes its positions, sides, length and way out, and a width for each" do
       [layer] =
         @rows
         |> Plot.new()
@@ -3545,12 +3556,18 @@ defmodule Giggly.PlotTest do
           y: [1.5, 3.5],
           sides: [:right],
           length: {2, :in},
+          outside: true,
           linewidth: [1, 2]
         )
         |> Map.fetch!(:reversed_layers)
 
       assert %Plot.Layer{
-               geom: %Geom.Rug{sides: [:right], length: {144.0, :points}, line_end: :butt},
+               geom: %Geom.Rug{
+                 sides: [:right],
+                 length: {144.0, :points},
+                 outside: true,
+                 line_end: :butt
+               },
                mapping: %{y: "y"},
                fixed: %{linewidth: [1.0, 2.0]},
                annotation: true
@@ -3771,6 +3788,34 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
+    end
+  end
+
+  describe "coord_cartesian/2" do
+    test "cartesian coordinates clip each panel unless told not to, replacing radial ones" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.coord_radial()
+
+      assert Plot.coord_cartesian(plot).coord == %Coord.Cartesian{clip: :on}
+      assert Plot.coord_cartesian(plot, clip: :off).coord == %Coord.Cartesian{clip: :off}
+    end
+
+    # ggplot2 4.0.3 builds `coord_cartesian(clip = "bogus")`, and grid fails as it draws it:
+    # "invalid 'clip' value". grid's `"inherit"` draws byte for byte as `"off"` does, so Giggly
+    # takes no second name for `:off`.
+    test "a clip that is not :on or :off, or an option it does not take, is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {option, value} <- [clip: :inherit, clip: true, clip: "off", xlim: {1, 2}] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.coord_cartesian(plot, [{option, value}])
+          end
+
+        assert error.key in [option, [option]]
+      end
     end
   end
 

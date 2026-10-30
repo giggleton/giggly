@@ -23,7 +23,7 @@ defmodule Giggly.Coord.Cartesian do
 
   defstruct clip: :on
 
-  @type t :: %__MODULE__{clip: :on}
+  @type t :: %__MODULE__{clip: Giggly.Coord.clip()}
 
   @typedoc "A panel's params under cartesian coordinates."
   @type panel_params :: %{

@@ -13,7 +13,7 @@ defmodule Giggly.GeomTest do
     arrow: :none
   }
   @segment %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none}
-  @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, line_end: :butt}
+  @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, outside: false, line_end: :butt}
 
   @ribbon %Geom.Ribbon{
     orientation: :none,
@@ -1764,6 +1764,30 @@ defmodule Giggly.GeomTest do
       assert top.offsets === [{{0.0, 0.0}, {0.0, -12.0}}]
       assert left.offsets === [{{0.0, 0.0}, {12.0, 0.0}}]
       assert right.offsets === [{{0.0, 0.0}, {-12.0, 0.0}}]
+    end
+
+    # ggplot2 4.0.3's `geom_rug(sides = "trbl", outside = TRUE)` runs its lines from 0npc to
+    # -0.03npc and from 1npc to 1.03npc, and with `length = unit(12, "pt")` to -12 points and to
+    # 1npc plus 12 points.
+    test "drawn outside, each line runs as far out from its edge, a share or a number of points",
+         %{coord: coord, params: params} do
+      geom = %{@rug | sides: [:bottom, :top, :left, :right], outside: true}
+      frame = DataFrame.new(x: [1.0], y: [2.0])
+
+      assert [bottom, top, left, right] = draw_panel(geom, frame, coord, params)
+      assert {bottom.starts, bottom.ends} === {[{0.25, 0.0}], [{0.25, -0.25}]}
+      assert {top.starts, top.ends} === {[{0.25, 1.0}], [{0.25, 1.25}]}
+      assert {left.starts, left.ends} === {[{0.0, 0.5}], [{-0.25, 0.5}]}
+      assert {right.starts, right.ends} === {[{1.0, 0.5}], [{1.25, 0.5}]}
+
+      assert [bottom, top, left, right] =
+               draw_panel(%{geom | length: {12.0, :points}}, frame, coord, params)
+
+      assert {bottom.starts, bottom.ends} === {[{0.25, 0.0}], [{0.25, 0.0}]}
+      assert bottom.offsets === [{{0.0, 0.0}, {0.0, -12.0}}]
+      assert top.offsets === [{{0.0, 0.0}, {0.0, 12.0}}]
+      assert left.offsets === [{{0.0, 0.0}, {-12.0, 0.0}}]
+      assert right.offsets === [{{0.0, 0.0}, {12.0, 0.0}}]
     end
 
     # As ggplot2 4.0.3's `GeomRug$handle_na()` keeps them: `vctrs::vec_set_union()` of the rows

@@ -10032,6 +10032,56 @@ defmodule GigglyTest do
       assert golden?(plot, "rug_radial")
     end
 
+    # Golden: test/golden/rug_outside.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_outside.R: every element and clip path matches, the x axis drawn before
+    # the y as in test/golden/point.svg. The geom_rug reference page's example moving the rug
+    # outside: each line runs out from the panel's edge, and the panel, unclipped, has no clip
+    # path. It moves with how a rug is drawn and with what moves test/golden/rug.svg.
+    test "a rug outside an unclipped panel runs out from its edges" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(outside: true)
+        |> Plot.coord_cartesian(clip: :off)
+
+      assert golden?(plot, "rug_outside")
+    end
+
+    # Golden: test/golden/rug_outside_margin.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/rug_outside_margin.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg, and the background's edge written as
+    # R's rounding error. The reference page's rug outside along the top and the right, a
+    # centimetre of plot margin leaving it room.
+    test "a rug outside along the top and right, in a wider plot margin" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(outside: true, sides: [:top, :right])
+        |> Plot.coord_cartesian(clip: :off)
+        |> Plot.theme(plot_margin: {1, :cm})
+
+      assert golden?(plot, "rug_outside_margin")
+    end
+
+    # Golden: test/golden/rug_outside_clipped.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/rug_outside_clipped.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. Lines 6 TeX points long outside every
+    # side and an annotated rug outside the bottom, each drawn past the panel's edge, where its
+    # clip hides it.
+    test "a rug outside a clipped panel is drawn past its edges, where the clip hides it" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [10, 30, 20]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(sides: [:top, :right, :bottom, :left], outside: true, length: {6, :pt})
+        |> Plot.annotate(:rug, x: 2.5, outside: true, colour: "red")
+        |> Plot.coord_cartesian(clip: :on)
+
+      assert golden?(plot, "rug_outside_clipped")
+    end
+
     # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/path_arrow.R: every element and clip path matches, the x axis drawn before the
     # y as in test/golden/point.svg. Each group's heads at its own ends, in its colour.

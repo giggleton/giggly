@@ -1050,12 +1050,13 @@ defmodule Giggly.Plot do
   of `:x` and `:y`; a side whose axis is not mapped draws nothing. `sides:` says which sides are
   drawn, in any order. Each line runs in from the panel's edge as far as `length:` says, by
   default 3% of the panel, which the 5% of room the axes leave at each end keeps clear of the
-  data. A row missing its place draws no line along that axis's sides, and an infinite one is at
-  the panel's corner. Where the rugs run along both axes, a row repeated in every column is drawn
-  once on each side, as ggplot2 draws it. Each line takes its own row's colour, alpha, width and
-  line type; a colour of `:none` draws none, and so does the line type `:blank`. Under
-  `coord_radial/1` the lines are straight all the same, along the panel's square edges at each
-  row's place, and a rug needs both `:x` and `:y` there.
+  data; with `outside: true` it runs out from the edge instead, which shows only where
+  `coord_cartesian/2` leaves the panel unclipped. A row missing its place draws no line along
+  that axis's sides, and an infinite one is at the panel's corner. Where the rugs run along both
+  axes, a row repeated in every column is drawn once on each side, as ggplot2 draws it. Each line
+  takes its own row's colour, alpha, width and line type; a colour of `:none` draws none, and so
+  does the line type `:blank`. Under `coord_radial/1` the lines are straight all the same, along
+  the panel's square edges at each row's place, and a rug needs both `:x` and `:y` there.
 
   With `position: :jitter` each row moves as `geom_jitter/3` moves the points of the same rows,
   so a rug beside them marks each point; it needs both `:x` and `:y`.
@@ -1591,8 +1592,8 @@ defmodule Giggly.Plot do
       and `linemitre:`, and `:line` those and `orientation:`;
     * `:segment`: `x:`, `y:`, `xend:`, `yend:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`,
       `lineend:` and `linejoin:`;
-    * `:rug`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `sides:`, `length:` and
-      `lineend:`;
+    * `:rug`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `sides:`, `length:`,
+      `outside:` and `lineend:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
@@ -1849,6 +1850,40 @@ defmodule Giggly.Plot do
     facet = %Facet.Grid{rows: rows, cols: cols, scales: Keyword.fetch!(options, :scales)}
 
     %{plot | facet: facet}
+  end
+
+  @doc """
+  Draws the plot in cartesian coordinates, x across each panel and y up it, replacing any
+  coordinate system the plot had. A plot is cartesian until another is chosen, each panel cut off
+  at its edges; with `clip: :off` what is drawn may run past them, as rugs drawn outside the
+  panel do.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.coord_cartesian())}
+
+  Clipped, the panel's cell has a clip path of its own beside the plot's background's; unclipped,
+  the background's alone:
+
+      iex> plot =
+      ...>   %{"wt" => [2.32, 2.62, 3.44], "mpg" => [22.8, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_rug(outside: true)
+      iex> Enum.map([:on, :off], fn clip ->
+      ...>   svg =
+      ...>     plot
+      ...>     |> Giggly.Plot.coord_cartesian(clip: clip)
+      ...>     |> Giggly.to_svg()
+      ...>     |> IO.iodata_to_binary()
+      ...>
+      ...>   ~r/<clipPath/ |> Regex.scan(svg) |> length()
+      ...> end)
+      [2, 1]
+  """
+  @spec coord_cartesian(t(), keyword()) :: t()
+  def coord_cartesian(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, Options.coord_cartesian())
+    %{plot | coord: %Coord.Cartesian{clip: Keyword.fetch!(validated, :clip)}}
   end
 
   @doc """
@@ -4933,6 +4968,7 @@ defmodule Giggly.Plot do
     %Geom.Rug{
       sides: Keyword.fetch!(validated, :sides),
       length: Keyword.fetch!(validated, :length),
+      outside: Keyword.fetch!(validated, :outside),
       line_end: Keyword.fetch!(validated, :lineend)
     }
   end

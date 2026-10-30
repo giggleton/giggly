@@ -376,6 +376,10 @@ defmodule Giggly.CoordTest do
       assert Coord.clip(%Coord.Cartesian{}) == :on
     end
 
+    test "cartesian coordinates told not to clip clip no panel" do
+      assert Coord.clip(%Coord.Cartesian{clip: :off}) == :off
+    end
+
     test "radial coordinates clip no panel by default, as ggplot2's do" do
       assert Coord.clip(%Coord.Radial{}) == :off
     end

@@ -75,8 +75,8 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   only that the ends are equal and never copies the rule.
 - **A coordinate system records whether its panels are clipped as one of its parameters, and
   `clip/1` reads it**, as ggplot2's `coord$clip` holds it. Cartesian coordinates default to `:on`,
-  `coord_cartesian(clip = "on")`'s default, and radial ones to `:off`, `coord_radial()`'s, values
-  a test can assert on the plot. The assembly asks once and carries the answer to rendering,
+  `coord_cartesian(clip = "on")`'s default, which `Plot.coord_cartesian/2` turns `:off`, and
+  radial ones to `:off`, `coord_radial()`'s, values a test can assert on the plot. The assembly asks once and carries the answer to rendering,
   which marks each panel's cell, so rendering never lists this namespace.
 - **`linear?/1` says whether a straight line in the data stays straight in the panel**, ggplot2's
   `is_linear()`: `true` for cartesian coordinates, `false` for radial ones, so a geom drawing a
@@ -94,6 +94,6 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   turn round: the arc of Archimedes' spiral through its ends, a circle's arc where its radius stays
   the same, a ray where its angle does, classified by the rescaled values as R compares them, and
   not measured where neither changes.
-- **What waits for its first reader:** axes above or to the right, and every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`;
+- **What waits for its first reader:** axes above or to the right, and every coordinate option (cartesian `xlim`, `expand`, `ratio`, `reverse`;
   radial `theta`, `start` and `end`, `inner.radius`, `thetalim` and `rlim`, `expand`,
   `clip = "on"`, `r.axis.inside`, `rotate.angle`, `reverse`).

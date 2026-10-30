@@ -6,8 +6,9 @@ defmodule Giggly.Geom.Rug do
   # margins show each axis's distribution. Its parameters are the sides it draws along (`sides`,
   # each of `:bottom`, `:top`, `:left` and `:right`, ggplot2's `sides` string), how long each line
   # is (`length`: a share of the panel, `{share, :npc}`, or a number of points,
-  # `{points, :points}`, ggplot2's `length` unit) and how its ends are drawn (`line_end`,
-  # ggplot2's `lineend`). Use it through `Giggly.Geom`.
+  # `{points, :points}`, ggplot2's `length` unit), whether each line runs out from the edge rather
+  # than in (`outside`, ggplot2's `outside`) and how its ends are drawn (`line_end`, ggplot2's
+  # `lineend`). Use it through `Giggly.Geom`.
   #
   # Rugs use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need one
   # of `:x` and `:y`, where ggplot2's `GeomRug` needs neither and draws nothing with neither; a
@@ -19,16 +20,17 @@ defmodule Giggly.Geom.Rug do
   # draws along both axes, the rows with an `x` and then those with a `y`, a row repeated in every
   # column kept once, where it first appears, as `vctrs::vec_set_union()` joins them
   # (`Giggly.DataFrame.distinct/1`), so translucent lines repeating a row darken along one axis's
-  # sides alone. The rows are placed through the
-  # coordinate system (`Giggly.Coord.transform/3`), an infinite position at the panel's edge, and
-  # the sides drawn in ggplot2's order, bottom, top, left, right, whatever the order given: each a
-  # straight line per row with a place on its axis, from the panel's edge inward, in its row's
-  # colour at its alpha, width and line type, as grid's `segmentsGrob()` draws one, each run of a
-  # side's lines alike in width and line type one primitive. A row missing its width or line
-  # type, or of a blank line type, draws no line, as R's graphics engine draws none, and a colour
-  # of `:none`, R's `NA`, a line of no stroke, as svglite writes one. A share of the panel puts a
-  # line's inner end that far in, a place in the cell; a number of points leaves it at the edge,
-  # moved in by that many, as grid works out `unit(1, "npc") - unit(12, "pt")`. Under coordinates
+  # sides alone. The rows are placed through the coordinate system (`Giggly.Coord.transform/3`),
+  # an infinite position at the panel's edge, and the sides drawn in ggplot2's order, bottom, top,
+  # left, right, whatever the order given: each a straight line per row with a place on its axis,
+  # from the panel's edge inward, in its row's colour at its alpha, width and line type, as grid's
+  # `segmentsGrob()` draws one, each run of a side's lines alike in width and line type one
+  # primitive. A row missing its width or line type, or of a blank line type, draws no line, as
+  # R's graphics engine draws none, and a colour of `:none`, R's `NA`, a line of no stroke, as
+  # svglite writes one. A share of the panel puts a line's inner end that far in, a place in the
+  # cell; a number of points leaves it at the edge, moved in by that many, as grid works out
+  # `unit(1, "npc") - unit(12, "pt")`. Drawn outside, each line runs as far out past the edge, as
+  # ggplot2 negates its length, where a panel clipped to its edges hides it. Under coordinates
   # whose lines curve the lines are straight all the same, from the panel's square edges at each
   # row's place, as ggplot2's are; radial coordinates refuse a rug missing `x` or `y`
   # (`Giggly.Coord.transform/3`), as ggplot2's fail to place a row without both.
@@ -37,7 +39,7 @@ defmodule Giggly.Geom.Rug do
   # `GeomRug$default_aes` being `GeomPath$default_aes`, and its legend key is a path's,
   # `draw_key_path()`, with the rug's line ends.
 
-  @enforce_keys [:sides, :length, :line_end]
+  @enforce_keys [:sides, :length, :outside, :line_end]
   defstruct @enforce_keys
 
   @typedoc "A side of the panel a rug is drawn along."
@@ -46,6 +48,7 @@ defmodule Giggly.Geom.Rug do
   @type t :: %__MODULE__{
           sides: [side()],
           length: {float(), :npc | :points},
+          outside: boolean(),
           line_end: Giggly.Scene.Polylines.line_end()
         }
 
@@ -180,7 +183,7 @@ defmodule Giggly.Geom.Rug do
       end)
       |> Enum.chunk_by(fn line -> line.line end)
       |> Enum.map(fn [%{line: {line_width, line_type}} | _rest] = lines ->
-        {starts, ends, offsets} = ends(geom.length, axis, edge, inward, lines)
+        {starts, ends, offsets} = ends(geom.length, axis, edge, direction(geom, inward), lines)
 
         %Segments{
           starts: starts,
@@ -200,18 +203,22 @@ defmodule Giggly.Geom.Rug do
 
     defp missing?(value), do: value in [nil, :nan]
 
-    # Each line's start at the edge and its end: a share of the panel in from the edge, or at the
-    # edge and moved that many points in.
-    defp ends({share, :npc}, axis, edge, inward, lines) do
-      inner = edge + inward * share
+    # Which way a side's lines run from its edge: in, or out where the rug is drawn outside.
+    defp direction(%{outside: false}, inward), do: inward
+    defp direction(%{outside: true}, inward), do: -inward
+
+    # Each line's start at the edge and its end: a share of the panel along `direction` from the
+    # edge, or at the edge and moved that many points along it.
+    defp ends({share, :npc}, axis, edge, direction, lines) do
+      inner = edge + direction * share
       starts = Enum.map(lines, fn line -> at(axis, line.place, edge) end)
       ends = Enum.map(lines, fn line -> at(axis, line.place, inner) end)
       {starts, ends, :none}
     end
 
-    defp ends({points, :points}, axis, edge, inward, lines) do
+    defp ends({points, :points}, axis, edge, direction, lines) do
       starts = Enum.map(lines, fn line -> at(axis, line.place, edge) end)
-      moved = at(axis, 0.0, inward * points)
+      moved = at(axis, 0.0, direction * points)
       offsets = Enum.map(lines, fn _line -> {{0.0, 0.0}, moved} end)
       {starts, starts, offsets}
     end

@@ -36,8 +36,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   them),
   `stat_sum/3`, `stat_bin/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
-  (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_radial/1`), the scale functions
-  (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
+  (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
+  `coord_radial/1`), the scale functions (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
   `scale_x_datetime/2`, `scale_y_datetime/2`, `scale_x_time/2`, `scale_y_time/2`, the colour
   scales
@@ -132,7 +132,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
-  chooses others; `coord_radial/1` records `%Coord.Radial{}`); `geom_text/3` records
+  chooses others; `coord_cartesian/2` records `%Coord.Cartesian{}` with its `clip:`, `:on` unless
+  `:off` is given, and `coord_radial/1` `%Coord.Radial{}`); `geom_text/3` records
   `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
@@ -335,7 +336,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `orientation:` (`:none`, the range's, and `:x`), and a rug's `sides:`, a list of the panel's
   sides, each given once (`validate_rug_sides/1`), `[:bottom, :left]` unless given, and
   `length:`, `{amount, unit}` in `:npc`, a share of the panel, or an arrowhead's units, any amount
-  (`validate_rug_length/1`), recorded `{share, :npc}` or `{points, :points}`. **So is `arrow:`,
+  (`validate_rug_length/1`), recorded `{share, :npc}` or `{points, :points}`, and `outside:`,
+  `false` unless given. **So is `arrow:`,
   an arrowhead on a layer's lines, an option of the line layer functions (`geom_segment/3`,
   `geom_path/3`, `geom_line/3`,
   `geom_freqpoly/3`) and their annotations, never a value of its own** (design-log §4, the entry
@@ -358,8 +360,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`, `geom_segment/3`, `geom_rug/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
-  `geom_density/3`, `stat_density/3`, `annotate/3`, the scale functions, the guide
-  functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
+  `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
+  guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
   functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.

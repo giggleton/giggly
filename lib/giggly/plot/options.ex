@@ -37,6 +37,17 @@ defmodule Giggly.Plot.Options do
                         ]
                       )
 
+  # `coord_cartesian/2`'s options.
+  @coord_cartesian_options NimbleOptions.new!(
+                             clip: [
+                               type: {:in, [:on, :off]},
+                               default: :on,
+                               doc:
+                                 "Whether what is drawn in each panel is cut off at its edges " <>
+                                   "(`:on`), or may run past them (`:off`)."
+                             ]
+                           )
+
   # `facet_grid/2`'s options.
   @facet_grid_options NimbleOptions.new!(
                         rows: [
@@ -575,8 +586,8 @@ defmodule Giggly.Plot.Options do
   # The units a rug's length may be given in: a share of the panel, or an arrowhead's.
   @rug_length_units [:npc | @arrow_units]
 
-  # How a layer's rugs are drawn: along which sides, how long, and how their ends are cut, ggplot2's
-  # `sides`, `length` and `lineend`.
+  # How a layer's rugs are drawn: along which sides, how long, which way from the edge and how
+  # their ends are cut, ggplot2's `sides`, `length`, `outside` and `lineend`.
   @rug_drawing_options [
     sides: [
       type: {:custom, __MODULE__, :validate_rug_sides, []},
@@ -592,6 +603,13 @@ defmodule Giggly.Plot.Options do
       doc:
         "How long each line is, `{amount, unit}`: a share of the panel (`:npc`), or a length " <>
           "in `:pt`, `:cm`, `:mm` or `:in`."
+    ],
+    outside: [
+      type: :boolean,
+      default: false,
+      doc:
+        "Whether each line runs out from the panel's edge rather than in, which shows only " <>
+          "where the panel is not clipped (`coord_cartesian/2`'s `clip: :off`)."
     ],
     lineend: Keyword.fetch!(@line_style_options, :lineend)
   ]
@@ -2953,6 +2971,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec facet_grid() :: NimbleOptions.t()
   def facet_grid, do: @facet_grid_options
+
+  @doc false
+  @spec coord_cartesian() :: NimbleOptions.t()
+  def coord_cartesian, do: @coord_cartesian_options
 
   @doc false
   @spec point() :: NimbleOptions.t()
