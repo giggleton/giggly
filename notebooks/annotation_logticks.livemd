@@ -57,8 +57,8 @@ a + annotation_logticks(sides = "lr", outside = TRUE) +
 ```
 
 Not in Giggly yet: everything `a` needs (the `msleep` dataset, `scales::trans_breaks()`,
-`scales::trans_format()` and `scales::math_format()`), `annotation_logticks()` and its `outside`
-option, and `coord_cartesian()` and its `clip` option.
+`scales::trans_format()` and `scales::math_format()`), and `annotation_logticks()` and its
+`outside` option.
 
 ## Without the minor grid lines
 

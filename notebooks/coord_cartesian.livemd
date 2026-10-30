@@ -31,11 +31,13 @@ Cartesian coordinates are the familiar kind, and ggplot2's default: `x` runs acr
 magnifying glass, and leaves the data alone, where setting limits on a scale drops the values
 outside them. Its other options turn off the expansion around the data, reverse an axis, fix the
 aspect ratio and stop the panel clipping what is drawn. Every Giggly plot is drawn in Cartesian
-coordinates unless `Giggly.Plot.coord_radial/1` is added, but Giggly takes none of
-`coord_cartesian()`'s options yet. A plot is described with `Giggly.Plot` and drawn with
-`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
-cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
+coordinates unless `Giggly.Plot.coord_radial/1` is added. `Giggly.Plot.coord_cartesian/2` takes
+`coord_cartesian()`'s `clip` option alone, `clip: :off` letting what is drawn run past the panel's
+edges; its `xlim`, `expand`, `ratio` and `reverse` options wait. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to
+`mtcars`, R's name for it.
 
 ## The plot to zoom
 

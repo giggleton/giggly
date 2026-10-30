@@ -3156,6 +3156,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Draw the notebook examples geom_rug() and coord_cartesian(clip:) unlock, and
+  narrow every verdict to what still waits (geom_rug, step 3, the notebook sweep)
 - 2026-10-29 — Add outside: to geom_rug() and annotate(:rug), and coord_cartesian(clip:), whose
   :off lets a rug's lines show past the panel (geom_rug, step 2); §4: "`geom_rug()` draws
   ggplot2's rugs"

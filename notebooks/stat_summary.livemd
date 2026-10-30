@@ -136,7 +136,7 @@ p + coord_cartesian(ylim = c(15, 30))
 taken, and so changes the means; `coord_cartesian()` zooms in after the stat, leaving them as
 they were.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, and `coord_cartesian()` and its `ylim`
+Not in Giggly yet: `stat_summary()` and its `fun` option, and `coord_cartesian()`'s `ylim`
 option.
 
 ## Summary functions from Hmisc

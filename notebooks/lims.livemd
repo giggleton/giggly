@@ -31,12 +31,13 @@ by its aesthetic, without writing out the scale itself. Values outside the limit
 are dropped from the plot; giving the larger limit first reverses the scale, and `NA` leaves a limit
 to the data. To zoom without dropping data, ggplot2 sets the limits on the coordinate system
 instead, with `coord_cartesian()`. Giggly has `Giggly.Plot.xlim/3`, `Giggly.Plot.ylim/3` and
-`Giggly.Plot.lims/2`, `nil` leaving a limit to the data, but no `coord_cartesian()`. A plot is
-described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
-setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
-a plot and shows it below the cell with `Kino.Image`. The data in most examples is
-`Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
-setup cell binds to `mtcars`, R's name for it.
+`Giggly.Plot.lims/2`, `nil` leaving a limit to the data, and `Giggly.Plot.coord_cartesian/2`, but
+not `coord_cartesian()`'s `xlim` and `ylim` options. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
+so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
+cell with `Kino.Image`. The data in most examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32
+cars from the 1974 *Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for
+it.
 
 ## Zooming into a range
 
@@ -237,6 +238,4 @@ p
 p + coord_cartesian(xlim =c(Sys.Date() - 30, NA), ylim = c(10, 20))
 ```
 
-Not in Giggly yet: `coord_cartesian()` and its `xlim` and `ylim` options.
-Giggly's plots are in Cartesian coordinates, as ggplot2's are by default, but nothing sets their
-options.
+Not in Giggly yet: `coord_cartesian()`'s `xlim` and `ylim` options.
