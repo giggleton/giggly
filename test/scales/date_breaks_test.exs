@@ -1407,8 +1407,57 @@ defmodule Scales.DateBreaksTest do
     # one instant, widened by a second for none wanted, whose closest step is a thousand years
     {{100.0, 100.0}, 0, [-2_208_988_800.0, 29_348_006_400.0], ["1900", "2900"]},
     {{100.0, 100.0}, 5, [97.0, 98.0, 99.0, 100.0, 101.0, 102.0],
-     ["37", "38", "39", "40", "41", "42"]}
+     ["37", "38", "39", "40", "41", "42"]},
+    # one wanted for an instant: a second either side, so two seconds' step
+    {{100.0, 100.0}, 1, [98.0, 100.0], ["38", "40"]},
+    # one wanted under a second: half a second either side, at least none
+    {{1_142_150_775.6458595, 1_142_150_775.8323736}, 1, [1_142_150_774.0, 1_142_150_776.0],
+     ["14", "16"]},
+    # a second's breaks too few for 8 / 2 by three: right, left, then right again
+    {{54_138_502.0, 54_138_503.0}, 8,
+     [54_138_501.0, 54_138_502.0, 54_138_503.0, 54_138_504.0, 54_138_505.0],
+     ["21", "22", "23", "24", "25"]},
+    # three hours' length decides: twelve hours, labelled with the day
+    {{1_288_706_028.2519088, 1_288_720_942.6053517}, 1, [1_288_699_200.0, 1_288_742_400.0],
+     ["Nov 02 12:00", "Nov 03 00:00"]},
+    # six months cut the extent once more than wanted, and fewer lie beyond it: all of those go
+    {{17_106_768.0, 24_539_736.0}, 1, [15_638_400.0, 31_536_000.0], ["1970-07", "1971-01"]},
+    # the coarser step's six weeks are R's fewest, 12 / 2, so they win
+    {{2_265_499_553.0, 2_268_613_925.0}, 12,
+     [
+       2_265_321_600.0,
+       2_265_926_400.0,
+       2_266_531_200.0,
+       2_267_136_000.0,
+       2_267_740_800.0,
+       2_268_345_600.0,
+       2_268_950_400.0
+     ], ["Oct 14", "Oct 21", "Oct 28", "Nov 04", "Nov 11", "Nov 18", "Nov 25"]},
+    # a day of hours, exactly, is labelled with the time alone
+    {{0.0, 86_400.0}, 24, Enum.map(0..24, fn hour -> hour * 3600.0 end),
+     Enum.map(0..24, fn hour ->
+       hour
+       |> rem(24)
+       |> Integer.to_string()
+       |> String.pad_leading(2, "0")
+       |> Kernel.<>(":00")
+     end)}
   ]
+
+  # Golden: R 4.6.1's `pretty(n = 1)` on New York's clock from 1971-07-31 08:14:41 to 10:18:59
+  # EDT: an hour's length decides, six hours chosen. It moves only if R does.
+  test "an hour's length decides a date-time's step on a zone's clock, as R's does" do
+    {times, format} =
+      DateBreaks.pretty_datetime(
+        {49_810_481.257736683, 49_817_939.325837798},
+        zoned("America/New_York"),
+        1
+      )
+
+    assert {Enum.map(times, &DateTime.to_unix/1),
+            Enum.map(times, fn time -> DateBreaks.label(time, format) end)} ==
+             {[49_802_400, 49_824_000], ["Jul 31 06:00", "Jul 31 12:00"]}
+  end
 
   describe "pretty_datetime/3 and pretty/2 with a number wanted" do
     test "the breaks and their labels are R's for each branch the number changes" do
@@ -1439,8 +1488,9 @@ defmodule Scales.DateBreaksTest do
     end
 
     # R's `pretty()` of dates: ten wanted over eight days is every day, widened by a day either
-    # side; one wanted under a day is its day and the next; none wanted over five months is the
-    # thousand years' step.
+    # side; one wanted under a day is its day and the next; ten over exactly ten days every day it
+    # touches; a year trimmed of all beyond it; a coarser step of R's fewest, 14 / 2, winning; and
+    # none wanted over five months is the thousand years' step.
     test "a date's breaks are R's for a number wanted" do
       epoch = ~D[1970-01-01]
 
@@ -1460,6 +1510,24 @@ defmodule Scales.DateBreaksTest do
                "Jan 10"
              ]},
             {{18_262.0, 18_262.4}, 1, [18_262, 18_263], ["Jan 01", "Jan 02"]},
+            {{18_262.5, 18_272.5}, 10, Enum.to_list(18_262..18_272),
+             [
+               "Jan 01",
+               "Jan 02",
+               "Jan 03",
+               "Jan 04",
+               "Jan 05",
+               "Jan 06",
+               "Jan 07",
+               "Jan 08",
+               "Jan 09",
+               "Jan 10",
+               "Jan 11"
+             ]},
+            {{5868.0, 6050.0}, 1, [5844, 6209], ["1986", "1987"]},
+            {{35_197.4454568699, 35_240.67082419902}, 14,
+             [35_193, 35_200, 35_207, 35_214, 35_221, 35_228, 35_235, 35_242],
+             ["May 10", "May 17", "May 24", "May 31", "Jun 07", "Jun 14", "Jun 21", "Jun 28"]},
             {{18_262.0, 18_414.0}, 0, [10_957, 376_200], ["2000", "3000"]}
           ] do
         {dates, format} = DateBreaks.pretty(extent, wanted)

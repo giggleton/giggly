@@ -692,9 +692,10 @@ defmodule Scales.TransformTest do
       labels =
         assert_raise(ArgumentError, fn -> Transform.format(:time, [0.0], {0.0, 3.0}, n: 3) end)
 
-      assert {breaks.message =~ ":time", breaks.message =~ "Scales.Breaks.timespan/2",
+      assert {String.starts_with?(breaks.message, "the :time transformation"),
+              breaks.message =~ "[:n]", breaks.message =~ "Scales.Breaks.timespan/2",
               labels.message == breaks.message, Transform.format(:time, [0.0], {0.0, 3.0}, [])} ==
-               {true, true, true, ["00:00:00"]}
+               {true, true, true, true, ["00:00:00"]}
     end
 
     test "a number wanted is a whole number, one below a breaks function's least refused there" do

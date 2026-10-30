@@ -294,10 +294,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   beginning "`n:` reaches"): on numbers, the width over the number wanted, one for none, rounded
   to 1, 2, 5 or 10 times its power of ten, up from just above R's switches, 1.4, 2.8 and 7,
   measured from R's output since R documents every step but that one; every multiple from the
-  low limit's down to the high one's up, each judged by the multiple itself, spread as R's
-  `seq()` spreads them, the multiple zero exactly 0. Dates and date-times are their
-  transformation's, typed; times numbers' on their seconds, wrapped past midnight; a zero-wide
-  range its first limit. Refused: limits past 1e307 and a width per interval under the smallest
+  low limit's down to the high one's up, by the quotient, a step in where that multiple itself
+  reaches the limit and never one out, spread as R's `seq()` spreads them, the multiple zero
+  exactly 0. Dates and date-times are their transformation's, typed; times numbers' on their
+  seconds, wrapped past midnight; a zero-wide range its first limit. Refused: limits past 1e307 and a width per interval under the smallest
   normal float, where R answers or warns. All of 1,500 whole-number ranges, 2,946 of 2,992 round
   and 2,567 of 2,699 random ones matched R, the rest at an end, where R counts a limit within a
   ten-billionth of a step of a multiple as on it, as only its C says. Its tests pin R's figures

@@ -390,7 +390,7 @@ defmodule Scales.DateBreaks do
 
     {dropped_left, dropped_right} =
       cond do
-        excess <= 0 or (left <= 0 and right <= 0) -> {0, 0}
+        excess <= 0 -> {0, 0}
         excess < left + right -> shared(excess, left, left + right)
         true -> {left, right}
       end

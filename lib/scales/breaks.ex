@@ -578,26 +578,20 @@ defmodule Scales.Breaks do
     end)
   end
 
-  # The multiple of `step` at or below `value`, and at or above it, judged by the multiple itself,
-  # since the quotient's rounding can put a value on a multiple a hair to its other side.
+  # The multiple of `step` at or below `value`, and at or above it: the quotient rounded down, or
+  # up, but the next multiple in where that multiple itself reaches the value, since the
+  # quotient's rounding can put a value on a multiple a hair past it. A multiple a hair short of
+  # the value, by the quotient, is kept, as R's tolerance keeps it, so no break goes beyond.
   defp multiple_below(value, step) do
     multiple = trunc(Float.floor(value / step))
 
-    cond do
-      (multiple + 1) * step <= value -> multiple + 1
-      multiple * step > value -> multiple - 1
-      true -> multiple
-    end
+    if (multiple + 1) * step <= value, do: multiple + 1, else: multiple
   end
 
   defp multiple_above(value, step) do
     multiple = trunc(Float.ceil(value / step))
 
-    cond do
-      (multiple - 1) * step >= value -> multiple - 1
-      multiple * step < value -> multiple + 1
-      true -> multiple
-    end
+    if (multiple - 1) * step >= value, do: multiple - 1, else: multiple
   end
 
   defp nice_fraction(fraction) do

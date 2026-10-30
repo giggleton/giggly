@@ -828,6 +828,7 @@ defmodule Scales.BreaksTest do
     {{0, 36}, 5, [0.0, 10.0, 20.0, 30.0, 40.0]},
     {{994, 2399.6}, 5, [500.0, 1000.0, 1500.0, 2000.0, 2500.0]},
     {{-0.035, -0.020000000000000004}, 5, [-0.035, -0.030000000000000002, -0.025, -0.02]},
+    {{4.415, 4.44}, 5, [4.415, 4.42, 4.425, 4.430000000000001, 4.4350000000000005, 4.44]},
     {{-4.94e-4, -5.0e-4}, 5,
      [-5.0e-4, -4.99e-4, -4.98e-4, -4.97e-4, -4.96e-4, -4.95e-4, -4.94e-4]},
     {{0.2671, 0.4941}, 3, [0.2, 0.3, 0.4, 0.5]},
@@ -854,6 +855,13 @@ defmodule Scales.BreaksTest do
       for {limits, wanted, breaks} <- @r_pretty do
         assert {limits, wanted, Breaks.pretty(limits, n: wanted)} === {limits, wanted, breaks}
       end
+    end
+
+    # R's `breaks_pretty()(c(0.1056, 0.10610000000000001))` is these six, its last written as the
+    # limit itself: a limit a hair past a multiple, by the quotient, is reached by that multiple.
+    test "a limit a rounding past a multiple takes no break beyond it" do
+      assert Breaks.pretty({0.1056, 0.10610000000000001}) ===
+               [0.1056, 0.1057, 0.1058, 0.1059, 0.106, 0.1061]
     end
 
     test "limits that are one value give the first, as R's breaks_pretty() gives it" do
@@ -898,22 +906,35 @@ defmodule Scales.BreaksTest do
                ]
     end
 
-    # R's `breaks_pretty(1)(c(0, 1e307))` is 0 and 1e307: the largest limits are broken.
+    # R's `breaks_pretty(1)` of 0 and 1e307 is 0 and 1e307, and of -1e307 and 0 those two: the
+    # largest limits are broken. Its `breaks_pretty(1)(c(0, 2.2250738585072014e-308))` is three
+    # breaks too, its second 1.9999999999999998e-308, from a power of ten below the normal floats.
     test "limits beyond 1e307, and less than the smallest normal float apart, are refused" do
       large = assert_raise(ArgumentError, fn -> Breaks.pretty({0.0, 1.1e307}) end)
       low = assert_raise(ArgumentError, fn -> Breaks.pretty({-1.1e307, 0.0}) end)
       narrow = assert_raise(ArgumentError, fn -> Breaks.pretty({0.0, 1.0e-310}) end)
-      wide = Breaks.pretty({0.0, 1.0e307}, n: 1)
 
-      assert {large.message =~ "no larger than 1.0e307", low.message =~ "{-1.1e307, 0.0}",
-              narrow.message =~ "smallest normal float", wide} ==
-               {true, true, true, [0.0, 1.0e307]}
+      broken = [
+        Breaks.pretty({0.0, 1.0e307}, n: 1),
+        Breaks.pretty({-1.0e307, 0.0}, n: 1),
+        Breaks.pretty({0.0, 2.2250738585072014e-308}, n: 1)
+      ]
+
+      assert {String.starts_with?(large.message, "expected limits no larger than 1.0e307"),
+              low.message =~ "{-1.1e307, 0.0}",
+              String.starts_with?(narrow.message, "expected limits at least the smallest normal"),
+              narrow.message =~ "{0.0, 1.0e-310} and 5 wanted", broken} ==
+               {true, true, true, true,
+                [[0.0, 1.0e307], [-1.0e307, 0.0], [0.0, 2.0e-308, 3.9999999999999996e-308]]}
     end
 
     test "limits of two kinds are refused" do
       # Built as the test runs: a literal the guard refuses fails the type checker.
       mixed = List.to_tuple([~D[2020-01-01], ~T[10:00:00]])
       assert_raise FunctionClauseError, fn -> Breaks.pretty(mixed) end
+
+      number_and_date = List.to_tuple([0.0, ~D[2020-01-01]])
+      assert_raise FunctionClauseError, fn -> Breaks.pretty(number_and_date) end
     end
 
     test "a number wanted is a whole number from 0" do
