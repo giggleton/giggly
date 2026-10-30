@@ -530,6 +530,67 @@ defmodule Giggly.Plot.Options do
                  ] ++ @binning_options ++ @bar_look_options
                )
 
+  # `geom_hex/3`'s and `stat_bin_hex/3`'s options, validated at the call: how the plane is cut into
+  # hexagons, how they look, and how their borders are drawn, their corners pointed by default, as
+  # ggplot2's `geom_hex()` draws them.
+  @hex_options NimbleOptions.new!(
+                 [
+                   data: @data_option,
+                   bins: [
+                     type: {:custom, __MODULE__, :validate_hex_bins, []},
+                     default: 30,
+                     doc:
+                       "How many hexagons span each axis, when `binwidth:` is not given: a " <>
+                         "whole number above 0 for both, or `{x_bins, y_bins}`."
+                   ],
+                   binwidth: [
+                     type: {:custom, __MODULE__, :validate_hex_binwidth, []},
+                     doc:
+                       "How wide and how high each hexagon is, in the axes' transformed units, " <>
+                         "which takes the place of `bins:`: a number above 0 for both, or " <>
+                         "`{width, height}`."
+                   ],
+                   alpha: [
+                     type: {:custom, __MODULE__, :validate_alpha, []},
+                     doc:
+                       "How opaque every hexagon's fill is, from 0, invisible, to 1, opaque; " <>
+                         "its border keeps its colour's own alpha."
+                   ],
+                   color: [
+                     type: @color_type,
+                     doc:
+                       "The colour of every hexagon's border, written `colour:` or `color:`: " <>
+                         @color_forms <> "; no border when not given."
+                   ],
+                   fill: [
+                     type: @color_type,
+                     doc:
+                       "The colour every hexagon is filled with: " <>
+                         @color_forms <>
+                         "; when not given, each hexagon is filled by its count, through the fill scale."
+                   ],
+                   linewidth: [
+                     type: {:custom, __MODULE__, :validate_linewidth, []},
+                     doc:
+                       "How wide every hexagon's border is, in millimetres; the theme's " <>
+                         "`base_line_size` when not given, 0.5 at its default sizes."
+                   ],
+                   linetype: [
+                     type: @linetype_type,
+                     doc:
+                       "The line type of every hexagon's border: " <>
+                         @linetype_forms <> "; `:solid` when not given."
+                   ]
+                 ] ++
+                   Keyword.replace!(@line_style_options, :linejoin,
+                     type: {:in, [:round, :mitre, :bevel]},
+                     default: :mitre,
+                     doc:
+                       "How a border turns a corner: pointed (`:mitre`), rounded (`:round`) or " <>
+                         "cut off (`:bevel`)."
+                   )
+               )
+
   # `geom_path/3`'s options, validated at the call.
   @path_options NimbleOptions.new!(
                   [
@@ -3001,6 +3062,10 @@ defmodule Giggly.Plot.Options do
   def bin, do: @bin_options
 
   @doc false
+  @spec hex() :: NimbleOptions.t()
+  def hex, do: @hex_options
+
+  @doc false
   @spec ribbon() :: NimbleOptions.t()
   def ribbon, do: @ribbon_options
 
@@ -4705,6 +4770,39 @@ defmodule Giggly.Plot.Options do
 
   def validate_binwidth(width),
     do: {:error, "expected a bin width, a number above 0, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a hexagon layer's `bins:`: a whole number above 0 for both axes, or a
+  # pair of them, x's first, held as the pair.
+  @doc false
+  @spec validate_hex_bins(term()) ::
+          {:ok, {pos_integer(), pos_integer()}} | {:error, String.t()}
+  def validate_hex_bins(bins) when is_integer(bins) and bins > 0, do: {:ok, {bins, bins}}
+
+  def validate_hex_bins({x_bins, y_bins} = bins)
+      when is_integer(x_bins) and x_bins > 0 and is_integer(y_bins) and y_bins > 0,
+      do: {:ok, bins}
+
+  def validate_hex_bins(bins),
+    do:
+      {:error,
+       "expected a number of bins, a whole number above 0, or {x_bins, y_bins}, got: " <>
+         inspect(bins)}
+
+  # NimbleOptions' check of a hexagon layer's `binwidth:`: a number above 0 for both axes, or a
+  # pair of them, the width's first, held as a pair of floats, as R keeps doubles.
+  @doc false
+  @spec validate_hex_binwidth(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_hex_binwidth(width) when is_number(width) and width > 0,
+    do: {:ok, {width / 1, width / 1}}
+
+  def validate_hex_binwidth({width, height})
+      when is_number(width) and width > 0 and is_number(height) and height > 0,
+      do: {:ok, {width / 1, height / 1}}
+
+  def validate_hex_binwidth(width),
+    do:
+      {:error,
+       "expected a bin width, a number above 0, or {width, height}, got: " <> inspect(width)}
 
   # NimbleOptions' check of a `breaks:` option for bins: two or more numbers, no two the same, each
   # kept as a float, as R keeps doubles; a list of one break or a repeated one has no bins between.

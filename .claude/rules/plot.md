@@ -32,9 +32,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
-  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3` and `geom_rug/3` among
-  them),
-  `stat_sum/3`, `stat_bin/3`,
+  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3` and
+  `geom_hex/3` among them),
+  `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
   `coord_radial/1`), the scale functions (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
@@ -78,6 +78,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's, and `geom_segment/3` `%Geom.Segment{}` with the identity stat
   and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
+  `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
+  `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
+  each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
+  above 0 and widths numbers above 0 kept as floats (`validate_hex_bins/1`,
+  `validate_hex_binwidth/1`; design-log §4, the entry beginning "`geom_hex()`'s `bins:` and
+  `binwidth:`"), `lineend:`, `linejoin:` and `linemitre:` the geom's, its corners `:mitre`
+  unless given, as ggplot2's `geom_hex()` draws them, and
   `geom_smooth/3` and `stat_smooth/3` both `%Geom.Smooth{}`
   with `%Stat.Smooth{}` and `%Position.Identity{}`, as ggplot2's are aliases: `se:` a field of
   both, `method:` (`:lm`, `:loess` or `:gam`), `level:`, above 0 and below 1 where R also takes 1,
@@ -264,7 +271,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   accepting too what its geom draws (`:alpha`), which counting carries, and a count layer against
   `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's, and a box plot
   layer against `Stat.Boxplot`'s (`:x` or `:y` needed, both allowed, `:width` taken) and
-  `Geom.Boxplot`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
+  `Geom.Boxplot`'s, and a hexagon layer against `Stat.BinHex`'s (`:x` and `:y` needed,
+  `:weight` taken) and `Geom.Hex`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
   taken) and `Geom.Smooth`'s, which takes no band's ends, its stat writing them, and a density
   layer against `Stat.Density`'s (one of `:x` and `:y` needed and not both, `:weight` taken) and
   its geom's. **An after_stat,
@@ -303,6 +311,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth and
   point functions `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
+  the hexagon functions `fill:`, `linewidth:` and `linetype:`,
   the line, segment, rug, bar, rectangle, ribbon, area, density and smooth
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
@@ -358,7 +367,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
-  `geom_text/3`, `geom_segment/3`, `geom_rug/3`,
+  `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `stat_bin_hex/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
   guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme

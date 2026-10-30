@@ -19,7 +19,8 @@ defprotocol Giggly.Stat do
   # `geom_bar()` defaults `stat = "count"`, counting at each place (`Giggly.Stat.Sum`) the rows
   # at each combination of their aesthetics, as `geom_count()` defaults `stat = "sum"`, and
   # binning (`Giggly.Stat.Bin`) the rows in each bin of the axis, as `geom_histogram()` defaults
-  # `stat = "bin"`, the box plot's summary (`Giggly.Stat.Boxplot`) each group's quartiles,
+  # `stat = "bin"`, hexagonal binning (`Giggly.Stat.BinHex`) the rows in each hexagon of the plane,
+  # as `geom_hex()` defaults `stat = "binhex"`, the box plot's summary (`Giggly.Stat.Boxplot`) each group's quartiles,
   # whiskers and outliers, as `geom_boxplot()` defaults `stat = "boxplot"`, aligning
   # (`Giggly.Stat.Align`) each group of areas at every other group's places, as `geom_area()`
   # defaults `stat = "align"`, smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
@@ -45,7 +46,7 @@ defprotocol Giggly.Stat do
   # implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution, Giggly.Tensor],
-    exports: [Align, Bin, Boxplot, Count, Density, Identity, Smooth, Sum]
+    exports: [Align, Bin, BinHex, Boxplot, Count, Density, Identity, Smooth, Sum]
 
   alias Giggly.DataFrame
 

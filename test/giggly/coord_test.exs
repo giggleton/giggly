@@ -75,6 +75,26 @@ defmodule Giggly.CoordTest do
       assert DataFrame.pull(placed, :y) === [0.5, 0.29999999999999999]
     end
 
+    # ggplot2's `theta_rescale()` takes its angle `%% (2 * pi)`, so a position past either end of
+    # the angle's extent, as a hexagon's corner reaches, comes round the circle: a quarter of the
+    # extent before its start is three quarters round, and a quarter past its end a quarter round.
+    test "radially, a position past the angle's extent comes round the circle" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+      frame = DataFrame.new(x: [-1.0, 5.0, 4.0], y: [15.0, 15.0, 15.0])
+
+      placed = Coord.transform(@radial, frame, params)
+
+      Enum.zip_with(
+        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y)],
+        [[0.3, 0.7, 0.5], [0.5, 0.5, 0.7]],
+        fn places, expected ->
+          Enum.zip_with(places, expected, fn place, wanted ->
+            assert_in_delta place, wanted, 1.0e-15
+          end)
+        end
+      )
+    end
+
     test "radial coordinates refuse a range, which cannot be placed without its pair" do
       params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
       frame = DataFrame.new(x: [1.0], xend: [2.0], y: [15.0])

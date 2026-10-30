@@ -386,16 +386,16 @@ defmodule Giggly.Coord.Radial do
 
     defp place({_x_position, y_position}, _params), do: {y_position, y_position}
 
-    # ggplot2's `theta_rescale()`: the position rescaled to a full turn, and R's `%%` taking a
-    # full turn to 0.
+    # ggplot2's `theta_rescale()`: the position rescaled to a full turn, and R's `%%` bringing the
+    # angle within one, so a full turn is 0 and a place before the axis's start, as a hexagon's
+    # corner reaches, comes round from the end.
     defp angle(position, extent) do
       position
       |> rescale(extent, @full_turn)
       |> within_turn()
     end
 
-    defp within_turn(@full_turn), do: 0.0
-    defp within_turn(angle) when angle >= 0 and angle < @full_turn, do: angle
+    defp within_turn(angle), do: angle - :math.floor(angle / @full_turn) * @full_turn
 
     # A position rescaled from its extent to 0 to `span`, as `scales::rescale()` rescales it, an
     # infinite one put at its extent's end first, as `squish_infinite()` puts it. On an extent of

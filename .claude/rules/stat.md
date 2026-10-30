@@ -31,8 +31,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   boundary lists none; binning first read them. The inverse of the transformation arrives with its
   first reader (`stat_function()`), and a stat's own parameters with the option that sets them.
 - **A stat that summarises computes per panel and per group, in that order**, as ggplot2's
-  `compute_panel()` does. **Counting, binning, the box plot's summary, smoothing and densities
-  carry a group's constant columns** (`Giggly.Stat.Carry`): a column holding one
+  `compute_panel()` does. **Counting, binning, hexagonal binning, the box plot's summary,
+  smoothing and densities carry a group's constant columns** (`Giggly.Stat.Carry`): a column holding one
   value within every group goes to that group's rows with its type, a factor's category included
   with its levels and ordered flag, as R carries a factor, and one that varies within any group is
   dropped (ggplot2 also warns, which a pure pipeline cannot), smoothing reading only the groups it
@@ -68,9 +68,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `flipped_aes` its table also holds; the box plot's summary's whiskers, hinges, notches and
   `width`, each in either orientation, not its `outliers` or `relvarwidth`; smoothing's `y`,
   `ymin`, `ymax` and `se`, each in either orientation; a density's `density`, `count`, `scaled`,
-  `ndensity`, `wdensity` and `n`), **and the aesthetics
-  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's, smoothing's and a
-  density's `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each
+  `ndensity`, `wdensity` and `n`; hexagonal binning's `count`, `density`, `ncount` and
+  `ndensity`, not the `width` and `height` its table also holds), **and the aesthetics
+  it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's, hexagonal
+  binning's, smoothing's and a density's `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each
   place's, which `StatSum` sums without declaring), module functions beside its accepted aesthetics,
   which `Plot` reads at the call. A stat with neither, the identity, computes nothing an after_stat
   can read.
@@ -105,6 +106,23 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   bins along whichever of x and y is mapped, as counting counts, refuses an axis that is
   discrete, and refuses bins that would number more than a million, as R does; y takes `count`
   by default, and an after_stat reads `count`, `density`, `ncount`, `ndensity` and `width`.
+- **Hexagonal binning is ggplot2's `stat_bin_hex()`, each row in the hexagon hexbin puts it in**
+  (design-log §4, the entries beginning "`geom_hex()` puts each row" and "`geom_hex()`'s `bins:`
+  and `binwidth:`"): per panel and per group, the rows at a finite x and y; the bins `binwidth`
+  wide and high, else each panel's axis's extent unwidened over its own `bins`, as ggplot2's
+  documentation describes a pair, not as its 4.0.3 divides x's twice; each group's hexagons from
+  its own least and greatest x and y, rounded out to the bins and a millionth beyond, as
+  `hex_bounds()` does; a row's hexagon the nearer of two lattices' nearest centres, computed in
+  the frame (`floor`, arithmetic, `<`, `if_else`), with hexbin's single-precision √3, and its
+  centre with the double √3, as `hcell2xy()`, so `layer_data/2` holds R's doubles. A row per
+  hexagon with rows, in hexbin's order, its `count` the rows or their weights' sum, as R's
+  `sum()` adds them, a hexagon whose sum is missing or NaN left out, as `na.omit()` leaves it,
+  an infinite one counted; `density` the count over the group's total, `ncount` and `ndensity`
+  over the group's largest, divided as R divides. **Where ggplot2's binning fails the whole panel
+  is given no rows**, as it catches the failure per panel: bins of no width, as an axis of no
+  extent gives `bins`, or hexagons that would not span a group's rows, which hexbin refuses. A
+  discrete axis is binned on its positions; fill takes `count` by default; it needs `x` and `y`
+  and consumes `weight`. A weight that is not a number is refused when the plot is run.
 - **Counting at each place is ggplot2's `stat_sum()`** (design-log §4, the entry beginning "A
   count layer counts over ggplot2's list"): per panel, a row for each combination of the columns
   ggplot2's `.all_aesthetics` names but `weight`, `group` included, in column order, so a column

@@ -64,6 +64,9 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   one turns it into a path first, as ggplot2's geoms do under coordinates that are not linear.
   **It refuses a frame lacking `x` or `y` with an `ArgumentError` naming it**, a rug of one axis,
   as ggplot2's fails on one, since a row is placed by both together.
+- **Radially, a position past either end of the angle's extent comes round the circle**, as
+  ggplot2's `theta_rescale()` takes its angle `%% (2 * pi)`: a full turn is 0, and a hexagon's
+  corner before the axis's start lies near its end.
 - **An infinite position goes to its extent's end and a missing one stays missing**, as ggplot2's
   `squish_infinite()` and `rescale()` leave them: the panel's edge, or radially the angle's start
   or the circle's centre or edge, a row missing either radial position missing both; dropping a

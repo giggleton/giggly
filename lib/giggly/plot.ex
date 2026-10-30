@@ -658,6 +658,75 @@ defmodule Giggly.Plot do
       do: bin_layer(plot, mapping, options, "Plot.stat_bin/3")
 
   @doc """
+  Adds a layer of hexagons counting the rows in each, hexagonal binning: the plane cut into
+  hexagons, each standing on a point, and for each group one hexagon wherever a row falls, filled
+  by how many rows fall in it, or, where `:weight` is mapped, by the sum of their weights. A
+  heatmap of two continuous variables, it shows where many rows overlap, as points drawn over
+  one another cannot.
+
+  The hexagons are 30 across each panel's x and y axes unless `bins:` or `binwidth:` says
+  otherwise; each group's hexagons start from its own rows, so groups are binned apart. A row
+  falls in the hexagon whose centre is nearest. A row missing its `x` or `y`, or at an infinite
+  one, is not counted. A panel where an axis has no extent, as for rows all at one `x`, is drawn
+  nothing.
+
+  Hexagonal binning uses `:x`, `:y`, `:weight` and `:group`, and needs `:x` and `:y`. A `:weight`
+  column must hold numbers. The hexagons also take `:alpha`, `:fill`, `:color`, `:linetype` and
+  `:linewidth`; one reaches a hexagon only where it is the same in every row of its group, so a
+  discrete one groups the rows. Each is filled by its count through the fill scale, which titles
+  the legend `count`, unless a fill is mapped or set, and drawn without a border unless a colour
+  is mapped or set.
+
+  Hexagonal binning computes, for each hexagon, `count`; `density`, the count over the group's
+  total; and `ncount` and `ndensity`, the count and the density over the group's largest. A
+  mapping reads them with an after_stat (`Giggly.Mapping`): `%{x: :carat, y: :price, fill:
+  {:after_stat, [:density]}}` fills each hexagon by its share of the rows.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.hex())}
+
+      iex> frame =
+      ...>   %{"x" => [0.0, 0.1, 1.0, 2.0], "y" => [0.0, 0.1, 1.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_hex(binwidth: 1)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :count)
+      [2.0, 1.0, 1.0]
+  """
+  @spec geom_hex(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_hex(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_hex(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_hex(plot, %{}, options)
+
+  def geom_hex(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: hex_layer(plot, mapping, options, "Plot.geom_hex/3")
+
+  @doc """
+  Adds the layer `geom_hex/3` adds, hexagons counting the rows in each, from the same mapping and
+  options.
+
+      iex> frame =
+      ...>   %{"x" => [0.0, 0.1, 1.0, 2.0], "y" => [0.0, 0.1, 1.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.stat_bin_hex(binwidth: 1)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :density)
+      [0.5, 0.25, 0.25]
+  """
+  @spec stat_bin_hex(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_bin_hex(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_bin_hex(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_bin_hex(plot, %{}, options)
+
+  def stat_bin_hex(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: hex_layer(plot, mapping, options, "Plot.stat_bin_hex/3")
+
+  @doc """
   Adds a layer of frequency polygons: the `x` axis cut into bins, as `geom_histogram/3` cuts it,
   and for each group a line through the middle of each bin at the number of rows in it, or, where
   `:weight` is mapped, the sum of their weights. A bin of no rows is added at each end, so every
@@ -4814,6 +4883,39 @@ defmodule Giggly.Plot do
     }
 
     add_binning_layer(plot, layer, validated, function)
+  end
+
+  # The layer `geom_hex/3` and `stat_bin_hex/3` add, hexagons counting the rows in each, its
+  # mistakes named as `function`'s.
+  defp hex_layer(plot, mapping, options, function) do
+    validated = layer_options(options, Options.hex())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Hex{
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.BinHex{
+        bins: Keyword.fetch!(validated, :bins),
+        binwidth: Keyword.get(validated, :binwidth, :none)
+      },
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.BinHex.accepted_aesthetics() ++ Geom.Hex.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.BinHex.required_aesthetics(),
+      computed: Stat.BinHex.computed_variables(),
+      dropped: Stat.BinHex.dropped_aesthetics()
+    )
+    |> check_weight(layer, function)
   end
 
   # The plot with a binning layer added, once its mappings are checked against binning's, its

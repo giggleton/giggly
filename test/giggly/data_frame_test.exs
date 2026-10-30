@@ -950,6 +950,57 @@ defmodule Giggly.DataFrameTest do
       end
     end
 
+    # Golden: Explorer 0.13.0's Series.select/3 of the same series: a missing condition takes the
+    # second choice, a missing value or NaN chosen is kept, and an integer beside a float is a float.
+    test "if_else takes each row's first choice where its condition is true, else its second" do
+      frame =
+        DataFrame.new(
+          kept: [true, false, nil, true],
+          first: [nil, 2.0, 3.0, :nan],
+          second: [10.0, :nan, 30.0, 40.0],
+          whole: [1, 2, 3, 4],
+          other_whole: [10, 20, 30, 40]
+        )
+
+      mutated =
+        DataFrame.mutate(frame,
+          floats: {:if_else, [:kept, :first, :second]},
+          integers: {:if_else, [:kept, :whole, :other_whole]},
+          mixed: {:if_else, [:kept, :whole, :second]}
+        )
+
+      assert DataFrame.pull(mutated, :floats) === [nil, :nan, 30.0, :nan]
+      assert DataFrame.pull(mutated, :integers) === [1, 20, 30, 4]
+      assert DataFrame.pull(mutated, :mixed) === [1.0, :nan, 30.0, 4.0]
+
+      dtypes = DataFrame.dtypes(mutated)
+
+      assert Map.take(dtypes, [:floats, :integers, :mixed]) ==
+               %{floats: :float, integers: :integer, mixed: :float}
+    end
+
+    test "if_else takes other operations and constants as its condition and choices" do
+      frame = DataFrame.new(x: [1.0, 5.0])
+
+      mutated = DataFrame.mutate(frame, y: {:if_else, [{:<, [:x, 2]}, {:*, [:x, 10]}, 0]})
+
+      assert DataFrame.pull(mutated, :y) === [10.0, 0.0]
+      assert DataFrame.dtypes(mutated).y == :float
+    end
+
+    test "if_else of a condition that is not booleans, or choices that are not numbers, is refused" do
+      frame = DataFrame.new(n: [1], label: ["a"], kept: [true])
+
+      for expression <- [
+            {:if_else, [:n, :n, :n]},
+            {:if_else, [:kept, :label, :n]},
+            {:if_else, [:kept, :n, :label]},
+            {:if_else, [:kept, :kept, :n]}
+          ] do
+        assert_raise FunctionClauseError, fn -> DataFrame.mutate(frame, x: expression) end
+      end
+    end
+
     test "log10 of a column of only missing values is missing in every row, a float" do
       frame = DataFrame.new(x: [nil, nil])
 
@@ -1155,6 +1206,7 @@ defmodule Giggly.DataFrameTest do
                :cut,
                :first,
                :floor,
+               :if_else,
                :is_finite,
                :list,
                :log10,

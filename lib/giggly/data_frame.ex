@@ -82,7 +82,10 @@ defmodule Giggly.DataFrame do
   #     right]}`, whether one number is below or above another, a boolean; `{:log10, [x]}`, a
   #     number's base-10 logarithm, a float, as R's `log10()` gives it, zero's minus infinity and
   #     a negative number's NaN; `{:floor, [x]}`, the greatest whole number at or below a float, a
-  #     float, as Explorer floors one; `{:cut, [x], breaks:
+  #     float, as Explorer floors one; `{:if_else, [condition, when_true, when_false]}`, each row's
+  #     `when_true` where its condition is true and its `when_false` where it is false or
+  #     missing, as Explorer's `select/3` chooses, both numbers, an integer where both are and a
+  #     float otherwise; `{:cut, [x], breaks:
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
@@ -169,6 +172,7 @@ defmodule Giggly.DataFrame do
           | {:>, [expression()]}
           | {:log10, [expression()]}
           | {:floor, [expression()]}
+          | {:if_else, [expression()]}
           | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."

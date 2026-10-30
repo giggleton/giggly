@@ -533,6 +533,167 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for hexagons" do
+    @hex %Geom.Hex{line_end: :butt, line_join: :mitre, mitre_limit: 10.0}
+
+    # Hexagons as hexagonal binning leaves them: `centres` in one panel, each `{width, height}`
+    # in `sizes`, a group each in `groups`, with `columns` besides.
+    defp hexagons(centres, sizes, groups, columns \\ []) do
+      {x_positions, y_positions} = Enum.unzip(centres)
+      {widths, heights} = Enum.unzip(sizes)
+
+      DataFrame.new(
+        [
+          x: x_positions,
+          y: y_positions,
+          width: widths,
+          height: heights,
+          panel: List.duplicate(1, length(centres)),
+          group: groups
+        ] ++ columns
+      )
+    end
+
+    # A hexagon `height` high reaches its height over √3 above its centre at its sides and twice
+    # that at its top: one 1 wide and √3 high, at 1, 2 on the panel 2 wide and 4 tall, has its
+    # corners half a unit either side and a half and a whole unit up and down.
+    test "a hexagon's six corners stand round its centre on a point, its sides upright" do
+      frame = hexagons([{1.0, 2.0}], [{1.0, :math.sqrt(3)}], [1])
+
+      assert [%Polygons{outlines: [outline]} = polygons] =
+               draw_panel(@hex, frame, @cartesian, @params)
+
+      expected = [
+        {0.75, 0.625},
+        {0.75, 0.375},
+        {0.5, 0.25},
+        {0.25, 0.375},
+        {0.25, 0.625},
+        {0.5, 0.75}
+      ]
+
+      Enum.zip_with(outline, expected, fn {x, y}, {wanted_x, wanted_y} ->
+        assert_in_delta x, wanted_x, 1.0e-15
+        assert_in_delta y, wanted_y, 1.0e-15
+      end)
+
+      assert {polygons.offsets, polygons.line_end, polygons.line_join, polygons.mitre_limit} ==
+               {:none, :butt, :mitre, 10.0}
+    end
+
+    # ggplot2's `GeomHex$draw_group()` reads `width[1]` and `height[1]`, so every hexagon of a
+    # group is its first row's size, and another group's its own first's.
+    test "a group's hexagons are all its first row's size" do
+      frame =
+        hexagons(
+          [{0.5, 1.0}, {1.5, 1.0}, {1.0, 3.0}],
+          [{1.0, :math.sqrt(3)}, {0.2, 0.2}, {0.4, :math.sqrt(3)}],
+          [1, 1, 2]
+        )
+
+      assert [%Polygons{outlines: outlines}] = draw_panel(@hex, frame, @cartesian, @params)
+
+      widths =
+        Enum.map(outlines, fn outline ->
+          {x_places, _y_places} = Enum.unzip(outline)
+          Float.round(Enum.max(x_places) - Enum.min(x_places), 12)
+        end)
+
+      assert widths == [0.5, 0.5, 0.2]
+    end
+
+    test "a hexagon's alpha reaches its fill alone, its border keeping its colour's own" do
+      frame =
+        hexagons([{0.5, 1.0}, {1.5, 1.0}], [{1.0, 1.0}, {1.0, 1.0}], [1, 1],
+          fill: ["#FF0000", "#0000FF80"],
+          alpha: [0.25, nil],
+          color: ["#00FF0080", "#000000"]
+        )
+
+      assert [%Polygons{} = polygons] = draw_panel(@hex, frame, @cartesian, @params)
+
+      assert {polygons.fill, polygons.fill_opacity, polygons.color, polygons.color_opacity} ==
+               {["#FF0000", "#0000FF"], [0.25, @half_alpha], ["#00FF00", "#000000"],
+                [@half_alpha, 1.0]}
+    end
+
+    # ggplot2's default hexagon is unbordered, filled with its ink mixed halfway to its paper.
+    test "a hexagon given no look is filled grey and unbordered, its borders' width the theme's" do
+      frame = hexagons([{1.0, 2.0}], [{1.0, 1.0}], [1])
+
+      assert [%Polygons{} = polygons] = draw_panel(@hex, frame, @cartesian, @params)
+
+      assert {polygons.fill, polygons.color, polygons.stroke_width, polygons.dashes} ==
+               {["#808080"], [:none], @default_width, :none}
+    end
+
+    test "each run of hexagons bordered alike is one primitive, a blank border none" do
+      frame =
+        hexagons(
+          [{0.25, 1.0}, {0.75, 1.0}, {1.25, 1.0}, {1.75, 1.0}],
+          List.duplicate({0.5, 0.5}, 4),
+          [1, 1, 1, 1],
+          color: List.duplicate("#000000", 4),
+          linewidth: [0.5, 0.5, 2.0, 0.5],
+          linetype: [{4, 4}, {4, 4}, {4, 4}, nil]
+        )
+
+      assert [thin, thick, blank] = draw_panel(@hex, frame, @cartesian, @params)
+
+      assert Enum.map([thin, thick, blank], fn polygons ->
+               {length(polygons.outlines), Float.round(polygons.stroke_width, 2),
+                rounded(polygons.dashes), polygons.color}
+             end) === [
+               {2, 1.07, [5.69, 5.69], ["#000000", "#000000"]},
+               {1, 4.27, [22.76, 22.76], ["#000000"]},
+               {1, 1.07, :none, [:none]}
+             ]
+    end
+
+    # As a rectangle's: R's graphics engine draws a border of no width transparent, which
+    # svglite writes `nan` wide and Giggly 0.
+    test "a missing border width draws no border, a run of its own 0 wide" do
+      frame =
+        hexagons([{0.5, 1.0}, {1.5, 1.0}], [{1.0, 1.0}, {1.0, 1.0}], [1, 1],
+          color: ["#000000", "#000000"],
+          linewidth: [nil, 0.5]
+        )
+
+      assert [missing, drawn] = draw_panel(@hex, frame, @cartesian, @params)
+
+      assert {missing.color, missing.stroke_width, drawn.color} ===
+               {[:none], 0.0, ["#000000"]}
+    end
+
+    test "a hexagon missing its centre is not drawn" do
+      frame =
+        hexagons([{nil, 1.0}, {1.0, :nan}, {1.0, 2.0}], List.duplicate({1.0, 1.0}, 3), [1, 1, 1])
+
+      assert [%Polygons{outlines: [_outline]}] = draw_panel(@hex, frame, @cartesian, @params)
+    end
+
+    # ggplot2's `GeomHex` never munches: under coordinates that curve, its corners are placed and
+    # its sides drawn straight between them.
+    test "in radial coordinates a hexagon is its six placed corners" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 2.0}, [], []}, {{0.0, 4.0}, [], []})
+      frame = hexagons([{1.0, 2.0}], [{1.0, 1.0}], [1])
+
+      assert [%Polygons{outlines: [[_first, _second, _third, _fourth, _fifth, _sixth]]}] =
+               draw_panel(@hex, frame, coord, params)
+    end
+
+    test "a hexagon's key is a polygon's with the layer's ends and corners" do
+      key = %{fill: "#FF0000", linewidth: 1.0}
+
+      assert [%Rectangles{line_end: :butt, line_join: :mitre, fill: ["#FF0000"]}] =
+               draw_key(@hex, key)
+
+      assert key_size(@hex, key) == {2 * 72 / 25.4, 2 * 72 / 25.4}
+      assert key_size(@hex, %{linewidth: nil}) == {0.0, 0.0}
+    end
+  end
+
   describe "draw_panel/4 for box plots" do
     @box %Geom.Boxplot{
       outliers: true,

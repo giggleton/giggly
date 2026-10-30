@@ -3014,6 +3014,147 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_hex/3 and stat_bin_hex/3" do
+    @hex_values %{
+      "x" => [1.0, 2.0, 4.0, 4.0],
+      "y" => [1, 2, 3, 4],
+      "w" => [1, 2, 1, 2],
+      "s" => ~w(a b c d)
+    }
+
+    test "a hexagon layer records its geom, stat and position with ggplot2's defaults" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      expected = [
+        %Plot.Layer{
+          geom: %Geom.Hex{line_end: :butt, line_join: :mitre, mitre_limit: 10.0},
+          stat: %Stat.BinHex{bins: {30, 30}, binwidth: :none},
+          position: %Position.Identity{},
+          data: :none,
+          mapping: %{},
+          fixed: %{},
+          accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
+          annotation: false
+        }
+      ]
+
+      assert Plot.geom_hex(plot).reversed_layers == expected
+      assert Plot.stat_bin_hex(plot).reversed_layers == expected
+    end
+
+    test "bins and bin widths are one for both axes or a pair, each width kept as a float" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      [bins] = Plot.geom_hex(plot, bins: 10).reversed_layers
+      assert bins.stat.bins == {10, 10}
+
+      [pair] = Plot.stat_bin_hex(plot, bins: {10, 20}).reversed_layers
+      assert pair.stat.bins == {10, 20}
+
+      [width] = Plot.geom_hex(plot, binwidth: 2).reversed_layers
+      assert width.stat.binwidth === {2.0, 2.0}
+
+      [widths] = Plot.geom_hex(plot, binwidth: {0.1, 500}).reversed_layers
+      assert widths.stat.binwidth === {0.1, 500.0}
+    end
+
+    test "bins or bin widths not offered are refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for bins <- [0, -1, 2.5, {10, 0}, {10}, {10, 20, 30}, [10, 20], "10"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a number of bins/, fn ->
+            Plot.geom_hex(plot, bins: bins)
+          end
+
+        assert error.message =~ "got: #{inspect(bins)}"
+      end
+
+      for width <- [0, -0.5, {1, 0}, {1, -1}, {1, 2, 3}, [1, 2], "1"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a bin width/, fn ->
+            Plot.stat_bin_hex(plot, binwidth: width)
+          end
+
+        assert error.message =~ "got: #{inspect(width)}"
+      end
+    end
+
+    test "a hexagon's look is set for every hexagon, and its borders' ends and corners chosen" do
+      [layer] =
+        @hex_values
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(
+          colour: "red",
+          fill: "steelblue",
+          alpha: 1,
+          linewidth: 2,
+          linetype: 2,
+          lineend: :round,
+          linejoin: :bevel,
+          linemitre: 2
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Hex{line_end: :round, line_join: :bevel, mitre_limit: 2.0},
+               fixed: %{
+                 color: "#FF0000",
+                 fill: "#4682B4",
+                 alpha: 1.0,
+                 linewidth: 2.0,
+                 linetype: {4, 4}
+               }
+             } = layer
+    end
+
+    test "a layer missing x or y, a position, or an option not offered is refused" do
+      for {mapping, missing} <- [{%{x: :x}, ":y"}, {%{y: :y}, ":x"}] do
+        error =
+          assert_raise ArgumentError, fn ->
+            @hex_values
+            |> Plot.new(mapping)
+            |> Plot.geom_hex()
+          end
+
+        assert error.message ==
+                 "Plot.geom_hex/3 needs #{missing}, but neither its mapping nor the plot's maps it"
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
+        @hex_values
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(position: :identity)
+      end
+    end
+
+    test "a weight that is not numbers, an unusable aesthetic or an unknown after_stat is refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      weight = assert_raise ArgumentError, fn -> Plot.geom_hex(plot, %{weight: :s}) end
+      assert weight.message =~ "a weight is summed"
+
+      assert [_layer] = Plot.geom_hex(plot, %{weight: :w}).reversed_layers
+
+      assert_raise ArgumentError, ~r/:size/, fn -> Plot.geom_hex(plot, %{size: :y}) end
+
+      for variable <- [:count, :density, :ncount, :ndensity] do
+        assert [_layer] =
+                 Plot.geom_hex(plot, %{fill: {:after_stat, [variable]}}).reversed_layers
+      end
+
+      for variable <- [:width, :height, :prop] do
+        assert_raise ArgumentError, ~r/#{variable}/, fn ->
+          Plot.geom_hex(plot, %{fill: {:after_stat, [variable]}})
+        end
+      end
+
+      assert_raise ArgumentError, ~r/weight/, fn ->
+        Plot.stat_bin_hex(plot, %{weight: {:after_stat, [:count]}})
+      end
+    end
+  end
+
   describe "geom_smooth/3 and stat_smooth/3" do
     @points %{
       "x" => [1, 2, 3, 4],

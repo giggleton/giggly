@@ -82,6 +82,7 @@ defmodule Giggly.DataFrame.Lists do
       :cut,
       :first,
       :floor,
+      :if_else,
       :is_finite,
       :list,
       :log10,
@@ -337,6 +338,25 @@ defmodule Giggly.DataFrame.Lists do
     {:float, Enum.map(values, &floored/1)}
   end
 
+  defp evaluated(frame, {:if_else, [condition, when_true, when_false]}) do
+    {condition_dtype, conditions} = evaluated(frame, condition)
+    {true_dtype, true_values} = evaluated(frame, when_true)
+    {false_dtype, false_values} = evaluated(frame, when_false)
+    booleans(condition_dtype)
+    numbers(true_dtype)
+    numbers(false_dtype)
+
+    dtype = chosen_dtype(true_dtype, false_dtype)
+
+    chosen =
+      Enum.zip_with([conditions, true_values, false_values], fn
+        [true, true_value, _false_value] -> true_value
+        [_false_or_missing, _true_value, false_value] -> false_value
+      end)
+
+    {dtype, cast(dtype, chosen)}
+  end
+
   defp evaluated(frame, {:cut, [argument], options}) do
     {dtype, values} = evaluated(frame, argument)
     numbers(dtype)
@@ -377,6 +397,10 @@ defmodule Giggly.DataFrame.Lists do
   # subtracts or multiplies, and floats otherwise.
   defp arithmetic_dtype(operator, :integer, :integer) when operator != :/, do: :integer
   defp arithmetic_dtype(_operator, _left_dtype, _right_dtype), do: :float
+
+  # A choice's type, Explorer's `select/3`'s: integers where both choices are, and floats otherwise.
+  defp chosen_dtype(:integer, :integer), do: :integer
+  defp chosen_dtype(_true_dtype, _false_dtype), do: :float
 
   # A number's base-10 logarithm, as R's `log10()` gives it: minus infinity for zero, NaN for a
   # negative number, minus infinity included, missing for a missing value, and a positive number's

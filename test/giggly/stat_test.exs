@@ -2555,6 +2555,49 @@ defmodule Giggly.StatTest do
     end
   end
 
+  describe "compute_layer/3 for hexagonal binning" do
+    @hexagonal %Stat.BinHex{bins: {30, 30}, binwidth: {1.0, 1.0}}
+
+    test "a weight that is not a number is refused, naming its type" do
+      frame = one_panel(x: [1.0, 2.0], y: [1.0, 2.0], weight: ["light", "heavy"])
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Stat.compute_layer(@hexagonal, frame, axes([1], false, false))
+        end
+
+      assert error.message ==
+               "hexagonal binning sums each row's weight, so a weight must be a number, but " <>
+                 "the layer's weight is a :string column"
+    end
+
+    # ggplot2 carries a group's constant columns to its hexagons, a factor with its levels, and
+    # drops one that varies within a group.
+    test "a group's constant columns are carried to its hexagons, a category with its levels" do
+      frame =
+        DataFrame.new([
+          {:x, [1.0, 1.1, 3.0, 5.0]},
+          {:y, [1.0, 1.1, 3.0, 5.0]},
+          {:color, ["r", "r", "f", "f"], {:category, levels: ["r", "f"], ordered: true}},
+          {:label, ["a", "b", "c", "c"]},
+          {:panel, [1, 1, 1, 1]},
+          {:group, [1, 1, 2, 2]}
+        ])
+
+      hexagons = Stat.compute_layer(@hexagonal, frame, axes([1], false, false))
+
+      assert DataFrame.names(hexagons) ==
+               [:x, :y, :width, :height, :density, :ndensity, :count, :ncount] ++
+                 [:color, :panel, :group]
+
+      assert DataFrame.pull(hexagons, :color) == ["r", "f", "f"]
+      assert DataFrame.pull(hexagons, :count) == [2.0, 1.0, 1.0]
+
+      assert DataFrame.category(hexagons, :color) ==
+               {:category, levels: ["r", "f"], ordered: true}
+    end
+  end
+
   # The table a smooth by least squares with ggplot2's defaults but `options` computes from
   # `frame`, in the panels given.
   defp fit(frame, options, panels \\ [1]) do
