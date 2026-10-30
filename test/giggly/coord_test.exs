@@ -75,11 +75,46 @@ defmodule Giggly.CoordTest do
       assert DataFrame.pull(placed, :y) === [0.5, 0.29999999999999999]
     end
 
+    # ggplot2's `theta_rescale()` takes its angle `%% (2 * pi)`, so a position past either end of
+    # the angle's extent, as a hexagon's corner reaches, comes round the circle: a quarter of the
+    # extent before its start is three quarters round, and a quarter past its end a quarter round.
+    test "radially, a position past the angle's extent comes round the circle" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+      frame = DataFrame.new(x: [-1.0, 5.0, 4.0], y: [15.0, 15.0, 15.0])
+
+      placed = Coord.transform(@radial, frame, params)
+
+      Enum.zip_with(
+        [DataFrame.pull(placed, :x), DataFrame.pull(placed, :y)],
+        [[0.3, 0.7, 0.5], [0.5, 0.5, 0.7]],
+        fn places, expected ->
+          Enum.zip_with(places, expected, fn place, wanted ->
+            assert_in_delta place, wanted, 1.0e-15
+          end)
+        end
+      )
+    end
+
     test "radial coordinates refuse a range, which cannot be placed without its pair" do
       params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
       frame = DataFrame.new(x: [1.0], xend: [2.0], y: [15.0])
 
       assert_raise MatchError, fn -> Coord.transform(@radial, frame, params) end
+    end
+
+    # ggplot2 4.0.3's `coord_radial()` fails on a rug of `x` alone or `y` alone: "replacement has
+    # 0 rows, data has 3".
+    test "radial coordinates refuse a frame lacking x or y, naming the one it lacks" do
+      params = Coord.panel_params(@radial, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+
+      for {frame, lacking} <- [
+            {DataFrame.new(x: [1.0]), ":y"},
+            {DataFrame.new(y: [15.0]), ":x"},
+            {DataFrame.new(group: [1]), ":x or :y"}
+          ] do
+        error = assert_raise ArgumentError, fn -> Coord.transform(@radial, frame, params) end
+        assert error.message =~ "a layer drawn in it maps no #{lacking};"
+      end
     end
   end
 
@@ -359,6 +394,10 @@ defmodule Giggly.CoordTest do
   describe "clip/1" do
     test "cartesian coordinates clip each panel by default, as ggplot2's do" do
       assert Coord.clip(%Coord.Cartesian{}) == :on
+    end
+
+    test "cartesian coordinates told not to clip clip no panel" do
+      assert Coord.clip(%Coord.Cartesian{clip: :off}) == :off
     end
 
     test "radial coordinates clip no panel by default, as ggplot2's do" do

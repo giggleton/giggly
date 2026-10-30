@@ -62,6 +62,11 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   **Radial `transform/3` places `x` and `y` only**, as ggplot2's does, **and fails on any other
   x-family or y-family column**: a range cannot be placed without its pair, so a geom drawing
   one turns it into a path first, as ggplot2's geoms do under coordinates that are not linear.
+  **It refuses a frame lacking `x` or `y` with an `ArgumentError` naming it**, a rug of one axis,
+  as ggplot2's fails on one, since a row is placed by both together.
+- **Radially, a position past either end of the angle's extent comes round the circle**, as
+  ggplot2's `theta_rescale()` takes its angle `%% (2 * pi)`: a full turn is 0, and a hexagon's
+  corner before the axis's start lies near its end.
 - **An infinite position goes to its extent's end and a missing one stays missing**, as ggplot2's
   `squish_infinite()` and `rescale()` leave them: the panel's edge, or radially the angle's start
   or the circle's centre or edge, a row missing either radial position missing both; dropping a
@@ -73,8 +78,8 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   only that the ends are equal and never copies the rule.
 - **A coordinate system records whether its panels are clipped as one of its parameters, and
   `clip/1` reads it**, as ggplot2's `coord$clip` holds it. Cartesian coordinates default to `:on`,
-  `coord_cartesian(clip = "on")`'s default, and radial ones to `:off`, `coord_radial()`'s, values
-  a test can assert on the plot. The assembly asks once and carries the answer to rendering,
+  `coord_cartesian(clip = "on")`'s default, which `Plot.coord_cartesian/2` turns `:off`, and
+  radial ones to `:off`, `coord_radial()`'s, values a test can assert on the plot. The assembly asks once and carries the answer to rendering,
   which marks each panel's cell, so rendering never lists this namespace.
 - **`linear?/1` says whether a straight line in the data stays straight in the panel**, ggplot2's
   `is_linear()`: `true` for cartesian coordinates, `false` for radial ones, so a geom drawing a
@@ -92,6 +97,6 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   turn round: the arc of Archimedes' spiral through its ends, a circle's arc where its radius stays
   the same, a ray where its angle does, classified by the rescaled values as R compares them, and
   not measured where neither changes.
-- **What waits for its first reader:** axes above or to the right, and every coordinate option (cartesian `xlim`, `expand`, `ratio`, `clip = "off"`;
+- **What waits for its first reader:** axes above or to the right, and every coordinate option (cartesian `xlim`, `expand`, `ratio`, `reverse`;
   radial `theta`, `start` and `end`, `inner.radius`, `thetalim` and `rlim`, `expand`,
   `clip = "on"`, `r.axis.inside`, `rotate.angle`, `reverse`).

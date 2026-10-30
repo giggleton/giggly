@@ -82,7 +82,10 @@ defmodule Giggly.DataFrame do
   #     right]}`, whether one number is below or above another, a boolean; `{:log10, [x]}`, a
   #     number's base-10 logarithm, a float, as R's `log10()` gives it, zero's minus infinity and
   #     a negative number's NaN; `{:floor, [x]}`, the greatest whole number at or below a float, a
-  #     float, as Explorer floors one; `{:cut, [x], breaks:
+  #     float, as Explorer floors one; `{:if_else, [condition, when_true, when_false]}`, each row's
+  #     `when_true` where its condition is true and its `when_false` where it is false or
+  #     missing, as Explorer's `select/3` chooses, both numbers, an integer where both are and a
+  #     float otherwise; `{:cut, [x], breaks:
   #     breaks, closed: :right}`, the interval of `breaks`, ascending, each number falls in,
   #     numbered from 1, an integer, as R's `cut(include.lowest = TRUE)` numbers it: closed on the
   #     right, or on the left with `closed: :left`, and the outermost interval at its outer end
@@ -169,6 +172,7 @@ defmodule Giggly.DataFrame do
           | {:>, [expression()]}
           | {:log10, [expression()]}
           | {:floor, [expression()]}
+          | {:if_else, [expression()]}
           | {:cut, [expression()], [breaks: [number()], closed: :right | :left]}
 
   @typedoc "What `summarise/3` computes over each group's values of a column."
@@ -232,6 +236,10 @@ defmodule Giggly.DataFrame do
   # The rows at the given indices, as `slice/2` describes.
   @doc false
   @callback slice(t(), [non_neg_integer()]) :: t()
+
+  # Each row once, as `distinct/1` describes.
+  @doc false
+  @callback distinct(t()) :: t()
 
   # The rows an expression is true in, as `filter/2` describes.
   @doc false
@@ -441,6 +449,15 @@ defmodule Giggly.DataFrame do
   @spec slice(t(), [non_neg_integer()]) :: t()
   def slice(%implementation{} = frame, indices) when is_list(indices),
     do: implementation.slice(frame, indices)
+
+  # The frame's rows with each row a later one repeats left out, in the order they first appear,
+  # as vctrs' `vec_unique()` and Explorer's `distinct/2` keep them, as a rug's geom drops the
+  # rows its sides share: two rows are one where every column holds equal values, a missing value
+  # equal to a missing one and NaN to NaN, never to each other, and `-0.0` to `0.0`, the first
+  # kept as it is. Every column and each column's type are kept.
+  @doc false
+  @spec distinct(t()) :: t()
+  def distinct(%implementation{} = frame), do: implementation.distinct(frame)
 
   # The frame's rows in which `expression` is true, in their order, every column keeping its type,
   # as dplyr's `filter()` and SQL's `WHERE` keep them: a row where it is false or missing is left

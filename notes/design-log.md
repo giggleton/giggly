@@ -106,6 +106,52 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: Heckbert's 1.5, 3 and 7*: 91.4% of 7,191 ranges matched R, against 97.5%, twice
   R's breaks on the rest. *Rejected: R's tolerance at the ends*: only its C holds it, and its breaks there are
   not round. *Rejected: `pretty()`'s biases and shrinking*: they set the rule R leaves out.
+- **`geom_hex()` puts each row in the hexagon hexbin puts it in, its √3 single precision
+  (2026-10-29, Steve: "A"; checked against hexbin 1.28.6).** A row's hexagon is the nearer of the
+  nearest centres on two rectangular lattices offset by half a step, in units where the
+  hexagons are regular (Carr et al. 1987), as hexbin's documentation describes, never its Fortran
+  ported. hexbin scales y by Fortran's `sqrt(3.)`, a single-precision √3, so Giggly does too in
+  the assignment; a hexagon's centre takes the double √3, as `hcell2xy()` in R computes it.
+  Measured against `hexbin()`'s cell of every row: identical over 12 cases, diamonds at four bin
+  sizes, mpg four ways, 100,000 normal points and points on cell edges. *Rejected: the true √3
+  throughout*, which put 12 of diamonds' 53,940 rows one hexagon over at 0.5 by 0.5, a departure
+  to explain for nothing visible.
+- **`geom_hex()`'s `bins:` and `binwidth:` take one value for both axes or an `{x, y}` pair, as
+  ggplot2's documentation says (2026-10-29, Steve: "B", "A").** `geom_hex.Rd`'s section on
+  binning in each direction gives `bins = c(10, 20)` x's count and y's, each axis's extent over
+  its own; ggplot2 4.0.3's `hex_binwidth()` divides x's extent for both, which Giggly does not
+  copy, and a golden checks the pair against R drawing the widths it means. A width pair is
+  `{width, height}`, as the API's pairs are tuples. *Rejected: refusing a pair of bins*, which
+  refuses what ggplot2 documents. *Rejected: `[x: 0.1, y: 500]`*, which raises a partial and a
+  reordered form R has no answer for and reads as a sub-part's options (`arrow: [angle: 30]`);
+  R's `list(x =, y =)` fails in R. *Rejected: R's length-3 width silently cut to two, and its
+  function bin width*, which fails for hexagons: both refused.
+- **The frame chooses each row's value by `{:if_else, [condition, when_true, when_false]}`
+  (2026-10-29, Steve: "if_else I guess"; checked against Explorer 0.13.0).** Hexagonal binning
+  picks the nearer lattice per row, so the choice is an expression, dplyr's `if_else()`,
+  Explorer's `Series.select/3` and SQL's `CASE`, typed and missing as `select/3` is: a missing
+  condition takes the second choice, and an integer beside a float gives floats. *Rejected:
+  `:if`* (Steve), *`:select`*, which clashes with `DataFrame.select/2`, *`:where`*, which reads as
+  filtering, *`:choose`*, and *`:case` and `:when`*, Elixir's keywords. *Rejected: summarising by
+  both candidate hexagons and choosing afterwards*, which sums a hexagon's weights in two stages
+  where R sums them once.
+
+- **`geom_rug()` draws ggplot2's rugs, repeated rows and all, but needs one of `x` and `y`
+  (2026-10-29, Steve: "A", "A", "A", walked one at a time; checked against ggplot2 4.0.3).** As
+  `GeomRug`: `sides:` a list of `:top`, `:right`, `:bottom` and `:left`, not R's `"trbl"` string;
+  `length:` `{amount, unit}`, `:npc` beside an arrowhead's units, an absolute one drawn as an
+  offset in points; `lineend:`; `position:` as a point's, a jitter needing both positions, as
+  `position_jitter()` does. Along both axes a row repeated in every column is drawn once, as
+  `handle_na()`'s `vec_set_union()` drops it, through a new frame operation,
+  `DataFrame.distinct/1`. Radial coordinates refuse a frame lacking `x` or `y`, as R's fail.
+  `outside:` came with `coord_cartesian/2` taking `clip:` alone, `:on` or `:off`, its zoom,
+  `expand`, `ratio` and `reverse` waiting (step 2). *Rejected: drawing every row*: a departure
+  R's drawings would not match. *Rejected: requiring nothing, as R does*: a rug of neither axis
+  draws nothing, unwarned. *Rejected: the refusal in the geom, asking `linear?/1`*:
+  `coord_transform()` curves lines yet places each axis alone. *Rejected: grid's `clip =
+  "inherit"`* (Steve agreed): R draws it byte for byte as `"off"`, so it would be a second name
+  for `:off`. *Left out*: `coord_flip()`'s swapped sides, compound and `"lines"` units, other
+  positions.
 
 - **`geom_segment()` draws a straight line per row, or a path where the coordinate system curves
   lines, asking `Coord.linear?/1` (2026-10-29, Steve's scope: "yes", `arrow()` its step 2;
@@ -3189,6 +3235,18 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-29 — Add MinorBreaks.n, MinorBreaks.width and MinorBreaks.log, R's minor_breaks_n(),
   minor_breaks_width() and minor_breaks_log() (breaks, step 3); §4: "Minor breaks a number or a
   width"
+- 2026-10-29 — Add geom_hex() and stat_bin_hex(): hexagons counting the rows in each, each row in
+  the hexagon hexbin puts it in, through the frame's :if_else (geom_hex, step 1); §4:
+  "`geom_hex()` puts each row", "`geom_hex()`'s `bins:` and `binwidth:`", "The frame chooses each
+  row's value"
+- 2026-10-29 — Draw the notebook examples geom_rug() and coord_cartesian(clip:) unlock, and
+  narrow every verdict to what still waits (geom_rug, step 3, the notebook sweep)
+- 2026-10-29 — Add outside: to geom_rug() and annotate(:rug), and coord_cartesian(clip:), whose
+  :off lets a rug's lines show past the panel (geom_rug, step 2); §4: "`geom_rug()` draws
+  ggplot2's rugs"
+- 2026-10-29 — Add geom_rug(): a line at the panel's edge for each row's x and y, and
+  annotate(:rug), drawing a repeated row once as ggplot2 does through DataFrame.distinct/1
+  (geom_rug, step 1); §4: "`geom_rug()` draws ggplot2's rugs"
 - 2026-10-29 — Draw the notebook examples geom_segment() and arrow: unlock, and narrow every
   verdict to what still waits (geom_segment, step 3, the notebook sweep)
 - 2026-10-29 — Add arrowheads: an arrow: option on geom_segment(), geom_path(), geom_line(),

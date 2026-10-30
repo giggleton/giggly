@@ -18,7 +18,9 @@ defmodule Giggly.Coord.Radial do
   # rescaled to, half a turn or a radius of 0.2, infinite ones too, as `scales::rescale()` puts
   # them. Only `x` and `y` are placed: a range such as `xmin` cannot be placed without its pair, so
   # a frame holding another x-family or y-family column fails here, and a geom drawing one turns it
-  # into a path first, as ggplot2's geoms do under coordinates that are not linear.
+  # into a path first, as ggplot2's geoms do under coordinates that are not linear. A row is placed
+  # by both together, so a frame lacking either, a rug of one axis, is refused with an
+  # `ArgumentError`, as ggplot2's radial coordinates fail on one ("replacement has 0 rows").
   #
   # The radius axis is drawn to the panel's left in the radius axis's look, its breaks placed up
   # the radius at the angle's start, 12 o'clock, as ggplot2 draws it outside a full circle. The
@@ -102,6 +104,7 @@ defmodule Giggly.Coord.Radial do
         |> DataFrame.names()
         |> Enum.filter(fn name -> name not in [:x, :y] and Aesthetics.family(name) != :none end)
 
+      both_positions(frame)
       x_positions = DataFrame.pull(frame, :x)
       y_positions = DataFrame.pull(frame, :y)
 
@@ -115,6 +118,21 @@ defmodule Giggly.Coord.Radial do
       frame
       |> DataFrame.put(:x, x_places)
       |> DataFrame.put(:y, y_places)
+    end
+
+    # The frame, refused where it lacks a position, which a row cannot be placed without.
+    defp both_positions(frame) do
+      case Enum.reject([:x, :y], fn axis -> axis in DataFrame.names(frame) end) do
+        [] ->
+          frame
+
+        lacking ->
+          raise ArgumentError,
+                "Plot.coord_radial/1 places each row by its :x and :y together, as ggplot2's " <>
+                  "radial coordinates do, but a layer drawn in it maps no " <>
+                  "#{Enum.map_join(lacking, " or ", &inspect/1)}; map both, or draw it in " <>
+                  "cartesian coordinates"
+      end
     end
 
     # Each line cut into steps, then placed, as ggplot2's `coord_munch()` munches data: an infinite
@@ -368,16 +386,16 @@ defmodule Giggly.Coord.Radial do
 
     defp place({_x_position, y_position}, _params), do: {y_position, y_position}
 
-    # ggplot2's `theta_rescale()`: the position rescaled to a full turn, and R's `%%` taking a
-    # full turn to 0.
+    # ggplot2's `theta_rescale()`: the position rescaled to a full turn, and R's `%%` bringing the
+    # angle within one, so a full turn is 0 and a place before the axis's start, as a hexagon's
+    # corner reaches, comes round from the end.
     defp angle(position, extent) do
       position
       |> rescale(extent, @full_turn)
       |> within_turn()
     end
 
-    defp within_turn(@full_turn), do: 0.0
-    defp within_turn(angle) when angle >= 0 and angle < @full_turn, do: angle
+    defp within_turn(angle), do: angle - :math.floor(angle / @full_turn) * @full_turn
 
     # A position rescaled from its extent to 0 to `span`, as `scales::rescale()` rescales it, an
     # infinite one put at its extent's end first, as `squish_infinite()` puts it. On an extent of

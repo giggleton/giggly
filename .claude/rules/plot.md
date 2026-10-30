@@ -32,11 +32,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
-  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3` and `geom_segment/3` among them),
-  `stat_sum/3`, `stat_bin/3`,
+  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3` and
+  `geom_hex/3` among them),
+  `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
-  (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_radial/1`), the scale functions
-  (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
+  (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
+  `coord_radial/1`), the scale functions (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
   `scale_x_datetime/2`, `scale_y_datetime/2`, `scale_x_time/2`, `scale_y_time/2`, the colour
   scales
@@ -76,7 +77,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   identity stat and position, and `geom_area/3` `%Geom.Area{}` with `%Stat.Align{}`, as ggplot2's
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's, and `geom_segment/3` `%Geom.Segment{}` with the identity stat
-  and position, and `geom_smooth/3` and `stat_smooth/3` both `%Geom.Smooth{}`
+  and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
+  `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
+  `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
+  each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
+  above 0 and widths numbers above 0 kept as floats (`validate_hex_bins/1`,
+  `validate_hex_binwidth/1`; design-log §4, the entry beginning "`geom_hex()`'s `bins:` and
+  `binwidth:`"), `lineend:`, `linejoin:` and `linemitre:` the geom's, its corners `:mitre`
+  unless given, as ggplot2's `geom_hex()` draws them, and
+  `geom_smooth/3` and `stat_smooth/3` both `%Geom.Smooth{}`
   with `%Stat.Smooth{}` and `%Position.Identity{}`, as ggplot2's are aliases: `se:` a field of
   both, `method:` (`:lm`, `:loess` or `:gam`), `level:`, above 0 and below 1 where R also takes 1,
   an infinite band, and past it, none, `n:`, `span:`, above 0 (`validate_span/1`), `fullrange:` and
@@ -130,7 +139,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
   layer's geom, stat and position (`%Geom.Point{}`, `%Stat.Identity{}`, `%Position.Identity{}`), and
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
-  chooses others; `coord_radial/1` records `%Coord.Radial{}`); `geom_text/3` records
+  chooses others; `coord_cartesian/2` records `%Coord.Cartesian{}` with its `clip:`, `:on` unless
+  `:off` is given, and `coord_radial/1` `%Coord.Radial{}`); `geom_text/3` records
   `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
@@ -268,7 +278,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   accepting too what its geom draws (`:alpha`), which counting carries, and a count layer against
   `Stat.Sum`'s (`:x` and `:y` needed, `:weight` and `:size` taken) and its geom's, and a box plot
   layer against `Stat.Boxplot`'s (`:x` or `:y` needed, both allowed, `:width` taken) and
-  `Geom.Boxplot`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
+  `Geom.Boxplot`'s, and a hexagon layer against `Stat.BinHex`'s (`:x` and `:y` needed,
+  `:weight` taken) and `Geom.Hex`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
   taken) and `Geom.Smooth`'s, which takes no band's ends, its stat writing them, and a density
   layer against `Stat.Density`'s (one of `:x` and `:y` needed and not both, `:weight` taken) and
   its geom's. **An after_stat,
@@ -298,13 +309,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_jitter/3`'s is that struct alone, its own `width:` and `height:` recorded as
   `position_jitter/1`'s and refused beside `position:`, as ggplot2's `geom_jitter()` refuses
   both, and it takes no `seed:`, as ggplot2's does not (design-log §4, the entry beginning
-  "`geom_jitter` is Phase 3's fourteenth"). The count functions take no position.
+  "`geom_jitter` is Phase 3's fourteenth"). `geom_rug/3`'s `position:` is `geom_point/3`'s, a
+  jittered rug needing both `:x` and `:y`, as `position_jitter()` does, where it otherwise needs
+  one of them (design-log §4, the entry beginning "`geom_rug()` draws ggplot2's rugs"). The count
+  functions take no position.
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth and
   point functions `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
-  the line, segment, bar, rectangle, ribbon, area, density and smooth
+  the hexagon functions `fill:`, `linewidth:` and `linetype:`,
+  the line, segment, rug, bar, rectangle, ribbon, area, density and smooth
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
@@ -334,8 +349,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   geom's struct**, its default recorded as ggplot2's (`:butt`, `:round`, `10.0`, `:x`, `false`,
   `0.5`), a segment taking no `linemitre:`, as ggplot2's does not, and so is a ribbon's and an
   area's `outline_type:` (`:both` and `:upper`) and
-  `orientation:` (`:none`, the range's, and `:x`). **So is `arrow:`, an arrowhead on a layer's
-  lines, an option of the line layer functions (`geom_segment/3`, `geom_path/3`, `geom_line/3`,
+  `orientation:` (`:none`, the range's, and `:x`), and a rug's `sides:`, a list of the panel's
+  sides, each given once (`validate_rug_sides/1`), `[:bottom, :left]` unless given, and
+  `length:`, `{amount, unit}` in `:npc`, a share of the panel, or an arrowhead's units, any amount
+  (`validate_rug_length/1`), recorded `{share, :npc}` or `{points, :points}`, and `outside:`,
+  `false` unless given. **So is `arrow:`,
+  an arrowhead on a layer's lines, an option of the line layer functions (`geom_segment/3`,
+  `geom_path/3`, `geom_line/3`,
   `geom_freqpoly/3`) and their annotations, never a value of its own** (design-log §4, the entry
   beginning "An arrowhead is an option of a line"): `true` for grid's defaults or a keyword list
   of `angle:` (30), `length:` (`{0.25, :in}`, in `:pt`, `:cm`, `:mm` or `:in`, any amount),
@@ -354,10 +374,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
-  `geom_text/3`, `geom_segment/3`,
+  `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `stat_bin_hex/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
-  `geom_density/3`, `stat_density/3`, `annotate/3`, the scale functions, the guide
-  functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
+  `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
+  guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
   functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
@@ -484,8 +504,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
-  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's, a segment's or a rectangle's
-  `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn a segment at a time) take
+  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's, a segment's, a rug's or a
+  rectangle's `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn a segment
+  at a time) take
   a list, which `fixed` holds as one value per annotation; a path's or a line's line type is one,
   as ggplot2 refuses a line type varying along a line. A list's values are of one type, checked by
   building its column (`Giggly.DataFrame`) at the call, a colour's, a shape's or a stroke's `:none`,

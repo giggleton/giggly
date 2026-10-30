@@ -37,6 +37,17 @@ defmodule Giggly.Plot.Options do
                         ]
                       )
 
+  # `coord_cartesian/2`'s options.
+  @coord_cartesian_options NimbleOptions.new!(
+                             clip: [
+                               type: {:in, [:on, :off]},
+                               default: :on,
+                               doc:
+                                 "Whether what is drawn in each panel is cut off at its edges " <>
+                                   "(`:on`), or may run past them (`:off`)."
+                             ]
+                           )
+
   # `facet_grid/2`'s options.
   @facet_grid_options NimbleOptions.new!(
                         rows: [
@@ -519,6 +530,67 @@ defmodule Giggly.Plot.Options do
                  ] ++ @binning_options ++ @bar_look_options
                )
 
+  # `geom_hex/3`'s and `stat_bin_hex/3`'s options, validated at the call: how the plane is cut into
+  # hexagons, how they look, and how their borders are drawn, their corners pointed by default, as
+  # ggplot2's `geom_hex()` draws them.
+  @hex_options NimbleOptions.new!(
+                 [
+                   data: @data_option,
+                   bins: [
+                     type: {:custom, __MODULE__, :validate_hex_bins, []},
+                     default: 30,
+                     doc:
+                       "How many hexagons span each axis, when `binwidth:` is not given: a " <>
+                         "whole number above 0 for both, or `{x_bins, y_bins}`."
+                   ],
+                   binwidth: [
+                     type: {:custom, __MODULE__, :validate_hex_binwidth, []},
+                     doc:
+                       "How wide and how high each hexagon is, in the axes' transformed units, " <>
+                         "which takes the place of `bins:`: a number above 0 for both, or " <>
+                         "`{width, height}`."
+                   ],
+                   alpha: [
+                     type: {:custom, __MODULE__, :validate_alpha, []},
+                     doc:
+                       "How opaque every hexagon's fill is, from 0, invisible, to 1, opaque; " <>
+                         "its border keeps its colour's own alpha."
+                   ],
+                   color: [
+                     type: @color_type,
+                     doc:
+                       "The colour of every hexagon's border, written `colour:` or `color:`: " <>
+                         @color_forms <> "; no border when not given."
+                   ],
+                   fill: [
+                     type: @color_type,
+                     doc:
+                       "The colour every hexagon is filled with: " <>
+                         @color_forms <>
+                         "; when not given, each hexagon is filled by its count, through the fill scale."
+                   ],
+                   linewidth: [
+                     type: {:custom, __MODULE__, :validate_linewidth, []},
+                     doc:
+                       "How wide every hexagon's border is, in millimetres; the theme's " <>
+                         "`base_line_size` when not given, 0.5 at its default sizes."
+                   ],
+                   linetype: [
+                     type: @linetype_type,
+                     doc:
+                       "The line type of every hexagon's border: " <>
+                         @linetype_forms <> "; `:solid` when not given."
+                   ]
+                 ] ++
+                   Keyword.replace!(@line_style_options, :linejoin,
+                     type: {:in, [:round, :mitre, :bevel]},
+                     default: :mitre,
+                     doc:
+                       "How a border turns a corner: pointed (`:mitre`), rounded (`:round`) or " <>
+                         "cut off (`:bevel`)."
+                   )
+               )
+
   # `geom_path/3`'s options, validated at the call.
   @path_options NimbleOptions.new!(
                   [
@@ -568,6 +640,63 @@ defmodule Giggly.Plot.Options do
                        arrow: @arrow_option
                      ] ++ @segment_line_style_options
                    )
+
+  # The sides a rug may be drawn along.
+  @rug_sides [:top, :right, :bottom, :left]
+
+  # The units a rug's length may be given in: a share of the panel, or an arrowhead's.
+  @rug_length_units [:npc | @arrow_units]
+
+  # How a layer's rugs are drawn: along which sides, how long, which way from the edge and how
+  # their ends are cut, ggplot2's `sides`, `length`, `outside` and `lineend`.
+  @rug_drawing_options [
+    sides: [
+      type: {:custom, __MODULE__, :validate_rug_sides, []},
+      default: [:bottom, :left],
+      doc:
+        "The sides of the panel the rugs are drawn along, a list of `:top`, `:right`, " <>
+          "`:bottom` and `:left`, each given once: an `x` along the bottom and top, a `y` along " <>
+          "the left and right."
+    ],
+    length: [
+      type: {:custom, __MODULE__, :validate_rug_length, []},
+      default: {0.03, :npc},
+      doc:
+        "How long each line is, `{amount, unit}`: a share of the panel (`:npc`), or a length " <>
+          "in `:pt`, `:cm`, `:mm` or `:in`."
+    ],
+    outside: [
+      type: :boolean,
+      default: false,
+      doc:
+        "Whether each line runs out from the panel's edge rather than in, which shows only " <>
+          "where the panel is not clipped (`coord_cartesian/2`'s `clip: :off`)."
+    ],
+    lineend: Keyword.fetch!(@line_style_options, :lineend)
+  ]
+
+  # How every line of a rug layer looks, set by its options.
+  @rug_look_options [
+    alpha: @alpha_option,
+    color: @line_color_option,
+    linewidth: @linewidth_option,
+    linetype: @linetype_option
+  ]
+
+  # `geom_rug/3`'s options, validated at the call.
+  @rug_options NimbleOptions.new!(
+                 [
+                   data: @data_option,
+                   position: [
+                     type: {:custom, __MODULE__, :validate_point_position, []},
+                     default: :identity,
+                     doc:
+                       "Where the rugs are placed: at their positions (`:identity`), or each " <>
+                         "moved a small random distance (`:jitter`, or as `position_jitter/1` " <>
+                         "says), which needs both `:x` and `:y`."
+                   ]
+                 ] ++ @rug_look_options ++ @rug_drawing_options
+               )
 
   # How every band of a ribbon or area layer looks, set by its options.
   @band_look_options [
@@ -1324,7 +1453,15 @@ defmodule Giggly.Plot.Options do
                         linetype: @annotation_linetype,
                         arrow: @arrow_option
                       ] ++ @segment_line_style_options
-  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :text, :rect]
+  @rug_annotation [
+                    x: @annotation_position,
+                    y: @annotation_position,
+                    alpha: @annotation_alpha,
+                    color: @annotation_color,
+                    linewidth: @annotation_linewidth,
+                    linetype: @annotation_linetype
+                  ] ++ @rug_drawing_options
+  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :rect]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
     col: NimbleOptions.new!(@bar_annotation),
@@ -1332,6 +1469,7 @@ defmodule Giggly.Plot.Options do
     path: NimbleOptions.new!(@path_annotation),
     line: NimbleOptions.new!([orientation: @orientation_option] ++ @path_annotation),
     segment: NimbleOptions.new!(@segment_annotation),
+    rug: NimbleOptions.new!(@rug_annotation),
     text:
       NimbleOptions.new!(
         [
@@ -2967,6 +3105,10 @@ defmodule Giggly.Plot.Options do
   def facet_grid, do: @facet_grid_options
 
   @doc false
+  @spec coord_cartesian() :: NimbleOptions.t()
+  def coord_cartesian, do: @coord_cartesian_options
+
+  @doc false
   @spec point() :: NimbleOptions.t()
   def point, do: @point_options
 
@@ -2989,6 +3131,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec bin() :: NimbleOptions.t()
   def bin, do: @bin_options
+
+  @doc false
+  @spec hex() :: NimbleOptions.t()
+  def hex, do: @hex_options
 
   @doc false
   @spec ribbon() :: NimbleOptions.t()
@@ -3021,6 +3167,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec segment() :: NimbleOptions.t()
   def segment, do: @segment_options
+
+  @doc false
+  @spec rug() :: NimbleOptions.t()
+  def rug, do: @rug_options
 
   @doc false
   @spec freqpoly() :: NimbleOptions.t()
@@ -4661,6 +4811,41 @@ defmodule Giggly.Plot.Options do
        "got: #{inspect(length)}"}
   end
 
+  # NimbleOptions' check of a rug's `sides:`: a list of the panel's sides, each given once, as
+  # ggplot2 draws a side its `sides` names twice once; none draws no rug, as R's `""` draws none.
+  @doc false
+  @spec validate_rug_sides(term()) :: {:ok, [atom()]} | {:error, String.t()}
+  def validate_rug_sides(sides) when is_list(sides) do
+    if Enum.all?(sides, fn side -> side in @rug_sides end) and Enum.uniq(sides) == sides,
+      do: {:ok, sides},
+      else: rug_sides_error(sides)
+  end
+
+  def validate_rug_sides(sides), do: rug_sides_error(sides)
+
+  defp rug_sides_error(sides) do
+    {:error,
+     "expected a list of the sides #{inspect(@rug_sides)}, each given once, got: " <>
+       inspect(sides)}
+  end
+
+  # NimbleOptions' check of a rug's `length:`: any amount, as grid draws a negative one's lines
+  # out from the edge, a share of the panel kept as a float and any other worked out in points as
+  # the theme works one out.
+  @doc false
+  @spec validate_rug_length(term()) :: {:ok, {float(), :npc | :points}} | {:error, String.t()}
+  def validate_rug_length({amount, :npc}) when is_number(amount), do: {:ok, {amount / 1, :npc}}
+
+  def validate_rug_length({amount, unit} = length)
+      when is_number(amount) and unit in @arrow_units,
+      do: {:ok, {Theme.points(length), :points}}
+
+  def validate_rug_length(length) do
+    {:error,
+     "expected {amount, unit}, an amount with a unit of #{inspect(@rug_length_units)}, " <>
+       "got: #{inspect(length)}"}
+  end
+
   # NimbleOptions' check of a closed arrowhead's `fill:`: `:color`, the line's own, or a colour,
   # resolved as `validate_color/1` resolves one.
   @doc false
@@ -4676,6 +4861,39 @@ defmodule Giggly.Plot.Options do
 
   def validate_binwidth(width),
     do: {:error, "expected a bin width, a number above 0, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a hexagon layer's `bins:`: a whole number above 0 for both axes, or a
+  # pair of them, x's first, held as the pair.
+  @doc false
+  @spec validate_hex_bins(term()) ::
+          {:ok, {pos_integer(), pos_integer()}} | {:error, String.t()}
+  def validate_hex_bins(bins) when is_integer(bins) and bins > 0, do: {:ok, {bins, bins}}
+
+  def validate_hex_bins({x_bins, y_bins} = bins)
+      when is_integer(x_bins) and x_bins > 0 and is_integer(y_bins) and y_bins > 0,
+      do: {:ok, bins}
+
+  def validate_hex_bins(bins),
+    do:
+      {:error,
+       "expected a number of bins, a whole number above 0, or {x_bins, y_bins}, got: " <>
+         inspect(bins)}
+
+  # NimbleOptions' check of a hexagon layer's `binwidth:`: a number above 0 for both axes, or a
+  # pair of them, the width's first, held as a pair of floats, as R keeps doubles.
+  @doc false
+  @spec validate_hex_binwidth(term()) :: {:ok, {float(), float()}} | {:error, String.t()}
+  def validate_hex_binwidth(width) when is_number(width) and width > 0,
+    do: {:ok, {width / 1, width / 1}}
+
+  def validate_hex_binwidth({width, height})
+      when is_number(width) and width > 0 and is_number(height) and height > 0,
+      do: {:ok, {width / 1, height / 1}}
+
+  def validate_hex_binwidth(width),
+    do:
+      {:error,
+       "expected a bin width, a number above 0, or {width, height}, got: " <> inspect(width)}
 
   # NimbleOptions' check of a `breaks:` option for bins: two or more numbers, no two the same, each
   # kept as a float, as R keeps doubles; a list of one break or a repeated one has no bins between.

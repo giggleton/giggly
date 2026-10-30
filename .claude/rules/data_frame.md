@@ -44,7 +44,8 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **Its readers are API, and the rest is not.** `Giggly.layer_data/2` returns a frame, so
   `names/1`, `row_count/1`, `dtypes/1` and `pull/2` are documented with doctests, and `t` is
   `@opaque`: a user reads a frame through them. `from_table/1`, `new/1`, `select/2`, `put/3`,
-  `put/4`, `category/2`, `operations/1`, `split/2`, `slice/2`, `filter/2`, `mutate/2`,
+  `put/4`, `category/2`, `operations/1`, `split/2`, `slice/2`, `distinct/1`, `filter/2`,
+  `mutate/2`,
   `summarise/3`, `join/3` and the callbacks are the pipeline's, `@doc false`, and `Lists` is
   `@moduledoc false`; offering a
   user another operation is a decision (CLAUDE.md, Conventions).
@@ -73,7 +74,10 @@ column names become strings", "Column types belong to the frame" and "Every boun
   zero's minus infinity and a negative number's NaN, a float, by `:math.log10`, which matches
   R's to the last bit where a division of natural logarithms does not; `floor` is a float's
   greatest whole number at or below it, a float, as Explorer floors one, an integer refused, as
-  Explorer refuses it. A column named alone
+  Explorer refuses it; `if_else` (design-log §4, the entry beginning "The frame chooses each
+  row's value") is each row's second argument where its first, a boolean, is true and its third
+  where it is false or missing, as Explorer's `select/3` chooses, both numbers, integers where
+  both are and floats otherwise. A column named alone
   keeps its type, a constant's is worked out from its value, an operation's is what it computes. An
   expression outside the vocabulary, or an operation given a column of the wrong type, rows or
   none, raises `FunctionClauseError`. **An implementation names the operations it runs**
@@ -83,14 +87,18 @@ column names become strings", "Column types belong to the frame" and "Every boun
 - **An operation arrives with its first caller**, shaped by what that caller needs — split and
   recombine, the relational operations; `slice/2`, vctrs' `vec_slice()`, takes rows by index, in
   any order, repeated or left out, as a line's geom reorders and drops rows, munching repeats
-  them, and the facet repeats a table across the panels; `summarise/3`, the first group-by
+  them, and the facet repeats a table across the panels; `distinct/1`, vctrs' `vec_unique()` and
+  Explorer's `distinct/2`, each row once where it first appears, a missing value equal to a
+  missing one, NaN to NaN and `-0.0` to `0.0`, with a rug's rows along both axes; `summarise/3`,
+  the first group-by
   aggregate, with the stats that count; `filter/2`, `mutate/2`, the `is_finite` and `and`
   operations and the `n_distinct` and `first` aggregates, with counting's rows, weights and carried
   columns; `cut`, with binning's bins; `log10` and `operations/1`, with a mapping's functions by
   name; `join/3`, the `or`, `not`, `<` and `>` operations and the
   `quantile`, `count`, `min`, `max` and `list` aggregates, with the box plot's fences, outliers
   and whiskers; the `mean` aggregate, with a mapping's reordering; `+`, `-`, `*` and `/`, with a
-  linear smooth's sums; `floor` and the `variance` aggregate, with a density's grid and bandwidth.
+  linear smooth's sums; `floor` and the `variance` aggregate, with a density's grid and bandwidth; `if_else`, with
+  hexagonal binning's choice of lattice.
   Not designed ahead.
 - **`join/3` is a left join on equal keys, as Explorer joins**: a missing key matches nothing,
   the key columns must be of one type in both frames, and a column besides them in both is

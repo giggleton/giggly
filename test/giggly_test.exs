@@ -4269,6 +4269,44 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_rug" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(df, aes(x, y)) + geom_rug()`
+    # over x 1, NA, 3, 4 and y 10, 20, NA, 40: every row kept, with a path's defaults, which the
+    # geom leaves out as it draws.
+    test "a rug's table keeps every row as mapped, with a path's defaults" do
+      frame =
+        %{"x" => [1, nil, 3, 4], "y" => [10, 20, nil, 40]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug()
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) ==
+               [:x, :y, :panel, :group, :color, :linewidth, :linetype, :alpha]
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :y)} ===
+               {[1, nil, 3, 4], [10, 20, nil, 40]}
+    end
+
+    test "a jittered rug moves each row as geom_jitter/3 moves the points of the same rows" do
+      plot = Plot.new(%{"x" => [1, 1, 2, 2], "y" => [3, 3, 4, 4]}, %{x: :x, y: :y})
+
+      points =
+        plot
+        |> Plot.geom_jitter()
+        |> Giggly.layer_data()
+
+      rugs =
+        plot
+        |> Plot.geom_rug(position: :jitter)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(rugs, :x), DataFrame.pull(rugs, :y)} ===
+               {DataFrame.pull(points, :x), DataFrame.pull(points, :y)}
+
+      refute DataFrame.pull(rugs, :x) == [1.0, 1.0, 2.0, 2.0]
+    end
+  end
+
   describe "layer_data/2, for geom_area" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(crossing, aes(x, y, fill = g))
     # + geom_area()`, `a` at y 1 and `b` from -1 to 1 at x 1 and 3, printed to 17 significant
@@ -4417,6 +4455,494 @@ defmodule GigglyTest do
         |> Plot.geom_density()
 
       assert Giggly.Assembly.run(plot).guide_titles == %{x: "density", y: "hwy"}
+    end
+  end
+
+  describe "layer_data/2, for geom_hex" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, with hexbin 1.28.6, for
+    # `ggplot(mpg, aes(displ, hwy)) + geom_hex(bins = 5)`: a row per hexagon some row falls in, in
+    # hexbin's order, along each row of hexagons from the left and the rows from the bottom, its
+    # centre, the bins' width and height, the axes' extents over 5, its count and shares, then
+    # the geom's defaults, the fill its count's colour through the default gradient.
+    test "a hexagon's table holds its centre, its size, its count and its shares" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: 5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) ==
+               [:x, :y, :width, :height, :density, :ndensity, :count, :ncount, :panel, :group] ++
+                 [:fill, :color, :linewidth, :linetype, :alpha]
+
+      assert DataFrame.pull(frame, :x) ==
+               [4.8599990000000002, 5.9399990000000003, 3.2399990000000001, 4.3199990000000001] ++
+                 [5.3999990000000002, 6.4799990000000003, 1.6199990000000002, 2.699999] ++
+                 [3.7799990000000001, 4.8599990000000002, 5.9399990000000003] ++
+                 [7.0199990000000003, 1.0799990000000002, 2.159999, 3.2399990000000001] ++
+                 [4.3199990000000001, 5.3999990000000002, 6.4799990000000003] ++
+                 [1.6199990000000002, 2.699999, 2.159999, 1.6199990000000002]
+
+      assert DataFrame.pull(frame, :y) ==
+               List.duplicate(11.942561584220407, 2) ++
+                 List.duplicate(17.485124168440816, 4) ++
+                 List.duplicate(23.027686752661225, 6) ++
+                 List.duplicate(28.570249336881631, 6) ++
+                 List.duplicate(34.112811921102036, 2) ++
+                 [39.655374505322449, 45.197937089542854]
+
+      widths = DataFrame.pull(frame, :width)
+      heights = DataFrame.pull(frame, :height)
+      assert Enum.uniq(widths) == [1.0800000000000001]
+      assert Enum.uniq(heights) == [6.4000000000000004]
+
+      assert DataFrame.pull(frame, :count) ==
+               [7.0, 3.0, 10.0, 37.0, 26.0, 2.0, 2.0, 36.0, 16.0, 5.0, 2.0] ++
+                 [1.0, 1.0, 52.0, 14.0, 3.0, 1.0, 1.0, 11.0, 1.0, 1.0, 2.0]
+
+      assert DataFrame.pull(frame, :density) == [
+               0.029914529914529916,
+               0.01282051282051282,
+               0.042735042735042736,
+               0.15811965811965811,
+               0.1111111111111111,
+               0.0085470085470085479,
+               0.0085470085470085479,
+               0.15384615384615385,
+               0.068376068376068383,
+               0.021367521367521368,
+               0.0085470085470085479,
+               0.0042735042735042739,
+               0.0042735042735042739,
+               0.22222222222222221,
+               0.059829059829059832,
+               0.01282051282051282,
+               0.0042735042735042739,
+               0.0042735042735042739,
+               0.047008547008547008,
+               0.0042735042735042739,
+               0.0042735042735042739,
+               0.0085470085470085479
+             ]
+
+      assert DataFrame.pull(frame, :ndensity) == [
+               0.13461538461538464,
+               0.057692307692307696,
+               0.19230769230769232,
+               0.71153846153846156,
+               0.5,
+               0.038461538461538471,
+               0.038461538461538471,
+               0.6923076923076924,
+               0.30769230769230776,
+               0.096153846153846159,
+               0.038461538461538471,
+               0.019230769230769235,
+               0.019230769230769235,
+               1.0,
+               0.26923076923076927,
+               0.057692307692307696,
+               0.019230769230769235,
+               0.019230769230769235,
+               0.21153846153846154,
+               0.019230769230769235,
+               0.019230769230769235,
+               0.038461538461538471
+             ]
+
+      assert DataFrame.pull(frame, :ncount) == [
+               0.13461538461538461,
+               0.057692307692307696,
+               0.19230769230769232,
+               0.71153846153846156,
+               0.5,
+               0.038461538461538464,
+               0.038461538461538464,
+               0.69230769230769229,
+               0.30769230769230771,
+               0.096153846153846159,
+               0.038461538461538464,
+               0.019230769230769232,
+               0.019230769230769232,
+               1.0,
+               0.26923076923076922,
+               0.057692307692307696,
+               0.019230769230769232,
+               0.019230769230769232,
+               0.21153846153846154,
+               0.019230769230769232,
+               0.019230769230769232,
+               0.038461538461538464
+             ]
+
+      assert DataFrame.pull(frame, :fill) ==
+               ~w(#1A3956 #153049 #1E4060 #4187BE #326996 #142D46 #142D46 #4084BA #254F74) ++
+                 ~w(#18344F #142D46 #132B43 #132B43 #56B1F7 #234A6D #153049 #132B43 #132B43) ++
+                 ~w(#1F4363 #132B43 #132B43 #142D46)
+
+      assert Enum.map([:color, :linewidth, :linetype, :alpha], fn name ->
+               frame
+               |> DataFrame.pull(name)
+               |> Enum.uniq()
+             end) == [[nil], [0.5], [{}], [nil]]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(weight = cyl), bins = 5)`: each count the sum of
+    # its rows' cylinders, its shares over the weights' total and the largest count.
+    test "a weighted hexagon counts its rows' weights" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, weight: :cyl})
+        |> Plot.geom_hex(bins: 5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) ==
+               [56.0, 24.0, 60.0, 264.0, 208.0, 16.0, 8.0, 186.0, 98.0, 40.0, 16.0] ++
+                 [8.0, 4.0, 212.0, 84.0, 18.0, 8.0, 8.0, 44.0, 4.0, 4.0, 8.0]
+
+      assert DataFrame.pull(frame, :density) == [
+               0.040638606676342524,
+               0.01741654571843251,
+               0.043541364296081277,
+               0.19158200290275762,
+               0.15094339622641509,
+               0.011611030478955007,
+               0.0058055152394775036,
+               0.13497822931785197,
+               0.071117561683599423,
+               0.029027576197387519,
+               0.011611030478955007,
+               0.0058055152394775036,
+               0.0029027576197387518,
+               0.15384615384615385,
+               0.06095791001451379,
+               0.013062409288824383,
+               0.0058055152394775036,
+               0.0058055152394775036,
+               0.031930333817126268,
+               0.0029027576197387518,
+               0.0029027576197387518,
+               0.0058055152394775036
+             ]
+
+      assert DataFrame.pull(frame, :ndensity) == [
+               0.21212121212121213,
+               0.090909090909090898,
+               0.22727272727272727,
+               1.0,
+               0.78787878787878785,
+               0.060606060606060608,
+               0.030303030303030304,
+               0.70454545454545459,
+               0.37121212121212122,
+               0.15151515151515152,
+               0.060606060606060608,
+               0.030303030303030304,
+               0.015151515151515152,
+               0.80303030303030309,
+               0.31818181818181818,
+               0.068181818181818177,
+               0.030303030303030304,
+               0.030303030303030304,
+               0.16666666666666666,
+               0.015151515151515152,
+               0.015151515151515152,
+               0.030303030303030304
+             ]
+    end
+
+    # Golden: `layer_data()` for `ggplot(mpg, aes(displ, hwy, colour = drv)) +
+    # geom_hex(bins = 5)`: each drive's hexagons start from its own rows, so the 4's lowest row of
+    # hexagons is at 11.94, the f's at 18.34 and the r's at 12.80, and each group's shares are
+    # over its own total.
+    test "each group is binned on hexagons of its own" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, color: :drv})
+        |> Plot.geom_hex(bins: 5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :group) ==
+               List.duplicate(1, 10) ++ List.duplicate(2, 11) ++ List.duplicate(3, 7)
+
+      assert DataFrame.pull(frame, :y) ==
+               List.duplicate(11.942561584220407, 2) ++
+                 List.duplicate(17.485124168440816, 4) ++
+                 List.duplicate(23.027686752661225, 3) ++
+                 [28.570249336881631, 18.342561584220409] ++
+                 List.duplicate(23.885124168440818, 4) ++
+                 List.duplicate(29.427686752661224, 3) ++
+                 [34.970249336881629, 40.512811921102035, 46.055374505322447] ++
+                 [12.799999000000001, 18.342561584220409, 18.342561584220409] ++
+                 [23.885124168440814, 23.885124168440814, 23.885124168440814, 29.427686752661224]
+
+      assert DataFrame.pull(frame, :count) ==
+               [7.0, 3.0, 9.0, 36.0, 16.0, 1.0, 2.0, 21.0, 1.0, 7.0] ++
+                 [2.0, 11.0, 29.0, 3.0, 1.0, 24.0, 19.0, 7.0, 7.0, 1.0, 2.0] ++
+                 [2.0, 4.0, 7.0, 6.0, 2.0, 3.0, 1.0]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(bins = 5) + facet_wrap(~drv, scales = "free")`: each
+    # panel's hexagons are its own axes' extents over 5.
+    test "each panel's hexagons span its own axes" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: 5)
+        |> Plot.facet_wrap(:drv, scales: :free)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :panel) ==
+               List.duplicate(1, 17) ++ List.duplicate(2, 14) ++ List.duplicate(3, 16)
+
+      widths = DataFrame.pull(frame, :width)
+      heights = DataFrame.pull(frame, :height)
+
+      assert Enum.dedup(widths) ==
+               [0.94000000000000006, 0.73999999999999999, 0.64000000000000001]
+
+      assert Enum.dedup(heights) == [3.2000000000000002, 5.4000000000000004, 2.2000000000000002]
+
+      assert DataFrame.pull(frame, :count) ==
+               [5.0, 1.0, 1.0, 6.0, 9.0, 7.0, 17.0, 12.0, 5.0, 6.0, 6.0, 3.0, 7.0, 1.0, 5.0] ++
+                 [11.0, 1.0, 1.0, 1.0, 2.0, 3.0, 14.0, 22.0, 9.0, 1.0, 26.0, 14.0, 3.0, 6.0] ++
+                 [2.0, 2.0, 2.0, 1.0, 2.0, 2.0, 3.0, 1.0, 2.0, 3.0, 1.0, 2.0, 1.0, 1.0, 1.0] ++
+                 [1.0, 1.0, 1.0]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(bins = 2) + facet_wrap(~p, scales = s)` over rows whose
+    # first panel holds one x: on free scales that panel's x axis has no extent, so its hexagons
+    # have no width and ggplot2's binning fails there ("Computation failed in `stat_binhex()`"),
+    # drawing nothing; on fixed scales the axis is the plot's, and the panel's two rows fall in
+    # one hexagon. Over rows whose first panel holds one y, its y axis fails alike.
+    test "a panel whose axis has no extent is binned nothing" do
+      rows = %{"x" => [1, 1, 2, 3, 5], "y" => [1, 2, 3, 4, 6], "p" => ~w(a a b b b)}
+
+      free =
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Plot.facet_wrap(:p, scales: :free)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(free, :panel) == [2, 2, 2]
+      assert DataFrame.pull(free, :x) == [1.499999, 3.749999, 4.499999]
+      assert DataFrame.pull(free, :y) == [2.999999, 4.2990371056766580, 5.598075211353316]
+
+      fixed =
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Plot.facet_wrap(:p)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(fixed, :panel) == [1, 2, 2, 2]
+      assert DataFrame.pull(fixed, :count) == [2.0, 1.0, 1.0, 1.0]
+
+      flat =
+        %{"x" => [1, 2, 2, 3, 5], "y" => [1, 1, 3, 4, 6], "p" => ~w(a a b b b)}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Plot.facet_wrap(:p, scales: :free)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(flat, :panel) == [2, 2, 2]
+      assert DataFrame.pull(flat, :y) == [2.999999, 4.2990371056766580, 5.598075211353316]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(bins = 2)` over two rows of one x: the only panel's x
+    # axis has no extent, so the layer is binned nothing at all.
+    test "a layer whose every panel is binned nothing has no rows" do
+      frame =
+        %{"x" => [1, 1], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(bins: 2)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
+    end
+
+    # Golden: `layer_data()` for `geom_hex(binwidth = c(1.1, 1)) + facet_wrap(~p, scales =
+    # "free")`, the first panel's x at 7.7e11, where rounding to the bins' width and a millionth
+    # out lands past the rows, which hexbin refuses ("'xbnds' must encompass range(x)"), so
+    # ggplot2's binning fails there and that panel is drawn nothing, the second binned as ever.
+    test "a panel whose hexagons would not span its rows is binned nothing" do
+      frame =
+        %{"x" => [7.7e11, 7.7e11 + 5, 1, 2], "y" => [1, 2, 1, 2], "p" => ~w(a a b b)}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: {1.1, 1})
+        |> Plot.facet_wrap(:p, scales: :free)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :panel) == [2, 2]
+      assert DataFrame.pull(frame, :x) == [1.0999990000000002, 1.6499990000000002]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(colour = g), binwidth = c(1.1, 1))` with group a's x
+    # at 7.7e11, whose hexagons would not span its rows, and group b's at 1 and 2: ggplot2's
+    # binning fails for the panel, so group b is binned nothing too.
+    test "a panel one of whose groups' hexagons would not span its rows is binned nothing" do
+      frame =
+        %{"x" => [7.7e11, 7.7e11 + 5, 1, 2], "y" => [1, 2, 1, 2], "g" => ~w(a a b b)}
+        |> Plot.new(%{x: :x, y: :y, color: :g})
+        |> Plot.geom_hex(binwidth: {1.1, 1})
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
+    end
+
+    # Golden: `layer_data()` for `geom_hex(binwidth = 1)` over x at 7.7e11 and 7.7e11 + 5, whole
+    # numbers of widths, where the millionth beyond is lost to rounding: the hexagons reach just
+    # to the rows, which hexbin takes; over two rows at 7.7e11 they reach no width at all, which
+    # it refuses.
+    test "hexagons reaching just to their rows bin them, and hexagons of no extent bin nothing" do
+      reaching =
+        %{"x" => [7.7e11, 7.7e11 + 5], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(reaching, :x) == [770_000_000_000.0, 770_000_000_005.5]
+      assert DataFrame.pull(reaching, :y) == [0.99999899999999997, 1.8660244037844387]
+      assert DataFrame.pull(reaching, :density) == [0.5, 0.5]
+
+      collapsed =
+        %{"x" => [7.7e11, 7.7e11], "y" => [1, 2]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(collapsed, :count) == []
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(weight = w), binwidth = 1)` with weights 1 and
+    # `NA` in the first hexagon, 2, `Inf` and 1 in the others, and again with `NaN` for the
+    # missing one: a hexagon whose weights sum to a missing value or NaN is left out, as R's
+    # `na.omit()` leaves it, and an infinite one is counted infinite, its shares R's divisions.
+    test "a hexagon of a missing weight is left out, and an infinite one counted" do
+      rows = %{
+        "x" => [1, 1.1, 3, 5, 5.1],
+        "y" => [1, 1.1, 3, 5, 5.1],
+        "w" => [1, nil, 2, :infinity, 1],
+        "v" => [:nan, 1, 2, 3, 4]
+      }
+
+      infinite =
+        rows
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(infinite, :x) ==
+               [2.9999989999999999, 4.9999989999999999, 5.4999989999999999]
+
+      assert Enum.map([:count, :density, :ndensity, :ncount], fn name ->
+               DataFrame.pull(infinite, name)
+             end) == [
+               [2.0, :infinity, 1.0],
+               [0.0, :nan, 0.0],
+               [:nan, :nan, :nan],
+               [0.0, :nan, 0.0]
+             ]
+
+      not_a_number =
+        rows
+        |> Plot.new(%{x: :x, y: :y, weight: :v})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(not_a_number, :count) == [2.0, 3.0, 4.0]
+
+      assert DataFrame.pull(not_a_number, :density) ==
+               [0.22222222222222221, 0.33333333333333331, 0.44444444444444442]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(weight = w), binwidth = 1)` with `w` missing in every
+    # row: each hexagon's weights sum to `NA`, so every one is left out.
+    test "a weight missing in every row bins nothing" do
+      frame =
+        %{"x" => [1, 2, 3], "y" => [1, 2, 3], "w" => [nil, nil, nil]}
+        |> Plot.new(%{x: :x, y: :y, weight: :w})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :count) == []
+    end
+
+    # Golden: `layer_data()` for `geom_hex(binwidth = 1)` over rows missing an x, at an infinite
+    # one, and missing a y as NaN: only the rows at a finite x and y are counted, as ggplot2's
+    # stats drop the others.
+    test "a row missing its x or y, or at an infinite one, is not counted" do
+      frame =
+        %{"x" => [1.0, 2.0, nil, 3.0, :infinity], "y" => [1.0, 2.0, 3.0, :nan, 4.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 1)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) == [0.99999899999999997, 2.4999989999999999]
+      assert DataFrame.pull(frame, :y) == [0.99999899999999997, 1.8660244037844387]
+      assert DataFrame.pull(frame, :count) == [1.0, 1.0]
+    end
+
+    # Golden: `layer_data()` for `ggplot(mpg, aes(drv, hwy)) + geom_hex(bins = 5)`: a discrete x is
+    # binned on its levels' positions, 1 to 3, its hexagons 0.4 wide.
+    test "a discrete axis is binned on its positions" do
+      frame =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :drv, y: :hwy})
+        |> Plot.geom_hex(bins: 5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) ==
+               [0.99999900000000008, 1.199999, 0.99999900000000008, 1.199999, 2.199999] ++
+                 [1.9999990000000001, 2.199999, 1.9999990000000001, 2.199999] ++
+                 [1.9999990000000001, 2.9999990000000003, 3.199999, 2.9999990000000003]
+
+      widths = DataFrame.pull(frame, :width)
+      assert Enum.uniq(widths) == [0.40000000000000002]
+
+      assert DataFrame.pull(frame, :count) ==
+               [16.0, 52.0, 30.0, 5.0, 1.0, 51.0, 39.0, 12.0, 1.0, 2.0, 15.0, 6.0, 4.0]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(binwidth = 0.5)` over diamonds' least and greatest
+    # carat and price and its 1,019th row, 0.72 carats at $4,339, the first of the 12 rows whose
+    # hexagon turns on hexbin's single-precision √3: its centre is hexbin's, cell 111218, where the
+    # true √3 puts it in cell 111206.
+    test "a row near a hexagon's edge falls where hexbin puts it" do
+      frame =
+        %{"x" => [0.2, 5.01, 0.72], "y" => [326, 18_823, 4339]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(binwidth: 0.5)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(frame, :x) == [
+               -9.9999999999999995e-07,
+               0.49999900000000003,
+               5.2499989999999999
+             ]
+
+      assert DataFrame.pull(frame, :y) == [325.999999, 4339.1617201370882, 18_823.00358572993]
+    end
+
+    # Golden: `layer_data()` for `geom_hex(aes(fill = after_stat(density)), bins = 3)`: each
+    # hexagon filled by its share of the rows, through the default gradient.
+    test "an after_stat reads a hexagon's density" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, fill: {:after_stat, [:density]}})
+        |> Plot.geom_hex(bins: 3)
+
+      fills =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:fill)
+
+      assert fills ==
+               ~w(#132B43 #214869 #336A98 #4895D2 #214667 #56B1F7 #2E608B #152E48 #132B43) ++
+                 ~w(#16304A #142D45)
+
+      assert [%{title: "density"}] = Giggly.Assembly.run(plot).legends
     end
   end
 
@@ -9938,6 +10464,135 @@ defmodule GigglyTest do
       assert golden?(plot, "segment_arrow_radial")
     end
 
+    # Golden: test/golden/rug.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/rug.R: every element and clip path matches, the x axis drawn before the y as in
+    # test/golden/point.svg. The first example on ggplot2's geom_rug reference page: mtcars'
+    # points and a rug along the bottom and the left. It moves with how a rug is drawn.
+    test "a rug along the bottom and the left marks each point's x and y" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug()
+
+      assert golden?(plot, "rug")
+    end
+
+    # Golden: test/golden/rug_sides.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_sides.R: every element and clip path matches, the x axis drawn before the
+    # y as in test/golden/point.svg. All four sides in ggplot2's order whatever the order given, in
+    # each row's colour with round ends, keyed as a path; an annotated rug in no legend. It moves
+    # with how a rug is drawn and with a path's key.
+    test "rugs along every side, in their rows' colours, keyed as a path" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4], "g" => ~w(a b a b)}
+        |> Plot.new(%{x: :x, y: :y, color: :g})
+        |> Plot.geom_rug(sides: [:left, :bottom, :right, :top], linewidth: 1, lineend: :round)
+        |> Plot.annotate(:rug,
+          y: [1.5, 3.5],
+          sides: [:right],
+          colour: "steelblue",
+          length: {0.1, :npc}
+        )
+
+      assert golden?(plot, "rug_sides")
+    end
+
+    # Golden: test/golden/rug_length.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_length.R: every element and clip path matches, the x axis drawn before
+    # the y as in test/golden/point.svg. Lines 12 TeX points long along the top and right and 5% of
+    # the panel along the bottom and left, dashed; a row missing its x draws only its y's line,
+    # one missing its y only its x's, and an infinite x is at the panel's corner.
+    test "a rug's length in points or a share of the panel, and its rows missing a place" do
+      plot =
+        %{"x" => [1, nil, 3, :infinity, 2], "y" => [10, 20, nil, 40, 30]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug(sides: [:top, :right], length: {12, :pt}, colour: "red")
+        |> Plot.geom_rug(length: {0.05, :npc}, linetype: :dashed)
+
+      assert golden?(plot, "rug_length")
+    end
+
+    # Golden: test/golden/rug_repeated.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/rug_repeated.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Along the bottom and left a row repeated in every
+    # column is drawn once, and the row missing its x comes last along the left; along the top
+    # alone each is drawn, darkening where they pile up. It moves with how a rug keeps its rows.
+    test "a rug along both axes draws a repeated row once, and along one every time" do
+      plot =
+        %{"x" => [1, nil, 1, 2, 1], "y" => [5, 7, 5, 6, 5]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_rug(alpha: 0.3, linewidth: 2)
+        |> Plot.geom_rug(sides: [:top], alpha: 0.3, linewidth: 2)
+
+      assert golden?(plot, "rug_repeated")
+    end
+
+    # Golden: test/golden/rug_radial.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_radial.R: every element matches, in order, and every clip path but
+    # svglite's around the whole drawing. Straight lines from the panel's square edges, each at
+    # its point's place on the circle. It moves with what moves test/golden/radial.svg.
+    test "a rug in radial coordinates is straight lines at each point's place" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 3, 2, 4]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_rug()
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "rug_radial")
+    end
+
+    # Golden: test/golden/rug_outside.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/rug_outside.R: every element and clip path matches, the x axis drawn before
+    # the y as in test/golden/point.svg. The geom_rug reference page's example moving the rug
+    # outside: each line runs out from the panel's edge, and the panel, unclipped, has no clip
+    # path. It moves with how a rug is drawn and with what moves test/golden/rug.svg.
+    test "a rug outside an unclipped panel runs out from its edges" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(outside: true)
+        |> Plot.coord_cartesian(clip: :off)
+
+      assert golden?(plot, "rug_outside")
+    end
+
+    # Golden: test/golden/rug_outside_margin.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/rug_outside_margin.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg, and the background's edge written as
+    # R's rounding error. The reference page's rug outside along the top and the right, a
+    # centimetre of plot margin leaving it room.
+    test "a rug outside along the top and right, in a wider plot margin" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(outside: true, sides: [:top, :right])
+        |> Plot.coord_cartesian(clip: :off)
+        |> Plot.theme(plot_margin: {1, :cm})
+
+      assert golden?(plot, "rug_outside_margin")
+    end
+
+    # Golden: test/golden/rug_outside_clipped.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/rug_outside_clipped.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. Lines 6 TeX points long outside every
+    # side and an annotated rug outside the bottom, each drawn past the panel's edge, where its
+    # clip hides it.
+    test "a rug outside a clipped panel is drawn past its edges, where the clip hides it" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [10, 30, 20]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_rug(sides: [:top, :right, :bottom, :left], outside: true, length: {6, :pt})
+        |> Plot.annotate(:rug, x: 2.5, outside: true, colour: "red")
+        |> Plot.coord_cartesian(clip: :on)
+
+      assert golden?(plot, "rug_outside_clipped")
+    end
+
     # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/path_arrow.R: every element and clip path matches, the x axis drawn before the
     # y as in test/golden/point.svg. Each group's heads at its own ends, in its colour.
@@ -10255,6 +10910,99 @@ defmodule GigglyTest do
         |> Plot.facet_wrap(:p)
 
       assert golden?(plot, "density_dropped")
+    end
+
+    # Golden: test/golden/hex.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/hex.R: every element and clip path matches but the colour bar's fill, which
+    # vdiffr does not draw, the x axis drawn before the y as in test/golden/point.svg. mpg's
+    # hexagons 30 across each axis, filled by their counts, unbordered. It moves with hexagonal
+    # binning, a hexagon's corners, or a colour bar.
+    test "hexagons are filled by their counts" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex()
+
+      assert golden?(plot, "hex")
+    end
+
+    # Golden: test/golden/hex_bins.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_bins.R, which gives ggplot2 the widths `bins: {10, 5}` makes: x's extent
+    # over 10 and y's over 5, as ggplot2's documentation describes a pair of bins.
+    test "a pair of bins numbers the hexagons along each axis apart" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: {10, 5})
+
+      assert golden?(plot, "hex_bins")
+    end
+
+    # Golden: test/golden/hex_log.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_log.R, whose x axis ggplot2 labels in scientific form, which Giggly writes
+    # plainly. Hexagons a tenth of a power of ten wide and high on two log10 axes, the rows missing
+    # either left out.
+    test "a bin width is in the axes' transformed units" do
+      plot =
+        Giggly.Datasets.txhousing()
+        |> Plot.new(%{x: :volume, y: :sales})
+        |> Plot.geom_hex(binwidth: 0.1)
+        |> Plot.scale_x_log10()
+        |> Plot.scale_y_log10()
+
+      assert golden?(plot, "hex_log")
+    end
+
+    # Golden: test/golden/hex_groups.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_groups.R: every element and clip path matches but for the axes' order. Each
+    # drive's hexagons on a grid of its own, unfilled and outlined in its colour, the keys a
+    # polygon's. It moves with a group's hexagons, or a hexagon's key.
+    test "each group's hexagons are outlined in its colour, its key a polygon's" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, color: :drv})
+        |> Plot.geom_hex(bins: 5, fill: :none)
+
+      assert golden?(plot, "hex_groups")
+    end
+
+    # Golden: test/golden/hex_facets.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_facets.R. A panel for each drive on scales of its own, each panel's hexagons
+    # its own axes' extents over 5, so each panel's are a size of their own.
+    test "each panel's hexagons are sized by its own axes" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: 5)
+        |> Plot.facet_wrap(:drv, scales: :free)
+
+      assert golden?(plot, "hex_facets")
+    end
+
+    # Golden: test/golden/hex_radial.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_radial.R. Each corner placed on the circle and the sides straight between
+    # them, a corner before the theta axis's start coming round from its end. It moves with what
+    # moves test/golden/radial.svg.
+    test "hexagons in radial coordinates are straight between their placed corners" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: 5)
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "hex_radial")
+    end
+
+    # Golden: test/golden/hex_dashed.svg, checked as test/golden/hex.svg is, made by
+    # test/golden/hex_dashed.R. Half-opaque hexagons bordered in black dashes a millimetre wide,
+    # their corners pointed: the alpha reaches the fill alone.
+    test "a hexagon's alpha reaches its fill, and its border is dashed and mitred" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy})
+        |> Plot.geom_hex(bins: 5, alpha: 0.5, color: "black", linetype: :dashed, linewidth: 1)
+
+      assert golden?(plot, "hex_dashed")
     end
 
     # Golden: test/golden/smooth_loess.svg, checked as test/golden/smooth_lm.svg is, made by

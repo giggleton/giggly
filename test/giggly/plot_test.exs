@@ -1,7 +1,7 @@
 defmodule Giggly.PlotTest do
   use ExUnit.Case, async: true
 
-  alias Giggly.{Coord, DataFrame, Facet, Geom, Guide, Plot, Position, Scale, Stat}
+  alias Giggly.{Coord, DataFrame, Facet, Geom, Guide, Plot, Position, Scale, Stat, Theme}
 
   doctest Giggly.Plot
 
@@ -2154,6 +2154,172 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_rug/3" do
+    # ggplot2 4.0.3's `geom_rug()`: `sides = "bl"`, `length = unit(0.03, "npc")`, `outside =
+    # FALSE`, `lineend = "butt"`, and the identity stat and position.
+    test "a rug layer records its geom with ggplot2's sides, length and line ends by default" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_rug(%{colour: :cyl})
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Rug{
+                   sides: [:bottom, :left],
+                   length: {0.03, :npc},
+                   outside: false,
+                   line_end: :butt
+                 },
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{color: "cyl"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :y],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "the options choose the sides, the length, the way out and the line ends, and set looks" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_rug(
+          sides: [:top, :right],
+          length: {1, :npc},
+          outside: true,
+          lineend: :round,
+          colour: "red",
+          linewidth: 2,
+          linetype: :dashed,
+          alpha: 1
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Rug{
+                   sides: [:top, :right],
+                   length: {1.0, :npc},
+                   outside: true,
+                   line_end: :round
+                 },
+                 fixed: %{color: "#FF0000", linewidth: 2.0, linetype: {4, 4}, alpha: 1.0}
+               }
+             ] = plot.reversed_layers
+    end
+
+    # Any amount, as grid draws a negative one's lines out from the edge; the theme's tests pin
+    # how a unit is worked out in points.
+    test "a length in a unit is recorded in points, worked out as the theme works one out" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for length <- [{12, :pt}, {0.5, :cm}, {-2, :mm}, {1, :in}] do
+        assert [%Plot.Layer{geom: %Geom.Rug{length: {points, :points}}}] =
+                 Plot.geom_rug(plot, length: length).reversed_layers
+
+        assert points === Theme.points(length)
+      end
+    end
+
+    test "sides that are not a list of the panel's four, each given once, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for sides <- [[:bottom, :bottom], [:north], :bottom, "bl"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_rug(plot, sides: sides) end
+
+        assert error.message =~
+                 "[:top, :right, :bottom, :left], each given once, got: " <>
+                   inspect(sides)
+      end
+
+      assert [%Plot.Layer{geom: %Geom.Rug{sides: []}}] =
+               Plot.geom_rug(plot, sides: []).reversed_layers
+    end
+
+    # ggplot2 4.0.3 refuses `geom_rug(length = 0.01)`: "`length` must be a <unit> object".
+    test "a length that is not an amount in a share of the panel or a unit is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for length <- [0.03, {0.03, :lines}, {"1", :npc}, {"1", :cm}, [0.03, :npc]] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_rug(plot, length: length)
+          end
+
+        assert error.message =~
+                 "an amount with a unit of [:npc, :pt, :cm, :mm, :in], got: " <>
+                   inspect(length)
+      end
+    end
+
+    # ggplot2 4.0.3's `GeomRug` needs neither, and draws nothing with neither.
+    test "a rug needs one of x and y" do
+      unmapped = Plot.new(@rows)
+      error = assert_raise ArgumentError, fn -> Plot.geom_rug(unmapped) end
+      assert error.message =~ "Plot.geom_rug/3 needs one of :x, :y, but neither its mapping"
+
+      for mapping <- [%{x: :wt}, %{y: :mpg}] do
+        plot = Plot.new(@rows, mapping)
+        assert [%Plot.Layer{}] = Plot.geom_rug(plot).reversed_layers
+      end
+    end
+
+    # ggplot2 4.0.3: `geom_rug(position = "jitter")` of `aes(x)` alone fails as the plot is built,
+    # "`position_jitter()` requires the following missing aesthetics: y".
+    test "a jittered rug needs both x and y, saying it is jittered" do
+      across = Plot.new(@rows, %{x: :wt})
+      both = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for position <- [:jitter, Plot.position_jitter(seed: 3)] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_rug(across, position: position) end
+        assert error.message =~ "Plot.geom_rug/3 needs :y, but neither its mapping"
+        assert error.message =~ "its rugs are jittered"
+      end
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
+               Plot.geom_rug(both, position: :jitter).reversed_layers
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_rug(both, position: :dodge)
+        end
+
+      assert error.key == :position
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_rug(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_rug, 3}
+      end
+    end
+
+    test "a mapping a rug cannot use, or an option it does not take, is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for mapping <- [%{xend: :wt}, %{fill: :cyl}, %{y: :nope}] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_rug(plot, mapping) end
+        assert String.starts_with?(error.message, "Plot.geom_rug/3 ")
+      end
+
+      for {option, value} <- [linejoin: :mitre, fill: "red", outside: 1, arrow: true] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_rug(plot, [{option, value}])
+          end
+
+        assert error.key in [option, [option]]
+      end
+    end
+  end
+
   describe "geom_text/3" do
     @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
 
@@ -2848,6 +3014,181 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_hex/3 and stat_bin_hex/3" do
+    @hex_values %{
+      "x" => [1.0, 2.0, 4.0, 4.0],
+      "y" => [1, 2, 3, 4],
+      "w" => [1, 2, 1, 2],
+      "s" => ~w(a b c d)
+    }
+
+    test "a hexagon layer records its geom, stat and position with ggplot2's defaults" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      expected = [
+        %Plot.Layer{
+          geom: %Geom.Hex{line_end: :butt, line_join: :mitre, mitre_limit: 10.0},
+          stat: %Stat.BinHex{bins: {30, 30}, binwidth: :none},
+          position: %Position.Identity{},
+          data: :none,
+          mapping: %{},
+          fixed: %{},
+          accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
+          annotation: false
+        }
+      ]
+
+      assert Plot.geom_hex(plot).reversed_layers == expected
+      assert Plot.stat_bin_hex(plot).reversed_layers == expected
+    end
+
+    test "bins and bin widths are one for both axes or a pair, each width kept as a float" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      [bins] = Plot.geom_hex(plot, bins: 10).reversed_layers
+      assert bins.stat.bins == {10, 10}
+
+      [pair] = Plot.stat_bin_hex(plot, bins: {10, 20}).reversed_layers
+      assert pair.stat.bins == {10, 20}
+
+      [one] = Plot.geom_hex(plot, bins: 1).reversed_layers
+      assert one.stat.bins == {1, 1}
+
+      [ones] = Plot.geom_hex(plot, bins: {1, 1}).reversed_layers
+      assert ones.stat.bins == {1, 1}
+
+      [width] = Plot.geom_hex(plot, binwidth: 2).reversed_layers
+      assert width.stat.binwidth === {2.0, 2.0}
+
+      [widths] = Plot.geom_hex(plot, binwidth: {0.1, 500}).reversed_layers
+      assert widths.stat.binwidth === {0.1, 500.0}
+
+      [whole] = Plot.geom_hex(plot, binwidth: {2, 500}).reversed_layers
+      assert whole.stat.binwidth === {2.0, 500.0}
+    end
+
+    test "bins or bin widths not offered are refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for bins <- [0, -1, 2.5, {0, 10}, {2.5, 10}, {10, 0}, {10}, {10, 20, 30}, [10, 20], "10"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a number of bins/, fn ->
+            Plot.geom_hex(plot, bins: bins)
+          end
+
+        assert error.message =~ "got: #{inspect(bins)}"
+      end
+
+      for width <- [0, -0.5, {0, 1}, {"1", 1}, {1, 0}, {1, -1}, {1, 2, 3}, [1, 2], "1"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/a bin width/, fn ->
+            Plot.stat_bin_hex(plot, binwidth: width)
+          end
+
+        assert error.message =~ "got: #{inspect(width)}"
+      end
+    end
+
+    test "a hexagon's look is set for every hexagon, and its borders' ends and corners chosen" do
+      [layer] =
+        @hex_values
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(
+          colour: "red",
+          fill: "steelblue",
+          alpha: 1,
+          linewidth: 2,
+          linetype: 2,
+          lineend: :round,
+          linejoin: :bevel,
+          linemitre: 2
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Hex{line_end: :round, line_join: :bevel, mitre_limit: 2.0},
+               fixed: %{
+                 color: "#FF0000",
+                 fill: "#4682B4",
+                 alpha: 1.0,
+                 linewidth: 2.0,
+                 linetype: {4, 4}
+               }
+             } = layer
+
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for join <- [:round, :mitre] do
+        [joined] = Plot.geom_hex(plot, linejoin: join).reversed_layers
+        assert joined.geom.line_join == join
+      end
+    end
+
+    test "a layer missing x or y, a position, or an option not offered is refused" do
+      for {function, name} <- [
+            {&Plot.geom_hex/1, "geom_hex"},
+            {&Plot.stat_bin_hex/1, "stat_bin_hex"}
+          ],
+          {mapping, missing} <- [{%{x: :x}, ":y"}, {%{y: :y}, ":x"}] do
+        error =
+          assert_raise ArgumentError, fn ->
+            @hex_values
+            |> Plot.new(mapping)
+            |> function.()
+          end
+
+        assert error.message ==
+                 "Plot.#{name}/3 needs #{missing}, but neither its mapping nor the plot's maps it"
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
+        @hex_values
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_hex(position: :identity)
+      end
+    end
+
+    test "a weight that is not numbers, an unusable aesthetic or an unknown after_stat is refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      weight = assert_raise ArgumentError, fn -> Plot.geom_hex(plot, %{weight: :s}) end
+      assert weight.message =~ "a weight is summed"
+
+      assert [_layer] = Plot.geom_hex(plot, %{weight: :w}).reversed_layers
+
+      assert_raise ArgumentError, ~r/:size/, fn -> Plot.geom_hex(plot, %{size: :y}) end
+
+      for variable <- [:count, :density, :ncount, :ndensity] do
+        assert [_layer] =
+                 Plot.geom_hex(plot, %{fill: {:after_stat, [variable]}}).reversed_layers
+      end
+
+      for variable <- [:width, :height, :prop] do
+        assert_raise ArgumentError, ~r/#{variable}/, fn ->
+          Plot.geom_hex(plot, %{fill: {:after_stat, [variable]}})
+        end
+      end
+
+      assert_raise ArgumentError, ~r/weight/, fn ->
+        Plot.stat_bin_hex(plot, %{weight: {:after_stat, [:count]}})
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@hex_values, %{x: :x, y: :y})
+
+      for function <- [:geom_hex, :stat_bin_hex],
+          {mapping, options} <- [{untyped(:x), []}, {%{}, untyped(:bins)}] do
+        error =
+          assert_raise FunctionClauseError, fn ->
+            apply(Plot, function, [plot, mapping, options])
+          end
+
+        assert {error.module, error.function, error.arity} == {Plot, function, 3}
+      end
+    end
+  end
+
   describe "geom_smooth/3 and stat_smooth/3" do
     @points %{
       "x" => [1, 2, 3, 4],
@@ -3213,7 +3554,7 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :curve, x: 1, y: 1) end
 
       assert error.message =~
-               ":point, :col, :bar, :path, :line, :segment, :text or :rect, got: :curve"
+               ":point, :col, :bar, :path, :line, :segment, :rug, :text or :rect, got: :curve"
     end
 
     # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
@@ -3378,6 +3719,39 @@ defmodule Giggly.PlotTest do
       assert_raise NimbleOptions.ValidationError, fn ->
         Plot.annotate(plot, :segment, x: 1, y: 0, xend: 3, linemitre: 4)
       end
+    end
+
+    # ggplot2 4.0.3: `annotate("rug", y = c(1.5, 3.5), sides = "r", outside = TRUE, linewidth =
+    # c(1, 2))` draws a line out from the right for each, each as wide as its own.
+    test "a rug annotation takes its positions, sides, length and way out, and a width for each" do
+      [layer] =
+        @rows
+        |> Plot.new()
+        |> Plot.annotate(:rug,
+          y: [1.5, 3.5],
+          sides: [:right],
+          length: {2, :in},
+          outside: true,
+          linewidth: [1, 2]
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Rug{
+                 sides: [:right],
+                 length: {144.0, :points},
+                 outside: true,
+                 line_end: :butt
+               },
+               mapping: %{y: "y"},
+               fixed: %{linewidth: [1.0, 2.0]},
+               annotation: true
+             } = layer
+
+      plot = Plot.new(@rows)
+      error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :rug, sides: [:top]) end
+
+      assert error.message =~ "Plot.annotate/3 needs one of :x, :y, but :rug is given no value"
     end
 
     # ggplot2 4.0.3: `layer_data(ggplot() + annotate("col", x = 1, y = 3, width = c(0.5, 0.8)))`
@@ -3589,6 +3963,45 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
+    end
+  end
+
+  describe "coord_cartesian/2" do
+    test "cartesian coordinates clip each panel unless told not to, replacing radial ones" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.coord_radial()
+
+      assert Plot.coord_cartesian(plot).coord == %Coord.Cartesian{clip: :on}
+      assert Plot.coord_cartesian(plot, clip: :off).coord == %Coord.Cartesian{clip: :off}
+    end
+
+    # ggplot2 4.0.3 builds `coord_cartesian(clip = "bogus")`, and grid fails as it draws it:
+    # "invalid 'clip' value". grid's `"inherit"` draws byte for byte as `"off"` does, so Giggly
+    # takes no second name for `:off`.
+    test "a clip that is not :on or :off, or an option it does not take, is refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {option, value} <- [clip: :inherit, clip: true, clip: "off", xlim: {1, 2}] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.coord_cartesian(plot, [{option, value}])
+          end
+
+        assert error.key in [option, [option]]
+      end
+    end
+
+    test "options that are not a keyword list are refused by its own clause" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise FunctionClauseError, fn ->
+          Plot.coord_cartesian(plot, untyped(%{clip: :off}))
+        end
+
+      assert {error.module, error.function, error.arity} == {Plot, :coord_cartesian, 2}
     end
   end
 
@@ -6325,4 +6738,9 @@ defmodule Giggly.PlotTest do
       end
     end
   end
+
+  # `value` with its type hidden from the compiler, so a test can hand a function a value its
+  # guards refuse.
+  @spec untyped(term()) :: term()
+  defp untyped(value), do: value
 end

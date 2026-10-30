@@ -658,6 +658,75 @@ defmodule Giggly.Plot do
       do: bin_layer(plot, mapping, options, "Plot.stat_bin/3")
 
   @doc """
+  Adds a layer of hexagons counting the rows in each, hexagonal binning: the plane cut into
+  hexagons, each standing on a point, and for each group one hexagon wherever a row falls, filled
+  by how many rows fall in it, or, where `:weight` is mapped, by the sum of their weights. A
+  heatmap of two continuous variables, it shows where many rows overlap, as points drawn over
+  one another cannot.
+
+  The hexagons are 30 across each panel's x and y axes unless `bins:` or `binwidth:` says
+  otherwise; each group's hexagons start from its own rows, so groups are binned apart. A row
+  falls in the hexagon whose centre is nearest. A row missing its `x` or `y`, or at an infinite
+  one, is not counted. A panel where an axis has no extent, as for rows all at one `x`, is drawn
+  nothing.
+
+  Hexagonal binning uses `:x`, `:y`, `:weight` and `:group`, and needs `:x` and `:y`. A `:weight`
+  column must hold numbers. The hexagons also take `:alpha`, `:fill`, `:color`, `:linetype` and
+  `:linewidth`; one reaches a hexagon only where it is the same in every row of its group, so a
+  discrete one groups the rows. Each is filled by its count through the fill scale, which titles
+  the legend `count`, unless a fill is mapped or set, and drawn without a border unless a colour
+  is mapped or set.
+
+  Hexagonal binning computes, for each hexagon, `count`; `density`, the count over the group's
+  total; and `ncount` and `ndensity`, the count and the density over the group's largest. A
+  mapping reads them with an after_stat (`Giggly.Mapping`): `%{x: :carat, y: :price, fill:
+  {:after_stat, [:density]}}` fills each hexagon by its share of the rows.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.hex())}
+
+      iex> frame =
+      ...>   %{"x" => [0.0, 0.1, 1.0, 2.0], "y" => [0.0, 0.1, 1.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_hex(binwidth: 1)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :count)
+      [2.0, 1.0, 1.0]
+  """
+  @spec geom_hex(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_hex(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_hex(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_hex(plot, %{}, options)
+
+  def geom_hex(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: hex_layer(plot, mapping, options, "Plot.geom_hex/3")
+
+  @doc """
+  Adds the layer `geom_hex/3` adds, hexagons counting the rows in each, from the same mapping and
+  options.
+
+      iex> frame =
+      ...>   %{"x" => [0.0, 0.1, 1.0, 2.0], "y" => [0.0, 0.1, 1.0, 2.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.stat_bin_hex(binwidth: 1)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :density)
+      [0.5, 0.25, 0.25]
+  """
+  @spec stat_bin_hex(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_bin_hex(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_bin_hex(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_bin_hex(plot, %{}, options)
+
+  def stat_bin_hex(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: hex_layer(plot, mapping, options, "Plot.stat_bin_hex/3")
+
+  @doc """
   Adds a layer of frequency polygons: the `x` axis cut into bins, as `geom_histogram/3` cuts it,
   and for each group a line through the middle of each bin at the number of rows in it, or, where
   `:weight` is mapped, the sum of their weights. A bin of no rows is added at each end, so every
@@ -1039,6 +1108,77 @@ defmodule Giggly.Plot do
     }
 
     add_layer(plot, layer, "Plot.geom_segment/3", required: Geom.Segment.required_aesthetics())
+  end
+
+  @doc """
+  Adds a layer of rugs: a short line at the panel's edge for each row, at its `x` along the
+  bottom and at its `y` along the left, so the margins show how each axis's values are spread,
+  beside a scatter plot of the same rows. Every row is drawn, so rugs suit small tables.
+
+  Rugs use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`, and need one
+  of `:x` and `:y`; a side whose axis is not mapped draws nothing. `sides:` says which sides are
+  drawn, in any order. Each line runs in from the panel's edge as far as `length:` says, by
+  default 3% of the panel, which the 5% of room the axes leave at each end keeps clear of the
+  data; with `outside: true` it runs out from the edge instead, which shows only where
+  `coord_cartesian/2` leaves the panel unclipped. A row missing its place draws no line along
+  that axis's sides, and an infinite one is at the panel's corner. Where the rugs run along both
+  axes, a row repeated in every column is drawn once on each side, as ggplot2 draws it. Each line
+  takes its own row's colour, alpha, width and line type; a colour of `:none` draws none, and so
+  does the line type `:blank`. Under `coord_radial/1` the lines are straight all the same, along
+  the panel's square edges at each row's place, and a rug needs both `:x` and `:y` there.
+
+  With `position: :jitter` each row moves as `geom_jitter/3` moves the points of the same rows,
+  so a rug beside them marks each point; it needs both `:x` and `:y`.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.rug())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_rug(sides: [:bottom, :right], length: {2, :mm})
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :x), Giggly.DataFrame.pull(frame, :y)}
+      {[2.62, 2.875], [21.0, 22.8]}
+
+  Rows repeated in every column are drawn once on each side where the rugs run along both axes,
+  so these three rows draw two lines along the bottom and two along the left:
+
+      iex> svg =
+      ...>   %{"x" => [1.0, 1.0, 2.0], "y" => [5.0, 5.0, 6.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_rug()
+      ...>   |> Giggly.Plot.theme_void()
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> ~r/<line / |> Regex.scan(svg) |> length()
+      4
+  """
+  @spec geom_rug(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_rug(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_rug(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_rug(plot, %{}, options)
+
+  def geom_rug(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.rug())
+    data = own_data(validated)
+    position = position(Keyword.fetch!(validated, :position))
+
+    layer = %Layer{
+      geom: rug_geom(validated),
+      stat: %Stat.Identity{},
+      position: position,
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_rug/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Rug.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_rug/3", rug_requirements(position))
   end
 
   @doc """
@@ -1494,7 +1634,7 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:text` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
@@ -1506,8 +1646,8 @@ defmodule Giggly.Plot do
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
   a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
-  segment's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash
-  pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
+  segment's, a rug's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a
+  dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
   along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
   that makes more than one panel, an annotation given such a list raises when the plot is run.
 
@@ -1521,6 +1661,8 @@ defmodule Giggly.Plot do
       and `linemitre:`, and `:line` those and `orientation:`;
     * `:segment`: `x:`, `y:`, `xend:`, `yend:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`,
       `lineend:` and `linejoin:`;
+    * `:rug`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `sides:`, `length:`,
+      `outside:` and `lineend:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
@@ -1587,8 +1729,8 @@ defmodule Giggly.Plot do
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :text or " <>
-            ":rect, got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text " <>
+            "or :rect, got: #{inspect(geom)}"
   end
 
   @doc """
@@ -1777,6 +1919,40 @@ defmodule Giggly.Plot do
     facet = %Facet.Grid{rows: rows, cols: cols, scales: Keyword.fetch!(options, :scales)}
 
     %{plot | facet: facet}
+  end
+
+  @doc """
+  Draws the plot in cartesian coordinates, x across each panel and y up it, replacing any
+  coordinate system the plot had. A plot is cartesian until another is chosen, each panel cut off
+  at its edges; with `clip: :off` what is drawn may run past them, as rugs drawn outside the
+  panel do.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.coord_cartesian())}
+
+  Clipped, the panel's cell has a clip path of its own beside the plot's background's; unclipped,
+  the background's alone:
+
+      iex> plot =
+      ...>   %{"wt" => [2.32, 2.62, 3.44], "mpg" => [22.8, 21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_rug(outside: true)
+      iex> Enum.map([:on, :off], fn clip ->
+      ...>   svg =
+      ...>     plot
+      ...>     |> Giggly.Plot.coord_cartesian(clip: clip)
+      ...>     |> Giggly.to_svg()
+      ...>     |> IO.iodata_to_binary()
+      ...>
+      ...>   ~r/<clipPath/ |> Regex.scan(svg) |> length()
+      ...> end)
+      [2, 1]
+  """
+  @spec coord_cartesian(t(), keyword()) :: t()
+  def coord_cartesian(%__MODULE__{} = plot, options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, Options.coord_cartesian())
+    %{plot | coord: %Coord.Cartesian{clip: Keyword.fetch!(validated, :clip)}}
   end
 
   @doc """
@@ -4709,6 +4885,39 @@ defmodule Giggly.Plot do
     add_binning_layer(plot, layer, validated, function)
   end
 
+  # The layer `geom_hex/3` and `stat_bin_hex/3` add, hexagons counting the rows in each, its
+  # mistakes named as `function`'s.
+  defp hex_layer(plot, mapping, options, function) do
+    validated = layer_options(options, Options.hex())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Hex{
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        mitre_limit: Keyword.fetch!(validated, :linemitre)
+      },
+      stat: %Stat.BinHex{
+        bins: Keyword.fetch!(validated, :bins),
+        binwidth: Keyword.get(validated, :binwidth, :none)
+      },
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted: Enum.uniq(Stat.BinHex.accepted_aesthetics() ++ Geom.Hex.accepted_aesthetics()),
+      annotation: false
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.BinHex.required_aesthetics(),
+      computed: Stat.BinHex.computed_variables(),
+      dropped: Stat.BinHex.dropped_aesthetics()
+    )
+    |> check_weight(layer, function)
+  end
+
   # The plot with a binning layer added, once its mappings are checked against binning's, its
   # weight's type and its orientation.
   defp add_binning_layer(plot, layer, validated, function) do
@@ -4857,6 +5066,27 @@ defmodule Giggly.Plot do
     }
   end
 
+  defp rug_geom(validated) do
+    %Geom.Rug{
+      sides: Keyword.fetch!(validated, :sides),
+      length: Keyword.fetch!(validated, :length),
+      outside: Keyword.fetch!(validated, :outside),
+      line_end: Keyword.fetch!(validated, :lineend)
+    }
+  end
+
+  # What a rug layer needs: one of its positions, or, jittered, both, which jittering moves.
+  defp rug_requirements(%Position.Jitter{}) do
+    [
+      required: [:x, :y],
+      unmet:
+        "neither its mapping nor the plot's maps it, and its rugs are jittered, which moves " <>
+          "each row across and up, as ggplot2's position_jitter() needs both"
+    ]
+  end
+
+  defp rug_requirements(_position), do: [required: Geom.Rug.required_aesthetics()]
+
   defp text_geom(validated),
     do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
 
@@ -4879,6 +5109,10 @@ defmodule Giggly.Plot do
   defp annotation_geom(:segment, validated) do
     geom = segment_geom(validated)
     {geom, Geom.Segment.accepted_aesthetics(), Geom.Segment.required_aesthetics()}
+  end
+
+  defp annotation_geom(:rug, validated) do
+    {rug_geom(validated), Geom.Rug.accepted_aesthetics(), Geom.Rug.required_aesthetics()}
   end
 
   defp annotation_geom(:text, validated),
