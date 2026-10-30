@@ -31,12 +31,12 @@ its labels are written, in units of time such as `"1 week"` and formats such as 
 has `Giggly.Plot.scale_x_date/2` and `Giggly.Plot.scale_y_date/2` for `Date`s,
 `Giggly.Plot.scale_x_datetime/2` and `Giggly.Plot.scale_y_datetime/2` for `DateTime`s and
 `NaiveDateTime`s, and `Giggly.Plot.scale_x_time/2` and `Giggly.Plot.scale_y_time/2` for `Time`s,
-with their limits, breaks, labels and minor breaks, breaks also as a step of time
-(`date_breaks: [week: 1]`) and labels as a `Calendar.strftime/3` format (`date_labels: "%b %d"`); a
-date-time scale lays its breaks and writes its labels on a time zone's clock (`timezone:`). A plot
-is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
-setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
-a plot and shows it below the cell with `Kino.Image`.
+with their limits, breaks, labels and minor breaks, breaks and minor breaks also as a function of
+the limits or a step of time (`date_breaks: [week: 1]`) and labels as a `Calendar.strftime/3` format
+(`date_labels: "%b %d"`); a date-time scale lays its breaks and writes its labels on a time zone's
+clock (`timezone:`). A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
+defines `render`, which draws a plot and shows it below the cell with `Kino.Image`.
 
 ## Breaks and labels
 
