@@ -3817,6 +3817,17 @@ defmodule Giggly.PlotTest do
         assert error.key in [option, [option]]
       end
     end
+
+    test "options that are not a keyword list are refused by its own clause" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error =
+        assert_raise FunctionClauseError, fn ->
+          Plot.coord_cartesian(plot, untyped(%{clip: :off}))
+        end
+
+      assert {error.module, error.function, error.arity} == {Plot, :coord_cartesian, 2}
+    end
   end
 
   describe "facet_grid/2" do
