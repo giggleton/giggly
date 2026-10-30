@@ -2244,7 +2244,21 @@ defmodule Giggly.ScaleTest do
       {scale, extent} = to_97(breaks: fn _limits -> [0, 50, 150] end, labels: ["a", "b"])
 
       error = assert_raise ArgumentError, fn -> Scale.breaks(scale, extent) end
-      assert error.message =~ "2 labels must be one for each of the 3 breaks"
+
+      assert String.starts_with?(
+               error.message,
+               "a scale's 2 labels must be one for each of the 3"
+             )
+
+      assert error.message =~ ~s(got: ["a", "b"])
+    end
+
+    # R's `get_breaks()` gives none for a scale with no range, before calling the function.
+    test "a scale with no limits yet has no breaks, the function not called" do
+      continuous = %Scale.Continuous{breaks: fn _limits -> flunk("called") end}
+      binned = %Scale.Binned{breaks: fn _limits, _wanted -> flunk("called") end}
+
+      assert {Scale.breaks(continuous, {0.0, 1.0}), Scale.legend_breaks(binned)} === {[], []}
     end
 
     test "what is not a list of the scale's breaks, or of pairs, raises, naming the kind" do
@@ -2267,8 +2281,35 @@ defmodule Giggly.ScaleTest do
 
         error = assert_raise ArgumentError, fn -> Scale.breaks(scale, Scale.dimension(scale)) end
         assert String.starts_with?(error.message, "a scale's breaks function must return")
-        assert error.message =~ "a list of #{kind}, or of {break, label} pairs"
+        assert error.message =~ "a list of #{kind}, or of {break, label} pairs, got: "
+        assert error.message =~ inspect(returned)
       end
+    end
+
+    test "a date-time axis's function returns date-times in a zone, or naive ones" do
+      utc = {:datetime, "Etc/UTC", Calendar.UTCOnlyTimeZoneDatabase}
+      naive = {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}
+
+      zoned =
+        Scale.train(
+          %Scale.Continuous{transform: utc, breaks: fn _limits -> [~U[1970-01-01 00:01:00Z]] end},
+          [0.0, 120.0],
+          :none
+        )
+
+      unzoned =
+        Scale.train(
+          %Scale.Continuous{
+            transform: naive,
+            breaks: fn _limits -> [~N[1970-01-01 00:01:00]] end
+          },
+          [0.0, 120.0],
+          :none
+        )
+
+      assert {Scale.breaks(zoned, Scale.dimension(zoned)),
+              Scale.breaks(unzoned, Scale.dimension(unzoned))} ===
+               {[{60.0, "1970-01-01 00:01:00"}], [{60.0, "1970-01-01 00:01:00"}]}
     end
 
     # R's `breaks_pretty(10)` on dates from 2020-01-01 to 2020-03-14 gives Mondays named `Dec 30`

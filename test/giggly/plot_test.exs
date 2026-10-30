@@ -3994,8 +3994,13 @@ defmodule Giggly.PlotTest do
             fn -> Plot.scale_alpha_continuous(plot, n_breaks: 1) end
           ] do
         error = assert_raise ArgumentError, call
-        assert error.message =~ "is given n_breaks: 1, and the breaks it chooses need 2 or more"
+        assert String.starts_with?(error.message, "Plot.scale_")
+
+        assert error.message =~
+                 "/2 is given n_breaks: 1, and the breaks it chooses need 2 or more"
       end
+
+      assert Plot.scale_x_continuous(plot, transform: :log10, n_breaks: 1).scales.x.n_breaks === 1
     end
   end
 

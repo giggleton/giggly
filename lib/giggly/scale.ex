@@ -995,21 +995,18 @@ defmodule Giggly.Scale do
 
   # An extent turned back into data units, the limits a breaks function is handed: a date's low
   # end rounded down to its day and its high end up, so the function sees the whole axis, where R
-  # hands it a fraction of a day; a time's ends held inside the day, from midnight to its last
-  # microsecond, where R hands it a span past either midnight, which a time of day cannot hold,
-  # nor a break the function returns.
+  # hands it a fraction of a day; a time's ends held inside the day, its low end from midnight and
+  # its high to the day's last microsecond, where R hands it a span past either midnight, which a
+  # time of day cannot hold, nor a break the function returns. An extent widens its data's range,
+  # which lies inside the day, so its low end is never past the day's end, nor its high before
+  # midnight.
   defp turned_back(:date, {low, high}) do
-    [low_date, high_date] = Transform.inverse(:date, [low, Float.ceil(high / 1)])
+    [low_date, high_date] = Transform.inverse(:date, [low, Float.ceil(high)])
     {low_date, high_date}
   end
 
   defp turned_back(:time, {low, high}) do
-    [low_time, high_time] =
-      Transform.inverse(:time, [
-        min(max(low, 0.0), @last_second),
-        max(min(high, @last_second), 0.0)
-      ])
-
+    [low_time, high_time] = Transform.inverse(:time, [max(low, 0.0), min(high, @last_second)])
     {low_time, high_time}
   end
 
