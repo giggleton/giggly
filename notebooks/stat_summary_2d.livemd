@@ -58,5 +58,5 @@ d + stat_summary_hex(fun = ~ sum(.x^2))
 }
 ```
 
-Not in Giggly yet: mapping `z`, `stat_summary_hex()` and its `fun` option, the hexagons it draws,
-and `geom_hex()`.
+Not in Giggly yet: mapping `z`, `stat_summary_hex()` and its `fun` option, and the hexagons it
+draws.

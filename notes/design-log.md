@@ -3224,6 +3224,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-30 — Draw the notebook examples geom_hex() unlocks, and narrow stat_summary_hex()'s
+  verdict to what still waits (geom_hex, step 2, the notebook sweep)
 - 2026-10-30 — Name the breaks functions, n_breaks: and a discrete axis's minor breaks in the
   scale notebooks' About sentences; no example waits on them (breaks, step 6, the notebook sweep)
 - 2026-10-29 — Take breaks and minor breaks functions and n_breaks: on Giggly's scales, R's

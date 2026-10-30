@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+diamonds = Giggly.Datasets.diamonds()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,7 +30,15 @@ waiting for, so the page is also a list of what remains.
 plane into regular hexagons and counts the rows that fall in each, and the count is mapped to the
 hexagon's `fill`. Hexagons avoid the artefacts the strict alignment of square bins
 (`geom_bin_2d()`) can produce. The size of the bins is set by their number or their width, for
-`x` and `y` together or each on its own. Giggly has none of this yet.
+`x` and `y` together or each on its own. Giggly draws hexagonal bins with `Giggly.Plot.geom_hex/3`,
+and `Giggly.Plot.stat_bin_hex/3` adds the same layer; `bins:` takes one number of bins or a pair,
+`x`'s first, and `binwidth:` one width or a pair. A pair of numbers of bins divides each axis's
+extent by its own, as ggplot2's documentation says, where ggplot2 4.0.3 divides `x`'s extent by
+both. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
+document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
+`Giggly.Datasets.diamonds/0`, ggplot2's `diamonds`: the prices and other attributes of almost
+54,000 diamonds, which the setup cell binds to `diamonds`, ggplot2's name for it.
 
 ## Counting in hexagons
 
@@ -30,7 +49,13 @@ d + geom_hex()
 
 Each hexagon's count is mapped to its `fill`, so the plot has a legend for the counts.
 
-Not in Giggly yet: `geom_hex()`.
+```elixir
+d = Plot.new(diamonds, %{x: :carat, y: :price})
+
+d
+|> Plot.geom_hex()
+|> render.()
+```
 
 ## The number of bins
 
@@ -41,7 +66,19 @@ d + geom_hex(bins = 10)
 d + geom_hex(bins = 30)
 ```
 
-Not in Giggly yet: `geom_hex()` and its `bins` option.
+Thirty bins along each axis is the default, so the second plot is the first again.
+
+```elixir
+d
+|> Plot.geom_hex(bins: 10)
+|> render.()
+```
+
+```elixir
+d
+|> Plot.geom_hex(bins: 30)
+|> render.()
+```
 
 ## The width of the bins
 
@@ -51,6 +88,17 @@ d + geom_hex(binwidth = c(1, 1000))
 d + geom_hex(binwidth = c(.1, 500))
 ```
 
-A pair of widths gives the width along `x` first, then along `y`.
+A pair of widths gives the width along `x` first, then along `y`, which Giggly writes as a tuple,
+`{1, 1000}` for `c(1, 1000)`.
 
-Not in Giggly yet: `geom_hex()` and its `binwidth` option.
+```elixir
+d
+|> Plot.geom_hex(binwidth: {1, 1000})
+|> render.()
+```
+
+```elixir
+d
+|> Plot.geom_hex(binwidth: {0.1, 500})
+|> render.()
+```
