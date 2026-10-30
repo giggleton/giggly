@@ -296,7 +296,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   measured from R's output since R documents every step but that one; every multiple from the
   low limit's down to the high one's up, by the quotient, a step in where that multiple itself
   reaches the limit and never one out, spread as R's `seq()` spreads them, the multiple zero
-  exactly 0. Dates and date-times are their transformation's, typed; times numbers' on their
+  exactly 0. Dates and date-times are their transformation's, typed, each a `{break, label}` pair,
+  the label R's name for it, `Transform.format/4`'s with the same `n:`, a zero-wide range's
+  written in full as R writes a break it has not named (design-log §4, the entry beginning "A
+  breaks function"); times numbers' on their
   seconds, wrapped past midnight; a zero-wide range its first limit. Refused: limits past 1e307 and a width per interval under the smallest
   normal float, where R answers or warns. All of 1,500 whole-number ranges, 2,946 of 2,992 round
   and 2,567 of 2,699 random ones matched R, the rest at an end, where R counts a limit within a

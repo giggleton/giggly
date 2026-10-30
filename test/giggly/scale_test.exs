@@ -2141,4 +2141,319 @@ defmodule Giggly.ScaleTest do
       assert error.message =~ "[20.0"
     end
   end
+
+  # Golden: ggplot2 4.0.3's `get_breaks()` and `get_breaks_minor()` in R 4.6.1 with scales 1.4.0
+  # (the image `giggly-r:ggplot2-4.0.3`), each function printing what it was handed: on x from 0
+  # to 97 a breaks function is handed the widened axis, -4.8500000000000005 to 101.85, and a
+  # minor breaks function the same and the breaks drawn, 0, 50 and 100 of 0, 50, 100 and 150; on
+  # x from 1 to 1000 under log10, 0.70794578438413791 to 1412.537544622754; a legend's the
+  # scale's limits, 0 to 97; a discrete axis's the limits, and its minor breaks function the
+  # extent, 0.4 to 3.6, and the breaks' places, 1, 2 and 3. Made by session b7994e6e's
+  # scratchpad `step5/probe.R`, `probe2.R`, `q2.R` and `steps.R`.
+  describe "a breaks or minor breaks function" do
+    # A function that sends what it was handed to the test and returns `returned`.
+    defp handing(returned) do
+      fn limits ->
+        send(self(), {:handed, limits})
+        returned
+      end
+    end
+
+    defp handing_two(returned) do
+      fn limits, second ->
+        send(self(), {:handed, limits, second})
+        returned
+      end
+    end
+
+    # A position scale with `options` set, trained on 0 and 97, and its axis's extent.
+    defp to_97(options) do
+      scale =
+        Scale.Continuous
+        |> struct!(options)
+        |> Scale.train([0, 97], :none)
+
+      {scale, Scale.dimension(scale)}
+    end
+
+    test "breaks are handed the widened axis in data units, kept and labelled as given ones" do
+      {scale, extent} = to_97(breaks: handing([0, 50, 100, 150]), labels: ["a", "b", "c", "d"])
+
+      assert Scale.breaks(scale, extent) === [{0.0, "a"}, {50.0, "b"}, {100.0, "c"}]
+      assert_received {:handed, {-4.8500000000000005, 101.85}}
+    end
+
+    test "under a transformation, breaks are handed the axis turned back and put through it" do
+      scale =
+        Scale.train(
+          %Scale.Continuous{transform: :log10, breaks: handing([1, 10, 100, 1000])},
+          [
+            0.0,
+            3.0
+          ],
+          :none
+        )
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{0.0, "1"}, {1.0, "10"}, {2.0, "100"}, {3.0, "1000"}]
+
+      assert_received {:handed, {0.7079457843841379, 1_412.537544622754}}
+    end
+
+    test "breaks of two arguments are handed n_breaks, or none where it is the default" do
+      {wanted, extent} = to_97(breaks: handing_two([50]), n_breaks: 10)
+      {default, _extent} = to_97(breaks: handing_two([50]))
+
+      assert {Scale.breaks(wanted, extent), Scale.breaks(default, extent)} ===
+               {[{50.0, "50"}], [{50.0, "50"}]}
+
+      assert_received {:handed, _limits, [n: 10]}
+      assert_received {:handed, _limits, []}
+    end
+
+    test "n_breaks asks the transformation for as many as its own breaks would give" do
+      {scale, extent} = to_97(n_breaks: 10)
+
+      positions =
+        scale
+        |> Scale.breaks(extent)
+        |> Enum.map(fn {position, _label} -> position end)
+
+      assert positions === Scales.Transform.breaks(:identity, extent, n: 10)
+    end
+
+    test "an axis of zero width is its end, the function not called, as R's get_breaks()" do
+      scale = %Scale.Continuous{breaks: fn _limits -> flunk("called") end, range: {5.0, 5.0}}
+
+      assert Scale.breaks(scale, {5.0, 5.0}) === [{5.0, "5"}]
+    end
+
+    test "a pair's label is its break's, unless the scale's labels say otherwise" do
+      pairs = [{0, "none"}, {50, "half"}]
+      {named, extent} = to_97(breaks: fn _limits -> pairs end)
+      {listed, _extent} = to_97(breaks: fn _limits -> pairs end, labels: ["a", "b"])
+      {unlabelled, _extent} = to_97(breaks: fn _limits -> pairs end, labels: :none)
+
+      assert {Scale.breaks(named, extent), Scale.breaks(listed, extent),
+              Scale.breaks(unlabelled, extent)} ===
+               {[{0.0, "none"}, {50.0, "half"}], [{0.0, "a"}, {50.0, "b"}],
+                [{0.0, :none}, {50.0, :none}]}
+    end
+
+    test "a list of labels is one for each break the function returns, or the run raises" do
+      {scale, extent} = to_97(breaks: fn _limits -> [0, 50, 150] end, labels: ["a", "b"])
+
+      error = assert_raise ArgumentError, fn -> Scale.breaks(scale, extent) end
+      assert error.message =~ "2 labels must be one for each of the 3 breaks"
+    end
+
+    test "what is not a list of the scale's breaks, or of pairs, raises, naming the kind" do
+      for {transform, returned, kind} <- [
+            {:identity, [~D[2020-01-01]], "numbers"},
+            {:identity, [{1, "one"}, 2], "numbers"},
+            {:identity, [{1, :one}], "numbers"},
+            {:identity, 5, "numbers"},
+            {:date, [1.0], "dates"},
+            {{:datetime, :default, Calendar.UTCOnlyTimeZoneDatabase}, [~D[2020-01-01]],
+             "date-times"},
+            {:time, [1.0], "times of day"}
+          ] do
+        scale =
+          Scale.train(
+            %Scale.Continuous{transform: transform, breaks: fn _limits -> returned end},
+            [0.0, 100.0],
+            :none
+          )
+
+        error = assert_raise ArgumentError, fn -> Scale.breaks(scale, Scale.dimension(scale)) end
+        assert String.starts_with?(error.message, "a scale's breaks function must return")
+        assert error.message =~ "a list of #{kind}, or of {break, label} pairs"
+      end
+    end
+
+    # R's `breaks_pretty(10)` on dates from 2020-01-01 to 2020-03-14 gives Mondays named `Dec 30`
+    # to `Mar 16`; `breaks_pretty()` from 2024-01-08 to 2024-01-13 is handed 19729.75 to 19735.25
+    # and draws 2024-01-09, 01-11 and 01-13, named `Jan 09`, `Jan 11` and `Jan 13`, where the days
+    # rounded down, 2024-01-07 to 01-13, would draw every day.
+    test "a date axis's function is handed its ends rounded out to whole days" do
+      scale =
+        Scale.train(
+          %Scale.Continuous{
+            transform: :date,
+            breaks: fn limits ->
+              send(self(), {:handed, limits})
+              Scales.Breaks.pretty(limits)
+            end
+          },
+          [19_730.0, 19_735.0],
+          :none
+        )
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) ===
+               [{19_731.0, "Jan 09"}, {19_733.0, "Jan 11"}, {19_735.0, "Jan 13"}]
+
+      assert_received {:handed, {~D[2024-01-07], ~D[2024-01-14]}}
+    end
+
+    test "a pretty function's dates are labelled by their names, as R labels breaks_pretty(10)" do
+      scale =
+        Scale.train(
+          %Scale.Continuous{
+            transform: :date,
+            breaks: fn limits -> Scales.Breaks.pretty(limits, n: 10) end
+          },
+          [18_262.0, 18_335.0],
+          :none
+        )
+
+      labels =
+        scale
+        |> Scale.breaks(Scale.dimension(scale))
+        |> Enum.map(fn {_day, label} -> label end)
+
+      assert labels === [
+               "Dec 30",
+               "Jan 06",
+               "Jan 13",
+               "Jan 20",
+               "Jan 27",
+               "Feb 03",
+               "Feb 10",
+               "Feb 17",
+               "Feb 24",
+               "Mar 02",
+               "Mar 09",
+               "Mar 16"
+             ]
+    end
+
+    test "a time axis's function is handed its ends held inside the day" do
+      scale =
+        Scale.train(
+          %Scale.Continuous{transform: :time, breaks: handing([~T[12:00:00]])},
+          [
+            0.0,
+            82_800.0
+          ],
+          :none
+        )
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) === [{43_200.0, "12:00:00"}]
+      assert_received {:handed, {~T[00:00:00], ~T[23:59:59.999999]}}
+    end
+
+    test "minor breaks of one argument are handed the axis, of two the breaks drawn too" do
+      breaks = fn _limits -> [0, 50, 100, 150] end
+      {one, extent} = to_97(breaks: breaks, minor_breaks: handing([10, 20]))
+      {two, _extent} = to_97(breaks: breaks, minor_breaks: handing_two([{10, "ten"}, {20, "x"}]))
+
+      assert {Scale.minor_breaks(one, Scale.breaks(one, extent), extent),
+              Scale.minor_breaks(two, Scale.breaks(two, extent), extent)} ===
+               {[10.0, 20.0], [10.0, 20.0]}
+
+      assert_received {:handed, {-4.8500000000000005, 101.85}}
+      assert_received {:handed, {-4.8500000000000005, 101.85}, [+0.0, 50.0, 100.0]}
+    end
+
+    test "minor breaks on an axis of zero width are none, the function not called" do
+      scale = %Scale.Continuous{
+        minor_breaks: fn _limits -> flunk("called") end,
+        range: {5.0, 5.0}
+      }
+
+      assert Scale.minor_breaks(scale, [{5.0, "5"}], {5.0, 5.0}) === []
+    end
+
+    test "a legend's function is handed the scale's limits" do
+      scale = Scale.train(%Scale.Continuous{breaks: handing([0, 25, 50, 75])}, [0, 97], :none)
+
+      assert Scale.legend_breaks(scale) === [{0.0, "0"}, {25.0, "25"}, {50.0, "50"}, {75.0, "75"}]
+      assert_received {:handed, {+0.0, 97.0}}
+    end
+
+    # R's colour steps of `breaks = function(l) c(0, 25, 50, 75)` leave out 0, on the limit, as
+    # they leave out a default break there, where `breaks = c(0, 25, 50, 75)` places it a step
+    # down: 0.25, 0.5 and 0.75 either way.
+    test "colour steps leave out a function's break on a limit, as a default one" do
+      breaks = [0, 25, 50, 75]
+      called = gradient_through(["#132B43", "#56B1F7"], [0, 97], breaks: fn _limits -> breaks end)
+      given = gradient_through(["#132B43", "#56B1F7"], [0, 97], breaks: [0.0, 25.0, 50.0, 75.0])
+
+      {called_places, _bins} = Scale.steps(called, [0.0, 25.0, 50.0, 75.0])
+      {given_places, _bins} = Scale.steps(given, [0.0, 25.0, 50.0, 75.0])
+
+      assert {called_places, given_places} ===
+               {[nil, 0.25, 0.5, 0.75], [0.0, 0.25, 0.5, 0.75]}
+    end
+
+    test "a discrete scale's function is handed its limits, a pair's label its break's" do
+      scale =
+        Scale.train(
+          %Scale.Discrete{breaks: handing([{"c", "see"}, {"a", "ay"}])},
+          ~w(a b c),
+          :none
+        )
+
+      assert Scale.breaks(scale, Scale.dimension(scale)) === [{3, "see"}, {1, "ay"}]
+      assert_received {:handed, ["a", "b", "c"]}
+
+      refused = %{scale | breaks: fn _limits -> [{"a", "ay"}, "b"] end}
+
+      error =
+        assert_raise ArgumentError, fn -> Scale.breaks(refused, Scale.dimension(refused)) end
+
+      assert error.message =~ "a list of values, or of {break, label} pairs"
+    end
+
+    test "a discrete axis's minor breaks are its own, or a function's on the extent and places" do
+      letters = fn options ->
+        Scale.Discrete
+        |> struct!(options)
+        |> Scale.train(~w(a b c), :none)
+      end
+
+      minor = fn scale ->
+        extent = Scale.dimension(scale)
+        Scale.minor_breaks(scale, Scale.breaks(scale, extent), extent)
+      end
+
+      shifted = fn _extent, places -> Enum.map(places, fn place -> place + 0.5 end) end
+
+      minor_breaks =
+        Enum.map(
+          [
+            [],
+            [minor_breaks: :none],
+            [minor_breaks: [1.5, 2.5, 4.0]],
+            [minor_breaks: handing([1.5, 2.0])],
+            [minor_breaks: shifted]
+          ],
+          fn options ->
+            options
+            |> letters.()
+            |> minor.()
+          end
+        )
+
+      assert List.to_tuple(minor_breaks) ===
+               {[], [], [1.5, 2.5], [1.5], [1.5, 2.5, 3.5]}
+
+      assert_received {:handed, {0.4, 3.6}}
+    end
+
+    # R's `scale_colour_binned(breaks = function(l, n) c(10, 50), n.breaks = 3)` is handed 0, 97
+    # and 3, and keeps its limits 0 to 97; `breaks_extended(10)` is handed n = 5 with none given,
+    # and gives 0, 25, 50, 75 and 100.
+    test "a binned scale's function is handed its limits and n_breaks, its limits not widened" do
+      wanted = binned([0, 97], breaks: handing_two([10.0, 50.0]), n_breaks: 3)
+      default = binned([0, 97], breaks: handing_two([{10, "ten"}]))
+
+      assert {Scale.legend_breaks(wanted), Scale.Binned.limits(wanted),
+              Scale.legend_breaks(default)} ===
+               {[{10.0, "10"}, {50.0, "50"}], {0.0, 97.0}, [{10.0, "ten"}]}
+
+      assert_received {:handed, {+0.0, 97.0}, [n: 3]}
+      assert_received {:handed, {+0.0, 97.0}, [n: 5]}
+    end
+  end
 end

@@ -3879,6 +3879,126 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "a breaks function and n_breaks: on the scale functions" do
+    test "breaks: and minor_breaks: take a function of one argument or two, as R counts them" do
+      plot = Plot.new(@rows)
+      one = fn _limits -> [] end
+      two = fn _limits, _second -> [] end
+
+      recorded = [
+        Plot.scale_x_continuous(plot, breaks: one, minor_breaks: two).scales.x,
+        Plot.scale_x_log10(plot, breaks: two, minor_breaks: one).scales.x,
+        Plot.scale_x_date(plot, breaks: one, minor_breaks: two).scales.x,
+        Plot.scale_x_datetime(plot, breaks: two, minor_breaks: one).scales.x,
+        Plot.scale_x_time(plot, breaks: one, minor_breaks: two).scales.x,
+        Plot.scale_x_discrete(plot, breaks: one, minor_breaks: two).scales.x,
+        Plot.scale_color_continuous(plot, breaks: two).scales.color,
+        Plot.scale_color_binned(plot, breaks: one).scales.color,
+        Plot.scale_color_discrete(plot, breaks: one).scales.color
+      ]
+
+      assert Enum.map(recorded, fn scale -> {scale.breaks, Map.get(scale, :minor_breaks)} end) ===
+               [
+                 {one, two},
+                 {two, one},
+                 {one, two},
+                 {two, one},
+                 {one, two},
+                 {one, two},
+                 {two, :default},
+                 {one, nil},
+                 {one, :default}
+               ]
+
+      three = fn _limits, _second, _third -> [] end
+
+      for call <- [
+            fn -> Plot.scale_x_continuous(plot, breaks: three) end,
+            fn -> Plot.scale_x_date(plot, minor_breaks: three) end,
+            fn -> Plot.scale_x_datetime(plot, breaks: three) end,
+            fn -> Plot.scale_x_time(plot, breaks: three) end,
+            fn -> Plot.scale_x_discrete(plot, minor_breaks: three) end,
+            fn -> Plot.scale_color_binned(plot, breaks: three) end
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, call
+        assert error.message =~ "a function of one or two arguments"
+      end
+    end
+
+    test "a discrete axis records its minor breaks as floats, its values' places" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_x_discrete(plot, minor_breaks: [1, 2.5]).scales.x.minor_breaks,
+              Plot.scale_y_discrete(plot, minor_breaks: :none).scales.y.minor_breaks,
+              Plot.scale_x_discrete(plot).scales.x.minor_breaks} === {[1.0, 2.5], :none, :default}
+    end
+
+    test "a list of labels may stand beside a breaks function, its count checked when run" do
+      plot = Plot.new(@rows)
+      breaker = fn _limits -> [1, 2] end
+
+      assert {Plot.scale_x_continuous(plot, breaks: breaker, labels: ["a", "b"]).scales.x.labels,
+              Plot.scale_color_binned(plot, breaks: breaker, labels: ["a"]).scales.color.labels} ===
+               {["a", "b"], ["a"]}
+    end
+
+    test "n_breaks: is recorded on the continuous scale functions, and not on dates or times" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_x_continuous(plot, n_breaks: 10).scales.x.n_breaks,
+              Plot.scale_y_sqrt(plot, n_breaks: 3).scales.y.n_breaks,
+              Plot.scale_size_continuous(plot, n_breaks: 4).scales.size.n_breaks,
+              Plot.scale_x_continuous(plot).scales.x.n_breaks} === {10, 3, 4, :default}
+
+      for call <- [
+            fn -> Plot.scale_x_date(plot, n_breaks: 10) end,
+            fn -> Plot.scale_x_datetime(plot, n_breaks: 10) end,
+            fn -> Plot.scale_x_time(plot, n_breaks: 10) end
+          ] do
+        error = assert_raise NimbleOptions.ValidationError, call
+        assert error.key == [:n_breaks]
+      end
+    end
+
+    # R warns and ignores `n.breaks` beside a function with no `n` argument, and ignores it
+    # silently beside a list or NULL.
+    test "n_breaks: beside breaks that want no number is refused at the call" do
+      plot = Plot.new(@rows)
+
+      for {call, shown} <- [
+            {fn -> Plot.scale_x_continuous(plot, n_breaks: 3, breaks: [1, 2]) end, "[1, 2]"},
+            {fn -> Plot.scale_x_log10(plot, n_breaks: 3, breaks: :none) end, ":none"},
+            {fn -> Plot.scale_color_continuous(plot, n_breaks: 3, breaks: fn _ -> [] end) end,
+             "#Function"},
+            {fn -> Plot.scale_fill_binned(plot, n_breaks: 3, breaks: [1]) end, "[1]"}
+          ] do
+        error = assert_raise ArgumentError, call
+        assert String.starts_with?(error.message, "Plot.scale_")
+        assert error.message =~ "is given n_breaks: beside breaks: #{shown}"
+        assert error.message =~ "which wants no number of breaks"
+      end
+
+      two = fn _limits, _wanted -> [] end
+
+      assert {Plot.scale_x_continuous(plot, n_breaks: 1, breaks: two).scales.x.n_breaks,
+              Plot.scale_x_log10(plot, n_breaks: 1).scales.x.n_breaks,
+              Plot.scale_fill_binned(plot, breaks: [1]).scales.fill.breaks} === {1, 1, [1.0]}
+    end
+
+    test "one break wanted of the breaks the scale chooses is refused but on a log axis" do
+      plot = Plot.new(@rows)
+
+      for call <- [
+            fn -> Plot.scale_x_continuous(plot, n_breaks: 1) end,
+            fn -> Plot.scale_y_reverse(plot, n_breaks: 1) end,
+            fn -> Plot.scale_alpha_continuous(plot, n_breaks: 1) end
+          ] do
+        error = assert_raise ArgumentError, call
+        assert error.message =~ "is given n_breaks: 1, and the breaks it chooses need 2 or more"
+      end
+    end
+  end
+
   describe "scale_x_discrete/2 and scale_y_discrete/2" do
     test "a discrete scale function records an untrained discrete scale with the options given" do
       labeller = fn values -> Enum.map(values, &to_string/1) end
@@ -3953,7 +4073,9 @@ defmodule Giggly.PlotTest do
             {:labels, %{["a"] => "b"}, ~s(got: ["a"] in)},
             {:labels, "a",
              ~s(a map from a value to its label, a function of one argument or :none, got: "a")},
-            {:expand, [mult: "a"], ~s([mult: "a"])}
+            {:expand, [mult: "a"], ~s([mult: "a"])},
+            {:breaks, fn _limits, _wanted -> [] end, "a function of one argument, or :none"},
+            {:minor_breaks, ["a"], ~s(got: "a" in it)}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
@@ -3962,13 +4084,6 @@ defmodule Giggly.PlotTest do
 
         assert {error.key, error.message =~ shown} == {key, true}
       end
-
-      minor =
-        assert_raise NimbleOptions.ValidationError, fn ->
-          Plot.scale_x_discrete(plot, minor_breaks: ["a"])
-        end
-
-      assert minor.key == [:minor_breaks]
     end
 
     # ggplot2 4.0.3 pads a list of labels short of the breaks with NA and drops one past them, or
@@ -5078,7 +5193,6 @@ defmodule Giggly.PlotTest do
         limits: {400, 0},
         breaks: [100, 200],
         labels: ["a", "b"],
-        n_breaks: 3,
         nice_breaks: false,
         right: false,
         na_value: "red",
@@ -5096,7 +5210,7 @@ defmodule Giggly.PlotTest do
                  limits: {400.0, 0.0},
                  breaks: [100.0, 200.0],
                  labels: ["a", "b"],
-                 n_breaks: 3,
+                 n_breaks: 5,
                  nice_breaks: false,
                  right: false,
                  na_value: "#FF0000",
@@ -5159,7 +5273,7 @@ defmodule Giggly.PlotTest do
       end
 
       assert {Plot.scale_color_binned(plot, n_breaks: 1, nice_breaks: false).scales.color.n_breaks,
-              Plot.scale_color_binned(plot, n_breaks: 1, breaks: [1]).scales.color.n_breaks} ===
+              Plot.scale_color_binned(plot, n_breaks: 1, breaks: fn _limits, _wanted -> [1] end).scales.color.n_breaks} ===
                {1, 1}
     end
 

@@ -5271,6 +5271,8 @@ defmodule Giggly.Plot do
   defp continuous_scale(plot, aesthetic, options, function) do
     validated = NimbleOptions.validate!(options, Options.continuous_scale())
     check_scale_labels(validated, function)
+    check_wanted_beside(options, function)
+    check_n_breaks(validated, Keyword.get(validated, :transform, :identity), function)
     put_scale(plot, aesthetic, struct!(Scale.Continuous, validated))
   end
 
@@ -5279,6 +5281,8 @@ defmodule Giggly.Plot do
   defp transformed_scale(plot, aesthetic, transform, options, function) do
     validated = NimbleOptions.validate!(options, Options.transformed_scale())
     check_scale_labels(validated, function)
+    check_wanted_beside(options, function)
+    check_n_breaks(validated, transform, function)
     put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, transform} | validated]))
   end
 
@@ -5362,11 +5366,14 @@ defmodule Giggly.Plot do
     validated = NimbleOptions.validate!(options, schema)
     scale = scale_of.(validated)
     check_labels(scale, validated, function)
+    check_wanted_beside(options, function)
     put_scale(plot, aesthetic, scale)
   end
 
-  defp check_labels(%Scale.Continuous{}, validated, function),
-    do: check_scale_labels(validated, function)
+  defp check_labels(%Scale.Continuous{}, validated, function) do
+    check_scale_labels(validated, function)
+    check_n_breaks(validated, :identity, function)
+  end
 
   defp check_labels(%Scale.Discrete{}, validated, function),
     do: check_discrete_labels(validated, function)
@@ -5684,6 +5691,9 @@ defmodule Giggly.Plot do
              length(labels) == length(breaks) ->
         :ok
 
+      {labels, {:ok, breaker}} when is_list(labels) and is_function(breaker) ->
+        :ok
+
       {labels, breaks} when is_list(labels) ->
         raise ArgumentError,
               "#{function} is given #{length(labels)} labels, which need breaks: a list of " <>
@@ -5695,7 +5705,38 @@ defmodule Giggly.Plot do
   end
 
   defp given_breaks({:ok, breaks}), do: "got: #{inspect(breaks)}"
+
   defp given_breaks(:error), do: "and it has none"
+
+  # Extended breaks, every transformation's on a continuous scale but log10's, need two or more
+  # wanted, as R's search finds none for one and fails.
+  defp check_n_breaks(validated, transform, function) do
+    case {Keyword.fetch(validated, :n_breaks), Keyword.get(validated, :breaks, :default)} do
+      {{:ok, 1}, :default} when transform != :log10 ->
+        raise ArgumentError,
+              "#{function} is given n_breaks: 1, and the breaks it chooses need 2 or more " <>
+                "wanted, as a log axis's do not"
+
+      _wanted ->
+        :ok
+    end
+  end
+
+  # A number of breaks wanted, given among `options`, is read by the transformation's breaks or by
+  # a breaks function of two arguments, so it is refused beside breaks that want none, as R
+  # ignores `n.breaks` there, warning beside a function.
+  defp check_wanted_beside(options, function) do
+    case {Keyword.has_key?(options, :n_breaks), Keyword.get(options, :breaks, :default)} do
+      {true, breaks} when is_list(breaks) or breaks == :none or is_function(breaks, 1) ->
+        raise ArgumentError,
+              "#{function} is given n_breaks: beside breaks: #{inspect(breaks)}, which wants no " <>
+                "number of breaks; give breaks: a function of two arguments, handed [n: n], or " <>
+                "leave it out"
+
+      _wanted ->
+        :ok
+    end
+  end
 
   # The columns a facet splits on, by name as strings, in the order written. Whether a table holds
   # them is the facet's question, answered when the plot is run, since a layer added later may

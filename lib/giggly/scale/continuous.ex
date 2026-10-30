@@ -44,8 +44,14 @@ defmodule Giggly.Scale.Continuous do
     * `breaks` and `minor_breaks`: the values an axis marks, in data units; on a date axis,
       `{:width, [week: 1]}` for a break every step, one of `:day`, `:week`, `:month` and `:year`
       and how many of it, on a date-time axis `:second`, `:minute` and `:hour` too, and on a time
-      axis `:second`, `:minute` and `:hour` alone; `:none` for none; or `:default` for those its
-      transformation chooses.
+      axis `:second`, `:minute` and `:hour` alone; a function, handed the limits, `{low, high}`
+      in data units, a date axis's rounded out to whole days, and for breaks of two arguments
+      `[n: n_breaks]` too, or `[]` where `n_breaks` is the default, and for minor breaks of two
+      arguments the breaks drawn, that returns the values, or `{value, label}` pairs, a pair's
+      label the break's unless `labels` says otherwise; `:none` for none; or `:default` for those
+      its transformation chooses.
+    * `n_breaks`: how many breaks its transformation, or a breaks function of two arguments, is
+      asked for, or `:default` for as many as it chooses.
     * `labels`: a label for each break; a function handed every break drawn, in data units, a
       time axis's as times of day wrapped past midnight, that returns their labels; on a date,
       date-time or time axis, `{:format, format}`, each break written in `format` by
@@ -72,6 +78,7 @@ defmodule Giggly.Scale.Continuous do
             limits: {nil, nil},
             breaks: :default,
             minor_breaks: :default,
+            n_breaks: :default,
             labels: :default,
             expand: [mult: {0.05, 0.05}, add: {0, 0}]
 
@@ -103,8 +110,21 @@ defmodule Giggly.Scale.Continuous do
           guide: :axis | :legend | :colorbar | :colorsteps | :none | struct(),
           name: :default | :none | String.t(),
           limits: {number() | time_value() | nil, number() | time_value() | nil},
-          breaks: :default | :none | [number() | time_value()] | {:width, date_step()},
-          minor_breaks: :default | :none | [number() | time_value()] | {:width, date_step()},
+          breaks:
+            :default
+            | :none
+            | [number() | time_value()]
+            | {:width, date_step()}
+            | ({term(), term()} -> list())
+            | ({term(), term()}, keyword() -> list()),
+          minor_breaks:
+            :default
+            | :none
+            | [number() | time_value()]
+            | {:width, date_step()}
+            | ({term(), term()} -> list())
+            | ({term(), term()}, list() -> list()),
+          n_breaks: :default | pos_integer(),
           labels:
             :default
             | :none

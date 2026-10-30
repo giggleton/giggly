@@ -7882,6 +7882,29 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/scale_discrete_bars.svg")
     end
 
+    # Golden: test/golden/scale_discrete_minor.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/scale_discrete_minor.R: every element matches it, the x axis drawn
+    # before the y as in test/golden/point.svg, and every clip path. mpg's highway mileage by class
+    # on a discrete x scale whose minor breaks function is handed the breaks' places and returns
+    # each plus a half, a minor grid line between each class and the next and after the last. It
+    # moves with what moves test/golden/point.svg, and with a discrete axis's minor breaks.
+    test "a discrete axis's minor breaks function draws a minor grid line at each place returned" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+        |> Plot.scale_x_discrete(
+          minor_breaks: fn _extent, places -> Enum.map(places, fn place -> place + 0.5 end) end
+        )
+
+      svg =
+        plot
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      assert svg == File.read!("test/golden/scale_discrete_minor.svg")
+    end
+
     # Golden: test/golden/scale_manual.svg, checked against ggplot2's drawing of the same plot, made
     # by test/golden/scale_manual.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. ggplot2's scale_manual example: mtcars's points

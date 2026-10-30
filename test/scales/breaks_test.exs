@@ -864,14 +864,17 @@ defmodule Scales.BreaksTest do
                [0.1056, 0.1057, 0.1058, 0.1059, 0.106, 0.1061]
     end
 
+    # R's `breaks_pretty()` gives the date unnamed, which R's `format()` writes in full.
     test "limits that are one value give the first, as R's breaks_pretty() gives it" do
-      assert {Breaks.pretty({5, 5}), Breaks.pretty({~D[2020-01-01], ~D[2020-01-01]})} ===
-               {[5.0], [~D[2020-01-01]]}
+      assert {Breaks.pretty({5, 5}), Breaks.pretty({~D[2020-01-01], ~D[2020-01-01]}),
+              Breaks.pretty({~T[10:00:00], ~T[10:00:00]})} ===
+               {[5.0], [{~D[2020-01-01], "2020-01-01"}], [~T[10:00:00]]}
     end
 
-    # R's `breaks_pretty(20)` over 2020 and 2021 is every month; on New York's clock from noon on
-    # 9 March 2024 to 6 pm the next day, every hour, 2 am skipped.
-    test "dates' and date-times' breaks are R's pretty() for them, on the zone's clock" do
+    # R's `breaks_pretty(20)` over 2020 and 2021 is every month, named `Jan 2020`, `Feb 2020`; on
+    # New York's clock from noon on 9 March 2024 to 6 pm the next day, every hour, 2 am skipped,
+    # named `Mar 09 23:00`, `Mar 10 00:00`, `Mar 10 01:00`, `Mar 10 03:00`.
+    test "dates' and date-times' breaks are R's pretty() for them, on the zone's clock, named" do
       zone = "America/New_York"
       database = Tz.TimeZoneDatabase
       months = Breaks.pretty({~D[2020-01-01], ~D[2022-01-01]}, n: 20)
@@ -884,12 +887,19 @@ defmodule Scales.BreaksTest do
           time_zone_database: database
         )
 
-      around_two = Enum.slice(hours, 12, 3)
+      around_two =
+        hours
+        |> Enum.slice(11, 4)
+        |> Enum.map(fn {hour, label} -> {DateTime.to_naive(hour), label} end)
 
-      assert {Enum.count(months), Enum.take(months, 2), Enum.count(hours),
-              Enum.map(around_two, &DateTime.to_naive/1)} ==
-               {25, [~D[2020-01-01], ~D[2020-02-01]], 30,
-                [~N[2024-03-10 00:00:00], ~N[2024-03-10 01:00:00], ~N[2024-03-10 03:00:00]]}
+      assert {Enum.count(months), Enum.take(months, 2), Enum.count(hours), around_two} ==
+               {25, [{~D[2020-01-01], "Jan 2020"}, {~D[2020-02-01], "Feb 2020"}], 30,
+                [
+                  {~N[2024-03-09 23:00:00], "Mar 09 23:00"},
+                  {~N[2024-03-10 00:00:00], "Mar 10 00:00"},
+                  {~N[2024-03-10 01:00:00], "Mar 10 01:00"},
+                  {~N[2024-03-10 03:00:00], "Mar 10 03:00"}
+                ]}
     end
 
     # R's `breaks_pretty()` of an `hms` from 23:00 to 23:59:59 is the seconds 82000 to 87000,

@@ -118,8 +118,10 @@ identity transformation: the entry beginning "A layer records its stat and posit
   its rescaler and cut at the breaks' places, R's `cut(include.lowest = TRUE, right)`; a bin is
   coloured by `{:binned, palette}`'s colours for the bins' count, too few raising, or by a
   continuous palette at its middle. Given breaks outside the limits are left out with their
-  labels, a labels list is one for each given or default break or the run raises, and a missing
-  value is never coloured. **Default breaks are `n_breaks` wanted (5)**: nice ones, the
+  labels, a function's breaks, handed the limits and `[n: n_breaks]` for two arguments, read as
+  given ones once called (`Binned.called/1`), the limits not widened, as R's `get_breaks()`
+  writes them back; a labels list is one for each given or default break or the run raises, and
+  a missing value is never coloured. **Default breaks are `n_breaks` wanted (5)**: nice ones, the
   identity's extended breaks with `n:`, or, with `nice_breaks: false`, `n_breaks` spaced evenly
   by R's `seq()` less its ends; with no limits given, two or more inside the range widen it so
   the end bins match their neighbours, one widens it to that break less and plus its distance to
@@ -129,7 +131,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   written by its labels as its breaks are, `[]` when not shown, raising beside a list of labels,
   which R ignores with a warning. Its tests pin R's breaks, limits, colours and labels.
 - **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
-  `minor_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but `rescaler`,
+  `minor_breaks`, `n_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but
+  `rescaler`,
   `:rescale`, `limits` `{nil, nil}` and
   `expand` ggplot2's `[mult: {0.05, 0.05}, add: {0, 0}]`; `Giggly.Plot` writes the struct,
   untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
@@ -140,15 +143,25 @@ identity transformation: the entry beginning "A layer records its stat and posit
   `date_minor_breaks:` and `date_labels:` (design-log §4, the entry beginning "`date_breaks:` and
   `date_minor_breaks:` are a step"): a width's breaks are `DateBreaks.width/2` on the extent,
   those inside it kept, and a format's labels each date written by `Calendar.strftime/3` as it is.
+  **Its breaks and minor breaks may be a function** (`Giggly.Scale.BreaksFunction`; design-log §4,
+  the entry beginning "A breaks function"), called as ggplot2's `get_breaks()` calls one: handed
+  the extent squished into the domain, turned back into data units, a date's rounded out to whole
+  days and a time's held inside the day, and for breaks of two arguments `[n: n_breaks]`, `[]`
+  while `n_breaks` is `:default`; for minor breaks of two the breaks drawn; an extent of zero width
+  its end, the function not called. It returns breaks of the scale's kind or `{break, label}`
+  pairs, R's named breaks, a pair's label its default label; what it returns is kept and
+  labelled as given breaks are, a list of labels one for each break it returns or the run raises,
+  and colour steps leave out its breaks on a limit as they do default ones, as R's scale holds no
+  numbers there. `n_breaks` asks the transformation's own breaks for that many.
   A date-time scale's are the same, `Plot.scale_x_datetime/2` recording them, its steps taking
   `:second`, `:minute` and `:hour` too, its width's breaks `DateBreaks.datetime_width/3`'s and its
   format writing each break as a `DateTime` or a `NaiveDateTime`; a time scale's too,
   `Plot.scale_x_time/2` recording them, its steps `:second`, `:minute` and `:hour` alone, its
   format writing each break as a `Time` wrapped past midnight; the transformation lays a width
   (`Transform.width/3`), only a date's, a date-time's and a time's having one.
-- **A discrete scale carries the options a plot gives it**, `name`, `limits`, `breaks`, `labels`
-  and `expand`, each `:default` until given but `expand`, ggplot2's `[mult: {0, 0}, add: {0.6,
-  0.6}]`; its field defaults are a position scale's, so `%Discrete{}` is `new(:discrete)`.
+- **A discrete scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
+  `minor_breaks`, `labels` and `expand`, each `:default` until given but `expand`, ggplot2's
+  `[mult: {0, 0}, add: {0.6, 0.6}]`; its field defaults are a position scale's, so `%Discrete{}` is `new(:discrete)`.
   **Its limits are the values it shows** (`Discrete.limits/1`, R's `get_limits()`): given, they
   replace its levels, in their order, every reader (`map/2`, `breaks/2`, `dimension/1`,
   `legend_breaks/1`) going through them; a value not among them maps to `nil`, so its row is not
@@ -156,7 +169,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   value is matched by `Scales.DataRange.key/1`, as the column holds it (design-log §4, the entry beginning
   "A discrete axis names its values"). **Its breaks are the given values among its limits, in the
   order given, at their limits' places**, each the limit as the scale holds it, so a break of `4`
-  is a level of `4.0`, or every limit; **its labels** go with given breaks by
+  is a level of `4.0`, or every limit, or those a function handed the limits returns, a pair's
+  label its default label; **its labels** go with given breaks by
   place, a break left out taking its label with it, a list one for each candidate break or the run
   raises (R pads it with `NA`); a map labels the values it holds, the rest written as a level is;
   a function is handed the breaks' values, `nil` among them.
@@ -238,8 +252,10 @@ identity transformation: the entry beginning "A layer records its stat and posit
 - **`minor_breaks/3` gives an axis's minor breaks between the breaks `breaks/2` gave on the same
   extent**, as ggplot2's view scale hands `get_breaks_minor()` its breaks: the transformation's
   minor breaks kept inside the extent, ends included (R's `discard()`), less the breaks
-  themselves, which ggplot2's grid takes out of its minor lines and nothing here reads. A discrete
-  scale has none, as in ggplot2.
+  themselves, matched by value as R's `setdiff()` matches them, which ggplot2's grid takes out of
+  its minor lines and nothing here reads. **A discrete axis's are its `minor_breaks`**, as ggplot2
+  3.5.0's are, positions at its values' places, or a function's on the extent and the breaks'
+  places, none by default.
 - **A discrete level is written as R's `as.character()` writes its value** (`level_labels/1`,
   `Giggly.AsCharacter`),
   as `factor()` labels its levels: `4`, `0.5`, `1e+05`, `TRUE`; a missing level is `NA`. The

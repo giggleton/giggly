@@ -492,10 +492,12 @@ defmodule Scales.Breaks do
   wanted, rounded to the nearest of those, and the breaks every multiple of it from the low limit
   rounded down to one to the high limit rounded up. On dates and date-times they are R's calendar
   and clock steps, from a second to a thousand years, the one that cuts the limits closest to
-  `n:` times, a `DateTime` broken on its zone's clock, read by `time_zone_database:`; on times of
+  `n:` times, a `DateTime` broken on its zone's clock, read by `time_zone_database:`, each break
+  with its label, `{break, label}`, as R names its breaks: written in the format of the step, as
+  `Scales.Transform.format/4` writes them; on times of
   day the numbers' breaks on their seconds since midnight, as R breaks an `hms`, each a `Time`,
   wrapped past midnight. Limits that are one value, as R's `zero_range()` judges them, give the
-  first alone.
+  first alone, a date's or date-time's labelled in full, as R writes a break it has not named.
 
   R's documentation describes its numbers' steps but for the rule that rounds the width over the
   number wanted, which it leaves out; this rounds it to the nearest nice number as Heckbert's
@@ -515,12 +517,19 @@ defmodule Scales.Breaks do
       [0.0, 10.0, 20.0]
 
       iex> Scales.Breaks.pretty({~D[2020-01-01], ~D[2022-01-01]})
-      [~D[2020-01-01], ~D[2020-07-01], ~D[2021-01-01], ~D[2021-07-01], ~D[2022-01-01]]
+      [
+        {~D[2020-01-01], "2020-01"},
+        {~D[2020-07-01], "2020-07"},
+        {~D[2021-01-01], "2021-01"},
+        {~D[2021-07-01], "2021-07"},
+        {~D[2022-01-01], "2022-01"}
+      ]
 
       iex> Scales.Breaks.pretty({~T[00:00:00], ~T[01:00:00]})
       [~T[00:00:00], ~T[00:16:40], ~T[00:33:20], ~T[00:50:00], ~T[01:06:40]]
   """
-  @spec pretty({value(), value()}, keyword()) :: [value()]
+  @spec pretty({value(), value()}, keyword()) ::
+          [number() | Time.t() | {Date.t() | NaiveDateTime.t() | DateTime.t(), String.t()}]
   def pretty(limits, options \\ []) do
     validated = NimbleOptions.validate!(options, @pretty_options)
     pretty_breaks(limits, validated)
@@ -548,9 +557,24 @@ defmodule Scales.Breaks do
       |> Enum.min_max()
 
     cond do
-      Bounds.zero_range?(positions) -> [first]
-      name == :time -> Transform.inverse(:time, nice_breaks(positions, wanted))
-      true -> Transform.inverse(name, Transform.breaks(name, positions, n: wanted))
+      name == :time and Bounds.zero_range?(positions) ->
+        [first]
+
+      name == :time ->
+        Transform.inverse(:time, nice_breaks(positions, wanted))
+
+      Bounds.zero_range?(positions) ->
+        position = Transform.transform(name, [first])
+        [label] = Transform.format(name, position, :given)
+        [{first, label}]
+
+      true ->
+        breaks = Transform.breaks(name, positions, n: wanted)
+        labels = Transform.format(name, breaks, positions, n: wanted)
+
+        name
+        |> Transform.inverse(breaks)
+        |> Enum.zip(labels)
     end
   end
 

@@ -192,6 +192,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   fermenter `{:binned, {:brewer, ...}}`, direction -1, as the distiller checks it; each grey50
   and colour steps. `n_breaks: 1` with nice breaks and no breaks given, and `show_limits: true`
   beside a list of labels, raise at the call, where R fails and where it warns and ignores.
+  **`n_breaks:` is taken where R takes `n.breaks`**, the continuous position and legend scale
+  functions and the binned ones, not dates, date-times or times; given beside `breaks:` a list,
+  `:none` or a function of one argument it raises at the call, where R ignores it, and `n_breaks:
+  1` beside default breaks but under log10, where R's extended search fails.
   **`palette:` on the discrete and continuous colour scales is a
   name, `Scales.Palette.named/1`'s palette, or a list** (`validate_discrete_palette/1`,
   `validate_continuous_palette/1`), a manual palette or a gradient. **A size scale function
@@ -226,7 +230,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   refused at the call, where R reverses the
   values through a transformation these scales lack (design-log §4, the entry beginning "Colour,
   fill and alpha scales"), and dates are refused. **Limits, breaks and minor breaks are recorded in
-  data units, as given**, for the scale to transform; a shortcut records its transformation in
+  data units, as given**, for the scale to transform, or a function, of one argument or two on
+  continuous, date, date-time, time and binned scales and for a discrete axis's minor breaks, of
+  one for a discrete scale's breaks, as ggplot2 counts its arguments (design-log §4, the entry
+  beginning "A breaks function"); a shortcut records its transformation in
   `transform`, and takes every other option `scale_x_continuous/2` does; limits in either order are
   recorded so, and `xlim/3`, `ylim/3` and `lims/2` record `:reverse` for a pair given high to low,
   as ggplot2's `limits()` does (design-log §4, the entry beginning "Transformations are").
@@ -357,7 +364,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   A deliberate default is recorded as a value (`scales: :fixed`). An option not given is recorded as
   `:none` in the kind's struct, but a scale's, whose `:none` removes, is `:default`. A continuous or
   date scale's list of labels needs a list of breaks as long, checked at the call, since its default
-  breaks are known only when run; a discrete scale's is one for each break given, or else each limit
+  breaks are known only when run, or a breaks function, whose breaks it is one for each of when
+  run; a discrete scale's is one for each break given, or else each limit
   given, checked at the call, and otherwise when run. `date_labels:` is checked at the call by
   writing a date in it with `Calendar.strftime/3`, a date-time on a date-time scale or a time of
   day on a time scale, so a format it cannot write (`"%W"`, or a date's `"%Y"` on a time scale)

@@ -117,7 +117,7 @@ defmodule Giggly.Scale do
     exports: [Binned, Continuous, Discrete]
 
   alias Giggly.AsCharacter
-  alias Giggly.Scale.{Binned, Continuous, Discrete}
+  alias Giggly.Scale.{Binned, BreaksFunction, Continuous, Discrete}
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
   @typedoc "A scale: a continuous, a discrete or a binned one."
@@ -125,6 +125,9 @@ defmodule Giggly.Scale do
 
   @typedoc "A break on an axis: its position and its label, `:none` where the axis has no labels."
   @type break :: {number(), String.t() | :none}
+
+  # A day's last microsecond, in seconds since midnight: the latest time of day.
+  @last_second 86_399.999_999
 
   @typedoc "Which kind of scale a column needs, or `:none` when no scale can place it yet."
   @type kind :: :continuous | :discrete | :date | :datetime | :naive_datetime | :time | :none
@@ -496,14 +499,20 @@ defmodule Giggly.Scale do
   #
   # A continuous scale's breaks are those its `breaks` gives, in data units and in the order
   # given, put through its transformation, or by default its transformation's
-  # (`Scales.Transform`), found on the extent squished into the transformation's domain and
+  # (`Scales.Transform`), `n_breaks` of them wanted where given, found on the extent squished into
+  # the transformation's domain and
   # ascending in data units, so a reversing transformation's descend; either way those inside
   # `extent` are kept (ggplot2 computes breaks on the widened extent and drops the rest), a break
   # exactly at an end included, so a given break beyond the limits but inside the widened axis is
   # drawn, and one outside the domain is not. A scale with no limits yet has none by default, and
   # an extent of zero width one, at its end, as in ggplot2. A date scale's width, `{:width, step}`,
   # gives a break every step (`Scales.DateBreaks.width/2`) on the extent, those inside it
-  # kept. `breaks: :none` gives none. Each is labelled by `labels/4`.
+  # kept. A function's are those it returns on the squished extent turned back into data units
+  # (`Giggly.Scale.BreaksFunction`), as ggplot2's `get_breaks()` calls one, kept and labelled as
+  # given breaks are, a pair's label its break's where the scale's labels are the default, and a
+  # list of labels one for each break it returns, or the plot cannot be drawn, as R fails; an
+  # extent of zero width gives its end, as ggplot2's, without calling it. `breaks: :none` gives
+  # none. Each is labelled by `labels/4`.
   #
   # A discrete scale has a break at each value its `breaks` gives among its limits, in the order
   # given, or else at each of its limits, its levels unless it gives them, whatever the extent;
@@ -514,15 +523,14 @@ defmodule Giggly.Scale do
   def breaks(%Continuous{breaks: :none}, _extent), do: []
 
   def breaks(%Continuous{breaks: given, transform: transform} = scale, extent)
-      when is_list(given) do
-    {positions, indexes} =
-      transform
-      |> Transform.transform(given)
-      |> Enum.with_index()
-      |> Enum.filter(fn {position, _index} -> placed_inside?(position, extent) end)
-      |> Enum.unzip()
+      when is_list(given),
+      do: placed_breaks(scale, Transform.transform(transform, given), extent)
 
-    Enum.zip(positions, labels(scale, positions, indexes, extent))
+  def breaks(%Continuous{breaks: breaker} = scale, extent) when is_function(breaker) do
+    case limits(scale) do
+      :none -> []
+      _limits -> called_breaks(scale, extent)
+    end
   end
 
   def breaks(%Continuous{breaks: :default} = scale, extent) do
@@ -555,14 +563,15 @@ defmodule Giggly.Scale do
   end
 
   # A discrete scale's breaks among `limits`, each the limit's value and its label: the values its
-  # `breaks` gives among the limits, in the order given, or else every limit; none for `:none`.
+  # `breaks` gives among the limits, in the order given, or its function returns, handed the
+  # limits, or else every limit; none for `:none`.
   # Each is the limit as the scale holds it, which a given break names by value (`Scales.DataRange.key/1`),
   # so a break of `4` is a level of `4.0`. Each is labelled by `discrete_labels/3`.
   defp discrete_breaks(%Discrete{breaks: :none}, _limits), do: []
 
   defp discrete_breaks(%Discrete{} = scale, limits) do
     limit_by_key = Map.new(limits, fn limit -> {DataRange.key(limit), limit} end)
-    candidates = discrete_candidates(scale, limits)
+    {candidates, scale} = discrete_candidates(scale, limits)
 
     {values, indexes} =
       candidates
@@ -578,9 +587,18 @@ defmodule Giggly.Scale do
     Enum.zip(values, discrete_labels(scale, values, {indexes, length(candidates)}))
   end
 
-  # The values a discrete scale may mark: its breaks where given, else its limits.
-  defp discrete_candidates(%Discrete{breaks: :default}, limits), do: limits
-  defp discrete_candidates(%Discrete{breaks: given}, _limits), do: given
+  # The values a discrete scale may mark, and the scale that labels them: its breaks where given,
+  # or what its function returns on its limits, the labels of its pairs its own where its labels
+  # are the default, as R labels a break by its name; else its limits.
+  defp discrete_candidates(%Discrete{breaks: :default} = scale, limits), do: {limits, scale}
+
+  defp discrete_candidates(%Discrete{breaks: given} = scale, _limits) when is_list(given),
+    do: {given, scale}
+
+  defp discrete_candidates(%Discrete{breaks: breaker} = scale, limits) do
+    {values, names} = BreaksFunction.breaks(breaker, limits, :default, :value)
+    {values, named(scale, names)}
+  end
 
   # The labels of a discrete scale's breaks `values`, which are the candidates at `indexes` among
   # `count` (its given breaks, or its limits): written as `level_labels/1` writes a level by
@@ -621,8 +639,9 @@ defmodule Giggly.Scale do
   # continuous scale's are its breaks, given or its transformation's, inside its limits, taken as
   # floats as R's limits are doubles, one at the low end of limits of zero width, and none before
   # the scale has limits; a discrete scale's are its breaks among its limits, `nil` labelled `NA`,
-  # as ggplot2's legend keeps `NA`; a binned scale's are its breaks (`Giggly.Scale.Binned`),
-  # labelled by `binned_labels/3`; `:none` gives none.
+  # as ggplot2's legend keeps `NA`; a binned scale's are its breaks (`Giggly.Scale.Binned`), a
+  # function's those it returns on the limits (`Binned.called/1`), labelled by `binned_labels/3`;
+  # `:none` gives none.
   @doc false
   @spec legend_breaks(t()) :: [{term(), String.t() | :none}]
   def legend_breaks(%Continuous{} = scale) do
@@ -634,7 +653,9 @@ defmodule Giggly.Scale do
 
   def legend_breaks(%Discrete{} = scale), do: discrete_breaks(scale, Discrete.limits(scale))
 
-  def legend_breaks(%Binned{} = scale) do
+  def legend_breaks(%Binned{} = binned) do
+    scale = Binned.called(binned)
+
     {values, indexes} =
       scale
       |> Binned.breaks()
@@ -682,7 +703,8 @@ defmodule Giggly.Scale do
             "and its labels are a list, which labels its breaks alone, got: #{inspect(given)}"
   end
 
-  def shown_limits(%Binned{show_limits: true} = scale) do
+  def shown_limits(%Binned{show_limits: true} = binned) do
+    scale = Binned.called(binned)
     {low, high} = Binned.limits(scale)
     limits = [low, high]
     Enum.zip(limits, binned_labels(scale, limits, []))
@@ -717,12 +739,16 @@ defmodule Giggly.Scale do
   # among the breaks shown, in their order, over the bins' count, not its own edge's, as R counts
   # them, one lower where the scale's first break falls on a limit: breaks given out of order, or
   # after a first given outside the limits, are placed where R places them, and one counted past
-  # the bar's end is left out. A continuous scale's default breaks on a limit are left out, as R
-  # leaves them out of a scale that has not written its breaks back, as a binned one has.
+  # the bar's end is left out. A continuous scale's default breaks, or its function's, on a limit
+  # are left out, as R leaves them out of a scale that has not written its breaks back, as a
+  # binned one has, a function's breaks too (`Binned.called/1`).
   @doc false
   @spec steps(Continuous.t() | Binned.t(), [float()]) ::
           {[float() | nil], [{float(), float(), String.t() | :none}]}
-  def steps(scale, values) do
+  def steps(%Binned{} = binned, values), do: stepped(Binned.called(binned), values)
+  def steps(%Continuous{} = scale, values), do: stepped(scale, values)
+
+  defp stepped(scale, values) do
     {low, high} = limits = step_limits(scale)
     shown = Enum.map(values, fn value -> if step_shown?(scale, value, limits), do: value end)
 
@@ -775,17 +801,20 @@ defmodule Giggly.Scale do
 
   defp step_limits(%Binned{} = scale), do: Binned.limits(scale)
 
-  # Whether a colour steps guide shows a break of the scale's: a continuous scale's default break
-  # only off its limits, any other.
-  defp step_shown?(%Continuous{breaks: :default}, value, {low, high}),
-    do: value != low and value != high
+  # Whether a colour steps guide shows a break of the scale's: a continuous scale's default break,
+  # or its function's, only off its limits, any other.
+  defp step_shown?(%Continuous{breaks: breaks}, value, {low, high})
+       when breaks == :default or is_function(breaks),
+       do: value != low and value != high
 
   defp step_shown?(_scale, _value, _limits), do: true
 
   # Whether the scale's first break, `values`' first or its first given, is on a limit, R's
-  # `breaks[1] %in% limits`; never for a continuous scale's default breaks, which R has left out
-  # there.
-  defp stepped_down?(%Continuous{breaks: :default}, _values, _limits), do: false
+  # `breaks[1] %in% limits`; never for a continuous scale's default breaks, or its function's,
+  # which R has left out there.
+  defp stepped_down?(%Continuous{breaks: breaks}, _values, _limits)
+       when breaks == :default or is_function(breaks),
+       do: false
 
   defp stepped_down?(%Continuous{breaks: [first | _given], transform: transform}, _values, limits) do
     [position] = Transform.transform(transform, [first])
@@ -805,13 +834,17 @@ defmodule Giggly.Scale do
   # less the breaks themselves, which ggplot2's grid leaves out of its minor lines.
   #
   # A continuous scale takes those its `minor_breaks` gives, in data units, put through its
-  # transformation, or a date scale's every step of its width, or by default its transformation's
+  # transformation, or a date scale's every step of its width, or those its function returns on
+  # the extent and the breaks, in data units (`Giggly.Scale.BreaksFunction`), none on an extent of
+  # zero width, or by default its transformation's
   # (`Scales.Transform`), and keeps those inside `extent`, its ends included; `:none` gives
   # none. By default they fall midway
   # between breaks in transformed space, and between the outermost breaks and the extent's ends,
   # and an axis with fewer than two breaks has none.
   #
-  # A discrete scale has none, as in ggplot2.
+  # A discrete scale takes the positions its `minor_breaks` gives, or its function returns on the
+  # extent and the breaks' positions, as ggplot2 3.5.0's do, kept as a continuous scale's are; by
+  # default none, as in ggplot2.
   @doc false
   @spec minor_breaks(t(), [break()], {float(), float()}) :: [float()]
   def minor_breaks(%Continuous{minor_breaks: :none}, _breaks, _extent), do: []
@@ -821,11 +854,34 @@ defmodule Giggly.Scale do
 
     scale
     |> candidate_minor_breaks(positions, extent)
-    |> Enum.filter(fn position -> placed_inside?(position, extent) end)
-    |> Enum.reject(fn position -> position in positions end)
+    |> kept_minor_breaks(breaks, extent)
   end
 
-  def minor_breaks(%Discrete{}, _breaks, _extent), do: []
+  def minor_breaks(%Discrete{minor_breaks: minor_breaks}, _breaks, _extent)
+      when minor_breaks in [:default, :none],
+      do: []
+
+  def minor_breaks(%Discrete{minor_breaks: given}, breaks, extent) when is_list(given),
+    do: kept_minor_breaks(given, breaks, extent)
+
+  def minor_breaks(%Discrete{minor_breaks: breaker}, breaks, extent) do
+    positions = Enum.map(breaks, fn {position, _label} -> position end)
+
+    breaker
+    |> BreaksFunction.minor_breaks(extent, positions, :number)
+    |> kept_minor_breaks(breaks, extent)
+  end
+
+  # The minor breaks inside `extent`, ends included, less the breaks themselves, each matched by
+  # value, as R's `setdiff()` matches doubles, so a discrete axis's break at 2 takes out a minor
+  # break at 2.0.
+  defp kept_minor_breaks(minor_breaks, breaks, extent) do
+    positions = Enum.map(breaks, fn {position, _label} -> position end)
+
+    minor_breaks
+    |> Enum.filter(fn position -> placed_inside?(position, extent) end)
+    |> Enum.reject(fn position -> Enum.any?(positions, fn break -> break == position end) end)
+  end
 
   defp candidate_minor_breaks(
          %Continuous{minor_breaks: given, transform: transform},
@@ -841,6 +897,22 @@ defmodule Giggly.Scale do
          extent
        ),
        do: Transform.width(transform, step, extent)
+
+  defp candidate_minor_breaks(
+         %Continuous{minor_breaks: breaker, transform: transform},
+         positions,
+         extent
+       )
+       when is_function(breaker) do
+    if Bounds.zero_range?(extent) do
+      []
+    else
+      breaks = Transform.inverse(transform, positions)
+      limits = turned_back(transform, extent)
+      minor_breaks = BreaksFunction.minor_breaks(breaker, limits, breaks, break_kind(transform))
+      Transform.transform(transform, minor_breaks)
+    end
+  end
 
   defp candidate_minor_breaks(%Continuous{transform: transform}, positions, extent),
     do: Transform.minor_breaks(transform, positions, extent)
@@ -861,17 +933,99 @@ defmodule Giggly.Scale do
   # width, and the transformation's breaks on it, those inside the extent itself kept.
   defp default_breaks(%Continuous{}, :none, _extent), do: []
 
-  defp default_breaks(%Continuous{transform: transform}, _limits, extent) do
+  defp default_breaks(%Continuous{transform: transform, n_breaks: wanted}, _limits, extent) do
     {low, _high} = squished = Transform.squish(transform, extent)
 
     if Bounds.zero_range?(squished) do
       [low]
     else
       transform
-      |> Transform.breaks(squished)
+      |> Transform.breaks(squished, wanted_options(wanted))
       |> Enum.filter(fn position -> placed_inside?(position, extent) end)
     end
   end
+
+  # The breaks a continuous scale's function gives on `extent`, as `breaks/2` describes: handed
+  # the extent squished into the transformation's domain and turned back into data units, and
+  # `n_breaks`, or else the extent's end where it has zero width.
+  defp called_breaks(%Continuous{breaks: breaker, transform: transform} = scale, extent) do
+    {low, _high} = squished = Transform.squish(transform, extent)
+
+    {positions, names} =
+      if Bounds.zero_range?(squished) do
+        {[low], :none}
+      else
+        limits = turned_back(transform, squished)
+        kind = break_kind(transform)
+        {values, names} = BreaksFunction.breaks(breaker, limits, scale.n_breaks, kind)
+        {Transform.transform(transform, values), names}
+      end
+
+    check_labels_count(scale, positions)
+    placed_breaks(named(scale, names), positions, extent)
+  end
+
+  # The breaks at `positions` inside `extent`, ends included, in the order given, each with its
+  # label, those of a list of labels at the breaks' indexes.
+  defp placed_breaks(scale, positions, extent) do
+    {kept, indexes} =
+      positions
+      |> Enum.with_index()
+      |> Enum.filter(fn {position, _index} -> placed_inside?(position, extent) end)
+      |> Enum.unzip()
+
+    Enum.zip(kept, labels(scale, kept, indexes, extent))
+  end
+
+  # A list of labels beside a breaks function is one for each break it returns, as R fails on
+  # breaks and labels of different lengths.
+  defp check_labels_count(%Continuous{labels: given}, positions)
+       when is_list(given) and length(given) != length(positions) do
+    raise ArgumentError,
+          "a scale's #{length(given)} labels must be one for each of the " <>
+            "#{length(positions)} breaks its breaks function gives, got: #{inspect(given)}"
+  end
+
+  defp check_labels_count(_scale, _positions), do: :ok
+
+  # The scale labelled by the labels of its breaks function's pairs where its labels are the
+  # default, as R labels a break by its name.
+  defp named(%{labels: :default} = scale, names) when is_list(names), do: %{scale | labels: names}
+  defp named(scale, _names), do: scale
+
+  # An extent turned back into data units, the limits a breaks function is handed: a date's low
+  # end rounded down to its day and its high end up, so the function sees the whole axis, where R
+  # hands it a fraction of a day; a time's ends held inside the day, from midnight to its last
+  # microsecond, where R hands it a span past either midnight, which a time of day cannot hold,
+  # nor a break the function returns.
+  defp turned_back(:date, {low, high}) do
+    [low_date, high_date] = Transform.inverse(:date, [low, Float.ceil(high / 1)])
+    {low_date, high_date}
+  end
+
+  defp turned_back(:time, {low, high}) do
+    [low_time, high_time] =
+      Transform.inverse(:time, [
+        min(max(low, 0.0), @last_second),
+        max(min(high, @last_second), 0.0)
+      ])
+
+    {low_time, high_time}
+  end
+
+  defp turned_back(transform, {low, high}) do
+    [low_value, high_value] = Transform.inverse(transform, [low, high])
+    {low_value, high_value}
+  end
+
+  # The kind of break a transformation's scale takes.
+  defp break_kind(:date), do: :date
+  defp break_kind({:datetime, _zone, _database}), do: :datetime
+  defp break_kind(:time), do: :time
+  defp break_kind(_numeric), do: :number
+
+  defp wanted_options(:default), do: []
+  defp wanted_options(wanted), do: [n: wanted]
 
   # The labels of the breaks at `positions`, which are the given breaks at `indexes` in the order
   # given, the breaks a date scale's width gives (`:width`), or else the default breaks
@@ -904,8 +1058,13 @@ defmodule Giggly.Scale do
     |> Enum.map(fn date -> Calendar.strftime(date, format) end)
   end
 
-  defp labels(%Continuous{labels: :default, transform: transform}, positions, :default, extent),
-    do: Transform.format(transform, positions, extent)
+  defp labels(
+         %Continuous{labels: :default, transform: transform, n_breaks: wanted},
+         positions,
+         :default,
+         extent
+       ),
+       do: Transform.format(transform, positions, extent, wanted_options(wanted))
 
   defp labels(%Continuous{labels: :default, transform: transform}, positions, _given, _extent),
     do: Transform.format(transform, positions, :given)

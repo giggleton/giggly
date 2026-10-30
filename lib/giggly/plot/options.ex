@@ -1386,7 +1386,11 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
         "The values the axis marks with a tick, a label and a grid " <>
-          "line, a list of numbers in data units, or `:none` for " <>
+          "line, a list of numbers in data units; a function that " <>
+          "returns them, or `{break, label}` pairs, handed the axis's " <>
+          "extent in data units, `{low, high}`, and, taking two " <>
+          "arguments, `[n: n]` as `n_breaks:` asks, `[]` when not " <>
+          "given, such as `&Scales.Breaks.extended/2`; or `:none` for " <>
           "none; chosen from the limits when not given. A break is " <>
           "drawn wherever it falls inside the widened axis."
     ],
@@ -1394,16 +1398,29 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
         "The values the panel draws a minor grid line at, a list of " <>
-          "numbers in data units, or `:none` for none; midway " <>
-          "between the breaks, once transformed, when not given."
+          "numbers in data units; a function that returns them, " <>
+          "handed the axis's extent in data units, `{low, high}`, and, " <>
+          "taking two arguments, the breaks drawn; or `:none` for none; " <>
+          "midway between the breaks, once transformed, when not given."
+    ],
+    n_breaks: [
+      type: :pos_integer,
+      doc:
+        "How many breaks are wanted, of the breaks chosen when " <>
+          "`breaks:` is not given, 2 or more but on a log axis, or of " <>
+          "a `breaks:` function of two arguments; not beside " <>
+          "`breaks:` a list, `:none` or a function of one argument, " <>
+          "which wants no number."
     ],
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
         "The breaks' labels: a list of strings, one for each of " <>
-          "`breaks:`; a function handed every break drawn, a list of " <>
-          "numbers in data units, that returns a string for each, as " <>
-          "`Scales.Labels`'s do; or `:none` for ticks with no labels."
+          "`breaks:`, or of the breaks its function returns; a " <>
+          "function handed every break drawn, a list of numbers in " <>
+          "data units, that returns a string for each, as " <>
+          "`Scales.Labels`'s do; or `:none` for ticks with no labels. " <>
+          "A pair's label when a `breaks:` function returns pairs."
     ],
     expand: [
       type: @scale_expand_type,
@@ -1450,8 +1467,19 @@ defmodule Giggly.Plot.Options do
                               type: {:custom, __MODULE__, :validate_discrete_breaks, []},
                               doc:
                                 "The values the axis marks with a tick and a label, a list " <>
-                                  "in the order given, those not among the limits left out, " <>
-                                  "or `:none` for none; every one of the limits when not given."
+                                  "in the order given, those not among the limits left out; " <>
+                                  "a function of one argument handed the limits that returns " <>
+                                  "them, or `{value, label}` pairs; or `:none` for none; " <>
+                                  "every one of the limits when not given."
+                            ],
+                            minor_breaks: [
+                              type: {:custom, __MODULE__, :validate_breaks, []},
+                              doc:
+                                "The positions the panel draws a minor grid line at, the " <>
+                                  "values placed at 1, 2, 3 and on: a list of numbers; a " <>
+                                  "function that returns them, handed the axis's extent, " <>
+                                  "`{low, high}`, and, taking two arguments, the breaks' " <>
+                                  "positions; or `:none` for none; none when not given."
                             ],
                             labels: [
                               type: {:custom, __MODULE__, :validate_discrete_labels, []},
@@ -1461,8 +1489,9 @@ defmodule Giggly.Plot.Options do
                                   "value to its label, a value it does not hold keeping its " <>
                                   "own; a function handed every break drawn, a list of " <>
                                   "values, that returns a string for each; or `:none` for " <>
-                                  "ticks with no labels. Each value written as text when not " <>
-                                  "given."
+                                  "ticks with no labels. A pair's label when a `breaks:` " <>
+                                  "function returns pairs, else each value written as text, " <>
+                                  "when not given."
                             ],
                             expand: [
                               type: @scale_expand_type,
@@ -1491,9 +1520,12 @@ defmodule Giggly.Plot.Options do
                           type: {:custom, __MODULE__, :validate_dates, []},
                           doc:
                             "The dates the axis marks with a tick, a label and a grid line, a " <>
-                              "list, or `:none` for none; chosen from the limits when neither " <>
-                              "this nor `date_breaks:` is given. A break is drawn wherever it " <>
-                              "falls inside the widened axis."
+                              "list; a function that returns them, or `{date, label}` pairs, " <>
+                              "handed the axis's extent, `{low, high}`, its ends rounded out " <>
+                              "to whole days, and, taking two arguments, `[]`, such as " <>
+                              "`&Scales.Breaks.pretty/2`; or `:none` for none; chosen from the " <>
+                              "limits when neither this nor `date_breaks:` is given. A break " <>
+                              "is drawn wherever it falls inside the widened axis."
                         ],
                         date_breaks: [
                           type: @date_step_type,
@@ -1508,11 +1540,13 @@ defmodule Giggly.Plot.Options do
                           type: {:custom, __MODULE__, :validate_scale_labels, []},
                           doc:
                             "The breaks' labels: a list of strings, one for each of " <>
-                              "`breaks:`; a function handed every break drawn, a list of " <>
-                              "dates, that returns a string for each; or `:none` for ticks " <>
-                              "with no labels. Not with `date_labels:`. When neither is given, " <>
-                              "the breaks the axis chooses are written as suits their step " <>
-                              "(`Sep 21`, `2026`) and others in full (`2026-09-21`)."
+                              "`breaks:`, or of the breaks its function returns; a function " <>
+                              "handed every break drawn, a list of dates, that returns a " <>
+                              "string for each; or `:none` for ticks with no labels. Not with " <>
+                              "`date_labels:`. When neither is given, the breaks the axis " <>
+                              "chooses are written as suits their step (`Sep 21`, `2026`), a " <>
+                              "`breaks:` function's pairs by their labels, and others in full " <>
+                              "(`2026-09-21`)."
                         ],
                         date_labels: [
                           type: {:custom, __MODULE__, :validate_date_format, []},
@@ -1524,7 +1558,9 @@ defmodule Giggly.Plot.Options do
                         minor_breaks: [
                           type: {:custom, __MODULE__, :validate_dates, []},
                           doc:
-                            "The dates the panel draws a minor grid line at, a list, or " <>
+                            "The dates the panel draws a minor grid line at, a list; a " <>
+                              "function that returns them, handed the axis's extent as " <>
+                              "`breaks:`'s is, and, taking two arguments, the breaks drawn; or " <>
                               "`:none` for none; midway between the breaks when neither this " <>
                               "nor `date_minor_breaks:` is given."
                         ],
@@ -1565,9 +1601,13 @@ defmodule Giggly.Plot.Options do
                               type: {:custom, __MODULE__, :validate_datetimes, []},
                               doc:
                                 "The date-times the axis marks with a tick, a label and a grid " <>
-                                  "line, a list, or `:none` for none; chosen from the limits " <>
-                                  "when neither this nor `date_breaks:` is given. A break is " <>
-                                  "drawn wherever it falls inside the widened axis."
+                                  "line, a list; a function that returns them, or " <>
+                                  "`{date_time, label}` pairs, handed the axis's extent, " <>
+                                  "`{low, high}`, as the column holds date-times, and, taking " <>
+                                  "two arguments, `[]`, such as `&Scales.Breaks.pretty/2`; or " <>
+                                  "`:none` for none; chosen from the limits when neither this " <>
+                                  "nor `date_breaks:` is given. A break is drawn wherever it " <>
+                                  "falls inside the widened axis."
                             ],
                             date_breaks: [
                               type: @datetime_step_type,
@@ -1584,12 +1624,14 @@ defmodule Giggly.Plot.Options do
                               type: {:custom, __MODULE__, :validate_scale_labels, []},
                               doc:
                                 "The breaks' labels: a list of strings, one for each of " <>
-                                  "`breaks:`; a function handed every break drawn, a list of " <>
-                                  "date-times as the column holds them, that returns a string " <>
-                                  "for each; or `:none` for ticks with no labels. Not with " <>
-                                  "`date_labels:`. When neither is given, the breaks the axis " <>
-                                  "chooses are written as suits their step (`06:00`, " <>
-                                  "`Mar 10 06:00`, `Mar 10`) and others in full, the date " <>
+                                  "`breaks:`, or of the breaks its function returns; a " <>
+                                  "function handed every break drawn, a list of date-times as " <>
+                                  "the column holds them, that returns a string for each; or " <>
+                                  "`:none` for ticks with no labels. Not with `date_labels:`. " <>
+                                  "When neither is given, the breaks the axis chooses are " <>
+                                  "written as suits their step (`06:00`, `Mar 10 06:00`, " <>
+                                  "`Mar 10`), a `breaks:` function's pairs by their labels, and " <>
+                                  "others in full, the date " <>
                                   "alone where every one is a midnight (`2024-03-10`), else to " <>
                                   "the second (`2024-03-10 06:30:00`)."
                             ],
@@ -1603,7 +1645,9 @@ defmodule Giggly.Plot.Options do
                             minor_breaks: [
                               type: {:custom, __MODULE__, :validate_datetimes, []},
                               doc:
-                                "The date-times the panel draws a minor grid line at, a list, " <>
+                                "The date-times the panel draws a minor grid line at, a list; " <>
+                                  "a function that returns them, handed the axis's extent as " <>
+                                  "`breaks:`'s is, and, taking two arguments, the breaks drawn; " <>
                                   "or `:none` for none; midway between the breaks when neither " <>
                                   "this nor `date_minor_breaks:` is given."
                             ],
@@ -1657,9 +1701,12 @@ defmodule Giggly.Plot.Options do
                           type: {:custom, __MODULE__, :validate_times, []},
                           doc:
                             "The times of day the axis marks with a tick, a label and a grid " <>
-                              "line, a list, or `:none` for none; chosen from the limits when " <>
-                              "neither this nor `date_breaks:` is given. A break is drawn " <>
-                              "wherever it falls inside the widened axis."
+                              "line, a list; a function that returns them, or `{time, label}` " <>
+                              "pairs, handed the axis's extent, `{low, high}`, as times of day " <>
+                              "wrapped past midnight, and, taking two arguments, `[]`; or " <>
+                              "`:none` for none; chosen from the limits when neither this nor " <>
+                              "`date_breaks:` is given. A break is drawn wherever it falls " <>
+                              "inside the widened axis."
                         ],
                         date_breaks: [
                           type: @time_step_type,
@@ -1673,8 +1720,10 @@ defmodule Giggly.Plot.Options do
                           type: {:custom, __MODULE__, :validate_scale_labels, []},
                           doc:
                             "The breaks' labels: a list of strings, one for each of " <>
-                              "`breaks:`; a function handed every break drawn, a list of " <>
-                              "times of day, wrapped past midnight, so a break at the end of " <>
+                              "`breaks:`, or of the breaks its function returns, a pair's " <>
+                              "label when it returns pairs; a function handed every break " <>
+                              "drawn, a list of times of day, wrapped past midnight, so a " <>
+                              "break at the end of " <>
                               "the day is `~T[00:00:00]`, that returns a string for each; or " <>
                               "`:none` for ticks with no labels. Not with `date_labels:`. When " <>
                               "neither is given, each break is written in hours, minutes and " <>
@@ -1693,7 +1742,9 @@ defmodule Giggly.Plot.Options do
                         minor_breaks: [
                           type: {:custom, __MODULE__, :validate_times, []},
                           doc:
-                            "The times of day the panel draws a minor grid line at, a list, or " <>
+                            "The times of day the panel draws a minor grid line at, a list; " <>
+                              "a function that returns them, handed the axis's extent as " <>
+                              "`breaks:`'s is, and, taking two arguments, the breaks drawn; or " <>
                               "`:none` for none; midway between the breaks when neither this " <>
                               "nor `date_minor_breaks:` is given."
                         ],
@@ -1741,7 +1792,9 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_discrete_breaks, []},
       doc:
         "The values the legend shows a key for, a list in the order given, those not among " <>
-          "the limits left out, or `:none` for no legend; every one of the limits when not given."
+          "the limits left out; a function of one argument handed the limits that returns " <>
+          "them, or `{value, label}` pairs, a pair's label its key's; or `:none` for no legend; " <>
+          "every one of the limits when not given."
     ],
     labels: [
       type: {:custom, __MODULE__, :validate_discrete_labels, []},
@@ -1766,14 +1819,24 @@ defmodule Giggly.Plot.Options do
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
         "The values the legend or colour bar marks, a list of numbers, those outside the " <>
-          "limits left out, or `:none` for no guide; chosen from the limits when not given."
+          "limits left out; a function that returns them, or `{break, label}` pairs, handed the " <>
+          "limits, `{low, high}`, and, taking two arguments, `[n: n]` as `n_breaks:` asks, `[]` " <>
+          "when not given; or `:none` for no guide; chosen from the limits when not given."
+    ],
+    n_breaks: [
+      type: :pos_integer,
+      doc:
+        "How many breaks are wanted, 2 or more, of the breaks chosen when `breaks:` is not " <>
+          "given, or of a `breaks:` function of two arguments; not beside `breaks:` a list, " <>
+          "`:none` or a function of one argument, which wants no number."
     ],
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
-        "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
-          "every break, a list of numbers, that returns a string for each, as `Scales.Labels`'s " <>
-          "do; or `:none` for no labels."
+        "The breaks' labels: a list of strings, one for each of `breaks:`, or of the breaks its " <>
+          "function returns; a function handed every break, a list of numbers, that returns a " <>
+          "string for each, as `Scales.Labels`'s do; or `:none` for no labels. A pair's label " <>
+          "when a `breaks:` function returns pairs."
     ]
   ]
 
@@ -2142,24 +2205,28 @@ defmodule Giggly.Plot.Options do
     breaks: [
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
-        "The values the bins are cut at, a list of numbers, those outside the limits left out, " <>
-          "or `:none` for one bin and no guide; chosen from the limits as `n_breaks:` and " <>
-          "`nice_breaks:` say when not given."
+        "The values the bins are cut at, a list of numbers, those outside the limits left out; " <>
+          "a function that returns them, or `{break, label}` pairs, handed the limits, `{low, " <>
+          "high}`, and, taking two arguments, `[n: n_breaks]`; or `:none` for one bin and no " <>
+          "guide; chosen from the limits as `n_breaks:` and `nice_breaks:` say when not given."
     ],
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
-        "The breaks' labels: a list of strings, one for each of `breaks:`; a function handed " <>
-          "every break, a list of numbers, that returns a string for each, as `Scales.Labels`'s " <>
-          "do, and handed the limits too where `show_limits:` shows them; or `:none` for no " <>
-          "labels."
+        "The breaks' labels: a list of strings, one for each of `breaks:`, or of the breaks its " <>
+          "function returns; a function handed every break, a list of numbers, that returns a " <>
+          "string for each, as `Scales.Labels`'s do, and handed the limits too where " <>
+          "`show_limits:` shows them; or `:none` for no labels. A pair's label when a `breaks:` " <>
+          "function returns pairs."
     ],
     n_breaks: [
       type: :pos_integer,
       default: 5,
       doc:
         "How many breaks are wanted when `breaks:` is not given: 2 or more for nice breaks, " <>
-          "which may number a few more or fewer, 1 or more otherwise."
+          "which may number a few more or fewer, 1 or more otherwise; or of a `breaks:` function " <>
+          "of two arguments. When given, not beside `breaks:` a list, `:none` or a function of " <>
+          "one argument, which wants no number."
     ],
     nice_breaks: [
       type: :boolean,
@@ -2884,6 +2951,10 @@ defmodule Giggly.Plot.Options do
 
   # A date-time, naive or not.
   defguardp is_datetime(value) when is_struct(value, DateTime) or is_struct(value, NaiveDateTime)
+
+  # A continuous or binned scale's breaks or minor breaks function, ggplot2's: of one argument, the
+  # limits, or of two, the limits and the breaks wanted or the breaks, as R counts them.
+  defguardp is_breaks_function(term) when is_function(term, 1) or is_function(term, 2)
 
   # Each `Giggly.Plot` function's schema, named after the function, or after the family of scale
   # functions whose options are checked against it.
@@ -3704,10 +3775,11 @@ defmodule Giggly.Plot.Options do
   defp limit(number), do: number / 1
 
   # NimbleOptions' check of a scale's breaks or minor breaks: a list of numbers, each kept as a
-  # float, or `:none` for none.
+  # float, a function of one or two arguments, or `:none` for none.
   @doc false
-  @spec validate_breaks(term()) :: {:ok, [float()] | :none} | {:error, String.t()}
+  @spec validate_breaks(term()) :: {:ok, [float()] | function() | :none} | {:error, String.t()}
   def validate_breaks(:none), do: {:ok, :none}
+  def validate_breaks(breaker) when is_breaks_function(breaker), do: {:ok, breaker}
 
   def validate_breaks(breaks) when is_list(breaks) do
     case Enum.reject(breaks, &is_number/1) do
@@ -3716,8 +3788,11 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  def validate_breaks(breaks),
-    do: {:error, "expected a list of numbers or :none, got: #{inspect(breaks)}"}
+  def validate_breaks(breaks) do
+    {:error,
+     "expected a list of numbers, a function of one or two arguments or :none, got: " <>
+       inspect(breaks)}
+  end
 
   # NimbleOptions' check of a scale's labels: a list of strings, a function of one argument, which
   # is handed the breaks, or `:none` for none.
@@ -3785,15 +3860,19 @@ defmodule Giggly.Plot.Options do
   end
 
   # NimbleOptions' check of a discrete scale's breaks: a list of values, each named once
-  # (`discrete_values/1`), or `:none` for none.
+  # (`discrete_values/1`), a function of one argument, handed the limits, as ggplot2 calls one,
+  # or `:none` for none.
   @doc false
-  @spec validate_discrete_breaks(term()) :: {:ok, list() | :none} | {:error, String.t()}
+  @spec validate_discrete_breaks(term()) ::
+          {:ok, list() | (list() -> list()) | :none} | {:error, String.t()}
   def validate_discrete_breaks(:none), do: {:ok, :none}
+  def validate_discrete_breaks(breaker) when is_function(breaker, 1), do: {:ok, breaker}
   def validate_discrete_breaks(values) when is_list(values), do: discrete_values(values)
 
   def validate_discrete_breaks(values) do
     {:error,
-     "expected a list of values, each a string, a number, an atom or nil, or :none, got: " <>
+     "expected a list of values, each a string, a number, an atom or nil, a function of one " <>
+       "argument, or :none, got: " <>
        inspect(values)}
   end
 
@@ -3870,11 +3949,12 @@ defmodule Giggly.Plot.Options do
        inspect(limits)}
   end
 
-  # NimbleOptions' check of a date scale's breaks or minor breaks: a list of dates, or `:none` for
-  # none.
+  # NimbleOptions' check of a date scale's breaks or minor breaks: a list of dates, a function of
+  # one or two arguments, or `:none` for none.
   @doc false
-  @spec validate_dates(term()) :: {:ok, [Date.t()] | :none} | {:error, String.t()}
+  @spec validate_dates(term()) :: {:ok, [Date.t()] | function() | :none} | {:error, String.t()}
   def validate_dates(:none), do: {:ok, :none}
+  def validate_dates(breaker) when is_breaks_function(breaker), do: {:ok, breaker}
 
   def validate_dates(dates) when is_list(dates) do
     case Enum.reject(dates, fn date -> is_struct(date, Date) end) do
@@ -3883,8 +3963,11 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  def validate_dates(dates),
-    do: {:error, "expected a list of dates or :none, got: #{inspect(dates)}"}
+  def validate_dates(dates) do
+    {:error,
+     "expected a list of dates, a function of one or two arguments or :none, got: " <>
+       inspect(dates)}
+  end
 
   # NimbleOptions' check of a date scale's step between breaks: one of a day, a week, a month and a
   # year and how many of it, a positive whole number.
@@ -3941,11 +4024,12 @@ defmodule Giggly.Plot.Options do
   end
 
   # NimbleOptions' check of a date-time scale's breaks or minor breaks: a list of date-times of one
-  # kind, `DateTime` or `NaiveDateTime`, or `:none` for none.
+  # kind, `DateTime` or `NaiveDateTime`, a function of one or two arguments, or `:none` for none.
   @doc false
   @spec validate_datetimes(term()) ::
-          {:ok, [DateTime.t()] | [NaiveDateTime.t()] | :none} | {:error, String.t()}
+          {:ok, [DateTime.t()] | [NaiveDateTime.t()] | function() | :none} | {:error, String.t()}
   def validate_datetimes(:none), do: {:ok, :none}
+  def validate_datetimes(breaker) when is_breaks_function(breaker), do: {:ok, breaker}
 
   def validate_datetimes(datetimes) when is_list(datetimes) do
     with [] <- Enum.reject(datetimes, fn datetime -> is_datetime(datetime) end),
@@ -3957,8 +4041,11 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  def validate_datetimes(datetimes),
-    do: {:error, "expected a list of date-times or :none, got: #{inspect(datetimes)}"}
+  def validate_datetimes(datetimes) do
+    {:error,
+     "expected a list of date-times, a function of one or two arguments or :none, got: " <>
+       inspect(datetimes)}
+  end
 
   # Whether the date-times given, `nil` aside, are all of one kind: an instant in a time zone, or
   # a naive date-time, which is not one.
@@ -4029,11 +4116,12 @@ defmodule Giggly.Plot.Options do
        inspect(limits)}
   end
 
-  # NimbleOptions' check of a time scale's breaks or minor breaks: a list of times of day, or
-  # `:none` for none.
+  # NimbleOptions' check of a time scale's breaks or minor breaks: a list of times of day, a
+  # function of one or two arguments, or `:none` for none.
   @doc false
-  @spec validate_times(term()) :: {:ok, [Time.t()] | :none} | {:error, String.t()}
+  @spec validate_times(term()) :: {:ok, [Time.t()] | function() | :none} | {:error, String.t()}
   def validate_times(:none), do: {:ok, :none}
+  def validate_times(breaker) when is_breaks_function(breaker), do: {:ok, breaker}
 
   def validate_times(times) when is_list(times) do
     case Enum.reject(times, fn time -> is_struct(time, Time) end) do
@@ -4042,8 +4130,11 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  def validate_times(times),
-    do: {:error, "expected a list of times of day or :none, got: #{inspect(times)}"}
+  def validate_times(times) do
+    {:error,
+     "expected a list of times of day, a function of one or two arguments or :none, got: " <>
+       inspect(times)}
+  end
 
   # NimbleOptions' check of a time scale's step between breaks: one of a second, a minute and an
   # hour and how many of it, a positive whole number.

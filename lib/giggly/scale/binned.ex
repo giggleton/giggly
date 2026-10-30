@@ -27,11 +27,14 @@ defmodule Giggly.Scale.Binned do
       same; with none inside, not widened, its ends its breaks, and a range of one value widened
       by 0.05 either side first.
     * `breaks`: the values its bins are cut at, beside the limits: a list, those inside the
-      limits kept, in the order given; `:none` for one bin; or `:default` for about `n_breaks`,
+      limits kept, in the order given; a function handed the limits, `{low, high}`, and for one of
+      two arguments `[n: n_breaks]` too, that returns them, or `{value, label}` pairs, a pair's
+      label the break's unless `labels` says otherwise, kept as a list's are, the limits not
+      widened; `:none` for one bin; or `:default` for about `n_breaks`,
       chosen as `nice_breaks` says on the limits, those at either end of the data's range left
       out where the limits are widened.
-    * `n_breaks`: how many default breaks are wanted, 5 unless given; nice breaks may number a
-      few more or fewer.
+    * `n_breaks`: how many default breaks are wanted, or a breaks function of two arguments is
+      asked for, 5 unless given; nice breaks may number a few more or fewer.
     * `nice_breaks`: `true` for default breaks chosen to be round numbers, as a continuous
       scale's are, `n_breaks` of them wanted, 2 or more; `false` for `n_breaks` breaks spaced
       evenly between the ends of the limits, 1 or more.
@@ -63,6 +66,7 @@ defmodule Giggly.Scale.Binned do
   # limits, whose middle no gradient colours, so a value on the limit there drew as missing. One
   # bin colours every value but a missing one, which R's single colour, recycled, colours too.
 
+  alias Giggly.Scale.BreaksFunction
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
   # Every field's default is `scale_colour_binned()`'s before it has seen any data: the gradient
@@ -91,7 +95,12 @@ defmodule Giggly.Scale.Binned do
           guide: :colorsteps | :legend | :none,
           name: :default | :none | String.t(),
           limits: {number() | nil, number() | nil},
-          breaks: :default | :none | [number()],
+          breaks:
+            :default
+            | :none
+            | [number()]
+            | ({float(), float()} -> list())
+            | ({float(), float()}, keyword() -> list()),
           labels: :default | :none | [String.t()] | ([float()] -> [String.t()]),
           n_breaks: pos_integer(),
           nice_breaks: boolean(),
@@ -127,6 +136,30 @@ defmodule Giggly.Scale.Binned do
   def breaks(%__MODULE__{} = scale) do
     {breaks, _limits} = resolved(scale)
     breaks
+  end
+
+  # The scale with the breaks its breaks function returns on its limits in the function's place,
+  # as R's `get_breaks()` writes them back, and their pairs' labels its labels where they are the
+  # default (`Giggly.Scale.BreaksFunction`), so it is read as a scale given them; none before it
+  # has limits; any other scale as it is.
+  @doc false
+  @spec called(t()) :: t()
+  def called(%__MODULE__{breaks: breaker} = scale) when is_function(breaker) do
+    case given_limits(scale) do
+      :none -> %{scale | breaks: []}
+      limits -> called(scale, limits)
+    end
+  end
+
+  def called(%__MODULE__{} = scale), do: scale
+
+  defp called(%__MODULE__{breaks: breaker, n_breaks: wanted} = scale, limits) do
+    {breaks, names} = BreaksFunction.breaks(breaker, limits, wanted, :number)
+
+    case {scale.labels, names} do
+      {:default, names} when is_list(names) -> %{scale | breaks: breaks, labels: names}
+      _given -> %{scale | breaks: breaks}
+    end
   end
 
   # Each value's colour: the colour of the bin it falls in once squished into the limits, or the
@@ -189,6 +222,12 @@ defmodule Giggly.Scale.Binned do
       |> indexed_inside(limits)
 
     {breaks, limits}
+  end
+
+  defp resolved(%__MODULE__{breaks: breaker} = scale, limits) when is_function(breaker) do
+    scale
+    |> called(limits)
+    |> resolved(limits)
   end
 
   defp resolved(%__MODULE__{breaks: :default, limits: {nil, nil}} = scale, limits),

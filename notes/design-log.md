@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A breaks function is called as ggplot2's `get_breaks()` calls one, and R's names are
+  `{break, label}` pairs (2026-10-29, Steve, increment 2's step 5: "Match R", "B", "A"; checked
+  against ggplot2 4.0.3).** `breaks:` and `minor_breaks:` take a function of one argument or two,
+  as R counts formals (D1), on continuous, date, date-time, time, binned and discrete scales:
+  the extent squished and turned back, `[n: n_breaks]` or `[]`, a binned scale's always
+  `n_breaks`. Elixir lists carry no names, so a function may return pairs, a pair's label its
+  default label, and `Breaks.pretty/2` on dates and date-times returns them, R's names. A date
+  axis's ends are rounded out to whole days, where R hands fractions (98.0% of 20,000 random axes
+  match R's breaks), a time's held inside the day. Discrete axes take `minor_breaks:`, as
+  ggplot2 3.5.0's do. *Rejected: a function's breaks written in full*: `breaks_pretty(10)`'s
+  `Jan 06` lost. *Rejected: the axis's step format*: a width's breaks read `Jan, Jan, Feb`.
+  *Rejected: dates rounded down*: 97.6%, missing more of 10 to 100 days. *Rejected: day
+  numbers*: reverses D2. *Rejected: no discrete minor breaks*: R draws them.
+
 - **`n:` reaches every transformation's own breaks but time's, labels follow it, and numbers'
   `pretty()` rounds at R's measured switches (2026-10-29, Steve, increment 2's step 4: "A", "A",
   "A", "Agree", then "A"; checked against scales 1.4.0).** `Transform.breaks/3`'s `n:` reaches
@@ -90,8 +104,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   it rounds up from just above 1.4, 2.8 and 7, R's switches found by bisecting its output.
   *Rejected: time passing `n:` to `timespan`*: R's `transform_hms()` takes no number.
   *Rejected: Heckbert's 1.5, 3 and 7*: 91.4% of 7,191 ranges matched R, against 97.5%, twice
-  R's breaks on the rest. *Rejected: breaks returning their labels*: every caller's shape
-  changes. *Rejected: R's tolerance at the ends*: only its C holds it, and its breaks there are
+  R's breaks on the rest. *Rejected: R's tolerance at the ends*: only its C holds it, and its breaks there are
   not round. *Rejected: `pretty()`'s biases and shrinking*: they set the rule R leaves out.
 
 - **`geom_segment()` draws a straight line per row, or a path where the coordinate system curves
@@ -3165,6 +3178,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-29 — Take breaks and minor breaks functions and n_breaks: on Giggly's scales, R's
+  names as {break, label} pairs, and minor breaks on a discrete axis (breaks, step 5); §4: "A
+  breaks function"
 - 2026-10-29 — Add Breaks.pretty, R's breaks_pretty(), and n: through log10, dates and
   date-times, their labels following it (breaks, step 4); §4: "`n:` reaches", "A date-time's
   breaks under a day"

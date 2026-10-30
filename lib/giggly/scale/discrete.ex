@@ -44,7 +44,12 @@ defmodule Giggly.Scale.Discrete do
       `nil` among them places the missing value. A number names the value equal to it, so `2`
       names a level of `2.0`.
     * `breaks`: the values an axis marks, in the order given, those not among its limits left out;
-      `:none` for none, or `:default` for every one of its limits.
+      a function handed the limits that returns them, or `{value, label}` pairs, a pair's label
+      the break's unless `labels` says otherwise; `:none` for none, or `:default` for every one of
+      its limits.
+    * `minor_breaks`: the positions an axis draws a minor grid line at, its values at 1, 2, 3 and
+      on: a list; a function handed the axis's extent, `{low, high}`, and for one of two
+      arguments the breaks' positions too, that returns them; or `:default` or `:none` for none.
     * `labels`: the breaks' labels: a list, one for each break; a map from a value to its label,
       a value it does not hold keeping its own; a function handed every break drawn, which
       returns their labels; `:none` for none; or `:default`, each value written as text.
@@ -69,6 +74,7 @@ defmodule Giggly.Scale.Discrete do
             name: :default,
             limits: :default,
             breaks: :default,
+            minor_breaks: :default,
             labels: :default,
             expand: [mult: {0, 0}, add: {0.6, 0.6}]
 
@@ -86,7 +92,13 @@ defmodule Giggly.Scale.Discrete do
           guide: :axis | :legend | :none | struct(),
           name: :default | :none | String.t(),
           limits: :default | [term()],
-          breaks: :default | :none | [term()],
+          breaks: :default | :none | [term()] | (list() -> list()),
+          minor_breaks:
+            :default
+            | :none
+            | [number()]
+            | ({number(), number()} -> [number()])
+            | ({number(), number()}, [number()] -> [number()]),
           labels: :default | :none | [String.t()] | %{term() => String.t()} | (list() -> list()),
           expand: [mult: {number(), number()}, add: {number(), number()}]
         }
