@@ -1569,6 +1569,71 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of labels: each row's `label` at its `x` and `y`, as `geom_text/3` writes it, on a
+  box with rounded corners, so it reads over what lies beneath.
+
+  Each label is written and justified as `geom_text/3`'s are, its box placed and turned with its
+  text, padded round it by a quarter of a line of the text on every side and its corners rounded
+  to 0.15 of a line. A box is white with a black border 0.25 millimetres wide, and its text black
+  and 11 points tall, unless the options say otherwise; `alpha:` makes the box see-through, but
+  neither the text nor the border. Labels are drawn in the order of their rows, each box and then
+  its text, so a later label covers an earlier one. A row missing its `x`, `y` or label draws
+  nothing.
+
+  Labels use `:x`, `:y`, `:label`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and
+  `:linewidth`, and need `:x`, `:y` and `:label`; a label never groups the rows. `nudge_x:` and
+  `nudge_y:` move every label, in the units of each axis, and the axes reach each label's place,
+  though not its box.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.label())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, label: :model})
+      ...>   |> Giggly.Plot.geom_label(fill: "lightyellow")
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :fill), Giggly.DataFrame.pull(frame, :linewidth)}
+      {["#FFFFE0", "#FFFFE0"], [0.25, 0.25]}
+
+  A label is drawn as its box and its text, here padded 4 points either side, on square corners:
+
+      iex> svg =
+      ...>   %{"x" => [1.0], "y" => [1.0], "name" => ["a"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, label: :name})
+      ...>   |> Giggly.Plot.geom_label(label_padding: [left: 4, right: 4], label_r: 0)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "<polygon points=", svg =~ ">a</text>"}
+      {true, true}
+  """
+  @spec geom_label(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_label(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_label(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_label(plot, %{}, options)
+
+  def geom_label(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.label())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: label_geom(validated),
+      stat: %Stat.Identity{},
+      position: %Position.Nudge{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_label/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Label.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_label/3", required: Geom.Label.required_aesthetics())
+  end
+
+  @doc """
   Adds a layer of rectangles, one per row, each from its `xmin` to its `xmax` and its `ymin` to its
   `ymax`.
 
@@ -1634,11 +1699,11 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text`, `:label` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
-  where it is placed: text is not nudged, and bars at one `x` are not stacked.
+  where it is placed: text and labels are not nudged, and bars at one `x` are not stacked.
 
   Each option takes one value, or a list of them, one per annotation: every list holds as many
   values as the others, and a single value is used for every annotation, so
@@ -1646,9 +1711,10 @@ defmodule Giggly.Plot do
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
   a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
-  segment's, a rug's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a
-  dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
-  along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
+  segment's, a rug's, a label's or a rectangle's `linewidth:` and `linetype:`, whose list holds
+  line types, a dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line
+  whose width changes along it drawn a segment from each annotation to the next; the rest take one
+  value, a label's `label_padding:` one for every label however many sides it gives. Under a facet
   that makes more than one panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
@@ -1665,6 +1731,9 @@ defmodule Giggly.Plot do
       `outside:` and `lineend:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
+    * `:label`: `x:`, `y:`, `label:`, `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`,
+      `size:`, `angle:`, `hjust:`, `vjust:`, `family:`, `label_padding:`, `label_r:`,
+      `border_colour:` and `text_colour:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
       `linetype:`.
 
@@ -1723,14 +1792,14 @@ defmodule Giggly.Plot do
 
     add_layer(plot, layer, "Plot.annotate/3",
       required: required,
-      unmet: "#{inspect(geom)} is given no value for it"
+      unmet: "the #{inspect(geom)} annotation is given no value for it"
     )
   end
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text " <>
-            "or :rect, got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text, " <>
+            ":label or :rect, got: #{inspect(geom)}"
   end
 
   @doc """
@@ -5090,6 +5159,15 @@ defmodule Giggly.Plot do
   defp text_geom(validated),
     do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
 
+  defp label_geom(validated) do
+    %Geom.Label{
+      label_padding: Keyword.fetch!(validated, :label_padding),
+      label_r: Keyword.fetch!(validated, :label_r),
+      border_color: Keyword.fetch!(validated, :border_color),
+      text_color: Keyword.fetch!(validated, :text_color)
+    }
+  end
+
   # The geom an annotation draws with, a struct of its kind, with the aesthetics it accepts and
   # those it needs, as a layer function of the same geom records them.
   defp annotation_geom(:point, _validated),
@@ -5117,6 +5195,10 @@ defmodule Giggly.Plot do
 
   defp annotation_geom(:text, validated),
     do: {text_geom(validated), Geom.Text.accepted_aesthetics(), Geom.Text.required_aesthetics()}
+
+  defp annotation_geom(:label, validated),
+    do:
+      {label_geom(validated), Geom.Label.accepted_aesthetics(), Geom.Label.required_aesthetics()}
 
   defp annotation_geom(:rect, _validated),
     do: {%Geom.Rect{}, Geom.Rect.accepted_aesthetics(), Geom.Rect.required_aesthetics()}

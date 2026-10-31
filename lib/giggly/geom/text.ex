@@ -43,22 +43,88 @@ defmodule Giggly.Geom.Text do
   @spec required_aesthetics() :: [atom()]
   def required_aesthetics, do: [:label, :x, :y]
 
+  # ggplot2's `.pt`: font points per millimetre, which turns a `size` in millimetres into points.
+  @font_points_per_millimetre 72.27 / 25.4
+
+  # How close to the middle of the panel a label justified `:inward` or `:outward` is taken as at
+  # the middle, ggplot2's `just_dir()` tolerance.
+  @middle_tolerance 0.001
+
+  # Where ggplot2's words put a label's anchor along its baseline or up its height: at its start or
+  # bottom, its middle, or its end or top.
+  @word_places %{left: 0.0, bottom: 0.0, center: 0.5, middle: 0.5, right: 1.0, top: 1.0}
+
+  # The size text is set at, in points: its size in millimetres, the layer's or the theme's, times
+  # `.pt`. Not API: a label's text is set at it too (`Giggly.Geom.Label`).
+  @doc false
+  @spec font_size(number()) :: float()
+  def font_size(millimetres), do: millimetres * @font_points_per_millimetre
+
+  # A justification as a number, from ggplot2's `compute_just()`: a number as it is, a word by its
+  # place, and `:inward` or `:outward` by where the label falls along its own axis, `along`, or,
+  # for text turned between 45 and 135 degrees either way, along the other, `across`, reversed for
+  # text turned backward or past 135 degrees. A number reaches it a float, as `Giggly.Plot` holds
+  # one. Not API: a label is justified by it too.
+  @doc false
+  @spec justification(float() | atom(), number(), number(), number()) :: float()
+  def justification(just, _along, _across, _angle) when is_float(just), do: just
+
+  def justification(just, _along, _across, _angle) when is_map_key(@word_places, just),
+    do: Map.fetch!(@word_places, just)
+
+  def justification(just, along, across, angle) when just in [:inward, :outward] do
+    turn = half_turn(angle)
+    forward = turn > 45 and turn < 135
+    backward = turn < -45 and turn > -135
+    place = if forward or backward, do: across, else: along
+    swapped = backward or abs(turn) > 135
+    toward_middle = just == :inward != swapped
+    side_justification(toward_middle, direction(place))
+  end
+
+  # A label's justification turned with the text, as ggplot2's `rotate_just()` turns it for a
+  # legend key: where in the key, across and up, the label's anchor goes. Not API: a label's key is
+  # placed by it too.
+  @doc false
+  @spec turned_justification(number(), float(), float()) :: {float(), float()}
+  def turned_justification(angle, hjust, vjust) do
+    turn = angle - 360 * Float.floor(angle / 360)
+
+    cond do
+      turn < 90 -> {hjust, vjust}
+      turn < 180 -> {1 - vjust, hjust}
+      turn < 270 -> {1 - hjust, 1 - vjust}
+      true -> {vjust, 1 - hjust}
+    end
+  end
+
+  # A label on the low or high side of the panel's middle justified toward the middle or away from
+  # it, and one at the middle centred.
+  defp side_justification(_toward_middle, :middle), do: 0.5
+  defp side_justification(true, :low), do: 0.0
+  defp side_justification(true, :high), do: 1.0
+  defp side_justification(false, :low), do: 1.0
+  defp side_justification(false, :high), do: 0.0
+
+  # An angle in degrees as ggplot2's `compute_just()` reads it, from -180 to 180.
+  defp half_turn(angle) do
+    turn = angle - 360 * Float.floor(angle / 360)
+    if turn > 180, do: turn - 360, else: turn
+  end
+
+  # Which side of the panel's middle a place falls on, ggplot2's `just_dir()`.
+  defp direction(place) when place < 0.5 - @middle_tolerance, do: :low
+  defp direction(place) when place > 0.5 + @middle_tolerance, do: :high
+  defp direction(_place), do: :middle
+
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{AsCharacter, Coord, DataFrame, Font}
+    alias Giggly.{AsCharacter, Coord, DataFrame, Font, Geom, Scene}
     alias Giggly.Geom.Mark
-    alias Giggly.Scene.Text
 
     # The line height a legend key's margins are measured in lines of.
     @line_height 1.2
-
-    # ggplot2's `.pt`: font points per millimetre, which turns a `size` in millimetres into points.
-    @font_points_per_millimetre 72.27 / 25.4
-
-    # How close to the middle of the panel a label justified `:inward` or `:outward` is taken as at
-    # the middle, ggplot2's `just_dir()` tolerance.
-    @middle_tolerance 0.001
 
     # A legend key's margin round its text, in lines of the text, as `draw_key_text()` sets it.
     @key_margin_lines 0.1
@@ -67,10 +133,6 @@ defmodule Giggly.Geom.Text do
     # of grid's default font, 12 points at a line height of 1.2, not of the text's own, since R
     # turns the margin into centimetres outside the text's font.
     @key_measured_margin @key_margin_lines * 12 * @line_height
-
-    # Where ggplot2's words put a label's anchor along its baseline or up its height: at its start or
-    # bottom, its middle, or its end or top.
-    @word_places %{left: 0.0, bottom: 0.0, center: 0.5, middle: 0.5, right: 1.0, top: 1.0}
 
     # ggplot2's `GeomText$default_aes`, as far as Giggly draws text: the theme's ink, its text's
     # family and size, no angle, centred both ways, and no alpha.
@@ -96,7 +158,12 @@ defmodule Giggly.Geom.Text do
     @impl Giggly.Geom
     def draw_panel(%{check_overlap: check_overlap}, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
-      font_size = font_size(Mark.set(placed, :size))
+
+      font_size =
+        placed
+        |> Mark.set(:size)
+        |> Geom.Text.font_size()
+
       angle = Mark.set(placed, :angle)
       hjust = Mark.set(placed, :hjust)
       vjust = Mark.set(placed, :vjust)
@@ -125,15 +192,15 @@ defmodule Giggly.Geom.Text do
             width: Font.width(text, font_size),
             color: Mark.hex(color),
             opacity: opacity,
-            hjust: justification(hjust, x_position, y_position, angle),
-            vjust: justification(vjust, y_position, x_position, angle)
+            hjust: Geom.Text.justification(hjust, x_position, y_position, angle),
+            vjust: Geom.Text.justification(vjust, y_position, x_position, angle)
           }
         end)
 
       ascent = Font.ascent(font_size)
 
       [
-        %Text{
+        %Scene.Text{
           x: Enum.map(drawn, fn label -> label.x end),
           y: Enum.map(drawn, fn label -> label.y end),
           labels: Enum.map(drawn, fn label -> label.label end),
@@ -166,11 +233,24 @@ defmodule Giggly.Geom.Text do
           []
 
         color ->
-          font_size = font_size(Map.fetch!(key, :size))
+          font_size =
+            key
+            |> Map.fetch!(:size)
+            |> Geom.Text.font_size()
+
           angle = Map.fetch!(key, :angle)
-          hjust = justification(Map.fetch!(key, :hjust), 0.5, 0.5, angle)
-          vjust = justification(Map.fetch!(key, :vjust), 0.5, 0.5, angle)
-          {across, up} = turned_justification(angle, hjust, vjust)
+
+          hjust =
+            key
+            |> Map.fetch!(:hjust)
+            |> Geom.Text.justification(0.5, 0.5, angle)
+
+          vjust =
+            key
+            |> Map.fetch!(:vjust)
+            |> Geom.Text.justification(0.5, 0.5, angle)
+
+          {across, up} = Geom.Text.turned_justification(angle, hjust, vjust)
           margin = @key_margin_lines * font_size * @line_height
 
           {along, toward_top} =
@@ -179,7 +259,7 @@ defmodule Giggly.Geom.Text do
           label = "a"
 
           [
-            %Text{
+            %Scene.Text{
               x: [across],
               y: [up],
               labels: [label],
@@ -205,7 +285,11 @@ defmodule Giggly.Geom.Text do
     # sine and cosine, as `titleGrob()` adds it, and the measured margin each side.
     @impl Giggly.Geom
     def key_size(_geom, key) do
-      font_size = font_size(Map.fetch!(key, :size))
+      font_size =
+        key
+        |> Map.fetch!(:size)
+        |> Geom.Text.font_size()
+
       radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
       sine = abs(:math.sin(radians))
@@ -226,60 +310,6 @@ defmodule Giggly.Geom.Text do
       cosine = :math.cos(radians)
       sine = :math.sin(radians)
       {across * cosine + up * sine, up * cosine - across * sine}
-    end
-
-    # The text's size in points: its size in millimetres, the layer's or the theme's, times `.pt`.
-    defp font_size(millimetres), do: millimetres * @font_points_per_millimetre
-
-    # A justification as a number, from ggplot2's `compute_just()`: a number as it is, a word by its
-    # place, and `:inward` or `:outward` by where the label falls along its own axis, `along`, or,
-    # for text turned between 45 and 135 degrees either way, along the other, `across`, reversed for
-    # text turned backward or past 135 degrees.
-    defp justification(just, _along, _across, _angle) when is_number(just), do: just / 1
-
-    defp justification(just, _along, _across, _angle) when is_map_key(@word_places, just),
-      do: Map.fetch!(@word_places, just)
-
-    defp justification(just, along, across, angle) when just in [:inward, :outward] do
-      turn = half_turn(angle)
-      forward = turn > 45 and turn < 135
-      backward = turn < -45 and turn > -135
-      place = if forward or backward, do: across, else: along
-      swapped = backward or abs(turn) > 135
-      toward_middle = just == :inward != swapped
-      side_justification(toward_middle, direction(place))
-    end
-
-    # A label on the low or high side of the panel's middle justified toward the middle or away from
-    # it, and one at the middle centred.
-    defp side_justification(_toward_middle, :middle), do: 0.5
-    defp side_justification(true, :low), do: 0.0
-    defp side_justification(true, :high), do: 1.0
-    defp side_justification(false, :low), do: 1.0
-    defp side_justification(false, :high), do: 0.0
-
-    # An angle in degrees as ggplot2's `compute_just()` reads it, from -180 to 180.
-    defp half_turn(angle) do
-      turn = angle - 360 * Float.floor(angle / 360)
-      if turn > 180, do: turn - 360, else: turn
-    end
-
-    # Which side of the panel's middle a place falls on, ggplot2's `just_dir()`.
-    defp direction(place) when place < 0.5 - @middle_tolerance, do: :low
-    defp direction(place) when place > 0.5 + @middle_tolerance, do: :high
-    defp direction(_place), do: :middle
-
-    # A label's justification turned with the text, as ggplot2's `rotate_just()` turns it for a
-    # legend key: where in the key, across and up, the label's anchor goes.
-    defp turned_justification(angle, hjust, vjust) do
-      turn = angle - 360 * Float.floor(angle / 360)
-
-      cond do
-        turn < 90 -> {hjust, vjust}
-        turn < 180 -> {1 - vjust, hjust}
-        turn < 270 -> {1 - hjust, 1 - vjust}
-        true -> {vjust, 1 - hjust}
-      end
     end
   end
 end

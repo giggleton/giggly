@@ -79,6 +79,33 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`annotate(:label)` counts a padding as one value, and sets a label's part colours once
+  (2026-10-30, Steve, geom_label step 2: "A A"; checked against ggplot2 4.0.3).** Its lists are
+  the text annotation's and a label's border's: `label`, `colour`, `alpha`, `fill`, `linewidth`,
+  `linetype`. R's `annotate()` counts annotations with `lengths()` over every option, so a
+  `margin()` padding, four long, counts four: one label drawn four times, stacked, and beside two
+  labels "Unequal parameter lengths". Giggly counts only positions and the aesthetics drawn row by
+  row, so `label_padding:` is one value however many sides it gives. *Rejected: copying R*, whose
+  count is an accident of `lengths()` and whose stacked copies darken a see-through box.
+  `border_colour:` and `text_colour:` take one value, as `geom_label/3` holds them in the geom's
+  struct; *rejected: a list per annotation*, which R takes, since they would have to become
+  per-row columns, a second way `Geom.Label` reads them.
+
+- **`geom_label()` draws ggplot2's `labelGrob()`, its box's corners grid's own points
+  (2026-10-30, Steve's scope: "A", "no"; checked against ggplot2 4.0.3).** A label is its text on
+  a box padded `label_padding:` round it, a theme length or margin, and cornered `label_r:`, a
+  theme length, `:lines` being lines of the label's own text, as grid works one out in the
+  label's viewport; the top padding at least the descent and the bottom less it, as `labelGrob()`
+  balances them. The box is the polygon grid's `roundrectGrob()` hands the device, each corner
+  the points `roundCorner()` picks round a circle a 39th of a turn apart, a `Scene.Polygons`
+  turned with the text, so it matches vdiffr's drawing element by element. `alpha:` fills the box
+  alone; `border_color:` and `text_color:` default to `:color`, the label's own, as an
+  arrowhead's `fill:` does. The key copies R: lifted by the descent of a font as many points as
+  its size is millimetres, its room padded in lines of grid's 12-point font. *Rejected: a true
+  rounded rectangle*, a new scene primitive each backend draws (`<rect rx>`), within 0.1 pt of
+  R's but comparable only by geometry. *Left out*: `fontface` (Steve: "no", with text's),
+  `parse`, `size.unit`, multi-line labels, the deprecated `label.size`.
+
 - **A breaks function is called as ggplot2's `get_breaks()` calls one, and R's names are
   `{break, label}` pairs (2026-10-29, Steve, increment 2's step 5: "Match R", "B", "A"; checked
   against ggplot2 4.0.3).** `breaks:` and `minor_breaks:` take a function of one argument or two,
@@ -3224,6 +3251,14 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook example geom_label() unlocks, and narrow the filled labels'
+  verdict to a fixed fontface (geom_label, step 3, the notebook sweep)
+- 2026-10-30 — Add annotate(:label): labels placed by hand, each look a list of one per label,
+  a padding one value however many sides it gives (geom_label, step 2); §4: "`annotate(:label)`
+  counts a padding as one value"
+- 2026-10-30 — Add geom_label(): each label's text on grid's rounded box, turned and justified
+  with it, and its legend key as draw_key_label() draws it (geom_label, step 1); §4:
+  "`geom_label()` draws ggplot2's `labelGrob()`"
 - 2026-10-30 — Draw the notebook examples geom_hex() unlocks, and narrow stat_summary_hex()'s
   verdict to what still waits (geom_hex, step 2, the notebook sweep)
 - 2026-10-30 — Name the breaks functions, n_breaks: and a discrete axis's minor breaks in the

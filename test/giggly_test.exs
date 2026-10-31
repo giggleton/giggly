@@ -5668,6 +5668,59 @@ defmodule GigglyTest do
                 }}
     end
 
+    # `geom_label(aes(label = l))` with `theme_gray(base_size = 16, base_line_size = 1)` and with
+    # `theme_void()`: R's columns, less `fontface` and `lineheight`, which Giggly has no aesthetic
+    # for, and its border half the borders' width.
+    test "a label's defaults follow the theme: its size, its border's width, its fill's paper" do
+      layer = fn theme ->
+        @three
+        |> Plot.new(%{x: :x, y: :y, label: :l})
+        |> Plot.geom_label()
+        |> theme.()
+        |> Giggly.layer_data()
+      end
+
+      gray = layer.(fn plot -> Plot.theme_gray(plot, base_size: 16, base_line_size: 1) end)
+      void = layer.(&Plot.theme_void/1)
+
+      look = [
+        :color,
+        :fill,
+        :family,
+        :size,
+        :angle,
+        :hjust,
+        :vjust,
+        :alpha,
+        :linewidth,
+        :linetype
+      ]
+
+      assert DataFrame.names(gray) === [
+               :x,
+               :y,
+               :label,
+               :panel,
+               :group,
+               :nudge_x,
+               :nudge_y | look
+             ]
+
+      assert {first_row(gray, look), first_row(void, [:fill, :size, :linewidth])} ===
+               {%{
+                  color: "#000000",
+                  fill: "#FFFFFF",
+                  family: "",
+                  size: 5.6233568562335678,
+                  angle: 0.0,
+                  hjust: 0.5,
+                  vjust: 0.5,
+                  alpha: nil,
+                  linewidth: 0.5,
+                  linetype: {}
+                }, %{fill: "#00000000", size: 3.8660578386605779, linewidth: 0.25}}
+    end
+
     # `annotate("text", x = 2, y = 2, label = "hi")` with `theme_gray(base_size = 16)`, and
     # `annotate("rect", xmin = 1, xmax = 2, ymin = 1, ymax = 2)` with `theme_void()`
     test "an annotation takes the theme's defaults as any layer does" do
@@ -7234,17 +7287,25 @@ defmodule GigglyTest do
     end
 
     # Golden: test/golden/point_key_big.svg, test/golden/bar_key_big.svg,
-    # test/golden/line_key_big.svg, test/golden/text_key_big.svg and
-    # test/golden/text_key_turned.svg, checked against ggplot2's drawings of the same plots, made by
-    # the R script beside each: every element matches, the x axis drawn before the y as in
-    # test/golden/point.svg, and every clip path. A point set to 8 mm, a bar bordered 4 mm wide, a
-    # line 8 mm wide, and text at 12 mm and at 8 mm turned 30 degrees, each in a colour or fill
-    # legend whose keys widen to fit it, as ggplot2's `set_key_size()` and `draw_key_text()` size
+    # test/golden/line_key_big.svg, test/golden/text_key_big.svg, test/golden/text_key_turned.svg,
+    # test/golden/label_key_big.svg and test/golden/label_key_turned.svg, checked against ggplot2's
+    # drawings of the same plots, made by the R script beside each: every element matches, the x
+    # axis drawn before the y as in test/golden/point.svg, and every clip path. A point set to 8 mm,
+    # a bar bordered 4 mm wide, a line 8 mm wide, text at 12 mm and at 8 mm turned 30 degrees, and
+    # labels at 10 mm, whose boxes spill out of keys measured with grid's default font's padding,
+    # and at 8 mm turned 120 degrees, padded 6 points, each in a colour or fill legend whose keys
+    # widen to fit it, as ggplot2's `set_key_size()`, `draw_key_text()` and `draw_key_label()` size
     # them. They move with what moves test/golden/point_colour_legend.svg.
     test "a legend's keys widen to fit what the layers set too big for the theme's key" do
       mpg = Giggly.Datasets.mpg()
       lines = %{"x" => [1, 2, 1, 2], "y" => [1, 2, 2, 1], "g" => ["a", "a", "b", "b"]}
       labelled = Plot.new(mpg, %{x: :displ, y: :hwy, colour: :drv, label: :drv})
+
+      kinds =
+        Plot.new(
+          %{"x" => [1, 2], "y" => [1, 2], "text" => ["Ag", "b"], "kind" => ["u", "v"]},
+          %{x: :x, y: :y, label: :text, fill: :kind}
+        )
 
       plots = [
         {"point_key_big",
@@ -7260,7 +7321,21 @@ defmodule GigglyTest do
          |> Plot.new(%{x: :x, y: :y, colour: :g})
          |> Plot.geom_line(linewidth: 8)},
         {"text_key_big", Plot.geom_text(labelled, size: 12)},
-        {"text_key_turned", Plot.geom_text(labelled, size: 8, angle: 30, hjust: 0, vjust: 1)}
+        {"text_key_turned", Plot.geom_text(labelled, size: 8, angle: 30, hjust: 0, vjust: 1)},
+        {"label_key_big", Plot.geom_label(kinds, size: 10)},
+        {"label_key_turned",
+         Plot.geom_label(kinds,
+           angle: 120,
+           hjust: 0,
+           vjust: 1,
+           size: 8,
+           alpha: 0.4,
+           linetype: :dashed,
+           label_padding: {6, :pt},
+           label_r: {3, :pt},
+           border_colour: "red",
+           text_colour: "blue"
+         )}
       ]
 
       for {name, plot} <- plots do
@@ -8718,6 +8793,39 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/annotate.svg")
     end
 
+    # Golden: test/golden/annotate_label.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/annotate_label.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Labels annotated with a fill, colour, alpha,
+    # border width and line type each, one in no colour keeping its box, one with no border; and a
+    # turned label beyond the data, which both axes reach, its text apart from its border. It moves
+    # with what moves test/golden/label.svg and test/golden/annotate.svg.
+    test "a label annotation draws each label in its own look" do
+      plot =
+        [wt: [2.62, 2.32, 3.215, 3.44, 5.25, 1.615], mpg: [21.0, 22.8, 21.4, 18.7, 10.4, 30.4]]
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:label,
+          x: [2, 3, 4],
+          y: [15, 20, 25],
+          label: ["first", "second", "third"],
+          fill: ["lightyellow", :none, "pink"],
+          colour: ["red", "darkgreen", :none],
+          alpha: [0.5, 1, 1],
+          linewidth: [1, 0.25, 0],
+          linetype: [:dashed, :solid, :dotted]
+        )
+        |> Plot.annotate(:label,
+          x: 6,
+          y: 35,
+          label: "beyond",
+          size: 6,
+          angle: 15,
+          text_colour: "blue"
+        )
+
+      assert golden?(plot, "annotate_label")
+    end
+
     # Golden: test/golden/rect.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/rect.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_rect()'s "Rectangles by their corners" with
@@ -8834,6 +8942,94 @@ defmodule GigglyTest do
         |> IO.iodata_to_binary()
 
       assert svg == File.read!("test/golden/text_inward.svg")
+    end
+
+    # Golden: test/golden/label.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/label.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_label()'s "Labels with background" example:
+    # each car's name on a white box with rounded corners, bordered in black, each box drawn just
+    # before its text. It moves with what moves test/golden/text.svg.
+    test "each label is drawn on a white box with rounded corners, the box before its text" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_label()
+
+      assert to_svg(plot) == File.read!("test/golden/label.svg")
+    end
+
+    # Golden: test/golden/label_turned.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/label_turned.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Labels turned 30 degrees and hung by their start
+    # and top, and turned 200 degrees, justified inward along their baseline and outward up it,
+    # padded a millimetre on corners of 4 points, each box turned with its text.
+    test "a label's box turns with its text, padded and rounded by lengths in any unit" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [1, 3, 2], "text" => ["Ag", "turned", "Wy"]}
+        |> Plot.new(%{x: :x, y: :y, label: :text})
+        |> Plot.geom_label(angle: 30, hjust: 0, vjust: 1)
+        |> Plot.geom_label(
+          angle: 200,
+          hjust: :inward,
+          vjust: :outward,
+          label_padding: {1, :mm},
+          label_r: {4, :pt},
+          colour: "blue"
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/label_turned.svg")
+    end
+
+    # Golden: test/golden/label_look.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/label_look.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Boxes filled by a mapped kind at half alpha, their
+    # text and dashed borders red, which takes no alpha; and unfilled boxes nudged up, their borders
+    # blue and their text dark green.
+    test "a label's alpha fills its box alone, and its border and text may each take a colour" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 4],
+          "y" => [1, 2, 1, 2],
+          "text" => ["one", "two", "three", "four"],
+          "kind" => ["a", "b", "a", "b"]
+        }
+        |> Plot.new(%{x: :x, y: :y, label: :text})
+        |> Plot.geom_label(%{fill: :kind},
+          alpha: 0.5,
+          colour: "red",
+          linetype: :dashed,
+          linewidth: 0.8
+        )
+        |> Plot.geom_label(
+          nudge_y: 0.3,
+          fill: :none,
+          border_colour: "blue",
+          text_colour: "darkgreen"
+        )
+        |> Plot.guides(fill: :none)
+
+      assert to_svg(plot) == File.read!("test/golden/label_look.svg")
+    end
+
+    # Golden: test/golden/label_padding.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/label_padding.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Padding given side by side at 6 mm, on
+    # square corners with no border, the text's descent taken from its bottom padding; an empty
+    # label's box of padding alone; and labels of no colour, their white boxes drawn, their text in
+    # no colour.
+    test "a label is padded side by side, its descent within its bottom padding" do
+      plot =
+        %{"x" => [1, 2, 3], "y" => [1, 2, 3], "text" => ["Ag", "", "b"]}
+        |> Plot.new(%{x: :x, y: :y, label: :text})
+        |> Plot.geom_label(
+          label_padding: [top: 2, right: 8, bottom: 4, left: 1],
+          label_r: 0,
+          linewidth: 0,
+          size: 6
+        )
+        |> Plot.geom_label(nudge_y: 0.4, colour: :none)
+
+      assert to_svg(plot) == File.read!("test/golden/label_padding.svg")
     end
 
     # Golden: test/golden/labs.svg, checked against ggplot2's drawing of the same plot, made by

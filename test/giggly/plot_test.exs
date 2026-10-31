@@ -2450,6 +2450,192 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_label/3" do
+    @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+
+    # ggplot2 4.0.3's `geom_label()`: `label.padding = unit(0.25, "lines")`, `label.r =
+    # unit(0.15, "lines")`, `border.colour` and `text.colour` `NULL`, the label's colour.
+    test "a label layer records R's padding and corners, the identity stat and nudging" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_label(%{label: :model})
+
+      quarter = {0.25, :lines}
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{top: quarter, right: quarter, bottom: quarter, left: quarter},
+                   label_r: {0.15, :lines},
+                   border_color: :color,
+                   text_color: :color
+                 },
+                 stat: %Stat.Identity{},
+                 position: %Position.Nudge{},
+                 data: :none,
+                 mapping: %{label: "model"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :fill, :group, :label, :linetype, :linewidth, :x, :y],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "the options set every label's look, and its box's padding, corners and colours" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_label(
+          size: 5,
+          angle: 45,
+          hjust: :inward,
+          vjust: 1,
+          family: "Times New Roman",
+          colour: "red",
+          fill: "lightyellow",
+          alpha: 0.5,
+          linewidth: 1,
+          linetype: :dashed,
+          nudge_x: 0.1,
+          nudge_y: -1,
+          label_padding: [top: 2, left: {1, :lines}, right: {0.5, :cm}],
+          label_r: {1, :in},
+          border_colour: :none,
+          text_color: "blue"
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{
+                     top: {top, :points},
+                     right: {right, :points},
+                     bottom: {+0.0, :points},
+                     left: {1.0, :lines}
+                   },
+                   label_r: {radius, :points},
+                   border_color: :none,
+                   text_color: "#0000FF"
+                 },
+                 fixed: %{
+                   size: 5.0,
+                   angle: 45.0,
+                   hjust: :inward,
+                   vjust: 1.0,
+                   family: "Times New Roman",
+                   color: "#FF0000",
+                   fill: "#FFFFE0",
+                   alpha: 0.5,
+                   linewidth: 1.0,
+                   linetype: {4, 4},
+                   nudge_x: 0.1,
+                   nudge_y: -1.0
+                 }
+               }
+             ] = plot.reversed_layers
+
+      assert {top, right, radius} ===
+               {Theme.points({2, :pt}), Theme.points({0.5, :cm}), Theme.points({1, :in})}
+    end
+
+    test "one length pads every side alike" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_label(label_padding: {3, :mm})
+
+      side = {Theme.points({3, :mm}), :points}
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{top: ^side, right: ^side, bottom: ^side, left: ^side}
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a column the data does not have is refused by the label layer that maps it" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot, %{label: :modle}) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":modle"
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_label(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_label, 3}
+      end
+    end
+
+    test "a label mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":label"
+    end
+
+    test "an aesthetic a label cannot use, mapped by the layer, is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot, %{shape: :model}) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":shape"
+    end
+
+    test "padding, corners or part colours of the wrong kind are refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      for {key, value} <- [
+            label_padding: {1, :npc},
+            label_padding: [top: 1, top: 2],
+            label_padding: [middle: 1],
+            label_padding: "1",
+            label_r: {0.5, :lines, :extra},
+            label_r: [top: 1],
+            border_color: "nonsense",
+            text_color: 3
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_label(plot, [{key, value}])
+          end
+
+        assert error.key == key
+      end
+    end
+
+    test "overlap is not checked, as ggplot2's geom_label() takes no check_overlap" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_label(plot, check_overlap: true)
+        end
+
+      assert error.key == [:check_overlap]
+    end
+
+    test "a part's colour written twice, once with each spelling, is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_label(plot, border_colour: "red", border_color: "blue")
+        end
+
+      assert error.message =~ ":border_color"
+    end
+  end
+
   describe "a layer's own table" do
     @own %{"wt" => [4.0, 3.0], "mpg" => [16.0, 15.0], "name" => ["p", "q"]}
 
@@ -2463,6 +2649,7 @@ defmodule Giggly.PlotTest do
             fn plot -> Plot.geom_path(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_line(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_text(plot, %{y: :mpg, label: :name}, data: @own) end,
+            fn plot -> Plot.geom_label(plot, %{y: :mpg, label: :name}, data: @own) end,
             fn plot ->
               Plot.geom_rect(plot, %{xmin: :mpg, xmax: :mpg}, data: @own, ymin: 0, ymax: 1)
             end
@@ -3554,12 +3741,12 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :curve, x: 1, y: 1) end
 
       assert error.message =~
-               ":point, :col, :bar, :path, :line, :segment, :rug, :text or :rect, got: :curve"
+               ":point, :col, :bar, :path, :line, :segment, :rug, :text, :label or :rect, got: :curve"
     end
 
     # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
     # "Ignoring unknown parameters: `label`" for a rectangle; and ignores `nudge_x`, as an
-    # annotation is not nudged.
+    # annotation is not nudged, and a label's `check_overlap`, which its geom lacks.
     test "an option its geom does not take is refused, naming it" do
       plot = Plot.new(@rows)
 
@@ -3567,6 +3754,8 @@ defmodule Giggly.PlotTest do
             {:text, [x: 1, y: 1, label: "a", xmin: 0], ":xmin"},
             {:rect, [xmin: 1, xmax: 2, ymin: 1, ymax: 2, label: "a"], ":label"},
             {:text, [x: 1, y: 1, label: "a", nudge_x: 1], ":nudge_x"},
+            {:label, [x: 1, y: 1, label: "a", nudge_y: 1], ":nudge_y"},
+            {:label, [x: 1, y: 1, label: "a", check_overlap: true], ":check_overlap"},
             {:col, [x: 1, y: 1, position: :dodge], ":position"},
             {:point, [x: 1, y: 1, data: @rows], ":data"}
           ] do
@@ -3604,17 +3793,100 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       label = assert_raise ArgumentError, fn -> Plot.annotate(plot, :text, x: 1, y: 1) end
-      assert label.message =~ "Plot.annotate/3 needs :label, but :text is given no value for it"
+
+      assert label.message =~
+               "Plot.annotate/3 needs :label, but the :text annotation is given no value for it"
 
       position = assert_raise ArgumentError, fn -> Plot.annotate(plot, :text, label: "a") end
       assert position.message =~ "Plot.annotate/3 needs :x, :y"
     end
 
-    test "an aesthetic its geom sets once for the layer takes one value, not a list" do
+    # ggplot2 4.0.3 takes a list of each of these, one per annotation: `annotate("label", x = 1:2,
+    # y = 1, label = "a", border.colour = c("red", "blue"))` borders the first red and the second
+    # blue. Giggly sets them once for the layer, as `geom_text/3` and `geom_label/3` do.
+    test "an aesthetic or a colour its geom sets once for the layer takes one value, not a list" do
       plot = Plot.new(@rows)
 
-      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :size option/, fn ->
-        Plot.annotate(plot, :text, x: [1, 2], y: 1, label: "a", size: [3, 5])
+      for {geom, option} <- [
+            text: :size,
+            label: :size,
+            label: :angle,
+            label: :border_color,
+            label: :text_color
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.annotate(plot, geom, [{:x, [1, 2]}, {:y, 1}, {:label, "a"}, {option, [3, 5]}])
+          end
+
+        assert error.key == option
+      end
+    end
+
+    test "a label annotation records its geom with its box, and its look per annotation" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, fill: :cyl})
+        |> Plot.annotate(:label,
+          x: [2, 3],
+          y: 25,
+          label: ["a", "b"],
+          fill: ["pink", :none],
+          colour: [:none, "red"],
+          linewidth: [0, 1],
+          linetype: [:dashed, :blank],
+          size: 5,
+          label_r: 0,
+          border_colour: "blue"
+        )
+
+      [layer] = plot.reversed_layers
+
+      assert %Plot.Layer{
+               geom: %Geom.Label{
+                 label_padding: %{
+                   top: {0.25, :lines},
+                   right: {0.25, :lines},
+                   bottom: {0.25, :lines},
+                   left: {0.25, :lines}
+                 },
+                 label_r: {+0.0, :points},
+                 border_color: "#0000FF",
+                 text_color: :color
+               },
+               stat: %Stat.Identity{},
+               position: %Position.Identity{},
+               mapping: %{x: "x", y: "y"},
+               accepted: [:alpha, :color, :fill, :group, :label, :linetype, :linewidth, :x, :y],
+               annotation: true
+             } = layer
+
+      assert layer.fixed === %{
+               label: ["a", "b"],
+               fill: ["#FFC0CB", nil],
+               color: [nil, "#FF0000"],
+               linewidth: [+0.0, 1.0],
+               linetype: [{4, 4}, nil],
+               size: 5.0
+             }
+    end
+
+    # ggplot2 4.0.3's `annotate()` counts annotations over every option with `lengths()`, so a
+    # `margin()` padding counts four: `annotate("label", x = 1, y = 2, label = "a", label.padding =
+    # margin(1, 2, 3, 4))` has four rows, one label drawn four times, and beside two labels
+    # "Unequal parameter lengths: x (2), label (2), and label.padding (4)". Giggly counts a
+    # padding as one value, whatever its sides.
+    test "a label's padding is one value for every label, however many sides it gives" do
+      plot = Plot.new(@rows)
+      padding = [top: 1, right: 2, bottom: 3, left: 4]
+
+      for {places, labels} <- [{1, "a"}, {[1, 2], ["a", "b"]}] do
+        frame =
+          plot
+          |> Plot.annotate(:label, x: places, y: 2, label: labels, label_padding: padding)
+          |> Giggly.layer_data()
+
+        assert DataFrame.pull(frame, :label) == List.wrap(labels)
       end
     end
 
@@ -3751,7 +4023,8 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
       error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :rug, sides: [:top]) end
 
-      assert error.message =~ "Plot.annotate/3 needs one of :x, :y, but :rug is given no value"
+      assert error.message =~
+               "Plot.annotate/3 needs one of :x, :y, but the :rug annotation is given no value"
     end
 
     # ggplot2 4.0.3: `layer_data(ggplot() + annotate("col", x = 1, y = 3, width = c(0.5, 0.8)))`
