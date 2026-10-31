@@ -9,6 +9,56 @@ defmodule Scales.LabelsTest do
   # `giggly-r:ggplot2-4.0.3`), each from the call in the comment above it. They move only if
   # scales' formatting does.
 
+  describe "number/2" do
+    test "is comma/2 with a space between each three whole digits" do
+      # label_number()(c(1234567, 0.5)); trim = FALSE on c(NA, 1, 1000)
+      assert Labels.number([1_234_567, 0.5]) == ["1 234 567", "0"]
+      assert Labels.number([nil, 1, 1000], trim: false) == [nil, "    1", "1 000"]
+    end
+  end
+
+  describe "a missing break" do
+    test "has no label, and leaves the others' accuracy to them" do
+      # label_number()(c(NA_real_)); c(NA_real_, NA_real_); accuracy = 0.01 on c(NA, 2);
+      # label_comma()(c(NA, 1234.5, 2000))
+      assert Labels.number([nil]) == [nil]
+      assert Labels.number([nil, nil]) == [nil, nil]
+      assert Labels.number([nil, 2], accuracy: 0.01) == [nil, "2.00"]
+      assert Labels.comma([nil, 1234.5, 2000]) == [nil, "1,234", "2,000"]
+    end
+
+    test "widens the others' padding to its NA, untrimmed" do
+      # label_number(trim = FALSE)(c(1, NA)); c(NA, 1, 10); scale_cut = cut_short_scale() on
+      # c(1, 1500, NA)
+      assert Labels.number([1, nil], trim: false) == [" 1", nil]
+      assert Labels.number([nil, 1, 10], trim: false) == [nil, " 1", "10"]
+
+      assert Labels.number([1, 1500, nil], trim: false, scale_cut: Labels.cut_short_scale()) ==
+               [" 1", " 2K", nil]
+    end
+
+    test "takes no step under scale_cut:, and no sign" do
+      # label_number(scale_cut = cut_short_scale())(c(1500, NA, 2e6)); c(NA, 0, 2500);
+      # style_positive = "plus", style_negative = "parens" on c(-1, NA, 1)
+      assert Labels.number([1500, nil, 2.0e6], scale_cut: Labels.cut_short_scale()) ==
+               ["2K", nil, "2M"]
+
+      assert Labels.number([nil, 0, 2500], scale_cut: Labels.cut_short_scale()) ==
+               [nil, "0", "2K"]
+
+      assert Labels.number([-1, nil, 1], style_positive: :plus, style_negative: :parens) ==
+               ["(1)", nil, "+1"]
+    end
+
+    test "leaves currency's cents to the amounts given" do
+      # label_currency()(c(1.5, NA)); c(NA, 2); c(NA_real_); label_percent()(c(NA, 0.5))
+      assert Labels.currency([1.5, nil]) == ["$1.50", nil]
+      assert Labels.currency([nil, 2]) == [nil, "$2"]
+      assert Labels.currency([nil]) == [nil]
+      assert Labels.percent([nil, 0.5]) == [nil, "50%"]
+    end
+  end
+
   describe "comma/2's default accuracy" do
     test "is a tenth of the power of ten at or below the smallest gap, shared by every label" do
       # label_comma()(c(2, 2.25, 3)); c(10, 12.5)
@@ -132,13 +182,14 @@ defmodule Scales.LabelsTest do
 
     test "marks negatives and positives in the style given" do
       # label_comma(style_negative = "minus")(c(-1, 0, 1));
-      # style_negative = "parens", style_positive = "plus"; style_positive = "space"
+      # style_negative = "parens", style_positive = "plus"; style_positive = "space", a figure
+      # space (U+2007)
       assert Labels.comma([-1, 0, 1], style_negative: :minus) == ["−1", "0", "1"]
 
       assert Labels.comma([-1, 0, 1], style_negative: :parens, style_positive: :plus) ==
                ["(1)", "0", "+1"]
 
-      assert Labels.comma([-1, 0, 1], style_positive: :space) == ["-1", "0", " 1"]
+      assert Labels.comma([-1, 0, 1], style_positive: :space) == ["-1", "0", "\u20071"]
     end
 
     test "labels no breaks with no labels" do
@@ -432,16 +483,18 @@ defmodule Scales.LabelsTest do
   end
 
   describe "a call Scales.Labels refuses" do
-    test "names breaks that are not a list of numbers" do
-      for breaks <- [[1, nil], 5] do
+    test "names breaks that are not a list of numbers and nils" do
+      for breaks <- [[1, "2"], [1, :infinity], 5] do
         error = assert_raise ArgumentError, fn -> Labels.comma(breaks) end
         assert error.message =~ "Labels.comma/2"
         assert error.message =~ inspect(breaks)
       end
 
-      percent = assert_raise ArgumentError, fn -> Labels.percent([1, nil]) end
+      number = assert_raise ArgumentError, fn -> Labels.number([1, "2"]) end
+      assert number.message =~ "Labels.number/2"
+      percent = assert_raise ArgumentError, fn -> Labels.percent([1, "2"]) end
       assert percent.message =~ "Labels.percent/2"
-      currency = assert_raise ArgumentError, fn -> Labels.currency([1, nil]) end
+      currency = assert_raise ArgumentError, fn -> Labels.currency([1, "2"]) end
       assert currency.message =~ "Labels.currency/2"
     end
 

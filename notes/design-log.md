@@ -79,6 +79,64 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **R's `format()` for numbers is built rule for rule, `Labels.Format` grown from `Labels.Fixed`
+  (2026-10-31, Steve: "A"; checked against R 4.6.1 and scales 1.4.0).** `scientific`,
+  `number_auto` and `log` are thin wrappers over `format()`, whose labels depend on each other:
+  the fewest significant digits up to `digits` that show every number, scientific notation for
+  all where it is narrower, a shared mantissa, `e+05`, `nsmall`, padding. So `formatReal()` is
+  ported whole, each number printed from its exact value half to even, as `Fixed` already printed
+  plain decimals; all of 6,000 random vectors matched R, across digits 1 to 22, `nsmall`, both
+  trims, marks and every notation. R's `scientific = FALSE` is plain unless more than 310
+  characters wider, a margin measured by bisecting R, so `number()`'s labels are R's there too.
+  *Rejected: Erlang's `~e` per labeller*: other digits and ties, labels no longer R's.
+
+- **A missing break's label is `nil`, as R's labellers give `NA`, and Giggly draws it `NA`
+  (2026-10-31, Steve: "A"; checked against scales 1.4.0 and ggplot2 4.0.3).** Each labeller gives
+  `nil` for `nil` where R gives `NA`, and the text `"NA"` where R writes it (`wrap`, `number_auto`;
+  `dictionary`'s `nomatch:` for `nil` too); `comma`, `percent` and `currency` take `nil` as R's
+  `number()` takes `NA`, which widens the others' untrimmed padding to its two characters. Giggly
+  takes a `nil` label from a labels function and draws `NA`, as grid draws R's `NA` on axes and
+  legends alike. A discrete scale's labels function is handed `nil`, so the labellers must take
+  it. *Rejected: refusing `nil`*: `wrap` and `dictionary` unusable on a missing level.
+  *Rejected: the package writing `"NA"`*: not R's values, and a missing label then reads as text.
+
+- **`log/2` returns powers as values, and Giggly draws them as plotmath draws `a^b` (2026-10-31,
+  Steve: "A"; checked against scales 1.4.0 and svglite).** R's `label_log()` returns expressions
+  (`10^3`), drawn as a base at the label's size and its exponent at 0.7 of it, raised, after the
+  base, two texts in svglite's output. The package gives `{:power, base, exponent}`, each written
+  as R deparses it (`10^0.301`, a base of e as `2.71828182845905`), or `"0"`; `format_log/2` is
+  R's `format_log()`, text exactly. A label is then a string or a power. *Rejected: the text
+  `10^3`*: not what R draws, and superscripts later would change the package's API. *Rejected:
+  Unicode superscripts*: Liberation Sans lacks ⁰, ⁶, ⁹ and ⁻. *Rejected: leaving it out with
+  plotmath*: the package touched again for it.
+
+- **The date labellers take `Calendar.strftime/3` formats, as `date_labels:` does (2026-10-31,
+  Steve: "A"; checked against scales 1.4.0).** `date/2`, `date_short/2` and `time/2` write R's
+  defaults to the character, `%Y` unpadded as `DateBreaks.label/2` writes it; a format Calendar
+  cannot write raises (`%e`, `%U`, `%W`, `%D`, `%F`, `%T`, `%R`, `%h`, `%k`, R's `%OSn`), and
+  `%c`, `%x`, `%X` are Calendar's. `tz:` is R's, UTC unless given: a `DateTime` is shifted into it
+  (`time_zone_database:`), a `Date`, `NaiveDateTime` or `Time` written as it is; `date_short/2`
+  reads which parts change in each value's own zone and writes them in `tz`, as R does. `locale`
+  is left out, since R needs stringi for it. *Rejected: R's conversions ported*: it reverses the
+  entry beginning "`date_breaks:` and `date_minor_breaks:`", and R's `%c`, `%x` and `%X` follow
+  the machine's locale, so there is no one answer to match.
+
+- **Labellers are composed with a pipe; `compose_label()` is left out (2026-10-31, Steve: "C").**
+  R's `compose_label()` runs labellers in order, each handed the last one's output, and restores
+  `NA`; in Elixir that is a pipe, which `Scales.Labels`' documentation shows under R's name, and
+  `nil` is each labeller's to keep. *Rejected: `compose(breaks, labellers)`*: a function for what
+  a pipe does. *Rejected: a function returning a labeller*: the package's functions take values
+  (the entry beginning "The scales package's API").
+
+- **`ordinal/2`'s rules are matched against the rounded number's whole digits (2026-10-31, Steve:
+  "A"; checked against scales 1.4.0).** `rules:` is a list of `{suffix, regex}` pairs, Elixir's
+  regular expressions taking Perl's syntax as R's `perl = TRUE` does, the first match winning, in
+  order, repeats kept; `ordinal_english/0` gives R's. R matches its rules against
+  `as.character()`, so a round number from 1e5 up is its scientific text there, and `ordinal(1e21)`
+  is `...st`; here the digits are matched, documented as the one departure. *Rejected: R's
+  `as.character()` exactly*: a second home for `Giggly.AsCharacter`'s rule, or moving that module
+  into the package against the entry beginning "`scales`, a package of R's scales half".
+
 - **An axis's scale is chosen by the first layer mapping its own aesthetic, and places every
   column it takes, numbers on a discrete axis as positions (2026-10-31, Steve: "a", "A", "a",
   walked one at a time; checked against ggplot2 4.0.3).** As `Scales$add_defaults()` adds a scale
@@ -475,7 +533,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   families (2026-10-27, Steve, the split's step 2; checked against scales 1.4.0).** API: the root,
   `Breaks`, `MinorBreaks`, `Labels` (`Format` merged in, since scales 1.1.0 renamed `*_format`
   to `label_*`), `Transform`, `Palette`, `Bounds`, `DataRange`, `ColorOperations`, Giggly's
-  helpers among them. Internal: `Labels.Fixed`, the `Transform.*` modules behind a name, and
+  helpers among them. Internal: `Labels.Format`, the `Transform.*` modules behind a name, and
   `DateBreaks`, which takes days or seconds and a clock, R's representation, through `Transform`.
   A function is R's name less its family's prefix (`Breaks.extended`), its doc naming R's, but
   Elixir's words where R's differ (`:time` a time of day); options are R's arguments spelled out;
@@ -3415,6 +3473,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Write numbers as R's format() does, label them with number/2, and give a missing
+  break no label (labels, step 1); §4: "R's `format()` for numbers", "A missing break's label",
+  and the increment's other four entries of that day, agreed with them
 - 2026-10-31 — Take Pica 0.1.0 from Hex, its native library prebuilt, and write the fonts guide
   (Pica, steps 4 and 5); §4: "Fonts are explained by one guide", "The mutation pass runs muex's
   mutants in warm VMs"

@@ -33,7 +33,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   their functions R's names less the family's prefix, each `@doc` naming R's function and saying
   where it departs, options keyword lists of R's arguments checked by NimbleOptions; the root
   documents the conventions they share, once. `Scales.DateBreaks` (days or seconds and a clock),
-  `Scales.Labels.Fixed` and the `Scales.Transform.*` modules stay internal, reached through
+  `Scales.Labels.Format` and the `Scales.Transform.*` modules stay internal, reached through
   `Scales.Transform` and `Scales.Labels`.
 - **A palette is a value naming its function (`Scales.Palette`), never a closure, and each is
   R's**: continuous, `:identity`, R's `pal_identity()`, `{:rescale, {low, high}}`, R's

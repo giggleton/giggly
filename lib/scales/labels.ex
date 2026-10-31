@@ -1,13 +1,24 @@
 defmodule Scales.Labels do
   @moduledoc """
-  Labels for a scale's breaks: numbers written plainly (`plain/1`), with a mark between thousands
-  (`comma/2`), as percentages (`percent/2`) and as amounts of money (`currency/2`).
+  Labels for a scale's breaks: numbers written plainly (`plain/1`), in decimals (`number/2`),
+  with a comma between thousands (`comma/2`), as percentages (`percent/2`) and as amounts of
+  money (`currency/2`).
 
   Each labeller is handed every break an axis or a legend draws and returns a label for each, in
   order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
-  `1.00` and `1.25`. One that takes options is handed on inside a function:
+  `1.00` and `1.25`. A missing break, `nil`, has no label, `nil`, as R's `NA` has none. One that
+  takes options is handed on inside a function:
 
       fn breaks -> Scales.Labels.comma(breaks, accuracy: 0.1) end
+
+  Labellers are composed by piping one's labels into the next, where R composes them with
+  `compose_label()`:
+
+      fn breaks ->
+        breaks
+        |> Scales.Labels.number(accuracy: 0.1)
+        |> Enum.map(fn label -> label && label <> " m" end)
+      end
 
   `plain/1` writes numbers as Elixir shows them, with what an axis read at a glance needs on top;
   the others write them as R's scales does, each a label to the character.
@@ -16,10 +27,12 @@ defmodule Scales.Labels do
 
   Each number is multiplied by `scale:`, then rounded to a multiple of `accuracy:`, a half going
   to the even neighbour (`2.5` to `2`, `3.5` to `4`). A number that rounds to zero has no sign.
-  It is written in plain decimals, never scientific notation, with as many decimals as the
-  accuracy has (`0.01` writes two, `1` or more none) up to twenty, or more if a label needs them
-  to show its first seven significant digits (an accuracy of `0.25` writes `0.25` and `0.50`); every
-  label shares the most any needs. `big_mark:` goes between each three digits of the whole part
+  It is written in plain decimals, with as many decimals as the accuracy has (`0.01` writes two,
+  `1` or more none) up to twenty, or more if a label needs them to show its first seven
+  significant digits (an accuracy of `0.25` writes `0.25` and `0.50`); every label shares the
+  most any needs. Only labels more than 310 characters longer than their scientific form, past
+  about 1e290, are written in scientific notation, as R writes them. `big_mark:` goes between
+  each three digits of the whole part
   and `decimal_mark:` before the decimals; then `prefix:` and `suffix:` go around the number,
   and the sign outside the prefix (`-$13.50`).
 
@@ -53,7 +66,7 @@ defmodule Scales.Labels do
   #   rounding.
   # - The decimals are `-floor(log10(accuracy))`, from 0 to 20, and the numbers sharing a count
   #   are written together, as R's `format(scale * abs(x), nsmall = decimals, scientific =
-  #   FALSE)` writes them, by `Scales.Labels.Fixed`; then prefix, number and suffix, the sign
+  #   FALSE)` writes them, by `Scales.Labels.Format`; then prefix, number and suffix, the sign
   #   outside them.
   # - `scale_cut` is `scales:::scale_cut`: steps are sorted by threshold; a step is looked up by
   #   its suffix as R indexes a named vector, the first step with it and never an empty suffix;
@@ -64,13 +77,16 @@ defmodule Scales.Labels do
   #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
-  alias Scales.Labels.Fixed
+  alias Scales.Labels.Format
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
 
   # The largest decimal count R's `number()` asks for.
   @max_decimals 20
+
+  # R's `getOption("digits")`: the significant digits `format()` shows.
+  @format_digits 7
 
   # The significant digits `plain/1` rounds each break to.
   @significant_digits 15
@@ -112,7 +128,9 @@ defmodule Scales.Labels do
     ],
     style_positive: [
       type: {:in, [:none, :plus, :space]},
-      doc: "How a positive is marked: `:none` (`1`), `:plus` (`+1`) or `:space` (`\" 1\"`)."
+      doc:
+        "How a positive is marked: `:none` (`1`), `:plus` (`+1`) or `:space`, a figure space " <>
+          "as wide as a digit (`\"\\u20071\"`)."
     ],
     scale_cut: [
       type: {:custom, __MODULE__, :validate_steps, []},
@@ -133,6 +151,8 @@ defmodule Scales.Labels do
     style_positive: :none
   ]
 
+  @number_defaults Keyword.put(@comma_defaults, :big_mark, " ")
+
   @percent_defaults Keyword.merge(@comma_defaults, scale: 100, suffix: "%", big_mark: " ")
 
   @currency_defaults Keyword.put(@comma_defaults, :prefix, "$")
@@ -149,6 +169,7 @@ defmodule Scales.Labels do
   # Each formatter's options: the shared ones with its defaults, and currency's own.
   @formatter_schemas Map.new(
                        [
+                         {:number, @number_defaults, []},
                          {:comma, @comma_defaults, []},
                          {:percent, @percent_defaults, []},
                          {:currency, @currency_defaults, @currency_options}
@@ -227,6 +248,34 @@ defmodule Scales.Labels do
   ]
 
   @doc """
+  Labels numbers in decimals, R's `label_number()`, with a space between each three digits of the
+  whole part.
+
+  ## Options
+
+  #{NimbleOptions.docs(@formatter_schemas.number)}
+
+  ## Examples
+
+      iex> Scales.Labels.number([-2.5, 0, 1.0e6])
+      ["-2.5", "0.0", "1 000 000.0"]
+
+      iex> Scales.Labels.number([1, nil, 1.5])
+      ["1.0", nil, "1.5"]
+
+      iex> Scales.Labels.number([0.001, 0.0025], scale: 1000, suffix: " ms")
+      ["1.0 ms", "2.5 ms"]
+  """
+  @spec number([number() | nil], keyword()) :: [String.t() | nil]
+  def number(breaks, options \\ []) do
+    settings = settings!(options, :number)
+
+    breaks
+    |> numbers!("Labels.number/2")
+    |> label(settings)
+  end
+
+  @doc """
   Labels numbers with a comma between each three digits of the whole part, R's `label_comma()`.
 
   ## Options
@@ -247,7 +296,7 @@ defmodule Scales.Labels do
       iex> Scales.Labels.comma([0, 1500, 1.0e6], scale_cut: Scales.Labels.cut_short_scale())
       ["0", "2K", "1M"]
   """
-  @spec comma([number()], keyword()) :: [String.t()]
+  @spec comma([number() | nil], keyword()) :: [String.t() | nil]
   def comma(breaks, options \\ []) do
     settings = settings!(options, :comma)
 
@@ -277,7 +326,7 @@ defmodule Scales.Labels do
       iex> Scales.Labels.percent([-0.5, 0.125, 12.345])
       ["-50%", "12%", "1 234%"]
   """
-  @spec percent([number()], keyword()) :: [String.t()]
+  @spec percent([number() | nil], keyword()) :: [String.t() | nil]
   def percent(breaks, options \\ []) do
     settings = settings!(options, :percent)
 
@@ -312,7 +361,7 @@ defmodule Scales.Labels do
       iex> Scales.Labels.currency([0, 2.5e5, 5.0e5, 1.0e6], scale_cut: Scales.Labels.cut_short_scale())
       ["$0", "$250K", "$500K", "$1M"]
   """
-  @spec currency([number()], keyword()) :: [String.t()]
+  @spec currency([number() | nil], keyword()) :: [String.t() | nil]
   def currency(breaks, options \\ []) do
     values = numbers!(breaks, "Labels.currency/2")
 
@@ -512,17 +561,19 @@ defmodule Scales.Labels do
     end
   end
 
-  # The breaks as floats, R's doubles, a negative zero made zero as R's `unique()` makes it.
+  # The breaks as floats, R's doubles, a negative zero made zero as R's `unique()` makes it, and
+  # a missing one `nil`.
   defp numbers!(breaks, function) when is_list(breaks) do
-    if Enum.all?(breaks, &is_number/1) do
-      Enum.map(breaks, fn value -> :erlang.float(value) + 0.0 end)
+    if Enum.all?(breaks, fn value -> is_number(value) or is_nil(value) end) do
+      Enum.map(breaks, fn value -> value && :erlang.float(value) + 0.0 end)
     else
-      raise ArgumentError, "#{function} takes a list of numbers, got: #{inspect(breaks)}"
+      raise ArgumentError,
+            "#{function} takes a list of numbers and nils, got: #{inspect(breaks)}"
     end
   end
 
   defp numbers!(breaks, function) do
-    raise ArgumentError, "#{function} takes a list of numbers, got: #{inspect(breaks)}"
+    raise ArgumentError, "#{function} takes a list of numbers and nils, got: #{inspect(breaks)}"
   end
 
   # The options given, checked, with the formatter's defaults; `accuracy:` and `scale_cut:` have
@@ -557,7 +608,7 @@ defmodule Scales.Labels do
   defp with_cents(settings, _values) when is_map_key(settings, :scale_cut), do: settings
 
   defp with_cents(settings, values) do
-    amounts = Enum.map(values, fn value -> value * settings.scale end)
+    amounts = for value <- values, value != nil, do: value * settings.scale
     small = Enum.all?(amounts, fn amount -> abs(amount) <= settings.largest_with_fractional end)
     accuracy = if small and not Enum.all?(amounts, &whole?/1), do: 0.01, else: 1
     Map.put(settings, :accuracy, accuracy)
@@ -587,8 +638,9 @@ defmodule Scales.Labels do
     |> with_accuracy(settings)
     |> Enum.map(&rounded/1)
     |> texts(settings)
-    |> Enum.map(fn {number, text} ->
-      signed(settings.prefix <> text <> number.suffix, number.sign, settings)
+    |> Enum.map(fn
+      {%{value: nil}, _text} -> nil
+      {number, text} -> signed(settings.prefix <> text <> number.suffix, number.sign, settings)
     end)
   end
 
@@ -599,10 +651,19 @@ defmodule Scales.Labels do
 
     sorted = Enum.sort_by(steps, fn {_suffix, threshold} -> threshold end)
 
-    Enum.map(values, fn value ->
-      name = refined_step(value, scale, step_reached(value, scale, sorted), sorted)
-      threshold = step_threshold(sorted, name)
-      %{value: value, scale: step_scale(value, scale, threshold), suffix: name <> settings.suffix}
+    Enum.map(values, fn
+      nil ->
+        %{value: nil, scale: scale, suffix: settings.suffix}
+
+      value ->
+        name = refined_step(value, scale, step_reached(value, scale, sorted), sorted)
+        threshold = step_threshold(sorted, name)
+
+        %{
+          value: value,
+          scale: step_scale(value, scale, threshold),
+          suffix: name <> settings.suffix
+        }
     end)
   end
 
@@ -667,14 +728,17 @@ defmodule Scales.Labels do
   defp with_accuracy(numbers, _settings) do
     accuracies =
       numbers
-      |> Enum.group_by(fn number -> number.scale end, fn number -> number.value * number.scale end)
-      |> Map.new(fn {scale, scaled} -> {scale, precision(scaled)} end)
+      |> Enum.group_by(fn number -> number.scale end, fn number -> number.value end)
+      |> Map.new(fn {scale, values} ->
+        {scale, precision(for value <- values, value != nil, do: value * scale)}
+      end)
 
     Enum.map(numbers, fn number -> Map.put(number, :accuracy, accuracies[number.scale]) end)
   end
 
   # The power of ten at or below the smallest gap when every value is a multiple of it, a tenth
-  # of it otherwise, at most 1: R computes the tenth and multiplies by ten.
+  # of it otherwise, at most 1: R computes the tenth and multiplies by ten. Fewer than two values
+  # take 1.
   defp precision(values) do
     sorted =
       values
@@ -682,6 +746,9 @@ defmodule Scales.Labels do
       |> Enum.sort()
 
     case sorted do
+      [] ->
+        1.0
+
       [_one] ->
         1.0
 
@@ -714,17 +781,10 @@ defmodule Scales.Labels do
   end
 
   # The value rounded to its accuracy, its sign after rounding, the number written (scaled and
-  # without its sign) and the decimals its accuracy asks for.
+  # without its sign) and the decimals its accuracy asks for; a missing one has no sign and is
+  # written missing.
   defp rounded(number) do
-    step = number.accuracy / number.scale
-    value = round_half_even(number.value / step) * step
-
-    sign =
-      cond do
-        value > 0 -> 1
-        value < 0 -> -1
-        true -> 0
-      end
+    {sign, magnitude} = rounded_value(number)
 
     power =
       number.accuracy
@@ -737,10 +797,28 @@ defmodule Scales.Labels do
       |> max(0)
       |> min(@max_decimals)
 
-    Map.merge(number, %{sign: sign, magnitude: number.scale * abs(value), decimals: decimals})
+    Map.merge(number, %{sign: sign, magnitude: magnitude, decimals: decimals})
   end
 
-  # Each number with its text, written with the others sharing its decimal count.
+  defp rounded_value(%{value: nil}), do: {0, nil}
+
+  defp rounded_value(number) do
+    step = number.accuracy / number.scale
+    value = round_half_even(number.value / step) * step
+
+    sign =
+      cond do
+        value > 0 -> 1
+        value < 0 -> -1
+        true -> 0
+      end
+
+    {sign, number.scale * abs(value)}
+  end
+
+  # Each number with its text, written with the others sharing its decimal count, as R's
+  # `format()` writes them in plain decimals; a missing one widens the others' padding to its
+  # `NA`, as in R.
   defp texts(numbers, settings) do
     texts =
       numbers
@@ -749,7 +827,14 @@ defmodule Scales.Labels do
       |> Enum.flat_map(fn {decimals, group} ->
         {group_numbers, indices} = Enum.unzip(group)
         magnitudes = Enum.map(group_numbers, fn number -> number.magnitude end)
-        Enum.zip(indices, Fixed.write(magnitudes, decimals, settings))
+
+        written =
+          Format.write(
+            magnitudes,
+            Map.merge(settings, %{digits: @format_digits, nsmall: decimals, notation: :fixed})
+          )
+
+        Enum.zip(indices, written)
       end)
       |> Map.new()
 
@@ -760,7 +845,7 @@ defmodule Scales.Labels do
   defp signed(text, -1, %{style_negative: :minus}), do: "−" <> text
   defp signed(text, -1, %{style_negative: :parens}), do: "(" <> text <> ")"
   defp signed(text, 1, %{style_positive: :plus}), do: "+" <> text
-  defp signed(text, 1, %{style_positive: :space}), do: " " <> text
+  defp signed(text, 1, %{style_positive: :space}), do: " " <> text
   defp signed(text, _sign, _settings), do: text
 
   # R's `round()`: to the nearest whole number, a half to the even one.
