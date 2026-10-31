@@ -95,7 +95,8 @@ size has a weight".
   `monospace`; any other name, R's `"symbol"` included, a CSS string, its quotes and backslashes
   escaped for CSS and the whole for the attribute, then the default list, for a browser that lacks
   it. Each is drawn at the measured width all the same, and so is a bold or italic label, measured
-  as plain text, as vdiffr measures every face but the symbol one. **An empty label is not
+  in its face where a font is registered with Pica for it and else as plain text, as vdiffr
+  measures every face but the symbol one (`font.md`). **An empty label is not
   written**, as svglite writes none, though the room measured for it stays. Text escapes `&`, `<`
   and `>`, as svglite does.
 - **A text checking overlap is drawn as grid's `textGrob(check.overlap = TRUE)` draws one**: each

@@ -54,8 +54,9 @@ theme puts them".
 - **A text carries each label's measured width**, which the backend draws it at, **and each label's
   colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label; its size, its
   `family` (`""` the default sans-serif, `"sans"`, `"serif"` and `"mono"` R's generic families,
-  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), neither of
-  which changes its measured width, and its angle, any number of degrees, are the text's. **A
+  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), both of
+  which its widths were measured in (`Giggly.Font`), and its angle, any number of degrees, are
+  the text's. **A
   text that checks overlap (`check_overlap`) draws a label only where its box crosses the box of no
   label drawn before it**, the box its width along the baseline by the text's `ascent` up from
   it, as grid's `check.overlap` measures a string; which labels cross turns on where they land, so

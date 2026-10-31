@@ -10083,6 +10083,41 @@ defmodule GigglyTest do
       assert golden?(plot, "theme_family_geom_text")
     end
 
+    # Golden: test/golden/theme_family_lato.svg, checked against svglite's drawing of the same plot
+    # in the fonts test/test_helper.exs registers under "Lato", made by
+    # test/golden/theme_family_lato.R, which says how they compare. It moves with how a registered
+    # family is measured, or with which texts take which family and face.
+    @tag :pica
+    test "a family registered with Pica measures every text in its font, each face in its own" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.labs(
+          title: "Fuel economy declines as engine size increases",
+          subtitle: "Two seaters are the exception"
+        )
+        |> Plot.theme_gray(base_family: "Lato")
+        |> Plot.theme(plot_title: [face: :bold])
+
+      assert golden?(plot, "theme_family_lato")
+    end
+
+    # Golden: test/golden/theme_family_lato_geom_text.svg, checked against svglite's drawing of the
+    # same plot in the font test/test_helper.exs registers under "Lato", made by
+    # test/golden/theme_family_lato_geom_text.R, which says how they compare. It moves with how a
+    # registered family is measured, or with how a layer's labels and keys take their family.
+    @tag :pica
+    test "a layer's labels and its legend's keys are measured in a family registered with Pica" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model, colour: {:factor, [:cyl]}})
+        |> Plot.geom_text()
+        |> Plot.theme_gray(base_family: "Lato")
+
+      assert golden?(plot, "theme_family_lato_geom_text")
+    end
+
     # Golden: test/golden/theme_text_plot_titles.svg, checked against ggplot2's drawing of the same
     # plot, made by test/golden/theme_text_plot_titles.R: every element and clip path matches. Each
     # face is written as vdiffr writes it, after the size, and measured as plain text is.

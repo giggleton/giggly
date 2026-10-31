@@ -2131,7 +2131,7 @@ defmodule Giggly.GeomTest do
 
     test "a label's vjust lowers its baseline that part of its ascent, a word by where it falls",
          context do
-      ascent = Font.ascent(11.0)
+      ascent = Font.ascent(11.0, "", :plain)
 
       frame =
         DataFrame.new(
@@ -2172,7 +2172,9 @@ defmodule Giggly.GeomTest do
       assert {text(frame, context).size, text(sized, context).size} === {11.0, points}
 
       assert %Text{widths: [width], ascent: ascent} = text(sized, context)
-      assert {width, ascent} === {Font.width("Mazda", points), Font.ascent(points)}
+
+      assert {width, ascent} ===
+               {Font.width("Mazda", points, "", :plain), Font.ascent(points, "", :plain)}
     end
 
     test "each label is in its row's colour at its row's alpha, black and opaque by default",
@@ -2440,7 +2442,7 @@ defmodule Giggly.GeomTest do
     end
 
     test "a text's key is the letter a at the middle of the key, in its colour at its alpha" do
-      ascent = Font.ascent(11.0)
+      ascent = Font.ascent(11.0, "", :plain)
 
       assert [%Text{} = key] =
                draw_key(
@@ -2468,7 +2470,7 @@ defmodule Giggly.GeomTest do
                )
 
       assert {key.x, key.y, key.hjust, key.offset} ===
-               {[0.0], [1.0], [0.0], [{margin, -margin - Font.ascent(11.0)}]}
+               {[0.0], [1.0], [0.0], [{margin, -margin - Font.ascent(11.0, "", :plain)}]}
     end
 
     # Golden: ggplot2 4.0.3's keys for text set `hjust = 0, vjust = 1` and turned 100, 200 and 300
@@ -2476,7 +2478,7 @@ defmodule Giggly.GeomTest do
     # element: `rotate_just()` puts the anchor at (1 - vjust, hjust) of the key, then at
     # (1 - hjust, 1 - vjust), then at (vjust, 1 - hjust).
     test "a turned text's key is placed at its justification turned with it" do
-      ascent = Font.ascent(11.0)
+      ascent = Font.ascent(11.0, "", :plain)
 
       places =
         Enum.map([100.0, 200.0, 300.0], fn angle ->

@@ -19,6 +19,9 @@ defmodule Giggly.MixProject do
         {"compile (:dev)", "mix compile --warnings-as-errors"},
         {"compile (:test)", "MIX_ENV=test mix compile --warnings-as-errors"},
         {"test", "mix test --warnings-as-errors"},
+        {"test (without Pica)",
+         "GIGGLY_WITHOUT_PICA=1 MIX_BUILD_ROOT=_build/without_pica MIX_ENV=test " <>
+           "mix do compile --warnings-as-errors + test --warnings-as-errors"},
         {"format", "mix format --check-formatted"},
         {"credo", "mix credo --strict"},
         {"rules", "mix tack.rules_check"}
@@ -50,9 +53,22 @@ defmodule Giggly.MixProject do
       {:color, "~> 0.13.0"},
       {:nx, "~> 1.0"},
       {:tz, "~> 0.28", only: :test}
-      # {:dep_from_hexpm, "~> 0.3.0"},
-      # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"}
-    ]
+    ] ++ pica()
+  end
+
+  # Pica measures text in the fonts a user names, when the user's project lists it; without it,
+  # Giggly measures with its own table. Until Pica's first release it is the checkout beside this
+  # one, built from source, which needs Rustler. `GIGGLY_WITHOUT_PICA=1` leaves it out, as a
+  # project that does not list it builds Giggly, for the gate step that checks that build.
+  defp pica do
+    if System.get_env("GIGGLY_WITHOUT_PICA") in ["1", "true"] do
+      []
+    else
+      [
+        {:pica, path: "../pica", optional: true},
+        {:rustler, "~> 0.38.0", only: [:dev, :test], runtime: false}
+      ]
+    end
   end
 
   defp aliases() do

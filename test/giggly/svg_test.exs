@@ -1323,7 +1323,9 @@ defmodule Giggly.SVGTest do
       y: Enum.map(labels, fn {_label, _x_points, y_points, _hjust} -> y_points / 576 end),
       labels: Enum.map(labels, fn {label, _x_points, _y_points, _hjust} -> label end),
       widths:
-        Enum.map(labels, fn {label, _x_points, _y_points, _hjust} -> Font.width(label, 11.0) end),
+        Enum.map(labels, fn {label, _x_points, _y_points, _hjust} ->
+          Font.width(label, 11.0, "", :plain)
+        end),
       size: 11.0,
       family: "",
       face: :plain,
@@ -1333,7 +1335,7 @@ defmodule Giggly.SVGTest do
       hjust: Enum.map(labels, fn {_label, _x_points, _y_points, hjust} -> hjust end),
       offset: List.duplicate({0.0, 0.0}, count),
       check_overlap: true,
-      ascent: Font.ascent(11.0)
+      ascent: Font.ascent(11.0, "", :plain)
     }
   end
 

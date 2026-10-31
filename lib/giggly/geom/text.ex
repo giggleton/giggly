@@ -97,6 +97,7 @@ defmodule Giggly.Geom.Text do
     def draw_panel(%{check_overlap: check_overlap}, frame, coord, panel_params) do
       placed = Coord.transform(coord, frame, panel_params)
       font_size = font_size(Mark.set(placed, :size))
+      family = Mark.set(placed, :family)
       angle = Mark.set(placed, :angle)
       hjust = Mark.set(placed, :hjust)
       vjust = Mark.set(placed, :vjust)
@@ -122,7 +123,7 @@ defmodule Giggly.Geom.Text do
             x: x_position,
             y: y_position,
             label: text,
-            width: Font.width(text, font_size),
+            width: Font.width(text, font_size, family, :plain),
             color: Mark.hex(color),
             opacity: opacity,
             hjust: justification(hjust, x_position, y_position, angle),
@@ -130,7 +131,7 @@ defmodule Giggly.Geom.Text do
           }
         end)
 
-      ascent = Font.ascent(font_size)
+      ascent = Font.ascent(font_size, family, :plain)
 
       [
         %Text{
@@ -139,7 +140,7 @@ defmodule Giggly.Geom.Text do
           labels: Enum.map(drawn, fn label -> label.label end),
           widths: Enum.map(drawn, fn label -> label.width end),
           size: font_size,
-          family: Mark.set(placed, :family),
+          family: family,
           face: :plain,
           color: Enum.map(drawn, fn label -> label.color end),
           opacity: Enum.map(drawn, fn label -> label.opacity end),
@@ -167,6 +168,8 @@ defmodule Giggly.Geom.Text do
 
         color ->
           font_size = font_size(Map.fetch!(key, :size))
+          family = Map.fetch!(key, :family)
+          ascent = Font.ascent(font_size, family, :plain)
           angle = Map.fetch!(key, :angle)
           hjust = justification(Map.fetch!(key, :hjust), 0.5, 0.5, angle)
           vjust = justification(Map.fetch!(key, :vjust), 0.5, 0.5, angle)
@@ -183,17 +186,17 @@ defmodule Giggly.Geom.Text do
               x: [across],
               y: [up],
               labels: [label],
-              widths: [Font.width(label, font_size)],
+              widths: [Font.width(label, font_size, family, :plain)],
               size: font_size,
-              family: Map.fetch!(key, :family),
+              family: family,
               face: :plain,
               color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.fetch!(key, :alpha))],
               angle: angle,
               hjust: [hjust],
-              offset: [{along, toward_top - vjust * Font.ascent(font_size)}],
+              offset: [{along, toward_top - vjust * ascent}],
               check_overlap: false,
-              ascent: Font.ascent(font_size)
+              ascent: ascent
             }
           ]
       end
@@ -209,9 +212,10 @@ defmodule Giggly.Geom.Text do
       radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
       sine = abs(:math.sin(radians))
-      width = Font.width("a", font_size)
-      ascent = Font.ascent(font_size)
-      descent = Font.descent(font_size)
+      family = Map.fetch!(key, :family)
+      width = Font.width("a", font_size, family, :plain)
+      ascent = Font.ascent(font_size, family, :plain)
+      descent = Font.descent(font_size, family, :plain)
 
       {
         width * cosine + ascent * sine + sine * descent + 2 * @key_measured_margin,

@@ -122,7 +122,16 @@ defmodule Giggly.GuideTest do
 
       measured =
         Enum.map([30.0, 120.0, 210.0, 300.0, 89.5, 359.5, -1.0e-14], fn angle ->
-          look = %{size: 8.8, angle: angle, hjust: 0.2, vjust: 0.7, margin: margin}
+          look = %{
+            size: 8.8,
+            family: "",
+            face: :plain,
+            angle: angle,
+            hjust: 0.2,
+            vjust: 0.7,
+            margin: margin
+          }
+
           {across, up} = Guide.Parts.turned_justification(look)
           {width, height} = Guide.Parts.extent(["a longer label"], look)
           rounded = fn number -> Float.round(number, 9) end

@@ -4255,7 +4255,16 @@ defmodule Giggly.Plot do
   `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
   "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
   [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.
-  Every family is measured as the default sans-serif is, and each label drawn at that width.
+  A family is measured in its own font where the project lists Pica, the optional package that
+  shapes text, and a font is registered with Pica under the family's name in the text's face, by
+  the project, once, as it starts:
+
+      {:ok, lato} = Pica.load(File.read!("priv/static/fonts/Lato-Regular.ttf"))
+      :ok = Pica.register("Lato", plain: lato)
+
+  Every other family, and every face no font is registered for, is measured as the default
+  sans-serif is. Each label is drawn at the width measured, in a text naming its family, so a
+  viewer sees the font the project serves it.
 
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin

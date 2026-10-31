@@ -9,7 +9,8 @@ defmodule Giggly do
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
   # a sub-boundary beneath it. Like every boundary it is strict (`mix.exs`). It lists `Nx` and
-  # `Table`, the outside libraries `Giggly.Tensor` and `Giggly.DataFrame` own, and `Scales`, R's
+  # `Table`, the outside libraries `Giggly.Tensor` and `Giggly.DataFrame` own, `Pica`, which
+  # `Giggly.Font` owns when a project lists it, and `Scales`, R's
   # scales half, which several domains call, since a sub-boundary may list only what its parent
   # does; nothing here calls any of them, and no other domain lists `Nx` or `Table`.
   # `panel_scales/2` reads the layout table through `Giggly.DataFrame`, which a parent may call
@@ -18,7 +19,10 @@ defmodule Giggly do
   # the description the run functions take; what a user of Giggly calls is the documented API
   # (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `Scales.Labels`,
   # `DataFrame`'s readers and the scales `panel_scales/2` returns.
-  use Boundary, deps: [NimbleOptions, Nx, Scales, Table], exports: [Plot]
+  use Boundary,
+    deps:
+      [NimbleOptions, Nx, Scales, Table] ++ if(Code.ensure_loaded?(Pica), do: [Pica], else: []),
+    exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
 

@@ -215,6 +215,12 @@ semver or the changelog).
   - Both `mix compile --warnings-as-errors` (in `:dev` and in `:test`) warm the two build dirs; a
     compile warning is a hard failure, matching CI. `mix test --warnings-as-errors` makes a warning
     in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed.
+  - `test (without Pica)` builds and tests Giggly as a project that does not list Pica does:
+    `GIGGLY_WITHOUT_PICA=1` leaves Pica, and Rustler with it, out of `deps`, in a build root of
+    its own (`_build/without_pica`), so the code behind `Code.ensure_loaded?(Pica)` and the
+    boundaries listing Pica are compiled both ways (`font.md`). Until Pica's first release it is
+    the checkout beside this one (`path: "../pica"`), built from source, which needs Rustler in
+    dev and test; CI cannot fetch it, so nothing that lists it is pushed until that release.
 - **Architecture as a compile-time check** (`boundary`): `compilers: [:boundary]` in `mix.exs`
   checks the `use Boundary` declarations, so a forbidden cross-namespace call is a compiler
   warning and therefore a gate failure. The installed shape was the umbrella `Giggly` (`exports:

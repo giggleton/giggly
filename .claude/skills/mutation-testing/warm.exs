@@ -9,7 +9,9 @@
 # thirty, and every mutant meets every test, so no test is missed by selection.
 #
 # It rests on Giggly keeping no state for one mutant to leave the next: no process, application
-# env, ETS table or persistent term, which the `CorePurity` check holds over lib/. A struct whose
+# env, ETS table or persistent term, which the `CorePurity` check holds over lib/. The fonts the
+# suite registers with Pica are Pica's state, registered once by test/test_helper.exs, which a
+# worker runs once, and only read by Giggly, so no mutant can change them. A struct whose
 # defaults a mutant changes is baked into every module that wrote the struct, so such a mutant is
 # reported `struct_changed`, not judged. The mutants are muex's, built through its library as
 # `mix muex --since SINCE --no-optimize --no-filter --files FILES` builds them, and the report is

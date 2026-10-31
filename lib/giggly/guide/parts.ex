@@ -236,7 +236,7 @@ defmodule Giggly.Guide.Parts do
     radians = look.angle / 180 * :math.pi()
     cosine = :math.cos(radians)
     sine = :math.sin(radians)
-    ascent = Font.ascent(look.size)
+    ascent = Font.ascent(look.size, look.family, look.face)
 
     corners =
       Enum.flat_map(texts, fn text ->
@@ -244,7 +244,7 @@ defmodule Giggly.Guide.Parts do
 
         width =
           lines
-          |> Enum.map(fn line -> Font.width(line, look.size) end)
+          |> Enum.map(fn line -> Font.width(line, look.size, look.family, look.face) end)
           |> Enum.max()
 
         height = (length(lines) - 1) * line_spacing(look) + ascent
@@ -264,7 +264,7 @@ defmodule Giggly.Guide.Parts do
       |> Enum.map(fn {_across, up} -> up end)
       |> Enum.min_max()
 
-    descent = Font.descent(look.size)
+    descent = Font.descent(look.size, look.family, look.face)
     descent_radians = turned_angle(look.angle) / 180 * :math.pi()
 
     {right - left + abs(:math.sin(descent_radians)) * descent,
@@ -279,7 +279,7 @@ defmodule Giggly.Guide.Parts do
   @spec text([String.t()], [{float(), float()}], {float(), float()}, Theme.text() | Theme.title()) ::
           Text.t()
   def text(texts, places, offset, look) do
-    ascent = Font.ascent(look.size)
+    ascent = Font.ascent(look.size, look.family, look.face)
     {along, up} = in_text_frame(offset, look.angle)
 
     lines =
@@ -301,7 +301,10 @@ defmodule Giggly.Guide.Parts do
       x: Enum.map(lines, fn {_line, {x_place, _y_place}, _offset} -> x_place end),
       y: Enum.map(lines, fn {_line, {_x_place, y_place}, _offset} -> y_place end),
       labels: Enum.map(lines, fn {line, _place, _offset} -> line end),
-      widths: Enum.map(lines, fn {line, _place, _offset} -> Font.width(line, look.size) end),
+      widths:
+        Enum.map(lines, fn {line, _place, _offset} ->
+          Font.width(line, look.size, look.family, look.face)
+        end),
       size: look.size,
       family: look.family,
       face: look.face,

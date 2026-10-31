@@ -788,11 +788,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   caption, tag, strips, tick labels and legend labels keep the base family, as `calc_element()`
   gives every leaf of the eight themes; unset is `:none`, R's `NULL`. `theme(text: [family:])`
   never reaches a layer. Every family is measured with the built-in table, as vdiffr measures
-  each. The SVG writes `""` and `"sans"` as the default list, `"serif"` and `"mono"` as CSS's
+  each, but where a font is registered with Pica under it (the entry beginning "A font family is
+  a name"). The SVG writes `""` and `"sans"` as the default list, `"serif"` and `"mono"` as CSS's
   `serif` and `monospace`, and any other name as a CSS string before the default list.
   *Rejected: a named family written alone* — a browser lacking it draws its own default, often a
-  serif, at sans widths. *Rejected: a family argument to `Giggly.Font` now* — no measure differs
-  by family until the package does. *Rejected: following ggplot2's docs, which give the tag the
+  serif, at sans widths. *Rejected: following ggplot2's docs, which give the tag the
   header family* — R gives it the base. *Rejected: CSS's names for the Symbol font for R's
   `"symbol"`* (Steve) — what a reader sees would turn on the fonts their machine has; it is
   written as any other name.
@@ -802,15 +802,52 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   surveys of Hex and checks in R).** `family:`, `base_family:`, `header_family:` and a layer's
   `family:` name fonts; no font value travels in a plot. The package is a Rust NIF over
   HarfBuzz's shaping (harfrust, skrifa, wuff; Rustler and rustler_precompiled), in its own
-  repository, and never depends on Giggly. Giggly will list it as an optional dependency and hold
-  the adapter behind `Code.ensure_loaded?`, with no behaviour yet, keeping R's rounding itself.
+  repository, and never depends on Giggly: Pica. Giggly lists it as an optional dependency and
+  measures through it behind `Code.ensure_loaded?`, with no behaviour, keeping R's rounding
+  itself. A project registers a font's file with Pica under a family's name; a face no font is
+  registered for is measured from the table, never another face's, as Pica never substitutes one.
   `""` and R's generic names stay on the built-in table unless a font is registered under that
   name, so the goldens never move. *Rejected: a TrueType parser of our own* — no ligatures or
   contextual forms, which svglite's HarfBuzz applies, and a thousand lines to own. *Rejected:
   Hex's parsers* — none reads GPOS kerning correctly (`truetype_metrics`, `opentype`,
   `tincture`). *Rejected: measuring by rendering (resvg, libvips)* — the ink box, not the advance
   ggplot2 lays out with. *Rejected: fonts as values passed to `to_svg/2`* — names are the only
-  input. *Open:* how the package finds a family's files (a registry is recommended).
+  input. *Rejected: a `Giggly.register_font/2`* (2026-10-30) — Pica's two calls renamed, and a
+  file read inside the pure core.
+
+- **A label measured with a font Pica found reaches the viewer as outlines by default, plain text
+  naming the font an option (2026-10-30, Steve, after a survey of other libraries).** Measured on
+  one machine and viewed on another, matplotlib's and Typst's SVG, Satori and Plotto's PNG draw
+  outlines; svglite and vl-convert name the font and leave it to the viewer. With outlines the
+  viewer's fonts stop mattering, so Pica's installed fonts, searched by default, are safe on any
+  server: an `installed_fonts:` option on the run functions, on by default, arrives with them, the
+  geom protocol's drawing functions taking the font settings, and the suite passes `false`. Until
+  then only registered fonts are searched. Each label keeps its words for screen readers.
+  *Rejected: an embedded subset* — a subsetter, each font's embedding permissions, and unproven
+  in Livebook's SVG images. *Rejected: plain text by default* — right only where the viewer has
+  the font. *Rejected: no option* — a render would turn on the machine's fonts, and the suite
+  would read the disk. *Rejected: threading the option before outlines* — a protocol change
+  nothing needs yet.
+
+- **A registered font is measured by svglite's rules, measured in R (2026-10-30).** A width is
+  the shaped glyphs' advances at the size truncated to 1/64 point, as svglite hands FreeType a
+  size: at 13.2 and 7.04 points truncating matches R and rounding misses; a size truncating to
+  nothing is 1 point, as R measures 0. A height is the box of "M" or of "gjpqyQ" rounded out to
+  a whole pixel at 10,000 dots per inch, as svglite reads glyph boxes. Over sizes from 5 to 30
+  points in Lato and Source Serif 4 the widths came within 4/64 point of svglite's and the heights
+  within a pixel, and two goldens within 0.04 point of svglite's drawings. *Rejected: a whole
+  number of pixels per em* — Lato's `head` flag asks FreeType for it and its heights then all but
+  match, but Source Serif 4's match less often, Pica does not report the flag, and the rest is
+  FreeType's arithmetic, a port. *Rejected: rounding the size* — it misses R.
+
+- **The gate builds and tests Giggly without Pica (2026-10-30, Steve, agreeing the plan).**
+  `GIGGLY_WITHOUT_PICA=1` leaves Pica out of `deps`, in a build root of its own, and runs the suite
+  less its `:pica` tests, plus the `:without_pica` ones. `Giggly.Font` switches when it compiles,
+  behind `Code.ensure_loaded?(Pica)`, the build without it measuring by the table alone, so it
+  names no Pica function and no warning is waived; the boundaries list `Pica` on the same test.
+  *Rejected: a project depending on Giggly by path* — a second project and dependency tree to
+  keep, for what a variable gives. *Rejected: `@compile {:no_warn_undefined, Pica}`* — a waiver
+  for calls the switch keeps out.
 
 - **Text's face, angle, justification and line height are the theme's, and every text a guide
   draws is placed and measured by one rule, ggplot2's `titleGrob()` (2026-10-24, Steve, agreeing
@@ -821,7 +858,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Guide.Parts` anchors a text at `rotate_just()` of its room, moved by the margins it counts, and
   measures grid's box round it turned with its descent, so 432 R drawings, every 15 degrees by
   each justification, matched. A face is an SVG style, measured at plain widths, as vdiffr
-  measures. *Rejected: R's `"oblique"` and faces 1 to 4* — second spellings no example writes.
+  measures, where no font is registered with Pica for it. *Rejected: R's `"oblique"` and faces 1
+  to 4* — second spellings no example writes.
   *Rejected: a negative `lineheight`*, which R stacks upward. *Rejected: failing where only a
   removed root text gives a justification*, as R does — grid's centring, as every such property
   falls to grid. *Rejected: a bold glyph table* — the goldens would leave R's. *Deferred:*
@@ -832,7 +870,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   mutant over its module, recompile what read it while compiling and now reads something else, run
   the whole suite to its first failure, and load the originals back; muex builds the mutants and
   writes the JSON report, as a library, and one `:cover` run per worker finds the lines no test
-  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`); a mutant
+  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`), the fonts
+  the suite registers with Pica registered once per worker and only read; a mutant
   that changes a struct's defaults is reported, not judged. Replayed over step 6's pass, every
   kill, survivor and uncovered line matched muex's, and it killed three survivors muex's test
   selection never ran against; the element tree split's pass took minutes where muex took hours.
@@ -3224,6 +3263,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-30 — Measure text in the fonts a project registers with Pica, as svglite measures
+  them, and with the table otherwise (Pica, step 1); §4: "A label measured with a font Pica", "A
+  registered font is measured", "The gate builds and tests Giggly without Pica"
 - 2026-10-30 — Draw the notebook examples geom_hex() unlocks, and narrow stat_summary_hex()'s
   verdict to what still waits (geom_hex, step 2, the notebook sweep)
 - 2026-10-30 — Name the breaks functions, n_breaks: and a discrete axis's minor breaks in the

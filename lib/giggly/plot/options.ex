@@ -1278,7 +1278,8 @@ defmodule Giggly.Plot.Options do
         ~s(The font every label is drawn in, by name, such as `"Times New Roman"`, or one ) <>
           ~s(of the generic families `"sans"`, `"serif"` and `"mono"`; the theme's ) <>
           "`base_family` when not given, the default sans-serif at its default. A label is " <>
-          "measured as the default font measures it, and drawn at that width."
+          "measured in the font registered with Pica under its family, as `Giggly.Plot.theme/2` " <>
+          "says, or else as the default font measures it, and drawn at that width."
     ]
   ]
 
