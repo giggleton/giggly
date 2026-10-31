@@ -15,6 +15,7 @@ defmodule Giggly.GeomTest do
   @segment %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none}
   @hline %Geom.Hline{line_end: :butt}
   @vline %Geom.Vline{line_end: :butt}
+  @abline %Geom.Abline{line_end: :butt}
   @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, outside: false, line_end: :butt}
 
   @ribbon %Geom.Ribbon{
@@ -1958,6 +1959,138 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  # The panel runs 0 to 4 along x and 10 to 20 up y, so clipped, as a cartesian panel is by
+  # default, the extents a diagonal line is cut to are those widened by their widths each side, -4
+  # to 8 and 0 to 30, a cell's -1 to 2. Each end is worked out as `GeomAbline` works it out: x where
+  # y meets each end of its extent, `(y - intercept) / slope`, the lesser no lower than x's start
+  # and the greater no higher than its end, then `y = intercept + slope * x` at both. Golden: every
+  # cartesian end is ggplot2 4.0.3's own, the `x0`, `y0`, `x1` and `y1` of `layer_grob()` for the
+  # same lines under `coord_cartesian(xlim = c(0, 4), ylim = c(10, 20), expand = FALSE)`, clipped
+  # or not; the infinite intercept and slope draw a `zeroGrob()`.
+  describe "draw_panel/4 for diagonal lines" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+      }
+    end
+
+    test "a line runs between the widened extents, cut to the x extent where y stays inside",
+         %{coord: coord, params: params} do
+      # y = 10 + x meets y's ends at x -10 and 20, cut to -4 and 8, where y is 6 and 18.
+      frame = DataFrame.new(intercept: [10.0], slope: [1.0], group: [-1])
+
+      assert [%Segments{starts: [{-1.0, -0.4}], ends: [{2.0, 0.8}]}] =
+               draw_panel(@abline, frame, coord, params)
+    end
+
+    test "a steep line is cut to where its y meets the y extent's ends, whichever way it slopes",
+         %{coord: coord, params: params} do
+      # y = 10 + 10x meets y's 0 and 30 at x -1 and 2; y = 20 - 10x meets them at 2 and -1.
+      frame = DataFrame.new(intercept: [10.0, 20.0], slope: [10.0, -10.0], group: [-1, -1])
+
+      assert [%Segments{} = lines] = draw_panel(@abline, frame, coord, params)
+
+      assert {lines.starts, lines.ends} ===
+               {[{-0.25, -1.0}, {-0.25, 2.0}], [{0.5, 2.0}, {0.5, -1.0}]}
+    end
+
+    test "a flat line runs the whole x extent, from the division's infinities",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(intercept: [15.0], slope: [0.0], group: [-1])
+
+      assert [%Segments{starts: [{-1.0, 0.5}], ends: [{2.0, 0.5}]}] =
+               draw_panel(@abline, frame, coord, params)
+    end
+
+    test "each repeat is drawn once, its corners round and its ends as the layer says",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          intercept: [10.0, 10.0, 12.0],
+          slope: [1.0, 1.0, 1.0],
+          group: [-1, -1, -1]
+        )
+
+      assert [%Segments{starts: [_first, _second], line_end: :square, line_join: :round}] =
+               draw_panel(%Geom.Abline{line_end: :square}, frame, coord, params)
+    end
+
+    # R's `NA` and infinities: a missing intercept leaves every end missing; an infinite slope
+    # makes `0 * Inf`, NaN, at y; an infinite intercept `Inf - Inf`, NaN, at the end's y.
+    test "a line missing its intercept or slope draws nothing, and nor does an infinite one",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          intercept: [nil, 0.0, :infinity, 10.0],
+          slope: [1.0, :infinity, 1.0, 1.0],
+          group: [-1, -1, -1, -1]
+        )
+
+      assert [%Segments{starts: [{-1.0, -0.4}]}] = draw_panel(@abline, frame, coord, params)
+    end
+
+    test "unclipped, a line runs between the extents themselves", %{params: params} do
+      coord = %Coord.Cartesian{clip: :off}
+      frame = DataFrame.new(intercept: [10.0], slope: [1.0], group: [-1])
+
+      assert [%Segments{starts: [{+0.0, +0.0}], ends: [{1.0, 0.4}]}] =
+               draw_panel(@abline, frame, coord, params)
+    end
+
+    # As R draws them: y = 100 + x is 100 at x's start, and meets y's end, 20, at x -80, so its
+    # end is cut to that, below its start, and the line is drawn above and left of the panel; a
+    # flat line on y's end meets it at `0 / 0`, NaN, which leaves the row out.
+    test "unclipped, a line missing the panel is drawn beyond it, and one on its edge not at all",
+         %{params: params} do
+      coord = %Coord.Cartesian{clip: :off}
+      frame = DataFrame.new(intercept: [100.0, 20.0], slope: [1.0, 0.0], group: [-1, -1])
+
+      assert [%Segments{starts: [{+0.0, 9.0}], ends: [{-20.0, 1.0}]}] =
+               draw_panel(@abline, frame, coord, params)
+    end
+
+    # `GeomAbline` widens the extents only where the coordinate system is linear and clipped, so a
+    # radial panel clipped, which `coord_radial/1` cannot yet ask for, is not widened either.
+    test "under radial coordinates a line follows the panel's curves between the extents, clipped or not" do
+      params = Coord.panel_params(%Coord.Radial{}, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+      frame = DataFrame.new(intercept: [10.0], slope: [1.0], group: [-1])
+
+      # Not widened: y = 10 + x from x's start, at 10, to its end, at 14.
+      placed =
+        Coord.transform(%Coord.Radial{}, DataFrame.new(x: [0.0, 4.0], y: [10.0, 14.0]), params)
+
+      ends =
+        placed
+        |> DataFrame.pull(:x)
+        |> Enum.zip_with(DataFrame.pull(placed, :y), fn x, y -> {x, y} end)
+
+      for coord <- [%Coord.Radial{}, %Coord.Radial{clip: :on}] do
+        assert [%Polylines{lines: [line]}] = draw_panel(@abline, frame, coord, params)
+        assert [List.first(line), List.last(line)] === ends
+        assert [_start, _step, _more | _rest] = line
+      end
+    end
+
+    test "an intercept or slope an expression makes that is not a number is refused" do
+      axes = %{x: :continuous, y: :continuous}
+
+      for {intercepts, slopes, refused} <- [{["a"], [1.0], "intercept"}, {[1.0], ["a"], "slope"}] do
+        frame = DataFrame.new(intercept: intercepts, slope: slopes)
+
+        assert_raise ArgumentError,
+                     "a line is drawn at y = intercept + slope * x, so its #{refused} must be a " <>
+                       "number, but the layer's #{refused} is a :string column",
+                     fn -> Geom.setup_data(@abline, frame, axes) end
+      end
+
+      numbers = DataFrame.new(intercept: [1], slope: [nil])
+      assert Geom.setup_data(@abline, numbers, axes) === numbers
+    end
+  end
+
   describe "draw_panel/4 for rugs" do
     setup do
       coord = %Coord.Cartesian{}
@@ -2523,6 +2656,20 @@ defmodule Giggly.GeomTest do
 
       assert key_size(vline, key) === key_size(@path, key)
       assert draw_key(vline, %{linetype: :none}) === []
+    end
+
+    # ggplot2's `draw_key_abline()`: `segmentsGrob(0, 0, 1, 1)`, corner to corner.
+    test "a diagonal line's key runs from the key's bottom left corner to its top right" do
+      abline = %Geom.Abline{line_end: :square}
+      key = %{alpha: 0.4, linewidth: 2.0}
+
+      assert [%Segments{} = glyph] = draw_key(abline, key)
+
+      assert {glyph.starts, glyph.ends, glyph.opacity, glyph.stroke_width, glyph.line_end} ===
+               {[{0.0, 0.0}], [{1.0, 1.0}], [0.4], @two_millimetres, :square}
+
+      assert key_size(abline, key) === key_size(@path, key)
+      assert draw_key(abline, %{linetype: :none}) === []
     end
 
     test "a key of a missing width draws nothing, and of a missing line type no line or border" do

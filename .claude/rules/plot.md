@@ -33,7 +33,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
-  `geom_hex/3`, `geom_hline/3` and `geom_vline/3` among them),
+  `geom_hex/3`, `geom_hline/3`, `geom_vline/3` and `geom_abline/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
@@ -78,8 +78,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's, and `geom_segment/3` `%Geom.Segment{}` with the identity stat
   and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
-  `geom_hline/3` and `geom_vline/3` `%Geom.Hline{}` and `%Geom.Vline{}` with the identity stat and
-  position, taking no `position:`, as only nudging moves a reference line in R, and
+  `geom_hline/3`, `geom_vline/3` and `geom_abline/3` `%Geom.Hline{}`, `%Geom.Vline{}` and
+  `%Geom.Abline{}` with the identity stat and position, taking no `position:`, as only nudging
+  moves a reference line in R, and
   `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
   `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
   each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
@@ -298,7 +299,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   allows at most one. A weight must hold numbers: a column's type, read from the layer's table, and
   a constant's are refused at the call, where R would fail inside the stat and draw nothing; an
   expression's type is known only once it has run, so its stat refuses it then; a column layer's
-  mapped `:width` alike, an expression's refused by the bar geom.
+  mapped `:width` alike, an expression's refused by the bar geom, and a diagonal line's mapped
+  `:intercept` and `:slope`, an expression's refused by its geom.
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A bar function's
@@ -380,6 +382,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `geom_hline/3`, `geom_vline/3`,
+  `geom_abline/3`,
   `stat_bin_hex/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
@@ -519,10 +522,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   or a line type's `:blank`, in a list held as `nil`, the column's missing value, as R's `c(NA,
   "red")` holds `NA`. A position is kept as a float where it is a number, as an option's number is.
   The options are each geom's function's but `data:`, `position:` and nudging, so one its geom
-  cannot use raises, where ggplot2 warns and ignores it. **`:hline` and `:vline` are refused,
-  naming the function that draws them**, as ggplot2's `annotate()` warns that they annotate on
+  cannot use raises, where ggplot2 warns and ignores it. **`:abline`, `:hline` and `:vline` are
+  refused, naming the function that draws them**, as ggplot2's `annotate()` warns that they annotate on
   their own.
-- **A reference line function (`geom_hline/3`, `geom_vline/3`) gives its lines one of two ways**
+- **A reference line function (`geom_hline/3`, `geom_vline/3`, `geom_abline/3`) gives its lines
+  one of two ways**
   (design-log §4, the entry beginning "A reference line is drawn from the panel's extents"): its
   intercept's option (`yintercept:`, `xintercept:`), any position an annotation takes, makes the
   layer an annotation of those lines, built as `annotate/3` builds one, each
@@ -532,4 +536,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the call, where ggplot2 warns and ignores them; a layer given neither is refused as needing the
   intercept, "neither its mapping maps it nor yintercept: gives it". `lineend:` is the geom's
   field, `:butt` unless given; `arrow:`, `linejoin:` and `size:` are refused, R ignoring the first
-  two and `size` being superseded.
+  two and `size` being superseded. **A diagonal line's values are `intercept:` and `slope:`**,
+  numbers alone, kept as floats (`validate_coefficient/1`), as no scale sees them: given neither
+  and no mapping, the layer is the line `y = x`, an annotation of `intercept: 0.0, slope: 1.0`;
+  given one, the other takes that default, as ggplot2's `geom_abline()` fills them in; `data:`
+  with neither and no mapping is refused, where R ignores it and draws `y = x`. Mapped, it needs
+  both, the unmet one "neither its mapping maps it nor intercept: or slope: gives it".

@@ -88,14 +88,20 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `aes_params` take a vector; mapped, an ordinary layer with `inherit: false`, a new `Layer`
   field, as `inherit.aes = FALSE`, so it draws in legends; a mapping or `data:` beside values is
   refused, where R warns and ignores it. An intercept is any position an annotation takes, which
-  gained date-times and times. *Rejected: segments from minus to plus infinity*: radially
-  infinities cannot be munched, and a diagonal line needs numbers. *Rejected: placing two points
-  and extending them in the panel*: affine only, and not R's arithmetic. *Rejected: one layer
-  kind for both forms*: the argument form's mapping would title the axis "yintercept".
-  *Rejected: `annotation: true` for the mapped form*: it loses its legend. *Left out*:
-  `position:` (in R only nudging moves a line, to a value one could write), `arrow:`, which R
-  ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is refused, naming the function,
-  as R warns.
+  gained date-times and times. A diagonal line's `intercept:` and `slope:` are numbers no scale
+  trains on or transforms, as R gives them none, the line `y = x` given neither, the other's
+  default given one; `data:` alone is refused, where R ignores it and draws `y = x`. Its ends are
+  R's arithmetic, oddities included (2026-10-31, Steve: "A"): a line missing the panel is drawn
+  beyond it, showing unclipped, a spiral radially, and a flat line on an unclipped edge is `0 /
+  0` and not drawn. *Rejected: leaving out a line that misses the extents*: a departure to
+  defend, in code R's arithmetic needs none of. *Rejected: segments from minus to plus
+  infinity*: radially infinities cannot be munched, and a diagonal line needs numbers.
+  *Rejected: placing two points and extending them in the panel*: affine only, and not R's
+  arithmetic. *Rejected: one layer kind for both forms*: the argument form's mapping would title
+  the axis "yintercept". *Rejected: `annotation: true` for the mapped form*: it loses its legend.
+  *Left out*: `position:` (in R only nudging moves a line, to a value one could write),
+  `arrow:`, which R ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is refused,
+  naming the function, as R warns.
 - **A breaks function is called as ggplot2's `get_breaks()` calls one, and R's names are
   `{break, label}` pairs (2026-10-29, Steve, increment 2's step 5: "Match R", "B", "A"; checked
   against ggplot2 4.0.3).** `breaks:` and `minor_breaks:` take a function of one argument or two,
@@ -3241,6 +3247,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Add geom_abline(): diagonal lines between the panel's extents, cut and widened as
+  R's arithmetic cuts them, given as values or mapped (reference lines, step 2); §4: "A reference
+  line is drawn from the panel's extents"
 - 2026-10-30 — Add geom_hline() and geom_vline(): lines across the whole panel from its extents,
   given as values or mapped, taking nothing from the plot's mapping (reference lines, step 1);
   §4: "A reference line is drawn from the panel's extents"

@@ -3674,6 +3674,183 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_abline/3" do
+    # ggplot2 4.0.3's `geom_abline(intercept = 37, slope = c(-5, -4))` builds a table of its own,
+    # each intercept recycled to the slopes' count, and maps `aes(intercept = intercept, slope =
+    # slope)`, taking nothing from the plot's mapping.
+    test "lines given as values are an annotation of their own table, each look one per line" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_abline(intercept: 37, slope: [-5, -4], colour: ["red", "blue"])
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Abline{line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: table,
+                 mapping: %{intercept: "intercept", slope: "slope"},
+                 fixed: %{color: ["#FF0000", "#0000FF"]},
+                 accepted: [:alpha, :color, :group, :intercept, :linetype, :linewidth, :slope],
+                 annotation: true,
+                 inherit: false
+               }
+             ] = plot.reversed_layers
+
+      assert {DataFrame.pull(table, "intercept"), DataFrame.pull(table, "slope")} ===
+               {[37.0, 37.0], [-5.0, -4.0]}
+    end
+
+    # ggplot2 4.0.3: given nothing, `slope = 1, intercept = 0`; given either, the other's default.
+    test "given neither value nor a mapping, the line is y = x, and either value takes the other's default" do
+      plot = Plot.new(@rows)
+
+      for {options, intercepts, slopes} <- [
+            {[], [0.0], [1.0]},
+            {[slope: 2], [0.0], [2.0]},
+            {[intercept: 30, lineend: :round], [30.0], [1.0]}
+          ] do
+        assert [%Plot.Layer{data: table, annotation: true}] =
+                 Plot.geom_abline(plot, options).reversed_layers
+
+        assert {DataFrame.pull(table, "intercept"), DataFrame.pull(table, "slope")} ===
+                 {intercepts, slopes}
+      end
+    end
+
+    test "mapped lines are a layer of their table that takes nothing from the plot's mapping" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_abline(%{intercept: :a, slope: :b},
+          data: %{"a" => [30.0], "b" => [-2]},
+          lineend: :square
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Abline{line_end: :square},
+                 data: %_{},
+                 mapping: %{intercept: "a", slope: "b"},
+                 annotation: false,
+                 inherit: false
+               } = layer
+             ] = plot.reversed_layers
+
+      assert Plot.computed_mapping(plot, layer) == %{intercept: "a", slope: "b"}
+    end
+
+    # ggplot2 4.0.3 warns "Ignoring `mapping` because `slope` and/or `intercept` were provided.",
+    # and "Ignoring `data`" beside them or given alone, drawing y = x.
+    test "lines given as values take no mapping and no table, and nor does the line y = x" do
+      plot = Plot.new(@rows)
+
+      mapping =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :wt}, slope: 2)
+        end
+
+      assert mapping.message ===
+               "Plot.geom_abline/3 draws the lines slope: gives, so it takes no mapping, got: " <>
+                 "%{intercept: :wt}"
+
+      data =
+        assert_raise ArgumentError, fn -> Plot.geom_abline(plot, intercept: 2, data: @rows) end
+
+      assert data.message ===
+               "Plot.geom_abline/3 draws the lines intercept: gives, so it takes no data:"
+
+      alone = assert_raise ArgumentError, fn -> Plot.geom_abline(plot, data: @rows) end
+
+      assert alone.message ===
+               "Plot.geom_abline/3 given no mapping, intercept: or slope: draws the line y = x, " <>
+                 "so it takes no data:; map :intercept and :slope to draw lines from the table"
+    end
+
+    # ggplot2 4.0.3: "`geom_abline()` requires the following missing aesthetics: slope", and
+    # "Can't recycle `intercept` (size 2) to size 3".
+    test "a mapped line needs both its intercept and its slope, and lists must agree in length" do
+      plot = Plot.new(@rows)
+
+      missing =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :a}, data: %{"a" => [1.0]})
+        end
+
+      assert missing.message ===
+               "Plot.geom_abline/3 needs :slope, but neither its mapping maps it nor intercept: " <>
+                 "or slope: gives it"
+
+      looks =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :wt, slope: :mpg}, linewidth: [1, 2])
+        end
+
+      assert looks.message =~ "only beside intercept: or slope:"
+
+      lengths =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, intercept: [1, 2], slope: [1, 2, 3])
+        end
+
+      assert String.starts_with?(lengths.message, "Plot.geom_abline/3 gives :intercept 2 values")
+    end
+
+    # ggplot2 4.0.3 fails drawing: "non-numeric argument to binary operator", for a string
+    # intercept, a mapped string slope or a date intercept alike.
+    test "an intercept or slope must be a number, given or mapped" do
+      plot = Plot.new(@rows)
+
+      for value <- ["a", ~D[2020-01-03], :infinity, nil] do
+        assert_raise NimbleOptions.ValidationError,
+                     ~r/expected a number, or a list of them/,
+                     fn ->
+                       Plot.geom_abline(plot, intercept: value)
+                     end
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a number/, fn ->
+        Plot.geom_abline(plot, slope: [1, "steep"])
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :mpg, slope: :cyl})
+        end
+
+      assert error.message ===
+               "Plot.geom_abline/3 maps :slope to \"cyl\", a :string column, but a line is " <>
+                 "drawn at y = intercept + slope * x, so it must be a number"
+
+      intercept =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :cyl, slope: :mpg})
+        end
+
+      assert String.starts_with?(intercept.message, "Plot.geom_abline/3 maps :intercept to")
+    end
+
+    test "a line takes the options a reference line has, and no other" do
+      plot = Plot.new(@rows)
+
+      for option <- [arrow: true, position: :identity, size: 2, linejoin: :round, yintercept: 1] do
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_abline(plot, [option]) end
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows)
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_abline(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_abline, 3}
+      end
+    end
+  end
+
   describe "annotate/3" do
     test "a bar annotation's width is checked as each bar's, and its just: as geom_col/3's" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
@@ -3764,7 +3941,7 @@ defmodule Giggly.PlotTest do
     test "a reference line is refused, naming the function that draws it" do
       plot = Plot.new(@rows)
 
-      for geom <- [:hline, :vline] do
+      for geom <- [:abline, :hline, :vline] do
         error = assert_raise ArgumentError, fn -> Plot.annotate(plot, geom, x: 1) end
 
         assert error.message ===

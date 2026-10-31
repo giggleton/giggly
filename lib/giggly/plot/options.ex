@@ -1467,8 +1467,9 @@ defmodule Giggly.Plot.Options do
     type: :any,
     doc:
       "A table for the layer's mapping to draw from instead of the plot's data, anything " <>
-        "implementing `Table.Reader`; refused beside the intercept's option, which draws lines " <>
-        "of its own. Under a facet, a table lacking a faceting column is drawn in every panel."
+        "implementing `Table.Reader`; refused beside the options giving lines as values, which " <>
+        "draw lines of their own. Under a facet, a table lacking a faceting column is drawn in " <>
+        "every panel."
   ]
 
   # How every reference line looks, each set by an option: one value, or beside the intercept's
@@ -1533,6 +1534,37 @@ defmodule Giggly.Plot.Options do
                        )
                    ] ++ @reference_line_look_options
                  )
+
+  # A diagonal line's intercept or slope, given as a value: a number, or a list of them, one per
+  # line.
+  @abline_coefficient [
+    type: {:custom, __MODULE__, :validate_per_annotation, [:validate_coefficient]}
+  ]
+
+  # `geom_abline/3`'s options, validated at the call.
+  @abline_options NimbleOptions.new!(
+                    [
+                      data: @reference_line_data_option,
+                      intercept:
+                        Keyword.put(
+                          @abline_coefficient,
+                          :doc,
+                          "Where each line crosses x = 0, in the y axis's positions, the units " <>
+                            "its scale transforms into: a number, or a list of them, a line for " <>
+                            "each, drawn in every panel; 0 when only `slope:` is given. Given, " <>
+                            "the layer takes no mapping and no `data:`."
+                        ),
+                      slope:
+                        Keyword.put(
+                          @abline_coefficient,
+                          :doc,
+                          "How far each line rises along y for each unit along x, in the " <>
+                            "axes' positions: a number, or a list of them, a line for each; 1 " <>
+                            "when only `intercept:` is given. Given, the layer takes no mapping " <>
+                            "and no `data:`."
+                        )
+                    ] ++ @reference_line_look_options
+                  )
 
   @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :rect]
   @annotation_options %{
@@ -3246,6 +3278,10 @@ defmodule Giggly.Plot.Options do
   def rug, do: @rug_options
 
   @doc false
+  @spec abline() :: NimbleOptions.t()
+  def abline, do: @abline_options
+
+  @doc false
   @spec hline() :: NimbleOptions.t()
   def hline, do: @hline_options
 
@@ -3986,6 +4022,15 @@ defmodule Giggly.Plot.Options do
 
   def validate_nudge(distance),
     do: {:error, "expected a distance along the axis, a number, got: #{inspect(distance)}"}
+
+  # NimbleOptions' check of a diagonal line's intercept or slope: any number, kept as a float, as
+  # R keeps one.
+  @doc false
+  @spec validate_coefficient(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_coefficient(coefficient) when is_number(coefficient), do: {:ok, coefficient / 1}
+
+  def validate_coefficient(coefficient),
+    do: {:error, "expected a number, or a list of them, got: #{inspect(coefficient)}"}
 
   # NimbleOptions' check of a scale's limits: `{low, high}`, each a number, kept as a float, or
   # `nil` for an end the data decides, in either order, which the scale sorts once transformed.

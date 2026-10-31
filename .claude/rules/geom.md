@@ -219,6 +219,18 @@ beginning "Each layer's defaults are filled in from the theme".
   one a spoke under radial coordinates; `layer_data/2` keeps every row. Its look is a path's; a
   horizontal line's key is a path's, a vertical one's `draw_key_vline()`'s, up the key's middle
   from bottom to top (`Path.line_key/4`, which every line key shares), each needing a path's room.
+  **A diagonal line (`Geom.Abline`) is drawn as `GeomAbline` draws one**: the extents, each
+  widened by its own width each side where `Coord.linear?/1` and `Coord.clip/1` is `:on`; each
+  distinct row's x where its y meets the y extent's ends, `(y - intercept) / slope`, the lesser
+  no lower than x's start and the greater no higher than its end, and y `intercept + slope * x`
+  at both, in R's arithmetic (`DataFrame.Arithmetic`), so a flat line runs the x extent from the
+  division's infinities, a NaN end drops the row, and a line missing the panel is drawn beyond it
+  (design-log §4, the entry beginning "A reference line is drawn from the panel's extents"); the
+  rows, intercept and slope kept, are drawn as segments as a horizontal line's are. Repeats are
+  dropped before the arithmetic, which drops what `unique0()` drops after, since a row's ends
+  follow from the columns it keeps. Its intercept and slope must be numbers, an expression's
+  refused in `setup_data/3`; its key is `draw_key_abline()`'s, corner to corner, needing a
+  path's room.
 - **A hexagon (`Geom.Hex`) is drawn as ggplot2's `GeomHex` draws one**: per panel, group by
   group, in row order, each row with a place its six corners round its centre, half its group's
   first row's `width` across and its `height` over √3 and over 2 up, twice that at its top and

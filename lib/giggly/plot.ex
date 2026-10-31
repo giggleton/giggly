@@ -278,7 +278,7 @@ defmodule Giggly.Plot do
 
   # The reference lines, which ggplot2's `annotate()` refuses to draw, since each annotates on its
   # own.
-  @reference_line_geoms [:hline, :vline]
+  @reference_line_geoms [:abline, :hline, :vline]
   @theme_drawn_kinds Options.theme_drawn_kinds()
 
   # What every function choosing a complete theme does to the plot's theme and the settings laid
@@ -1324,6 +1324,87 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of diagonal reference lines: a line across the whole panel for each `intercept`
+  and `slope`, `y = intercept + slope * x`, for a line of equality, a fitted line worked out
+  elsewhere, or a rule of thumb drawn over the data.
+
+  The lines are given in one of two ways. `intercept:` and `slope:` give them as values, a line
+  for each, drawn in every panel and in no legend; given neither, nor a mapping, the layer draws
+  the line `y = x`. Or the layer maps both `:intercept` and `:slope` from a table, its own
+  `data:` or the plot's, so the lines can differ from panel to panel under a facet and map a
+  colour, alpha, width or line type into a legend. Either way the layer takes nothing from the
+  plot's mapping, and titles no axis.
+
+  Diagonal lines use `:intercept`, `:slope`, `:group`, `:alpha`, `:color`, `:linetype` and
+  `:linewidth`, and need `:intercept` and `:slope`, numbers in the axes' positions, the units
+  their scales transform into, so under `scale_y_log10/2` an intercept of 1 crosses at 10; on a
+  discrete axis the levels sit at 1, 2, 3 and on. Neither widens an axis or goes through a
+  scale. A line repeated in a panel is drawn once. Beside `intercept:` or `slope:`, each look
+  option takes one value or a list, one per line, every list as long as the others. A line
+  missing its intercept or slope draws nothing, and so do an infinite one, a colour of `:none`
+  and the line type `:blank`. A line that misses the panel is still drawn, beyond its edges:
+  hidden where the panel is clipped, but under `coord_cartesian(clip: :off)` and
+  `coord_radial/1`, which never clips, it may show outside the panel, a spiral under radial
+  coordinates. A flat line exactly on the edge of such a panel draws nothing.
+
+  Raises `ArgumentError` for `intercept:` or `slope:` beside a mapping or `data:`, for `data:`
+  without a mapping, for a list of looks without `intercept:` or `slope:`, for lists of
+  different lengths, and for a mapped intercept or slope that is not a number.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.abline())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.geom_abline(intercept: 37, slope: [-5, -4], colour: "red")
+      ...>   |> Giggly.layer_data(1)
+      iex> {Giggly.DataFrame.pull(frame, :intercept), Giggly.DataFrame.pull(frame, :slope)}
+      {[37.0, 37.0], [-5.0, -4.0]}
+
+  A line for each panel, mapped from a table of its own:
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7], "cyl" => [4, 8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.geom_abline(%{intercept: :intercept, slope: :slope},
+      ...>     data: %{"cyl" => [4, 8], "intercept" => [40.0, 20.0], "slope" => [-5.0, -1.0]}
+      ...>   )
+      ...>   |> Giggly.Plot.facet_wrap(:cyl)
+      ...>   |> Giggly.layer_data(1)
+      iex> {Giggly.DataFrame.pull(frame, :slope), Giggly.DataFrame.pull(frame, :panel)}
+      {[-5.0, -1.0], [1, 2]}
+  """
+  @spec geom_abline(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_abline(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_abline(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_abline(plot, %{}, options)
+
+  def geom_abline(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.abline())
+
+    reference_line_layer(
+      plot,
+      mapping,
+      abline_values(mapping, validated),
+      %Geom.Abline{line_end: Keyword.fetch!(validated, :lineend)},
+      [:intercept, :slope],
+      "Plot.geom_abline/3",
+      accepted: Geom.Abline.accepted_aesthetics(),
+      required: Geom.Abline.required_aesthetics(),
+      numbers: [
+        intercept: "a line is drawn at y = intercept + slope * x",
+        slope: "a line is drawn at y = intercept + slope * x"
+      ]
+    )
+  end
+
+  @doc """
   Adds a layer of ribbons: the band between each group's `ymin` and `ymax` along its `x`, for a
   range around a line, or between its `xmin` and `xmax` up its `y`.
 
@@ -1816,7 +1897,7 @@ defmodule Giggly.Plot do
       `linetype:`.
 
   The reference lines are not among them: each annotates on its own, given its lines as values
-  (`geom_hline/3`, `geom_vline/3`).
+  (`geom_hline/3`, `geom_vline/3`, `geom_abline/3`).
 
   Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, for a
   list whose values are not of one type, and for an aesthetic the geom needs and is not given;
@@ -5323,7 +5404,9 @@ defmodule Giggly.Plot do
           inherit: false
         }
 
-        add_layer(plot, layer, function, [unmet: unmet] ++ facts)
+        plot
+        |> add_layer(layer, function, [unmet: unmet] ++ facts)
+        |> check_all_numbers(layer, function, Keyword.get(facts, :numbers, []))
 
       given ->
         check_given_alone(mapping, others, given, function)
@@ -5341,6 +5424,38 @@ defmodule Giggly.Plot do
   end
 
   defp options_named(names), do: Enum.map_join(names, " or ", fn name -> "#{name}:" end)
+
+  # A diagonal line's values as ggplot2's `geom_abline()` fills them in: given neither a mapping
+  # nor a value, the line `y = x`; given either value, the other's default, a slope of 1 or an
+  # intercept of 0. Beside a mapping or `data:` the values are left as given, for
+  # `reference_line_layer/7` to refuse naming those the caller wrote; `data:` with neither would
+  # draw nothing of its own, which ggplot2 warns of and ignores, drawing `y = x`.
+  defp abline_values(mapping, validated) when map_size(mapping) > 0, do: validated
+
+  defp abline_values(_mapping, validated) do
+    validated
+    |> Keyword.take([:intercept, :slope])
+    |> with_abline_defaults(Keyword.has_key?(validated, :data), validated)
+  end
+
+  defp with_abline_defaults([], true, _validated) do
+    raise ArgumentError,
+          "Plot.geom_abline/3 given no mapping, intercept: or slope: draws the line y = x, so it " <>
+            "takes no data:; map :intercept and :slope to draw lines from the table"
+  end
+
+  defp with_abline_defaults(_given, true, validated), do: validated
+
+  defp with_abline_defaults(_given, false, validated),
+    do: Keyword.merge([intercept: 0.0, slope: 1.0], validated)
+
+  # The plot, once each column the layer maps an aesthetic of `numbers` to, where the call can
+  # tell its type, is found to hold numbers, for the reason `numbers` gives.
+  defp check_all_numbers(plot, layer, function, numbers) do
+    Enum.reduce(numbers, plot, fn {aesthetic, reason}, checked ->
+      check_numbers(checked, layer, function, aesthetic, reason)
+    end)
+  end
 
   # A reference line's options give lines of their own, so a mapping or a table beside them would
   # draw nothing, which ggplot2 warns of and ignores.

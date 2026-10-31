@@ -4447,6 +4447,95 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for diagonal lines" do
+    setup do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_point()
+
+      %{plot: plot}
+    end
+
+    # ggplot2 4.0.3: the y axis of `p + geom_abline(intercept = 100)` runs 9.2249999999999996 to
+    # 35.074999999999996, as the points' alone; under `scale_y_log10()` an intercept of 1 is still 1
+    # in `layer_data()`.
+    test "a line's intercept and slope train no axis and go through no scale", %{plot: plot} do
+      assembled =
+        plot
+        |> Plot.geom_abline(intercept: 100)
+        |> Giggly.Assembly.run()
+
+      logged =
+        plot
+        |> Plot.geom_abline(intercept: 1, slope: 0.1)
+        |> Plot.scale_y_log10()
+        |> Giggly.layer_data(1)
+
+      assert %{y: {9.2249999999999996, 35.074999999999996}} =
+               Giggly.Coord.extents(assembled.coord, assembled.panel_params[1])
+
+      assert {DataFrame.pull(logged, :intercept), DataFrame.pull(logged, :slope)} ===
+               {[1.0], [0.1]}
+    end
+
+    # ggplot2 4.0.3's `layer_data()` of `p + geom_abline(intercept = 37, slope = -5)`:
+    # `intercept`, `slope`, `PANEL`, `group`, `colour` "black", `linewidth`, `linetype` and
+    # `alpha`; the plot's colour reaches no reference line.
+    test "a line takes nothing from the plot's mapping", %{plot: plot} do
+      frame =
+        plot
+        |> Plot.geom_abline(intercept: 37, slope: -5)
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.names(frame) ===
+               [:intercept, :slope, :panel, :group, :color, :linewidth, :linetype, :alpha]
+
+      assert DataFrame.pull(frame, :color) === ["#000000"]
+    end
+
+    # ggplot2 4.0.3's `ggplot(mtcars, aes(wt, mpg)) + geom_abline(aes(intercept = cyl * 3, slope =
+    # 1))`: 32 rows in `layer_data()`, three lines drawn, as `unique0()` drops the repeats.
+    test "a line mapped from every row is drawn once for each distinct row" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_abline(%{intercept: :cyl, slope: 1})
+
+      svg =
+        plot
+        |> Plot.theme_void()
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      rows =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.row_count()
+
+      lines = Regex.scan(~r/<line /, svg)
+
+      assert {rows, Enum.count(lines)} === {32, 3}
+    end
+
+    # ggplot2 4.0.3: `ggplot() + geom_abline()` draws y = x, titling no axis, both axes running
+    # -0.05 to 1.05, and the line from the widened extents' corner to corner, (-1, -1) to (2, 2) in
+    # the panel's units.
+    test "a plot of the line y = x alone takes R's default extents and titles no axis" do
+      plot =
+        %{"unused" => [1]}
+        |> Plot.new()
+        |> Plot.geom_abline()
+
+      assembled = Giggly.Assembly.run(plot)
+
+      assert assembled.guide_titles === %{x: :none, y: :none}
+
+      assert Giggly.Coord.extents(assembled.coord, assembled.panel_params[1]) ===
+               %{x: {-0.05, 1.05}, y: {-0.05, 1.05}}
+    end
+  end
+
   describe "layer_data/2, for geom_area" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(crossing, aes(x, y, fill = g))
     # + geom_area()`, `a` at y 1 and `b` from -1 to 1 at x 1 and 3, printed to 17 significant
@@ -10804,6 +10893,72 @@ defmodule GigglyTest do
         |> Plot.coord_radial()
 
       assert golden?(plot, "reference_line_radial")
+    end
+
+    # Golden: test/golden/abline.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/abline.R: every element and clip path matches, the x axis drawn before the y as in
+    # test/golden/point.svg. The reference page's two diagonal lines and two more each in its own
+    # colour and width, ended round, one flat, each running between the widened extents.
+    test "diagonal lines given as values cross the whole panel, each in its own look" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_abline(intercept: 37, slope: -5)
+        |> Plot.geom_abline(intercept: 20)
+        |> Plot.geom_abline(
+          intercept: [10, 30],
+          slope: [2, 0],
+          colour: ["red", "blue"],
+          linewidth: [1, 2],
+          lineend: :round
+        )
+
+      assert golden?(plot, "abline")
+    end
+
+    # Golden: test/golden/abline_keys.svg, checked against ggplot2's drawing of the same plot, made
+    # by test/golden/abline_keys.R: every element matches, in order, and every clip path. Lines
+    # from a table of their own differ between panels, and each key runs corner to corner in the
+    # key's colour and line type, ended square.
+    test "mapped diagonal lines differ between panels, each key running corner to corner" do
+      lines = %{
+        "cyl" => [4.0, 6.0, 8.0, 8.0],
+        "intercept" => [40, 30, 25, 20],
+        "slope" => [-5, -3, -2, -1],
+        "kind" => ["steep", "steep", "steep", "shallow"]
+      }
+
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_abline(
+          %{intercept: :intercept, slope: :slope, colour: :kind, linetype: :kind},
+          data: lines,
+          lineend: :square
+        )
+        |> Plot.facet_wrap(:cyl)
+
+      assert golden?(plot, "abline_keys")
+    end
+
+    # Golden: test/golden/abline_radial.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/abline_radial.R: every element matches, in order, once positions are
+    # rounded to two decimals, and every clip path but svglite's around the whole drawing. A line
+    # crossing the panel is munched between the extents, not widened, and one missing it is drawn
+    # as R draws it, a spiral of 5,138 points outside the panel. It moves with what moves
+    # test/golden/segment_radial.svg.
+    test "in radial coordinates a diagonal line follows the curves, and one missing the panel spirals round it" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_abline(intercept: 37, slope: -5, colour: "blue")
+        |> Plot.geom_abline(intercept: 100, slope: 1, colour: "red")
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "abline_radial")
     end
 
     # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made
