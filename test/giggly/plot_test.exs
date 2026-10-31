@@ -3755,11 +3755,13 @@ defmodule Giggly.PlotTest do
                "Plot.geom_abline/3 draws the lines slope: gives, so it takes no mapping, got: " <>
                  "%{intercept: :wt}"
 
-      data =
-        assert_raise ArgumentError, fn -> Plot.geom_abline(plot, intercept: 2, data: @rows) end
+      for {given, named} <- [{[intercept: 2], "intercept:"}, {[slope: 2], "slope:"}] do
+        data =
+          assert_raise ArgumentError, fn -> Plot.geom_abline(plot, [{:data, @rows} | given]) end
 
-      assert data.message ===
-               "Plot.geom_abline/3 draws the lines intercept: gives, so it takes no data:"
+        assert data.message ===
+                 "Plot.geom_abline/3 draws the lines #{named} gives, so it takes no data:"
+      end
 
       alone = assert_raise ArgumentError, fn -> Plot.geom_abline(plot, data: @rows) end
 
@@ -3803,11 +3805,12 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for value <- ["a", ~D[2020-01-03], :infinity, nil] do
-        assert_raise NimbleOptions.ValidationError,
-                     ~r/expected a number, or a list of them/,
-                     fn ->
-                       Plot.geom_abline(plot, intercept: value)
-                     end
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_abline(plot, intercept: value)
+          end
+
+        assert error.message =~ "expected a number, or a list of them, got: #{inspect(value)}"
       end
 
       assert_raise NimbleOptions.ValidationError, ~r/expected a number/, fn ->
@@ -3828,7 +3831,9 @@ defmodule Giggly.PlotTest do
           Plot.geom_abline(plot, %{intercept: :cyl, slope: :mpg})
         end
 
-      assert String.starts_with?(intercept.message, "Plot.geom_abline/3 maps :intercept to")
+      assert intercept.message ===
+               "Plot.geom_abline/3 maps :intercept to \"cyl\", a :string column, but a line " <>
+                 "is drawn at y = intercept + slope * x, so it must be a number"
     end
 
     test "a line takes the options a reference line has, and no other" do
