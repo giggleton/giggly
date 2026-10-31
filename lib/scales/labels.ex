@@ -1145,8 +1145,8 @@ defmodule Scales.Labels do
 
   defp sign_of(:infinity), do: 1
   defp sign_of(:neg_infinity), do: -1
-  defp sign_of(value) when value > 0, do: 1
-  defp sign_of(value) when value < 0, do: -1
+  defp sign_of(value) when is_float(value) and value > 0, do: 1
+  defp sign_of(value) when is_float(value) and value < 0, do: -1
   defp sign_of(_zero), do: 0
 
   # Each number with its text, written with the others sharing its decimal count, as R's
@@ -1283,24 +1283,25 @@ defmodule Scales.Labels do
   defp logged(value, true), do: abs(value)
   defp logged(value, false), do: value
 
+  # Signed, a zero is labelled `"0"` before its sign is asked for.
   defp sign(value, true) when value > 0, do: "+"
-  defp sign(value, true) when value < 0, do: "-"
+  defp sign(_negative, true), do: "-"
   defp sign(_value, false), do: ""
 
   # R's `zapsmall()`: each exponent rounded to the decimals that leave the largest seven
-  # significant digits, or seven decimals when every one is 0.
+  # significant digits; every one 0, or missing, is left as it is, as rounding leaves it.
   defp zapped(exponents) do
-    case for exponent <- exponents, exponent != nil, do: abs(exponent) do
-      [] ->
-        exponents
+    largest =
+      exponents
+      |> Enum.reject(&is_nil/1)
+      |> Enum.map(&abs/1)
+      |> Enum.max(fn -> 0 end)
 
-      magnitudes ->
-        largest = Enum.max(magnitudes)
-
-        decimals =
-          if largest > 0, do: max(0, @format_digits - :math.log10(largest)), else: @format_digits
-
-        Enum.map(exponents, fn exponent -> exponent && Arithmetic.round_to(exponent, decimals) end)
+    if largest == 0 do
+      exponents
+    else
+      decimals = max(0, @format_digits - :math.log10(largest))
+      Enum.map(exponents, fn exponent -> exponent && Arithmetic.round_to(exponent, decimals) end)
     end
   end
 

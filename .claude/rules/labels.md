@@ -4,6 +4,7 @@ paths:
   - "lib/scales/labels/**"
   - "test/scales/labels_test.exs"
   - "test/scales/labels_format_test.exs"
+  - "test/scales/labels_arithmetic_test.exs"
 ---
 
 # Labels

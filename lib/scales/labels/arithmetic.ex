@@ -12,9 +12,10 @@ defmodule Scales.Labels.Arithmetic do
   #   1.5, where `format(0.15, digits = 1)`, from the exact value, writes `0.1`.
   # - `round_to/2` is R's `round(x, digits)`, `fround()` in `nmath/fround.c`: the digits rounded
   #   half up, then the nearer of the number rounded down and up to them, measured in floats, a
-  #   tie to the even. Only `zapsmall()`'s digits reach it, which leave every number at most
-  #   about seven significant digits, so R's branches for a number already within 15 of them and
-  #   for digits past 308 are never taken and are left out.
+  #   tie to the even; a zero comes out a zero, as R returns it. Only `zapsmall()`'s digits
+  #   reach it, which leave every number at most about seven significant digits, so R's
+  #   branches for a number already within 15 of them and for digits past 308 are never taken
+  #   and are left out.
   # - A power of ten is R's `R_pow_di()`, by repeated squaring, which is exact to 1e22 and lands
   #   on R's own double past it.
   # - A logarithm is R's `log(x, base)`: base 10 and 2 their own functions, any other the ratio
@@ -79,7 +80,6 @@ defmodule Scales.Labels.Arithmetic do
   # `value` rounded to `digits` decimals, as R's `round()` rounds it.
   @doc false
   @spec round_to(float(), number()) :: float()
-  def round_to(value, _digits) when value == 0, do: value
   def round_to(value, digits) when digits == 0, do: nearest(value)
 
   def round_to(value, digits) do
@@ -151,8 +151,6 @@ defmodule Scales.Labels.Arithmetic do
   # reciprocal of the positive.
   defp power_of_ten(power) when power < 0, do: 1 / power_of_ten(-power)
   defp power_of_ten(power), do: squared(10.0, power, 1.0)
-
-  defp squared(_base, 0, product), do: product
 
   defp squared(base, power, product) do
     product = if rem(power, 2) == 1, do: product * base, else: product

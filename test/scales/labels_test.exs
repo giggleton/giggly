@@ -504,6 +504,12 @@ defmodule Scales.LabelsTest do
       assert Labels.number([-1.0e307, 1], scale: 100, style_negative: :minus) == ["−Inf", "100"]
     end
 
+    test "is Inf where rounding to the accuracy takes it past" do
+      # label_number(accuracy = 1e308)(c(1.79e308, 1e308)), the second label's start
+      assert ["Inf", "100 000 000 000 000 001 097 906" <> _rest] =
+               Labels.number([1.79e308, 1.0e308], accuracy: 1.0e308)
+    end
+
     test "keeps its prefix and suffix when only the scaling passes it" do
       # label_number(scale = 100, accuracy = 1000, prefix = "$", suffix = "!")(c(1e307, 5));
       # prefix = "$", trim = FALSE on c(1e307, 5, -1e307)
@@ -522,7 +528,9 @@ defmodule Scales.LabelsTest do
       # label_comma(scale = 100)(c(1e307, 1234, NA)); label_percent()(c(1e307, 0.5));
       # label_currency(scale = 100)(c(1e307, 1.5, 2)); label_number(scale = 100, scale_cut =
       # cut_short_scale())(c(1e307, 1500, 2500)); suffix = "m", prefix = "$", accuracy = 1e6 on
-      # c(1e307, 15); label_number(scale = 1e300)(c(1e10, 1)), the second label's start
+      # c(1e307, 15); label_number(scale = 1e300)(c(1e10, 1)), the second label's start;
+      # scale = 100 on c(1e307, 1, 1.5); label_number()(c(-1e308, 1e308)), whose gap passes the
+      # largest double, the labels' starts and lengths
       assert Labels.comma([1.0e307, 1234, nil], scale: 100) == ["Inf", "123,400", nil]
       assert Labels.percent([1.0e307, 0.5]) == ["Inf", "50%"]
       assert Labels.currency([1.0e307, 1.5, 2], scale: 100) == ["Inf", "$150", "$200"]
@@ -540,6 +548,15 @@ defmodule Scales.LabelsTest do
 
       assert ["Inf", "999 999 999 999 999 903 803 069" <> _rest] =
                Labels.number([1.0e10, 1], scale: 1.0e300)
+
+      assert Labels.number([1.0e307, 1, 1.5], scale: 100) == ["Inf", "100", "150"]
+
+      assert [
+               "-100 000 000 000 000 001 097 9" <> _negative,
+               "100 000 000 000 000 001 097 90" <> _positive
+             ] = labels = Labels.number([-1.0e308, 1.0e308])
+
+      assert Enum.map(labels, &String.length/1) == [412, 411]
     end
 
     test "is Inf in scientific notation, inside its prefix and suffix" do
@@ -562,6 +579,11 @@ defmodule Scales.LabelsTest do
 
       assert Labels.scientific([2.675, 1.005, 0.125]) == ["2.68e+00", "1.00e+00", "1.25e-01"]
 
+      # digits = 1 on c(650000); digits = 2 on c(1250000, 1450000): divided by the power of
+      # ten, 6.5 rounds to 6, where multiplying by its reciprocal lands above the half
+      assert Labels.scientific([650_000], digits: 1) == ["6e+05"]
+      assert Labels.scientific([1_250_000, 1_450_000], digits: 2) == ["1.2e+06", "1.4e+06"]
+
       assert Labels.scientific([0.125, 0.375, 12.5], digits: 2) == [
                "1.2e-01",
                "3.8e-01",
@@ -580,10 +602,21 @@ defmodule Scales.LabelsTest do
     end
 
     test "rounds the largest and smallest doubles in R's two steps" do
-      # label_scientific(digits = 2)(c(1.09e308, 1.234_5e307, 1.75e306));
-      # digits = 3 on c(6.2097656959666999e-311, 1.23456e-307, 2.5e-306)
+      # label_scientific(digits = 2)(c(1.09e308, 1.2345e307, 1.75e306)); c(1.79e308,
+      # 1.7976931348623157e308), which R rounds down; digits = 3 on c(6.2097656959666999e-311,
+      # 1.23456e-307, 2.5e-306); digits = 1 on 2.5e306, 2.5e-306 and c(2.5e305, 2.5e-305,
+      # 3.5e306, 3.5e-306), either side of the branch
       assert Labels.scientific([1.09e308, 1.234_5e307, 1.75e306], digits: 2) ==
                ["1.1e+308", "1.2e+307", "1.7e+306"]
+
+      assert Labels.scientific([1.79e308, 1.797_693_134_862_315_7e308], digits: 2) ==
+               ["1.7e+308", "1.7e+308"]
+
+      assert Labels.scientific([2.5e306], digits: 1) == ["2e+306"]
+      assert Labels.scientific([2.5e-306], digits: 1) == ["3e-306"]
+
+      assert Labels.scientific([2.5e305, 2.5e-305, 3.5e306, 3.5e-306], digits: 1) ==
+               ["2e+305", "3e-305", "3e+306", "4e-306"]
 
       assert Labels.scientific([6.2097656959666999e-311, 1.23456e-307, 2.5e-306], digits: 3) ==
                ["6.21e-311", "1.23e-307", "2.50e-306"]
@@ -591,9 +624,10 @@ defmodule Scales.LabelsTest do
 
     test "scales a number below 1e-287 by its digits in two powers" do
       # label_scientific(digits = 22)(c(1.234567890123456789e-300));
-      # digits = 15 on c(1.5e-290, 2.5e-300)
+      # digits = 15 on c(1.5e-290, 2.5e-300); digits = 9 on c(1.234567e-303)
       assert Labels.scientific([1.234567890123456789e-300], digits: 22) == ["1.234568e-300"]
       assert Labels.scientific([1.5e-290, 2.5e-300], digits: 15) == ["1.5e-290", "2.5e-300"]
+      assert Labels.scientific([1.234567e-303], digits: 9) == ["1.234567e-303"]
     end
 
     test "writes the sign, a zero, the scale and the marks, and no label for a missing break" do
@@ -612,7 +646,7 @@ defmodule Scales.LabelsTest do
   describe "number_auto/1" do
     test "writes breaks past a million in whole numbers or scientific notation, the shorter" do
       # label_number_auto()(c(0, 2e6, 4e6)); c(1, 1e7, 123456789); c(0, 1.5e6, 2e6, 2.5e6);
-      # c(-3e6, 0, 3e6); c(1e6, 1000001); c(0, 1e6)
+      # c(-3e6, 0, 3e6); c(1e6, 1000001); c(0, 1e6); c(0, 1000000.5); c(1000, 2e6), a tie
       assert Labels.number_auto([0, 2.0e6, 4.0e6]) == ["0", "2e+06", "4e+06"]
       assert Labels.number_auto([1, 1.0e7, 123_456_789]) == ["1", "10 000 000", "123 456 789"]
 
@@ -622,6 +656,8 @@ defmodule Scales.LabelsTest do
       assert Labels.number_auto([-3.0e6, 0, 3.0e6]) == ["-3e+06", "0", "3e+06"]
       assert Labels.number_auto([1.0e6, 1_000_001]) == ["1 000 000", "1 000 001"]
       assert Labels.number_auto([0, 1.0e6]) == ["0", "1 000 000"]
+      assert Labels.number_auto([0, 1_000_000.5]) == ["0", "1e+06"]
+      assert Labels.number_auto([1000, 2.0e6]) == ["1 000", "2e+06"]
     end
 
     test "writes breaks below 0.001 in plain decimals or scientific notation, the shorter" do
@@ -651,7 +687,7 @@ defmodule Scales.LabelsTest do
 
     test "writes breaks past 1000 in whole numbers, and the rest as R's format() does" do
       # label_number_auto()(c(0, 5000, 10000)); c(1000.5, 2500); c(-1500, 1500); c(0, 0.5, 1);
-      # c(0.1234567891, 1); c(0.001, 1000); c(0, 0); c(1000, 1000.5)
+      # c(0.1234567891, 1); c(0.001, 1000); c(0, 0); c(1000, 1000.5); c(0, 1000.5)
       assert Labels.number_auto([0, 5000, 10_000]) == ["0", "5 000", "10 000"]
       assert Labels.number_auto([1000.5, 2500]) == ["1 000", "2 500"]
       assert Labels.number_auto([-1500, 1500]) == ["-1 500", "1 500"]
@@ -660,6 +696,7 @@ defmodule Scales.LabelsTest do
       assert Labels.number_auto([0.001, 1000]) == ["1e-03", "1e+03"]
       assert Labels.number_auto([0, 0]) == ["0", "0"]
       assert Labels.number_auto([1000, 1000.5]) == ["1000.0", "1000.5"]
+      assert Labels.number_auto([0, 1000.5]) == ["0", "1 000"]
       assert Labels.number_auto([]) == []
     end
 
@@ -695,11 +732,13 @@ defmodule Scales.LabelsTest do
     end
 
     test "signs each power and writes a zero 0, when signed" do
-      # format_log(c(-100, 0, 100)); c(-100, NA, 100); signed = TRUE on c(1, 100); c(-0.5, 2)
+      # format_log(c(-100, 0, 100)); c(-100, NA, 100); signed = TRUE on c(1, 100); c(-0.5, 2);
+      # c(0, 10, 100), a zero signing them alone
       assert Labels.format_log([-100, 0, 100]) == ["-10^2", "0", "+10^2"]
       assert Labels.format_log([-100, nil, 100]) == ["-10^ 2", nil, "+10^ 2"]
       assert Labels.format_log([1, 100], signed: true) == ["+10^0", "+10^2"]
       assert Labels.format_log([-0.5, 2]) == ["-10^-0.30103", "+10^ 0.30103"]
+      assert Labels.format_log([0, 10, 100]) == ["0", "+10^1", "+10^2"]
     end
 
     test "writes the base as R writes a number alone" do
@@ -725,20 +764,30 @@ defmodule Scales.LabelsTest do
     end
 
     test "rounds the exponents as R's zapsmall() does first" do
-      # format_log(c(1, 1e300), base = 1.0001, digits = 3); c(1, 1e300), base = 1.0001;
-      # c(1, 1 + 1e-10)
+      # format_log(c(1, 1e300), base = 1.0001, digits = 3); c(1, 1e300), base = 1.0001; the
+      # same with digits = 9, rounded whole; c(1, 1e300), base = 1.00001, past 1e7;
+      # c(1, 1 + 1e-10); c(1), every exponent 0
       assert Labels.format_log([1, 1.0e300], base: 1.0001, digits: 3) ==
                ["1.0001^      0", "1.0001^6908101"]
 
       assert Labels.format_log([1, 1.0e300], base: 1.0001) == ["1.0001^      0", "1.0001^6908101"]
+
+      assert Labels.format_log([1, 1.0e300], base: 1.0001, digits: 9) ==
+               ["1.0001^      0", "1.0001^6908101"]
+
+      assert Labels.format_log([1, 1.0e300], base: 1.000_01) ==
+               ["1.00001^       0", "1.00001^69077898"]
+
       assert Labels.format_log([1, 1 + 1.0e-10]) == ["10^0.000000e+00", "10^4.342945e-11"]
+      assert Labels.format_log([1]) == ["10^0"]
     end
   end
 
   describe "log/2" do
     test "gives each break's power, its exponent read back and written alone" do
       # label_log()(c(0.01, 1, 100, 1e5)); c(1, 10, NA); c(0.5, 2, 8); c(1, 2, 3); 10^c(-2.5,
-      # 0, 2.5); c(1e-300, 1e300); c(1, 1 + 1e-10), each deparsed
+      # 0, 2.5); c(1e-300, 1e300); c(1, 1 + 1e-10); c(1); c(1, 1e300), base = 1.00001, each
+      # deparsed
       assert Labels.log([0.01, 1, 100, 1.0e5]) == [
                {:power, "10", "-2"},
                {:power, "10", "0"},
@@ -759,6 +808,11 @@ defmodule Scales.LabelsTest do
 
       assert Labels.log([1.0e-300, 1.0e300]) == [{:power, "10", "-300"}, {:power, "10", "300"}]
       assert Labels.log([1, 1 + 1.0e-10]) == [{:power, "10", "0"}, {:power, "10", "4.34e-11"}]
+      assert Labels.log([1]) == [{:power, "10", "0"}]
+
+      assert Labels.log([1, 1.0e300], base: 1.000_01) ==
+               [{:power, "1.00001", "0"}, {:power, "1.00001", "69077898"}]
+
       assert Labels.log([]) == []
     end
 
@@ -771,7 +825,7 @@ defmodule Scales.LabelsTest do
     end
 
     test "puts each sign before its power, and labels a zero 0, when signed" do
-      # label_log()(c(-100, 0, 100)); signed = TRUE on c(1, 100); c(-0.5, 2)
+      # label_log()(c(-100, 0, 100)); signed = TRUE on c(1, 100); c(-0.5, 2); c(0, 10, 100)
       assert Labels.log([-100, 0, 100]) == [
                {:signed, "-", {:power, "10", "2"}},
                "0",
@@ -783,6 +837,9 @@ defmodule Scales.LabelsTest do
 
       assert Labels.log([-0.5, 2]) ==
                [{:signed, "-", {:power, "10", "-0.301"}}, {:signed, "+", {:power, "10", "0.301"}}]
+
+      assert Labels.log([0, 10, 100]) ==
+               ["0", {:signed, "+", {:power, "10", "1"}}, {:signed, "+", {:power, "10", "2"}}]
     end
 
     test "writes the base and the exponents as R deparses them" do
