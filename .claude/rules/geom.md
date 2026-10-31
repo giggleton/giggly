@@ -51,7 +51,8 @@ beginning "Each layer's defaults are filled in from the theme".
   (`Giggly.Resolution`), as ggplot2's `compute_data_size()` does: a bar takes its `width`, the
   one its stat gave it, as counting does, or the layer maps or sets (design-log §4, the entry
   beginning "Bars take R's `width:`"), or else 0.9 of the closest spacing of its x positions, not
-  counting from zero, the smallest found in any panel; the `width` column is then dropped. A
+  counting from zero, a discrete axis's spaced by their gaps too, as `GeomBar` reads no discrete
+  position, the smallest found in any panel; the `width` column is then dropped. A
   width that is not a number is refused when the plot is run. **A bar sits against its x as its
   struct's `just` says**, R's parameter, `x - width * just` to `x + width * (1 - just)`.
 - **A geom calls the coordinate system itself**, as ggplot2's `draw_panel()` calls

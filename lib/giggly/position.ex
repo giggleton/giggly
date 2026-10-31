@@ -25,9 +25,10 @@ defprotocol Giggly.Position do
   # them with their defaults, as ggplot2's position declares its `default_aes`, and the assembly
   # puts them into every row before the position runs.
 
-  # A position is handed a layer's table and returns one, reading and writing its columns through
-  # the data frame, and asks `Giggly.Resolution` how finely its positions are spaced where its
-  # distances are a share of that.
+  # A position is handed a layer's table and whether each axis is discrete, and returns the table,
+  # reading and writing its columns through the data frame, and asks `Giggly.Resolution` how finely
+  # its positions are spaced where its distances are a share of that, 1 on a discrete axis, as
+  # ggplot2's positions read a mapped discrete position.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
   use Boundary,
@@ -36,10 +37,14 @@ defprotocol Giggly.Position do
 
   alias Giggly.DataFrame
 
-  # The layer's table `frame` after `position` has moved its marks: ggplot2's `compute_layer()`.
+  @typedoc "Whether each axis's scale is discrete or continuous."
+  @type axis_kinds :: %{x: :continuous | :discrete, y: :continuous | :discrete}
+
+  # The layer's table `frame` after `position` has moved its marks, each axis's kind in
+  # `axis_kinds`: ggplot2's `compute_layer()`.
   @doc false
-  @spec compute_layer(t(), DataFrame.t()) :: DataFrame.t()
-  def compute_layer(position, frame)
+  @spec compute_layer(t(), DataFrame.t(), axis_kinds()) :: DataFrame.t()
+  def compute_layer(position, frame, axis_kinds)
 
   # The aesthetics `position` reads, each with the value it takes when a layer does not set it:
   # ggplot2's `default_aes` for a position.

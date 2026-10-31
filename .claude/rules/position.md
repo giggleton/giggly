@@ -25,7 +25,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
 - **A position runs after the stat**, on positions: a discrete value is its level's position, so
   a width is a fraction of the spacing between levels.
 - **A position's arguments arrive with their first reader.** Every position is handed the table
-  alone: stacking splits it by the `panel` column itself and reads no scale. A position's own
+  and each axis's kind (`axis_kinds`, as a geom's `setup_data/3` is), which jittering first read,
+  as R's `compute_jitter()` reads a mapped discrete position: stacking splits the table by the
+  `panel` column itself and reads no scale. A position's own
   parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
   them, as dodging by clusters' `preserve`, `padding` and `reverse` arrived with
   `Plot.position_dodge2/1`, its `width` waiting for a geom without edges, and the panel's scales
@@ -67,7 +69,7 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   every column of the x family moves by its row's distance across and every one of the y family
   by its distance up, each drawn from minus to plus its amount, one not given 0.4 of the closest
   spacing of each panel's positions along that axis (`Giggly.Resolution`, not counting from zero,
-  the one position listing it). Each panel draws afresh from the seed, as R sets its seed per
+  the one position listing it), 0.4 on a discrete axis whatever levels a panel holds. Each panel draws afresh from the seed, as R sets its seed per
   panel, two numbers a row, across then up, whatever the amounts, by `:rand`'s `exsss` named,
   never OTP's default, a draw `u` becoming `-amount + 2 * amount * u`, as R's `runif()` scales
   one; the moves are the frame's `+` (`DataFrame.mutate/2`), so a position comes out a double, a

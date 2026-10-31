@@ -16,6 +16,6 @@ defmodule Giggly.Position.Identity do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(_position, frame), do: frame
+    def compute_layer(_position, frame, _axis_kinds), do: frame
   end
 end

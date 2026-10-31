@@ -100,17 +100,15 @@ defmodule Giggly.Geom.Tile do
     defp size_words(:height), do: "tall as its height"
 
     # Each row's width or height, ggplot2's `compute_data_size()` by panel: the one the layer maps
-    # or sets, or else, on a discrete axis, 1, and on a continuous one the closest spacing of the
-    # positions in the row's own panel.
+    # or sets, or else the closest spacing of the positions in the row's own panel, 1 on a discrete
+    # axis.
     defp sizes(frame, position, size, kind) do
-      cond do
-        size in DataFrame.names(frame) -> DataFrame.pull(frame, size)
-        kind == :discrete -> List.duplicate(1, DataFrame.row_count(frame))
-        true -> panel_resolutions(frame, position)
-      end
+      if size in DataFrame.names(frame),
+        do: DataFrame.pull(frame, size),
+        else: panel_resolutions(frame, position, kind == :discrete)
     end
 
-    defp panel_resolutions(frame, position) do
+    defp panel_resolutions(frame, position, discrete) do
       panels = DataFrame.pull(frame, :panel)
 
       resolutions =
@@ -118,7 +116,7 @@ defmodule Giggly.Geom.Tile do
         |> Enum.zip(DataFrame.pull(frame, position))
         |> Enum.group_by(fn {panel, _position} -> panel end, fn {_panel, value} -> value end)
         |> Map.new(fn {panel, panel_positions} ->
-          {panel, Resolution.of(panel_positions, zero: false)}
+          {panel, Resolution.of(panel_positions, zero: false, discrete: discrete)}
         end)
 
       Enum.map(panels, fn panel -> Map.fetch!(resolutions, panel) end)

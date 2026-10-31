@@ -32,7 +32,7 @@ defmodule Giggly.Position.Dodge do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(_position, frame) do
+    def compute_layer(_position, frame, _axis_kinds) do
       flipped = Orientation.flipped?(frame)
 
       frame

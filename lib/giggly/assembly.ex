@@ -326,7 +326,7 @@ defmodule Giggly.Assembly do
 
         position = Plot.layer_position(layer)
         defaulted = set_position_aesthetics(set_up, position, fixed)
-        Position.compute_layer(position, defaulted)
+        Position.compute_layer(position, defaulted, axis_kinds)
       end)
 
     # ggplot2 resets the position scales and trains them again on the marks where they now stand,

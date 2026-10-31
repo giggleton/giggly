@@ -126,7 +126,7 @@ defmodule Giggly.Stat.Boxplot do
       frame
       |> flip(flipped)
       |> at_zero()
-      |> boxes(stat, flipped)
+      |> boxes(stat, flipped, discrete?(axes, if(flipped, do: :y, else: :x)))
       |> flip(flipped)
     end
 
@@ -196,10 +196,10 @@ defmodule Giggly.Stat.Boxplot do
         else: DataFrame.mutate(frame, x: 0.0)
     end
 
-    defp boxes(frame, stat, flipped) do
+    defp boxes(frame, stat, flipped, discrete) do
       names = DataFrame.names(frame)
       carried = Enum.reject(names, fn name -> name in @computed end)
-      default_width = default_width(stat, frame)
+      default_width = default_width(stat, frame, discrete)
       rows = DataFrame.filter(frame, {:and, [{:is_finite, [:x]}, {:is_finite, [:y]}]})
       constant = Carry.constant_columns(rows, carried)
       firsts = for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
@@ -245,15 +245,15 @@ defmodule Giggly.Stat.Boxplot do
       |> DataFrame.select(Enum.map(@computed ++ constant, fn name -> {name, name} end))
     end
 
-    # The stat's width, or else 0.75 of the spacing of the layer's x values counting from zero,
-    # read from every row, as ggplot2 reads it before it drops any.
-    defp default_width(%{width: width}, _frame) when is_number(width), do: width
+    # The stat's width, or else 0.75 of the spacing of the layer's x values counting from zero, 1
+    # on a discrete axis, read from every row, as ggplot2 reads it before it drops any.
+    defp default_width(%{width: width}, _frame, _discrete) when is_number(width), do: width
 
-    defp default_width(%{width: :none}, frame) do
+    defp default_width(%{width: :none}, frame, discrete) do
       frame
       |> DataFrame.summarise([:x], [])
       |> DataFrame.pull(:x)
-      |> Resolution.of(zero: true)
+      |> Resolution.of(zero: true, discrete: discrete)
       |> Kernel.*(@width_share)
     end
 

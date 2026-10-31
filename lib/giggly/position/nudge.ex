@@ -29,7 +29,7 @@ defmodule Giggly.Position.Nudge do
     def default_aesthetics(_position), do: %{nudge_x: 0.0, nudge_y: 0.0}
 
     @impl Giggly.Position
-    def compute_layer(_position, frame) do
+    def compute_layer(_position, frame, _axis_kinds) do
       Enum.reduce(@nudges, frame, fn {family, aesthetic}, nudged ->
         nudge_family(nudged, family, DataFrame.pull(nudged, aesthetic))
       end)

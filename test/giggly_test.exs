@@ -1185,6 +1185,126 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
   # `mpg` where it is used, printed to 17 significant digits. It moves with ggplot2's default alpha
   # scales: a continuous column onto 0.1 to 1, a discrete one spread from 0.1 to 1.
+  describe "layer_data/2, the spacing of integers and of a discrete axis's levels" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, each over integer columns, which R's
+    # continuous scale maps to doubles before any mark reads their spacing: `geom_col()` over x 1L,
+    # 4L, bars 2.7 wide; `geom_bar()` over x 2L, 4L, 4L, 1.8 wide, counting from zero; box plots
+    # over x 2L, 2L, 4L, 4L by x, 1.5 wide; tiles over x 1L, 4L and y 1L, 3L, 3 wide and 2 tall.
+    # They move only with ggplot2's `resolution()` or its marks.
+    test "integers on a continuous axis are spaced by their gaps, as R's doubles" do
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      columns =
+        %{"x" => [1, 4], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      counted =
+        %{"x" => [2, 4, 4]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      boxes =
+        %{"x" => [2, 2, 4, 4], "y" => [1.0, 2.0, 3.0, 4.0]}
+        |> Plot.new(%{x: :x, y: :y, group: :x})
+        |> Plot.geom_boxplot()
+        |> Giggly.layer_data()
+
+      tiles =
+        %{"x" => [1, 4], "y" => [1, 3]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+
+      assert edges.(columns) ===
+               {[-0.35000000000000009, 2.6499999999999999],
+                [2.3500000000000001, 5.3499999999999996]}
+
+      assert edges.(counted) ===
+               {[1.1000000000000001, 3.1000000000000001],
+                [2.8999999999999999, 4.9000000000000004]}
+
+      assert edges.(boxes) === {[1.25, 3.25], [2.75, 4.75]}
+      assert edges.(tiles) === {[-0.5, 2.5], [2.5, 5.5]}
+
+      assert {DataFrame.pull(tiles, :ymin), DataFrame.pull(tiles, :ymax)} ===
+               {[0.0, 2.0], [2.0, 4.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 under `scale_x_discrete(limits = c("a",
+    # "b", "c"))` with a layer holding only a and c: `geom_col()`, whose `resolution()` reads no
+    # discrete axis, bars 1.8 wide across b's place; `geom_bar()` and `geom_boxplot()`, which read
+    # one, 0.9 and 0.75 wide. They move only with ggplot2's `resolution()` or its marks.
+    test "a discrete axis's levels are 1 apart where R reads them so, a column's bars spanning a gap" do
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      drawn = fn rows, mapping, layer ->
+        rows
+        |> Plot.new(mapping)
+        |> layer.()
+        |> Plot.scale_x_discrete(limits: ["a", "b", "c"])
+        |> Giggly.layer_data()
+      end
+
+      columns = drawn.(%{"x" => ["a", "c"], "y" => [1.0, 2.0]}, %{x: :x, y: :y}, &Plot.geom_col/1)
+      counted = drawn.(%{"x" => ["a", "c", "c"]}, %{x: :x}, &Plot.geom_bar/1)
+
+      boxes =
+        drawn.(
+          %{"x" => ["a", "c", "c"], "y" => [1.0, 2.0, 3.0]},
+          %{x: :x, y: :y},
+          &Plot.geom_boxplot/1
+        )
+
+      assert edges.(columns) ===
+               {[0.099999999999999978, 2.1000000000000001],
+                [1.8999999999999999, 3.8999999999999999]}
+
+      assert edges.(counted) === {[0.55, 2.55], [1.45, 3.45]}
+      assert edges.(boxes) === {[0.625, 2.625], [1.375, 3.375]}
+    end
+
+    # R 4.6.1 with ggplot2 4.0.3: 400 points at x 1L and 4L jittered move at most 1.197 across, 0.4
+    # of their spacing of 3; at levels a and c of a discrete axis of a, b and c, at most 0.399, 0.4
+    # of 1. R's random numbers are not Giggly's, so the bound is the check, and the furthest move
+    # past 0.4 shows the spacing of 3 was taken.
+    test "jittering moves 0.4 of the spacing of integers, and 0.4 on a discrete axis" do
+      ones = List.duplicate(1.0, 400)
+      repeated = fn pair -> Enum.flat_map(1..200, fn _repeat -> pair end) end
+
+      moves = fn rows, plot ->
+        placed =
+          plot
+          |> Giggly.layer_data()
+          |> DataFrame.pull(:x)
+
+        Enum.zip_with(placed, rows, fn moved, at -> abs(moved - at) end)
+      end
+
+      integers = repeated.([1, 4])
+
+      jittered =
+        [x: integers, y: ones]
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_jitter(height: 0)
+
+      leveled =
+        [x: repeated.(["a", "c"]), y: ones]
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_jitter(height: 0)
+        |> Plot.scale_x_discrete(limits: ["a", "b", "c"])
+
+      continuous = moves.(integers, jittered)
+      levels = repeated.([1, 3])
+      discrete = moves.(levels, leveled)
+
+      assert Enum.max(continuous) > 0.4 and Enum.max(continuous) <= 1.2
+      assert Enum.max(discrete) <= 0.4
+    end
+  end
+
   describe "layer_data/2, for geom_tile" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for geom_tile()'s first example, `df`'s x 2,
     # 5, 7, 9, 12 and y 1, 2: tiles 2 wide and 1 tall, filled #333333 and bordered 0.2 mm wide, with

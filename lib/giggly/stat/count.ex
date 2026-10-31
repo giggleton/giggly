@@ -85,15 +85,21 @@ defmodule Giggly.Stat.Count do
     def default_mapping(_stat), do: %{x: :count, y: :count}
 
     @impl Giggly.Stat
-    def compute_layer(stat, frame, _axes) do
+    def compute_layer(stat, frame, axes) do
       check_weight(frame)
       flipped = :x not in DataFrame.names(frame)
+      discrete = discrete?(axes, if(flipped, do: :y, else: :x))
 
       frame
       |> flip(flipped)
-      |> count(stat.width, flipped)
+      |> count(stat.width, flipped, discrete)
       |> flip(flipped)
     end
+
+    # Whether the axis counted along is discrete in any panel, as ggplot2 reads a mapped discrete
+    # position.
+    defp discrete?(axes, axis),
+      do: Enum.any?(axes, fn {_panel, panel_axes} -> Map.fetch!(panel_axes, axis).discrete end)
 
     # A weight is summed, so it must hold numbers. `Giggly.Plot` refuses a column or a constant
     # that does not at the call; an expression's type is known only once it has run, so one that
@@ -122,7 +128,7 @@ defmodule Giggly.Stat.Count do
       DataFrame.select(frame, renames)
     end
 
-    defp count(frame, set_width, flipped) do
+    defp count(frame, set_width, flipped, discrete) do
       carried =
         frame
         |> DataFrame.names()
@@ -147,7 +153,7 @@ defmodule Giggly.Stat.Count do
       totals = totals_by_group(counted, counts)
       rows = DataFrame.row_count(counted)
 
-      width = width(set_width, counted)
+      width = width(set_width, counted, discrete)
 
       prop =
         Enum.zip_with(counts, groups, fn count, group ->
@@ -162,13 +168,13 @@ defmodule Giggly.Stat.Count do
     end
 
     # Each bar's width: the one the layer sets, or else 0.9 of the spacing of the counted table's
-    # x positions, the layer's distinct ones, counting from zero.
-    defp width(set_width, _counted) when is_number(set_width), do: set_width
+    # x positions, the layer's distinct ones, counting from zero, 1 on a discrete axis.
+    defp width(set_width, _counted, _discrete) when is_number(set_width), do: set_width
 
-    defp width(:none, counted) do
+    defp width(:none, counted, discrete) do
       counted
       |> DataFrame.pull(:x)
-      |> Resolution.of(zero: true)
+      |> Resolution.of(zero: true, discrete: discrete)
       |> Kernel.*(@width_share)
     end
 

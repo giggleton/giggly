@@ -3,7 +3,10 @@ defmodule Giggly.PositionTest do
 
   alias Giggly.{DataFrame, Position}
 
-  describe "compute_layer/2 for nudging" do
+  # Both axes continuous, as every test here but the discrete one's draws.
+  @continuous %{x: :continuous, y: :continuous}
+
+  describe "compute_layer/3 for nudging" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_rect()` of the same edges under
     # `position_nudge(x = 1, y = -0.5)`. No geom Giggly nudges has edges yet, so the table is built
     # here.
@@ -18,7 +21,7 @@ defmodule Giggly.PositionTest do
           nudge_y: [-0.5, -0.5]
         )
 
-      nudged = Position.compute_layer(%Position.Nudge{}, frame)
+      nudged = Position.compute_layer(%Position.Nudge{}, frame, @continuous)
 
       assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn name -> DataFrame.pull(nudged, name) end) ===
                [[2.0, 3.0], [2.5, 4.0], [-0.5, 0.5], [0.5, 1.5]]
@@ -29,7 +32,7 @@ defmodule Giggly.PositionTest do
   # `compute_panel()` on each panel of the same table, printed to 17 significant digits: a bar
   # Giggly draws has one edge missing, or an infinite x, only from infinite data, so the tables
   # are built here. They move with `position_dodge2()`.
-  describe "compute_layer/2 for dodging by clusters" do
+  describe "compute_layer/3 for dodging by clusters" do
     test "a bar missing an edge is in no cluster and loses its x, the others dodged and padded" do
       frame =
         DataFrame.new(
@@ -130,9 +133,10 @@ defmodule Giggly.PositionTest do
 
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_area(stat = "identity")` of the
   # same rows, each band set up from 0 to its y as the area geom sets it up and in its order.
-  describe "compute_layer/2 for stacking areas" do
+  describe "compute_layer/3 for stacking areas" do
     test "each row's xmin and xmax is its x, and the bands at an x pile up, the first group on top" do
-      stacked = Position.compute_layer(%Position.Stack{}, area_rows([1.0, 3.0, 2.0, 4.0]))
+      stacked =
+        Position.compute_layer(%Position.Stack{}, area_rows([1.0, 3.0, 2.0, 4.0]), @continuous)
 
       assert Enum.map([:y, :ymin, :ymax, :xmin, :xmax], fn name ->
                DataFrame.pull(stacked, name)
@@ -147,7 +151,8 @@ defmodule Giggly.PositionTest do
     end
 
     test "a band below zero piles down from zero, keeping its ymax below its ymin" do
-      stacked = Position.compute_layer(%Position.Stack{}, area_rows([1.0, -3.0, -2.0, 4.0]))
+      stacked =
+        Position.compute_layer(%Position.Stack{}, area_rows([1.0, -3.0, -2.0, 4.0]), @continuous)
 
       assert Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(stacked, name) end) ===
                [[1.0, 0.0, 0.0, 4.0], [0.0, 0.0, 0.0, 0.0], [1.0, -3.0, -2.0, 4.0]]
@@ -159,7 +164,7 @@ defmodule Giggly.PositionTest do
   # checked in ggplot2 4.0.3 with R 4.6.1: a distance is `-amount + 2 * amount * u`, as R's
   # `runif()` scales a draw; each panel draws from the seed afresh, so panels with as many rows
   # move them alike; an amount not given is 0.4 of each panel's closest spacing.
-  describe "compute_layer/2 for jittering" do
+  describe "compute_layer/3 for jittering" do
     test "each row draws across then up from its panel's numbers, each panel's from the seed" do
       frame =
         DataFrame.new(
@@ -168,7 +173,13 @@ defmodule Giggly.PositionTest do
           y: [5.0, 6.0, 7.0, 8.0]
         )
 
-      jittered = Position.compute_layer(%Position.Jitter{width: 0.4, height: 0.2, seed: 5}, frame)
+      jittered =
+        Position.compute_layer(
+          %Position.Jitter{width: 0.4, height: 0.2, seed: 5},
+          frame,
+          @continuous
+        )
+
       [first_across, first_up, second_across, second_up] = draws(5, 4)
 
       assert {DataFrame.pull(jittered, :x), DataFrame.pull(jittered, :y)} ===
@@ -202,8 +213,8 @@ defmodule Giggly.PositionTest do
       position = %Position.Jitter{width: :none, height: 0.0, seed: 1}
       [first, _first_up, second, _second_up] = draws(1, 4)
 
-      jittered_apart = Position.compute_layer(position, apart)
-      jittered_levels = Position.compute_layer(position, levels)
+      jittered_apart = Position.compute_layer(position, apart, @continuous)
+      jittered_levels = Position.compute_layer(position, levels, %{x: :discrete, y: :continuous})
 
       assert DataFrame.pull(jittered_apart, :x) === [
                1.0 + distance(first, 0.8),
@@ -227,7 +238,13 @@ defmodule Giggly.PositionTest do
           size: [1.5, 1.5, 1.5]
         )
 
-      jittered = Position.compute_layer(%Position.Jitter{width: 0.3, height: 0.1, seed: 2}, frame)
+      jittered =
+        Position.compute_layer(
+          %Position.Jitter{width: 0.3, height: 0.1, seed: 2},
+          frame,
+          @continuous
+        )
+
       [across, up, second_across, second_up, third_across, third_up] = draws(2, 6)
 
       assert Enum.map([:x, :xmin, :y, :ymax, :size], fn name -> DataFrame.pull(jittered, name) end) ===
@@ -250,8 +267,20 @@ defmodule Giggly.PositionTest do
 
     test "an amount of 0 moves nothing, and leaves the other axis's distances as they were" do
       frame = DataFrame.new(panel: [1, 1], x: [1, 2], y: [3, 4])
-      still = Position.compute_layer(%Position.Jitter{width: 0.0, height: 0.5, seed: 9}, frame)
-      moved = Position.compute_layer(%Position.Jitter{width: 0.3, height: 0.5, seed: 9}, frame)
+
+      still =
+        Position.compute_layer(
+          %Position.Jitter{width: 0.0, height: 0.5, seed: 9},
+          frame,
+          @continuous
+        )
+
+      moved =
+        Position.compute_layer(
+          %Position.Jitter{width: 0.3, height: 0.5, seed: 9},
+          frame,
+          @continuous
+        )
 
       assert DataFrame.pull(still, :x) === [1.0, 2.0]
       assert DataFrame.pull(still, :y) === DataFrame.pull(moved, :y)
@@ -264,7 +293,11 @@ defmodule Giggly.PositionTest do
       frame = DataFrame.new(panel: [1, 1, 1], x: [1.0, 2.0, 3.0], y: [1.0, 1.0, :neg_infinity])
 
       jittered =
-        Position.compute_layer(%Position.Jitter{width: 0.0, height: :none, seed: 4}, frame)
+        Position.compute_layer(
+          %Position.Jitter{width: 0.0, height: :none, seed: 4},
+          frame,
+          @continuous
+        )
 
       [_first_across, first_up, _second_across, second_up | _rest] = draws(4, 6)
 
@@ -273,14 +306,18 @@ defmodule Giggly.PositionTest do
     end
   end
 
-  describe "compute_layer/2 for jittering, given what Plot never gives" do
+  describe "compute_layer/3 for jittering, given what Plot never gives" do
     # `Plot.position_jitter/1` keeps every amount as a float, so an integer is a programmer error,
     # refused rather than drawn from.
     test "an amount that is not a float is refused" do
       frame = DataFrame.new(panel: [1], x: [1.0], y: [1.0])
 
       assert_raise FunctionClauseError, fn ->
-        Position.compute_layer(%Position.Jitter{width: untyped(1), height: :none, seed: 0}, frame)
+        Position.compute_layer(
+          %Position.Jitter{width: untyped(1), height: :none, seed: 0},
+          frame,
+          @continuous
+        )
       end
     end
   end
@@ -321,7 +358,8 @@ defmodule Giggly.PositionTest do
   defp dodged_by_clusters(frame) do
     Position.compute_layer(
       %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
-      frame
+      frame,
+      @continuous
     )
   end
 end

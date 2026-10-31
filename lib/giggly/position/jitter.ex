@@ -9,7 +9,8 @@ defmodule Giggly.Position.Jitter do
   # in the units of the position: a level's position on a discrete axis. An amount not given
   # (`:none`) is 0.4 of the closest spacing of the panel's positions along that axis
   # (`Giggly.Resolution`, not counting from zero), worked out panel by panel, as ggplot2's
-  # `compute_jitter()` works it out, so 0.4 on a discrete axis; an amount of 0 moves nothing.
+  # `compute_jitter()` works it out, so 0.4 on a discrete axis, whatever levels a panel holds; an
+  # amount of 0 moves nothing.
   #
   # The distances come from random numbers drawn from `seed` by Erlang's `exsss` algorithm, named
   # so that a change of OTP's default changes no drawing, and each panel draws afresh from the
@@ -50,8 +51,12 @@ defmodule Giggly.Position.Jitter do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(%{width: width, height: height, seed: seed}, frame) do
-      amounts = %{x: amounts(frame, :x, width), y: amounts(frame, :y, height)}
+    def compute_layer(%{width: width, height: height, seed: seed}, frame, axis_kinds) do
+      amounts = %{
+        x: amounts(frame, :x, width, axis_kinds.x),
+        y: amounts(frame, :y, height, axis_kinds.y)
+      }
+
       names = DataFrame.names(frame)
 
       {across, up} =
@@ -67,8 +72,8 @@ defmodule Giggly.Position.Jitter do
     end
 
     # The amount along `axis`: the one given, or, for each panel, 0.4 of the closest spacing of the
-    # distinct positions it holds.
-    defp amounts(frame, axis, :none) do
+    # distinct positions it holds, 1 on a discrete axis.
+    defp amounts(frame, axis, :none, kind) do
       frame
       |> DataFrame.summarise([:panel, axis], [])
       |> DataFrame.split(:panel)
@@ -76,13 +81,13 @@ defmodule Giggly.Position.Jitter do
         spacing =
           positions
           |> DataFrame.pull(axis)
-          |> Resolution.of(zero: false)
+          |> Resolution.of(zero: false, discrete: kind == :discrete)
 
         {panel, @share * spacing}
       end)
     end
 
-    defp amounts(_frame, _axis, amount) when is_float(amount), do: amount
+    defp amounts(_frame, _axis, amount, _kind) when is_float(amount), do: amount
 
     defp amount(%{} = by_panel, panel), do: Map.fetch!(by_panel, panel)
     defp amount(amount, _panel), do: amount

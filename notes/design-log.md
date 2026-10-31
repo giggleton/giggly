@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A mark's spacing is R's `resolution()` on positions as R's scales map them: integers by
+  their gaps, and a discrete axis 1 where R reads it so (2026-10-31, Steve: "A", then "Go" on the
+  corrected fix; checked against ggplot2 4.0.3).** R's continuous scale makes every position a
+  double before a stat, a geom or a position reads its spacing, so `resolution()`'s rule that an
+  integer column is 1 apart never fires in a plot: mpg's `year` bars are 8.1 wide, where Giggly,
+  which keeps integers, drew them 0.9. Jittering, counting, the box plot's summary and tiles pass
+  `discrete = TRUE`, a discrete axis's positions 1 apart whatever levels a panel holds; bars pass
+  none, so a column holding levels a and c of three is 1.8 wide. `Resolution.of/2` takes
+  `discrete:`, and every position is handed each axis's kind, as a geom is, jittering the first to
+  read it. *Rejected: dropping the integer rule alone*: a discrete axis's levels 1 and 3 jittered
+  0.8. *Rejected: continuous positions made floats*: `layer_data/2` would change type everywhere.
+
 - **`geom_tile()`, `geom_raster()` and `faithfuld` come together, a tile its own kind drawn as a
   rectangle (2026-10-31, Steve: "let's do it", then the proposal's decisions one at a time;
   checked against ggplot2 4.0.3).** Sixteen waiting notebook examples need nothing else. `Geom.Tile`
@@ -2302,9 +2314,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   (`preserve = "total"`), and orientation, which the entry beginning "Giggly follows ggplot2's
   current coordinate functions" said arrives with the first geom that has a direction (Steve:
   now). Position scales reset and retrain after the position, a discrete scale keeping its levels
-  and retraining the continuous range bars give it. A bar's width follows R's `resolution()`,
-  integer columns included (Steve): an integer column's bars are 0.9 wide. *Rejected: width from
-  the values alone*, which departs from ggplot2 for R's integer columns. *Deferred:* bars under
+  and retraining the continuous range bars give it. A bar's width follows R's `resolution()`.
+  *Deferred:* bars under
   `coord_radial()` (Steve), with `Coord.munch/3` and the radial options every radial bar example
   needs; `position_fill`; `geom_bar`'s options; histograms.
 
@@ -2468,7 +2479,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Geom.Point` drew, and default aesthetics (the assembly) and legend keys (the guides) would
   each add another place, the scattering the ggity research found. **The shape:** a family's root
   is a protocol (`Giggly.Geom` with `draw_panel/5`; `Giggly.Stat` with `compute_layer/3` and
-  `Giggly.Position` with `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
+  `Giggly.Position` with `compute_layer/3`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
   `panel_params/3`, `transform/3`, `axes/2`, `grid/2` and `clip/1`), each function taking the
   kind first, and each kind is one module holding everything about it, as ggplot2's `GeomPoint`
   does: `Giggly.Geom.Point` has `defstruct` with the kind's parameters, functions giving its facts
