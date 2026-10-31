@@ -79,6 +79,43 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A raster is drawn as svglite draws one: an `<image>` of a PNG pngex writes (2026-10-31,
+  Steve: decisions 1 to 4, "A", "A", "C", "A", then "A" on rectangles in radial coordinates;
+  checked against ggplot2 4.0.3).** A panel's cells are one `Scene.Raster`, written as svglite's
+  `<image>`, each cell blown up `ceil(points / cells)` each way unless interpolating, so its pixels
+  are vdiffr's byte for byte; the PNG's bytes are the machine's zlib's, so a golden compares its
+  pixels. Where the gaps differ, a position off the smallest gap's grid is refused, as R would
+  draw the cell shifted with only a warning. Outside linear coordinates it draws as rectangles, as
+  R falls back, and rectangles there are refused until they bend. *Rejected: rectangles*, a
+  departure from R's drawing, 650 kB for faithfuld, seams and no `interpolate`; *the grid's own
+  pixels uncompressed*, leaning on `image-rendering`; *png* (callback streaming) and *ex_png*
+  (a file API); *drawing off-grid cells as R does*, silently shifted; *refusing every uneven
+  grid*, which refuses holes.
+
+- **A mark's spacing is R's `resolution()` on positions as R's scales map them: integers by
+  their gaps, and a discrete axis 1 where R reads it so (2026-10-31, Steve: "A", then "Go" on the
+  corrected fix; checked against ggplot2 4.0.3).** R's continuous scale makes every position a
+  double before a stat, a geom or a position reads its spacing, so `resolution()`'s rule that an
+  integer column is 1 apart never fires in a plot: mpg's `year` bars are 8.1 wide, where Giggly,
+  which keeps integers, drew them 0.9. Jittering, counting, the box plot's summary and tiles pass
+  `discrete = TRUE`, a discrete axis's positions 1 apart whatever levels a panel holds; bars pass
+  none, so a column holding levels a and c of three is 1.8 wide. `Resolution.of/2` takes
+  `discrete:`, and every position is handed each axis's kind, as a geom is, jittering the first to
+  read it. *Rejected: dropping the integer rule alone*: a discrete axis's levels 1 and 3 jittered
+  0.8. *Rejected: continuous positions made floats*: `layer_data/2` would change type everywhere.
+
+- **`geom_tile()`, `geom_raster()` and `faithfuld` come together, a tile its own kind drawn as a
+  rectangle (2026-10-31, Steve: "let's do it", then the proposal's decisions one at a time;
+  checked against ggplot2 4.0.3).** Sixteen waiting notebook examples need nothing else. `Geom.Tile`
+  works out each tile's corners and draws and keys through `Geom.Rect`, as `Geom.Bar` does, since
+  `GeomTile` is a `GeomRect` with defaults of its own (`#333333`, a border 0.4 times the theme's);
+  its size is its own panel's closest spacing, R's `compute_data_size(panels = "by")`, 1 on a
+  discrete axis. `faithfuld` is R's `write.csv()` of the 75 by 75 grid, kept as columns (about
+  530 kB, below `economics_long`), behind a waiver of its own.
+  *Rejected: `Rect` growing a centre-and-size form*: a rectangle's defaults are not a tile's, and
+  `geom_rect()`'s own `x`/`width` form is another feature. *Deferred (Steve):* `annotate(:tile)`,
+  which no waiting example draws.
+
 - **A break whose quotient by the accuracy `precision()` tries passes the largest double is left
   out of its test for multiples (2026-10-31, Steve: "B"; checked against scales 1.4.0).** R's
   `precision()` asks whether every `round(x / precision)` is a multiple of 10; a quotient past
@@ -2457,9 +2494,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   (`preserve = "total"`), and orientation, which the entry beginning "Giggly follows ggplot2's
   current coordinate functions" said arrives with the first geom that has a direction (Steve:
   now). Position scales reset and retrain after the position, a discrete scale keeping its levels
-  and retraining the continuous range bars give it. A bar's width follows R's `resolution()`,
-  integer columns included (Steve): an integer column's bars are 0.9 wide. *Rejected: width from
-  the values alone*, which departs from ggplot2 for R's integer columns. *Deferred:* bars under
+  and retraining the continuous range bars give it. A bar's width follows R's `resolution()`.
+  *Deferred:* bars under
   `coord_radial()` (Steve), with `Coord.munch/3` and the radial options every radial bar example
   needs; `position_fill`; `geom_bar`'s options; histograms.
 
@@ -2623,7 +2659,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Geom.Point` drew, and default aesthetics (the assembly) and legend keys (the guides) would
   each add another place, the scattering the ggity research found. **The shape:** a family's root
   is a protocol (`Giggly.Geom` with `draw_panel/5`; `Giggly.Stat` with `compute_layer/3` and
-  `Giggly.Position` with `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
+  `Giggly.Position` with `compute_layer/3`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
   `panel_params/3`, `transform/3`, `axes/2`, `grid/2` and `clip/1`), each function taking the
   kind first, and each kind is one module holding everything about it, as ggplot2's `GeomPoint`
   does: `Giggly.Geom.Point` has `defstruct` with the kind's parameters, functions giving its facts
@@ -3582,6 +3618,15 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples tiles, rasters and faithfuld unlock (tile, step 3, the
+  notebook sweep); §4: none, each checked against vdiffr's drawing at the notebook's size
+- 2026-10-31 — Draw a raster as one image of its cells, as svglite writes one, and refuse
+  rectangles in radial coordinates (tile, step 2); §4: "A raster is drawn as svglite draws one"
+- 2026-10-31 — Space a mark's positions as R's scales map them: integers by their gaps, and a
+  discrete axis 1 apart where R reads it so; §4: "A mark's spacing is R's `resolution()`", and the
+  bars entry beginning "Bars are Phase 3's first increment" made exact
+- 2026-10-31 — Draw tiles centred on their positions, and copy ggplot2's faithfuld (tile, step 1);
+  §4: "`geom_tile()`, `geom_raster()` and `faithfuld` come together"
 - 2026-10-31 — Label bytes, ordinals, p-values and spans of time (labels, step 3); §4: "A break
   whose quotient", "`timespan/2` takes", "`pvalue/2`'s accuracy", "`ordinal/2` takes", "Plain
   bytes under binary units", "`bytes/2`'s `units:`"

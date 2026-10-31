@@ -81,7 +81,7 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   sum of its counts' magnitudes, divided as R divides (`Giggly.DataFrame.Arithmetic`: NaN for a
   total of zero or an infinite count over an infinite total, 0 for a finite one), and its `width`
   the one the layer sets, the stat's `width`, as `stat_count()` takes it, else 0.9 of the layer's
-  x spacing counting from zero (`Giggly.Resolution`). A weight that is not a
+  x spacing counting from zero (`Giggly.Resolution`), 1 on a discrete axis. A weight that is not a
   number is refused when the plot is run, an expression's, whose type the call cannot know. A row
   missing its x, or at an infinite one, is not counted. Counts are doubles, as R's `rowsum()` gives
   them. **It counts along whichever of x and y is mapped**, exactly one, as `stat_count()` decides
@@ -156,7 +156,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   outliers reaches its hinges; its notches `middle` ∓ 1.58 × height / √rows, `relvarwidth` √rows,
   `x` the middle of its x range, and `width` its group's first mapped width, else 0.9 of its x
   range where it holds several, else the stat's `width`, the layer's `width:`, which drops a mapped
-  one as any set aesthetic does, else 0.75 of the layer's x spacing from zero. The orientation and the spacing are read from every row, as R reads them; then a row
+  one as any set aesthetic does, else 0.75 of the layer's x spacing from zero, 1 on a discrete
+  axis. The orientation and the spacing are read from every row, as R reads them; then a row
   missing its x or y, or at an infinite one, is left out, and a group left with none has no box.
   **It runs along the axis R's `has_flipped_aes()` picks for a box plot**: `orientation`, else the
   one axis mapped (y at x 0, or x), else the continuous axis beside a discrete one, else y where

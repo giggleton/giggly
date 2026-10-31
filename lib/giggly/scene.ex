@@ -35,6 +35,7 @@ defmodule Giggly.Scene do
       Gradient,
       Polygons,
       Polylines,
+      Raster,
       Rect,
       Rectangles,
       Segments,
@@ -58,6 +59,7 @@ defmodule Giggly.Scene do
           | Giggly.Scene.Gradient.t()
           | Giggly.Scene.Polygons.t()
           | Giggly.Scene.Polylines.t()
+          | Giggly.Scene.Raster.t()
           | Giggly.Scene.Rect.t()
           | Giggly.Scene.Rectangles.t()
           | Giggly.Scene.Segments.t()

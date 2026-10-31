@@ -14,7 +14,8 @@ defmodule Giggly.Geom.Rect do
   # A rectangle is drawn where its corners are, which the build leaves as they are, so a row whose
   # `xmin` is past its `xmax` is drawn between them all the same, as grid draws one. A row missing a
   # corner is not drawn, and an infinite one reaches the panel's edge, where the coordinate system
-  # puts it.
+  # puts it. In radial coordinates, where ggplot2 bends a rectangle's sides along the curves, a
+  # rectangle is refused, which waits.
   #
   # A rectangle the layer neither maps nor sets a look for looks as ggplot2's default rectangle
   # does under the plot's theme: filled with the theme's ink mixed 35% toward its paper, `#595959`
@@ -144,9 +145,17 @@ defmodule Giggly.Geom.Rect do
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
-    # A rectangle for each row placed in the panel, in its fill and border.
+    # A rectangle for each row placed in the panel, in its fill and border; in a coordinate system
+    # whose straight lines bend, where ggplot2 draws each as a polygon following the curves, none
+    # yet, so a rectangle, a bar, a tile and a raster drawn as tiles are refused there.
     @impl Giggly.Geom
     def draw_panel(_geom, frame, coord, panel_params, _installed_fonts) do
+      unless Coord.linear?(coord) do
+        raise ArgumentError,
+              "rectangles, bars, tiles and rasters cannot be drawn in radial coordinates yet: " <>
+                "their sides would follow its curves, which Giggly does not draw"
+      end
+
       placed = Coord.transform(coord, frame, panel_params)
       fills = Mark.colors(placed, :fill)
 

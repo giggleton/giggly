@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,8 +29,10 @@ colour or fill scale: a colour bar, as `guide_colourbar()` draws, but with each 
 colour rather than a gradient. It is the default guide for binned colour scales. Giggly draws it at
 its defaults, `guide: :colorsteps`, the default guide of `Giggly.Plot.scale_fill_binned/2` and the
 other binned colour and fill scales, which label the ends with the limits too for `show_limits:
-true`, but takes none of its options (`guide_coloursteps()` with its `even.steps` option), and has
-no tiles (`geom_tile()`).
+true`, but takes none of its options (`guide_coloursteps()` with its `even.steps` option). A plot
+is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
+setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
+a plot and shows it below the cell with `Kino.Image`.
 
 ## The default for binned colours
 
@@ -38,7 +49,26 @@ p <- ggplot(df, aes(X1, X2)) + geom_tile(aes(fill = value))
 p + scale_fill_binned()
 ```
 
-Not in Giggly yet: `geom_tile()`.
+The cell builds the same table, `X1` changing fastest, as `expand.grid()` builds it.
+
+```elixir
+pairs = for x2 <- 1..10, x1 <- 1..10, do: {x1, x2}
+
+df = %{
+  "X1" => Enum.map(pairs, fn {x1, _x2} -> x1 end),
+  "X2" => Enum.map(pairs, fn {_x1, x2} -> x2 end),
+  "value" => Enum.map(pairs, fn {x1, x2} -> x1 * x2 end)
+}
+
+p =
+  df
+  |> Plot.new(%{x: :X1, y: :X2})
+  |> Plot.geom_tile(%{fill: :value})
+
+p
+|> Plot.scale_fill_binned()
+|> render.()
+```
 
 ## Bins of equal size
 
@@ -48,7 +78,11 @@ Not in Giggly yet: `geom_tile()`.
 p + scale_fill_binned(breaks = c(10, 25, 50))
 ```
 
-Not in Giggly yet: `geom_tile()`.
+```elixir
+p
+|> Plot.scale_fill_binned(breaks: [10, 25, 50])
+|> render.()
+```
 
 ## Bins in proportion
 
@@ -60,7 +94,7 @@ p + scale_fill_binned(
 )
 ```
 
-Not in Giggly yet: `geom_tile()`, and `guide_coloursteps()` with its `even.steps` option, which
+Not in Giggly yet: `guide_coloursteps()` with its `even.steps` option, which
 sizes each bin in the legend in proportion to its range in the data.
 
 ## Showing the limits
@@ -73,6 +107,12 @@ p + scale_fill_binned(guide = guide_coloursteps(show.limits = TRUE))
 p + scale_fill_binned(show.limits = TRUE)
 ```
 
-Not in Giggly yet: `geom_tile()`, and for the first plot `guide_coloursteps()` with its
-`show.limits` option, which labels the ends of the scale too, as the scale's own `show_limits:`
-does for the second.
+Giggly draws the second plot, the scale's own `show_limits:` labelling the ends of the scale too.
+
+```elixir
+p
+|> Plot.scale_fill_binned(show_limits: true)
+|> render.()
+```
+
+Not in Giggly yet: for the first plot, `guide_coloursteps()` with its `show.limits` option.

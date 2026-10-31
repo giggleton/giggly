@@ -70,7 +70,9 @@ defprotocol Giggly.Geom do
       Rug,
       Segment,
       Smooth,
+      Raster,
       Text,
+      Tile,
       Vline
     ]
 

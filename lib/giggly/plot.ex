@@ -491,7 +491,7 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.geom_jitter(height: 0)
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.pull(frame, :x)
-      [3.9846655701967295, 4.393111264959721, 5.71528099031685]
+      [3.969331140393459, 4.786222529919443, 5.4305619806336995]
       iex> Giggly.DataFrame.pull(frame, :y)
       [29.0, 29.0, 26.0]
   """
@@ -506,13 +506,19 @@ defmodule Giggly.Plot do
     validated = layer_options(options, Options.jitter())
     data = own_data(validated)
 
+    # Its `width:` and `height:` say how far the points move, its position's, never a size.
+    set =
+      validated
+      |> fixed()
+      |> Map.drop([:width, :height])
+
     layer = %Layer{
       geom: %Geom.Point{},
       stat: %Stat.Identity{},
       position: jitter_position(validated, "Plot.geom_jitter/3"),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_jitter/3"),
-      fixed: fixed(validated),
+      fixed: set,
       accepted: Geom.Point.accepted_aesthetics(),
       annotation: false,
       inherit: true
@@ -593,7 +599,7 @@ defmodule Giggly.Plot do
   hold numbers. The bars also take `:alpha`, `:fill`, `:color`, `:linetype` and `:linewidth`; one
   reaches a bar only where it is the same in every row the bar counts, so a discrete one groups the
   rows and gives each group its own bar. Each bar is 0.9 times the closest spacing of the `x`
-  positions wide, counting from zero, unless `width:` says otherwise; counting gives every bar its
+  positions wide, counting from zero, 0.9 on a discrete axis, unless `width:` says otherwise; counting gives every bar its
   width, so `:width` is not mapped. `just:` places each bar against its `x`.
 
   Counting computes `count` and `prop`, the count's share of its group's total, which a mapping
@@ -844,7 +850,8 @@ defmodule Giggly.Plot do
   its upper, a line across it at its median, and whiskers out to the least and greatest `y` within
   `coef:` heights of the box beyond it, every value further out drawn as a point, an outlier. The
   quartiles are R's default (type 7). Each box stands at the middle of its group's `x` values,
-  0.75 times the closest spacing of the `x` positions wide, counting from zero, or 0.9 of the
+  0.75 times the closest spacing of the `x` positions wide, counting from zero, 0.75 on a
+  discrete axis, or 0.9 of the
   range of its group's `x` values where they are several, or as wide as its group's first mapped
   `:width`, a number, or as `width:` says. A row missing its `x` or `y`, or at an infinite one, is
   left out.
@@ -926,8 +933,9 @@ defmodule Giggly.Plot do
   :dodge2`, or as `position_dodge2/1` says, bars whose spans overlap are set side by side, each its
   share of their widths, with a gap between them.
 
-  Each bar is 0.9 times the closest spacing of the `x` positions wide: 0.9 on a discrete axis, and
-  on a continuous one 0.9 times the closest gap, a column of integers counting as 1 apart; or as
+  Each bar is 0.9 times the closest spacing of the `x` positions wide: 0.9 on a discrete axis
+  whose neighbouring levels the layer holds, and 1.8 where it skips one, and on a continuous one
+  0.9 times the closest gap, a column of integers spaced as any numbers are; or as
   wide as its mapped `:width`, a number, or as `width:` makes every bar, which wins over a mapped
   one. `just:` places each bar against its `x`, its lower edge there at 0 and its upper at 1. Bars
   of different widths at one `x` are dodged together only by `:dodge2`. The `y` axis reaches 0.
@@ -1968,6 +1976,135 @@ defmodule Giggly.Plot do
       required: Geom.Rect.required_aesthetics(),
       unmet: "neither its mapping nor the plot's maps it, and no option sets it"
     )
+  end
+
+  @doc """
+  Adds a layer of tiles, one per row, each a rectangle centred on its `x` and `y`, for a surface
+  or a grid of values drawn as colours.
+
+  Each tile is as wide as the closest spacing of the `x` positions in its panel and as tall as
+  that of the `y` positions, 1 on a discrete axis, and on a continuous one the closest gap, a
+  column of integers spaced as any numbers are; or as wide as its mapped `:width` and as tall as its
+  mapped `:height`, numbers, or as `width:` and `height:` make every tile, which win over mapped
+  ones. A row missing its `x` or `y` draws nothing.
+
+  Tiles use `:x`, `:y`, `:group`, `:alpha`, `:fill`, `:color`, `:linetype`, `:linewidth`,
+  `:width` and `:height`, and need `:x` and `:y`. `:fill` fills a tile and takes its alpha;
+  `:color` borders it, and tiles have no border unless it is mapped or set; `:linewidth` and
+  `:linetype` say how wide the border is and how it is dashed.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.tile())}
+
+      iex> frame =
+      ...>   %{"x" => [2.0, 5.0, 7.0, 9.0, 12.0], "y" => [1.0, 1.0, 1.0, 1.0, 1.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_tile()
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[1.0, 4.0, 6.0, 8.0, 11.0], [3.0, 6.0, 8.0, 10.0, 13.0]}
+
+  Mapped widths make tiles of different sizes, here meeting edge to edge:
+
+      iex> frame =
+      ...>   %{"x" => [2.0, 5.0, 7.0, 9.0, 12.0], "y" => [1.0, 1.0, 1.0, 1.0, 1.0],
+      ...>     "w" => [4.0, 2.0, 2.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, width: :w})
+      ...>   |> Giggly.Plot.geom_tile()
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[0.0, 4.0, 6.0, 8.0, 10.0], [4.0, 6.0, 8.0, 10.0, 14.0]}
+  """
+  @spec geom_tile(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_tile(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_tile(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_tile(plot, %{}, options)
+
+  def geom_tile(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.tile())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Tile{},
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_tile/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Tile.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_tile/3", required: Geom.Tile.required_aesthetics())
+    |> check_numbers(layer, "Plot.geom_tile/3", :width, "a tile is drawn as wide as its width")
+    |> check_numbers(layer, "Plot.geom_tile/3", :height, "a tile is drawn as tall as its height")
+  end
+
+  @doc """
+  Adds a layer of equal cells on a regular grid, one per row, drawn as one image: a faster,
+  smaller tile for a surface of values, such as a density over two variables.
+
+  Every cell is as wide as the gap between the `x` positions and as tall as the gap between the
+  `y` positions, the smallest where the gaps differ. Positions may skip places, a grid with
+  holes, but each must be a whole number of cells from the least, or the plot raises when run;
+  `geom_tile/3` draws cells at uneven positions. `hjust:` and `vjust:` place each cell against
+  its position. A row missing its `x` or `y` draws nothing, and a place no row fills is left
+  clear. In radial coordinates the cells are drawn as tiles.
+
+  Rasters use `:x`, `:y`, `:group`, `:alpha` and `:fill`, and need `:x` and `:y`. `:fill` fills a
+  cell and takes its alpha; a raster has no border.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.raster())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 4.0], "y" => [1.0, 1.0, 1.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_raster(hjust: 0)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[0.0, 1.0, 3.0], [1.0, 2.0, 4.0]}
+  """
+  @spec geom_raster(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_raster(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_raster(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_raster(plot, %{}, options)
+
+  def geom_raster(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.raster())
+    data = own_data(validated)
+
+    # Its `hjust:` and `vjust:` place its cells, its geom's, never a text's justification.
+    set =
+      validated
+      |> fixed()
+      |> Map.drop([:hjust, :vjust])
+
+    layer = %Layer{
+      geom: %Geom.Raster{
+        hjust: Keyword.fetch!(validated, :hjust),
+        vjust: Keyword.fetch!(validated, :vjust),
+        interpolate: Keyword.fetch!(validated, :interpolate)
+      },
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_raster/3"),
+      fixed: set,
+      accepted: Geom.Raster.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    add_layer(plot, layer, "Plot.geom_raster/3", required: Geom.Raster.required_aesthetics())
   end
 
   @doc """

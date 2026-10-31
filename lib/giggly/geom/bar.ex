@@ -167,7 +167,7 @@ defmodule Giggly.Geom.Bar do
         |> Enum.zip(x_positions)
         |> Enum.group_by(fn {panel, _x} -> panel end, fn {_panel, x} -> x end)
         |> Enum.map(fn {_panel, panel_positions} ->
-          Resolution.of(panel_positions, zero: false)
+          Resolution.of(panel_positions, zero: false, discrete: false)
         end)
         |> Enum.min()
 

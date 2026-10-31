@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 economics = Giggly.Datasets.economics()
+faithfuld = Giggly.Datasets.faithfuld()
 mtcars = Giggly.Datasets.mtcars()
 
 render = fn plot ->
@@ -37,9 +38,9 @@ or `:none` for `NA`. Where R and CSS give a name different colours, as `"green"`
 name CSS lacks, as R's `"grey50"`, is written as its hex. A plot is described with `Giggly.Plot` and
 drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
 so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
-cell with `Kino.Image`. It binds `Giggly.Datasets.economics/0`, ggplot2's `economics`, and
-`Giggly.Datasets.mtcars/0`, R's `mtcars`, to `economics` and `mtcars`, the names ggplot2 and R give
-them.
+cell with `Kino.Image`. It binds `Giggly.Datasets.economics/0` and
+`Giggly.Datasets.faithfuld/0`, ggplot2's `economics` and `faithfuld`, and
+`Giggly.Datasets.mtcars/0`, R's `mtcars`, to their names in R.
 
 ## The default bars
 
@@ -144,7 +145,12 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
   geom_raster(aes(fill = density))
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and `geom_raster()`.
+```elixir
+faithfuld
+|> Plot.new(%{x: :waiting, y: :eruptions})
+|> Plot.geom_raster(%{fill: :density})
+|> render.()
+```
 
 ## Geoms with colour only
 

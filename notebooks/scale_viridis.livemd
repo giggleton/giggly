@@ -10,6 +10,7 @@ alias Giggly.Plot
 
 diamonds = Giggly.Datasets.diamonds()
 txhousing = Giggly.Datasets.txhousing()
+faithfuld = Giggly.Datasets.faithfuld()
 
 render = fn plot ->
   plot
@@ -41,8 +42,9 @@ options, `option:` naming a palette by an atom (`:plasma`), `begin:`, `end:` and
 ggplot2 does. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
 cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`. It binds ggplot2's `diamonds` and `txhousing`, `Giggly.Datasets.diamonds/0` and
-`Giggly.Datasets.txhousing/0`, to their names in R.
+`Kino.Image`. It binds ggplot2's `diamonds`, `txhousing` and `faithfuld`,
+`Giggly.Datasets.diamonds/0`, `Giggly.Datasets.txhousing/0` and `Giggly.Datasets.faithfuld/0`, to
+their names in R.
 
 ## The default for ordered values
 
@@ -274,7 +276,29 @@ v + scale_fill_viridis_c()
 v + scale_fill_viridis_c(option = "plasma")
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and tiles (`geom_tile()`).
+The tiles' layer maps its own `x`, `y` and `fill`, as the example's does, and the plot maps
+nothing; R's parentheses round the assignment show `v`, which the first cell draws.
+
+```elixir
+v =
+  faithfuld
+  |> Plot.new()
+  |> Plot.geom_tile(%{x: :waiting, y: :eruptions, fill: :density})
+
+render.(v)
+```
+
+```elixir
+v
+|> Plot.scale_fill_viridis_c()
+|> render.()
+```
+
+```elixir
+v
+|> Plot.scale_fill_viridis_c(option: :plasma)
+|> render.()
+```
 
 ## Binned values
 
@@ -283,4 +307,8 @@ Not in Giggly yet: the `faithfuld` dataset and tiles (`geom_tile()`).
 v + scale_fill_viridis_b()
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
+```elixir
+v
+|> Plot.scale_fill_viridis_b()
+|> render.()
+```

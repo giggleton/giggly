@@ -400,7 +400,8 @@ defmodule Giggly.Plot.Options do
     :xmax,
     :ymin,
     :ymax,
-    :width
+    :width,
+    :height
   ]
 
   # How every point of a layer looks, set by its options.
@@ -1499,6 +1500,92 @@ defmodule Giggly.Plot.Options do
       "The line type of every rectangle's border: " <>
         @linetype_forms <> "; `:solid` when not given."
   ]
+
+  @tile_fill_option [
+    type: @color_type,
+    doc:
+      "The colour every tile is filled with: " <>
+        @color_forms <>
+        "; when not given, the theme's ink mixed 20% toward its paper, `#333333`, or " <>
+        "`#000000CC` under `theme_void/2`, whose paper is clear."
+  ]
+
+  @tile_linewidth_option [
+    type: {:custom, __MODULE__, :validate_linewidth, []},
+    doc:
+      "How wide every tile's border is, in millimetres; 0.4 times the theme's " <>
+        "`base_line_size` when not given, 0.2 at its default sizes."
+  ]
+
+  # `geom_tile/3`'s options, validated at the call.
+  @tile_options NimbleOptions.new!(
+                  data: @data_option,
+                  alpha: @alpha_option,
+                  color: [
+                    type: @color_type,
+                    doc:
+                      "The colour of every tile's border, written `colour:` or `color:`: " <>
+                        @color_forms <>
+                        "; no border when not given. A border takes no alpha but its colour's " <>
+                        "own."
+                  ],
+                  fill: @tile_fill_option,
+                  linewidth: @tile_linewidth_option,
+                  linetype: [
+                    type: @linetype_type,
+                    doc:
+                      "The line type of every tile's border: " <>
+                        @linetype_forms <> "; `:solid` when not given."
+                  ],
+                  width: [
+                    type: {:custom, __MODULE__, :validate_width, []},
+                    doc:
+                      "How wide every tile is, in the units of the x axis, any number; it " <>
+                        "replaces the width the tiles would take otherwise, and a mapped `:width`."
+                  ],
+                  height: [
+                    type: {:custom, __MODULE__, :validate_height, []},
+                    doc:
+                      "How tall every tile is, in the units of the y axis, as `width:` sets a " <>
+                        "width."
+                  ]
+                )
+
+  # Where every raster cell sits against its position, along one axis: an option of
+  # `geom_raster/3` that chooses how the raster geom draws.
+  @raster_just_doc "a number from 0 to 1: 0 puts the cell's right or top edge there, 1 its left " <>
+                     "or bottom edge, and 0.5 centres it."
+
+  # `geom_raster/3`'s options, validated at the call.
+  @raster_options NimbleOptions.new!(
+                    data: @data_option,
+                    alpha: @alpha_option,
+                    fill: [
+                      type: @color_type,
+                      doc:
+                        "The colour every cell is filled with: " <>
+                          @color_forms <>
+                          "; when not given, the theme's ink mixed 20% toward its paper, " <>
+                          "`#333333`, or `#000000CC` under `theme_void/2`, whose paper is clear."
+                    ],
+                    hjust: [
+                      type: {:custom, __MODULE__, :validate_just, []},
+                      default: 0.5,
+                      doc: "Where each cell sits across against its `x`, " <> @raster_just_doc
+                    ],
+                    vjust: [
+                      type: {:custom, __MODULE__, :validate_just, []},
+                      default: 0.5,
+                      doc: "Where each cell sits up against its `y`, " <> @raster_just_doc
+                    ],
+                    interpolate: [
+                      type: :boolean,
+                      default: false,
+                      doc:
+                        "Whether a viewer blends neighbouring cells' colours, smoothing the " <>
+                          "image, rather than drawing each cell as a block of its colour."
+                    ]
+                  )
 
   # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
   @corner_type {:custom, __MODULE__, :validate_corner, []}
@@ -3486,6 +3573,14 @@ defmodule Giggly.Plot.Options do
   def rect, do: @rect_options
 
   @doc false
+  @spec tile() :: NimbleOptions.t()
+  def tile, do: @tile_options
+
+  @doc false
+  @spec raster() :: NimbleOptions.t()
+  def raster, do: @raster_options
+
+  @doc false
   @spec continuous_scale() :: NimbleOptions.t()
   def continuous_scale, do: @continuous_scale_options
 
@@ -4105,12 +4200,20 @@ defmodule Giggly.Plot.Options do
   def validate_lineheight(height),
     do: {:error, "expected a line height, a number 0 or more, got: #{inspect(height)}"}
 
-  # NimbleOptions' check of a bar's `width:`: any number, kept as a float, as R keeps one; a
-  # negative width puts a bar's edges the other way round, which draws it as wide.
+  # NimbleOptions' check of a bar's or a tile's `width:`: any number, kept as a float, as R keeps
+  # one; a negative width puts a mark's edges the other way round, which draws it as wide.
   @doc false
   @spec validate_width(term()) :: {:ok, float()} | {:error, String.t()}
   def validate_width(width) when is_number(width), do: {:ok, width / 1}
   def validate_width(width), do: {:error, "expected a width, a number, got: #{inspect(width)}"}
+
+  # NimbleOptions' check of a tile's `height:`: any number, kept as a float, as R keeps one.
+  @doc false
+  @spec validate_height(term()) :: {:ok, float()} | {:error, String.t()}
+  def validate_height(height) when is_number(height), do: {:ok, height / 1}
+
+  def validate_height(height),
+    do: {:error, "expected a height, a number, got: #{inspect(height)}"}
 
   # NimbleOptions' check of a bar's `just:`: where it sits against its position, from 0 to 1, kept
   # as a float.

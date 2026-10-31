@@ -52,6 +52,7 @@ defmodule Giggly.MixProject do
       {:nimble_options, "~> 1.1"},
       {:color, "~> 0.13.0"},
       {:nx, "~> 1.0"},
+      {:pngex, "~> 0.1.2"},
       {:tz, "~> 0.28", only: :test}
     ] ++ pica()
   end

@@ -902,15 +902,18 @@ defmodule Giggly.PlotTest do
     end
 
     # ggplot2's `geom_jitter(width = 0.25)` is `position_jitter(width = 0.25)`, its height and seed
-    # their defaults.
+    # their defaults; neither is a size its points take, so neither is set on them, as R's
+    # `layer_data()` of `geom_jitter(width = 0.2, height = 0.1)` holds no width or height.
     test "a width and a height say how far the points move, each kept as a float" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      assert [%Plot.Layer{position: %Position.Jitter{width: 1.0, height: :none, seed: 0}}] =
+      assert [%Plot.Layer{position: %Position.Jitter{width: 1.0, height: :none, seed: 0}} = wide] =
                Plot.geom_jitter(plot, width: 1).reversed_layers
 
-      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: +0.0}}] =
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: +0.0}} = flat] =
                Plot.geom_jitter(plot, height: 0).reversed_layers
+
+      assert {wide.fixed, flat.fixed} == {%{}, %{}}
     end
 
     test "a position says how the points move" do
@@ -3678,6 +3681,179 @@ defmodule Giggly.PlotTest do
         end
 
       assert error.message =~ "Plot.geom_rect/3 cannot use :x"
+    end
+  end
+
+  describe "geom_tile/3" do
+    test "a tile layer records its geom, the identity stat and position, and its set sizes" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_tile(%{y: :mpg}, width: 1, height: 2, colour: "red")
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Tile{},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{y: "mpg"},
+                 fixed: %{width: 1.0, height: 2.0, color: "#FF0000"},
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :fill,
+                   :group,
+                   :height,
+                   :linetype,
+                   :linewidth,
+                   :width,
+                   :x,
+                   :y
+                 ],
+                 annotation: false,
+                 inherit: true
+               }
+             ]
+
+      assert hd(plot.reversed_layers).fixed === %{width: 1.0, height: 2.0, color: "#FF0000"}
+    end
+
+    test "y mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_tile(plot) end
+
+      assert error.message =~ "Plot.geom_tile/3 needs :y"
+    end
+
+    test "an aesthetic tiles cannot use is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_tile(plot, %{xmin: :wt}) end
+      assert error.message =~ "Plot.geom_tile/3 cannot use :xmin"
+    end
+
+    # A width or height set at the call replaces a mapped one, so only a mapped one is checked.
+    test "a mapped width or height that is not numbers is refused, a set one taking its place" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for size <- [:width, :height] do
+        error = assert_raise ArgumentError, fn -> Plot.geom_tile(plot, %{size => :cyl}) end
+
+        assert error.message ==
+                 "Plot.geom_tile/3 maps #{inspect(size)} to \"cyl\", a :string column, but a " <>
+                   "tile is drawn as #{if size == :width, do: "wide as its width", else: "tall as its height"}, " <>
+                   "so it must be a number"
+
+        assert [%Plot.Layer{}] =
+                 Plot.geom_tile(plot, %{size => :cyl}, [{size, 1}]).reversed_layers
+      end
+    end
+
+    test "a width or a height is set to a number, and nothing else" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a width, a number/, fn ->
+        Plot.geom_tile(plot, width: "1")
+      end
+
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/expected a height, a number, got: :none$/,
+                   fn ->
+                     Plot.geom_tile(plot, height: :none)
+                   end
+    end
+
+    test "a tile's look is checked and resolved at the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{fixed: fixed}] =
+               Plot.geom_tile(plot, fill: "red", linewidth: 1, linetype: :dashed).reversed_layers
+
+      assert fixed === %{fill: "#FF0000", linewidth: 1.0, linetype: {4, 4}}
+
+      for {option, value} <- [fill: "reddish", linewidth: -1, linetype: :wavy] do
+        assert_raise NimbleOptions.ValidationError, ~r/invalid value for :#{option} option/, fn ->
+          Plot.geom_tile(plot, [{option, value}])
+        end
+      end
+    end
+  end
+
+  describe "geom_raster/3" do
+    test "a raster layer records its geom with its justification and interpolation" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_raster(%{y: :mpg}, hjust: 0, vjust: 1, interpolate: true, alpha: 0.5)
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Raster{hjust: 0.0, vjust: 1.0, interpolate: true},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{y: "mpg"},
+                 fixed: %{alpha: 0.5},
+                 accepted: [:alpha, :fill, :group, :x, :y],
+                 annotation: false,
+                 inherit: true
+               }
+             ]
+
+      assert [%Plot.Layer{geom: %Geom.Raster{hjust: hjust, vjust: vjust}}] =
+               plot.reversed_layers
+
+      assert {hjust, vjust} === {0.0, 1.0}
+    end
+
+    test "a raster is centred and blocky unless told otherwise" do
+      assert [%Plot.Layer{geom: geom}] =
+               @rows
+               |> Plot.new(%{x: :wt, y: :mpg})
+               |> Plot.geom_raster()
+               |> Map.fetch!(:reversed_layers)
+
+      assert geom === %Geom.Raster{hjust: 0.5, vjust: 0.5, interpolate: false}
+    end
+
+    test "y mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_raster(plot) end
+      assert error.message =~ "Plot.geom_raster/3 needs :y"
+    end
+
+    test "a raster's fill is checked and resolved at the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{fixed: %{fill: "#FF0000"}}] =
+               Plot.geom_raster(plot, fill: "red").reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :fill option/, fn ->
+        Plot.geom_raster(plot, fill: "reddish")
+      end
+    end
+
+    # ggplot2's raster ignores `colour`, so a raster takes none.
+    test "a colour, mapped or set, is refused, and so is a justification past 0 to 1" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_raster(plot, %{colour: :cyl}) end
+      assert error.message =~ "Plot.geom_raster/3 cannot use :color"
+
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options \[:color\]/, fn ->
+        Plot.geom_raster(plot, colour: "red")
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a number from 0 to 1/, fn ->
+        Plot.geom_raster(plot, hjust: 1.5)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :interpolate/, fn ->
+        Plot.geom_raster(plot, interpolate: :yes)
+      end
     end
   end
 

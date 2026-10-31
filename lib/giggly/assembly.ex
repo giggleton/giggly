@@ -326,7 +326,7 @@ defmodule Giggly.Assembly do
 
         position = Plot.layer_position(layer)
         defaulted = set_position_aesthetics(set_up, position, fixed)
-        Position.compute_layer(position, defaulted)
+        Position.compute_layer(position, defaulted, axis_kinds)
       end)
 
     # ggplot2 resets the position scales and trains them again on the marks where they now stand,
@@ -852,17 +852,19 @@ defmodule Giggly.Assembly do
 
   # The layer's table with each position the layer sets, an x- or y-family aesthetic, given its
   # value in every row just before its geom's setup, as ggplot2's `GeomRect$setup_data()` fills a
-  # rectangle's missing corners, and the width it sets where the table has none, as ggplot2's
-  # `compute_data_size()` reads a mark's width from its row before the layer's parameters: so the
-  # position moves the mark and the scales, trained again after the position, cover it, as a
-  # rectangle's set corners and a set bar's edges need. A stat that writes a width takes the set
-  # one as its own, as `stat_count()` and `stat_boxplot()` do, so the width it wrote stands.
+  # rectangle's missing corners, and the width or height it sets where the table has none, as
+  # ggplot2's `compute_data_size()` reads a mark's size from its row before the layer's
+  # parameters: so the position moves the mark and the scales, trained again after the position,
+  # cover it, as a rectangle's set corners and a set bar's or tile's edges need. A stat that writes
+  # a width takes the set one as its own, as `stat_count()` and `stat_boxplot()` do, so the width
+  # it wrote stands.
   defp set_positions(frame, fixed) do
     names = DataFrame.names(frame)
 
     positions =
       Map.filter(fixed, fn {aesthetic, _value} ->
-        Aesthetics.family(aesthetic) != :none or (aesthetic == :width and :width not in names)
+        Aesthetics.family(aesthetic) != :none or
+          (aesthetic in [:width, :height] and aesthetic not in names)
       end)
 
     set_fixed(frame, positions)

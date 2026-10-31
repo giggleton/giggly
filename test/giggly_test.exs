@@ -7,6 +7,8 @@ defmodule GigglyTest do
 
   @rows %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "qsec" => [16.46, 17.02]}
   @mixed_rows %{"wt" => [2.62, 2.875], "mpg" => [21.0, 22.8], "cyl" => ["6", "4"]}
+  # geom_tile()'s reference page's x positions.
+  @tile_xs [2.0, 5.0, 7.0, 9.0, 12.0]
   @mpg_rows %{
     "displ" => [1.8, 2.0, 5.7],
     "hwy" => [29, 26, 17],
@@ -1183,6 +1185,446 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plot, on the same
   # `mpg` where it is used, printed to 17 significant digits. It moves with ggplot2's default alpha
   # scales: a continuous column onto 0.1 to 1, a discrete one spread from 0.1 to 1.
+  describe "layer_data/2, the spacing of integers and of a discrete axis's levels" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, each over integer columns, which R's
+    # continuous scale maps to doubles before any mark reads their spacing: `geom_col()` over x 1L,
+    # 4L, bars 2.7 wide; `geom_bar()` over x 2L, 4L, 4L, 1.8 wide, counting from zero; box plots
+    # over x 2L, 2L, 4L, 4L by x, 1.5 wide; tiles over x 1L, 4L and y 1L, 3L, 3 wide and 2 tall.
+    # They move only with ggplot2's `resolution()` or its marks.
+    test "integers on a continuous axis are spaced by their gaps, as R's doubles" do
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      columns =
+        %{"x" => [1, 4], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_col()
+        |> Giggly.layer_data()
+
+      counted =
+        %{"x" => [2, 4, 4]}
+        |> Plot.new(%{x: :x})
+        |> Plot.geom_bar()
+        |> Giggly.layer_data()
+
+      boxes =
+        %{"x" => [2, 2, 4, 4], "y" => [1.0, 2.0, 3.0, 4.0]}
+        |> Plot.new(%{x: :x, y: :y, group: :x})
+        |> Plot.geom_boxplot()
+        |> Giggly.layer_data()
+
+      tiles =
+        %{"x" => [1, 4], "y" => [1, 3]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+
+      assert edges.(columns) ===
+               {[-0.35000000000000009, 2.6499999999999999],
+                [2.3500000000000001, 5.3499999999999996]}
+
+      assert edges.(counted) ===
+               {[1.1000000000000001, 3.1000000000000001],
+                [2.8999999999999999, 4.9000000000000004]}
+
+      assert edges.(boxes) === {[1.25, 3.25], [2.75, 4.75]}
+      assert edges.(tiles) === {[-0.5, 2.5], [2.5, 5.5]}
+
+      assert {DataFrame.pull(tiles, :ymin), DataFrame.pull(tiles, :ymax)} ===
+               {[0.0, 2.0], [2.0, 4.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 under `scale_x_discrete(limits = c("a",
+    # "b", "c"))` with a layer holding only a and c: `geom_col()`, whose `resolution()` reads no
+    # discrete axis, bars 1.8 wide across b's place; `geom_bar()` and `geom_boxplot()`, which read
+    # one, 0.9 and 0.75 wide. They move only with ggplot2's `resolution()` or its marks.
+    test "a discrete axis's levels are 1 apart where R reads them so, a column's bars spanning a gap" do
+      edges = fn frame -> {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} end
+
+      drawn = fn rows, mapping, layer ->
+        rows
+        |> Plot.new(mapping)
+        |> layer.()
+        |> Plot.scale_x_discrete(limits: ["a", "b", "c"])
+        |> Giggly.layer_data()
+      end
+
+      columns = drawn.(%{"x" => ["a", "c"], "y" => [1.0, 2.0]}, %{x: :x, y: :y}, &Plot.geom_col/1)
+      counted = drawn.(%{"x" => ["a", "c", "c"]}, %{x: :x}, &Plot.geom_bar/1)
+
+      boxes =
+        drawn.(
+          %{"x" => ["a", "c", "c"], "y" => [1.0, 2.0, 3.0]},
+          %{x: :x, y: :y},
+          &Plot.geom_boxplot/1
+        )
+
+      assert edges.(columns) ===
+               {[0.099999999999999978, 2.1000000000000001],
+                [1.8999999999999999, 3.8999999999999999]}
+
+      assert edges.(counted) === {[0.55, 2.55], [1.45, 3.45]}
+      assert edges.(boxes) === {[0.625, 2.625], [1.375, 3.375]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for a layer holding levels c and e of a
+    # discrete axis of a to e: `geom_bar()` over x and over y, 0.9 wide either way, and
+    # `geom_boxplot()` standing on x and lying on y, 0.75; counted from zero alone, the gaps 0 to 3
+    # to 5 would make them 1.8 and 1.5. They move only with ggplot2's `resolution()`.
+    test "the axis counted or summarised along is read as discrete, upright or lying" do
+      # Only the axis holding the level is discrete, so reading the other one shows.
+      across = fn mapping, layer, axis ->
+        {scale, low, high} =
+          if axis == :x,
+            do: {&Plot.scale_x_discrete/2, :xmin, :xmax},
+            else: {&Plot.scale_y_discrete/2, :ymin, :ymax}
+
+        frame =
+          %{"k" => ["c", "e", "e"], "v" => [1.0, 3.0, 5.0]}
+          |> Plot.new(mapping)
+          |> layer.()
+          |> scale.(limits: ["a", "b", "c", "d", "e"])
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, low), DataFrame.pull(frame, high)}
+      end
+
+      counted = {[2.55, 4.55], [3.45, 5.45]}
+      boxed = {[2.625, 4.625], [3.375, 5.375]}
+
+      assert across.(%{x: :k}, &Plot.geom_bar/1, :x) === counted
+      assert across.(%{y: :k}, &Plot.geom_bar/1, :y) === counted
+      assert across.(%{x: :k, y: :v}, &Plot.geom_boxplot/1, :x) === boxed
+      assert across.(%{x: :v, y: :k}, &Plot.geom_boxplot/1, :y) === boxed
+    end
+
+    # R 4.6.1 with ggplot2 4.0.3: 400 points at x 1L and 4L jittered move at most 1.197 across, 0.4
+    # of their spacing of 3; at levels a and c of a discrete axis of a, b and c, at most 0.399, 0.4
+    # of 1. R's random numbers are not Giggly's, so the bound is the check, and the furthest move
+    # past 0.4 shows the spacing of 3 was taken.
+    test "jittering moves 0.4 of the spacing of integers, and 0.4 on a discrete axis" do
+      ones = List.duplicate(1.0, 400)
+      repeated = fn pair -> Enum.flat_map(1..200, fn _repeat -> pair end) end
+
+      moves = fn rows, plot ->
+        placed =
+          plot
+          |> Giggly.layer_data()
+          |> DataFrame.pull(:x)
+
+        Enum.zip_with(placed, rows, fn moved, at -> abs(moved - at) end)
+      end
+
+      integers = repeated.([1, 4])
+
+      jittered =
+        [x: integers, y: ones]
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_jitter(height: 0)
+
+      leveled =
+        [x: repeated.(["a", "c"]), y: ones]
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_jitter(height: 0)
+        |> Plot.scale_x_discrete(limits: ["a", "b", "c"])
+
+      continuous = moves.(integers, jittered)
+      levels = repeated.([1, 3])
+      discrete = moves.(levels, leveled)
+
+      assert Enum.max(continuous) > 0.4 and Enum.max(continuous) <= 1.2
+      assert Enum.max(discrete) <= 0.4
+    end
+  end
+
+  describe "layer_data/2, for geom_raster" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_raster(hjust = 0.25, vjust =
+    # 0.75)` over x 1, 3 and y 0.5, 1: cells 2 wide and 0.5 tall, from `x - width * (1 - hjust)`
+    # to `x + width * hjust`, filled #333333, #000000CC under `theme_void()`; then over one x, 5,
+    # cells 1 wide. They move only with ggplot2's rasters.
+    test "a cell is as wide as the gap between positions, placed by hjust and vjust" do
+      rows = %{"x" => [1.0, 3.0, 1.0, 3.0], "y" => [0.5, 0.5, 1.0, 1.0]}
+
+      placed =
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster(hjust: 0.25, vjust: 0.75)
+
+      frame = Giggly.layer_data(placed)
+      edges = Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge -> DataFrame.pull(frame, edge) end)
+
+      assert edges === [
+               [-0.5, 1.5, -0.5, 1.5],
+               [1.5, 3.5, 1.5, 3.5],
+               [0.375, 0.375, 0.875, 0.875],
+               [0.875, 0.875, 1.375, 1.375]
+             ]
+
+      void =
+        placed
+        |> Plot.theme_void()
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:fill)
+
+      assert {DataFrame.pull(frame, :fill), void} ===
+               {List.duplicate("#333333", 4), List.duplicate("#000000CC", 4)}
+
+      alone =
+        %{"x" => [5.0, 5.0], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(alone, :xmin), DataFrame.pull(alone, :xmax)} ===
+               {[4.5, 4.5], [5.5, 5.5]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2, 4, a grid with a hole, which R
+    # warns of and draws right, cells 1 wide; over levels a and c of a discrete axis of a, b and c,
+    # cells 2 wide, the gap between their positions; over x 1, NA, 3, the missing row's edges NA.
+    # They move only with ggplot2's rasters.
+    test "a grid with holes, a discrete axis's levels and a missing position are R's" do
+      drawn = fn rows, plot ->
+        frame =
+          rows
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+          |> plot.()
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)}
+      end
+
+      same = fn plot -> plot end
+      levels = fn plot -> Plot.scale_x_discrete(plot, limits: ["a", "b", "c"]) end
+
+      assert drawn.(%{"x" => [1.0, 2.0, 4.0], "y" => [1.0, 1.0, 1.0]}, same) ===
+               {[0.5, 1.5, 3.5], [1.5, 2.5, 4.5]}
+
+      assert drawn.(%{"x" => ["a", "c"], "y" => [1.0, 1.0]}, levels) === {[0.0, 2.0], [2.0, 4.0]}
+
+      assert drawn.(%{"x" => [1.0, nil, 3.0], "y" => [1.0, 1.0, 1.0]}, same) ===
+               {[0.0, nil, 2.0], [2.0, nil, 4.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 2, 1, 4, rows out of order; x 1, 3,
+    # 4, 5, whose first gap is not its smallest, and x 0, 2, 4, 5, 6, whose gaps 2, 2, 1, 1 pair
+    # off evenly two by two; x 0, 1 + 2^-26, 2 + 2^-26, whose gaps differ by R's
+    # tolerance exactly, so even, cells as wide as the first; x 0, 1, 3 + 2^-26, a position off
+    # the grid by that tolerance exactly, so on it; x 1.2, 1.7, 2.7, cells half as wide, from a
+    # least that is no multiple of them; and faithfuld's first cell, as wide as its first gap. They
+    # move only with ggplot2's rasters.
+    test "a cell's size and the grid are R's to the last digit, at R's tolerance" do
+      tolerance = :math.pow(2, -26)
+
+      edges = fn xs ->
+        frame =
+          [x: xs, y: Enum.map(xs, fn _x -> 1.0 end)]
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)}
+      end
+
+      assert edges.([2.0, 1.0, 4.0]) === {[1.5, 0.5, 3.5], [2.5, 1.5, 4.5]}
+      assert edges.([1.0, 3.0, 4.0, 5.0]) === {[0.5, 2.5, 3.5, 4.5], [1.5, 3.5, 4.5, 5.5]}
+
+      assert edges.([0.0, 2.0, 4.0, 5.0, 6.0]) ===
+               {[-0.5, 1.5, 3.5, 4.5, 5.5], [0.5, 2.5, 4.5, 5.5, 6.5]}
+
+      assert edges.([0.0, 1.0 + tolerance, 2.0 + tolerance]) ===
+               {[-0.5000000074505806, 0.5000000074505806, 1.5000000074505806],
+                [0.5000000074505806, 1.5000000223517418, 2.5000000223517418]}
+
+      assert edges.([0.0, 1.0, 3.0 + tolerance]) ===
+               {[-0.5, 0.5, 2.5000000149011612], [0.5, 1.5, 3.5000000149011612]}
+
+      assert edges.([1.2, 1.7, 2.7]) ===
+               {[0.94999999999999996, 1.45, 2.4500000000000002], [1.45, 1.95, 2.9500000000000002]}
+
+      faithful =
+        Giggly.Datasets.faithfuld()
+        |> Plot.new(%{x: :waiting, y: :eruptions})
+        |> Plot.geom_raster()
+        |> Giggly.layer_data()
+
+      assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge ->
+               hd(DataFrame.pull(faithful, edge))
+             end) ===
+               [42.641891891891888, 43.358108108108112, 1.5763513513513514, 1.6236486486486488]
+    end
+
+    # ggplot2 4.0.3 warns at x 1, 2, 3.5, "Raster pixels are placed at uneven horizontal intervals
+    # and will be shifted", and draws the three cells centred at 1.08, 2.25 and 3.42; Giggly cannot
+    # warn, so it refuses (design-log §4, the entry beginning "`geom_tile()`, `geom_raster()`").
+    test "a position off the grid of the smallest gap is refused, naming the axis and geom_tile/3" do
+      for {axis, other} <- [x: :y, y: :x] do
+        plot =
+          %{axis => [1.0, 2.0, 3.5], other => [1.0, 1.0, 1.0]}
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        assert error.message ==
+                 "a raster's cells sit on a grid of its #{axis} positions' smallest gap, 1.0, " <>
+                   "but #{axis} 3.5 is not a whole number of gaps from the least, 1.0, so its " <>
+                   "cell would be drawn away from it; draw cells at uneven positions with " <>
+                   "geom_tile/3"
+      end
+    end
+  end
+
+  describe "layer_data/2, for geom_tile" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for geom_tile()'s first example, `df`'s x 2,
+    # 5, 7, 9, 12 and y 1, 2: tiles 2 wide and 1 tall, filled #333333 and bordered 0.2 mm wide, with
+    # no colour; R's table holds a width and height of 1 too, its defaults, which it adds back once
+    # they are read. They move only with ggplot2's tiles.
+    test "a tile is as wide and tall as the closest spacing of its positions, in R's default look" do
+      frame =
+        [x: Enum.concat(@tile_xs, @tile_xs), y: List.duplicate(1.0, 5) ++ List.duplicate(2.0, 5)]
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+
+      assert DataFrame.names(frame) ==
+               [:x, :y, :panel, :group, :xmin, :xmax, :ymin, :ymax] ++
+                 [:color, :fill, :linewidth, :linetype, :alpha]
+
+      assert {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)} ===
+               {[1.0, 4.0, 6.0, 8.0, 11.0, 1.0, 4.0, 6.0, 8.0, 11.0],
+                [3.0, 6.0, 8.0, 10.0, 13.0, 3.0, 6.0, 8.0, 10.0, 13.0]}
+
+      assert {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)} ===
+               {[0.5, 0.5, 0.5, 0.5, 0.5, 1.5, 1.5, 1.5, 1.5, 1.5],
+                [1.5, 1.5, 1.5, 1.5, 1.5, 2.5, 2.5, 2.5, 2.5, 2.5]}
+
+      looks = Enum.map([:fill, :linewidth, :color], fn look -> DataFrame.pull(frame, look) end)
+
+      assert looks === [
+               List.duplicate("#333333", 10),
+               List.duplicate(0.2, 10),
+               List.duplicate(nil, 10)
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(df, aes(x, y))` over x 2, 5, 7,
+    # 9, 12 and y 1 with `geom_tile(width = 0.5, height = 2)`, and with `aes(width = w)` of 4, 2, 2,
+    # 2, 4 and `width = 0.5`; a mapped width alone is `geom_tile/3`'s doctest. They move only with
+    # ggplot2's tiles.
+    test "a tile is as wide and tall as width: and height: say, which win over a mapped width" do
+      tiles = fn mapping, options ->
+        [x: @tile_xs, y: List.duplicate(1.0, 5), w: [4.0, 2.0, 2.0, 2.0, 4.0]]
+        |> Plot.new(mapping)
+        |> Plot.geom_tile(options)
+        |> Giggly.layer_data()
+      end
+
+      set = tiles.(%{x: :x, y: :y}, width: 0.5, height: 2)
+      both = tiles.(%{x: :x, y: :y, width: :w}, width: 0.5)
+
+      assert {DataFrame.pull(set, :xmin), DataFrame.pull(set, :xmax)} ===
+               {[1.75, 4.75, 6.75, 8.75, 11.75], [2.25, 5.25, 7.25, 9.25, 12.25]}
+
+      assert {DataFrame.pull(set, :ymin), DataFrame.pull(set, :ymax)} ===
+               {List.duplicate(0.0, 5), List.duplicate(2.0, 5)}
+
+      assert DataFrame.pull(both, :xmin) === DataFrame.pull(set, :xmin)
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_tile() + facet_wrap(~p)` over x
+    # 1, 2, 3 and y 1, 1.5, 3 in panel a and x 10, 20 and y 1, 1 in panel b, R's
+    # `compute_data_size(panels = "by")`: panel a's tiles 1 wide and 0.5 tall, b's 10 wide and,
+    # one y alone, 1 tall; then for `scale_x_discrete()` over the numbers 1.5, 2 and 4, each tile 1
+    # wide on the discrete axis; then over x 1, NA, 3 and y 1, 2, NA, each missing edge NA. They
+    # move only with ggplot2's tiles.
+    test "a tile takes its own panel's spacing, 1 on a discrete axis, and no edge where missing" do
+      paneled =
+        %{
+          "x" => [1.0, 2.0, 3.0, 10.0, 20.0],
+          "y" => [1.0, 1.5, 3.0, 1.0, 1.0],
+          "p" => ["a", "a", "a", "b", "b"]
+        }
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Plot.facet_wrap(:p)
+        |> Giggly.layer_data()
+
+      discrete =
+        %{"x" => [1.5, 2.0, 4.0], "y" => [1.0, 1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Plot.scale_x_discrete()
+        |> Giggly.layer_data()
+
+      missing =
+        %{"x" => [1.0, nil, 3.0], "y" => [1.0, 2.0, nil]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(paneled, :xmin), DataFrame.pull(paneled, :xmax)} ===
+               {[0.5, 1.5, 2.5, 5.0, 15.0], [1.5, 2.5, 3.5, 15.0, 25.0]}
+
+      assert {DataFrame.pull(paneled, :ymin), DataFrame.pull(paneled, :ymax)} ===
+               {[0.75, 1.25, 2.75, 0.5, 0.5], [1.25, 1.75, 3.25, 1.5, 1.5]}
+
+      assert {DataFrame.pull(discrete, :xmin), DataFrame.pull(discrete, :xmax)} ===
+               {[1.0, 1.5, 3.5], [2.0, 2.5, 4.5]}
+
+      assert {DataFrame.pull(missing, :xmin), DataFrame.pull(missing, :ymax)} ===
+               {[0.0, nil, 2.0], [1.5, 2.5, nil]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `aes(x, y, width = w, height = h)`
+    # over x 2, 5, 7, 9, 12 and y 1, w `c(4L, 2L, 2L, 2L, 4L)` and h its reverse, then both
+    # `NA_real_`: each edge NA. R's table then holds width and height 1, its defaults; Giggly's
+    # holds neither, as they are not the sizes the tiles are drawn at. They move only with ggplot2's
+    # tiles.
+    test "a mapped size of whole numbers is taken, one of only missing values draws nothing" do
+      tiles = fn widths ->
+        [x: @tile_xs, y: List.duplicate(1.0, 5), w: widths, h: Enum.reverse(widths)]
+        |> Plot.new(%{x: :x, y: :y, width: :w, height: :h})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+      end
+
+      whole = tiles.([4, 2, 2, 2, 4])
+      nothing = List.duplicate(nil, 5)
+      missing = tiles.(nothing)
+
+      assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge -> DataFrame.pull(whole, edge) end) ===
+               [
+                 [0.0, 4.0, 6.0, 8.0, 10.0],
+                 [4.0, 6.0, 8.0, 10.0, 14.0],
+                 [-1.0, 0.0, 0.0, 0.0, -1.0],
+                 [3.0, 2.0, 2.0, 2.0, 3.0]
+               ]
+
+      assert Enum.map([:xmin, :ymax], fn edge -> DataFrame.pull(missing, edge) end) ===
+               [nothing, nothing]
+
+      assert DataFrame.names(whole) ==
+               [:x, :y, :panel, :group, :xmin, :xmax, :ymin, :ymax] ++
+                 [:color, :fill, :linewidth, :linetype, :alpha]
+    end
+
+    test "an expression's width or height that is not a number is refused when the plot is run" do
+      for {size, words} <- [width: "wide as its width", height: "tall as its height"] do
+        plot =
+          %{"x" => [1.0], "y" => [1.0]}
+          |> Plot.new(%{:x => :x, :y => :y, size => {&to_string/1, [:y]}})
+          |> Plot.geom_tile()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        assert error.message ==
+                 "a tile is drawn as #{words}, so a #{size} must be a number, but the layer's " <>
+                   "#{size} is a :string column"
+      end
+    end
+  end
+
   describe "layer_data/2, a bar's width and placement" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mpg, aes(drv)) +
     # geom_bar(width = 0.5)`, then with `fill = factor(year)` and `position = "dodge"`, then
@@ -9363,6 +9805,168 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/rect.svg")
     end
 
+    # Golden: test/golden/raster_faithfuld.svg, raster_interpolate.svg, raster_just.svg and
+    # raster_hole.svg, checked against ggplot2's drawings of the same plots, made by the R scripts
+    # beside them: every element and clip path matches but the colour bar's fill, which vdiffr
+    # cannot draw, and each image's attributes and pixels. geom_raster()'s first three examples,
+    # faithfuld's densities as blocks, then blended, and a grid of R's `runif()` draws after
+    # `set.seed(1)` placed by `hjust = 0, vjust = 0`; and a grid with a hole and a missing fill.
+    # Each image is compared by its pixels, as another zlib may compress them to other bytes.
+    # They move with how a raster is drawn, with the continuous fill scale and the colour bar.
+    # ggplot2 4.0.3 draws a rectangle, a bar and a tile in `coord_radial()` as a polygon whose
+    # sides follow the curves, and a raster as such rectangles; Giggly draws no such polygon yet,
+    # so each is refused, rather than drawn wrong.
+    # R 4.6.1 with ggplot2 4.0.3: over x 0.5, 2.5 and 4.5 the raster's `rasterGrob()` is 1 by 3
+    # cells, counted in the gaps between the positions, not from 0; interpolated, the PNG is the
+    # cells alone. A panel whose every row is missing its position draws no image.
+    test "a raster's image counts its cells in the gaps between positions, and none of no cells" do
+      cells =
+        %{"x" => [0.5, 2.5, 4.5], "y" => [1.0, 1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster(interpolate: true)
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+        |> without_images()
+        |> elem(1)
+        |> Enum.map(&png_pixels/1)
+
+      assert [{<<3::32, 1::32, _rest::binary>>, _rows}] = cells
+
+      missing =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_raster(data: %{"x" => [nil], "y" => [1.0]})
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      refute missing =~ "<image "
+    end
+
+    test "rectangles, bars, tiles and rasters are refused in radial coordinates" do
+      rows = %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "k" => ["a", "b"]}
+
+      layers = [
+        fn plot -> Plot.geom_rect(plot, xmin: 0, xmax: 1, ymin: 0, ymax: 1) end,
+        fn plot -> Plot.geom_col(plot, %{x: :k}) end,
+        &Plot.geom_tile/1,
+        &Plot.geom_raster/1
+      ]
+
+      for layer <- layers do
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y})
+          |> layer.()
+          |> Plot.coord_radial()
+
+        error = assert_raise ArgumentError, fn -> Giggly.to_svg(plot) end
+
+        assert error.message ==
+                 "rectangles, bars, tiles and rasters cannot be drawn in radial coordinates " <>
+                   "yet: their sides would follow its curves, which Giggly does not draw"
+      end
+    end
+
+    test "a raster is drawn as one image of its cells" do
+      faithfuld = Plot.new(Giggly.Datasets.faithfuld(), %{x: :waiting, y: :eruptions})
+
+      uniform = [
+        0.26550866314209998,
+        0.37212389963679016,
+        0.57285336335189641,
+        0.90820778999477625,
+        0.2016819310374558,
+        0.89838968496769667,
+        0.94467526860535145,
+        0.66079779248684645,
+        0.62911404389888048,
+        0.061786270467564464,
+        0.20597457489930093,
+        0.17655675252899528,
+        0.68702284665778279,
+        0.38410371821373701,
+        0.76984141999855638,
+        0.49769924208521843,
+        0.71761850826442242,
+        0.9919060948304832,
+        0.38003517943434417,
+        0.77744522131979465,
+        0.93470523110590875,
+        0.21214252128265798,
+        0.65167376608587801,
+        0.12555509596131742,
+        0.26722066872753203,
+        0.3861140925437212,
+        0.013390333158895373,
+        0.38238795707002282,
+        0.86969084572046995,
+        0.34034899668768048,
+        0.48208011547103524,
+        0.59956582542508841,
+        0.49354130704887211,
+        0.1862176014110446,
+        0.8273733186069876,
+        0.66846673819236457
+      ]
+
+      places = for y <- 0..5, x <- 0..5, do: {x / 1, y / 1}
+
+      just =
+        [
+          x: Enum.map(places, fn {x, _y} -> x end),
+          y: Enum.map(places, fn {_x, y} -> y end),
+          z: uniform
+        ]
+        |> Plot.new(%{x: :x, y: :y, fill: :z})
+        |> Plot.geom_raster(hjust: 0, vjust: 0)
+
+      hole =
+        [
+          x: [1.0, 2.0, 4.0, 1.0, 2.0, 4.0],
+          y: [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
+          z: ["a", "b", "c", "a", nil, "c"]
+        ]
+        |> Plot.new(%{x: :x, y: :y, fill: :z})
+        |> Plot.geom_raster()
+
+      assert raster_golden?(Plot.geom_raster(faithfuld, %{fill: :density}), "raster_faithfuld")
+
+      assert raster_golden?(
+               Plot.geom_raster(faithfuld, %{fill: :density}, interpolate: true),
+               "raster_interpolate"
+             )
+
+      assert raster_golden?(just, "raster_just")
+      assert raster_golden?(hole, "raster_hole")
+    end
+
+    # Golden: test/golden/tile.svg and test/golden/tile_width.svg, checked against ggplot2's
+    # drawings of the same plots, made by test/golden/tile.R and test/golden/tile_width.R: every
+    # rectangle, the tiles' and the keys', matches, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_tile()'s first two tile examples: tiles 2
+    # wide, the closest spacing of the x positions, and 1 tall, each filled by its level and
+    # bordered in grey50 at a tile's own default width; then each as wide as its mapped width,
+    # meeting edge to edge. They move with how a rectangle is drawn, with the hue palette and the
+    # legend.
+    test "tiles are drawn centred on their positions, as wide as the spacing or their width" do
+      data = [
+        x: [2.0, 5.0, 7.0, 9.0, 12.0, 2.0, 5.0, 7.0, 9.0, 12.0],
+        y: [1.0, 1.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0],
+        z: ["1", "1", "2", "2", "3", "3", "4", "4", "5", "5"],
+        w: [4.0, 2.0, 2.0, 2.0, 4.0, 4.0, 2.0, 2.0, 2.0, 4.0]
+      ]
+
+      tiles = fn mapping ->
+        data
+        |> Plot.new(mapping)
+        |> Plot.geom_tile(%{fill: :z}, colour: "#7F7F7F")
+      end
+
+      assert golden?(tiles.(%{x: :x, y: :y}), "tile")
+      assert golden?(tiles.(%{x: :x, y: :y, width: :w}), "tile_width")
+    end
+
     # Golden: test/golden/text.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/text.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_text()'s "Avoid overlaps" example: each car's
@@ -12124,6 +12728,58 @@ defmodule GigglyTest do
              "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
     end)
   end
+
+  # Whether the plot draws its golden, an image's data set aside and its pixels compared, decoded
+  # from each PNG, since another zlib may compress the same pixels to other bytes (design-log §4,
+  # the entry beginning "`geom_tile()`, `geom_raster()` and `faithfuld`").
+  defp raster_golden?(plot, name) do
+    {drawn, drawn_images} =
+      plot
+      |> Giggly.to_svg(width: 960, height: 768)
+      |> IO.iodata_to_binary()
+      |> without_images()
+
+    {golden, golden_images} = without_images(File.read!("test/golden/#{name}.svg"))
+
+    drawn == golden and
+      Enum.map(drawn_images, &png_pixels/1) == Enum.map(golden_images, &png_pixels/1)
+  end
+
+  # An SVG with each image's base64 data cut out, and the data cut.
+  defp without_images(svg) do
+    data = ~r/base64,([A-Za-z0-9+\/=]+)/
+
+    images =
+      data
+      |> Regex.scan(svg, capture: :all_but_first)
+      |> List.flatten()
+
+    {Regex.replace(data, svg, "base64,"), images}
+  end
+
+  # A PNG's header and its decompressed rows, each led by its filter's byte.
+  defp png_pixels(encoded) do
+    <<137, "PNG", 13, 10, 26, 10, chunks::binary>> = Base.decode64!(encoded)
+    {header, data} = png_chunks(chunks, :none, [])
+    {header, :zlib.uncompress(data)}
+  end
+
+  defp png_chunks(
+         <<size::32, "IHDR", header::binary-size(size), _crc::32, rest::binary>>,
+         _,
+         data
+       ),
+       do: png_chunks(rest, header, data)
+
+  defp png_chunks(
+         <<size::32, "IDAT", body::binary-size(size), _crc::32, rest::binary>>,
+         header,
+         data
+       ),
+       do: png_chunks(rest, header, [data, body])
+
+  defp png_chunks(<<_size::32, "IEND", _rest::binary>>, header, data),
+    do: {header, IO.iodata_to_binary(data)}
 
   defp golden?(plot, name, options \\ []) do
     svg =

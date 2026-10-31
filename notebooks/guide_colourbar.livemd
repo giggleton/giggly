@@ -45,7 +45,7 @@ p1 + scale_fill_continuous(guide = guide_colourbar())
 p1 + guides(fill = guide_colourbar())
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`) and `guide_colourbar()`.
+Not in Giggly yet: `guide_colourbar()`.
 
 ## Styling the bar
 
@@ -82,7 +82,7 @@ p1 + guides(fill = guide_colourbar(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and the theme's
+Not in Giggly yet: `guide_colourbar()` and its `theme` option, and the theme's
 `legend.text.position` setting.
 
 ## The number of bins
@@ -97,7 +97,7 @@ p1 + guides(fill = guide_colourbar(nbin = 100))
 
 `nbin` sets how many steps the bar's shading is drawn in.
 
-Not in Giggly yet: `geom_tile()`, and `guide_colourbar()` and its `nbin` option.
+Not in Giggly yet: `guide_colourbar()` and its `nbin` option.
 
 ## Hiding the end ticks
 
@@ -110,8 +110,7 @@ p1 +
   )
 ```
 
-Not in Giggly yet: `geom_tile()`, and `guide_colourbar()` and its `nbin`, `draw.ulim` and
-`draw.llim` options.
+Not in Giggly yet: `guide_colourbar()` and its `nbin`, `draw.ulim` and `draw.llim` options.
 
 ## A colour bar beside a legend
 
@@ -134,5 +133,5 @@ p2 +
   )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_colourbar()` and its `theme` option, and `guide_legend()`'s
-`theme` option.
+Not in Giggly yet: `guide_colourbar()` and its `theme` option, and `guide_legend()`'s `theme`
+option.

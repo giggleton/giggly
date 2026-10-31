@@ -56,7 +56,27 @@ p2 <- p1 + geom_point(aes(size = value))
 p1 + scale_fill_continuous(guide = guide_legend())
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`).
+The cell builds the same table, `X1` changing fastest, as `expand.grid()` builds it. `p2`, which
+adds points sized by `value`, is drawn by no example.
+
+```elixir
+pairs = for x2 <- 1..10, x1 <- 1..10, do: {x1, x2}
+
+df = %{
+  "X1" => Enum.map(pairs, fn {x1, _x2} -> x1 end),
+  "X2" => Enum.map(pairs, fn {_x1, x2} -> x2 end),
+  "value" => Enum.map(pairs, fn {x1, x2} -> x1 * x2 end)
+}
+
+p1 =
+  df
+  |> Plot.new(%{x: :X1, y: :X2})
+  |> Plot.geom_tile(%{fill: :value})
+
+p1
+|> Plot.scale_fill_continuous(guide: Plot.guide_legend())
+|> render.()
+```
 
 ## Styling the title and labels
 
@@ -84,7 +104,7 @@ p1 + guides(fill = guide_legend(theme = theme(
 )))
 ```
 
-Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `title` and `theme` options, and the theme's
+Not in Giggly yet: `guide_legend()`'s `title` and `theme` options, and the theme's
 `legend.title.position` and `legend.text.position` settings.
 
 ## A horizontal legend
@@ -107,7 +127,7 @@ p1 +
 The keys run across, with the title above them and each label below its key, turned on its
 side.
 
-Not in Giggly yet: `geom_tile()`, `guide_legend()`'s `theme` option, and the theme's
+Not in Giggly yet: `guide_legend()`'s `theme` option, and the theme's
 `legend.title.position` and `legend.text.position` settings.
 
 ## Keys drawn opaque
