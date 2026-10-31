@@ -22,8 +22,8 @@ defmodule Scales.Labels.Arithmetic do
   #   of natural ones.
   # - `product/2`, `quotient/2` and `difference/2` are a double's `*`, `/` and `-`, a result
   #   past the largest double the infinity of its sign, `:infinity` or `:neg_infinity`, as R's
-  #   is, where Erlang raises;
-  #   `signif/2` keeps an infinity, as R does.
+  #   is, where Erlang raises; each takes numbers alone, so the rescue never takes a missing or
+  #   infinite operand for an overflow. `signif/2` keeps an infinity, as R does.
 
   # R's `MAX_DIGITS` for `signif()`, and `DBL_MAX_10_EXP`.
   @max_digits 22
@@ -100,7 +100,7 @@ defmodule Scales.Labels.Arithmetic do
   # `left * right` as a double, or the infinity of its sign past the largest.
   @doc false
   @spec product(float(), float()) :: float() | :infinity | :neg_infinity
-  def product(left, right) do
+  def product(left, right) when is_number(left) and is_number(right) do
     left * right
   rescue
     ArithmeticError -> infinity(left, right)
@@ -109,7 +109,7 @@ defmodule Scales.Labels.Arithmetic do
   # `left / right` as a double, or the infinity of its sign past the largest.
   @doc false
   @spec quotient(float(), float()) :: float() | :infinity | :neg_infinity
-  def quotient(left, right) do
+  def quotient(left, right) when is_number(left) and is_number(right) do
     left / right
   rescue
     ArithmeticError -> infinity(left, right)
@@ -118,7 +118,7 @@ defmodule Scales.Labels.Arithmetic do
   # `high - low`, `high` the larger, as a double, or `:infinity` past the largest.
   @doc false
   @spec difference(float(), float()) :: float() | :infinity
-  def difference(high, low) do
+  def difference(high, low) when is_number(high) and is_number(low) do
     high - low
   rescue
     ArithmeticError -> :infinity

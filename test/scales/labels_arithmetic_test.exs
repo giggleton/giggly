@@ -37,5 +37,24 @@ defmodule Scales.Labels.ArithmeticTest do
       assert Arithmetic.quotient(0.5, -1.0e-310) == :neg_infinity
       assert Arithmetic.quotient(-1.0e308, -0.1) == :infinity
     end
+
+    # Not R's: the labellers hand these a break only once it is a number, and a missing or
+    # infinite one taken through the rescue would read as an overflow, its sign lost.
+    test "refuse what is not a number" do
+      for value <- [nil, :infinity, :neg_infinity] do
+        refused = untyped(value)
+        assert_raise FunctionClauseError, fn -> Arithmetic.product(refused, 1.0) end
+        assert_raise FunctionClauseError, fn -> Arithmetic.product(1.0, refused) end
+        assert_raise FunctionClauseError, fn -> Arithmetic.quotient(refused, 1.0) end
+        assert_raise FunctionClauseError, fn -> Arithmetic.quotient(1.0, refused) end
+        assert_raise FunctionClauseError, fn -> Arithmetic.difference(refused, 1.0) end
+        assert_raise FunctionClauseError, fn -> Arithmetic.difference(1.0, refused) end
+      end
+    end
   end
+
+  # `value` with its type hidden from the compiler, so a test can hand a function a value its
+  # guards refuse.
+  @spec untyped(term()) :: term()
+  defp untyped(value), do: value
 end

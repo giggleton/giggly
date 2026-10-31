@@ -559,6 +559,29 @@ defmodule Scales.LabelsTest do
       assert Enum.map(labels, &String.length/1) == [412, 411]
     end
 
+    test "takes no part in the others' accuracy where dividing it by one passes the double" do
+      # label_number()(c(-1.5e308, 1, 1.25)); c(1.5e308, 1, 1.25); label_bytes("kiB", accuracy =
+      # NULL)(c(1e15, 0.803, 6658.14, 0, -2.29e307))
+      assert Labels.number([-1.5e308, 1, 1.25]) == ["-Inf", "1.00", "1.25"]
+      assert Labels.number([1.5e308, 1, 1.25]) == ["Inf", "1.00", "1.25"]
+
+      assert Labels.bytes([1.0e15, 0.803, 6658.14, 0, -2.29e307],
+               units: "kiB",
+               accuracy: nil,
+               trim: false
+             ) ==
+               ["976 562 500 000.00012 kiB", "              0.00078 kiB"] ++
+                 ["              6.50209 kiB", "              0.00000 kiB", "-Inf"]
+
+      # R fails on these ("missing value where TRUE/FALSE needed"), so they are not R's: the
+      # accuracy is the others' alone (design-log §4, the entry beginning "A break whose
+      # quotient"), 1 leaving the first finite and 0.01, the gap a hair under 0.1, taking it past
+      assert ["150 000 000 000 000 001 646 859" <> _rest, "1", "2"] =
+               Labels.number([1.5e308, 1, 2])
+
+      assert Labels.number([1.5e308, 1.1, 1.2]) == ["Inf", "1.10", "1.20"]
+    end
+
     test "is Inf in scientific notation, inside its prefix and suffix" do
       # label_scientific(scale = 100)(c(1e307, -1e307, 1, NA)); prefix = "<", suffix = ">" on
       # c(1e307, 1)
@@ -881,6 +904,392 @@ defmodule Scales.LabelsTest do
     end
   end
 
+  describe "bytes/2" do
+    test "writes each break in the SI unit it reaches, plain bytes B" do
+      # label_bytes()(c(NA, 0, 1, 999, 1000, 1023, 1024, 1500, 1e6, 1048576, 1.5e9, -2048, 1e27,
+      # 1e30)); c(1e24, 1e25, 9.99e23, 5e23); c(999.5, 999500, 999.4999)
+      assert Labels.bytes(
+               [nil, 0, 1, 999, 1000, 1023, 1024, 1500, 1.0e6, 1_048_576] ++
+                 [1.5e9, -2048, 1.0e27, 1.0e30]
+             ) ==
+               [nil, "0 B", "1 B", "999 B", "1 kB", "1 kB", "1 kB", "2 kB", "1 MB", "1 MB"] ++
+                 ["2 GB", "-2 kB", "1 000 YB", "1 000 000 YB"]
+
+      assert Labels.bytes([1.0e24, 1.0e25, 9.99e23, 5.0e23]) ==
+               ["1 YB", "10 YB", "999 ZB", "500 ZB"]
+
+      assert Labels.bytes([999.5, 999_500, 999.4999]) == ["1 000 B", "1 000 kB", "999 B"]
+    end
+
+    # R writes plain bytes " iB" under binary units, which these rows write " B" (design-log §4,
+    # the entry beginning "Plain bytes under binary units").
+    test "writes each break in the binary unit it reaches, a break not whole in it in bytes" do
+      # label_bytes("auto_binary")(c(NA, 0, 1, 999, 1000, 1023, 1024, 1500, 1e6, 1048576, 1.5e9,
+      # -2048, 1e27, 1e30)); c(1023.5, 1048064, 1048063)
+      assert Labels.bytes(
+               [nil, 0, 1, 999, 1000, 1023, 1024, 1500, 1.0e6, 1_048_576] ++
+                 [1.5e9, -2048, 1.0e27, 1.0e30],
+               units: :auto_binary
+             ) ==
+               [nil, "0 B", "1 B", "999 B", "1 000 B", "1 023 B", "1 kiB", "1 500 B"] ++
+                 ["1 000 000 B", "1 MiB", "1 GiB", "-2 kiB", "827 YiB", "827 181 YiB"]
+
+      assert Labels.bytes([1023.5, 1_048_064, 1_048_063], units: :auto_binary) ==
+               ["1 024 B", "1 048 064 B", "1 048 063 B"]
+    end
+
+    test "writes every break in a unit given, its scale divided by the unit's size" do
+      # label_bytes("kB")(c(NA, 0, 1, 999, 1000, 1500, 1e6, 1048576, -2048, 1e27)); "kiB" on
+      # c(0, 1, 1024, 1500, 1e6, 1048576, 1e27); "MB" on c(1e5, 5e5, 1.5e6); "GiB" on c(2^30,
+      # 2^31, 3e9); "TB" on c(1e12, 2.5e12); "PiB" on c(2^50, 2^51); "EB", accuracy = 0.1 on
+      # c(1e18, 2.25e18); "ZB" on c(1e21, 3e21); "YiB" on c(1e24, 1e27, 1e30); "kB", scale = 2 on
+      # c(1000, 2000); "MiB", scale = 1000 on c(1048.576, 2097.152)
+      assert Labels.bytes([nil, 0, 1, 999, 1000, 1500, 1.0e6, 1_048_576, -2048, 1.0e27],
+               units: "kB"
+             ) ==
+               [
+                 nil,
+                 "0 kB",
+                 "0 kB",
+                 "1 kB",
+                 "1 kB",
+                 "2 kB",
+                 "1 000 kB",
+                 "1 049 kB",
+                 "-2 kB",
+                 "999 999 999 999 999 983 222 784 kB"
+               ]
+
+      assert Labels.bytes([0, 1, 1024, 1500, 1.0e6, 1_048_576, 1.0e27], units: "kiB") ==
+               [
+                 "0 kiB",
+                 "0 kiB",
+                 "1 kiB",
+                 "1 kiB",
+                 "977 kiB",
+                 "1 024 kiB",
+                 "976 562 500 000 000 012 976 128 kiB"
+               ]
+
+      assert Labels.bytes([1.0e5, 5.0e5, 1.5e6], units: "MB") == ["0 MB", "0 MB", "2 MB"]
+
+      assert Labels.bytes([1_073_741_824, 2_147_483_648, 3.0e9], units: "GiB") ==
+               ["1 GiB", "2 GiB", "3 GiB"]
+
+      assert Labels.bytes([1.0e12, 2.5e12], units: "TB") == ["1 TB", "2 TB"]
+
+      assert Labels.bytes([1_125_899_906_842_624, 2_251_799_813_685_248], units: "PiB") ==
+               ["1 PiB", "2 PiB"]
+
+      assert Labels.bytes([1.0e18, 2.25e18], units: "EB", accuracy: 0.1) == ["1.0 EB", "2.2 EB"]
+      assert Labels.bytes([1.0e21, 3.0e21], units: "ZB") == ["1 ZB", "3 ZB"]
+
+      assert Labels.bytes([1.0e24, 1.0e27, 1.0e30], units: "YiB") ==
+               ["1 YiB", "827 YiB", "827 181 YiB"]
+
+      assert Labels.bytes([1000, 2000], units: "kB", scale: 2) == ["2 kB", "4 kB"]
+
+      assert Labels.bytes([1048.576, 2097.152], units: "MiB", scale: 1000) ==
+               ["1 MiB", "2 MiB"]
+    end
+
+    test "rounds to whole units, to the accuracy given, or to one worked out under nil" do
+      # label_bytes(accuracy = NULL)(c(1500, 2500, 1e6)); accuracy = 0.1 on it;
+      # label_bytes("auto_binary", accuracy = NULL)(c(512, 1536, 2560, 1048576));
+      # label_bytes("kB", accuracy = NULL)(c(1250, 1500, 1750))
+      assert Labels.bytes([1500, 2500, 1.0e6], accuracy: nil) == ["1.5 kB", "2.5 kB", "1 MB"]
+      assert Labels.bytes([1500, 2500, 1.0e6], accuracy: 0.1) == ["1.5 kB", "2.5 kB", "1.0 MB"]
+
+      assert Labels.bytes([512, 1536, 2560, 1_048_576], units: :auto_binary, accuracy: nil) ==
+               ["512 B", "1 536 B", "2 560 B", "1 MiB"]
+
+      assert Labels.bytes([1250, 1500, 1750], units: "kB", accuracy: nil) ==
+               ["1.25 kB", "1.50 kB", "1.75 kB"]
+    end
+
+    test "takes number/2's scale, marks, padding, prefix and styles" do
+      # label_bytes(scale = 1024)(c(1, 2, 1000)); big.mark = ",", trim = FALSE on c(1, 1e6,
+      # 999999); "kB", big.mark = "," on c(1e9); style_negative = "parens", prefix = "~" on
+      # c(-2048, 3000); style_negative = "minus", style_positive = "plus" on c(-2048, 0, 3000);
+      # "kB", decimal.mark = ",", accuracy = 0.01 on c(1234, 5678); trim = FALSE on c(NA, 1, 1500)
+      assert Labels.bytes([1, 2, 1000], scale: 1024) == ["1 kB", "2 kB", "1 MB"]
+
+      assert Labels.bytes([1, 1.0e6, 999_999], big_mark: ",", trim: false) ==
+               ["    1 B", "    1 MB", "1,000 kB"]
+
+      assert Labels.bytes([1.0e9], units: "kB", big_mark: ",") == ["1,000,000 kB"]
+
+      assert Labels.bytes([-2048, 3000], style_negative: :parens, prefix: "~") ==
+               ["(~2 kB)", "~3 kB"]
+
+      assert Labels.bytes([-2048, 0, 3000], style_negative: :minus, style_positive: :plus) ==
+               ["−2 kB", "0 B", "+3 kB"]
+
+      assert Labels.bytes([1234, 5678], units: "kB", decimal_mark: ",", accuracy: 0.01) ==
+               ["1,23 kB", "5,68 kB"]
+
+      assert Labels.bytes([nil, 1, 1500], trim: false) == [nil, " 1 B", " 2 kB"]
+    end
+
+    test "labels a break scale: takes past the largest double Inf, and no breaks with none" do
+      # label_bytes(scale = 10)(c(1e308, 1)); "YiB", scale = 1e300 on c(1e300, 1e290);
+      # label_bytes()(numeric(0))
+      assert Labels.bytes([1.0e308, 1], scale: 10) == ["Inf", "10 B"]
+      assert Labels.bytes([1.0e300, 1.0e290], units: "YiB", scale: 1.0e300) == ["Inf", "Inf"]
+      assert Labels.bytes([]) == []
+    end
+  end
+
+  describe "ordinal/2" do
+    test "rounds each break half to even and writes English ordinals" do
+      # label_ordinal()(c(NA, 0, 1, 2, 3, 4, 11, 12, 13, 21, 101, 111, 112, 1001, 1e4, 1e5,
+      # 123456, 1e6, -1, -11, -12, 0.5, 1.5, 2.5, 2.4999, -0.4)); c(22, 23, 24, 211, 212, 213,
+      # 1011, 1021, 3.5, -2.5, -3.5, 113); c(1e14, 999999999999999, 123456789012345)
+      assert Labels.ordinal(
+               [nil, 0, 1, 2, 3, 4, 11, 12, 13, 21, 101, 111, 112, 1001, 1.0e4, 1.0e5] ++
+                 [123_456, 1.0e6, -1, -11, -12, 0.5, 1.5, 2.5, 2.4999, -0.4]
+             ) ==
+               [nil, "0th", "1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st"] ++
+                 ["101st", "111th", "112th", "1 001st", "10 000th", "100 000th", "123 456th"] ++
+                 ["1 000 000th", "-1st", "-11th", "-12th", "0th", "2nd", "2nd", "2nd", "0th"]
+
+      assert Labels.ordinal([22, 23, 24, 211, 212, 213, 1011, 1021, 3.5, -2.5, -3.5, 113]) ==
+               ["22nd", "23rd", "24th", "211th", "212th", "213th", "1 011th", "1 021st"] ++
+                 ["4th", "-2nd", "-4th", "113th"]
+
+      assert Labels.ordinal([1.0e14, 999_999_999_999_999, 123_456_789_012_345]) ==
+               ["100 000 000 000 000th", "999 999 999 999 999th", "123 456 789 012 345th"]
+    end
+
+    test "takes number/2's marks, padding, prefix and styles, and a suffix after its own" do
+      # label_ordinal(big.mark = ",")(c(1001, 1e6)); prefix = "#", suffix = " place" on c(1, 2,
+      # NA); prefix = "#" on c(-1, 2); style_negative = "parens" on c(-1, -2, 3);
+      # style_negative = "minus", style_positive = "space" on c(-1, 0, 2); style_positive =
+      # "plus" on c(-1, 0, 2); trim = FALSE on c(1, 1000)
+      assert Labels.ordinal([1001, 1.0e6], big_mark: ",") == ["1,001st", "1,000,000th"]
+
+      assert Labels.ordinal([1, 2, nil], prefix: "#", suffix: " place") ==
+               ["#1st place", "#2nd place", nil]
+
+      assert Labels.ordinal([-1, 2], prefix: "#") == ["-#1st", "#2nd"]
+      assert Labels.ordinal([-1, -2, 3], style_negative: :parens) == ["(1)st", "(2)nd", "3rd"]
+
+      assert Labels.ordinal([-1, 0, 2], style_negative: :minus, style_positive: :space) ==
+               ["−1st", "0th", "\u20072nd"]
+
+      assert Labels.ordinal([-1, 0, 2], style_positive: :plus) == ["-1st", "0th", "+2nd"]
+      assert Labels.ordinal([1, 1000], trim: false) == ["    1st", "1 000th"]
+    end
+
+    test "pads a missing break's neighbours as though it were 1, as R writes it" do
+      # label_ordinal(trim = FALSE)(c(NA, 1, 22)); prefix = "$", trim = FALSE, rules = list(a =
+      # "^1$", b = "(?<=[02468])$", c = "[13579]$", d = ".") on c(1.5, NA)
+      assert Labels.ordinal([nil, 1, 22], trim: false) == [nil, " 1st", "22nd"]
+
+      rules = [{"a", ~r/^1$/}, {"b", ~r/(?<=[02468])$/}, {"c", ~r/[13579]$/}, {"d", ~r/./}]
+      assert Labels.ordinal([1.5, nil], prefix: "$", trim: false, rules: rules) == ["$2b", nil]
+    end
+
+    test "takes the first rule matching the digits, a negative's minus among them" do
+      # label_ordinal(rules = list(a = "1", b = "."))(c(1, 2, 3, 12)); rules = list(a = "1",
+      # a = "2", b = ".") on c(1, 2, 3); rules = list(x = "^1$", y = ".") on c(-1, 1, 1e5);
+      # rules = list(neg = "^-", pos = ".") on c(-3, -0.4, 0, 3); rules = ordinal_english() on
+      # c(1, 2)
+      assert Labels.ordinal([1, 2, 3, 12], rules: [{"a", ~r/1/}, {"b", ~r/./}]) ==
+               ["1a", "2b", "3b", "12a"]
+
+      assert Labels.ordinal([1, 2, 3], rules: [{"a", ~r/1/}, {"a", ~r/2/}, {"b", ~r/./}]) ==
+               ["1a", "2a", "3b"]
+
+      assert Labels.ordinal([-1, 1, 1.0e5], rules: [{"x", ~r/^1$/}, {"y", ~r/./}]) ==
+               ["-1y", "1x", "100 000y"]
+
+      assert Labels.ordinal([-3, -0.4, 0, 3], rules: [{"neg", ~r/^-/}, {"pos", ~r/./}]) ==
+               ["-3neg", "0pos", "0pos", "3pos"]
+
+      assert Labels.ordinal([1, 2], rules: Labels.ordinal_english()) == ["1st", "2nd"]
+    end
+
+    # R matches its rules against as.character(), which writes a round number in scientific
+    # notation where that is shorter; the digits are matched here (design-log §4, the entry
+    # beginning "`ordinal/2`'s rules are matched"), so these rows are not R's.
+    test "matches a round number's digits, where R matches its scientific notation" do
+      # R: label_ordinal()(c(1e21, 2e22)) is "...st", "...nd", from "1e+21" and "2e+22";
+      # rules = list(even = "[02468]$", odd = ".") on 2e5 is "200 000odd", from "2e+05"
+      assert Labels.ordinal([1.0e21, 2.0e22]) ==
+               ["1 000 000 000 000 000 000 000th", "20 000 000 000 000 000 000 000th"]
+
+      assert Labels.ordinal([2.0e5], rules: [{"even", ~r/[02468]$/}, {"odd", ~r/./}]) ==
+               ["200 000even"]
+    end
+
+    test "labels no breaks with none" do
+      assert Labels.ordinal([]) == []
+    end
+  end
+
+  describe "pvalue/2" do
+    test "writes a p-value below the accuracy as less, and above 1 less it as more" do
+      # label_pvalue()(c(NA, -0.5, 0, 0.0004, 0.0005, 0.00051, 0.001, 0.0015, 0.0025, 0.01, 0.05,
+      # 0.5, 0.999, 0.9994, 0.9995, 0.9996, 1, 1.5, 1e6)); c(1e308, -1e308, 0.0125, 0.0135)
+      assert Labels.pvalue(
+               [nil, -0.5, 0, 0.0004, 0.0005, 0.00051, 0.001, 0.0015, 0.0025, 0.01, 0.05] ++
+                 [0.5, 0.999, 0.9994, 0.9995, 0.9996, 1, 1.5, 1.0e6]
+             ) ==
+               [nil, "<0.001", "<0.001", "<0.001", "<0.001", "<0.001", "0.001", "0.002"] ++
+                 ["0.002", "0.010", "0.050", "0.500", "0.999", ">0.999", ">0.999", ">0.999"] ++
+                 [">0.999", ">0.999", ">0.999"]
+
+      assert Labels.pvalue([1.0e308, -1.0e308, 0.0125, 0.0135]) ==
+               [">0.999", "<0.001", "0.012", "0.014"]
+    end
+
+    test "rounds the bounds' labels to the accuracy too" do
+      # label_pvalue(accuracy = 0.01)(c(0.001, 0.005, 0.0051, 0.01, 0.123, 0.985, 0.99, 0.995,
+      # 0.999)); accuracy = 0.05 on c(0.01, 0.05, 0.07, 0.5, 0.94, 0.95, 0.96); 0.5 on c(0, 0.25,
+      # 0.5, 0.75, 1); 0.3 on c(0.1, 0.3, 0.5, 0.65, 0.7, 0.8); 0.25 on c(0.1, 0.25, 0.5, 0.75,
+      # 0.8); 0.002 on c(0.001, 0.003, 0.5, 0.997, 0.999); 0.1 on c(0.05, 0.1, 0.9, 0.95); 1e-4 on
+      # c(5e-5, 0.12345, 0.99995); 1e-10 on c(1e-11, 0.5, 1 - 1e-11)
+      assert Labels.pvalue([0.001, 0.005, 0.0051, 0.01, 0.123, 0.985, 0.99, 0.995, 0.999],
+               accuracy: 0.01
+             ) == ["<0.01", "<0.01", "<0.01", "0.01", "0.12", "0.98", "0.99", ">0.99", ">0.99"]
+
+      assert Labels.pvalue([0.01, 0.05, 0.07, 0.5, 0.94, 0.95, 0.96], accuracy: 0.05) ==
+               ["<0.05", "0.05", "0.05", "0.50", "0.95", "0.95", ">0.95"]
+
+      assert Labels.pvalue([0, 0.25, 0.5, 0.75, 1], accuracy: 0.5) ==
+               ["<0.5", "<0.5", "0.5", ">0.5", ">0.5"]
+
+      assert Labels.pvalue([0.1, 0.3, 0.5, 0.65, 0.7, 0.8], accuracy: 0.3) ==
+               ["<0.3", "0.3", "0.6", "0.6", "0.6", ">0.6"]
+
+      assert Labels.pvalue([0.1, 0.25, 0.5, 0.75, 0.8], accuracy: 0.25) ==
+               ["<0.25", "0.25", "0.50", "0.75", ">0.75"]
+
+      assert Labels.pvalue([0.001, 0.003, 0.5, 0.997, 0.999], accuracy: 0.002) ==
+               ["<0.002", "0.004", "0.500", "0.996", ">0.998"]
+
+      assert Labels.pvalue([0.05, 0.1, 0.9, 0.95], accuracy: 0.1) ==
+               ["<0.1", "0.1", "0.9", ">0.9"]
+
+      assert Labels.pvalue([5.0e-5, 0.12345, 0.99995], accuracy: 1.0e-4) ==
+               ["<0.0001", "0.1234", ">0.9999"]
+
+      assert Labels.pvalue([1.0e-11, 0.5, 1 - 1.0e-11], accuracy: 1.0e-10) ==
+               ["<0.0000000001", "0.5000000000", ">0.9999999999"]
+    end
+
+    test "takes the prefixes, p's prefixes, and the decimal mark given" do
+      # label_pvalue(add_p = TRUE)(c(NA, -0.5, 0, 0.0005, 0.001, 0.05, 0.999, 0.9995, 1.5));
+      # prefix = c("less ", "is ", "more ") on c(1e-4, 0.05, 0.9999, NA); decimal.mark = "," on
+      # c(1e-4, 0.05, 0.9999)
+      assert Labels.pvalue([nil, -0.5, 0, 0.0005, 0.001, 0.05, 0.999, 0.9995, 1.5], add_p: true) ==
+               [nil, "p<0.001", "p<0.001", "p<0.001", "p=0.001", "p=0.050", "p=0.999"] ++
+                 ["p>0.999", "p>0.999"]
+
+      assert Labels.pvalue([1.0e-4, 0.05, 0.9999, nil], prefix: {"less ", "is ", "more "}) ==
+               ["less 0.001", "is 0.050", "more 0.999", nil]
+
+      assert Labels.pvalue([1.0e-4, 0.05, 0.9999], decimal_mark: ",") ==
+               ["<0,001", "0,050", ">0,999"]
+    end
+
+    test "labels no p-values with none" do
+      assert Labels.pvalue([]) == []
+    end
+  end
+
+  describe "timespan/2" do
+    test "writes seconds in the largest step of time each reaches" do
+      # label_timespan()(c(NA, 0, 1e-10, 1e-9, 5e-7, 0.001, 0.5, 1, 30, 59, 60, 90, 120, 3600,
+      # 5400, 86400, 129600, 604800, 1209600, 1e7, -90)); space = TRUE on c(NA, 0, 1e-10, 1e-9,
+      # 5e-7, 0.001, 0.5, 1, 30, 90, 120, 5400, 129600, 604800, 1e7, -90)
+      assert Labels.timespan(
+               [nil, 0, 1.0e-10, 1.0e-9, 5.0e-7, 0.001, 0.5, 1, 30, 59, 60, 90, 120] ++
+                 [3600, 5400, 86_400, 129_600, 604_800, 1_209_600, 1.0e7, -90]
+             ) ==
+               [nil, "0", "0", "1ns", "500ns", "1ms", "500ms", "1s", "30s", "59s", "1m"] ++
+                 ["90s", "2m", "1h", "90m", "1d", "36h", "1.0w", "2.0w", "16.5w", "-90s"]
+
+      assert Labels.timespan(
+               [nil, 0, 1.0e-10, 1.0e-9, 5.0e-7, 0.001, 0.5, 1, 30, 90, 120, 5400] ++
+                 [129_600, 604_800, 1.0e7, -90],
+               space: true
+             ) ==
+               [nil, "0 ", "0 ", "1 ns", "500 ns", "1 ms", "500 ms", "1 s", "30 s", "90 s"] ++
+                 ["2 m", "90 m", "36 h", "1 w", "17 w", "-90 s"]
+    end
+
+    test "counts the breaks in the unit given" do
+      # label_timespan("mins")(c(0, 0.5, 1, 1.5, 60, 90, 1440, 10080)); "hours" on c(0, 0.5, 1,
+      # 1.5, 24, 36, 168); "days" on c(0, 0.5, 1, 1.5, 7, 10); "weeks" on c(0, 0.5, 1, 1.5, 52)
+      # and c(0.1, 0.3); "hours" on c(1/3, 2/3)
+      assert Labels.timespan([0, 0.5, 1, 1.5, 60, 90, 1440, 10_080], unit: :minute) ==
+               ["0", "30s", "1m", "90s", "1h", "90m", "1d", "1w"]
+
+      assert Labels.timespan([0, 0.5, 1, 1.5, 24, 36, 168], unit: :hour) ==
+               ["0", "30m", "1h", "90m", "1d", "36h", "1w"]
+
+      assert Labels.timespan([0, 0.5, 1, 1.5, 7, 10], unit: :day) ==
+               ["0", "12h", "1d", "36h", "1w", "10d"]
+
+      assert Labels.timespan([0, 0.5, 1, 1.5, 52], unit: :week) ==
+               ["0", "84h", "1.0w", "1.5w", "52.0w"]
+
+      assert Labels.timespan([0.1, 0.3], unit: :week) == ["1 008m", "2d"]
+      assert Labels.timespan([1 / 3, 2 / 3], unit: :hour) == ["20m", "40m"]
+    end
+
+    test "takes number/2's accuracy, scale, marks, padding, prefix, suffix and styles" do
+      # label_timespan(accuracy = 0.1)(c(1, 90, 5400)); accuracy = 1, scale = 60 on c(1, 1.5,
+      # 90); suffix = " ago", prefix = "~" on c(1, 60, -60); big.mark = "," on 1e4 * 604800;
+      # trim = FALSE on c(1, 100, 3600) and c(NA, 1, 100); style_positive = "plus",
+      # style_negative = "minus" on c(-60, 0, 60); "days", decimal.mark = ",", accuracy = 0.1 on
+      # c(0.25, 1.5)
+      assert Labels.timespan([1, 90, 5400], accuracy: 0.1) == ["1.0s", "90.0s", "90.0m"]
+      assert Labels.timespan([1, 1.5, 90], accuracy: 1, scale: 60) == ["1m", "90s", "90m"]
+
+      assert Labels.timespan([1, 60, -60], suffix: " ago", prefix: "~") ==
+               ["~1s ago", "~1m ago", "-~1m ago"]
+
+      assert Labels.timespan([1.0e4 * 604_800], big_mark: ",") == ["10,000w"]
+      assert Labels.timespan([1, 100, 3600], trim: false) == ["  1s", "100s", "  1h"]
+      assert Labels.timespan([nil, 1, 100], trim: false) == [nil, "  1s", "100s"]
+
+      assert Labels.timespan([-60, 0, 60], style_positive: :plus, style_negative: :minus) ==
+               ["−1m", "0", "+1m"]
+
+      assert Labels.timespan([0.25, 1.5], unit: :day, decimal_mark: ",", accuracy: 0.1) ==
+               ["6,0h", "36,0h"]
+    end
+
+    test "labels a break its unit or scale: takes past the largest double Inf" do
+      # label_timespan("weeks")(c(1e303, 3e302, -1e303, 1)); "weeks", style_negative = "parens",
+      # prefix = "~", suffix = "!" on c(-1e303, 1e303, 1); "weeks", trim = FALSE on c(1e303, 1,
+      # 2); "weeks", accuracy = 0.5 on c(1e303, 1, 2); scale = 1e10 on c(1e300, 1)
+      assert Labels.timespan([1.0e303, 3.0e302, -1.0e303, 1], unit: :week) ==
+               ["Inf", "Inf", "-Inf", "1w"]
+
+      assert Labels.timespan([-1.0e303, 1.0e303, 1],
+               unit: :week,
+               style_negative: :parens,
+               prefix: "~",
+               suffix: "!"
+             ) == ["(Inf)", "Inf", "~1w!"]
+
+      assert Labels.timespan([1.0e303, 1, 2], unit: :week, trim: false) == ["Inf", "  1w", "  2w"]
+
+      assert Labels.timespan([1.0e303, 1, 2], unit: :week, accuracy: 0.5) ==
+               ["Inf", "1.0w", "2.0w"]
+
+      assert Labels.timespan([1.0e300, 1], scale: 1.0e10) == ["Inf", "16 534w"]
+    end
+
+    test "labels no breaks with none" do
+      assert Labels.timespan([]) == []
+    end
+  end
+
   describe "a call Scales.Labels refuses" do
     test "names a digits: outside 1 to 22, for every function that takes it" do
       for digits <- [0, 23, 2.5, -1] do
@@ -1039,6 +1448,137 @@ defmodule Scales.LabelsTest do
       error = assert_raise ArgumentError, fn -> Labels.cut_si(:g) end
       assert error.message =~ "unit"
       assert error.message =~ ":g"
+    end
+
+    # R: label_bytes("KiB") "must be one of "kB", ..., "YiB", not "KiB""; label_bytes(suffix =
+    # "x") and label_bytes(scale_cut = ...) "matched by multiple actual arguments"
+    test "names a unit bytes/2 does not spell, and the options it does not take" do
+      for units <- ["KiB", "KB", "B", "iB", "kb", :auto, :kB, nil] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Labels.bytes([1], units: units) end
+
+        assert error.message =~ ~s(:auto_si, :auto_binary or one of "kB", "MB")
+        assert error.message =~ ~s("YiB")
+        assert error.message =~ "got: #{inspect(units)}"
+      end
+
+      for option <- [suffix: "x", scale_cut: Labels.cut_short_scale(), accuracy: 0] do
+        {name, _value} = option
+        error = assert_raise NimbleOptions.ValidationError, fn -> Labels.bytes([1], [option]) end
+        assert error.message =~ inspect(name)
+      end
+    end
+
+    # R: label_ordinal(accuracy = 0.1) "matched by multiple actual arguments"; scale writes the
+    # unscaled break's suffix ("10st"); rules = list() "at least one vector element is
+    # required"; a break no rule matches takes another's suffix ("1a" "2b" "3a" "4b")
+    test "names an option ordinal/2 does not take, rules that are not rules, and a break none match" do
+      for option <- [
+            accuracy: 0.1,
+            scale: 10,
+            scale_cut: Labels.cut_short_scale(),
+            decimal_mark: ","
+          ] do
+        {name, _value} = option
+
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Labels.ordinal([1], [option]) end
+
+        assert error.message =~ inspect(name)
+      end
+
+      for rules <- [
+            [],
+            [{"a", "1"}],
+            [{:a, ~r/1/}],
+            ["st"],
+            %{"st" => ~r/1/},
+            [{"st", ~r/1/}, {"th", "."}]
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Labels.ordinal([1], rules: rules) end
+
+        assert error.message =~ "{suffix, regex} pair"
+        assert error.message =~ inspect(rules)
+      end
+
+      for {breaks, digits} <- [{[2, 3], ~s("3")}, {[2, nil, -2.6], ~s("-3")}] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Labels.ordinal(breaks, rules: [{"a", ~r/2/}])
+          end
+
+        assert error.message =~ "Labels.ordinal/2 found no rule matching #{digits}"
+        assert error.message =~ inspect([{"a", ~r/2/}])
+      end
+    end
+
+    # R: label_pvalue(accuracy = 1)(c(0, 0.5, 1)) is "<1" ">0" ">0"; accuracy = 0 "NA"; a
+    # negative fails in format(); prefix = c("a", "b") "must be a length 3 character vector";
+    # with add_p = TRUE, prefix silently wins
+    test "names an accuracy above 0.5, a prefix not three strings, and add_p: beside prefix:" do
+      for accuracy <- [0.6, 1, 2, 0, -0.1, nil, "0.01"] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Labels.pvalue([0.5], accuracy: accuracy)
+          end
+
+        assert error.message =~ "positive number no larger than 0.5"
+        assert error.message =~ "got: #{inspect(accuracy)}"
+      end
+
+      for prefix <-
+            [{"a", "b"}, ["a", "b", "c"], {"a", "b", "c", "d"}] ++
+              [{:a, "b", "c"}, {"a", :b, "c"}, {"a", "b", :c}] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Labels.pvalue([0.5], prefix: prefix)
+          end
+
+        assert error.message =~ "three strings"
+        assert error.message =~ "got: #{inspect(prefix)}"
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Labels.pvalue([0.5], prefix: {"a", "b", "c"}, add_p: true)
+        end
+
+      assert error.message =~ "add_p: true or prefix:, not both"
+      assert error.message =~ ~s(prefix: {"a", "b", "c"})
+
+      assert Labels.pvalue([0.5], prefix: {"a", "b", "c"}, add_p: false) == ["b0.500"]
+    end
+
+    # R: label_timespan("min") "must be one of "secs", ..."; scale_cut "matched by multiple
+    # actual arguments"
+    test "names a unit timespan/2 does not count in, and scale_cut:" do
+      for unit <- ["mins", :min, :month] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Labels.timespan([1], unit: unit) end
+
+        assert error.message =~ ":unit"
+        assert error.message =~ ":week"
+      end
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Labels.timespan([1], scale_cut: Labels.cut_short_scale())
+        end
+
+      assert error.message =~ ":scale_cut"
+    end
+
+    test "names breaks that are not a list of numbers and nils, for bytes, ordinals, p-values and spans of time" do
+      for {label, name} <- [
+            {fn -> Labels.bytes([1, "2"]) end, "Labels.bytes/2"},
+            {fn -> Labels.ordinal([1, "2"]) end, "Labels.ordinal/2"},
+            {fn -> Labels.pvalue([1, "2"]) end, "Labels.pvalue/2"},
+            {fn -> Labels.timespan([1, "2"]) end, "Labels.timespan/2"}
+          ] do
+        error = assert_raise ArgumentError, label
+        assert error.message =~ name
+      end
     end
   end
 
