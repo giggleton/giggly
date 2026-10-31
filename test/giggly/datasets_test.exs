@@ -128,4 +128,20 @@ defmodule Giggly.DatasetsTest do
     assert Enum.frequencies(diets) ==
              %{"carni" => 19, "herbi" => 32, "insecti" => 5, "omni" => 20, nil => 7}
   end
+
+  # Golden: R 4.6.1 with ggplot2 4.0.3, `length(unique(faithfuld$eruptions))` and `$waiting`'s,
+  # `sprintf("%.17g", range(faithfuld$density))`, and `sprintf("%.17g", faithfuld$density[74])`,
+  # the first density 16 significant digits cannot write, a number so small that written without
+  # an exponent, as the file writes it, it has 23 zeros after the point.
+  test "faithfuld reads R's 75 by 75 grid, and a density only 17 digits write as R's double" do
+    faithfuld = Giggly.Datasets.faithfuld()
+    densities = Keyword.fetch!(faithfuld, :density)
+
+    grid = Enum.map([:eruptions, :waiting], fn name -> Keyword.fetch!(faithfuld, name) end)
+
+    assert Enum.map(grid, fn values -> Enum.count(Enum.uniq(values)) end) == [75, 75]
+
+    assert Enum.min_max(densities) === {1.2592497278268704e-24, 0.036987798689110785}
+    assert Enum.at(densities, 73) === 3.4387634410802696e-24
+  end
 end

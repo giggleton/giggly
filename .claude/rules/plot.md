@@ -33,7 +33,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
-  `geom_hex/3`, `geom_label/3`, `geom_hline/3`, `geom_vline/3` and `geom_abline/3` among them),
+  `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_hline/3`, `geom_vline/3` and
+  `geom_abline/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
@@ -149,7 +150,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `:off` is given, and `coord_radial/1` `%Coord.Radial{}`); `geom_text/3` records
   `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and so does
   `geom_label/3`, with `%Geom.Label{}` and the identity stat, as its `geom_label()` does, and
-  `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
+  `geom_rect/3` `%Geom.Rect{}` with the identity stat and position, and `geom_tile/3`
+  `%Geom.Tile{}` with them, taking no `position:`. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
   identity stat and position, as ggplot2's `annotate()` does, so its text and labels are never
   nudged. `Plot`
@@ -335,12 +337,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
   `:neg_infinity`, in the units of each axis, and `geom_bar/3` and `geom_col/3` `width:`, any
-  number, as R takes it, and `geom_boxplot/3` `fill:`, `linewidth:`, `linetype:`, `shape:` and
+  number, as R takes it, and `geom_tile/3` `width:` and `height:`, any numbers, and `geom_boxplot/3` `fill:`, `linewidth:`, `linetype:`, `shape:` and
   `size:`, the last two the outliers', and `width:`. The assembly puts it into every row last, a
   position's aesthetic also just before the position runs, and a set corner, an x- or y-family
-  aesthetic, and a set width where the table has none, before the geom's setup, so it widens the
-  axes as ggplot2 4.0's `GeomRect` fills its corners in, and a bar's edges are where R's are; a
-  stat writing a width takes the set one as its own (counting's `%Stat.Count{width:}`).
+  aesthetic, and a set width or height where the table has none, before the geom's setup, so it
+  widens the axes as ggplot2 4.0's `GeomRect` fills its corners in, and a bar's or a tile's edges
+  are where R's are; a stat writing a width takes the set one as its own (counting's
+  `%Stat.Count{width:}`). **`geom_jitter/3`'s `width:` and `height:` are its position's
+  distances, never set on its points**, as R's `layer_data()` of a jitter holds no width.
   **A colour is resolved at the call** (`Scales.ColorOperations.parse/1`): the layer
   holds its uppercase hex or `:none`, never the name written, and a colour CSS does not define
   raises naming the value. **A shape is resolved at the call too** (`validate_shape/1`): one of
@@ -391,7 +395,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`, `geom_label/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `geom_hline/3`,
   `geom_vline/3`, `geom_abline/3`, `stat_bin_hex/3`,
-  `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
+  `geom_rect/3`, `geom_tile/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
   guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
   functions), so

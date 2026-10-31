@@ -38,6 +38,9 @@ defmodule Giggly.Datasets do
   @msleep_path Application.app_dir(:giggly, "priv/datasets/msleep.csv")
   @external_resource @msleep_path
 
+  @faithfuld_path Application.app_dir(:giggly, "priv/datasets/faithfuld.csv")
+  @external_resource @faithfuld_path
+
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
     model: :string,
@@ -141,6 +144,14 @@ defmodule Giggly.Datasets do
     bodywt: :float
   ]
 
+  # How each of faithfuld's columns is read; the file's header gives their order. R stores every
+  # number as a double, the whole waiting times among them.
+  @faithfuld_types [
+    eruptions: :float,
+    waiting: :float,
+    density: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -183,6 +194,12 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @msleep_text File.read!(@msleep_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @faithfuld_text File.read!(@faithfuld_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
   # its table of types already holds, and read by its type, a string or float R writes as NA
   # missing.
@@ -194,7 +211,8 @@ defmodule Giggly.Datasets do
               economics: {@economics_text, @economics_types},
               economics_long: {@economics_long_text, @economics_long_types},
               txhousing: {@txhousing_text, @txhousing_types},
-              msleep: {@msleep_text, @msleep_types}
+              msleep: {@msleep_text, @msleep_types},
+              faithfuld: {@faithfuld_text, @faithfuld_types}
             ],
             fn {dataset, {text, types}} ->
               columns =
@@ -242,7 +260,7 @@ defmodule Giggly.Datasets do
   # they would be some 18 MB and 2 MB held wherever this module is loaded, a release loading every
   # module at boot, where compressed they are half a megabyte and a tenth of one, decoded in a few
   # tens of milliseconds and a few, with no IO either way.
-  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long, :msleep])
+  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long, :msleep, :faithfuld])
   @diamonds @parsed
             |> Map.fetch!(:diamonds)
             |> :erlang.term_to_binary(compressed: 9)
@@ -489,4 +507,23 @@ defmodule Giggly.Datasets do
   """
   @spec msleep() :: [{atom(), [String.t() | number() | nil]}]
   def msleep, do: Map.fetch!(@datasets, :msleep)
+
+  @doc """
+  ggplot2's `faithfuld`: a two-dimensional density estimate of the eruption and waiting times in
+  R's `faithful` data on the Old Faithful geyser, at each point of a 75 by 75 grid, 5,625 rows in
+  all, for drawing a surface.
+
+  The columns: `eruptions`, the eruption time in minutes; `waiting`, the waiting time to the next
+  eruption in minutes; and `density`, the estimated density there. Every number is a float.
+
+      iex> faithfuld = Giggly.Datasets.faithfuld()
+      iex> Keyword.keys(faithfuld)
+      [:eruptions, :waiting, :density]
+      iex> faithfuld |> Keyword.fetch!(:density) |> length()
+      5625
+      iex> Enum.map(faithfuld, fn {name, values} -> {name, Enum.at(values, 2)} end)
+      [eruptions: 1.6945945945945946, waiting: 43.0, density: 0.0044355477659065081]
+  """
+  @spec faithfuld() :: [{atom(), [float()]}]
+  def faithfuld, do: Map.fetch!(@datasets, :faithfuld)
 end

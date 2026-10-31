@@ -71,6 +71,7 @@ defprotocol Giggly.Geom do
       Segment,
       Smooth,
       Text,
+      Tile,
       Vline
     ]
 

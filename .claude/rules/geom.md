@@ -284,6 +284,14 @@ beginning "Each layer's defaults are filled in from the theme".
   their struct says, round corners by default, and mitred where its corners are `:none`, as
   `stat_density/3` leaves an area's, since `draw_key_polygon()` falls back to mitred corners while
   `GeomRibbon$draw_group()` draws round ones.
+- **A tile (`Geom.Tile`) is set up as ggplot2's `GeomTile` and drawn as a rectangle**, its key
+  too, as `GeomTile` is a `GeomRect`: `setup_data/3` makes each row a rectangle centred on its x
+  and y, as wide as its `width` and as tall as its `height`, mapped or set, or else the closest
+  spacing of its own panel's positions (`compute_data_size(panels = "by")`, never counting from
+  zero), 1 on a discrete axis, as R's `discrete = TRUE` reads a mapped discrete position, and drops
+  both columns. **Only its defaults are its own**: a fill of ink mixed 20% toward paper
+  (`col_mix(ink, paper, 0.2)`, `#333333`), a border 0.4 times the theme's borders' width, no
+  colour; each checked against R's `layer_data()` and vdiffr's drawing.
 - **A ribbon (`Geom.Ribbon`) is set up and drawn as ggplot2's `GeomRibbon` does it.** Its setup
   runs along its struct's `orientation`, or, where that is `:none`, along y where it has no `ymin`
   or `ymax`, as `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range (`Plot` makes sure it

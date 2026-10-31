@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`geom_tile()`, `geom_raster()` and `faithfuld` come together, a tile its own kind drawn as a
+  rectangle (2026-10-31, Steve: "let's do it", then the proposal's decisions one at a time;
+  checked against ggplot2 4.0.3).** Sixteen waiting notebook examples need nothing else. `Geom.Tile`
+  works out each tile's corners and draws and keys through `Geom.Rect`, as `Geom.Bar` does, since
+  `GeomTile` is a `GeomRect` with defaults of its own (`#333333`, a border 0.4 times the theme's);
+  its size is its own panel's closest spacing, R's `compute_data_size(panels = "by")`, 1 on a
+  discrete axis. `faithfuld` is R's `write.csv()` of the 75 by 75 grid, kept as columns (about
+  530 kB, below `economics_long`), behind a waiver of its own.
+  *Rejected: `Rect` growing a centre-and-size form*: a rectangle's defaults are not a tile's, and
+  `geom_rect()`'s own `x`/`width` form is another feature. *Deferred (Steve):* `annotate(:tile)`,
+  which no waiting example draws.
+
 - **An axis's scale is chosen by the first layer mapping its own aesthetic, and places every
   column it takes, numbers on a discrete axis as positions (2026-10-31, Steve: "a", "A", "a",
   walked one at a time; checked against ggplot2 4.0.3).** As `Scales$add_defaults()` adds a scale
