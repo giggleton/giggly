@@ -8,6 +8,8 @@ Mix.install([
 
 alias Giggly.Plot
 
+faithfuld = Giggly.Datasets.faithfuld()
+
 render = fn plot ->
   plot
   |> Giggly.to_svg()
@@ -33,7 +35,8 @@ same for fill. A missing value is drawn in grey, or in the colour `na.value` giv
 reads a gradient back is a colour bar, `guide_colourbar()`. Giggly has all six,
 `Giggly.Plot.scale_color_gradient/2` and the rest, with their colours, gradient2's `midpoint:`, and
 their limits, breaks, labels and `na_value:`, and reads each back with a colour bar; it has no
-`rescaler` option (`scales::rescale_mid()`).
+`rescaler` option (`scales::rescale_mid()`). The setup cell binds `Giggly.Datasets.faithfuld/0`,
+ggplot2's `faithfuld`, to its name in R.
 
 ## The default gradient
 
@@ -252,7 +255,15 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
   scale_fill_gradientn(colours = terrain.colors(10))
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and rasters (`geom_raster()`).
+`terrain` is the ten colours written out above.
+
+```elixir
+faithfuld
+|> Plot.new(%{x: :waiting, y: :eruptions})
+|> Plot.geom_raster(%{fill: :density})
+|> Plot.scale_fill_gradientn(colors: terrain)
+|> render.()
+```
 
 ## Choosing the low and high colours
 

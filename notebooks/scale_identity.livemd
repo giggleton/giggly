@@ -73,7 +73,7 @@ ggplot(df, aes(x, y)) +
   scale_fill_identity()
 ```
 
-Not in Giggly yet: tiles (`geom_tile()`) and `scale_fill_identity()`.
+Not in Giggly yet: `scale_fill_identity()`.
 
 ## A legend for an identity scale
 
@@ -89,7 +89,7 @@ ggplot(df, aes(x, y)) +
   guide = "legend")
 ```
 
-Not in Giggly yet: `geom_tile()`, `scale_fill_identity()`, whose first argument titles the legend,
+Not in Giggly yet: `scale_fill_identity()`, whose first argument titles the legend,
 and its `breaks`, `labels` and `guide` options, and the legend it asks for.
 
 ## Sizes from the data

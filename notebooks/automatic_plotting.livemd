@@ -18,4 +18,4 @@ each a step further than the last: a `fortify()` method reshapes the data into a
 ggplot2 can use, an `autolayer()` method makes a layer that draws it, and an `autoplot()` method
 makes a complete plot, here from that layer. It works through a `my_heatmap` class wrapping a
 matrix, drawn with `geom_raster()`. Not in Giggly yet: `fortify()`, `autolayer()` and
-`autoplot()`, and `geom_raster()`.
+`autoplot()`.

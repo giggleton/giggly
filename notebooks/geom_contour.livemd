@@ -30,7 +30,7 @@ v <- ggplot(faithfuld, aes(waiting, eruptions, z = density))
 v + geom_contour()
 ```
 
-Not in Giggly yet: `geom_contour()`, mapping `z`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour()` and mapping `z`.
 
 ## Contours of raw data
 
@@ -50,7 +50,7 @@ Not in Giggly yet: `geom_density_2d()`, and the `faithful` dataset.
 v + geom_contour_filled()
 ```
 
-Not in Giggly yet: `geom_contour_filled()`, mapping `z`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour_filled()` and mapping `z`.
 
 ## The number of contours
 
@@ -60,8 +60,7 @@ v + geom_contour(bins = 3)
 v + geom_contour(bins = 5)
 ```
 
-Not in Giggly yet: `geom_contour()` and its `bins` option, mapping `z`, and the `faithfuld`
-dataset.
+Not in Giggly yet: `geom_contour()` and its `bins` option, and mapping `z`.
 
 ## The distance between contours
 
@@ -72,8 +71,7 @@ v + geom_contour(binwidth = 0.01)
 v + geom_contour(binwidth = 0.001)
 ```
 
-Not in Giggly yet: `geom_contour()` and its `binwidth` option, mapping `z`, and the `faithfuld`
-dataset.
+Not in Giggly yet: `geom_contour()` and its `binwidth` option, and mapping `z`.
 
 ## Coloured contours
 
@@ -83,7 +81,7 @@ v + geom_contour(aes(colour = after_stat(level)))
 v + geom_contour(colour = "red")
 ```
 
-Not in Giggly yet: `geom_contour()`, mapping `z`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour()` and mapping `z`.
 
 ## Contours over a raster
 
@@ -92,4 +90,4 @@ v + geom_raster(aes(fill = density)) +
   geom_contour(colour = "white")
 ```
 
-Not in Giggly yet: `geom_raster()`, `geom_contour()`, mapping `z`, and the `faithfuld` dataset.
+Not in Giggly yet: `geom_contour()` and mapping `z`.

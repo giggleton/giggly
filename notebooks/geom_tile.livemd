@@ -8,6 +8,7 @@ Mix.install([
 
 alias Giggly.Plot
 
+faithfuld = Giggly.Datasets.faithfuld()
 mtcars = Giggly.Datasets.mtcars()
 
 render = fn plot ->
@@ -29,12 +30,14 @@ names what it is waiting for, so the page is also a list of what remains.
 `geom_rect()` and `geom_tile()` both draw a rectangle for each row. `geom_tile()` places it by its
 centre and size (`x`, `y`, `width`, `height`); `geom_rect()` can do the same or place it by its
 corners (`xmin`, `xmax`, `ymin`, `ymax`). `geom_raster()` is a fast special case for tiles that are
-all the same size. Giggly has `Giggly.Plot.geom_rect/3`, which places each rectangle by its corners
-only; it has no `geom_tile()` or `geom_raster()`, and maps no `width` or `height`. A plot is
-described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
-setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
-a plot and shows it below the cell with `Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's
-`mtcars`, to `mtcars`, R's name for it.
+all the same size. Giggly has all three: `Giggly.Plot.geom_rect/3`, which places each rectangle
+by its corners, `Giggly.Plot.geom_tile/3`, which places it by its centre and mapped or set `width`
+and `height`, and `Giggly.Plot.geom_raster/3`, drawn as one image, with its `hjust:`, `vjust:` and
+`interpolate:` options. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
+which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
+`Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. It binds `Giggly.Datasets.faithfuld/0` and `Giggly.Datasets.mtcars/0`, ggplot2's
+`faithfuld` and R's `mtcars`, to their names in R.
 
 ## A surface
 
@@ -49,7 +52,12 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
  geom_raster(aes(fill = density))
 ```
 
-Not in Giggly yet: `geom_raster()` and the `faithfuld` dataset.
+```elixir
+faithfuld
+|> Plot.new(%{x: :waiting, y: :eruptions})
+|> Plot.geom_raster(%{fill: :density})
+|> render.()
+```
 
 ## Interpolation
 
@@ -59,7 +67,12 @@ ggplot(faithfuld, aes(waiting, eruptions)) +
  geom_raster(aes(fill = density), interpolate = TRUE)
 ```
 
-Not in Giggly yet: `geom_raster()` and its `interpolate` option, and the `faithfuld` dataset.
+```elixir
+faithfuld
+|> Plot.new(%{x: :waiting, y: :eruptions})
+|> Plot.geom_raster(%{fill: :density}, interpolate: true)
+|> render.()
+```
 
 ## Tiles
 
@@ -75,7 +88,23 @@ ggplot(df, aes(x, y)) +
   geom_tile(aes(fill = z), colour = "grey50")
 ```
 
-Not in Giggly yet: `geom_tile()`.
+The cell writes out the tiles' table, `df`. R's `z` is a factor of the numbers 1 to 5, so the cell
+writes its levels as strings, which `fill` reads as levels, as R's does. R's `"grey50"` is
+`"#7F7F7F"`. Each tile is 2 wide, the closest gap between the `x` values, and 1 tall.
+
+```elixir
+df = %{
+  "x" => [2, 5, 7, 9, 12, 2, 5, 7, 9, 12],
+  "y" => [1, 1, 1, 1, 1, 2, 2, 2, 2, 2],
+  "z" => ["1", "1", "2", "2", "3", "3", "4", "4", "5", "5"],
+  "w" => [4, 2, 2, 2, 4, 4, 2, 2, 2, 4]
+}
+
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_tile(%{fill: :z}, colour: "#7F7F7F")
+|> render.()
+```
 
 ## Tiles of different widths
 
@@ -87,7 +116,12 @@ ggplot(df, aes(x, y, width = w)) +
 The widths, `w`, are the gaps between 0, 4, 6, 8, 10 and 14, so the tiles centred on the `x`
 values meet edge to edge.
 
-Not in Giggly yet: `geom_tile()` and mapping `width`.
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y, width: :w})
+|> Plot.geom_tile(%{fill: :z}, colour: "#7F7F7F")
+|> render.()
+```
 
 ## Rectangles by their corners
 
@@ -96,19 +130,10 @@ ggplot(df, aes(xmin = x - w / 2, xmax = x + w / 2, ymin = y, ymax = y + 1)) +
   geom_rect(aes(fill = z), colour = "grey50")
 ```
 
-The cell writes out the tiles' table, `df`. R's `z` is a factor of the numbers 1 to 5, so the cell
-writes its levels as strings, which `fill` reads as levels, as R's does. Each corner is an
-expression of the columns, `x - w / 2` written `{&Kernel.-/2, [:x, {&Kernel.//2, [:w, 2]}]}`. R's
-`"grey50"` is `"#7F7F7F"`.
+Each corner is an expression of the columns, `x - w / 2` written `{&Kernel.-/2, [:x,
+{&Kernel.//2, [:w, 2]}]}`.
 
 ```elixir
-df = %{
-  "x" => [2, 5, 7, 9, 12, 2, 5, 7, 9, 12],
-  "y" => [1, 1, 1, 1, 1, 2, 2, 2, 2, 2],
-  "z" => ["1", "1", "2", "2", "3", "3", "4", "4", "5", "5"],
-  "w" => [4, 2, 2, 2, 4, 4, 2, 2, 2, 4]
-}
-
 half_width = {&Kernel.//2, [:w, 2]}
 
 df
@@ -140,9 +165,45 @@ ggplot(df, aes(x, y, fill = z)) +
 ```
 
 By default each cell is centred on its `x` and `y`, as a tile is; `hjust` and `vjust` move the
-cells off centre.
+cells off centre. The cell writes out the 36 values R's `runif()` gives after `set.seed(1)`, in
+`expand.grid()`'s order, `x` changing fastest.
 
-Not in Giggly yet: `geom_raster()` and its `hjust` and `vjust` options.
+```elixir
+uniform = [
+  0.26550866314209998, 0.37212389963679016, 0.57285336335189641,
+  0.90820778999477625, 0.2016819310374558, 0.89838968496769667,
+  0.94467526860535145, 0.66079779248684645, 0.62911404389888048,
+  0.061786270467564464, 0.20597457489930093, 0.17655675252899528,
+  0.68702284665778279, 0.38410371821373701, 0.76984141999855638,
+  0.49769924208521843, 0.71761850826442242, 0.9919060948304832,
+  0.38003517943434417, 0.77744522131979465, 0.93470523110590875,
+  0.21214252128265798, 0.65167376608587801, 0.12555509596131742,
+  0.26722066872753203, 0.3861140925437212, 0.013390333158895373,
+  0.38238795707002282, 0.86969084572046995, 0.34034899668768048,
+  0.48208011547103524, 0.59956582542508841, 0.49354130704887211,
+  0.1862176014110446, 0.8273733186069876, 0.66846673819236457
+]
+
+places = for y <- 0..5, x <- 0..5, do: {x, y}
+
+df = %{
+  "x" => Enum.map(places, fn {x, _y} -> x end),
+  "y" => Enum.map(places, fn {_x, y} -> y end),
+  "z" => uniform
+}
+
+df
+|> Plot.new(%{x: :x, y: :y, fill: :z})
+|> Plot.geom_raster()
+|> render.()
+```
+
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y, fill: :z})
+|> Plot.geom_raster(hjust: 0, vjust: 0)
+|> render.()
+```
 
 ## Points along a discrete axis
 
@@ -193,4 +254,4 @@ cars +
 computes along `x`, so each row of cells is one number of cylinders.
 
 Not in Giggly yet: `stat_density()` given a discrete `y` beside `x`, which each curve keeps,
-giving a stat a geom by name, here `geom = "raster"`, and `geom_raster()`.
+and giving a stat a geom by name, here `geom = "raster"`.

@@ -3564,6 +3564,15 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples tiles, rasters and faithfuld unlock (tile, step 3, the
+  notebook sweep); §4: none, each checked against vdiffr's drawing at the notebook's size
+- 2026-10-31 — Draw a raster as one image of its cells, as svglite writes one, and refuse
+  rectangles in radial coordinates (tile, step 2); §4: "A raster is drawn as svglite draws one"
+- 2026-10-31 — Space a mark's positions as R's scales map them: integers by their gaps, and a
+  discrete axis 1 apart where R reads it so; §4: "A mark's spacing is R's `resolution()`", and the
+  bars entry beginning "Bars are Phase 3's first increment" made exact
+- 2026-10-31 — Draw tiles centred on their positions, and copy ggplot2's faithfuld (tile, step 1);
+  §4: "`geom_tile()`, `geom_raster()` and `faithfuld` come together"
 - 2026-10-31 — Label numbers in scientific notation, in whichever way suits their size, and as
   powers (labels, step 2); §4: "A break `scale:` takes past", "`scientific/2` takes",
   "`digits:` is an integer", "A signed power", "`log/2` refuses", "`format_log/2` takes", and

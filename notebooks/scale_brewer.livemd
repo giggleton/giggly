@@ -9,6 +9,7 @@ Mix.install([
 alias Giggly.Plot
 
 diamonds = Giggly.Datasets.diamonds()
+faithfuld = Giggly.Datasets.faithfuld()
 
 render = fn plot ->
   plot
@@ -37,8 +38,8 @@ options: `palette:` names a palette as ColorBrewer spells it (`"Greens"`) or giv
 the palettes of `type:`, and `direction:` reverses it. A plot is described with
 `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
-shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds`,
-`Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
+shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds` and `faithfuld`,
+`Giggly.Datasets.diamonds/0` and `Giggly.Datasets.faithfuld/0`, to their names in R.
 
 ## The default brewer palette
 
@@ -253,7 +254,29 @@ v + scale_fill_distiller()
 v + scale_fill_distiller(palette = "Spectral")
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
+The tiles' layer maps its own `x`, `y` and `fill`, as the example's does, and the plot maps
+nothing.
+
+```elixir
+v =
+  faithfuld
+  |> Plot.new()
+  |> Plot.geom_tile(%{x: :waiting, y: :eruptions, fill: :density})
+
+render.(v)
+```
+
+```elixir
+v
+|> Plot.scale_fill_distiller()
+|> render.()
+```
+
+```elixir
+v
+|> Plot.scale_fill_distiller(palette: "Spectral")
+|> render.()
+```
 
 ## Reversing a distiller palette
 
@@ -263,7 +286,11 @@ Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
 v + scale_fill_distiller(palette = "Spectral", direction = 1)
 ```
 
-Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
+```elixir
+v
+|> Plot.scale_fill_distiller(palette: "Spectral", direction: 1)
+|> render.()
+```
 
 ## Binned colours
 
@@ -274,4 +301,8 @@ v + scale_fill_fermenter()
 
 The comment's "blender" means the fermenter scales.
 
-Not in Giggly yet: the `faithfuld` dataset and `geom_tile()`.
+```elixir
+v
+|> Plot.scale_fill_fermenter()
+|> render.()
+```
