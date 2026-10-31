@@ -79,6 +79,60 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A break whose quotient by the accuracy `precision()` tries passes the largest double is left
+  out of its test for multiples (2026-10-31, Steve: "B"; checked against scales 1.4.0).** R's
+  `precision()` asks whether every `round(x / precision)` is a multiple of 10; a quotient past
+  the largest double is `NA` there, so beside a break that is no multiple R's `all()` is false,
+  as here, but beside multiples alone R fails ("missing value where TRUE/FALSE needed"), on
+  `number(c(1.5e308, 1, 2))`. Here the others decide, as `precision()` already drops an infinite
+  break. Erlang raised on the division before, whichever case. *Rejected: raising where R
+  fails*: an axis refused for a test the break takes no part in.
+
+- **`timespan/2` takes `unit:`, `space:` and `number/2`'s options but `scale_cut:`, on numbers
+  alone (2026-10-31, Steve: "A"; checked against scales 1.4.0).** `unit:` is `:second` to
+  `:week`, `Breaks.timespan/2`'s names, each break times its unit's seconds as R converts a
+  `difftime`, then `number()` under `cut_time_scale(space)`; `scale_cut` is R's collision, and a
+  break the unit takes past the largest double is `Inf`, as R's is. *Rejected: Elixir's
+  `Duration`*, as R takes a `difftime`: its months and years have no length in seconds, and it can
+  be added later. *Rejected: R's unit strings (`"secs"`)*: a second set of names in one package.
+
+- **`pvalue/2`'s accuracy is at most 0.5, its `prefix:` three strings, and `add_p: true` beside
+  `prefix:` raises (2026-10-31, Steve: "B", "A"; checked against scales 1.4.0).** Above 0.5 a
+  p-value is both below the accuracy and above 1 less it, and R writes the second, a false label
+  (`accuracy = 1` gives `"<1" ">0" ">0"`); 0 gives `"NA"`, a negative fails, `NULL` is `number()`'s
+  plain labels. `prefix:` is `{below, between, above}`; R lets `prefix` silently win over
+  `add_p`. *Rejected: any positive accuracy*: R's false labels. *Rejected: below 0.5 strictly*:
+  0.5 is sound. *Rejected: `prefix:` winning, as R*: an option that does nothing, hidden.
+  *Rejected: a keyword list*: what a partial one means is a question R never faces.
+
+- **`ordinal/2` takes `prefix:`, `suffix:`, `big_mark:`, `rules:`, `trim:` and the styles; its
+  rules see a negative's minus; a break none match raises (2026-10-31, Steve: "A" thrice; checked
+  against scales 1.4.0).** R's rules read the break before `number()` scales it, so `scale = 10`
+  writes `"10st"`; `decimal.mark` shows nothing at accuracy 1, and `accuracy` R refuses. The
+  digits matched are the label's, unmarked, a `-` before a negative's, as R's text has it
+  (`^1$` misses -1). R pastes suffixes in the rules' order of matching, so a break none match
+  takes another's (`"1a" "2b" "3a" "4b"`); `rules: []` R fails on. *Rejected: `scale:` with the
+  scaled number matched*: a second departure. *Rejected: the digits without the minus*: one on
+  every negative. *Rejected: no suffix, or no label*: a gap in the rules hidden.
+
+- **Plain bytes under binary units are `B`, where R writes `iB` (2026-10-31, Steve: "B"; checked
+  against scales 1.4.0).** R's `cut_bytes()` puts its `iB` on the zero step too, so under
+  `"auto_binary"` its own documented axis reads `"0 iB"`, and `1500` is `"1 500 iB"`; R's NEWS
+  for `label_bytes()` says "it always uses 'B' as the symbol for bytes (#174)", and the
+  development branch still has the slip. Every other label is R's; the tests pin R's rows with
+  that suffix swapped. *Rejected: R's `iB`*: no unit, copied. *Rejected: refusing plain bytes
+  under binary units*: an axis from 0 unusable.
+
+- **`bytes/2`'s `units:` is `:auto_si`, `:auto_binary` or R's fixed-unit string, and it takes
+  `number/2`'s options but `suffix:` and `scale_cut:`, `accuracy: nil` worked out (2026-10-31,
+  Steve: "A" twice; checked against scales 1.4.0).** A fixed unit is the text written after the
+  number, spelt as R spells it (`"kB"`, `"kiB"`, and `"KiB"` refused as R refuses it); the
+  automatic ones are modes, atoms as the package's modes are. `accuracy:` defaults to 1, R's, and
+  `nil` is R's `NULL`, an accuracy the data supplies; `suffix` and `scale_cut` R refuses.
+  *Rejected: every unit an atom*: mixed-case atoms turned back into text. *Rejected: every unit
+  a string*: a mode as a string. *Rejected: `:auto` for a worked-out accuracy*: a sentinel of its
+  own.
+
 - **A break `scale:` takes past the largest double is labelled `Inf`, as R labels it
   (2026-10-31, Steve: "Inf"; checked against scales 1.4.0).** Erlang raises where a double's
   arithmetic reaches an infinity, so every product, quotient and gap a break's label is worked
@@ -3528,6 +3582,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Label bytes, ordinals, p-values and spans of time (labels, step 3); §4: "A break
+  whose quotient", "`timespan/2` takes", "`pvalue/2`'s accuracy", "`ordinal/2` takes", "Plain
+  bytes under binary units", "`bytes/2`'s `units:`"
 - 2026-10-31 — Label numbers in scientific notation, in whichever way suits their size, and as
   powers (labels, step 2); §4: "A break `scale:` takes past", "`scientific/2` takes",
   "`digits:` is an integer", "A signed power", "`log/2` refuses", "`format_log/2` takes", and

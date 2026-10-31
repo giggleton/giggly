@@ -11,7 +11,8 @@ paths:
 
 `Scales.Labels` writes a scale's labels as scales 1.4.0's `label_number()`, `label_comma()`,
 `label_percent()`, `label_currency()`, `label_scientific()`, `label_number_auto()`,
-`label_log()` and `format_log()` do, `Scales.Labels.Format` writing their numbers as R's
+`label_log()`, `format_log()`, `label_bytes()`, `label_ordinal()`, `label_pvalue()` and
+`label_timespan()` do, `Scales.Labels.Format` writing their numbers as R's
 `format()` does and `Scales.Labels.Arithmetic` rounding them as R does; and plainly, the
 Elixir way (`plain/1`, `scales.md`), the default labels of a number's transformations.
 Why list functions: design-log §4, the entry beginning "`labels:` takes a list"; why these
@@ -20,21 +21,28 @@ entry beginning "R's `format()` for numbers"; why a missing break's label is `ni
 beginning "A missing break's label"; why a power is a value: the entries beginning "`log/2`
 returns powers" and "A signed power"; why the new labellers take the options they do and
 refuse what they refuse: the entries beginning "`scientific/2` takes", "`digits:` is an
-integer", "`log/2` refuses" and "`format_log/2` takes".
+integer", "`log/2` refuses", "`format_log/2` takes", "`bytes/2`'s `units:`", "`ordinal/2`
+takes", "`pvalue/2`'s accuracy" and "`timespan/2` takes"; why the departures from R's text:
+"Plain bytes under binary units" and "`ordinal/2`'s rules are matched".
 
 ## Rules
 
 - **Every label of `number/2`, `comma/2`, `percent/2`, `currency/2`, `scientific/2`,
-  `number_auto/1`, `log/2` and `format_log/2` is R's to the character, and the tests pin R's own
-  output**, each beside the R call that gave it (`giggly-r:ggplot2-4.0.3`). A label that differs
-  from R's is a bug, except where the module comments say this differs, and say why. All of
-  11,941 random cases of the last four matched R, and 1,728 of the first four near the largest
-  double.
+  `number_auto/1`, `log/2`, `format_log/2`, `bytes/2`, `ordinal/2`, `pvalue/2` and `timespan/2`
+  is R's to the character, and the tests pin R's own output**, each beside the R call that gave
+  it (`giggly-r:ggplot2-4.0.3`). A label that differs from R's is a bug, except where the module
+  comments say this differs, and say why: plain bytes `B` under binary units, and an ordinal's
+  rules matched against its digits, the tests pinning R's rows with those changed. All of 11,941
+  random cases of `scientific/2` to `format_log/2` matched R, 1,728 of the first four near the
+  largest double, and 24,000 of the last four, every option against missing, infinite and
+  overflowing breaks.
 - **A break `scale:` takes past the largest double is R's `Inf`**, never a raise: Erlang refuses
   the arithmetic R takes to an infinity, so each `*`, `/` and `-` on a break that can pass it is
   `Labels.Arithmetic`'s, the infinity an atom. Rounded past it, the label is `Inf`, its sign
   styled, its prefix and suffix dropped, as R's `number()` writes it; scaled past it only,
-  `Inf` inside them; it takes no step and no cents, and no part in the others' accuracy.
+  `Inf` inside them; it takes no step and no cents, and no part in the others' accuracy, nor
+  does a break whose quotient by the accuracy tried passes it, where R fails beside multiples
+  alone (design-log §4, the entry beginning "A break whose quotient").
 - **`Labels.Format` is R's `format()` for numbers, `formatReal()` rule for rule** (digits 1 to
   22, `nsmall`, trim, either notation, marks, `NA` and the non-finite values, each padded to the
   numbers' marked width), its tests pinning R's output; all of 6,000 random vectors matched R. **R's `scientific = FALSE` is plain unless
@@ -66,4 +74,10 @@ integer", "`log/2` refuses" and "`format_log/2` takes".
   not `dollar`), and a `scale_cut:` list without a zero threshold is refused, the one shape where
   R misaligns its steps; `scientific/2` takes no `trim:`, which `label_scientific()` drops;
   `digits:` is 1 to 22, `format()`'s range; a log's base is a positive number other than 1, and
-  an unsigned break at or below zero raises, where R writes `1^NaN` or `10^-Inf`.
+  an unsigned break at or below zero raises, where R writes `1^NaN` or `10^-Inf`; `ordinal/2`
+  takes no `scale:`, whose suffix R reads from the unscaled break, and raises on a break no rule
+  matches, which R gives another break's suffix; `pvalue/2`'s accuracy is at most 0.5, past which
+  R's labels say what is false, and `add_p: true` beside `prefix:` raises, where R ignores it.
+- **An option R's labeller fixes or refuses is not taken**: `bytes/2` has no `suffix:` or
+  `scale_cut:`, `ordinal/2` no `accuracy:` or `decimal_mark:`, `timespan/2` no `scale_cut:`, as
+  R's `...` collides with its own argument there or shows nothing.

@@ -3,7 +3,8 @@ defmodule Scales.Labels do
   Labels for a scale's breaks: numbers written plainly (`plain/1`), in decimals (`number/2`),
   with a comma between thousands (`comma/2`), as percentages (`percent/2`), as amounts of money
   (`currency/2`), in scientific notation (`scientific/2`), in whichever way suits their size
-  (`number_auto/1`), and as powers (`log/2`, or as text, `format_log/2`).
+  (`number_auto/1`), as powers (`log/2`, or as text, `format_log/2`), as bytes (`bytes/2`), as
+  ordinals (`ordinal/2`), as p-values (`pvalue/2`) and as spans of time (`timespan/2`).
 
   Each labeller is handed every break an axis or a legend draws and returns a label for each, in
   order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
@@ -102,6 +103,24 @@ defmodule Scales.Labels do
   #   at or below zero, are not powers of anything (`1^NaN`, `10^-Inf`, and `zapsmall()` rounding
   #   every exponent whole beside an infinite one), so each is refused (design-log §4, the entry
   #   beginning "`log/2` refuses").
+  # - `bytes/2` is `label_bytes()`: `number()` under R's `cut_bytes()` steps, or a fixed unit's
+  #   suffix and `scale / base^power`, R's order. R's binary steps write plain bytes `" iB"`,
+  #   which R's NEWS says is always `"B"`, so this writes `" B"` (design-log §4, the entry
+  #   beginning "Plain bytes under binary units").
+  # - `ordinal/2` is `ordinal()`: `round(x)`, a missing break written as 1 and dropped, then
+  #   `number(accuracy = 1)` and the first matching rule's suffix. R pastes the suffixes in the
+  #   order the rules matched, not the breaks', so a break no rule matches takes another's; that
+  #   raises here. R matches `as.character()`, scientific for a round number where shorter; the
+  #   digits are matched here (design-log §4, the entries beginning "`ordinal/2`'s rules are
+  #   matched" and "`ordinal/2` takes").
+  # - `pvalue/2` is `pvalue()`: `number(x, accuracy)`, the bounds' labels written alone the same
+  #   way. Above an accuracy of 0.5 a p-value can be both below it and above 1 less it, and R's
+  #   label then says what is false, so the accuracy is at most 0.5; R lets `prefix` silently
+  #   win over `add_p`, which raises here (design-log §4, the entry beginning "`pvalue/2`'s
+  #   accuracy").
+  # - `timespan/2` is `label_timespan()`: each break times its unit's seconds, R's `difftime`
+  #   conversion, then `number()` under `cut_time_scale()`; a break the unit takes past the
+  #   largest double is R's `Inf`, which `number()` writes as its own `as.character()`.
   #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
@@ -211,6 +230,19 @@ defmodule Scales.Labels do
     ]
   ]
 
+  # The shared options named, in their order, each with its default in `defaults` where it has
+  # one.
+  defaulted = fn names, defaults ->
+    @formatter_options
+    |> Keyword.take(names)
+    |> Enum.map(fn {name, spec} ->
+      case Keyword.fetch(defaults, name) do
+        {:ok, default} -> {name, Keyword.put(spec, :default, default)}
+        :error -> {name, spec}
+      end
+    end)
+  end
+
   # Each formatter's options: the shared ones with its defaults, and currency's own.
   @formatter_schemas Map.new(
                        [
@@ -220,17 +252,147 @@ defmodule Scales.Labels do
                          {:currency, @currency_defaults, @currency_options}
                        ],
                        fn {formatter, defaults, own} ->
-                         options =
-                           Enum.map(@formatter_options, fn {name, spec} ->
-                             case Keyword.fetch(defaults, name) do
-                               {:ok, default} -> {name, Keyword.put(spec, :default, default)}
-                               :error -> {name, spec}
-                             end
-                           end)
-
+                         options = defaulted.(Keyword.keys(@formatter_options), defaults)
                          {formatter, NimbleOptions.new!(options ++ own)}
                        end
                      )
+
+  # The prefixes of `bytes/2`'s units, each a power of 1000 or 1024 above the last.
+  @byte_prefixes ~w(k M G T P E Z Y)
+
+  # `bytes/2`'s fixed units, R's spelling, each with its base and power.
+  @byte_units Map.new(
+                for {base, symbol} <- [{1000.0, "B"}, {1024.0, "iB"}],
+                    {prefix, power} <- Enum.with_index(@byte_prefixes, 1),
+                    do: {prefix <> symbol, {base, power}}
+              )
+
+  @byte_unit_names for symbol <- ["B", "iB"], prefix <- @byte_prefixes, do: prefix <> symbol
+
+  # `bytes/2`'s automatic units, R's `cut_bytes()`, but for plain bytes' suffix under binary
+  # units, `" B"` where R writes `" iB"`.
+  @byte_steps Map.new([auto_si: {1000.0, "B"}, auto_binary: {1024.0, "iB"}], fn {units,
+                                                                                 {base, symbol}} ->
+                steps =
+                  for {prefix, power} <- Enum.with_index(@byte_prefixes, 1),
+                      do: {" " <> prefix <> symbol, base ** power}
+
+                {units, [{" B", 0} | steps]}
+              end)
+
+  @bytes_options NimbleOptions.new!(
+                   [
+                     units: [
+                       type: {:custom, __MODULE__, :validate_units, []},
+                       default: :auto_si,
+                       doc:
+                         "`:auto_si`, each label in the SI unit, a power of 1000, that suits " <>
+                           "it; `:auto_binary`, in the binary unit, a power of 1024; or a unit " <>
+                           "every label is written in, spelt as R spells it: " <>
+                           Enum.map_join(@byte_unit_names, ", ", fn name ->
+                             "`#{inspect(name)}`"
+                           end) <>
+                           "."
+                     ]
+                   ] ++
+                     Keyword.update!(
+                       defaulted.(
+                         [
+                           :accuracy,
+                           :scale,
+                           :prefix,
+                           :big_mark,
+                           :decimal_mark,
+                           :trim,
+                           :style_negative,
+                           :style_positive
+                         ],
+                         Keyword.put(@number_defaults, :accuracy, 1)
+                       ),
+                       :accuracy,
+                       fn spec ->
+                         Keyword.merge(spec,
+                           type: {:or, [{:custom, __MODULE__, :validate_positive, []}, nil]},
+                           doc:
+                             "A positive number each label is rounded to a multiple of, in " <>
+                               "its unit, or `nil` to work it out from the breaks (see the " <>
+                               "module's documentation)."
+                         )
+                       end
+                     )
+                 )
+
+  @ordinal_options NimbleOptions.new!(
+                     [
+                       rules: [
+                         type: {:custom, __MODULE__, :validate_rules, []},
+                         doc:
+                           "A list of `{suffix, regex}` pairs, each break taking the suffix " <>
+                             "of the first whose regex matches it (see the function's " <>
+                             "documentation); `ordinal_english/0`'s when not given."
+                       ]
+                     ] ++
+                       Keyword.update!(
+                         defaulted.(
+                           [:prefix, :suffix, :big_mark, :trim, :style_negative, :style_positive],
+                           @number_defaults
+                         ),
+                         :suffix,
+                         fn spec ->
+                           Keyword.put(spec, :doc, "Text written after the ordinal's.")
+                         end
+                       )
+                   )
+
+  @pvalue_options NimbleOptions.new!(
+                    accuracy: [
+                      type: {:custom, __MODULE__, :validate_pvalue_accuracy, []},
+                      default: 0.001,
+                      doc:
+                        "A positive number no larger than 0.5 each label is rounded to a " <>
+                          "multiple of; below it a p-value is written as less than it, and " <>
+                          "above 1 less it as more than that."
+                    ],
+                    decimal_mark: Keyword.put(@formatter_options[:decimal_mark], :default, "."),
+                    prefix: [
+                      type: {:custom, __MODULE__, :validate_pvalue_prefix, []},
+                      doc:
+                        "Three strings, `{below, between, above}`, written before a p-value " <>
+                          "below the accuracy, one between, and one above 1 less it; " <>
+                          ~s(`{"<", "", ">"}` when not given.)
+                    ],
+                    add_p: [
+                      type: :boolean,
+                      default: false,
+                      doc:
+                        ~s(`true` writes the prefixes `{"p<", "p=", "p>"}`; not taken with ) <>
+                          "`prefix:`."
+                    ]
+                  )
+
+  # The seconds in each unit `timespan/2` counts its breaks in.
+  @unit_seconds %{second: 1.0, minute: 60.0, hour: 3600.0, day: 86_400.0, week: 604_800.0}
+
+  @timespan_options NimbleOptions.new!(
+                      [
+                        unit: [
+                          type: {:in, [:second, :minute, :hour, :day, :week]},
+                          default: :second,
+                          doc:
+                            "The unit the breaks are counted in, `:second`, `:minute`, " <>
+                              "`:hour`, `:day` or `:week`."
+                        ],
+                        space: [
+                          type: :boolean,
+                          default: false,
+                          doc: "`true` puts a space before each unit's suffix (`90 s`)."
+                        ]
+                      ] ++
+                        defaulted.(
+                          Keyword.keys(@formatter_options) -- [:scale_cut],
+                          @number_defaults
+                        )
+                    )
 
   # The significant digits each label of `scientific/2` and each exponent of `log/2` and
   # `format_log/2` is written in, R's `format()` range.
@@ -641,6 +803,208 @@ defmodule Scales.Labels do
   end
 
   @doc """
+  Labels numbers of bytes, R's `label_bytes()`: in the unit that suits each, `1500` is `2 kB`, or
+  all in one unit.
+
+  Each label is written as `number/2` writes it, the unit its suffix. Under `:auto_si` and
+  `:auto_binary`, each break takes the largest unit it reaches, as `scale_cut:` does, and plain
+  bytes are `B`, a break that is not a whole number of its unit but is of plain bytes written in
+  bytes (`1500` is `1 500 B` under `:auto_binary`); in one unit, `scale:` is divided by the
+  unit's size. Labels are rounded to whole units unless `accuracy:` says otherwise.
+
+  ## Options
+
+  #{NimbleOptions.docs(@bytes_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.bytes([0, 1500, 2.0e6, nil])
+      ["0 B", "2 kB", "2 MB", nil]
+
+      iex> Scales.Labels.bytes([512, 1024, 1_048_576], units: :auto_binary)
+      ["512 B", "1 kiB", "1 MiB"]
+
+      iex> Scales.Labels.bytes([1500, 2500, 1.0e6], accuracy: nil)
+      ["1.5 kB", "2.5 kB", "1 MB"]
+
+      iex> Scales.Labels.bytes([1.0e6, 2.5e6], units: "kB", big_mark: ",")
+      ["1,000 kB", "2,500 kB"]
+  """
+  @spec bytes([number() | nil], keyword()) :: [String.t() | nil]
+  def bytes(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@bytes_options)
+      |> Map.new()
+      |> in_units()
+      |> without_given_accuracy()
+
+    breaks
+    |> numbers!("Labels.bytes/2")
+    |> label(settings)
+  end
+
+  @doc """
+  Labels numbers as ordinals, R's `label_ordinal()`: `1st`, `2nd`, `3rd`, `4th`.
+
+  Each break is rounded to a whole number, a half to the even one, and written as `number/2`
+  writes it with an accuracy of 1, then the suffix of the first rule whose regex matches the
+  whole number's digits: unmarked and unpadded, a negative's with a `-` before them (`"-12"`).
+  R matches the text it writes a number in alone, which for a round number is scientific
+  notation wherever that is shorter (`2e+05`); the digits are matched here, so a rule reading the
+  last digit sees `200000`'s `0`, and English ordinals from 1e21 up, which R writes `...st` from
+  `1e+21`, are `...th`. A break no rule matches raises, so the rules end with one every break
+  matches, as `ordinal_english/0`'s do.
+
+  ## Options
+
+  #{NimbleOptions.docs(@ordinal_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.ordinal([1, 2, 3, 4, 11, 12, 13, 21, nil])
+      ["1st", "2nd", "3rd", "4th", "11th", "12th", "13th", "21st", nil]
+
+      iex> Scales.Labels.ordinal([1, 1001, 2.5], big_mark: ",", prefix: "#")
+      ["#1st", "#1,001st", "#2nd"]
+
+      iex> Scales.Labels.ordinal([1, 2], rules: [{"º", ~r/./}])
+      ["1º", "2º"]
+  """
+  @spec ordinal([number() | nil], keyword()) :: [String.t() | nil]
+  def ordinal(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@ordinal_options)
+      |> Map.new()
+
+    rules = Map.get_lazy(settings, :rules, &ordinal_english/0)
+
+    rounded =
+      breaks
+      |> numbers!("Labels.ordinal/2")
+      |> Enum.map(fn value -> value && Arithmetic.nearest(value) end)
+
+    # A missing break is written as 1 and its label dropped, as R writes it, so it widens no
+    # padding to `NA`'s width.
+    numbers =
+      rounded
+      |> Enum.map(fn value -> value || 1.0 end)
+      |> label(Map.merge(settings, %{accuracy: 1, scale: 1, suffix: "", decimal_mark: "."}))
+
+    Enum.zip_with(rounded, numbers, fn
+      nil, _number -> nil
+      value, number -> number <> ordinal_suffix(value, rules) <> settings.suffix
+    end)
+  end
+
+  @doc """
+  English ordinals' rules for `ordinal/2`, R's `ordinal_english()`: `st` after a 1, `nd` after a
+  2 and `rd` after a 3, but for 11, 12 and 13, and `th` after anything else.
+
+  ## Examples
+
+      iex> Scales.Labels.ordinal_english() |> Enum.map(fn {suffix, _rule} -> suffix end)
+      ["st", "nd", "rd", "th", "th", "th"]
+  """
+  @spec ordinal_english() :: [{String.t(), Regex.t()}]
+  def ordinal_english do
+    [
+      {"st", ~r/(?<!1)1$/},
+      {"nd", ~r/(?<!1)2$/},
+      {"rd", ~r/(?<!1)3$/},
+      {"th", ~r/(?<=1)[123]$/},
+      {"th", ~r/[0456789]$/},
+      {"th", ~r/./}
+    ]
+  end
+
+  @doc """
+  Labels p-values, R's `label_pvalue()`: each rounded to `accuracy:` as `number/2` rounds it,
+  one below the accuracy written as less than it (`<0.001`) and one above 1 less the accuracy
+  as more than that (`>0.999`).
+
+  ## Options
+
+  #{NimbleOptions.docs(@pvalue_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.pvalue([0.0001, 0.05, 0.5, 0.9999, nil])
+      ["<0.001", "0.050", "0.500", ">0.999", nil]
+
+      iex> Scales.Labels.pvalue([0.001, 0.123, 0.999], accuracy: 0.01, add_p: true)
+      ["p<0.01", "p=0.12", "p>0.99"]
+
+      iex> Scales.Labels.pvalue([0.0001, 0.05], prefix: {"less than ", "", "more than "})
+      ["less than 0.001", "0.050"]
+  """
+  @spec pvalue([number() | nil], keyword()) :: [String.t() | nil]
+  def pvalue(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@pvalue_options)
+      |> Map.new()
+
+    {below, between, above} = pvalue_prefix(settings)
+    values = numbers!(breaks, "Labels.pvalue/2")
+    accuracy = settings.accuracy
+    highest = 1 - accuracy
+
+    written = fn numbers ->
+      number(numbers, accuracy: accuracy, decimal_mark: settings.decimal_mark)
+    end
+
+    [lowest_label] = written.([accuracy])
+    [highest_label] = written.([highest])
+
+    values
+    |> written.()
+    |> Enum.zip_with(values, fn
+      _label, nil -> nil
+      _label, value when value < accuracy -> below <> lowest_label
+      _label, value when value > highest -> above <> highest_label
+      label, _value -> between <> label
+    end)
+  end
+
+  @doc """
+  Labels spans of time, R's `label_timespan()`: each break, counted in `unit:`, turned into
+  seconds and written as `number/2` writes it under `cut_time_scale/1`'s steps, `90` minutes
+  being `90m` and `120` `2h`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@timespan_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.timespan([0, 30, 90, 3600, 86_400])
+      ["0", "30s", "90s", "1h", "1d"]
+
+      iex> Scales.Labels.timespan([0.5, 1.5, 36], unit: :hour)
+      ["30m", "90m", "36h"]
+
+      iex> Scales.Labels.timespan([1, 60, nil], space: true, suffix: " ago")
+      ["1 s ago", "1 m ago", nil]
+  """
+  @spec timespan([number() | nil], keyword()) :: [String.t() | nil]
+  def timespan(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@timespan_options)
+      |> Map.new()
+
+    seconds = Map.fetch!(@unit_seconds, settings.unit)
+    steps = cut_time_scale(space: settings.space)
+
+    breaks
+    |> numbers!("Labels.timespan/2")
+    |> Enum.map(fn value -> value && Arithmetic.product(value, seconds) end)
+    |> label(Map.put(settings, :scale_cut, steps))
+  end
+
+  @doc """
   The short scale's steps for `scale_cut:`, R's `cut_short_scale()`: thousands `K`, millions `M`,
   billions `B` (1e9) and trillions `T` (1e12).
 
@@ -811,6 +1175,51 @@ defmodule Scales.Labels do
   def validate_base(base),
     do: {:error, "expected a positive number other than 1, got: #{inspect(base)}"}
 
+  # NimbleOptions' check of `units:`: an automatic unit, or a fixed one as R spells it.
+  @doc false
+  @spec validate_units(term()) :: {:ok, atom() | String.t()} | {:error, String.t()}
+  def validate_units(units) when units in [:auto_si, :auto_binary], do: {:ok, units}
+  def validate_units(units) when is_map_key(@byte_units, units), do: {:ok, units}
+
+  def validate_units(units) do
+    {:error,
+     "expected :auto_si, :auto_binary or one of #{Enum.map_join(@byte_unit_names, ", ", &inspect/1)}, " <>
+       "got: #{inspect(units)}"}
+  end
+
+  # NimbleOptions' check of `rules:`: a list of at least one `{suffix, regex}` pair.
+  @doc false
+  @spec validate_rules(term()) :: {:ok, [{String.t(), Regex.t()}]} | {:error, String.t()}
+  def validate_rules(rules) do
+    if is_list(rules) and rules != [] and Enum.all?(rules, &rule?/1),
+      do: {:ok, rules},
+      else:
+        {:error,
+         "expected a list of at least one {suffix, regex} pair, each suffix a string, got: " <>
+           inspect(rules)}
+  end
+
+  # NimbleOptions' check of `pvalue/2`'s `accuracy:`: a positive number no larger than 0.5, so
+  # no p-value is both below it and above 1 less it.
+  @doc false
+  @spec validate_pvalue_accuracy(term()) :: {:ok, number()} | {:error, String.t()}
+  def validate_pvalue_accuracy(accuracy)
+      when is_number(accuracy) and accuracy > 0 and accuracy <= 0.5,
+      do: {:ok, accuracy}
+
+  def validate_pvalue_accuracy(accuracy),
+    do: {:error, "expected a positive number no larger than 0.5, got: #{inspect(accuracy)}"}
+
+  # NimbleOptions' check of `pvalue/2`'s `prefix:`: three strings.
+  @doc false
+  @spec validate_pvalue_prefix(term()) :: {:ok, tuple()} | {:error, String.t()}
+  def validate_pvalue_prefix({below, between, above} = prefix)
+      when is_binary(below) and is_binary(between) and is_binary(above),
+      do: {:ok, prefix}
+
+  def validate_pvalue_prefix(prefix),
+    do: {:error, "expected three strings, {below, between, above}, got: #{inspect(prefix)}"}
+
   # NimbleOptions' check of `scale_cut:`: `{suffix, threshold}` pairs, each threshold at least 0
   # and none given twice, one of them 0.
   @doc false
@@ -857,6 +1266,56 @@ defmodule Scales.Labels do
     |> NimbleOptions.validate!(Map.fetch!(@formatter_schemas, formatter))
     |> Map.new()
   end
+
+  defp rule?({suffix, rule}), do: is_binary(suffix) and is_struct(rule, Regex)
+  defp rule?(_rule), do: false
+
+  # `bytes/2`'s settings for its units: an automatic unit's steps, or a fixed unit's suffix and
+  # the scale divided by its size, as R divides it.
+  defp in_units(%{units: units} = settings) when is_map_key(@byte_steps, units),
+    do: Map.merge(settings, %{suffix: "", scale_cut: Map.fetch!(@byte_steps, units)})
+
+  defp in_units(%{units: units} = settings) do
+    {base, power} = Map.fetch!(@byte_units, units)
+    Map.merge(settings, %{suffix: " " <> units, scale: settings.scale / base ** power})
+  end
+
+  # An accuracy of `nil` is one worked out from the breaks, as one not given is.
+  defp without_given_accuracy(%{accuracy: nil} = settings), do: Map.delete(settings, :accuracy)
+  defp without_given_accuracy(settings), do: settings
+
+  # The suffix of the first rule matching a whole number's digits.
+  defp ordinal_suffix(value, rules) do
+    digits = whole_digits(value)
+
+    case Enum.find(rules, fn {_suffix, rule} -> Regex.match?(rule, digits) end) do
+      {suffix, _rule} ->
+        suffix
+
+      nil ->
+        raise ArgumentError,
+              "Labels.ordinal/2 found no rule matching #{inspect(digits)}, a break rounded; " <>
+                "the rules need one every break matches, as ordinal_english/0's last, " <>
+                "{\"th\", ~r/./}, is, got: #{inspect(rules)}"
+    end
+  end
+
+  # A whole number's digits, unmarked, a negative's with a `-` before them.
+  defp whole_digits(value) do
+    [digits] = Format.write([abs(value)], format_settings(@format_digits, :fixed, "."))
+    if value < 0, do: "-" <> digits, else: digits
+  end
+
+  # `pvalue/2`'s three prefixes.
+  defp pvalue_prefix(%{prefix: prefix, add_p: true}) do
+    raise ArgumentError,
+          "Labels.pvalue/2 takes add_p: true or prefix:, not both, since add_p: writes the " <>
+            "prefixes {\"p<\", \"p=\", \"p>\"}, got: prefix: #{inspect(prefix)}"
+  end
+
+  defp pvalue_prefix(%{prefix: prefix}), do: prefix
+  defp pvalue_prefix(%{add_p: true}), do: {"p<", "p=", "p>"}
+  defp pvalue_prefix(_settings), do: {"<", "", ">"}
 
   defp steps?(steps), do: is_list(steps) and steps != [] and Enum.all?(steps, &step?/1)
 
@@ -952,8 +1411,10 @@ defmodule Scales.Labels do
     Enum.map(values, fn value -> %{value: value, scale: scale, suffix: settings.suffix} end)
   end
 
-  # The suffix of the step a value takes: none past the largest double once scaled, where R's
-  # `cut()` finds no step for an infinity.
+  # The suffix of the step a value takes: none for an infinite value, or past the largest double
+  # once scaled, where R's `cut()` finds no step for an infinity.
+  defp step_name(value, _scale, _steps) when is_atom(value), do: ""
+
   defp step_name(value, scale, steps) do
     case Arithmetic.product(value, scale) do
       scaled when is_float(scaled) ->
@@ -1031,11 +1492,11 @@ defmodule Scales.Labels do
     Enum.map(numbers, fn number -> Map.put(number, :accuracy, accuracies[number.scale]) end)
   end
 
-  # The values scaled, as R's `precision()` takes them: the missing ones and those past the
-  # largest double left out.
+  # The values scaled, as R's `precision()` takes them: the missing and infinite ones and those
+  # past the largest double left out.
   defp finite_scaled(values, scale) do
     values
-    |> Enum.reject(&is_nil/1)
+    |> Enum.filter(&is_float/1)
     |> Enum.map(fn value -> Arithmetic.product(value, scale) end)
     |> Enum.filter(&is_float/1)
   end
@@ -1082,11 +1543,15 @@ defmodule Scales.Labels do
 
     precision = 10.0 ** (power - 1)
 
+    # R's `round(x / precision) %% 10 == 0`, where a quotient past the largest double is `NA`:
+    # beside a break that is no multiple R's `all()` is false, and beside multiples alone R
+    # fails, so such a quotient is left out (design-log §4, the entry beginning "A break whose
+    # quotient").
     tenfold =
-      Enum.all?(values, fn value ->
-        multiple = Arithmetic.nearest(value / precision)
-        rem(trunc(multiple), 10) == 0
-      end)
+      values
+      |> Enum.map(fn value -> Arithmetic.quotient(value, precision) end)
+      |> Enum.filter(&is_float/1)
+      |> Enum.all?(fn quotient -> rem(trunc(Arithmetic.nearest(quotient)), 10) == 0 end)
 
     if tenfold, do: min(precision * 10, 1.0), else: min(precision, 1.0)
   end
@@ -1117,6 +1582,10 @@ defmodule Scales.Labels do
   end
 
   defp rounded_value(%{value: nil}), do: {0, nil, false}
+
+  # A value already infinite, as `timespan/2`'s unit can take a break, rounds to itself.
+  defp rounded_value(%{value: infinite}) when is_atom(infinite),
+    do: {sign_of(infinite), :infinity, true}
 
   # Either step can pass the largest double, as R's `round_any()` and `scale * x` can: rounded
   # past it, the number is infinite; only scaled past it, it is written `Inf`.
