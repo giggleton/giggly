@@ -324,9 +324,9 @@ defmodule Giggly.Theme do
           | :none
 
   @typedoc """
-  A title's text, which may run over several lines: its `size`, `color`, `opacity`, `family`,
-  `face`, `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the distance
-  in points from one line's baseline to the next's; or `:none`, removed.
+  A title's or a strip's text, which may run over several lines: its `size`, `color`, `opacity`,
+  `family`, `face`, `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the
+  distance in points from one line's baseline to the next's; or `:none`, removed.
   """
   @type title ::
           %{
@@ -398,8 +398,8 @@ defmodule Giggly.Theme do
           panel_spacing_y: float(),
           strip_background_x: rect(),
           strip_background_y: rect(),
-          strip_text_x_top: text(),
-          strip_text_y_right: text(),
+          strip_text_x_top: title(),
+          strip_text_y_right: title(),
           legend_background: rect(),
           legend_margin: margin(),
           legend_key: rect(),
@@ -703,8 +703,8 @@ defmodule Giggly.Theme do
       panel_spacing_y: distance(theme, :panel_spacing_y),
       strip_background_x: rect(theme, :strip_background_x),
       strip_background_y: rect(theme, :strip_background_y),
-      strip_text_x_top: text(theme, :strip_text_x_top),
-      strip_text_y_right: text(theme, :strip_text_y_right),
+      strip_text_x_top: title(theme, :strip_text_x_top),
+      strip_text_y_right: title(theme, :strip_text_y_right),
       legend_background: rect(theme, :legend_background),
       legend_margin: margin(theme, :legend_margin),
       legend_key: rect(theme, :legend_key),

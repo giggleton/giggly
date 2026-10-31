@@ -25,7 +25,14 @@ defmodule Giggly.Plot.Options do
     both: [
       sep: [type: :string, default: ": ", doc: "What goes between a column's name and its value."]
     ],
-    context: []
+    context: [],
+    wrap: [
+      width: [
+        type: :pos_integer,
+        default: 25,
+        doc: "How many characters a line of a label is kept under."
+      ]
+    ]
   }
 
   @multi_line_option [
@@ -70,8 +77,9 @@ defmodule Giggly.Plot.Options do
                     )
 
   @labeller_doc "How each strip is labelled from its panel's values: `:value`, `:both`, " <>
-                  "`:context`, one of them with its options, a function, a map, or a keyword " <>
-                  "list labelling each side or column apart, as \"Labelling the strips\" says."
+                  "`:context`, `:wrap`, one of them with its options, a function, a map, or a " <>
+                  "keyword list labelling each side or column apart, as \"Labelling the " <>
+                  "strips\" says."
 
   # `facet_wrap/3`'s options, validated at the call as every public function's are.
   @facet_wrap_options NimbleOptions.new!(
@@ -3057,7 +3065,7 @@ defmodule Giggly.Plot.Options do
           type: {:custom, __MODULE__, :validate_lineheight, []},
           doc:
             "How far apart its lines are, 0 or more, a share of 1.2 times its size: a title's " <>
-              "lines are 0.9 apart unless given."
+              "or a strip's lines are 0.9 apart unless given."
         ],
         margin: [
           type: {:custom, __MODULE__, :validate_theme_margin, [:text]},
@@ -5102,6 +5110,6 @@ defmodule Giggly.Plot.Options do
 
   defp labeller_error(labeller),
     do:
-      "expected :value, :both or :context, one of them with its options, a function of one " <>
-        "label, a map of labels, or a keyword list of labellers, got: #{inspect(labeller)}"
+      "expected :value, :both, :context or :wrap, one of them with its options, a function of " <>
+        "one label, a map of labels, or a keyword list of labellers, got: #{inspect(labeller)}"
 end

@@ -475,7 +475,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   side's own labeller or `:none`, `columns`, a labeller per column by its name, `default`
   (`:value`) and `multi_line` (`true`). A labeller given alone is recorded as both sides', a
   keyword list as ggplot2's `labeller()`. Each labeller in it is a kind as `{kind, %{options}}`
-  (`:value`, `:both` with `sep:`, `:context`, which takes no `sep:`, as R passes it nowhere), a
+  (`:value`, `:both` with `sep:`, `:context`, which takes no `sep:`, as R passes it nowhere,
+  `:wrap` with `width:`, a positive integer, 25 unless given), a
   function of one label, or a map of label strings; `multi_line:` is the list's, never a kind's
   inside it, as R hands `.multi_line` on. A wrap given both `rows:` and `cols:` is refused by its
   validation; a `columns:` entry naming a column of a side with a labeller of its own raises at

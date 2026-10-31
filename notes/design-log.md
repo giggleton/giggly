@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Wrapping a strip's label is the facet's own, and counts graphemes (2026-10-30 and 2026-10-31,
+  Steve: Q3 "B", then "A"; checked against R 4.6.1).** `:wrap` and `{:wrap, width:}` break a
+  label by `strwrap()`'s documented rules and what R draws, never a port of its source, in
+  private functions of `Facet.Labeller`, with no boundary change; scales increment 3 (Labels)
+  brings `label_wrap()` and line breaks in axis and legend labels, and moves this onto it. Strip
+  text is a title look, its line spacing the theme's. A character is a grapheme: R counts an East
+  Asian wide character as two, so `"日本語 日本語"` breaks at 10 in R and not in Giggly.
+  *Rejected: `Scales.Labels.wrap/2` now* — it pulls axis and legend line breaks into a facet step
+  and widens Scales' exports and Facet's deps. *Rejected: display columns from a Hex width
+  table* — a dependency for one script's labels, whose glyph widths Giggly already approximates.
+
 - **A labeller is plain data under `labeller:`, ggplot2's labellers by R's rules (2026-10-30,
   Steve: "a", "A", and "agree" to the small calls; checked against ggplot2 4.0.3).** `:value`,
   `:both` and `:context`, each also `{kind, options}`; a function handed one label; a map of
@@ -3243,6 +3254,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Take labeller: :wrap and {:wrap, width: …}, and break strips over several lines
+  (labellers, step 2); §4: "Wrapping a strip's label"
 - 2026-10-30 — Take labeller: on facet_wrap and facet_grid, ggplot2's label_value, label_both and
   label_context, a function or a map, and labeller()'s sides and columns (labellers, step 1); §4:
   "A labeller is plain data", "A missing value is never handed"

@@ -67,7 +67,8 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   facet's are all above.
 - **A strip's label is the facet's labeller's, ggplot2's labellers by R's rules** (`Facet.Labeller`,
   checked in R 4.6.1 with ggplot2 4.0.3; design-log §4, the entries beginning "A labeller is plain
-  data" and "A missing value is never handed"). Each side is labelled from its own columns'
+  data", "A missing value is never handed" and "Wrapping a strip's label"). Each side is labelled
+  from its own columns'
   values, a wrap's all of them, a grid's rows' once per row and columns' once per column: by the
   side's own labeller where it has one (a wrap's `cols`, else `rows`, as `resolve_labeller()`
   takes them), else each column alone, by its own or the default, a label its own leaves missing
@@ -76,6 +77,12 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   `as.character()` (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`).
   A missing value is never handed to a function or looked up, and is written `NA`. The facet holds
   the labeller as `Plot` records it, plain data, and runs a function only to write labels.
+- **`:wrap` breaks a label as `strwrap()` does, from its documented rules and R's drawings, never a
+  port of its source** (`Facet.Labeller`; checked on 600 random labels against R 4.6.1): lines
+  shorter than the width, words never split, whitespace (space, tab and line break only) one
+  space, or two after a sentence's end that two or more followed, a line of only whitespace a
+  paragraph break, a character a grapheme (R counts an East Asian wide one as two). The wrapping is
+  the facet's own, private, until scales' `label_wrap()` takes it over.
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
   levels, the first table's and then those each later one adds; any other as a discrete scale

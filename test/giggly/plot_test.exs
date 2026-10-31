@@ -3989,7 +3989,15 @@ defmodule Giggly.PlotTest do
 
       recorded =
         Enum.map(
-          [:both, {:both, sep: "=", multi_line: false}, {:context, []}, capitalize, lookup],
+          [
+            :both,
+            {:both, sep: "=", multi_line: false},
+            {:context, []},
+            :wrap,
+            {:wrap, width: 10, multi_line: false},
+            capitalize,
+            lookup
+          ],
           fn labeller -> Plot.facet_wrap(plot, :cyl, labeller: labeller).facet.labeller end
         )
 
@@ -4002,6 +4010,13 @@ defmodule Giggly.PlotTest do
                    multi_line: false
                },
                %{@value_labeller | rows: {:context, %{}}, cols: {:context, %{}}},
+               %{@value_labeller | rows: {:wrap, %{width: 25}}, cols: {:wrap, %{width: 25}}},
+               %{
+                 @value_labeller
+                 | rows: {:wrap, %{width: 10}},
+                   cols: {:wrap, %{width: 10}},
+                   multi_line: false
+               },
                %{@value_labeller | rows: capitalize, cols: capitalize},
                %{@value_labeller | rows: lookup, cols: lookup}
              ]
@@ -4046,12 +4061,16 @@ defmodule Giggly.PlotTest do
             {{:bogus, sep: "="}, ~s(a keyword list of labellers, got: {:bogus, [sep: "="]})},
             {["cyl"], ~s(a keyword list of labellers, got: ["cyl"])},
             {{:context, sep: "="}, "unknown options [:sep]"},
+            {{:wrap, width: 0}, "invalid value for :width option: expected positive integer"},
+            {{:wrap, width: 2.5}, "got: 2.5"},
+            {[cols: {:wrap, multi_line: false}], "unknown options [:multi_line]"},
             {%{4 => "four"}, ~s(the labels to show, got: %{4 => "four"})},
             {%{"4" => "four", 6 => "six"}, "expected a map of labels to the labels to show"},
             {[rows: :both, cols: :value], "labelled by rows: or cols:, not both"},
             {[default: {:both, multi_line: false}], "unknown options [:multi_line]"},
             {[columns: [{:cyl, :both}, {"cyl", :value}]], ~s(got "cyl" twice)},
-            {[columns: [cyl: :label_both]], ~s(the labeller of "cyl": expected :value)},
+            {[columns: [cyl: :label_both]],
+             ~s(the labeller of "cyl": expected :value, :both, :context or :wrap,)},
             {[columns: [:cyl]], "expected a column and its labeller, got: :cyl"},
             {[columns: :cyl], "expected a keyword list or a map of a labeller for each column"}
           ] do

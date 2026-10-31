@@ -265,6 +265,15 @@ defmodule Giggly.ThemeTest do
       assert {theme.plot_title.line_spacing, theme.axis_title_x_bottom.line_spacing,
               theme.plot_subtitle.line_spacing} === {23.759999999999998, 0.0, 11.88}
     end
+
+    # test/golden/facet_grid_labeller_wrap.svg's strips, checked against R, set their lines 9.5
+    # points apart: theme_gray()'s 0.9 at the strips' 8.8 points.
+    test "a strip's line height spaces its lines, as a title's does" do
+      theme = complete(%{strip_text_y: %{lineheight: 1.5}})
+
+      assert {theme.strip_text_x_top.line_spacing, theme.strip_text_y_right.line_spacing} ===
+               {9.504000000000001, 15.84}
+    end
   end
 
   # ggplot2 4.0.3's `calc_element()` of each text Giggly draws, and `layer_data()`'s family for

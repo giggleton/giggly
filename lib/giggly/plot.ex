@@ -304,15 +304,22 @@ defmodule Giggly.Plot do
     * `:both`, the column's name and the value, `cyl: 4`;
     * `:context`, the value alone where a side's strips are for one column, and both where they
       are for several;
+    * `:wrap`, the value alone broken between its words into lines shorter than 25 characters, a
+      word longer than that on a line of its own: the whitespace between words becomes one space,
+      or two after a sentence's end that two or more followed, and a line holding only whitespace
+      starts a paragraph, an empty line before it;
     * one of these with its options, such as `{:both, sep: "=", multi_line: false}`: `sep:` goes
-      between the name and the value (`": "`), and `multi_line: false` puts a panel's labels in
+      between the name and the value (`": "`), `width:` sets how many characters `:wrap` keeps a
+      line under (`{:wrap, width: 10}`), and `multi_line: false` puts a panel's labels in
       one strip, joined by `", "`, in place of a strip for each column (`4, f`, or under
-      `:both` `cyl, drv: 4, f`);
+      `:both` `cyl, drv: 4, f`, and under `:wrap` the labels joined and then broken);
     * a function, handed each label as `:value` writes it and returning the label to show;
     * a map of labels to the labels to show, `%{"0" => "Zero", "1" => "One"}`, a label it lacks
       shown as `NA`.
 
-  A missing value is shown as `NA`, and is never handed to a function or looked up.
+  A missing value is shown as `NA`, and is never handed to a function or looked up. A label
+  holding a line break, whichever labeller writes it, is drawn in a strip of several lines,
+  spaced by the strip text's `lineheight:`.
 
   A keyword list labels the sides, or the columns, apart:
 
@@ -4325,7 +4332,8 @@ defmodule Giggly.Plot do
   own, along and across it once turned: the y axis's title is turned 90 degrees, so its `vjust:
   1` puts its top toward the left. A legend's labels sit right of their keys, left-aligned and
   centred on them, and its title is left-aligned, unless `:legend_text` or `:legend_title` says
-  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines.
+  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines,
+  and a strip's.
   `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
   "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
   [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.
