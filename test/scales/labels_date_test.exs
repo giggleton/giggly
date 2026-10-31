@@ -254,6 +254,16 @@ defmodule Scales.LabelsDateTest do
       seconds = ~N[2020-01-01 00:00:30]
       assert Labels.date_short([seconds, seconds]) == ["2020", "2020-01-01 00:00:30"]
 
+      # label_date_short(tz = "Etc/GMT+5")(NY("2020-01-01", "2020-01-01", "2020-07-01",
+      # "2020-07-01")): one repeat at midnight in tz and one not, so both to the second
+      [winter, summer] =
+        Enum.map([~N[2020-01-01 00:00:00], ~N[2020-07-01 00:00:00]], fn naive ->
+          in_zone(naive, "America/New_York")
+        end)
+
+      assert Labels.date_short([winter, winter, summer, summer], [tz: "Etc/GMT+5"] ++ @zones) ==
+               ["Jan\n2020", "2020-01-01 00:00:00", "Jun", "2020-06-30 23:00:00"]
+
       assert Labels.date_short([~D[2020-01-01], ~D[2021-01-01]], format: [year: nil]) ==
                ["2020-01-01", "2021-01-01"]
 
@@ -412,6 +422,7 @@ defmodule Scales.LabelsDateTest do
           assert_raise ArgumentError, fn -> Labels.time([~T[00:00:00]], format: format) end
 
         assert error.message =~ inspect(format)
+        assert error.message =~ inspect(~T[00:00:00])
       end
 
       assert Labels.time([~N[1970-01-01 00:00:00]], format: "%Y-%m-%d") == ["1970-01-01"]
@@ -421,9 +432,16 @@ defmodule Scales.LabelsDateTest do
       # R writes tz = "Not/AZone" as UTC under the abbreviation "Not", and tz = "" in the
       # machine's own zone; Elixir's own database knows "Etc/UTC" alone.
       for zone <- ["America/New_York", "UTC"],
-          function <- [&Labels.date/2, &Labels.date_short/2, &Labels.time/2] do
+          {function, name} <- [
+            {&Labels.date/2, "Labels.date/2"},
+            {&Labels.date_short/2, "Labels.date_short/2"},
+            {&Labels.time/2, "Labels.time/2"}
+          ] do
         error = assert_raise ArgumentError, fn -> function.([], tz: zone) end
+        assert error.message =~ name
         assert error.message =~ inspect(zone)
+        assert error.message =~ inspect(Calendar.UTCOnlyTimeZoneDatabase)
+        assert error.message =~ inspect(:utc_only_time_zone_database)
         assert error.message =~ "time_zone_database:"
       end
 
