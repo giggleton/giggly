@@ -321,6 +321,26 @@ defmodule Giggly.GuideTest do
       assert {Float.round(width, 2), Float.round(legend_height, 2), texts} ===
                {28.24, 78.13, [["drv"]]}
     end
+
+    test "a key whose label the theme removes is as tall as the key, however short" do
+      key_height = {0.5, :pt}
+
+      theme =
+        Theme.complete(%{
+          complete: :none,
+          settings: %{legend_text: :none, legend_key_height: key_height}
+        })
+
+      {_width, scene} = legend("drv", ~w(4 f r), theme)
+
+      # The key rows follow the margin and the title's row, a row of no spacing after each.
+      key_rows =
+        scene.heights
+        |> Enum.slice(2..-2//2)
+        |> Enum.uniq()
+
+      assert key_rows === [{:points, Theme.points(key_height)}]
+    end
   end
 
   # Golden: the legends ggplot2 4.0.3 stacks for mpg's `alpha = cyl` above `colour = class`

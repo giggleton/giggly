@@ -1563,7 +1563,9 @@ defmodule Giggly.SVGTest do
 
       drawn = draw(whole([text, nested, text]))
 
-      assert {count(drawn, "<path id="), count(drawn, "<use href=")} === {1, 3}
+      # One `<defs>` too: a label whose glyphs are all defined already writes none, not an empty one.
+      assert {count(drawn, "<defs>"), count(drawn, "<path id="), count(drawn, "<use href=")} ===
+               {1, 1, 3}
     end
 
     test "a label left out draws no glyph and defines none" do

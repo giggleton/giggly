@@ -822,7 +822,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   viewer's fonts stop mattering, so Pica's installed fonts, searched by default, are safe on any
   server: `to_svg/2`'s `installed_fonts:`, on by default, a boolean handed to every geom and guide
   drawing function as its last argument (2026-10-31, Steve), and the suite passes `false`; `""`
-  and R's generic names never search them, Pica matching installed families by exact name. Each
+  and R's generic names never search them, Pica matching installed families by exact name, a rule
+  no test reaches, since it differs only on a machine with such a font (*rejected:* a function
+  pulled out of `Font` to pin it, after the mutation pass over `9ede4f5`, Steve). Each
   label keeps its words for screen readers. *Rejected: an embedded subset* — a subsetter, each
   font's embedding permissions, and unproven in Livebook's SVG images. *Rejected: plain text by
   default* — right only where the viewer has the font. *Rejected: no option* — a render would turn

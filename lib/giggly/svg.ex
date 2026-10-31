@@ -665,10 +665,10 @@ defmodule Giggly.SVG do
   defp path_command(:close), do: "Z"
 
   # A length in a font's units, with up to two decimals and no trailing zeros, as a font's whole
-  # units are mostly whole.
+  # units are mostly whole, and a length that rounds to nothing below 0 written as 0.
   defp unit(value) do
-    case :erlang.float_to_binary(value / 1, decimals: 2) do
-      zero when zero in ["0.00", "-0.00"] ->
+    case :erlang.float_to_binary(value, decimals: 2) do
+      "-0.00" ->
         "0"
 
       written ->
