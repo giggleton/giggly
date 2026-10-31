@@ -29,8 +29,8 @@ is also a list of what remains.
 `geom_text()` draws each row's `label` as text at its `x` and `y`, and `geom_label()` draws it on
 a rectangle, which makes it easier to read. They label points or bars, or make a scatter plot of
 words. Text has no size in the data's units, so the axes do not grow to fit it, and it keeps its
-size when the plot is resized. Giggly draws text with `Giggly.Plot.geom_text/3`; it has no
-`geom_label()`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+size when the plot is resized. Giggly draws text with `Giggly.Plot.geom_text/3` and labels with
+`Giggly.Plot.geom_label/3`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
 returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and
 defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data in
 most examples is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US
@@ -80,7 +80,14 @@ p
 p + geom_label()
 ```
 
-Not in Giggly yet: `geom_label()`.
+Each label sits on a white box with rounded corners and a thin border, centred on its car's weight
+and mileage.
+
+```elixir
+p
+|> Plot.geom_label()
+|> render.()
+```
 
 ## Larger text
 
@@ -177,7 +184,7 @@ p
 |> render.()
 ```
 
-Not in Giggly yet: `geom_label()` and a fixed `fontface`.
+Not in Giggly yet: a fixed `fontface`.
 
 ## Mapping size
 

@@ -3251,6 +3251,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook example geom_label() unlocks, and narrow the filled labels'
+  verdict to a fixed fontface (geom_label, step 3, the notebook sweep)
 - 2026-10-30 — Add annotate(:label): labels placed by hand, each look a list of one per label,
   a padding one value however many sides it gives (geom_label, step 2); §4: "`annotate(:label)`
   counts a padding as one value"
