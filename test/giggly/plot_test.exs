@@ -3689,7 +3689,7 @@ defmodule Giggly.PlotTest do
       plot =
         @rows
         |> Plot.new(%{x: :wt})
-        |> Plot.geom_tile(%{y: :mpg}, width: 1, height: 0.5, colour: "red")
+        |> Plot.geom_tile(%{y: :mpg}, width: 1, height: 2, colour: "red")
 
       assert plot.reversed_layers == [
                %Plot.Layer{
@@ -3698,7 +3698,7 @@ defmodule Giggly.PlotTest do
                  position: %Position.Identity{},
                  data: :none,
                  mapping: %{y: "mpg"},
-                 fixed: %{width: 1.0, height: 0.5, color: "#FF0000"},
+                 fixed: %{width: 1.0, height: 2.0, color: "#FF0000"},
                  accepted: [
                    :alpha,
                    :color,
@@ -3715,6 +3715,8 @@ defmodule Giggly.PlotTest do
                  inherit: true
                }
              ]
+
+      assert hd(plot.reversed_layers).fixed === %{width: 1.0, height: 2.0, color: "#FF0000"}
     end
 
     test "y mapped by neither the layer nor the plot is refused, naming the call" do
@@ -3756,8 +3758,25 @@ defmodule Giggly.PlotTest do
         Plot.geom_tile(plot, width: "1")
       end
 
-      assert_raise NimbleOptions.ValidationError, ~r/expected a height, a number/, fn ->
-        Plot.geom_tile(plot, height: :none)
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/expected a height, a number, got: :none$/,
+                   fn ->
+                     Plot.geom_tile(plot, height: :none)
+                   end
+    end
+
+    test "a tile's look is checked and resolved at the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{fixed: fixed}] =
+               Plot.geom_tile(plot, fill: "red", linewidth: 1, linetype: :dashed).reversed_layers
+
+      assert fixed === %{fill: "#FF0000", linewidth: 1.0, linetype: {4, 4}}
+
+      for {option, value} <- [fill: "reddish", linewidth: -1, linetype: :wavy] do
+        assert_raise NimbleOptions.ValidationError, ~r/invalid value for :#{option} option/, fn ->
+          Plot.geom_tile(plot, [{option, value}])
+        end
       end
     end
   end

@@ -1286,6 +1286,39 @@ defmodule GigglyTest do
                {[0.0, nil, 2.0], [1.5, 2.5, nil]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `aes(x, y, width = w, height = h)`
+    # over x 2, 5, 7, 9, 12 and y 1, w `c(4L, 2L, 2L, 2L, 4L)` and h its reverse, then both
+    # `NA_real_`: each edge NA. R's table then holds width and height 1, its defaults; Giggly's
+    # holds neither, as they are not the sizes the tiles are drawn at. They move only with ggplot2's
+    # tiles.
+    test "a mapped size of whole numbers is taken, one of only missing values draws nothing" do
+      tiles = fn widths ->
+        [x: @tile_xs, y: List.duplicate(1.0, 5), w: widths, h: Enum.reverse(widths)]
+        |> Plot.new(%{x: :x, y: :y, width: :w, height: :h})
+        |> Plot.geom_tile()
+        |> Giggly.layer_data()
+      end
+
+      whole = tiles.([4, 2, 2, 2, 4])
+      nothing = List.duplicate(nil, 5)
+      missing = tiles.(nothing)
+
+      assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge -> DataFrame.pull(whole, edge) end) ===
+               [
+                 [0.0, 4.0, 6.0, 8.0, 10.0],
+                 [4.0, 6.0, 8.0, 10.0, 14.0],
+                 [-1.0, 0.0, 0.0, 0.0, -1.0],
+                 [3.0, 2.0, 2.0, 2.0, 3.0]
+               ]
+
+      assert Enum.map([:xmin, :ymax], fn edge -> DataFrame.pull(missing, edge) end) ===
+               [nothing, nothing]
+
+      assert DataFrame.names(whole) ==
+               [:x, :y, :panel, :group, :xmin, :xmax, :ymin, :ymax] ++
+                 [:color, :fill, :linewidth, :linetype, :alpha]
+    end
+
     test "an expression's width or height that is not a number is refused when the plot is run" do
       for {size, words} <- [width: "wide as its width", height: "tall as its height"] do
         plot =
