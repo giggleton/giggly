@@ -766,7 +766,8 @@ defmodule Scales.LabelsTest do
     test "rounds the exponents as R's zapsmall() does first" do
       # format_log(c(1, 1e300), base = 1.0001, digits = 3); c(1, 1e300), base = 1.0001; the
       # same with digits = 9, rounded whole; c(1, 1e300), base = 1.00001, past 1e7;
-      # c(1, 1 + 1e-10); c(1), every exponent 0
+      # c(1, 1 + 1e-10); c(1), every exponent 0; c(0.001, 0.01), every one negative; c(1e-300, 2),
+      # rounded by the largest magnitude, not the largest exponent
       assert Labels.format_log([1, 1.0e300], base: 1.0001, digits: 3) ==
                ["1.0001^      0", "1.0001^6908101"]
 
@@ -780,6 +781,8 @@ defmodule Scales.LabelsTest do
 
       assert Labels.format_log([1, 1 + 1.0e-10]) == ["10^0.000000e+00", "10^4.342945e-11"]
       assert Labels.format_log([1]) == ["10^0"]
+      assert Labels.format_log([0.001, 0.01]) == ["10^-3", "10^-2"]
+      assert Labels.format_log([1.0e-300, 2]) == ["10^-300.00000", "10^   0.30103"]
     end
   end
 
