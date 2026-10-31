@@ -2211,6 +2211,117 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 and draw_key/2 for labels" do
+    # A label's parameters as `Plot.geom_label/3` records ggplot2's defaults.
+    @quarter_line {0.25, :lines}
+    @label %Geom.Label{
+      label_padding: %{
+        top: @quarter_line,
+        right: @quarter_line,
+        bottom: @quarter_line,
+        left: @quarter_line
+      },
+      label_r: {0.15, :lines},
+      border_color: :color,
+      text_color: :color
+    }
+
+    setup do
+      coord = %Coord.Cartesian{}
+      params = Coord.panel_params(coord, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
+      %{coord: coord, params: params}
+    end
+
+    test "a row missing its x, its y or its label is not drawn, and each other is a box and text",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.2, nil, 0.4, 0.6, 0.8],
+          y: [0.2, 0.2, :nan, 0.6, 0.8],
+          label: ["a", "b", "c", nil, "e"]
+        )
+
+      assert [
+               %Polygons{outlines: [[{0.2, 0.2} | _first]]},
+               %Text{labels: ["a"]},
+               %Polygons{outlines: [[{0.8, 0.8} | _second]]},
+               %Text{labels: ["e"]}
+             ] = draw_panel(@label, frame, coord, params)
+    end
+
+    test "a label of no colour keeps its box, unbordered, and its text in no colour",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [0.2, 0.4], y: [0.2, 0.4], label: ["a", "b"], color: [:none, nil])
+
+      drawn = draw_panel(@label, frame, coord, params)
+
+      assert [
+               %Polygons{color: [:none], fill: ["#FFFFFF"]},
+               %Text{color: [:none], opacity: [+0.0]},
+               %Polygons{color: [:none], fill: ["#FFFFFF"]},
+               %Text{color: [:none], opacity: [+0.0]}
+             ] = drawn
+    end
+
+    # A line type a scale maps to blank is held as `nil`, as a column holds one type.
+    test "each box is bordered as wide and dashed as its row says, none where blank, missing or 0",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [0.2, 0.4, 0.6, 0.8],
+          y: [0.2, 0.4, 0.6, 0.8],
+          label: ["a", "b", "c", "d"],
+          linewidth: [2.0, 2.0, nil, 0.0],
+          linetype: [{4, 4}, nil, {}, {}]
+        )
+
+      boxes =
+        @label
+        |> draw_panel(frame, coord, params)
+        |> Enum.filter(fn primitive -> is_struct(primitive, Polygons) end)
+        |> Enum.map(fn box -> {box.color, box.stroke_width, rounded(box.dashes)} end)
+
+      assert boxes === [
+               {["#000000"], @two_millimetres, [22.76, 22.76]},
+               {[:none], @two_millimetres, :none},
+               {[:none], +0.0, :none},
+               {[:none], +0.0, :none}
+             ]
+    end
+
+    test "the layer's text and border colours replace the row's, which :color keeps",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [0.2], y: [0.2], label: ["a"], color: ["#FF000080"])
+      parted = %{@label | border_color: "#0000FF", text_color: :none}
+
+      assert [
+               %Polygons{color: ["#FF0000"], color_opacity: [@half_alpha]},
+               %Text{color: ["#FF0000"]}
+             ] =
+               draw_panel(@label, frame, coord, params)
+
+      assert [%Polygons{color: ["#0000FF"], color_opacity: [1.0]}, %Text{color: [:none]}] =
+               draw_panel(parted, frame, coord, params)
+    end
+
+    # Golden: ggplot2 4.0.3 under vdiffr 1.0.9 draws `geom_label(aes(fill = g), linewidth = 1e-8)`'s
+    # labels bordered and its keys `stroke: none`, as `draw_key_label()` takes a width `all.equal()`
+    # calls 0 as none, and at `linewidth = 2e-8` both bordered.
+    test "a key's border is none at a width all.equal() takes as 0, where a label's is drawn" do
+      key = %{linewidth: 1.0e-8}
+      frame = DataFrame.new(x: [0.5], y: [0.5], label: ["a"], linewidth: [1.0e-8])
+      params = Coord.panel_params(@cartesian, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
+
+      assert {[%Polygons{color: [:none]}, %Text{}], [%Polygons{color: [:none]}, %Text{}]} =
+               {draw_key(@label, key), draw_key(@label, %{linewidth: nil})}
+
+      assert [%Polygons{color: ["#000000"]}, %Text{}] =
+               draw_panel(@label, frame, @cartesian, params)
+
+      assert [%Polygons{color: ["#000000"]}, %Text{}] = draw_key(@label, %{linewidth: 2.0e-8})
+    end
+  end
+
   describe "draw_key/2 for ribbons, areas and rectangles" do
     # Golden: ggplot2 4.0.3's `geom_area(aes(fill = type))` through vdiffr 1.0.9: each key's
     # rectangle `stroke-linecap: butt` with grid's round corners, as `draw_key_polygon()` takes the

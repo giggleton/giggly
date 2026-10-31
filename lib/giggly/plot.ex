@@ -1569,6 +1569,71 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of labels: each row's `label` at its `x` and `y`, as `geom_text/3` writes it, on a
+  box with rounded corners, so it reads over what lies beneath.
+
+  Each label is written and justified as `geom_text/3`'s are, its box placed and turned with its
+  text, padded round it by a quarter of a line of the text on every side and its corners rounded
+  to 0.15 of a line. A box is white with a black border 0.25 millimetres wide, and its text black
+  and 11 points tall, unless the options say otherwise; `alpha:` makes the box see-through, but
+  neither the text nor the border. Labels are drawn in the order of their rows, each box and then
+  its text, so a later label covers an earlier one. A row missing its `x`, `y` or label draws
+  nothing.
+
+  Labels use `:x`, `:y`, `:label`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and
+  `:linewidth`, and need `:x`, `:y` and `:label`; a label never groups the rows. `nudge_x:` and
+  `nudge_y:` move every label, in the units of each axis, and the axes reach each label's place,
+  though not its box.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.label())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg, label: :model})
+      ...>   |> Giggly.Plot.geom_label(fill: "lightyellow")
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :fill), Giggly.DataFrame.pull(frame, :linewidth)}
+      {["#FFFFE0", "#FFFFE0"], [0.25, 0.25]}
+
+  A label is drawn as its box and its text, here padded 4 points either side, on square corners:
+
+      iex> svg =
+      ...>   %{"x" => [1.0], "y" => [1.0], "name" => ["a"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, label: :name})
+      ...>   |> Giggly.Plot.geom_label(label_padding: [left: 4, right: 4], label_r: 0)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> {svg =~ "<polygon points=", svg =~ ">a</text>"}
+      {true, true}
+  """
+  @spec geom_label(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_label(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_label(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_label(plot, %{}, options)
+
+  def geom_label(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.label())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: label_geom(validated),
+      stat: %Stat.Identity{},
+      position: %Position.Nudge{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_label/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Label.accepted_aesthetics(),
+      annotation: false
+    }
+
+    add_layer(plot, layer, "Plot.geom_label/3", required: Geom.Label.required_aesthetics())
+  end
+
+  @doc """
   Adds a layer of rectangles, one per row, each from its `xmin` to its `xmax` and its `ymin` to its
   `ymax`.
 
@@ -5089,6 +5154,15 @@ defmodule Giggly.Plot do
 
   defp text_geom(validated),
     do: %Geom.Text{check_overlap: Keyword.fetch!(validated, :check_overlap)}
+
+  defp label_geom(validated) do
+    %Geom.Label{
+      label_padding: Keyword.fetch!(validated, :label_padding),
+      label_r: Keyword.fetch!(validated, :label_r),
+      border_color: Keyword.fetch!(validated, :border_color),
+      text_color: Keyword.fetch!(validated, :text_color)
+    }
+  end
 
   # The geom an annotation draws with, a struct of its kind, with the aesthetics it accepts and
   # those it needs, as a layer function of the same geom records them.

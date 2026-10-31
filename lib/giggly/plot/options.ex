@@ -272,7 +272,7 @@ defmodule Giggly.Plot.Options do
                     doc: "The arms alone (`:open`), or a triangle (`:closed`)."
                   ],
                   fill: [
-                    type: {:custom, __MODULE__, :validate_arrow_fill, []},
+                    type: {:custom, __MODULE__, :validate_own_color, []},
                     default: :color,
                     doc:
                       "The fill of a closed head: a CSS colour, `:none` for none, or `:color`, " <>
@@ -1282,6 +1282,23 @@ defmodule Giggly.Plot.Options do
     ]
   ]
 
+  # How far every label moves from its place, as ggplot2's `nudge_x` and `nudge_y` move it, options
+  # of `geom_text/3` and `geom_label/3`.
+  @nudge_options [
+    nudge_x: [
+      type: {:custom, __MODULE__, :validate_nudge, []},
+      doc:
+        "How far every label moves along x from its place, in the units of the x axis; 0 when " <>
+          "not given."
+    ],
+    nudge_y: [
+      type: {:custom, __MODULE__, :validate_nudge, []},
+      doc:
+        "How far every label moves along y from its place, in the units of the y axis; 0 when " <>
+          "not given."
+    ]
+  ]
+
   # `geom_text/3`'s options, validated at the call.
   @text_options NimbleOptions.new!(
                   [
@@ -1289,23 +1306,91 @@ defmodule Giggly.Plot.Options do
                     check_overlap: @check_overlap_option,
                     alpha: @alpha_option,
                     color: @text_color_option
-                  ] ++
-                    @text_style_options ++
-                    [
-                      nudge_x: [
-                        type: {:custom, __MODULE__, :validate_nudge, []},
-                        doc:
-                          "How far every label moves along x from its place, in the units of the " <>
-                            "x axis; 0 when not given."
-                      ],
-                      nudge_y: [
-                        type: {:custom, __MODULE__, :validate_nudge, []},
-                        doc:
-                          "How far every label moves along y from its place, in the units of the " <>
-                            "y axis; 0 when not given."
-                      ]
-                    ]
+                  ] ++ @text_style_options ++ @nudge_options
                 )
+
+  # A label's colour, its text's and its border's unless the layer gives them apart.
+  @label_color_option [
+    type: @color_type,
+    doc:
+      "The colour of every label's text and border, written `colour:` or `color:`: " <>
+        @color_forms <> "; black when not given. Neither takes `alpha:`, only its colour's own."
+  ]
+
+  # `geom_label/3`'s options, validated at the call.
+  @label_options NimbleOptions.new!(
+                   [
+                     data: @data_option,
+                     alpha: [
+                       type: {:custom, __MODULE__, :validate_alpha, []},
+                       doc:
+                         "How opaque every label's box is, from 0, invisible, to 1, opaque; its " <>
+                           "text and border keep their colour's own."
+                     ],
+                     color: @label_color_option,
+                     fill: [
+                       type: @color_type,
+                       doc:
+                         "The colour every label's box is filled with: " <>
+                           @color_forms <>
+                           "; the theme's paper, white, when not given."
+                     ],
+                     linewidth: [
+                       type: {:custom, __MODULE__, :validate_linewidth, []},
+                       doc:
+                         "How wide every label's border is, in millimetres, 0 for none; half " <>
+                           "the theme's `base_line_size` when not given, 0.25 at its default " <>
+                           "sizes."
+                     ],
+                     linetype: [
+                       type: @linetype_type,
+                       doc:
+                         "The line type of every label's border: " <>
+                           @linetype_forms <> "; `:solid` when not given."
+                     ]
+                   ] ++
+                     @text_style_options ++
+                     @nudge_options ++
+                     [
+                       label_padding: [
+                         type: {:custom, __MODULE__, :validate_label_padding, []},
+                         default: {0.25, :lines},
+                         doc:
+                           "The room round every label's text inside its box: one length for " <>
+                             "every side, or a keyword list of `:top`, `:right`, `:bottom` and " <>
+                             "`:left`, a side left out 0; each a number of points or " <>
+                             "`{amount, unit}` with a unit of `:pt`, `:cm`, `:mm`, `:in` or " <>
+                             "`:lines`, lines of the label's own text. The text sits the " <>
+                             "bottom's padding above the box's bottom, its descent within it, " <>
+                             "and the top's is at least the descent."
+                       ],
+                       label_r: [
+                         type: {:custom, __MODULE__, :validate_label_r, []},
+                         default: {0.15, :lines},
+                         doc:
+                           "The radius of every label's box's corners, a length as " <>
+                             "`label_padding:` takes one; 0 for square corners."
+                       ],
+                       border_color: [
+                         type: {:custom, __MODULE__, :validate_own_color, []},
+                         default: :color,
+                         doc:
+                           "The colour of every label's border apart from its text, written " <>
+                             "`border_colour:` or `border_color:`: " <>
+                             @color_forms <>
+                             ", or `:color`, the label's own colour, when not given."
+                       ],
+                       text_color: [
+                         type: {:custom, __MODULE__, :validate_own_color, []},
+                         default: :color,
+                         doc:
+                           "The colour of every label's text apart from its border, written " <>
+                             "`text_colour:` or `text_color:`: " <>
+                             @color_forms <>
+                             ", or `:color`, the label's own colour, when not given."
+                       ]
+                     ]
+                 )
 
   @rect_color_option [
     type: @color_type,
@@ -3185,6 +3270,10 @@ defmodule Giggly.Plot.Options do
   def text, do: @text_options
 
   @doc false
+  @spec label() :: NimbleOptions.t()
+  def label, do: @label_options
+
+  @doc false
   @spec rect() :: NimbleOptions.t()
   def rect, do: @rect_options
 
@@ -4846,12 +4935,36 @@ defmodule Giggly.Plot.Options do
        "got: #{inspect(length)}"}
   end
 
-  # NimbleOptions' check of a closed arrowhead's `fill:`: `:color`, the line's own, or a colour,
-  # resolved as `validate_color/1` resolves one.
+  # NimbleOptions' check of a colour a mark may take from its own, `:color`: a closed arrowhead's
+  # `fill:`, the line's colour, and a label's `border_color:` and `text_color:`, the label's; or a
+  # colour, resolved as `validate_color/1` resolves one.
   @doc false
-  @spec validate_arrow_fill(term()) :: {:ok, String.t() | :none | :color} | {:error, String.t()}
-  def validate_arrow_fill(:color), do: {:ok, :color}
-  def validate_arrow_fill(fill), do: validate_color(fill)
+  @spec validate_own_color(term()) :: {:ok, String.t() | :none | :color} | {:error, String.t()}
+  def validate_own_color(:color), do: {:ok, :color}
+  def validate_own_color(color), do: validate_color(color)
+
+  # NimbleOptions' check of a label's `label_padding:`: a margin as a theme's is given, one length
+  # for every side or a keyword list of sides, each held as `validate_label_r/1` holds a length.
+  @doc false
+  @spec validate_label_padding(term()) ::
+          {:ok, %{atom() => {float(), :points | :lines}}} | {:error, String.t()}
+  def validate_label_padding(padding) do
+    with {:ok, sides} <- validate_theme_margin(padding, :root),
+         do: {:ok, Map.new(sides, fn {side, measure} -> {side, label_measure(measure)} end)}
+  end
+
+  # NimbleOptions' check of a label's `label_r:`: a length as a theme's is given, a number of
+  # ggplot2's points or `{amount, unit}`, held in points as the theme works one out, or in lines,
+  # which the geom works out in the label's own font, as grid works out a label's `"lines"`.
+  @doc false
+  @spec validate_label_r(term()) :: {:ok, {float(), :points | :lines}} | {:error, String.t()}
+  def validate_label_r(radius) do
+    with {:ok, measure} <- validate_theme_length(radius, :root),
+         do: {:ok, label_measure(measure)}
+  end
+
+  defp label_measure({amount, :lines}), do: {amount / 1, :lines}
+  defp label_measure(measure), do: {Theme.points(measure), :points}
 
   # NimbleOptions' check of a `binwidth:` option: a number above 0, kept as a float, as R keeps a
   # double.

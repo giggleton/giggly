@@ -32,8 +32,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
-  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3` and
-  `geom_hex/3` among them),
+  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
+  `geom_hex/3` and `geom_label/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
@@ -141,7 +141,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the plot's facet and coordinate system (`%Facet.Null{}` and `%Coord.Cartesian{}` when nothing
   chooses others; `coord_cartesian/2` records `%Coord.Cartesian{}` with its `clip:`, `:on` unless
   `:off` is given, and `coord_radial/1` `%Coord.Radial{}`); `geom_text/3` records
-  `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and
+  `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and so does
+  `geom_label/3`, with `%Geom.Label{}` and the identity stat, as its `geom_label()` does, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
   identity stat and position, as ggplot2's `annotate()` does, so its text is never nudged. `Plot`
@@ -315,13 +316,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   functions take no position.
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
-  function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth and
-  point functions `fill:`,
+  function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth,
+  point and label functions `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
   the hexagon functions `fill:`, `linewidth:` and `linetype:`,
-  the line, segment, rug, bar, rectangle, ribbon, area, density and smooth
+  the line, segment, rug, bar, rectangle, ribbon, area, density, smooth and label
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
-  and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
+  and `geom_text/3` and `geom_label/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
   and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
@@ -353,7 +354,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   sides, each given once (`validate_rug_sides/1`), `[:bottom, :left]` unless given, and
   `length:`, `{amount, unit}` in `:npc`, a share of the panel, or an arrowhead's units, any amount
   (`validate_rug_length/1`), recorded `{share, :npc}` or `{points, :points}`, and `outside:`,
-  `false` unless given. **So is `arrow:`,
+  `false` unless given, and a label's `label_padding:`, a theme margin, and `label_r:`, a theme
+  length (`validate_label_padding/1`, `validate_label_r/1`), each side recorded `{points, :points}`
+  or `{lines, :lines}`, lines of the label's own text, `{0.25, :lines}` and `{0.15, :lines}` unless
+  given, and `border_color:` and `text_color:` (`border_colour:`, `text_colour:`), a colour,
+  `:none`, or `:color`, the label's own and the default (`validate_own_color/1`, which an
+  arrowhead's `fill:` shares). **So is `arrow:`,
   an arrowhead on a layer's lines, an option of the line layer functions (`geom_segment/3`,
   `geom_path/3`, `geom_line/3`,
   `geom_freqpoly/3`) and their annotations, never a value of its own** (design-log §4, the entry
@@ -374,7 +380,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
-  `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `stat_bin_hex/3`,
+  `geom_text/3`, `geom_label/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `stat_bin_hex/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
   guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme

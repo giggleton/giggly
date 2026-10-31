@@ -2450,6 +2450,173 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_label/3" do
+    @cars %{"wt" => [2.62, 2.32], "mpg" => [21.0, 22.8], "model" => ["Mazda RX4", "Datsun 710"]}
+
+    # ggplot2 4.0.3's `geom_label()`: `label.padding = unit(0.25, "lines")`, `label.r =
+    # unit(0.15, "lines")`, `border.colour` and `text.colour` `NULL`, the label's colour.
+    test "a label layer records R's padding and corners, the identity stat and nudging" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_label(%{label: :model})
+
+      quarter = {0.25, :lines}
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{top: quarter, right: quarter, bottom: quarter, left: quarter},
+                   label_r: {0.15, :lines},
+                   border_color: :color,
+                   text_color: :color
+                 },
+                 stat: %Stat.Identity{},
+                 position: %Position.Nudge{},
+                 data: :none,
+                 mapping: %{label: "model"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :fill, :group, :label, :linetype, :linewidth, :x, :y],
+                 annotation: false
+               }
+             ]
+    end
+
+    test "the options set every label's look, and its box's padding, corners and colours" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_label(
+          size: 5,
+          angle: 45,
+          hjust: :inward,
+          vjust: 1,
+          family: "Times New Roman",
+          colour: "red",
+          fill: "lightyellow",
+          alpha: 0.5,
+          linewidth: 1,
+          linetype: :dashed,
+          nudge_x: 0.1,
+          nudge_y: -1,
+          label_padding: [top: 2, left: {1, :lines}, right: {0.5, :cm}],
+          label_r: {1, :in},
+          border_colour: :none,
+          text_color: "blue"
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{
+                     top: {top, :points},
+                     right: {right, :points},
+                     bottom: {+0.0, :points},
+                     left: {1.0, :lines}
+                   },
+                   label_r: {radius, :points},
+                   border_color: :none,
+                   text_color: "#0000FF"
+                 },
+                 fixed: %{
+                   size: 5.0,
+                   angle: 45.0,
+                   hjust: :inward,
+                   vjust: 1.0,
+                   family: "Times New Roman",
+                   color: "#FF0000",
+                   fill: "#FFFFE0",
+                   alpha: 0.5,
+                   linewidth: 1.0,
+                   linetype: {4, 4},
+                   nudge_x: 0.1,
+                   nudge_y: -1.0
+                 }
+               }
+             ] = plot.reversed_layers
+
+      assert {top, right, radius} ===
+               {Theme.points({2, :pt}), Theme.points({0.5, :cm}), Theme.points({1, :in})}
+    end
+
+    test "one length pads every side alike" do
+      plot =
+        @cars
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model})
+        |> Plot.geom_label(label_padding: {3, :mm})
+
+      side = {Theme.points({3, :mm}), :points}
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Label{
+                   label_padding: %{top: ^side, right: ^side, bottom: ^side, left: ^side}
+                 }
+               }
+             ] = plot.reversed_layers
+    end
+
+    test "a label mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":label"
+    end
+
+    test "an aesthetic a label cannot use, mapped by the layer, is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot, %{shape: :model}) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":shape"
+    end
+
+    test "padding, corners or part colours of the wrong kind are refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      for {key, value} <- [
+            label_padding: {1, :npc},
+            label_padding: [top: 1, top: 2],
+            label_padding: [middle: 1],
+            label_padding: "1",
+            label_r: {0.5, :lines, :extra},
+            label_r: [top: 1],
+            border_color: "nonsense",
+            text_color: 3
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_label(plot, [{key, value}])
+          end
+
+        assert error.key == key
+      end
+    end
+
+    test "overlap is not checked, as ggplot2's geom_label() takes no check_overlap" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_label(plot, check_overlap: true)
+        end
+
+      assert error.key == [:check_overlap]
+    end
+
+    test "a part's colour written twice, once with each spelling, is refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_label(plot, border_colour: "red", border_color: "blue")
+        end
+
+      assert error.message =~ ":border_color"
+    end
+  end
+
   describe "a layer's own table" do
     @own %{"wt" => [4.0, 3.0], "mpg" => [16.0, 15.0], "name" => ["p", "q"]}
 
@@ -2463,6 +2630,7 @@ defmodule Giggly.PlotTest do
             fn plot -> Plot.geom_path(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_line(plot, %{y: :mpg}, data: @own) end,
             fn plot -> Plot.geom_text(plot, %{y: :mpg, label: :name}, data: @own) end,
+            fn plot -> Plot.geom_label(plot, %{y: :mpg, label: :name}, data: @own) end,
             fn plot ->
               Plot.geom_rect(plot, %{xmin: :mpg, xmax: :mpg}, data: @own, ymin: 0, ymax: 1)
             end

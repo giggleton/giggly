@@ -171,6 +171,25 @@ beginning "Each layer's defaults are filled in from the theme".
   font's descent added by the angle's sine and cosine and a margin each side of a tenth of a line
   of grid's default 12-point font, not its own, as `draw_key_text()` measures it, outside the
   text's font.
+- **A label (`Geom.Label`) is drawn as ggplot2's `GeomLabel` draws it** (design-log §4, the entry
+  beginning "`geom_label()` draws ggplot2's `labelGrob()`"): a row at a time, its box and then its
+  text, so a later label covers an earlier; its text written, sized and justified as a text's,
+  through the functions `Geom.Text` shares (`justification/4`, ggplot2's `compute_just()`,
+  `turned_justification/3` and `font_size/1`), never a copy; its box the text's width and the
+  ascent of "M" and the descent, padded, the top at least the descent and the bottom less it, as
+  `labelGrob()` balances them, turned with the text about its place, a length in `:lines` lines of
+  the label's own text. **Its corners are the points grid's `roundCorner()` picks**, a polygon,
+  never a curve, so a drawing matches vdiffr's element by element, a radius past the box's half
+  drawn as given. Its fill takes the row's alpha, its text and border only their colour's own,
+  each the layer's `text_color` or `border_color`, or the row's colour for `:color`; a border
+  0 wide, blank or missing is none. A row missing its place or label is not drawn; one of no colour
+  keeps its box, its text written in no colour, as R's does. **Its key is `draw_key_label()`'s,
+  R's oddities copied**: the letter "a" as a label at its justification turned as `rotate_just()`
+  turns it, lifted by the descent of a font as many points as its size is millimetres, as R hands
+  `font_descent()` the millimetres, its border none at a width `all.equal()` takes as 0; it needs
+  its box turned with it, padded in lines of grid's 12-point font, not its own, so a label bigger
+  than grid's spills out of its key. Each checked against vdiffr's drawing
+  (`test/golden/label*.svg`).
 - **A line (`Geom.Line`) is a path whose rows `setup_data/3` puts in order** of panel, group and
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws

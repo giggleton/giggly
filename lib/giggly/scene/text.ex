@@ -8,8 +8,9 @@ defmodule Giggly.Scene.Text do
   # `:bold_italic`, grid's `fontface`. Neither changes a label's measured width, only how it is
   # drawn.
   #
-  # Each label has its own colour and opacity, `color` an `#RRGGBB` and `opacity` from 0 to 1, as
-  # grid's graphical parameters are one per label, so labels in many colours need one text.
+  # Each label has its own colour and opacity, `color` an `#RRGGBB`, or `:none`, written in no
+  # colour, as svglite writes R's `NA`, and `opacity` from 0 to 1, as grid's graphical parameters
+  # are one per label, so labels in many colours need one text.
   #
   # Each label's anchor is its `offset` in points from its place, `{along, up}`: along the text's
   # baseline and toward its top, the top being up for level text and turned with it otherwise, so
@@ -51,7 +52,7 @@ defmodule Giggly.Scene.Text do
           size: float(),
           family: String.t(),
           face: :plain | :bold | :italic | :bold_italic,
-          color: [String.t()],
+          color: [String.t() | :none],
           opacity: [float()],
           angle: number(),
           hjust: [float()],

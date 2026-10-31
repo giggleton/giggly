@@ -52,7 +52,8 @@ theme puts them".
   place, and a text's anchor by its `offset`, `{along, up}` in the text's own frame. A text's anchor
   is at its `hjust` of the label's width, any fraction from its start (0) to its end (1).
 - **A text carries each label's measured width**, which the backend draws it at, **and each label's
-  colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label; its size, its
+  colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label, a colour of
+  `:none` written in no colour, as svglite writes a label's of `NA`; its size, its
   `family` (`""` the default sans-serif, `"sans"`, `"serif"` and `"mono"` R's generic families,
   any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), neither of
   which changes its measured width, and its angle, any number of degrees, are the text's. **A

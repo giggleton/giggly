@@ -20,7 +20,8 @@ defprotocol Giggly.Geom do
   # rectangles (`Giggly.Geom.Rect`), bars (`Giggly.Geom.Bar`), which `geom_col()` draws with as
   # ggplot2's does and which are drawn as rectangles, as ggplot2's `GeomBar` is a `GeomRect`, paths
   # (`Giggly.Geom.Path`) and lines (`Giggly.Geom.Line`), which draw as paths once their rows are in
-  # order, as ggplot2's `GeomLine` is a `GeomPath`, text (`Giggly.Geom.Text`), box plots
+  # order, as ggplot2's `GeomLine` is a `GeomPath`, text (`Giggly.Geom.Text`), labels
+  # (`Giggly.Geom.Label`), text on a box with rounded corners, box plots
   # (`Giggly.Geom.Boxplot`), which draw their outliers as points, ribbons (`Giggly.Geom.Ribbon`)
   # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
   # `GeomArea` is a `GeomRibbon`, densities (`Giggly.Geom.Density`), which draw as areas with a
@@ -57,6 +58,7 @@ defprotocol Giggly.Geom do
       Boxplot,
       Density,
       Hex,
+      Label,
       Line,
       Path,
       Point,
