@@ -79,6 +79,16 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **ggplot2's `msleep` comes with the labeller sweep, behind a waiver of its own (2026-10-30 and
+  2026-10-31, Steve: Q4 "yes", then the waiver "yes").** Five of the `labeller()` page's six
+  examples plot it, so without it the page that shows off `labeller:` would draw two. It is R's
+  `write.csv()` of the 83 rows, kept as columns as `mpg` is, and its 36 missing diets and statuses
+  read as `nil`: a string column now reads R's unquoted `NA` as a number column does, which no
+  earlier dataset's text holds. The logticks pages' examples that plot it still wait on their own
+  guides. *Rejected: leaving the five examples waiting* — the labeller work would ship with its own
+  page showing almost none of it. *Rejected: writing the rows out in the notebook* — 83 rows of 11
+  columns are a dataset ggplot2 ships, which `Giggly.Datasets` exists to hold.
+
 - **Wrapping a strip's label is the facet's own, and counts graphemes (2026-10-30 and 2026-10-31,
   Steve: Q3 "B", then "A"; checked against R 4.6.1).** `:wrap` and `{:wrap, width:}` break a
   label by `strwrap()`'s documented rules and what R draws, never a port of its source, in
@@ -3254,6 +3264,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Add the msleep dataset, a string column reading R's NA as missing (labellers, step
+  3); §4: "ggplot2's `msleep` comes with the labeller sweep"
 - 2026-10-31 — Take labeller: :wrap and {:wrap, width: …}, and break strips over several lines
   (labellers, step 2); §4: "Wrapping a strip's label"
 - 2026-10-30 — Take labeller: on facet_wrap and facet_grid, ggplot2's label_value, label_both and

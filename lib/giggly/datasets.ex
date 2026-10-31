@@ -35,6 +35,9 @@ defmodule Giggly.Datasets do
   @txhousing_path Application.app_dir(:giggly, "priv/datasets/txhousing.csv")
   @external_resource @txhousing_path
 
+  @msleep_path Application.app_dir(:giggly, "priv/datasets/msleep.csv")
+  @external_resource @msleep_path
+
   # How each of mtcars's columns is read; the file's header gives their order.
   @mtcars_types [
     model: :string,
@@ -122,6 +125,22 @@ defmodule Giggly.Datasets do
     date: :float
   ]
 
+  # How each of msleep's columns is read; the file's header gives their order. R stores every
+  # number as a double.
+  @msleep_types [
+    name: :string,
+    genus: :string,
+    vore: :string,
+    order: :string,
+    conservation: :string,
+    sleep_total: :float,
+    sleep_rem: :float,
+    sleep_cycle: :float,
+    awake: :float,
+    brainwt: :float,
+    bodywt: :float
+  ]
+
   # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
   # instead of: the values as literals in this module — rejected because it is R's data, kept as
   #   the file R writes so it can be regenerated and diffed against its source apart from the code
@@ -158,8 +177,15 @@ defmodule Giggly.Datasets do
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
   @txhousing_text File.read!(@txhousing_path)
 
+  # why: the dataset is read once, at compile time; no IO happens when a dataset is asked for
+  # instead of: the values as literals in this module — rejected because it is ggplot2's data, kept
+  #   as the file R writes so it can be regenerated and diffed against its source apart from the code
+  # credo:disable-for-next-line Tack.Credo.Check.CorePurity
+  @msleep_text File.read!(@msleep_path)
+
   # Each dataset's columns, its file's comment lines skipped: each named by its header, an atom
-  # its table of types already holds, and read by its type, a float's R writes as NA missing.
+  # its table of types already holds, and read by its type, a string or float R writes as NA
+  # missing.
   @parsed Map.new(
             [
               mtcars: {@mtcars_text, @mtcars_types},
@@ -167,7 +193,8 @@ defmodule Giggly.Datasets do
               diamonds: {@diamonds_text, @diamonds_types},
               economics: {@economics_text, @economics_types},
               economics_long: {@economics_long_text, @economics_long_types},
-              txhousing: {@txhousing_text, @txhousing_types}
+              txhousing: {@txhousing_text, @txhousing_types},
+              msleep: {@msleep_text, @msleep_types}
             ],
             fn {dataset, {text, types}} ->
               columns =
@@ -181,7 +208,10 @@ defmodule Giggly.Datasets do
                   read =
                     case Keyword.fetch!(types, name) do
                       :string ->
-                        fn value -> value end
+                        fn
+                          "NA" -> nil
+                          value -> value
+                        end
 
                       :integer ->
                         &String.to_integer/1
@@ -212,7 +242,7 @@ defmodule Giggly.Datasets do
   # they would be some 18 MB and 2 MB held wherever this module is loaded, a release loading every
   # module at boot, where compressed they are half a megabyte and a tenth of one, decoded in a few
   # tens of milliseconds and a few, with no IO either way.
-  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long])
+  @datasets Map.take(@parsed, [:mtcars, :mpg, :economics, :economics_long, :msleep])
   @diamonds @parsed
             |> Map.fetch!(:diamonds)
             |> :erlang.term_to_binary(compressed: 9)
@@ -423,4 +453,40 @@ defmodule Giggly.Datasets do
   """
   @spec txhousing() :: [{atom(), [String.t() | number() | nil]}]
   def txhousing, do: :erlang.binary_to_term(@txhousing)
+
+  @doc """
+  ggplot2's `msleep`: the sleep of 83 mammals, an updated and expanded version of the mammals
+  sleep dataset. The sleep times and weights are from Savage and West (2007); the order,
+  conservation status and diet were added from Wikipedia.
+
+  The columns: `name`, the animal's common name; `genus`; `vore`, its diet, `"carni"`,
+  `"herbi"`, `"insecti"` or `"omni"`; `order`; `conservation`, its conservation status, such as
+  `"lc"`, least concern, or `"domesticated"`; `sleep_total`, its total sleep in hours;
+  `sleep_rem`, its REM sleep in hours; `sleep_cycle`, the length of its sleep cycle in hours;
+  `awake`, its time awake in hours; and `brainwt` and `bodywt`, its brain and body weight in
+  kilograms. Every number is a float, and a value the data lacks is `nil`, as R's is `NA`.
+
+      iex> msleep = Giggly.Datasets.msleep()
+      iex> Keyword.keys(msleep)
+      [:name, :genus, :vore, :order, :conservation, :sleep_total, :sleep_rem, :sleep_cycle,
+       :awake, :brainwt, :bodywt]
+      iex> msleep |> Keyword.fetch!(:name) |> length()
+      83
+      iex> Enum.map(msleep, fn {name, values} -> {name, Enum.at(values, 1)} end)
+      [
+        name: "Owl monkey",
+        genus: "Aotus",
+        vore: "omni",
+        order: "Primates",
+        conservation: nil,
+        sleep_total: 17.0,
+        sleep_rem: 1.8,
+        sleep_cycle: nil,
+        awake: 7.0,
+        brainwt: 0.0155,
+        bodywt: 0.48
+      ]
+  """
+  @spec msleep() :: [{atom(), [String.t() | number() | nil]}]
+  def msleep, do: Map.fetch!(@datasets, :msleep)
 end
