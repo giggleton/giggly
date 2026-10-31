@@ -75,7 +75,9 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   filled in from the default's, as `labeller()` fills R's `NA`; a function's or a map's labels
   are then written by the default. The default, `:value`, is `label_value()`: R's
   `as.character()` (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`).
-  A missing value is never handed to a function or looked up, and is written `NA`. The facet holds
+  A missing value is never handed to a function or looked up, and is written `NA`; a column's own
+  `:both` or `:wrap` writes it, where its own `:value` or `:context` leaves it for the default, as
+  R fills in only what stays `NA` (`strwrap()` writes R's `NA`). The facet holds
   the labeller as `Plot` records it, plain data, and runs a function only to write labels.
 - **`:wrap` breaks a label as `strwrap()` does, from its documented rules and R's drawings, never a
   port of its source** (`Facet.Labeller`; checked on 600 random labels against R 4.6.1): lines

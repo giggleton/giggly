@@ -97,7 +97,14 @@ ggplot(mpg, aes(displ, hwy)) +
   facet_wrap(vars(cyl, drv), labeller = "label_both")
 ```
 
-Not in Giggly yet: `labeller`, which here writes each strip as `cyl: 4` rather than `4`.
+ggplot2 names its labeller here by the name of its function, `"label_both"`; Giggly's is `:both`,
+which writes each strip as `cyl: 4` rather than `4`.
+
+```elixir
+plot
+|> Plot.facet_wrap([:cyl, :drv], labeller: :both)
+|> render.()
+```
 
 ## The order of the panels
 

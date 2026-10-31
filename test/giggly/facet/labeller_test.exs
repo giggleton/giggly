@@ -345,6 +345,18 @@ defmodule Giggly.Facet.LabellerTest do
       assert Labeller.label(own, :wrap, ["cyl"], [["Conservation Dependent"]]) ==
                [["Conservation\nDependent"]]
     end
+
+    # Golden: `labeller(v = label_wrap_gen(10), .default = label_both)` over `v = c("a", "b",
+    # NA)`, the missing value `NA` where `v = label_value` gives `v: NA`; `labeller(am = c(`0` =
+    # "zero"), .default = label_wrap_gen(10))` over mtcars, the second strip `NA` where a
+    # `label_value` default gives `1`: `strwrap()` writes R's NA, so nothing is left to fill in.
+    test "wrap writes a missing value NA itself, so the default fills in none" do
+      own = labellers(columns: [{"v", {:wrap, %{width: 10}}}], default: @both)
+      looked_up = labellers(columns: [{"am", %{"0" => "zero"}}], default: {:wrap, %{width: 10}})
+
+      assert Labeller.label(own, :wrap, ["v"], [["a"], [nil]]) == [["a"], ["NA"]]
+      assert Labeller.label(looked_up, :wrap, ["am"], [[0.0], [1.0]]) == [["zero"], ["NA"]]
+    end
   end
 
   describe "a missing value" do

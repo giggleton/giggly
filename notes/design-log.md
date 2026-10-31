@@ -113,9 +113,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   level* — a column named `rows` or `default` would collide, which R's leading dots avoid.
 
 - **A missing value is never handed to a labeller's function or looked up (2026-10-30, Steve:
-  "A").** It stays missing until the default writes it, `NA` or `vore: NA`. R hands its `NA` over,
-  so a function adding text departs: `NA-foo` in R, `NA` in Giggly, and a map's miss under such a
-  default the default's own label (`1-foo`, R `NA-foo`). *Rejected: handing over `"NA"`* —
+  "A").** It stays missing until a labeller writes it, the default `NA` or `vore: NA`, or a column's
+  own `:both` or `:wrap`, as R fills in only labels left `NA` (`strwrap()` writes R's `NA`; checked
+  2026-10-31 in the labeller sweep, whose global labeller drew it). R hands its `NA` over, so a
+  function adding text departs: `NA-foo` in R, `NA` in Giggly, and a map's miss under such a default
+  the default's own label (`1-foo`, R `NA-foo`). *Rejected: handing over `"NA"`* —
   `String.capitalize("NA")` is `"Na"`, where R draws `NA`. *Rejected: handing over `nil`* —
   `&String.capitalize/1` would raise on msleep's `vore`, and every function would need a clause.
 
@@ -3264,6 +3266,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples labeller: unlocks, and write a missing value NA under a
+  column's own :wrap (labellers, step 3, the notebook sweep); §4: "A missing value is never handed"
 - 2026-10-31 — Add the msleep dataset, a string column reading R's NA as missing (labellers, step
   3); §4: "ggplot2's `msleep` comes with the labeller sweep"
 - 2026-10-31 — Take labeller: :wrap and {:wrap, width: …}, and break strips over several lines

@@ -19,8 +19,9 @@ defmodule Giggly.Facet.Labeller do
   # - `{:context, %{}}`, `label_context()`: the value alone for one column, both for more, with
   #   ": ", as R passes its `sep` nowhere;
   # - `{:wrap, %{width: width}}`, `label_wrap_gen()`: the value alone, broken into lines by
-  #   `wrapped/2`, R's `strwrap()`, each label's lines joined by a line break; with every label in
-  #   one strip, the labels joined first and then broken;
+  #   `wrapped/2`, R's `strwrap()`, each label's lines joined by a line break, a missing value
+  #   written `NA`, as `strwrap()` writes R's; with every label in one strip, the labels joined
+  #   first and then broken;
   # - a function of one label, returning the label to show, or a map of labels to the labels to
   #   show, ggplot2's `as_labeller()`: each label is replaced, and then the labeller's `:default`
   #   writes the labels it gives, as `as_labeller(x, default)` hands them on, a label the map
@@ -32,9 +33,10 @@ defmodule Giggly.Facet.Labeller do
   # labeller or else the default, and a label its own leaves missing is the default's, as
   # `labeller()` fills them in; with `multi_line` false they are then joined, `cyl: 8, drv: 4`.
   #
-  # A missing value (`nil`) is missing to the end, never handed to a function or looked up, and is
-  # written `NA` wherever a strip shows it, `cyl: NA` beside a name, as R writes and draws R's
-  # missing string. A function must return a string.
+  # A missing value (`nil`) is never handed to a function or looked up, and stays missing until a
+  # labeller writes it, `cyl: NA` beside a name, or a strip shows it, `NA`, as R writes and draws
+  # R's missing string: so a column's own `:value` or `:context` leaves it for the default to fill
+  # in, where its own `:both` or `:wrap` writes it. A function must return a string.
   #
   # A label is broken into lines as `strwrap()` documents it, and as R draws it where it does not
   # say: a label is split into paragraphs at each line holding only whitespace, a break at its
@@ -145,7 +147,7 @@ defmodule Giggly.Facet.Labeller do
   defp evaluate({:wrap, %{width: width}}, _default, multi_line, table) do
     table
     |> values(multi_line)
-    |> Enum.map(fn labels -> Enum.map(labels, fn label -> label && wrapped(label, width) end) end)
+    |> Enum.map(fn labels -> Enum.map(labels, fn label -> wrapped(shown(label), width) end) end)
   end
 
   defp evaluate(function, default, multi_line, table) when is_function(function, 1) do
