@@ -32,8 +32,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (design-log §4, the entry beginning "`Plot` lists `Giggly.Guide`"). A plot writes a scale and
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
-  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3` and
-  `geom_hex/3` among them),
+  `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
+  `geom_hex/3`, `geom_hline/3` and `geom_vline/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
@@ -78,6 +78,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_area()` aligns, and `%Position.Stack{}` unless `position: :identity`, its orientation in
   the geom's struct and the stat's, and `geom_segment/3` `%Geom.Segment{}` with the identity stat
   and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
+  `geom_hline/3` and `geom_vline/3` `%Geom.Hline{}` and `%Geom.Vline{}` with the identity stat and
+  position, taking no `position:`, as only nudging moves a reference line in R, and
   `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
   `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
   each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
@@ -133,7 +135,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   reader of a layer's aesthetics — the checks here, the assembly's evaluation — asks for it, so
   the precedence exists once: the layer's column wins over the plot's, and an aesthetic the layer
   sets wins over both, dropped from the mapping as ggplot2's `compute_aesthetics()` drops what
-  `aes_params` set. **The order ggplot2 evaluates them in is `mapping_order/2`'s, here alone**:
+  `aes_params` set. **A layer whose `inherit` is `false`, an annotation or a reference line, lays
+  its own over nothing**, as ggplot2's `inherit.aes = FALSE`, so it checks none of the plot's
+  columns and draws no aesthetic the plot maps.
+  **The order ggplot2 evaluates them in is `mapping_order/2`'s, here alone**:
   the layer's own aesthetics, then those it takes from the plot, each mapping's `x` and `y` first
   and its others in name order, as `defaults(layer$mapping, plot$mapping)` lays them.
 - **A plot and its layers record their kinds as structs, the null and identity ones included**: each
@@ -319,7 +324,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   point functions `fill:`,
   `geom_point/3`, `geom_count/3` and `stat_sum/3` `shape:`, `size:` and `stroke:`, in millimetres,
   the hexagon functions `fill:`, `linewidth:` and `linetype:`,
-  the line, segment, rug, bar, rectangle, ribbon, area, density and smooth
+  the line, segment, rug, reference line, bar, rectangle, ribbon, area, density and smooth
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` `size:`, in millimetres, `angle:`, in degrees,
   `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
@@ -374,7 +379,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `linewidth:`, `geom_freqpoly/3`'s among them; the line, bar and rectangle functions' `linetype:`,
   and the bar functions' `linewidth:`; `geom_line/3`'s `orientation:`; the binning functions'
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
-  `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `stat_bin_hex/3`,
+  `geom_text/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `geom_hline/3`, `geom_vline/3`,
+  `stat_bin_hex/3`,
   `geom_rect/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
   guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
@@ -513,4 +519,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   or a line type's `:blank`, in a list held as `nil`, the column's missing value, as R's `c(NA,
   "red")` holds `NA`. A position is kept as a float where it is a number, as an option's number is.
   The options are each geom's function's but `data:`, `position:` and nudging, so one its geom
-  cannot use raises, where ggplot2 warns and ignores it.
+  cannot use raises, where ggplot2 warns and ignores it. **`:hline` and `:vline` are refused,
+  naming the function that draws them**, as ggplot2's `annotate()` warns that they annotate on
+  their own.
+- **A reference line function (`geom_hline/3`, `geom_vline/3`) gives its lines one of two ways**
+  (design-log §4, the entry beginning "A reference line is drawn from the panel's extents"): its
+  intercept's option (`yintercept:`, `xintercept:`), any position an annotation takes, makes the
+  layer an annotation of those lines, built as `annotate/3` builds one, each
+  look one value or a list, one per line; without it, the layer maps the intercept from its own
+  `data:` or the plot's, an ordinary layer but for `inherit: false`, each look one value, a list
+  refused naming the option that takes one. The option beside a mapping or `data:` is refused at
+  the call, where ggplot2 warns and ignores them; a layer given neither is refused as needing the
+  intercept, "neither its mapping maps it nor yintercept: gives it". `lineend:` is the geom's
+  field, `:butt` unless given; `arrow:`, `linejoin:` and `size:` are refused, R ignoring the first
+  two and `size` being superseded.

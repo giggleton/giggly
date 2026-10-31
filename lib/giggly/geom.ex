@@ -27,7 +27,8 @@ defprotocol Giggly.Geom do
   # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, segments
   # (`Giggly.Geom.Segment`), a straight line for each row, rugs (`Giggly.Geom.Rug`), a short line
   # at the panel's edge for each row's place, hexagons (`Giggly.Geom.Hex`), one round each row's
-  # centre, and smooths (`Giggly.Geom.Smooth`), each group a
+  # centre, horizontal and vertical reference lines (`Giggly.Geom.Hline`, `Giggly.Geom.Vline`),
+  # segments across the whole panel, and smooths (`Giggly.Geom.Smooth`), each group a
   # ribbon under a line, as ggplot2's `GeomSmooth` draws one.
   # A geom drawing lines places its rows with `Giggly.Coord.munch/3`, which cuts them to follow the
   # panel's curves.
@@ -57,6 +58,7 @@ defprotocol Giggly.Geom do
       Boxplot,
       Density,
       Hex,
+      Hline,
       Line,
       Path,
       Point,
@@ -65,7 +67,8 @@ defprotocol Giggly.Geom do
       Rug,
       Segment,
       Smooth,
-      Text
+      Text,
+      Vline
     ]
 
   alias Giggly.{Coord, DataFrame, Scene}

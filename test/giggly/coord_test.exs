@@ -415,6 +415,18 @@ defmodule Giggly.CoordTest do
     end
   end
 
+  describe "extents/2" do
+    test "a cartesian panel's extents are its axes', by aesthetic, as given" do
+      params = Coord.panel_params(@cartesian, {{0.4, 7.6}, [], []}, {{8.42, 51.98}, [], []})
+      assert Coord.extents(@cartesian, params) === %{x: {0.4, 7.6}, y: {8.42, 51.98}}
+    end
+
+    test "a radial panel's extents are the angle's as x and the radius's as y" do
+      params = Coord.panel_params(@radial, {{0.4, 7.6}, [], []}, {{8.42, 51.98}, [], []})
+      assert Coord.extents(@radial, params) === %{x: {0.4, 7.6}, y: {8.42, 51.98}}
+    end
+  end
+
   describe "aspect/2" do
     test "a cartesian panel takes whatever shape the drawing leaves it" do
       params = Coord.panel_params(@cartesian, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})

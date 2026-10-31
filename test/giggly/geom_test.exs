@@ -13,6 +13,8 @@ defmodule Giggly.GeomTest do
     arrow: :none
   }
   @segment %Geom.Segment{line_end: :butt, line_join: :round, arrow: :none}
+  @hline %Geom.Hline{line_end: :butt}
+  @vline %Geom.Vline{line_end: :butt}
   @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, outside: false, line_end: :butt}
 
   @ribbon %Geom.Ribbon{
@@ -1878,6 +1880,84 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "draw_panel/4 for reference lines" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+      }
+    end
+
+    test "a horizontal line crosses the panel's x extent at its yintercept, each repeat drawn once",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          yintercept: [15.0, 12.5, 15.0],
+          group: [-1, -1, -1],
+          color: ["#FF0000", "#0000FF", "#FF0000"]
+        )
+
+      assert [%Segments{} = lines] = draw_panel(@hline, frame, coord, params)
+      assert {lines.starts, lines.ends} === {[{0.0, 0.5}, {0.0, 0.25}], [{1.0, 0.5}, {1.0, 0.25}]}
+      assert lines.color === ["#FF0000", "#0000FF"]
+    end
+
+    test "a vertical line runs up the panel's y extent at its xintercept, each repeat drawn once",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(xintercept: [1.0, 3.0, 1.0], group: [-1, -1, -1])
+
+      assert [%Segments{} = lines] = draw_panel(@vline, frame, coord, params)
+
+      assert {lines.starts, lines.ends} ===
+               {[{0.25, 0.0}, {0.75, 0.0}], [{0.25, 1.0}, {0.75, 1.0}]}
+    end
+
+    # ggplot2's `GeomHline` and `GeomVline` hand their rows to `GeomSegment$draw_panel()` with their
+    # `lineend` alone, so their corners are a segment's, round.
+    test "a reference line is ended as the layer says, its corners round",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(yintercept: [15.0], group: [-1])
+
+      assert [%Segments{line_end: :square, line_join: :round}] =
+               draw_panel(%Geom.Hline{line_end: :square}, frame, coord, params)
+    end
+
+    test "a line missing its intercept is not drawn", %{coord: coord, params: params} do
+      frame = DataFrame.new(xintercept: [nil, 2.0], group: [-1, -1])
+
+      assert [%Segments{starts: [{0.5, +0.0}]}] = draw_panel(@vline, frame, coord, params)
+    end
+
+    test "under radial coordinates a horizontal line is a circle and a vertical one a spoke" do
+      coord = %Coord.Radial{}
+      params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{10.0, 20.0}, [], []})
+
+      assert [%Polylines{lines: [circle]}] =
+               draw_panel(@hline, DataFrame.new(yintercept: [15.0], group: [-1]), coord, params)
+
+      assert [%Polylines{lines: [spoke]}] =
+               draw_panel(@vline, DataFrame.new(xintercept: [1.0], group: [-1]), coord, params)
+
+      # Every point of the circle as far from the centre; the spoke from the centre out at 3
+      # o'clock, x's 1 a quarter turn round its extent.
+      radii =
+        circle
+        |> Enum.map(fn {x, y} ->
+          ((x - 0.5) ** 2 + (y - 0.5) ** 2)
+          |> :math.sqrt()
+          |> Float.round(9)
+        end)
+        |> Enum.uniq()
+
+      heights = Enum.uniq_by(spoke, fn {_x, y} -> Float.round(y, 9) end)
+
+      assert {Enum.count(circle) > 2, Enum.count(radii)} === {true, 1}
+      assert {List.first(spoke), heights} === {{0.5, 0.5}, [{0.5, 0.5}]}
+    end
+  end
+
   describe "draw_panel/4 for rugs" do
     setup do
       coord = %Coord.Cartesian{}
@@ -2422,6 +2502,29 @@ defmodule Giggly.GeomTest do
     # path's key draws no line for either, and a bar's key of a missing width nothing at all, as
     # `draw_key_polygon()`'s rectangle of a missing width has no size; a missing line type leaves a
     # bar's border blank, as `gg_par()` reads `NA` as `"blank"`.
+    # ggplot2's `GeomHline` draws its key with `draw_key_path()`, ended as its lines are.
+    test "a horizontal line's key and its room are a path's, ended as the lines are" do
+      path = %Geom.Path{line_end: :square, line_join: :round, mitre_limit: 10.0, arrow: :none}
+      key = %{alpha: 0.4, linewidth: 2.0}
+
+      assert draw_key(%Geom.Hline{line_end: :square}, key) === draw_key(path, key)
+      assert key_size(%Geom.Hline{line_end: :square}, key) === key_size(path, key)
+    end
+
+    # ggplot2's `draw_key_vline()`: `segmentsGrob(0.5, 0, 0.5, 1)`, the whole key's height.
+    test "a vertical line's key runs up the middle of the key, needing a path's room" do
+      vline = %Geom.Vline{line_end: :square}
+      key = %{alpha: 0.4, linewidth: 2.0}
+
+      assert [%Segments{} = glyph] = draw_key(vline, key)
+
+      assert {glyph.starts, glyph.ends, glyph.opacity, glyph.stroke_width, glyph.line_end} ===
+               {[{0.5, 0.0}], [{0.5, 1.0}], [0.4], @two_millimetres, :square}
+
+      assert key_size(vline, key) === key_size(@path, key)
+      assert draw_key(vline, %{linetype: :none}) === []
+    end
+
     test "a key of a missing width draws nothing, and of a missing line type no line or border" do
       assert {draw_key(@path, %{linewidth: nil}), draw_key(@path, %{linetype: nil}),
               draw_key(%Geom.Bar{just: 0.5}, %{color: "#000000", linewidth: nil})} ===

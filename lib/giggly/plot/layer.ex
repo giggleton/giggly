@@ -24,10 +24,25 @@ defmodule Giggly.Plot.Layer do
   # column, as ggplot2's `annotate()` maps `aes_all()` of its data. It takes nothing from the plot's
   # mapping, as ggplot2's `inherit.aes = FALSE`, and its mapping titles no guide, as ggplot2's
   # `aes_all()` mapping is unlabelled; every other layer's `annotation` is `false`.
+  #
+  # `inherit` says whether the layer takes the plot's mapping, as ggplot2's `inherit.aes`: `false`
+  # for an annotation and for a reference line (`Giggly.Plot.geom_hline/3` and the rest), which
+  # takes nothing from it, mapped or not, as ggplot2's `geom_hline()` sets `inherit.aes = FALSE`;
+  # `true` for every other layer.
 
   alias Giggly.{DataFrame, Plot}
 
-  @enforce_keys [:geom, :stat, :position, :data, :mapping, :fixed, :accepted, :annotation]
+  @enforce_keys [
+    :geom,
+    :stat,
+    :position,
+    :data,
+    :mapping,
+    :fixed,
+    :accepted,
+    :annotation,
+    :inherit
+  ]
   defstruct @enforce_keys
 
   @typedoc "What the layer draws: a geom's struct (`Giggly.Geom`)."
@@ -54,6 +69,7 @@ defmodule Giggly.Plot.Layer do
           mapping: Plot.mapping(),
           fixed: fixed(),
           accepted: [Plot.aesthetic()],
-          annotation: boolean()
+          annotation: boolean(),
+          inherit: boolean()
         }
 end

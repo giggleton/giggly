@@ -79,6 +79,23 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A reference line is drawn from the panel's extents, given as values or mapped, and takes
+  nothing from the plot's mapping (2026-10-30, Steve: "yes", "yes", "agree", "agree", walked one at
+  a time; checked against ggplot2 4.0.3).** As `GeomHline`, `GeomVline` and `GeomAbline` draw
+  from `coord$backtransform_range()`, a geom asks `Coord.extents/2` where the panel ends in
+  positions, the one thing it learns of the params. Given as values (`yintercept:`), the lines are
+  an annotation of their own table, each look one value or a list, one per line, as R's
+  `aes_params` take a vector; mapped, an ordinary layer with `inherit: false`, a new `Layer`
+  field, as `inherit.aes = FALSE`, so it draws in legends; a mapping or `data:` beside values is
+  refused, where R warns and ignores it. An intercept is any position an annotation takes, which
+  gained date-times and times. *Rejected: segments from minus to plus infinity*: radially
+  infinities cannot be munched, and a diagonal line needs numbers. *Rejected: placing two points
+  and extending them in the panel*: affine only, and not R's arithmetic. *Rejected: one layer
+  kind for both forms*: the argument form's mapping would title the axis "yintercept".
+  *Rejected: `annotation: true` for the mapped form*: it loses its legend. *Left out*:
+  `position:` (in R only nudging moves a line, to a value one could write), `arrow:`, which R
+  ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is refused, naming the function,
+  as R warns.
 - **A breaks function is called as ggplot2's `get_breaks()` calls one, and R's names are
   `{break, label}` pairs (2026-10-29, Steve, increment 2's step 5: "Match R", "B", "A"; checked
   against ggplot2 4.0.3).** `breaks:` and `minor_breaks:` take a function of one argument or two,
@@ -3224,6 +3241,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-30 — Add geom_hline() and geom_vline(): lines across the whole panel from its extents,
+  given as values or mapped, taking nothing from the plot's mapping (reference lines, step 1);
+  §4: "A reference line is drawn from the panel's extents"
 - 2026-10-30 — Draw the notebook examples geom_hex() unlocks, and narrow stat_summary_hex()'s
   verdict to what still waits (geom_hex, step 2, the notebook sweep)
 - 2026-10-30 — Name the breaks functions, n_breaks: and a discrete axis's minor breaks in the

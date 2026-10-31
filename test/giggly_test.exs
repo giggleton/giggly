@@ -4307,6 +4307,146 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for reference lines" do
+    setup do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_point()
+
+      %{plot: plot}
+    end
+
+    # ggplot2 4.0.3: the y axis of `p + geom_hline(yintercept = 50)` runs 8.42 to 51.98.
+    test "a line's intercept widens its axis", %{plot: plot} do
+      assembled =
+        plot
+        |> Plot.geom_hline(yintercept: 50)
+        |> Giggly.Assembly.run()
+
+      assert %{y: {8.42, 51.98}} =
+               Giggly.Coord.extents(assembled.coord, assembled.panel_params[1])
+    end
+
+    # ggplot2 4.0.3's `layer_data()` of `p + geom_hline(yintercept = 20)`: `yintercept`, `PANEL`,
+    # `group`, `colour` "black", `linewidth`, `linetype` and `alpha`; the plot's colour reaches no
+    # reference line.
+    test "a line takes nothing from the plot's mapping", %{plot: plot} do
+      frame =
+        plot
+        |> Plot.geom_hline(yintercept: 20)
+        |> Giggly.layer_data(1)
+
+      assert DataFrame.names(frame) ===
+               [:yintercept, :panel, :group, :color, :linewidth, :linetype, :alpha]
+
+      assert DataFrame.pull(frame, :color) === ["#000000"]
+    end
+
+    # ggplot2 4.0.3: under `scale_y_log10()` a line at 100 is at 2; under `ylim(10, 40)` lines at
+    # 20 and 50 are at 20 and `NA`.
+    test "an intercept goes through its axis's scale, its limits leaving it missing", %{
+      plot: plot
+    } do
+      logged =
+        plot
+        |> Plot.geom_hline(yintercept: 100)
+        |> Plot.scale_y_log10()
+        |> Giggly.layer_data(1)
+
+      limited =
+        plot
+        |> Plot.geom_hline(yintercept: [20, 50])
+        |> Plot.ylim(10, 40)
+        |> Giggly.layer_data(1)
+
+      assert {DataFrame.pull(logged, :yintercept), DataFrame.pull(limited, :yintercept)} ===
+               {[2.0], [20.0, nil]}
+    end
+
+    # ggplot2 4.0.3: `geom_vline(xintercept = "suv")` over mpg's classes is at 7, and `"zzz"`, no
+    # class, at 8, a level of its own; a date at its days, 18266, and a date-time at its seconds,
+    # 1577856600.
+    test "an intercept is placed as its axis places any value of its kind" do
+      classes =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_point()
+
+      days =
+        %{"t" => [~D[2020-01-01], ~D[2020-01-11]], "v" => [1, 2]}
+        |> Plot.new(%{x: :t, y: :v})
+        |> Plot.geom_point()
+
+      hours =
+        %{"t" => [~U[2020-01-01 00:00:00Z], ~U[2020-01-01 10:00:00Z]], "v" => [1, 2]}
+        |> Plot.new(%{x: :t, y: :v})
+        |> Plot.geom_point()
+
+      plots = [
+        Plot.geom_vline(classes, xintercept: "suv"),
+        Plot.geom_vline(classes, xintercept: "zzz"),
+        Plot.geom_vline(days, xintercept: ~D[2020-01-05]),
+        Plot.geom_vline(hours, xintercept: ~U[2020-01-01 05:30:00Z])
+      ]
+
+      placed =
+        Enum.map(plots, fn plotted ->
+          plotted
+          |> Giggly.layer_data(1)
+          |> DataFrame.pull(:xintercept)
+        end)
+
+      assert placed === [[7], [8], [18_266.0], [1_577_856_600.0]]
+    end
+
+    # ggplot2 4.0.3's `ggplot(mtcars, aes(wt, mpg)) + geom_hline(aes(yintercept = cyl))`: 32 rows
+    # in `layer_data()`, three lines drawn, as `GeomHline` drops the repeats with `unique0()`.
+    test "a line mapped from every row is drawn once for each distinct row" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_hline(%{yintercept: :cyl})
+
+      svg =
+        plot
+        |> Plot.theme_void()
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      rows =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.row_count()
+
+      lines = Regex.scan(~r/<line /, svg)
+
+      assert {rows, Enum.count(lines)} === {32, 3}
+    end
+
+    # ggplot2 4.0.3: a mapped `yintercept` titles no axis, before a point's `y = mpg` or alone,
+    # where the plot draws no y title, and an axis no layer maps runs -0.05 to 1.05.
+    test "a line's mapping titles no axis, and an axis no layer maps takes R's default extent" do
+      before_points =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_hline(%{yintercept: :level}, data: %{"level" => [2.28, 3.11]})
+        |> Plot.geom_point(%{y: :mpg})
+        |> Giggly.Assembly.run()
+
+      alone =
+        %{"level" => [2.28, 3.11]}
+        |> Plot.new()
+        |> Plot.geom_hline(%{yintercept: :level})
+        |> Giggly.Assembly.run()
+
+      assert {before_points.guide_titles, alone.guide_titles} ===
+               {%{x: "wt", y: "mpg"}, %{x: :none, y: :none}}
+
+      assert %{x: {-0.05, 1.05}} = Giggly.Coord.extents(alone.coord, alone.panel_params[1])
+    end
+  end
+
   describe "layer_data/2, for geom_area" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(crossing, aes(x, y, fill = g))
     # + geom_area()`, `a` at y 1 and `b` from -1 to 1 at x 1 and 3, printed to 17 significant
@@ -10591,6 +10731,79 @@ defmodule GigglyTest do
         |> Plot.coord_cartesian(clip: :on)
 
       assert golden?(plot, "rug_outside_clipped")
+    end
+
+    # Golden: test/golden/hline_vline.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/hline_vline.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. The reference page's five vertical lines and two
+    # horizontal ones, each its own colour and width, ended round, over mtcars' points.
+    test "lines given as values cross the whole panel, each in its own look" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_vline(xintercept: [1, 2, 3, 4, 5])
+        |> Plot.geom_hline(
+          yintercept: [15, 25],
+          colour: ["red", "blue"],
+          linewidth: [1, 2],
+          lineend: :round
+        )
+
+      assert golden?(plot, "hline_vline")
+    end
+
+    # Golden: test/golden/hline_facets.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/hline_facets.R: every element and clip path matches vdiffr's but the
+    # bar's fill, which vdiffr's device cannot draw, and every stop matches svglite's. The
+    # reference page's last example: a line in each panel from a table of its own, coloured
+    # through the colour bar the points share.
+    test "mapped lines differ between panels and share the points' colour bar" do
+      mean_wt = %{"cyl" => [4.0, 6.0, 8.0], "wt" => [2.28, 3.11, 4.00]}
+
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt, colour: :wt})
+        |> Plot.geom_point()
+        |> Plot.geom_hline(%{yintercept: :wt, colour: :wt}, data: mean_wt)
+        |> Plot.facet_wrap(:cyl)
+
+      assert golden?(plot, "hline_facets")
+    end
+
+    # Golden: test/golden/reference_line_keys.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/reference_line_keys.R: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. Each key a path's line across its middle
+    # and `draw_key_vline()`'s up it, in the key's colour and line type, ended square.
+    test "a horizontal line's key is a path's, and a vertical one's runs up the key" do
+      marks = %{"wt" => [2.5, 4.5], "mpg" => [15, 30], "kind" => ["low", "high"]}
+      mapping = %{colour: :kind, linetype: :kind}
+
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_vline(Map.put(mapping, :xintercept, :wt), data: marks, lineend: :square)
+        |> Plot.geom_hline(Map.put(mapping, :yintercept, :mpg), data: marks, lineend: :square)
+
+      assert golden?(plot, "reference_line_keys")
+    end
+
+    # Golden: test/golden/reference_line_radial.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/reference_line_radial.R: every element matches, in order, and every
+    # clip path but svglite's around the whole drawing. A horizontal line a circle munched round
+    # the whole turn, a vertical one a spoke from the centre. It moves with what moves
+    # test/golden/segment_radial.svg.
+    test "in radial coordinates a horizontal line is a circle and a vertical one a spoke" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.geom_hline(yintercept: 20, colour: "red")
+        |> Plot.geom_vline(xintercept: 3, colour: "blue")
+        |> Plot.coord_radial()
+
+      assert golden?(plot, "reference_line_radial")
     end
 
     # Golden: test/golden/path_arrow.svg, checked against ggplot2's drawing of the same plot, made

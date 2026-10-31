@@ -1461,6 +1461,79 @@ defmodule Giggly.Plot.Options do
                     linewidth: @annotation_linewidth,
                     linetype: @annotation_linetype
                   ] ++ @rug_drawing_options
+  # A reference line layer's own table, which its mapping reads, as ggplot2's `data =` gives one;
+  # it takes nothing from the plot's mapping, so it need hold only what its own mapping names.
+  @reference_line_data_option [
+    type: :any,
+    doc:
+      "A table for the layer's mapping to draw from instead of the plot's data, anything " <>
+        "implementing `Table.Reader`; refused beside the intercept's option, which draws lines " <>
+        "of its own. Under a facet, a table lacking a faceting column is drawn in every panel."
+  ]
+
+  # How every reference line looks, each set by an option: one value, or beside the intercept's
+  # option a list, one per line, as ggplot2's `geom_hline(yintercept = 1:3, colour = ...)` takes
+  # a vector.
+  @reference_line_look_options [
+    alpha:
+      Keyword.put(
+        @annotation_alpha,
+        :doc,
+        "How opaque each line is, from 0, invisible, to 1, opaque."
+      ),
+    color:
+      Keyword.put(
+        @annotation_color,
+        :doc,
+        "The colour of each line, written `colour:` or `color:`: " <>
+          @color_forms <> "; black when not given."
+      ),
+    linewidth:
+      Keyword.put(
+        @annotation_linewidth,
+        :doc,
+        "How wide each line is, in millimetres; the theme's `base_line_size` when not " <>
+          "given, 0.5 at its default sizes."
+      ),
+    linetype:
+      Keyword.put(
+        @annotation_linetype,
+        :doc,
+        "The line type of each line: " <> @linetype_forms <> "; `:solid` when not given."
+      ),
+    lineend: Keyword.fetch!(@line_style_options, :lineend)
+  ]
+
+  # `geom_hline/3`'s options, validated at the call.
+  @hline_options NimbleOptions.new!(
+                   [
+                     data: @reference_line_data_option,
+                     yintercept:
+                       Keyword.put(
+                         @annotation_position,
+                         :doc,
+                         "Where each line crosses the y axis, in its units: a value, or a " <>
+                           "list of them, a line for each, drawn in every panel. Given, the " <>
+                           "layer takes no mapping and no `data:`."
+                       )
+                   ] ++ @reference_line_look_options
+                 )
+
+  # `geom_vline/3`'s options, validated at the call.
+  @vline_options NimbleOptions.new!(
+                   [
+                     data: @reference_line_data_option,
+                     xintercept:
+                       Keyword.put(
+                         @annotation_position,
+                         :doc,
+                         "Where each line crosses the x axis, in its units: a value, or a " <>
+                           "list of them, a line for each, drawn in every panel. Given, the " <>
+                           "layer takes no mapping and no `data:`."
+                       )
+                   ] ++ @reference_line_look_options
+                 )
+
   @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :rect]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
@@ -3173,6 +3246,14 @@ defmodule Giggly.Plot.Options do
   def rug, do: @rug_options
 
   @doc false
+  @spec hline() :: NimbleOptions.t()
+  def hline, do: @hline_options
+
+  @doc false
+  @spec vline() :: NimbleOptions.t()
+  def vline, do: @vline_options
+
+  @doc false
   @spec freqpoly() :: NimbleOptions.t()
   def freqpoly, do: @freqpoly_options
 
@@ -4706,7 +4787,8 @@ defmodule Giggly.Plot.Options do
   end
 
   # One of an annotation's positions: a number, kept as a float, as R keeps a number written in a
-  # call, `:infinity` or `:neg_infinity`, `nil` for none, a string, `true` or `false`, or a date.
+  # call, `:infinity` or `:neg_infinity`, `nil` for none, a string, `true` or `false`, a date, a
+  # date-time, naive or not, or a time of day.
   @doc false
   @spec validate_annotation_position(term()) :: {:ok, term()} | {:error, String.t()}
   def validate_annotation_position(value) when is_number(value), do: {:ok, value / 1}
@@ -4715,12 +4797,14 @@ defmodule Giggly.Plot.Options do
       when is_binary(value) or is_boolean(value) or value in [nil, :infinity, :neg_infinity],
       do: {:ok, value}
 
-  def validate_annotation_position(%Date{} = value), do: {:ok, value}
+  def validate_annotation_position(%struct{} = value)
+      when struct in [Date, DateTime, NaiveDateTime, Time],
+      do: {:ok, value}
 
   def validate_annotation_position(value) do
     {:error,
      "expected a position, or a list of them: a number, :infinity or :neg_infinity, nil, a " <>
-       "string, true or false, or a date, got: #{inspect(value)}"}
+       "string, true or false, a date, a date-time or a time, got: #{inspect(value)}"}
   end
 
   # NimbleOptions' check of an annotation's label: a string, a number, or `true` or `false`, which

@@ -275,6 +275,10 @@ defmodule Giggly.Plot do
 
   # Read in guards, which take only a value known while compiling.
   @annotation_geoms Options.annotation_geoms()
+
+  # The reference lines, which ggplot2's `annotate()` refuses to draw, since each annotates on its
+  # own.
+  @reference_line_geoms [:hline, :vline]
   @theme_drawn_kinds Options.theme_drawn_kinds()
 
   # What every function choosing a complete theme does to the plot's theme and the settings laid
@@ -411,7 +415,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_point/3"),
       fixed: fixed(validated),
       accepted: Geom.Point.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_point/3", required: Geom.Point.required_aesthetics())
@@ -463,7 +468,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_jitter/3"),
       fixed: fixed(validated),
       accepted: Geom.Point.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_jitter/3", required: Geom.Point.required_aesthetics())
@@ -579,7 +585,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_bar/3"),
       fixed: fixed(validated),
       accepted: counted_bar_aesthetics(Stat.Count.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -779,7 +786,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_freqpoly/3"),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Bin.accepted_aesthetics() ++ Geom.Path.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_binning_layer(plot, layer, validated, "Plot.geom_freqpoly/3")
@@ -849,7 +857,8 @@ defmodule Giggly.Plot do
       fixed: fixed(validated),
       accepted:
         Enum.uniq(Stat.Boxplot.accepted_aesthetics() ++ Geom.Boxplot.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -926,7 +935,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_col/3"),
       fixed: fixed(validated),
       accepted: Geom.Bar.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -994,7 +1004,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_path/3"),
       fixed: fixed(validated),
       accepted: Geom.Path.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_path/3", required: Geom.Path.required_aesthetics())
@@ -1038,7 +1049,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_line/3"),
       fixed: fixed(validated),
       accepted: Geom.Line.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_line/3", required: Geom.Line.required_aesthetics())
@@ -1104,7 +1116,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_segment/3"),
       fixed: fixed(validated),
       accepted: Geom.Segment.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_segment/3", required: Geom.Segment.required_aesthetics())
@@ -1175,10 +1188,139 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_rug/3"),
       fixed: fixed(validated),
       accepted: Geom.Rug.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_rug/3", rug_requirements(position))
+  end
+
+  @doc """
+  Adds a layer of horizontal reference lines: a line across the whole panel at each `yintercept`,
+  for a threshold, a target or a mean drawn over the data.
+
+  The lines are given in one of two ways. `yintercept:` gives them as values, a line for each,
+  drawn in every panel and in no legend. Or the layer maps `:yintercept` from a table, its own
+  `data:` or the plot's, so the lines can differ from panel to panel under a facet and map a
+  colour, alpha, width or line type into a legend. Either way the layer takes nothing from the
+  plot's mapping, and titles no axis.
+
+  Horizontal lines use `:yintercept`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`,
+  and need `:yintercept`, which the y axis widens to show and puts through its scale as it does
+  `y`: a number on a continuous axis, a string on a discrete one, a date, a date-time or a time
+  on such an axis, and `:infinity` or `:neg_infinity` at the panel's edge. A line repeated in a
+  panel is drawn once. Beside `yintercept:`, each look option takes one value or a list, one per
+  line, every list as long as the others. A line missing its `yintercept`, as a scale's limits
+  leave it, draws nothing, and so do a colour of `:none` and the line type `:blank`. Under
+  `coord_radial/1` each line is a circle.
+
+  Raises `ArgumentError` for `yintercept:` beside a mapping or `data:`, for a list of looks
+  without `yintercept:`, and for lists of different lengths.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.hline())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.geom_hline(yintercept: [20, 25], colour: ["red", "blue"])
+      ...>   |> Giggly.layer_data(1)
+      iex> {Giggly.DataFrame.pull(frame, :yintercept), Giggly.DataFrame.pull(frame, :color)}
+      {[20.0, 25.0], ["#FF0000", "#0000FF"]}
+
+  A line for each panel, mapped from a table of its own:
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7], "cyl" => [4, 8]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.geom_hline(%{yintercept: :mean},
+      ...>     data: %{"cyl" => [4, 8], "mean" => [26.7, 15.1]}
+      ...>   )
+      ...>   |> Giggly.Plot.facet_wrap(:cyl)
+      ...>   |> Giggly.layer_data(1)
+      iex> {Giggly.DataFrame.pull(frame, :yintercept), Giggly.DataFrame.pull(frame, :panel)}
+      {[26.7, 15.1], [1, 2]}
+  """
+  @spec geom_hline(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_hline(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_hline(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_hline(plot, %{}, options)
+
+  def geom_hline(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.hline())
+
+    reference_line_layer(
+      plot,
+      mapping,
+      validated,
+      %Geom.Hline{line_end: Keyword.fetch!(validated, :lineend)},
+      [:yintercept],
+      "Plot.geom_hline/3",
+      accepted: Geom.Hline.accepted_aesthetics(),
+      required: Geom.Hline.required_aesthetics()
+    )
+  end
+
+  @doc """
+  Adds a layer of vertical reference lines: a line up the whole panel at each `xintercept`, for
+  a date to mark, a threshold or a mean drawn over the data.
+
+  The lines are given in one of two ways. `xintercept:` gives them as values, a line for each,
+  drawn in every panel and in no legend. Or the layer maps `:xintercept` from a table, its own
+  `data:` or the plot's, so the lines can differ from panel to panel under a facet and map a
+  colour, alpha, width or line type into a legend. Either way the layer takes nothing from the
+  plot's mapping, and titles no axis.
+
+  Vertical lines use `:xintercept`, `:group`, `:alpha`, `:color`, `:linetype` and `:linewidth`,
+  and need `:xintercept`, which the x axis widens to show and puts through its scale as it does
+  `x`: a number on a continuous axis, a string on a discrete one, a date, a date-time or a time
+  on such an axis, and `:infinity` or `:neg_infinity` at the panel's edge. A line repeated in a
+  panel is drawn once. Beside `xintercept:`, each look option takes one value or a list, one per
+  line, every list as long as the others. A line missing its `xintercept`, as a scale's limits
+  leave it, draws nothing, and so do a colour of `:none` and the line type `:blank`. Under
+  `coord_radial/1` each line is a spoke from the centre.
+
+  Raises `ArgumentError` for `xintercept:` beside a mapping or `data:`, for a list of looks
+  without `xintercept:`, and for lists of different lengths.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.vline())}
+
+      iex> frame =
+      ...>   %{"wt" => [2.62, 3.44], "mpg" => [21.0, 18.7]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.geom_vline(xintercept: [3, 5], linetype: :dashed)
+      ...>   |> Giggly.layer_data(1)
+      iex> Giggly.DataFrame.pull(frame, :xintercept)
+      [3.0, 5.0]
+  """
+  @spec geom_vline(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_vline(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_vline(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_vline(plot, %{}, options)
+
+  def geom_vline(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.vline())
+
+    reference_line_layer(
+      plot,
+      mapping,
+      validated,
+      %Geom.Vline{line_end: Keyword.fetch!(validated, :lineend)},
+      [:xintercept],
+      "Plot.geom_vline/3",
+      accepted: Geom.Vline.accepted_aesthetics(),
+      required: Geom.Vline.required_aesthetics()
+    )
   end
 
   @doc """
@@ -1241,7 +1383,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_ribbon/3"),
       fixed: fixed(validated),
       accepted: Geom.Ribbon.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -1301,7 +1444,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_area/3"),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Align.accepted_aesthetics() ++ Geom.Area.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_area/3",
@@ -1562,7 +1706,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_text/3"),
       fixed: fixed(validated),
       accepted: Geom.Text.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_text/3", required: Geom.Text.required_aesthetics())
@@ -1622,7 +1767,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, "Plot.geom_rect/3"),
       fixed: fixed(validated),
       accepted: Geom.Rect.accepted_aesthetics(),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_layer(plot, layer, "Plot.geom_rect/3",
@@ -1644,8 +1790,9 @@ defmodule Giggly.Plot do
   values as the others, and a single value is used for every annotation, so
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
-  a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
-  a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
+  a date, a date-time or a time on such an axis. Of the other options, `label:`, `colour:`,
+  `alpha:` and `fill:` each take a list, its values of one type, and so do a point's `shape:`,
+  `size:` and `stroke:`, a bar's, a
   segment's, a rug's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a
   dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
   along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
@@ -1668,6 +1815,9 @@ defmodule Giggly.Plot do
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
       `linetype:`.
 
+  The reference lines are not among them: each annotates on its own, given its lines as values
+  (`geom_hline/3`, `geom_vline/3`).
+
   Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, for a
   list whose values are not of one type, and for an aesthetic the geom needs and is not given;
   `NimbleOptions.ValidationError` for an option the geom does not take, or a value it cannot draw.
@@ -1688,43 +1838,18 @@ defmodule Giggly.Plot do
     {kind, accepted, required} = annotation_geom(geom, validated)
     {positions, others} = Enum.split_with(validated, &position?/1)
 
-    per_row = Keyword.take(others, Options.per_annotation_aesthetics())
-
-    count =
-      positions
-      |> Enum.concat(per_row)
-      |> annotation_count()
-
-    table =
-      positions
-      |> Enum.map(fn {aesthetic, values} ->
-        {Atom.to_string(aesthetic), recycled(values, count)}
-      end)
-      |> DataFrame.new()
-
-    fixed =
-      others
-      |> fixed()
-      |> Map.new(fn {aesthetic, value} -> {aesthetic, per_row(value)} end)
-
-    check_columns(fixed)
-
-    layer = %Layer{
-      geom: kind,
-      stat: %Stat.Identity{},
-      position: %Position.Identity{},
-      data: table,
-      mapping:
-        Map.new(positions, fn {aesthetic, _values} -> {aesthetic, Atom.to_string(aesthetic)} end),
-      fixed: fixed,
+    annotation_layer(plot, positions, others, kind, "Plot.annotate/3", "annotation",
       accepted: accepted,
-      annotation: true
-    }
-
-    add_layer(plot, layer, "Plot.annotate/3",
       required: required,
       unmet: "#{inspect(geom)} is given no value for it"
     )
+  end
+
+  def annotate(%__MODULE__{}, geom, options)
+      when geom in @reference_line_geoms and is_list(options) do
+    raise ArgumentError,
+          "Plot.annotate/3 does not draw #{inspect(geom)}: a reference line annotates on its own, " <>
+            "so use Plot.geom_#{geom}/3, whose options give its lines as values"
   end
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
@@ -4557,8 +4682,8 @@ defmodule Giggly.Plot do
   # The mapping `layer` draws with: its own mapping laid over the plot's, if both map an aesthetic,
   # the layer's column is used, and less any aesthetic the layer sets to one value, which wins over
   # a mapping, as ggplot2's `compute_aesthetics()` drops the aesthetics a layer's `aes_params` set.
-  # An annotation takes nothing from the plot's mapping, as ggplot2's `annotate()` sets
-  # `inherit.aes = FALSE`.
+  # A layer that does not inherit, an annotation or a reference line, takes nothing from the
+  # plot's mapping, as ggplot2's `annotate()` and `geom_hline()` set `inherit.aes = FALSE`.
   @doc false
   @spec computed_mapping(t(), Layer.t()) :: mapping()
   def computed_mapping(%__MODULE__{} = plot, %Layer{} = layer) do
@@ -4568,8 +4693,8 @@ defmodule Giggly.Plot do
     |> Map.drop(Map.keys(layer.fixed))
   end
 
-  defp inherited_mapping(%__MODULE__{}, %Layer{annotation: true}), do: %{}
-  defp inherited_mapping(%__MODULE__{mapping: mapping}, %Layer{annotation: false}), do: mapping
+  defp inherited_mapping(%__MODULE__{}, %Layer{inherit: false}), do: %{}
+  defp inherited_mapping(%__MODULE__{mapping: mapping}, %Layer{inherit: true}), do: mapping
 
   # The aesthetics `computed_mapping/2` maps for `layer`, in the order ggplot2 evaluates them: the
   # layer's own, then those it takes from the plot's mapping, as `defaults(layer$mapping,
@@ -4778,7 +4903,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Smooth.accepted_aesthetics() ++ Geom.Smooth.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -4824,7 +4950,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Density.accepted_aesthetics() ++ geom_aesthetics),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -4852,7 +4979,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.Sum.accepted_aesthetics() ++ Geom.Point.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -4879,7 +5007,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
       accepted: counted_bar_aesthetics(Stat.Bin.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     add_binning_layer(plot, layer, validated, function)
@@ -4906,7 +5035,8 @@ defmodule Giggly.Plot do
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
       accepted: Enum.uniq(Stat.BinHex.accepted_aesthetics() ++ Geom.Hex.accepted_aesthetics()),
-      annotation: false
+      annotation: false,
+      inherit: true
     }
 
     plot
@@ -5123,10 +5253,132 @@ defmodule Giggly.Plot do
 
   defp position?({aesthetic, _values}), do: Aesthetics.family(aesthetic) != :none
 
+  # The plot with an annotation drawn by `kind` added, as `function` adds it: a table of its own
+  # holding `columns`, each a value or a list, one per annotation (a `noun`, as `function`'s
+  # messages count them), repeated where given once, its mapping naming each column; the other
+  # options' aesthetics set, each a value or a list of one per annotation, as ggplot2's
+  # `annotate()` builds its data and `aes_params`. It takes nothing from the plot's mapping and
+  # titles no guide. `facts` are what `add_layer/4` checks it against.
+  defp annotation_layer(plot, columns, others, kind, function, noun, facts) do
+    per_row = Keyword.take(others, Options.per_annotation_aesthetics())
+
+    count =
+      columns
+      |> Enum.concat(per_row)
+      |> annotation_count(function, noun)
+
+    table =
+      columns
+      |> Enum.map(fn {aesthetic, values} ->
+        {Atom.to_string(aesthetic), recycled(values, count)}
+      end)
+      |> DataFrame.new()
+
+    fixed =
+      others
+      |> fixed()
+      |> Map.new(fn {aesthetic, value} -> {aesthetic, per_row(value)} end)
+
+    check_columns(fixed)
+
+    layer = %Layer{
+      geom: kind,
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: table,
+      mapping:
+        Map.new(columns, fn {aesthetic, _values} -> {aesthetic, Atom.to_string(aesthetic)} end),
+      fixed: fixed,
+      accepted: Keyword.fetch!(facts, :accepted),
+      annotation: true,
+      inherit: false
+    }
+
+    add_layer(plot, layer, function, facts)
+  end
+
+  # The plot with a layer of reference lines drawn by `kind` added, as `function` adds it, its
+  # lines given one of two ways, as ggplot2's `geom_hline()` takes them: by the options naming
+  # where they cross (`intercepts`), an annotation of those lines, which takes no mapping and no
+  # `data:`; or else by its mapping, from its own table or the plot's, each look one value. Either
+  # way it takes nothing from the plot's mapping, as ggplot2's sets `inherit.aes = FALSE`.
+  defp reference_line_layer(plot, mapping, validated, kind, intercepts, function, facts) do
+    {given, others} = Keyword.split(validated, intercepts)
+    unmet = "neither its mapping maps it nor #{options_named(intercepts)} gives it"
+
+    case given do
+      [] ->
+        check_one_look(others, intercepts, function)
+        data = own_data(validated)
+
+        layer = %Layer{
+          geom: kind,
+          stat: %Stat.Identity{},
+          position: %Position.Identity{},
+          data: data,
+          mapping: resolve(mapping, plot, data, function),
+          fixed: fixed(validated),
+          accepted: Keyword.fetch!(facts, :accepted),
+          annotation: false,
+          inherit: false
+        }
+
+        add_layer(plot, layer, function, [unmet: unmet] ++ facts)
+
+      given ->
+        check_given_alone(mapping, others, given, function)
+
+        annotation_layer(
+          plot,
+          given,
+          others,
+          kind,
+          function,
+          "line",
+          [unmet: unmet] ++ facts
+        )
+    end
+  end
+
+  defp options_named(names), do: Enum.map_join(names, " or ", fn name -> "#{name}:" end)
+
+  # A reference line's options give lines of their own, so a mapping or a table beside them would
+  # draw nothing, which ggplot2 warns of and ignores.
+  defp check_given_alone(mapping, _others, given, function) when map_size(mapping) > 0 do
+    raise ArgumentError,
+          "#{function} draws the lines #{options_named(Keyword.keys(given))} gives, so it takes " <>
+            "no mapping, got: #{inspect(mapping)}"
+  end
+
+  defp check_given_alone(_mapping, others, given, function) do
+    if Keyword.has_key?(others, :data) do
+      raise ArgumentError,
+            "#{function} draws the lines #{options_named(Keyword.keys(given))} gives, so it " <>
+              "takes no data:"
+    end
+  end
+
+  # A mapped reference line takes one value for each look, as a list gives one per line only
+  # beside the options naming where they cross.
+  defp check_one_look(others, intercepts, function) do
+    looks = Keyword.take(others, Options.per_annotation_aesthetics())
+
+    case Enum.find(looks, fn {_name, value} -> is_list(value) end) do
+      nil ->
+        :ok
+
+      {name, value} ->
+        raise ArgumentError,
+              "#{function} sets #{inspect(name)} to #{inspect(value)}, but a list gives one " <>
+                "value per line only beside #{options_named(intercepts)}; a mapped line takes " <>
+                "one value, or maps #{inspect(name)}"
+    end
+  end
+
   # How many annotations the options give, as ggplot2's `annotate()` counts them: every option
   # given several values holds as many as each other such, a single value counting once, so their
   # count is the one, or 1 where none has several.
-  defp annotation_count(options) do
+  defp annotation_count(options, function, noun) do
     several =
       options
       |> Enum.map(fn {aesthetic, values} -> {aesthetic, value_count(values)} end)
@@ -5141,12 +5393,12 @@ defmodule Giggly.Plot do
 
       _unequal ->
         raise ArgumentError,
-              "Plot.annotate/3 gives " <>
+              "#{function} gives " <>
                 Enum.map_join(several, " and ", fn {aesthetic, count} ->
                   "#{inspect(aesthetic)} #{count} values"
                 end) <>
-                "; an option takes one value, or one per annotation, and these disagree on how " <>
-                "many annotations there are"
+                "; an option takes one value, or one per #{noun}, and these disagree on how " <>
+                "many #{noun}s there are"
     end
   end
 

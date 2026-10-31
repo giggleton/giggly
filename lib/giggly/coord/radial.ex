@@ -232,6 +232,11 @@ defmodule Giggly.Coord.Radial do
       }
     end
 
+    # By aesthetic, as ggplot2's `CoordRadial$range()` names them: x the angle's, y the radius's.
+    @impl Giggly.Coord
+    def extents(_coord, %{theta_range: theta_range, r_range: r_range}),
+      do: %{x: theta_range, y: r_range}
+
     @impl Giggly.Coord
     def linear?(_coord), do: false
 
