@@ -82,9 +82,10 @@ defmodule Giggly.Geom.Label do
     # the label's own, since R turns the padding into centimetres outside the label's font.
     @key_measured_font_size 12
 
-    # The width below which `draw_key_label()` takes a key's border as none, `all.equal()`'s
-    # tolerance, where a label's own border is none only at 0.
-    @key_no_border_width 1.5e-8
+    # The widest a key's border is that `draw_key_label()` takes as none, `all.equal()`'s tolerance,
+    # the square root of a double's epsilon, 2 to the -26, where a label's own border is none only
+    # at 0.
+    @key_no_border_width 1.4901161193847656e-8
 
     # How many points grid's `roundCorner()` puts round a whole circle, and which of them it draws
     # at each corner, counting from 0 at the circle's right, a 39th of a turn apart.
@@ -141,7 +142,12 @@ defmodule Giggly.Geom.Label do
       angle = Mark.set(placed, :angle)
       hjust = Mark.set(placed, :hjust)
       vjust = Mark.set(placed, :vjust)
-      layout = layout(geom, font_size, font_size, angle, Mark.set(placed, :family))
+
+      layout =
+        geom
+        |> layout(font_size, font_size)
+        |> Map.merge(%{angle: angle, family: Mark.set(placed, :family)})
+
       colors = Mark.colors(placed, :color)
       fills = Mark.colors(placed, :fill)
 
@@ -217,7 +223,10 @@ defmodule Giggly.Geom.Label do
         line_type: line_type
       }
 
-      layout = layout(geom, font_size, font_size, angle, Map.fetch!(key, :family))
+      layout =
+        geom
+        |> layout(font_size, font_size)
+        |> Map.merge(%{angle: angle, family: Map.fetch!(key, :family)})
 
       lift =
         key
@@ -239,25 +248,22 @@ defmodule Giggly.Geom.Label do
         |> Map.fetch!(:size)
         |> Geom.Text.font_size()
 
-      angle = Map.fetch!(key, :angle)
-      layout = layout(geom, font_size, @key_measured_font_size, angle, Map.fetch!(key, :family))
-
       {width, height} =
         @key_label
         |> Font.width(font_size)
-        |> box_size(layout)
+        |> box_size(layout(geom, font_size, @key_measured_font_size))
 
-      radians = angle * :math.pi() / 180
+      radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
       sine = abs(:math.sin(radians))
       {width * cosine + height * sine, width * sine + height * cosine}
     end
 
-    # What every label of a layer is drawn at: its font size in points, its font's ascent and
-    # descent, its padding on each side and its corners' radius in points, lines of text measured
-    # at `lines_font_size`, the padding above at least the descent and below less it, as
-    # `labelGrob()` balances them, and its angle and family.
-    defp layout(geom, font_size, lines_font_size, angle, family) do
+    # The sizes every label of a layer is drawn at: its font size in points, its font's ascent and
+    # descent, and its padding on each side and its corners' radius in points, lines of text
+    # measured at `lines_font_size`, the padding above at least the descent and below less it, as
+    # `labelGrob()` balances them. A label is drawn at them with its layer's `angle` and `family`.
+    defp layout(geom, font_size, lines_font_size) do
       descent = Font.descent(font_size)
 
       %{top: top, right: right, bottom: bottom, left: left} =
@@ -273,9 +279,7 @@ defmodule Giggly.Geom.Label do
         right: right,
         bottom: max(bottom - descent, 0.0),
         left: left,
-        radius: points(geom.label_r, font_size),
-        angle: angle,
-        family: family
+        radius: points(geom.label_r, font_size)
       }
     end
 
@@ -306,7 +310,7 @@ defmodule Giggly.Geom.Label do
         (1 - vjust) * layout.descent - layout.top * vjust + layout.bottom * (1 - vjust) -
           vjust * layout.ascent
 
-      {lift_along, lift_up} = along_text({0.0, lift}, layout.angle)
+      {lift_along, lift_up} = along_text(lift, layout.angle)
 
       [
         %Scene.Polygons{
@@ -369,15 +373,15 @@ defmodule Giggly.Geom.Label do
     end
 
     # A corner's points round the circle of `radius` about `centre`, as grid's `roundCorner()`
-    # picks them from 40 points a 39th of a turn apart, the last a whole turn, as R's `seq()` ends
-    # on its end.
+    # picks them from 40 points a 39th of a turn apart, the last a whole turn, where R's `seq()`
+    # ends on its end and 39 steps land exactly.
     defp corner(name, {centre_across, centre_up}, radius) do
       step = 2 * :math.pi() / (@circle_points - 1)
 
       @corner_steps
       |> Map.fetch!(name)
       |> Enum.map(fn index ->
-        angle = if index == @circle_points - 1, do: 2 * :math.pi(), else: index * step
+        angle = index * step
         {centre_across + :math.cos(angle) * radius, centre_up + :math.sin(angle) * radius}
       end)
     end
@@ -390,13 +394,11 @@ defmodule Giggly.Geom.Label do
       {across * cosine - up * sine, across * sine + up * cosine}
     end
 
-    # An offset across and up the cell, in points, as the offset along a text turned `angle`
-    # degrees anticlockwise and toward its top.
-    defp along_text({across, up}, angle) do
+    # A lift `lift` points up the cell, as the offset along a text turned `angle` degrees
+    # anticlockwise and toward its top.
+    defp along_text(lift, angle) do
       radians = angle * :math.pi() / 180
-      cosine = :math.cos(radians)
-      sine = :math.sin(radians)
-      {across * cosine + up * sine, up * cosine - across * sine}
+      {lift * :math.sin(radians), lift * :math.cos(radians)}
     end
 
     # A border's or text's colour: the row's own for `:color`, else the layer's.

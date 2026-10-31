@@ -63,10 +63,11 @@ defmodule Giggly.Geom.Text do
   # A justification as a number, from ggplot2's `compute_just()`: a number as it is, a word by its
   # place, and `:inward` or `:outward` by where the label falls along its own axis, `along`, or,
   # for text turned between 45 and 135 degrees either way, along the other, `across`, reversed for
-  # text turned backward or past 135 degrees. Not API: a label is justified by it too.
+  # text turned backward or past 135 degrees. A number reaches it a float, as `Giggly.Plot` holds
+  # one. Not API: a label is justified by it too.
   @doc false
-  @spec justification(number() | atom(), number(), number(), number()) :: float()
-  def justification(just, _along, _across, _angle) when is_number(just), do: just / 1
+  @spec justification(float() | atom(), number(), number(), number()) :: float()
+  def justification(just, _along, _across, _angle) when is_float(just), do: just
 
   def justification(just, _along, _across, _angle) when is_map_key(@word_places, just),
     do: Map.fetch!(@word_places, just)

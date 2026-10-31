@@ -2556,6 +2556,25 @@ defmodule Giggly.PlotTest do
              ] = plot.reversed_layers
     end
 
+    test "a column the data does not have is refused by the label layer that maps it" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_label(plot, %{label: :modle}) end
+      assert error.message =~ "Plot.geom_label/3"
+      assert error.message =~ ":modle"
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@cars, %{x: :wt, y: :mpg, label: :model})
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_label(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_label, 3}
+      end
+    end
+
     test "a label mapped by neither the layer nor the plot is refused, naming the call" do
       plot = Plot.new(@cars, %{x: :wt, y: :mpg})
 

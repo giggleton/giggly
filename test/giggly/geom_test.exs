@@ -2211,6 +2211,123 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  describe "the justification text and labels share" do
+    # Golden: ggplot2 4.0.3's `compute_just(just, 0.2, 0.9, angle)` at each angle, a label's x
+    # (`a`) low and its y (`b`) high, so whichever axis it reads decides the side: past 45 and 135
+    # degrees either way, at them, and short of them, a whole turn back and on, and 225, whose half
+    # turn is -135.
+    test "inward and outward follow compute_just() at the angles where it turns" do
+      angles =
+        [44.5, 45, 45.5, 134.5, 135, 135.5, -44.5, -45, -45.5, -134.5, -135, -135.5] ++
+          [225, -90, 404.5, 405.5, 450]
+
+      justified = fn just ->
+        Enum.map(angles, fn angle -> Geom.Text.justification(just, 0.2, 0.9, angle) end)
+      end
+
+      assert {justified.(:inward), justified.(:outward)} ===
+               {[
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  1.0
+                ],
+                [
+                  1.0,
+                  1.0,
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  0.0,
+                  1.0,
+                  1.0,
+                  1.0,
+                  0.0,
+                  0.0
+                ]}
+    end
+
+    # Golden: ggplot2 4.0.3's `compute_just(just, 0.2, 0.1, angle)` either side of -45 and -135
+    # degrees and at them, a label's x and y both low, so reading the other axis while reversing
+    # the side tells turned backward from not, where a low x and a high y cancel out.
+    test "inward and outward follow compute_just() where text turns backward" do
+      angles = [-44.5, -45, -45.5, -134.5, -135, -135.5]
+
+      justified = fn just ->
+        Enum.map(angles, fn angle -> Geom.Text.justification(just, 0.2, 0.1, angle) end)
+      end
+
+      assert {justified.(:inward), justified.(:outward)} ===
+               {[0.0, 0.0, 1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 0.0, 0.0, 1.0, 0.0]}
+    end
+
+    # Golden: ggplot2 4.0.3's `compute_just("inward", a, a, 0)` at `a` of 0.5 less and plus 0.001,
+    # `just_dir()`'s tolerance, and a little further.
+    test "a label within the middle's tolerance is centred, and one past it is not" do
+      places = [0.5 - 0.001, 0.5 + 0.001, 0.5 - 0.0010001, 0.5 + 0.0010001]
+
+      assert Enum.map(places, fn place ->
+               Geom.Text.justification(:inward, place, place, 0)
+             end) === [0.5, 0.5, 0.0, 1.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `rotate_just(angle, 0.2, 0.9)` at each angle, either side of each
+    # quarter turn, a quarter turn back, and a whole turn and two on.
+    test "a key's justification is turned at each quarter turn as rotate_just() turns it" do
+      angles = [-90, 89.5, 90, 179.5, 180, 269.5, 270, 359.5, 360.5, 449.5, 450, 719]
+
+      turned =
+        Enum.map(angles, fn angle ->
+          {hjust, vjust} = Geom.Text.turned_justification(angle, 0.2, 0.9)
+          {Float.round(hjust, 15), Float.round(vjust, 15)}
+        end)
+
+      assert turned === [
+               {0.9, 0.8},
+               {0.2, 0.9},
+               {0.1, 0.2},
+               {0.1, 0.2},
+               {0.8, 0.1},
+               {0.8, 0.1},
+               {0.9, 0.8},
+               {0.9, 0.8},
+               {0.2, 0.9},
+               {0.2, 0.9},
+               {0.1, 0.2},
+               {0.9, 0.8}
+             ]
+    end
+
+    test "a justification that is neither a float nor one of ggplot2's words is refused" do
+      for just <- [:sideways, 1] do
+        assert_raise FunctionClauseError, fn ->
+          just
+          |> untyped()
+          |> Geom.Text.justification(0.2, 0.9, 0.0)
+        end
+      end
+    end
+  end
+
   describe "draw_panel/4 and draw_key/2 for labels" do
     # A label's parameters as `Plot.geom_label/3` records ggplot2's defaults.
     @quarter_line {0.25, :lines}
@@ -2241,12 +2358,27 @@ defmodule Giggly.GeomTest do
           label: ["a", "b", "c", nil, "e"]
         )
 
+      not_a_number = DataFrame.new(x: [0.2, 0.4], y: [0.2, 0.4], label: [:nan, 2.5])
+
       assert [
                %Polygons{outlines: [[{0.2, 0.2} | _first]]},
                %Text{labels: ["a"]},
                %Polygons{outlines: [[{0.8, 0.8} | _second]]},
                %Text{labels: ["e"]}
              ] = draw_panel(@label, frame, coord, params)
+
+      assert [%Polygons{}, %Text{labels: ["2.5"]}] =
+               draw_panel(@label, not_a_number, coord, params)
+    end
+
+    # grid's `gpar()` defaults, which `labelGrob()`'s box takes: round ends and corners, a mitre
+    # limit of 10.
+    test "a box's ends and corners are grid's, round, at its mitre limit",
+         %{coord: coord, params: params} do
+      frame = DataFrame.new(x: [0.5], y: [0.5], label: ["a"])
+
+      assert [%Polygons{line_end: :round, line_join: :round, mitre_limit: 10.0}, %Text{}] =
+               draw_panel(@label, frame, coord, params)
     end
 
     test "a label of no colour keeps its box, unbordered, and its text in no colour",
@@ -2304,21 +2436,39 @@ defmodule Giggly.GeomTest do
                draw_panel(parted, frame, coord, params)
     end
 
-    # Golden: ggplot2 4.0.3 under vdiffr 1.0.9 draws `geom_label(aes(fill = g), linewidth = 1e-8)`'s
+    # Golden: ggplot2 4.0.3 under vdiffr 1.0.9 draws `geom_label(aes(fill = g), linewidth = 2^-26)`'s
     # labels bordered and its keys `stroke: none`, as `draw_key_label()` takes a width `all.equal()`
-    # calls 0 as none, and at `linewidth = 2e-8` both bordered.
+    # calls 0, its tolerance `sqrt(.Machine$double.eps)`, as none, and at `linewidth = 1.4902e-8`
+    # both bordered.
     test "a key's border is none at a width all.equal() takes as 0, where a label's is drawn" do
-      key = %{linewidth: 1.0e-8}
-      frame = DataFrame.new(x: [0.5], y: [0.5], label: ["a"], linewidth: [1.0e-8])
+      tolerance = :math.pow(2, -26)
+      frame = DataFrame.new(x: [0.5], y: [0.5], label: ["a"], linewidth: [tolerance])
       params = Coord.panel_params(@cartesian, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
 
-      assert {[%Polygons{color: [:none]}, %Text{}], [%Polygons{color: [:none]}, %Text{}]} =
-               {draw_key(@label, key), draw_key(@label, %{linewidth: nil})}
+      assert [%Polygons{color: [:none]}, %Text{}] = draw_key(@label, %{linewidth: tolerance})
 
       assert [%Polygons{color: ["#000000"]}, %Text{}] =
                draw_panel(@label, frame, @cartesian, params)
 
-      assert [%Polygons{color: ["#000000"]}, %Text{}] = draw_key(@label, %{linewidth: 2.0e-8})
+      assert [%Polygons{color: ["#000000"]}, %Text{}] = draw_key(@label, %{linewidth: 1.4902e-8})
+    end
+
+    test "a key of no width or no line type is unbordered, and one of no width drawn 0 wide" do
+      assert [%Polygons{color: [:none], stroke_width: +0.0}, %Text{}] =
+               draw_key(@label, %{linewidth: nil})
+
+      assert [%Polygons{color: [:none], dashes: :none}, %Text{}] =
+               draw_key(@label, %{linetype: nil})
+    end
+
+    # ggplot2 4.0.3's `draw_key_label()` justifies its key by `compute_just(hjust)`, a word as a
+    # number and inward or outward read against the middle.
+    test "a key's justification by a word is its number, inward or outward centred" do
+      assert [%Polygons{}, %Text{hjust: [1.0], x: [1.0], y: [+0.0]}] =
+               draw_key(@label, %{hjust: :right, vjust: :bottom})
+
+      assert [%Polygons{}, %Text{hjust: [0.5], x: [0.5], y: [0.5]}] =
+               draw_key(@label, %{hjust: :inward, vjust: :outward})
     end
   end
 
@@ -2684,4 +2834,9 @@ defmodule Giggly.GeomTest do
   end
 
   defp rounded_size({width, height}), do: {Float.round(width, 2), Float.round(height, 2)}
+
+  # `value` with its type hidden from the compiler, so a test can hand a function a value its
+  # guards refuse.
+  @spec untyped(term()) :: term()
+  defp untyped(value), do: value
 end
