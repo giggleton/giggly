@@ -33,12 +33,29 @@ defmodule Scales.Labels.FormatTest do
       assert write([9.9999999, 1.0]) == ["10", " 1"]
     end
 
+    test "counts a negative's sign in both widths" do
+      # format(c(-1e5, 1)): its sign makes plain decimals 7 wide to scientific notation's 6;
+      # format(c(-0.5, 1.5e5)): the sign makes scientific notation 8 wide, plain decimals' width
+      assert write([-1.0e5, 1.0]) == ["-1e+05", " 1e+00"]
+      assert write([-0.5, 1.5e5]) == ["    -0.5", "150000.0"]
+    end
+
+    test "counts a number rounding carries past the digits it prints at the digits printed" do
+      # format(c(99999999.4, 123.4567)): seven digits round 99999999.4 to 1e8, but it prints
+      # eight whole digits, so plain decimals are 13 wide to scientific notation's 12
+      assert write([99_999_999.4, 123.4567]) == ["1.000000e+08", "1.234567e+02"]
+    end
+
     test "is scientific unless 100 characters narrower in plain decimals, where asked" do
       # format(c(0, 5e5, -1230), scientific = TRUE); c(0.5, 100), scientific = TRUE
       assert write([0.0, 5.0e5, -1.23e3], notation: :scientific) ==
                [" 0.00e+00", " 5.00e+05", "-1.23e+03"]
 
       assert write([0.5, 1.0e2], notation: :scientific) == ["5e-01", "1e+02"]
+      # format(0, scientific = TRUE); 9.9999999; c(9.9999999, 1.5), a mantissa carried to 10
+      assert write([0.0], notation: :scientific) == ["0e+00"]
+      assert write([9.9999999], notation: :scientific) == ["1e+01"]
+      assert write([9.9999999, 1.5], notation: :scientific) == ["1.0e+01", "1.5e+00"]
     end
 
     test "is plain unless more than 310 characters wider, where asked" do
@@ -54,6 +71,18 @@ defmodule Scales.Labels.FormatTest do
 
       assert [two_digits, _large] = write([1.5e-157, 1.0e157], notation: :fixed)
       assert String.length(two_digits) == 317
+    end
+
+    test "takes an exponent of three digits for the margin from either end's power" do
+      # format(c(1e-215, 1e99), scientific = FALSE) and c(1e304, 1e-10): 316 characters each,
+      # within the margin only of scientific notation 6 wide; c(1e304, 1e-11), 317
+      for values <- [[1.0e-215, 1.0e99], [1.0e304, 1.0e-10]] do
+        assert values
+               |> write(notation: :fixed)
+               |> Enum.map(&String.length/1) == [316, 316]
+      end
+
+      assert write([1.0e304, 1.0e-11], notation: :fixed) == ["1e+304", " 1e-11"]
     end
 
     test "writes an exponent in three digits for a group with a power past 99 either way" do
@@ -101,6 +130,11 @@ defmodule Scales.Labels.FormatTest do
       # format(5e-324)
       assert write([5.0e-324]) == ["4.940656e-324"]
     end
+
+    test "are counted from the power of ten below a number its log10 rounds up to the next" do
+      # format(1e-20, digits = 22): the double 1e-20 is just below 10^-20, where log10 gives -20
+      assert write([1.0e-20], digits: 22) == ["9.999999999999999451533e-21"]
+    end
   end
 
   describe "the padding" do
@@ -122,6 +156,13 @@ defmodule Scales.Labels.FormatTest do
       # format(c(-1.5, 2), trim = TRUE); c(1, NA, Inf), trim = TRUE
       assert write([-1.5, 2.0], trim: true) == ["-1.5", "2.0"]
       assert write([1.0, nil, :infinity], trim: true) == ["1", "NA", "Inf"]
+    end
+  end
+
+  describe "no numbers" do
+    test "are written as no texts" do
+      # format(numeric())
+      assert write([]) == []
     end
   end
 
@@ -151,9 +192,11 @@ defmodule Scales.Labels.FormatTest do
       assert write([1.5, 10.0], decimal_mark: "::") == [" 1::5", "10::0"]
     end
 
-    test "go between each three whole digits, after a sign" do
-      # format(c(-1234567, 1), big.mark = ",")
+    test "go between each three whole digits, after a sign and its padding" do
+      # format(c(-1234567, 1), big.mark = ","); -123456; c(-123456, 1e7)
       assert write([-1_234_567.0, 1.0], big_mark: ",") == ["-1,234,567", "         1"]
+      assert write([-123_456.0], big_mark: ",") == ["-123,456"]
+      assert write([-123_456.0, 1.0e7], big_mark: ",") == ["  -123,456", "10,000,000"]
     end
   end
 end

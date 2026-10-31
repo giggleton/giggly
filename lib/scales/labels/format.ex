@@ -13,15 +13,16 @@ defmodule Scales.Labels.Format do
   # - In plain decimals the group takes the most decimals any of its numbers needs to show its
   #   significant digits, and at least `nsmall`; in scientific notation, the most significant
   #   digits any has, less the one before the point. The group is written in scientific notation
-  #   when that is narrower than its plain decimals (`notation: :auto`, R's default), unless 100
-  #   characters narrower (`:scientific`, R's `scientific = TRUE`), and in plain decimals unless
-  #   they are more than 310 characters wider (`:fixed`, R's `scientific = FALSE`), a margin
-  #   measured from R 4.6.1's output by bisecting it, where R's documentation gives none. An
-  #   exponent has two digits, or three in a group with a power past 99 either way.
+  #   when that is narrower than its plain decimals (`notation: :auto`, R's default); always
+  #   (`:scientific`, R's `scientific = TRUE`), since R takes plain decimals only where they are
+  #   100 characters narrower and scientific notation is never 30 wide; and in plain decimals
+  #   unless they are more than 310 characters wider (`:fixed`, R's `scientific = FALSE`), a
+  #   margin measured from R 4.6.1's output by bisecting it, where R's documentation gives none.
+  #   An exponent has two digits, or three in a group with a power past 99 either way.
   # - Each number is printed as C's `sprintf("%.*f")` or `sprintf("%.*e")` prints it, rounding
   #   its exact binary value half to even, here in integer arithmetic from the float's bits:
   #   Erlang's `float_to_binary/2` with `decimals:` rounds a tie away from zero (`0.125` to
-  #   `0.13`, where R writes `0.12`). A zero of either sign is `0`.
+  #   `0.13`, where R writes `0.12`). A zero of either sign is `0`, as R drops a zero's sign.
   # - A missing number is `NA`, the non-finite `NaN`, `Inf` and `-Inf`, which take no marks.
   # - `big_mark` goes between each three digits of the whole part, `decimal_mark` before the
   #   decimals.
@@ -51,9 +52,8 @@ defmodule Scales.Labels.Format do
   # R's `KP_MAX`, the largest power of ten `formatReal()` checks for a number that rounding widens.
   @largest_power 27
 
-  # How much narrower R's `scientific = TRUE` takes scientific notation to be (`R_print.scipen`),
-  # and how much wider `scientific = FALSE` takes it to be, as measured from R's output.
-  @scientific_penalty -100
+  # How much wider R's `scientific = FALSE` takes scientific notation to be, as measured from
+  # R's output (`R_print.scipen`).
   @fixed_penalty 310
 
   # A double's significand has 52 stored bits and an implicit leading one.
@@ -67,6 +67,8 @@ defmodule Scales.Labels.Format do
   # padded to a common width unless `trim` is set.
   @doc false
   @spec write([value()], settings()) :: [String.t()]
+  def write([], _settings), do: []
+
   def write(values, settings) do
     layout =
       values
@@ -141,14 +143,12 @@ defmodule Scales.Labels.Format do
   defp plain?(fixed_width, scientific_width, :fixed),
     do: fixed_width <= scientific_width + @fixed_penalty
 
-  defp plain?(fixed_width, scientific_width, :scientific),
-    do: fixed_width <= scientific_width + @scientific_penalty
+  defp plain?(_fixed_width, _scientific_width, :scientific), do: false
 
   defp plain?(fixed_width, scientific_width, :auto), do: fixed_width <= scientific_width
 
   # Each value printed in the group's notation, unmarked and unpadded, with whether it is a
-  # number; a zero of either sign is printed as zero.
-  defp printed(value, layout) when value == 0, do: {:number, number(0.0, layout)}
+  # number.
   defp printed(value, layout) when is_float(value), do: {:number, number(value, layout)}
   defp printed(value, _layout), do: {:other, Map.fetch!(@texts, value)}
 
@@ -167,7 +167,7 @@ defmodule Scales.Labels.Format do
     longest =
       marked
       |> Enum.map(fn {_kind, text} -> String.length(text) end)
-      |> Enum.max(fn -> 0 end)
+      |> Enum.max()
 
     Enum.map(marked, fn
       {:number, text} -> String.pad_leading(text, longest)
@@ -238,8 +238,9 @@ defmodule Scales.Labels.Format do
     }
   end
 
-  # The power of ten at or below a nonzero float, its exact value the ratio given, found exactly
-  # from its log10's estimate.
+  # The power of ten at or below a nonzero float, its exact value the ratio given: its log10's
+  # floor, one less where that rounded up to a power the exact value is below, as R steps down
+  # from it; it never rounds down past one, which glibc's log10 keeps exact at a power of ten.
   defp power_of_ten(value, numerator, denominator) do
     estimate =
       value
@@ -252,18 +253,12 @@ defmodule Scales.Labels.Format do
   end
 
   defp settle(numerator, denominator, power) do
-    cond do
-      below?(numerator, denominator, power) -> settle(numerator, denominator, power - 1)
-      not below?(numerator, denominator, power + 1) -> settle(numerator, denominator, power + 1)
-      true -> power
-    end
+    if below?(numerator, denominator, power), do: power - 1, else: power
   end
 
   # Whether the ratio is below 10^power.
-  defp below?(numerator, denominator, power) when power >= 0,
-    do: numerator < denominator * 10 ** power
-
-  defp below?(numerator, denominator, power), do: numerator * 10 ** -power < denominator
+  defp below?(numerator, denominator, power),
+    do: numerator * 10 ** max(-power, 0) < denominator * 10 ** max(power, 0)
 
   # The ratio divided by 10^power.
   defp scaled(numerator, denominator, power) when power >= 0,
