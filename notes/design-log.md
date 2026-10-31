@@ -79,6 +79,60 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A break `scale:` takes past the largest double is labelled `Inf`, as R labels it
+  (2026-10-31, Steve: "Inf"; checked against scales 1.4.0).** Erlang raises where a double's
+  arithmetic reaches an infinity, so every product, quotient and gap a break's label is worked
+  from is taken to `:infinity` or `:neg_infinity` instead, and `Format` writes it. In
+  `number/2`'s family, a break rounded past the largest double is `Inf` with its sign styled and
+  no prefix or suffix, as R's `number()` overwrites it; one only scaled past it is `Inf` inside
+  them; either takes no step, no cents and no part in the others' accuracy, and a gap past it
+  leaves the accuracy 1, as R's `precision()` does. `scientific/2` writes `<Inf>`. All of 1,728
+  random cases near the largest double matched R. *Rejected: raising*, as `number/2` did: an
+  axis R draws, refused.
+
+- **`scientific/2` takes `digits:`, `scale:`, `prefix:`, `suffix:` and `decimal_mark:`, and no
+  `trim:` (2026-10-31, Steve: "A"; checked against scales 1.4.0).** `label_scientific()` takes
+  `trim` but never hands it to `scientific()`, so its labels are always trimmed; `big.mark` and
+  `nsmall`, which its `...` takes, change nothing in scientific notation. *Rejected: `trim:`
+  honoured*: the superseded `scientific()`'s labels, which R's current labeller never gives.
+  *Rejected: `trim:` taken and ignored*: R's exactly, an option that does nothing.
+
+- **`digits:` is an integer from 1 to 22 under `scientific/2`, `log/2` and `format_log/2`
+  (2026-10-31, Steve: "A"; checked against scales 1.4.0).** It is `format()`'s range, outside
+  which `label_log()` already fails; `signif()` takes any number, a fraction rounded half up (2.5
+  is 3) and 0 or below as 1, where `format()` truncates (2.9 is 2). No label shows more than 7
+  significant digits, since `scientific` hands `format()` its default and `zapsmall()` rounds
+  exponents to 7, and each function's documentation says so. *Rejected: any positive integer
+  under `scientific/2`*: past 22, 22's labels. *Rejected: R's coercions*: two opposite roundings
+  of a fraction, and a `digits: 0` that is surely a mistake.
+
+- **A signed power is `{:signed, "-" | "+", {:power, base, exponent}}` (2026-10-31, Steve: "B";
+  checked against scales 1.4.0 and svglite).** R's `label_log()` writes `-10^2` as a unary call
+  around the power, −(10²), and plotmath draws the sign as an operator of its own, a symbol-font
+  `−` or `+` and a gap before the base, as it draws an exponent's minus. So the sign wraps the
+  power, the shape the entry beginning "`log/2` returns powers" agreed kept; a signed zero is
+  `"0"`, and an exponent's minus stays in its text (`"-2"`). *Rejected: the sign in the base's
+  text (`{:power, "-10", "2"}`)*: it reads as (−10)², and is split off again to draw.
+  *Rejected: a sign on every power*: the agreed shape changed.
+
+- **`log/2` refuses a base that is not a positive number other than 1, and an unsigned break at
+  or below zero (2026-10-31, Steve: "A" twice; checked against scales 1.4.0).** R's text there is
+  no power of anything: a base of 0 gives `0^0`, 1 `1^NaN`, a negative `-2^NaN`; under `signed =
+  FALSE` a zero is `10^-Inf`, a negative `10^NaN`, and `zapsmall()`, beside an infinite exponent,
+  rounds every other one whole, so 0.5 and 2 are both `10^0`. Both raise, the second an
+  `ArgumentError` naming the break; `signed: :auto`, the default, signs such breaks. *Rejected:
+  bases above 1 alone*: 0.5's powers are sound. *Rejected: R's text*: no infinity or NaN to
+  write it from, and the sound breaks mislabelled. *Rejected: no label for such a break*: a
+  mistake hidden.
+
+- **`format_log/2` takes `base:`, `signed:` and `digits:` alone (2026-10-31, Steve: "A"; checked
+  against scales 1.4.0).** They are `label_log()`'s arguments, `digits` the one `format()`
+  argument a log label uses; `digits:` defaults to 7, `format()`'s own, under `format_log/2`, and
+  to 3, `label_log()`'s, under `log/2`. R's `format_log()` hands its `...` to `format()`
+  (`trim`, `nsmall`, `scientific`, `width`, marks), which can be added later without breaking
+  anything. *Rejected: the `format()` arguments `Format` already writes*: rows to pin and a name
+  for R's `scientific`, with no reader asking. *Rejected: `width` too*: `Format` has none.
+
 - **R's `format()` for numbers is built rule for rule, `Labels.Format` grown from `Labels.Fixed`
   (2026-10-31, Steve: "A"; checked against R 4.6.1 and scales 1.4.0).** `scientific`,
   `number_auto` and `log` are thin wrappers over `format()`, whose labels depend on each other:
@@ -92,8 +146,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A missing break's label is `nil`, as R's labellers give `NA`, and Giggly draws it `NA`
   (2026-10-31, Steve: "A"; checked against scales 1.4.0 and ggplot2 4.0.3).** Each labeller gives
-  `nil` for `nil` where R gives `NA`, and the text `"NA"` where R writes it (`wrap`, `number_auto`;
-  `dictionary`'s `nomatch:` for `nil` too); `comma`, `percent` and `currency` take `nil` as R's
+  `nil` for `nil` where R gives `NA`, and the text `"NA"` where R writes it (`wrap`;
+  `number_auto` in its two `format()` ways, `nil` in the others, as R's `number()` gives and as
+  both its ways give where R breaks on an `NA`, Steve: "A"; `dictionary`'s `nomatch:` for `nil` too); `comma`, `percent` and `currency` take `nil` as R's
   `number()` takes `NA`, which widens the others' untrimmed padding to its two characters. Giggly
   takes a `nil` label from a labels function and draws `NA`, as grid draws R's `NA` on axes and
   legends alike. A discrete scale's labels function is handed `nil`, so the labellers must take
@@ -3473,6 +3528,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Label numbers in scientific notation, in whichever way suits their size, and as
+  powers (labels, step 2); §4: "A break `scale:` takes past", "`scientific/2` takes",
+  "`digits:` is an integer", "A signed power", "`log/2` refuses", "`format_log/2` takes", and
+  "A missing break's label" made exact
 - 2026-10-31 — Write numbers as R's format() does, label them with number/2, and give a missing
   break no label (labels, step 1); §4: "R's `format()` for numbers", "A missing break's label",
   and the increment's other four entries of that day, agreed with them

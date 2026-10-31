@@ -157,7 +157,7 @@ defmodule Scales.Labels.Format do
   defp number(value, %{notation: :scientific, decimals: decimals}),
     do: exponential(value, decimals)
 
-  # Padding to the width R estimates, then, once marked, the numbers to the longest.
+  # Padding to the width R estimates, then, once marked, every value to the longest.
   defp padded(printed, width, settings) do
     marked =
       Enum.map(printed, fn {kind, text} ->
@@ -169,10 +169,7 @@ defmodule Scales.Labels.Format do
       |> Enum.map(fn {_kind, text} -> String.length(text) end)
       |> Enum.max()
 
-    Enum.map(marked, fn
-      {:number, text} -> String.pad_leading(text, longest)
-      {:other, text} -> text
-    end)
+    Enum.map(marked, fn {_kind, text} -> String.pad_leading(text, longest) end)
   end
 
   # A printed number with `big_mark` between each three digits of its whole part and

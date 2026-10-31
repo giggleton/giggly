@@ -1,13 +1,15 @@
 defmodule Scales.Labels do
   @moduledoc """
   Labels for a scale's breaks: numbers written plainly (`plain/1`), in decimals (`number/2`),
-  with a comma between thousands (`comma/2`), as percentages (`percent/2`) and as amounts of
-  money (`currency/2`).
+  with a comma between thousands (`comma/2`), as percentages (`percent/2`), as amounts of money
+  (`currency/2`), in scientific notation (`scientific/2`), in whichever way suits their size
+  (`number_auto/1`), and as powers (`log/2`, or as text, `format_log/2`).
 
   Each labeller is handed every break an axis or a legend draws and returns a label for each, in
   order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
-  `1.00` and `1.25`. A missing break, `nil`, has no label, `nil`, as R's `NA` has none. One that
-  takes options is handed on inside a function:
+  `1.00` and `1.25`. A label is text, but for `log/2`'s powers (`t:power_label/0`). A missing
+  break, `nil`, has no label, `nil`, as R's `NA` has none, but where `number_auto/1` writes it
+  `"NA"`. One that takes options is handed on inside a function:
 
       fn breaks -> Scales.Labels.comma(breaks, accuracy: 0.1) end
 
@@ -27,6 +29,9 @@ defmodule Scales.Labels do
 
   Each number is multiplied by `scale:`, then rounded to a multiple of `accuracy:`, a half going
   to the even neighbour (`2.5` to `2`, `3.5` to `4`). A number that rounds to zero has no sign.
+  One that `scale:` takes past the largest float is labelled `Inf` or `-Inf`, without
+  `prefix:` and `suffix:` where rounding takes it past (and inside them where only the scaling
+  does), and takes no part in the others' accuracy, cents or step.
   It is written in plain decimals, with as many decimals as the accuracy has (`0.01` writes two,
   `1` or more none) up to twenty, or more if a label needs them to show its first seven
   significant digits (an accuracy of `0.25` writes `0.25` and `0.50`); every label shares the
@@ -67,20 +72,56 @@ defmodule Scales.Labels do
   # - The decimals are `-floor(log10(accuracy))`, from 0 to 20, and the numbers sharing a count
   #   are written together, as R's `format(scale * abs(x), nsmall = decimals, scientific =
   #   FALSE)` writes them, by `Scales.Labels.Format`; then prefix, number and suffix, the sign
-  #   outside them.
+  #   outside them. Where R's `round_any()` takes a break to an infinity, `number()` writes
+  #   `as.character(x)` over the label, so `Inf` loses its prefix and suffix but keeps its sign;
+  #   R's `cut()` finds no step for an infinite break, `needs_cents()` no cents, and
+  #   `precision()` drops it, or takes an infinite gap to 1. Erlang raises where R reaches an
+  #   infinity, so those operations are `Scales.Labels.Arithmetic`'s.
   # - `scale_cut` is `scales:::scale_cut`: steps are sorted by threshold; a step is looked up by
   #   its suffix as R indexes a named vector, the first step with it and never an empty suffix;
   #   a zero threshold never refines and divides by 1 below. R requires no zero step, but without
   #   one its lookup of the step below misaligns its vectors (`c(m = 60, h = 3600)` writes 5400
   #   as `5 400NA`), so one is required here (design-log §4, the entry beginning
   #   "`Scales.Labels`'s").
+  # - `scientific/2` is `label_scientific()`: `signif(x * scale, digits)`, `Scales.Labels.Arithmetic`
+  #   in R's order of floating-point operations, then `format(scientific = TRUE)` at R's default
+  #   7 digits, trimmed. `label_scientific()` never hands `scientific()` its `trim`, so there is
+  #   no `trim:`; nor `big_mark:` or `nsmall:`, which R's `...` takes and scientific notation
+  #   never shows.
+  # - `number_auto/1` is `label_number_auto()`'s branches in R's order, `format_shortest()` each
+  #   label's shorter, the first on a tie. A missing break is R's `"NA"` where R writes them with
+  #   `format(trim = TRUE)`, and `nil` from `number()` and where R breaks: its years test reads
+  #   the numbers alone, where R fails on an `NA`, and its shortest is `nil` where R's
+  #   `which.min()` finds no label (design-log §4, the entry beginning "A missing break's label").
+  # - `format_log/2` is `format_log()`: signed when any finite break is at or below zero, the
+  #   exponents `format(zapsmall(log(x, base)), digits)`, untrimmed, after R's `paste0()` of the
+  #   sign and the base, written as `as.character()` writes a number, in 15 digits. `log/2` is
+  #   `label_log()`: that text parsed and each number deparsed, again in 15 digits, so `10^ 0`
+  #   is `{:power, "10", "0"}` and an exponent of `6.91e+06` is `"6910000"`; a sign is R's unary
+  #   call around the power. R's answers for a base of 0, 1 or below 0, and for an unsigned break
+  #   at or below zero, are not powers of anything (`1^NaN`, `10^-Inf`, and `zapsmall()` rounding
+  #   every exponent whole beside an infinite one), so each is refused (design-log §4, the entry
+  #   beginning "`log/2` refuses").
   #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
-  alias Scales.Labels.Format
+  alias Scales.Labels.{Arithmetic, Format}
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
+
+  @typedoc """
+  A power `log/2` labels a break with, its base and its exponent each written as text: `10^3`
+  is `{:power, "10", "3"}`.
+  """
+  @type power :: {:power, String.t(), String.t()}
+
+  @typedoc """
+  A label of `log/2`: a power, a power with a sign before it (`-10^3` is
+  `{:signed, "-", {:power, "10", "3"}}`), the text `"0"` for a signed zero, or `nil` for a
+  missing break.
+  """
+  @type power_label :: power() | {:signed, String.t(), power()} | String.t() | nil
 
   # The largest decimal count R's `number()` asks for.
   @max_decimals 20
@@ -90,6 +131,10 @@ defmodule Scales.Labels do
 
   # The significant digits `plain/1` rounds each break to.
   @significant_digits 15
+
+  # The significant digits R writes a number in when it writes one alone, as `as.character()`
+  # and `deparse()` do.
+  @alone_digits 15
 
   # `sqrt(.Machine$double.eps)`: gaps below it are rounding error, so the accuracy is 1.
   @smallest_gap :math.sqrt(2.220446049250313e-16)
@@ -186,6 +231,60 @@ defmodule Scales.Labels do
                          {formatter, NimbleOptions.new!(options ++ own)}
                        end
                      )
+
+  # The significant digits each label of `scientific/2` and each exponent of `log/2` and
+  # `format_log/2` is written in, R's `format()` range.
+  @digits_option [
+    type: {:in, 1..22},
+    doc:
+      "An integer from 1 to 22, the most significant digits shown, though no label shows more " <>
+        "than 7 (see the function's documentation)."
+  ]
+
+  @scientific_options NimbleOptions.new!(
+                        digits: Keyword.put(@digits_option, :default, 3),
+                        scale: Keyword.put(@formatter_options[:scale], :default, 1),
+                        prefix: [
+                          type: :string,
+                          default: "",
+                          doc: "Text written before the number."
+                        ],
+                        suffix: [
+                          type: :string,
+                          default: "",
+                          doc: "Text written after the number."
+                        ],
+                        decimal_mark:
+                          Keyword.put(@formatter_options[:decimal_mark], :default, ".")
+                      )
+
+  @log_options [
+    base: [
+      type: {:custom, __MODULE__, :validate_base, []},
+      default: 10,
+      doc: "The base of the logarithm, a positive number other than 1."
+    ],
+    signed: [
+      type: {:in, [:auto, true, false]},
+      default: :auto,
+      doc:
+        "Whether each label is signed, `+` or `-` before its power and a zero `\"0\"`; " <>
+          "`:auto` signs them when any break is zero or negative. Unsigned, a break at or " <>
+          "below zero raises."
+    ]
+  ]
+
+  # `log/2`'s and `format_log/2`'s options, each with its default digits.
+  @log_schemas Map.new([log: 3, format_log: 7], fn {function, default} ->
+                 digits = Keyword.put(@digits_option, :default, default)
+
+                 schema =
+                   @log_options
+                   |> Keyword.merge(digits: digits)
+                   |> NimbleOptions.new!()
+
+                 {function, schema}
+               end)
 
   # A set of steps' option.
   @space_options NimbleOptions.new!(
@@ -375,6 +474,173 @@ defmodule Scales.Labels do
   end
 
   @doc """
+  Labels numbers in scientific notation, R's `label_scientific()`.
+
+  Each break is multiplied by `scale:` and rounded to `digits:` significant digits, a half to the
+  even neighbour of the number as a float scaled into its digits (`0.15` to one digit is `2e-01`).
+  The labels are then written together, their mantissas sharing the most decimals any needs, in
+  at most 7 significant digits: `digits:` above 7 shows 7. They are never padded. A break that
+  `scale:` takes past the largest float is written `Inf` or `-Inf`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@scientific_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.scientific([0.15, 1.5, 12345])
+      ["1.50e-01", "1.50e+00", "1.23e+04"]
+
+      iex> Scales.Labels.scientific([1, 10, nil, 100])
+      ["1e+00", "1e+01", nil, "1e+02"]
+
+      iex> Scales.Labels.scientific([1234, 5], decimal_mark: ",", suffix: " m")
+      ["1,23e+03 m", "5,00e+00 m"]
+  """
+  @spec scientific([number() | nil], keyword()) :: [String.t() | nil]
+  def scientific(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@scientific_options)
+      |> Map.new()
+
+    rounded =
+      breaks
+      |> numbers!("Labels.scientific/2")
+      |> Enum.map(fn value ->
+        value &&
+          value
+          |> Arithmetic.product(settings.scale)
+          |> Arithmetic.signif(settings.digits)
+      end)
+
+    rounded
+    |> Format.write(format_settings(@format_digits, :scientific, settings.decimal_mark))
+    |> Enum.zip_with(rounded, fn text, value ->
+      value && settings.prefix <> text <> settings.suffix
+    end)
+  end
+
+  @doc """
+  Labels numbers in whichever way suits their size, R's `label_number_auto()`.
+
+  The way is chosen by the largest and smallest magnitudes of the breaks other than zero:
+
+  - any above a million: each label in whole numbers with a space between each three digits, as
+    `number(breaks, accuracy: 1)` writes it, or in scientific notation, whichever is shorter,
+    the whole number on a tie;
+  - any below 0.001: each in plain decimals or in scientific notation, whichever is shorter,
+    plain on a tie;
+  - all positive, from 1000 to 2200, as years are: in plain decimals, with no mark between
+    thousands;
+  - any above 1000: as `number(breaks, accuracy: 1)` writes them;
+  - otherwise in plain decimals, or in scientific notation where that is narrower for all.
+
+  Plain decimals and scientific notation are written with every label sharing its decimals, in
+  up to 7 significant digits, each way on its own when the shorter of two is taken. A missing
+  break is labelled with the text `"NA"` in the years' way and the last, and has no label in the
+  others.
+
+  ## Examples
+
+      iex> Scales.Labels.number_auto([0, 2.5e6, 5.0e6])
+      ["0", "2.5e+06", "5.0e+06"]
+
+      iex> Scales.Labels.number_auto([1990, 2000, 2010])
+      ["1990", "2000", "2010"]
+
+      iex> Scales.Labels.number_auto([0, 5000, 10_000, nil])
+      ["0", "5 000", "10 000", nil]
+
+      iex> Scales.Labels.number_auto([0, 0.5, nil])
+      ["0.0", "0.5", "NA"]
+  """
+  @spec number_auto([number() | nil]) :: [String.t() | nil]
+  def number_auto(breaks) do
+    values = numbers!(breaks, "Labels.number_auto/1")
+
+    case automatic_way(values) do
+      :large -> shortest(number(values, accuracy: 1), written_alone(values, :scientific))
+      :small -> shortest(written_alone(values, :fixed), written_alone(values, :scientific))
+      :whole -> number(values, accuracy: 1)
+      :together -> Format.write(values, format_settings(@format_digits, :auto, "."))
+    end
+  end
+
+  @doc """
+  Labels numbers as powers of `base:`, R's `label_log()`: `1000` is `{:power, "10", "3"}`, drawn
+  as a superscript.
+
+  Each break's exponent, its logarithm in `base:`, is rounded to the seventh significant digit
+  of the largest exponent's, then the exponents are written together in up to `digits:`
+  significant digits, sharing their decimals, and each is read back and written alone in up to
+  15, its zeros after the last significant digit dropped: `2` is `{:power, "10", "0.301"}`, and
+  `1` beside it `{:power, "10", "0"}`. No exponent shows more than 7 significant digits. The
+  base is written in up to 15 significant digits too, in plain or scientific notation,
+  whichever is shorter (`"2.71828182845905"` for e, `"1e+06"`).
+
+  Signed, each power has its sign before it, `{:signed, "-", power}` or `{:signed, "+", power}`,
+  and a zero is labelled `"0"`. A missing break has no label.
+
+  ## Options
+
+  #{NimbleOptions.docs(@log_schemas.log)}
+
+  ## Examples
+
+      iex> Scales.Labels.log([0.01, 1, 100])
+      [{:power, "10", "-2"}, {:power, "10", "0"}, {:power, "10", "2"}]
+
+      iex> Scales.Labels.log([1, 2, 8], base: 2)
+      [{:power, "2", "0"}, {:power, "2", "1"}, {:power, "2", "3"}]
+
+      iex> Scales.Labels.log([-100, 0, 100])
+      [{:signed, "-", {:power, "10", "2"}}, "0", {:signed, "+", {:power, "10", "2"}}]
+  """
+  @spec log([number() | nil], keyword()) :: [power_label()]
+  def log(breaks, options \\ []) do
+    {base, parts} = powers(breaks, options, :log)
+
+    Enum.map(parts, fn
+      nil -> nil
+      :zero -> "0"
+      {"", exponent} -> {:power, base, read_back(exponent)}
+      {sign, exponent} -> {:signed, sign, {:power, base, read_back(exponent)}}
+    end)
+  end
+
+  @doc """
+  Writes numbers as powers of `base:` in text, R's `format_log()`: `log/2`'s labels each written
+  `base^exponent`, its exponent as the exponents are written together, padded on the left to the
+  widest, in up to `digits:` significant digits.
+
+  ## Options
+
+  #{NimbleOptions.docs(@log_schemas.format_log)}
+
+  ## Examples
+
+      iex> Scales.Labels.format_log([0.01, 1, 100])
+      ["10^-2", "10^ 0", "10^ 2"]
+
+      iex> Scales.Labels.format_log([0.5, 2, 8], digits: 3)
+      ["10^-0.301", "10^ 0.301", "10^ 0.903"]
+
+      iex> Scales.Labels.format_log([-100, 0, 100])
+      ["-10^2", "0", "+10^2"]
+  """
+  @spec format_log([number() | nil], keyword()) :: [String.t() | nil]
+  def format_log(breaks, options \\ []) do
+    {base, parts} = powers(breaks, options, :format_log)
+
+    Enum.map(parts, fn
+      nil -> nil
+      :zero -> "0"
+      {sign, exponent} -> sign <> base <> "^" <> exponent
+    end)
+  end
+
+  @doc """
   The short scale's steps for `scale_cut:`, R's `cut_short_scale()`: thousands `K`, millions `M`,
   billions `B` (1e9) and trillions `T` (1e12).
 
@@ -537,6 +803,14 @@ defmodule Scales.Labels do
   def validate_number(value) when is_number(value), do: {:ok, value}
   def validate_number(value), do: {:error, "expected a number, got: #{inspect(value)}"}
 
+  # NimbleOptions' check of `base:`: a positive number other than 1.
+  @doc false
+  @spec validate_base(term()) :: {:ok, number()} | {:error, String.t()}
+  def validate_base(base) when is_number(base) and base > 0 and base != 1, do: {:ok, base}
+
+  def validate_base(base),
+    do: {:error, "expected a positive number other than 1, got: #{inspect(base)}"}
+
   # NimbleOptions' check of `scale_cut:`: `{suffix, threshold}` pairs, each threshold at least 0
   # and none given twice, one of them 0.
   @doc false
@@ -608,8 +882,13 @@ defmodule Scales.Labels do
   defp with_cents(settings, _values) when is_map_key(settings, :scale_cut), do: settings
 
   defp with_cents(settings, values) do
-    amounts = for value <- values, value != nil, do: value * settings.scale
-    small = Enum.all?(amounts, fn amount -> abs(amount) <= settings.largest_with_fractional end)
+    amounts = for value <- values, value != nil, do: Arithmetic.product(value, settings.scale)
+
+    small =
+      Enum.all?(amounts, fn amount ->
+        is_float(amount) and abs(amount) <= settings.largest_with_fractional
+      end)
+
     accuracy = if small and not Enum.all?(amounts, &whole?/1), do: 0.01, else: 1
     Map.put(settings, :accuracy, accuracy)
   end
@@ -640,6 +919,7 @@ defmodule Scales.Labels do
     |> texts(settings)
     |> Enum.map(fn
       {%{value: nil}, _text} -> nil
+      {%{infinite: true} = number, _text} -> signed("Inf", number.sign, settings)
       {number, text} -> signed(settings.prefix <> text <> number.suffix, number.sign, settings)
     end)
   end
@@ -656,7 +936,7 @@ defmodule Scales.Labels do
         %{value: nil, scale: scale, suffix: settings.suffix}
 
       value ->
-        name = refined_step(value, scale, step_reached(value, scale, sorted), sorted)
+        name = step_name(value, scale, sorted)
         threshold = step_threshold(sorted, name)
 
         %{
@@ -672,10 +952,20 @@ defmodule Scales.Labels do
     Enum.map(values, fn value -> %{value: value, scale: scale, suffix: settings.suffix} end)
   end
 
-  # The suffix of the last step whose threshold the value's magnitude reaches.
-  defp step_reached(value, scale, steps) do
-    magnitude = abs(value * scale)
+  # The suffix of the step a value takes: none past the largest double once scaled, where R's
+  # `cut()` finds no step for an infinity.
+  defp step_name(value, scale, steps) do
+    case Arithmetic.product(value, scale) do
+      scaled when is_float(scaled) ->
+        refined_step(value, scale, step_reached(abs(scaled), steps), steps)
 
+      _infinite ->
+        ""
+    end
+  end
+
+  # The suffix of the last step whose threshold the value's magnitude reaches.
+  defp step_reached(magnitude, steps) do
     {name, _threshold} =
       steps
       |> Enum.take_while(fn {_name, threshold} -> threshold <= magnitude end)
@@ -730,10 +1020,24 @@ defmodule Scales.Labels do
       numbers
       |> Enum.group_by(fn number -> number.scale end, fn number -> number.value end)
       |> Map.new(fn {scale, values} ->
-        {scale, precision(for value <- values, value != nil, do: value * scale)}
+        accuracy =
+          values
+          |> finite_scaled(scale)
+          |> precision()
+
+        {scale, accuracy}
       end)
 
     Enum.map(numbers, fn number -> Map.put(number, :accuracy, accuracies[number.scale]) end)
+  end
+
+  # The values scaled, as R's `precision()` takes them: the missing ones and those past the
+  # largest double left out.
+  defp finite_scaled(values, scale) do
+    values
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(fn value -> Arithmetic.product(value, scale) end)
+    |> Enum.filter(&is_float/1)
   end
 
   # The power of ten at or below the smallest gap when every value is a multiple of it, a tenth
@@ -756,10 +1060,17 @@ defmodule Scales.Labels do
         smallest =
           sorted
           |> Enum.chunk_every(2, 1, :discard)
-          |> Enum.map(fn [low, high] -> high - low end)
+          |> Enum.map(fn [low, high] -> Arithmetic.difference(high, low) end)
           |> Enum.min()
 
-        if smallest < @smallest_gap, do: 1.0, else: power_precision(sorted, smallest)
+        # A gap past the largest double is R's infinity, an atom, which sorts after every number,
+        # so it is the smallest only when every gap is; R's `precision()` takes that through an
+        # infinite power of ten to 1.
+        cond do
+          smallest == :infinity -> 1.0
+          smallest < @smallest_gap -> 1.0
+          true -> power_precision(sorted, smallest)
+        end
     end
   end
 
@@ -773,7 +1084,7 @@ defmodule Scales.Labels do
 
     tenfold =
       Enum.all?(values, fn value ->
-        multiple = round_half_even(value / precision)
+        multiple = Arithmetic.nearest(value / precision)
         rem(trunc(multiple), 10) == 0
       end)
 
@@ -781,10 +1092,10 @@ defmodule Scales.Labels do
   end
 
   # The value rounded to its accuracy, its sign after rounding, the number written (scaled and
-  # without its sign) and the decimals its accuracy asks for; a missing one has no sign and is
-  # written missing.
+  # without its sign), whether rounding took it past the largest double, and the decimals its
+  # accuracy asks for; a missing one has no sign and is written missing.
   defp rounded(number) do
-    {sign, magnitude} = rounded_value(number)
+    {sign, magnitude, infinite} = rounded_value(number)
 
     power =
       number.accuracy
@@ -797,24 +1108,46 @@ defmodule Scales.Labels do
       |> max(0)
       |> min(@max_decimals)
 
-    Map.merge(number, %{sign: sign, magnitude: magnitude, decimals: decimals})
+    Map.merge(number, %{
+      sign: sign,
+      magnitude: magnitude,
+      infinite: infinite,
+      decimals: decimals
+    })
   end
 
-  defp rounded_value(%{value: nil}), do: {0, nil}
+  defp rounded_value(%{value: nil}), do: {0, nil, false}
 
+  # Either step can pass the largest double, as R's `round_any()` and `scale * x` can: rounded
+  # past it, the number is infinite; only scaled past it, it is written `Inf`.
   defp rounded_value(number) do
     step = number.accuracy / number.scale
-    value = round_half_even(number.value / step) * step
 
-    sign =
-      cond do
-        value > 0 -> 1
-        value < 0 -> -1
-        true -> 0
-      end
+    case Arithmetic.quotient(number.value, step) do
+      quotient when is_float(quotient) ->
+        rounded =
+          quotient
+          |> Arithmetic.nearest()
+          |> Arithmetic.product(step)
 
-    {sign, number.scale * abs(value)}
+        case rounded do
+          value when is_float(value) ->
+            {sign_of(value), Arithmetic.product(number.scale, abs(value)), false}
+
+          infinite ->
+            {sign_of(infinite), :infinity, true}
+        end
+
+      infinite ->
+        {sign_of(infinite), :infinity, true}
+    end
   end
+
+  defp sign_of(:infinity), do: 1
+  defp sign_of(:neg_infinity), do: -1
+  defp sign_of(value) when value > 0, do: 1
+  defp sign_of(value) when value < 0, do: -1
+  defp sign_of(_zero), do: 0
 
   # Each number with its text, written with the others sharing its decimal count, as R's
   # `format()` writes them in plain decimals; a missing one widens the others' padding to its
@@ -848,15 +1181,143 @@ defmodule Scales.Labels do
   defp signed(text, 1, %{style_positive: :space}), do: " " <> text
   defp signed(text, _sign, _settings), do: text
 
-  # R's `round()`: to the nearest whole number, a half to the even one.
-  defp round_half_even(value) do
-    floor = Float.floor(value)
+  # How `Format` writes numbers together with R's `format()` defaults: untrimmed under
+  # `log/2`, trimmed otherwise.
+  defp format_settings(digits, notation, decimal_mark, trim \\ true) do
+    %{
+      digits: digits,
+      nsmall: 0,
+      notation: notation,
+      big_mark: "",
+      decimal_mark: decimal_mark,
+      trim: trim
+    }
+  end
 
-    case value - floor do
-      fraction when fraction > 0.5 -> floor + 1
-      fraction when fraction < 0.5 -> floor
-      _half -> if rem(trunc(floor), 2) == 0, do: floor, else: floor + 1
+  # `number_auto/1`'s way of writing the breaks, from the magnitudes of those other than zero;
+  # R's test that all are positive reads the numbers alone.
+  defp automatic_way(values) do
+    magnitudes = for value <- values, value != nil and value != 0, do: abs(value)
+    automatic_way(values, magnitudes)
+  end
+
+  defp automatic_way(_values, []), do: :together
+
+  defp automatic_way(values, magnitudes) do
+    {smallest, largest} = Enum.min_max(magnitudes)
+
+    cond do
+      largest > 1.0e6 -> :large
+      smallest < 1.0e-3 -> :small
+      years?(values, smallest, largest) -> :together
+      largest > 1000 -> :whole
+      true -> :together
     end
+  end
+
+  defp years?(values, smallest, largest) do
+    smallest >= 1000 and largest <= 2200 and
+      Enum.all?(values, fn value -> value == nil or value > 0 end)
+  end
+
+  # The breaks written together in one notation, trimmed, a missing one with no label.
+  defp written_alone(values, notation) do
+    values
+    |> Format.write(format_settings(@format_digits, notation, "."))
+    |> Enum.zip_with(values, fn text, value -> value && text end)
+  end
+
+  # Each label the shorter of the two, the first on a tie.
+  defp shortest(firsts, seconds) do
+    Enum.zip_with(firsts, seconds, fn first, second ->
+      if first && String.length(second) < String.length(first), do: second, else: first
+    end)
+  end
+
+  # `log/2`'s and `format_log/2`'s base as text, and each break's sign and exponent as text,
+  # written together: `nil` for a missing break and `:zero` for a signed zero.
+  defp powers(breaks, options, function) do
+    settings =
+      options
+      |> NimbleOptions.validate!(Map.fetch!(@log_schemas, function))
+      |> Map.new()
+
+    name = "Labels.#{function}/2"
+    values = numbers!(breaks, name)
+    signed = signed?(values, settings.signed)
+    if not signed, do: Enum.each(values, fn value -> unsigned!(value, name) end)
+
+    exponents =
+      Enum.map(values, fn value ->
+        value && Arithmetic.logarithm(logged(value, signed), settings.base)
+      end)
+
+    texts =
+      exponents
+      |> zapped()
+      |> Format.write(format_settings(settings.digits, :auto, ".", false))
+
+    parts =
+      Enum.zip_with(values, texts, fn
+        nil, _text -> nil
+        value, _text when signed and value == 0 -> :zero
+        value, text -> {sign(value, signed), text}
+      end)
+
+    {alone(settings.base * 1.0), parts}
+  end
+
+  defp signed?(values, :auto), do: Enum.any?(values, fn value -> value != nil and value <= 0 end)
+  defp signed?(_values, signed), do: signed
+
+  defp unsigned!(value, name) when is_float(value) and value <= 0 do
+    raise ArgumentError,
+          "#{name} labels a break at or below zero only when signed, with signed: true or " <>
+            ":auto, got: #{inspect(value)} with signed: false"
+  end
+
+  defp unsigned!(_value, _name), do: :ok
+
+  # The number whose logarithm is the exponent: signed, the magnitude, a zero's 1.
+  defp logged(value, true) when value == 0, do: 1.0
+  defp logged(value, true), do: abs(value)
+  defp logged(value, false), do: value
+
+  defp sign(value, true) when value > 0, do: "+"
+  defp sign(value, true) when value < 0, do: "-"
+  defp sign(_value, false), do: ""
+
+  # R's `zapsmall()`: each exponent rounded to the decimals that leave the largest seven
+  # significant digits, or seven decimals when every one is 0.
+  defp zapped(exponents) do
+    case for exponent <- exponents, exponent != nil, do: abs(exponent) do
+      [] ->
+        exponents
+
+      magnitudes ->
+        largest = Enum.max(magnitudes)
+
+        decimals =
+          if largest > 0, do: max(0, @format_digits - :math.log10(largest)), else: @format_digits
+
+        Enum.map(exponents, fn exponent -> exponent && Arithmetic.round_to(exponent, decimals) end)
+    end
+  end
+
+  # An exponent's text as R reads it back and writes it alone.
+  defp read_back(text) do
+    {value, ""} =
+      text
+      |> String.trim_leading()
+      |> Float.parse()
+
+    alone(value)
+  end
+
+  # A number written alone, as R's `as.character()` and `deparse()` write it.
+  defp alone(value) do
+    [text] = Format.write([value], format_settings(@alone_digits, :auto, "."))
+    text
   end
 
   defp whole?(value), do: value == Float.floor(value)

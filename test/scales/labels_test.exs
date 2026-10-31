@@ -482,7 +482,411 @@ defmodule Scales.LabelsTest do
     end
   end
 
+  describe "a break scale: takes past the largest double" do
+    test "is Inf, its sign styled, its prefix and suffix dropped once rounding passes it" do
+      # label_number(scale = 100)(c(1e307, 1)); trim = FALSE on c(-1e307, 1, 2.5) and
+      # c(1e307, 0.01); accuracy = 0.1 on c(1e307, 1); prefix = "$", suffix = "!",
+      # style_positive = "plus" on c(1e307, -1e307); style_negative = "parens" and "minus" on
+      # c(-1e307, 1)
+      assert Labels.number([1.0e307, 1], scale: 100) == ["Inf", "100"]
+      assert Labels.number([-1.0e307, 1, 2.5], scale: 100, trim: false) == ["-Inf", "100", "250"]
+      assert Labels.number([1.0e307, 0.01], scale: 100, trim: false) == ["Inf", "  1"]
+      assert Labels.number([1.0e307, 1], scale: 100, accuracy: 0.1) == ["Inf", "100.0"]
+
+      assert Labels.number([1.0e307, -1.0e307],
+               scale: 100,
+               prefix: "$",
+               suffix: "!",
+               style_positive: :plus
+             ) == ["+Inf", "-Inf"]
+
+      assert Labels.number([-1.0e307, 1], scale: 100, style_negative: :parens) == ["(Inf)", "100"]
+      assert Labels.number([-1.0e307, 1], scale: 100, style_negative: :minus) == ["−Inf", "100"]
+    end
+
+    test "keeps its prefix and suffix when only the scaling passes it" do
+      # label_number(scale = 100, accuracy = 1000, prefix = "$", suffix = "!")(c(1e307, 5));
+      # prefix = "$", trim = FALSE on c(1e307, 5, -1e307)
+      assert Labels.number([1.0e307, 5], scale: 100, accuracy: 1000, prefix: "$", suffix: "!") ==
+               ["$Inf!", "$0!"]
+
+      assert Labels.number([1.0e307, 5, -1.0e307],
+               scale: 100,
+               accuracy: 1000,
+               prefix: "$",
+               trim: false
+             ) == ["$Inf", "$  0", "-$Inf"]
+    end
+
+    test "takes no step, no cents and no part in the others' accuracy" do
+      # label_comma(scale = 100)(c(1e307, 1234, NA)); label_percent()(c(1e307, 0.5));
+      # label_currency(scale = 100)(c(1e307, 1.5, 2)); label_number(scale = 100, scale_cut =
+      # cut_short_scale())(c(1e307, 1500, 2500)); suffix = "m", prefix = "$", accuracy = 1e6 on
+      # c(1e307, 15); label_number(scale = 1e300)(c(1e10, 1)), the second label's start
+      assert Labels.comma([1.0e307, 1234, nil], scale: 100) == ["Inf", "123,400", nil]
+      assert Labels.percent([1.0e307, 0.5]) == ["Inf", "50%"]
+      assert Labels.currency([1.0e307, 1.5, 2], scale: 100) == ["Inf", "$150", "$200"]
+
+      assert Labels.number([1.0e307, 1500, 2500], scale: 100, scale_cut: Labels.cut_short_scale()) ==
+               ["Inf", "150K", "250K"]
+
+      assert Labels.number([1.0e307, 15],
+               scale: 100,
+               scale_cut: Labels.cut_short_scale(),
+               suffix: "m",
+               prefix: "$",
+               accuracy: 1.0e6
+             ) == ["$Infm", "$0Km"]
+
+      assert ["Inf", "999 999 999 999 999 903 803 069" <> _rest] =
+               Labels.number([1.0e10, 1], scale: 1.0e300)
+    end
+
+    test "is Inf in scientific notation, inside its prefix and suffix" do
+      # label_scientific(scale = 100)(c(1e307, -1e307, 1, NA)); prefix = "<", suffix = ">" on
+      # c(1e307, 1)
+      assert Labels.scientific([1.0e307, -1.0e307, 1, nil], scale: 100) ==
+               ["Inf", "-Inf", "1e+02", nil]
+
+      assert Labels.scientific([1.0e307, 1], scale: 100, prefix: "<", suffix: ">") ==
+               ["<Inf>", "<1e+02>"]
+    end
+  end
+
+  describe "scientific/2" do
+    test "rounds as R's signif() does, in floats scaled into the digits" do
+      # label_scientific(digits = 1)(c(0.15, 0.25, 0.35, 0.45)); label_scientific()(c(2.675,
+      # 1.005, 0.125)); digits = 2 on c(0.125, 0.375, 12.5)
+      assert Labels.scientific([0.15, 0.25, 0.35, 0.45], digits: 1) ==
+               ["2e-01", "2e-01", "4e-01", "4e-01"]
+
+      assert Labels.scientific([2.675, 1.005, 0.125]) == ["2.68e+00", "1.00e+00", "1.25e-01"]
+
+      assert Labels.scientific([0.125, 0.375, 12.5], digits: 2) == [
+               "1.2e-01",
+               "3.8e-01",
+               "1.2e+01"
+             ]
+    end
+
+    test "shares the mantissas' decimals, and shows at most 7 significant digits" do
+      # label_scientific()(c(1, 10, 100)); c(1.234, 5); c(1e100, 1); digits = 8 on c(1/3, 1);
+      # digits = 22 on c(123456.789)
+      assert Labels.scientific([1, 10, 100]) == ["1e+00", "1e+01", "1e+02"]
+      assert Labels.scientific([1.234, 5]) == ["1.23e+00", "5.00e+00"]
+      assert Labels.scientific([1.0e100, 1]) == ["1e+100", "1e+00"]
+      assert Labels.scientific([1 / 3, 1], digits: 8) == ["3.333333e-01", "1.000000e+00"]
+      assert Labels.scientific([123_456.789], digits: 22) == ["1.234568e+05"]
+    end
+
+    test "rounds the largest and smallest doubles in R's two steps" do
+      # label_scientific(digits = 2)(c(1.09e308, 1.234_5e307, 1.75e306));
+      # digits = 3 on c(6.2097656959666999e-311, 1.23456e-307, 2.5e-306)
+      assert Labels.scientific([1.09e308, 1.234_5e307, 1.75e306], digits: 2) ==
+               ["1.1e+308", "1.2e+307", "1.7e+306"]
+
+      assert Labels.scientific([6.2097656959666999e-311, 1.23456e-307, 2.5e-306], digits: 3) ==
+               ["6.21e-311", "1.23e-307", "2.50e-306"]
+    end
+
+    test "scales a number below 1e-287 by its digits in two powers" do
+      # label_scientific(digits = 22)(c(1.234567890123456789e-300));
+      # digits = 15 on c(1.5e-290, 2.5e-300)
+      assert Labels.scientific([1.234567890123456789e-300], digits: 22) == ["1.234568e-300"]
+      assert Labels.scientific([1.5e-290, 2.5e-300], digits: 15) == ["1.5e-290", "2.5e-300"]
+    end
+
+    test "writes the sign, a zero, the scale and the marks, and no label for a missing break" do
+      # label_scientific()(c(-1, 0, 1, NA)); scale = 100, prefix = "~", suffix = "%" on
+      # c(0.0123, -0.5); decimal.mark = "," on c(1234, 5)
+      assert Labels.scientific([-1, 0, 1, nil]) == ["-1e+00", "0e+00", "1e+00", nil]
+
+      assert Labels.scientific([0.0123, -0.5], scale: 100, prefix: "~", suffix: "%") ==
+               ["~1.23e+00%", "~-5.00e+01%"]
+
+      assert Labels.scientific([1234, 5], decimal_mark: ",") == ["1,23e+03", "5,00e+00"]
+      assert Labels.scientific([]) == []
+    end
+  end
+
+  describe "number_auto/1" do
+    test "writes breaks past a million in whole numbers or scientific notation, the shorter" do
+      # label_number_auto()(c(0, 2e6, 4e6)); c(1, 1e7, 123456789); c(0, 1.5e6, 2e6, 2.5e6);
+      # c(-3e6, 0, 3e6); c(1e6, 1000001); c(0, 1e6)
+      assert Labels.number_auto([0, 2.0e6, 4.0e6]) == ["0", "2e+06", "4e+06"]
+      assert Labels.number_auto([1, 1.0e7, 123_456_789]) == ["1", "10 000 000", "123 456 789"]
+
+      assert Labels.number_auto([0, 1.5e6, 2.0e6, 2.5e6]) ==
+               ["0", "1.5e+06", "2.0e+06", "2.5e+06"]
+
+      assert Labels.number_auto([-3.0e6, 0, 3.0e6]) == ["-3e+06", "0", "3e+06"]
+      assert Labels.number_auto([1.0e6, 1_000_001]) == ["1 000 000", "1 000 001"]
+      assert Labels.number_auto([0, 1.0e6]) == ["0", "1 000 000"]
+    end
+
+    test "writes breaks below 0.001 in plain decimals or scientific notation, the shorter" do
+      # label_number_auto()(c(0, 0.0005, 0.25, 0.5)); c(0.0001234, 0.5); c(0.0001, 0.0002,
+      # 0.5); c(1e-10, 1); c(0.001, 0.002); c(0.00012, 0.5), a tie
+      assert Labels.number_auto([0, 0.0005, 0.25, 0.5]) ==
+               ["0.0000", "0.0005", "0.2500", "0.5000"]
+
+      assert Labels.number_auto([0.0001234, 0.5]) == ["0.0001234", "0.5000000"]
+      assert Labels.number_auto([0.0001, 0.0002, 0.5]) == ["1e-04", "2e-04", "5e-01"]
+      assert Labels.number_auto([1.0e-10, 1]) == ["1e-10", "1e+00"]
+      assert Labels.number_auto([0.001, 0.002]) == ["0.001", "0.002"]
+      assert Labels.number_auto([0.000_12, 0.5]) == ["0.00012", "0.50000"]
+    end
+
+    test "writes years as they are" do
+      # label_number_auto()(c(1990, 2000, 2010)); c(1000, 2200); c(1990.5, 2000); c(999.5,
+      # 2000); c(1000, 2200.5); c(0, 1990, 2000); c(-1990, 2000)
+      assert Labels.number_auto([1990, 2000, 2010]) == ["1990", "2000", "2010"]
+      assert Labels.number_auto([1000, 2200]) == ["1000", "2200"]
+      assert Labels.number_auto([1990.5, 2000]) == ["1990.5", "2000.0"]
+      assert Labels.number_auto([999.5, 2000]) == ["1 000", "2 000"]
+      assert Labels.number_auto([1000, 2200.5]) == ["1 000", "2 200"]
+      assert Labels.number_auto([0, 1990, 2000]) == ["0", "1 990", "2 000"]
+      assert Labels.number_auto([-1990, 2000]) == ["-1 990", "2 000"]
+    end
+
+    test "writes breaks past 1000 in whole numbers, and the rest as R's format() does" do
+      # label_number_auto()(c(0, 5000, 10000)); c(1000.5, 2500); c(-1500, 1500); c(0, 0.5, 1);
+      # c(0.1234567891, 1); c(0.001, 1000); c(0, 0); c(1000, 1000.5)
+      assert Labels.number_auto([0, 5000, 10_000]) == ["0", "5 000", "10 000"]
+      assert Labels.number_auto([1000.5, 2500]) == ["1 000", "2 500"]
+      assert Labels.number_auto([-1500, 1500]) == ["-1 500", "1 500"]
+      assert Labels.number_auto([0, 0.5, 1]) == ["0.0", "0.5", "1.0"]
+      assert Labels.number_auto([0.1234567891, 1]) == ["0.1234568", "1.0000000"]
+      assert Labels.number_auto([0.001, 1000]) == ["1e-03", "1e+03"]
+      assert Labels.number_auto([0, 0]) == ["0", "0"]
+      assert Labels.number_auto([1000, 1000.5]) == ["1000.0", "1000.5"]
+      assert Labels.number_auto([]) == []
+    end
+
+    test "labels a missing break NA where R's format() writes them all, and not otherwise" do
+      # label_number_auto()(c(NA, 0.5, 1)); c(NA_real_); c(-1, 1990, NA); c(0, 5000, NA). The
+      # last three rows are not R's: it fails on a missing break among years, and gives no
+      # vector of labels with one past a million or below 0.001, where both its ways of writing
+      # it give NA (design-log §4, the entry beginning "A missing break's label").
+      assert Labels.number_auto([nil, 0.5, 1]) == ["NA", "0.5", "1.0"]
+      assert Labels.number_auto([nil]) == ["NA"]
+      assert Labels.number_auto([-1, 1990, nil]) == ["-1", "1 990", nil]
+      assert Labels.number_auto([0, 5000, nil]) == ["0", "5 000", nil]
+      assert Labels.number_auto([1990, 2000, nil]) == ["1990", "2000", "NA"]
+      assert Labels.number_auto([0, 2.0e6, nil]) == ["0", "2e+06", nil]
+      assert Labels.number_auto([0, 0.0005, nil]) == ["0e+00", "5e-04", nil]
+    end
+  end
+
+  describe "format_log/2" do
+    test "writes each exponent as R's format() writes them together, padded" do
+      # format_log(c(0.01, 1, 100, 1e5)); c(1, 10, NA); c(0.5, 2, 8); digits = 3 on c(0.5, 2,
+      # 8); digits = 1 on c(2, 3); c(1e-300, 1e300)
+      assert Labels.format_log([0.01, 1, 100, 1.0e5]) == ["10^-2", "10^ 0", "10^ 2", "10^ 5"]
+      assert Labels.format_log([1, 10, nil]) == ["10^ 0", "10^ 1", nil]
+      assert Labels.format_log([0.5, 2, 8]) == ["10^-0.30103", "10^ 0.30103", "10^ 0.90309"]
+
+      assert Labels.format_log([0.5, 2, 8], digits: 3) ==
+               ["10^-0.301", "10^ 0.301", "10^ 0.903"]
+
+      assert Labels.format_log([2, 3], digits: 1) == ["10^0.3", "10^0.5"]
+      assert Labels.format_log([1.0e-300, 1.0e300]) == ["10^-300", "10^ 300"]
+      assert Labels.format_log([]) == []
+    end
+
+    test "signs each power and writes a zero 0, when signed" do
+      # format_log(c(-100, 0, 100)); c(-100, NA, 100); signed = TRUE on c(1, 100); c(-0.5, 2)
+      assert Labels.format_log([-100, 0, 100]) == ["-10^2", "0", "+10^2"]
+      assert Labels.format_log([-100, nil, 100]) == ["-10^ 2", nil, "+10^ 2"]
+      assert Labels.format_log([1, 100], signed: true) == ["+10^0", "+10^2"]
+      assert Labels.format_log([-0.5, 2]) == ["-10^-0.30103", "+10^ 0.30103"]
+    end
+
+    test "writes the base as R writes a number alone" do
+      # format_log(c(1, 2, 8), base = 2); c(1, 2, 3), base = 2; c(1, exp(1), exp(2)), base =
+      # exp(1); c(1, 1e12), base = 1e6; c(1, 4), base = 0.5; c(1, 4, 100), base = 1/3;
+      # c(1, 1e12), base = 1e15
+      assert Labels.format_log([1, 2, 8], base: 2) == ["2^0", "2^1", "2^3"]
+      assert Labels.format_log([1, 2, 3], base: 2) == ["2^0.000000", "2^1.000000", "2^1.584963"]
+
+      assert Labels.format_log([1, :math.exp(1), :math.exp(2)], base: :math.exp(1)) ==
+               ["2.71828182845905^0", "2.71828182845905^1", "2.71828182845905^2"]
+
+      assert Labels.format_log([1, 1.0e12], base: 1.0e6) == ["1e+06^0", "1e+06^2"]
+      assert Labels.format_log([1, 4], base: 0.5) == ["0.5^ 0", "0.5^-2"]
+
+      assert Labels.format_log([1, 4, 100], base: 1 / 3) == [
+               "0.333333333333333^ 0.000000",
+               "0.333333333333333^-1.261860",
+               "0.333333333333333^-4.191807"
+             ]
+
+      assert Labels.format_log([1, 1.0e12], base: 1.0e15) == ["1e+15^0.0", "1e+15^0.8"]
+    end
+
+    test "rounds the exponents as R's zapsmall() does first" do
+      # format_log(c(1, 1e300), base = 1.0001, digits = 3); c(1, 1e300), base = 1.0001;
+      # c(1, 1 + 1e-10)
+      assert Labels.format_log([1, 1.0e300], base: 1.0001, digits: 3) ==
+               ["1.0001^      0", "1.0001^6908101"]
+
+      assert Labels.format_log([1, 1.0e300], base: 1.0001) == ["1.0001^      0", "1.0001^6908101"]
+      assert Labels.format_log([1, 1 + 1.0e-10]) == ["10^0.000000e+00", "10^4.342945e-11"]
+    end
+  end
+
+  describe "log/2" do
+    test "gives each break's power, its exponent read back and written alone" do
+      # label_log()(c(0.01, 1, 100, 1e5)); c(1, 10, NA); c(0.5, 2, 8); c(1, 2, 3); 10^c(-2.5,
+      # 0, 2.5); c(1e-300, 1e300); c(1, 1 + 1e-10), each deparsed
+      assert Labels.log([0.01, 1, 100, 1.0e5]) == [
+               {:power, "10", "-2"},
+               {:power, "10", "0"},
+               {:power, "10", "2"},
+               {:power, "10", "5"}
+             ]
+
+      assert Labels.log([1, 10, nil]) == [{:power, "10", "0"}, {:power, "10", "1"}, nil]
+
+      assert Labels.log([0.5, 2, 8]) ==
+               [{:power, "10", "-0.301"}, {:power, "10", "0.301"}, {:power, "10", "0.903"}]
+
+      assert Labels.log([1, 2, 3]) ==
+               [{:power, "10", "0"}, {:power, "10", "0.301"}, {:power, "10", "0.477"}]
+
+      assert Labels.log([10 ** -2.5, 1, 10 ** 2.5]) ==
+               [{:power, "10", "-2.5"}, {:power, "10", "0"}, {:power, "10", "2.5"}]
+
+      assert Labels.log([1.0e-300, 1.0e300]) == [{:power, "10", "-300"}, {:power, "10", "300"}]
+      assert Labels.log([1, 1 + 1.0e-10]) == [{:power, "10", "0"}, {:power, "10", "4.34e-11"}]
+      assert Labels.log([]) == []
+    end
+
+    test "shows up to digits: significant digits, and never more than 7" do
+      # label_log(digits = 1)(c(2, 3)); digits = 22
+      assert Labels.log([2, 3], digits: 1) == [{:power, "10", "0.3"}, {:power, "10", "0.5"}]
+
+      assert Labels.log([2, 3], digits: 22) ==
+               [{:power, "10", "0.30103"}, {:power, "10", "0.4771213"}]
+    end
+
+    test "puts each sign before its power, and labels a zero 0, when signed" do
+      # label_log()(c(-100, 0, 100)); signed = TRUE on c(1, 100); c(-0.5, 2)
+      assert Labels.log([-100, 0, 100]) == [
+               {:signed, "-", {:power, "10", "2"}},
+               "0",
+               {:signed, "+", {:power, "10", "2"}}
+             ]
+
+      assert Labels.log([1, 100], signed: true) ==
+               [{:signed, "+", {:power, "10", "0"}}, {:signed, "+", {:power, "10", "2"}}]
+
+      assert Labels.log([-0.5, 2]) ==
+               [{:signed, "-", {:power, "10", "-0.301"}}, {:signed, "+", {:power, "10", "0.301"}}]
+    end
+
+    test "writes the base and the exponents as R deparses them" do
+      # label_log(base = 2)(c(1, 2, 8)); base = exp(1) on c(1, exp(1), 20); base = 1e6 on c(1,
+      # 1e12); base = 0.5 on c(1, 4); base = 1/3 on c(1, 4); base = 1e15 on c(1, 1e12);
+      # base = 1.0001 on c(1, 1e300) and c(1.0001, 1e300)
+      assert Labels.log([1, 2, 8], base: 2) ==
+               [{:power, "2", "0"}, {:power, "2", "1"}, {:power, "2", "3"}]
+
+      euler = "2.71828182845905"
+
+      assert Labels.log([1, :math.exp(1), 20], base: :math.exp(1)) ==
+               [{:power, euler, "0"}, {:power, euler, "1"}, {:power, euler, "3"}]
+
+      assert Labels.log([1, 1.0e12], base: 1.0e6) == [
+               {:power, "1e+06", "0"},
+               {:power, "1e+06", "2"}
+             ]
+
+      assert Labels.log([1, 4], base: 0.5) == [{:power, "0.5", "0"}, {:power, "0.5", "-2"}]
+
+      third = "0.333333333333333"
+
+      assert Labels.log([1, 4], base: 1 / 3) == [{:power, third, "0"}, {:power, third, "-1.26"}]
+
+      assert Labels.log([1, 1.0e12], base: 1.0e15) == [
+               {:power, "1e+15", "0"},
+               {:power, "1e+15", "0.8"}
+             ]
+
+      assert Labels.log([1, 1.0e300], base: 1.0001) ==
+               [{:power, "1.0001", "0"}, {:power, "1.0001", "6908101"}]
+
+      assert Labels.log([1.0001, 1.0e300], base: 1.0001) ==
+               [{:power, "1.0001", "1"}, {:power, "1.0001", "6908101"}]
+    end
+  end
+
   describe "a call Scales.Labels refuses" do
+    test "names a digits: outside 1 to 22, for every function that takes it" do
+      for digits <- [0, 23, 2.5, -1] do
+        for label <- [
+              fn -> Labels.scientific([1], digits: digits) end,
+              fn -> Labels.log([1], digits: digits) end,
+              fn -> Labels.format_log([1], digits: digits) end
+            ] do
+          error = assert_raise NimbleOptions.ValidationError, label
+          assert error.message =~ ":digits"
+          assert error.message =~ inspect(digits)
+        end
+      end
+    end
+
+    test "names an option scientific/2 does not take, trim: among them" do
+      for option <- [trim: false, big_mark: ","] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn -> Labels.scientific([1], [option]) end
+
+        {name, _value} = option
+        assert error.message =~ inspect(name)
+      end
+    end
+
+    test "names a base that is not a positive number other than 1" do
+      for base <- [1, 1.0, 0, -2, "10"] do
+        for label <- [
+              fn -> Labels.log([1], base: base) end,
+              fn -> Labels.format_log([1], base: base) end
+            ] do
+          error = assert_raise NimbleOptions.ValidationError, label
+          assert error.message =~ "positive number other than 1"
+          assert error.message =~ "got: #{inspect(base)}"
+        end
+      end
+    end
+
+    test "names a break at or below zero labelled unsigned" do
+      for {breaks, value} <- [{[0, 10], "0.0"}, {[-100, 10, nil], "-100.0"}] do
+        log = assert_raise ArgumentError, fn -> Labels.log(breaks, signed: false) end
+        assert log.message =~ "Labels.log/2"
+        assert log.message =~ "got: #{value}"
+
+        format_log =
+          assert_raise ArgumentError, fn -> Labels.format_log(breaks, signed: false) end
+
+        assert format_log.message =~ "Labels.format_log/2"
+      end
+
+      error = assert_raise NimbleOptions.ValidationError, fn -> Labels.log([1], signed: :yes) end
+      assert error.message =~ ":signed"
+    end
+
+    test "names breaks that are not a list of numbers and nils, for the new labellers too" do
+      for {label, name} <- [
+            {fn -> Labels.scientific([1, "2"]) end, "Labels.scientific/2"},
+            {fn -> Labels.number_auto([1, "2"]) end, "Labels.number_auto/1"},
+            {fn -> Labels.log([1, "2"]) end, "Labels.log/2"},
+            {fn -> Labels.format_log([1, "2"]) end, "Labels.format_log/2"}
+          ] do
+        error = assert_raise ArgumentError, label
+        assert error.message =~ name
+      end
+    end
+
     test "names breaks that are not a list of numbers and nils" do
       for breaks <- [[1, "2"], [1, :infinity], 5] do
         error = assert_raise ArgumentError, fn -> Labels.comma(breaks) end

@@ -182,6 +182,14 @@ defmodule Scales.Labels.FormatTest do
       # format(c(1.5, NA), nsmall = 2, decimal.mark = ",")
       assert write([1.5, nil], nsmall: 2, decimal_mark: ",") == ["1,50", "  NA"]
     end
+
+    test "is padded to the numbers' width once marks lengthen them" do
+      # format(c(Inf, 10000, 8000), big.mark = " "); c(NA, 10000, 8000), big.mark = ",";
+      # c(NaN, 1234.5), big.mark = ",", nsmall = 2
+      assert write([:infinity, 10_000.0, 8000.0], big_mark: " ") == ["   Inf", "10 000", " 8 000"]
+      assert write([nil, 10_000.0, 8000.0], big_mark: ",") == ["    NA", "10,000", " 8,000"]
+      assert write([:nan, 1234.5], big_mark: ",", nsmall: 2) == ["     NaN", "1,234.50"]
+    end
   end
 
   describe "the marks" do
