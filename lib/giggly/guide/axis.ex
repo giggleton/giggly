@@ -5,12 +5,12 @@ defmodule Giggly.Guide.Axis do
   # reaching out from that edge, and the break's label beyond it; and the axis's title, beyond the
   # axis in a cell of its own, as ggplot2 lays its axis titles out.
   #
-  # When a plot is rendered, `draw/3` takes the plot's coordinate system, a panel's params and the
+  # When a plot is rendered, `draw/4` takes the plot's coordinate system, a panel's params and the
   # plot's complete theme, and draws an axis on each side of the panel that the coordinate system
   # puts one, from that axis's breaks and line already placed along the side
   # (`Giggly.Coord.axes/2`), in the look the coordinate system names, so ticks and marks are placed
   # by one rule;
-  # `draw_inside/3` draws the axes the coordinate system puts inside the panel, over its layers, a
+  # `draw_inside/4` draws the axes the coordinate system puts inside the panel, over its layers, a
   # radial panel's angle axis (`Giggly.Guide.AxisTheta`), as ggplot2's coordinate system draws its
   # foreground (`render_fg()`); and `titles/4` draws the title of the aesthetic the coordinate
   # system says each side shows, once for the plot, however many panels it has.
@@ -51,12 +51,13 @@ defmodule Giggly.Guide.Axis do
   # in the look the coordinate system names and `theme`'s. An axis with no breaks draws only its
   # line and takes no room.
   @doc false
-  @spec draw(Coord.t(), Coord.panel_params(), Theme.t()) :: %{Coord.side() => Guide.drawn()}
-  def draw(coord, panel_params, theme) do
+  @spec draw(Coord.t(), Coord.panel_params(), Theme.t(), boolean()) ::
+          %{Coord.side() => Guide.drawn()}
+  def draw(coord, panel_params, theme, installed_fonts) do
     coord
     |> sides(panel_params)
     |> Map.new(fn {side, {_aesthetic, look, breaks, line}} ->
-      {side, axis({breaks, line}, side, look, theme)}
+      {side, axis({breaks, line}, side, look, theme, installed_fonts)}
     end)
   end
 
@@ -64,11 +65,14 @@ defmodule Giggly.Guide.Axis do
   # in `theme`'s look, placed in the panel's cell: a radial panel's angle axis, around its circle;
   # none for a panel whose axes are all on its sides.
   @doc false
-  @spec draw_inside(Coord.t(), Coord.panel_params(), Theme.t()) :: [Scene.primitive()]
-  def draw_inside(coord, panel_params, theme) do
+  @spec draw_inside(Coord.t(), Coord.panel_params(), Theme.t(), boolean()) :: [Scene.primitive()]
+  def draw_inside(coord, panel_params, theme, installed_fonts) do
     case Coord.axes(coord, panel_params) do
-      %{theta: {_aesthetic, :theta, breaks, line}} -> Guide.AxisTheta.draw(breaks, line, theme)
-      %{} -> []
+      %{theta: {_aesthetic, :theta, breaks, line}} ->
+        Guide.AxisTheta.draw(breaks, line, theme, installed_fonts)
+
+      %{} ->
+        []
     end
   end
 
@@ -80,16 +84,17 @@ defmodule Giggly.Guide.Axis do
           Coord.t(),
           Coord.panel_params(),
           %{(:x | :y) => String.t() | :none},
-          Theme.t()
+          Theme.t(),
+          boolean()
         ) :: %{Coord.side() => Guide.drawn()}
-  def titles(coord, panel_params, guide_titles, theme) do
+  def titles(coord, panel_params, guide_titles, theme, installed_fonts) do
     coord
     |> sides(panel_params)
     |> Map.new(fn {side, {aesthetic, _look, _breaks, _line}} ->
       title =
         guide_titles
         |> Map.fetch!(aesthetic)
-        |> title(side, theme)
+        |> title(side, theme, installed_fonts)
 
       {side, title}
     end)
@@ -108,18 +113,18 @@ defmodule Giggly.Guide.Axis do
   # it reaches from the panel, in points, and its primitives, placed in a cell that deep. Its line
   # is drawn first, along the panel's edge, and takes no room, as ggplot2 draws an axis's line
   # under its ticks and labels and leaves it out of the axis's size.
-  defp axis({breaks, line}, side, look, theme) do
+  defp axis({breaks, line}, side, look, theme, installed_fonts) do
     {text_look, ticks, line_look} = elements(theme, look)
-    {depth, primitives} = draw_axis(breaks, side, look, {text_look, ticks})
+    {depth, primitives} = draw_axis(breaks, side, look, {text_look, ticks}, installed_fonts)
     {depth, axis_line(line, side, line_look) ++ primitives}
   end
 
   # An axis with no breaks draws only its line, as ggplot2's exits early.
-  defp draw_axis([], _side, _look, _elements), do: {0.0, []}
+  defp draw_axis([], _side, _look, _elements, _installed_fonts), do: {0.0, []}
 
   # An axis whose scale has no labels, or whose labels the theme removes, draws its ticks alone and
   # reaches only as far as they do, as ggplot2's leaves out the labels and their room.
-  defp draw_axis(breaks, side, _look, {text_look, ticks})
+  defp draw_axis(breaks, side, _look, {text_look, ticks}, _installed_fonts)
        when text_look == :none or elem(hd(breaks), 1) == :none do
     places = Enum.map(breaks, fn {place, _label} -> place end)
     depth = reach(ticks)
@@ -133,14 +138,14 @@ defmodule Giggly.Guide.Axis do
   # Labels below the panel count their margins above and below them, as ggplot2's do: each at its
   # break, and up at its turned justification of their room below the ticks, which the cell's y,
   # running up from its bottom, places under the ticks hung from its top.
-  defp draw_axis(breaks, :bottom, :x, {%{margin: margin} = text_look, ticks}) do
+  defp draw_axis(breaks, :bottom, :x, {%{margin: margin} = text_look, ticks}, installed_fonts) do
     {places, labels} = Enum.unzip(breaks)
-    {_width, labels_height} = Parts.extent(labels, text_look)
+    {_width, labels_height} = Parts.extent(labels, text_look, installed_fonts)
     room = margin.top + labels_height + margin.bottom
     height = reach(ticks) + room
     {{_across, up}, offset} = Parts.anchor(text_look, :up)
     label_places = Enum.map(places, fn place -> {place, up * room / height} end)
-    text = Parts.text(labels, label_places, offset, text_look)
+    text = Parts.text(labels, label_places, offset, text_look, installed_fonts)
 
     tick_lines = bottom_ticks(places, ticks)
     {height, Enum.concat(tick_lines, [text])}
@@ -148,14 +153,14 @@ defmodule Giggly.Guide.Axis do
 
   # Labels left of the panel count their margins either side of them, as ggplot2's do: each at its
   # break, and across at its turned justification of their room left of the ticks.
-  defp draw_axis(breaks, :left, _look, {%{margin: margin} = text_look, ticks}) do
+  defp draw_axis(breaks, :left, _look, {%{margin: margin} = text_look, ticks}, installed_fonts) do
     {places, labels} = Enum.unzip(breaks)
-    {labels_width, _height} = Parts.extent(labels, text_look)
+    {labels_width, _height} = Parts.extent(labels, text_look, installed_fonts)
     room = margin.left + labels_width + margin.right
     width = room + reach(ticks)
     {{across, _up}, offset} = Parts.anchor(text_look, :across)
     label_places = Enum.map(places, fn place -> {across * room / width, place} end)
-    text = Parts.text(labels, label_places, offset, text_look)
+    text = Parts.text(labels, label_places, offset, text_look, installed_fonts)
 
     {width, [text | left_ticks(places, ticks)]}
   end
@@ -271,24 +276,38 @@ defmodule Giggly.Guide.Axis do
   # The title of the axis on `side` of the panel, in `theme`'s look: how far its cell reaches from
   # the axis, in points, and its primitives, placed in a cell that deep and as long as the panel's
   # side.
-  defp title(:none, _side, _theme), do: {0.0, []}
+  defp title(:none, _side, _theme, _installed_fonts), do: {0.0, []}
 
   # A title the theme removes draws as no title, as ggplot2's does.
-  defp title(_text, :bottom, %Theme{axis_title_x_bottom: :none}), do: {0.0, []}
-  defp title(_text, :left, %Theme{axis_title_y_left: :none}), do: {0.0, []}
+  defp title(_text, :bottom, %Theme{axis_title_x_bottom: :none}, _installed_fonts), do: {0.0, []}
+  defp title(_text, :left, %Theme{axis_title_y_left: :none}, _installed_fonts), do: {0.0, []}
 
   # A title is anchored along the panel's side at its turned justification of the side, and across
   # it at its turned justification of its cell, moved by its margins across the axis: below the
   # panel those above and below it, and to its left those either side of it, as ggplot2's are.
-  defp title(text, :bottom, %Theme{axis_title_x_bottom: %{margin: margin} = title_look}) do
-    {_width, title_height} = Parts.extent([text], title_look)
+  defp title(
+         text,
+         :bottom,
+         %Theme{axis_title_x_bottom: %{margin: margin} = title_look},
+         installed_fonts
+       ) do
+    {_width, title_height} = Parts.extent([text], title_look, installed_fonts)
     {place, offset} = Parts.anchor(title_look, :up)
-    {margin.top + title_height + margin.bottom, [Parts.text([text], [place], offset, title_look)]}
+
+    {margin.top + title_height + margin.bottom,
+     [Parts.text([text], [place], offset, title_look, installed_fonts)]}
   end
 
-  defp title(text, :left, %Theme{axis_title_y_left: %{margin: margin} = title_look}) do
-    {title_width, _height} = Parts.extent([text], title_look)
+  defp title(
+         text,
+         :left,
+         %Theme{axis_title_y_left: %{margin: margin} = title_look},
+         installed_fonts
+       ) do
+    {title_width, _height} = Parts.extent([text], title_look, installed_fonts)
     {place, offset} = Parts.anchor(title_look, :across)
-    {margin.left + title_width + margin.right, [Parts.text([text], [place], offset, title_look)]}
+
+    {margin.left + title_width + margin.right,
+     [Parts.text([text], [place], offset, title_look, installed_fonts)]}
   end
 end

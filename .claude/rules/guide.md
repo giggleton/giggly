@@ -24,7 +24,7 @@ panel's grid lines are placed by the coordinate system".
 ## Rules
 
 - **The root is a protocol and holds nothing else** (`defprotocol` allows only its functions):
-  `draw/3` draws a guide of an aesthetic other than position, as a table of its own, for the box,
+  `draw/4` draws a guide of an aesthetic other than position, as a table of its own, for the box,
   its keys running the way rendering hands it (`direction`, `:vertical` or `:horizontal`).
   **A kind is one module**, its struct, whose fields are its parameters, and its drawing, in a
   `defimpl Giggly.Guide` whose first line classifies it into this boundary. A scale names its guide
@@ -44,11 +44,11 @@ panel's grid lines are placed by the coordinate system".
 - **Every text a guide draws is placed and measured by one rule in `Guide.Parts`, ggplot2's
   `titleGrob()`** (design-log §4, the entry beginning "Text's face, angle, justification and line
   height are the theme's"): drawn in its look's family and face, turned its `angle` and justified
-  by its `hjust` and `vjust` in its own turned frame (`text/4`); anchored at its justification
+  by its `hjust` and `vjust` in its own turned frame (`text/5`); anchored at its justification
   turned a quarter turn at a time (`turned_justification/1`, `rotate_just()`) of its room, moved by
   the margins it counts (`anchor/2`), as a share of the room and an offset in points, so it sits
   right in a room bigger than itself; and as wide and deep as grid's box round it turned, with the
-  font's descent turned (`extent/2`), an axis's or a colour bar's labels measured together as one
+  font's descent turned (`extent/3`), an axis's or a colour bar's labels measured together as one
   grob, whatever its family. A title may break over lines (the entry beginning "A title may run
   over several lines"): each line a label of its own, its `line_spacing` below the one before,
   stacked `vjust` of the way down from its top as R's graphics engine stacks lines; tick labels,
@@ -58,7 +58,7 @@ panel's grid lines are placed by the coordinate system".
   aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a
   guide draws the sides it is given, in the looks it is given, with the titles it is handed by
   aesthetic. An axis the coordinate system puts inside the panel (`:theta`) is drawn by
-  `Axis.draw_inside/3` over the panel's layers, takes no title of its own, and is neither measured
+  `Axis.draw_inside/4` over the panel's layers, takes no title of its own, and is neither measured
   nor given room, as ggplot2's `guide_axis_theta()` is not.
 - **An axis's title is drawn by its guide, in a cell of its own beyond the axis**, as ggplot2 lays
   out its axis titles, counting its margins across the axis alone: `theme_gray()`'s centred on
@@ -130,8 +130,8 @@ panel's grid lines are placed by the coordinate system".
   degrees) as wide as its margins left and right and the label turned, as R measures it. A panel
   has one strip per label it is given on a side, top to bottom or left to right, each drawn alone,
   as ggplot2's `assemble_strips()` stacks them.
-- **An axis is drawn per panel, its title once per plot.** `Axis.draw/3` draws one panel's axes;
-  `Axis.titles/4` the plot's titles, from any panel's params, since every panel puts the same
+- **An axis is drawn per panel, its title once per plot.** `Axis.draw/4` draws one panel's axes;
+  `Axis.titles/5` the plot's titles, from any panel's params, since every panel puts the same
   aesthetic on each side.
 - **What waits for its first reader:** axes above or to the right, `guide_axis()`'s `angle` and
   its justification heuristic, dodged or thinned labels, `guide_axis()`'s `cap` cutting the axis
@@ -143,7 +143,7 @@ panel's grid lines are placed by the coordinate system".
   (`legend.byrow`), titles and labels on other sides of the keys, `guide_colourbar()`'s
   options: `nbin`, `reverse`, and its raster and rectangles displays, and `guide_coloursteps()`'s:
   `even.steps`, `show.limits` (the scale's `show_limits` is read), `reverse`, `alpha`.
-- **A legend is a table of its own (`Guide.Legend`, drawn by `draw/3` as a nested
+- **A legend is a table of its own (`Guide.Legend`, drawn by `draw/4` as a nested
   `Giggly.Scene`), laid out as ggplot2's `GuideLegend` lays one out at its defaults**: the legend
   margin inside the edge; **the keys in a grid filled a column at a time**, one column for each
   twenty keys running down, one row for each five running across, as ggplot2's `setup_params()`
@@ -153,7 +153,7 @@ panel's grid lines are placed by the coordinate system".
   left-aligned and centred on the key; **each row as tall as the theme's key height, its tallest
   glyph or its tallest label turned with the labels' margins above and below, and each column of
   keys as wide as the theme's key width or its widest glyph**, from the room each glyph needs,
-  which rendering hands over with it (`Geom.key_size/2`), as ggplot2's `measure_legend_keys()`
+  which rendering hands over with it (`Geom.key_size/3`), as ggplot2's `measure_legend_keys()`
   sizes them, each key's background
   filling its whole cell and its glyphs placed in it as drawn; each column of labels as wide as its
   widest label turned and the labels' right margin; `legend_key_spacing` between a column's labels
@@ -163,10 +163,10 @@ panel's grid lines are placed by the coordinate system".
   columns, **or left of keys running across** (`legend_title_left`), in a column spanning their
   rows, placed by the rule, `theme_gray()`'s left-aligned and centred down; **a title bigger than
   the keys and their labels leaves the rest of its room either side of them, split by its turned
-  justification** (`Parts.title_above/3`, `title_column/3`, as `add_title()` adds columns or rows);
+  justification** (`Parts.title_above/4`, `title_column/4`, as `add_title()` adds columns or rows);
   a title of `:none` takes no room, as ggplot2 leaves out a `NULL` title. **With no labels (every
   key's `:none`), the labels' margins and columns take no room**, as ggplot2 leaves them out for a
-  scale's `labels = NULL` (`Parts.label_widths/2` and `Parts.label_columns/3`, which the colour bar
+  scale's `labels = NULL` (`Parts.label_widths/3` and `Parts.label_columns/3`, which the colour bar
   shares). Drawn in ggplot2's order: background, title, each key's background and glyphs, then the
   labels. Every size is in points. **Its one parameter, `reverse`, is the assembly's to apply**,
   handing the keys over last first, so the drawing takes them in the order given.

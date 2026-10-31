@@ -445,18 +445,19 @@ defmodule Giggly.Geom.Ribbon do
     end
 
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params),
+    def draw_panel(geom, frame, coord, panel_params, _installed_fonts),
       do: Ribbon.draw(geom, frame, coord, panel_params, [:x, :ymin, :ymax])
 
     # A legend's key, ggplot2's `draw_key_polygon()`, its corners and ends the layer's, its corners
     # mitred where the layer gives none, and the room it needs, a rectangle's.
     @impl Giggly.Geom
-    def draw_key(geom, key), do: Rect.polygon_key(key, geom.line_end, key_join(geom.line_join))
+    def draw_key(geom, key, _installed_fonts),
+      do: Rect.polygon_key(key, geom.line_end, key_join(geom.line_join))
 
     defp key_join(:none), do: :mitre
     defp key_join(line_join), do: line_join
 
     @impl Giggly.Geom
-    def key_size(_geom, key), do: Geom.key_size(%Rect{}, key)
+    def key_size(_geom, key, installed_fonts), do: Geom.key_size(%Rect{}, key, installed_fonts)
   end
 end

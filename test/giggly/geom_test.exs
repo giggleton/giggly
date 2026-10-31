@@ -67,7 +67,7 @@ defmodule Giggly.GeomTest do
         DataFrame.put(filled, aesthetic, List.duplicate(value, rows))
       end)
 
-    Geom.draw_panel(geom, filled, coord, panel_params)
+    Geom.draw_panel(geom, filled, coord, panel_params, false)
   end
 
   # `geom` with an arrowhead at grid's defaults, 18 points long, closed and filled with its line's
@@ -79,8 +79,8 @@ defmodule Giggly.GeomTest do
 
   # A key's glyph and the room it needs, `key` laid over the geom's defaults, as rendering hands a
   # geom a key.
-  defp draw_key(geom, key), do: Geom.draw_key(geom, Map.merge(key_defaults(geom), key))
-  defp key_size(geom, key), do: Geom.key_size(geom, Map.merge(key_defaults(geom), key))
+  defp draw_key(geom, key), do: Geom.draw_key(geom, Map.merge(key_defaults(geom), key), false)
+  defp key_size(geom, key), do: Geom.key_size(geom, Map.merge(key_defaults(geom), key), false)
 
   # A band's rows as a ribbon's setup leaves them, along x, outlined in red, in one panel and group.
   defp band(x_positions, lows, highs) do
@@ -103,7 +103,7 @@ defmodule Giggly.GeomTest do
     |> Map.new()
   end
 
-  describe "draw_panel/4 for points" do
+  describe "draw_panel/5 for points" do
     test "a row missing its x or its y is not drawn" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
@@ -337,7 +337,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for bars" do
+  describe "draw_panel/5 for bars" do
     test "a bar missing an edge is not drawn" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
@@ -456,7 +456,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for rectangles" do
+  describe "draw_panel/5 for rectangles" do
     test "a rectangle is placed between its corners as given, reversed or infinite" do
       coord = %Coord.Cartesian{}
       panel_params = Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
@@ -533,7 +533,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for hexagons" do
+  describe "draw_panel/5 for hexagons" do
     @hex %Geom.Hex{line_end: :butt, line_join: :mitre, mitre_limit: 10.0}
 
     # Hexagons as hexagonal binning leaves them: `centres` in one panel, each `{width, height}`
@@ -694,7 +694,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for box plots" do
+  describe "draw_panel/5 for box plots" do
     @box %Geom.Boxplot{
       outliers: true,
       outlier: %{stroke: 0.5},
@@ -1091,7 +1091,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for ribbons and areas" do
+  describe "draw_panel/5 for ribbons and areas" do
     # Golden: ggplot2 4.0.3's `geom_ribbon(colour = "red")` through vdiffr 1.0.9: a polygon of no
     # border out along `ymax` and back along `ymin`, then the upper and the lower edge, each a line.
     test "a piece is a polygon out along its upper edge and back along its lower, then its lines" do
@@ -1269,7 +1269,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for paths, in a line type" do
+  describe "draw_panel/5 for paths, in a line type" do
     setup do
       coord = %Coord.Cartesian{}
 
@@ -1401,7 +1401,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for paths" do
+  describe "draw_panel/5 for paths" do
     setup do
       coord = %Coord.Cartesian{}
 
@@ -1739,7 +1739,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for segments" do
+  describe "draw_panel/5 for segments" do
     setup do
       coord = %Coord.Cartesian{}
 
@@ -1878,7 +1878,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for rugs" do
+  describe "draw_panel/5 for rugs" do
     setup do
       coord = %Coord.Cartesian{}
 
@@ -2060,7 +2060,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for text" do
+  describe "draw_panel/5 for text" do
     setup do
       coord = %Coord.Cartesian{}
       params = Coord.panel_params(coord, {{0.0, 1.0}, [], []}, {{0.0, 1.0}, [], []})
@@ -2131,7 +2131,7 @@ defmodule Giggly.GeomTest do
 
     test "a label's vjust lowers its baseline that part of its ascent, a word by where it falls",
          context do
-      ascent = Font.ascent(11.0, "", :plain)
+      ascent = Font.ascent(11.0, "", :plain, false)
 
       frame =
         DataFrame.new(
@@ -2174,7 +2174,8 @@ defmodule Giggly.GeomTest do
       assert %Text{widths: [width], ascent: ascent} = text(sized, context)
 
       assert {width, ascent} ===
-               {Font.width("Mazda", points, "", :plain), Font.ascent(points, "", :plain)}
+               {Font.width("Mazda", points, "", :plain, false),
+                Font.ascent(points, "", :plain, false)}
     end
 
     test "each label is in its row's colour at its row's alpha, black and opaque by default",
@@ -2211,9 +2212,32 @@ defmodule Giggly.GeomTest do
       assert %Text{angle: +0.0, family: "", check_overlap: false} =
                text(DataFrame.new(x: [0.2], y: [0.2], label: ["a"]), context)
     end
+
+    # The test below reads the glyphs a font gives, which the build without Pica, where
+    # `Font.glyphs/5` gives none, would type as code that can never run, so it is compiled only
+    # where Pica is.
+    if Code.ensure_loaded?(Pica) do
+      @tag :pica
+      test "labels in a family registered with Pica carry its outlines, a run for each drawn",
+           context do
+        frame =
+          DataFrame.new(
+            x: [0.2, nil, 0.8],
+            y: [0.2, 0.5, 0.8],
+            label: ["AV", "b", "A"],
+            family: ["Lato", "Lato", "Lato"]
+          )
+
+        assert %Text{glyphs: %Giggly.Scene.Glyphs{} = glyphs} = text(frame, context)
+        assert glyphs === Font.glyphs(["AV", "A"], 11.0, "Lato", :plain, false)
+
+        assert %Text{glyphs: :none} =
+                 text(DataFrame.new(x: [0.2], y: [0.2], label: ["a"]), context)
+      end
+    end
   end
 
-  describe "draw_key/2 for ribbons, areas and rectangles" do
+  describe "draw_key/3 for ribbons, areas and rectangles" do
     # Golden: ggplot2 4.0.3's `geom_area(aes(fill = type))` through vdiffr 1.0.9: each key's
     # rectangle `stroke-linecap: butt` with grid's round corners, as `draw_key_polygon()` takes the
     # layer's `linejoin`, where a rectangle's key is mitred.
@@ -2231,7 +2255,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_panel/4 for smooths" do
+  describe "draw_panel/5 for smooths" do
     # Past 32 groups a map's keys come in no order, so the groups are drawn in their own.
     test "a panel's smooths are drawn in the order of their groups, past 32 of them" do
       groups = Enum.to_list(1..40)
@@ -2252,7 +2276,7 @@ defmodule Giggly.GeomTest do
     end
   end
 
-  describe "draw_key/2 for smooths" do
+  describe "draw_key/3 for smooths" do
     # Golden: ggplot2 4.0.3's `geom_smooth(aes(colour = drv), method = lm)` through vdiffr 1.0.9:
     # each key's band a rectangle over the whole key, `stroke-width: 0.75; stroke: none`, at the
     # band's alpha, then its line; and `aes(fill = drv)` with `colour = "#FF000080"`, whose keys'
@@ -2280,11 +2304,11 @@ defmodule Giggly.GeomTest do
                draw_key(%{@smooth | se: false, line_end: :round}, key)
 
       sized = Map.put(key, :linewidth, 1.5)
-      assert Geom.key_size(@smooth, sized) == Geom.key_size(@path, sized)
+      assert Geom.key_size(@smooth, sized, false) == Geom.key_size(@path, sized, false)
     end
   end
 
-  describe "draw_key/2" do
+  describe "draw_key/3" do
     test "a box's key takes the key's line width, line type and alpha, its lines never the alpha" do
       key = %{flipped_aes: false, linewidth: 1.0, linetype: {4, 4}, alpha: 0.5, fill: "#FF0000"}
       millimetre = 2 * @default_width
@@ -2442,7 +2466,7 @@ defmodule Giggly.GeomTest do
     end
 
     test "a text's key is the letter a at the middle of the key, in its colour at its alpha" do
-      ascent = Font.ascent(11.0, "", :plain)
+      ascent = Font.ascent(11.0, "", :plain, false)
 
       assert [%Text{} = key] =
                draw_key(
@@ -2470,7 +2494,7 @@ defmodule Giggly.GeomTest do
                )
 
       assert {key.x, key.y, key.hjust, key.offset} ===
-               {[0.0], [1.0], [0.0], [{margin, -margin - Font.ascent(11.0, "", :plain)}]}
+               {[0.0], [1.0], [0.0], [{margin, -margin - Font.ascent(11.0, "", :plain, false)}]}
     end
 
     # Golden: ggplot2 4.0.3's keys for text set `hjust = 0, vjust = 1` and turned 100, 200 and 300
@@ -2478,7 +2502,7 @@ defmodule Giggly.GeomTest do
     # element: `rotate_just()` puts the anchor at (1 - vjust, hjust) of the key, then at
     # (1 - hjust, 1 - vjust), then at (vjust, 1 - hjust).
     test "a turned text's key is placed at its justification turned with it" do
-      ascent = Font.ascent(11.0, "", :plain)
+      ascent = Font.ascent(11.0, "", :plain, false)
 
       places =
         Enum.map([100.0, 200.0, 300.0], fn angle ->
@@ -2523,6 +2547,20 @@ defmodule Giggly.GeomTest do
       end
     end
 
+    # The test below reads the glyphs a font gives, which the build without Pica, where
+    # `Font.glyphs/5` gives none, would type as code that can never run, so it is compiled only
+    # where Pica is.
+    if Code.ensure_loaded?(Pica) do
+      @tag :pica
+      test "a text's key in a family registered with Pica carries the outline of its letter" do
+        [%Text{size: size, glyphs: glyphs}] =
+          draw_key(%Geom.Text{check_overlap: false}, %{family: "Lato"})
+
+        assert %Giggly.Scene.Glyphs{} = glyphs
+        assert glyphs === Font.glyphs(["a"], size, "Lato", :plain, false)
+      end
+    end
+
     test "a path's key is in the colour its layer sets, and a colour of :none draws none" do
       assert [%Segments{color: ["#FF0000"], opacity: [@half_alpha]}] =
                draw_key(@path, %{alpha: nil, color: "#FF000080"})
@@ -2535,7 +2573,7 @@ defmodule Giggly.GeomTest do
   # ggplot2 4.0.3's legends (the keys of test/golden/point_key_big.svg, bar_key_big.svg,
   # line_key_big.svg and text_key_big.svg) and against `draw_key_text()`'s own `width` and
   # `height` on vdiffr's device.
-  describe "key_size/2" do
+  describe "key_size/3" do
     test "a point's key needs its size, in millimetres, either way; a missing size none" do
       assert rounded_size(key_size(%Geom.Point{}, %{size: 8.0})) === {22.68, 22.68}
       assert rounded_size(key_size(%Geom.Point{}, %{})) === {4.25, 4.25}

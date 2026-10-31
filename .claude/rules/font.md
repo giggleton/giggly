@@ -21,16 +21,26 @@ entry beginning "A registered font is measured".
   family and face.
 - **A family and face a font is registered under with Pica is measured from that font**, in a
   project that lists Pica, by svglite's rules, as the module's comment gives them; a test is
-  pinned only where svglite's measurement and Giggly's agree. **Only registered fonts are
-  searched** (`installed: false`) until labels are drawn as outlines (design-log §4, the entry
-  beginning "A label measured with a font Pica"). **A face no font is registered for is measured
-  from the table, never another face's font.**
+  pinned only where svglite's measurement and Giggly's agree. **Installed fonts are searched too
+  where `installed_fonts` says** (`to_svg/2`'s option, on by default, since a label in such a font
+  is drawn as outlines: design-log §4, the entry beginning "A label measured with a font Pica"),
+  handed down as the last argument of every measure, guide and geom drawing function, **never for
+  `""` or R's generic names** (`"sans"`, `"serif"`, `"mono"`), whatever the machine has. **A face
+  no font is found for is measured from the table, never another face's font.**
+- **A registered font also gives each label's glyphs, as the scene carries them** (`Scene.Glyphs`,
+  so `Giggly.Font` lists `Giggly.Scene`): placed as shaped at the size it is measured at, each its
+  offset from a pen its advance moves on, so a label's glyphs span its measured width; outlines in
+  the font's units; a glyph that draws nothing left out. A family measured from the table gives
+  `:none`. A test that reads a font's glyphs is compiled only where Pica is
+  (`Code.ensure_loaded?(Pica)` round it, beside its `:pica` tag), since the build without Pica
+  types it as code that can never run.
 - **The table is vdiffr's Liberation Sans table, copied as written, never recomputed.**
   `priv/fonts/liberation_sans.txt` is regenerated from vdiffr's `glyph_dims.h` as its header
   says. The ascent of "M", the descent of "gjpqyQ" and the missing-glyph width are read from it,
   never restated as constants.
 - **The table is read at compile time and only then**, behind a `CorePurity` waiver of its own;
-  measuring reads nothing but the fonts registered with Pica. `@external_resource` recompiles the
+  measuring reads nothing but the fonts Pica holds, registered or installed, the first search of
+  the installed ones reading the machine's font files, once for the VM's life, inside Pica. `@external_resource` recompiles the
   module when the file changes, and the path comes from `Application.app_dir/2`.
 - **vdiffr's and R's rules for the table, which make ggplot2's snapshot layouts reproducible:** a
   string's width is the sum of its characters' advances, with no kerning; a character the font
@@ -48,5 +58,6 @@ entry beginning "A registered font is measured".
   boundaries only when it is loaded. The gate builds and tests Giggly without Pica too
   (`dependencies.md`), leaving out the tests tagged `:pica` and running the `:without_pica` ones.
 - **The tests measure only the fonts `test/test_helper.exs` registers**, from `test/fonts/`, never
-  the machine's, and never under a family an existing golden names, so those goldens stay
+  the machine's: every measure and drawing function a test calls is handed `false`, and a plot
+  naming a family no test registers is drawn with `installed_fonts: false`, and never under a family an existing golden names, so those goldens stay
   vdiffr's; each value they expect is svglite's measurement of the same file.

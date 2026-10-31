@@ -17,7 +17,7 @@ defmodule Giggly.Guide.Parts do
   # its justification turned with it a quarter turn at a time (`turned_justification/1`, ggplot2's
   # `rotate_just()`), moved by the margins it counts (`anchor/2`), and it is as wide and as deep as
   # the box grid's text grob takes, turned, with the font's descent turned with it added
-  # (`extent/2`): a level label is a line of text deep, one turned 90 degrees as deep as it is
+  # (`extent/3`): a level label is a line of text deep, one turned 90 degrees as deep as it is
   # wide. A title may run over several lines, split where it breaks, each line drawn by itself as
   # R's graphics engine draws one, a line spacing below the one before, stacked `vjust` of the way
   # down from their top: the baseline of line `i` of `n`, counting from 0, is
@@ -76,12 +76,12 @@ defmodule Giggly.Guide.Parts do
   # spanning the grid's columns, the title anchored in it as `anchor/2` places it. A title of
   # `:none` takes no room, as ggplot2's legend leaves out a title it is given as `NULL`.
   @doc false
-  @spec title_above(String.t() | :none, Theme.title(), [float()]) ::
+  @spec title_above(String.t() | :none, Theme.title(), [float()], boolean()) ::
           {[float()], [float()], pos_integer(), [Cell.t()]}
-  def title_above(:none, _look, widths), do: {widths, [], 2, []}
+  def title_above(:none, _look, widths, _installed_fonts), do: {widths, [], 2, []}
 
-  def title_above(title, %{margin: margin} = look, widths) do
-    {title_width, title_height} = extent([title], look)
+  def title_above(title, %{margin: margin} = look, widths, installed_fonts) do
+    {title_width, title_height} = extent([title], look, installed_fonts)
     extra = max(margin.left + title_width + margin.right - Enum.sum(widths), 0.0)
     {across, _up} = turned_justification(look)
 
@@ -97,7 +97,7 @@ defmodule Giggly.Guide.Parts do
       columns: first..(first + length(widths) - 1),
       clip: :off,
       hang: :none,
-      primitives: [text([title], [place], offset, look)]
+      primitives: [text([title], [place], offset, look, installed_fonts)]
     }
 
     {with_room, [margin.top + title_height + margin.bottom], first, [cell]}
@@ -110,12 +110,12 @@ defmodule Giggly.Guide.Parts do
   # starts at; and the title's cell, spanning the grid's rows, the title anchored in it as
   # `anchor/2` places it. A title of `:none` takes no room.
   @doc false
-  @spec title_column(String.t() | :none, Theme.title(), [float()]) ::
+  @spec title_column(String.t() | :none, Theme.title(), [float()], boolean()) ::
           {[float()], [float()], pos_integer(), [Cell.t()]}
-  def title_column(:none, _look, heights), do: {[], heights, 2, []}
+  def title_column(:none, _look, heights, _installed_fonts), do: {[], heights, 2, []}
 
-  def title_column(title, %{margin: margin} = look, heights) do
-    {title_width, title_height} = extent([title], look)
+  def title_column(title, %{margin: margin} = look, heights, installed_fonts) do
+    {title_width, title_height} = extent([title], look, installed_fonts)
     extra = max(margin.top + title_height + margin.bottom - Enum.sum(heights), 0.0)
     {_across, up} = turned_justification(look)
     {place, offset} = anchor(look, :both)
@@ -125,7 +125,7 @@ defmodule Giggly.Guide.Parts do
       columns: 2..2,
       clip: :off,
       hang: :none,
-      primitives: [text([title], [place], offset, look)]
+      primitives: [text([title], [place], offset, look, installed_fonts)]
     }
 
     heights = Enum.concat([[(1 - up) * extra], heights, [up * extra]])
@@ -135,8 +135,8 @@ defmodule Giggly.Guide.Parts do
   # `label` in `look`, in a cell of `row` and `columns`, the labels' margin before it and their
   # column, anchored as `anchor/2` places it, counting its margins on every side.
   @doc false
-  @spec label_cell(String.t(), Theme.text(), pos_integer(), Range.t()) :: Cell.t()
-  def label_cell(label, look, row, columns) do
+  @spec label_cell(String.t(), Theme.text(), pos_integer(), Range.t(), boolean()) :: Cell.t()
+  def label_cell(label, look, row, columns, installed_fonts) do
     {place, offset} = anchor(look, :both)
 
     %Cell{
@@ -144,21 +144,21 @@ defmodule Giggly.Guide.Parts do
       columns: columns,
       clip: :off,
       hang: :none,
-      primitives: [text([label], [place], offset, look)]
+      primitives: [text([label], [place], offset, look, installed_fonts)]
     }
   end
 
   # How wide each of a guide's `labels` is in `look`, turned, in points, a label of `:none` taking
   # no room.
   @doc false
-  @spec label_widths([String.t() | :none], Theme.text()) :: [float()]
-  def label_widths(labels, look) do
+  @spec label_widths([String.t() | :none], Theme.text(), boolean()) :: [float()]
+  def label_widths(labels, look, installed_fonts) do
     Enum.map(labels, fn
       :none ->
         0.0
 
       label ->
-        {width, _height} = extent([label], look)
+        {width, _height} = extent([label], look, installed_fonts)
         width
     end)
   end
@@ -178,11 +178,11 @@ defmodule Giggly.Guide.Parts do
   # How tall a guide's label is in `look`, turned, its margins above and below it included: none
   # for `:none`.
   @doc false
-  @spec label_height(String.t() | :none, Theme.text()) :: float()
-  def label_height(:none, _look), do: 0.0
+  @spec label_height(String.t() | :none, Theme.text(), boolean()) :: float()
+  def label_height(:none, _look, _installed_fonts), do: 0.0
 
-  def label_height(label, %{margin: margin} = look) do
-    {_width, height} = extent([label], look)
+  def label_height(label, %{margin: margin} = look, installed_fonts) do
+    {_width, height} = extent([label], look, installed_fonts)
     margin.top + height + margin.bottom
   end
 
@@ -231,12 +231,12 @@ defmodule Giggly.Guide.Parts do
   # across and its cosine up. An axis's labels or a colour bar's are measured together, as one grob
   # holds them; ggplot2 measures them along a line, so only the way across it counts.
   @doc false
-  @spec extent([String.t()], Theme.text() | Theme.title()) :: {float(), float()}
-  def extent(texts, look) do
+  @spec extent([String.t()], Theme.text() | Theme.title(), boolean()) :: {float(), float()}
+  def extent(texts, look, installed_fonts) do
     radians = look.angle / 180 * :math.pi()
     cosine = :math.cos(radians)
     sine = :math.sin(radians)
-    ascent = Font.ascent(look.size, look.family, look.face)
+    ascent = Font.ascent(look.size, look.family, look.face, installed_fonts)
 
     corners =
       Enum.flat_map(texts, fn text ->
@@ -244,7 +244,9 @@ defmodule Giggly.Guide.Parts do
 
         width =
           lines
-          |> Enum.map(fn line -> Font.width(line, look.size, look.family, look.face) end)
+          |> Enum.map(fn line ->
+            Font.width(line, look.size, look.family, look.face, installed_fonts)
+          end)
           |> Enum.max()
 
         height = (length(lines) - 1) * line_spacing(look) + ascent
@@ -264,7 +266,7 @@ defmodule Giggly.Guide.Parts do
       |> Enum.map(fn {_across, up} -> up end)
       |> Enum.min_max()
 
-    descent = Font.descent(look.size, look.family, look.face)
+    descent = Font.descent(look.size, look.family, look.face, installed_fonts)
     descent_radians = turned_angle(look.angle) / 180 * :math.pi()
 
     {right - left + abs(:math.sin(descent_radians)) * descent,
@@ -276,10 +278,15 @@ defmodule Giggly.Guide.Parts do
   # `hjust` along its baseline, and each line of a title stacked `vjust` of the way down from its
   # top, every line a label of its own, as grid's text grob draws them.
   @doc false
-  @spec text([String.t()], [{float(), float()}], {float(), float()}, Theme.text() | Theme.title()) ::
-          Text.t()
-  def text(texts, places, offset, look) do
-    ascent = Font.ascent(look.size, look.family, look.face)
+  @spec text(
+          [String.t()],
+          [{float(), float()}],
+          {float(), float()},
+          Theme.text() | Theme.title(),
+          boolean()
+        ) :: Text.t()
+  def text(texts, places, offset, look, installed_fonts) do
+    ascent = Font.ascent(look.size, look.family, look.face, installed_fonts)
     {along, up} = in_text_frame(offset, look.angle)
 
     lines =
@@ -303,7 +310,7 @@ defmodule Giggly.Guide.Parts do
       labels: Enum.map(lines, fn {line, _place, _offset} -> line end),
       widths:
         Enum.map(lines, fn {line, _place, _offset} ->
-          Font.width(line, look.size, look.family, look.face)
+          Font.width(line, look.size, look.family, look.face, installed_fonts)
         end),
       size: look.size,
       family: look.family,
@@ -314,7 +321,11 @@ defmodule Giggly.Guide.Parts do
       hjust: List.duplicate(look.hjust, count),
       offset: Enum.map(lines, fn {_line, _place, offset} -> offset end),
       check_overlap: false,
-      ascent: ascent
+      ascent: ascent,
+      glyphs:
+        lines
+        |> Enum.map(fn {line, _place, _offset} -> line end)
+        |> Font.glyphs(look.size, look.family, look.face, installed_fonts)
     }
   end
 

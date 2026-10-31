@@ -7,6 +7,7 @@ defmodule Giggly.SVGTest do
     Arrow,
     Cell,
     Circles,
+    Glyphs,
     Gradient,
     Polygons,
     Polylines,
@@ -20,7 +21,7 @@ defmodule Giggly.SVGTest do
   # svglite (R 4.6.1), sizes in grid's "bigpts", which are points. It moves only with how grid lays
   # out a table, anchors text or writes these elements.
 
-  describe "draw/3, laying out the table" do
+  describe "draw/4, laying out the table" do
     test "shares split what the sizes in points leave by their weights" do
       drawn = draw(gray_cells([10, {:rest, 1}, {:rest, 3}, 20], [30, {:rest, 2}], false))
 
@@ -68,7 +69,7 @@ defmodule Giggly.SVGTest do
   # As svglite writes theme_void()'s bars, whose panel's clipping is the whole drawing's, as the
   # plot's background's is: one group, its clip path written once; a clipping it returns to after
   # another is named again but not defined again.
-  describe "draw/3, clipping cells" do
+  describe "draw/4, clipping cells" do
     test "clipped cells in a row sharing a box are one group, each box's clip path defined once" do
       rect = %Rect{
         fill: "#EBEBEB",
@@ -110,7 +111,7 @@ defmodule Giggly.SVGTest do
     end
   end
 
-  describe "draw/3, writing primitives" do
+  describe "draw/4, writing primitives" do
     test "text is anchored at the start, middle or end nearest its hjust, and moved the rest of its width" do
       text = fn x_place, hjust, angle ->
         %Text{
@@ -127,7 +128,8 @@ defmodule Giggly.SVGTest do
           hjust: [hjust],
           offset: [{0.0, 0.0}],
           check_overlap: false,
-          ascent: 6.3
+          ascent: 6.3,
+          glyphs: :none
         }
       end
 
@@ -166,7 +168,8 @@ defmodule Giggly.SVGTest do
           hjust: [0.5],
           offset: [{3.0, -4.0}],
           check_overlap: false,
-          ascent: 6.3
+          ascent: 6.3,
+          glyphs: :none
         }
       end
 
@@ -1324,7 +1327,7 @@ defmodule Giggly.SVGTest do
       labels: Enum.map(labels, fn {label, _x_points, _y_points, _hjust} -> label end),
       widths:
         Enum.map(labels, fn {label, _x_points, _y_points, _hjust} ->
-          Font.width(label, 11.0, "", :plain)
+          Font.width(label, 11.0, "", :plain, false)
         end),
       size: 11.0,
       family: "",
@@ -1335,7 +1338,8 @@ defmodule Giggly.SVGTest do
       hjust: Enum.map(labels, fn {_label, _x_points, _y_points, hjust} -> hjust end),
       offset: List.duplicate({0.0, 0.0}, count),
       check_overlap: true,
-      ascent: Font.ascent(11.0, "", :plain)
+      ascent: Font.ascent(11.0, "", :plain, false),
+      glyphs: :none
     }
   end
 
@@ -1356,7 +1360,8 @@ defmodule Giggly.SVGTest do
         hjust: [0.5],
         offset: [{0.0, 0.0}],
         check_overlap: false,
-        ascent: 7.88
+        ascent: 7.88,
+        glyphs: :none
       },
       changes
     )
@@ -1365,7 +1370,7 @@ defmodule Giggly.SVGTest do
   # Drawn at vdiffr's size, 720 by 576 points.
   defp draw(scene) do
     scene
-    |> SVG.draw(720, 576)
+    |> SVG.draw(720, 576, :outlines)
     |> IO.iodata_to_binary()
   end
 
@@ -1395,7 +1400,7 @@ defmodule Giggly.SVGTest do
   # justified 1 and 1, and at 0.25 and 1.1 justified 0 and 0.5, beyond its cell's top: its left
   # edges at 395, 628 and 255 points, its tops at 273, 57.6 and -72.6. It moves with how a hanging
   # box or a nested table is laid out.
-  describe "draw/3, a scene nested in a cell" do
+  describe "draw/4, a scene nested in a cell" do
     test "a box hung at a point of its cell by its own point, as grid places a viewport" do
       nested = %Scene{
         widths: [{:points, 10}, {:points, 20}],
@@ -1491,4 +1496,117 @@ defmodule Giggly.SVGTest do
       assert rects(draw(whole([nested]))) === [{"10.00", "0.00", "710.00", "576.00"}]
     end
   end
+
+  # Not R's: svglite writes text alone. The form is the scene's own: each glyph defined once, in the
+  # font's units, and each label a group of its glyphs scaled into points, then its text, unseen.
+  describe "draw/4, a label as its font's outlines" do
+    test "a label is its new glyphs defined, a group of them at its start, and its text unseen" do
+      # A square, then a curve, then the square again, 0.006 points to the font's unit.
+      square = [{:move, 0.0, -0.004}, {:line, 100.0, 0.0}, {:line, 100.0, 700.5}, :close]
+
+      curve = [
+        {:move, 0.0, 0.0},
+        {:quad, 50.0, 25.25, 100.0, 0.333},
+        {:cubic, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0},
+        :close
+      ]
+
+      label =
+        one_label(
+          labels: ["ABA"],
+          glyphs: %Glyphs{
+            scale: 0.006,
+            runs: [[{square, 0.0, 0.0}, {curve, 7.484375, 0.6}, {square, 12.0, 0.0}]]
+          }
+        )
+
+      [square_path, curve_path] = ["M0 0L100 0L100 700.5Z", "M0 0Q50 25.25 100 0.33C1 2 3 4 5 6Z"]
+
+      assert body(draw(whole([label]))) ===
+               """
+               <defs>
+                 <path id='#{glyph_id(square_path)}' d='#{square_path}' />
+                 <path id='#{glyph_id(curve_path)}' d='#{curve_path}' />
+               </defs>
+               <g transform='translate(347.16,288.00) scale(0.006,-0.006)'>
+                 <use href='##{glyph_id(square_path)}' />
+                 <use href='##{glyph_id(curve_path)}' x='1247.40' y='100.00' />
+                 <use href='##{glyph_id(square_path)}' x='2000.00' />
+               </g>
+               <text x='360.00' y='288.00' text-anchor='middle' style='font-size: 11.00px; fill: none; font-family: "Liberation Sans", Arial, Helvetica, sans-serif;' textLength='25.68px' lengthAdjust='spacingAndGlyphs'>ABA</text>
+               """
+    end
+
+    test "a label's group starts at its exact justification, turned as its text, in its colour" do
+      label =
+        one_label(
+          angle: 90,
+          hjust: [0.3],
+          color: ["#FF0000"],
+          opacity: [0.5],
+          glyphs: %Glyphs{scale: 0.00659375, runs: [[{[{:move, 0.0, 0.0}, :close], 0.0, 0.0}]]}
+        )
+
+      # 0.3 of 25.68 points back from the place, up the page since the label is turned.
+      assert [group] = Regex.run(~r/<g [^>]*>/, draw(whole([label])))
+
+      assert group ===
+               "<g transform='translate(360.00,295.70) rotate(-90) scale(0.00659375,-0.00659375)' " <>
+                 "style='fill: #FF0000; fill-opacity: 0.50;'>"
+    end
+
+    test "a glyph is defined once in the document, however many labels and scenes draw it" do
+      glyph = [{:move, 0.0, 0.0}, {:line, 10.0, 0.0}, :close]
+      run = [{glyph, 0.0, 0.0}]
+      text = one_label(glyphs: %Glyphs{scale: 0.006, runs: [run]})
+      nested = %{whole([text]) | cells: [%{hd(whole([text]).cells) | hang: :none}]}
+
+      drawn = draw(whole([text, nested, text]))
+
+      assert {count(drawn, "<path id="), count(drawn, "<use href=")} === {1, 3}
+    end
+
+    test "a label left out draws no glyph and defines none" do
+      # The second label's box crosses the first's, so it is left out (grid's check.overlap).
+      kept = [{:move, 0.0, 0.0}, {:line, 10.0, 0.0}, :close]
+      left_out = [{:move, 0.0, 0.0}, {:line, 20.0, 0.0}, :close]
+      overlapping = overlap_text([{"MMMM", 100, 100, 0.5}, {"MMMM", 110, 103, 0.5}], 0.0)
+      runs = [[{kept, 0.0, 0.0}], [{left_out, 0.0, 0.0}]]
+
+      drawn = draw(whole([%{overlapping | glyphs: %Glyphs{scale: 0.006, runs: runs}}]))
+
+      assert {count(drawn, "<path id="), drawn =~ "M0 0L20 0Z"} === {1, false}
+    end
+
+    test "a label is written as text where its text carries no outlines, or text is asked for" do
+      run = [{[{:move, 0.0, 0.0}, {:line, 10.0, 0.0}, :close], 0.0, 0.0}]
+      outlined = whole([one_label(glyphs: %Glyphs{scale: 0.006, runs: [run]})])
+      plain = whole([one_label([])])
+
+      as_text = fn scene ->
+        scene
+        |> SVG.draw(720, 576, :text)
+        |> IO.iodata_to_binary()
+      end
+
+      assert {as_text.(outlined), draw(plain)} === {as_text.(plain), as_text.(plain)}
+    end
+  end
+
+  # The document between its root's opening and closing tags.
+  defp body(svg) do
+    [_root, rest] = String.split(svg, ">\n", parts: 2)
+    String.replace_suffix(rest, "</svg>\n", "")
+  end
+
+  defp glyph_id(path) do
+    digest =
+      path
+      |> :erlang.md5()
+      |> Base.encode16(case: :lower)
+
+    "gl" <> digest
+  end
+
+  defp count(svg, element), do: length(String.split(svg, element)) - 1
 end

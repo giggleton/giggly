@@ -94,8 +94,8 @@ invariants. Add a line here when an area gets its rules file; nothing else about
   `deps:` or `exports:` is a decision for the user, and `.claude/hooks/waiver-gate.sh` stops the
   edit until it has been explained in conversation (`.claude/rules/dependencies.md`).
 - **The pipeline is pure: no application config, no clock, no unseeded randomness.** Every option
-  is an argument, and the one random step (jitter) takes an injected integer seed, so a render is
-  reproducible and the suite runs offline. It reads one outside state: fonts registered with Pica.
+  is an argument, and jitter takes an injected seed, so a render is reproducible and the suite
+  runs offline. It reads one outside state, Pica's fonts: registered, and installed (`to_svg/2`).
 - **The public API raises; everything beneath it is assertive and pipes.** The `Giggly.Plot`
   functions validate their options with NimbleOptions and raise on anything invalid, since a pipe
   cannot carry `{:error, reason}`. The functions beneath take already-validated data, return

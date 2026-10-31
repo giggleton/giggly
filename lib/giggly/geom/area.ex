@@ -91,21 +91,21 @@ defmodule Giggly.Geom.Area do
     end
 
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params),
+    def draw_panel(geom, frame, coord, panel_params, _installed_fonts),
       do: Ribbon.draw(geom, frame, coord, panel_params, [:x, :y])
 
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       geom
       |> ribbon()
-      |> Geom.draw_key(key)
+      |> Geom.draw_key(key, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> ribbon()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The ribbon an area is drawn as.

@@ -88,7 +88,7 @@ defmodule Giggly.Geom.Path do
 
     # The panel's lines.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, _installed_fonts) do
       kept =
         frame
         |> trimmed()
@@ -121,7 +121,7 @@ defmodule Giggly.Geom.Path do
     # `draw_key_path()` draws a missing line type blank and R's graphics engine draws no line of a
     # missing width.
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, _installed_fonts) do
       look =
         {Mark.key_color(key, :color), Map.fetch!(key, :linewidth), Map.fetch!(key, :linetype)}
 
@@ -157,7 +157,7 @@ defmodule Giggly.Geom.Path do
     # gives its glyph a size: as wide as an arm reaches along the line, over the eight tenths of
     # the key the line spans, and as tall as both arms reach across it.
     @impl Giggly.Geom
-    def key_size(%{arrow: :none}, key) do
+    def key_size(%{arrow: :none}, key, _installed_fonts) do
       side =
         case Map.fetch!(key, :linewidth) do
           nil -> 0.0
@@ -167,7 +167,7 @@ defmodule Giggly.Geom.Path do
       {side, side}
     end
 
-    def key_size(%{arrow: arrow}, _key) do
+    def key_size(%{arrow: arrow}, _key, _installed_fonts) do
       angle = arrow.angle * :math.pi() / 180
       {:math.cos(angle) * arrow.length * 1.25, :math.sin(angle) * arrow.length * 2}
     end

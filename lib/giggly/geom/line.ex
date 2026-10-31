@@ -72,24 +72,24 @@ defmodule Giggly.Geom.Line do
     end
 
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       geom
       |> path()
-      |> Geom.draw_panel(frame, coord, panel_params)
+      |> Geom.draw_panel(frame, coord, panel_params, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.draw_key(key)
+      |> Geom.draw_key(key, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The path a line is drawn as.

@@ -37,6 +37,29 @@ defmodule Giggly do
                       type: :pos_integer,
                       default: 433,
                       doc: "The drawing's height, in pixels."
+                    ],
+                    text: [
+                      type: {:in, [:outlines, :text]},
+                      default: :outlines,
+                      doc: """
+                      How a label in a font registered with Pica is written: `:outlines` draws it \
+                      as the font's own shapes, so it looks the same wherever the drawing is \
+                      viewed, and keeps its words as unseen text, to be read aloud, selected and \
+                      found; `:text` writes it as text naming its font, which a viewer without \
+                      that font draws in another. Every other label is written as text.
+                      """
+                    ],
+                    installed_fonts: [
+                      type: :boolean,
+                      default: true,
+                      doc: """
+                      In a project that lists Pica, whether a family no font is registered under \
+                      with Pica is looked for among the machine's installed fonts too, by its \
+                      exact name, before its text is measured as Liberation Sans's would be. The first such search reads every \
+                      font file on the machine, once for the life of the VM. The default family \
+                      and the generic names `"sans"`, `"serif"` and `"mono"` are never looked \
+                      for there.
+                      """
                     ]
                   )
 
@@ -155,7 +178,7 @@ defmodule Giggly do
 
     plot
     |> Assembly.run()
-    |> Render.scene()
-    |> SVG.draw(width, height)
+    |> Render.scene(Keyword.fetch!(options, :installed_fonts))
+    |> SVG.draw(width, height, Keyword.fetch!(options, :text))
   end
 end

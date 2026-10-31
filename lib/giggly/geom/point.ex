@@ -102,7 +102,7 @@ defmodule Giggly.Geom.Point do
     # Each row placed in the panel, in its shape, size, stroke, colour and fill, but a row whose
     # colour or shape is `:none`.
     @impl Giggly.Geom
-    def draw_panel(_geom, frame, coord, panel_params) do
+    def draw_panel(_geom, frame, coord, panel_params, _installed_fonts) do
       placed = Coord.transform(coord, frame, panel_params)
       colors = Mark.colors(placed, :color)
       fills = Mark.colors(placed, :fill)
@@ -146,7 +146,7 @@ defmodule Giggly.Geom.Point do
     # it, in the key's shape, size, stroke, colour and fill at its alpha; a colour or shape of
     # `:none`, or a missing size, draws nothing.
     @impl Giggly.Geom
-    def draw_key(_geom, key) do
+    def draw_key(_geom, key, _installed_fonts) do
       color = Mark.key_color(key, :color)
       fill = Mark.key_color(key, :fill)
       alpha = Map.fetch!(key, :alpha)
@@ -169,7 +169,7 @@ defmodule Giggly.Geom.Point do
     # `set_key_size()` reads a point's key, which has no `linewidth`, its stroke left out; a
     # missing size needs none.
     @impl Giggly.Geom
-    def key_size(_geom, key) do
+    def key_size(_geom, key, _installed_fonts) do
       side =
         case Map.fetch!(key, :size) do
           nil -> 0.0

@@ -37,7 +37,10 @@ defmodule Giggly.SVG do
   # Text is drawn in the fonts whose widths `Giggly.Font` measures with (Liberation Sans, Arial,
   # Helvetica) or else the browser's sans-serif, and each label is stretched or squeezed to its
   # measured width (svglite's `textLength`), so it fills the space measured for it whatever font
-  # draws it.
+  # draws it. A label whose text carries its font's outlines is written as them unless text is
+  # asked for: each glyph's path defined once in the document, where it is first drawn, in the
+  # font's units, and the label a group of its glyphs placed at its start, turned and scaled into
+  # points, then its text, unseen, so it is still read aloud, selected and found.
 
   # The SVG backend reads the scene and nothing else.
   use Boundary, deps: [Giggly.Scene], exports: []
@@ -48,6 +51,7 @@ defmodule Giggly.SVG do
     Arrow,
     Cell,
     Circles,
+    Glyphs,
     Gradient,
     Polygons,
     Polylines,
@@ -63,12 +67,21 @@ defmodule Giggly.SVG do
   @epsilon 2.220446049250313e-16
 
   # The SVG document that draws `scene` at `width` by `height` points, as grid's `grid.draw()` puts
-  # a finished table on a device.
+  # a finished table on a device, each label whose font gives its outlines written as them
+  # (`:outlines`) or as text naming its font (`:text`).
   @doc false
-  @spec draw(Scene.t(), number(), number()) :: iodata()
-  def draw(%Scene{widths: widths, heights: heights, cells: cells} = scene, width, height) do
+  @spec draw(Scene.t(), number(), number(), :outlines | :text) :: iodata()
+  def draw(
+        %Scene{widths: widths, heights: heights, cells: cells} = scene,
+        width,
+        height,
+        text_mode
+      )
+      when text_mode in [:outlines, :text] do
     {column_spans, row_spans} =
       lay_out({widths, width}, {heights, height}, scene.keep_proportions)
+
+    {drawn, _glyphs} = cells(cells, column_spans, row_spans, text_mode, MapSet.new())
 
     [
       "<svg xmlns='http://www.w3.org/2000/svg' width='",
@@ -80,7 +93,7 @@ defmodule Giggly.SVG do
       " ",
       number(height),
       "' stroke-linecap='round' stroke-linejoin='round' stroke-miterlimit='10.00'>\n",
-      cells(cells, column_spans, row_spans),
+      drawn,
       "</svg>\n"
     ]
   end
@@ -144,35 +157,50 @@ defmodule Giggly.SVG do
   # writes a clipping viewport: one group for clipped cells in a row that share a box, since
   # svglite starts a group only where the clipping changes, and each box's clip path defined once,
   # where it is first used, named by its edges so that two drawings on one page share a name only
-  # when they share the box.
-  defp cells(cells, column_spans, row_spans) do
+  # when they share the box. `glyphs` holds the ids of the glyphs defined so far in the document,
+  # each defined once, where it is first drawn, and comes back with those the cells defined.
+  defp cells(cells, column_spans, row_spans, text_mode, glyphs) do
+    {drawn_cells, glyphs} =
+      Enum.map_reduce(cells, glyphs, fn cell, glyphs ->
+        cell(cell, column_spans, row_spans, text_mode, glyphs)
+      end)
+
     {groups, _defined} =
-      cells
-      |> Enum.map(fn cell -> cell(cell, column_spans, row_spans) end)
+      drawn_cells
       |> Enum.chunk_by(fn {clip, _drawn} -> clip end)
       |> Enum.map_reduce(MapSet.new(), fn [{clip, _drawn} | _rest] = chunk, defined ->
         drawn = Enum.map(chunk, fn {_clip, cell_drawn} -> cell_drawn end)
         group(drawn, clip, defined)
       end)
 
-    groups
+    {groups, glyphs}
   end
 
   # A cell's primitives, drawn in its box, and the box they are cut off at, by its edges as they
   # are written, `:off` for none.
-  defp cell(%Cell{rows: rows, columns: columns} = cell, column_spans, row_spans) do
+  defp cell(
+         %Cell{rows: rows, columns: columns} = cell,
+         column_spans,
+         row_spans,
+         text_mode,
+         glyphs
+       ) do
     box = hang({span(column_spans, columns), span(row_spans, rows)}, cell.hang)
-    drawn = Enum.map(cell.primitives, fn primitive -> primitive(primitive, box) end)
+
+    {drawn, glyphs} =
+      Enum.map_reduce(cell.primitives, glyphs, fn primitive, glyphs ->
+        drawn(primitive, box, text_mode, glyphs)
+      end)
 
     case {cell.clip, box} do
       {:off, _box} ->
-        {:off, drawn}
+        {{:off, drawn}, glyphs}
 
       {:on, {{left, width}, {top, height}}} ->
         edges =
           Enum.join([number(left), number(left + width), number(top), number(top + height)], "|")
 
-        {{edges, box}, drawn}
+        {{{edges, box}, drawn}, glyphs}
     end
   end
 
@@ -235,14 +263,23 @@ defmodule Giggly.SVG do
   # A position moved `across` and `up` in points.
   defp moved({x_position, y_position}, {across, up}), do: {x_position + across, y_position - up}
 
-  # A scene nested in a cell, laid out in the cell's box as grid lays out a layout in a viewport:
-  # its sizes in points take their length and its shares split what is left, from the box's top
-  # left. Its cells are drawn as the whole scene's are.
-  defp primitive(%Scene{keep_proportions: false} = scene, {{left, width}, {top, height}}) do
+  # A primitive drawn in its box, and the glyphs defined once it is: a scene nested in a cell, laid
+  # out in the cell's box as grid lays out a layout in a viewport, its sizes in points taking their
+  # length and its shares splitting what is left, from the box's top left, its cells drawn as the
+  # whole scene's are; a text, which may define glyphs; or any other primitive, which defines none.
+  defp drawn(
+         %Scene{keep_proportions: false} = scene,
+         {{left, width}, {top, height}},
+         text_mode,
+         glyphs
+       ) do
     column_spans = spans(scene.widths, split(scene.widths, width), left)
     row_spans = spans(scene.heights, split(scene.heights, height), top)
-    cells(scene.cells, column_spans, row_spans)
+    cells(scene.cells, column_spans, row_spans, text_mode, glyphs)
   end
+
+  defp drawn(%Text{} = text, box, text_mode, glyphs), do: text(text, box, text_mode, glyphs)
+  defp drawn(primitive, box, _text_mode, glyphs), do: {primitive(primitive, box), glyphs}
 
   # Each circle at its own radius, its outline its colour at its opacity and its fill likewise, as
   # svglite writes a colour's alpha.
@@ -484,7 +521,15 @@ defmodule Giggly.SVG do
     end)
   end
 
-  defp primitive(%Text{} = text, box) do
+  # A text's labels, each written as its font's outlines where the text carries them and they are
+  # asked for, else as text, and the glyphs defined once they are.
+  defp text(%Text{} = text, box, text_mode, glyphs) do
+    runs =
+      case text.glyphs do
+        %Glyphs{runs: runs} -> runs
+        :none -> List.duplicate(:none, length(text.labels))
+      end
+
     columns = [
       text.x,
       text.y,
@@ -493,11 +538,12 @@ defmodule Giggly.SVG do
       text.color,
       text.opacity,
       text.hjust,
-      text.offset
+      text.offset,
+      runs
     ]
 
     columns
-    |> Enum.zip_with(fn [x_place, y_place, label, label_width, color, opacity, hjust, offset] ->
+    |> Enum.zip_with(fn [x_place, y_place, label, label_width, color, opacity, hjust, offset, run] ->
       %{
         place: place({x_place, y_place}, box),
         label: label,
@@ -505,12 +551,147 @@ defmodule Giggly.SVG do
         color: color,
         opacity: opacity,
         hjust: hjust,
-        offset: offset
+        offset: offset,
+        run: run
       }
     end)
     |> drawn_labels(text)
     |> Enum.reject(fn label -> label.label == "" end)
-    |> Enum.map(fn label -> text_label(label, text) end)
+    |> Enum.map_reduce(glyphs, fn label, glyphs -> label(label, text, text_mode, glyphs) end)
+  end
+
+  defp label(%{run: :none} = label, text, _text_mode, glyphs),
+    do: {text_label(label, text), glyphs}
+
+  defp label(label, text, :text, glyphs), do: {text_label(label, text), glyphs}
+
+  # A label as its font's outlines: each glyph not yet defined in the document defined first, in a
+  # `<defs>` of its own, its id `gl` and the MD5 of its path, so two drawings on one page share an
+  # id only when they share the glyph; then a group placed at the label's start on its baseline,
+  # turned with the text and scaled from the font's units to points, y turned up as a font's runs,
+  # in the label's colour, of each glyph used at its place in the font's units; then the label as
+  # text, unseen, so it is read, selected and found as text is.
+  defp label(label, %Text{glyphs: %Glyphs{scale: scale}} = text, :outlines, glyphs) do
+    outlined =
+      Enum.map(label.run, fn {outline, along, up} ->
+        path = path_data(outline)
+        {glyph_id(path), path, along, up}
+      end)
+
+    {definitions, glyphs} = glyph_definitions(outlined, glyphs)
+    {along, up} = label.offset
+    start = along_text(label.place, {along - label.hjust * label.width, up}, text.angle)
+
+    {[
+       definitions,
+       outlined_label(outlined, start, scale, label, text),
+       text_label(%{label | opacity: 0.0}, text)
+     ], glyphs}
+  end
+
+  defp outlined_label(outlined, {x_position, y_position}, scale, label, text) do
+    written_scale = Float.to_string(scale)
+
+    [
+      "<g transform='translate(",
+      number(x_position),
+      ",",
+      number(y_position),
+      ")",
+      glyph_rotation(text.angle),
+      " scale(",
+      written_scale,
+      ",-",
+      written_scale,
+      ")'",
+      glyph_fill(label.color, label.opacity),
+      ">\n",
+      Enum.map(outlined, fn {id, _path, along, up} ->
+        [
+          "  <use href='#",
+          id,
+          "'",
+          use_place("x", along / scale),
+          use_place("y", up / scale),
+          " />\n"
+        ]
+      end),
+      "</g>\n"
+    ]
+  end
+
+  # The glyphs among `outlined` the document has not yet defined, each once, in a `<defs>` of its
+  # own, or nothing when it has them all; and the ids defined once they are.
+  defp glyph_definitions(outlined, glyphs) do
+    {paths, glyphs} =
+      Enum.flat_map_reduce(outlined, glyphs, fn {id, path, _along, _up}, glyphs ->
+        if MapSet.member?(glyphs, id),
+          do: {[], glyphs},
+          else: {[["  <path id='", id, "' d='", path, "' />\n"]], MapSet.put(glyphs, id)}
+      end)
+
+    case paths do
+      [] -> {[], glyphs}
+      paths -> {["<defs>\n", paths, "</defs>\n"], glyphs}
+    end
+  end
+
+  defp glyph_id(path) do
+    digest =
+      path
+      |> :erlang.md5()
+      |> Base.encode16(case: :lower)
+
+    ["gl", digest]
+  end
+
+  # An outline as SVG's path data: each contour a move, then lines, quadratic and cubic curves and a
+  # close, in the font's units.
+  defp path_data(outline), do: Enum.map(outline, fn command -> path_command(command) end)
+
+  defp path_command({:move, x, y}), do: ["M", unit(x), " ", unit(y)]
+  defp path_command({:line, x, y}), do: ["L", unit(x), " ", unit(y)]
+
+  defp path_command({:quad, control_x, control_y, x, y}),
+    do: ["Q", unit(control_x), " ", unit(control_y), " ", unit(x), " ", unit(y)]
+
+  defp path_command({:cubic, first_x, first_y, second_x, second_y, x, y}) do
+    [
+      ["C", unit(first_x), " ", unit(first_y), " ", unit(second_x), " ", unit(second_y)],
+      [" ", unit(x), " ", unit(y)]
+    ]
+  end
+
+  defp path_command(:close), do: "Z"
+
+  # A length in a font's units, with up to two decimals and no trailing zeros, as a font's whole
+  # units are mostly whole.
+  defp unit(value) do
+    case :erlang.float_to_binary(value / 1, decimals: 2) do
+      zero when zero in ["0.00", "-0.00"] ->
+        "0"
+
+      written ->
+        written
+        |> String.trim_trailing("0")
+        |> String.trim_trailing(".")
+    end
+  end
+
+  # A glyph's place in its group, left out where it is 0, SVG's default.
+  defp use_place(_attribute, value) when value == 0, do: ""
+  defp use_place(attribute, value), do: [" ", attribute, "='", number(value), "'"]
+
+  # A label's turn as text's is written, in whole degrees, and none for level text.
+  defp glyph_rotation(angle) when angle == 0, do: ""
+  defp glyph_rotation(angle), do: [" rotate(", whole_degrees(-angle), ")"]
+
+  # A label's colour as its text's is written, as the group's style, left out for opaque black.
+  defp glyph_fill(color, opacity) do
+    case text_fill(color, opacity) do
+      "" -> ""
+      _fill -> [" style='", fill_declaration(color, opacity), "'"]
+    end
   end
 
   # Where a gradient up or across its box starts and ends, in the drawing's points.
@@ -911,12 +1092,14 @@ defmodule Giggly.SVG do
     end
   end
 
-  defp fill_style(:none, _opacity), do: " fill: none;"
+  defp fill_style(fill, opacity), do: [" ", fill_declaration(fill, opacity)]
 
-  defp fill_style(fill, opacity) do
+  defp fill_declaration(:none, _opacity), do: "fill: none;"
+
+  defp fill_declaration(fill, opacity) do
     case alpha_byte(opacity) do
-      0 -> " fill: none;"
-      byte -> [" fill: ", fill, ";", opacity_style("fill", byte)]
+      0 -> "fill: none;"
+      byte -> ["fill: ", fill, ";", opacity_style("fill", byte)]
     end
   end
 

@@ -80,7 +80,7 @@ defmodule Giggly.Geom.Segment do
     # The panel's segments: straight lines where the coordinate system keeps them straight, else
     # each a path of its two ends.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       complete =
         frame
         |> with_both_ends()
@@ -92,22 +92,22 @@ defmodule Giggly.Geom.Segment do
         geom
         |> path()
         |> without_fill()
-        |> Geom.draw_panel(pieces(complete), coord, panel_params)
+        |> Geom.draw_panel(pieces(complete), coord, panel_params, installed_fonts)
       end
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.draw_key(key)
+      |> Geom.draw_key(key, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The path a segment's two ends are drawn as, and its legend key, with the segments' line ends

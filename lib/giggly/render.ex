@@ -71,9 +71,10 @@ defmodule Giggly.Render do
   alias Giggly.{Assembly, DataFrame, Geom, Guide, Scene, Theme}
   alias Giggly.Scene.{Cell, Rect}
 
-  # The scene that draws `assembly`.
+  # The scene that draws `assembly`, its texts measured in the machine's installed fonts too where
+  # `installed_fonts` (`Giggly.Font`), which rendering hands to every geom and guide that measures.
   @doc false
-  @spec scene(Assembly.t()) :: Scene.t()
+  @spec scene(Assembly.t(), boolean()) :: Scene.t()
   def scene(
         %Assembly{
           layout: layout,
@@ -82,14 +83,22 @@ defmodule Giggly.Render do
           guide_titles: guide_titles,
           plot_labels: plot_labels,
           theme: theme
-        } = assembly
-      ) do
-    panels = draw_panels(assembly, theme)
-    labels = Guide.Title.draw(plot_labels, theme)
+        } = assembly,
+        installed_fonts
+      )
+      when is_boolean(installed_fonts) do
+    panels = draw_panels(assembly, theme, installed_fonts)
+    labels = Guide.Title.draw(plot_labels, theme, installed_fonts)
 
     # Every panel puts the same aesthetic on each side, so any panel's params title the axes.
     %{bottom: bottom_title, left: left_title} =
-      Guide.Axis.titles(coord, Map.fetch!(panel_params, hd(panels).panel), guide_titles, theme)
+      Guide.Axis.titles(
+        coord,
+        Map.fetch!(panel_params, hd(panels).panel),
+        guide_titles,
+        theme,
+        installed_fonts
+      )
 
     panel_rows = DataFrame.pull(layout, :row)
     panel_columns = DataFrame.pull(layout, :column)
@@ -110,7 +119,7 @@ defmodule Giggly.Render do
       panel_height: panel_height
     }
 
-    legend = draw_legend(assembly.legends, theme)
+    legend = draw_legend(assembly.legends, theme, installed_fonts)
     widths = widths(panels, grid, {left_title, labels}, legend, theme)
     heights = heights(panels, grid, {bottom_title, labels}, legend, theme)
 
@@ -137,7 +146,8 @@ defmodule Giggly.Render do
            coord: coord,
            panel_params: panel_params
          },
-         theme
+         theme,
+         installed_fonts
        ) do
     layers_by_panel = Enum.map(drawn_data, fn frame -> DataFrame.split(frame, :panel) end)
 
@@ -145,12 +155,14 @@ defmodule Giggly.Render do
     |> Enum.map(fn name -> DataFrame.pull(layout, name) end)
     |> Enum.zip_with(fn [panel, row, column, axis_bottom, axis_left, strip_top, strip_right] ->
       params = Map.fetch!(panel_params, panel)
-      %{bottom: bottom_axis, left: left_axis} = Guide.Axis.draw(coord, params, theme)
+
+      %{bottom: bottom_axis, left: left_axis} =
+        Guide.Axis.draw(coord, params, theme, installed_fonts)
 
       layer_primitives =
         layer_geoms
         |> Enum.zip_with(layers_by_panel, fn geom, frames ->
-          draw_layer(geom, Map.fetch(frames, panel), coord, params)
+          draw_layer(geom, Map.fetch(frames, panel), coord, params, installed_fonts)
         end)
         |> Enum.concat()
 
@@ -158,7 +170,7 @@ defmodule Giggly.Render do
 
       foreground =
         coord
-        |> Guide.Axis.draw_inside(params, theme)
+        |> Guide.Axis.draw_inside(params, theme, installed_fonts)
         |> Enum.concat(border_rect(theme.panel_border))
 
       %{
@@ -168,8 +180,8 @@ defmodule Giggly.Render do
         primitives: panel_primitives({background, layer_primitives, foreground}, theme),
         bottom: if(axis_bottom, do: bottom_axis, else: :none),
         left: if(axis_left, do: left_axis, else: :none),
-        strips: Guide.Strip.draw(strip_top, :top, theme),
-        right_strips: Guide.Strip.draw(strip_right, :right, theme)
+        strips: Guide.Strip.draw(strip_top, :top, theme, installed_fonts),
+        right_strips: Guide.Strip.draw(strip_right, :right, theme, installed_fonts)
       }
     end)
   end
@@ -186,24 +198,24 @@ defmodule Giggly.Render do
   # A layer's rows in one panel drawn by its geom; a panel where the layer has none, as one whose
   # own table holds no row there, draws nothing of it, as ggplot2's `draw_layer()` gives such a
   # panel an empty grob.
-  defp draw_layer(geom, {:ok, frame}, coord, params),
-    do: Geom.draw_panel(geom, frame, coord, params)
+  defp draw_layer(geom, {:ok, frame}, coord, params, installed_fonts),
+    do: Geom.draw_panel(geom, frame, coord, params, installed_fonts)
 
-  defp draw_layer(_geom, :error, _coord, _params), do: []
+  defp draw_layer(_geom, :error, _coord, _params, _installed_fonts), do: []
 
   # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none or where the
   # theme puts them nowhere (`legend_position: :none`), or where the box goes, its width and height
-  # and its table: each legend drawn by its guide (`Giggly.Guide.draw/3`), its keys running as the
+  # and its table: each legend drawn by its guide (`Giggly.Guide.draw/4`), its keys running as the
   # theme says, or across above or below the panels and down elsewhere, as ggplot2's guides run,
   # each key handed the glyphs drawn by the geom of every layer that maps one of the legend's
   # aesthetics and draws in that key, in the order the layers were added, at the key's values of
   # the aesthetics it maps and with what the layer sets, as ggplot2 draws each such layer's
-  # `draw_key` in the keys it keeps, and the room each glyph needs (`Geom.key_size/2`), which the
+  # `draw_key` in the keys it keeps, and the room each glyph needs (`Geom.key_size/3`), which the
   # guide sizes the key by.
-  defp draw_legend([], _theme), do: :none
-  defp draw_legend(_legends, %Theme{legend_position: :none}), do: :none
+  defp draw_legend([], _theme, _installed_fonts), do: :none
+  defp draw_legend(_legends, %Theme{legend_position: :none}, _installed_fonts), do: :none
 
-  defp draw_legend(legends, %Theme{legend_position: position} = theme) do
+  defp draw_legend(legends, %Theme{legend_position: position} = theme, installed_fonts) do
     box_direction = if position in [:top, :bottom], do: :horizontal, else: :vertical
 
     direction =
@@ -212,8 +224,11 @@ defmodule Giggly.Render do
     {width, height, box} =
       legends
       |> Enum.map(fn %{guide: guide, keys: keys, layers: layers} = legend ->
-        drawn_keys = Enum.with_index(keys, fn key, index -> draw_key(key, index, layers) end)
-        Guide.draw(guide, Map.merge(legend, %{keys: drawn_keys, direction: direction}), theme)
+        drawn_keys =
+          Enum.with_index(keys, fn key, index -> draw_key(key, index, layers, installed_fonts) end)
+
+        legend = Map.merge(legend, %{keys: drawn_keys, direction: direction})
+        Guide.draw(guide, legend, theme, installed_fonts)
       end)
       |> Guide.Box.draw(box_direction, theme)
 
@@ -224,7 +239,7 @@ defmodule Giggly.Render do
   # the layer maps and what the layer sets laid over its geom's defaults, as ggplot2 fills a key's
   # data from the layer's `default_aes`, and whether its marks are horizontal, in `flipped_aes`, as
   # ggplot2 hands `draw_key` the layer's, and the room each layer's glyph needs.
-  defp draw_key(%{values: values} = key, index, layers) do
+  defp draw_key(%{values: values} = key, index, layers, installed_fonts) do
     {glyphs, sizes} =
       for %{
             geom: geom,
@@ -241,7 +256,8 @@ defmodule Giggly.Render do
           |> Map.merge(Map.take(values, aesthetics))
           |> Map.put(:flipped_aes, flipped)
 
-        {Geom.draw_key(geom, key_values), Geom.key_size(geom, key_values)}
+        {Geom.draw_key(geom, key_values, installed_fonts),
+         Geom.key_size(geom, key_values, installed_fonts)}
       end
       |> Enum.unzip()
 

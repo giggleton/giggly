@@ -7,17 +7,24 @@ defmodule Giggly.Font do
   # with and without descenders take the same height.
   #
   # A family and face a font is registered under with Pica, in a project that lists Pica, is
-  # measured from that font as svglite measures a font it is given. A string's width is its glyphs'
-  # advances once Pica has shaped it, kerning and ligatures applied, at the size truncated to 1/64
-  # point (a size under one at 1 point), in 1/64 point; a character the font lacks takes the width
-  # of the font's glyph for one (`.notdef`). The height is the top of "M"'s box and the room below
-  # the bottom of the lowest of "gjpqyQ"'s, each rounded outward to a whole pixel at 10,000 dots
-  # per inch, as R takes heights from glyph boxes at that resolution. Over sizes from 5 to 30
-  # points in Lato and Source Serif 4, the widths come within 4/64 point of svglite's, whose
-  # FreeType rounds an advance by its own arithmetic, and the heights within a pixel, 0.0072 point,
-  # as its FreeType sizes a font its own way. Installed fonts are not searched: a label is written
-  # as text naming its family, which only the fonts a project registers, and serves, are sure to
-  # draw.
+  # measured from that font as svglite measures a font it is given; so, where installed fonts are
+  # searched (`installed_fonts`), is one the machine has a font of that exact family name for, as
+  # Pica finds one, except `""` and R's generic names, `"sans"`, `"serif"` and `"mono"`, which are
+  # measured from a font only where one is registered under that name, whatever the machine has. A
+  # string's width is its glyphs' advances once Pica has shaped it, kerning and ligatures applied,
+  # at the size truncated to 1/64 point (a size under one at 1 point), in 1/64 point; a character
+  # the font lacks takes the width of the font's glyph for one (`.notdef`). The height is the top of
+  # "M"'s box and the room below the bottom of the lowest of "gjpqyQ"'s, each rounded outward to a
+  # whole pixel at 10,000 dots per inch, as R takes heights from glyph boxes at that resolution.
+  # Over sizes from 5 to 30 points in Lato and Source Serif 4, the widths come within 4/64 point of
+  # svglite's, whose FreeType rounds an advance by its own arithmetic, and the heights within a
+  # pixel, 0.0072 point, as its FreeType sizes a font its own way.
+  #
+  # Such a font also gives the glyphs each label is drawn with: each glyph's outline, in the font's
+  # own units, at its place once shaped at the same truncated size, the pen moved on by each
+  # advance and the glyph drawn its offset from the pen, so a label's glyphs span its measured
+  # width; and the scale, in points per font unit, the outlines are drawn at. A glyph that draws
+  # nothing, such as a space, is left out.
   #
   # Every other family and face, and every one in a project without Pica, is measured as ggplot2's
   # own SVG test snapshots measure it: with the glyph metrics of Liberation Sans, which vdiffr, the
@@ -28,11 +35,15 @@ defmodule Giggly.Font do
   # table lacks takes vdiffr's width for a missing glyph; the heights are the table's own.
   #
   # The table is read when Giggly compiles, from `priv/fonts/liberation_sans.txt`, a copy of
-  # vdiffr's; its header says where it came from. Measuring reads nothing but the fonts registered
-  # with Pica.
+  # vdiffr's; its header says where it came from. Measuring reads nothing but the fonts Pica holds,
+  # registered or, where they are searched, installed.
 
-  # Measures strings and nothing else.
-  use Boundary, deps: if(Code.ensure_loaded?(Pica), do: [Pica], else: []), exports: []
+  # Measures strings, and gives the scene the outlines its labels are drawn with.
+  use Boundary,
+    deps: [Giggly.Scene] ++ if(Code.ensure_loaded?(Pica), do: [Pica], else: []),
+    exports: []
+
+  alias Giggly.Scene.Glyphs
 
   @glyph_table_path Application.app_dir(:giggly, "priv/fonts/liberation_sans.txt")
   @external_resource @glyph_table_path
@@ -77,22 +88,37 @@ defmodule Giggly.Font do
   # A face, as `Giggly.Theme` names one.
   @type face :: :plain | :bold | :italic | :bold_italic
 
+  # Each measure takes whether the machine's installed fonts are searched, `installed_fonts`.
+
   # The width of `text` set at `size` points in `family`'s `face`, in points.
   @doc false
-  @spec width(String.t(), number(), String.t(), face()) :: float()
-  def width(text, size, family, face), do: measure({:width, text, size}, family, face)
+  @spec width(String.t(), number(), String.t(), face(), boolean()) :: float()
+  def width(text, size, family, face, installed_fonts) when is_boolean(installed_fonts),
+    do: measure({:width, text, size}, family, face, installed_fonts)
 
   # The height of a line of text set at `size` points in `family`'s `face` above its baseline, in
   # points: that of "M".
   @doc false
-  @spec ascent(number(), String.t(), face()) :: float()
-  def ascent(size, family, face), do: measure({:ascent, size}, family, face)
+  @spec ascent(number(), String.t(), face(), boolean()) :: float()
+  def ascent(size, family, face, installed_fonts) when is_boolean(installed_fonts),
+    do: measure({:ascent, size}, family, face, installed_fonts)
 
   # The room below the baseline of a line of text set at `size` points in `family`'s `face`, in
   # points: the deepest descent among "gjpqyQ".
   @doc false
-  @spec descent(number(), String.t(), face()) :: float()
-  def descent(size, family, face), do: measure({:descent, size}, family, face)
+  @spec descent(number(), String.t(), face(), boolean()) :: float()
+  def descent(size, family, face, installed_fonts) when is_boolean(installed_fonts),
+    do: measure({:descent, size}, family, face, installed_fonts)
+
+  # The glyphs `texts`, each a label set at `size` points in `family`'s `face`, are drawn with, as
+  # the scene carries them: each label's run of glyphs in order, and the outlines' scale in points
+  # per font unit, where a font Pica holds gives them, or `:none` where they are measured from the
+  # table.
+  @doc false
+  @spec glyphs([String.t()], number(), String.t(), face(), boolean()) :: Glyphs.t() | :none
+  def glyphs(texts, size, family, face, installed_fonts)
+      when is_list(texts) and is_boolean(installed_fonts),
+      do: runs(texts, size, family, face, installed_fonts)
 
   defp from_table({:width, text, size}) do
     advance =
@@ -112,10 +138,19 @@ defmodule Giggly.Font do
     @dots_per_inch 10_000
     @points_per_inch 72
 
-    # `measure` taken from the font registered with Pica under `family` with `face`, or from the
-    # table where none is.
-    defp measure(measure, family, face) do
-      case Pica.lookup(family, face, installed: false) do
+    # The families measured from a font only where one is registered under their name: the default
+    # and R's generic names.
+    @generic_families ["", "sans", "serif", "mono"]
+
+    # The font of `family`'s `face` Pica holds: registered, or, where `installed_fonts`, installed,
+    # but never installed for a generic family.
+    defp lookup(family, face, installed_fonts) do
+      Pica.lookup(family, face, installed: installed_fonts and family not in @generic_families)
+    end
+
+    # `measure` taken from the font of `family`'s `face`, or from the table where there is none.
+    defp measure(measure, family, face, installed_fonts) do
+      case lookup(family, face, installed_fonts) do
         {:ok, font} -> from_font(measure, font)
         :error -> from_table(measure)
       end
@@ -156,6 +191,41 @@ defmodule Giggly.Font do
 
     defp boxes(font, text), do: Pica.glyph_boxes(font, Pica.glyph_ids(font, text))
 
+    defp runs(texts, size, family, face, installed_fonts) do
+      case lookup(family, face, installed_fonts) do
+        {:ok, font} ->
+          %Glyphs{
+            scale: sixty_fourths(size) / (64 * Pica.info(font).units_per_em),
+            runs: Enum.map(texts, fn text -> run(text, size, font) end)
+          }
+
+        :error ->
+          :none
+      end
+    end
+
+    # `text`'s glyphs shaped at `size` points truncated to 1/64 point, each placed its offset from
+    # the pen, which each advance moves on, in points; a glyph that draws nothing left out.
+    defp run(text, size, font) do
+      shaped = Pica.shape(font, text, scale: sixty_fourths(size))
+      outlines = Pica.glyph_outlines(font, Enum.map(shaped, fn glyph -> glyph.glyph_id end))
+
+      {glyphs, _pen} =
+        shaped
+        |> Enum.zip(outlines)
+        |> Enum.flat_map_reduce(0, fn {glyph, outline}, pen ->
+          placed =
+            case outline do
+              :none -> []
+              commands -> [{commands, (pen + glyph.x_offset) / 64, glyph.y_offset / 64}]
+            end
+
+          {placed, pen + glyph.x_advance}
+        end)
+
+      glyphs
+    end
+
     # A length in `font`'s units, at `size` points truncated to 1/64 point, in pixels at 10,000
     # dots per inch: one division of whole numbers, so a length that is a whole number of pixels
     # comes out exactly one.
@@ -175,6 +245,7 @@ defmodule Giggly.Font do
       end
     end
   else
-    defp measure(measure, _family, _face), do: from_table(measure)
+    defp measure(measure, _family, _face, _installed_fonts), do: from_table(measure)
+    defp runs(_texts, _size, _family, _face, _installed_fonts), do: :none
   end
 end
