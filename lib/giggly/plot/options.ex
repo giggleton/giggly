@@ -5003,7 +5003,7 @@ defmodule Giggly.Plot.Options do
 
   def validate_labeller(labeller, _facet) do
     case labeller_entry(labeller, @labeller_alone_schemas) do
-      {:ok, {kind, options}} when is_atom(kind) ->
+      {:ok, {kind, options}} ->
         {multi_line, kind_options} = Map.pop!(options, :multi_line)
         {:ok, alone({kind, kind_options}, multi_line)}
 
@@ -5077,11 +5077,10 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  defp labeller_entry(kind, schemas) when is_atom(kind) and is_map_key(schemas, kind),
+  defp labeller_entry(kind, schemas) when is_map_key(schemas, kind),
     do: labeller_entry({kind, []}, schemas)
 
-  defp labeller_entry({kind, options} = labeller, schemas)
-       when is_atom(kind) and is_map_key(schemas, kind) do
+  defp labeller_entry({kind, options} = labeller, schemas) when is_map_key(schemas, kind) do
     with true <- Keyword.keyword?(options) || {:error, labeller_error(labeller)},
          {:ok, validated} <- NimbleOptions.validate(options, Map.fetch!(schemas, kind)) do
       {:ok, {kind, Map.new(validated)}}

@@ -4041,11 +4041,13 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for {labeller, message} <- [
-            {:label_both, "expected :value, :both or :context"},
-            {{:both, [1]}, "expected :value, :both or :context"},
-            {["cyl"], "expected :value, :both or :context"},
+            {:label_both, "a keyword list of labellers, got: :label_both"},
+            {{:both, [1]}, "a keyword list of labellers, got: {:both, [1]}"},
+            {{:bogus, sep: "="}, ~s(a keyword list of labellers, got: {:bogus, [sep: "="]})},
+            {["cyl"], ~s(a keyword list of labellers, got: ["cyl"])},
             {{:context, sep: "="}, "unknown options [:sep]"},
-            {%{4 => "four"}, "expected a map of labels to the labels to show"},
+            {%{4 => "four"}, ~s(the labels to show, got: %{4 => "four"})},
+            {%{"4" => "four", 6 => "six"}, "expected a map of labels to the labels to show"},
             {[rows: :both, cols: :value], "labelled by rows: or cols:, not both"},
             {[default: {:both, multi_line: false}], "unknown options [:multi_line]"},
             {[columns: [{:cyl, :both}, {"cyl", :value}]], ~s(got "cyl" twice)},
