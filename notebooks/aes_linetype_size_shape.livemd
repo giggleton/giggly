@@ -138,8 +138,8 @@ p + geom_point(size = 2.5) +
   geom_hline(yintercept = 25, size = 3.5)
 ```
 
-The `size` given to `geom_hline()` is its line's width, which ggplot2 now calls `linewidth`.
-Giggly draws the first two.
+The `size` given to `geom_hline()` is its line's width, which ggplot2 now calls `linewidth`,
+warning that `size` is deprecated; Giggly takes only `linewidth:`, and the drawing is the same.
 
 ```elixir
 p = Plot.new(mtcars, %{x: :wt, y: :mpg})
@@ -155,7 +155,12 @@ p
 |> render.()
 ```
 
-Not in Giggly yet: `geom_hline()`.
+```elixir
+p
+|> Plot.geom_point(size: 2.5)
+|> Plot.geom_hline(yintercept: 25, linewidth: 3.5)
+|> render.()
+```
 
 ## Point shapes
 

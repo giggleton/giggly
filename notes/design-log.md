@@ -3247,6 +3247,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples the reference lines unlock, and narrow scale_linetype's
+  and position_stack's verdicts to what still waits (reference lines, step 3, the notebook
+  sweep); the `lm()` example keeps waiting on `lm()` though its line draws (Steve: "c"); §4: "A
+  reference line is drawn from the panel's extents"
 - 2026-10-31 — Add geom_abline(): diagonal lines between the panel's extents, cut and widened as
   R's arithmetic cuts them, given as values or mapped (reference lines, step 2); §4: "A reference
   line is drawn from the panel's extents"
