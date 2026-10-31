@@ -9740,6 +9740,18 @@ defmodule GigglyTest do
       assert error.key == [:widht]
     end
 
+    test "a way of writing labels it does not know is refused at the call, naming the option" do
+      plot =
+        %{"wt" => [2.62], "mpg" => [21.0]}
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Giggly.to_svg(plot, text: :paths) end
+
+      assert error.key == :text
+    end
+
     # Golden: test/golden/theme_backgrounds.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/theme_backgrounds.R: every element matches once positions are rounded to
     # two decimals, and every clip path but svglite's around the whole drawing. The element
@@ -10747,7 +10759,8 @@ defmodule GigglyTest do
     # Golden: test/golden/theme_family_elements.svg, checked against ggplot2's drawing of the same
     # plot, made by test/golden/theme_family_elements.R: every element and clip path matches but
     # the background's edge, which R writes as its rounding error. A family R has no generic name
-    # for is written by its name, then the default fonts.
+    # for is written by its name, then the default fonts; installed fonts are not searched for it,
+    # so the drawing is the same whatever fonts the machine has.
     test "a text element's own family draws its texts" do
       plot =
         Giggly.Datasets.mpg()
@@ -10761,7 +10774,7 @@ defmodule GigglyTest do
           legend_text: [family: "Lobster"]
         )
 
-      assert golden?(plot, "theme_family_elements")
+      assert golden?(plot, "theme_family_elements", installed_fonts: false)
     end
 
     # Golden: test/golden/theme_family_geom_text.svg, checked against ggplot2's drawing of the same
@@ -10775,6 +10788,62 @@ defmodule GigglyTest do
         |> Plot.theme_gray(base_family: "serif")
 
       assert golden?(plot, "theme_family_geom_text")
+    end
+
+    # Golden: test/golden/theme_family_lato.svg, checked against svglite's drawing of the same plot
+    # in the fonts test/test_helper.exs registers under "Lato", made by
+    # test/golden/theme_family_lato.R, which says how they compare; written as text (`text: :text`),
+    # as svglite writes it. It moves with how a registered family is measured, or with which texts
+    # take which family and face.
+    @tag :pica
+    test "a family registered with Pica measures every text in its font, each face in its own" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :class})
+        |> Plot.geom_point()
+        |> Plot.labs(
+          title: "Fuel economy declines as engine size increases",
+          subtitle: "Two seaters are the exception"
+        )
+        |> Plot.theme_gray(base_family: "Lato")
+        |> Plot.theme(plot_title: [face: :bold])
+
+      assert golden?(plot, "theme_family_lato", text: :text)
+    end
+
+    # Golden: test/golden/theme_family_lato_geom_text.svg, checked against svglite's drawing of the
+    # same plot in the font test/test_helper.exs registers under "Lato", made by
+    # test/golden/theme_family_lato_geom_text.R, which says how they compare; written as text
+    # (`text: :text`), as svglite writes it. It moves with how a registered family is measured, or
+    # with how a layer's labels and keys take their family.
+    @tag :pica
+    test "a layer's labels and its legend's keys are measured in a family registered with Pica" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model, colour: {:factor, [:cyl]}})
+        |> Plot.geom_text()
+        |> Plot.theme_gray(base_family: "Lato")
+
+      assert golden?(plot, "theme_family_lato_geom_text", text: :text)
+    end
+
+    @tag :pica
+    test "a label in a family registered with Pica is drawn as outlines, each glyph defined once" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :wt, y: :mpg, label: :model, colour: {:factor, [:cyl]}})
+        |> Plot.geom_text()
+        |> Plot.theme_gray(base_family: "Lato")
+        |> Giggly.to_svg(width: 960, height: 768)
+        |> IO.iodata_to_binary()
+
+      defined = Regex.scan(~r/<path id='([^']*)'/, svg, capture: :all_but_first)
+      used = Regex.scan(~r/<use href='#([^']*)'/, svg, capture: :all_but_first)
+      visible_texts = Regex.scan(~r/<text [^>]*style='(?![^']*fill: none;)/, svg)
+
+      # Every label is unseen text after its outlines, every glyph used is defined, and once.
+      assert {visible_texts, defined != [], Enum.uniq(defined) === defined,
+              Enum.uniq(used) -- defined} === {[], true, true, []}
     end
 
     # Golden: test/golden/theme_text_plot_titles.svg, checked against ggplot2's drawing of the same
@@ -12056,10 +12125,10 @@ defmodule GigglyTest do
     end)
   end
 
-  defp golden?(plot, name) do
+  defp golden?(plot, name, options \\ []) do
     svg =
       plot
-      |> Giggly.to_svg(width: 960, height: 768)
+      |> Giggly.to_svg([width: 960, height: 768] ++ options)
       |> IO.iodata_to_binary()
 
     svg == File.read!("test/golden/#{name}.svg")

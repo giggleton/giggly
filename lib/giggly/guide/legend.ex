@@ -57,12 +57,17 @@ defmodule Giggly.Guide.Legend do
     # label and the glyphs drawn in it, in `theme`'s look: its width in points, and its table,
     # every size in points.
     @impl Giggly.Guide
-    def draw(_guide, %{title: title, keys: keys, direction: direction}, %Theme{} = theme) do
+    def draw(
+          _guide,
+          %{title: title, keys: keys, direction: direction},
+          %Theme{} = theme,
+          installed_fonts
+        ) do
       %Theme{legend_margin: margin, legend_text_right: text_look} = theme
       title_look = title_look(direction, theme)
       title = Parts.title(title, title_look)
       labels = Parts.labels(keys, text_look)
-      label_widths = Parts.label_widths(labels, text_look)
+      label_widths = Parts.label_widths(labels, text_look, installed_fonts)
       rows = rows(length(keys), direction)
 
       # Each key beside its label and the label's width, in the grid's columns, top down.
@@ -74,10 +79,12 @@ defmodule Giggly.Guide.Legend do
       grid = %{
         rows: rows,
         widths: column_widths(columns, theme),
-        heights: row_heights(columns, rows, direction, theme)
+        heights: row_heights(columns, rows, direction, {theme, installed_fonts})
       }
 
-      {widths, heights, first, title_cells} = with_title(grid, title, title_look, direction)
+      {widths, heights, first, title_cells} =
+        with_title(grid, title, title_look, direction, installed_fonts)
+
       widths = Enum.concat([[margin.left], widths, [margin.right]])
       heights = Enum.concat([[margin.top], heights, [margin.bottom]])
 
@@ -90,7 +97,7 @@ defmodule Giggly.Guide.Legend do
             Parts.background(length(widths), length(heights), theme),
             title_cells,
             key_cells(keys, rows, first, theme),
-            label_cells(labels, {rows, first}, text_look)
+            label_cells(labels, {rows, first}, text_look, installed_fonts)
           ])
       }
 
@@ -129,12 +136,12 @@ defmodule Giggly.Guide.Legend do
 
     # The grid's heights, top down: each row as tall as its tallest key or label, the rows spaced
     # apart when the keys run across.
-    defp row_heights(columns, rows, direction, theme) do
+    defp row_heights(columns, rows, direction, {theme, installed_fonts}) do
       0..(rows - 1)//1
       |> Enum.map(fn row ->
         columns
         |> Enum.flat_map(fn column -> Enum.slice(column, row, 1) end)
-        |> Enum.map(fn key_and_label -> row_height(key_and_label, theme) end)
+        |> Enum.map(fn key_and_label -> row_height(key_and_label, theme, installed_fonts) end)
         |> Enum.max()
       end)
       |> Enum.intersperse(row_spacing(direction, theme))
@@ -142,10 +149,14 @@ defmodule Giggly.Guide.Legend do
 
     # How tall a key's row must be for it and its label: the theme's key height, its tallest
     # glyph, or its label and the labels' margins above and below.
-    defp row_height({key, label, _width}, %Theme{legend_key_height: key_height} = theme) do
+    defp row_height(
+           {key, label, _width},
+           %Theme{legend_key_height: key_height} = theme,
+           installed_fonts
+         ) do
       [key]
       |> key_extent(key_height, fn {_width, height} -> height end)
-      |> max(Parts.label_height(label, theme.legend_text_right))
+      |> max(Parts.label_height(label, theme.legend_text_right, installed_fonts))
     end
 
     defp row_spacing(:vertical, _theme), do: 0.0
@@ -154,16 +165,18 @@ defmodule Giggly.Guide.Legend do
     # The grid's widths and heights with the title's room, where its first key's cell is, and the
     # title's cell: above the keys or left of them, a title bigger than them leaving the rest of its
     # room either side, as `Giggly.Guide.Parts` splits it.
-    defp with_title(grid, title, look, :vertical) do
+    defp with_title(grid, title, look, :vertical, installed_fonts) do
       {widths, title_heights, first_column, title_cells} =
-        Parts.title_above(title, look, grid.widths)
+        Parts.title_above(title, look, grid.widths, installed_fonts)
 
       {widths, title_heights ++ grid.heights, {2 + length(title_heights), first_column},
        title_cells}
     end
 
-    defp with_title(grid, title, look, :horizontal) do
-      {title_widths, heights, first, title_cells} = Parts.title_column(title, look, grid.heights)
+    defp with_title(grid, title, look, :horizontal, installed_fonts) do
+      {title_widths, heights, first, title_cells} =
+        Parts.title_column(title, look, grid.heights, installed_fonts)
+
       {title_widths ++ grid.widths, heights, {first, first}, title_cells}
     end
 
@@ -217,13 +230,13 @@ defmodule Giggly.Guide.Legend do
 
     # Each key's label in the labels' margin and column right of its key, a key of no label
     # drawing none.
-    defp label_cells(labels, {rows, first}, text_look) do
+    defp label_cells(labels, {rows, first}, text_look, installed_fonts) do
       labels
       |> Enum.with_index()
       |> Enum.reject(fn {label, _index} -> label == :none end)
       |> Enum.map(fn {label, index} ->
         {row, column} = place(index, rows, first)
-        Parts.label_cell(label, text_look, row, (column + 1)..(column + 2))
+        Parts.label_cell(label, text_look, row, (column + 1)..(column + 2), installed_fonts)
       end)
     end
 

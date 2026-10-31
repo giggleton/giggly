@@ -95,7 +95,7 @@ defmodule Giggly.Geom.Rug do
     # The panel's rugs: each side the layer gives, in ggplot2's order, from the rows its sides can
     # draw.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, _installed_fonts) do
       sides = Enum.filter(@sides, fn {side, _drawing} -> side in geom.sides end)
 
       axes =
@@ -112,17 +112,17 @@ defmodule Giggly.Geom.Rug do
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.draw_key(key)
+      |> Geom.draw_key(key, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The path a rug's legend key is drawn as, with the rug's line ends and grid's round corners.

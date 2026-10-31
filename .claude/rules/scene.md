@@ -20,8 +20,8 @@ theme puts them".
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
   rendering builds and a backend reads (`Arrow`, `Cell`, `Circles`, `Gradient`, `Polygons`,
-  `Polylines`, `Rect`, `Rectangles`, `Segments`, `Text`); nothing in it knows SVG, a font or a
-  theme.
+  `Polylines`, `Rect`, `Rectangles`, `Segments`, `Text`, and `Glyphs`, which a text carries);
+  nothing in it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
   what the fixed sizes leave of the drawing, which a panel takes (grid's `"null"` unit): the
@@ -55,8 +55,13 @@ theme puts them".
   colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label, a colour of
   `:none` written in no colour, as svglite writes a label's of `NA`; its size, its
   `family` (`""` the default sans-serif, `"sans"`, `"serif"` and `"mono"` R's generic families,
-  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), neither of
-  which changes its measured width, and its angle, any number of degrees, are the text's. **A
+  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), both of
+  which its widths were measured in (`Giggly.Font`), and its angle, any number of degrees, are
+  the text's. **A text carries the outlines its labels are drawn with where its font gives them**
+  (`glyphs`, a `Glyphs` of one scale, in points per font unit, and a run per label, each glyph's
+  outline in the font's units at its place in points from the label's start), or `:none` for the
+  whole text where it is measured from the table, so a backend may draw a label as shapes rather
+  than as text. **A
   text that checks overlap (`check_overlap`) draws a label only where its box crosses the box of no
   label drawn before it**, the box its width along the baseline by the text's `ascent` up from
   it, as grid's `check.overlap` measures a string; which labels cross turns on where they land, so

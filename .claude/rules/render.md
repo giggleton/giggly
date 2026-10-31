@@ -99,13 +99,13 @@ beginning "Legends go where the theme puts them".
   it out. Each legend runs as `legend_direction` says, or across above or below the panels and
   down elsewhere, as ggplot2's `Guides$draw()` decides, and that direction by position is handed
   to `Guide.Box.draw/3` for its own defaults.
-  Each legend is drawn by the guide its scale names (`Guide.draw/3`) and the legends are stacked
+  Each legend is drawn by the guide its scale names (`Guide.draw/4`) and the legends are stacked
   in the guide's box (`Guide.Box.draw/3`), in the order the assembly gives them; the cell is
   drawn after the axes' titles and before the plot's labels. Each key's glyphs are drawn by the geom
-  of every layer that maps one of the legend's aesthetics and draws in that key (`Geom.draw_key/2`),
+  of every layer that maps one of the legend's aesthetics and draws in that key (`Geom.draw_key/3`),
   in layer order, at the key's values of the aesthetics that layer maps, with what it sets, both
   laid over its geom's defaults under the theme (the layer's `defaults`), and with whether its marks
   are horizontal (`flipped_aes`, the assembly's `flipped`), as ggplot2 hands `draw_key` the layer's
   `flipped_aes`, so a box's key is turned, and handed to the guide with the
-  room each glyph needs (`Geom.key_size/2`), which the guide sizes the key by, so rendering
+  room each glyph needs (`Geom.key_size/3`), which the guide sizes the key by, so rendering
   measures nothing itself; a key no layer draws in keeps its background and label.

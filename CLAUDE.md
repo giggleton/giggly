@@ -67,8 +67,8 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 - **Values as R writes them** (`Giggly.AsCharacter`) — `.claude/rules/as_character.md`.
 - **Guides** (`Giggly.Guide`, axes, legends, every title) — `.claude/rules/guide.md`.
 - **The theme** (`Giggly.Theme`, the complete theme all but the marks are drawn in) — `.claude/rules/theme.md`.
-- **Text measurement** (`Giggly.Font`, the glyph table ggplot2's snapshots measure with) —
-  `.claude/rules/font.md`.
+- **Text measurement** (`Giggly.Font`, the glyph table ggplot2's snapshots measure with, and the
+  fonts registered with Pica) — `.claude/rules/font.md`.
 - **Rendering** (`Giggly.Render`, an assembled plot into a scene) — `.claude/rules/render.md`.
 - **The scene** (`Giggly.Scene`, the table of cells and its primitives) — `.claude/rules/scene.md`.
 - **The SVG backend** (`Giggly.SVG`, `Giggly.to_svg/2`, the goldens) — `.claude/rules/svg.md`.
@@ -94,8 +94,8 @@ invariants. Add a line here when an area gets its rules file; nothing else about
   `deps:` or `exports:` is a decision for the user, and `.claude/hooks/waiver-gate.sh` stops the
   edit until it has been explained in conversation (`.claude/rules/dependencies.md`).
 - **The pipeline is pure: no application config, no clock, no unseeded randomness.** Every option
-  is an argument, and the one random step (jitter) takes an injected integer seed, so a render is
-  reproducible and the suite runs offline.
+  is an argument, and jitter takes an injected seed, so a render is reproducible and the suite
+  runs offline. It reads one outside state, Pica's fonts: registered, and installed (`to_svg/2`).
 - **The public API raises; everything beneath it is assertive and pipes.** The `Giggly.Plot`
   functions validate their options with NimbleOptions and raise on anything invalid, since a pipe
   cannot carry `{:error, reason}`. The functions beneath take already-validated data, return

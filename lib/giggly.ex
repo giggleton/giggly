@@ -9,7 +9,8 @@ defmodule Giggly do
 
   # The umbrella: the run functions here, with the description (`Plot`) and every internal domain
   # a sub-boundary beneath it. Like every boundary it is strict (`mix.exs`). It lists `Nx` and
-  # `Table`, the outside libraries `Giggly.Tensor` and `Giggly.DataFrame` own, and `Scales`, R's
+  # `Table`, the outside libraries `Giggly.Tensor` and `Giggly.DataFrame` own, `Pica`, which
+  # `Giggly.Font` owns when a project lists it, and `Scales`, R's
   # scales half, which several domains call, since a sub-boundary may list only what its parent
   # does; nothing here calls any of them, and no other domain lists `Nx` or `Table`.
   # `panel_scales/2` reads the layout table through `Giggly.DataFrame`, which a parent may call
@@ -18,7 +19,10 @@ defmodule Giggly do
   # the description the run functions take; what a user of Giggly calls is the documented API
   # (CLAUDE.md, Conventions), which reaches past boundary exports to `Datasets`, `Scales.Labels`,
   # `DataFrame`'s readers and the scales `panel_scales/2` returns.
-  use Boundary, deps: [NimbleOptions, Nx, Scales, Table], exports: [Plot]
+  use Boundary,
+    deps:
+      [NimbleOptions, Nx, Scales, Table] ++ if(Code.ensure_loaded?(Pica), do: [Pica], else: []),
+    exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}
 
@@ -33,6 +37,26 @@ defmodule Giggly do
                       type: :pos_integer,
                       default: 433,
                       doc: "The drawing's height, in pixels."
+                    ],
+                    text: [
+                      type: {:in, [:outlines, :text]},
+                      default: :outlines,
+                      doc: """
+                      How a label in a font Pica holds is written: `:outlines` draws it as the \
+                      font's own shapes, keeping its words as unseen text; `:text` writes it as \
+                      text naming its font. Every other label is written as text. The trade: \
+                      the [fonts guide](fonts.md).
+                      """
+                    ],
+                    installed_fonts: [
+                      type: :boolean,
+                      default: true,
+                      doc: """
+                      In a project that lists Pica, whether a family no font is registered under \
+                      with Pica is looked for among the machine's installed fonts too, by its \
+                      exact name. `false` draws with the registered fonts alone. What the search \
+                      costs, and which names it skips: the [fonts guide](fonts.md).
+                      """
                     ]
                   )
 
@@ -151,7 +175,7 @@ defmodule Giggly do
 
     plot
     |> Assembly.run()
-    |> Render.scene()
-    |> SVG.draw(width, height)
+    |> Render.scene(Keyword.fetch!(options, :installed_fonts))
+    |> SVG.draw(width, height, Keyword.fetch!(options, :text))
   end
 end

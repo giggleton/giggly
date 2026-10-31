@@ -30,12 +30,17 @@ defmodule Giggly.Guide.Colorbar do
     # along the bar, 0 to 1, and its colour, in `theme`'s look: its width in points and its table,
     # every size in points.
     @impl Giggly.Guide
-    def draw(_guide, %{decor: decor} = legend, %Theme{legend_ticks: ticks_look} = theme) do
+    def draw(
+          _guide,
+          %{decor: decor} = legend,
+          %Theme{legend_ticks: ticks_look} = theme,
+          installed_fonts
+        ) do
       fill = fn direction ->
         %Gradient{stops: decor, direction: direction, stroke_width: @bar_stroke_width}
       end
 
-      Bar.draw(legend, fill, ticks_look, theme)
+      Bar.draw(legend, fill, ticks_look, theme, installed_fonts)
     end
   end
 end

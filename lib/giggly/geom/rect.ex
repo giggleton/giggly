@@ -146,7 +146,7 @@ defmodule Giggly.Geom.Rect do
 
     # A rectangle for each row placed in the panel, in its fill and border.
     @impl Giggly.Geom
-    def draw_panel(_geom, frame, coord, panel_params) do
+    def draw_panel(_geom, frame, coord, panel_params, _installed_fonts) do
       placed = Coord.transform(coord, frame, panel_params)
       fills = Mark.colors(placed, :fill)
 
@@ -196,13 +196,13 @@ defmodule Giggly.Geom.Rect do
     # A legend's key, `draw_key_polygon()`'s, its corners mitred and its ends cut square, as
     # `geom_rect()`'s are.
     @impl Giggly.Geom
-    def draw_key(_geom, key), do: Rect.polygon_key(key, @line_end, @line_join)
+    def draw_key(_geom, key, _installed_fonts), do: Rect.polygon_key(key, @line_end, @line_join)
 
     # The room a key's rectangle needs, its border's width twice, in millimetres, either way, as
     # ggplot2's `draw_key_polygon()` sizes its glyph, `linewidth / 5` centimetres; a missing width
     # needs none.
     @impl Giggly.Geom
-    def key_size(_geom, key) do
+    def key_size(_geom, key, _installed_fonts) do
       side =
         case Map.fetch!(key, :linewidth) do
           nil -> 0.0

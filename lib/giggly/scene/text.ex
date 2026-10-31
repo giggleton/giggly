@@ -25,6 +25,11 @@ defmodule Giggly.Scene.Text do
   # the baseline from its anchor's start and `ascent` points up from the baseline, as grid measures
   # a string's height by the ascent of "M". Which labels overlap depends on where they land, so the
   # backend decides it once the boxes are placed, as grid does when it draws.
+  #
+  # `glyphs` holds the outlines each label is drawn with (`Giggly.Scene.Glyphs`), one run per label
+  # in the labels' order, where the text's font gives them, or `:none` where it is measured from a
+  # table of widths alone, so a backend may draw a label as its font's shapes rather than as text
+  # naming the font.
 
   @enforce_keys [
     :x,
@@ -40,7 +45,8 @@ defmodule Giggly.Scene.Text do
     :hjust,
     :offset,
     :check_overlap,
-    :ascent
+    :ascent,
+    :glyphs
   ]
   defstruct @enforce_keys
 
@@ -58,6 +64,7 @@ defmodule Giggly.Scene.Text do
           hjust: [float()],
           offset: [{float(), float()}],
           check_overlap: boolean(),
-          ascent: float()
+          ascent: float(),
+          glyphs: Giggly.Scene.Glyphs.t() | :none
         }
 end

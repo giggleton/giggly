@@ -31,6 +31,7 @@ defmodule Giggly.Scene do
       Arrow,
       Cell,
       Circles,
+      Glyphs,
       Gradient,
       Polygons,
       Polylines,

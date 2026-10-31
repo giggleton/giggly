@@ -68,9 +68,10 @@ defprotocol Giggly.Guide do
           optional(atom()) => term()
         }
 
-  # The guide `guide` draws for `legend`, in `theme`'s look: its width in points and its table, a
-  # nested `Giggly.Scene` sized in points, for the box of guides beside or inside the panels.
+  # The guide `guide` draws for `legend`, in `theme`'s look, its texts measured in the machine's
+  # installed fonts too where `installed_fonts`: its width in points and its table, a nested
+  # `Giggly.Scene` sized in points, for the box of guides beside or inside the panels.
   @doc false
-  @spec draw(t(), legend(), Theme.t()) :: {float(), Scene.t()}
-  def draw(guide, legend, theme)
+  @spec draw(t(), legend(), Theme.t(), boolean()) :: {float(), Scene.t()}
+  def draw(guide, legend, theme, installed_fonts)
 end

@@ -1351,8 +1351,8 @@ defmodule Giggly.Plot.Options do
       doc:
         ~s(The font every label is drawn in, by name, such as `"Times New Roman"`, or one ) <>
           ~s(of the generic families `"sans"`, `"serif"` and `"mono"`; the theme's ) <>
-          "`base_family` when not given, the default sans-serif at its default. A label is " <>
-          "measured as the default font measures it, and drawn at that width."
+          "`base_family` when not given, the default sans-serif at its default. How a label " <>
+          "is measured and drawn in it: the [fonts guide](fonts.md)."
     ]
   ]
 
@@ -3245,7 +3245,8 @@ defmodule Giggly.Plot.Options do
           type: :string,
           doc:
             ~s(The font it is drawn in, by name, such as `"Lobster"`, or one of the generic ) <>
-              ~s(families `"sans"`, `"serif"` and `"mono"`; `""` is the default sans-serif.)
+              ~s(families `"sans"`, `"serif"` and `"mono"`; `""` is the default sans-serif. ) <>
+              "How it is measured and drawn: the [fonts guide](fonts.md)."
         ],
         face: [
           type: {:in, [:plain, :bold, :italic, :bold_italic]},

@@ -106,12 +106,13 @@ defmodule Giggly.Geom.Smooth do
     # Each group's band, where `se`, then its line, the groups in order. The stat writes a band
     # wherever `se` asks for one, so the band's ends are always there to draw.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       frame
       |> DataFrame.split(:group)
       |> Enum.sort_by(fn {group, _rows} -> group end)
       |> Enum.flat_map(fn {_group, rows} ->
-        band(geom.se, rows, coord, panel_params) ++ line(geom, rows, coord, panel_params)
+        band(geom.se, rows, coord, panel_params) ++
+          line(geom, rows, coord, panel_params, installed_fonts)
       end)
     end
 
@@ -122,24 +123,24 @@ defmodule Giggly.Geom.Smooth do
       Ribbon.draw(@band, uncoloured, coord, panel_params, [:x, :ymin, :ymax])
     end
 
-    defp line(geom, rows, coord, panel_params) do
+    defp line(geom, rows, coord, panel_params, installed_fonts) do
       own_alpha = DataFrame.put(rows, :alpha, List.duplicate(nil, DataFrame.row_count(rows)))
 
       geom
       |> path()
-      |> Geom.draw_panel(own_alpha, coord, panel_params)
+      |> Geom.draw_panel(own_alpha, coord, panel_params, installed_fonts)
     end
 
     # A legend's key, ggplot2's `draw_key_smooth()`: where `se`, the band's fill at the key's alpha
     # over the whole key, then a line's key at an alpha of 1.
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       opaque = Map.put(key, :alpha, 1.0)
 
       line =
         geom
         |> path()
-        |> Geom.draw_key(opaque)
+        |> Geom.draw_key(opaque, installed_fonts)
 
       band_key(geom.se, key) ++ line
     end
@@ -171,10 +172,10 @@ defmodule Giggly.Geom.Smooth do
 
     # The room a smooth's key needs, a line's.
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> path()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The path a smooth's line is drawn as, with its ends and corners and no arrowhead, as

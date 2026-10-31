@@ -119,10 +119,12 @@ defprotocol Giggly.Geom do
   def setup_data(geom, frame, axis_kinds)
 
   # The primitives `geom` draws `frame`'s rows with, in the panel that `panel_params` describes
-  # under `coord`: ggplot2's `draw_panel()`.
+  # under `coord`: ggplot2's `draw_panel()`. Each drawing function takes whether text it measures
+  # is measured in the machine's installed fonts too, `installed_fonts`, as `Giggly.Font` takes it.
   @doc false
-  @spec draw_panel(t(), DataFrame.t(), Coord.t(), Coord.panel_params()) :: [Scene.primitive()]
-  def draw_panel(geom, frame, coord, panel_params)
+  @spec draw_panel(t(), DataFrame.t(), Coord.t(), Coord.panel_params(), boolean()) ::
+          [Scene.primitive()]
+  def draw_panel(geom, frame, coord, panel_params, installed_fonts)
 
   # The primitives `geom` draws a legend's key with, in the key's cell, its aesthetics' values in
   # `key`, such as `%{alpha: 0.2}`, `nil` for none, and whether its layer's marks are horizontal,
@@ -130,16 +132,16 @@ defprotocol Giggly.Geom do
   # it draws, handed the layer's `flipped_aes` as ggplot2 hands it the layer's params. The glyph is
   # placed by fractions of the cell and offsets in points, as grid places one by `npc` and absolute
   # units, so it is drawn right in a cell of any size: a legend sizes its keys to their glyphs
-  # (`key_size/2`) before any is drawn.
+  # (`key_size/3`) before any is drawn.
   @doc false
-  @spec draw_key(t(), %{optional(atom()) => term()}) :: [Scene.primitive()]
-  def draw_key(geom, key)
+  @spec draw_key(t(), %{optional(atom()) => term()}, boolean()) :: [Scene.primitive()]
+  def draw_key(geom, key, installed_fonts)
 
-  # The room, `{width, height}` in points, that the glyph `draw_key/2` draws for `key` needs in its
+  # The room, `{width, height}` in points, that the glyph `draw_key/3` draws for `key` needs in its
   # key: the width and height ggplot2's `draw_key` gives its glyph, or else, as its legend's
   # `set_key_size()` reads the key, its `size` and `linewidth` in millimetres added, a missing one
   # counting 0. A legend makes each key at least as big as the theme's key size.
   @doc false
-  @spec key_size(t(), %{optional(atom()) => term()}) :: {float(), float()}
-  def key_size(geom, key)
+  @spec key_size(t(), %{optional(atom()) => term()}, boolean()) :: {float(), float()}
+  def key_size(geom, key, installed_fonts)
 end

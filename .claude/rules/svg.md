@@ -95,7 +95,18 @@ size has a weight".
   `monospace`; any other name, R's `"symbol"` included, a CSS string, its quotes and backslashes
   escaped for CSS and the whole for the attribute, then the default list, for a browser that lacks
   it. Each is drawn at the measured width all the same, and so is a bold or italic label, measured
-  as plain text, as vdiffr measures every face but the symbol one. **An empty label is not
+  in its face where a font is registered with Pica for it and else as plain text, as vdiffr
+  measures every face but the symbol one (`font.md`). **A label whose text carries its font's
+  outlines is written as them** (`to_svg/2`'s `text: :outlines`, the default; `:text` writes it as
+  above): each glyph not yet defined in the document first, in a `<defs>` of its own, `<path
+  id='gl…' d='…'/>`, the id `gl` and the MD5 of the path, its data in the font's units with up to
+  two decimals and no trailing zeros; then a `<g transform='translate(start) rotate(-angle)
+  scale(s,-s)'>`, the start the label's exact `hjust` back from its anchor, the angle in whole
+  degrees as text's, the scale written exactly (shortest round trip), in the label's fill as text
+  writes it, of a `<use href='#…'>` per glyph at its place in font units, `x` and `y` left out at
+  0; then the label's `<text>` as above with `fill: none`, so it is still read aloud, selected and
+  found. A glyph is defined once per document, however many labels or nested scenes draw it. **An
+  empty label is not
   written**, as svglite writes none, though the room measured for it stays. Text escapes `&`, `<`
   and `>`, as svglite does.
 - **A text checking overlap is drawn as grid's `textGrob(check.overlap = TRUE)` draws one**: each

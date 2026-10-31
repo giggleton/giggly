@@ -30,8 +30,14 @@ defmodule Giggly.Guide.Colorsteps do
     # each its place along the bar from and to, 0 to 1, and its colour, in `theme`'s look: its
     # width in points and its table, every size in points.
     @impl Giggly.Guide
-    def draw(_guide, %{decor: decor} = legend, %Theme{legend_steps_ticks: ticks_look} = theme) do
-      Bar.draw(legend, fn direction -> bins(decor, direction) end, ticks_look, theme)
+    def draw(
+          _guide,
+          %{decor: decor} = legend,
+          %Theme{legend_steps_ticks: ticks_look} = theme,
+          installed_fonts
+        ) do
+      fill = fn direction -> bins(decor, direction) end
+      Bar.draw(legend, fill, ticks_look, theme, installed_fonts)
     end
 
     # The bins' rectangles, along a bar running up, across its whole width, or along one running

@@ -28,7 +28,7 @@ beginning "Each layer's defaults are filled in from the theme".
   over in data space, after the stat and before the position, as ggplot2's `setup_data()` does, so
   a position stacks or dodges that extent and the scales, trained again after the position, cover
   it. A geom drawn at its x and y alone returns the frame as it is. It is a build function: the
-  assembly calls it, and rendering calls `draw_panel/4`. **It is told whether each axis is
+  assembly calls it, and rendering calls `draw_panel/5`. **It is told whether each axis is
   discrete** (`axis_kinds`), which ggplot2's geoms read from a position's `mapped_discrete` class;
   a geom sees an axis's kind, never its range.
 - **A geom says what it draws with: `default_aesthetics/2`** gives each aesthetic it draws with
@@ -114,8 +114,8 @@ beginning "Each layer's defaults are filled in from the theme".
   (`na_value: :none`), or an
   annotation's list's `:none`, is held as `nil`, as R's column holds `NA`, and so is a default R
   gives as `NA`, a rectangle's border or a point's fill.
-- **A geom draws its own legend key (`draw_key/2`) and says how much room it needs
-  (`key_size/2`)**, as ggplot2's `draw_key` belongs to the geom: handed the key's aesthetic
+- **A geom draws its own legend key (`draw_key/3`) and says how much room it needs
+  (`key_size/3`)**, as ggplot2's `draw_key` belongs to the geom: handed the key's aesthetic
   values, the layer's set values among them as ggplot2's key data holds its `aes_params`, laid
   over its geom's defaults under the theme, as ggplot2 fills key data from `default_aes`, it draws
   in the key's cell **by fractions of the cell and offsets in points**, as grid places a glyph by
@@ -178,8 +178,9 @@ beginning "Each layer's defaults are filled in from the theme".
   beginning "`geom_label()` draws ggplot2's `labelGrob()`"): a row at a time, its box and then its
   text, so a later label covers an earlier; its text written, sized and justified as a text's,
   through the functions `Geom.Text` shares (`justification/4`, ggplot2's `compute_just()`,
-  `turned_justification/3` and `font_size/1`), never a copy; its box the text's width and the
-  ascent of "M" and the descent, padded, the top at least the descent and the bottom less it, as
+  `turned_justification/3` and `font_size/1`), never a copy, and measured in its family's font
+  with the glyphs it gives (`font.md`); its box the text's width and that font's ascent of "M"
+  and descent, padded, the top at least the descent and the bottom less it, as
   `labelGrob()` balances them, turned with the text about its place, a length in `:lines` lines of
   the label's own text. **Its corners are the points grid's `roundCorner()` picks**, a polygon,
   never a curve, so a drawing matches vdiffr's element by element, a radius past the box's half

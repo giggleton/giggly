@@ -90,7 +90,7 @@ defmodule Giggly.Geom.Abline do
     # dropped before the ends are worked out, which drops what `unique0()` drops after, since a
     # row's ends follow from the columns it keeps.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       %{x: x_extent, y: y_extent} =
         coord
         |> Coord.extents(panel_params)
@@ -114,18 +114,19 @@ defmodule Giggly.Geom.Abline do
 
       geom
       |> segment()
-      |> Geom.draw_panel(segments, coord, panel_params)
+      |> Geom.draw_panel(segments, coord, panel_params, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key), do: Path.line_key(key, @key_line, geom.line_end, :none)
+    def draw_key(geom, key, _installed_fonts),
+      do: Path.line_key(key, @key_line, geom.line_end, :none)
 
     # A path's room, as `draw_key_abline()` sets no size of its own.
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> segment()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # Each extent widened by its own width each side, where straight lines stay straight and the

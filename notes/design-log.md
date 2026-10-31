@@ -896,11 +896,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   caption, tag, strips, tick labels and legend labels keep the base family, as `calc_element()`
   gives every leaf of the eight themes; unset is `:none`, R's `NULL`. `theme(text: [family:])`
   never reaches a layer. Every family is measured with the built-in table, as vdiffr measures
-  each. The SVG writes `""` and `"sans"` as the default list, `"serif"` and `"mono"` as CSS's
+  each, but where a font is registered with Pica under it (the entry beginning "A font family is
+  a name"). The SVG writes `""` and `"sans"` as the default list, `"serif"` and `"mono"` as CSS's
   `serif` and `monospace`, and any other name as a CSS string before the default list.
   *Rejected: a named family written alone* — a browser lacking it draws its own default, often a
-  serif, at sans widths. *Rejected: a family argument to `Giggly.Font` now* — no measure differs
-  by family until the package does. *Rejected: following ggplot2's docs, which give the tag the
+  serif, at sans widths. *Rejected: following ggplot2's docs, which give the tag the
   header family* — R gives it the base. *Rejected: CSS's names for the Symbol font for R's
   `"symbol"`* (Steve) — what a reader sees would turn on the fonts their machine has; it is
   written as any other name.
@@ -910,15 +910,95 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   surveys of Hex and checks in R).** `family:`, `base_family:`, `header_family:` and a layer's
   `family:` name fonts; no font value travels in a plot. The package is a Rust NIF over
   HarfBuzz's shaping (harfrust, skrifa, wuff; Rustler and rustler_precompiled), in its own
-  repository, and never depends on Giggly. Giggly will list it as an optional dependency and hold
-  the adapter behind `Code.ensure_loaded?`, with no behaviour yet, keeping R's rounding itself.
+  repository, and never depends on Giggly: Pica. Giggly lists it as an optional dependency and
+  measures through it behind `Code.ensure_loaded?`, with no behaviour, keeping R's rounding
+  itself. A project registers a font's file with Pica under a family's name; a face no font is
+  registered for is measured from the table, never another face's, as Pica never substitutes one.
   `""` and R's generic names stay on the built-in table unless a font is registered under that
   name, so the goldens never move. *Rejected: a TrueType parser of our own* — no ligatures or
   contextual forms, which svglite's HarfBuzz applies, and a thousand lines to own. *Rejected:
   Hex's parsers* — none reads GPOS kerning correctly (`truetype_metrics`, `opentype`,
   `tincture`). *Rejected: measuring by rendering (resvg, libvips)* — the ink box, not the advance
   ggplot2 lays out with. *Rejected: fonts as values passed to `to_svg/2`* — names are the only
-  input. *Open:* how the package finds a family's files (a registry is recommended).
+  input. *Rejected: a `Giggly.register_font/2`* (2026-10-30) — Pica's two calls renamed, and a
+  file read inside the pure core.
+
+- **A label measured with a font Pica found reaches the viewer as outlines by default, plain text
+  naming the font an option (2026-10-30, Steve, after a survey of other libraries).** Measured on
+  one machine and viewed on another, matplotlib's and Typst's SVG, Satori and Plotto's PNG draw
+  outlines; svglite and vl-convert name the font and leave it to the viewer. With outlines the
+  viewer's fonts stop mattering, so Pica's installed fonts, searched by default, are safe on any
+  server: `to_svg/2`'s `installed_fonts:`, on by default, a boolean handed to every geom and guide
+  drawing function as its last argument (2026-10-31, Steve), and the suite passes `false`; `""`
+  and R's generic names never search them, Pica matching installed families by exact name, a rule
+  no test reaches, since it differs only on a machine with such a font (*rejected:* a function
+  pulled out of `Font` to pin it, after the mutation pass over `9ede4f5`, Steve). Each
+  label keeps its words for screen readers. *Rejected: an embedded subset* — a subsetter, each
+  font's embedding permissions, and unproven in Livebook's SVG images. *Rejected: plain text by
+  default* — right only where the viewer has the font. *Rejected: no option* — a render would turn
+  on the machine's fonts, and the suite would read the disk. *Rejected: the option on
+  `layer_data/2` and `panel_scales/2`*, which measure nothing. *Rejected: a keyword list of font
+  settings* — one setting exists, and a second is the same mechanical sweep.
+
+- **A label is drawn as its font's outlines in font units, scaled by the SVG, at places from
+  shaping (2026-10-31, Steve, one decision at a time).** `Font.glyphs/5` gives each label's glyphs
+  at their places in points, from shaping at the truncated size the width is measured at, so they
+  end at the measured width, and their outlines as Pica draws them, with one scale in points per
+  font unit for the text. The SVG defines each glyph once per document, where first drawn, `gl` and
+  the MD5 of its path its id, and writes a label as a group translated, turned and scaled to its
+  glyphs' `<use>`s. `text: :text` reaches only the SVG writer, the scene always carrying the
+  runs: about a millisecond a plot (Lato, 99 glyphs). *Rejected: `Font` scaling each outline into
+  points* — a definition per glyph per size, every coordinate multiplied. *Rejected: `text:`
+  reaching `Font` through rendering* — a format's choice in the geom protocol and the scene.
+
+- **A text carries its glyphs as `Scene.Glyphs`, which `Font` builds (2026-10-31, Steve).**
+  `glyphs: :none | %Scene.Glyphs{scale, runs}` on `Scene.Text`, `:none` for the whole text, as one
+  text has one font; `Giggly.Scene` exports `Glyphs` and `Giggly.Font` lists `Giggly.Scene`. Elixir
+  1.20's type checker, in the build without Pica, types `Font.glyphs/5` as `:none` alone and fails
+  any caller's branch on a run as never used, a `case` or private clauses alike, so `Font` returns
+  the struct and a test reading one is compiled only where Pica is. *Rejected: a tuple or two
+  fields* — positional, or able to disagree. *Rejected: `Scene.Glyphs.new/1`* — the scene's first
+  function. *Rejected: the builders checking for Pica* — the switch would leave `Font`.
+
+- **A label drawn as outlines keeps its text, unseen (2026-10-31, Steve; checked in
+  `giggly-accessibility.md`, still proposed).** After its outlines, the label's `<text>` as text
+  mode writes it, `fill: none`, so a screen reader reads it as it reads text mode, and it is
+  selected and found in the page; about 150 bytes a label. In Firefox 158, selecting a drawing
+  gives every label's words and find-in-page finds a label; a screen reader is unchecked.
+  *Rejected: `role='img'` and
+  `aria-label` per label* — every tick label announced as an image, the noise blind readers
+  report, and no selection or search. *Rejected: a `<title>` per label* — patchy support, and a
+  tooltip on every label.
+
+- **Fonts are explained by one guide, `guides/fonts.md`, which every place a family is set links
+  (2026-10-31, Steve, one decision at a time).** It covers listing Pica (`~> 0.1.0`, as Giggly's
+  other 0.x dependencies pin the patch), naming a family and what inherits it, registering with
+  Pica, the installed search and `installed_fonts:`, a face no font is found for, and `text:`'s
+  trade, and nothing about testing. `theme/2`, the text element's and `geom_text/3`'s `family:`
+  and `to_svg/2`'s `text:` and `installed_fonts:` say what they do and link it; Pica's own
+  guide holds registering at startup. The `geom_text` notebook links it on GitHub, needing
+  neither local docs nor Giggly on Hex. *Rejected: a section in `Giggly`'s moduledoc* (Steve) —
+  only a few calls set a family. *Rejected: a README section* — the README is not in the docs.
+
+- **A registered font is measured by svglite's rules, measured in R (2026-10-30).** A width is
+  the shaped glyphs' advances at the size truncated to 1/64 point, as svglite hands FreeType a
+  size: at 13.2 and 7.04 points truncating matches R and rounding misses; a size truncating to
+  nothing is 1 point, as R measures 0. A height is the box of "M" or of "gjpqyQ" rounded out to
+  a whole pixel at 10,000 dots per inch, as svglite reads glyph boxes. Over sizes from 5 to 30
+  points in Lato and Source Serif 4 the widths came within 4/64 point of svglite's and the heights
+  within a pixel, and two goldens within 0.04 point of svglite's drawings. *Rejected: a whole
+  number of pixels per em* — Lato's `head` flag asks FreeType for it and its heights then all but
+  match, but Source Serif 4's match less often, Pica does not report the flag, and the rest is
+  FreeType's arithmetic, a port. *Rejected: rounding the size* — it misses R.
+
+- **The gate builds and tests Giggly without Pica (2026-10-30, Steve, agreeing the plan).**
+  `GIGGLY_WITHOUT_PICA=1` leaves Pica out of `deps`, in a build root of its own, and runs the suite
+  less its `:pica` tests, plus the `:without_pica` ones. `Giggly.Font` switches when it compiles,
+  behind `Code.ensure_loaded?(Pica)`, the build without it measuring by the table alone, so it
+  names no Pica function and no warning is waived; the boundaries list `Pica` on the same test.
+  *Rejected: a project depending on Giggly by path* — a second project and dependency tree to
+  keep, for what a variable gives. *Rejected: `@compile {:no_warn_undefined, Pica}`* — a waiver
+  for calls the switch keeps out.
 
 - **Text's face, angle, justification and line height are the theme's, and every text a guide
   draws is placed and measured by one rule, ggplot2's `titleGrob()` (2026-10-24, Steve, agreeing
@@ -929,7 +1009,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Guide.Parts` anchors a text at `rotate_just()` of its room, moved by the margins it counts, and
   measures grid's box round it turned with its descent, so 432 R drawings, every 15 degrees by
   each justification, matched. A face is an SVG style, measured at plain widths, as vdiffr
-  measures. *Rejected: R's `"oblique"` and faces 1 to 4* — second spellings no example writes.
+  measures, where no font is registered with Pica for it. *Rejected: R's `"oblique"` and faces 1
+  to 4* — second spellings no example writes.
   *Rejected: a negative `lineheight`*, which R stacks upward. *Rejected: failing where only a
   removed root text gives a justification*, as R does — grid's centring, as every such property
   falls to grid. *Rejected: a bold glyph table* — the goldens would leave R's. *Deferred:*
@@ -940,7 +1021,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   mutant over its module, recompile what read it while compiling and now reads something else, run
   the whole suite to its first failure, and load the originals back; muex builds the mutants and
   writes the JSON report, as a library, and one `:cover` run per worker finds the lines no test
-  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`); a mutant
+  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`), the fonts
+  the suite registers with Pica registered once per worker and only read, and a mutant that
+  searches the installed fonts leaving Pica's scan of them, which a later one reads as a fresh
+  scan would give it; a mutant
   that changes a struct's defaults is reported, not judged. Replayed over step 6's pass, every
   kill, survivor and uncovered line matched muex's, and it killed three survivors muex's test
   selection never ran against; the element tree split's pass took minutes where muex took hours.
@@ -1296,8 +1380,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   limits' high end, R's `rescale_max()`, which no palette can work out from a place alone, so
   `Scale.Continuous`'s `midpoint` became `rescaler` (`:rescale`, `{:mid, midpoint}`, `:max`), the
   field ggplot2's scale holds: one field for one question (Steve). Keys size themselves as
-  `measure_legend_keys()` sizes them: each geom reports its glyph's room (`Geom.key_size/2`) and
-  draws by fractions of the key and offsets in points (`draw_key/2`), as grid mixes `npc` and
+  `measure_legend_keys()` sizes them: each geom reports its glyph's room (`Geom.key_size/3`) and
+  draws by fractions of the key and offsets in points (`draw_key/3`), as grid mixes `npc` and
   absolute units, so the legend lays out its rows and column before any glyph is placed; text keys
   too (Steve), measured as `draw_key_text()` measures them. A size scale takes R's options,
   `na_value:` on `_area` and `_discrete` alone. *Rejected: `rescaler` beside `midpoint`*, two
@@ -2147,7 +2231,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   functions, its kind fixed (`legends/3` in the assembly, `draw_legend/2` in rendering). Then each
   kind becomes one module holding its struct (its options), key and drawing, behind a protocol at
   `Giggly.Guide`: a build function the assembly calls, a drawing one rendering calls; glyphs stay
-  on `Geom.draw_key/2`. Merging groups guides by order, kind, title and labels, each kind merging
+  on `Geom.draw_key/3`. Merging groups guides by order, kind, title and labels, each kind merging
   its own way. Axes join when a user can choose one. `Plot` building guide structs widens its
   boundary, raised then. *Rejected: ggity's legend protocol on the scale*, every scale redoing the
   layout and its own glyphs. *Rejected: building it now*, a protocol with one implementation.
@@ -2159,7 +2243,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   centred when its sizes are all points, as grid centres a fixed gtable in its viewport; the
   legend's cell spans the panel rows right of the panels. Its geometry is read from ggplot2's
   `GuideLegend` (`setup_elements()`'s margins and justifications) and checked against R, not
-  fitted. Each geom draws its own key (`Geom.draw_key/2`), as ggplot2's `draw_key` does.
+  fitted. Each geom draws its own key (`Geom.draw_key/3`), as ggplot2's `draw_key` does.
   *Rejected: the legend's rows and columns in the plot's table*, which centring on faceted panels
   breaks. *Rejected: one cell placed by point offsets*, which rectangles and circles lack and which
   would write the key backgrounds unlike svglite.
@@ -2216,7 +2300,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   the assembly calls only the families' build functions (2026-10-15, Steve).** ggplot2 calls a
   geom's `setup_data` after the stat and before the position, since positions stack and dodge a
   mark's extent and the retrained scales must cover it (a bar's `ymin` of 0). So the assembly lists
-  `Giggly.Geom`, as it lists `Giggly.Coord`, and could call `draw_panel/4`; `assembly.md` says it
+  `Giggly.Geom`, as it lists `Giggly.Coord`, and could call `draw_panel/5`; `assembly.md` says it
   calls build functions only, which review holds. *Rejected: a credo allow-list* (proposed) — the
   assembly calls family roots by design, so the list would change with every build stage, against
   a mistake no one has made; *a protocol per family for drawing* — the compiler would hold it, at a
@@ -2371,7 +2455,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   across the pipeline: `Plot` held `geom_point`'s accepted and required aesthetics while
   `Geom.Point` drew, and default aesthetics (the assembly) and legend keys (the guides) would
   each add another place, the scattering the ggity research found. **The shape:** a family's root
-  is a protocol (`Giggly.Geom` with `draw_panel/4`; `Giggly.Stat` with `compute_layer/3` and
+  is a protocol (`Giggly.Geom` with `draw_panel/5`; `Giggly.Stat` with `compute_layer/3` and
   `Giggly.Position` with `compute_layer/2`; `Giggly.Facet` with `layout/1` and `assign_panels/2`; `Giggly.Coord` with
   `panel_params/3`, `transform/3`, `axes/2`, `grid/2` and `clip/1`), each function taking the
   kind first, and each kind is one module holding everything about it, as ggplot2's `GeomPoint`
@@ -2446,7 +2530,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   read as every title in the plot once a plot title existed. They are the titles guides draw:
   ggplot2's axes and legends are both guides, each titled from the mapping and set with
   `guide_axis(title = …)` or `guide_legend(title = …)`, and `Giggly.Guide` draws them. The field,
-  the private `guide_title/3` that finds one, and `Guide.Axis.titles/4`'s argument took the name.
+  the private `guide_title/3` that finds one, and `Guide.Axis.titles/5`'s argument took the name.
   *Rejected: `aesthetic_titles`* — it says how the map is keyed, not what the titles are for;
   *and waiting for `labs/2`* — the rename was cheapest while nothing depended on the name.
 
@@ -3331,6 +3415,16 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Take Pica 0.1.0 from Hex, its native library prebuilt, and write the fonts guide
+  (Pica, steps 4 and 5); §4: "Fonts are explained by one guide", "The mutation pass runs muex's
+  mutants in warm VMs"
+- 2026-10-31 — Draw a label in a font Pica holds as its outlines, its words kept as unseen text,
+  and search installed fonts unless told not to (Pica, step 3); §4: "A label measured with a font
+  Pica", "A label is drawn as its font's outlines", "A text carries its glyphs", "A label drawn as
+  outlines keeps its text"
+- 2026-10-30 — Measure text in the fonts a project registers with Pica, as svglite measures
+  them, and with the table otherwise (Pica, step 1); §4: "A label measured with a font Pica", "A
+  registered font is measured", "The gate builds and tests Giggly without Pica"
 - 2026-10-31 — Place numbers on a discrete axis as positions, and choose an axis's scale by the
   first layer mapping its own aesthetic; no notebook example waits on it; §4: "An axis's scale is
   chosen by the first layer mapping its own aesthetic"

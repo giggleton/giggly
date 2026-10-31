@@ -136,7 +136,7 @@ defmodule Giggly.Geom.Path do
 
     # The panel's lines.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, _installed_fonts) do
       kept =
         frame
         |> trimmed()
@@ -166,7 +166,7 @@ defmodule Giggly.Geom.Path do
 
     # A legend's key, a line across its middle.
     @impl Giggly.Geom
-    def draw_key(geom, key),
+    def draw_key(geom, key, _installed_fonts),
       do: Path.line_key(key, {@key_start, @key_end}, geom.line_end, geom.arrow)
 
     # The room a key's line needs, its width in millimetres either way, as ggplot2's
@@ -175,7 +175,7 @@ defmodule Giggly.Geom.Path do
     # gives its glyph a size: as wide as an arm reaches along the line, over the eight tenths of
     # the key the line spans, and as tall as both arms reach across it.
     @impl Giggly.Geom
-    def key_size(%{arrow: :none}, key) do
+    def key_size(%{arrow: :none}, key, _installed_fonts) do
       side =
         case Map.fetch!(key, :linewidth) do
           nil -> 0.0
@@ -185,7 +185,7 @@ defmodule Giggly.Geom.Path do
       {side, side}
     end
 
-    def key_size(%{arrow: arrow}, _key) do
+    def key_size(%{arrow: arrow}, _key, _installed_fonts) do
       angle = arrow.angle * :math.pi() / 180
       {:math.cos(angle) * arrow.length * 1.25, :math.sin(angle) * arrow.length * 2}
     end

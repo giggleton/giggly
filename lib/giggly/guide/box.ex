@@ -17,7 +17,7 @@ defmodule Giggly.Guide.Box do
   alias Giggly.{Scene, Theme}
   alias Giggly.Scene.{Cell, Rect}
 
-  # The guides, each its width and table as `Giggly.Guide.draw/3` draws it, stacked in a box where
+  # The guides, each its width and table as `Giggly.Guide.draw/4` draws it, stacked in a box where
   # legends run `direction`, across above or below the panels and down elsewhere, in `theme`'s
   # arrangement, spacing and justification: its width and height in points and its table, for
   # rendering to place beside or inside the panels.

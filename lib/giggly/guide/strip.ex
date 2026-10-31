@@ -2,7 +2,7 @@ defmodule Giggly.Guide.Strip do
   @moduledoc false
 
   # A strip, one layer of what ggplot2's `render_strips()` draws beside a facet's panel: the label
-  # of the panel's value of one column, on a background as long as the panel's side. `draw/3`
+  # of the panel's value of one column, on a background as long as the panel's side. `draw/4`
   # draws a panel's strips on one side, one for each of its labels: above the panel, top to
   # bottom, or right of it, the first nearest the panel; a panel with no labels on a side has none
   # there.
@@ -31,28 +31,33 @@ defmodule Giggly.Guide.Strip do
   # away from the panel, in points, and its primitives: ggplot2's `render_strips()` for strips
   # above a panel (`:top`) or right of it (`:right`).
   @doc false
-  @spec draw([String.t()], :top | :right, Theme.t()) :: [Giggly.Guide.drawn()]
-  def draw(_labels, :top, %Theme{strip_text_x_top: :none}), do: []
-  def draw(_labels, :right, %Theme{strip_text_y_right: :none}), do: []
+  @spec draw([String.t()], :top | :right, Theme.t(), boolean()) :: [Giggly.Guide.drawn()]
+  def draw(_labels, :top, %Theme{strip_text_x_top: :none}, _installed_fonts), do: []
+  def draw(_labels, :right, %Theme{strip_text_y_right: :none}, _installed_fonts), do: []
 
-  def draw(labels, :top, theme),
+  def draw(labels, :top, theme, installed_fonts),
     do:
       Enum.map(labels, fn label ->
-        strip(label, :top, theme.strip_text_x_top, theme.strip_background_x)
+        strip(label, :top, {theme.strip_text_x_top, theme.strip_background_x}, installed_fonts)
       end)
 
-  def draw(labels, :right, theme),
+  def draw(labels, :right, theme, installed_fonts),
     do:
       Enum.map(labels, fn label ->
-        strip(label, :right, theme.strip_text_y_right, theme.strip_background_y)
+        strip(
+          label,
+          :right,
+          {theme.strip_text_y_right, theme.strip_background_y},
+          installed_fonts
+        )
       end)
 
   # The strip labelled `label` on `side`, in `text_look` on `background`: how deep it is, in
   # points, and its primitives, placed in a cell that deep and as long as the panel's side.
-  defp strip(label, side, %{margin: margin} = text_look, background) do
+  defp strip(label, side, {%{margin: margin} = text_look, background}, installed_fonts) do
     {place, offset} = Parts.anchor(text_look, :both)
-    text = Parts.text([label], [place], offset, text_look)
-    extent = Parts.extent([label], text_look)
+    text = Parts.text([label], [place], offset, text_look, installed_fonts)
+    extent = Parts.extent([label], text_look, installed_fonts)
     background_rect = background(background)
 
     {depth(side, margin, extent), Enum.concat(background_rect, [text])}

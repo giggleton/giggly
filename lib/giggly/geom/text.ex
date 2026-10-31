@@ -156,7 +156,7 @@ defmodule Giggly.Geom.Text do
     # The labels of the rows placed in the panel, each justified by where it falls, but a row missing
     # its place or label, or whose colour is `:none`.
     @impl Giggly.Geom
-    def draw_panel(%{check_overlap: check_overlap}, frame, coord, panel_params) do
+    def draw_panel(%{check_overlap: check_overlap}, frame, coord, panel_params, installed_fonts) do
       placed = Coord.transform(coord, frame, panel_params)
 
       font_size =
@@ -164,6 +164,7 @@ defmodule Giggly.Geom.Text do
         |> Mark.set(:size)
         |> Geom.Text.font_size()
 
+      family = Mark.set(placed, :family)
       angle = Mark.set(placed, :angle)
       hjust = Mark.set(placed, :hjust)
       vjust = Mark.set(placed, :vjust)
@@ -189,7 +190,7 @@ defmodule Giggly.Geom.Text do
             x: x_position,
             y: y_position,
             label: text,
-            width: Font.width(text, font_size),
+            width: Font.width(text, font_size, family, :plain, installed_fonts),
             color: Mark.hex(color),
             opacity: opacity,
             hjust: Geom.Text.justification(hjust, x_position, y_position, angle),
@@ -197,7 +198,7 @@ defmodule Giggly.Geom.Text do
           }
         end)
 
-      ascent = Font.ascent(font_size)
+      ascent = Font.ascent(font_size, family, :plain, installed_fonts)
 
       [
         %Scene.Text{
@@ -206,7 +207,7 @@ defmodule Giggly.Geom.Text do
           labels: Enum.map(drawn, fn label -> label.label end),
           widths: Enum.map(drawn, fn label -> label.width end),
           size: font_size,
-          family: Mark.set(placed, :family),
+          family: family,
           face: :plain,
           color: Enum.map(drawn, fn label -> label.color end),
           opacity: Enum.map(drawn, fn label -> label.opacity end),
@@ -214,7 +215,11 @@ defmodule Giggly.Geom.Text do
           hjust: Enum.map(drawn, fn label -> label.hjust end),
           offset: Enum.map(drawn, fn label -> {0.0, -label.vjust * ascent} end),
           check_overlap: check_overlap,
-          ascent: ascent
+          ascent: ascent,
+          glyphs:
+            drawn
+            |> Enum.map(fn label -> label.label end)
+            |> Font.glyphs(font_size, family, :plain, installed_fonts)
         }
       ]
     end
@@ -227,7 +232,7 @@ defmodule Giggly.Geom.Text do
     # as `titleGrob()` moves its text, turned into the text's own frame, along its baseline and
     # toward its top.
     @impl Giggly.Geom
-    def draw_key(_geom, key) do
+    def draw_key(_geom, key, installed_fonts) do
       case Mark.key_color(key, :color) do
         :none ->
           []
@@ -238,6 +243,8 @@ defmodule Giggly.Geom.Text do
             |> Map.fetch!(:size)
             |> Geom.Text.font_size()
 
+          family = Map.fetch!(key, :family)
+          ascent = Font.ascent(font_size, family, :plain, installed_fonts)
           angle = Map.fetch!(key, :angle)
 
           hjust =
@@ -263,17 +270,18 @@ defmodule Giggly.Geom.Text do
               x: [across],
               y: [up],
               labels: [label],
-              widths: [Font.width(label, font_size)],
+              widths: [Font.width(label, font_size, family, :plain, installed_fonts)],
               size: font_size,
-              family: Map.fetch!(key, :family),
+              family: family,
               face: :plain,
               color: [Mark.hex(color)],
               opacity: [Mark.opacity(color, Map.fetch!(key, :alpha))],
               angle: angle,
               hjust: [hjust],
-              offset: [{along, toward_top - vjust * Font.ascent(font_size)}],
+              offset: [{along, toward_top - vjust * ascent}],
               check_overlap: false,
-              ascent: Font.ascent(font_size)
+              ascent: ascent,
+              glyphs: Font.glyphs([label], font_size, family, :plain, installed_fonts)
             }
           ]
       end
@@ -284,7 +292,7 @@ defmodule Giggly.Geom.Text do
     # "M", as grid bounds turned text, with the font's descent added across and up by the angle's
     # sine and cosine, as `titleGrob()` adds it, and the measured margin each side.
     @impl Giggly.Geom
-    def key_size(_geom, key) do
+    def key_size(_geom, key, installed_fonts) do
       font_size =
         key
         |> Map.fetch!(:size)
@@ -293,9 +301,10 @@ defmodule Giggly.Geom.Text do
       radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
       sine = abs(:math.sin(radians))
-      width = Font.width("a", font_size)
-      ascent = Font.ascent(font_size)
-      descent = Font.descent(font_size)
+      family = Map.fetch!(key, :family)
+      width = Font.width("a", font_size, family, :plain, installed_fonts)
+      ascent = Font.ascent(font_size, family, :plain, installed_fonts)
+      descent = Font.descent(font_size, family, :plain, installed_fonts)
 
       {
         width * cosine + ascent * sine + sine * descent + 2 * @key_measured_margin,

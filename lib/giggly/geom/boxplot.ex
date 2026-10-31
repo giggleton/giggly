@@ -248,7 +248,7 @@ defmodule Giggly.Geom.Boxplot do
 
     # Each box, in the order of their groups, drawn whole before the next.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       flipped = flipped?(frame)
       placing = {flipped, coord, panel_params}
 
@@ -258,7 +258,7 @@ defmodule Giggly.Geom.Boxplot do
       |> Enum.sort_by(fn box -> box.group end)
       |> Enum.flat_map(fn box ->
         Enum.concat([
-          outliers(geom, box, placing),
+          outliers(geom, box, placing, installed_fonts),
           staples(geom, box, placing),
           whiskers(geom, box, placing),
           crossbar(geom, box, placing)
@@ -294,7 +294,7 @@ defmodule Giggly.Geom.Boxplot do
 
     # A box's outliers as points at its x, in the outliers' look, else the box's, their stroke the
     # look's, which the layer always gives.
-    defp outliers(geom, box, {flipped, coord, panel_params}) do
+    defp outliers(geom, box, {flipped, coord, panel_params}, installed_fonts) do
       look = geom.outlier
       count = length(box.outliers)
       positions = List.duplicate(box.x, count)
@@ -314,7 +314,7 @@ defmodule Giggly.Geom.Boxplot do
           alpha: List.duplicate(Map.get(look, :alpha, box.alpha), count)
         )
 
-      Geom.draw_panel(%Point{}, points, coord, panel_params)
+      Geom.draw_panel(%Point{}, points, coord, panel_params, installed_fonts)
     end
 
     # A box's staples across its whiskers' ends, the upper first, where they have a width.
@@ -517,7 +517,7 @@ defmodule Giggly.Geom.Boxplot do
 
     # A legend's key, ggplot2's `draw_key_boxplot()`, turned for a horizontal layer.
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, _installed_fonts) do
       base = %{
         color: Mark.key_color(key, :color),
         linewidth: Map.fetch!(key, :linewidth),
@@ -604,7 +604,7 @@ defmodule Giggly.Geom.Boxplot do
     # The room a key needs, its size and line width added, in millimetres, either way, a missing
     # one counting 0, as ggplot2's `set_key_size()` reads a key with no size of its own.
     @impl Giggly.Geom
-    def key_size(_geom, key) do
+    def key_size(_geom, key, _installed_fonts) do
       side =
         [Map.fetch!(key, :size), Map.fetch!(key, :linewidth)]
         |> Enum.map(fn millimetres -> millimetres || 0.0 end)

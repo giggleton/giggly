@@ -19,9 +19,10 @@ defmodule Giggly.Geom.Label do
   # text, so a later label covers an earlier, each placed through the coordinate system
   # (`Giggly.Coord.transform/3`) and turned its layer's `angle` about its place, box and text
   # alike. Its text is set as a text layer's is, its value written as R's `as.character()` writes
-  # it (`Giggly.AsCharacter`), its size in millimetres times `.pt`, measured (`Giggly.Font`), and
-  # justified by `hjust` and `vjust` as text is, `:inward` and `:outward` by where it falls in the
-  # panel. Its box is the text's width with the padding either side across, and up the ascent of
+  # it (`Giggly.AsCharacter`), its size in millimetres times `.pt`, measured in its family's font
+  # (`Giggly.Font`), which also gives the glyphs it carries, its box's ascent and descent that
+  # font's too, and justified by `hjust` and `vjust` as text is, `:inward` and `:outward` by where
+  # it falls in the panel. Its box is the text's width with the padding either side across, and up the ascent of
   # "M" and the font's descent, with the padding above, at least the descent, and below, less the
   # descent, as `labelGrob()` balances them, so the baseline sits the bottom padding up whatever
   # the descent; the box is placed by `hjust` across and `vjust` up, as the text is, and its text
@@ -131,7 +132,7 @@ defmodule Giggly.Geom.Label do
     # Each row placed in the panel as its box and then its text, justified by where it falls, but a
     # row missing its place or label.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       placed = Coord.transform(coord, frame, panel_params)
 
       font_size =
@@ -145,8 +146,8 @@ defmodule Giggly.Geom.Label do
 
       layout =
         geom
-        |> layout(font_size, font_size)
-        |> Map.merge(%{angle: angle, family: Mark.set(placed, :family)})
+        |> layout(font_size, font_size, Mark.set(placed, :family), installed_fonts)
+        |> Map.put(:angle, angle)
 
       colors = Mark.colors(placed, :color)
       fills = Mark.colors(placed, :fill)
@@ -191,7 +192,7 @@ defmodule Giggly.Geom.Label do
     # as the key's size is millimetres, as R hands `font_descent()` the size in millimetres; its
     # border none at a width `all.equal()` takes as 0.
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       font_size =
         key
         |> Map.fetch!(:size)
@@ -223,15 +224,17 @@ defmodule Giggly.Geom.Label do
         line_type: line_type
       }
 
+      family = Map.fetch!(key, :family)
+
       layout =
         geom
-        |> layout(font_size, font_size)
-        |> Map.merge(%{angle: angle, family: Map.fetch!(key, :family)})
+        |> layout(font_size, font_size, family, installed_fonts)
+        |> Map.put(:angle, angle)
 
       lift =
         key
         |> Map.fetch!(:size)
-        |> Font.descent()
+        |> Font.descent(family, :plain, installed_fonts)
 
       place = Geom.Text.turned_justification(angle, hjust, vjust)
       label(place, lift, @key_label, {hjust, vjust}, look, layout)
@@ -242,16 +245,18 @@ defmodule Giggly.Geom.Label do
     # font, not the label's own, though the box is drawn in the label's, so a label of a larger font
     # than grid's spills out of its key, as R's does.
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       font_size =
         key
         |> Map.fetch!(:size)
         |> Geom.Text.font_size()
 
+      family = Map.fetch!(key, :family)
+
       {width, height} =
         @key_label
-        |> Font.width(font_size)
-        |> box_size(layout(geom, font_size, @key_measured_font_size))
+        |> Font.width(font_size, family, :plain, installed_fonts)
+        |> box_size(layout(geom, font_size, @key_measured_font_size, family, installed_fonts))
 
       radians = Map.fetch!(key, :angle) * :math.pi() / 180
       cosine = abs(:math.cos(radians))
@@ -262,9 +267,10 @@ defmodule Giggly.Geom.Label do
     # The sizes every label of a layer is drawn at: its font size in points, its font's ascent and
     # descent, and its padding on each side and its corners' radius in points, lines of text
     # measured at `lines_font_size`, the padding above at least the descent and below less it, as
-    # `labelGrob()` balances them. A label is drawn at them with its layer's `angle` and `family`.
-    defp layout(geom, font_size, lines_font_size) do
-      descent = Font.descent(font_size)
+    # `labelGrob()` balances them, the text's measures its `family`'s, its installed fonts looked
+    # for where `installed_fonts` says. A label is drawn at them with its layer's `angle`.
+    defp layout(geom, font_size, lines_font_size, family, installed_fonts) do
+      descent = Font.descent(font_size, family, :plain, installed_fonts)
 
       %{top: top, right: right, bottom: bottom, left: left} =
         Map.new(geom.label_padding, fn {side, measure} ->
@@ -273,7 +279,9 @@ defmodule Giggly.Geom.Label do
 
       %{
         font_size: font_size,
-        ascent: Font.ascent(font_size),
+        family: family,
+        installed_fonts: installed_fonts,
+        ascent: Font.ascent(font_size, family, :plain, installed_fonts),
         descent: descent,
         top: max(top, descent),
         right: right,
@@ -291,7 +299,9 @@ defmodule Giggly.Geom.Label do
     # A label's box and its text at `place` in the cell, lifted `lift` points up the cell, its
     # text `text`, justified `{hjust, vjust}`, in `look`.
     defp label(place, lift, text, {hjust, vjust}, look, layout) do
-      text_width = Font.width(text, layout.font_size)
+      text_width =
+        Font.width(text, layout.font_size, layout.family, :plain, layout.installed_fonts)
+
       {width, height} = box_size(text_width, layout)
       left = -hjust * width
       bottom = -vjust * height
@@ -340,7 +350,9 @@ defmodule Giggly.Geom.Label do
           hjust: [hjust],
           offset: [{along + lift_along, up + lift_up}],
           check_overlap: false,
-          ascent: layout.ascent
+          ascent: layout.ascent,
+          glyphs:
+            Font.glyphs([text], layout.font_size, layout.family, :plain, layout.installed_fonts)
         }
       ]
     end

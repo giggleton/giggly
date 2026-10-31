@@ -136,15 +136,15 @@ defmodule Giggly.Geom.Bar do
 
     # Each bar as a rectangle, ggplot2's `GeomRect` drawing it.
     @impl Giggly.Geom
-    def draw_panel(_geom, frame, coord, panel_params),
-      do: Geom.draw_panel(%Rect{}, frame, coord, panel_params)
+    def draw_panel(_geom, frame, coord, panel_params, installed_fonts),
+      do: Geom.draw_panel(%Rect{}, frame, coord, panel_params, installed_fonts)
 
     # A legend's key, and the room it needs, as a rectangle's.
     @impl Giggly.Geom
-    def draw_key(_geom, key), do: Geom.draw_key(%Rect{}, key)
+    def draw_key(_geom, key, installed_fonts), do: Geom.draw_key(%Rect{}, key, installed_fonts)
 
     @impl Giggly.Geom
-    def key_size(_geom, key), do: Geom.key_size(%Rect{}, key)
+    def key_size(_geom, key, installed_fonts), do: Geom.key_size(%Rect{}, key, installed_fonts)
 
     # Each row's width, ggplot2's `compute_data_size()`: the `width` its stat gave it, as counting
     # does, or else the closest spacing of the x positions in each panel, the smallest of them,

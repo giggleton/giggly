@@ -4,7 +4,7 @@ defmodule Giggly.Guide.AxisTheta do
   # The axis around a radial panel's circle, ggplot2's `guide_axis_theta()`: drawn inside the
   # panel, over its layers, a tick at each break reaching out from the circle's edge along the
   # break's angle, the break's label beyond it, and a line round the circle's edge through the
-  # points the coordinate system gives it. `Giggly.Guide.Axis.draw_inside/3` draws it.
+  # points the coordinate system gives it. `Giggly.Guide.Axis.draw_inside/4` draws it.
   #
   # It looks as the theme's angle axis does (`Giggly.Theme`'s `axis_text_theta` and the rest), which
   # inherits the x axis's look: each tick reaches its tick length out from the circle, and each
@@ -34,25 +34,30 @@ defmodule Giggly.Guide.AxisTheta do
   # `theme`'s look: its primitives, placed in the panel's cell, its line after its ticks, as
   # ggplot2 draws it.
   @doc false
-  @spec draw([Giggly.Coord.theta_break()], [{float(), float()}], Theme.t()) ::
+  @spec draw([Giggly.Coord.theta_break()], [{float(), float()}], Theme.t(), boolean()) ::
           [Giggly.Scene.primitive()]
-  def draw(breaks, line, %Theme{
-        axis_ticks_theta: ticks_look,
-        axis_ticks_length_theta: tick_length,
-        axis_text_theta: text_look,
-        axis_line_theta: line_look
-      }) do
+  def draw(
+        breaks,
+        line,
+        %Theme{
+          axis_ticks_theta: ticks_look,
+          axis_ticks_length_theta: tick_length,
+          axis_text_theta: text_look,
+          axis_line_theta: line_look
+        },
+        installed_fonts
+      ) do
     Enum.concat([
-      labels(breaks, tick_length, text_look),
+      labels(breaks, tick_length, text_look, installed_fonts),
       ticks(breaks, tick_length, ticks_look),
       line(line, line_look)
     ])
   end
 
   # Each break's label, justified by its angle beyond its tick; none where the theme removes them.
-  defp labels(_breaks, _tick_length, :none), do: []
+  defp labels(_breaks, _tick_length, :none, _installed_fonts), do: []
 
-  defp labels(breaks, tick_length, text_look) do
+  defp labels(breaks, tick_length, text_look, installed_fonts) do
     # A label sits its margin's widest side beyond its tick, or beyond the circle for a tick turned
     # into the panel by a negative length, as ggplot2's does.
     widest_margin =
@@ -76,7 +81,7 @@ defmodule Giggly.Guide.AxisTheta do
       }
 
       offset = {label_offset * :math.sin(angle), label_offset * :math.cos(angle)}
-      Parts.text([label], [place], offset, look)
+      Parts.text([label], [place], offset, look, installed_fonts)
     end)
   end
 

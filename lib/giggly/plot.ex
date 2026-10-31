@@ -4613,7 +4613,7 @@ defmodule Giggly.Plot do
   `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
   "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
   [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.
-  Every family is measured as the default sans-serif is, and each label drawn at that width.
+  How a family is measured and drawn, with Pica or without it: the [fonts guide](fonts.md).
 
   A length is a number of ggplot2's points (1/72.27 inch), `{amount, unit}` in `:pt`, `:cm`,
   `:mm`, `:in` or `:lines`, a line of text, or `{:rel, share}`, a share of its parent's. A margin

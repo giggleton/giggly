@@ -45,14 +45,25 @@ defmodule Giggly.Guide.Bar do
   # label for each of `keys`, each its place along the bar, 0 to 1, and its label, in `theme`'s
   # look: its width in points and its table, every size in points.
   @doc false
-  @spec draw(Giggly.Guide.legend(), (:up | :across -> Scene.primitive()), Theme.line(), Theme.t()) ::
-          {float(), Scene.t()}
-  def draw(%{title: title, keys: keys, direction: direction}, fill, ticks_look, theme) do
+  @spec draw(
+          Giggly.Guide.legend(),
+          (:up | :across -> Scene.primitive()),
+          Theme.line(),
+          Theme.t(),
+          boolean()
+        ) :: {float(), Scene.t()}
+  def draw(
+        %{title: title, keys: keys, direction: direction},
+        fill,
+        ticks_look,
+        theme,
+        installed_fonts
+      ) do
     %Theme{legend_margin: margin} = theme
     places = Enum.map(keys, fn key -> key.place end)
 
     {widths, heights, cells} =
-      lay_out(direction, {title, keys}, {fill, places, ticks_look}, theme)
+      lay_out(direction, {title, keys}, {fill, places, ticks_look}, theme, installed_fonts)
 
     widths = Enum.concat([[margin.left], widths, [margin.right]])
     heights = Enum.concat([[margin.top], heights, [margin.bottom]])
@@ -72,7 +83,13 @@ defmodule Giggly.Guide.Bar do
 
   # The bar's widths and heights inside the legend's margin, and its cells after the background:
   # the title's, the bar's and the labels'.
-  defp lay_out(:vertical, {title, keys}, {fill, places, ticks_look}, %Theme{} = theme) do
+  defp lay_out(
+         :vertical,
+         {title, keys},
+         {fill, places, ticks_look},
+         %Theme{} = theme,
+         installed_fonts
+       ) do
     %Theme{
       legend_key_width: key_width,
       legend_key_height: key_height,
@@ -82,10 +99,15 @@ defmodule Giggly.Guide.Bar do
 
     title = Parts.title(title, title_look)
     labels = Parts.labels(keys, text_look)
-    {label_margin, labels_width} = label_column(labels, text_look)
+    {label_margin, labels_width} = label_column(labels, text_look, installed_fonts)
 
     {widths, title_heights, first, title_cells} =
-      Parts.title_above(title, title_look, [key_width, label_margin, labels_width])
+      Parts.title_above(
+        title,
+        title_look,
+        [key_width, label_margin, labels_width],
+        installed_fonts
+      )
 
     bar_row = 2 + length(title_heights)
     ticks = ticks_up(places, key_width, theme)
@@ -94,13 +116,25 @@ defmodule Giggly.Guide.Bar do
       Enum.concat([
         title_cells,
         [bar_cell(fill.(:up), ticks(ticks, ticks_look), {bar_row, first})],
-        right_label_cells(labels, {bar_row, (first + 1)..(first + 2)}, places, text_look)
+        right_label_cells(
+          labels,
+          {bar_row, (first + 1)..(first + 2)},
+          places,
+          text_look,
+          installed_fonts
+        )
       ])
 
     {widths, Enum.concat(title_heights, [@bar_keys * key_height]), cells}
   end
 
-  defp lay_out(:horizontal, {title, keys}, {fill, places, ticks_look}, %Theme{} = theme) do
+  defp lay_out(
+         :horizontal,
+         {title, keys},
+         {fill, places, ticks_look},
+         %Theme{} = theme,
+         installed_fonts
+       ) do
     %Theme{
       legend_key_width: key_width,
       legend_key_height: key_height,
@@ -110,10 +144,10 @@ defmodule Giggly.Guide.Bar do
 
     title = Parts.title(title, title_look)
     labels = Parts.labels(keys, text_look)
-    label_height = label_row(labels, text_look)
+    label_height = label_row(labels, text_look, installed_fonts)
 
     {title_widths, heights, first, title_cells} =
-      Parts.title_column(title, title_look, [key_height, label_height])
+      Parts.title_column(title, title_look, [key_height, label_height], installed_fonts)
 
     ticks = ticks_across(places, key_height, theme)
 
@@ -121,7 +155,7 @@ defmodule Giggly.Guide.Bar do
       Enum.concat([
         title_cells,
         [bar_cell(fill.(:across), ticks(ticks, ticks_look), {first, first})],
-        below_label_cells(labels, {first + 1, first}, places, text_look)
+        below_label_cells(labels, {first + 1, first}, places, text_look, installed_fonts)
       ])
 
     bar_length = @bar_keys * key_width
@@ -182,22 +216,22 @@ defmodule Giggly.Guide.Bar do
   # The labels' margin beside a bar running up and their column, as wide as the labels turned,
   # measured together as ggplot2's colour bar measures its one grob of labels, and their right
   # margin; none of either for a bar with no labels.
-  defp label_column(labels, look) do
+  defp label_column(labels, look, installed_fonts) do
     if unlabelled?(labels) do
       {0.0, 0.0}
     else
-      {width, _height} = Parts.extent(labels, look)
+      {width, _height} = Parts.extent(labels, look, installed_fonts)
       {look.margin.left, width + look.margin.right}
     end
   end
 
   # How deep the labels' row below a bar running across is: the labels turned, measured together,
   # and their margins above and below; none for a bar with no labels.
-  defp label_row(labels, look) do
+  defp label_row(labels, look, installed_fonts) do
     if unlabelled?(labels) do
       0.0
     else
-      {_width, height} = Parts.extent(labels, look)
+      {_width, height} = Parts.extent(labels, look, installed_fonts)
       look.margin.top + height + look.margin.bottom
     end
   end
@@ -205,20 +239,26 @@ defmodule Giggly.Guide.Bar do
   # The labels of a bar running up, each at its tick's place up the bar's row, across at its
   # turned justification of the labels' margin and column, its margins either side counted;
   # none for a bar with no labels.
-  defp right_label_cells(labels, {row, columns}, places, text_look) do
+  defp right_label_cells(labels, {row, columns}, places, text_look, installed_fonts) do
     if unlabelled?(labels) do
       []
     else
       {{across, _up}, offset} = Parts.anchor(text_look, :across)
       label_places = Enum.map(places, fn place -> {across, place} end)
-      [label_cell(Parts.text(labels, label_places, offset, text_look), {row..row, columns})]
+
+      [
+        label_cell(
+          Parts.text(labels, label_places, offset, text_look, installed_fonts),
+          {row..row, columns}
+        )
+      ]
     end
   end
 
   # The labels of a bar running across, each at its tick's place along the bar's column, up at
   # its turned justification of the labels' row below the bar, its margins above and below
   # counted; none for a bar with no labels.
-  defp below_label_cells(labels, {row, column}, places, text_look) do
+  defp below_label_cells(labels, {row, column}, places, text_look, installed_fonts) do
     if unlabelled?(labels) do
       []
     else
@@ -227,7 +267,7 @@ defmodule Giggly.Guide.Bar do
 
       [
         label_cell(
-          Parts.text(labels, label_places, offset, text_look),
+          Parts.text(labels, label_places, offset, text_look, installed_fonts),
           {row..row, column..column}
         )
       ]

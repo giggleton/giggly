@@ -29,42 +29,49 @@ defmodule Giggly.Guide.Title do
   @doc false
   @spec draw(
           %{title: label(), subtitle: label(), caption: label(), tag: label()},
-          Theme.t()
+          Theme.t(),
+          boolean()
         ) :: %{
           title: drawn(),
           subtitle: drawn(),
           caption: drawn(),
           tag: {{float(), float()}, [struct()]}
         }
-  def draw(%{title: title, subtitle: subtitle, caption: caption, tag: tag}, %Theme{} = theme) do
+  def draw(
+        %{title: title, subtitle: subtitle, caption: caption, tag: tag},
+        %Theme{} = theme,
+        installed_fonts
+      ) do
     %{
-      title: row_label(title, theme.plot_title),
-      subtitle: row_label(subtitle, theme.plot_subtitle),
-      caption: row_label(caption, theme.plot_caption),
-      tag: tag(tag, theme.plot_tag)
+      title: row_label(title, theme.plot_title, installed_fonts),
+      subtitle: row_label(subtitle, theme.plot_subtitle, installed_fonts),
+      caption: row_label(caption, theme.plot_caption, installed_fonts),
+      tag: tag(tag, theme.plot_tag, installed_fonts)
     }
   end
 
   # A label in a row of its own, spanning the panels: as deep as it and its margins above and
   # below, anchored in the row as `Giggly.Guide.Parts` places it.
-  defp row_label(:none, _look), do: {0.0, []}
-  defp row_label(_label, :none), do: {0.0, []}
+  defp row_label(:none, _look, _installed_fonts), do: {0.0, []}
+  defp row_label(_label, :none, _installed_fonts), do: {0.0, []}
 
-  defp row_label(label, %{margin: margin} = look) do
-    {_width, height} = Parts.extent([label], look)
+  defp row_label(label, %{margin: margin} = look, installed_fonts) do
+    {_width, height} = Parts.extent([label], look, installed_fonts)
     {place, offset} = Parts.anchor(look, :both)
-    {margin.top + height + margin.bottom, [Parts.text([label], [place], offset, look)]}
+
+    {margin.top + height + margin.bottom,
+     [Parts.text([label], [place], offset, look, installed_fonts)]}
   end
 
   # The tag, in a cell as wide and as deep as it and its margins, anchored in it as
   # `Giggly.Guide.Parts` places it.
-  defp tag(:none, _look), do: {{0.0, 0.0}, []}
-  defp tag(_label, :none), do: {{0.0, 0.0}, []}
+  defp tag(:none, _look, _installed_fonts), do: {{0.0, 0.0}, []}
+  defp tag(_label, :none, _installed_fonts), do: {{0.0, 0.0}, []}
 
-  defp tag(label, %{margin: margin} = look) do
-    {width, height} = Parts.extent([label], look)
+  defp tag(label, %{margin: margin} = look, installed_fonts) do
+    {width, height} = Parts.extent([label], look, installed_fonts)
     {place, offset} = Parts.anchor(look, :both)
     cell = {margin.left + width + margin.right, margin.top + height + margin.bottom}
-    {cell, [Parts.text([label], [place], offset, look)]}
+    {cell, [Parts.text([label], [place], offset, look, installed_fonts)]}
   end
 end

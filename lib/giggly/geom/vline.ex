@@ -57,7 +57,7 @@ defmodule Giggly.Geom.Vline do
     # The panel's lines: each distinct row a segment up the panel's y extent at its `xintercept`,
     # its `xend` left for the segment to copy from its `x`.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       %{y: {low, high}} = Coord.extents(coord, panel_params)
       lines = DataFrame.distinct(frame)
       count = DataFrame.row_count(lines)
@@ -75,18 +75,19 @@ defmodule Giggly.Geom.Vline do
 
       geom
       |> segment()
-      |> Geom.draw_panel(segments, coord, panel_params)
+      |> Geom.draw_panel(segments, coord, panel_params, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key), do: Path.line_key(key, @key_line, geom.line_end, :none)
+    def draw_key(geom, key, _installed_fonts),
+      do: Path.line_key(key, @key_line, geom.line_end, :none)
 
     # A path's room, as `draw_key_vline()` sets no size of its own without an arrow.
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> segment()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The segments the lines are drawn as, with the lines' ends and a segment's round corners, as

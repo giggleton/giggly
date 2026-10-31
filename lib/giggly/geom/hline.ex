@@ -52,7 +52,7 @@ defmodule Giggly.Geom.Hline do
     # The panel's lines: each distinct row a segment across the panel's x extent at its
     # `yintercept`, its `yend` left for the segment to copy from its `y`.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params) do
+    def draw_panel(geom, frame, coord, panel_params, installed_fonts) do
       %{x: {low, high}} = Coord.extents(coord, panel_params)
       lines = DataFrame.distinct(frame)
       count = DataFrame.row_count(lines)
@@ -70,21 +70,21 @@ defmodule Giggly.Geom.Hline do
 
       geom
       |> segment()
-      |> Geom.draw_panel(segments, coord, panel_params)
+      |> Geom.draw_panel(segments, coord, panel_params, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def draw_key(geom, key) do
+    def draw_key(geom, key, installed_fonts) do
       geom
       |> segment()
-      |> Geom.draw_key(key)
+      |> Geom.draw_key(key, installed_fonts)
     end
 
     @impl Giggly.Geom
-    def key_size(geom, key) do
+    def key_size(geom, key, installed_fonts) do
       geom
       |> segment()
-      |> Geom.key_size(key)
+      |> Geom.key_size(key, installed_fonts)
     end
 
     # The segments the lines are drawn as, with the lines' ends and a segment's round corners, as
