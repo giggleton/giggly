@@ -23,11 +23,8 @@ defmodule Giggly.Facet.Combinations do
   # its rows repeated once for each combination of the missing columns' values in the layout, in
   # panel order, as ggplot2's `map_facet_data()` repeats them: all its rows for the first, then
   # all for the next, so one lacking them all is drawn in every panel.
-  #
-  # A strip writes a value as ggplot2's `label_value()` writes it, R's `as.character()`
-  # (`Giggly.AsCharacter`: `4` for a whole float, `TRUE`), with a missing value written `NA`.
 
-  alias Giggly.{AsCharacter, DataFrame}
+  alias Giggly.DataFrame
 
   # The combinations of `columns`' values that `frames` make, the plot's data and then each
   # layer's table, each a list of values in the columns' order, sorted; `order_key` orders values
@@ -85,12 +82,6 @@ defmodule Giggly.Facet.Combinations do
 
     DataFrame.put(repeated, :panel, panels)
   end
-
-  # A value as its strip writes it, ggplot2's `label_value()`.
-  @doc false
-  @spec label(term()) :: String.t()
-  def label(nil), do: "NA"
-  def label(value), do: AsCharacter.text(value)
 
   # How a facet column's values are ordered: by the places of the levels of the tables holding it,
   # in table order, where every one holds it as a category, a missing value after them, as vctrs

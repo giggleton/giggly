@@ -79,6 +79,25 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A labeller is plain data under `labeller:`, ggplot2's labellers by R's rules (2026-10-30,
+  Steve: "a", "A", and "agree" to the small calls; checked against ggplot2 4.0.3).** `:value`,
+  `:both` and `:context`, each also `{kind, options}`; a function handed one label; a map of
+  labels; a keyword list as R's `labeller()`, its per-column labellers under `columns:`, with
+  `rows:`, `cols:`, `default:` and `multi_line:`. R's composition is copied, quirks included: a
+  function's or map's labels written by the default, a column's missing labels filled in from it,
+  `label_context()` ignoring `sep` (refused), two ways of joining one strip. *Rejected: builder
+  functions in a `Giggly.Labeller`* — R builds values because it passes objects; Giggly's options
+  take keyword lists. *Rejected: a function handed a side's list, as `Scales.Labels` takes
+  breaks* — breaks share decimals, strips share nothing. *Rejected: column names at the list's top
+  level* — a column named `rows` or `default` would collide, which R's leading dots avoid.
+
+- **A missing value is never handed to a labeller's function or looked up (2026-10-30, Steve:
+  "A").** It stays missing until the default writes it, `NA` or `vore: NA`. R hands its `NA` over,
+  so a function adding text departs: `NA-foo` in R, `NA` in Giggly, and a map's miss under such a
+  default the default's own label (`1-foo`, R `NA-foo`). *Rejected: handing over `"NA"`* —
+  `String.capitalize("NA")` is `"Na"`, where R draws `NA`. *Rejected: handing over `nil`* —
+  `&String.capitalize/1` would raise on msleep's `vore`, and every function would need a clause.
+
 - **A breaks function is called as ggplot2's `get_breaks()` calls one, and R's names are
   `{break, label}` pairs (2026-10-29, Steve, increment 2's step 5: "Match R", "B", "A"; checked
   against ggplot2 4.0.3).** `breaks:` and `minor_breaks:` take a function of one argument or two,
@@ -3224,6 +3243,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-30 — Take labeller: on facet_wrap and facet_grid, ggplot2's label_value, label_both and
+  label_context, a function or a map, and labeller()'s sides and columns (labellers, step 1); §4:
+  "A labeller is plain data", "A missing value is never handed"
 - 2026-10-30 — Draw the notebook examples geom_hex() unlocks, and narrow stat_summary_hex()'s
   verdict to what still waits (geom_hex, step 2, the notebook sweep)
 - 2026-10-30 — Name the breaks functions, n_breaks: and a discrete axis's minor breaks in the

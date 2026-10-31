@@ -364,7 +364,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   each given once (`validate_arrow/1`); recorded as a map, its angle a float, its length in points
   and its fill resolved, `:none` when not given.
 - **A function's keyword options are validated by NimbleOptions at the call** (`facet_wrap/3`'s
-  `nrow:`, `ncol:` and `scales:`; `facet_grid/2`'s `rows:`, `cols:` and `scales:`; the bar
+  `nrow:`, `ncol:`, `scales:` and `labeller:`; `facet_grid/2`'s `rows:`, `cols:`, `scales:` and
+  `labeller:`; the bar
   functions' `position:`, `fill:`, `width:` and `just:`,
   0 to 1; every geom function's
   `data:`, `alpha:` and `colour:`; `geom_point/3`'s, `geom_jitter/3`'s, `geom_count/3`'s and
@@ -469,6 +470,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `.claude/rules/mapping.md`'s; `Plot` never matches a value's shape itself.
 - **A facet's column reference is an atom or a string,** compared with the data's names as a
   string.
+- **A facet's `labeller:` is recorded as `Facet.Labeller` reads it** (`validate_labeller/2`;
+  design-log §4, the entry beginning "A labeller is plain data"): a map of `rows` and `cols`, each
+  side's own labeller or `:none`, `columns`, a labeller per column by its name, `default`
+  (`:value`) and `multi_line` (`true`). A labeller given alone is recorded as both sides', a
+  keyword list as ggplot2's `labeller()`. Each labeller in it is a kind as `{kind, %{options}}`
+  (`:value`, `:both` with `sep:`, `:context`, which takes no `sep:`, as R passes it nowhere), a
+  function of one label, or a map of label strings; `multi_line:` is the list's, never a kind's
+  inside it, as R hands `.multi_line` on. A wrap given both `rows:` and `cols:` is refused by its
+  validation; a `columns:` entry naming a column of a side with a labeller of its own raises at
+  the call, where R aborts when it draws; one naming no facet column is kept, as R passes it over.
 - **A layer's own mapping is checked against what it accepts as the layer is added, and its own
   laid over the plot's against what it requires**: an aesthetic the layer maps that it cannot use
   raises, and so does a required one neither mapping gives nor an option sets, as ggplot2 checks a

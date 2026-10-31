@@ -122,8 +122,8 @@ panel's grid lines are placed by the coordinate system".
 - **Drawing order follows ggplot2's:** an axis's line first; below the panel the ticks and then
   the labels, to its left and round a radial panel's circle the labels and then the ticks, and
   round the circle the line last.
-- **A strip is one label on a background as long as its panel's side**, ggplot2's `label_value()`
-  text placed by the rule counting its margins on every side, each side the cell's own,
+- **A strip is one label on a background as long as its panel's side**, the text its facet's
+  labeller wrote, placed by the rule counting its margins on every side, each side the cell's own,
   `theme_gray()`'s centred: above the panel (`strip_text_x_top`, `strip_background_x`) as tall as
   its margins above and below and the label turned, a level one an ascent and the deepest descent;
   right of it (`strip_text_y_right`, `strip_background_y`, `theme_gray()`'s text turned -90

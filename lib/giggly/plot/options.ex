@@ -17,6 +17,62 @@ defmodule Giggly.Plot.Options do
   alias Giggly.{Aesthetics, ElementTree, Geom, Guide, Position, Theme}
   alias Scales.{ColorOperations, DataRange, Palette}
 
+  # A facet's strip labels, ggplot2's labellers: each kind's options, and whether a labeller given
+  # alone puts each column's label in a strip of its own. In a keyword list of labellers,
+  # `multi_line:` is the list's, as ggplot2's `labeller()` hands its `.multi_line` to each.
+  @labeller_kind_options %{
+    value: [],
+    both: [
+      sep: [type: :string, default: ": ", doc: "What goes between a column's name and its value."]
+    ],
+    context: []
+  }
+
+  @multi_line_option [
+    type: :boolean,
+    default: true,
+    doc:
+      "Whether each column's label is a strip of its own (`true`), or one strip holds them " <>
+        "all, joined by `\", \"`."
+  ]
+
+  @labeller_kind_schemas Map.new(@labeller_kind_options, fn {kind, options} ->
+                           {kind, NimbleOptions.new!(options)}
+                         end)
+
+  @labeller_alone_schemas Map.new(@labeller_kind_options, fn {kind, options} ->
+                            {kind,
+                             options
+                             |> Keyword.put(:multi_line, @multi_line_option)
+                             |> NimbleOptions.new!()}
+                          end)
+
+  @labellers_schema NimbleOptions.new!(
+                      rows: [
+                        type: {:custom, __MODULE__, :validate_labeller_entry, []},
+                        doc: "The labeller of every strip of the rows of panels."
+                      ],
+                      cols: [
+                        type: {:custom, __MODULE__, :validate_labeller_entry, []},
+                        doc: "The labeller of every strip of the columns of panels."
+                      ],
+                      columns: [
+                        type: {:custom, __MODULE__, :validate_column_labellers, []},
+                        default: %{},
+                        doc: "A labeller for each column named, by the column."
+                      ],
+                      default: [
+                        type: {:custom, __MODULE__, :validate_labeller_entry, []},
+                        default: :value,
+                        doc: "The labeller of every other column."
+                      ],
+                      multi_line: @multi_line_option
+                    )
+
+  @labeller_doc "How each strip is labelled from its panel's values: `:value`, `:both`, " <>
+                  "`:context`, one of them with its options, a function, a map, or a keyword " <>
+                  "list labelling each side or column apart, as \"Labelling the strips\" says."
+
   # `facet_wrap/3`'s options, validated at the call as every public function's are.
   @facet_wrap_options NimbleOptions.new!(
                         nrow: [
@@ -34,6 +90,11 @@ defmodule Giggly.Plot.Options do
                             "Whether the panels share each axis's scale (`:fixed`), or each " <>
                               "panel has its own x scale (`:free_x`), y scale (`:free_y`) or both " <>
                               "(`:free`), and draws its own axis for each."
+                        ],
+                        labeller: [
+                          type: {:custom, __MODULE__, :validate_labeller, [:wrap]},
+                          default: :value,
+                          doc: @labeller_doc
                         ]
                       )
 
@@ -71,6 +132,11 @@ defmodule Giggly.Plot.Options do
                             "Whether the panels share each axis's scale (`:fixed`), or each " <>
                               "column of panels has its own x scale (`:free_x`), each row its " <>
                               "own y scale (`:free_y`), or both (`:free`)."
+                        ],
+                        labeller: [
+                          type: {:custom, __MODULE__, :validate_labeller, [:grid]},
+                          default: :value,
+                          doc: @labeller_doc
                         ]
                       )
 
@@ -4911,4 +4977,132 @@ defmodule Giggly.Plot.Options do
 
   defp bin_breaks_error(breaks),
     do: "expected two or more distinct numbers where the bins meet, got: #{inspect(breaks)}"
+
+  # NimbleOptions' check of a facet's `labeller:`, kept as `Giggly.Facet.Labeller` reads it: one
+  # labeller given alone labels both sides, every column at once, as ggplot2 hands a labeller each
+  # side's table; a keyword list is ggplot2's `labeller()`, its sides `:none` when not given. A wrap
+  # has one side of strips, so it takes `rows:` or `cols:` for them, not both.
+  @doc false
+  @spec validate_labeller(term(), :wrap | :grid) :: {:ok, map()} | {:error, String.t()}
+  def validate_labeller(labellers, facet) when is_list(labellers) do
+    cond do
+      not Keyword.keyword?(labellers) ->
+        {:error, labeller_error(labellers)}
+
+      facet == :wrap and both_sides?(labellers) ->
+        {:error,
+         "a wrap's strips are one side, labelled by rows: or cols:, not both, got: " <>
+           inspect(labellers)}
+
+      true ->
+        labellers
+        |> NimbleOptions.validate(@labellers_schema)
+        |> labellers_kept()
+    end
+  end
+
+  def validate_labeller(labeller, _facet) do
+    case labeller_entry(labeller, @labeller_alone_schemas) do
+      {:ok, {kind, options}} when is_atom(kind) ->
+        {multi_line, kind_options} = Map.pop!(options, :multi_line)
+        {:ok, alone({kind, kind_options}, multi_line)}
+
+      {:ok, kept} ->
+        {:ok, alone(kept, true)}
+
+      error ->
+        error
+    end
+  end
+
+  defp both_sides?(labellers),
+    do: Keyword.has_key?(labellers, :rows) and Keyword.has_key?(labellers, :cols)
+
+  defp labellers_kept({:ok, validated}) do
+    {:ok,
+     %{
+       rows: Keyword.get(validated, :rows, :none),
+       cols: Keyword.get(validated, :cols, :none),
+       columns: Keyword.fetch!(validated, :columns),
+       default: Keyword.fetch!(validated, :default),
+       multi_line: Keyword.fetch!(validated, :multi_line)
+     }}
+  end
+
+  defp labellers_kept({:error, %NimbleOptions.ValidationError{message: message}}),
+    do: {:error, message}
+
+  defp alone(labeller, multi_line),
+    do: %{
+      rows: labeller,
+      cols: labeller,
+      columns: %{},
+      default: {:value, %{}},
+      multi_line: multi_line
+    }
+
+  # NimbleOptions' check of one labeller in a keyword list of them: a kind by name, or with its
+  # options, which take no `multi_line:` there; a function of one label; or a map of labels.
+  @doc false
+  @spec validate_labeller_entry(term()) :: {:ok, term()} | {:error, String.t()}
+  def validate_labeller_entry(labeller), do: labeller_entry(labeller, @labeller_kind_schemas)
+
+  # NimbleOptions' check of `columns:`: a keyword list or a map of a labeller for each column, by
+  # a column reference, kept as a map by the column's name, a column named twice refused.
+  @doc false
+  @spec validate_column_labellers(term()) :: {:ok, map()} | {:error, String.t()}
+  def validate_column_labellers(labellers) when is_list(labellers) or is_map(labellers) do
+    Enum.reduce_while(labellers, {:ok, %{}}, fn
+      {reference, labeller}, {:ok, kept} when is_binary(reference) or is_atom(reference) ->
+        column_labeller(to_string(reference), labeller, kept)
+
+      other, _kept ->
+        {:halt, {:error, "expected a column and its labeller, got: #{inspect(other)}"}}
+    end)
+  end
+
+  def validate_column_labellers(labellers),
+    do:
+      {:error,
+       "expected a keyword list or a map of a labeller for each column, got: " <>
+         inspect(labellers)}
+
+  defp column_labeller(name, _labeller, kept) when is_map_key(kept, name),
+    do: {:halt, {:error, "expected each column named once, got #{inspect(name)} twice"}}
+
+  defp column_labeller(name, labeller, kept) do
+    case validate_labeller_entry(labeller) do
+      {:ok, entry} -> {:cont, {:ok, Map.put(kept, name, entry)}}
+      {:error, message} -> {:halt, {:error, "the labeller of #{inspect(name)}: #{message}"}}
+    end
+  end
+
+  defp labeller_entry(kind, schemas) when is_atom(kind) and is_map_key(schemas, kind),
+    do: labeller_entry({kind, []}, schemas)
+
+  defp labeller_entry({kind, options} = labeller, schemas)
+       when is_atom(kind) and is_map_key(schemas, kind) do
+    with true <- Keyword.keyword?(options) || {:error, labeller_error(labeller)},
+         {:ok, validated} <- NimbleOptions.validate(options, Map.fetch!(schemas, kind)) do
+      {:ok, {kind, Map.new(validated)}}
+    else
+      {:error, %NimbleOptions.ValidationError{message: message}} -> {:error, message}
+      error -> error
+    end
+  end
+
+  defp labeller_entry(function, _schemas) when is_function(function, 1), do: {:ok, function}
+
+  defp labeller_entry(lookup, _schemas) when is_map(lookup) do
+    if Enum.all?(lookup, fn {label, shown} -> is_binary(label) and is_binary(shown) end),
+      do: {:ok, lookup},
+      else: {:error, "expected a map of labels to the labels to show, got: #{inspect(lookup)}"}
+  end
+
+  defp labeller_entry(labeller, _schemas), do: {:error, labeller_error(labeller)}
+
+  defp labeller_error(labeller),
+    do:
+      "expected :value, :both or :context, one of them with its options, a function of one " <>
+        "label, a map of labels, or a keyword list of labellers, got: #{inspect(labeller)}"
 end

@@ -7,17 +7,32 @@ defmodule Giggly.FacetTest do
   # A frame whose column "g" holds `count` distinct values, one row each.
   defp distinct_values(count), do: DataFrame.new([{"g", Enum.to_list(1..count//1)}])
 
+  # The labeller a plot records when none is given: each value alone, a strip for each column.
+  @value %{
+    rows: {:value, %{}},
+    cols: {:value, %{}},
+    columns: %{},
+    default: {:value, %{}},
+    multi_line: true
+  }
+
   defp wrap(facets, options \\ []) do
     %Facet.Wrap{
       facets: facets,
       nrow: Keyword.get(options, :nrow, :none),
       ncol: Keyword.get(options, :ncol, :none),
-      scales: Keyword.get(options, :scales, :fixed)
+      scales: Keyword.get(options, :scales, :fixed),
+      labeller: Keyword.get(options, :labeller, @value)
     }
   end
 
   defp grid(rows, cols, options \\ []) do
-    %Facet.Grid{rows: rows, cols: cols, scales: Keyword.get(options, :scales, :fixed)}
+    %Facet.Grid{
+      rows: rows,
+      cols: cols,
+      scales: Keyword.get(options, :scales, :fixed),
+      labeller: Keyword.get(options, :labeller, @value)
+    }
   end
 
   defp layout(facet, frame), do: Facet.layout(facet, [frame], &DataRange.level_key/1)
@@ -334,6 +349,27 @@ defmodule Giggly.FacetTest do
               DataFrame.pull(by_cylinders, :strip_top)} ===
                {[["FALSE", "1e+05"], ["TRUE", "0.5"], ["TRUE", "2"]], [["4"], ["6"], ["8"]]}
     end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 labels `facet_wrap(vars(cyl, drv))` over mpg's strips `cyl: 4`
+    # above `drv: f` under `labeller(.cols = label_both)` and under `labeller(.rows = label_both)`
+    # alike: a wrap's one side is labelled by either, so neither side's alone may be read for it.
+    test "the labeller labels every panel's strips from all its columns' values" do
+      frame = DataFrame.new([{"cyl", [4, 6]}, {"drv", ["f", "r"]}])
+      both = {:both, %{sep: ": "}}
+
+      labellers = [%{@value | rows: :none, cols: both}, %{@value | rows: both, cols: :none}]
+
+      strips =
+        Enum.map(labellers, fn labeller ->
+          facet = wrap(["cyl", "drv"], labeller: labeller)
+
+          facet
+          |> layout(frame)
+          |> DataFrame.pull(:strip_top)
+        end)
+
+      assert strips == List.duplicate([["cyl: 4", "drv: f"], ["cyl: 6", "drv: r"]], 2)
+    end
   end
 
   describe "the wrapped layout's free scales" do
@@ -454,6 +490,20 @@ defmodule Giggly.FacetTest do
 
       assert {DataFrame.pull(rows_alone, :strip_top), DataFrame.pull(rows_alone, :strip_right)} ==
                {[[], []], [["a"], ["b"]]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 labels `facet_grid(vs + am ~ gear, labeller = labeller(.rows
+    # = label_both))` over mtcars' rows `am: 0` nearest the panels and `vs: 0` outermost, and its
+    # columns' `3`: each side's strips by that side's own labeller.
+    test "the labeller labels each side's strips from that side's columns' values" do
+      frame = DataFrame.new([{"vs", [0.0, 1.0]}, {"am", [0.0, 1.0]}, {"gear", [3.0, 4.0]}])
+      labeller = %{@value | rows: {:both, %{sep: ": "}}, cols: :none}
+
+      facet_layout = layout(grid(["vs", "am"], ["gear"], labeller: labeller), frame)
+
+      assert {DataFrame.pull(facet_layout, :strip_top),
+              DataFrame.pull(facet_layout, :strip_right)} ==
+               {[["3"], ["4"], [], []], [[], ["am: 0", "vs: 0"], [], ["am: 1", "vs: 1"]]}
     end
   end
 

@@ -3902,6 +3902,16 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  # The labeller a facet records when given none, as `labeller: :value`: each value alone, labelling
+  # both sides, a strip for each column.
+  @value_labeller %{
+    rows: {:value, %{}},
+    cols: {:value, %{}},
+    columns: %{},
+    default: {:value, %{}},
+    multi_line: true
+  }
+
   describe "facet_wrap/3" do
     test "a plot records the wrapped facet with its columns by their names in the data" do
       plot =
@@ -3913,7 +3923,8 @@ defmodule Giggly.PlotTest do
                facets: ["cyl", "wt"],
                nrow: :none,
                ncol: 2,
-               scales: :fixed
+               scales: :fixed,
+               labeller: @value_labeller
              }
     end
 
@@ -3923,7 +3934,13 @@ defmodule Giggly.PlotTest do
         |> Plot.new()
         |> Plot.facet_wrap(:cyl, nrow: 3, scales: :free_y)
 
-      assert plot.facet == %Facet.Wrap{facets: ["cyl"], nrow: 3, ncol: :none, scales: :free_y}
+      assert plot.facet == %Facet.Wrap{
+               facets: ["cyl"],
+               nrow: 3,
+               ncol: :none,
+               scales: :free_y,
+               labeller: @value_labeller
+             }
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1 facets `ggplot(df) + geom_point(data = df2)` by a column only
@@ -3934,7 +3951,7 @@ defmodule Giggly.PlotTest do
         |> Plot.new()
         |> Plot.facet_wrap(:gear)
 
-      assert plot.facet == %Facet.Wrap{facets: ["gear"], nrow: :none, ncol: :none, scales: :fixed}
+      assert plot.facet.facets == ["gear"]
     end
 
     test "a value that is not a column reference is refused" do
@@ -3963,6 +3980,108 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       assert_raise NimbleOptions.ValidationError, fn -> Plot.facet_wrap(plot, :cyl, nrow: 0) end
+    end
+
+    test "a labeller given alone is recorded as the labeller of both sides, with its options" do
+      plot = Plot.new(@rows)
+      capitalize = fn label -> String.capitalize(label) end
+      lookup = %{"4" => "four"}
+
+      recorded =
+        Enum.map(
+          [:both, {:both, sep: "=", multi_line: false}, {:context, []}, capitalize, lookup],
+          fn labeller -> Plot.facet_wrap(plot, :cyl, labeller: labeller).facet.labeller end
+        )
+
+      assert recorded == [
+               %{@value_labeller | rows: {:both, %{sep: ": "}}, cols: {:both, %{sep: ": "}}},
+               %{
+                 @value_labeller
+                 | rows: {:both, %{sep: "="}},
+                   cols: {:both, %{sep: "="}},
+                   multi_line: false
+               },
+               %{@value_labeller | rows: {:context, %{}}, cols: {:context, %{}}},
+               %{@value_labeller | rows: capitalize, cols: capitalize},
+               %{@value_labeller | rows: lookup, cols: lookup}
+             ]
+    end
+
+    test "a keyword list of labellers is recorded with each column's by its name, a side not " <>
+           "given as :none" do
+      plot = Plot.new(@rows)
+      lookup = %{"4" => "four"}
+
+      by_column =
+        Plot.facet_wrap(plot, [:cyl, :wt],
+          labeller: [columns: %{:cyl => :both, "wt" => lookup}, default: :context]
+        )
+
+      by_side =
+        Plot.facet_wrap(plot, :cyl, labeller: [cols: {:both, sep: "="}, multi_line: false])
+
+      assert by_column.facet.labeller == %{
+               rows: :none,
+               cols: :none,
+               columns: %{"cyl" => {:both, %{sep: ": "}}, "wt" => lookup},
+               default: {:context, %{}},
+               multi_line: true
+             }
+
+      assert by_side.facet.labeller == %{
+               rows: :none,
+               cols: {:both, %{sep: "="}},
+               columns: %{},
+               default: {:value, %{}},
+               multi_line: false
+             }
+    end
+
+    test "a labeller it cannot use is refused by the option's validation, saying why" do
+      plot = Plot.new(@rows)
+
+      for {labeller, message} <- [
+            {:label_both, "expected :value, :both or :context"},
+            {{:both, [1]}, "expected :value, :both or :context"},
+            {["cyl"], "expected :value, :both or :context"},
+            {{:context, sep: "="}, "unknown options [:sep]"},
+            {%{4 => "four"}, "expected a map of labels to the labels to show"},
+            {[rows: :both, cols: :value], "labelled by rows: or cols:, not both"},
+            {[default: {:both, multi_line: false}], "unknown options [:multi_line]"},
+            {[columns: [{:cyl, :both}, {"cyl", :value}]], ~s(got "cyl" twice)},
+            {[columns: [cyl: :label_both]], ~s(the labeller of "cyl": expected :value)},
+            {[columns: [:cyl]], "expected a column and its labeller, got: :cyl"},
+            {[columns: :cyl], "expected a keyword list or a map of a labeller for each column"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.facet_wrap(plot, :cyl, labeller: labeller)
+          end
+
+        assert error.key == :labeller
+        assert error.message =~ message
+      end
+    end
+
+    test "a labeller labelling every strip, and the faceting column apart, is refused" do
+      plot = Plot.new(@rows)
+
+      for side <- [:rows, :cols] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.facet_wrap(plot, [:wt, :cyl], labeller: [{side, :both}, columns: [cyl: :value]])
+          end
+
+        assert String.starts_with?(
+                 error.message,
+                 "Plot.facet_wrap/3's labeller labels every strip with #{side}:"
+               )
+
+        assert error.message =~ ~s(columns: cannot also label "cyl")
+      end
+
+      labelled_apart = Plot.facet_wrap(plot, :cyl, labeller: [columns: [cyl: :value]])
+      assert labelled_apart.facet.labeller.columns == %{"cyl" => {:value, %{}}}
     end
   end
 
@@ -4012,7 +4131,12 @@ defmodule Giggly.PlotTest do
         |> Plot.new()
         |> Plot.facet_grid(rows: [:cyl, "wt"], cols: :mpg, scales: :free_x)
 
-      assert plot.facet == %Facet.Grid{rows: ["cyl", "wt"], cols: ["mpg"], scales: :free_x}
+      assert plot.facet == %Facet.Grid{
+               rows: ["cyl", "wt"],
+               cols: ["mpg"],
+               scales: :free_x,
+               labeller: @value_labeller
+             }
     end
 
     test "each of the scales' settings is recorded as given" do
@@ -4029,7 +4153,12 @@ defmodule Giggly.PlotTest do
         |> Plot.new()
         |> Plot.facet_grid(cols: :cyl)
 
-      assert plot.facet == %Facet.Grid{rows: [], cols: ["cyl"], scales: :fixed}
+      assert plot.facet == %Facet.Grid{
+               rows: [],
+               cols: ["cyl"],
+               scales: :fixed,
+               labeller: @value_labeller
+             }
     end
 
     test "no column on either side is refused" do
@@ -4052,6 +4181,58 @@ defmodule Giggly.PlotTest do
       assert_raise ArgumentError, ~r/more than once/, fn ->
         Plot.facet_grid(plot, rows: [:cyl, :wt, :cyl])
       end
+    end
+
+    test "a labeller is recorded as facet_wrap/3 records one, a side each" do
+      plot = Plot.new(@rows)
+
+      recorded =
+        Enum.map([:both, [rows: :both, cols: :value]], fn labeller ->
+          Plot.facet_grid(plot, rows: :cyl, cols: :wt, labeller: labeller).facet.labeller
+        end)
+
+      assert recorded == [
+               %{@value_labeller | rows: {:both, %{sep: ": "}}, cols: {:both, %{sep: ": "}}},
+               %{@value_labeller | rows: {:both, %{sep: ": "}}, cols: {:value, %{}}}
+             ]
+    end
+
+    test "a labeller labelling a side, and a column of that side apart, is refused" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.facet_grid(plot,
+            rows: :cyl,
+            cols: :wt,
+            labeller: [rows: :both, columns: [cyl: :value]]
+          )
+        end
+
+      assert String.starts_with?(
+               error.message,
+               "Plot.facet_grid/2's labeller labels every strip of the rows with rows:"
+             )
+
+      assert error.message =~ ~s(columns: cannot also label "cyl")
+
+      assert_raise ArgumentError, ~r/every strip of the columns with cols:/, fn ->
+        Plot.facet_grid(plot,
+          rows: :cyl,
+          cols: :wt,
+          labeller: [cols: :both, columns: [wt: :value]]
+        )
+      end
+
+      # A column of the other side is its own to label.
+      labelled =
+        Plot.facet_grid(plot,
+          rows: :cyl,
+          cols: :wt,
+          labeller: [rows: :both, columns: [wt: :value]]
+        )
+
+      assert labelled.facet.labeller.columns == %{"wt" => {:value, %{}}}
     end
 
     test "a value that is not a column reference, or a scales that is not one, is refused" do

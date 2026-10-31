@@ -24,31 +24,35 @@ defmodule Giggly.Facet.Grid do
   # or not, ggplot2's default: below the last row and left of the first column, so each column's
   # bottom axis is its own x scale's. The panels of the first row have a strip above them for each
   # of the columns' columns, in their order, and those of the last column a strip right of them for
-  # each of the rows' columns, the first outermost, each labelled with its value as ggplot2's
-  # `label_value()` writes it.
+  # each of the rows' columns, the first outermost, or each one strip for them all, labelled from
+  # the values of that side's columns by the facet's labeller (`Giggly.Facet.Labeller`, whose map
+  # the struct holds), the rows' once for each row and the columns' once for each column.
 
-  @enforce_keys [:rows, :cols, :scales]
+  @enforce_keys [:rows, :cols, :scales, :labeller]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           rows: [String.t()],
           cols: [String.t()],
-          scales: :fixed | :free_x | :free_y | :free
+          scales: :fixed | :free_x | :free_y | :free,
+          labeller: Giggly.Facet.Labeller.t()
         }
 
   defimpl Giggly.Facet, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Facet
 
     alias Giggly.DataFrame
-    alias Giggly.Facet.Combinations
+    alias Giggly.Facet.{Combinations, Labeller}
 
     # A fixed axis's one scale.
     @only_scale 1
 
     @impl Giggly.Facet
-    def layout(%{rows: rows, cols: cols, scales: scales}, frames, order_key) do
+    def layout(%{rows: rows, cols: cols, scales: scales, labeller: labeller}, frames, order_key) do
       row_values = values(frames, rows, order_key, "rows")
       column_values = values(frames, cols, order_key, "cols")
+      row_labels = Labeller.label(labeller, :rows, rows, row_values)
+      column_labels = Labeller.label(labeller, :cols, cols, column_values)
       last_row = length(row_values)
       last_column = length(column_values)
 
@@ -59,8 +63,8 @@ defmodule Giggly.Facet.Grid do
               row: row,
               column: column,
               values: row_value ++ column_value,
-              top: column_value,
-              right: row_value
+              top: Enum.at(column_labels, column - 1),
+              right: Enum.at(row_labels, row - 1)
             }
 
       free_x = scales in [:free_x, :free]
@@ -114,14 +118,10 @@ defmodule Giggly.Facet.Grid do
     # The first row's strips label the columns' values, top to bottom, and the last column's the
     # rows', left to right, so the first column split on is outermost on both sides, as ggplot2's
     # `build_strip()` turns the right side's round; the other panels have none.
-    defp top_strip(%{row: 1, top: values}), do: Enum.map(values, &Combinations.label/1)
+    defp top_strip(%{row: 1, top: labels}), do: labels
     defp top_strip(_cell), do: []
 
-    defp right_strip(%{column: last_column, right: values}, last_column) do
-      values
-      |> Enum.reverse()
-      |> Enum.map(&Combinations.label/1)
-    end
+    defp right_strip(%{column: last_column, right: labels}, last_column), do: Enum.reverse(labels)
 
     defp right_strip(_cell, _last_column), do: []
 
