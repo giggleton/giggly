@@ -20,7 +20,7 @@ theme puts them".
 
 - **A scene is values and calls nothing.** Its boundary lists nothing and exports the structs
   rendering builds and a backend reads (`Arrow`, `Cell`, `Circles`, `Gradient`, `Polygons`,
-  `Polylines`, `Rect`, `Rectangles`, `Segments`, `Text`, and `Glyphs`, which a text carries);
+  `Polylines`, `Raster`, `Rect`, `Rectangles`, `Segments`, `Text`, and `Glyphs`, which a text carries);
   nothing in it knows SVG, a font or a theme.
 - **A column's width or a row's height is a number of points or a share, `{:rest, weight}`.** A
   size in points is measured when the scene is built (an axis, a margin); a share is a part of
@@ -109,7 +109,10 @@ theme puts them".
   filling its cell with a linear gradient running up it** (`direction: :up`), from the cell's
   bottom to its top, **or across it** (`:across`), from its left to its right, through its stops,
   each an offset, 0 to 1, and an opaque `#RRGGBB`, with no border: grid's `rectGrob()` filled with
-  a `linearGradient()`, as ggplot2's colour bar draws its bar.
+  a `linearGradient()`, as ggplot2's colour bar draws its bar. **A raster (`Raster`) is an image of
+  equal cells spanning `xmin` to `xmax` and `ymin` to `ymax` in its cell's units**, grid's
+  `rasterGrob()`: its `fill` and `fill_opacity` row by row from the top, each cell's `#RRGGBB` or
+  `:none`, clear, at its opacity, and whether a viewer blends neighbouring cells (`interpolate`).
 - **A cell may hold a scene of its own among its primitives**, a table laid out in the cell's box
   as gtable nests one table in another: its sizes in points take their length from the box's top
   left and its shares split what is left of the box. Each nested table is hung at its own size

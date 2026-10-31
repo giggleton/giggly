@@ -21,7 +21,8 @@ defmodule Giggly do
   # `DataFrame`'s readers and the scales `panel_scales/2` returns.
   use Boundary,
     deps:
-      [NimbleOptions, Nx, Scales, Table] ++ if(Code.ensure_loaded?(Pica), do: [Pica], else: []),
+      [NimbleOptions, Nx, Pngex, Scales, Table] ++
+        if(Code.ensure_loaded?(Pica), do: [Pica], else: []),
     exports: [Plot]
 
   alias Giggly.{Assembly, DataFrame, Plot, Render, SVG}

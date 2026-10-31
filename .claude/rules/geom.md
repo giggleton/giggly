@@ -278,7 +278,9 @@ beginning "Each layer's defaults are filled in from the theme".
   `xmax` included, as grid draws one; a row missing a corner is not drawn, and an infinite one is
   at the panel's edge, where the coordinate system puts it. Its corners are `xmin`, `xmax`,
   `ymin` and `ymax`; ggplot2 4.0 also places one by `x` and `width`, `y` and `height`, which
-  waits, and so does a rectangle in radial coordinates, drawn square as a bar is.
+  waits. **A rectangle in radial coordinates is refused when drawn** (`Rect.draw_panel/5`), and
+  so are a bar, a tile and a raster's cells, which draw through it, where ggplot2 bends their
+  sides along the curves; drawing them so waits.
   **Its key is ggplot2's `draw_key_polygon()`, `Rect.polygon_key/3`, which bars, ribbons and areas
   share**, its ends and corners the layer's, as `draw_key_polygon()` reads the layer's `lineend`
   and `linejoin`: a rectangle's and a bar's cut square and mitred, a ribbon's and an area's as
@@ -293,6 +295,18 @@ beginning "Each layer's defaults are filled in from the theme".
   both columns. **Only its defaults are its own**: a fill of ink mixed 20% toward paper
   (`col_mix(ink, paper, 0.2)`, `#333333`), a border 0.4 times the theme's borders' width, no
   colour; each checked against R's `layer_data()` and vdiffr's drawing.
+- **A raster (`Geom.Raster`) is ggplot2's `GeomRaster`, its panel's cells one image**
+  (`Scene.Raster`; design-log §4, the entry beginning "A raster is drawn as svglite draws one"):
+  `setup_data/3` sizes every cell by the gap between the layer's distinct positions, the first
+  where all are equal within R's `sqrt(.Machine$double.eps)`, else the smallest, 1 for one
+  position, placed by `hjust` and `vjust` as R places it, and **refuses a position off that grid
+  where the gaps differ**, naming the axis and `geom_tile/3`, where R warns and draws the cells
+  shifted; a grid with holes draws as R's. Each panel's cells go into the image by R's
+  `as.integer((x - min(x)) / resolution(x, FALSE))`, rows from the top, a place no row fills clear;
+  in a coordinate system that is not linear it draws its cells through `Rect`, bordered 0.3 mm in
+  their fill, as R falls back. Its defaults are a tile's fill and no alpha; it takes no colour,
+  which R ignores; its key is the fill over the whole key, unbordered, as `draw_key_polygon()`
+  draws a key of no border's width. Each checked against vdiffr's drawing, pixel for pixel.
 - **A ribbon (`Geom.Ribbon`) is set up and drawn as ggplot2's `GeomRibbon` does it.** Its setup
   runs along its struct's `orientation`, or, where that is `:none`, along y where it has no `ymin`
   or `ymax`, as `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range (`Plot` makes sure it

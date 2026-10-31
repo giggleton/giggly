@@ -43,7 +43,7 @@ defmodule Giggly.SVG do
   # points, then its text, unseen, so it is still read aloud, selected and found.
 
   # The SVG backend reads the scene and nothing else.
-  use Boundary, deps: [Giggly.Scene], exports: []
+  use Boundary, deps: [Giggly.Scene, Pngex], exports: []
 
   alias Giggly.Scene
 
@@ -55,6 +55,7 @@ defmodule Giggly.SVG do
     Gradient,
     Polygons,
     Polylines,
+    Raster,
     Rect,
     Rectangles,
     Segments,
@@ -393,6 +394,56 @@ defmodule Giggly.SVG do
       "; stroke: none; fill: url(#",
       id,
       ");' />\n"
+    ]
+  end
+
+  # An image as svglite writes a raster: an `<image>` stretched over its place
+  # (`preserveAspectRatio='none'`), its cells a PNG of 8-bit red, green, blue and alpha in
+  # base64, each cell's alpha its opacity as svglite holds an R colour's, a clear cell transparent
+  # white, as R's `NA`. Unless it interpolates, each cell is repeated to at least a pixel per point
+  # each way, `ceil(points / cells)` times, and the image asks to be drawn `pixelated`, as svglite
+  # writes one, so a viewer that blends pixels still draws blocks; interpolating, it is the cells
+  # alone, for the viewer to blend. Its data is written `href`, as the glyphs' `<use>` is, where
+  # svglite writes `xlink:href`, which needs a namespace the root does not declare.
+  defp primitive(%Raster{} = raster, box) do
+    {left, top} = place({raster.xmin, raster.ymax}, box)
+    {right, bottom} = place({raster.xmax, raster.ymin}, box)
+    {across, down} = {right - left, bottom - top}
+    columns = length(hd(raster.fill))
+    rows = length(raster.fill)
+    {column_repeats, row_repeats} = repeats(raster.interpolate, {columns, across}, {rows, down})
+
+    pixels =
+      Enum.zip_with(raster.fill, raster.fill_opacity, fn fills, opacities ->
+        line =
+          fills
+          |> Enum.zip_with(opacities, &pixel/2)
+          |> Enum.map(fn cell -> :binary.copy(cell, column_repeats) end)
+          |> :erlang.iolist_to_binary()
+
+        :binary.copy(line, row_repeats)
+      end)
+
+    png =
+      [type: :rgba, depth: :depth8, width: columns * column_repeats, height: rows * row_repeats]
+      |> Pngex.new()
+      |> Pngex.generate(:erlang.iolist_to_binary(pixels))
+      |> :erlang.iolist_to_binary()
+
+    [
+      "<image width='",
+      number(abs(across)),
+      "' height='",
+      number(abs(down)),
+      "' x='",
+      number(min(left, right)),
+      "' y='",
+      number(min(top, bottom)),
+      "' preserveAspectRatio='none'",
+      if(raster.interpolate, do: "", else: " image-rendering='pixelated'"),
+      " href='data:image/png;base64,",
+      Base.encode64(png),
+      "'/>\n"
     ]
   end
 
@@ -1102,6 +1153,29 @@ defmodule Giggly.SVG do
       byte -> ["fill: ", fill, ";", opacity_style("fill", byte)]
     end
   end
+
+  # How many times a raster's cells are repeated across and down: once each when it interpolates,
+  # else enough that each cell takes at least a pixel per point, as svglite blows up a raster it
+  # draws without interpolating.
+  defp repeats(true, _across, _down), do: {1, 1}
+
+  defp repeats(false, {columns, across}, {rows, down}),
+    do: {cell_repeats(columns, abs(across)), cell_repeats(rows, abs(down))}
+
+  defp cell_repeats(cells, points) when cells < points, do: ceil(points / cells)
+  defp cell_repeats(_cells, _points), do: 1
+
+  # A raster's cell as a PNG's pixel: its colour's red, green and blue and its opacity as R's alpha
+  # byte, or transparent white where it is clear, as R writes `NA`.
+  defp pixel(:none, _opacity), do: <<255, 255, 255, 0>>
+
+  defp pixel(<<"#", red::binary-size(2), green::binary-size(2), blue::binary-size(2)>>, opacity),
+    do: <<
+      String.to_integer(red, 16),
+      String.to_integer(green, 16),
+      String.to_integer(blue, 16),
+      alpha_byte(opacity)
+    >>
 
   defp opacity_style(_property, 255), do: ""
 

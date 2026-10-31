@@ -2046,6 +2046,68 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of equal cells on a regular grid, one per row, drawn as one image: a faster,
+  smaller tile for a surface of values, such as a density over two variables.
+
+  Every cell is as wide as the gap between the `x` positions and as tall as the gap between the
+  `y` positions, the smallest where the gaps differ. Positions may skip places, a grid with
+  holes, but each must be a whole number of cells from the least, or the plot raises when run;
+  `geom_tile/3` draws cells at uneven positions. `hjust:` and `vjust:` place each cell against
+  its position. A row missing its `x` or `y` draws nothing, and a place no row fills is left
+  clear. In radial coordinates the cells are drawn as tiles.
+
+  Rasters use `:x`, `:y`, `:group`, `:alpha` and `:fill`, and need `:x` and `:y`. `:fill` fills a
+  cell and takes its alpha; a raster has no border.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.raster())}
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 2.0, 4.0], "y" => [1.0, 1.0, 1.0]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_raster(hjust: 0)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[0.0, 1.0, 3.0], [1.0, 2.0, 4.0]}
+  """
+  @spec geom_raster(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_raster(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_raster(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_raster(plot, %{}, options)
+
+  def geom_raster(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.raster())
+    data = own_data(validated)
+
+    # Its `hjust:` and `vjust:` place its cells, its geom's, never a text's justification.
+    set =
+      validated
+      |> fixed()
+      |> Map.drop([:hjust, :vjust])
+
+    layer = %Layer{
+      geom: %Geom.Raster{
+        hjust: Keyword.fetch!(validated, :hjust),
+        vjust: Keyword.fetch!(validated, :vjust),
+        interpolate: Keyword.fetch!(validated, :interpolate)
+      },
+      stat: %Stat.Identity{},
+      position: %Position.Identity{},
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_raster/3"),
+      fixed: set,
+      accepted: Geom.Raster.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    add_layer(plot, layer, "Plot.geom_raster/3", required: Geom.Raster.required_aesthetics())
+  end
+
+  @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
   `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text`, `:label` or `:rect`.

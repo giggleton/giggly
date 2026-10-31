@@ -1336,6 +1336,97 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_raster" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_raster(hjust = 0.25, vjust =
+    # 0.75)` over x 1, 3 and y 0.5, 1: cells 2 wide and 0.5 tall, from `x - width * (1 - hjust)`
+    # to `x + width * hjust`, filled #333333, #000000CC under `theme_void()`; then over one x, 5,
+    # cells 1 wide. They move only with ggplot2's rasters.
+    test "a cell is as wide as the gap between positions, placed by hjust and vjust" do
+      rows = %{"x" => [1.0, 3.0, 1.0, 3.0], "y" => [0.5, 0.5, 1.0, 1.0]}
+
+      placed =
+        rows
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster(hjust: 0.25, vjust: 0.75)
+
+      frame = Giggly.layer_data(placed)
+      edges = Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge -> DataFrame.pull(frame, edge) end)
+
+      assert edges === [
+               [-0.5, 1.5, -0.5, 1.5],
+               [1.5, 3.5, 1.5, 3.5],
+               [0.375, 0.375, 0.875, 0.875],
+               [0.875, 0.875, 1.375, 1.375]
+             ]
+
+      void =
+        placed
+        |> Plot.theme_void()
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:fill)
+
+      assert {DataFrame.pull(frame, :fill), void} ===
+               {List.duplicate("#333333", 4), List.duplicate("#000000CC", 4)}
+
+      alone =
+        %{"x" => [5.0, 5.0], "y" => [1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster()
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(alone, :xmin), DataFrame.pull(alone, :xmax)} ===
+               {[4.5, 4.5], [5.5, 5.5]}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 1, 2, 4, a grid with a hole, which R
+    # warns of and draws right, cells 1 wide; over levels a and c of a discrete axis of a, b and c,
+    # cells 2 wide, the gap between their positions; over x 1, NA, 3, the missing row's edges NA.
+    # They move only with ggplot2's rasters.
+    test "a grid with holes, a discrete axis's levels and a missing position are R's" do
+      drawn = fn rows, plot ->
+        frame =
+          rows
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+          |> plot.()
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)}
+      end
+
+      same = fn plot -> plot end
+      levels = fn plot -> Plot.scale_x_discrete(plot, limits: ["a", "b", "c"]) end
+
+      assert drawn.(%{"x" => [1.0, 2.0, 4.0], "y" => [1.0, 1.0, 1.0]}, same) ===
+               {[0.5, 1.5, 3.5], [1.5, 2.5, 4.5]}
+
+      assert drawn.(%{"x" => ["a", "c"], "y" => [1.0, 1.0]}, levels) === {[0.0, 2.0], [2.0, 4.0]}
+
+      assert drawn.(%{"x" => [1.0, nil, 3.0], "y" => [1.0, 1.0, 1.0]}, same) ===
+               {[0.0, nil, 2.0], [2.0, nil, 4.0]}
+    end
+
+    # ggplot2 4.0.3 warns at x 1, 2, 3.5, "Raster pixels are placed at uneven horizontal intervals
+    # and will be shifted", and draws the three cells centred at 1.08, 2.25 and 3.42; Giggly cannot
+    # warn, so it refuses (design-log §4, the entry beginning "`geom_tile()`, `geom_raster()`").
+    test "a position off the grid of the smallest gap is refused, naming the axis and geom_tile/3" do
+      for {axis, other} <- [x: :y, y: :x] do
+        plot =
+          %{axis => [1.0, 2.0, 3.5], other => [1.0, 1.0, 1.0]}
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        assert error.message ==
+                 "a raster's cells sit on a grid of its #{axis} positions' smallest gap, 1.0, " <>
+                   "but #{axis} 3.5 is not a whole number of gaps from the least, 1.0, so its " <>
+                   "cell would be drawn away from it; draw cells at uneven positions with " <>
+                   "geom_tile/3"
+      end
+    end
+  end
+
   describe "layer_data/2, for geom_tile" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for geom_tile()'s first example, `df`'s x 2,
     # 5, 7, 9, 12 and y 1, 2: tiles 2 wide and 1 tall, filled #333333 and bordered 0.2 mm wide, with
@@ -9666,6 +9757,112 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/rect.svg")
     end
 
+    # Golden: test/golden/raster_faithfuld.svg, raster_interpolate.svg, raster_just.svg and
+    # raster_hole.svg, checked against ggplot2's drawings of the same plots, made by the R scripts
+    # beside them: every element and clip path matches but the colour bar's fill, which vdiffr
+    # cannot draw, and each image's attributes and pixels. geom_raster()'s first three examples,
+    # faithfuld's densities as blocks, then blended, and a grid of R's `runif()` draws after
+    # `set.seed(1)` placed by `hjust = 0, vjust = 0`; and a grid with a hole and a missing fill.
+    # Each image is compared by its pixels, as another zlib may compress them to other bytes.
+    # They move with how a raster is drawn, with the continuous fill scale and the colour bar.
+    # ggplot2 4.0.3 draws a rectangle, a bar and a tile in `coord_radial()` as a polygon whose
+    # sides follow the curves, and a raster as such rectangles; Giggly draws no such polygon yet,
+    # so each is refused, rather than drawn wrong.
+    test "rectangles, bars, tiles and rasters are refused in radial coordinates" do
+      rows = %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "k" => ["a", "b"]}
+
+      layers = [
+        fn plot -> Plot.geom_rect(plot, xmin: 0, xmax: 1, ymin: 0, ymax: 1) end,
+        fn plot -> Plot.geom_col(plot, %{x: :k}) end,
+        &Plot.geom_tile/1,
+        &Plot.geom_raster/1
+      ]
+
+      for layer <- layers do
+        plot =
+          rows
+          |> Plot.new(%{x: :x, y: :y})
+          |> layer.()
+          |> Plot.coord_radial()
+
+        error = assert_raise ArgumentError, fn -> Giggly.to_svg(plot) end
+        assert error.message =~ "cannot be drawn in radial coordinates yet"
+      end
+    end
+
+    test "a raster is drawn as one image of its cells" do
+      faithfuld = Plot.new(Giggly.Datasets.faithfuld(), %{x: :waiting, y: :eruptions})
+
+      uniform = [
+        0.26550866314209998,
+        0.37212389963679016,
+        0.57285336335189641,
+        0.90820778999477625,
+        0.2016819310374558,
+        0.89838968496769667,
+        0.94467526860535145,
+        0.66079779248684645,
+        0.62911404389888048,
+        0.061786270467564464,
+        0.20597457489930093,
+        0.17655675252899528,
+        0.68702284665778279,
+        0.38410371821373701,
+        0.76984141999855638,
+        0.49769924208521843,
+        0.71761850826442242,
+        0.9919060948304832,
+        0.38003517943434417,
+        0.77744522131979465,
+        0.93470523110590875,
+        0.21214252128265798,
+        0.65167376608587801,
+        0.12555509596131742,
+        0.26722066872753203,
+        0.3861140925437212,
+        0.013390333158895373,
+        0.38238795707002282,
+        0.86969084572046995,
+        0.34034899668768048,
+        0.48208011547103524,
+        0.59956582542508841,
+        0.49354130704887211,
+        0.1862176014110446,
+        0.8273733186069876,
+        0.66846673819236457
+      ]
+
+      places = for y <- 0..5, x <- 0..5, do: {x / 1, y / 1}
+
+      just =
+        [
+          x: Enum.map(places, fn {x, _y} -> x end),
+          y: Enum.map(places, fn {_x, y} -> y end),
+          z: uniform
+        ]
+        |> Plot.new(%{x: :x, y: :y, fill: :z})
+        |> Plot.geom_raster(hjust: 0, vjust: 0)
+
+      hole =
+        [
+          x: [1.0, 2.0, 4.0, 1.0, 2.0, 4.0],
+          y: [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
+          z: ["a", "b", "c", "a", nil, "c"]
+        ]
+        |> Plot.new(%{x: :x, y: :y, fill: :z})
+        |> Plot.geom_raster()
+
+      assert raster_golden?(Plot.geom_raster(faithfuld, %{fill: :density}), "raster_faithfuld")
+
+      assert raster_golden?(
+               Plot.geom_raster(faithfuld, %{fill: :density}, interpolate: true),
+               "raster_interpolate"
+             )
+
+      assert raster_golden?(just, "raster_just")
+      assert raster_golden?(hole, "raster_hole")
+    end
+
     # Golden: test/golden/tile.svg and test/golden/tile_width.svg, checked against ggplot2's
     # drawings of the same plots, made by test/golden/tile.R and test/golden/tile_width.R: every
     # rectangle, the tiles' and the keys', matches, the x axis drawn before the y as in
@@ -12453,6 +12650,58 @@ defmodule GigglyTest do
              "#{name}: #{inspect(actual)}, R #{inspect(expected)}"
     end)
   end
+
+  # Whether the plot draws its golden, an image's data set aside and its pixels compared, decoded
+  # from each PNG, since another zlib may compress the same pixels to other bytes (design-log §4,
+  # the entry beginning "`geom_tile()`, `geom_raster()` and `faithfuld`").
+  defp raster_golden?(plot, name) do
+    {drawn, drawn_images} =
+      plot
+      |> Giggly.to_svg(width: 960, height: 768)
+      |> IO.iodata_to_binary()
+      |> without_images()
+
+    {golden, golden_images} = without_images(File.read!("test/golden/#{name}.svg"))
+
+    drawn == golden and
+      Enum.map(drawn_images, &png_pixels/1) == Enum.map(golden_images, &png_pixels/1)
+  end
+
+  # An SVG with each image's base64 data cut out, and the data cut.
+  defp without_images(svg) do
+    data = ~r/base64,([A-Za-z0-9+\/=]+)/
+
+    images =
+      data
+      |> Regex.scan(svg, capture: :all_but_first)
+      |> List.flatten()
+
+    {Regex.replace(data, svg, "base64,"), images}
+  end
+
+  # A PNG's header and its decompressed rows, each led by its filter's byte.
+  defp png_pixels(encoded) do
+    <<137, "PNG", 13, 10, 26, 10, chunks::binary>> = Base.decode64!(encoded)
+    {header, data} = png_chunks(chunks, :none, [])
+    {header, :zlib.uncompress(data)}
+  end
+
+  defp png_chunks(
+         <<size::32, "IHDR", header::binary-size(size), _crc::32, rest::binary>>,
+         _,
+         data
+       ),
+       do: png_chunks(rest, header, data)
+
+  defp png_chunks(
+         <<size::32, "IDAT", body::binary-size(size), _crc::32, rest::binary>>,
+         header,
+         data
+       ),
+       do: png_chunks(rest, header, [data, body])
+
+  defp png_chunks(<<_size::32, "IEND", _rest::binary>>, header, data),
+    do: {header, IO.iodata_to_binary(data)}
 
   defp golden?(plot, name, options \\ []) do
     svg =

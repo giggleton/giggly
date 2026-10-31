@@ -11,6 +11,7 @@ defmodule Giggly.SVGTest do
     Gradient,
     Polygons,
     Polylines,
+    Raster,
     Rect,
     Rectangles,
     Segments,
@@ -621,6 +622,72 @@ defmodule Giggly.SVGTest do
       assert {drawn =~ "spreadMethod='pad' x1='342.97' y1='19.60' x2='429.37' y2='19.60'>",
               drawn =~ "<rect x='342.97' y='10.96' width='86.40' height='17.28' "} ===
                {true, true}
+    end
+
+    # svglite 2.2.2's `raster_to_string()`: without interpolating, a raster narrower in cells than
+    # in points repeats each cell `ceil(points / cells)` times each way and is marked pixelated,
+    # each pixel 8-bit RGBA, an `NA` cell transparent white; interpolating, the cells alone. R's
+    # `alpha("#FF0000", 0.5)` is `#FF000080`, the opacity's byte rounded half to even.
+    test "a raster is an image of its cells' pixels, blown up unless it interpolates" do
+      raster = %Raster{
+        xmin: 0.25,
+        xmax: 0.75,
+        ymin: 0.0,
+        ymax: 0.5,
+        fill: [["#FF0000", :none]],
+        fill_opacity: [[0.5, 0.0]],
+        interpolate: false
+      }
+
+      drawn = fn primitive ->
+        draw(%Giggly.Scene{
+          widths: [{:points, 20.0}],
+          heights: [{:points, 8.0}],
+          keep_proportions: false,
+          cells: [
+            %Cell{rows: 1..1, columns: 1..1, clip: :off, hang: :none, primitives: [primitive]}
+          ]
+        })
+      end
+
+      blocks = drawn.(raster)
+      blended = drawn.(%{raster | interpolate: true})
+
+      assert blocks =~
+               "<image width='10.00' height='4.00' x='5.00' y='4.00' preserveAspectRatio='none' " <>
+                 "image-rendering='pixelated' href='data:image/png;base64,"
+
+      assert blended =~
+               "<image width='10.00' height='4.00' x='5.00' y='4.00' preserveAspectRatio='none' " <>
+                 "href='data:image/png;base64,"
+
+      red = :binary.copy(<<255, 0, 0, 128>>, 5)
+      clear = :binary.copy(<<255, 255, 255, 0>>, 5)
+
+      assert image_pixels(blocks) == {{10, 4}, :binary.copy(<<0, red::binary, clear::binary>>, 4)}
+      assert image_pixels(blended) == {{2, 1}, <<0, 255, 0, 0, 128, 255, 255, 255, 0>>}
+    end
+
+    test "a raster with more cells than points is written a pixel a cell" do
+      raster = %Raster{
+        xmin: 0.0,
+        xmax: 1.0,
+        ymin: 0.0,
+        ymax: 1.0,
+        fill: for(_row <- 1..2, do: List.duplicate("#000000", 30)),
+        fill_opacity: for(_row <- 1..2, do: List.duplicate(1.0, 30)),
+        interpolate: false
+      }
+
+      drawn =
+        draw(%Giggly.Scene{
+          widths: [{:points, 20.0}],
+          heights: [{:points, 8.0}],
+          keep_proportions: false,
+          cells: [%Cell{rows: 1..1, columns: 1..1, clip: :off, hang: :none, primitives: [raster]}]
+        })
+
+      assert {{30, 8}, _pixels} = image_pixels(drawn)
     end
 
     test "a gradient's id is its content's, the same for the same gradient and another for another" do
@@ -1611,4 +1678,26 @@ defmodule Giggly.SVGTest do
   end
 
   defp count(svg, element), do: length(String.split(svg, element)) - 1
+
+  # The first image's width and height and its decompressed rows, each led by its filter's byte.
+  defp image_pixels(svg) do
+    [_all, data] = Regex.run(~r/base64,([A-Za-z0-9+\/=]+)/, svg)
+    <<137, "PNG", 13, 10, 26, 10, chunks::binary>> = Base.decode64!(data)
+    png_rows(chunks, :none, [])
+  end
+
+  defp png_rows(<<size::32, "IHDR", header::binary-size(size), _crc::32, rest::binary>>, _, data) do
+    <<width::32, height::32, _rest::binary>> = header
+    png_rows(rest, {width, height}, data)
+  end
+
+  defp png_rows(
+         <<size::32, "IDAT", body::binary-size(size), _crc::32, rest::binary>>,
+         sizes,
+         data
+       ),
+       do: png_rows(rest, sizes, [data, body])
+
+  defp png_rows(<<_size::32, "IEND", _rest::binary>>, sizes, data),
+    do: {sizes, :zlib.uncompress(data)}
 end

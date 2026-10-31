@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A raster is drawn as svglite draws one: an `<image>` of a PNG pngex writes (2026-10-31,
+  Steve: decisions 1 to 4, "A", "A", "C", "A", then "A" on rectangles in radial coordinates;
+  checked against ggplot2 4.0.3).** A panel's cells are one `Scene.Raster`, written as svglite's
+  `<image>`, each cell blown up `ceil(points / cells)` each way unless interpolating, so its pixels
+  are vdiffr's byte for byte; the PNG's bytes are the machine's zlib's, so a golden compares its
+  pixels. Where the gaps differ, a position off the smallest gap's grid is refused, as R would
+  draw the cell shifted with only a warning. Outside linear coordinates it draws as rectangles, as
+  R falls back, and rectangles there are refused until they bend. *Rejected: rectangles*, a
+  departure from R's drawing, 650 kB for faithfuld, seams and no `interpolate`; *the grid's own
+  pixels uncompressed*, leaning on `image-rendering`; *png* (callback streaming) and *ex_png*
+  (a file API); *drawing off-grid cells as R does*, silently shifted; *refusing every uneven
+  grid*, which refuses holes.
+
 - **A mark's spacing is R's `resolution()` on positions as R's scales map them: integers by
   their gaps, and a discrete axis 1 where R reads it so (2026-10-31, Steve: "A", then "Go" on the
   corrected fix; checked against ggplot2 4.0.3).** R's continuous scale makes every position a

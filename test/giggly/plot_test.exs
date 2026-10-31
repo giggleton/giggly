@@ -3781,6 +3781,64 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_raster/3" do
+    test "a raster layer records its geom with its justification and interpolation" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt})
+        |> Plot.geom_raster(%{y: :mpg}, hjust: 0, vjust: 1, interpolate: true, alpha: 0.5)
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Raster{hjust: 0.0, vjust: 1.0, interpolate: true},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{y: "mpg"},
+                 fixed: %{alpha: 0.5},
+                 accepted: [:alpha, :fill, :group, :x, :y],
+                 annotation: false,
+                 inherit: true
+               }
+             ]
+
+      assert [%Plot.Layer{geom: %Geom.Raster{hjust: hjust, vjust: vjust}}] =
+               plot.reversed_layers
+
+      assert {hjust, vjust} === {0.0, 1.0}
+    end
+
+    test "a raster is centred and blocky unless told otherwise" do
+      assert [%Plot.Layer{geom: geom}] =
+               @rows
+               |> Plot.new(%{x: :wt, y: :mpg})
+               |> Plot.geom_raster()
+               |> Map.fetch!(:reversed_layers)
+
+      assert geom === %Geom.Raster{hjust: 0.5, vjust: 0.5, interpolate: false}
+    end
+
+    # ggplot2's raster ignores `colour`, so a raster takes none.
+    test "a colour, mapped or set, is refused, and so is a justification past 0 to 1" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_raster(plot, %{colour: :cyl}) end
+      assert error.message =~ "Plot.geom_raster/3 cannot use :color"
+
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options \[:color\]/, fn ->
+        Plot.geom_raster(plot, colour: "red")
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a number from 0 to 1/, fn ->
+        Plot.geom_raster(plot, hjust: 1.5)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :interpolate/, fn ->
+        Plot.geom_raster(plot, interpolate: :yes)
+      end
+    end
+  end
+
   describe "geom_hline/3 and geom_vline/3" do
     # ggplot2 4.0.3's `geom_hline(yintercept = c(15, 25), colour = c("red", "blue"))` builds a
     # table of its own, maps `aes(yintercept = yintercept)`, sets each line's colour and takes

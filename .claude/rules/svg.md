@@ -15,8 +15,8 @@ size has a weight".
 
 ## Rules
 
-- **SVG reads only the scene.** Its boundary lists `Giggly.Scene` alone; everything about a plot
-  reaches it as primitives.
+- **SVG reads only the scene.** Its boundary lists `Giggly.Scene` and Pngex, which writes a
+  raster's PNG; everything about a plot reaches it as primitives.
 - **The output is the product, so its strings are behaviour.** An attribute, an element or a
   number's format that changes changes the golden; a surviving mutant in a literal here is a
   finding, never message wording.
@@ -50,6 +50,15 @@ size has a weight".
   `stop-opacity='1.00'`; then the `<rect>` filled `url(#…)` and stroked `none`. **Its id comes from
   its content**, `lg` and the MD5 of what the gradient holds, where svglite's counts up from
   `pat-0`, so two drawings on one page share an id only when they share the gradient.
+- **A raster is written as svglite writes one**: an `<image>` of its place's width, height, `x`
+  and `y`, `preserveAspectRatio='none'`, `image-rendering='pixelated'` unless it interpolates, and
+  its data a base64 PNG of 8-bit RGBA written by pngex, each cell's alpha its opacity's byte as an
+  R colour's, a clear cell transparent white, as R writes `NA`; unless interpolating, each cell
+  repeated `ceil(points / cells)` times each way, as svglite's `raster_to_string()` blows one up.
+  Its data is written `href`, as a glyph's `<use>` is, where svglite writes `xlink:href`, which
+  needs a namespace the root does not declare. **The PNG's bytes are the machine's zlib's**, so a
+  golden holding one is compared by its text with each image's data set aside and by each image's
+  decoded pixels (`raster_golden?/2` in `test/giggly_test.exs`), checked against vdiffr's pixels.
 - **Each mark is written in its own colour and opacity**, as svglite writes each element's own
   `gp`, so a mapped colour needs no element of its own per value.
 - **A dashed line is written as svglite writes R's line type**: `stroke-dasharray` right after

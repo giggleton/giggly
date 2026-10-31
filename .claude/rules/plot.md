@@ -33,7 +33,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
-  `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_hline/3`, `geom_vline/3` and
+  `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_raster/3`, `geom_hline/3`, `geom_vline/3` and
   `geom_abline/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
   `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
@@ -151,7 +151,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and so does
   `geom_label/3`, with `%Geom.Label{}` and the identity stat, as its `geom_label()` does, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position, and `geom_tile/3`
-  `%Geom.Tile{}` with them, taking no `position:`. `annotate/3` records the kind
+  `%Geom.Tile{}` with them, taking no `position:`, and `geom_raster/3` `%Geom.Raster{}` with them,
+  its `hjust:` and `vjust:`, 0 to 1, 0.5 unless given, kept as floats, and `interpolate:`, `false`
+  unless given, the geom's fields and never set on its rows. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
   identity stat and position, as ggplot2's `annotate()` does, so its text and labels are never
   nudged. `Plot`
@@ -395,7 +397,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`, `geom_label/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `geom_hline/3`,
   `geom_vline/3`, `geom_abline/3`, `stat_bin_hex/3`,
-  `geom_rect/3`, `geom_tile/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
+  `geom_rect/3`, `geom_tile/3`, `geom_raster/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
   `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
   guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
   functions), so

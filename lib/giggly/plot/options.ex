@@ -1551,6 +1551,42 @@ defmodule Giggly.Plot.Options do
                   ]
                 )
 
+  # Where every raster cell sits against its position, along one axis: an option of
+  # `geom_raster/3` that chooses how the raster geom draws.
+  @raster_just_doc "a number from 0 to 1: 0 puts the cell's right or top edge there, 1 its left " <>
+                     "or bottom edge, and 0.5 centres it."
+
+  # `geom_raster/3`'s options, validated at the call.
+  @raster_options NimbleOptions.new!(
+                    data: @data_option,
+                    alpha: @alpha_option,
+                    fill: [
+                      type: @color_type,
+                      doc:
+                        "The colour every cell is filled with: " <>
+                          @color_forms <>
+                          "; when not given, the theme's ink mixed 20% toward its paper, " <>
+                          "`#333333`, or `#000000CC` under `theme_void/2`, whose paper is clear."
+                    ],
+                    hjust: [
+                      type: {:custom, __MODULE__, :validate_just, []},
+                      default: 0.5,
+                      doc: "Where each cell sits across against its `x`, " <> @raster_just_doc
+                    ],
+                    vjust: [
+                      type: {:custom, __MODULE__, :validate_just, []},
+                      default: 0.5,
+                      doc: "Where each cell sits up against its `y`, " <> @raster_just_doc
+                    ],
+                    interpolate: [
+                      type: :boolean,
+                      default: false,
+                      doc:
+                        "Whether a viewer blends neighbouring cells' colours, smoothing the " <>
+                          "image, rather than drawing each cell as a block of its colour."
+                    ]
+                  )
+
   # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
   @corner_type {:custom, __MODULE__, :validate_corner, []}
 
@@ -3539,6 +3575,10 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec tile() :: NimbleOptions.t()
   def tile, do: @tile_options
+
+  @doc false
+  @spec raster() :: NimbleOptions.t()
+  def raster, do: @raster_options
 
   @doc false
   @spec continuous_scale() :: NimbleOptions.t()
