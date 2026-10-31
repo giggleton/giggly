@@ -50,7 +50,7 @@ defmodule Giggly.Geom.Hline do
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
     # The panel's lines: each distinct row a segment across the panel's x extent at its
-    # `yintercept`.
+    # `yintercept`, its `yend` left for the segment to copy from its `y`.
     @impl Giggly.Geom
     def draw_panel(geom, frame, coord, panel_params) do
       %{x: {low, high}} = Coord.extents(coord, panel_params)
@@ -67,7 +67,6 @@ defmodule Giggly.Geom.Hline do
         |> DataFrame.put(:x, List.duplicate(low, count))
         |> DataFrame.put(:xend, List.duplicate(high, count))
         |> DataFrame.put(:y, intercepts)
-        |> DataFrame.put(:yend, intercepts)
 
       geom
       |> segment()

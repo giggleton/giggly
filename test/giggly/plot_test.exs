@@ -3581,8 +3581,10 @@ defmodule Giggly.PlotTest do
 
       assert String.starts_with?(
                mapping.message,
-               "Plot.geom_hline/3 draws the lines yintercept: gives, so it takes no mapping, got:"
+               "Plot.geom_hline/3 draws the lines yintercept: gives, so it takes no mapping"
              )
+
+      assert mapping.message =~ "got: %{colour: :cyl}"
 
       data =
         assert_raise ArgumentError, fn -> Plot.geom_vline(plot, xintercept: 2, data: @rows) end
@@ -3600,9 +3602,8 @@ defmodule Giggly.PlotTest do
         end
 
       assert String.starts_with?(error.message, "Plot.geom_hline/3 sets :color to")
-
-      assert error.message =~
-               "only beside yintercept:; a mapped line takes one value, or maps :color"
+      assert error.message =~ ~s(["#FF0000", "#0000FF"])
+      assert error.message =~ "only beside yintercept:"
     end
 
     # ggplot2 4.0.3: "Aesthetics must be either length 1 or the same as the data (3)", and
@@ -3621,11 +3622,27 @@ defmodule Giggly.PlotTest do
                  "takes one value, or one per line, and these disagree on how many lines there are"
              )
 
-      missing = assert_raise ArgumentError, fn -> Plot.geom_vline(plot) end
+      for {function, add, intercept} <- [
+            {"geom_hline", &Plot.geom_hline/1, :yintercept},
+            {"geom_vline", &Plot.geom_vline/1, :xintercept}
+          ] do
+        missing = assert_raise ArgumentError, fn -> add.(plot) end
 
-      assert missing.message ===
-               "Plot.geom_vline/3 needs :xintercept, but neither its mapping maps it nor " <>
-                 "xintercept: gives it"
+        assert missing.message ===
+                 "Plot.#{function}/3 needs #{inspect(intercept)}, but neither its mapping maps " <>
+                   "it nor #{intercept}: gives it"
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {add, name} <- [{&Plot.geom_hline/3, :geom_hline}, {&Plot.geom_vline/3, :geom_vline}],
+          {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error = assert_raise FunctionClauseError, fn -> add.(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, name, 3}
+      end
     end
 
     test "a mapped line's columns are found in its own table, the plot's mapping never checked" do

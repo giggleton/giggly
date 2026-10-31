@@ -54,7 +54,8 @@ defmodule Giggly.Geom.Vline do
     @impl Giggly.Geom
     def setup_data(_geom, frame, _axis_kinds), do: frame
 
-    # The panel's lines: each distinct row a segment up the panel's y extent at its `xintercept`.
+    # The panel's lines: each distinct row a segment up the panel's y extent at its `xintercept`,
+    # its `xend` left for the segment to copy from its `x`.
     @impl Giggly.Geom
     def draw_panel(geom, frame, coord, panel_params) do
       %{y: {low, high}} = Coord.extents(coord, panel_params)
@@ -69,7 +70,6 @@ defmodule Giggly.Geom.Vline do
         lines
         |> DataFrame.select(kept)
         |> DataFrame.put(:x, intercepts)
-        |> DataFrame.put(:xend, intercepts)
         |> DataFrame.put(:y, List.duplicate(low, count))
         |> DataFrame.put(:yend, List.duplicate(high, count))
 
