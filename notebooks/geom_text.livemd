@@ -141,8 +141,10 @@ p
 |> render.()
 ```
 
-`family` names the font. Giggly measures a label as its default font does, and draws it at that
-width in the font named, or in the default sans-serif font where the browser lacks it.
+`family` names the font. Without Pica, which this notebook does not install, Giggly measures a
+label as its default font does, and draws it at that width in the font named, or in the default
+sans-serif font where the browser lacks it. With Pica, a label is measured and drawn in the font
+itself: see [the fonts guide](https://github.com/giggleton/giggly/blob/main/guides/fonts.md).
 
 ```elixir
 p

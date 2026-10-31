@@ -8,6 +8,11 @@
 following its page example by example and drawing each one Giggly can draw so far. Start with
 `notebooks/index.livemd`, which follows ggplot2's reference index and links every notebook.
 
+## Documentation
+
+- [Fonts](guides/fonts.md): naming the fonts a plot's text is drawn in, and measuring and drawing
+  them with Pica.
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed

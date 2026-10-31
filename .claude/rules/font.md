@@ -1,5 +1,6 @@
 ---
 paths:
+  - "guides/fonts.md"
   - "lib/giggly/font.ex"
   - "priv/fonts/**"
   - "test/fonts/**"
@@ -34,6 +35,10 @@ entry beginning "A registered font is measured".
   `:none`. A test that reads a font's glyphs is compiled only where Pica is
   (`Code.ensure_loaded?(Pica)` round it, beside its `:pica` tag), since the build without Pica
   types it as code that can never run.
+- **What a user is told about fonts is `guides/fonts.md`**, which the family options, `theme/2`
+  and `to_svg/2`'s `text:` and `installed_fonts:` link rather than restate: a change to which
+  fonts a family is measured or drawn in, or to either option, updates it (design-log §4, the
+  entry beginning "Fonts are explained by one guide").
 - **The table is vdiffr's Liberation Sans table, copied as written, never recomputed.**
   `priv/fonts/liberation_sans.txt` is regenerated from vdiffr's `glyph_dims.h` as its header
   says. The ascent of "M", the descent of "gjpqyQ" and the missing-glyph width are read from it,

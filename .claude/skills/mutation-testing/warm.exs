@@ -11,7 +11,11 @@
 # It rests on Giggly keeping no state for one mutant to leave the next: no process, application
 # env, ETS table or persistent term, which the `CorePurity` check holds over lib/. The fonts the
 # suite registers with Pica are Pica's state, registered once by test/test_helper.exs, which a
-# worker runs once, and only read by Giggly, so no mutant can change them. A struct whose
+# worker runs once, and only read by Giggly, so no mutant can change them. A mutant that turns
+# on the search of installed fonts leaves Pica's scan of the machine's fonts in persistent terms
+# for the worker's life; no later mutant is judged differently for it, since a lookup that does
+# not search never reads the scan, and one that does finds what a fresh VM's would, the
+# machine's fonts unchanged, only sooner. A struct whose
 # defaults a mutant changes is baked into every module that wrote the struct, so such a mutant is
 # reported `struct_changed`, not judged. The mutants are muex's, built through its library as
 # `mix muex --since SINCE --no-optimize --no-filter --files FILES` builds them, and the report is

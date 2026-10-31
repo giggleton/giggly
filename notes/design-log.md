@@ -862,6 +862,16 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   report, and no selection or search. *Rejected: a `<title>` per label* — patchy support, and a
   tooltip on every label.
 
+- **Fonts are explained by one guide, `guides/fonts.md`, which every place a family is set links
+  (2026-10-31, Steve, one decision at a time).** It covers listing Pica (`~> 0.1.0`, as Giggly's
+  other 0.x dependencies pin the patch), naming a family and what inherits it, registering with
+  Pica, the installed search and `installed_fonts:`, a face no font is found for, and `text:`'s
+  trade, and nothing about testing. `theme/2`, the text element's and `geom_text/3`'s `family:`
+  and `to_svg/2`'s `text:` and `installed_fonts:` say what they do and link it; Pica's own
+  guide holds registering at startup. The `geom_text` notebook links it on GitHub, needing
+  neither local docs nor Giggly on Hex. *Rejected: a section in `Giggly`'s moduledoc* (Steve) —
+  only a few calls set a family. *Rejected: a README section* — the README is not in the docs.
+
 - **A registered font is measured by svglite's rules, measured in R (2026-10-30).** A width is
   the shaped glyphs' advances at the size truncated to 1/64 point, as svglite hands FreeType a
   size: at 13.2 and 7.04 points truncating matches R and rounding misses; a size truncating to
@@ -904,7 +914,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   the whole suite to its first failure, and load the originals back; muex builds the mutants and
   writes the JSON report, as a library, and one `:cover` run per worker finds the lines no test
   runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`), the fonts
-  the suite registers with Pica registered once per worker and only read; a mutant
+  the suite registers with Pica registered once per worker and only read, and a mutant that
+  searches the installed fonts leaving Pica's scan of them, which a later one reads as a fresh
+  scan would give it; a mutant
   that changes a struct's defaults is reported, not judged. Replayed over step 6's pass, every
   kill, survivor and uncovered line matched muex's, and it killed three survivors muex's test
   selection never ran against; the element tree split's pass took minutes where muex took hours.
@@ -3296,6 +3308,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Take Pica 0.1.0 from Hex, its native library prebuilt, and write the fonts guide
+  (Pica, steps 4 and 5); §4: "Fonts are explained by one guide", "The mutation pass runs muex's
+  mutants in warm VMs"
 - 2026-10-31 — Draw a label in a font Pica holds as its outlines, its words kept as unseen text,
   and search installed fonts unless told not to (Pica, step 3); §4: "A label measured with a font
   Pica", "A label is drawn as its font's outlines", "A text carries its glyphs", "A label drawn as

@@ -113,12 +113,6 @@ mix muex --since HEAD~1 --no-optimize --no-filter --verbose --coverage-guided --
 - **One `--files`, comma-separated**: given `--files` twice, muex keeps only the last; it splits the
   value on commas, so a brace glob (`lib/{a,b}.ex`) crashes its loader. `--verbose` prints
   `Found <n> file(s)`: check it counts every file named.
-- **While Pica is a path dependency, two things more** (2026-10-30, over `4c3e3aa`). A sandbox sits
-  at `$TMPDIR/muex_sandboxes_<run>/worker_<n>`, where `path: "../pica"` finds nothing, so
-  `mix.exs` names Pica's absolute path for the run, copied aside first and restored with `cmp`
-  after. And with Pica among the dependencies, `--coverage-guided` fails at once, `:cover.start/0`
-  undefined in muex's own VM, though `mix run` loads it; loading it first in that VM works:
-  `mix do run --no-start -e '{:module, :cover} = Code.ensure_loaded(:cover)' + muex ...`.
 - muex runs the mutants of one file one at a time, and a run of many mutants in one file is slow.
 
 ## Findings

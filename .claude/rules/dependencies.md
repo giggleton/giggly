@@ -161,7 +161,9 @@ semver or the changelog).
   do not recompile keep their recorded classification, so the next incremental build can report a
   forbidden reference that no longer exists, or an unused `dirty_xrefs:` entry that is gone. The
   error is in the safe direction — a real violation *is* caught incrementally — so this costs a
-  confusing red gate, never a false pass. The same holds when `boundary` itself is bumped.
+  confusing red gate, never a false pass. The same holds when `boundary` itself is bumped, and
+  when a dependency that declares boundaries changes where it comes from: moving Pica from a path
+  to Hex left the dev build calling it an unknown boundary until `--force`.
 - **To find what calls into a namespace, ask the compiler — not grep, not xref.** Boundary checks
   calls and struct expansions and skips typespec and alias references, so `mix xref graph` (which
   records typespec edges) over-counts and a text sweep mis-attributes. The probe that works is a
@@ -216,11 +218,11 @@ semver or the changelog).
     compile warning is a hard failure, matching CI. `mix test --warnings-as-errors` makes a warning
     in any test file fail the gate too, so stray test-file warnings can't pile up unnoticed.
   - `test (without Pica)` builds and tests Giggly as a project that does not list Pica does:
-    `GIGGLY_WITHOUT_PICA=1` leaves Pica, and Rustler with it, out of `deps`, in a build root of
-    its own (`_build/without_pica`), so the code behind `Code.ensure_loaded?(Pica)` and the
-    boundaries listing Pica are compiled both ways (`font.md`). Until Pica's first release it is
-    the checkout beside this one (`path: "../pica"`), built from source, which needs Rustler in
-    dev and test; CI cannot fetch it, so nothing that lists it is pushed until that release.
+    `GIGGLY_WITHOUT_PICA=1` leaves Pica out of `deps`, in a build root of its own
+    (`_build/without_pica`), so the code behind `Code.ensure_loaded?(Pica)` and the boundaries
+    listing Pica are compiled both ways (`font.md`). Pica comes from Hex with its native library
+    prebuilt, downloaded and checked against the checksums its package carries, so Giggly lists
+    no Rustler and needs no Rust.
 - **Architecture as a compile-time check** (`boundary`): `compilers: [:boundary]` in `mix.exs`
   checks the `use Boundary` declarations, so a forbidden cross-namespace call is a compiler
   warning and therefore a gate failure. The installed shape was the umbrella `Giggly` (`exports:

@@ -57,17 +57,13 @@ defmodule Giggly.MixProject do
   end
 
   # Pica measures text in the fonts a user names, when the user's project lists it; without it,
-  # Giggly measures with its own table. Until Pica's first release it is the checkout beside this
-  # one, built from source, which needs Rustler. `GIGGLY_WITHOUT_PICA=1` leaves it out, as a
-  # project that does not list it builds Giggly, for the gate step that checks that build.
+  # Giggly measures with its own table. `GIGGLY_WITHOUT_PICA=1` leaves it out, as a project that
+  # does not list it builds Giggly, for the gate step that checks that build.
   defp pica do
     if System.get_env("GIGGLY_WITHOUT_PICA") in ["1", "true"] do
       []
     else
-      [
-        {:pica, path: "../pica", optional: true},
-        {:rustler, "~> 0.38.0", only: [:dev, :test], runtime: false}
-      ]
+      [{:pica, "~> 0.1.0", optional: true}]
     end
   end
 
@@ -93,6 +89,8 @@ defmodule Giggly.MixProject do
   # modules, Tack's and its mix tasks', are left out of the documentation.
   defp docs do
     [
+      extras: ["guides/fonts.md"],
+      groups_for_extras: [Guides: ~r"guides/"],
       filter_modules: fn module, _metadata ->
         case Module.split(module) do
           ["Tack" | _rest] -> false

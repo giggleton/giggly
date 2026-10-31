@@ -42,11 +42,10 @@ defmodule Giggly do
                       type: {:in, [:outlines, :text]},
                       default: :outlines,
                       doc: """
-                      How a label in a font registered with Pica is written: `:outlines` draws it \
-                      as the font's own shapes, so it looks the same wherever the drawing is \
-                      viewed, and keeps its words as unseen text, to be read aloud, selected and \
-                      found; `:text` writes it as text naming its font, which a viewer without \
-                      that font draws in another. Every other label is written as text.
+                      How a label in a font Pica holds is written: `:outlines` draws it as the \
+                      font's own shapes, keeping its words as unseen text; `:text` writes it as \
+                      text naming its font. Every other label is written as text. The trade: \
+                      the [fonts guide](fonts.md).
                       """
                     ],
                     installed_fonts: [
@@ -55,10 +54,8 @@ defmodule Giggly do
                       doc: """
                       In a project that lists Pica, whether a family no font is registered under \
                       with Pica is looked for among the machine's installed fonts too, by its \
-                      exact name, before its text is measured as Liberation Sans's would be. The first such search reads every \
-                      font file on the machine, once for the life of the VM. The default family \
-                      and the generic names `"sans"`, `"serif"` and `"mono"` are never looked \
-                      for there.
+                      exact name. `false` draws with the registered fonts alone. What the search \
+                      costs, and which names it skips: the [fonts guide](fonts.md).
                       """
                     ]
                   )
