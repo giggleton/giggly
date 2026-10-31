@@ -303,8 +303,9 @@ beginning "Each layer's defaults are filled in from the theme".
   where the gaps differ**, naming the axis and `geom_tile/3`, where R warns and draws the cells
   shifted; a grid with holes draws as R's. Each panel's cells go into the image by R's
   `as.integer((x - min(x)) / resolution(x, FALSE))`, rows from the top, a place no row fills clear;
-  in a coordinate system that is not linear it draws its cells through `Rect`, bordered 0.3 mm in
-  their fill, as R falls back. Its defaults are a tile's fill and no alpha; it takes no colour,
+  in a coordinate system that is not linear it hands its cells to `Rect`, as R falls back, which
+  refuses them there; R's fallback border, 0.3 mm in each cell's fill, waits with radial
+  rectangles. Its defaults are a tile's fill and no alpha; it takes no colour,
   which R ignores; its key is the fill over the whole key, unbordered, as `draw_key_polygon()`
   draws a key of no border's width. Each checked against vdiffr's drawing, pixel for pixel.
 - **A ribbon (`Geom.Ribbon`) is set up and drawn as ggplot2's `GeomRibbon` does it.** Its setup

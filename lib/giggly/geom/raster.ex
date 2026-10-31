@@ -24,8 +24,9 @@ defmodule Giggly.Geom.Raster do
   # in its fill at its opacity, as `alpha()` makes it, a place no row fills left clear, the image
   # spanning the cells' edges, smoothed between cells when `interpolate` says so. In a coordinate
   # system whose straight lines bend (`Giggly.Coord.linear?/1`), where an image cannot follow,
-  # the cells are drawn as rectangles (`Giggly.Geom.Rect`), each bordered in its own fill 0.3 mm
-  # wide so they meet, as ggplot2 falls back to `GeomRect`. A raster the layer neither maps nor
+  # the cells are handed to the rectangle (`Giggly.Geom.Rect`), as ggplot2 falls back to
+  # `GeomRect`, which refuses them there until rectangles bend; ggplot2 then borders each cell in
+  # its own fill 0.3 mm wide so they meet, which waits with them. A raster the layer neither maps nor
   # sets a fill for is filled with the theme's ink mixed 20% toward its paper, `#333333` on white
   # paper. Its legend key is the key's fill over the whole key, unbordered, as
   # `draw_key_polygon()` draws a key with no border's width.
@@ -61,10 +62,6 @@ defmodule Giggly.Geom.Raster do
 
     # R's `sqrt(.Machine$double.eps)`, within which ggplot2's raster calls two gaps equal.
     @precision :math.sqrt(2.220446049250313e-16)
-
-    # The border ggplot2 gives each cell drawn as a rectangle, in millimetres, its own fill's
-    # colour, so neighbouring cells meet.
-    @fallback_border 0.3
 
     @impl Giggly.Geom
     def setup_data(geom, frame, _axis_kinds) do
@@ -157,8 +154,7 @@ defmodule Giggly.Geom.Raster do
           [image(geom, placed, coord, panel_params)]
 
         true ->
-          fallback = rectangles(placed)
-          Geom.draw_panel(%Rect{}, fallback, coord, panel_params, installed_fonts)
+          Geom.draw_panel(%Rect{}, placed, coord, panel_params, installed_fonts)
       end
     end
 
@@ -225,14 +221,6 @@ defmodule Giggly.Geom.Raster do
       least = Enum.min(positions)
       spacing = Resolution.of(positions, zero: false, discrete: false)
       Enum.map(positions, fn value -> trunc((value - least) / spacing) end)
-    end
-
-    # The cells as ggplot2's fallback rectangles: bordered in their own fill, solid, 0.3 mm wide.
-    defp rectangles(frame) do
-      frame
-      |> DataFrame.put(:color, DataFrame.pull(frame, :fill))
-      |> DataFrame.put(:linewidth, List.duplicate(@fallback_border, DataFrame.row_count(frame)))
-      |> DataFrame.put(:linetype, List.duplicate({}, DataFrame.row_count(frame)))
     end
 
     # A legend's key, and the room it needs, as `draw_key_polygon()` draws a raster's: the key's

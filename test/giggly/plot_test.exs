@@ -3818,6 +3818,24 @@ defmodule Giggly.PlotTest do
       assert geom === %Geom.Raster{hjust: 0.5, vjust: 0.5, interpolate: false}
     end
 
+    test "y mapped by neither the layer nor the plot is refused, naming the call" do
+      plot = Plot.new(@rows, %{x: :wt})
+
+      error = assert_raise ArgumentError, fn -> Plot.geom_raster(plot) end
+      assert error.message =~ "Plot.geom_raster/3 needs :y"
+    end
+
+    test "a raster's fill is checked and resolved at the call" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      assert [%Plot.Layer{fixed: %{fill: "#FF0000"}}] =
+               Plot.geom_raster(plot, fill: "red").reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, ~r/invalid value for :fill option/, fn ->
+        Plot.geom_raster(plot, fill: "reddish")
+      end
+    end
+
     # ggplot2's raster ignores `colour`, so a raster takes none.
     test "a colour, mapped or set, is refused, and so is a justification past 0 to 1" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})

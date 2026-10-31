@@ -1406,6 +1406,54 @@ defmodule GigglyTest do
                {[0.0, nil, 2.0], [2.0, nil, 4.0]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 over x 2, 1, 4, rows out of order; x 1, 3,
+    # 4, 5, whose first gap is not its smallest, and x 0, 2, 4, 5, 6, whose gaps 2, 2, 1, 1 pair
+    # off evenly two by two; x 0, 1 + 2^-26, 2 + 2^-26, whose gaps differ by R's
+    # tolerance exactly, so even, cells as wide as the first; x 0, 1, 3 + 2^-26, a position off
+    # the grid by that tolerance exactly, so on it; x 1.2, 1.7, 2.7, cells half as wide, from a
+    # least that is no multiple of them; and faithfuld's first cell, as wide as its first gap. They
+    # move only with ggplot2's rasters.
+    test "a cell's size and the grid are R's to the last digit, at R's tolerance" do
+      tolerance = :math.pow(2, -26)
+
+      edges = fn xs ->
+        frame =
+          [x: xs, y: Enum.map(xs, fn _x -> 1.0 end)]
+          |> Plot.new(%{x: :x, y: :y})
+          |> Plot.geom_raster()
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax)}
+      end
+
+      assert edges.([2.0, 1.0, 4.0]) === {[1.5, 0.5, 3.5], [2.5, 1.5, 4.5]}
+      assert edges.([1.0, 3.0, 4.0, 5.0]) === {[0.5, 2.5, 3.5, 4.5], [1.5, 3.5, 4.5, 5.5]}
+
+      assert edges.([0.0, 2.0, 4.0, 5.0, 6.0]) ===
+               {[-0.5, 1.5, 3.5, 4.5, 5.5], [0.5, 2.5, 4.5, 5.5, 6.5]}
+
+      assert edges.([0.0, 1.0 + tolerance, 2.0 + tolerance]) ===
+               {[-0.5000000074505806, 0.5000000074505806, 1.5000000074505806],
+                [0.5000000074505806, 1.5000000223517418, 2.5000000223517418]}
+
+      assert edges.([0.0, 1.0, 3.0 + tolerance]) ===
+               {[-0.5, 0.5, 2.5000000149011612], [0.5, 1.5, 3.5000000149011612]}
+
+      assert edges.([1.2, 1.7, 2.7]) ===
+               {[0.94999999999999996, 1.45, 2.4500000000000002], [1.45, 1.95, 2.9500000000000002]}
+
+      faithful =
+        Giggly.Datasets.faithfuld()
+        |> Plot.new(%{x: :waiting, y: :eruptions})
+        |> Plot.geom_raster()
+        |> Giggly.layer_data()
+
+      assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn edge ->
+               hd(DataFrame.pull(faithful, edge))
+             end) ===
+               [42.641891891891888, 43.358108108108112, 1.5763513513513514, 1.6236486486486488]
+    end
+
     # ggplot2 4.0.3 warns at x 1, 2, 3.5, "Raster pixels are placed at uneven horizontal intervals
     # and will be shifted", and draws the three cells centred at 1.08, 2.25 and 3.42; Giggly cannot
     # warn, so it refuses (design-log §4, the entry beginning "`geom_tile()`, `geom_raster()`").
@@ -9768,6 +9816,33 @@ defmodule GigglyTest do
     # ggplot2 4.0.3 draws a rectangle, a bar and a tile in `coord_radial()` as a polygon whose
     # sides follow the curves, and a raster as such rectangles; Giggly draws no such polygon yet,
     # so each is refused, rather than drawn wrong.
+    # R 4.6.1 with ggplot2 4.0.3: over x 0.5, 2.5 and 4.5 the raster's `rasterGrob()` is 1 by 3
+    # cells, counted in the gaps between the positions, not from 0; interpolated, the PNG is the
+    # cells alone. A panel whose every row is missing its position draws no image.
+    test "a raster's image counts its cells in the gaps between positions, and none of no cells" do
+      cells =
+        %{"x" => [0.5, 2.5, 4.5], "y" => [1.0, 1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_raster(interpolate: true)
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+        |> without_images()
+        |> elem(1)
+        |> Enum.map(&png_pixels/1)
+
+      assert [{<<3::32, 1::32, _rest::binary>>, _rows}] = cells
+
+      missing =
+        %{"x" => [1.0, 2.0], "y" => [1.0, 1.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_raster(data: %{"x" => [nil], "y" => [1.0]})
+        |> Giggly.to_svg()
+        |> IO.iodata_to_binary()
+
+      refute missing =~ "<image "
+    end
+
     test "rectangles, bars, tiles and rasters are refused in radial coordinates" do
       rows = %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "k" => ["a", "b"]}
 
@@ -9786,7 +9861,10 @@ defmodule GigglyTest do
           |> Plot.coord_radial()
 
         error = assert_raise ArgumentError, fn -> Giggly.to_svg(plot) end
-        assert error.message =~ "cannot be drawn in radial coordinates yet"
+
+        assert error.message ==
+                 "rectangles, bars, tiles and rasters cannot be drawn in radial coordinates " <>
+                   "yet: their sides would follow its curves, which Giggly does not draw"
       end
     end
 
