@@ -221,7 +221,7 @@ defmodule Giggly.Facet.Labeller do
 
   defp paragraphs(label) do
     pieces = String.split(label, ~r/\n[ \t\n]*\n/)
-    if pieces != [""] and List.last(pieces) == "", do: Enum.drop(pieces, -1), else: pieces
+    if List.last(pieces) == "", do: Enum.drop(pieces, -1), else: pieces
   end
 
   # A paragraph's words, each with how many spaces follow it on a line.
