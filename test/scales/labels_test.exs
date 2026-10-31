@@ -1487,7 +1487,14 @@ defmodule Scales.LabelsTest do
         assert error.message =~ inspect(name)
       end
 
-      for rules <- [[], [{"a", "1"}], [{:a, ~r/1/}], ["st"], %{"st" => ~r/1/}] do
+      for rules <- [
+            [],
+            [{"a", "1"}],
+            [{:a, ~r/1/}],
+            ["st"],
+            %{"st" => ~r/1/},
+            [{"st", ~r/1/}, {"th", "."}]
+          ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> Labels.ordinal([1], rules: rules) end
 
@@ -1520,7 +1527,9 @@ defmodule Scales.LabelsTest do
         assert error.message =~ "got: #{inspect(accuracy)}"
       end
 
-      for prefix <- [{"a", "b"}, ["a", "b", "c"], {"a", "b", :c}, {"a", "b", "c", "d"}] do
+      for prefix <-
+            [{"a", "b"}, ["a", "b", "c"], {"a", "b", "c", "d"}] ++
+              [{:a, "b", "c"}, {"a", :b, "c"}, {"a", "b", :c}] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Labels.pvalue([0.5], prefix: prefix)
