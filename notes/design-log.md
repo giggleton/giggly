@@ -79,6 +79,30 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A reference line is drawn from the panel's extents, given as values or mapped, and takes
+  nothing from the plot's mapping (2026-10-30, Steve: "yes", "yes", "agree", "agree", walked one at
+  a time; checked against ggplot2 4.0.3).** As `GeomHline`, `GeomVline` and `GeomAbline` draw
+  from `coord$backtransform_range()`, a geom asks `Coord.extents/2` where the panel ends in
+  positions, the one thing it learns of the params. Given as values (`yintercept:`), the lines are
+  an annotation of their own table, each look one value or a list, one per line, as R's
+  `aes_params` take a vector; mapped, an ordinary layer with `inherit: false`, a new `Layer`
+  field, as `inherit.aes = FALSE`, so it draws in legends; a mapping or `data:` beside values is
+  refused, where R warns and ignores it. An intercept is any position an annotation takes, which
+  gained date-times and times. A diagonal line's `intercept:` and `slope:` are numbers no scale
+  trains on or transforms, as R gives them none, the line `y = x` given neither, the other's
+  default given one; `data:` alone is refused, where R ignores it and draws `y = x`. Its ends are
+  R's arithmetic, oddities included (2026-10-31, Steve: "A"): a line missing the panel is drawn
+  beyond it, showing unclipped, a spiral radially, and a flat line on an unclipped edge is `0 /
+  0` and not drawn. *Rejected: leaving out a line that misses the extents*: a departure to
+  defend, in code R's arithmetic needs none of. *Rejected: segments from minus to plus
+  infinity*: radially infinities cannot be munched, and a diagonal line needs numbers.
+  *Rejected: placing two points and extending them in the panel*: affine only, and not R's
+  arithmetic. *Rejected: one layer kind for both forms*: the argument form's mapping would title
+  the axis "yintercept". *Rejected: `annotation: true` for the mapped form*: it loses its legend.
+  *Left out*: `position:` (in R only nudging moves a line, to a value one could write),
+  `arrow:`, which R ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is refused,
+  naming the function, as R warns.
+
 - **`annotate(:label)` counts a padding as one value, and sets a label's part colours once
   (2026-10-30, Steve, geom_label step 2: "A A"; checked against ggplot2 4.0.3).** Its lists are
   the text annotation's and a label's border's: `label`, `colour`, `alpha`, `fill`, `linewidth`,
@@ -3251,11 +3275,21 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples the reference lines unlock, and narrow scale_linetype's
+  and position_stack's verdicts to what still waits (reference lines, step 3, the notebook
+  sweep); the `lm()` example keeps waiting on `lm()` though its line draws (Steve: "c"); §4: "A
+  reference line is drawn from the panel's extents"
+- 2026-10-31 — Add geom_abline(): diagonal lines between the panel's extents, cut and widened as
+  R's arithmetic cuts them, given as values or mapped (reference lines, step 2); §4: "A reference
+  line is drawn from the panel's extents"
 - 2026-10-31 — Draw the notebook example geom_label() unlocks, and narrow the filled labels'
   verdict to a fixed fontface (geom_label, step 3, the notebook sweep)
 - 2026-10-30 — Add annotate(:label): labels placed by hand, each look a list of one per label,
   a padding one value however many sides it gives (geom_label, step 2); §4: "`annotate(:label)`
   counts a padding as one value"
+- 2026-10-30 — Add geom_hline() and geom_vline(): lines across the whole panel from its extents,
+  given as values or mapped, taking nothing from the plot's mapping (reference lines, step 1);
+  §4: "A reference line is drawn from the panel's extents"
 - 2026-10-30 — Add geom_label(): each label's text on grid's rounded box, turned and justified
   with it, and its legend key as draw_key_label() draws it (geom_label, step 1); §4:
   "`geom_label()` draws ggplot2's `labelGrob()`"

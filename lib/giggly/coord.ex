@@ -14,10 +14,11 @@ defprotocol Giggly.Coord do
   # look; the panel's grid and background are drawn from `grid/2`, which runs a line through the
   # panel at each break and minor break and gives the background's shape; `linear?/1` says
   # whether a straight line stays straight, so a geom drawing one knows whether it must munch it;
-  # `clip/1` says whether what is drawn in a panel is cut off at its edges; and `aspect/2` whether
-  # a panel keeps a shape of its own. A geom never sees a scale's range, and the params are opaque to everything but the
-  # coordinate system that built them, so a coordinate system that places positions differently
-  # changes no geom.
+  # `clip/1` says whether what is drawn in a panel is cut off at its edges; `aspect/2` whether
+  # a panel keeps a shape of its own; and `extents/2` where the panel ends along each axis, in
+  # positions, for a geom drawing a line across it. A geom never sees a scale's range, and the
+  # params are opaque to everything but the coordinate system that built them, so a coordinate
+  # system that places positions differently changes no geom.
   #
   # A plot records its coordinate system as a struct of its kind. Each coordinate system is one
   # module holding everything about it: its struct, whose fields are its parameters, and its
@@ -146,6 +147,14 @@ defprotocol Giggly.Coord do
   @doc false
   @spec grid(t(), panel_params()) :: grid()
   def grid(coord, panel_params)
+
+  # Each axis's extent in the panel `panel_params` describes, by the aesthetic it shows, in
+  # positions on its scale: ggplot2's `coord$backtransform_range()`, which a geom drawing a line
+  # across the whole panel, a reference line, reads to know where the panel ends in the data's
+  # terms. It is the one thing a geom learns of the params.
+  @doc false
+  @spec extents(t(), panel_params()) :: %{x: dimension(), y: dimension()}
+  def extents(coord, panel_params)
 
   # Whether a straight line in the data stays straight in the panel under `coord`, ggplot2's
   # `coord$is_linear()`: a geom drawing a straight line from row to row may then place its ends with

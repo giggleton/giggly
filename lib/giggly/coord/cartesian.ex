@@ -88,6 +88,9 @@ defmodule Giggly.Coord.Cartesian do
     end
 
     @impl Giggly.Coord
+    def extents(_coord, %{x_range: x_range, y_range: y_range}), do: %{x: x_range, y: y_range}
+
+    @impl Giggly.Coord
     def linear?(_coord), do: true
 
     @impl Giggly.Coord

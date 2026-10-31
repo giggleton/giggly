@@ -29,8 +29,12 @@ and names what it is waiting for, so the page is also a list of what remains.
 These geoms add reference lines to a plot: vertical ones at an `xintercept`, horizontal ones at a
 `yintercept`, and diagonal ones given a `slope` and an `intercept`. Given as arguments, a line is
 the same in every panel; mapped from a data frame, the lines can differ from panel to panel. Unlike
-other geoms, they take nothing from the plot's mapping and do not change the plot's scales. Giggly
-has none of them yet. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
+other geoms, they take nothing from the plot's mapping. ggplot2's page says they do not affect the
+x and y scales, but a vertical or horizontal line's intercept widens its axis to show it, as a
+point's position does: the line at 1 in the second example widens the x axis past the lightest
+car, 1.513. A diagonal line's slope and intercept change no scale. Giggly draws them with
+`Giggly.Plot.geom_vline/3`, `Giggly.Plot.geom_hline/3` and `Giggly.Plot.geom_abline/3`, each
+given its lines as options, `xintercept: 5`, or mapped from a table. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`,
 which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write
 `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
 `Kino.Image`. It binds `Giggly.Datasets.mtcars/0`, R's `mtcars`, to `mtcars`, R's name for it.
@@ -45,7 +49,31 @@ p + geom_vline(xintercept = 1:5)
 p + geom_hline(yintercept = 20)
 ```
 
-Not in Giggly yet: `geom_vline()` and `geom_hline()`.
+`1:5` is R's sequence of the whole numbers from 1 to 5, a line for each, which Giggly gives as a
+list.
+
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :mpg})
+  |> Plot.geom_point()
+
+p
+|> Plot.geom_vline(xintercept: 5)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_vline(xintercept: [1, 2, 3, 4, 5])
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_hline(yintercept: 20)
+|> render.()
+```
 
 ## Diagonal lines
 
@@ -54,8 +82,20 @@ p + geom_abline() # Can't see it - outside the range of the data
 p + geom_abline(intercept = 20)
 ```
 
-With no arguments, the line is `y = x`, which runs below the panel, out of sight. Not in Giggly
-yet: `geom_abline()`.
+With no arguments, the line is `y = x`, which runs below the panel, out of sight; given only an
+intercept, its slope is 1.
+
+```elixir
+p
+|> Plot.geom_abline()
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_abline(intercept: 20)
+|> render.()
+```
 
 ## A line of best fit
 
@@ -66,7 +106,7 @@ p + geom_abline(intercept = 37, slope = -5)
 ```
 
 R fits `mpg` to `wt` with a linear model and prints its intercept and slope, which the line then
-rounds. Not in Giggly yet: models fitted by `lm()`, and `geom_abline()`.
+rounds. Not in Giggly yet: models fitted by `lm()`.
 
 ## Fitting the line with geom_smooth()
 
@@ -75,15 +115,10 @@ rounds. Not in Giggly yet: models fitted by `lm()`, and `geom_abline()`.
 p + geom_smooth(method = "lm", se = FALSE)
 ```
 
-`p` is the first example's plot, `mtcars`' weights against their miles per gallon, which Giggly
-draws here. The smooth fits the same line as `lm(mpg ~ wt)`.
+`p` is still the first example's plot, `mtcars`' weights against their miles per gallon. The
+smooth fits the same line as `lm(mpg ~ wt)`.
 
 ```elixir
-p =
-  mtcars
-  |> Plot.new(%{x: :wt, y: :mpg})
-  |> Plot.geom_point()
-
 p
 |> Plot.geom_smooth(method: :lm, se: false)
 |> render.()
@@ -100,9 +135,23 @@ mean_wt <- data.frame(cyl = c(4, 6, 8), wt = c(2.28, 3.11, 4.00))
 p + geom_hline(aes(yintercept = wt), mean_wt)
 ```
 
-The facets are in Giggly: `facet_wrap(~ cyl)` is `Giggly.Plot.facet_wrap(plot, :cyl)`. Each line
-comes from the row of `mean_wt` with its panel's `cyl`. Not in Giggly yet: `geom_hline()` and
-mapping `yintercept`.
+`facet_wrap(~ cyl)` is `Giggly.Plot.facet_wrap(plot, :cyl)`, and `mean_wt` is written out as a
+table of its own, given to the layer as `data:`. Each line comes from the row of `mean_wt` with
+its panel's `cyl`.
+
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt})
+  |> Plot.geom_point()
+  |> Plot.facet_wrap(:cyl)
+
+mean_wt = %{"cyl" => [4.0, 6.0, 8.0], "wt" => [2.28, 3.11, 4.00]}
+
+p
+|> Plot.geom_hline(%{yintercept: :wt}, data: mean_wt)
+|> render.()
+```
 
 ## Other aesthetics
 
@@ -114,4 +163,14 @@ ggplot(mtcars, aes(mpg, wt, colour = wt)) +
   facet_wrap(~ cyl)
 ```
 
-Not in Giggly yet: `geom_hline()` and mapping `yintercept`.
+The points and the lines share the colour scale, so each line takes the colour of its mean weight
+on the points' gradient.
+
+```elixir
+mtcars
+|> Plot.new(%{x: :mpg, y: :wt, colour: :wt})
+|> Plot.geom_point()
+|> Plot.geom_hline(%{yintercept: :wt, colour: :wt}, data: mean_wt)
+|> Plot.facet_wrap(:cyl)
+|> render.()
+```

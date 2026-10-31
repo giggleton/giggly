@@ -259,7 +259,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "wt", y: "mpg", group: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :fill, :group, :shape, :size, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -590,7 +591,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
                  accepted: [:alpha, :color, :fill, :group, :linetype, :linewidth, :width, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -733,7 +735,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "cyl", weight: "wt"},
                  fixed: %{},
                  accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -892,7 +895,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "wt", y: "mpg"},
                  fixed: %{color: "#FF0000"},
                  accepted: [:alpha, :color, :fill, :group, :shape, :size, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -994,7 +998,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "wt", y: "mpg", weight: "wt"},
                  fixed: %{},
                  accepted: [:group, :size, :weight, :x, :y, :alpha, :color, :fill, :shape],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -1123,7 +1128,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "wt", weight: "mpg"},
                  fixed: %{},
                  accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -1261,7 +1267,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{x: "wt", color: "cyl", weight: "mpg"},
                  fixed: %{},
                  accepted: [:group, :weight, :x, :y, :alpha, :color, :linetype, :linewidth],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -1401,7 +1408,8 @@ defmodule Giggly.PlotTest do
                    :shape,
                    :size
                  ],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -1758,7 +1766,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{group: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2000,7 +2009,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{xend: "wt", color: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :xend, :y, :yend],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2177,7 +2187,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{color: "cyl"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :linetype, :linewidth, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2338,7 +2349,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{label: "model"},
                  fixed: %{},
                  accepted: [:alpha, :color, :group, :label, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2477,7 +2489,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{label: "model"},
                  fixed: %{},
                  accepted: [:alpha, :color, :fill, :group, :label, :linetype, :linewidth, :x, :y],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2777,7 +2790,8 @@ defmodule Giggly.PlotTest do
                    :ymax,
                    :ymin
                  ],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -2986,7 +3000,8 @@ defmodule Giggly.PlotTest do
                    :linetype,
                    :linewidth
                  ],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -3221,7 +3236,8 @@ defmodule Giggly.PlotTest do
           mapping: %{},
           fixed: %{},
           accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
-          annotation: false
+          annotation: false,
+          inherit: true
         }
       ]
 
@@ -3412,7 +3428,8 @@ defmodule Giggly.PlotTest do
                  mapping: %{},
                  fixed: %{},
                  accepted: [:group, :weight, :x, :y, :alpha, :color, :fill, :linetype, :linewidth],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -3618,7 +3635,8 @@ defmodule Giggly.PlotTest do
                    :ymax,
                    :ymin
                  ],
-                 annotation: false
+                 annotation: false,
+                 inherit: true
                }
              ]
     end
@@ -3663,6 +3681,369 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_hline/3 and geom_vline/3" do
+    # ggplot2 4.0.3's `geom_hline(yintercept = c(15, 25), colour = c("red", "blue"))` builds a
+    # table of its own, maps `aes(yintercept = yintercept)`, sets each line's colour and takes
+    # nothing from the plot's mapping; `lineend = "butt"`, the identity stat and position.
+    test "lines given as values are an annotation of their own table, each look one per line" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_hline(yintercept: [15, 25], colour: ["red", "blue"], linewidth: 2)
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Hline{line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: table,
+                 mapping: %{yintercept: "yintercept"},
+                 fixed: %{color: ["#FF0000", "#0000FF"], linewidth: 2.0},
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :yintercept],
+                 annotation: true,
+                 inherit: false
+               }
+             ] = plot.reversed_layers
+
+      assert DataFrame.pull(table, "yintercept") === [15.0, 25.0]
+    end
+
+    # ggplot2 4.0.3's `geom_vline(aes(xintercept = wt), mean_wt)`: an ordinary layer of the table
+    # it is given, `inherit.aes = FALSE`, so it takes no x from the plot's mapping.
+    test "mapped lines are a layer of their table that takes nothing from the plot's mapping" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_vline(%{xintercept: :w}, data: %{"w" => [3.0]}, lineend: :round)
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Vline{line_end: :round},
+                 data: %_{},
+                 mapping: %{xintercept: "w"},
+                 fixed: %{},
+                 accepted: [:alpha, :color, :group, :linetype, :linewidth, :xintercept],
+                 annotation: false,
+                 inherit: false
+               } = layer
+             ] = plot.reversed_layers
+
+      assert Plot.computed_mapping(plot, layer) == %{xintercept: "w"}
+    end
+
+    test "a line's intercept is any position an axis takes, and its looks each one value or a list" do
+      plot = Plot.new(@rows)
+      instant = ~U[2020-01-01 05:30:00Z]
+
+      for {value, kept} <- [
+            {:infinity, :infinity},
+            {"b", "b"},
+            {~D[2020-01-05], ~D[2020-01-05]},
+            {instant, instant},
+            {~N[2020-01-01 05:30:00], ~N[2020-01-01 05:30:00]},
+            {~T[05:30:00], ~T[05:30:00]}
+          ] do
+        assert [%Plot.Layer{data: table}] =
+                 Plot.geom_vline(plot, xintercept: value).reversed_layers
+
+        assert DataFrame.pull(table, "xintercept") === [kept]
+      end
+
+      assert [%Plot.Layer{fixed: %{linetype: [{4, 4}, nil], alpha: [0.5, 1.0]}}] =
+               Plot.geom_hline(plot,
+                 yintercept: [1, 2],
+                 linetype: [:dashed, :blank],
+                 alpha: [0.5, 1]
+               ).reversed_layers
+    end
+
+    # ggplot2 4.0.3 warns "Ignoring `mapping` because `yintercept` was provided." and "Ignoring
+    # `data`", and draws the lines the argument gives.
+    test "lines given as values take no mapping and no table, which would draw nothing" do
+      plot = Plot.new(@rows)
+
+      mapping =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_hline(plot, %{colour: :cyl}, yintercept: 20)
+        end
+
+      assert String.starts_with?(
+               mapping.message,
+               "Plot.geom_hline/3 draws the lines yintercept: gives, so it takes no mapping"
+             )
+
+      assert mapping.message =~ "got: %{colour: :cyl}"
+
+      data =
+        assert_raise ArgumentError, fn -> Plot.geom_vline(plot, xintercept: 2, data: @rows) end
+
+      assert data.message ===
+               "Plot.geom_vline/3 draws the lines xintercept: gives, so it takes no data:"
+    end
+
+    test "mapped lines take one value for each look, a list giving one per line only beside values" do
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_hline(plot, %{yintercept: :mpg}, colour: ["red", "blue"])
+        end
+
+      assert String.starts_with?(error.message, "Plot.geom_hline/3 sets :color to")
+      assert error.message =~ ~s(["#FF0000", "#0000FF"])
+      assert error.message =~ "only beside yintercept:"
+    end
+
+    # ggplot2 4.0.3: "Aesthetics must be either length 1 or the same as the data (3)", and
+    # "`geom_hline()` requires the following missing aesthetics: yintercept".
+    test "lists of different lengths are refused, and so is a layer given no intercept" do
+      plot = Plot.new(@rows, %{y: :mpg})
+
+      lengths =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_hline(plot, yintercept: [1, 2, 3], colour: ["red", "blue"])
+        end
+
+      assert String.starts_with?(
+               lengths.message,
+               "Plot.geom_hline/3 gives :yintercept 3 values and :color 2 values; an option " <>
+                 "takes one value, or one per line, and these disagree on how many lines there are"
+             )
+
+      for {function, add, intercept} <- [
+            {"geom_hline", &Plot.geom_hline/1, :yintercept},
+            {"geom_vline", &Plot.geom_vline/1, :xintercept}
+          ] do
+        missing = assert_raise ArgumentError, fn -> add.(plot) end
+
+        assert missing.message ===
+                 "Plot.#{function}/3 needs #{inspect(intercept)}, but neither its mapping maps " <>
+                   "it nor #{intercept}: gives it"
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {add, name} <- [{&Plot.geom_hline/3, :geom_hline}, {&Plot.geom_vline/3, :geom_vline}],
+          {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error = assert_raise FunctionClauseError, fn -> add.(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, name, 3}
+      end
+    end
+
+    test "a mapped line's columns are found in its own table, the plot's mapping never checked" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg, colour: :cyl})
+
+      assert [%Plot.Layer{}] =
+               Plot.geom_hline(plot, %{yintercept: :level}, data: %{"level" => [1.0]}).reversed_layers
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_hline(plot, %{yintercept: :level}, data: %{"other" => [1.0]})
+        end
+
+      assert error.message =~ "the layer's own data has no column \"level\""
+    end
+
+    test "a line takes the options a reference line has, and no other" do
+      plot = Plot.new(@rows)
+
+      for option <- [arrow: true, position: :identity, size: 2, linejoin: :round, slope: 1] do
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Plot.geom_hline(plot, [{:yintercept, 1} | [option]])
+        end
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/a date, a date-time or a time/, fn ->
+        Plot.geom_vline(plot, xintercept: %{})
+      end
+    end
+  end
+
+  describe "geom_abline/3" do
+    # ggplot2 4.0.3's `geom_abline(intercept = 37, slope = c(-5, -4))` builds a table of its own,
+    # each intercept recycled to the slopes' count, and maps `aes(intercept = intercept, slope =
+    # slope)`, taking nothing from the plot's mapping.
+    test "lines given as values are an annotation of their own table, each look one per line" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_abline(intercept: 37, slope: [-5, -4], colour: ["red", "blue"])
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Abline{line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: table,
+                 mapping: %{intercept: "intercept", slope: "slope"},
+                 fixed: %{color: ["#FF0000", "#0000FF"]},
+                 accepted: [:alpha, :color, :group, :intercept, :linetype, :linewidth, :slope],
+                 annotation: true,
+                 inherit: false
+               }
+             ] = plot.reversed_layers
+
+      assert {DataFrame.pull(table, "intercept"), DataFrame.pull(table, "slope")} ===
+               {[37.0, 37.0], [-5.0, -4.0]}
+    end
+
+    # ggplot2 4.0.3: given nothing, `slope = 1, intercept = 0`; given either, the other's default.
+    test "given neither value nor a mapping, the line is y = x, and either value takes the other's default" do
+      plot = Plot.new(@rows)
+
+      for {options, intercepts, slopes} <- [
+            {[], [0.0], [1.0]},
+            {[slope: 2], [0.0], [2.0]},
+            {[intercept: 30, lineend: :round], [30.0], [1.0]}
+          ] do
+        assert [%Plot.Layer{data: table, annotation: true}] =
+                 Plot.geom_abline(plot, options).reversed_layers
+
+        assert {DataFrame.pull(table, "intercept"), DataFrame.pull(table, "slope")} ===
+                 {intercepts, slopes}
+      end
+    end
+
+    test "mapped lines are a layer of their table that takes nothing from the plot's mapping" do
+      plot =
+        @rows
+        |> Plot.new(%{x: :wt, y: :mpg, colour: :cyl})
+        |> Plot.geom_abline(%{intercept: :a, slope: :b},
+          data: %{"a" => [30.0], "b" => [-2]},
+          lineend: :square
+        )
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Abline{line_end: :square},
+                 data: %_{},
+                 mapping: %{intercept: "a", slope: "b"},
+                 annotation: false,
+                 inherit: false
+               } = layer
+             ] = plot.reversed_layers
+
+      assert Plot.computed_mapping(plot, layer) == %{intercept: "a", slope: "b"}
+    end
+
+    # ggplot2 4.0.3 warns "Ignoring `mapping` because `slope` and/or `intercept` were provided.",
+    # and "Ignoring `data`" beside them or given alone, drawing y = x.
+    test "lines given as values take no mapping and no table, and nor does the line y = x" do
+      plot = Plot.new(@rows)
+
+      mapping =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :wt}, slope: 2)
+        end
+
+      assert mapping.message ===
+               "Plot.geom_abline/3 draws the lines slope: gives, so it takes no mapping, got: " <>
+                 "%{intercept: :wt}"
+
+      for {given, named} <- [{[intercept: 2], "intercept:"}, {[slope: 2], "slope:"}] do
+        data =
+          assert_raise ArgumentError, fn -> Plot.geom_abline(plot, [{:data, @rows} | given]) end
+
+        assert data.message ===
+                 "Plot.geom_abline/3 draws the lines #{named} gives, so it takes no data:"
+      end
+
+      alone = assert_raise ArgumentError, fn -> Plot.geom_abline(plot, data: @rows) end
+
+      assert alone.message ===
+               "Plot.geom_abline/3 given no mapping, intercept: or slope: draws the line y = x, " <>
+                 "so it takes no data:; map :intercept and :slope to draw lines from the table"
+    end
+
+    # ggplot2 4.0.3: "`geom_abline()` requires the following missing aesthetics: slope", and
+    # "Can't recycle `intercept` (size 2) to size 3".
+    test "a mapped line needs both its intercept and its slope, and lists must agree in length" do
+      plot = Plot.new(@rows)
+
+      missing =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :a}, data: %{"a" => [1.0]})
+        end
+
+      assert missing.message ===
+               "Plot.geom_abline/3 needs :slope, but neither its mapping maps it nor intercept: " <>
+                 "or slope: gives it"
+
+      looks =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :wt, slope: :mpg}, linewidth: [1, 2])
+        end
+
+      assert looks.message =~ "only beside intercept: or slope:"
+
+      lengths =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, intercept: [1, 2], slope: [1, 2, 3])
+        end
+
+      assert String.starts_with?(lengths.message, "Plot.geom_abline/3 gives :intercept 2 values")
+    end
+
+    # ggplot2 4.0.3 fails drawing: "non-numeric argument to binary operator", for a string
+    # intercept, a mapped string slope or a date intercept alike.
+    test "an intercept or slope must be a number, given or mapped" do
+      plot = Plot.new(@rows)
+
+      for value <- ["a", ~D[2020-01-03], :infinity, nil] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_abline(plot, intercept: value)
+          end
+
+        assert error.message =~ "expected a number, or a list of them, got: #{inspect(value)}"
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected a number/, fn ->
+        Plot.geom_abline(plot, slope: [1, "steep"])
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :mpg, slope: :cyl})
+        end
+
+      assert error.message ===
+               "Plot.geom_abline/3 maps :slope to \"cyl\", a :string column, but a line is " <>
+                 "drawn at y = intercept + slope * x, so it must be a number"
+
+      intercept =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_abline(plot, %{intercept: :cyl, slope: :mpg})
+        end
+
+      assert intercept.message ===
+               "Plot.geom_abline/3 maps :intercept to \"cyl\", a :string column, but a line " <>
+                 "is drawn at y = intercept + slope * x, so it must be a number"
+    end
+
+    test "a line takes the options a reference line has, and no other" do
+      plot = Plot.new(@rows)
+
+      for option <- [arrow: true, position: :identity, size: 2, linejoin: :round, yintercept: 1] do
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_abline(plot, [option]) end
+      end
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@rows)
+
+      for {mapping, options} <- [{untyped(:wt), []}, {%{}, untyped(:bottom)}] do
+        error =
+          assert_raise FunctionClauseError, fn -> Plot.geom_abline(plot, mapping, options) end
+
+        assert {error.module, error.function, error.arity} == {Plot, :geom_abline, 3}
+      end
+    end
+  end
+
   describe "annotate/3" do
     test "a bar annotation's width is checked as each bar's, and its just: as geom_col/3's" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
@@ -3692,7 +4073,8 @@ defmodule Giggly.PlotTest do
                mapping: %{x: "x", y: "y"},
                fixed: %{label: "a", size: 5.0},
                accepted: [:alpha, :color, :group, :label, :x, :y],
-               annotation: true
+               annotation: true,
+               inherit: false
              } = layer
 
       table = Plot.layer_table(plot, layer)
@@ -3742,6 +4124,20 @@ defmodule Giggly.PlotTest do
 
       assert error.message =~
                ":point, :col, :bar, :path, :line, :segment, :rug, :text, :label or :rect, got: :curve"
+    end
+
+    # ggplot2 4.0.3 warns "`geom` must not be \"hline\". Please use `geom_hline()` directly
+    # instead."
+    test "a reference line is refused, naming the function that draws it" do
+      plot = Plot.new(@rows)
+
+      for geom <- [:abline, :hline, :vline] do
+        error = assert_raise ArgumentError, fn -> Plot.annotate(plot, geom, x: 1) end
+
+        assert error.message ===
+                 "Plot.annotate/3 does not draw #{inspect(geom)}: a reference line annotates on " <>
+                   "its own, so use Plot.geom_#{geom}/3, whose options give its lines as values"
+      end
     end
 
     # ggplot2 4.0.3 warns "Ignoring unknown aesthetics: xmin", and the x axis still reaches it;
@@ -4017,7 +4413,8 @@ defmodule Giggly.PlotTest do
                },
                mapping: %{y: "y"},
                fixed: %{linewidth: [1.0, 2.0]},
-               annotation: true
+               annotation: true,
+               inherit: false
              } = layer
 
       plot = Plot.new(@rows)

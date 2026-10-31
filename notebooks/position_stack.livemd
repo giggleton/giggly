@@ -243,7 +243,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
 R's `rep()` repeats `"a"` twice and `"b"` three times. The one negative value stacks downward
 from zero, apart from the positive ones.
 
-Not in Giggly yet: `position_stack()`'s `reverse` option and `geom_hline()`.
+Not in Giggly yet: `position_stack()`'s `reverse` option.
 
 ## Labels in the middle of each part
 
@@ -254,5 +254,4 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = grp), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_hline()`, `geom_text()`'s `position` option, and `position_stack()`'s
-`vjust` option.
+Not in Giggly yet: `geom_text()`'s `position` option and `position_stack()`'s `vjust` option.

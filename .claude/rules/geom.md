@@ -21,7 +21,9 @@ beginning "Each layer's defaults are filled in from the theme".
   `Giggly.AsCharacter` for the text it writes and `Scales` to mix its default colours
   (`Scales.ColorOperations`), never `Giggly.Scale`. It is handed one panel's rows, the
   plot's coordinate system and that panel's params, as ggplot2's `draw_panel()` is, places the rows
-  with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1.
+  with `Coord.transform/3`, and emits primitives in the cell's units, 0 to 1. A geom drawing across
+  the whole panel asks the coordinate system where the panel ends (`Coord.extents/2`), as
+  ggplot2's reference lines read `coord$backtransform_range()`.
 - **A geom has a say during the build: `setup_data/3`** gives each row the extent it is drawn
   over in data space, after the stat and before the position, as ggplot2's `setup_data()` does, so
   a position stacks or dodges that extent and the scales, trained again after the position, cover
@@ -55,7 +57,8 @@ beginning "Each layer's defaults are filled in from the theme".
 - **A geom calls the coordinate system itself**, as ggplot2's `draw_panel()` calls
   `coord$transform()`: a geom drawing lines (`Geom.Path`) places its rows with `Coord.munch/3`,
   which cuts them to follow the panel's curves, and every other with `transform/3`, which only
-  the geom knows to choose. The params stay opaque to it.
+  the geom knows to choose. The params stay opaque to it; their extents, through
+  `Coord.extents/2`, are all it learns of them.
 - **A layer records its geom as a struct of its kind, and each geom is one module holding
   everything about it**: its struct, whose fields are its parameters; the facts a plot checks a
   layer's mapping against (`accepted_aesthetics/0`, `required_aesthetics/0`), which `Plot` reads;
@@ -226,6 +229,27 @@ beginning "Each layer's defaults are filled in from the theme".
   a share of the panel a place in the cell and a length in points an offset. A row missing its
   width or line type draws no line, and a colour of `:none` is a line of no stroke; its key is a
   path's, with the rug's ends.
+- **A reference line (`Geom.Hline`, `Geom.Vline`) is drawn as ggplot2's `GeomHline` and
+  `GeomVline` draw one** (design-log §4, the entry beginning "A reference line is drawn from the
+  panel's extents"): each panel's distinct rows (`DataFrame.distinct/1`, as `unique0()`) become
+  segments across the panel's extent along the other axis at their intercept, the intercept
+  column dropped so no coordinate system places it, drawn as `Geom.Segment` draws them with the
+  lines' ends, round corners and no arrowheads, so a horizontal line is a circle and a vertical
+  one a spoke under radial coordinates; `layer_data/2` keeps every row. Its look is a path's; a
+  horizontal line's key is a path's, a vertical one's `draw_key_vline()`'s, up the key's middle
+  from bottom to top (`Path.line_key/4`, which every line key shares), each needing a path's room.
+  **A diagonal line (`Geom.Abline`) is drawn as `GeomAbline` draws one**: the extents, each
+  widened by its own width each side where `Coord.linear?/1` and `Coord.clip/1` is `:on`; each
+  distinct row's x where its y meets the y extent's ends, `(y - intercept) / slope`, the lesser
+  no lower than x's start and the greater no higher than its end, and y `intercept + slope * x`
+  at both, in R's arithmetic (`DataFrame.Arithmetic`), so a flat line runs the x extent from the
+  division's infinities, a NaN end drops the row, and a line missing the panel is drawn beyond it
+  (design-log §4, the entry beginning "A reference line is drawn from the panel's extents"); the
+  rows, intercept and slope kept, are drawn as segments as a horizontal line's are. Repeats are
+  dropped before the arithmetic, which drops what `unique0()` drops after, since a row's ends
+  follow from the columns it keeps. Its intercept and slope must be numbers, an expression's
+  refused in `setup_data/3`; its key is `draw_key_abline()`'s, corner to corner, needing a
+  path's room.
 - **A hexagon (`Geom.Hex`) is drawn as ggplot2's `GeomHex` draws one**: per panel, group by
   group, in row order, each row with a place its six corners round its centre, half its group's
   first row's `width` across and its `height` over √3 and over 2 up, twice that at its top and

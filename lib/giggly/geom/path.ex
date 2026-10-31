@@ -36,12 +36,15 @@ defmodule Giggly.Geom.Path do
   # are drawn in group order, each run of lines alike in width and line type one primitive, and the
   # segments in row order, each run alike in width one.
 
+  alias Giggly.Geom.Mark
+  alias Giggly.Scene.{Polylines, Segments}
+
   @enforce_keys [:line_end, :line_join, :mitre_limit, :arrow]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          line_end: Giggly.Scene.Polylines.line_end(),
-          line_join: Giggly.Scene.Polylines.line_join(),
+          line_end: Polylines.line_end(),
+          line_join: Polylines.line_join(),
           mitre_limit: float(),
           arrow: Giggly.Geom.arrow() | :none
         }
@@ -56,18 +59,63 @@ defmodule Giggly.Geom.Path do
   @spec required_aesthetics() :: [atom()]
   def required_aesthetics, do: [:x, :y]
 
+  # A legend's key drawn as a line in the key's cell from one place to another, `{start, end}`,
+  # each a fraction of the cell's width and height, as ggplot2's `draw_key_path()`,
+  # `draw_key_vline()` and `draw_key_abline()` draw theirs: in the key's colour at its alpha, width
+  # and line type, its ends `line_end`, its corners grid's default, round, with `arrow`'s head; a
+  # colour of `:none`, a blank line type, or a missing width or line type, R's `NA`, draws nothing,
+  # as `draw_key_path()` draws a missing line type blank and R's graphics engine draws no line of
+  # a missing width.
+  @doc false
+  @spec line_key(
+          %{optional(atom()) => term()},
+          {{float(), float()}, {float(), float()}},
+          Polylines.line_end(),
+          Giggly.Geom.arrow() | :none
+        ) :: [Segments.t()]
+  def line_key(key, {start, finish}, line_end, arrow) do
+    look =
+      {Mark.key_color(key, :color), Map.fetch!(key, :linewidth), Map.fetch!(key, :linetype)}
+
+    case look do
+      {color, line_width, line_type}
+      when :none in [color, line_type] or is_nil(line_width) or is_nil(line_type) ->
+        []
+
+      {color, line_width, line_type} ->
+        alpha = Map.fetch!(key, :alpha)
+        head = Mark.head(arrow, color, alpha)
+
+        [
+          %Segments{
+            starts: [start],
+            ends: [finish],
+            offsets: :none,
+            stroke_width: Mark.stroke_width(line_width),
+            dashes: Mark.dashes(line_type, line_width),
+            color: [Mark.hex(color)],
+            opacity: [Mark.opacity(color, alpha)],
+            line_end: line_end,
+            line_join: :round,
+            mitre_limit: 10.0,
+            arrows: if(head == :none, do: :none, else: [head])
+          }
+        ]
+    end
+  end
+
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Coord, DataFrame}
-    alias Giggly.Geom.Mark
+    alias Giggly.Geom.{Mark, Path}
     alias Giggly.Scene.{Polylines, Segments}
 
     # The solid line type, which a line must keep all along it to be drawn as segments.
     @solid {}
 
     # A legend's key, `draw_key_path()`: a line across the middle of the key, from a tenth of its
-    # width to nine tenths, its corners grid's default, round.
+    # width to nine tenths.
     @key_start {0.1, 0.5}
     @key_end {0.9, 0.5}
 
@@ -116,40 +164,10 @@ defmodule Giggly.Geom.Path do
     defp draw_lines(geom, rows, _solid, true), do: draw_polylines(geom, rows)
     defp draw_lines(geom, rows, true, false), do: draw_segments(geom, rows)
 
-    # A legend's key, in the key's colour at its alpha, width and line type; a colour of `:none`, a
-    # blank line type, or a missing width or line type, R's `NA`, draws nothing, as
-    # `draw_key_path()` draws a missing line type blank and R's graphics engine draws no line of a
-    # missing width.
+    # A legend's key, a line across its middle.
     @impl Giggly.Geom
-    def draw_key(geom, key) do
-      look =
-        {Mark.key_color(key, :color), Map.fetch!(key, :linewidth), Map.fetch!(key, :linetype)}
-
-      case look do
-        {color, line_width, line_type}
-        when :none in [color, line_type] or is_nil(line_width) or is_nil(line_type) ->
-          []
-
-        {color, line_width, line_type} ->
-          alpha = Map.fetch!(key, :alpha)
-
-          [
-            %Segments{
-              starts: [@key_start],
-              ends: [@key_end],
-              offsets: :none,
-              stroke_width: Mark.stroke_width(line_width),
-              dashes: Mark.dashes(line_type, line_width),
-              color: [Mark.hex(color)],
-              opacity: [Mark.opacity(color, alpha)],
-              line_end: geom.line_end,
-              line_join: :round,
-              mitre_limit: 10.0,
-              arrows: arrows([Mark.head(geom.arrow, color, alpha)])
-            }
-          ]
-      end
-    end
+    def draw_key(geom, key),
+      do: Path.line_key(key, {@key_start, @key_end}, geom.line_end, geom.arrow)
 
     # The room a key's line needs, its width in millimetres either way, as ggplot2's
     # `set_key_size()` reads a path's key, which has no `size`; a missing width needs none. A key

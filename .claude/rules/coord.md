@@ -25,7 +25,10 @@ stat and position is a struct"; what radial coordinates are and why: the entry b
   built, rendering passes them on with the plot's coordinate system, and a geom or a guide hands
   both back; only that coordinate system's implementation reads them, a map it builds in its own
   shape, so a coordinate system that places positions differently changes no geom, and a guide
-  draws only what `axes/2` and `grid/2` hand it.
+  draws only what `axes/2` and `grid/2` hand it. **What a geom may learn of them is each axis's
+  extent, through `extents/2`**, by aesthetic, in positions, as ggplot2's
+  `backtransform_range()`: cartesian the x and y extents, radially the angle's as x and the
+  radius's as y, so a reference line can run across the whole panel.
 - **A plot always records its coordinate system as a struct of its kind, `%Coord.Cartesian{}`
   included**, whose fields are its parameters. `Giggly.Coord` is a protocol, every function taking
   the coordinate system first; each coordinate system is one module holding its struct and its
