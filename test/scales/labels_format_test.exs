@@ -132,8 +132,10 @@ defmodule Scales.Labels.FormatTest do
     end
 
     test "are counted from the power of ten below a number its log10 rounds up to the next" do
-      # format(1e-20, digits = 22): the double 1e-20 is just below 10^-20, where log10 gives -20
+      # format(1e-20, digits = 22): the double 1e-20 is just below 10^-20, where log10 gives
+      # -20; 99.99999999999999, digits = 22, below 10^2, where log10 gives 2
       assert write([1.0e-20], digits: 22) == ["9.999999999999999451533e-21"]
+      assert write([99.99999999999999], digits: 22) == ["99.99999999999998578915"]
     end
   end
 
