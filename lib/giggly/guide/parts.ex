@@ -23,7 +23,8 @@ defmodule Giggly.Guide.Parts do
   # down from their top: the baseline of line `i` of `n`, counting from 0, is
   # `((1 - vjust)(n - 1) - i)` line spacings above the anchor, less `vjust` of a line's ascent; a
   # title is as deep as its lines spaced out and an ascent, as grid measures one, and as wide as its
-  # widest line. Tick labels, strips and a legend's labels stay one line.
+  # widest line. A strip's label breaks as a title does; tick labels and a legend's labels stay one
+  # line.
 
   alias Giggly.{Font, Theme}
   alias Giggly.Scene.{Cell, Rect, Text}
@@ -326,11 +327,12 @@ defmodule Giggly.Guide.Parts do
     {across * cosine + up * sine, up * cosine - across * sine}
   end
 
-  # A title's lines, split where it breaks; any other text is one line.
+  # A title's or a strip's lines, split where it breaks; any other text is one line.
   defp lines(text, %{line_spacing: _spacing}), do: String.split(text, "\n")
   defp lines(text, _look), do: [text]
 
-  # The distance from one line's baseline to the next's: a title's, and none for one-line text.
+  # The distance from one line's baseline to the next's: a title's or a strip's, and none for
+  # one-line text.
   defp line_spacing(%{line_spacing: spacing}), do: spacing
   defp line_spacing(_look), do: 0.0
 

@@ -297,6 +297,52 @@ defmodule Giggly.Plot do
   #{NimbleOptions.docs(Options.complete_theme())}
   """
 
+  # How both facets label their strips, for each one's documentation.
+  @labeller_doc """
+  ## Labelling the strips
+
+  Each strip is labelled from its panel's values by `labeller:`, the value alone unless it says
+  otherwise:
+
+    * `:value`, the value alone, as a table writes it: `4` for a whole float, `TRUE`;
+    * `:both`, the column's name and the value, `cyl: 4`;
+    * `:context`, the value alone where a side's strips are for one column, and both where they
+      are for several;
+    * `:wrap`, the value alone broken between its words into lines shorter than 25 characters, a
+      word longer than that on a line of its own: the whitespace between words becomes one space,
+      or two after a sentence's end that two or more followed, and a line holding only whitespace
+      starts a paragraph, an empty line before it;
+    * one of these with its options, such as `{:both, sep: "=", multi_line: false}`: `sep:` goes
+      between the name and the value (`": "`), `width:` sets how many characters `:wrap` keeps a
+      line under (`{:wrap, width: 10}`), and `multi_line: false` puts a panel's labels in
+      one strip, joined by `", "`, in place of a strip for each column (`4, f`, or under
+      `:both` `cyl, drv: 4, f`, and under `:wrap` the labels joined and then broken);
+    * a function, handed each label as `:value` writes it and returning the label to show;
+    * a map of labels to the labels to show, `%{"0" => "Zero", "1" => "One"}`, a label it lacks
+      shown as `NA`.
+
+  A missing value is shown as `NA`, and is never handed to a function or looked up. A label
+  holding a line break, whichever labeller writes it, is drawn in a strip of several lines,
+  spaced by the strip text's `lineheight:`.
+
+  A keyword list labels the sides, or the columns, apart:
+
+    * `rows:` and `cols:`, the labeller of every strip of the rows or of the columns of panels;
+      a wrap's strips are one side, labelled by either;
+    * `columns:`, a keyword list or a map of a labeller for each column it names, by the column.
+      A column the facet does not split on is passed over, so one list can label several plots.
+      A label a column's own labeller leaves missing, as a map does one it lacks, is the
+      default's;
+    * `default:`, the labeller of every other column (`:value`), which also writes the labels a
+      function or a map gives: under `[columns: [vore: &String.upcase/1], default: :both]` the
+      strip of `"carni"` shows `vore: CARNI`;
+    * `multi_line:`, whether each column's label is a strip of its own (`true`), or one strip
+      joins them, `cyl: 4, drv: f`.
+
+  In the list a labeller takes its options but not `multi_line:`, which is the list's. A side
+  whose strips have a labeller of their own cannot also have its columns labelled apart.
+  """
+
   defguardp is_column_reference(reference) when is_binary(reference) or is_atom(reference)
 
   # A date-time, naive or not.
@@ -2097,13 +2143,18 @@ defmodule Giggly.Plot do
   The panels share each axis's scale, and an axis is drawn only at the panels' outer edges. Free
   scales give each panel a scale of its own, trained on its rows alone, and its own axis.
 
+  Each panel has a strip above it for each column, in the order given, labelled with its value
+  unless `labeller:` says otherwise.
+
   ## Options
 
   #{NimbleOptions.docs(Options.facet_wrap())}
 
-  Raises `ArgumentError` for a column named twice or none at all, or a value that is not a column
-  reference, and `NimbleOptions.ValidationError` for an option it does not take or a count that is
-  not a positive whole number. When the plot is run, since a layer added later may bring a column,
+  Raises `ArgumentError` for a column named twice or none at all, a value that is not a column
+  reference, or a labeller whose `columns:` names a column when `rows:` or `cols:` labels every
+  strip, and `NimbleOptions.ValidationError` for an option it does not take, a count that is not a
+  positive whole number, or a labeller it cannot use, `rows:` and `cols:` together among them. When
+  the plot is run, since a layer added later may bring a column,
   it raises `ArgumentError` unless the plot's data or some layer's own table holds every column,
   when `nrow:` and `ncol:` together hold fewer panels than there are, and when no table has a row
   to make a panel from.
@@ -2115,16 +2166,34 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.facet_wrap(:cyl)
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:panel)
       [1, 2, 3, 1]
+
+  Under `labeller: :both` each strip shows the column's name beside its value:
+
+      iex> svg =
+      ...>   %{"wt" => [2.32, 2.62], "mpg" => [22.8, 21.0], "cyl" => [4, 6]}
+      ...>   |> Giggly.Plot.new(%{x: :wt, y: :mpg})
+      ...>   |> Giggly.Plot.geom_point()
+      ...>   |> Giggly.Plot.facet_wrap(:cyl, labeller: :both)
+      ...>   |> Giggly.to_svg()
+      ...>   |> IO.iodata_to_binary()
+      iex> Enum.map(["cyl: 4", "cyl: 6"], fn label -> svg =~ ">\#{label}</text>" end)
+      [true, true]
+
+  #{@labeller_doc}
   """
   @spec facet_wrap(t(), column_reference() | [column_reference()], keyword()) :: t()
   def facet_wrap(%__MODULE__{} = plot, facets, options \\ []) when is_list(options) do
     options = NimbleOptions.validate!(options, Options.facet_wrap())
+    columns = facet_columns(facets)
+    labeller = Keyword.fetch!(options, :labeller)
+    check_labelled_sides(labeller, [wrap: columns], "Plot.facet_wrap/3")
 
     facet = %Facet.Wrap{
-      facets: facet_columns(facets),
+      facets: columns,
       nrow: Keyword.get(options, :nrow, :none),
       ncol: Keyword.get(options, :ncol, :none),
-      scales: Keyword.fetch!(options, :scales)
+      scales: Keyword.fetch!(options, :scales),
+      labeller: labeller
     }
 
     %{plot | facet: facet}
@@ -2146,7 +2215,8 @@ defmodule Giggly.Plot do
 
   Each column of panels is labelled by strips above the first row, and each row by strips right of
   the last column, turned to read downward unless the theme says otherwise (`strip_text_y`): a
-  strip for each column split on, the first outermost.
+  strip for each column split on, the first outermost, labelled with its value unless
+  `labeller:` says otherwise.
 
   The panels share each axis's scale, and an axis is drawn only at the grid's outer edges. Free
   scales give each column of panels an x scale of its own and each row a y scale, trained on its
@@ -2157,12 +2227,13 @@ defmodule Giggly.Plot do
 
   #{NimbleOptions.docs(Options.facet_grid())}
 
-  Raises `ArgumentError` when neither `rows:` nor `cols:` names a column, or a column is named
-  twice, in one of them or in both, and `NimbleOptions.ValidationError` for an option it does not
-  take or a value that is not a column reference. When the plot is run, since a layer added later
-  may bring a column, it raises `ArgumentError` unless the plot's data or some layer's own table
-  holds every column of `rows:`, and likewise of `cols:`, and when no table has a row to make a
-  panel from.
+  Raises `ArgumentError` when neither `rows:` nor `cols:` names a column, a column is named twice,
+  in one of them or in both, or the labeller's `columns:` names a column of a side its `rows:` or
+  `cols:` labels, and `NimbleOptions.ValidationError` for an option it does not take, a value that
+  is not a column reference, or a labeller it cannot use. When the plot is run, since a layer added
+  later may bring a column, it raises `ArgumentError` unless the plot's data or some layer's own
+  table holds every column of `rows:`, and likewise of `cols:`, and when no table has a row to
+  make a panel from.
 
       iex> plot =
       ...>   %{
@@ -2176,6 +2247,8 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.facet_grid(rows: :am, cols: :cyl)
       iex> plot |> Giggly.layer_data() |> Giggly.DataFrame.pull(:panel)
       [4, 5, 3, 4]
+
+  #{@labeller_doc}
   """
   @spec facet_grid(t(), keyword()) :: t()
   def facet_grid(%__MODULE__{} = plot, options) when is_list(options) do
@@ -2192,7 +2265,15 @@ defmodule Giggly.Plot do
       Enum.map(references, fn side -> Enum.map(side, fn reference -> to_string(reference) end) end)
 
     check_facet_columns(rows ++ cols, Enum.concat(references), "Plot.facet_grid/2")
-    facet = %Facet.Grid{rows: rows, cols: cols, scales: Keyword.fetch!(options, :scales)}
+    labeller = Keyword.fetch!(options, :labeller)
+    check_labelled_sides(labeller, [rows: rows, cols: cols], "Plot.facet_grid/2")
+
+    facet = %Facet.Grid{
+      rows: rows,
+      cols: cols,
+      scales: Keyword.fetch!(options, :scales),
+      labeller: labeller
+    }
 
     %{plot | facet: facet}
   end
@@ -4527,7 +4608,8 @@ defmodule Giggly.Plot do
   own, along and across it once turned: the y axis's title is turned 90 degrees, so its `vjust:
   1` puts its top toward the left. A legend's labels sit right of their keys, left-aligned and
   centred on them, and its title is left-aligned, unless `:legend_text` or `:legend_title` says
-  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines.
+  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines,
+  and a strip's.
   `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
   "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
   [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.
@@ -6454,6 +6536,34 @@ defmodule Giggly.Plot do
               "#{function} facets by #{inspect_all(references)}, which names the column " <>
                 "#{inspect(repeated)} more than once"
     end
+  end
+
+  # A side whose strips have a labeller of their own labels its columns with it, so `columns:` may
+  # name none of them, as ggplot2's `labeller()` refuses ("Conflict between `.rows` and `vs`"); a
+  # wrap's one side is labelled by `cols:`, else `rows:`.
+  defp check_labelled_sides(%{columns: own} = labeller, sides, function) do
+    Enum.each(sides, fn {side, columns} ->
+      labeller
+      |> side_labeller(side)
+      |> check_labelled_side(
+        Enum.filter(columns, fn column -> is_map_key(own, column) end),
+        function
+      )
+    end)
+  end
+
+  defp side_labeller(%{rows: rows, cols: :none}, :wrap), do: {"every strip", :rows, rows}
+  defp side_labeller(%{cols: cols}, :wrap), do: {"every strip", :cols, cols}
+  defp side_labeller(%{rows: rows}, :rows), do: {"every strip of the rows", :rows, rows}
+  defp side_labeller(%{cols: cols}, :cols), do: {"every strip of the columns", :cols, cols}
+
+  defp check_labelled_side({_strips, _key, :none}, _named, _function), do: :ok
+  defp check_labelled_side(_side, [], _function), do: :ok
+
+  defp check_labelled_side({strips, key, _labeller}, [column | _others], function) do
+    raise ArgumentError,
+          "#{function}'s labeller labels #{strips} with #{key}:, so its columns: cannot also " <>
+            "label #{inspect(column)}, a column those strips show"
   end
 
   defp inspect_all(terms), do: Enum.map_join(terms, ", ", &inspect/1)

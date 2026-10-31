@@ -26,7 +26,7 @@ defprotocol Giggly.Facet do
   # and `facet_grid` (`Giggly.Facet.Grid`), a row of panels for each combination of some columns'
   # values crossed with a column of panels for each of others'. What the two that split on values
   # share, the combinations the tables make and the panel each row is given by its values, is
-  # `Giggly.Facet.Combinations`'s.
+  # `Giggly.Facet.Combinations`'s, and the labels of their strips `Giggly.Facet.Labeller`'s.
   #
   # A facet that orders its panels by values orders them as a discrete scale orders its levels,
   # by the key the assembly hands it, so panels and axes agree while this namespace names nothing

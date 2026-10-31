@@ -102,4 +102,30 @@ defmodule Giggly.DatasetsTest do
 
     assert Enum.at(dates, 1) === 2000.0833333333333
   end
+
+  # Golden: R 4.6.1 with ggplot2 4.0.3, `colSums(is.na(msleep))` and `table(msleep$vore, useNA =
+  # "always")`, counts no summation order can move. They move only if ggplot2's msleep does.
+  test "msleep reads R's every row, a missing diet or status nil as a missing number is" do
+    msleep = Giggly.Datasets.msleep()
+
+    assert Enum.map(msleep, fn {name, values} -> {name, Enum.count(values, &is_nil/1)} end) ==
+             [
+               name: 0,
+               genus: 0,
+               vore: 7,
+               order: 0,
+               conservation: 29,
+               sleep_total: 0,
+               sleep_rem: 22,
+               sleep_cycle: 51,
+               awake: 0,
+               brainwt: 27,
+               bodywt: 0
+             ]
+
+    diets = Keyword.fetch!(msleep, :vore)
+
+    assert Enum.frequencies(diets) ==
+             %{"carni" => 19, "herbi" => 32, "insecti" => 5, "omni" => 20, nil => 7}
+  end
 end

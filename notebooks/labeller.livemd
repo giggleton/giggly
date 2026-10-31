@@ -5,6 +5,18 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+msleep = Giggly.Datasets.msleep()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -19,8 +31,17 @@ A labeller writes the labels in a facet's strips from the values of its columns.
 builds one from a labeller for each column, or one for all the rows' strips and one for all the
 columns', and a default for the rest; each may be a labeller function, a function on strings, or a
 lookup table of the labels to show in place of the values. The result goes to the `labeller`
-argument of `facet_grid()` or `facet_wrap()`. Giggly has none of it yet: neither
-`Giggly.Plot.facet_grid/2` nor `Giggly.Plot.facet_wrap/3` takes a `labeller` option.
+argument of `facet_grid()` or `facet_wrap()`. Giggly's `Giggly.Plot.facet_grid/2` and
+`Giggly.Plot.facet_wrap/3` take a `labeller:` option, and what `labeller()` builds is a keyword
+list there: `columns:` a labeller for each column it names, `rows:` and `cols:` one for each side,
+and `default:` one for the rest. A labeller is `:value`, `:both`, `:context` or `:wrap`, R's
+`label_value()`, `label_both()`, `label_context()` and `label_wrap_gen()`, a function handed each
+label, or a map of labels. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
+cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine; and `Giggly.Datasets.msleep/0`, ggplot2's `msleep`: the sleep of 83 mammals,
+which the setup cell binds to `mtcars` and `msleep`, R's names for them.
 
 ## A labeller for each column
 
@@ -34,8 +55,23 @@ p1 + facet_grid(
 )
 ```
 
-Not in Giggly yet: `facet_grid()`'s `labeller` option, `labeller()`, `label_both()` and
-`label_value()`.
+Giggly gives the facet's rows as `rows:` and its columns as `cols:`, and the labellers of `vs` and
+`am` under `columns:`.
+
+```elixir
+p1 =
+  mtcars
+  |> Plot.new(%{x: :mpg, y: :wt})
+  |> Plot.geom_point()
+
+p1
+|> Plot.facet_grid(
+  rows: [:vs, :am],
+  cols: :gear,
+  labeller: [columns: [vs: :both, am: :value]]
+)
+|> render.()
+```
 
 ## A labeller for the rows and one for the columns
 
@@ -47,12 +83,20 @@ p1 + facet_grid(
 )
 ```
 
-Not in Giggly yet: `facet_grid()`'s `labeller` option, `labeller()`, `label_both()` and
-`label_value()`.
+```elixir
+p1
+|> Plot.facet_grid(
+  rows: [:vs, :am],
+  cols: :gear,
+  labeller: [rows: :both, cols: :value]
+)
+|> render.()
+```
 
 ## A function on strings
 
-`capitalize()` upper-cases the first letter of each label.
+`capitalize()` upper-cases the first letter of each label. The strips of the animals whose diet
+`msleep` lacks show `NA`, and a missing value is never handed to the function.
 
 ```r
 # You can supply functions operating on strings:
@@ -64,12 +108,29 @@ p2 <- ggplot(msleep, aes(x = sleep_total, y = awake)) + geom_point()
 p2 + facet_grid(vore ~ conservation, labeller = labeller(vore = capitalize))
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option and `labeller()`.
+Giggly's `capitalize` upper-cases the first letter and keeps the rest, as R's does;
+`String.capitalize/1` would also lower-case the rest.
+
+```elixir
+capitalize = fn string ->
+  {first, rest} = String.split_at(string, 1)
+  String.upcase(first) <> rest
+end
+
+p2 =
+  msleep
+  |> Plot.new(%{x: :sleep_total, y: :awake})
+  |> Plot.geom_point()
+
+p2
+|> Plot.facet_grid(rows: :vore, cols: :conservation, labeller: [columns: [vore: capitalize]])
+|> render.()
+```
 
 ## A lookup table
 
 The named vector gives each `conservation` code its long form, and `capitalize()` labels the
-other strips.
+other strips. Giggly's lookup table is a map.
 
 ```r
 # Or use character vectors as lookup tables:
@@ -89,7 +150,24 @@ p2 + facet_grid(vore ~ conservation, labeller = labeller(
 ))
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option and `labeller()`.
+```elixir
+conservation_status = %{
+  "cd" => "Conservation Dependent",
+  "en" => "Endangered",
+  "lc" => "Least concern",
+  "nt" => "Near Threatened",
+  "vu" => "Vulnerable",
+  "domesticated" => "Domesticated"
+}
+
+p2
+|> Plot.facet_grid(
+  rows: :vore,
+  cols: :conservation,
+  labeller: [default: capitalize, columns: [conservation: conservation_status]]
+)
+|> render.()
+```
 
 ## Wrapping long labels
 
@@ -106,8 +184,30 @@ p3 +
   )
 ```
 
-Not in Giggly yet: the `msleep` dataset, `facet_grid()`'s `labeller` option, `labeller()`, and
-`label_wrap_gen()`, which wraps each label at 10 characters.
+The first two lines give each animal its conservation status's long form, missing where its code
+is, as a new column `conservation2`; the cell does the same in Elixir, looking each code up in
+`conservation_status`. `label_wrap_gen(10)` is `{:wrap, width: 10}`, which breaks each label into
+lines shorter than 10 characters, between its words.
+
+```elixir
+conservation2 =
+  Enum.map(msleep[:conservation], fn code -> conservation_status[code] end)
+
+msleep = Keyword.put(msleep, :conservation2, conservation2)
+
+p3 =
+  msleep
+  |> Plot.new(%{x: :sleep_total, y: :awake})
+  |> Plot.geom_point()
+
+p3
+|> Plot.facet_grid(
+  rows: :vore,
+  cols: :conservation2,
+  labeller: [columns: [conservation2: {:wrap, width: 10}]]
+)
+|> render.()
+```
 
 ## One labeller for several plots
 
@@ -127,5 +227,28 @@ p2 + facet_grid(vore ~ conservation, labeller = global_labeller)
 p3 + facet_wrap(~conservation2, labeller = global_labeller)
 ```
 
-Not in Giggly yet: the `msleep` dataset, `labeller()`, `label_wrap_gen()`, `label_both()`,
-`facet_grid()`'s `labeller` option, and `facet_wrap()`'s `labeller` option.
+A column the facet does not split on is passed over, so the one labeller serves both plots. Under
+`default: :both` the labels `capitalize` and the lookup give are written with their column's name,
+`vore: Carni`, while `{:wrap, width: 10}` writes its own, so `conservation2`'s strips show the
+wrapped long forms alone.
+
+```elixir
+global_labeller = [
+  columns: [
+    vore: capitalize,
+    conservation: conservation_status,
+    conservation2: {:wrap, width: 10}
+  ],
+  default: :both
+]
+
+p2
+|> Plot.facet_grid(rows: :vore, cols: :conservation, labeller: global_labeller)
+|> render.()
+```
+
+```elixir
+p3
+|> Plot.facet_wrap(:conservation2, labeller: global_labeller)
+|> render.()
+```

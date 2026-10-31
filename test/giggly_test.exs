@@ -8315,6 +8315,23 @@ defmodule GigglyTest do
       assert golden?(plot, "facet_grid_two_rows")
     end
 
+    # Golden: test/golden/facet_grid_labeller_wrap.svg, checked against ggplot2's drawing of the
+    # same plot, made by test/golden/facet_grid_labeller_wrap.R: every element, in order, and every
+    # clip path match it. Each strip's label is wrapped under 10 characters, so the strips above
+    # stack two lines down and those to the right two lines leftward, every strip as deep as two
+    # lines, and the one-line label centred in it.
+    test "a grid's wrapped labels break their strips into lines, each strip as deep as its row's" do
+      statuses = ["Conservation Dependent", "Least concern", "Near Threatened", "Domesticated"]
+
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [1, 2, 3, 4], "g" => statuses, "h" => statuses}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.facet_grid(rows: :h, cols: :g, labeller: {:wrap, width: 10})
+
+      assert golden?(plot, "facet_grid_labeller_wrap")
+    end
+
     # Golden: test/golden/facet_grid_legend.svg, checked against ggplot2's drawing of the same plot,
     # made by test/golden/facet_grid_legend.R: every element, in order, and every clip path match
     # it. facet_grid()'s free scales example: the strips right of the panels, the legend beyond

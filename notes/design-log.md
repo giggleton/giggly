@@ -79,6 +79,48 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **ggplot2's `msleep` comes with the labeller sweep, behind a waiver of its own (2026-10-30 and
+  2026-10-31, Steve: Q4 "yes", then the waiver "yes").** Five of the `labeller()` page's six
+  examples plot it, so without it the page that shows off `labeller:` would draw two. It is R's
+  `write.csv()` of the 83 rows, kept as columns as `mpg` is, and its 36 missing diets and statuses
+  read as `nil`: a string column now reads R's unquoted `NA` as a number column does, which no
+  earlier dataset's text holds. The logticks pages' examples that plot it still wait on their own
+  guides. *Rejected: leaving the five examples waiting* — the labeller work would ship with its own
+  page showing almost none of it. *Rejected: writing the rows out in the notebook* — 83 rows of 11
+  columns are a dataset ggplot2 ships, which `Giggly.Datasets` exists to hold.
+
+- **Wrapping a strip's label is the facet's own, and counts graphemes (2026-10-30 and 2026-10-31,
+  Steve: Q3 "B", then "A"; checked against R 4.6.1).** `:wrap` and `{:wrap, width:}` break a
+  label by `strwrap()`'s documented rules and what R draws, never a port of its source, in
+  private functions of `Facet.Labeller`, with no boundary change; scales increment 3 (Labels)
+  brings `label_wrap()` and line breaks in axis and legend labels, and moves this onto it. Strip
+  text is a title look, its line spacing the theme's. A character is a grapheme: R counts an East
+  Asian wide character as two, so `"日本語 日本語"` breaks at 10 in R and not in Giggly.
+  *Rejected: `Scales.Labels.wrap/2` now* — it pulls axis and legend line breaks into a facet step
+  and widens Scales' exports and Facet's deps. *Rejected: display columns from a Hex width
+  table* — a dependency for one script's labels, whose glyph widths Giggly already approximates.
+
+- **A labeller is plain data under `labeller:`, ggplot2's labellers by R's rules (2026-10-30,
+  Steve: "a", "A", and "agree" to the small calls; checked against ggplot2 4.0.3).** `:value`,
+  `:both` and `:context`, each also `{kind, options}`; a function handed one label; a map of
+  labels; a keyword list as R's `labeller()`, its per-column labellers under `columns:`, with
+  `rows:`, `cols:`, `default:` and `multi_line:`. R's composition is copied, quirks included: a
+  function's or map's labels written by the default, a column's missing labels filled in from it,
+  `label_context()` ignoring `sep` (refused), two ways of joining one strip. *Rejected: builder
+  functions in a `Giggly.Labeller`* — R builds values because it passes objects; Giggly's options
+  take keyword lists. *Rejected: a function handed a side's list, as `Scales.Labels` takes
+  breaks* — breaks share decimals, strips share nothing. *Rejected: column names at the list's top
+  level* — a column named `rows` or `default` would collide, which R's leading dots avoid.
+
+- **A missing value is never handed to a labeller's function or looked up (2026-10-30, Steve:
+  "A").** It stays missing until a labeller writes it, the default `NA` or `vore: NA`, or a column's
+  own `:both` or `:wrap`, as R fills in only labels left `NA` (`strwrap()` writes R's `NA`; checked
+  2026-10-31 in the labeller sweep, whose global labeller drew it). R hands its `NA` over, so a
+  function adding text departs: `NA-foo` in R, `NA` in Giggly, and a map's miss under such a default
+  the default's own label (`1-foo`, R `NA-foo`). *Rejected: handing over `"NA"`* —
+  `String.capitalize("NA")` is `"Na"`, where R draws `NA`. *Rejected: handing over `nil`* —
+  `&String.capitalize/1` would raise on msleep's `vore`, and every function would need a clause.
+
 - **A reference line is drawn from the panel's extents, given as values or mapped, and takes
   nothing from the plot's mapping (2026-10-30, Steve: "yes", "yes", "agree", "agree", walked one at
   a time; checked against ggplot2 4.0.3).** As `GeomHline`, `GeomVline` and `GeomAbline` draw
@@ -3275,6 +3317,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Draw the notebook examples labeller: unlocks, and write a missing value NA under a
+  column's own :wrap (labellers, step 3, the notebook sweep); §4: "A missing value is never handed"
+- 2026-10-31 — Add the msleep dataset, a string column reading R's NA as missing (labellers, step
+  3); §4: "ggplot2's `msleep` comes with the labeller sweep"
+- 2026-10-31 — Take labeller: :wrap and {:wrap, width: …}, and break strips over several lines
+  (labellers, step 2); §4: "Wrapping a strip's label"
 - 2026-10-31 — Draw the notebook examples the reference lines unlock, and narrow scale_linetype's
   and position_stack's verdicts to what still waits (reference lines, step 3, the notebook
   sweep); the `lm()` example keeps waiting on `lm()` though its line draws (Steve: "c"); §4: "A
@@ -3284,6 +3332,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   line is drawn from the panel's extents"
 - 2026-10-31 — Draw the notebook example geom_label() unlocks, and narrow the filled labels'
   verdict to a fixed fontface (geom_label, step 3, the notebook sweep)
+- 2026-10-30 — Take labeller: on facet_wrap and facet_grid, ggplot2's label_value, label_both and
+  label_context, a function or a map, and labeller()'s sides and columns (labellers, step 1); §4:
+  "A labeller is plain data", "A missing value is never handed"
 - 2026-10-30 — Add annotate(:label): labels placed by hand, each look a list of one per label,
   a padding one value however many sides it gives (geom_label, step 2); §4: "`annotate(:label)`
   counts a padding as one value"

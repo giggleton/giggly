@@ -51,8 +51,8 @@ panel's grid lines are placed by the coordinate system".
   font's descent turned (`extent/2`), an axis's or a colour bar's labels measured together as one
   grob, whatever its family. A title may break over lines (the entry beginning "A title may run
   over several lines"): each line a label of its own, its `line_spacing` below the one before,
-  stacked `vjust` of the way down from its top as R's graphics engine stacks lines; tick labels,
-  strips and a legend's labels stay one line.
+  stacked `vjust` of the way down from its top as R's graphics engine stacks lines; a strip's label
+  breaks the same way; tick labels and a legend's labels stay one line.
 - **A guide takes its breaks and its axis's line from the coordinate system, already placed**
   (`Coord.axes/2`), so ticks and marks are placed by one rule. Where an axis is drawn, which
   aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a
@@ -122,8 +122,9 @@ panel's grid lines are placed by the coordinate system".
 - **Drawing order follows ggplot2's:** an axis's line first; below the panel the ticks and then
   the labels, to its left and round a radial panel's circle the labels and then the ticks, and
   round the circle the line last.
-- **A strip is one label on a background as long as its panel's side**, ggplot2's `label_value()`
-  text placed by the rule counting its margins on every side, each side the cell's own,
+- **A strip is one label on a background as long as its panel's side**, the text its facet's
+  labeller wrote, in as many lines as it breaks into (a right strip's stacking leftward), placed
+  by the rule counting its margins on every side, each side the cell's own,
   `theme_gray()`'s centred: above the panel (`strip_text_x_top`, `strip_background_x`) as tall as
   its margins above and below and the label turned, a level one an ascent and the deepest descent;
   right of it (`strip_text_y_right`, `strip_background_y`, `theme_gray()`'s text turned -90

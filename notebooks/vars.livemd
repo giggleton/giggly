@@ -65,10 +65,27 @@ p + wrap_by(vs, am)
 ```
 
 A Giggly column is a plain value, an atom or a string, so a wrapper function takes columns as
-arguments and passes them on to `Giggly.Plot.facet_wrap/3` without quoting them.
+arguments and passes them on to `Giggly.Plot.facet_wrap/3` without quoting them. `labeller: :both`
+writes each strip as `vs: 0` rather than `0`.
 
-Not in Giggly yet: `facet_wrap()`'s `labeller` option, here `label_both()`, which writes each strip
-as `vs: 0` rather than `0`.
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :wt, y: :disp})
+  |> Plot.geom_point()
+
+wrap_by = fn plot, columns -> Plot.facet_wrap(plot, columns, labeller: :both) end
+
+p
+|> wrap_by.(:vs)
+|> render.()
+```
+
+```elixir
+p
+|> wrap_by.([:vs, :am])
+|> render.()
+```
 
 ## An expression to facet by
 
@@ -81,8 +98,8 @@ number of cars, and the name `drat` is what `label_both()` writes in the strips.
 p + wrap_by(drat = cut_number(drat, 3))
 ```
 
-Not in Giggly yet: `cut_number()`, an expression where Giggly takes a column, here
-`cut_number(drat, 3)`, and `facet_wrap()`'s `labeller` option.
+Not in Giggly yet: `cut_number()`, and an expression where Giggly takes a column, here
+`cut_number(drat, 3)`.
 
 ## A wrapper that cuts
 
@@ -112,5 +129,4 @@ R's tidy evaluation (`enquo()`, `as_label()`, `!!` and `:=`) is how an R functio
 column it was given without evaluating it, and names it. A Giggly column is a plain value, so a
 wrapper passes it on as it would any other.
 
-Not in Giggly yet: `cut_number()`, an expression where Giggly takes a column, and `facet_wrap()`'s
-`labeller` option.
+Not in Giggly yet: `cut_number()`, and an expression where Giggly takes a column.

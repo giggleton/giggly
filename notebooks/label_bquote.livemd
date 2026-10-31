@@ -17,8 +17,8 @@ of what remains.
 
 `label_bquote()` labels a facet's rows or columns with one of R's plotmath expressions,
 mathematical notation in which a column written `.(column)` is replaced by its value in each
-panel. Giggly has none of it yet: `Giggly.Plot.facet_grid/2` takes no `labeller` option, and Giggly
-has no labellers and no plotmath.
+panel. Giggly's `Giggly.Plot.facet_grid/2` takes a `labeller:` option, but Giggly has no
+`label_bquote()` and no plotmath.
 
 ## Expressions in the strips
 
@@ -33,5 +33,4 @@ p + facet_grid(. ~ vs, labeller = label_bquote(cols = .(vs) ^ .(vs)))
 p + facet_grid(. ~ vs + am, labeller = label_bquote(cols = .(am) ^ .(vs)))
 ```
 
-Not in Giggly yet: `facet_grid()`'s `labeller` option, `label_bquote()` and R's plotmath
-expressions.
+Not in Giggly yet: `label_bquote()` and R's plotmath expressions.

@@ -36,7 +36,7 @@ p + scale_x_log10(guide = "axis_logticks") +
 `na.rm = TRUE` only stops ggplot2 warning about the animals in `msleep` that have no brain weight;
 Giggly drops a row missing a position without a warning.
 
-Not in Giggly yet: the `msleep` dataset, the `na.rm` option and `guide_axis_logticks()`.
+Not in Giggly yet: the `na.rm` option and `guide_axis_logticks()`.
 
 ## Log-transformed coordinates
 
@@ -46,8 +46,7 @@ p + coord_transform(x = "log10", y = "log10") +
   guides(x = "axis_logticks", y = "axis_logticks")
 ```
 
-Not in Giggly yet: the `msleep` dataset, the `na.rm` option, `coord_transform()` and
-`guide_axis_logticks()`.
+Not in Giggly yet: the `na.rm` option, `coord_transform()` and `guide_axis_logticks()`.
 
 ## Data logged by hand
 
@@ -64,8 +63,7 @@ p + aes(x = log2(bodywt), y = log10(brainwt)) +
 The mapping logs the data itself, base 2 for x and base 10 for y, and `prescale.base` tells each
 axis which base that was.
 
-Not in Giggly yet: the `msleep` dataset, the `na.rm` option, and `guide_axis_logticks()` with its
-`prescale.base` option.
+Not in Giggly yet: the `na.rm` option, and `guide_axis_logticks()` with its `prescale.base` option.
 
 ## A pseudo-log scale
 

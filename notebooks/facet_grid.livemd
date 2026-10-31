@@ -34,8 +34,8 @@ every combination occurs in the data; for one column with many values, ggplot2 s
 columns, panels can take space in proportion to their scales, and margins add panels that hold
 the data for every value of a column. Giggly has `Giggly.Plot.facet_grid/2`, which takes the
 rows' columns as `rows:`, the columns' as `cols:`, and `scales:`, shared or free along either. It
-takes no `space`, `margins`, `axes`, `axis.labels`, `labeller`, `switch`, `as.table`, `drop` or
-`shrink` options. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+takes `labeller:` and no `space`, `margins`, `axes`, `axis.labels`, `switch`, `as.table`, `drop`
+or `shrink` options. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
 returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
 and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`. The data
 is `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for 234 cars of 38 popular models from

@@ -25,30 +25,31 @@ defmodule Giggly.Facet.Wrap do
   # beside it, ggplot2's axes at the margins: below the last row, and below a panel with an empty
   # cell under it, at the end of an unfilled last row; and left of the first column. On a free axis
   # every panel draws its own, since no two share a scale. Each panel has a strip above it for
-  # each facet column, in the columns' order, labelled with its value as ggplot2's `label_value()`
-  # writes it.
+  # each facet column, in the columns' order, or one for them all, labelled from its values by the
+  # facet's labeller (`Giggly.Facet.Labeller`, whose map the struct holds).
 
-  @enforce_keys [:facets, :nrow, :ncol, :scales]
+  @enforce_keys [:facets, :nrow, :ncol, :scales, :labeller]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           facets: [String.t()],
           nrow: pos_integer() | :none,
           ncol: pos_integer() | :none,
-          scales: :fixed | :free_x | :free_y | :free
+          scales: :fixed | :free_x | :free_y | :free,
+          labeller: Giggly.Facet.Labeller.t()
         }
 
   defimpl Giggly.Facet, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Facet
 
     alias Giggly.DataFrame
-    alias Giggly.Facet.Combinations
+    alias Giggly.Facet.{Combinations, Labeller}
 
     # A fixed axis's one scale.
     @only_scale 1
 
     @impl Giggly.Facet
-    def layout(%{facets: facets, scales: scales} = wrap, frames, order_key) do
+    def layout(%{facets: facets, scales: scales, labeller: labeller} = wrap, frames, order_key) do
       combinations = Combinations.combine(frames, facets, order_key, subject(facets))
       count = length(combinations)
       {_rows, columns} = dimensions(wrap, count)
@@ -74,8 +75,7 @@ defmodule Giggly.Facet.Wrap do
               end),
             axis_left:
               Enum.map(places, fn {row, column} -> free_y or {row, column - 1} not in occupied end),
-            strip_top:
-              Enum.map(combinations, fn values -> Enum.map(values, &Combinations.label/1) end),
+            strip_top: Labeller.label(labeller, :wrap, facets, combinations),
             strip_right: Enum.map(combinations, fn _values -> [] end)
           ]
       )

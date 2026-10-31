@@ -12,9 +12,12 @@ defmodule Giggly.Guide.Strip do
   # text `theme_gray()` turns 90 degrees clockwise): the background fills the strip's cell, and the
   # label is placed in it as `Giggly.Guide.Parts` places every text, ggplot2's `titleGrob()`,
   # counting its margins on every side, each side of the cell's own: centred in what the margins
-  # leave unless the theme justifies it otherwise. A strip above is as tall as its margins above
-  # and below and its label turned, a level one a line's ascent and deepest descent, as ggplot2
-  # measures it; one to the right is as wide as its margins left and right and its label turned. The
+  # leave unless the theme justifies it otherwise. A label breaks into lines where it holds a line
+  # break, as a title does, each line its text's line spacing below the one before in the label's
+  # own turned frame, so a strip right of a panel stacks its lines leftward. A strip above is as
+  # tall as its margins above and below and its label turned, a level one-line label a line's ascent
+  # and deepest descent, as ggplot2 measures it, each further line its line spacing more; one to the
+  # right is as wide as its margins left and right and its label turned. The
   # label is anchored by shares of the strip and offsets in points, so it sits right in a strip
   # longer or deeper than itself, as a row or column of strips is as deep as its deepest. A strip
   # whose text the theme removes is not drawn at all, its background with it, and takes no room, as

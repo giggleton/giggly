@@ -3,6 +3,7 @@ paths:
   - "lib/giggly/facet.ex"
   - "lib/giggly/facet/**"
   - "test/giggly/facet_test.exs"
+  - "test/giggly/facet/**"
 ---
 
 # The facet
@@ -36,7 +37,7 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   apart**, each side refused alone, as ggplot2's `facet_grid` calls `combine_vars()` once for
   each, and then crosses them: every row's values with every column's, so a pair no table holds is
   a panel, drawn empty, as `df.grid()` crosses them. What the two facets share, combining and
-  repeating, is `Facet.Combinations`'s.
+  repeating, is `Facet.Combinations`'s, and labelling their strips `Facet.Labeller`'s.
 - **A table lacking some facet columns is repeated in each panel of the values it has**, as
   ggplot2's `map_data()` repeats it: all its rows, in their order, once for each combination of
   the missing columns' values in the layout, in panel order, so one lacking them all is drawn in
@@ -55,9 +56,8 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   column. **On a free axis (`scales: :free_x`, `:free_y` or `:free`) each panel has a scale of its
   own, its id the panel's, and draws its own axis**, as ggplot2's layout numbers `SCALE_X` and
   `SCALE_Y` by panel and its `facet_wrap` draws every axis of a free scale. Its strips are one per
-  facet column, the value written as ggplot2's `label_value()` writes it, R's `as.character()`
-  (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`), a missing value
-  `NA`. The null facet's one panel draws both axes and has no strip. **A grid's panels draw an
+  facet column, or one for them all, labelled by the facet's labeller (below). The null facet's
+  one panel draws both axes and has no strip. **A grid's panels draw an
   axis only at its margins, free scales or not**, below the last row and left of the first
   column, ggplot2's `axes = "margins"`; **on a free axis each column of panels shares an x scale
   and each row a y scale, its id the column's or the row's**, as ggplot2 numbers `SCALE_X` by
@@ -65,6 +65,26 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   its last column's those of its rows' columns, the first column split on outermost on both sides,
   as ggplot2's `build_strip()` turns the right side's round. A wrapped panel's and the null
   facet's are all above.
+- **A strip's label is the facet's labeller's, ggplot2's labellers by R's rules** (`Facet.Labeller`,
+  checked in R 4.6.1 with ggplot2 4.0.3; design-log §4, the entries beginning "A labeller is plain
+  data", "A missing value is never handed" and "Wrapping a strip's label"). Each side is labelled
+  from its own columns'
+  values, a wrap's all of them, a grid's rows' once per row and columns' once per column: by the
+  side's own labeller where it has one (a wrap's `cols`, else `rows`, as `resolve_labeller()`
+  takes them), else each column alone, by its own or the default, a label its own leaves missing
+  filled in from the default's, as `labeller()` fills R's `NA`; a function's or a map's labels
+  are then written by the default. The default, `:value`, is `label_value()`: R's
+  `as.character()` (`Giggly.AsCharacter`, which the facet lists: `4` for a whole float, `TRUE`).
+  A missing value is never handed to a function or looked up, and is written `NA`; a column's own
+  `:both` or `:wrap` writes it, where its own `:value` or `:context` leaves it for the default, as
+  R fills in only what stays `NA` (`strwrap()` writes R's `NA`). The facet holds
+  the labeller as `Plot` records it, plain data, and runs a function only to write labels.
+- **`:wrap` breaks a label as `strwrap()` does, from its documented rules and R's drawings, never a
+  port of its source** (`Facet.Labeller`; checked on 600 random labels against R 4.6.1): lines
+  shorter than the width, words never split, whitespace (space, tab and line break only) one
+  space, or two after a sentence's end that two or more followed, a line of only whitespace a
+  paragraph break, a character a grapheme (R counts an East Asian wide one as two). The wrapping is
+  the facet's own, private, until scales' `label_wrap()` takes it over.
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
   levels, the first table's and then those each later one adds; any other as a discrete scale
@@ -84,6 +104,7 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   `Giggly.Facet` is a protocol; each facet is one module holding its struct, whose fields are its
   parameters, and its computing, in a `defimpl` that opens by classifying itself into this
   boundary. The boundary exports the kinds, whose structs a plot records; what they compute with
-  stays in their implementations and in `Facet.Combinations`, which it does not export.
+  stays in their implementations and in `Facet.Combinations` and `Facet.Labeller`, which it does
+  not export.
   `facet_wrap` arrives as `%Facet.Wrap{}` and `facet_grid` as `%Facet.Grid{}`, touching only
   `Plot`, `Facet`, the assembly and rendering, never a geom.
