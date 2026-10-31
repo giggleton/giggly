@@ -216,10 +216,11 @@ defmodule WarmMutation do
       load_built(Map.get(file_modules, file, []))
     end
 
-    # The tests, loaded once, started as test/test_helper.exs starts them; the match stops the run
-    # if the helper ever does more, which this would then have to do too.
-    "ExUnit.start()\n" = File.read!("test/test_helper.exs")
+    # The tests, loaded once, after test/test_helper.exs has run as `mix test` runs it: it registers
+    # the suite's fonts with Pica and leaves out the tags its build cannot run. ExUnit started
+    # first, with this runner's options, its own `ExUnit.start/1` only configures.
     ExUnit.start(autorun: false, formatters: [WarmMutation.FirstFailure], max_failures: 1)
+    Code.eval_file("test/test_helper.exs")
     test_files = Enum.map(Muex.Config.expand_test_paths(["test"]), &Path.relative_to_cwd/1)
     {:ok, loaded_modules, _warnings} = Kernel.ParallelCompiler.require(test_files)
     Code.put_compiler_option(:tracers, [])
