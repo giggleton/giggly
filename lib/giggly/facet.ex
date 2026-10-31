@@ -29,14 +29,15 @@ defprotocol Giggly.Facet do
   # `Giggly.Facet.Combinations`'s, and the labels of their strips `Giggly.Facet.Labeller`'s.
   #
   # A facet that orders its panels by values orders them as a discrete scale orders its levels,
-  # by the key the assembly hands it, so panels and axes agree while this namespace names nothing
-  # about scales.
+  # by the key the assembly hands it, so panels and axes agree while this namespace holds no
+  # ordering rule of its own.
 
-  # The facet reads and writes the tables' data frames, and writes a strip's value as R's
-  # `as.character()` writes it (`Giggly.AsCharacter`), and nothing else.
+  # The facet reads and writes the tables' data frames, writes a strip's value as R's
+  # `as.character()` writes it (`Giggly.AsCharacter`), and breaks a wrapped strip's label into
+  # lines as R's `label_wrap()` does (`Scales.Labels.wrap/2`), and nothing else.
   # It exports its kinds, whose structs a plot records, and nothing they compute with: that is in
   # their protocol implementations, which no boundary exports.
-  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame], exports: [Grid, Null, Wrap]
+  use Boundary, deps: [Giggly.AsCharacter, Giggly.DataFrame, Scales], exports: [Grid, Null, Wrap]
 
   alias Giggly.DataFrame
 

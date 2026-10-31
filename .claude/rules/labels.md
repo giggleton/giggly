@@ -6,6 +6,8 @@ paths:
   - "test/scales/labels_date_test.exs"
   - "test/scales/labels_format_test.exs"
   - "test/scales/labels_arithmetic_test.exs"
+  - "test/scales/labels_text_test.exs"
+  - "test/scales/labels_width_test.exs"
 ---
 
 # Labels
@@ -13,10 +15,12 @@ paths:
 `Scales.Labels` writes a scale's labels as scales 1.4.0's `label_number()`, `label_comma()`,
 `label_percent()`, `label_currency()`, `label_scientific()`, `label_number_auto()`,
 `label_log()`, `format_log()`, `label_bytes()`, `label_ordinal()`, `label_pvalue()`,
-`label_timespan()`, `label_date()`, `label_date_short()` and `label_time()` do,
+`label_timespan()`, `label_date()`, `label_date_short()`, `label_time()`, `label_wrap()` and
+`label_dictionary()` do,
 `Scales.Labels.Format` writing their numbers as R's `format()` does,
-`Scales.Labels.Arithmetic` rounding them as R does and `Scales.Labels.DateFormat` writing dates
-as R's `format()` does in a zone; and plainly, the
+`Scales.Labels.Arithmetic` rounding them as R does, `Scales.Labels.DateFormat` writing dates
+as R's `format()` does in a zone, `Scales.Labels.Wrap` breaking text as R's `strwrap()` does and
+`Scales.Labels.Width` counting its characters as R does; and plainly, the
 Elixir way (`plain/1`, `scales.md`), the default labels of a number's transformations.
 Why list functions: design-log §4, the entry beginning "`labels:` takes a list"; why these
 names and options: the entry beginning "`Scales.Labels`'s"; why `format()` is ported whole: the
@@ -28,7 +32,9 @@ integer", "`log/2` refuses", "`format_log/2` takes", "`bytes/2`'s `units:`", "`o
 takes", "`pvalue/2`'s accuracy" and "`timespan/2` takes"; why the departures from R's text:
 "Plain bytes under binary units" and "`ordinal/2`'s rules are matched"; why the date
 labellers write and take what they do: "The date labellers take", "The date labellers write",
-"`date/2`'s and `time/2`'s `format:`" and "`date_short/2` takes its parts".
+"`date/2`'s and `time/2`'s `format:`" and "`date_short/2` takes its parts"; why `wrap/2`
+breaks, counts and takes what it does: "Wrapping a strip's label", "`wrap/2` counts a character"
+and "`wrap/2` takes"; why `dictionary/2` matches and takes what it does: "`dictionary/2` matches".
 
 ## Rules
 
@@ -50,6 +56,17 @@ labellers write and take what they do: "The date labellers take", "The date labe
   clock and written in `tz:`. All of 12,000 random cases matched R, every kind, seven zones and
   their changes of offset, missing and repeated breaks, and every option, the departures checked
   against R's own rule.
+- **Every label of `wrap/2` and `dictionary/2` is R's to the character**, the tests pinning R's
+  rows beside their calls, but where the module comments say this differs: `wrap/2` takes strings
+  and `nil` alone, which R writes with `as.character()` first; `dictionary/2` matches a value by
+  `Scales.DataRange.key/1`, where R matches its text, takes `""` as a key, which R refuses, and
+  raises on an unmatched value that is not a string, which R hands back as text. **A character is
+  as wide as R 4.6.1 counts it under `en_US.UTF-8`**, `nchar(type = "w")` measured for every
+  code point and held in `Labels.Width`, which matched R on all of them; a row that stops
+  matching is a bug, and the table moves only by measuring R again. `wrap/2` is modelled from
+  `strwrap()`'s documentation and R's output, never ported from R's source; all of 16,000 random
+  labels, of every width, whitespace, sentence end, wide, combining and zero-width character,
+  matched R.
 - **A break `scale:` takes past the largest double is R's `Inf`**, never a raise: Erlang refuses
   the arithmetic R takes to an infinity, so each `*`, `/` and `-` on a break that can pass it is
   `Labels.Arithmetic`'s, the infinity an atom. Rounded past it, the label is `Inf`, its sign
@@ -91,7 +108,11 @@ labellers write and take what they do: "The date labellers take", "The date labe
   an unsigned break at or below zero raises, where R writes `1^NaN` or `10^-Inf`; `ordinal/2`
   takes no `scale:`, whose suffix R reads from the unscaled break, and raises on a break no rule
   matches, which R gives another break's suffix; `pvalue/2`'s accuracy is at most 0.5, past which
-  R's labels say what is false, and `add_p: true` beside `prefix:` raises, where R ignores it.
+  R's labels say what is false, and `add_p: true` beside `prefix:` raises, where R ignores it;
+  `wrap/2`'s `width:` is a positive integer, where R's fractions, zero and below and `Inf` say
+  nothing a whole width does not; `dictionary/2` refuses a key `nil`, which never matches, two
+  keys naming one value, which R settles silently, and a `nomatch:` but a string or `nil`, which
+  R coerces or recycles.
 - **An option R's labeller fixes or refuses is not taken**: `bytes/2` has no `suffix:` or
   `scale_cut:`, `ordinal/2` no `accuracy:` or `decimal_mark:`, `timespan/2` no `scale_cut:`, as
   R's `...` collides with its own argument there or shows nothing. The date labellers take no

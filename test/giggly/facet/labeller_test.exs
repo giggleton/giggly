@@ -39,13 +39,6 @@ defmodule Giggly.Facet.LabellerTest do
   # The labeller page's `appender()`.
   defp appender(label) when is_binary(label), do: label <> "-foo"
 
-  # `text` as one strip labelled under `label_wrap_gen(width)` writes it.
-  defp wrapped(text, width) do
-    labeller = alone({:wrap, %{width: width}})
-    [[label]] = Labeller.label(labeller, :wrap, ["g"], [[text]])
-    label
-  end
-
   describe "the kinds of label" do
     # Golden: `facet_wrap(vars(cyl, drv))` over mpg, and over a column `g` holding `NA`.
     test "the value alone, a strip for each column, a missing value as NA" do
@@ -234,9 +227,9 @@ defmodule Giggly.Facet.LabellerTest do
     end
   end
 
-  # Every expected label in this block is `label_wrap_gen(width)`'s in ggplot2 4.0.3, or
-  # `strwrap(text, width)`'s that it joins with line breaks, in R 4.6.1, for the text and width
-  # each test gives.
+  # Every expected label in this block is `label_wrap_gen(width)`'s in ggplot2 4.0.3, in R 4.6.1,
+  # for the text and width each test gives; how a label breaks is `Scales.Labels.wrap/2`'s, whose
+  # tests pin `label_wrap()`, which `label_wrap_gen()` calls.
   describe "wrapping" do
     # Golden: `facet_grid(h ~ g, labeller = label_wrap_gen(10))` over four conservation statuses,
     # as test/golden/facet_grid_labeller_wrap.svg draws it, and `label_wrap_gen()` of two labels
@@ -261,51 +254,6 @@ defmodule Giggly.Facet.LabellerTest do
                ["Critically Endangered in\nthe Wild and elsewhere", "Conservation Dependent"],
                ["NA", "4"]
              ]
-    end
-
-    test "words are never split, and whitespace between them is one space" do
-      texts = ["abcdefghi j", "abcdefghij k", "verylongwordhere x", "a  b", " lead", "trail "]
-      more = ["tab\there", "x\ny", "abcdefghi"]
-
-      assert Enum.map(texts ++ more, fn text -> wrapped(text, 10) end) ==
-               ["abcdefghi\nj", "abcdefghij\nk", "verylongwordhere\nx", "a b", "lead", "trail"] ++
-                 ["tab here", "x y", "abcdefghi"]
-    end
-
-    test "a sentence's end keeps two spaces after two or more whitespace characters, counted in " <>
-           "the width" do
-      kept = ["a.  b", "a?  b", "a!  b", "a.   b", "a. \tb", "a.  \nb", "(a.)  b", ~s("a."  b)]
-      single = ["a. b", "a.\tb", "a.\nb", "a)  b", "a'  b", "a.]  b"]
-      widths = ["Mr.  Smith", "a.  bcdefg", "a.  bcdef", "a.  "]
-
-      assert Enum.map(kept, fn text -> wrapped(text, 10) end) ==
-               ["a.  b", "a?  b", "a!  b", "a.  b", "a.  b", "a.  b", "(a.)  b", ~s("a."  b)]
-
-      assert Enum.map(single, fn text -> wrapped(text, 10) end) ==
-               ["a. b", "a. b", "a. b", "a) b", "a' b", "a.] b"]
-
-      assert Enum.map(widths, fn text -> wrapped(text, 10) end) ==
-               ["Mr.\nSmith", "a.\nbcdefg", "a.  bcdef", "a."]
-    end
-
-    test "a line holding only whitespace breaks a paragraph, an empty line between paragraphs; " <>
-           "a break at the start gives empty lines, and one at the end none" do
-      texts = ["x\n\ny", "x\n \ny", "x\n\n\ny", "a\n\nb\n\nc", "\n\nx", "x\n\n", "", "  \n\n  "]
-
-      assert Enum.map(texts, fn text -> wrapped(text, 10) end) ==
-               ["x\n\ny", "x\n\ny", "x\n\ny", "a\n\nb\n\nc", "\n\nx", "x", "", "\n\n"]
-    end
-
-    test "only spaces, tabs and line breaks are whitespace" do
-      assert {wrapped("x\r\ny", 10), wrapped("aaaa\u00A0bbbb cc", 10)} ==
-               {"x\r y", "aaaa\u00A0bbbb\ncc"}
-    end
-
-    # R counts display columns, an East Asian wide character two, so splits `"日本語 日本語"` at
-    # 10; Giggly counts graphemes, a letter and its combining accent one, as R does.
-    test "a character is a grapheme, where R counts a wide one as two" do
-      assert {wrapped("日本語 日本語", 10), wrapped("e\u0301e\u0301e\u0301e\u0301 abcd", 10)} ==
-               {"日本語 日本語", "e\u0301e\u0301e\u0301e\u0301 abcd"}
     end
 
     # Golden: `facet_wrap(vars(cyl, drv))` of one panel, `cyl = "Conservation Dependent"` and `drv

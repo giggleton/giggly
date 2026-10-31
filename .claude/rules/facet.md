@@ -79,12 +79,10 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   `:both` or `:wrap` writes it, where its own `:value` or `:context` leaves it for the default, as
   R fills in only what stays `NA` (`strwrap()` writes R's `NA`). The facet holds
   the labeller as `Plot` records it, plain data, and runs a function only to write labels.
-- **`:wrap` breaks a label as `strwrap()` does, from its documented rules and R's drawings, never a
-  port of its source** (`Facet.Labeller`; checked on 600 random labels against R 4.6.1): lines
-  shorter than the width, words never split, whitespace (space, tab and line break only) one
-  space, or two after a sentence's end that two or more followed, a line of only whitespace a
-  paragraph break, a character a grapheme (R counts an East Asian wide one as two). The wrapping is
-  the facet's own, private, until scales' `label_wrap()` takes it over.
+- **`:wrap` breaks a label by `Scales.Labels.wrap/2`, R's `label_wrap()`, which
+  `label_wrap_gen()` calls**, handing it the width, 25 unless given, and the labels with `nil`
+  for a missing value, which it writes `NA`; how a label breaks is the package's (`labels.md`),
+  and the facet keeps no rule of its own for it. The facet's boundary lists `Scales` for it alone.
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its
   levels, the first table's and then those each later one adds; any other as a discrete scale

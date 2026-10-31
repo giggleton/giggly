@@ -308,12 +308,13 @@ defmodule Giggly.Plot do
     * `:both`, the column's name and the value, `cyl: 4`;
     * `:context`, the value alone where a side's strips are for one column, and both where they
       are for several;
-    * `:wrap`, the value alone broken between its words into lines shorter than 25 characters, a
-      word longer than that on a line of its own: the whitespace between words becomes one space,
-      or two after a sentence's end that two or more followed, and a line holding only whitespace
-      starts a paragraph, an empty line before it;
+    * `:wrap`, the value alone broken between its words into lines shorter than 25 columns, a
+      word wider than that on a line of its own, as `Scales.Labels.wrap/2` breaks it (a Chinese,
+      Japanese or Korean character or an emoji takes two columns): the whitespace between words
+      becomes one space, or two after a sentence's end that two or more followed, and a line
+      holding only whitespace starts a paragraph, an empty line before it;
     * one of these with its options, such as `{:both, sep: "=", multi_line: false}`: `sep:` goes
-      between the name and the value (`": "`), `width:` sets how many characters `:wrap` keeps a
+      between the name and the value (`": "`), `width:` sets how many columns `:wrap` keeps a
       line under (`{:wrap, width: 10}`), and `multi_line: false` puts a panel's labels in
       one strip, joined by `", "`, in place of a strip for each column (`4, f`, or under
       `:both` `cyl, drv: 4, f`, and under `:wrap` the labels joined and then broken);

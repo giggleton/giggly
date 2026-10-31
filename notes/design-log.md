@@ -79,6 +79,56 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`dictionary/2` matches a value by `Scales.DataRange.key/1`, a map under `dictionary:` (2026-10-31,
+  Steve: D1 to D4 "A"; checked against scales 1.4.0).** `dictionary(breaks, dictionary: %{value =>
+  label}, nomatch:)`, the family's shape, each label a string or `nil`. A key names what a
+  discrete scale's map of labels names, so `2` names `2.0` and `"1"` never the number 1, where
+  R's `match()` compares text. `nomatch:` is `:none` unless given: an unmatched string is its own
+  label and `nil` stays missing, as in R, and any other value raises, which R hands back as
+  `as.character()`; a string or `nil` replaces every unmatched value, `nil` included. Refused: a
+  key `nil`, which never matches; two keys sharing a key (`1`, `1.0`), as `Plot` refuses a value
+  named twice; a `nomatch:` but a string or `nil`. A `""` key is taken, which R refuses only as a
+  vector's unnamed element. *Rejected: string keys alone* — useless on a discrete axis of
+  numbers. *Rejected: R's text for a value* — `as.character()` in the package (below). *Rejected:
+  a list of pairs, first winning* — a shape no other labels option takes, its repeats mistakes.
+
+- **`wrap/2` takes a width, a positive integer, and strings and `nil` alone (2026-10-31, Steve: W2
+  "A", W3 "A"; checked against scales 1.4.0).** `width:` is required, as R's `label_wrap()`
+  requires it, and checked by NimbleOptions; R lays a word while the line and one more character
+  fit within it, which for a whole width is "shorter than the width". `nil` is written `"NA"`
+  (the entry beginning "A missing break's label"); anything but a string, and text that is not
+  valid UTF-8, raises. *Rejected: any number, R's rule exactly* — a fraction is a threshold no one
+  means, zero and below repeat 1, `Inf` wraps nothing. *Rejected: 25 unless given* — ggplot2's
+  facet default, not scales'; the facet keeps it. *Rejected: numbers and booleans written as R's
+  `as.character()`* — a second home for `Giggly.AsCharacter`'s rule, which the entry beginning
+  "`ordinal/2`'s rules are matched" refused. *Rejected: `to_string/1`* — `1.0e5` and `true`,
+  departing from R unannounced.
+
+- **`wrap/2` counts a character as R 4.6.1 does, from R's own measured widths (2026-10-31, Steve:
+  W1 "B"; checked on every code point).** `nchar(intToUtf8(code_point), type = "w")` under
+  `en_US.UTF-8` in the image, for every code point, gives 457 runs not of width 1 (116 wide, 341
+  zero), held as a literal in the internal `Scales.Labels.Width` and summed per code point as R
+  sums them: CJK, fullwidth and most emoji 2, combining marks, zero-width spaces and joiners 0, a
+  joined family emoji 6, and a word of zero-width characters alone dropped as whitespace, as R
+  drops it. In a Chinese, Japanese or Korean locale R counts an ambiguous character as 2; this is
+  its default column. *Rejected: graphemes* — the facet's earlier call, made for a private helper
+  against a dependency; the package's labels are R's to the character. *Rejected: a Hex width
+  table* — a dependency, and Unicode's answer rather than R's. *Rejected: a file under `priv/`* —
+  a compile-time read under `CorePurity`'s palette waiver.
+
+- **Wrapping a strip's label is `Scales.Labels.wrap/2`'s, R's `label_wrap()`, which the facet
+  calls (2026-10-31, Steve: "Ok" and "Yes" to the two widenings; checked against R 4.6.1).**
+  `:wrap` and `{:wrap, width:}` hand their labels to `wrap/2`, as `label_wrap_gen()` calls
+  `label_wrap()`; `Giggly.Facet`'s `deps:` lists `Scales` and `Scales`' `exports:` `Labels` for
+  it. `wrap/2` breaks a label by `strwrap()`'s documented rules and what R gives, never a port of
+  its source; the move fixed the facet's sentence end, which took any number of closing marks
+  where R takes one. Strip text is a title look, its line spacing the theme's. *Rejected: the
+  facet keeping its port* — the rule in two homes, the widths in one. *Rejected: `Plot` turning
+  `:wrap` into a function* — the labeller plain data no longer, and `:wrap` writes `NA` and joins
+  before breaking, which a function handed one label cannot. *Rejected: a `Scales.Wrap` module
+  exported alone, or a root delegate* — the labeller family split, or the API shaped to dodge a
+  declaration.
+
 - **The date labellers write a `Date` at midnight UTC and a `NaiveDateTime` as UTC, each takes
   its own kinds, and `tz:` is any zone its database reads (2026-10-31, Steve: "A" on each of three
   calls; checked against scales 1.4.0).** R writes a `Date` at midnight UTC whatever `tz` says
@@ -343,17 +393,6 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   guides. *Rejected: leaving the five examples waiting* — the labeller work would ship with its own
   page showing almost none of it. *Rejected: writing the rows out in the notebook* — 83 rows of 11
   columns are a dataset ggplot2 ships, which `Giggly.Datasets` exists to hold.
-
-- **Wrapping a strip's label is the facet's own, and counts graphemes (2026-10-30 and 2026-10-31,
-  Steve: Q3 "B", then "A"; checked against R 4.6.1).** `:wrap` and `{:wrap, width:}` break a
-  label by `strwrap()`'s documented rules and what R draws, never a port of its source, in
-  private functions of `Facet.Labeller`, with no boundary change; scales increment 3 (Labels)
-  brings `label_wrap()` and line breaks in axis and legend labels, and moves this onto it. Strip
-  text is a title look, its line spacing the theme's. A character is a grapheme: R counts an East
-  Asian wide character as two, so `"日本語 日本語"` breaks at 10 in R and not in Giggly.
-  *Rejected: `Scales.Labels.wrap/2` now* — it pulls axis and legend line breaks into a facet step
-  and widens Scales' exports and Facet's deps. *Rejected: display columns from a Hex width
-  table* — a dependency for one script's labels, whose glyph widths Giggly already approximates.
 
 - **A labeller is plain data under `labeller:`, ggplot2's labellers by R's rules (2026-10-30,
   Steve: "a", "A", and "agree" to the small calls; checked against ggplot2 4.0.3).** `:value`,
@@ -3654,6 +3693,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Wrap text and look labels up in a dictionary, and break a facet's wrapped strips by
+  them (labels, step 5); §4: "`dictionary/2` matches", "`wrap/2` takes", "`wrap/2` counts a
+  character", "Wrapping a strip's label"
 - 2026-10-31 — Label dates, date-times and times of day (labels, step 4); §4: "The date
   labellers write", "`date/2`'s and `time/2`'s `format:`", "`date_short/2` takes its parts"
 - 2026-10-31 — Draw the notebook examples tiles, rasters and faithfuld unlock (tile, step 3, the

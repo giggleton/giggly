@@ -19,7 +19,7 @@ defmodule Giggly.Facet.Labeller do
   # - `{:context, %{}}`, `label_context()`: the value alone for one column, both for more, with
   #   ": ", as R passes its `sep` nowhere;
   # - `{:wrap, %{width: width}}`, `label_wrap_gen()`: the value alone, broken into lines by
-  #   `wrapped/2`, R's `strwrap()`, each label's lines joined by a line break, a missing value
+  #   `Scales.Labels.wrap/2`, R's `label_wrap()`, which `label_wrap_gen()` calls, a missing value
   #   written `NA`, as `strwrap()` writes R's; with every label in one strip, the labels joined
   #   first and then broken;
   # - a function of one label, returning the label to show, or a map of labels to the labels to
@@ -37,18 +37,9 @@ defmodule Giggly.Facet.Labeller do
   # labeller writes it, `cyl: NA` beside a name, or a strip shows it, `NA`, as R writes and draws
   # R's missing string: so a column's own `:value` or `:context` leaves it for the default to fill
   # in, where its own `:both` or `:wrap` writes it. A function must return a string.
-  #
-  # A label is broken into lines as `strwrap()` documents it, and as R draws it where it does not
-  # say: a label is split into paragraphs at each line holding only whitespace, a break at its
-  # start giving an empty paragraph and one at its end none, as R's `strsplit()` splits; each
-  # paragraph's whitespace (spaces, tabs and line breaks, nothing else) between its words becomes
-  # one space, or two after a word ending a sentence (in `.`, `?` or `!`, then any of `)`, `"` and
-  # `'`) where two or more whitespace characters followed it; and its words are laid on each line
-  # while the line stays shorter than `width` characters, a word longer than that on a line of its
-  # own, never split. An empty paragraph is an empty line, and an empty line comes between
-  # paragraphs. A character is a grapheme, where R counts an East Asian wide one as two.
 
   alias Giggly.AsCharacter
+  alias Scales.Labels
 
   @value {:value, %{}}
 
@@ -147,7 +138,7 @@ defmodule Giggly.Facet.Labeller do
   defp evaluate({:wrap, %{width: width}}, _default, multi_line, table) do
     table
     |> values(multi_line)
-    |> Enum.map(fn labels -> Enum.map(labels, fn label -> wrapped(shown(label), width) end) end)
+    |> Enum.map(fn labels -> Labels.wrap(labels, width: width) end)
   end
 
   defp evaluate(function, default, multi_line, table) when is_function(function, 1) do
@@ -205,51 +196,6 @@ defmodule Giggly.Facet.Labeller do
               "a labeller function must return a string, and returned #{inspect(other)} " <>
                 "for the label #{inspect(label)}"
     end
-  end
-
-  # A label broken into lines shorter than `width`, joined by line breaks.
-  defp wrapped(label, width) do
-    label
-    |> paragraphs()
-    |> Enum.map(fn paragraph ->
-      paragraph
-      |> words()
-      |> lines(width)
-    end)
-    |> Enum.intersperse([""])
-    |> Enum.concat()
-    |> Enum.join("\n")
-  end
-
-  defp paragraphs(label) do
-    pieces = String.split(label, ~r/\n[ \t\n]*\n/)
-    if List.last(pieces) == "", do: Enum.drop(pieces, -1), else: pieces
-  end
-
-  # A paragraph's words, each with how many spaces follow it on a line.
-  defp words(paragraph) do
-    ~r/([^ \t\n]+)([ \t\n]*)/
-    |> Regex.scan(paragraph, capture: :all_but_first)
-    |> Enum.map(fn [word, space] -> {word, gap(word, space)} end)
-  end
-
-  defp gap(word, space) do
-    if String.length(space) > 1 and Regex.match?(~r/[.?!][)"']*$/, word), do: 2, else: 1
-  end
-
-  defp lines([], _width), do: [""]
-
-  defp lines([{first, first_gap} | words], width) do
-    {done, line, _gap} =
-      Enum.reduce(words, {[], first, first_gap}, fn {word, word_gap}, {done, line, gap} ->
-        longer = line <> String.duplicate(" ", gap) <> word
-
-        if String.length(longer) < width,
-          do: {done, longer, word_gap},
-          else: {[line | done], word, word_gap}
-      end)
-
-    Enum.reverse([line | done])
   end
 
   defp written(nil), do: nil

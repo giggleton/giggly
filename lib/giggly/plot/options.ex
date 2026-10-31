@@ -30,7 +30,7 @@ defmodule Giggly.Plot.Options do
       width: [
         type: :pos_integer,
         default: 25,
-        doc: "How many characters a line of a label is kept under."
+        doc: "How many columns a line of a label is kept under."
       ]
     ]
   }

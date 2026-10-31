@@ -61,9 +61,9 @@ defmodule Scales do
   # defaults, its training and mapping, stays in `Giggly.Scale`.
   #
   # It lists `Color`, which `Scales.ColorOperations` converts colours with, and `NimbleOptions`,
-  # which checks its functions' options. It exports what Giggly's code calls; what a user calls
-  # is the documented API (CLAUDE.md, Conventions).
+  # which checks its functions' options. It exports what Giggly's code calls, `Labels` for a
+  # facet's wrapped strips; what a user calls is the documented API (CLAUDE.md, Conventions).
   use Boundary,
     deps: [Color, NimbleOptions],
-    exports: [Bounds, ColorOperations, DataRange, Palette, Transform]
+    exports: [Bounds, ColorOperations, DataRange, Labels, Palette, Transform]
 end

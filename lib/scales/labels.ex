@@ -6,7 +6,8 @@ defmodule Scales.Labels do
   (`number_auto/1`), as powers (`log/2`, or as text, `format_log/2`), as bytes (`bytes/2`), as
   ordinals (`ordinal/2`), as p-values (`pvalue/2`), as spans of time (`timespan/2`), and dates,
   date-times and times of day in a format (`date/2`, `time/2`) or by what changed from the break
-  before (`date_short/2`).
+  before (`date_short/2`); and text broken into lines (`wrap/2`) or looked up in a dictionary
+  (`dictionary/2`).
 
   Each labeller is handed every break an axis or a legend draws and returns a label for each, in
   order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
@@ -130,10 +131,24 @@ defmodule Scales.Labels do
   #   as `format()`'s default; one non-empty string is taken. R's `locale` is left out, and an
   #   unknown `tz`, which R writes as UTC under a made-up abbreviation, raises.
   #
+  # - `wrap/2` is `label_wrap()`, `strwrap()` of each label joined by line breaks
+  #   (`Scales.Labels.Wrap`), a character as wide as R counts it (`Scales.Labels.Width`). R writes
+  #   any value with `as.character()` first; this takes strings alone, so R's way of writing a
+  #   value has no second home here (design-log §4, the entry beginning "`ordinal/2`'s rules are
+  #   matched"). `width` is a positive integer, below which R's rule, a line and one more
+  #   character within it, is "shorter than the width".
+  # - `dictionary/2` is `label_dictionary()`: R's `match()` of each value against the names,
+  #   which compares them as text, so a number matches its `as.character()`; here a key matches a
+  #   value by `Scales.DataRange.key/1`, as a discrete scale's map of labels does. R refuses a
+  #   name that is empty or `NA` alike; an empty string is a value a level can hold, so it is a
+  #   key, and `nil`, which never matches, is refused. A map holds no name twice, where R takes
+  #   the first. Without `nomatch`, R hands back an unmatched value as text, a factor's as its
+  #   integer code; a string is handed back, and any other value raises.
+  #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
-  alias Scales.DateBreaks
-  alias Scales.Labels.{Arithmetic, DateFormat, Format}
+  alias Scales.{DataRange, DateBreaks}
+  alias Scales.Labels.{Arithmetic, DateFormat, Format, Wrap}
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
@@ -472,6 +487,30 @@ defmodule Scales.Labels do
                                 "writes the 5th `\" 5\"`, `\"\"` writes it `\"5\"`."
                           ]
                         ] ++ @time_zone_options
+                      )
+
+  @wrap_options NimbleOptions.new!(
+                  width: [
+                    type: :pos_integer,
+                    required: true,
+                    doc: "How many columns each line of a label is kept under."
+                  ]
+                )
+
+  @dictionary_options NimbleOptions.new!(
+                        dictionary: [
+                          type: {:custom, __MODULE__, :validate_dictionary, []},
+                          required: true,
+                          doc: "A map of values to their labels, each a string or `nil` for none."
+                        ],
+                        nomatch: [
+                          type: {:or, [:string, nil, {:in, [:none]}]},
+                          default: :none,
+                          doc:
+                            "The label of a value the dictionary lacks, a missing one " <>
+                              "included: a string, or `nil` for none; `:none` keeps a string " <>
+                              "as its own label and a missing value missing."
+                        ]
                       )
 
   # The significant digits each label of `scientific/2` and each exponent of `log/2` and
@@ -1204,6 +1243,84 @@ defmodule Scales.Labels do
   end
 
   @doc """
+  Breaks text into lines shorter than `width:` columns, R's `label_wrap()`, as R's `strwrap()`
+  breaks it, the lines joined by `"\\n"`. A missing label, `nil`, is written `"NA"`.
+
+  A word goes on the line before it while the line stays shorter than the width, and a word wider
+  than that has a line of its own, never split. Whitespace between words (spaces, tabs and line
+  breaks, nothing else) becomes one space, or two after a word ending a sentence, in `.`, `?` or
+  `!` and then at most one of `)`, `"` and `'`, where two or more whitespace characters followed
+  it. A line holding only whitespace starts a new paragraph, an empty line before it.
+
+  A character is as wide as R counts it: most Chinese, Japanese and Korean characters, fullwidth
+  forms and emoji take two columns, and combining marks, zero-width spaces and joiners none, so a
+  word made of those alone is dropped as whitespace is.
+
+  ## Options
+
+  #{NimbleOptions.docs(@wrap_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.wrap(["Conservation Dependent", "Least concern", nil], width: 10)
+      ["Conservation\\nDependent", "Least\\nconcern", "NA"]
+
+      iex> Scales.Labels.wrap(["Mr.  Smith went  to Washington."], width: 20)
+      ["Mr.  Smith went to\\nWashington."]
+
+      iex> Scales.Labels.wrap(["日本語 日本語"], width: 10)
+      ["日本語\\n日本語"]
+  """
+  @spec wrap([String.t() | nil], keyword()) :: [String.t()]
+  def wrap(labels, options) do
+    settings = NimbleOptions.validate!(options, @wrap_options)
+    width = Keyword.fetch!(settings, :width)
+
+    labels
+    |> texts!("Labels.wrap/2")
+    |> Enum.map(fn
+      nil -> "NA"
+      label -> Wrap.wrap(label, width)
+    end)
+  end
+
+  @doc """
+  Labels values by a dictionary, R's `label_dictionary()`: each value the dictionary holds takes
+  its label, and each it lacks, a missing one included, `nomatch:`'s; with no `nomatch:`, a string
+  it lacks is its own label and a missing value stays missing.
+
+  A value is matched by `Scales.DataRange.key/1`, so a key of `2` names `2.0`, and strings match
+  exactly, case and accents as written; a key matches a value of its own type, so `"1"` names the
+  string and never the number `1`. A value that is not a string, which the dictionary lacks,
+  needs a `nomatch:`, or raises.
+
+  ## Options
+
+  #{NimbleOptions.docs(@dictionary_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.dictionary(["a", "b", "c", nil], dictionary: %{"a" => "Apple", "b" => "Banana"})
+      ["Apple", "Banana", "c", nil]
+
+      iex> Scales.Labels.dictionary(["a", "c", nil], dictionary: %{"a" => "Apple"}, nomatch: "?")
+      ["Apple", "?", "?"]
+
+      iex> Scales.Labels.dictionary([4.0, 6.0, 8.0], dictionary: %{4 => "four", 6 => "six", 8 => "eight"})
+      ["four", "six", "eight"]
+  """
+  @spec dictionary([term()], keyword()) :: [String.t() | nil]
+  def dictionary(breaks, options) do
+    settings = NimbleOptions.validate!(options, @dictionary_options)
+    lookup = Keyword.fetch!(settings, :dictionary)
+    nomatch = Keyword.fetch!(settings, :nomatch)
+
+    breaks
+    |> values!("Labels.dictionary/2")
+    |> Enum.map(fn value -> looked_up(value, lookup, nomatch) end)
+  end
+
+  @doc """
   The short scale's steps for `scale_cut:`, R's `cut_short_scale()`: thousands `K`, millions `M`,
   billions `B` (1e9) and trillions `T` (1e12).
 
@@ -1398,6 +1515,47 @@ defmodule Scales.Labels do
            inspect(rules)}
   end
 
+  # NimbleOptions' check of `dictionary/2`'s `dictionary:`: a map of values but `nil`, no two
+  # sharing a `DataRange.key/1`, to strings or `nil`, given back keyed by `DataRange.key/1`.
+  @doc false
+  @spec validate_dictionary(term()) :: {:ok, map()} | {:error, String.t()}
+  def validate_dictionary(dictionary) when is_map(dictionary) and is_map_key(dictionary, nil),
+    do:
+      {:error,
+       "expected no key nil, which never matches, as nomatch: labels a missing value, got: " <>
+         inspect(dictionary)}
+
+  def validate_dictionary(dictionary) when is_map(dictionary) do
+    if Enum.all?(dictionary, fn {_value, label} -> is_binary(label) or is_nil(label) end),
+      do: keyed(dictionary),
+      else: {:error, "expected each label a string or nil, got: #{inspect(dictionary)}"}
+  end
+
+  def validate_dictionary(dictionary),
+    do: {:error, "expected a map of values to their labels, got: #{inspect(dictionary)}"}
+
+  defp keyed(dictionary) do
+    dictionary
+    |> Enum.reduce_while({%{}, %{}}, fn {value, label}, {lookup, named} ->
+      key = DataRange.key(value)
+
+      case Map.fetch(named, key) do
+        {:ok, other} ->
+          {:halt,
+           {:error,
+            "expected each value named once, but #{inspect(other)} and #{inspect(value)} name " <>
+              "the same value, got: #{inspect(dictionary)}"}}
+
+        :error ->
+          {:cont, {Map.put(lookup, key, label), Map.put(named, key, value)}}
+      end
+    end)
+    |> case do
+      {:error, _message} = error -> error
+      {lookup, _named} -> {:ok, lookup}
+    end
+  end
+
   # NimbleOptions' check of `pvalue/2`'s `accuracy:`: a positive number no larger than 0.5, so
   # no p-value is both below it and above 1 less it.
   @doc false
@@ -1474,6 +1632,49 @@ defmodule Scales.Labels do
 
   defp numbers!(breaks, function) do
     raise ArgumentError, "#{function} takes a list of numbers and nils, got: #{inspect(breaks)}"
+  end
+
+  # The labels, each valid UTF-8 or a missing one, `nil`.
+  defp texts!(labels, function) when is_list(labels) do
+    if Enum.all?(labels, fn label ->
+         is_nil(label) or (is_binary(label) and String.valid?(label))
+       end) do
+      labels
+    else
+      raise ArgumentError, "#{function} takes a list of strings and nils, got: #{inspect(labels)}"
+    end
+  end
+
+  defp texts!(labels, function),
+    do:
+      raise(
+        ArgumentError,
+        "#{function} takes a list of strings and nils, got: #{inspect(labels)}"
+      )
+
+  defp values!(breaks, _function) when is_list(breaks), do: breaks
+
+  defp values!(breaks, function),
+    do: raise(ArgumentError, "#{function} takes a list of values, got: #{inspect(breaks)}")
+
+  # A value's label from the dictionary, `nomatch` where it has none, or the value itself where
+  # `nomatch` is `:none` and it is a string or missing.
+  defp looked_up(value, lookup, nomatch) do
+    case {Map.fetch(lookup, DataRange.key(value)), nomatch} do
+      {{:ok, label}, _nomatch} ->
+        label
+
+      {:error, :none} when is_binary(value) or is_nil(value) ->
+        value
+
+      {:error, :none} ->
+        raise ArgumentError,
+              "Labels.dictionary/2 has no label for #{inspect(value)}: give it a key in " <>
+                "dictionary:, or give nomatch: a label for every value it lacks"
+
+      {:error, nomatch} ->
+        nomatch
+    end
   end
 
   # The breaks, each of one of the structs `kinds` or a missing one, `nil`.
