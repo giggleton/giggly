@@ -562,12 +562,16 @@ defmodule Scales.DateBreaks do
 
   # A date's or date-time's label in `format`, as R's `format()` writes it in the C locale: English
   # month abbreviations, a day, month, hour, minute or second two digits, and a year as its number,
-  # unpadded, so the year 900 is `"900"` where `Calendar.strftime/2` would write `"0900"`.
+  # unpadded, so the year 900 is `"900"` where `Calendar.strftime/2` would write `"0900"`. A `%%`
+  # is a literal `%`, so the `%Y` of `%%Y` is text; a time of day takes a format without `%Y`.
   @doc false
-  @spec label(Date.t() | NaiveDateTime.t() | DateTime.t(), String.t()) :: String.t()
+  @spec label(Date.t() | NaiveDateTime.t() | DateTime.t() | Time.t(), String.t()) :: String.t()
   def label(date, format) do
-    format
-    |> String.replace("%Y", Integer.to_string(date.year))
+    ~r/%%|%Y/
+    |> Regex.replace(format, fn
+      "%%" -> "%%"
+      "%Y" -> Integer.to_string(date.year)
+    end)
     |> then(fn unpadded -> Calendar.strftime(date, unpadded) end)
   end
 

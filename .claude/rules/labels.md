@@ -3,6 +3,7 @@ paths:
   - "lib/scales/labels.ex"
   - "lib/scales/labels/**"
   - "test/scales/labels_test.exs"
+  - "test/scales/labels_date_test.exs"
   - "test/scales/labels_format_test.exs"
   - "test/scales/labels_arithmetic_test.exs"
 ---
@@ -11,9 +12,11 @@ paths:
 
 `Scales.Labels` writes a scale's labels as scales 1.4.0's `label_number()`, `label_comma()`,
 `label_percent()`, `label_currency()`, `label_scientific()`, `label_number_auto()`,
-`label_log()`, `format_log()`, `label_bytes()`, `label_ordinal()`, `label_pvalue()` and
-`label_timespan()` do, `Scales.Labels.Format` writing their numbers as R's
-`format()` does and `Scales.Labels.Arithmetic` rounding them as R does; and plainly, the
+`label_log()`, `format_log()`, `label_bytes()`, `label_ordinal()`, `label_pvalue()`,
+`label_timespan()`, `label_date()`, `label_date_short()` and `label_time()` do,
+`Scales.Labels.Format` writing their numbers as R's `format()` does,
+`Scales.Labels.Arithmetic` rounding them as R does and `Scales.Labels.DateFormat` writing dates
+as R's `format()` does in a zone; and plainly, the
 Elixir way (`plain/1`, `scales.md`), the default labels of a number's transformations.
 Why list functions: design-log §4, the entry beginning "`labels:` takes a list"; why these
 names and options: the entry beginning "`Scales.Labels`'s"; why `format()` is ported whole: the
@@ -23,7 +26,9 @@ returns powers" and "A signed power"; why the new labellers take the options the
 refuse what they refuse: the entries beginning "`scientific/2` takes", "`digits:` is an
 integer", "`log/2` refuses", "`format_log/2` takes", "`bytes/2`'s `units:`", "`ordinal/2`
 takes", "`pvalue/2`'s accuracy" and "`timespan/2` takes"; why the departures from R's text:
-"Plain bytes under binary units" and "`ordinal/2`'s rules are matched".
+"Plain bytes under binary units" and "`ordinal/2`'s rules are matched"; why the date
+labellers write and take what they do: "The date labellers take", "The date labellers write",
+"`date/2`'s and `time/2`'s `format:`" and "`date_short/2` takes its parts".
 
 ## Rules
 
@@ -36,6 +41,15 @@ takes", "`pvalue/2`'s accuracy" and "`timespan/2` takes"; why the departures fro
   random cases of `scientific/2` to `format_log/2` matched R, 1,728 of the first four near the
   largest double, and 24,000 of the last four, every option against missing, infinite and
   overflowing breaks.
+- **Every label of `date/2`, `date_short/2` and `time/2` is R's to the character**, the tests
+  pinning R's rows beside their calls (`giggly-r:ggplot2-4.0.3-hms`), but where the module
+  comments say this differs: a `NaiveDateTime` and a `Time` are never shifted into `tz:`;
+  `date_short/2`'s `leading:` and `sep:` are text, applied to each part on its own; and `%s`
+  outside UTC is the instant's Unix time, where R's counts the wall clock. A `Date` is written at
+  midnight UTC, a year unpadded, `%%Y` a literal `%Y`; what changed is read on each break's own
+  clock and written in `tz:`. All of 12,000 random cases matched R, every kind, seven zones and
+  their changes of offset, missing and repeated breaks, and every option, the departures checked
+  against R's own rule.
 - **A break `scale:` takes past the largest double is R's `Inf`**, never a raise: Erlang refuses
   the arithmetic R takes to an infinity, so each `*`, `/` and `-` on a break that can pass it is
   `Labels.Arithmetic`'s, the infinity an atom. Rounded past it, the label is `Inf`, its sign
@@ -80,4 +94,6 @@ takes", "`pvalue/2`'s accuracy" and "`timespan/2` takes"; why the departures fro
   R's labels say what is false, and `add_p: true` beside `prefix:` raises, where R ignores it.
 - **An option R's labeller fixes or refuses is not taken**: `bytes/2` has no `suffix:` or
   `scale_cut:`, `ordinal/2` no `accuracy:` or `decimal_mark:`, `timespan/2` no `scale_cut:`, as
-  R's `...` collides with its own argument there or shows nothing.
+  R's `...` collides with its own argument there or shows nothing. The date labellers take no
+  `locale:`, which R needs stringi for, and refuse a format R recycles or reads as its default
+  (a list, `""`), a zone their database cannot read, and a break of a kind they do not write.

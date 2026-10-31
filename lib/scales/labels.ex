@@ -4,7 +4,9 @@ defmodule Scales.Labels do
   with a comma between thousands (`comma/2`), as percentages (`percent/2`), as amounts of money
   (`currency/2`), in scientific notation (`scientific/2`), in whichever way suits their size
   (`number_auto/1`), as powers (`log/2`, or as text, `format_log/2`), as bytes (`bytes/2`), as
-  ordinals (`ordinal/2`), as p-values (`pvalue/2`) and as spans of time (`timespan/2`).
+  ordinals (`ordinal/2`), as p-values (`pvalue/2`), as spans of time (`timespan/2`), and dates,
+  date-times and times of day in a format (`date/2`, `time/2`) or by what changed from the break
+  before (`date_short/2`).
 
   Each labeller is handed every break an axis or a legend draws and returns a label for each, in
   order, so the labels can share their decimals: `0.5`, `1` and `1.25` are labelled `0.50`,
@@ -121,10 +123,17 @@ defmodule Scales.Labels do
   # - `timespan/2` is `label_timespan()`: each break times its unit's seconds, R's `difftime`
   #   conversion, then `number()` under `cut_time_scale()`; a break the unit takes past the
   #   largest double is R's `Inf`, which `number()` writes as its own `as.character()`.
+  # - `date/2`, `date_short/2` and `time/2` are `label_date()`, `label_date_short()` and
+  #   `label_time()`, R's `format()` of a date or date-time in `tz`, written by
+  #   `Calendar.strftime/3` with an unpadded year (`Scales.Labels.DateFormat`, design-log §4, the
+  #   entry beginning "The date labellers take"). R recycles a vector of formats and reads `""`
+  #   as `format()`'s default; one non-empty string is taken. R's `locale` is left out, and an
+  #   unknown `tz`, which R writes as UTC under a made-up abbreviation, raises.
   #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
-  alias Scales.Labels.{Arithmetic, Format}
+  alias Scales.DateBreaks
+  alias Scales.Labels.{Arithmetic, DateFormat, Format}
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
@@ -393,6 +402,77 @@ defmodule Scales.Labels do
                           @number_defaults
                         )
                     )
+
+  @time_zone_options [
+    tz: [
+      type: :string,
+      default: "Etc/UTC",
+      doc:
+        "The time zone each `DateTime` is shifted into before it is written, one " <>
+          "`time_zone_database:` knows; a `Date` is written at midnight UTC and a " <>
+          "`NaiveDateTime` or `Time` as it is."
+    ],
+    time_zone_database: [
+      type: :atom,
+      default: Calendar.UTCOnlyTimeZoneDatabase,
+      doc:
+        "The time zone database that reads `tz:`, such as `Tz.TimeZoneDatabase`; Elixir's " <>
+          "own, which knows UTC alone, when not given."
+    ]
+  ]
+
+  # `date/2`'s and `time/2`'s options, each with its default format.
+  @date_schemas Map.new([date: "%Y-%m-%d", time: "%H:%M:%S"], fn {function, default} ->
+                  format = [
+                    type: {:custom, __MODULE__, :validate_date_format, []},
+                    default: default,
+                    doc:
+                      "The format each break is written in, as `Calendar.strftime/3` takes it, " <>
+                        "but for `%Y`, the year unpadded."
+                  ]
+
+                  {function, NimbleOptions.new!([format: format] ++ @time_zone_options)}
+                end)
+
+  # `date_short/2`'s part formats, each R's default.
+  @short_parts [year: "%Y", month: "%b", day: "%d", time: "%H:%M"]
+
+  @date_short_options NimbleOptions.new!(
+                        [
+                          format: [
+                            type: :keyword_list,
+                            default: [],
+                            keys:
+                              Enum.map(@short_parts, fn {part, default} ->
+                                {part,
+                                 [
+                                   type:
+                                     {:or,
+                                      [nil, {:custom, __MODULE__, :validate_date_format, []}]},
+                                   default: default,
+                                   doc:
+                                     "The #{part}'s format, or `nil` for a #{part} never " <>
+                                       "written."
+                                 ]}
+                              end),
+                            doc:
+                              "Each part's format, as `Calendar.strftime/3` takes it, but for " <>
+                                "`%Y`, the year unpadded; a part left out keeps its default."
+                          ],
+                          sep: [
+                            type: :string,
+                            default: "\n",
+                            doc: "The text written between the parts."
+                          ],
+                          leading: [
+                            type: :string,
+                            default: "0",
+                            doc:
+                              "The text that replaces a `0` at the start of each part: `\" \"` " <>
+                                "writes the 5th `\" 5\"`, `\"\"` writes it `\"5\"`."
+                          ]
+                        ] ++ @time_zone_options
+                      )
 
   # The significant digits each label of `scientific/2` and each exponent of `log/2` and
   # `format_log/2` is written in, R's `format()` range.
@@ -1005,6 +1085,125 @@ defmodule Scales.Labels do
   end
 
   @doc """
+  Labels dates and date-times in a format, R's `label_date()`, by `Calendar.strftime/3`, but for
+  `%Y`, the year unpadded (the year 900 is `900`).
+
+  A `DateTime` is shifted into `tz:` first, UTC unless given; a `NaiveDateTime` is written as it
+  is, its zone UTC, and a `Date` at midnight UTC, so `%H` writes `00` and `%Z` `UTC`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@date_schemas.date)}
+
+  ## Examples
+
+      iex> Scales.Labels.date([~D[2020-01-01], nil, ~D[2021-06-15]])
+      ["2020-01-01", nil, "2021-06-15"]
+
+      iex> Scales.Labels.date([~N[2020-03-05 14:07:09]], format: "%d %b %H:%M")
+      ["05 Mar 14:07"]
+
+      iex> Scales.Labels.date([~U[2021-03-14 06:30:00Z], ~U[2021-03-14 07:30:00Z]],
+      ...>   format: "%H:%M %Z",
+      ...>   tz: "America/New_York",
+      ...>   time_zone_database: Tz.TimeZoneDatabase
+      ...> )
+      ["01:30 EST", "03:30 EDT"]
+  """
+  @spec date([Date.t() | NaiveDateTime.t() | DateTime.t() | nil], keyword()) ::
+          [String.t() | nil]
+  def date(breaks, options \\ []) do
+    {format, clock} = date_settings!(options, :date, "Labels.date/2")
+
+    breaks
+    |> dates!("Labels.date/2", [Date, NaiveDateTime, DateTime], "dates, date-times")
+    |> DateFormat.write(format, clock)
+  end
+
+  @doc """
+  Labels dates and date-times with what changed from the break before, R's
+  `label_date_short()`: each part, a year, a month, a day and a time of day, written where it or
+  a coarser part changed, finest first, one part to a line.
+
+  The first break, and one after a missing break, show every part. The time is left out where
+  every break is at midnight, then the day where every break is a 1st, then the month where every
+  break is in January. A break with no part to write, as a date repeated, is written in full,
+  `2020-01-05`, or `2020-01-05 10:00:00` where one such break is not at midnight in `tz:`.
+
+  What changed is read on each break's own clock, a `DateTime` in its own zone; each part is
+  written as `date/2` writes it, a `DateTime` shifted into `tz:`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@date_short_options)}
+
+  ## Examples
+
+      iex> Scales.Labels.date_short([~D[2019-11-01], ~D[2019-12-01], ~D[2020-01-01], ~D[2020-02-01]])
+      ["Nov\\n2019", "Dec", "Jan\\n2020", "Feb"]
+
+      iex> Scales.Labels.date_short([~N[2020-01-01 18:00:00], ~N[2020-01-01 21:00:00], ~N[2020-01-02 00:00:00]])
+      ["18:00\\n01\\nJan\\n2020", "21:00", "00:00\\n02"]
+
+      iex> Scales.Labels.date_short([~D[2020-01-05], ~D[2020-01-06], ~D[2020-02-07]],
+      ...>   format: [month: "%B"],
+      ...>   sep: " ",
+      ...>   leading: ""
+      ...> )
+      ["5 January 2020", "6", "7 February"]
+  """
+  @spec date_short([Date.t() | NaiveDateTime.t() | DateTime.t() | nil], keyword()) ::
+          [String.t() | nil]
+  def date_short(breaks, options \\ []) do
+    settings =
+      options
+      |> NimbleOptions.validate!(@date_short_options)
+      |> Map.new()
+
+    clock = {settings.tz, settings.time_zone_database}
+    DateFormat.check_zone!("Labels.date_short/2", settings.tz, settings.time_zone_database)
+
+    breaks
+    |> dates!("Labels.date_short/2", [Date, NaiveDateTime, DateTime], "dates, date-times")
+    |> DateFormat.short(settings.format, settings.sep, settings.leading, clock)
+  end
+
+  @doc """
+  Labels times of day and date-times in a format, R's `label_time()`, by `Calendar.strftime/3`.
+
+  A `DateTime` is shifted into `tz:` first, UTC unless given; a `NaiveDateTime` is written as it
+  is, its zone UTC, and a `Time` as it is. A format writing a part of a date (`%Y`, `%d`) raises
+  on a `Time`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@date_schemas.time)}
+
+  ## Examples
+
+      iex> Scales.Labels.time([~T[00:00:00], ~T[01:01:01], ~T[23:59:59], nil])
+      ["00:00:00", "01:01:01", "23:59:59", nil]
+
+      iex> Scales.Labels.time([~T[00:00:59], ~T[00:59:59.9]], format: "%H:%M")
+      ["00:00", "00:59"]
+
+      iex> Scales.Labels.time([~U[2020-01-01 03:00:00Z]],
+      ...>   tz: "America/New_York",
+      ...>   time_zone_database: Tz.TimeZoneDatabase
+      ...> )
+      ["22:00:00"]
+  """
+  @spec time([NaiveDateTime.t() | DateTime.t() | Time.t() | nil], keyword()) ::
+          [String.t() | nil]
+  def time(breaks, options \\ []) do
+    {format, clock} = date_settings!(options, :time, "Labels.time/2")
+
+    breaks
+    |> dates!("Labels.time/2", [NaiveDateTime, DateTime, Time], "date-times, times of day")
+    |> DateFormat.write(format, clock)
+  end
+
+  @doc """
   The short scale's steps for `scale_cut:`, R's `cut_short_scale()`: thousands `K`, millions `M`,
   billions `B` (1e9) and trillions `T` (1e12).
 
@@ -1220,6 +1419,24 @@ defmodule Scales.Labels do
   def validate_pvalue_prefix(prefix),
     do: {:error, "expected three strings, {below, between, above}, got: #{inspect(prefix)}"}
 
+  # NimbleOptions' check of a date labeller's format: a string of at least one character that
+  # `Calendar.strftime/3` writes a date-time in, tried on one, so a format it cannot write raises
+  # at the call.
+  @doc false
+  @spec validate_date_format(term()) :: {:ok, String.t()} | {:error, String.t()}
+  def validate_date_format(format) when is_binary(format) and format != "" do
+    DateBreaks.label(~U[1970-01-01 00:00:00Z], format)
+    {:ok, format}
+  rescue
+    exception ->
+      {:error,
+       "expected a format Calendar.strftime/3 can write a date-time in, got: " <>
+         "#{inspect(format)}, which it cannot: #{Exception.message(exception)}"}
+  end
+
+  def validate_date_format(format),
+    do: {:error, "expected a format, a string of at least one character, got: #{inspect(format)}"}
+
   # NimbleOptions' check of `scale_cut:`: `{suffix, threshold}` pairs, each threshold at least 0
   # and none given twice, one of them 0.
   @doc false
@@ -1257,6 +1474,31 @@ defmodule Scales.Labels do
 
   defp numbers!(breaks, function) do
     raise ArgumentError, "#{function} takes a list of numbers and nils, got: #{inspect(breaks)}"
+  end
+
+  # The breaks, each of one of the structs `kinds` or a missing one, `nil`.
+  defp dates!(breaks, function, kinds, named) when is_list(breaks) do
+    if Enum.all?(breaks, fn value ->
+         is_nil(value) or (is_struct(value) and value.__struct__ in kinds)
+       end) do
+      breaks
+    else
+      raise ArgumentError,
+            "#{function} takes a list of #{named} and nils, got: #{inspect(breaks)}"
+    end
+  end
+
+  defp dates!(breaks, function, _kinds, named) do
+    raise ArgumentError, "#{function} takes a list of #{named} and nils, got: #{inspect(breaks)}"
+  end
+
+  # `date/2`'s or `time/2`'s format and the clock it writes on, its zone checked.
+  defp date_settings!(options, function, name) do
+    settings = NimbleOptions.validate!(options, Map.fetch!(@date_schemas, function))
+    zone = Keyword.fetch!(settings, :tz)
+    database = Keyword.fetch!(settings, :time_zone_database)
+    DateFormat.check_zone!(name, zone, database)
+    {Keyword.fetch!(settings, :format), {zone, database}}
   end
 
   # The options given, checked, with the formatter's defaults; `accuracy:` and `scale_cut:` have

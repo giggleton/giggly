@@ -79,6 +79,42 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The date labellers write a `Date` at midnight UTC and a `NaiveDateTime` as UTC, each takes
+  its own kinds, and `tz:` is any zone its database reads (2026-10-31, Steve: "A" on each of three
+  calls; checked against scales 1.4.0).** R writes a `Date` at midnight UTC whatever `tz` says
+  (`%H` `00`, `%Z` `UTC`), where `Calendar.strftime/3` raises on `%H` and writes `%Z` empty, so a
+  `Date` and a `NaiveDateTime` are written as UTC `DateTime`s, never shifted. `date/2` and
+  `date_short/2` take dates and date-times, `time/2` date-times and times, as `label_time()`
+  refuses a `Date`; R's `label_date()` writes an hms in its own text whatever the format, so a
+  `Time` is refused there. Kinds and zones may mix, `date_short/2` dropping the time where every
+  value is a `Date` or at its own midnight. `tz:` is `"Etc/UTC"` unless given, checked at the call
+  against `time_zone_database:`. `%s` is the instant's Unix time in every zone (Steve: "A"),
+  where R's, outside UTC, counts the wall clock as UTC's. *Rejected: Calendar on the structs as
+  they are*: `%H` raises. *Rejected: R's `%s`, or refusing `%s` outside UTC*: a count of nothing,
+  or a true one refused.
+  *Rejected: `date/2` writing times*: two labellers for one thing. *Rejected: `"UTC"` read as
+  `"Etc/UTC"`*: a name the database does not know, accepted anyway.
+
+- **`date/2`'s and `time/2`'s `format:` is one string, checked at the call (2026-10-31, Steve:
+  "A"; checked against scales 1.4.0).** R recycles a vector of formats over the breaks, an axis
+  of mixed labels, and reads `""` as `format()`'s own default; here a format is one string of at
+  least one character, written on `~U[1970-01-01 00:00:00Z]` at the call, as `date_labels:` is,
+  so one Calendar cannot write raises even for no breaks. A date conversion on a `Time` passes
+  that and raises an `ArgumentError` naming the format when written, where R writes 1970-01-01.
+  `%%Y` is a literal `%Y`, as in R, which `DateBreaks.label/2` had replaced with the year.
+  *Rejected: `""` as R's default*: the default is already R's.
+
+- **`date_short/2` takes its parts by name and writes each on its own (2026-10-31, Steve: "A" on
+  each of three calls; checked against scales 1.4.0).** `format:` is `[year:, month:, day:,
+  time:]`, a part left out R's default and `nil` never written, as R's `NA`; R's vector of four
+  errors at three on times and ignores a fifth. `leading:` replaces a `0` at the start of each
+  part, as text, before `sep:` joins them; R replaces `^0` and `sep` then `0` in the joined text,
+  which differs only under `sep: ""` (every `0`), a part or full label holding `sep` then `0`,
+  and a backslash, which R reads as an escape. A break with no part to write is R's `format()`
+  default in `tz`, `%Y-%m-%d` where each such break is exactly midnight, else to the second.
+  *Rejected: four formats in order*: one changed means four written. *Rejected: R's text
+  replacement*: `"2020"` written `"2 2 "`. *Rejected: an empty label*: R names the date.
+
 - **A raster is drawn as svglite draws one: an `<image>` of a PNG pngex writes (2026-10-31,
   Steve: decisions 1 to 4, "A", "A", "C", "A", then "A" on rectangles in radial coordinates;
   checked against ggplot2 4.0.3).** A panel's cells are one `Scene.Raster`, written as svglite's
@@ -3618,6 +3654,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Label dates, date-times and times of day (labels, step 4); §4: "The date
+  labellers write", "`date/2`'s and `time/2`'s `format:`", "`date_short/2` takes its parts"
 - 2026-10-31 — Draw the notebook examples tiles, rasters and faithfuld unlock (tile, step 3, the
   notebook sweep); §4: none, each checked against vdiffr's drawing at the notebook's size
 - 2026-10-31 — Draw a raster as one image of its cells, as svglite writes one, and refuse
