@@ -35,6 +35,20 @@ defmodule Giggly.ResolutionTest do
       assert Resolution.of([1.5, 2.0], zero: false, discrete: true) === 1
     end
 
+    test "counting from zero or not is a boolean, whether the axis is discrete or not" do
+      # Built as the test runs, as a literal the guard refuses fails the type check.
+      unsure =
+        :maybe
+        |> :erlang.term_to_binary()
+        |> :erlang.binary_to_term()
+
+      for discrete <- [true, false] do
+        assert_raise FunctionClauseError, fn ->
+          Resolution.of([1.0, 2.0], zero: unsure, discrete: discrete)
+        end
+      end
+    end
+
     test "a range zero wide, by R's zero_range(), is 1, one position or many" do
       assert Resolution.of([5.0], zero: true, discrete: false) === 1
       assert Resolution.of([5.0, 5.0], zero: false, discrete: false) === 1

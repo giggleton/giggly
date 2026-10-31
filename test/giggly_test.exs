@@ -1266,6 +1266,37 @@ defmodule GigglyTest do
       assert edges.(boxes) === {[0.625, 2.625], [1.375, 3.375]}
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for a layer holding levels c and e of a
+    # discrete axis of a to e: `geom_bar()` over x and over y, 0.9 wide either way, and
+    # `geom_boxplot()` standing on x and lying on y, 0.75; counted from zero alone, the gaps 0 to 3
+    # to 5 would make them 1.8 and 1.5. They move only with ggplot2's `resolution()`.
+    test "the axis counted or summarised along is read as discrete, upright or lying" do
+      # Only the axis holding the level is discrete, so reading the other one shows.
+      across = fn mapping, layer, axis ->
+        {scale, low, high} =
+          if axis == :x,
+            do: {&Plot.scale_x_discrete/2, :xmin, :xmax},
+            else: {&Plot.scale_y_discrete/2, :ymin, :ymax}
+
+        frame =
+          %{"k" => ["c", "e", "e"], "v" => [1.0, 3.0, 5.0]}
+          |> Plot.new(mapping)
+          |> layer.()
+          |> scale.(limits: ["a", "b", "c", "d", "e"])
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, low), DataFrame.pull(frame, high)}
+      end
+
+      counted = {[2.55, 4.55], [3.45, 5.45]}
+      boxed = {[2.625, 4.625], [3.375, 5.375]}
+
+      assert across.(%{x: :k}, &Plot.geom_bar/1, :x) === counted
+      assert across.(%{y: :k}, &Plot.geom_bar/1, :y) === counted
+      assert across.(%{x: :k, y: :v}, &Plot.geom_boxplot/1, :x) === boxed
+      assert across.(%{x: :v, y: :k}, &Plot.geom_boxplot/1, :y) === boxed
+    end
+
     # R 4.6.1 with ggplot2 4.0.3: 400 points at x 1L and 4L jittered move at most 1.197 across, 0.4
     # of their spacing of 3; at levels a and c of a discrete axis of a, b and c, at most 0.399, 0.4
     # of 1. R's random numbers are not Giggly's, so the bound is the check, and the furthest move
