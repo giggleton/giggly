@@ -244,9 +244,11 @@ defmodule Giggly.Assembly do
   # no title. The plot's own labels are carried for drawing.
   #
   # Raises `ArgumentError` when a layer maps an axis to a column no scale can place yet, such as a
-  # time, to a column whose kind (continuous, discrete or date) disagrees with the first column on
-  # that axis, or to one the plot's scale for the axis does not take. The message names the layer
-  # by its index, counting from 0, the aesthetic, the column as the data names it, and its type.
+  # list, or to one the axis's scale does not place: the plot's scale for the axis, or else the
+  # scale the first column of the axis's own aesthetic chose, or else a continuous one; numbers
+  # are placed on a discrete axis, and dates at their days on a continuous one. The message names
+  # the layer by its index, counting from 0, the aesthetic, the column as the data names it, and
+  # its type.
   # Raises it too for an annotation given a list of values for an aesthetic under a facet that
   # repeats its rows across several panels, naming the layer and the aesthetic.
   # No expansion, as ggplot2's stats read an axis's `dimension()`.
@@ -307,7 +309,8 @@ defmodule Giggly.Assembly do
       |> Enum.with_index()
       |> Enum.zip_with(transformed_data, fn {layer, index}, frame ->
         stat = Plot.layer_stat(layer)
-        mapped = through_scales(frame, axes.x, axes.y, &Scale.map/2)
+        kept = discrete_axis_positions(frame, scale_kinds)
+        mapped = through_scales(frame, axes.x, axes.y, &Scale.map/2, kept)
         computed = Stat.compute_layer(stat, mapped, panel_axes)
         map_statistic(computed, {plot, layer, index}, scale_kinds, axes)
       end)
@@ -1123,8 +1126,10 @@ defmodule Giggly.Assembly do
   # Each scale folds in, from every layer's columns on its axis, a column at a time, the values in
   # the rows of the panels that use it, as ggplot2's `train_position()` trains each panel scale on
   # its panels. `training` is `:levels` for the layers' own values, a discrete axis's levels, each
-  # with its factor's levels where it is a category (`Scale.train/3`), and `:positions` once they
-  # are positions (`Scale.train_positions/2`).
+  # with its factor's levels where it is a category (`Scale.train/3`), but a column of numbers,
+  # which are positions already, and `:positions` once they are all positions
+  # (`Scale.train_positions/2`), as ggplot2's discrete position scale trains its continuous range on
+  # a value that is not discrete.
   defp train(scales, routes, family, layer_data, training) do
     Map.new(scales, fn {scale_id, untrained} ->
       trained =
@@ -1139,11 +1144,35 @@ defmodule Giggly.Assembly do
     end)
   end
 
-  defp trained(scale, values, frame, name, :levels),
-    do: Scale.train(scale, values, levels(frame, name))
+  defp trained(scale, values, frame, name, :levels) do
+    if positions?(frame, name),
+      do: Scale.train_positions(scale, values),
+      else: Scale.train(scale, values, levels(frame, name))
+  end
 
   defp trained(scale, positions, _frame, _name, :positions),
     do: Scale.train_positions(scale, positions)
+
+  # Whether the column `name` holds numbers, which an axis places as they are, by its type.
+  defp positions?(frame, name) do
+    dtype =
+      frame
+      |> DataFrame.dtypes()
+      |> Map.fetch!(name)
+
+    Scale.kind(dtype) == :continuous
+  end
+
+  # The frame's columns of numbers on a discrete axis, which a discrete scale maps as themselves,
+  # as ggplot2's maps a value that is not discrete.
+  defp discrete_axis_positions(frame, scale_kinds) do
+    for name <- DataFrame.names(frame),
+        family = Aesthetics.family(name),
+        family != :none,
+        Map.fetch!(scale_kinds, family) == :discrete,
+        positions?(frame, name),
+        do: name
+  end
 
   # The levels of the factor the column `name` holds, or `:none` where it is not a category.
   defp levels(frame, name) do
@@ -1192,45 +1221,77 @@ defmodule Giggly.Assembly do
         do: {frame, name}
   end
 
-  # The untrained scale of the axis of `family`: the plot's own scale for the aesthetic, which
-  # must take the kind of column the axis's columns need (`Scale.takes?/2`), or else a new scale of
-  # that kind, as ggplot2 adds a default scale only for an aesthetic the plot has none for, before
-  # transforming anything; on an axis no layer maps, the plot's scale whatever its kind, or a
-  # continuous one, as ggplot2's is. A plot's scale that does not take the axis's columns is
-  # refused when the plot is run, naming the first column on the axis, as ggplot2 refuses
-  # "Discrete value supplied to a continuous scale". A date-time scale takes its zone from that
-  # first column (`Scale.settle_zone/2`), as ggplot2's takes the first column's `tzone`.
+  # The untrained scale of the axis of `family`: the plot's own scale for the aesthetic, or else a
+  # new scale of the kind the first column of the axis's own aesthetic needs (`:x` on the x axis),
+  # as ggplot2 adds a default scale only for an aesthetic with a scale function of its own name, so
+  # that an `xmin`, an `xend` or an `xintercept` never chooses one, before transforming anything;
+  # with no such column, a continuous one, as ggplot2's `add_missing()` adds. A date-time scale
+  # takes its zone from the axis's first date-time column (`Scale.settle_zone/2`), as ggplot2's
+  # takes the `tzone` of the first it transforms. Every column on the axis must then be one the
+  # scale places (`Scale.places?/2`), or the run is refused naming it and what chose the scale:
+  # the plot, the column, or no column of the axis's own aesthetic, as ggplot2 refuses "Discrete
+  # value supplied to a continuous scale".
   defp position_scale(%Plot{scales: scales} = plot, layer_frames, family) do
-    case {Map.fetch(scales, family), axis_columns(plot, layer_frames, family)} do
-      {{:ok, scale}, []} ->
-        scale
+    columns = axis_columns(plot, layer_frames, family)
+    Enum.each(columns, &check_placeable/1)
+    deciding = Enum.find(columns, fn column -> aesthetic_of(column) == family end)
 
-      {{:ok, scale}, [first | _rest] = columns} ->
-        scale
-        |> checked_scale(columns)
-        |> zoned(first)
+    {scale, chosen_by} =
+      case {Map.fetch(scales, family), deciding} do
+        {{:ok, scale}, _deciding} ->
+          {scale, :plot}
 
-      {:error, []} ->
-        Scale.new(:continuous)
+        {:error, nil} ->
+          {Scale.new(:continuous), {:none, family}}
 
-      {:error, [first | _rest] = columns} ->
-        columns
-        |> axis_kind()
-        |> Scale.new()
-        |> zoned(first)
-    end
+        {:error, column} ->
+          kind = kind_of_column(column)
+          {Scale.new(kind), {:column, column}}
+      end
+
+    zoned = zoned(scale, Enum.find(columns, &dated?/1))
+    Enum.each(columns, fn column -> check_placed(zoned, column, chosen_by) end)
+    zoned
   end
 
-  defp checked_scale(scale, [first_column | _rest] = columns) do
-    if Scale.takes?(scale, axis_kind(columns)),
-      do: scale,
-      else: raise(ArgumentError, untaken_message(scale, family_of(first_column), first_column))
-  end
-
+  defp aesthetic_of({_index, aesthetic, _value, _dtype, _kind}), do: aesthetic
+  defp kind_of_column({_index, _aesthetic, _value, _dtype, kind}), do: kind
   defp family_of({_index, aesthetic, _value, _dtype, _kind}), do: Aesthetics.family(aesthetic)
 
-  # The scale given the zone of `column`, the first it places, where the plot gave it none, or
-  # refused where its time zone database does not know that zone.
+  defp dated?({_index, _aesthetic, _value, _dtype, kind}),
+    do: kind in [:datetime, :naive_datetime]
+
+  defp check_placeable({_index, _aesthetic, _value, _dtype, :none} = column),
+    do: raise(ArgumentError, unplaceable_message(column))
+
+  defp check_placeable(_column), do: :ok
+
+  defp check_placed(scale, {_index, _aesthetic, _value, _dtype, kind} = column, chosen_by) do
+    if not Scale.places?(scale, kind),
+      do: raise(ArgumentError, unplaced_message(scale, column, chosen_by))
+  end
+
+  defp unplaced_message(scale, column, :plot),
+    do: untaken_message(scale, family_of(column), column)
+
+  defp unplaced_message(scale, column, {:column, deciding}),
+    do: kind_conflict_message(column, deciding, one_axis(scale))
+
+  defp unplaced_message(_scale, {index, aesthetic, value, _dtype, kind}, {:none, family}) do
+    "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, a #{kind} " <>
+      "column, but no layer maps #{inspect(family)}, so the #{family} axis is continuous; map " <>
+      "#{inspect(family)} to a #{kind} column, or give the plot Plot.scale_#{family}_#{kind}()"
+  end
+
+  # Why an axis of `scale` refuses a column another chose it against.
+  defp one_axis(%Scale.Discrete{}), do: "a discrete axis places its levels, and numbers alone"
+  defp one_axis(_scale), do: "an axis has one scale"
+
+  # The scale given the zone of `column`, the first date-time it places, where the plot gave it
+  # none, or refused where its time zone database does not know that zone; with no date-time
+  # column, as it is.
+  defp zoned(scale, nil), do: scale
+
   defp zoned(scale, {_index, _aesthetic, _value, dtype, _kind} = column) do
     case Scale.settle_zone(scale, dtype) do
       {:ok, settled} ->
@@ -1312,13 +1373,9 @@ defmodule Giggly.Assembly do
     mapped_columns(plot, layer_frames, selected?, :start)
   end
 
-  # The kind of scale an axis's columns need: an axis has one scale, so every column on it must be
-  # a type some scale can place, and all of one kind, the first column deciding.
-  defp axis_kind(columns), do: checked_kind(columns, "an axis has one scale")
-
   # The first column of each aesthetic other than position that a layer maps, which decides the
-  # kind of scale it needs: as an axis's, every column of it must be a type some scale can map,
-  # and all of one kind, the first deciding, as ggplot2 adds a scale for the first layer's and
+  # kind of scale it needs: every column of it must be a type some scale can map, and all of one
+  # kind, the first deciding, as ggplot2 adds a scale for the first layer's and
   # refuses a column it cannot map; and on an aesthetic whose every scale is discrete
   # (`Scale.discrete_only?/1`), none continuous or a date's, as ggplot2's `scale_shape_continuous()`
   # aborts for both.

@@ -200,8 +200,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   aesthetic**, read by the assembly to refuse a column when the plot is run and to choose the
   scale. A type with no scale yet returns `:none`. A `Date` column is `:date`, as ggplot2's
   `scale_type()` gives a `Date` `"date"`, and `:category`, a factor's column, is `:discrete`
-  whatever its values: a date's is a continuous scale through the date transformation, so
-  dates and numbers on one axis are two kinds and refused; on an aesthetic other than position a
+  whatever its values: a date's is a continuous scale through the date transformation, which
+  takes no numbers, as R's warns at them; on an aesthetic other than position a
   date has no scale yet (`kind/2` gives `:none`), ggplot2's `scale_colour_date()`,
   `scale_alpha_date()`, `scale_size_date()` and `scale_linewidth_date()`. **A date-time is
   `:datetime` and a naive one `:naive_datetime`**, as `scale_type()` gives a `POSIXct`
@@ -209,14 +209,19 @@ identity transformation: the entry beginning "A layer records its stat and posit
   the date-time transformation (`new/1`), and on an aesthetic other than position none yet, as a
   date's. **A time of day is `:time`**, as `scale_type()` gives an `hms` `"time"`, a continuous
   scale through the time-of-day transformation, and on an aesthetic other than position none yet.
-  **`takes?/2` is the one rule for which kind of column a plot's scale takes**: its own kind, a
+  **`takes?/2` is the one rule for which kind of column a scale takes**: its own kind, a
   date-time scale no column has settled either date-time kind, and a continuous scale through the
   identity a date's, a date-time's or a time's, which the identity places at its days, its seconds
   since 1970-01-01 or its seconds since midnight, as R's untransformed continuous scale draws
-  each; under any other transformation each is refused, where R fails.
-- **Which a discrete scale is handed, levels or positions, the caller says** by the function it calls, never by the values' type: `train/3`
-  for a layer's own values, its levels, and `train_positions/2` for positions once the levels are
-  mapped, which widen its continuous range alone. `discrete?/1` tells a discrete scale from the
+  each; under any other transformation each is refused, where R fails. **`places?/2` is the one
+  rule for which an axis's scale places**, a plot's or a default one: `takes?/2`'s, and numbers
+  on a discrete scale, each a position counting from its first level, as ggplot2's discrete
+  position scale trains its continuous range on a value that is not discrete; a date there is
+  refused, where R fails.
+- **Which a discrete scale is handed, levels or positions, the caller says** by the function it
+  calls, never by the values' type: `train/3` for a layer's own values, its levels, and
+  `train_positions/2` for positions, a layer's numbers or marks once the levels are mapped, which
+  widen its continuous range alone; `map/2` is never handed positions, which stay as they are. `discrete?/1` tells a discrete scale from the
   others for a caller that must, as a legend's key drawing does.
 - **A continuous scale records its transformation by name, the identity included.**
   `new(:continuous)` records `:identity`, as ggplot2's continuous scales default to

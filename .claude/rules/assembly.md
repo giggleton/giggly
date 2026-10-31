@@ -115,19 +115,30 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **Each panel's params are built once, after the positions, from the scales its layout row
   names, trained again:** each axis's extent (`Scale.dimension/1`) and the breaks an axis showing
   that extent draws (`Scale.breaks/2`), ggplot2's `setup_panel_params()`.
-- **Each axis's scale is added after grouping, of the kind its columns need, or is the plot's own
-  scale for the aesthetic, refused when run unless it takes their kind (`Scale.takes?/2`: a
-  continuous scale through the identity takes a date, at its days, as ggplot2 draws one; "the
-  plot's x scale is continuous through log10, but the layer at index 0 maps :x to "day", a date
-  column", where ggplot2 fails), and on an axis no layer maps before the stat the plot's scale
-  whatever its kind; the axis's kind, which each geom and the after-stat check are told, is its
-  scale's (`Scale.kind_of/1`); every layer's columns in the axis's family
-  are then put through the scale's transformation, trained on, and mapped to positions**, a
-  continuous scale censoring those outside its limits. Which columns belong to an axis is
-  `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A date-time scale given no
-  zone then takes the axis's first column's** (`Scale.settle_zone/2`), as ggplot2's takes the
-  first column's `tzone`, so later layers' date-times in other zones are placed by their instants;
-  a zone its time zone database does not know is refused when run, naming the layer, the
+- **Each axis's scale is added after grouping: the plot's own scale for the aesthetic, or else
+  one of the kind the first column of the axis's own aesthetic needs, `:x` on the x axis, or else
+  a continuous one**, as ggplot2 adds a default scale only for an aesthetic with a scale function
+  of its own name, so an `xmin`, an `xend` or an `xintercept` never chooses one (a band or a line
+  added before the bars leaves their axis discrete), and `add_missing()` makes an axis no layer
+  maps by its own aesthetic continuous (design-log §4, the entry beginning "An axis's scale is
+  chosen by"). **Every column on the axis must be one its scale places** (`Scale.places?/2`), or
+  the run is refused naming the column and what chose the scale: the plot's ("the plot's x scale
+  is continuous through log10, but the layer at index 0 maps :x to "day", a date column", where
+  ggplot2 fails), the column that chose it ("…; an axis has one scale", "…; a discrete axis
+  places its levels, and numbers alone"), or no column of its own aesthetic ("but no layer maps
+  :x, so the x axis is continuous; map :x to a discrete column, or give the plot
+  Plot.scale_x_discrete()"); a continuous scale through the identity places dates at their days,
+  as ggplot2 draws them, and a discrete one numbers as positions. On an axis no layer maps
+  before the stat it is the plot's scale whatever its kind; the axis's kind, which each geom and
+  the after-stat check are told, is its scale's (`Scale.kind_of/1`); every layer's columns in the
+  axis's family are then put through the scale's transformation, trained on, and mapped to
+  positions, a continuous scale censoring those outside its limits, a discrete one leaving a
+  column of numbers as it is, as ggplot2's maps a value that is not discrete. Which columns
+  belong to an axis is `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A
+  date-time scale given no zone then takes the axis's first date-time column's**
+  (`Scale.settle_zone/2`), as ggplot2's takes the `tzone` of the first it transforms, so later
+  layers' date-times in other zones are placed by their instants; a zone its time zone database
+  does not know is refused when run, naming the layer, the
   aesthetic, the column, the zone and the database, and the `time_zone_database:` of the axis's
   scale function that would fix it. A scale given a zone keeps it whatever its columns' and
   refuses naive date-times, saying why.
@@ -162,9 +173,9 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   about scales. It hands the facet the same key, so panels made from a column's values follow the
   same order.
 - **Whether a column suits an axis is checked here, when the plot is run.** Before training, every
-  column on an axis must be a type `Scale.kind/1` can place and all of one kind, each layer's
-  types read from its evaluated frame, since an expression's type is known only once it has run;
-  a refusal names the layer by index, the aesthetic, the value as the plot holds it (a column by
+  column on an axis must be a type `Scale.kind/1` can place and one the axis's scale places, each
+  layer's types read from its evaluated frame, since an expression's type is known only once it
+  has run; a refusal names the layer by index, the aesthetic, the value as the plot holds it (a column by
   the name its table gives it), and its type. The plot checks only what it knows (names and which
   aesthetics a geom takes).
 - **Discreteness is read from `DataFrame.dtypes/1`** (`:string`, `:boolean`, `:atom`,
@@ -174,9 +185,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   scales' kinds read it as discrete, numbers and all; the transformation leaves a category as it
   is, a discrete scale's being the identity, so it reaches training with its levels. **A scale is
   told levels from positions by the stage**: the first training hands it the layers' own values,
-  a column at a time, each with its factor's levels or `:none` (`Scale.train/3`), the retraining
-  after the position their positions (`Scale.train_positions/2`), so a factor's numbers train
-  levels and a bar's edges a discrete axis's continuous range. A non-position scale is trained on
+  a column at a time, each with its factor's levels or `:none` (`Scale.train/3`), but a column of
+  numbers, which are positions already, and the retraining after the position their positions
+  (`Scale.train_positions/2`), so a factor's numbers train levels, and a line's intercept or a
+  bar's edges a discrete axis's continuous range. A non-position scale is trained on
   each column with its levels too.
 - **A group id depends only on the values,** never on the panel or the row's position, so stacking
   and dodging order agree across facets. The integer `panel` column is never discrete, so it needs
@@ -192,8 +204,8 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   as ggplot2's `scale_type()` names an ordered factor's `"ordinal"`, the
   columns evaluated before the stats first and those computed after them next, each in layer
   order, as ggplot2 adds the scales of evaluated aesthetics before any stat runs; every column of
-  it checked as an axis's are, and on an aesthetic whose every scale is discrete
-  (`Scale.discrete_only?/1`: shape, line type) a continuous or a date column refused first, naming
+  it a type some scale can map and all of one kind, the first deciding, and on an aesthetic whose
+  every scale is discrete (`Scale.discrete_only?/1`: shape, line type) a continuous or a date column refused first, naming
   the layer, the aesthetic in words (`Aesthetics.in_words/1`), the value and its type, as ggplot2's
   `scale_shape_continuous()` and `scale_linetype_continuous()` abort for both,
   trained once the positions are final on every layer's column of it (a column a stat dropped

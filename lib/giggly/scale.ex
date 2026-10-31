@@ -294,6 +294,15 @@ defmodule Giggly.Scale do
 
   def takes?(scale, kind), do: kind_of(scale) == kind
 
+  # Whether an axis of `scale` places a column that needs a scale of `kind`: one the scale takes
+  # (`takes?/2`), or numbers on a discrete axis, each a position counting from its first level, as
+  # ggplot2's discrete position scale trains its continuous range on a value that is not discrete
+  # and maps it as itself.
+  @doc false
+  @spec places?(t(), kind()) :: boolean()
+  def places?(%Discrete{}, :continuous), do: true
+  def places?(scale, kind), do: takes?(scale, kind)
+
   # A date-time scale whose zone neither a plot nor a column has settled given the zone of the
   # first column it places, of type `dtype`, as ggplot2's date-time scale takes the first column's
   # `tzone` when not given one: a naive one's `:naive`, a date-time's its zone, `{:error, {zone,

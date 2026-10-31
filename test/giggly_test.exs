@@ -6112,8 +6112,7 @@ defmodule GigglyTest do
     # In R 4.6.1, ggplot2 4.0.3 refuses "Discrete value supplied to a continuous scale", fails on a
     # date under a reversed or a discrete scale ("unary - is not defined for "Date" objects",
     # "Can't convert `x` <date> to <double>") and on text under a date scale; it reads numbers on
-    # a date scale as days with a warning, and puts numbers on a discrete axis without breaks,
-    # which Giggly refuses, an axis having one kind.
+    # a date scale as days with a warning, which Giggly refuses.
     test "a column on the axis of a kind the plot's scale does not take is refused when run" do
       dates = %{"date" => [~D[2020-01-01], ~D[2020-02-01]], "value" => [1.0, 2.0]}
 
@@ -6138,12 +6137,6 @@ defmodule GigglyTest do
              |> Plot.geom_point()
              |> Plot.scale_x_discrete(),
              ~s(x scale is discrete, but the layer at index 0 maps :x to "date", a date column)},
-            {@mpg_rows
-             |> Plot.new(%{x: :hwy, y: :class})
-             |> Plot.geom_point()
-             |> Plot.ylim(["suv"])
-             |> Plot.xlim(["1"]),
-             ~s(x scale is discrete, but the layer at index 0 maps :x to "hwy", a continuous)},
             {@mpg_rows
              |> Plot.new(%{x: :hwy, y: :class})
              |> Plot.geom_point()
@@ -6484,6 +6477,265 @@ defmodule GigglyTest do
                {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase},
                {:datetime, :naive, Calendar.UTCOnlyTimeZoneDatabase}
              ]
+    end
+  end
+
+  describe "layer_data/2, numbers on a discrete axis" do
+    setup do
+      boxes =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot()
+
+      extents = fn plot ->
+        assembled = Giggly.Assembly.run(plot)
+        Giggly.Coord.extents(assembled.coord, assembled.panel_params[1]).x
+      end
+
+      %{boxes: boxes, extents: extents}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1's x range for `ggplot(mpg, aes(class, hwy)) + geom_boxplot()`
+    # and `geom_vline(xintercept = )` at 1.5, at 10, and at 0 and 8, and `layer_data()`'s 1.5: the
+    # seven classes widened by 0.6, then reaching the lines, which are not widened.
+    test "a number is a position among the levels, and the axis reaches it unwidened", context do
+      %{boxes: boxes, extents: extents} = context
+
+      ranges =
+        Enum.map([1.5, 10, [0, 8]], fn intercepts ->
+          boxes
+          |> Plot.geom_vline(xintercept: intercepts)
+          |> extents.()
+        end)
+
+      placed =
+        boxes
+        |> Plot.geom_vline(xintercept: 1.5)
+        |> Giggly.layer_data(1)
+        |> DataFrame.pull(:xintercept)
+
+      assert {ranges, placed} === {[{0.4, 7.6}, {0.4, 10.0}, {0.0, 8.0}], [1.5]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: `ggplot(mtcars, aes(factor(cyl), mpg)) + geom_boxplot() +
+    # geom_vline(xintercept = 4)` runs 0.4 to 4, the line beyond the third level, not at "4".
+    test "a number beside levels that are numbers is a position, never a level", %{
+      extents: extents
+    } do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_boxplot()
+        |> Plot.geom_vline(xintercept: 4)
+
+      assert {extents.(plot), Giggly.panel_scales(plot).x.levels} ===
+               {{0.4, 4.0}, [4.0, 6.0, 8.0]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: the boxes under `scale_x_discrete(limits = c("compact",
+    # "suv"))` and a line at 5 run 0.4 to 5; under `scale_x_discrete(expand = expansion(add = 2))`
+    # and a line at 9, -1 to 9.
+    test "the axis reaches a number past its limits, and past its expansion", context do
+      %{boxes: boxes, extents: extents} = context
+
+      limited =
+        boxes
+        |> Plot.scale_x_discrete(limits: ["compact", "suv"])
+        |> Plot.geom_vline(xintercept: 5)
+
+      widened =
+        boxes
+        |> Plot.scale_x_discrete(expand: [add: 2])
+        |> Plot.geom_vline(xintercept: 9)
+
+      assert {extents.(limited), extents.(widened)} === {{0.4, 5.0}, {-1.0, 9.0}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1's x ranges under `facet_wrap(~drv, scales = "free_x")` with
+    # lines at 1.5 and 4: five, four and three classes, the last panel reaching the line at 4.
+    test "each free panel reaches the numbers from its own levels", %{boxes: boxes} do
+      assembled =
+        boxes
+        |> Plot.geom_vline(xintercept: [1.5, 4])
+        |> Plot.facet_wrap(:drv, scales: :free_x)
+        |> Giggly.Assembly.run()
+
+      ranges =
+        Enum.map(1..3, fn panel ->
+          Giggly.Coord.extents(assembled.coord, assembled.panel_params[panel]).x
+        end)
+
+      assert ranges === [{0.4, 5.6}, {0.4, 4.6}, {0.4, 4.0}]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: a band or a line added before the boxes or bars leaves the
+    # axis discrete, as only a layer mapping `x` itself chooses its scale: `layer_data()`'s band at
+    # 1.5 to 2.5 and bars from 0.55 to 1.45 at the first class.
+    test "a band or a line added first leaves the axis to the layer mapping x", context do
+      %{extents: extents} = context
+
+      banded =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.annotate(:rect, xmin: 1.5, xmax: 2.5, ymin: :neg_infinity, ymax: :infinity)
+        |> Plot.geom_bar()
+
+      band = Giggly.layer_data(banded, 0)
+      bars = Giggly.layer_data(banded, 1)
+
+      lined =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_vline(xintercept: 1.5)
+        |> Plot.geom_boxplot()
+
+      assert {DataFrame.pull(band, :xmin), DataFrame.pull(band, :xmax),
+              hd(DataFrame.pull(bars, :xmin)), hd(DataFrame.pull(bars, :xmax)), extents.(banded),
+              extents.(lined)} ===
+               {[1.5], [2.5], 0.55, 1.45, {0.4, 7.6}, {0.4, 7.6}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: `annotate("text", x = 1.5, ...)` before `geom_bar()` maps
+    # `x`, so it chooses a continuous scale, and the bars fail ("Discrete value supplied to a
+    # continuous scale").
+    test "an annotation mapping x itself, added first, chooses the axis's scale" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.annotate(:text, x: 1.5, y: 40, label: "hi")
+        |> Plot.geom_bar()
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message ===
+               ~s(the layer at index 1 maps :x to "class", a discrete column, but the layer ) <>
+                 ~s(at index 0 maps :x to "x", a continuous one; an axis has one scale)
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1's `layer_data()` for points at x 1.5 and 2.25 from a table of
+    # their own, and columns at 1.5 and 1.75, over `ggplot(mpg, aes(class)) + geom_bar()`: placed as
+    # they are, the columns as wide as the numbers' spacing, as on a continuous axis.
+    test "a layer's numbers on a discrete axis are placed as they are" do
+      bars =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.geom_bar()
+
+      points =
+        bars
+        |> Plot.geom_point(%{x: :x, y: :y}, data: %{"x" => [1.5, 2.25], "y" => [10, 20]})
+        |> Giggly.layer_data(1)
+
+      columns =
+        bars
+        |> Plot.geom_col(%{x: :x, y: :y}, data: %{"x" => [1.5, 1.75], "y" => [10, 20]})
+        |> Giggly.layer_data(1)
+
+      assert {DataFrame.pull(points, :x), DataFrame.pull(columns, :xmin),
+              DataFrame.pull(columns, :xmax)} ===
+               {[1.5, 2.25], [1.3875, 1.6375], [1.6125, 1.8625]}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: `ggplot(mtcars, aes(mpg, wt)) + geom_point() +
+    # scale_x_discrete()` runs 9.8 to 34.5, the cars' range widened by 0.6, with no breaks;
+    # `geom_vline(xintercept = c(1, 3)) + scale_x_discrete()` alone, 0.4 to 3.6.
+    test "the plot's discrete scale over numbers alone widens their range, and has no breaks" do
+      points =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: :wt})
+        |> Plot.geom_point()
+        |> Plot.scale_x_discrete()
+        |> Giggly.Assembly.run()
+
+      lines =
+        %{"z" => [1]}
+        |> Plot.new()
+        |> Plot.geom_vline(xintercept: [1, 3])
+        |> Plot.scale_x_discrete()
+        |> Giggly.Assembly.run()
+
+      shown =
+        Enum.map([points, lines], fn assembled ->
+          Map.take(assembled.panel_params[1], [:x_range, :x_breaks])
+        end)
+
+      assert shown === [
+               %{x_range: {9.8, 34.5}, x_breaks: []},
+               %{x_range: {0.4, 3.6}, x_breaks: []}
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails on a date on a discrete axis ("Can't convert `x` <date>
+    # to <double>").
+    test "a date on a discrete axis is refused", %{boxes: boxes} do
+      plot = Plot.geom_vline(boxes, xintercept: ~D[2020-01-01])
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message ===
+               ~s(the layer at index 1 maps :xintercept to "xintercept", a date column, but the ) <>
+                 ~s(layer at index 0 maps :x to "class", a discrete one; a discrete axis places ) <>
+                 "its levels, and numbers alone"
+    end
+  end
+
+  describe "layer_data/2, the column that chooses an axis's scale" do
+    # Golden: ggplot2 4.0.3 in R 4.6.1: with no layer mapping `x`, `add_missing()` makes the axis
+    # continuous, so a band from 2020-01-01 to 2020-03-01 runs 18259 to 18325, labelled as numbers.
+    test "an axis no layer maps by x is continuous, and places dates at their days" do
+      plot =
+        %{"z" => [1]}
+        |> Plot.new()
+        |> Plot.annotate(:rect, xmin: ~D[2020-01-01], xmax: ~D[2020-03-01], ymin: 0, ymax: 1)
+
+      assembled = Giggly.Assembly.run(plot)
+
+      assert {Giggly.panel_scales(plot).x.transform,
+              Map.take(assembled.panel_params[1], [:x_range])} ===
+               {:identity, %{x_range: {18_259.0, 18_325.0}}}
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1 fails on `ggplot() + geom_vline(xintercept = c("a", "b"))`
+    # ("Discrete value supplied to a continuous scale").
+    test "strings on an axis no layer maps by x are refused, naming what would place them" do
+      plot =
+        %{"z" => [1]}
+        |> Plot.new()
+        |> Plot.geom_vline(xintercept: ["a", "b"])
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+      assert error.message ===
+               ~s(the layer at index 0 maps :xintercept to "xintercept", a discrete column, but ) <>
+                 "no layer maps :x, so the x axis is continuous; map :x to a discrete column, " <>
+                 "or give the plot Plot.scale_x_discrete()"
+    end
+
+    # Golden: ggplot2 4.0.3 in R 4.6.1: points at x 18200 and 18400, then a band of dates, run 18190
+    # to 18410 on a continuous scale; points at dates, then a line at 18300, make a date scale R
+    # warns at.
+    test "dates beside numbers are placed at their days, and numbers beside dates refused" do
+      numbers =
+        %{"x" => [18_200, 18_400], "y" => [0, 1]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+
+      banded =
+        numbers
+        |> Plot.annotate(:rect, xmin: ~D[2020-01-01], xmax: ~D[2020-03-01], ymin: 0, ymax: 1)
+        |> Giggly.Assembly.run()
+
+      dated =
+        %{"x" => [~D[2020-01-01]], "y" => [0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point()
+        |> Plot.geom_vline(xintercept: 18_300)
+
+      error = assert_raise ArgumentError, fn -> Giggly.layer_data(dated) end
+
+      assert {Map.take(banded.panel_params[1], [:x_range]), error.message} ===
+               {%{x_range: {18_190.0, 18_410.0}},
+                ~s(the layer at index 1 maps :xintercept to "xintercept", a continuous column, ) <>
+                  ~s(but the layer at index 0 maps :x to "x", a date one; an axis has one scale)}
     end
   end
 
@@ -11053,6 +11305,42 @@ defmodule GigglyTest do
         )
 
       assert golden?(plot, "hline_vline")
+    end
+
+    # Golden: test/golden/discrete_vline.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/discrete_vline.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. Lines between the classes' boxes and past the
+    # last, which the axis reaches.
+    test "lines at numbers on a discrete axis stand between its levels and past them" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy})
+        |> Plot.geom_boxplot()
+        |> Plot.geom_vline(xintercept: [1.5, 4.5, 8], colour: "red")
+
+      assert golden?(plot, "discrete_vline")
+    end
+
+    # Golden: test/golden/discrete_band.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/discrete_band.R: every element and clip path matches, the x axis drawn
+    # before the y as in test/golden/point.svg. A band added before the bars, so beneath them,
+    # and a label between two classes.
+    test "a band added before the bars is drawn beneath them on their discrete axis" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class})
+        |> Plot.annotate(:rect,
+          xmin: 1.5,
+          xmax: 2.5,
+          ymin: :neg_infinity,
+          ymax: :infinity,
+          fill: "blue",
+          alpha: 0.2
+        )
+        |> Plot.geom_bar()
+        |> Plot.annotate(:text, x: 4.5, y: 55, label: "between")
+
+      assert golden?(plot, "discrete_band")
     end
 
     # Golden: test/golden/hline_facets.svg, checked against ggplot2's drawing of the same plot,

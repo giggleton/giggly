@@ -79,6 +79,21 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **An axis's scale is chosen by the first layer mapping its own aesthetic, and places every
+  column it takes, numbers on a discrete axis as positions (2026-10-31, Steve: "a", "A", "a",
+  walked one at a time; checked against ggplot2 4.0.3).** As `Scales$add_defaults()` adds a scale
+  only for an aesthetic with a scale function of its own name, `:x` chooses the x axis's and an
+  `xmin`, `xend` or `xintercept` never does, so a band or a line added before the bars leaves
+  their axis discrete; with no such column the axis is continuous, as `add_missing()` makes it,
+  dates there at their days and strings refused, where R fails. Every column is then checked by
+  `Scale.places?/2`: a discrete scale places numbers, training its continuous range and mapping
+  them as themselves, never as levels; a continuous one through the identity dates beside
+  numbers; a date on a discrete axis, or a number on a date one (R warns), is refused.
+  *Rejected: the family's first column deciding*: a band beneath the bars refused.
+  *Rejected: it as the fallback with no `:x`*: a date axis and a discrete one where R draws days
+  or fails. *Rejected: dates beside numbers refused*: two rules for one scale, unlike R.
+  *Deferred:* `continuous.limits`, no reader.
+
 - **ggplot2's `msleep` comes with the labeller sweep, behind a waiver of its own (2026-10-30 and
   2026-10-31, Steve: Q4 "yes", then the waiver "yes").** Five of the `labeller()` page's six
   examples plot it, so without it the page that shows off `labeller:` would draw two. It is R's
@@ -522,8 +537,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   UTC; a `Time` column one of the seconds since midnight, R's `hms`. `scale_x_datetime/2` and
   `scale_x_time/2` and their y twins take `scale_x_date/2`'s options, steps gaining `:hour`,
   `:minute` and `:second`, the datetime ones `timezone:` and `time_zone_database:` too; `xlim/3`
-  takes two date-times, never two times, where R fails. An axis is one kind: a date beside a
-  date-time is refused, where R converts it. The notebooks draw nothing new: only `sec_axis`'s
+  takes two date-times, never two times, where R fails. A date-time axis takes no date, nor a
+  date axis a date-time, where R converts it. The notebooks draw nothing new: only `sec_axis`'s
   two examples hold a date-time, and both wait on `sec_axis()` too. *Rejected: times of day
   later*: one step, its breaks already in the tree. *Deferred:* date-times and dates on colour,
   fill, alpha, size and line width, together; sub-second steps; `oob`, `position`, `sec.axis`;
@@ -1707,8 +1722,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   building it from options in another shape*: every option in two shapes. *Rejected:
   `xlim(plot, "I1", "IF")`*: a second form of the list, for R's loose arguments. *Deferred:*
   `na.translate`, `drop`, a discrete `palette`, `continuous.limits`, discrete minor breaks, `oob`,
-  `position`, `sec.axis`, and numbers on a discrete axis, which R places and Giggly refuses, an
-  axis being one kind.
+  `position` and `sec.axis`.
 
 - **Transformations are log10, sqrt, reverse and reciprocal, R's transformation objects ported
   whole (2026-10-19, Steve).** `scale_x_continuous/2`'s `transform:` takes `:identity`, `:log10`,
@@ -3317,6 +3331,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Place numbers on a discrete axis as positions, and choose an axis's scale by the
+  first layer mapping its own aesthetic; no notebook example waits on it; §4: "An axis's scale is
+  chosen by the first layer mapping its own aesthetic"
 - 2026-10-31 — Draw the notebook examples labeller: unlocks, and write a missing value NA under a
   column's own :wrap (labellers, step 3, the notebook sweep); §4: "A missing value is never handed"
 - 2026-10-31 — Add the msleep dataset, a string column reading R's NA as missing (labellers, step
