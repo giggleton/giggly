@@ -8793,6 +8793,39 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/annotate.svg")
     end
 
+    # Golden: test/golden/annotate_label.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/annotate_label.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. Labels annotated with a fill, colour, alpha,
+    # border width and line type each, one in no colour keeping its box, one with no border; and a
+    # turned label beyond the data, which both axes reach, its text apart from its border. It moves
+    # with what moves test/golden/label.svg and test/golden/annotate.svg.
+    test "a label annotation draws each label in its own look" do
+      plot =
+        [wt: [2.62, 2.32, 3.215, 3.44, 5.25, 1.615], mpg: [21.0, 22.8, 21.4, 18.7, 10.4, 30.4]]
+        |> Plot.new(%{x: :wt, y: :mpg})
+        |> Plot.geom_point()
+        |> Plot.annotate(:label,
+          x: [2, 3, 4],
+          y: [15, 20, 25],
+          label: ["first", "second", "third"],
+          fill: ["lightyellow", :none, "pink"],
+          colour: ["red", "darkgreen", :none],
+          alpha: [0.5, 1, 1],
+          linewidth: [1, 0.25, 0],
+          linetype: [:dashed, :solid, :dotted]
+        )
+        |> Plot.annotate(:label,
+          x: 6,
+          y: 35,
+          label: "beyond",
+          size: 6,
+          angle: 15,
+          text_colour: "blue"
+        )
+
+      assert golden?(plot, "annotate_label")
+    end
+
     # Golden: test/golden/rect.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/rect.R: every element matches it, the x axis drawn before the y as in
     # test/golden/point.svg, and every clip path. geom_rect()'s "Rectangles by their corners" with

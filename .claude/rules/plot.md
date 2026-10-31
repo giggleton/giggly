@@ -145,7 +145,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_label/3`, with `%Geom.Label{}` and the identity stat, as its `geom_label()` does, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
-  identity stat and position, as ggplot2's `annotate()` does, so its text is never nudged. `Plot`
+  identity stat and position, as ggplot2's `annotate()` does, so its text and labels are never
+  nudged. `Plot`
   builds them and reads a geom's facts to check a layer, but never computes or draws with one; the
   assembly reads a layer's with `layer_geom/1`, `layer_stat/1`, `layer_position/1` and
   `layer_fixed/1`, so `Layer` stays private.
@@ -510,10 +511,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
-  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's, a segment's, a rug's or a
-  rectangle's `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn a segment
-  at a time) take
-  a list, which `fixed` holds as one value per annotation; a path's or a line's line type is one,
+  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's, a segment's, a rug's, a
+  label's or a rectangle's `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn
+  a segment at a time) take
+  a list, which `fixed` holds as one value per annotation, and only they count annotations, so a
+  label's `label_padding:` is one value however many sides it gives (design-log §4, the entry
+  beginning "`annotate(:label)` counts a padding"), and its `border_colour:` and `text_colour:`
+  one each, fields of its geom; a path's or a line's line type is one,
   as ggplot2 refuses a line type varying along a line. A list's values are of one type, checked by
   building its column (`Giggly.DataFrame`) at the call, a colour's, a shape's or a stroke's `:none`,
   or a line type's `:blank`, in a list held as `nil`, the column's missing value, as R's `c(NA,

@@ -1699,11 +1699,11 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text`, `:label` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
-  where it is placed: text is not nudged, and bars at one `x` are not stacked.
+  where it is placed: text and labels are not nudged, and bars at one `x` are not stacked.
 
   Each option takes one value, or a list of them, one per annotation: every list holds as many
   values as the others, and a single value is used for every annotation, so
@@ -1711,9 +1711,10 @@ defmodule Giggly.Plot do
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date on a date axis. Of the other options, `label:`, `colour:`, `alpha:` and `fill:` each take
   a list, its values of one type, and so do a point's `shape:`, `size:` and `stroke:`, a bar's, a
-  segment's, a rug's or a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a
-  dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line whose width changes
-  along it drawn a segment from each annotation to the next; the rest take one value. Under a facet
+  segment's, a rug's, a label's or a rectangle's `linewidth:` and `linetype:`, whose list holds
+  line types, a dash pattern among them a tuple, and a path's or a line's `linewidth:`, a line
+  whose width changes along it drawn a segment from each annotation to the next; the rest take one
+  value, a label's `label_padding:` one for every label however many sides it gives. Under a facet
   that makes more than one panel, an annotation given such a list raises when the plot is run.
 
   Each geom takes the positions it draws at and the options its own function takes but `data:`
@@ -1730,6 +1731,9 @@ defmodule Giggly.Plot do
       `outside:` and `lineend:`;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
+    * `:label`: `x:`, `y:`, `label:`, `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`,
+      `size:`, `angle:`, `hjust:`, `vjust:`, `family:`, `label_padding:`, `label_r:`,
+      `border_colour:` and `text_colour:`;
     * `:rect`: `xmin:`, `xmax:`, `ymin:`, `ymax:`, `alpha:`, `colour:`, `fill:`, `linewidth:` and
       `linetype:`.
 
@@ -1788,14 +1792,14 @@ defmodule Giggly.Plot do
 
     add_layer(plot, layer, "Plot.annotate/3",
       required: required,
-      unmet: "#{inspect(geom)} is given no value for it"
+      unmet: "the #{inspect(geom)} annotation is given no value for it"
     )
   end
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text " <>
-            "or :rect, got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text, " <>
+            ":label or :rect, got: #{inspect(geom)}"
   end
 
   @doc """
@@ -5191,6 +5195,10 @@ defmodule Giggly.Plot do
 
   defp annotation_geom(:text, validated),
     do: {text_geom(validated), Geom.Text.accepted_aesthetics(), Geom.Text.required_aesthetics()}
+
+  defp annotation_geom(:label, validated),
+    do:
+      {label_geom(validated), Geom.Label.accepted_aesthetics(), Geom.Label.required_aesthetics()}
 
   defp annotation_geom(:rect, _validated),
     do: {%Geom.Rect{}, Geom.Rect.accepted_aesthetics(), Geom.Rect.required_aesthetics()}

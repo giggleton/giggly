@@ -1317,6 +1317,47 @@ defmodule Giggly.Plot.Options do
         @color_forms <> "; black when not given. Neither takes `alpha:`, only its colour's own."
   ]
 
+  # How every label's box is drawn, options of `geom_label/3` and its annotation.
+  @label_box_options [
+    label_padding: [
+      type: {:custom, __MODULE__, :validate_label_padding, []},
+      default: {0.25, :lines},
+      doc:
+        "The room round every label's text inside its box: one length for " <>
+          "every side, or a keyword list of `:top`, `:right`, `:bottom` and " <>
+          "`:left`, a side left out 0; each a number of points or " <>
+          "`{amount, unit}` with a unit of `:pt`, `:cm`, `:mm`, `:in` or " <>
+          "`:lines`, lines of the label's own text. The text sits the " <>
+          "bottom's padding above the box's bottom, its descent within it, " <>
+          "and the top's is at least the descent."
+    ],
+    label_r: [
+      type: {:custom, __MODULE__, :validate_label_r, []},
+      default: {0.15, :lines},
+      doc:
+        "The radius of every label's box's corners, a length as " <>
+          "`label_padding:` takes one; 0 for square corners."
+    ],
+    border_color: [
+      type: {:custom, __MODULE__, :validate_own_color, []},
+      default: :color,
+      doc:
+        "The colour of every label's border apart from its text, written " <>
+          "`border_colour:` or `border_color:`: " <>
+          @color_forms <>
+          ", or `:color`, the label's own colour, when not given."
+    ],
+    text_color: [
+      type: {:custom, __MODULE__, :validate_own_color, []},
+      default: :color,
+      doc:
+        "The colour of every label's text apart from its border, written " <>
+          "`text_colour:` or `text_color:`: " <>
+          @color_forms <>
+          ", or `:color`, the label's own colour, when not given."
+    ]
+  ]
+
   # `geom_label/3`'s options, validated at the call.
   @label_options NimbleOptions.new!(
                    [
@@ -1351,45 +1392,7 @@ defmodule Giggly.Plot.Options do
                    ] ++
                      @text_style_options ++
                      @nudge_options ++
-                     [
-                       label_padding: [
-                         type: {:custom, __MODULE__, :validate_label_padding, []},
-                         default: {0.25, :lines},
-                         doc:
-                           "The room round every label's text inside its box: one length for " <>
-                             "every side, or a keyword list of `:top`, `:right`, `:bottom` and " <>
-                             "`:left`, a side left out 0; each a number of points or " <>
-                             "`{amount, unit}` with a unit of `:pt`, `:cm`, `:mm`, `:in` or " <>
-                             "`:lines`, lines of the label's own text. The text sits the " <>
-                             "bottom's padding above the box's bottom, its descent within it, " <>
-                             "and the top's is at least the descent."
-                       ],
-                       label_r: [
-                         type: {:custom, __MODULE__, :validate_label_r, []},
-                         default: {0.15, :lines},
-                         doc:
-                           "The radius of every label's box's corners, a length as " <>
-                             "`label_padding:` takes one; 0 for square corners."
-                       ],
-                       border_color: [
-                         type: {:custom, __MODULE__, :validate_own_color, []},
-                         default: :color,
-                         doc:
-                           "The colour of every label's border apart from its text, written " <>
-                             "`border_colour:` or `border_color:`: " <>
-                             @color_forms <>
-                             ", or `:color`, the label's own colour, when not given."
-                       ],
-                       text_color: [
-                         type: {:custom, __MODULE__, :validate_own_color, []},
-                         default: :color,
-                         doc:
-                           "The colour of every label's text apart from its border, written " <>
-                             "`text_colour:` or `text_color:`: " <>
-                             @color_forms <>
-                             ", or `:color`, the label's own colour, when not given."
-                       ]
-                     ]
+                     @label_box_options
                  )
 
   @rect_color_option [
@@ -1546,7 +1549,7 @@ defmodule Giggly.Plot.Options do
                     linewidth: @annotation_linewidth,
                     linetype: @annotation_linetype
                   ] ++ @rug_drawing_options
-  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :rect]
+  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :label, :rect]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
     col: NimbleOptions.new!(@bar_annotation),
@@ -1565,6 +1568,19 @@ defmodule Giggly.Plot.Options do
           alpha: @annotation_alpha,
           color: @annotation_color
         ] ++ @text_style_options
+      ),
+    label:
+      NimbleOptions.new!(
+        [
+          x: @annotation_position,
+          y: @annotation_position,
+          label: @annotation_label,
+          alpha: @annotation_alpha,
+          color: @annotation_color,
+          fill: @annotation_color,
+          linewidth: @annotation_linewidth,
+          linetype: @annotation_linetype
+        ] ++ @text_style_options ++ @label_box_options
       ),
     rect:
       NimbleOptions.new!(
