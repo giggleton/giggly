@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
+  "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
+  draws its `mean_cl_boot` intervals differently on every run, that Giggly draws them from
+  `seed:`, and how far an end moves, in mpg and in points, measured over 500 seeds in R and in
+  Giggly, whose averages and spreads agree; each bootstrap example says in a line that its ends
+  differ by sampling, and one whose axis differs gives its own points. Giggly's cells write a bare
+  `:mean_cl_boot`, as R's give no seed. The drawing check has R draw Giggly's ends through a
+  summary function, as `test/golden/summary_boot.R` does, so everything else is R's. *Rejected:
+  the full statement at every example* — three repeats of one measurement. *Rejected: the first
+  example alone* — the horizontal and Hmisc examples, read on their own, would not say it.
+
 - **`mean_cl_boot` draws its resamples from a `seed:` in its tuple, each position afresh
   (2026-11-01, Steve: "go").** `{:mean_cl_boot, seed: 7}`, 0 unless given, any integer, as
   `position_jitter(seed:)` holds the seed of what it draws; `resamples:` is R's `B` (1000).
@@ -3818,6 +3829,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
+  still waits (summaries, step 6, the notebook sweep); §4: "A bootstrap example states its
+  departure once", "The summaries are not public functions"
 - 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"

@@ -33,10 +33,11 @@ Dodging keeps each mark's vertical position and sets the marks that share an `x`
 each mark by its own extent and leaving a little padding between them, which suits box plots of
 different widths. `width` gives the width to dodge within, for marks narrower than the bars they sit
 beside, and `preserve` keeps either the total width at each position or the width of each mark.
-Giggly dodges bars and histograms as `position = "dodge"` does, with `position: :dodge`, which has
-no options, and bars, histograms and box plots as `position_dodge2()` does, with `position: :dodge2`
-or `Giggly.Plot.position_dodge2/1` and its `preserve:`, `padding:` and `reverse:`. Not in Giggly
-yet: `position_dodge()`'s options and `position_dodge2()`'s `width` option. The setup cell binds R's
+Giggly dodges bars, histograms and the range geoms as `position_dodge()` does, with
+`position: :dodge` or `Giggly.Plot.position_dodge/1` and its `width:`, and bars, histograms and box
+plots as `position_dodge2()` does, with `position: :dodge2` or `Giggly.Plot.position_dodge2/1` and
+its `preserve:`, `padding:` and `reverse:`. Not in Giggly yet: `position_dodge()`'s `preserve`,
+`orientation` and `reverse` options, and `position_dodge2()`'s `width` option. The setup cell binds R's
 `mtcars` and ggplot2's `mpg` and `diamonds`, `Giggly.Datasets.mtcars/0`, `Giggly.Datasets.mpg/0` and
 `Giggly.Datasets.diamonds/0`, to their names in R.
 
@@ -144,9 +145,16 @@ p + geom_linerange(aes(ymin = y - 1, ymax = y + 1), position = "dodge")
 ```
 
 With no width to dodge within, the line ranges are not moved apart, and do not sit on their
-columns.
+columns. Giggly writes `y - 1` as `{&Kernel.-/2, [:y, 1]}` and `y + 1` as
+`{&Kernel.+/2, [:y, 1]}`.
 
-Not in Giggly yet: line ranges and `geom_linerange()`.
+```elixir
+range = %{ymin: {&Kernel.-/2, [:y, 1]}, ymax: {&Kernel.+/2, [:y, 1]}}
+
+p
+|> Plot.geom_linerange(range, position: :dodge)
+|> render.()
+```
 
 ## Giving the width
 
@@ -160,7 +168,11 @@ p + geom_linerange(
 
 Dodged within 0.9, the width the columns take, each line range sits on its column.
 
-Not in Giggly yet: `geom_linerange()` and `position_dodge()`'s options.
+```elixir
+p
+|> Plot.geom_linerange(range, position: Plot.position_dodge(width: 0.9))
+|> render.()
+```
 
 ## Error bars
 
@@ -182,8 +194,17 @@ p + geom_errorbar(
 `"dodge"` sets the error bars side by side within their own width, 0.2, so they huddle at the
 middle of each `x`; dodged within 0.9, each sits on its column.
 
-Not in Giggly yet: error bars, `geom_errorbar()` and its `width` option, and `position_dodge()`'s
-options.
+```elixir
+p
+|> Plot.geom_errorbar(range, width: 0.2, position: :dodge)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_errorbar(range, width: 0.2, position: Plot.position_dodge(width: 0.9))
+|> render.()
+```
 
 ## Box plots
 

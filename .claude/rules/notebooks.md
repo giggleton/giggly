@@ -54,7 +54,10 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   than R's within the same distance of their places, which the jitter notebooks' About says, with
   how far an axis widened to hold them may move, and so does each other notebook at its first
   jittered example, which a drawing check makes R draw with Giggly's own distances (the entry
-  beginning "A jitter's distances are Erlang's").
+  beginning "A jitter's distances are Erlang's"); a bootstrap interval, drawn from Giggly's seed
+  where R's example sets none, is said once in the About, with how far an end moves over many
+  seeds, and in a line at each bootstrap example, which a drawing check makes R draw with
+  Giggly's ends (the entry beginning "A bootstrap example states its departure once").
 - **A colour is written as Giggly takes it**: a ggplot2 example's colour name keeps its name with
   CSS's meaning, and the prose notes where the drawing differs from R's (CSS's `"green"` is
   `#008000`, R's `#00FF00`); a name only R has is written as its hex, naming R's colour (`"grey50"`
